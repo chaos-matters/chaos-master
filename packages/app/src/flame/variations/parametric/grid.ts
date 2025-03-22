@@ -9,7 +9,8 @@ export const GridParams = struct({
 })
 export const grid = parametricVariation(
   GridParams,
-  /* wgsl */ `(_pos: vec2f, P: GridParams) -> vec2f {
+  /* wgsl */ `
+  (_pos: vec2f, _varInfo: VariationInfo, P: GridParams) -> vec2f {
     let D = P.jitterNearIntersectionsDistance;
     let divs = select(P.divisions, 1, random() > 0.8);
     let pos = P.size * (2 * vec2f(random(), random()) - 1);

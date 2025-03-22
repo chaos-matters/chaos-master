@@ -4,7 +4,12 @@ import {
   TransformVariationDescriptor,
   transformVariations,
 } from './variations/index'
-import { AffineParams, Point, transformAffine } from './variations/types'
+import {
+  AffineParams,
+  Point,
+  transformAffine,
+  VariationInfo,
+} from './variations/types'
 import tgpu from 'typegpu'
 import { sum } from '@/utils/sum'
 
@@ -41,11 +46,9 @@ function variationUniforms(name: TransformVariation) {
 function variationInvocation(name: TransformVariation, j: number) {
   switch (transformVariations[name].type) {
     case 'simple':
-      return `${name}(pre)`
-    case 'dependent':
-      return `${name}(pre, uniforms.preAffine)`
+      return `${name}(pre, VariationInfo(uniforms.variation${j}.weight, uniforms.preAffine))`
     case 'parametric':
-      return `${name}(pre, uniforms.variation${j}.params)`
+      return `${name}(pre, VariationInfo(uniforms.variation${j}.weight, uniforms.preAffine), uniforms.variation${j}.params)`
   }
 }
 
@@ -67,8 +70,8 @@ export function createFlameWgsl({
         var p = vec2f(0);
         ${variations
           .map(
-            ({ type }, j) =>
-              /* wgsl */ `p += uniforms.variation${j}.weight * ${variationInvocation(type, j)};`,
+            ({ type }, j) => /* wgsl */ `
+              p += uniforms.variation${j}.weight * ${variationInvocation(type, j)};`,
           )
           .join('\n')}
         p = transformAffine(uniforms.postAffine, p);
@@ -82,6 +85,7 @@ export function createFlameWgsl({
       ...Object.fromEntries(
         variations.map((v) => [v.type, transformVariations[v.type].fn]),
       ),
+      VariationInfo,
     })
   return {
     Uniforms,

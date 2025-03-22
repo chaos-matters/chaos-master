@@ -9,7 +9,7 @@ export const PdjParams = struct({
 })
 export const pdjVar = parametricVariation(
   PdjParams,
-  /* wgsl */ `(pos: vec2f, P: PdjParams) -> vec2f {
+  /* wgsl */ `(pos: vec2f, _varInfo: VariationInfo, P: PdjParams) -> vec2f {
     let p1 = P.a;
     let p2 = P.b;
     let p3 = P.c;

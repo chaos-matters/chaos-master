@@ -9,7 +9,7 @@ export const FanParams = struct({
 export const fan2 = parametricVariation(
   FanParams,
   /* wgsl */ `
-  (pos: vec2f, P: FanParams) -> vec2f {
+  (pos: vec2f, _varInfo: VariationInfo, P: FanParams) -> vec2f {
     let p1 = PI * P.x * P.x;
     let p2 = P.y; 
     let theta = atan2(pos.y, pos.x);

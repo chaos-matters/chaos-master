@@ -10,7 +10,7 @@ export const PieParams = struct({
 })
 export const pie = parametricVariation(
   PieParams,
-  /* wgsl */ `(_pos: vec2f, P: PieParams) -> vec2f {
+  /* wgsl */ `(_pos: vec2f, _varInfo: VariationInfo, P: PieParams) -> vec2f {
     let p1 = P.slices;
     let p2 = P.rotation;
     let p3 = P.thickness;
