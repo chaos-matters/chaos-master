@@ -28,7 +28,7 @@ import { Plus } from './icons/Plus'
 import { ExampleID, examples } from './flame/examples'
 import { Modal, useRequestModal } from './components/Modal/Modal'
 import { sum } from './utils/sum'
-import { isVariationType } from '@/flame/variations'
+import { isParametricType, isVariationType } from '@/flame/variations'
 import { FlameColorEditor } from './components/FlameColorEditor/FlameColorEditor'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
 import {
@@ -37,6 +37,8 @@ import {
 } from './utils/jsonQueryParam'
 import { FlameFunction } from './flame/flameFunction'
 import { SoftwareVersion } from './components/SoftwareVersion/SoftwareVersion'
+import { getParamsEditor } from './flame/variations/parametric'
+import { Dynamic } from 'solid-js/web'
 
 const { navigator } = window
 
@@ -262,48 +264,70 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               </label>
               <For each={flame.variations}>
                 {(variation, j) => (
-                  <label class={ui.labeledInput}>
-                    <span>
-                      {' '}
-                      Weight
-                      <input
-                        class="var-input-type"
-                        type="text"
-                        width="40px"
-                        value={variation.type}
-                        onInput={(ev) => {
-                          if (isVariationType(ev.target.value)) {
+                  <>
+                    <label class={ui.labeledInput}>
+                      <span>
+                        {' '}
+                        Weight
+                        <input
+                          class="var-input-type"
+                          type="text"
+                          width="40px"
+                          value={variation.type}
+                          onInput={(ev) => {
+                            if (isVariationType(ev.target.value)) {
+                              setFlameFunctions(
+                                i(),
+                                'variations',
+                                j(),
+                                'type',
+                                ev.target.value,
+                              )
+                            }
+                          }}
+                        />
+                      </span>
+                      <span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={1}
+                          step={0.001}
+                          value={variation.weight}
+                          onInput={(ev) => {
                             setFlameFunctions(
                               i(),
                               'variations',
                               j(),
-                              'type',
-                              ev.target.value,
+                              'weight',
+                              ev.target.valueAsNumber,
                             )
-                          }
-                        }}
-                      />
-                    </span>
-                    <span>
-                      <input
-                        type="range"
-                        min={0}
-                        max={1}
-                        step={0.001}
-                        value={variation.weight}
-                        onInput={(ev) => {
-                          setFlameFunctions(
-                            i(),
-                            'variations',
-                            j(),
-                            'weight',
-                            ev.target.valueAsNumber,
-                          )
-                        }}
-                      />
-                      {(100 * variation.weight).toFixed(1)} %
-                    </span>
-                  </label>
+                          }}
+                        />
+                        {(100 * variation.weight).toFixed(1)} %
+                      </span>
+                    </label>
+                    <Show when={isParametricType(variation) && variation} keyed>
+                      {(variation) => (
+                        <Dynamic
+                          {...getParamsEditor(variation)}
+                          setValue={(value) => {
+                            setFlameFunctions(
+                              i(),
+                              'variations',
+                              j(),
+                              produce((draft) => {
+                                if (!isParametricType(draft)) {
+                                  throw new Error(`Unreachable code`)
+                                }
+                                draft.params = value
+                              }),
+                            )
+                          }}
+                        />
+                      )}
+                    </Show>
+                  </>
                 )}
               </For>
             </Card>
@@ -320,7 +344,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                     color: vec2f(),
                     preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
                     postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-                    variations: [{ type: 'heart', weight: 1 }],
+                    variations: [{ type: 'linear', weight: 1 }],
                   })
                 }),
               )
