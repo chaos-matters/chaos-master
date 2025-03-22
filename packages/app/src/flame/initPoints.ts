@@ -7,7 +7,7 @@ import tgpu, {
   TgpuRoot,
 } from 'typegpu'
 import { arrayOf, WgslArray } from 'typegpu/data'
-import { Point } from './variations/types'
+import { Point, VariationInfo } from './variations/types'
 import { ComputeUniforms } from './ifsPipeline'
 import { PI } from './constants'
 
@@ -47,6 +47,7 @@ export function createInitPointsPipeline(
       random,
       hash,
       PI,
+      VariationInfo: VariationInfo,
     }}
 
     @compute @workgroup_size(${INIT_GROUP_SIZE}, 1, 1) fn computeSomething(
