@@ -44,13 +44,13 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
   const [outerIters, setOuterIters] = createSignal(1)
   const [skipIters, setSkipIters] = createSignal(15)
   const [pointCount, setPointCount] = createSignal(1e6)
-  const [exposure, setExposure] = createSignal(0.1)
+  const [exposure, setExposure] = createSignal(0.25)
   const [drawMode, setDrawMode] = createSignal(lightMode)
   const [backgroundColor, setBackgroundColor] = createSignal(vec3f(0, 0, 0))
   const [adaptiveFilterEnabled, setAdaptiveFilterEnabled] = createSignal(true)
   const [showSidebar, setShowSidebar] = createSignal(true)
   const [flameFunctions, setFlameFunctions] = createStore(
-    structuredClone(props.flameFromQuery ?? examples.blobFlame),
+    structuredClone(props.flameFromQuery ?? examples.example1),
   )
   const totalProbability = createMemo(() =>
     sum(flameFunctions.map((f) => f.probability)),
