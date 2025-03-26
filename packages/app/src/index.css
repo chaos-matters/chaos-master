@@ -5,10 +5,10 @@ body {
   margin: 0;
   overflow: hidden;
   overscroll-behavior: none;
-  font-family: Inter;
   background-color: black;
 }
 
 * {
   box-sizing: border-box;
+  font-family: Inter;
 }

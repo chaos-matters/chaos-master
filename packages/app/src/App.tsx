@@ -18,7 +18,7 @@ import {
   MAX_OUTER_ITERS,
   MAX_POINT_COUNT,
 } from './flame/Flam3'
-import { vec2f, vec3f } from 'typegpu/data'
+import { vec3f } from 'typegpu/data'
 import { hexToRgbNorm } from './utils/hexToRgb'
 import { lightMode, paintMode } from './flame/drawMode'
 import { Card } from './components/ControlCard/ControlCard'
@@ -32,6 +32,7 @@ import { isParametricType, isVariationType } from '@/flame/variations'
 import { FlameColorEditor } from './components/FlameColorEditor/FlameColorEditor'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
 import {
+  compressJsonQueryParam,
   decodeJsonQueryParam,
   encodeJsonQueryParam,
 } from './utils/jsonQueryParam'
@@ -39,6 +40,7 @@ import { FlameFunction } from './flame/flameFunction'
 import { SoftwareVersion } from './components/SoftwareVersion/SoftwareVersion'
 import { getParamsEditor } from './flame/variations/parametric'
 import { Dynamic } from 'solid-js/web'
+import { addFlameDataToPng, extractFlameFromPng } from './utils/flameInPng'
 
 const { navigator } = window
 
@@ -270,7 +272,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                         {' '}
                         Weight
                         <input
-                          class="var-input-type"
+                          class={ui.varInputType}
                           type="text"
                           width="40px"
                           value={variation.type}
@@ -341,7 +343,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                 produce((flames) => {
                   flames.push({
                     probability: 0.1,
-                    color: vec2f(),
+                    color: { x: 0, y: 0 },
                     preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
                     postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
                     variations: [{ type: 'linear', weight: 1 }],
@@ -362,11 +364,19 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               if (!(canvas instanceof HTMLCanvasElement)) {
                 return
               }
-              const fileURL = canvas.toDataURL()
-              const downloadLink = document.createElement('a')
-              downloadLink.href = fileURL
-              downloadLink.download = 'flame.png'
-              downloadLink.click()
+              canvas.toBlob(async (blob) => {
+                if (!blob) return
+                const imgData = await blob.arrayBuffer()
+                const pngBytes = new Uint8Array(imgData)
+                const encodedFlames =
+                  await compressJsonQueryParam(flameFunctions)
+                const imgExtData = addFlameDataToPng(encodedFlames, pngBytes)
+                const fileUrlExt = URL.createObjectURL(imgExtData)
+                const downloadLink = document.createElement('a')
+                downloadLink.href = fileUrlExt
+                downloadLink.download = 'flame.png'
+                downloadLink.click()
+              })
             }}
           >
             Export PNG
@@ -390,6 +400,35 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
           >
             Share Link
           </button>
+        </Card>
+        <Card class={ui.addFlameCard}>
+          <label class={ui.addFlameButton}>
+            Load Flame From Image
+            <input
+              id="png-files"
+              class={ui.loadImageType}
+              type="file"
+              accept="image/png"
+              onChange={(ev) => {
+                const file = ev.target.files?.item(0)
+                if (file && file.type == 'image/png') {
+                  const reader = new FileReader()
+                  reader.onload = async (e) => {
+                    const fr = e.target
+                    const arrBuf = new Uint8Array(fr?.result as ArrayBuffer)
+                    const newFlameFunctions = await extractFlameFromPng(arrBuf)
+                    setFlameFunctions(structuredClone(newFlameFunctions))
+                  }
+                  reader.onerror = function () {
+                    console.warn(reader.error)
+                  }
+                  reader.readAsArrayBuffer(file)
+                  // reset target value so same file can be reuploaded
+                  ev.target.value = ''
+                }
+              }}
+            />
+          </label>
         </Card>
       </div>
       <Root adapterOptions={{ powerPreference: 'high-performance' }}>

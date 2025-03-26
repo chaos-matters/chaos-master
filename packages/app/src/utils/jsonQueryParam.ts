@@ -4,7 +4,7 @@ import { sum } from './sum'
 
 const format: CompressionFormat = 'deflate'
 
-function concatBuffers(buffers: Uint8Array[]) {
+export function concatBuffers(buffers: Uint8Array[]): Uint8Array {
   const totalLength = sum(buffers.map((b) => b.length))
   const result = new Uint8Array(totalLength)
   let i = 0
@@ -15,7 +15,7 @@ function concatBuffers(buffers: Uint8Array[]) {
   return result
 }
 
-export async function encodeJsonQueryParam(obj: unknown) {
+export async function compressJsonQueryParam(obj: unknown) {
   const encoder = new TextEncoderStream()
   const compress = new CompressionStream(format)
   const writer = encoder.writable.getWriter()
@@ -28,16 +28,21 @@ export async function encodeJsonQueryParam(obj: unknown) {
   for await (const chunk of compress.readable) {
     chunks.push(chunk)
   }
-  return encodeBase64(concatBuffers(chunks), { pad: '' })
+  return concatBuffers(chunks)
 }
 
-export async function decodeJsonQueryParam(param: string) {
+export async function encodeJsonQueryParam(obj: unknown) {
+  const compressedQuery = await compressJsonQueryParam(obj)
+  return encodeBase64(compressedQuery, { pad: '' })
+}
+
+export async function decompressJsonQuery(compressedBytes: Uint8Array) {
   const decompress = new DecompressionStream(format)
   const decoder = new TextDecoderStream()
   const writer = decompress.writable.getWriter()
 
   decompress.readable.pipeTo(decoder.writable).catch(console.error)
-  await writer.write(decodeBase64(param))
+  await writer.write(compressedBytes)
   await writer.close()
 
   const chunks = []
@@ -47,4 +52,8 @@ export async function decodeJsonQueryParam(param: string) {
 
   // TODO: use valibot or something to validate this
   return JSON.parse(chunks.join()) as FlameFunction[]
+}
+
+export async function decodeJsonQueryParam(param: string) {
+  return decompressJsonQuery(decodeBase64(param))
 }
