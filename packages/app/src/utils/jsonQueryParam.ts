@@ -20,7 +20,7 @@ export async function encodeJsonQueryParam(obj: unknown) {
   const compress = new CompressionStream(format)
   const writer = encoder.writable.getWriter()
 
-  await encoder.readable.pipeTo(compress.writable)
+  encoder.readable.pipeTo(compress.writable).catch(console.error)
   await writer.write(JSON.stringify(obj))
   await writer.close()
 
@@ -36,7 +36,7 @@ export async function decodeJsonQueryParam(param: string) {
   const decoder = new TextDecoderStream()
   const writer = decompress.writable.getWriter()
 
-  await decompress.readable.pipeTo(decoder.writable)
+  decompress.readable.pipeTo(decoder.writable).catch(console.error)
   await writer.write(decodeBase64(param))
   await writer.close()
 
