@@ -1,0 +1,11 @@
+{
+  "editor.formatOnSave": true,
+  "editor.tabSize": 2,
+  "editor.detectIndentation": false,
+  "editor.linkedEditing": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "emmet.excludeLanguages": ["typescriptreact"],
+  "typescript.tsdk": "node_modules/typescript/lib"
+}

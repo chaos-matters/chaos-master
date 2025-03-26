@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "PolyMeilex.wgsl",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "ggsimm.wgsl-literal"
+  ]
+}

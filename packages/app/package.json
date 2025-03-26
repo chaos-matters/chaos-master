@@ -1,0 +1,22 @@
+{
+  "name": "chaos-master",
+  "version": "0.1.0",
+  "description": "WebGPU based IFS Flame Generator for Artists & Explorers",
+  "type": "module",
+  "scripts": {
+    "start": "vite",
+    "build": "vite build",
+    "serve": "vite preview",
+    "fmt": "prettier src"
+  },
+  "license": "AGPL-3.0-only",
+  "dependencies": {
+    "solid-js": "1.9.5",
+    "typegpu": "0.5.2",
+    "wgpu-matrix": "3.4.0"
+  },
+  "devDependencies": {
+    "@webgpu/types": "^0.1.59",
+    "vite-plugin-solid": "^2.11.0"
+  }
+}

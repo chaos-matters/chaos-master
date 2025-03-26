@@ -1,0 +1,26 @@
+{
+  "name": "chaos-master-monorepo",
+  "type": "module",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "packageManager": "pnpm@10.4.1",
+  "devDependencies": {
+    "@eslint/js": "^9.23.0",
+    "eslint": "^9.23.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.28.0",
+    "typescript-plugin-css-modules": "^5.1.0",
+    "vite": "^6.2.3",
+    "vite-plugin-mkcert": "^1.17.8"
+  },
+  "pnpm": {
+    "ignoredBuiltDependencies": [
+      "@parcel/watcher",
+      "esbuild"
+    ],
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
