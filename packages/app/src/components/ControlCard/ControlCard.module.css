@@ -1,0 +1,26 @@
+.container {
+  position: relative;
+  padding: 0.15rem;
+  user-select: none;
+
+  &::before {
+    content: '';
+    position: absolute;
+    border-radius: 1.2rem;
+    inset: 0;
+    backdrop-filter: blur(1rem) saturate(300%) brightness(2) contrast(0.8);
+    z-index: -1;
+  }
+}
+
+.content {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  justify-items: start;
+  padding: 1rem;
+  gap: 1rem;
+  background-color: #000a;
+  border-radius: 1rem;
+  font-variant-numeric: tabular-nums;
+}

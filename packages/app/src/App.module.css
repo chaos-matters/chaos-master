@@ -1,0 +1,99 @@
+.fullscreen {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.canvas-container {
+  flex: 1 1 0;
+  min-height: 0;
+  user-select: none;
+}
+
+.canvas {
+  image-rendering: pixelated;
+}
+
+.labeled-input {
+  display: contents;
+}
+
+.sidebar {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  max-width: 40%;
+  padding: 1rem;
+  /* turn off padding towards the flame so it can be clickable there */
+  padding-right: 0;
+  gap: 0.5rem;
+  max-height: 100%;
+  overflow-y: auto;
+  transition: translate 250ms;
+  color: white;
+
+  &:not(.show) {
+    translate: -100%;
+  }
+}
+
+.var-input-type {
+  max-width: 4px;
+  width: 70%;
+  border-radius: 8px;
+}
+
+.add-flame-card.add-flame-card {
+  display: flex;
+  padding: 0;
+  align-items: stretch;
+  flex-direction: column;
+
+  &:hover {
+    background: none;
+  }
+}
+
+.add-flame-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  appearance: none;
+  border: none;
+  background: none;
+  height: 4rem;
+  padding: 1rem;
+  color: currentColor;
+  cursor: pointer;
+  opacity: 0.5;
+
+  &:hover {
+    opacity: 1;
+  }
+
+  & > svg {
+    height: 24px;
+  }
+}
+
+.delete-flame-button {
+  border: none;
+  border-radius: 100vh;
+  position: absolute;
+  top: 0.2rem;
+  right: 0.2rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  color: white;
+  cursor: pointer;
+
+  &:hover {
+    color: white;
+  }
+}

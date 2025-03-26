@@ -39,8 +39,8 @@ importers:
         specifier: 1.9.5
         version: 1.9.5
       typegpu:
-        specifier: 0.5.2
-        version: 0.5.2
+        specifier: 0.4.6
+        version: 0.4.6
       wgpu-matrix:
         specifier: 3.4.0
         version: 3.4.0
@@ -1394,8 +1394,8 @@ packages:
   typed-binary@4.3.2:
     resolution: {integrity: sha512-HT3pIBM2njCZUmeczDaQUUErGiM6GXFCqMsHegE12HCoBtvHCkfR10JJni0TeGOTnLilTd6YFyj+YhflqQDrDQ==}
 
-  typegpu@0.5.2:
-    resolution: {integrity: sha512-UVZdR/mtC82d4whUXKeHPJnc0UBucEK16kzSHvlKqTGpE5/eiZB5AnlrJmEshSZO0tPTLo0XpR5HK42TSwNzYA==}
+  typegpu@0.4.6:
+    resolution: {integrity: sha512-goTO4JTYLfe7SIQ2lFrxiju1Ap/WBxWUihE7V3BOxqfi7Bick8tFZdwSjw+QAxw7h4NaAqzqlPIY0pdte4LawA==}
     engines: {node: '>=12.20.0'}
 
   typescript-eslint@8.28.0:
@@ -2788,7 +2788,7 @@ snapshots:
 
   typed-binary@4.3.2: {}
 
-  typegpu@0.5.2:
+  typegpu@0.4.6:
     dependencies:
       tinyest: 0.1.0-alpha.6
       typed-binary: 4.3.2

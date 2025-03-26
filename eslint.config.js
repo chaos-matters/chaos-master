@@ -4,7 +4,6 @@ import tseslint from 'typescript-eslint'
 export default tseslint.config(
   eslint.configs.recommended,
   tseslint.configs.strictTypeChecked,
-  tseslint.configs.stylistic,
   {
     languageOptions: {
       parserOptions: {
@@ -16,6 +15,21 @@ export default tseslint.config(
   },
   {
     rules: {
+      'no-console': ['error', { allow: ['info', 'warn', 'error'] }],
+
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+          destructuredArrayIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+        },
+      ],
+      '@typescript-eslint/no-misused-promises': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/restrict-template-expressions': 'off',
+
       'no-restricted-globals': [
         'error',
         'blur',

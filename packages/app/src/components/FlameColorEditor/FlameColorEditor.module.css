@@ -1,0 +1,48 @@
+.editor-card {
+  display: grid;
+  grid-template-areas: 'overlap';
+  border-radius: 1rem;
+  overflow: hidden;
+  min-height: 25vh;
+
+  & > * {
+    grid-area: overlap;
+  }
+}
+
+.canvas {
+  image-rendering: pixelated;
+}
+
+.svg {
+  width: 100%;
+  height: 100%;
+}
+
+.handle {
+  cursor: grab;
+  filter: drop-shadow(0 1px 2px black);
+
+  &:hover:not(:active) .handle-circle {
+    r: 0.4rem;
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.handle-circle {
+  r: 0.3rem;
+  fill: oklab(0.7 var(--a) var(--b));
+  stroke: white;
+  stroke-width: 1px;
+  transition: r 250ms;
+}
+
+.handle-circle-grab-area {
+  r: 0.6rem;
+  fill: transparent;
+  /* otherwise transparent fill is not hoverable */
+  pointer-events: all;
+}

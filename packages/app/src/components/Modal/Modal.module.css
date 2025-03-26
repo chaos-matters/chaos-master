@@ -1,0 +1,43 @@
+.modal {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  gap: 1rem;
+  border-radius: 1rem;
+  border: 2px solid gray;
+  max-width: 30rem;
+  animation: 200ms appear;
+  white-space: break-spaces;
+  background-color: black;
+}
+
+::backdrop {
+  backdrop-filter: brightness(50%) blur(10px);
+  animation: 500ms appear;
+}
+
+.title {
+  font-size: large;
+  color: white;
+}
+
+.message {
+  color: white;
+}
+
+.options {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 3.25rem;
+}
+
+@keyframes appear {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}

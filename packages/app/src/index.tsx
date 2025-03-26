@@ -2,6 +2,7 @@
 import { render } from 'solid-js/web'
 
 import './index.css'
+import { Wrappers } from './App'
 
 const root = document.getElementById('root')
 
@@ -15,4 +16,4 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
   )
 }
 
-render(() => <div>Hello world!</div>, root)
+render(() => <Wrappers />, root)
