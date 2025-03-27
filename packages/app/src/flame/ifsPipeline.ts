@@ -51,11 +51,12 @@ export function createIFSPipeline(
       uniform: ComputeUniforms,
     },
     flameUniforms: {
-      uniform: FlameUniforms,
+      storage: FlameUniforms,
+      access: 'readonly',
     },
   })
 
-  const flameUniformsBuffer = root.createBuffer(FlameUniforms).$usage('uniform')
+  const flameUniformsBuffer = root.createBuffer(FlameUniforms).$usage('storage')
 
   const bindGroup = root.createBindGroup(bindGroupLayout, {
     points,

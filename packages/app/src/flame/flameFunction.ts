@@ -1,4 +1,4 @@
-import { align, f32, struct, vec2f } from 'typegpu/data'
+import { f32, struct, vec2f } from 'typegpu/data'
 import {
   TransformVariation,
   TransformVariationDescriptor,
@@ -17,25 +17,25 @@ export type FlameFunction = {
 }
 
 const FlameUniformsBase = struct({
-  probability: align(16, f32),
-  preAffine: align(16, AffineParams),
-  postAffine: align(16, AffineParams),
-  color: align(16, vec2f),
-})
+  probability: f32,
+  preAffine: AffineParams,
+  postAffine: AffineParams,
+  color: vec2f,
+}).$name('FlameUniformsBase')
 
-const VariantUniforms = struct({
-  weight: align(16, f32),
-})
+const VariantUniformsBase = struct({
+  weight: f32,
+}).$name('VariantUniformsBase')
 
 function variationUniforms(name: TransformVariation) {
   const tf = transformVariations[name]
   if (tf.type === 'parametric') {
     return struct({
-      ...VariantUniforms.propTypes,
-      params: align(16, tf.paramShema),
-    })
+      ...VariantUniformsBase.propTypes,
+      params: tf.paramShema,
+    }).$name(`VariationUniforms_${name}`)
   }
-  return VariantUniforms
+  return VariantUniformsBase
 }
 
 function variationInvocation(name: TransformVariation, j: number) {
@@ -57,7 +57,7 @@ export function createFlameWgsl({
     ...Object.fromEntries(
       variations.map((v, j) => [`variation${j}`, variationUniforms(v.type)]),
     ),
-  })
+  }).$name(`FlameUniforms`)
   const fnImpl = tgpu['~unstable']
     .fn([Point, Uniforms], Point)
     .does(
