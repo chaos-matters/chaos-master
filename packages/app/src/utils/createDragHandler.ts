@@ -87,8 +87,8 @@ export function createDragHandler(
     }
 
     document.addEventListener('pointermove', onPointerMove_)
-    document.addEventListener('pointerup', onPointerUp_, { once: true })
-    document.addEventListener('pointercancel', onPointerUp_, { once: true })
+    document.addEventListener('pointerup', onPointerUp_)
+    document.addEventListener('pointercancel', onPointerUp_)
     document.addEventListener('click', preventDefaultIfMoved, {
       once: true,
       capture: true,

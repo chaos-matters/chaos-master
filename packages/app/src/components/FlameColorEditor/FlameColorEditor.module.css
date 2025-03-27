@@ -4,6 +4,7 @@
   border-radius: 1rem;
   overflow: hidden;
   min-height: 25vh;
+  touch-action: none;
 
   & > * {
     grid-area: overlap;
