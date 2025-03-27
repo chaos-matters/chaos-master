@@ -1,0 +1,12 @@
+.version {
+  position: absolute;
+  color: #fff5;
+  padding-inline: 0.5rem;
+  padding-block: 0.25rem;
+  line-height: 1;
+  right: 0;
+  bottom: 0;
+  font-size: small;
+  border-top-left-radius: 0.5rem;
+  background-color: #000d;
+}

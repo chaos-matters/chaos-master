@@ -36,6 +36,7 @@ import {
   encodeJsonQueryParam,
 } from './utils/jsonQueryParam'
 import { FlameFunction } from './flame/flameFunction'
+import { SoftwareVersion } from './components/SoftwareVersion/SoftwareVersion'
 
 const { navigator } = window
 
@@ -383,6 +384,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
           </WheelZoomCamera2D>
         </AutoCanvas>
       </Root>
+      <SoftwareVersion />
     </div>
   )
 }
