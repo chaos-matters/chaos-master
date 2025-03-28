@@ -8,7 +8,8 @@ export const BlobParams = struct({
 })
 export const blob = parametricVariation(
   BlobParams,
-  /* wgsl */ `(pos: vec2f, P: BlobParams) -> vec2f {
+  /* wgsl */ `
+  (pos: vec2f, _varInfo: VariationInfo, P: BlobParams) -> vec2f {
     let p1 = P.high;
     let p2 = P.low;
     let p3 = P.waves;

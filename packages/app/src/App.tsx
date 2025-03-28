@@ -320,7 +320,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                     color: vec2f(),
                     preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
                     postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-                    variations: [{ type: 'heart', weight: 1 }],
+                    variations: [{ type: 'linear', weight: 1 }],
                   })
                 }),
               )
