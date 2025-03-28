@@ -353,7 +353,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
             class={ui.addFlameButton}
             onClick={async () => {
               const encoded = await encodeJsonQueryParam(flameFunctions)
-              const url = `${window.location.origin}?flame=${encoded}`
+              const url = `${window.location.origin}/?flame=${encoded}`
               await navigator.clipboard.writeText(url)
               await requestModal({
                 title: 'Flame URL copied to clipboard!',
