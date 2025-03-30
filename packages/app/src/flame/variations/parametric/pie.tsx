@@ -1,12 +1,11 @@
-import { struct, f32, Infer } from 'typegpu/data'
-import { PI } from '../../constants'
-import { random } from '@/shaders/random'
-import {
-  EditorFor,
-  editorProps,
-} from '@/components/variationParamEditors/types'
-import { parametricVariation } from '../types'
+import { f32, struct } from 'typegpu/data'
 import { RangeEditor } from '@/components/variationParamEditors/RangeEditor'
+import { editorProps } from '@/components/variationParamEditors/types'
+import { random } from '@/shaders/random'
+import { PI } from '../../constants'
+import { parametricVariation } from '../types'
+import type { Infer } from 'typegpu/data'
+import type { EditorFor } from '@/components/variationParamEditors/types'
 
 export const PieParams = struct({
   slices: f32,

@@ -1,5 +1,5 @@
-import { EditorProps } from './types'
 import ui from './RangeEditor.module.css'
+import type { EditorProps } from './types'
 
 const { ceil, log10 } = Math
 

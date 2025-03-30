@@ -1,4 +1,4 @@
-import { onCleanup, createEffect, createSignal } from 'solid-js'
+import { createEffect, createSignal, onCleanup } from 'solid-js'
 
 function createAbortOnCleanup() {
   const ctrl = new AbortController()

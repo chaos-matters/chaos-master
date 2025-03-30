@@ -1,11 +1,10 @@
-import { f32, Infer, struct } from 'typegpu/data'
-import { parametricVariation } from '../types'
-import { PI } from '@/flame/constants'
-import {
-  EditorFor,
-  editorProps,
-} from '@/components/variationParamEditors/types'
+import { f32, struct } from 'typegpu/data'
 import { RangeEditor } from '@/components/variationParamEditors/RangeEditor'
+import { editorProps } from '@/components/variationParamEditors/types'
+import { PI } from '@/flame/constants'
+import { parametricVariation } from '../types'
+import type { Infer } from 'typegpu/data'
+import type { EditorFor } from '@/components/variationParamEditors/types'
 
 const NgonParams = struct({
   // some of those could be ints

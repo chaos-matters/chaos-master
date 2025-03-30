@@ -1,6 +1,6 @@
-import { FlameFunction } from '@/flame/flameFunction'
 import { decodeBase64, encodeBase64 } from './base64'
 import { sum } from './sum'
+import type { FlameFunction } from '@/flame/flameFunction'
 
 const format: CompressionFormat = 'deflate'
 

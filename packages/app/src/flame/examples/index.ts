@@ -1,16 +1,16 @@
-import { FlameFunction } from '../flameFunction'
+import { blobFlame } from './blobFlame'
 import { empty } from './empty'
 import { example1 } from './example1'
-import { varTest } from '@/flame/examples/varTest'
-import { blobFlame } from '@/flame/examples/blobFlame'
-import { pdjFlame } from './pdjFlame'
 import { fan2Flame } from './fan2'
 import { juliaNFlame } from './juliaNFlame'
-import { perspectiveFlame } from './perspectiveFlame'
 import { juliaNScopeFlame } from './juliaNScopeFlame'
-import { rings2Flame } from './rings2'
-import { radialBlurFlame } from './radialBlurFlame'
 import { ngonFlame } from './ngonFlame'
+import { pdjFlame } from './pdjFlame'
+import { perspectiveFlame } from './perspectiveFlame'
+import { radialBlurFlame } from './radialBlurFlame'
+import { rings2Flame } from './rings2'
+import { varTest } from './varTest'
+import type { FlameFunction } from '../flameFunction'
 
 export const examples = {
   varTest,

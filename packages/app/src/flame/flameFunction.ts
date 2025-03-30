@@ -1,17 +1,17 @@
+import { tgpu } from 'typegpu'
 import { f32, struct, vec2f } from 'typegpu/data'
-import {
-  TransformVariation,
-  TransformVariationDescriptor,
-  transformVariations,
-} from './variations/index'
+import { sum } from '@/utils/sum'
+import { transformVariations } from './variations'
 import {
   AffineParams,
   Point,
   transformAffine,
   VariationInfo,
 } from './variations/types'
-import tgpu from 'typegpu'
-import { sum } from '@/utils/sum'
+import type {
+  TransformVariation,
+  TransformVariationDescriptor,
+} from './variations'
 
 export type FlameFunction = {
   probability: number

@@ -1,10 +1,12 @@
-import { f32, mat3x3f, mat4x4f, struct, v2f, vec2f, vec3f } from 'typegpu/data'
-import tgpu from 'typegpu'
+import { createMemo } from 'solid-js'
+import { tgpu } from 'typegpu'
+import { f32, mat3x3f, mat4x4f, struct, vec2f, vec3f } from 'typegpu/data'
+import { mat3, mat4, vec3 } from 'wgpu-matrix'
 import { CameraContextProvider } from './CameraContext'
-import { createMemo, ParentProps } from 'solid-js'
 import { useCanvas } from './CanvasContext'
 import { useRootContext } from './RootContext'
-import { mat3, mat4, vec3 } from 'wgpu-matrix'
+import type { ParentProps } from 'solid-js'
+import type { v2f } from 'typegpu/data'
 
 export const Camera2DUniforms = struct({
   viewMatrix: mat3x3f,

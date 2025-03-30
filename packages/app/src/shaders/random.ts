@@ -1,4 +1,4 @@
-import tgpu from 'typegpu'
+import { tgpu } from 'typegpu'
 import { f32, u32, vec4u } from 'typegpu/data'
 
 export const randomState = tgpu['~unstable'].privateVar(

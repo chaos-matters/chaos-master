@@ -4,6 +4,8 @@
   border-radius: 1rem;
   overflow: hidden;
   min-height: 25vh;
+
+  /* allow pointer events to act correctly on touch devices */
   touch-action: none;
 
   & > * {

@@ -1,6 +1,3 @@
-import ui from './App.module.css'
-import { AutoCanvas } from './lib/AutoCanvas'
-import { Root } from './lib/Root'
 import {
   createEffect,
   createMemo,
@@ -11,36 +8,40 @@ import {
   Show,
   Suspense,
 } from 'solid-js'
-import { WheelZoomCamera2D } from './lib/WheelZoomCamera2D'
+import { createStore, produce } from 'solid-js/store'
+import { Dynamic } from 'solid-js/web'
+import { vec3f } from 'typegpu/data'
+import ui from './App.module.css'
+import { AffineEditor } from './components/AffineEditor/AffineEditor'
+import { Card } from './components/ControlCard/ControlCard'
+import { FlameColorEditor } from './components/FlameColorEditor/FlameColorEditor'
+import { Modal, useRequestModal } from './components/Modal/Modal'
+import { SoftwareVersion } from './components/SoftwareVersion/SoftwareVersion'
+import { lightMode, paintMode } from './flame/drawMode'
+import { examples } from './flame/examples'
 import {
   Flam3,
   MAX_INNER_ITERS,
   MAX_OUTER_ITERS,
   MAX_POINT_COUNT,
 } from './flame/Flam3'
-import { vec3f } from 'typegpu/data'
-import { hexToRgbNorm } from './utils/hexToRgb'
-import { lightMode, paintMode } from './flame/drawMode'
-import { Card } from './components/ControlCard/ControlCard'
-import { createStore, produce } from 'solid-js/store'
+import { isParametricType, isVariationType } from './flame/variations'
+import { getParamsEditor } from './flame/variations/parametric'
 import { Cross } from './icons/Cross'
 import { Plus } from './icons/Plus'
-import { ExampleID, examples } from './flame/examples'
-import { Modal, useRequestModal } from './components/Modal/Modal'
-import { sum } from './utils/sum'
-import { isParametricType, isVariationType } from '@/flame/variations'
-import { FlameColorEditor } from './components/FlameColorEditor/FlameColorEditor'
-import { AffineEditor } from './components/AffineEditor/AffineEditor'
+import { AutoCanvas } from './lib/AutoCanvas'
+import { Root } from './lib/Root'
+import { WheelZoomCamera2D } from './lib/WheelZoomCamera2D'
+import { addFlameDataToPng, extractFlameFromPng } from './utils/flameInPng'
+import { hexToRgbNorm } from './utils/hexToRgb'
 import {
   compressJsonQueryParam,
   decodeJsonQueryParam,
   encodeJsonQueryParam,
 } from './utils/jsonQueryParam'
-import { FlameFunction } from './flame/flameFunction'
-import { SoftwareVersion } from './components/SoftwareVersion/SoftwareVersion'
-import { getParamsEditor } from './flame/variations/parametric'
-import { Dynamic } from 'solid-js/web'
-import { addFlameDataToPng, extractFlameFromPng } from './utils/flameInPng'
+import { sum } from './utils/sum'
+import type { ExampleID } from './flame/examples'
+import type { FlameFunction } from './flame/flameFunction'
 
 const { navigator } = window
 
@@ -411,7 +412,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               accept="image/png"
               onChange={(ev) => {
                 const file = ev.target.files?.item(0)
-                if (file && file.type == 'image/png') {
+                if (file && file.type === 'image/png') {
                   const reader = new FileReader()
                   reader.onload = async (e) => {
                     const fr = e.target
@@ -456,7 +457,7 @@ export function Wrappers() {
   const [flameFromQuery] = createResource(async () => {
     const param = new URLSearchParams(window.location.search)
     const flameDef = param.get('flame')
-    if (flameDef) {
+    if (flameDef !== null) {
       try {
         return await decodeJsonQueryParam(flameDef)
       } catch (ex) {

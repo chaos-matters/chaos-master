@@ -1,8 +1,8 @@
 import { createContext, createSignal, For, onMount, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
+import { useContextSafe } from '@/utils/useContextSafe'
 import ui from './Modal.module.css'
 import type { JSX, ParentProps } from 'solid-js'
-import { useContextSafe } from '@/utils/useContextSafe'
 
 export type ModalConfig<T extends string> = {
   title: string | (() => JSX.Element)

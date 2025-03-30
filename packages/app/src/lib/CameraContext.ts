@@ -1,7 +1,8 @@
-import { Accessor, createContext } from 'solid-js'
+import { createContext } from 'solid-js'
 import { useContextSafe } from '@/utils/useContextSafe'
-import { TgpuBindGroup, TgpuBindGroupLayout, TgpuFn } from 'typegpu'
-import { F32, v2f, Vec2f } from 'typegpu/data'
+import type { Accessor } from 'solid-js'
+import type { TgpuBindGroup, TgpuBindGroupLayout, TgpuFn } from 'typegpu'
+import type { F32, v2f, Vec2f } from 'typegpu/data'
 
 export type CameraContext = {
   update: () => void

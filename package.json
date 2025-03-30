@@ -4,9 +4,17 @@
   "private": true,
   "license": "AGPL-3.0-only",
   "packageManager": "pnpm@10.4.1",
+  "scripts": {
+    "fmt": "prettier packages --check",
+    "lint": "eslint"
+  },
   "devDependencies": {
     "@eslint/js": "^9.23.0",
+    "@typescript-eslint/parser": "^8.28.0",
     "eslint": "^9.23.0",
+    "eslint-import-resolver-typescript": "^4.3.1",
+    "eslint-plugin-import-x": "^4.9.4",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
     "jsdom": "^26.0.0",
     "prettier": "^3.5.3",
     "typescript": "^5.8.2",

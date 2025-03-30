@@ -1,9 +1,11 @@
-import { wgsl } from '@/utils/wgsl'
-import tgpu, { LayoutEntryToInput, TgpuRoot } from 'typegpu'
+import { tgpu } from 'typegpu'
+import { f32, struct } from 'typegpu/data'
 import { alphaBlend } from '@/utils/blendModes'
-import { f32, struct, v3f } from 'typegpu/data'
+import { wgsl } from '@/utils/wgsl'
 import { gamutClipPreserveChroma } from './oklab'
-import { DrawModeFn } from './drawMode'
+import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
+import type { v3f } from 'typegpu/data'
+import type { DrawModeFn } from './drawMode'
 
 export const ColorGradingUniforms = struct({
   accumulatedIterationCount: f32,

@@ -1,21 +1,13 @@
+import { tgpu } from 'typegpu'
+import { arrayOf, struct, vec4u } from 'typegpu/data'
 import { hash, random, randomState, setSeed } from '@/shaders/random'
-import { wgsl } from '@/utils/wgsl'
-import tgpu, { StorageFlag, TgpuBuffer, TgpuRoot, UniformFlag } from 'typegpu'
-import {
-  arrayOf,
-  struct,
-  Vec4u,
-  vec4u,
-  WgslArray,
-  WgslStruct,
-} from 'typegpu/data'
-import { AffineParams, Point, transformAffine } from './variations/types'
-import {
-  createFlameWgsl,
-  extractFlameUniforms,
-  FlameFunction,
-} from './flameFunction'
 import { range } from '@/utils/range'
+import { wgsl } from '@/utils/wgsl'
+import { createFlameWgsl, extractFlameUniforms } from './flameFunction'
+import { AffineParams, Point, transformAffine } from './variations/types'
+import type { StorageFlag, TgpuBuffer, TgpuRoot, UniformFlag } from 'typegpu'
+import type { Vec4u, WgslArray, WgslStruct } from 'typegpu/data'
+import type { FlameFunction } from './flameFunction'
 
 const { ceil } = Math
 const IFS_GROUP_SIZE = 16

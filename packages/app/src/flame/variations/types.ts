@@ -1,14 +1,8 @@
-import { EditorFor } from '@/components/variationParamEditors/types'
-import tgpu, { TgpuFn } from 'typegpu'
-import {
-  AnyWgslData,
-  f32,
-  Infer,
-  struct,
-  Vec2f,
-  vec2f,
-  vec4u,
-} from 'typegpu/data'
+import { tgpu } from 'typegpu'
+import { f32, struct, vec2f, vec4u } from 'typegpu/data'
+import type { TgpuFn } from 'typegpu'
+import type { AnyWgslData, Infer, Vec2f } from 'typegpu/data'
+import type { EditorFor } from '@/components/variationParamEditors/types'
 
 export type AffineParams = Infer<typeof AffineParams>
 // prettier-ignore

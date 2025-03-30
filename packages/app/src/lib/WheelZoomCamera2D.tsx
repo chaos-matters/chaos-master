@@ -1,20 +1,21 @@
+import {
+  batch,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  untrack,
+} from 'solid-js'
+import { vec2f } from 'typegpu/data'
+import { clamp } from 'typegpu/std'
+import { vec2 } from 'wgpu-matrix'
 import { Camera2D } from '@/lib/Camera2D'
 import { useCamera } from '@/lib/CameraContext'
 import { useCanvas } from '@/lib/CanvasContext'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'
-import {
-  ParentProps,
-  createSignal,
-  batch,
-  createEffect,
-  onCleanup,
-  untrack,
-  createMemo,
-} from 'solid-js'
-import { vec2f, v2f } from 'typegpu/data'
-import { clamp } from 'typegpu/std'
-import { vec2 } from 'wgpu-matrix'
+import type { ParentProps } from 'solid-js'
+import type { v2f } from 'typegpu/data'
 
 type WheelZoomCamera2DProps = {
   initZoom?: number

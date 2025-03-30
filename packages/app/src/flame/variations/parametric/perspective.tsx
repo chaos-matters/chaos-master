@@ -1,10 +1,9 @@
-import {
-  EditorFor,
-  editorProps,
-} from '@/components/variationParamEditors/types'
-import { parametricVariation } from '../types'
-import { struct, f32, Infer } from 'typegpu/data'
+import { f32, struct } from 'typegpu/data'
 import { RangeEditor } from '@/components/variationParamEditors/RangeEditor'
+import { editorProps } from '@/components/variationParamEditors/types'
+import { parametricVariation } from '../types'
+import type { Infer } from 'typegpu/data'
+import type { EditorFor } from '@/components/variationParamEditors/types'
 
 export const PerspectiveParams = struct({
   angle: f32,
