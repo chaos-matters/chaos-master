@@ -1,4 +1,4 @@
-import tgpu from 'typegpu'
+import { tgpu } from 'typegpu'
 import { f32, struct, vec3f } from 'typegpu/data'
 
 const cbrt = tgpu['~unstable']

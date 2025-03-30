@@ -1,11 +1,29 @@
 import eslint from '@eslint/js'
+import tsParser from '@typescript-eslint/parser'
+import importX from 'eslint-plugin-import-x'
+import simpleImportSort from 'eslint-plugin-simple-import-sort'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
+  {
+    ignores: [
+      '**/*.css.d.ts',
+      '**/coverage',
+      '**/dist',
+      '**/node_modules',
+      '**/.pnpm-store', // present in CI
+    ],
+  },
+  importX.flatConfigs.recommended,
+  importX.flatConfigs.typescript,
   eslint.configs.recommended,
   tseslint.configs.strictTypeChecked,
   {
+    plugins: {
+      'simple-import-sort': simpleImportSort,
+    },
     languageOptions: {
+      parser: tsParser,
       parserOptions: {
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
@@ -14,7 +32,20 @@ export default tseslint.config(
   },
   {
     rules: {
+      'import-x/consistent-type-specifier-style': 'error',
+      'import-x/newline-after-import': 'error',
+      'import-x/no-duplicates': 'error',
+      'import-x/no-empty-named-blocks': 'error',
+      'import-x/no-named-as-default': 'error',
+      'import-x/no-useless-path-segments': 'error',
+      'import-x/no-named-as-default-member': 'off',
+      'import-x/no-unresolved': 'off', // TODO: figure out how to resolve @/ imports
+
       'no-console': ['error', { allow: ['info', 'warn', 'error'] }],
+      'no-throw-literal': 'error',
+      'no-useless-concat': 'error',
+      'prefer-template': 'error',
+      eqeqeq: 'error',
 
       '@typescript-eslint/no-unused-vars': [
         'error',
@@ -25,6 +56,8 @@ export default tseslint.config(
           varsIgnorePattern: '^_',
         },
       ],
+      '@typescript-eslint/consistent-type-imports': 'error',
+      '@typescript-eslint/strict-boolean-expressions': 'error',
       '@typescript-eslint/no-misused-promises': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/restrict-template-expressions': 'off',
@@ -33,6 +66,39 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
+
+      'padding-line-between-statements': [
+        'error',
+        {
+          blankLine: 'always',
+          prev: '*',
+          next: 'function',
+        },
+      ],
+
+      'simple-import-sort/imports': [
+        'error',
+        {
+          groups: [
+            [
+              // Side effect imports.
+              '^\\u0000',
+              // Packages.
+              // Things that start with a letter (or digit or underscore), or `@` followed by a letter.
+              '^@?\\w',
+              // Absolute imports and other imports such as `@/foo`.
+              // Anything not matched in another group.
+              '^',
+              // Relative imports.
+              // Anything that starts with a dot.
+              '^\\.',
+              // Type imports: first packages, then everything else
+              '^@?\\w.*\\u0000$',
+              '^.*\\u0000$',
+            ],
+          ],
+        },
+      ],
 
       'no-restricted-globals': [
         'error',

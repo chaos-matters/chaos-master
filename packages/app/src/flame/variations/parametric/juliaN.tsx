@@ -1,12 +1,11 @@
-import { f32, struct, Infer } from 'typegpu/data'
-import { parametricVariation } from '../types'
-import { random } from '@/shaders/random'
-import { PI } from '@/flame/constants'
-import {
-  EditorFor,
-  editorProps,
-} from '@/components/variationParamEditors/types'
+import { f32, struct } from 'typegpu/data'
 import { RangeEditor } from '@/components/variationParamEditors/RangeEditor'
+import { editorProps } from '@/components/variationParamEditors/types'
+import { PI } from '@/flame/constants'
+import { random } from '@/shaders/random'
+import { parametricVariation } from '../types'
+import type { Infer } from 'typegpu/data'
+import type { EditorFor } from '@/components/variationParamEditors/types'
 
 export const JuliaNParams = struct({
   power: f32,

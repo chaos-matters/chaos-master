@@ -1,4 +1,13 @@
-import { onCleanup, createEffect, createMemo } from 'solid-js'
+import { createEffect, createMemo, onCleanup } from 'solid-js'
+import { arrayOf, vec2f, vec4f, vec4u } from 'typegpu/data'
+import { clamp } from 'typegpu/std'
+import { randomVec4u } from '@/utils/randomVec4u'
+import { usePointer } from '@/utils/usePointer'
+import { useCamera } from '../lib/CameraContext'
+import { useCanvas } from '../lib/CanvasContext'
+import { useRootContext } from '../lib/RootContext'
+import { createAnimationFrame } from '../utils/createAnimationFrame'
+import { createBlurPipeline } from './blurPipeline'
 import {
   ColorGradingUniforms,
   createColorGradingPipeline,
@@ -6,18 +15,10 @@ import {
 import { ComputeUniforms, createIFSPipeline } from './ifsPipeline'
 import { createInitPointsPipeline } from './initPoints'
 import { createRenderPointsPipeline } from './renderPoints'
-import { Point, outputTextureFormat } from './variations/types'
-import { useCamera } from '../lib/CameraContext'
-import { useCanvas } from '../lib/CanvasContext'
-import { useRootContext } from '../lib/RootContext'
-import { createAnimationFrame } from '../utils/createAnimationFrame'
-import { arrayOf, v3f, vec2f, vec4f, vec4u } from 'typegpu/data'
-import { DrawModeFn } from './drawMode'
-import { usePointer } from '@/utils/usePointer'
-import { clamp } from 'typegpu/std'
-import { createBlurPipeline } from './blurPipeline'
-import { FlameFunction } from './flameFunction'
-import { randomVec4u } from '@/utils/randomVec4u'
+import { outputTextureFormat, Point } from './variations/types'
+import type { v3f } from 'typegpu/data'
+import type { DrawModeFn } from './drawMode'
+import type { FlameFunction } from './flameFunction'
 
 export const MAX_POINT_COUNT = 4e6
 export const MAX_OUTER_ITERS = 15

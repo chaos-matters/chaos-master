@@ -15,7 +15,7 @@ const CHUNK_HEADER_SIZE_IN_BYTES =
 // zTXt type specifies compressed PNG Latin-1 text
 const ztxtTypeBytes = new Uint8Array([0x7a, 0x54, 0x58, 0x74])
 // convert key to ASCII and add null separator
-const keywordBytes = new TextEncoder().encode(CHUNK_KEY_STRING + '\0')
+const keywordBytes = new TextEncoder().encode(`${CHUNK_KEY_STRING}\0`)
 // compression method (0 for deflate)
 const compressionMethod = new Uint8Array([CHUNK_COMPRESSION_DEFLATE])
 

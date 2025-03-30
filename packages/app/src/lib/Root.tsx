@@ -1,6 +1,8 @@
-import { createResource, onCleanup, ParentProps, Show } from 'solid-js'
-import { tgpu, TgpuRoot } from 'typegpu'
+import { createResource, onCleanup, Show } from 'solid-js'
+import { tgpu } from 'typegpu'
 import { RootContextProvider } from './RootContext'
+import type { ParentProps } from 'solid-js'
+import type { TgpuRoot } from 'typegpu'
 
 const { navigator } = window
 

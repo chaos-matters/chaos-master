@@ -1,4 +1,4 @@
-import tgpu from 'typegpu'
+import { tgpu } from 'typegpu'
 
 type Wgsl = Parameters<typeof tgpu.resolve>['0']['externals']
 
@@ -21,7 +21,7 @@ export function wgsl(
   }
   return tgpu.resolve({
     template: stringParts.join(''),
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
     externals: Object.assign({}, ...externals),
   })
 }

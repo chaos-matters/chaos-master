@@ -1,5 +1,6 @@
-import { v2f, vec2f } from 'typegpu/data'
+import { vec2f } from 'typegpu/data'
 import { vec2 } from 'wgpu-matrix'
+import type { v2f } from 'typegpu/data'
 
 export function maxLength2(v: v2f, maxLength: number) {
   const length = vec2.length(v)

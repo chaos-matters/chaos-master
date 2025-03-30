@@ -1,7 +1,9 @@
-import { createEffect, createSignal, ParentProps, Show } from 'solid-js'
-import { ElementSize, useElementSize } from '@/utils/useElementSize'
+import { createEffect, createSignal, Show } from 'solid-js'
+import { useElementSize } from '@/utils/useElementSize'
 import { CanvasContextProvider } from './CanvasContext'
 import { useRootContext } from './RootContext'
+import type { ParentProps } from 'solid-js'
+import type { ElementSize } from '@/utils/useElementSize'
 
 const { navigator } = window
 

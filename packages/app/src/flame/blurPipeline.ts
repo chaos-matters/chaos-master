@@ -1,5 +1,6 @@
+import { tgpu } from 'typegpu'
 import { wgsl } from '@/utils/wgsl'
-import tgpu, { LayoutEntryToInput, TgpuRoot } from 'typegpu'
+import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 
 const GROUP_SIZE_X = 8
 const GROUP_SIZE_Y = 4

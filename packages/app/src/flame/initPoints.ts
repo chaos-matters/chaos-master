@@ -1,15 +1,17 @@
+import { tgpu } from 'typegpu'
+import { arrayOf } from 'typegpu/data'
 import { hash, random, randomState, setSeed } from '@/shaders/random'
 import { wgsl } from '@/utils/wgsl'
-import tgpu, {
+import { PI } from './constants'
+import { ComputeUniforms } from './ifsPipeline'
+import { Point, VariationInfo } from './variations/types'
+import type {
   LayoutEntryToInput,
   StorageFlag,
   TgpuBuffer,
   TgpuRoot,
 } from 'typegpu'
-import { arrayOf, WgslArray } from 'typegpu/data'
-import { Point, VariationInfo } from './variations/types'
-import { ComputeUniforms } from './ifsPipeline'
-import { PI } from './constants'
+import type { WgslArray } from 'typegpu/data'
 
 const { ceil } = Math
 

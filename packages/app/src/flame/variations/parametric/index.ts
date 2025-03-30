@@ -1,5 +1,6 @@
-import { EditorFor } from '@/components/variationParamEditors/types'
-import { ParametricVariationDescriptor, transformVariations } from '..'
+import { transformVariations } from '..'
+import type { ParametricVariationDescriptor } from '..'
+import type { EditorFor } from '@/components/variationParamEditors/types'
 
 export function getParamsEditor<T extends ParametricVariationDescriptor>(
   variation: T,

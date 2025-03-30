@@ -1,5 +1,5 @@
-import { ParentProps } from 'solid-js'
 import ui from './ControlCard.module.css'
+import type { ParentProps } from 'solid-js'
 
 export function Card(props: ParentProps<{ class?: string }>) {
   return (
