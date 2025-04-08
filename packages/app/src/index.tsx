@@ -1,5 +1,6 @@
 /* @refresh reload */
 import { render } from 'solid-js/web'
+import { inject } from '@vercel/analytics'
 
 import './index.css'
 import { Wrappers } from './App'
@@ -17,3 +18,6 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
 }
 
 render(() => <Wrappers />, root)
+inject({
+  mode: import.meta.env.PROD ? 'production' : 'development',
+})

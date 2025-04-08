@@ -12,6 +12,7 @@
   },
   "license": "AGPL-3.0-only",
   "dependencies": {
+    "@vercel/analytics": "1.5.0",
     "solid-js": "1.9.5",
     "typegpu": "0.4.6",
     "wgpu-matrix": "3.4.0"
