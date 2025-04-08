@@ -8,7 +8,8 @@
     "fmt": "prettier src",
     "lint": "eslint src",
     "serve": "vite preview",
-    "start": "vite"
+    "start": "vite",
+    "test": "vitest"
   },
   "license": "AGPL-3.0-only",
   "dependencies": {
@@ -19,6 +20,7 @@
   },
   "devDependencies": {
     "@webgpu/types": "^0.1.59",
+    "jsdom": "^26.0.0",
     "vite-plugin-solid": "^2.11.0"
   }
 }
