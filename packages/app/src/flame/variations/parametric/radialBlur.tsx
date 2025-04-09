@@ -10,6 +10,10 @@ export const RadialBlurParams = struct({
   angle: f32,
 })
 
+export const RadialBlurParamsDefaults: Infer<typeof RadialBlurParams> = {
+  angle: Math.PI,
+}
+
 export const RadialBlurEditor: EditorFor<Infer<typeof RadialBlurParams>> = (
   props,
 ) => (
@@ -17,14 +21,15 @@ export const RadialBlurEditor: EditorFor<Infer<typeof RadialBlurParams>> = (
     <RangeEditor
       {...editorProps(props, 'angle', 'Angle')}
       min={0}
-      max={360}
-      step={0.1}
+      max={2 * Math.PI}
+      step={0.01}
     />
   </>
 )
 
 export const radialBlurVar = parametricVariation(
   RadialBlurParams,
+  RadialBlurParamsDefaults,
   RadialBlurEditor,
   /* wgsl */ `
   (pos: vec2f, varInfo: VariationInfo, P: RadialBlurParams) -> vec2f {

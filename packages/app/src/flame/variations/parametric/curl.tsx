@@ -10,17 +10,33 @@ export const CurlParams = struct({
   c2: f32,
 })
 
+export const CurlParamsDefaults: Infer<typeof CurlParams> = {
+  c1: 1,
+  c2: 1,
+}
+
 export const CurlParamsEditor: EditorFor<Infer<typeof CurlParams>> = (
   props,
 ) => (
   <>
-    <RangeEditor {...editorProps(props, 'c1', 'C1')} min={0} max={50} />
-    <RangeEditor {...editorProps(props, 'c2', 'C2,')} min={0} max={50} />
+    <RangeEditor
+      {...editorProps(props, 'c1', 'C1')}
+      min={0}
+      max={5}
+      step={0.001}
+    />
+    <RangeEditor
+      {...editorProps(props, 'c2', 'C2')}
+      min={0}
+      max={50}
+      step={1}
+    />
   </>
 )
 
 export const curlVar = parametricVariation(
   CurlParams,
+  CurlParamsDefaults,
   CurlParamsEditor,
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo, P: CurlParams) -> vec2f {

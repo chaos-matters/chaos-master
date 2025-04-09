@@ -12,17 +12,45 @@ export const PdjParams = struct({
   d: f32,
 })
 
+export const PdjParamsDefaults: Infer<typeof PdjParams> = {
+  a: 1,
+  b: 2,
+  c: 3,
+  d: 4,
+}
+
 export const PdjParamsEditor: EditorFor<Infer<typeof PdjParams>> = (props) => (
   <>
-    <RangeEditor {...editorProps(props, 'a', 'a')} min={0} max={100} step={1} />
-    <RangeEditor {...editorProps(props, 'b', 'b')} min={0} max={100} step={1} />
-    <RangeEditor {...editorProps(props, 'c', 'c')} min={0} max={100} step={1} />
-    <RangeEditor {...editorProps(props, 'd', 'd')} min={0} max={100} step={1} />
+    <RangeEditor
+      {...editorProps(props, 'a', 'a')}
+      min={1}
+      max={15}
+      step={0.1}
+    />
+    <RangeEditor
+      {...editorProps(props, 'b', 'b')}
+      min={1}
+      max={15}
+      step={0.1}
+    />
+    <RangeEditor
+      {...editorProps(props, 'c', 'c')}
+      min={1}
+      max={15}
+      step={0.1}
+    />
+    <RangeEditor
+      {...editorProps(props, 'd', 'd')}
+      min={1}
+      max={15}
+      step={0.1}
+    />
   </>
 )
 
 export const pdjVar = parametricVariation(
   PdjParams,
+  PdjParamsDefaults,
   PdjParamsEditor,
   /* wgsl */ `(pos: vec2f, _varInfo: VariationInfo, P: PdjParams) -> vec2f {
     let p1 = P.a;

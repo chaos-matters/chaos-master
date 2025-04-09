@@ -25,8 +25,15 @@ import {
   MAX_OUTER_ITERS,
   MAX_POINT_COUNT,
 } from './flame/Flam3'
-import { isParametricType, isVariationType } from './flame/variations'
-import { getParamsEditor } from './flame/variations/parametric'
+import {
+  isParametricType,
+  isVariationType,
+  variationTypes,
+} from './flame/variations'
+import {
+  getParamsEditor,
+  getVariationDefault,
+} from './flame/variations/parametric'
 import { Cross } from './icons/Cross'
 import { Plus } from './icons/Plus'
 import { AutoCanvas } from './lib/AutoCanvas'
@@ -270,25 +277,28 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                   <>
                     <label class={ui.labeledInput}>
                       <span>
-                        {' '}
-                        Weight
-                        <input
-                          class={ui.varInputType}
-                          type="text"
-                          width="40px"
+                        Weight{' '}
+                        <select
+                          id="ifs-variation-selector"
+                          class="border border-gray-300 rounded-md p-2 text-sm"
                           value={variation.type}
                           onInput={(ev) => {
-                            if (isVariationType(ev.target.value)) {
-                              setFlameFunctions(
-                                i(),
-                                'variations',
-                                j(),
-                                'type',
-                                ev.target.value,
-                              )
+                            const type = ev.target.value
+                            if (!isVariationType(type)) {
+                              return
                             }
+                            setFlameFunctions(
+                              i(),
+                              'variations',
+                              j(),
+                              getVariationDefault(type, variation.weight),
+                            )
                           }}
-                        />
+                        >
+                          {variationTypes.map((varName) => (
+                            <option value={varName}>{varName}</option>
+                          ))}
+                        </select>
                       </span>
                       <span>
                         <input

@@ -111,9 +111,12 @@ export const transformVariations = {
 export type TransformVariation = keyof typeof transformVariations
 export const variationTypes = Object.keys(transformVariations)
 
-export function isParametric(name: TransformVariation) {
+export function isParametric(
+  name: TransformVariation,
+): name is ParametricVariationDescriptor['type'] {
   return transformVariations[name].type === 'parametric'
 }
+
 export function isParametricType(
   v: TransformVariationDescriptor,
 ): v is Extract<TransformVariationDescriptor, { params: unknown }> {

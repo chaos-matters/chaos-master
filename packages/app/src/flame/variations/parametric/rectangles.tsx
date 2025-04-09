@@ -10,20 +10,24 @@ export const RectanglesParams = struct({
   y: f32,
 })
 
+export const RectanglesParamsDefaults: Infer<typeof RectanglesParams> = {
+  x: 2,
+  y: 4,
+}
 export const RectanglesParamsEditor: EditorFor<
   Infer<typeof RectanglesParams>
 > = (props) => (
   <>
     <RangeEditor
       {...editorProps(props, 'x', 'x')}
-      min={0}
-      max={125}
+      min={1}
+      max={20}
       step={0.1}
     />
     <RangeEditor
       {...editorProps(props, 'y', 'y')}
-      min={0}
-      max={125}
+      min={1}
+      max={20}
       step={0.1}
     />
   </>
@@ -31,6 +35,7 @@ export const RectanglesParamsEditor: EditorFor<
 
 export const rectanglesVar = parametricVariation(
   RectanglesParams,
+  RectanglesParamsDefaults,
   RectanglesParamsEditor,
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo, P: RectanglesParams) -> vec2f {

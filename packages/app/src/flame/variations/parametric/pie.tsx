@@ -13,31 +13,38 @@ export const PieParams = struct({
   thickness: f32,
 })
 
+export const PieParamsDefaults: Infer<typeof PieParams> = {
+  slices: 6,
+  rotation: Math.PI,
+  thickness: 1,
+}
+
 export const PieParamsEditor: EditorFor<Infer<typeof PieParams>> = (props) => (
   <>
     <RangeEditor
       {...editorProps(props, 'slices', 'Slices')}
-      min={0}
-      max={50}
-      step={0.1}
+      min={1}
+      max={200}
+      step={1}
     />
     <RangeEditor
       {...editorProps(props, 'rotation', 'Rotation')}
       min={0}
-      max={360}
-      step={0.1}
+      max={2 * Math.PI}
+      step={0.01}
     />
     <RangeEditor
       {...editorProps(props, 'thickness', 'Thickness')}
       min={0}
-      max={100}
-      step={1}
+      max={2 * Math.PI}
+      step={0.01}
     />
   </>
 )
 
 export const pie = parametricVariation(
   PieParams,
+  PieParamsDefaults,
   PieParamsEditor,
   /* wgsl */ `(_pos: vec2f, _varInfo: VariationInfo, P: PieParams) -> vec2f {
     let p1 = P.slices;
