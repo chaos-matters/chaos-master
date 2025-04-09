@@ -11,17 +11,33 @@ const Fan2Params = struct({
   y: f32,
 })
 
+export const Fan2ParamsDefaults: Infer<typeof Fan2Params> = {
+  x: 1,
+  y: 1,
+}
+
 export const Fan2ParamsEditor: EditorFor<Infer<typeof Fan2Params>> = (
   props,
 ) => (
   <>
-    <RangeEditor {...editorProps(props, 'x', 'X')} min={1} max={100} step={1} />
-    <RangeEditor {...editorProps(props, 'y', 'Y')} min={1} max={100} step={1} />
+    <RangeEditor
+      {...editorProps(props, 'x', 'X')}
+      min={0}
+      max={1}
+      step={0.01}
+    />
+    <RangeEditor
+      {...editorProps(props, 'y', 'Y')}
+      min={0}
+      max={1}
+      step={0.01}
+    />
   </>
 )
 
 export const fan2 = parametricVariation(
   Fan2Params,
+  Fan2ParamsDefaults,
   Fan2ParamsEditor,
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo, P: FanParams) -> vec2f {

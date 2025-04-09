@@ -10,7 +10,11 @@ export const BlobParams = struct({
   low: f32,
   waves: f32,
 })
-
+export const BlobParamsDefaults: Infer<typeof BlobParams> = {
+  high: 2,
+  low: 1,
+  waves: 1,
+}
 export const BlobParamsEditor: EditorFor<Infer<typeof BlobParams>> = (
   props,
 ) => (
@@ -23,12 +27,12 @@ export const BlobParamsEditor: EditorFor<Infer<typeof BlobParams>> = (
     <RangeEditor
       {...editorProps(props, 'high', 'High')}
       min={props.value.low}
-      max={10}
+      max={20}
     />
     <RangeEditor
       {...editorProps(props, 'waves', 'Waves')}
-      min={-5}
-      max={5}
+      min={-50}
+      max={50}
       step={1}
     />
   </>
@@ -36,6 +40,7 @@ export const BlobParamsEditor: EditorFor<Infer<typeof BlobParams>> = (
 
 export const blob = parametricVariation(
   BlobParams,
+  BlobParamsDefaults,
   BlobParamsEditor,
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo, P: BlobParams) -> vec2f {

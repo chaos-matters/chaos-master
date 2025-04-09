@@ -12,21 +12,27 @@ export const GridParams = struct({
   jitterNearIntersectionsDistance: f32,
 })
 
+export const GridParamsDefaults: Infer<typeof GridParams> = {
+  divisions: 4.0,
+  size: 1.0,
+  jitterNearIntersectionsDistance: 0.1,
+}
+
 export const GridParamsEditor: EditorFor<Infer<typeof GridParams>> = (
   props,
 ) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'divisions', 'division')}
+      {...editorProps(props, 'divisions', 'Divisions')}
       min={1}
-      max={100}
+      max={50}
       step={1}
     />
     <RangeEditor
       {...editorProps(props, 'size', 'Size')}
       min={1}
-      max={100}
-      step={1}
+      max={10}
+      step={0.1}
     />
     <RangeEditor
       {...editorProps(
@@ -34,15 +40,16 @@ export const GridParamsEditor: EditorFor<Infer<typeof GridParams>> = (
         'jitterNearIntersectionsDistance',
         'JitterNearIntersectionsDistance',
       )}
-      min={1}
-      max={100}
-      step={1}
+      min={0}
+      max={1}
+      step={0.001}
     />
   </>
 )
 
 export const grid = parametricVariation(
   GridParams,
+  GridParamsDefaults,
   GridParamsEditor,
   /* wgsl */ `
   (_pos: vec2f, _varInfo: VariationInfo, P: GridParams) -> vec2f {
