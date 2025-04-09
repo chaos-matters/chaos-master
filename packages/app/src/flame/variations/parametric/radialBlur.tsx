@@ -10,6 +10,10 @@ export const RadialBlurParams = struct({
   angle: f32,
 })
 
+export const RadialBlurParamsDefaults: Infer<typeof RadialBlurParams> = {
+  angle: 3.14,
+}
+
 export const RadialBlurEditor: EditorFor<Infer<typeof RadialBlurParams>> = (
   props,
 ) => (
@@ -25,6 +29,7 @@ export const RadialBlurEditor: EditorFor<Infer<typeof RadialBlurParams>> = (
 
 export const radialBlurVar = parametricVariation(
   RadialBlurParams,
+  RadialBlurParamsDefaults,
   RadialBlurEditor,
   /* wgsl */ `
   (pos: vec2f, varInfo: VariationInfo, P: RadialBlurParams) -> vec2f {

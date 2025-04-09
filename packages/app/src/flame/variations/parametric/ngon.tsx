@@ -14,6 +14,13 @@ const NgonParams = struct({
   circle: f32,
 })
 
+export const NgonParamsDefaults: Infer<typeof NgonParams> = {
+  power: 2,
+  sides: 3,
+  corners: 4,
+  circle: 4,
+}
+
 export const NgonParamsEditor: EditorFor<Infer<typeof NgonParams>> = (
   props,
 ) => (
@@ -47,6 +54,7 @@ export const NgonParamsEditor: EditorFor<Infer<typeof NgonParams>> = (
 
 export const ngonVar = parametricVariation(
   NgonParams,
+  NgonParamsDefaults,
   NgonParamsEditor,
   /* wgsl */ `
   (pos: vec2f, varInfo: VariationInfo, P: NgonParams) -> vec2f {

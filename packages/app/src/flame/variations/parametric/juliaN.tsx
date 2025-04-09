@@ -12,6 +12,11 @@ export const JuliaNParams = struct({
   dist: f32,
 })
 
+export const JuliaNParamsDefaults: Infer<typeof JuliaNParams> = {
+  power: 1,
+  dist: 5,
+}
+
 export const JuliaNParamsEditor: EditorFor<Infer<typeof JuliaNParams>> = (
   props,
 ) => (
@@ -33,6 +38,7 @@ export const JuliaNParamsEditor: EditorFor<Infer<typeof JuliaNParams>> = (
 
 export const juliaN = parametricVariation(
   JuliaNParams,
+  JuliaNParamsDefaults,
   JuliaNParamsEditor,
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo, P: JuliaNParams) -> vec2f {

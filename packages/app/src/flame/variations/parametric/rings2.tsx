@@ -9,6 +9,10 @@ export const Rings2Params = struct({
   val: f32,
 })
 
+export const Rings2ParamsDefaults: Infer<typeof Rings2Params> = {
+  val: 6,
+}
+
 export const Rings2ParamsEditor: EditorFor<Infer<typeof Rings2Params>> = (
   props,
 ) => (
@@ -24,6 +28,7 @@ export const Rings2ParamsEditor: EditorFor<Infer<typeof Rings2Params>> = (
 
 export const rings2 = parametricVariation(
   Rings2Params,
+  Rings2ParamsDefaults,
   Rings2ParamsEditor,
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo, P: RingsParams) -> vec2f {

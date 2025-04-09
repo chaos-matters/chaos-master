@@ -25,8 +25,16 @@ import {
   MAX_OUTER_ITERS,
   MAX_POINT_COUNT,
 } from './flame/Flam3'
-import { isParametricType, isVariationType } from './flame/variations'
-import { getParamsEditor } from './flame/variations/parametric'
+import {
+  isParametric,
+  isParametricType,
+  isVariationType,
+  variationTypes,
+} from './flame/variations'
+import {
+  getParamsDefaults,
+  getParamsEditor,
+} from './flame/variations/parametric'
 import { Cross } from './icons/Cross'
 import { Plus } from './icons/Plus'
 import { AutoCanvas } from './lib/AutoCanvas'
@@ -42,6 +50,7 @@ import {
 import { sum } from './utils/sum'
 import type { ExampleID } from './flame/examples'
 import type { FlameFunction } from './flame/flameFunction'
+import type { TransformVariationDescriptor } from './flame/variations'
 
 const { navigator } = window
 
@@ -272,13 +281,21 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                       <span>
                         {' '}
                         Weight
-                        <input
-                          class={ui.varInputType}
-                          type="text"
-                          width="40px"
+                        <select
+                          id="ifs-variation-selector"
+                          class="border border-gray-300 rounded-md p-2 text-sm"
                           value={variation.type}
                           onInput={(ev) => {
-                            if (isVariationType(ev.target.value)) {
+                            if (
+                              isVariationType(ev.target.value) &&
+                              isParametric(ev.target.value)
+                            ) {
+                              setFlameFunctions(i(), 'variations', j(), {
+                                type: ev.target.value,
+                                weight: variation.weight,
+                                params: getParamsDefaults(ev.target.value),
+                              } as TransformVariationDescriptor)
+                            } else if (isVariationType(ev.target.value)) {
                               setFlameFunctions(
                                 i(),
                                 'variations',
@@ -288,7 +305,11 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                               )
                             }
                           }}
-                        />
+                        >
+                          {variationTypes.map((varName) => (
+                            <option value={varName}>{varName}</option>
+                          ))}
+                        </select>
                       </span>
                       <span>
                         <input
