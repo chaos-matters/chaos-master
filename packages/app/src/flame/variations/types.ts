@@ -25,6 +25,7 @@ export type SimpleVariation = {
 export type ParametricVariation<T extends AnyWgslData> = {
   type: 'parametric'
   paramShema: T
+  paramDefaults: Infer<T>
   editor: EditorFor<Infer<T>> | undefined
   fn: TgpuFn<[Vec2f, typeof VariationInfo, T], Vec2f>
 }
@@ -42,12 +43,14 @@ export const simpleVariation = (
 
 export const parametricVariation = <T extends AnyWgslData>(
   paramShema: T,
+  paramDefaults: Infer<T>,
   editor: EditorFor<Infer<T>> | undefined,
   wgsl: string,
   dependencyMap: Record<string, unknown> = {},
 ): ParametricVariation<T> => ({
   type: 'parametric',
   paramShema,
+  paramDefaults,
   editor,
   fn: tgpu['~unstable']
     .fn([vec2f, VariationInfo, paramShema], vec2f)

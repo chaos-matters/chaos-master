@@ -10,6 +10,11 @@ export const PerspectiveParams = struct({
   dist: f32,
 })
 
+export const PerspectiveParamsDefaults: Infer<typeof PerspectiveParams> = {
+  angle: 3.14,
+  dist: 3,
+}
+
 export const PerspectiveParamsEditor: EditorFor<
   Infer<typeof PerspectiveParams>
 > = (props) => (
@@ -31,6 +36,7 @@ export const PerspectiveParamsEditor: EditorFor<
 
 export const perspective = parametricVariation(
   PerspectiveParams,
+  PerspectiveParamsDefaults,
   PerspectiveParamsEditor,
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo, P: PerspectiveParams) -> vec2f {

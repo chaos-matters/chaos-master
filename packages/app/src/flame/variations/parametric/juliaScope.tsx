@@ -1,16 +1,21 @@
 import { f32, struct } from 'typegpu/data'
 import { RangeEditor } from '@/components/variationParamEditors/RangeEditor'
-import { editorProps } from '@/components/variationParamEditors/types'
+import {editorProps } from '@/components/variationParamEditors/types'
 import { PI } from '@/flame/constants'
+import { parametricVariation } from '@/flame/variations/types'
 import { random } from '@/shaders/random'
-import { parametricVariation } from '../types'
-import type { Infer } from 'typegpu/data'
-import type { EditorFor } from '@/components/variationParamEditors/types'
+import type { Infer} from 'typegpu/data';
+import type {   EditorFor} from '@/components/variationParamEditors/types';
 
 export const JuliaScopeParams = struct({
   power: f32,
   dist: f32,
 })
+
+export const JuliaScopeParamsDefaults: Infer<typeof JuliaScopeParams> = {
+  power: 1,
+  dist: 5,
+}
 
 export const JuliaScopeParamsEditor: EditorFor<
   Infer<typeof JuliaScopeParams>
@@ -33,6 +38,7 @@ export const JuliaScopeParamsEditor: EditorFor<
 
 export const juliaScope = parametricVariation(
   JuliaScopeParams,
+  JuliaScopeParamsDefaults,
   JuliaScopeParamsEditor,
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo, P: JuliaScopeParams) -> vec2f {

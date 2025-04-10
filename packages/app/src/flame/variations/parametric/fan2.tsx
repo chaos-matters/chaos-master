@@ -11,6 +11,11 @@ const Fan2Params = struct({
   y: f32,
 })
 
+export const Fan2ParamsDefaults: Infer<typeof Fan2Params> = {
+  x: 1,
+  y: 1,
+}
+
 export const Fan2ParamsEditor: EditorFor<Infer<typeof Fan2Params>> = (
   props,
 ) => (
@@ -22,6 +27,7 @@ export const Fan2ParamsEditor: EditorFor<Infer<typeof Fan2Params>> = (
 
 export const fan2 = parametricVariation(
   Fan2Params,
+  Fan2ParamsDefaults,
   Fan2ParamsEditor,
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo, P: FanParams) -> vec2f {
