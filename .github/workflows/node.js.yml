@@ -1,0 +1,44 @@
+
+name: Chaos-Master CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [22.x]
+
+    steps:
+    - name: ⬇️ Checkout code
+      uses: actions/checkout@v4
+
+    - name: 💾 Install pnpm
+      run: npm install -g pnpm   
+      
+    - name: 🔧 Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'pnpm'
+        
+    - name: 📦 Install all dependencies
+      run: pnpm install
+
+    - name: 🧹 Lint code
+      run: pnpm lint
+      
+    - name: 🧪 Run tests
+      run: pnpm --filter chaos-master run test
+      
+    - name: 🛠️ Build project
+      run: pnpm --filter chaos-master run build
+
+   
