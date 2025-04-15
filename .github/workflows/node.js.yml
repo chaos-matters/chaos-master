@@ -20,9 +20,6 @@ jobs:
     - name: ⬇️ Checkout code
       uses: actions/checkout@v4
 
-    - name: 💾 Install pnpm
-      run: npm install -g pnpm   
-      
     - name: 🔧 Setup Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v4
       with:
@@ -30,7 +27,9 @@ jobs:
         cache: 'pnpm'
         
     - name: 📦 Install all dependencies
-      run: pnpm install
+      run: |
+        corepack enable
+        pnpm install
 
     - name: 🧹 Lint code
       run: pnpm lint
