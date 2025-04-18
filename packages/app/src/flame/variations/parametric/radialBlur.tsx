@@ -1,10 +1,10 @@
 import { f32, struct } from 'typegpu/data'
-import { RangeEditor } from '@/components/variationParamEditors/RangeEditor'
-import { editorProps } from '@/components/variationParamEditors/types'
+import { AngleEditor } from '@/components/Sliders/ParametricEditors/AngleEditor'
+import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { random } from '@/shaders/random'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
-import type { EditorFor } from '@/components/variationParamEditors/types'
+import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
 export const RadialBlurParams = struct({
   angle: f32,
@@ -18,7 +18,7 @@ export const RadialBlurEditor: EditorFor<Infer<typeof RadialBlurParams>> = (
   props,
 ) => (
   <>
-    <RangeEditor
+    <AngleEditor
       {...editorProps(props, 'angle', 'Angle')}
       min={0}
       max={2 * Math.PI}

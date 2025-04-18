@@ -1,11 +1,12 @@
 import { f32, struct } from 'typegpu/data'
-import { RangeEditor } from '@/components/variationParamEditors/RangeEditor'
-import { editorProps } from '@/components/variationParamEditors/types'
+import { AngleEditor } from '@/components/Sliders/ParametricEditors/AngleEditor'
+import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
+import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { random } from '@/shaders/random'
 import { PI } from '../../constants'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
-import type { EditorFor } from '@/components/variationParamEditors/types'
+import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
 export const PieParams = struct({
   slices: f32,
@@ -27,7 +28,7 @@ export const PieParamsEditor: EditorFor<Infer<typeof PieParams>> = (props) => (
       max={200}
       step={1}
     />
-    <RangeEditor
+    <AngleEditor
       {...editorProps(props, 'rotation', 'Rotation')}
       min={0}
       max={2 * Math.PI}

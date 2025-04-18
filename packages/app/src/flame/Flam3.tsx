@@ -28,6 +28,7 @@ type Flam3Props = {
   outerIters: number
   skipIters: number
   pointCount: number
+  renderInterval: number
   drawMode: DrawModeFn
   backgroundColor: v3f
   exposure: number
@@ -270,7 +271,7 @@ export function Flam3(props: Flam3Props) {
       // readCountUnderPoiner(count)
 
       device.queue.submit([encoder.finish()])
-    })
+    }, props.renderInterval)
   })
   return null
 }
