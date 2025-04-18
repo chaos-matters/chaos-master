@@ -1,11 +1,11 @@
 import { f32, struct } from 'typegpu/data'
-import { RangeEditor } from '@/components/variationParamEditors/RangeEditor'
-import { editorProps } from '@/components/variationParamEditors/types'
+import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
+import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { PI } from '@/flame/constants'
 import { parametricVariation } from '@/flame/variations/types'
 import { random } from '@/shaders/random'
 import type { Infer } from 'typegpu/data'
-import type { EditorFor } from '@/components/variationParamEditors/types'
+import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
 export const JuliaScopeParams = struct({
   power: f32,

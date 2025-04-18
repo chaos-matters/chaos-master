@@ -2,7 +2,7 @@ import { tgpu } from 'typegpu'
 import { f32, struct, vec2f, vec4u } from 'typegpu/data'
 import type { TgpuFn } from 'typegpu'
 import type { AnyWgslData, Infer, Vec2f } from 'typegpu/data'
-import type { EditorFor } from '@/components/variationParamEditors/types'
+import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
 export type AffineParams = Infer<typeof AffineParams>
 // prettier-ignore

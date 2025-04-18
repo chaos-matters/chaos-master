@@ -16,6 +16,7 @@ import { AffineEditor } from './components/AffineEditor/AffineEditor'
 import { Card } from './components/ControlCard/ControlCard'
 import { FlameColorEditor } from './components/FlameColorEditor/FlameColorEditor'
 import { Modal, useRequestModal } from './components/Modal/Modal'
+import { Slider } from './components/Sliders/Slider'
 import { SoftwareVersion } from './components/SoftwareVersion/SoftwareVersion'
 import { lightMode, paintMode } from './flame/drawMode'
 import { examples } from './flame/examples'
@@ -58,6 +59,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
   const [skipIters, setSkipIters] = createSignal(15)
   const [pointCount, setPointCount] = createSignal(1e6)
   const [exposure, setExposure] = createSignal(0.25)
+  const [renderInterval, setRenderInterval] = createSignal(100)
   const [drawMode, setDrawMode] = createSignal(lightMode)
   const [backgroundColor, setBackgroundColor] = createSignal(vec3f(0, 0, 0))
   const [adaptiveFilterEnabled, setAdaptiveFilterEnabled] = createSignal(true)
@@ -85,7 +87,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
 
   return (
     <div class={ui.fullscreen}>
-      <div class={ui.sidebar} classList={{ [ui.show]: showSidebar() }}>
+      <div class={`${ui.sidebar} ${showSidebar() ? ui.show : ''}`}>
         <AffineEditor
           flameFunctions={flameFunctions}
           setFlameFunctions={setFlameFunctions}
@@ -95,76 +97,60 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
           setFlameFunctions={setFlameFunctions}
         />
         <Card>
-          <label class={ui.labeledInput}>
-            Resolution
-            <span>
-              <input
-                type="range"
-                min={0.125}
-                max={1}
-                step={0.125}
-                value={pixelRatio()}
-                onInput={(ev) => setPixelRatio(ev.target.valueAsNumber)}
-              />
-              {pixelRatio()}
-            </span>
-          </label>
-          <label class={ui.labeledInput}>
-            Outer Iterations
-            <span>
-              <input
-                type="range"
-                min={0}
-                max={MAX_OUTER_ITERS}
-                step={1}
-                value={outerIters()}
-                onInput={(ev) => setOuterIters(ev.target.valueAsNumber)}
-              />
-              {outerIters()}
-            </span>
-          </label>
-          <label class={ui.labeledInput}>
-            Skip Iterations
-            <span>
-              <input
-                type="range"
-                min={0}
-                max={MAX_INNER_ITERS}
-                step={1}
-                value={skipIters()}
-                onInput={(ev) => setSkipIters(ev.target.valueAsNumber)}
-              />
-              {skipIters()}
-            </span>
-          </label>
-          <label class={ui.labeledInput}>
-            Point Count
-            <span>
-              <input
-                type="range"
-                min={0}
-                max={MAX_POINT_COUNT}
-                step={1e4}
-                value={pointCount()}
-                onInput={(ev) => setPointCount(ev.target.valueAsNumber)}
-              />
-              {(pointCount() / 1000).toFixed(0)} K
-            </span>
-          </label>
-          <label class={ui.labeledInput}>
-            Exposure
-            <span>
-              <input
-                type="range"
-                min={-4}
-                max={4}
-                step={0.05}
-                value={exposure()}
-                onInput={(ev) => setExposure(ev.target.valueAsNumber)}
-              />
-              {exposure()}
-            </span>
-          </label>
+          <Slider
+            label="Resolution"
+            value={pixelRatio()}
+            min={0.125}
+            max={1}
+            step={0.125}
+            onChange={setPixelRatio}
+            formatValue={(value) => value.toString()}
+          />
+          <Slider
+            label="Outer Iterations"
+            value={outerIters()}
+            min={0}
+            max={MAX_OUTER_ITERS}
+            step={1}
+            onChange={setOuterIters}
+            formatValue={(value) => value.toString()}
+          />
+          <Slider
+            label="Skip Iterations"
+            value={skipIters()}
+            min={0}
+            max={MAX_INNER_ITERS}
+            step={1}
+            onChange={setSkipIters}
+            formatValue={(value) => value.toString()}
+          />
+          <Slider
+            label="Point Count"
+            value={pointCount()}
+            min={1e3}
+            max={MAX_POINT_COUNT}
+            step={1e4}
+            onChange={setPointCount}
+            formatValue={(value) => `${(value / 1000).toFixed(0)} K`}
+          />
+          <Slider
+            label="Exposure"
+            value={exposure()}
+            min={-4}
+            max={4}
+            step={0.001}
+            onChange={setExposure}
+            formatValue={(value) => value.toString()}
+          />
+          <Slider
+            label="Render Interval"
+            value={renderInterval()}
+            min={1}
+            max={5000}
+            step={1}
+            onChange={setRenderInterval}
+            formatValue={(value) => value.toString()}
+          />
           <label class={ui.labeledInput}>
             Enable adaptive filter
             <input
@@ -252,26 +238,19 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               >
                 <Cross />
               </button>
-              <label class={ui.labeledInput}>
-                Probability
-                <span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.001}
-                    value={flame.probability}
-                    onInput={(ev) => {
-                      setFlameFunctions(
-                        i(),
-                        'probability',
-                        ev.target.valueAsNumber,
-                      )
-                    }}
-                  />
-                  {((100 * flame.probability) / totalProbability()).toFixed(1)}%
-                </span>
-              </label>
+              <Slider
+                label="Probability"
+                value={flame.probability}
+                min={0}
+                max={1}
+                step={0.001}
+                onChange={(value) => {
+                  setFlameFunctions(i(), 'probability', value)
+                }}
+                formatValue={(value) =>
+                  `${((100 * value) / totalProbability()).toFixed(1)}%`
+                }
+              />
               <For each={flame.variations}>
                 {(variation, j) => (
                   <>
@@ -279,7 +258,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                       <span>
                         Weight{' '}
                         <select
-                          id="ifs-variation-selector"
+                          id={`variation-selector-${i()}-${j()}`}
                           class="border border-gray-300 rounded-md p-2 text-sm"
                           value={variation.type}
                           onInput={(ev) => {
@@ -300,25 +279,22 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                           ))}
                         </select>
                       </span>
-                      <span>
-                        <input
-                          type="range"
-                          min={0}
-                          max={1}
-                          step={0.001}
-                          value={variation.weight}
-                          onInput={(ev) => {
-                            setFlameFunctions(
-                              i(),
-                              'variations',
-                              j(),
-                              'weight',
-                              ev.target.valueAsNumber,
-                            )
-                          }}
-                        />
-                        {(100 * variation.weight).toFixed(1)} %
-                      </span>
+                      <Slider
+                        value={variation.weight}
+                        min={0}
+                        max={1}
+                        step={0.001}
+                        onChange={(value) => {
+                          setFlameFunctions(
+                            i(),
+                            'variations',
+                            j(),
+                            'weight',
+                            value,
+                          )
+                        }}
+                        formatValue={(value) => `${(100 * value).toFixed(1)} %`}
+                      />
                     </label>
                     <Show when={isParametricType(variation) && variation} keyed>
                       {(variation) => (
@@ -449,6 +425,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               outerIters={outerIters()}
               skipIters={skipIters()}
               pointCount={pointCount()}
+              renderInterval={renderInterval()}
               drawMode={drawMode()}
               backgroundColor={backgroundColor()}
               exposure={exposure()}

@@ -1,10 +1,10 @@
 import { f32, struct } from 'typegpu/data'
-import { RangeEditor } from '@/components/variationParamEditors/RangeEditor'
-import { editorProps } from '@/components/variationParamEditors/types'
+import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
+import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { PI } from '@/flame/constants'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
-import type { EditorFor } from '@/components/variationParamEditors/types'
+import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
 const NgonParams = struct({
   // some of those could be ints
