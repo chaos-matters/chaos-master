@@ -36,8 +36,7 @@ export const simpleVariation = (
 ): SimpleVariation => ({
   type: 'simple',
   fn: tgpu['~unstable']
-    .fn([vec2f, VariationInfo], vec2f)
-    .does(wgsl)
+    .fn([vec2f, VariationInfo], vec2f)(wgsl)
     .$uses(dependencyMap),
 })
 
@@ -53,8 +52,7 @@ export const parametricVariation = <T extends AnyWgslData>(
   paramDefaults,
   editor,
   fn: tgpu['~unstable']
-    .fn([vec2f, VariationInfo, paramShema], vec2f)
-    .does(wgsl)
+    .fn([vec2f, VariationInfo, paramShema], vec2f)(wgsl)
     .$uses(dependencyMap),
 })
 
@@ -70,10 +68,11 @@ export const outputTextureFormat = 'rgba32float'
 export const transformAffine = tgpu['~unstable'].fn(
   [AffineParams, vec2f],
   vec2f,
-).does(/* wgsl */ `
+)/* wgsl */ `
   (T: AffineParams, p: vec2f) -> vec2f {
     return vec2f(
       T.a * p.x + T.b * p.y + T.c,
       T.d * p.x + T.e * p.y + T.f
     );
-  }`)
+  }
+`

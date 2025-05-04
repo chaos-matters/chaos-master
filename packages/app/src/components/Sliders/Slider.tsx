@@ -1,4 +1,5 @@
 import { Show } from 'solid-js'
+import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import ui from './Slider.module.css'
 
 type SliderProps = {
@@ -14,6 +15,7 @@ type SliderProps = {
 }
 
 export function Slider(props: SliderProps) {
+  const history = useChangeHistory()
   const label = () => props.label ?? ''
   const min = () => props.min ?? 0
   const max = () => props.max ?? 1
@@ -39,7 +41,14 @@ export function Slider(props: SliderProps) {
         step={step()}
         value={props.value}
         onInput={(ev) => {
+          if (!history.isPreviewing()) {
+            history.startPreview()
+          }
           props.onInput(ev.target.valueAsNumber)
+        }}
+        onChange={(ev) => {
+          props.onInput(ev.target.valueAsNumber)
+          history.commit()
         }}
         style={{
           '--fill-percent': `${(props.trackFill ?? true) ? fillPercentage() : 0}%`,

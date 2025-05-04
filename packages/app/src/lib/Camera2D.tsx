@@ -21,55 +21,54 @@ export const Camera2DBindGroupLayout = tgpu
   })
   .$name('Camera2DBindGroupLayout')
 
-export const camera2DWorldToClip = tgpu['~unstable']
-  .fn([vec2f], vec2f)
-  .does(
-    /* wgsl */ `(world: vec2f) -> vec2f {
-      let clip = camera2DUniforms.viewMatrix * vec3(world, 1);
-      return clip.xy / clip.z;
-    }`,
-  )
+export const camera2DWorldToClip = tgpu['~unstable'].fn(
+  [vec2f],
+  vec2f,
+)/* wgsl */ `
+  (world: vec2f) -> vec2f {
+    let clip = camera2DUniforms.viewMatrix * vec3(world, 1);
+    return clip.xy / clip.z;
+  }
+`
   .$uses({ ...Camera2DBindGroupLayout.bound })
   .$name('camera2DWorldToClip')
 
-export const camera2DClipToWorld = tgpu['~unstable']
-  .fn([vec2f], vec2f)
-  .does(
-    /* wgsl */ `(clip: vec2f) -> vec2f {
-      let world = camera2DUniforms.viewMatrixInverse * vec3(clip, 1);
-      return world.xy / world.z;
-    }`,
-  )
+export const camera2DClipToWorld = tgpu['~unstable'].fn(
+  [vec2f],
+  vec2f,
+)/* wgsl */ `
+  (clip: vec2f) -> vec2f {
+    let world = camera2DUniforms.viewMatrixInverse * vec3(clip, 1);
+    return world.xy / world.z;
+  }
+`
   .$uses({ ...Camera2DBindGroupLayout.bound })
   .$name('camera2DClipToWorld')
 
-export const camera2DClipToPixels = tgpu['~unstable']
-  .fn([vec2f], vec2f)
-  .does(
-    /* wgsl */ `(clip: vec2f) -> vec2f {
-      return 0.5 * clip * camera2DUniforms.resolution;
-    }`,
-  )
+export const camera2DClipToPixels = tgpu['~unstable'].fn(
+  [vec2f],
+  vec2f,
+)/* wgsl */ `
+  (clip: vec2f) -> vec2f {
+    return 0.5 * clip * camera2DUniforms.resolution;
+  }
+`
   .$uses({ ...Camera2DBindGroupLayout.bound })
   .$name('camera2DClipToPixels')
 
-export const camera2DResolution = tgpu['~unstable']
-  .fn([], vec2f)
-  .does(
-    /* wgsl */ `() -> vec2f {
-      return camera2DUniforms.resolution;
-    }`,
-  )
+export const camera2DResolution = tgpu['~unstable'].fn([], vec2f)/* wgsl */ `
+  () -> vec2f {
+    return camera2DUniforms.resolution;
+  }
+`
   .$uses({ ...Camera2DBindGroupLayout.bound })
   .$name('camera2DResolution')
 
-export const camera2DPixelRatio = tgpu['~unstable']
-  .fn([], f32)
-  .does(
-    /* wgsl */ `() -> f32 {
-      return camera2DUniforms.pixelRatio;
-    }`,
-  )
+export const camera2DPixelRatio = tgpu['~unstable'].fn([], f32)/* wgsl */ `
+  () -> f32 {
+    return camera2DUniforms.pixelRatio;
+  }
+`
   .$uses({ ...Camera2DBindGroupLayout.bound })
   .$name('camera2DPixelRatio')
 

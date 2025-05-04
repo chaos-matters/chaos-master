@@ -18,12 +18,13 @@
 
 .track {
   position: relative;
-  width: 60px;
-  height: 60px;
+  width: 36px;
+  height: 36px;
   border-radius: 100vh;
   background: rgba(255, 255, 255, 0.1);
   border: 2px solid rgba(255, 255, 255, 0.2);
   cursor: pointer;
+  outline: none;
 }
 
 .indicator {
@@ -38,7 +39,7 @@
   position: absolute;
   top: 50%;
   height: 2px;
-  width: 28px;
+  width: 50%;
   background: linear-gradient(to right, transparent, currentColor 50%);
   left: 50%;
   translate: 0 -50%;

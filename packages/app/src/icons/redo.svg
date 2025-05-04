@@ -1,0 +1,13 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 24 24"
+  stroke="currentColor"
+  stroke-width="1.5"
+  stroke-linecap="round"
+  fill="none"
+>
+  <!-- Same as undo but with transform -->
+  <g style="transform: translateX(100%) scaleX(-1)">
+    <path d="M 8.5,14 4.5,10 8.5,6 M 5,10 15,10 a 4,4 0 0 1 0,8 l -1,0" />
+  </g>
+</svg>

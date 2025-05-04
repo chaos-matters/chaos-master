@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite'
 import mkcert from 'vite-plugin-mkcert'
 import solidPlugin from 'vite-plugin-solid'
+import solidSvg from 'vite-plugin-solid-svg'
 
 export default defineConfig({
-  plugins: [solidPlugin(), mkcert()],
+  plugins: [solidPlugin(), solidSvg({ defaultAsComponent: true }), mkcert()],
   resolve: {
     alias: {
       '@': '/src',

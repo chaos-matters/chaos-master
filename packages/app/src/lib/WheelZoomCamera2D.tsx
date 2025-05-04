@@ -4,7 +4,6 @@ import {
   createMemo,
   createSignal,
   onCleanup,
-  untrack,
 } from 'solid-js'
 import { vec2f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
@@ -14,28 +13,39 @@ import { useCamera } from '@/lib/CameraContext'
 import { useCanvas } from '@/lib/CanvasContext'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'
-import type { ParentProps } from 'solid-js'
+import type { ParentProps, Setter, Signal } from 'solid-js'
 import type { v2f } from 'typegpu/data'
 
 type WheelZoomCamera2DProps = {
-  initZoom?: number
-  zoomRange?: [number, number]
+  zoom: Signal<number>
   eventTarget?: HTMLElement
+}
+
+export function createZoom(
+  initZoom: number,
+  zoomRange: [number, number],
+): Signal<number> {
+  const [min, max] = zoomRange
+  const [zoom, _setZoom] = createSignal(initZoom)
+
+  const setZoom: Setter<number> = (value) => {
+    if (typeof value === 'function') {
+      _setZoom((prev) => {
+        return clamp(value(prev), min, max)
+      })
+    } else {
+      _setZoom(clamp(value, min, max))
+    }
+    return zoom()
+  }
+
+  return [zoom, setZoom]
 }
 
 export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
   const { canvas } = useCanvas()
-  const [zoom, _setZoom] = createSignal(untrack(() => props.initZoom ?? 1))
+  const [zoom, setZoom] = props.zoom
   const el = createMemo(() => props.eventTarget ?? canvas)
-
-  function setZoom(value: number) {
-    if (props.zoomRange) {
-      const [min, max] = props.zoomRange
-      value = clamp(value, min, max)
-    }
-    _setZoom(value)
-    return value
-  }
 
   const [position, setPosition] = createSignal(vec2f())
   let clipToWorld: (clip: v2f) => v2f | undefined

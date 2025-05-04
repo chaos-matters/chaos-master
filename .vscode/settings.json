@@ -8,5 +8,8 @@
   },
   "emmet.excludeLanguages": ["typescriptreact"],
   "typescript.tsdk": "node_modules/typescript/lib",
-  "typescript.enablePromptUseWorkspaceTsdk": true
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "workbench.editorAssociations": {
+    "*.svg": "default"
+  }
 }
