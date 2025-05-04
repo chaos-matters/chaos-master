@@ -61,32 +61,27 @@ export function createFlameWgsl({
       variations.map((v, j) => [`variation${j}`, variationUniforms(v.type)]),
     ),
   }).$name(`FlameUniforms`)
-  const fnImpl = tgpu['~unstable']
-    .fn([Point, Uniforms], Point)
-    .does(
-      /* wgsl */ `
-      (point: Point, uniforms: Uniforms) -> Point {
-        let pre = transformAffine(uniforms.preAffine, point.position);
-        var p = vec2f(0);
-        ${variations
-          .map(
-            ({ type }, j) => /* wgsl */ `
-              p += uniforms.variation${j}.weight * ${variationInvocation(type, j)};`,
-          )
-          .join('\n')}
-        p = transformAffine(uniforms.postAffine, p);
-        let color = mix(point.color, uniforms.color, 0.4);
-        return Point(p, color, point.seed);
-      }
-    `,
-    )
-    .$uses({
-      transformAffine,
-      ...Object.fromEntries(
-        variations.map((v) => [v.type, transformVariations[v.type].fn]),
-      ),
-      VariationInfo,
-    })
+  const fnImpl = tgpu['~unstable'].fn([Point, Uniforms], Point)/* wgsl */ `
+    (point: Point, uniforms: Uniforms) -> Point {
+      let pre = transformAffine(uniforms.preAffine, point.position);
+      var p = vec2f(0);
+      ${variations
+        .map(
+          ({ type }, j) => /* wgsl */ `
+            p += uniforms.variation${j}.weight * ${variationInvocation(type, j)};`,
+        )
+        .join('\n')}
+      p = transformAffine(uniforms.postAffine, p);
+      let color = mix(point.color, uniforms.color, 0.4);
+      return Point(p, color, point.seed);
+    }
+  `.$uses({
+    transformAffine,
+    ...Object.fromEntries(
+      variations.map((v) => [v.type, transformVariations[v.type].fn]),
+    ),
+    VariationInfo,
+  })
   return {
     Uniforms,
     fnImpl,

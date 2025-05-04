@@ -1,3 +1,4 @@
+import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { createDragHandler } from '@/utils/createDragHandler'
 import ui from './AngleEditor.module.css'
 import type { EditorProps } from './types'
@@ -10,11 +11,14 @@ function formatAngle(angle: number) {
 }
 
 export function AngleEditor(props: AngleEditorProps) {
+  const history = useChangeHistory()
   const startRotating = createDragHandler((initEvent) => {
+    history.startPreview('Edit angle')
     const el = initEvent.currentTarget
     if (!(el instanceof HTMLElement)) {
       throw new Error('unreachable code')
     }
+    el.focus()
     const rect = el.getBoundingClientRect()
     const centerX = rect.left + rect.width / 2
     const centerY = rect.top + rect.height / 2
@@ -28,6 +32,7 @@ export function AngleEditor(props: AngleEditorProps) {
     setAngle(initEvent)
     return {
       onPointerMove: setAngle,
+      onDone: history.commit,
     }
   })
   return (

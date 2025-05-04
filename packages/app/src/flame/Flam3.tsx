@@ -191,37 +191,39 @@ export function Flam3(props: Flam3Props) {
 
     let count = 0
     createEffect(() => {
-      count = 0
-      const _ = props.outerIters
-      camera.js.clipToWorld(vec2f())
-      colorGradingUniforms.write({
-        accumulatedIterationCount: 0,
-        factor: factor(),
-        exposure: 1,
-      })
-
       runSkipIfs.update(props.flameFunctions)
       runIfs.update(props.flameFunctions)
 
-      const encoder = device.createCommandEncoder()
-      {
-        const pass = encoder.beginRenderPass({
-          colorAttachments: [
-            {
-              view: outputTextureView,
-              loadOp: 'clear',
-              storeOp: 'store',
-              clearValue: [0, 0, 0, 0],
-            },
-          ],
+      createEffect(() => {
+        count = 0
+        const _ = props.outerIters
+        camera.update()
+        camera.js.clipToWorld(vec2f())
+        colorGradingUniforms.write({
+          accumulatedIterationCount: 0,
+          factor: factor(),
+          exposure: 1,
         })
-        pass.end()
-      }
-      device.queue.submit([encoder.finish()])
+
+        const encoder = device.createCommandEncoder()
+        {
+          const pass = encoder.beginRenderPass({
+            colorAttachments: [
+              {
+                view: outputTextureView,
+                loadOp: 'clear',
+                storeOp: 'store',
+                clearValue: [0, 0, 0, 0],
+              },
+            ],
+          })
+          pass.end()
+        }
+        device.queue.submit([encoder.finish()])
+      })
     })
 
     createAnimationFrame(() => {
-      camera.update()
       computeUniforms.write({
         seed: randomVec4u(),
       })

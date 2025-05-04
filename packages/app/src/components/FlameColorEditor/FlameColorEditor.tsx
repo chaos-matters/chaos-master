@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, For } from 'solid-js'
-import { produce } from 'solid-js/store'
 import { vec2f } from 'typegpu/data'
 import { vec2 } from 'wgpu-matrix'
+import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { PI } from '@/flame/constants'
 import { gamutClipPreserveChroma } from '@/flame/oklab'
 import { AutoCanvas } from '@/lib/AutoCanvas'
@@ -9,16 +9,16 @@ import { useCamera } from '@/lib/CameraContext'
 import { useCanvas } from '@/lib/CanvasContext'
 import { Root } from '@/lib/Root'
 import { useRootContext } from '@/lib/RootContext'
-import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
+import { createZoom, WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { createAnimationFrame } from '@/utils/createAnimationFrame'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'
 import { maxLength2 } from '@/utils/maxLength'
 import { wgsl } from '@/utils/wgsl'
 import ui from './FlameColorEditor.module.css'
-import type { SetStoreFunction } from 'solid-js/store'
 import type { v2f } from 'typegpu/data'
 import type { FlameFunction } from '@/flame/flameFunction'
+import type { HistorySetter } from '@/utils/createStoreHistory'
 
 function Gradient() {
   const camera = useCamera()
@@ -142,8 +142,11 @@ function FlameColorHandle(props: {
   const {
     js: { worldToClip, clipToWorld },
   } = useCamera()
+  const changeHistory = useChangeHistory()
   const clip = createMemo(() => worldToClip(props.color))
   const startDragging = createDragHandler((initEvent) => {
+    changeHistory.startPreview('Flame color')
+
     const initialColor = props.color
     const grabPosition = clipToWorld(eventToClip(initEvent, canvas))
     return {
@@ -153,6 +156,9 @@ function FlameColorHandle(props: {
         const color = vec2.add(initialColor, diff, vec2f())
         const clampedColor = maxLength2(color, 0.3)
         props.setColor(clampedColor)
+      },
+      onDone() {
+        changeHistory.commit()
       },
     }
   })
@@ -181,18 +187,15 @@ function FlameColorHandle(props: {
 
 export function FlameColorEditor(props: {
   flameFunctions: FlameFunction[]
-  setFlameFunctions: SetStoreFunction<FlameFunction[]>
+  setFlameFunctions: HistorySetter<FlameFunction[]>
 }) {
   const [div, setDiv] = createSignal<HTMLDivElement>()
+  const [zoom, setZoom] = createZoom(4, [2, 20])
   return (
     <div ref={setDiv} class={ui.editorCard}>
       <Root adapterOptions={{ powerPreference: 'high-performance' }}>
         <AutoCanvas class={ui.canvas} pixelRatio={1}>
-          <WheelZoomCamera2D
-            eventTarget={div()}
-            initZoom={4}
-            zoomRange={[2, 20]}
-          >
+          <WheelZoomCamera2D eventTarget={div()} zoom={[zoom, setZoom]}>
             <Gradient />
             <svg class={ui.svg}>
               <For each={props.flameFunctions}>
@@ -200,15 +203,9 @@ export function FlameColorEditor(props: {
                   <FlameColorHandle
                     color={vec2f(flameFunction.color.x, flameFunction.color.y)}
                     setColor={(color) => {
-                      props.setFlameFunctions(
-                        i(),
-                        produce((flameFunction) => {
-                          flameFunction.color = {
-                            x: color.x,
-                            y: color.y,
-                          }
-                        }),
-                      )
+                      props.setFlameFunctions((draft) => {
+                        draft[i()]!.color = { x: color.x, y: color.y }
+                      })
                     }}
                   />
                 )}

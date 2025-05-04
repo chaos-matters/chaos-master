@@ -1,21 +1,90 @@
 .fullscreen {
   height: 100dvh;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: min(26rem, 40%) 1fr;
+  grid-template-rows: 1fr auto;
+  grid-template-areas:
+    'sidebar viewport'
+    'sidebar viewport-controls';
   overflow: hidden;
-}
 
-.canvas-container {
-  flex: 1 1 0;
-  min-height: 0;
-  user-select: none;
+  /* Start a stacking context so canvas doesn't go behind body */
+  isolation: isolate;
 }
 
 .canvas {
+  position: absolute;
+  width: 100%;
+  height: 100%;
   image-rendering: pixelated;
+  z-index: -1;
 
   /* allow pointer events to act correctly on touch devices */
   touch-action: none;
+}
+
+.viewport-controls {
+  grid-area: viewport-controls;
+  display: flex;
+  padding: 0.5rem;
+  gap: 0.5rem;
+}
+
+.button-group {
+  display: flex;
+  align-items: stretch;
+  border-radius: 0.5rem;
+  background-color: #111e;
+  user-select: none;
+  box-shadow: 0 0 2.5px 1px black;
+
+  & > button:first-child {
+    border-top-left-radius: 0.5rem;
+    border-bottom-left-radius: 0.5rem;
+  }
+
+  & > button:last-child {
+    border-top-right-radius: 0.5rem;
+    border-bottom-right-radius: 0.5rem;
+  }
+
+  & > button {
+    display: flex;
+    color: #aaa;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    line-height: 1;
+    padding-inline: 0.4rem;
+    padding-block: 0.2rem;
+
+    &:not(:disabled) {
+      cursor: pointer;
+    }
+
+    &:disabled {
+      color: #555;
+    }
+
+    &:active:not(:disabled) {
+      box-shadow: inset 0 0 0 1px #aaa;
+    }
+
+    &:hover:not(:disabled) {
+      color: white;
+      background-color: #222;
+    }
+
+    & > svg {
+      width: 24px;
+    }
+  }
+}
+
+.reset-zoom-button {
+  width: 4rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .labeled-input {
@@ -23,14 +92,11 @@
 }
 
 .sidebar {
-  position: absolute;
-  z-index: 1;
+  grid-area: sidebar;
   display: flex;
   flex-direction: column;
-  max-width: 40%;
   padding: 0.5rem;
   gap: 0.5rem;
-  max-height: 100%;
   overflow-y: auto;
   transition: translate 250ms;
   scrollbar-color: #5558 transparent;

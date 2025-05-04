@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, For } from 'solid-js'
-import { reconcile } from 'solid-js/store'
 import { vec2f } from 'typegpu/data'
 import { vec2 } from 'wgpu-matrix'
+import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { PI } from '@/flame/constants'
 import { gamutClipPreserveChroma } from '@/flame/oklab'
 import { AutoCanvas } from '@/lib/AutoCanvas'
@@ -9,16 +9,16 @@ import { useCamera } from '@/lib/CameraContext'
 import { useCanvas } from '@/lib/CanvasContext'
 import { Root } from '@/lib/Root'
 import { useRootContext } from '@/lib/RootContext'
-import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
+import { createZoom, WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { createAnimationFrame } from '@/utils/createAnimationFrame'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'
 import { wgsl } from '@/utils/wgsl'
 import ui from './AffineEditor.module.css'
-import type { SetStoreFunction } from 'solid-js/store'
 import type { v2f } from 'typegpu/data'
 import type { FlameFunction } from '@/flame/flameFunction'
 import type { AffineParams } from '@/flame/variations/types'
+import type { HistorySetter } from '@/utils/createStoreHistory'
 
 const { sqrt } = Math
 
@@ -159,6 +159,7 @@ function AffineHandle(props: {
   const {
     js: { worldToClip, clipToWorld },
   } = useCamera()
+  const changeHistory = useChangeHistory()
 
   const aspect = createMemo(() => canvasSize().width / canvasSize().height)
   const position = createMemo(() => vec2f(props.transform.c, props.transform.f))
@@ -174,6 +175,8 @@ function AffineHandle(props: {
     return [x.x * s, y.x * s, x.y, y.y, t.x * s, t.y]
   })
   const startDragging = createDragHandler((initEvent) => {
+    changeHistory.startPreview('Affine Translation')
+
     const initialTransform = { ...props.transform }
     const grabPosition = clipToWorld(eventToClip(initEvent, canvas))
     return {
@@ -191,10 +194,15 @@ function AffineHandle(props: {
           f: position.y,
         })
       },
+      onDone() {
+        changeHistory.commit()
+      },
     }
   })
   const startScalingRotating = (xFactor: -1 | 0 | 1, yFactor: -1 | 0 | 1) =>
     createDragHandler((initEvent) => {
+      changeHistory.startPreview('Affine Rotation')
+
       const { a, b, d, e, ...rest } = props.transform
       const grabPosition = clipToWorld(eventToClip(initEvent, canvas))
       const center = position()
@@ -224,6 +232,9 @@ function AffineHandle(props: {
 
       return {
         onPointerMove,
+        onDone() {
+          changeHistory.commit()
+        },
       }
     })
   const p = (v: number) => `${v}%`
@@ -299,18 +310,15 @@ function AffineHandle(props: {
 
 export function AffineEditor(props: {
   flameFunctions: FlameFunction[]
-  setFlameFunctions: SetStoreFunction<FlameFunction[]>
+  setFlameFunctions: HistorySetter<FlameFunction[]>
 }) {
   const [div, setDiv] = createSignal<HTMLDivElement>()
+  const [zoom, setZoom] = createZoom(0.9, [0.5, 20])
   return (
     <div ref={setDiv} class={ui.editorCard}>
       <Root adapterOptions={{ powerPreference: 'high-performance' }}>
         <AutoCanvas class={ui.canvas} pixelRatio={1}>
-          <WheelZoomCamera2D
-            eventTarget={div()}
-            initZoom={0.9}
-            zoomRange={[0.5, 20]}
-          >
+          <WheelZoomCamera2D eventTarget={div()} zoom={[zoom, setZoom]}>
             <Grid />
             <svg class={ui.svg}>
               <defs>
@@ -333,11 +341,9 @@ export function AffineEditor(props: {
                     transform={flameFunction.preAffine}
                     color={vec2f(flameFunction.color.x, flameFunction.color.y)}
                     setTransform={(affine) => {
-                      props.setFlameFunctions(
-                        i(),
-                        'preAffine',
-                        reconcile(affine),
-                      )
+                      props.setFlameFunctions((draft) => {
+                        draft[i()]!['preAffine'] = affine
+                      })
                     }}
                   />
                 )}
