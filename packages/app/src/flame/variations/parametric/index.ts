@@ -4,7 +4,7 @@ import type {
   TransformVariation,
   TransformVariationDescriptor,
 } from '..'
-import type { EditorFor } from '@/components/variationParamEditors/types'
+import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
 export function getVariationDefault(
   type: TransformVariation,

@@ -20,12 +20,7 @@ export const PerspectiveParamsEditor: EditorFor<
   Infer<typeof PerspectiveParams>
 > = (props) => (
   <>
-    <AngleEditor
-      {...editorProps(props, 'angle', 'Angle')}
-      min={0}
-      max={Math.PI}
-      step={0.01}
-    />
+    <AngleEditor {...editorProps(props, 'angle', 'Angle')} />
     <RangeEditor
       {...editorProps(props, 'dist', 'Dist')}
       min={1}

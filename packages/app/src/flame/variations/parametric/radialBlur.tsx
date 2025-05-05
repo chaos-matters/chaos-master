@@ -18,12 +18,7 @@ export const RadialBlurEditor: EditorFor<Infer<typeof RadialBlurParams>> = (
   props,
 ) => (
   <>
-    <AngleEditor
-      {...editorProps(props, 'angle', 'Angle')}
-      min={0}
-      max={2 * Math.PI}
-      step={0.01}
-    />
+    <AngleEditor {...editorProps(props, 'angle', 'Angle')} />
   </>
 )
 

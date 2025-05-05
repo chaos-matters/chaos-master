@@ -248,7 +248,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                   setFlameFunctions(i(), 'probability', value)
                 }}
                 formatValue={(value) =>
-                  `${((100 * value) / totalProbability()).toFixed(1)}%`
+                  `${((100 * value) / totalProbability()).toFixed(1)} %`
                 }
               />
               <For each={flame.variations}>
