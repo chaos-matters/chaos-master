@@ -14,13 +14,16 @@
 }
 
 .content {
+  --color: #aaa;
   display: grid;
-  grid-template-columns: auto auto;
+  grid-template-columns: 1fr 1.5fr 0.5fr;
   align-items: center;
   justify-items: stretch;
   padding: 1rem;
   gap: 1rem;
+  color: var(--color);
   background-color: #000a;
   border-radius: 1rem;
   font-variant-numeric: tabular-nums;
+  font-size: 14px;
 }

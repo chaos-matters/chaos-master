@@ -103,7 +103,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
             min={0.125}
             max={1}
             step={0.125}
-            onChange={setPixelRatio}
+            onInput={setPixelRatio}
             formatValue={(value) => value.toString()}
           />
           <Slider
@@ -112,7 +112,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
             min={0}
             max={MAX_OUTER_ITERS}
             step={1}
-            onChange={setOuterIters}
+            onInput={setOuterIters}
             formatValue={(value) => value.toString()}
           />
           <Slider
@@ -121,7 +121,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
             min={0}
             max={MAX_INNER_ITERS}
             step={1}
-            onChange={setSkipIters}
+            onInput={setSkipIters}
             formatValue={(value) => value.toString()}
           />
           <Slider
@@ -130,7 +130,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
             min={1e3}
             max={MAX_POINT_COUNT}
             step={1e4}
-            onChange={setPointCount}
+            onInput={setPointCount}
             formatValue={(value) => `${(value / 1000).toFixed(0)} K`}
           />
           <Slider
@@ -139,7 +139,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
             min={-4}
             max={4}
             step={0.001}
-            onChange={setExposure}
+            onInput={setExposure}
             formatValue={(value) => value.toString()}
           />
           <Slider
@@ -148,7 +148,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
             min={1}
             max={5000}
             step={1}
-            onChange={setRenderInterval}
+            onInput={setRenderInterval}
             formatValue={(value) => value.toString()}
           />
           <label class={ui.labeledInput}>
@@ -158,6 +158,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               checked={adaptiveFilterEnabled()}
               onInput={(ev) => setAdaptiveFilterEnabled(ev.target.checked)}
             />
+            <span></span>
           </label>
           <label class={ui.labeledInput}>
             Background Color
@@ -167,6 +168,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                 setBackgroundColor(hexToRgbNorm(ev.target.value))
               }
             />
+            <span></span>
           </label>
           <label class={ui.labeledInput}>
             Draw Mode
@@ -180,6 +182,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               <option value="light">Light</option>
               <option value="paint">Paint</option>
             </select>
+            <span></span>
           </label>
           <button
             onClick={async () => {
@@ -244,7 +247,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                 min={0}
                 max={1}
                 step={0.001}
-                onChange={(value) => {
+                onInput={(value) => {
                   setFlameFunctions(i(), 'probability', value)
                 }}
                 formatValue={(value) =>
@@ -254,48 +257,42 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               <For each={flame.variations}>
                 {(variation, j) => (
                   <>
-                    <label class={ui.labeledInput}>
-                      <span>
-                        Weight{' '}
-                        <select
-                          id={`variation-selector-${i()}-${j()}`}
-                          class="border border-gray-300 rounded-md p-2 text-sm"
-                          value={variation.type}
-                          onInput={(ev) => {
-                            const type = ev.target.value
-                            if (!isVariationType(type)) {
-                              return
-                            }
-                            setFlameFunctions(
-                              i(),
-                              'variations',
-                              j(),
-                              getVariationDefault(type, variation.weight),
-                            )
-                          }}
-                        >
-                          {variationTypes.map((varName) => (
-                            <option value={varName}>{varName}</option>
-                          ))}
-                        </select>
-                      </span>
-                      <Slider
-                        value={variation.weight}
-                        min={0}
-                        max={1}
-                        step={0.001}
-                        onChange={(value) => {
-                          setFlameFunctions(
-                            i(),
-                            'variations',
-                            j(),
-                            'weight',
-                            value,
-                          )
-                        }}
-                        formatValue={(value) => `${(100 * value).toFixed(1)} %`}
-                      />
-                    </label>
+                    <select
+                      class={ui.varInputType}
+                      value={variation.type}
+                      onInput={(ev) => {
+                        const type = ev.target.value
+                        if (!isVariationType(type)) {
+                          return
+                        }
+                        setFlameFunctions(
+                          i(),
+                          'variations',
+                          j(),
+                          getVariationDefault(type, variation.weight),
+                        )
+                      }}
+                    >
+                      {variationTypes.map((varName) => (
+                        <option value={varName}>{varName}</option>
+                      ))}
+                    </select>
+                    <Slider
+                      value={variation.weight}
+                      min={0}
+                      max={1}
+                      step={0.001}
+                      onInput={(value) => {
+                        setFlameFunctions(
+                          i(),
+                          'variations',
+                          j(),
+                          'weight',
+                          value,
+                        )
+                      }}
+                      formatValue={(value) => `${(100 * value).toFixed(1)} %`}
+                    />
                     <Show when={isParametricType(variation) && variation} keyed>
                       {(variation) => (
                         <Dynamic

@@ -1,18 +1,18 @@
 .label {
   display: contents;
+
+  &:hover,
+  &:focus-within {
+    color: white;
+  }
 }
 
 .name {
   justify-self: end;
 }
 
-.container {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
 .value {
+  justify-self: end;
   font-variant-numeric: tabular-nums;
 }
 
@@ -39,7 +39,7 @@
   top: 50%;
   height: 2px;
   width: 28px;
-  background: linear-gradient(to right, transparent, white 50%);
+  background: linear-gradient(to right, transparent, currentColor 50%);
   left: 50%;
   translate: 0 -50%;
 }
@@ -48,10 +48,14 @@
   position: absolute;
   width: 12px;
   height: 12px;
-  background: white;
+  background: currentColor;
   border-radius: 100vh;
   top: 50%;
   right: 0;
   transform: translate(50%, -50%);
   cursor: grab;
+
+  &:active {
+    cursor: grabbing;
+  }
 }
