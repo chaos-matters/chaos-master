@@ -1,13 +1,16 @@
+import { Show } from 'solid-js'
 import ui from './Slider.module.css'
 
 type SliderProps = {
+  class?: string
   value: number
   label?: string
   min?: number
   max?: number
   step?: number
-  onChange: (value: number) => void
+  onInput: (value: number) => void
   formatValue?: (value: number) => string
+  trackFill?: boolean
 }
 
 export function Slider(props: SliderProps) {
@@ -24,27 +27,25 @@ export function Slider(props: SliderProps) {
   }
 
   return (
-    <>
-      <label class={ui.label}>{label()}</label>
-      <div class={ui.sliderContainer}>
-        <div class={ui.sliderWrapper}>
-          <div class={ui.track}>
-            <div class={ui.fill} style={{ width: `${fillPercentage()}%` }} />
-          </div>
-          <input
-            class={ui.slider}
-            type="range"
-            min={min()}
-            max={max()}
-            step={step()}
-            value={props.value}
-            onInput={(ev) => {
-              props.onChange(ev.target.valueAsNumber)
-            }}
-          />
-        </div>
-        <span class={ui.value}>{formatValue()}</span>
-      </div>
-    </>
+    <label class={ui.label} classList={{ [props.class ?? '']: true }}>
+      <Show when={label()}>
+        <span>{label()}</span>
+      </Show>
+      <input
+        class={ui.slider}
+        type="range"
+        min={min()}
+        max={max()}
+        step={step()}
+        value={props.value}
+        onInput={(ev) => {
+          props.onInput(ev.target.valueAsNumber)
+        }}
+        style={{
+          '--fill-percent': `${(props.trackFill ?? true) ? fillPercentage() : 0}%`,
+        }}
+      />
+      <span class={ui.value}>{formatValue()}</span>
+    </label>
   )
 }

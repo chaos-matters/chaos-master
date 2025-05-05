@@ -33,15 +33,13 @@ export function AngleEditor(props: AngleEditorProps) {
   return (
     <label class={ui.label}>
       <span class={ui.name}>{props.name}</span>
-      <div class={ui.container}>
-        <div class={ui.track} onPointerDown={startRotating}>
-          <div class={ui.indicator} style={{ '--angle': `${props.value}rad` }}>
-            <div class={ui.line} />
-            <div class={ui.dot} />
-          </div>
+      <div class={ui.track} onPointerDown={startRotating} tabIndex={0}>
+        <div class={ui.indicator} style={{ '--angle': `${props.value}rad` }}>
+          <div class={ui.line} />
+          <div class={ui.dot} />
         </div>
-        <span class={ui.value}>{formatAngle(props.value)}</span>
       </div>
+      <span class={ui.value}>{formatAngle(props.value)}</span>
     </label>
   )
 }
