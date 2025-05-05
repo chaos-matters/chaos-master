@@ -17,7 +17,7 @@
   display: grid;
   grid-template-columns: auto auto;
   align-items: center;
-  justify-items: start;
+  justify-items: stretch;
   padding: 1rem;
   gap: 1rem;
   background-color: #000a;

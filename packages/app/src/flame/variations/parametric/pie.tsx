@@ -28,12 +28,7 @@ export const PieParamsEditor: EditorFor<Infer<typeof PieParams>> = (props) => (
       max={200}
       step={1}
     />
-    <AngleEditor
-      {...editorProps(props, 'rotation', 'Rotation')}
-      min={0}
-      max={2 * Math.PI}
-      step={0.01}
-    />
+    <AngleEditor {...editorProps(props, 'rotation', 'Rotation')} />
     <RangeEditor
       {...editorProps(props, 'thickness', 'Thickness')}
       min={0}
