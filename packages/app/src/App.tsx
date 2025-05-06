@@ -141,6 +141,98 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
             flameFunctions={flameFunctions}
             setFlameFunctions={setFlameFunctions}
           />
+          <For each={flameFunctions}>
+            {(flame, i) => (
+              <Card>
+                <button
+                  class={ui.deleteFlameButton}
+                  onClick={() => {
+                    setFlameFunctions((draft) => {
+                      draft.splice(i(), 1)
+                    })
+                  }}
+                >
+                  <Cross />
+                </button>
+                <Slider
+                  label="Probability"
+                  value={flame.probability}
+                  min={0}
+                  max={1}
+                  step={0.001}
+                  onInput={(probability) => {
+                    setFlameFunctions((draft) => {
+                      draft[i()]!.probability = probability
+                    })
+                  }}
+                  formatValue={(value) =>
+                    formatPercent(value / totalProbability())
+                  }
+                />
+                <For each={flame.variations}>
+                  {(variation, j) => (
+                    <>
+                      <select
+                        class={ui.varInputType}
+                        value={variation.type}
+                        onInput={(ev) => {
+                          const type = ev.target.value
+                          if (!isVariationType(type)) {
+                            return
+                          }
+                          setFlameFunctions((draft) => {
+                            draft[i()]!.variations[j()] = getVariationDefault(
+                              type,
+                              variation.weight,
+                            )
+                          })
+                        }}
+                      >
+                        {variationTypes.map((varName) => (
+                          <option value={varName}>{varName}</option>
+                        ))}
+                      </select>
+                      <Slider
+                        value={variation.weight}
+                        min={0}
+                        max={1}
+                        step={0.001}
+                        onInput={(weight) => {
+                          setFlameFunctions((draft) => {
+                            draft[i()]!.variations[j()]!.weight = weight
+                          })
+                        }}
+                        formatValue={formatPercent}
+                      />
+                      <Show
+                        when={isParametricType(variation) && variation}
+                        keyed
+                      >
+                        {(variation) => (
+                          <Dynamic
+                            {...getParamsEditor(variation)}
+                            setValue={(value) => {
+                              setFlameFunctions((draft) => {
+                                const i_ = i()
+                                const j_ = j()
+                                if (
+                                  !isParametricType(draft[i_]!.variations[j_]!)
+                                ) {
+                                  throw new Error(`Unreachable code`)
+                                }
+                                draft[i_]!.variations[j_].params = value
+                              })
+                            }}
+                          />
+                        )}
+                      </Show>
+                    </>
+                  )}
+                </For>
+              </Card>
+            )}
+          </For>
+
           <Card>
             <Slider
               label="Resolution"
@@ -271,97 +363,6 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               Load Example
             </button>
           </Card>
-          <For each={flameFunctions}>
-            {(flame, i) => (
-              <Card>
-                <button
-                  class={ui.deleteFlameButton}
-                  onClick={() => {
-                    setFlameFunctions((draft) => {
-                      draft.splice(i(), 1)
-                    })
-                  }}
-                >
-                  <Cross />
-                </button>
-                <Slider
-                  label="Probability"
-                  value={flame.probability}
-                  min={0}
-                  max={1}
-                  step={0.001}
-                  onInput={(probability) => {
-                    setFlameFunctions((draft) => {
-                      draft[i()]!.probability = probability
-                    })
-                  }}
-                  formatValue={(value) =>
-                    formatPercent(value / totalProbability())
-                  }
-                />
-                <For each={flame.variations}>
-                  {(variation, j) => (
-                    <>
-                      <select
-                        class={ui.varInputType}
-                        value={variation.type}
-                        onInput={(ev) => {
-                          const type = ev.target.value
-                          if (!isVariationType(type)) {
-                            return
-                          }
-                          setFlameFunctions((draft) => {
-                            draft[i()]!.variations[j()] = getVariationDefault(
-                              type,
-                              variation.weight,
-                            )
-                          })
-                        }}
-                      >
-                        {variationTypes.map((varName) => (
-                          <option value={varName}>{varName}</option>
-                        ))}
-                      </select>
-                      <Slider
-                        value={variation.weight}
-                        min={0}
-                        max={1}
-                        step={0.001}
-                        onInput={(weight) => {
-                          setFlameFunctions((draft) => {
-                            draft[i()]!.variations[j()]!.weight = weight
-                          })
-                        }}
-                        formatValue={formatPercent}
-                      />
-                      <Show
-                        when={isParametricType(variation) && variation}
-                        keyed
-                      >
-                        {(variation) => (
-                          <Dynamic
-                            {...getParamsEditor(variation)}
-                            setValue={(value) => {
-                              setFlameFunctions((draft) => {
-                                const i_ = i()
-                                const j_ = j()
-                                if (
-                                  !isParametricType(draft[i_]!.variations[j_]!)
-                                ) {
-                                  throw new Error(`Unreachable code`)
-                                }
-                                draft[i_]!.variations[j_].params = value
-                              })
-                            }}
-                          />
-                        )}
-                      </Show>
-                    </>
-                  )}
-                </For>
-              </Card>
-            )}
-          </For>
           <Card class={ui.addFlameCard}>
             <button
               class={ui.addFlameButton}
