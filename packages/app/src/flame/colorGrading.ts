@@ -10,6 +10,8 @@ import type { DrawModeFn } from './drawMode'
 export const ColorGradingUniforms = struct({
   countAdjustmentFactor: f32,
   exposure: f32,
+  /** Adds a slight fade towards the edge of the viewport */
+  edgeFade: f32,
 })
 
 const bindGroupLayout = tgpu.bindGroupLayout({
@@ -73,7 +75,8 @@ export function createColorGradingPipeline(
       let value = uniforms.exposure * pow(log(adjustedCount + 1), 0.4545);
       let ab = tex.gb / count;
       let rgb = gamutClipPreserveChroma(vec3f(drawMode(value), ab));
-      return vec4f(rgb, value);
+      let edgeFade = smoothstep(1, 0.98, max(abs(in.uv.x), abs(in.uv.y)));
+      return vec4f(rgb, value * mix(1.0, edgeFade, uniforms.edgeFade));
     }
   `
 

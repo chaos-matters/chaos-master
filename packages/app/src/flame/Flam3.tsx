@@ -107,6 +107,7 @@ export function Flam3(props: Flam3Props) {
     .createBuffer(ColorGradingUniforms, {
       countAdjustmentFactor: 1,
       exposure: 1,
+      edgeFade: 0.8,
     })
     .$usage('uniform')
 
