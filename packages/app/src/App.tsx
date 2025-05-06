@@ -87,7 +87,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
 
   return (
     <div class={ui.fullscreen}>
-      <div class={`${ui.sidebar} ${showSidebar() ? ui.show : ''}`}>
+      <div class={ui.sidebar} classList={{ [ui.show]: showSidebar() }}>
         <AffineEditor
           flameFunctions={flameFunctions}
           setFlameFunctions={setFlameFunctions}
