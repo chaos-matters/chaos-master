@@ -1,18 +1,3 @@
-.container {
-  position: relative;
-  padding: 0.15rem;
-  user-select: none;
-
-  &::before {
-    content: '';
-    position: absolute;
-    border-radius: 1.2rem;
-    inset: 0;
-    backdrop-filter: blur(1rem) saturate(300%) brightness(2) contrast(0.8);
-    z-index: -1;
-  }
-}
-
 .content {
   --color: #aaa;
   display: grid;
@@ -21,9 +6,15 @@
   justify-items: stretch;
   padding: 1rem;
   gap: 1rem;
+
   color: var(--color);
-  background-color: #000a;
-  border-radius: 1rem;
+  background-color: #080808;
+  border: 0.16rem solid #161616;
+  border-radius: 1.2rem;
+
   font-variant-numeric: tabular-nums;
   font-size: 14px;
+
+  /* required for delete button to position absolutely */
+  position: relative;
 }
