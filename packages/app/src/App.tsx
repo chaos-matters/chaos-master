@@ -17,6 +17,10 @@ import { Modal, useRequestModal } from './components/Modal/Modal'
 import { Slider } from './components/Sliders/Slider'
 import { SoftwareVersion } from './components/SoftwareVersion/SoftwareVersion'
 import { ChangeHistoryContextProvider } from './contexts/ChangeHistoryContext'
+import {
+  GlassyLookContextProvider,
+  useGlassyLookFlag,
+} from './contexts/GlassyLookContext'
 import { lightMode, paintMode } from './flame/drawMode'
 import { examples } from './flame/examples'
 import { Flam3, MAX_INNER_ITERS, MAX_POINT_COUNT } from './flame/Flam3'
@@ -60,9 +64,10 @@ function formatPercent(x: number) {
 }
 
 function App(props: { flameFromQuery?: FlameFunction[] }) {
-  const [pixelRatio, setPixelRatio] = createSignal(1)
+  const { glassyLook, setGlassyLook } = useGlassyLookFlag()
+  const [pixelRatio, setPixelRatio] = createSignal(0.5)
   const [skipIters, setSkipIters] = createSignal(15)
-  const [pointCount, setPointCount] = createSignal(1e6)
+  const [pointCount, setPointCount] = createSignal(1e5)
   const [exposure, setExposure] = createSignal(0.25)
   const [renderInterval, setRenderInterval] = createSignal(1)
   const [drawMode, setDrawMode] = createSignal(lightMode)
@@ -110,20 +115,25 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
     <ChangeHistoryContextProvider value={history}>
       <div class={ui.fullscreen}>
         <Root adapterOptions={{ powerPreference: 'high-performance' }}>
-          <AutoCanvas class={ui.canvas} pixelRatio={pixelRatio()}>
-            <WheelZoomCamera2D zoom={[zoom, setZoom]}>
-              <Flam3
-                skipIters={skipIters()}
-                pointCount={pointCount()}
-                drawMode={drawMode()}
-                backgroundColor={backgroundColor()}
-                exposure={exposure()}
-                adaptiveFilterEnabled={adaptiveFilterEnabled()}
-                flameFunctions={flameFunctions}
-                renderInterval={renderInterval()}
-              />
-            </WheelZoomCamera2D>
-          </AutoCanvas>
+          <div
+            class={ui.canvasContainer}
+            classList={{ [ui.canvasContainerGlassy]: glassyLook() }}
+          >
+            <AutoCanvas class={ui.canvas} pixelRatio={pixelRatio()}>
+              <WheelZoomCamera2D zoom={[zoom, setZoom]}>
+                <Flam3
+                  skipIters={skipIters()}
+                  pointCount={pointCount()}
+                  drawMode={drawMode()}
+                  backgroundColor={backgroundColor()}
+                  exposure={exposure()}
+                  adaptiveFilterEnabled={adaptiveFilterEnabled()}
+                  flameFunctions={flameFunctions}
+                  renderInterval={renderInterval()}
+                />
+              </WheelZoomCamera2D>
+            </AutoCanvas>
+          </div>
         </Root>
         <div class={ui.sidebar} classList={{ [ui.show]: showSidebar() }}>
           <AffineEditor
@@ -225,7 +235,24 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               </Card>
             )}
           </For>
-
+          <Card class={ui.addFlameCard}>
+            <button
+              class={ui.addFlameButton}
+              onClick={() => {
+                setFlameFunctions((draft) => {
+                  draft.push({
+                    probability: 0.1,
+                    color: { x: 0, y: 0 },
+                    preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+                    postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+                    variations: [{ type: 'linear', weight: 1 }],
+                  })
+                })
+              }}
+            >
+              <Plus />
+            </button>
+          </Card>
           <Card>
             <Slider
               label="Resolution"
@@ -280,6 +307,15 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                 onInput={(ev) => setAdaptiveFilterEnabled(ev.target.checked)}
               />
               <span></span>
+            </label>
+            <label class={ui.labeledInput}>
+              Glassy UI
+              <input
+                type="checkbox"
+                checked={glassyLook()}
+                onInput={(ev) => setGlassyLook(ev.target.checked)}
+              />
+              <span>perf. hit</span>
             </label>
             <label class={ui.labeledInput}>
               Background Color
@@ -345,24 +381,6 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               }}
             >
               Load Example
-            </button>
-          </Card>
-          <Card class={ui.addFlameCard}>
-            <button
-              class={ui.addFlameButton}
-              onClick={() => {
-                setFlameFunctions((draft) => {
-                  draft.push({
-                    probability: 0.1,
-                    color: { x: 0, y: 0 },
-                    preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-                    postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-                    variations: [{ type: 'linear', weight: 1 }],
-                  })
-                })
-              }}
-            >
-              <Plus />
             </button>
           </Card>
           <Card class={ui.addFlameCard}>
@@ -494,12 +512,14 @@ export function Wrappers() {
     return undefined
   })
   return (
-    <Modal>
-      <Suspense>
-        <Show when={flameFromQuery.state === 'ready'}>
-          <App flameFromQuery={flameFromQuery()} />
-        </Show>
-      </Suspense>
-    </Modal>
+    <GlassyLookContextProvider value={createSignal(true)}>
+      <Modal>
+        <Suspense>
+          <Show when={flameFromQuery.state === 'ready'}>
+            <App flameFromQuery={flameFromQuery()} />
+          </Show>
+        </Suspense>
+      </Modal>
+    </GlassyLookContextProvider>
   )
 }

@@ -11,6 +11,7 @@ export const ColorGradingUniforms = struct({
   accumulatedIterationCount: f32,
   factor: f32,
   exposure: f32,
+  featherTowardsSidebar: f32,
 })
 
 const bindGroupLayout = tgpu.bindGroupLayout({
@@ -74,7 +75,8 @@ export function createColorGradingPipeline(
       let value = uniforms.exposure * pow(log(adjustedCount + 1), 0.4545);
       let ab = tex.gb / count;
       let rgb = gamutClipPreserveChroma(vec3f(drawMode(value), ab));
-      return vec4f(rgb, value);
+      let featherTowardsSidebar = mix(1 - uniforms.featherTowardsSidebar, 1, smoothstep(-1, -0.98, in.uv.x));
+      return vec4f(rgb, value * featherTowardsSidebar);
     }
   `
 

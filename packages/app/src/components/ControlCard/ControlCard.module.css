@@ -1,4 +1,4 @@
-.container {
+.container-glassy {
   position: relative;
   padding: 0.15rem;
   user-select: none;
@@ -21,9 +21,21 @@
   justify-items: stretch;
   padding: 1rem;
   gap: 1rem;
+
   color: var(--color);
-  background-color: #000a;
-  border-radius: 1rem;
+  background-color: #080808;
+  border: 0.16rem solid #161616;
+  border-radius: 1.2rem;
+
   font-variant-numeric: tabular-nums;
   font-size: 14px;
+
+  /* required for delete button to position absolutely */
+  position: relative;
+}
+
+.content-glassy {
+  border: none;
+  border-radius: 1rem;
+  background-color: #000a;
 }

@@ -1,6 +1,7 @@
 import { createEffect, createMemo, onCleanup } from 'solid-js'
 import { arrayOf, vec2f, vec4f, vec4u } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
+import { useGlassyLookFlag } from '@/contexts/GlassyLookContext'
 import { randomVec4u } from '@/utils/randomVec4u'
 import { usePointer } from '@/utils/usePointer'
 import { useCamera } from '../lib/CameraContext'
@@ -36,6 +37,7 @@ type Flam3Props = {
 
 export function Flam3(props: Flam3Props) {
   const camera = useCamera()
+  const { glassyLook } = useGlassyLookFlag()
   const { root, device } = useRootContext()
   const { context, canvasSize, pixelRatio, canvas, canvasFormat } = useCanvas()
   const pointer = usePointer(canvas)
@@ -97,6 +99,7 @@ export function Flam3(props: Flam3Props) {
       accumulatedIterationCount: 0,
       factor: 1,
       exposure: 1,
+      featherTowardsSidebar: glassyLook() ? 0 : 1,
     })
     .$usage('uniform')
 
@@ -211,6 +214,7 @@ export function Flam3(props: Flam3Props) {
     createEffect(() => {
       colorGradingUniforms.writePartial({
         exposure: 2 * Math.exp(props.exposure),
+        featherTowardsSidebar: glassyLook() ? 0 : 1,
       })
       rafLoop.redraw()
     })
