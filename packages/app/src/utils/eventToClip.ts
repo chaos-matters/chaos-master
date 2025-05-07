@@ -8,6 +8,8 @@ export function eventToClip(
   if (!(target_ instanceof HTMLElement)) {
     return vec2f()
   }
+  // TODO: cache getBoundingClientRect
+  // because this causes a relayout which is pretty slow, 1-2ms
   const rect = target_.getBoundingClientRect()
   const centerX = rect.x + rect.width / 2
   const centerY = rect.y + rect.height / 2

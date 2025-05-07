@@ -111,25 +111,31 @@ function Gradient() {
       },
     })
 
-    createAnimationFrame(() => {
+    createEffect(() => {
       camera.update()
-
-      const encoder = device.createCommandEncoder()
-      const pass = encoder.beginRenderPass({
-        colorAttachments: [
-          {
-            view: context.getCurrentTexture().createView(),
-            loadOp: 'clear',
-            storeOp: 'store',
-          },
-        ],
-      })
-      pass.setBindGroup(0, root.unwrap(camera.bindGroup))
-      pass.setPipeline(renderPipeline)
-      pass.draw(3)
-      pass.end()
-      device.queue.submit([encoder.finish()])
+      rafLoop.redraw()
     })
+
+    const rafLoop = createAnimationFrame(
+      () => {
+        const encoder = device.createCommandEncoder()
+        const pass = encoder.beginRenderPass({
+          colorAttachments: [
+            {
+              view: context.getCurrentTexture().createView(),
+              loadOp: 'clear',
+              storeOp: 'store',
+            },
+          ],
+        })
+        pass.setBindGroup(0, root.unwrap(camera.bindGroup))
+        pass.setPipeline(renderPipeline)
+        pass.draw(3)
+        pass.end()
+        device.queue.submit([encoder.finish()])
+      },
+      () => Infinity,
+    )
   })
   return null
 }

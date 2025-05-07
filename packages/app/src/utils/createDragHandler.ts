@@ -47,6 +47,10 @@ export function createDragHandler(
   { deadZoneRadius = 0, setActive }: Options = {},
 ) {
   return (initEvent: PointerEvent) => {
+    // ignore non-left mouse button clicks
+    if (initEvent.button !== 0) {
+      return
+    }
     const handlers = createHandlers(initEvent)
     if (!handlers) return
 
