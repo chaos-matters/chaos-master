@@ -1,5 +1,5 @@
 import { createEffect, createMemo, onCleanup } from 'solid-js'
-import { arrayOf, vec2f, vec4f, vec4u } from 'typegpu/data'
+import { arrayOf, vec4f, vec4u } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { randomVec4u } from '@/utils/randomVec4u'
 import { usePointer } from '@/utils/usePointer'
@@ -21,11 +21,9 @@ import type { DrawModeFn } from './drawMode'
 import type { FlameFunction } from './flameFunction'
 
 export const MAX_POINT_COUNT = 4e6
-export const MAX_OUTER_ITERS = 15
 export const MAX_INNER_ITERS = 15
 
 type Flam3Props = {
-  outerIters: number
   skipIters: number
   pointCount: number
   renderInterval: number
@@ -43,7 +41,7 @@ export function Flam3(props: Flam3Props) {
   const pointer = usePointer(canvas)
   const queryBuffer = root.createBuffer(vec4f, vec4f())
 
-  function _readCountUnderPoiner(frameIndex: number) {
+  function _readCountUnderPointer(frameIndex: number) {
     const o = outputTextures()
     const p = pointer()
     if (frameIndex % 10 === 0 && p && o) {
@@ -194,15 +192,14 @@ export function Flam3(props: Flam3Props) {
       runSkipIfs.update(props.flameFunctions)
       runIfs.update(props.flameFunctions)
 
+      // this is in a separate effect because we don't
+      // want to run ifs.update if not necessary
       createEffect(() => {
         count = 0
-        const _ = props.outerIters
         camera.update()
-        camera.js.clipToWorld(vec2f())
-        colorGradingUniforms.write({
+        colorGradingUniforms.writePartial({
           accumulatedIterationCount: 0,
           factor: factor(),
-          exposure: 1,
         })
 
         const encoder = device.createCommandEncoder()
@@ -220,34 +217,43 @@ export function Flam3(props: Flam3Props) {
           pass.end()
         }
         device.queue.submit([encoder.finish()])
+        rafLoop.redraw()
       })
     })
 
-    createAnimationFrame(() => {
-      computeUniforms.write({
-        seed: randomVec4u(),
-      })
-      count += props.outerIters
-      colorGradingUniforms.write({
-        accumulatedIterationCount: count,
-        factor: factor(),
+    createEffect(() => {
+      colorGradingUniforms.writePartial({
         exposure: 2 * Math.exp(props.exposure),
       })
+      rafLoop.redraw()
+    })
 
-      // Encode commands to do the computation
-      const encoder = device.createCommandEncoder()
-      {
-        const pass = encoder.beginComputePass()
-        runInitPoints(pass, props.pointCount)
-        runSkipIfs.run(pass, props.pointCount)
-        pass.end()
-      }
-      for (let i = 0; i < props.outerIters; ++i) {
+    const rafLoop = createAnimationFrame(
+      () => {
+        computeUniforms.write({
+          seed: randomVec4u(),
+        })
+        count += 1
+        colorGradingUniforms.writePartial({
+          accumulatedIterationCount: count,
+        })
+
+        // Encode commands to do the computation
+        const encoder = device.createCommandEncoder()
+
+        {
+          const pass = encoder.beginComputePass()
+          runInitPoints(pass, props.pointCount)
+          runSkipIfs.run(pass, props.pointCount)
+          pass.end()
+        }
+
         {
           const pass = encoder.beginComputePass()
           runIfs.run(pass, props.pointCount)
           pass.end()
         }
+
         {
           const pass = encoder.beginRenderPass({
             colorAttachments: [
@@ -261,19 +267,21 @@ export function Flam3(props: Flam3Props) {
           renderPoints(pass, props.pointCount)
           pass.end()
         }
-      }
-      if (props.adaptiveFilterEnabled) {
-        const pass = encoder.beginComputePass()
-        runBlur(pass)
-        pass.end()
-      }
 
-      runColorGradingPipeline()?.(encoder, context, props.backgroundColor)
+        if (props.adaptiveFilterEnabled) {
+          const pass = encoder.beginComputePass()
+          runBlur(pass)
+          pass.end()
+        }
 
-      // readCountUnderPoiner(count)
+        runColorGradingPipeline()?.(encoder, context, props.backgroundColor)
 
-      device.queue.submit([encoder.finish()])
-    }, props.renderInterval)
+        // _readCountUnderPointer(count)
+
+        device.queue.submit([encoder.finish()])
+      },
+      () => props.renderInterval,
+    )
   })
   return null
 }

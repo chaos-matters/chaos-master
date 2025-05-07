@@ -19,12 +19,7 @@ import { SoftwareVersion } from './components/SoftwareVersion/SoftwareVersion'
 import { ChangeHistoryContextProvider } from './contexts/ChangeHistoryContext'
 import { lightMode, paintMode } from './flame/drawMode'
 import { examples } from './flame/examples'
-import {
-  Flam3,
-  MAX_INNER_ITERS,
-  MAX_OUTER_ITERS,
-  MAX_POINT_COUNT,
-} from './flame/Flam3'
+import { Flam3, MAX_INNER_ITERS, MAX_POINT_COUNT } from './flame/Flam3'
 import {
   isParametricType,
   isVariationType,
@@ -66,7 +61,6 @@ function formatPercent(x: number) {
 
 function App(props: { flameFromQuery?: FlameFunction[] }) {
   const [pixelRatio, setPixelRatio] = createSignal(1)
-  const [outerIters, setOuterIters] = createSignal(1)
   const [skipIters, setSkipIters] = createSignal(15)
   const [pointCount, setPointCount] = createSignal(1e6)
   const [exposure, setExposure] = createSignal(0.25)
@@ -119,7 +113,6 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
           <AutoCanvas class={ui.canvas} pixelRatio={pixelRatio()}>
             <WheelZoomCamera2D zoom={[zoom, setZoom]}>
               <Flam3
-                outerIters={outerIters()}
                 skipIters={skipIters()}
                 pointCount={pointCount()}
                 drawMode={drawMode()}
@@ -244,15 +237,6 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               formatValue={(value) => value.toString()}
             />
             <Slider
-              label="Outer Iterations"
-              value={outerIters()}
-              min={0}
-              max={MAX_OUTER_ITERS}
-              step={1}
-              onInput={setOuterIters}
-              formatValue={(value) => value.toString()}
-            />
-            <Slider
               label="Skip Iterations"
               value={skipIters()}
               min={0}
@@ -289,7 +273,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               formatValue={(value) => value.toString()}
             />
             <label class={ui.labeledInput}>
-              Enable adaptive filter
+              Adaptive filter
               <input
                 type="checkbox"
                 checked={adaptiveFilterEnabled()}

@@ -1,12 +1,13 @@
 import { createEffect, onCleanup, untrack } from 'solid-js'
 
-export function createAnimationFrame(fn: () => void, interval = 10) {
+export function createAnimationFrame(fn: () => void, minDeltaTime = () => 0) {
+  let lastTime = 0
   createEffect(() => {
-    let lastTime = 0
     let frameId: number
 
     function run(time: number) {
-      if (time - lastTime >= interval) {
+      const passedEnoughTime = time - lastTime >= minDeltaTime()
+      if (lastTime === 0 || passedEnoughTime) {
         lastTime = time
         untrack(fn)
       }
@@ -19,4 +20,10 @@ export function createAnimationFrame(fn: () => void, interval = 10) {
       cancelAnimationFrame(frameId)
     })
   })
+
+  return {
+    redraw() {
+      lastTime = 0
+    },
+  }
 }
