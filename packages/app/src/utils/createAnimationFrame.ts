@@ -1,4 +1,4 @@
-import { createEffect, onCleanup, untrack } from 'solid-js'
+import { createEffect, onCleanup } from 'solid-js'
 
 export function createAnimationFrame(
   fn: () => void,
@@ -6,17 +6,23 @@ export function createAnimationFrame(
   hold?: () => Promise<void>,
 ) {
   let lastTime = 0
-  let lastHold: Promise<void> | undefined = undefined
+
   createEffect(() => {
     let frameId: number
+    const framesPending = new Set<number>()
 
-    async function run(time: number) {
-      await lastHold
-      lastHold = hold?.()
+    function run(time: number) {
+      const framesNotPending = framesPending.size <= 2
       const passedEnoughTime = time - lastTime >= minDeltaTime()
-      if (lastTime === 0 || passedEnoughTime) {
+      if (framesNotPending && (lastTime === 0 || passedEnoughTime)) {
         lastTime = time
-        untrack(fn)
+        fn()
+        if (hold) {
+          framesPending.add(time)
+          hold()
+            .then(() => framesPending.delete(time))
+            .catch(console.error)
+        }
       }
       frameId = requestAnimationFrame(run)
     }
