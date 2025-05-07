@@ -21,6 +21,22 @@
   accent-color: var(--color);
   margin: 0;
 
+  /* when scrolling into view on change, how much to over-scroll */
+  scroll-margin-block: 8rem;
+
+  &::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 100vh;
+    cursor: pointer;
+    background: linear-gradient(
+      to bottom,
+      var(--color),
+      oklab(from var(--color) calc(l * 0.75) a b)
+    );
+  }
+
   /* track */
   isolation: isolate; /* allows sorting track below thumb */
   &::before {

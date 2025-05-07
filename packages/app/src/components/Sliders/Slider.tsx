@@ -1,5 +1,6 @@
-import { Show } from 'solid-js'
+import { createMemo, Show } from 'solid-js'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
+import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
 import ui from './Slider.module.css'
 
 type SliderProps = {
@@ -20,12 +21,13 @@ export function Slider(props: SliderProps) {
   const min = () => props.min ?? 0
   const max = () => props.max ?? 1
   const step = () => props.step ?? 0.01
+  const value = createMemo(() => props.value)
   const formatValue = () =>
-    props.formatValue ? props.formatValue(props.value) : props.value.toFixed(2)
+    props.formatValue ? props.formatValue(value()) : value().toFixed(2)
 
   const fillPercentage = () => {
     const range = max() - min()
-    return ((props.value - min()) / range) * 100
+    return ((value() - min()) / range) * 100
   }
 
   return (
@@ -34,12 +36,15 @@ export function Slider(props: SliderProps) {
         <span>{label()}</span>
       </Show>
       <input
+        ref={(el) => {
+          scrollIntoViewAndFocusOnChange(value, el)
+        }}
         class={ui.slider}
         type="range"
         min={min()}
         max={max()}
         step={step()}
-        value={props.value}
+        value={value()}
         onInput={(ev) => {
           if (!history.isPreviewing()) {
             history.startPreview()

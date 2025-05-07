@@ -13,6 +13,7 @@ import { createZoom, WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { createAnimationFrame } from '@/utils/createAnimationFrame'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'
+import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
 import { wgsl } from '@/utils/wgsl'
 import ui from './AffineEditor.module.css'
 import type { v2f } from 'typegpu/data'
@@ -320,8 +321,19 @@ export function AffineEditor(props: {
 }) {
   const [div, setDiv] = createSignal<HTMLDivElement>()
   const [zoom, setZoom] = createZoom(0.9, [0.5, 20])
+
+  const scrollTrigger = () => {
+    props.flameFunctions.forEach((f) => f.preAffine)
+  }
+
   return (
-    <div ref={setDiv} class={ui.editorCard}>
+    <div
+      ref={(el) => {
+        setDiv(el)
+        scrollIntoViewAndFocusOnChange(scrollTrigger, el)
+      }}
+      class={ui.editorCard}
+    >
       <Root adapterOptions={{ powerPreference: 'high-performance' }}>
         <AutoCanvas class={ui.canvas} pixelRatio={1}>
           <WheelZoomCamera2D eventTarget={div()} zoom={[zoom, setZoom]}>

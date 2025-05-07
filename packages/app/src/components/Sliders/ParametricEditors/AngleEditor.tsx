@@ -1,5 +1,7 @@
+import { createMemo } from 'solid-js'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { createDragHandler } from '@/utils/createDragHandler'
+import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
 import ui from './AngleEditor.module.css'
 import type { EditorProps } from './types'
 
@@ -12,6 +14,8 @@ function formatAngle(angle: number) {
 
 export function AngleEditor(props: AngleEditorProps) {
   const history = useChangeHistory()
+  const value = createMemo(() => props.value)
+
   const startRotating = createDragHandler((initEvent) => {
     history.startPreview('Edit angle')
     const el = initEvent.currentTarget
@@ -35,16 +39,24 @@ export function AngleEditor(props: AngleEditorProps) {
       onDone: history.commit,
     }
   })
+
   return (
     <label class={ui.label}>
       <span class={ui.name}>{props.name}</span>
-      <div class={ui.track} onPointerDown={startRotating} tabIndex={0}>
-        <div class={ui.indicator} style={{ '--angle': `${props.value}rad` }}>
+      <div
+        ref={(el) => {
+          scrollIntoViewAndFocusOnChange(value, el)
+        }}
+        class={ui.track}
+        onPointerDown={startRotating}
+        tabIndex={0}
+      >
+        <div class={ui.indicator} style={{ '--angle': `${value()}rad` }}>
           <div class={ui.line} />
           <div class={ui.dot} />
         </div>
       </div>
-      <span class={ui.value}>{formatAngle(props.value)}</span>
+      <span class={ui.value}>{formatAngle(value())}</span>
     </label>
   )
 }
