@@ -1,5 +1,5 @@
 import { createEffect, createMemo, onCleanup } from 'solid-js'
-import { arrayOf, vec4f, vec4u } from 'typegpu/data'
+import { arrayOf, vec2f, vec4f, vec4u } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { randomVec4u } from '@/utils/randomVec4u'
 import { usePointer } from '@/utils/usePointer'
@@ -197,7 +197,7 @@ export function Flam3(props: Flam3Props) {
       // want to run ifs.update if not necessary
       createEffect(() => {
         count = 0
-        camera.update()
+        camera.js.clipToWorld(vec2f())
         colorGradingUniforms.writePartial({
           accumulatedIterationCount: 0,
           factor: factor(),
