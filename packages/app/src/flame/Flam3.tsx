@@ -188,6 +188,7 @@ export function Flam3(props: Flam3Props) {
     )
 
     let count = 0
+    let clearRequested = true
     createEffect(() => {
       runSkipIfs.update(props.flameFunctions)
       runIfs.update(props.flameFunctions)
@@ -202,21 +203,7 @@ export function Flam3(props: Flam3Props) {
           factor: factor(),
         })
 
-        const encoder = device.createCommandEncoder()
-        {
-          const pass = encoder.beginRenderPass({
-            colorAttachments: [
-              {
-                view: outputTextureView,
-                loadOp: 'clear',
-                storeOp: 'store',
-                clearValue: [0, 0, 0, 0],
-              },
-            ],
-          })
-          pass.end()
-        }
-        device.queue.submit([encoder.finish()])
+        clearRequested = true
         rafLoop.redraw()
       })
     })
@@ -230,6 +217,25 @@ export function Flam3(props: Flam3Props) {
 
     const rafLoop = createAnimationFrame(
       () => {
+        if (clearRequested) {
+          clearRequested = false
+          const encoder = device.createCommandEncoder()
+          {
+            const pass = encoder.beginRenderPass({
+              colorAttachments: [
+                {
+                  view: outputTextureView,
+                  loadOp: 'clear',
+                  storeOp: 'store',
+                  clearValue: [0, 0, 0, 0],
+                },
+              ],
+            })
+            pass.end()
+          }
+          device.queue.submit([encoder.finish()])
+        }
+        camera.update()
         computeUniforms.write({
           seed: randomVec4u(),
         })
@@ -281,6 +287,7 @@ export function Flam3(props: Flam3Props) {
         device.queue.submit([encoder.finish()])
       },
       () => props.renderInterval,
+      () => device.queue.onSubmittedWorkDone(),
     )
   })
   return null
