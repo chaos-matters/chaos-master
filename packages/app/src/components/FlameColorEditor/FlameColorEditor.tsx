@@ -14,6 +14,7 @@ import { createAnimationFrame } from '@/utils/createAnimationFrame'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'
 import { maxLength2 } from '@/utils/maxLength'
+import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
 import { wgsl } from '@/utils/wgsl'
 import ui from './FlameColorEditor.module.css'
 import type { v2f } from 'typegpu/data'
@@ -197,8 +198,19 @@ export function FlameColorEditor(props: {
 }) {
   const [div, setDiv] = createSignal<HTMLDivElement>()
   const [zoom, setZoom] = createZoom(4, [2, 20])
+
+  const scrollTrigger = () => {
+    props.flameFunctions.forEach((f) => f.color)
+  }
+
   return (
-    <div ref={setDiv} class={ui.editorCard}>
+    <div
+      ref={(el) => {
+        setDiv(el)
+        scrollIntoViewAndFocusOnChange(scrollTrigger, el)
+      }}
+      class={ui.editorCard}
+    >
       <Root adapterOptions={{ powerPreference: 'high-performance' }}>
         <AutoCanvas class={ui.canvas} pixelRatio={1}>
           <WheelZoomCamera2D eventTarget={div()} zoom={[zoom, setZoom]}>

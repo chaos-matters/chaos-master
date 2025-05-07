@@ -1,9 +1,10 @@
 .label {
   display: contents;
+  color: var(--color);
 
   &:hover,
   &:focus-within {
-    color: white;
+    --color: white;
   }
 }
 
@@ -25,6 +26,9 @@
   border: 2px solid rgba(255, 255, 255, 0.2);
   cursor: pointer;
   outline: none;
+
+  /* when scrolling into view on change, how much to over-scroll */
+  scroll-margin-block: 8rem;
 }
 
 .indicator {
@@ -40,21 +44,26 @@
   top: 50%;
   height: 2px;
   width: 50%;
-  background: linear-gradient(to right, transparent, currentColor 50%);
+  background: linear-gradient(to right, transparent, var(--color) 50%);
   left: 50%;
   translate: 0 -50%;
+  border-radius: 50%;
 }
 
 .dot {
   position: absolute;
   width: 12px;
   height: 12px;
-  background: currentColor;
   border-radius: 100vh;
   top: 50%;
   right: 0;
-  transform: translate(50%, -50%);
+  transform: translate(50%, -50%) rotate(calc(var(--angle)));
   cursor: grab;
+  background: linear-gradient(
+    to bottom,
+    var(--color),
+    oklab(from var(--color) calc(l * 0.75) a b)
+  );
 
   &:active {
     cursor: grabbing;
