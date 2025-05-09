@@ -80,9 +80,12 @@ export function Flam3(props: Flam3Props) {
     }
   }
 
-  const factor = createMemo(
-    () => (camera.zoom() * pixelRatio()) ** 2 / (props.pointCount / 1e5),
-  )
+  const factor = createMemo(() => {
+    // height is used because camera.zoom is proportional to
+    // 1 / viewport.height in world-space
+    const { height } = canvasSize()
+    return (0.02 * (camera.zoom() * height) ** 2) / props.pointCount
+  })
 
   const points = root
     .createBuffer(arrayOf(Point, MAX_POINT_COUNT))
