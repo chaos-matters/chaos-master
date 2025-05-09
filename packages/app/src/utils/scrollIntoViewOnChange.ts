@@ -3,6 +3,9 @@ import { createEffect, on } from 'solid-js'
 /**
  * Scrolls the element into view when a signal triggers.
  *
+ * Used for navigating to the element which changes when
+ * triggering undo / redo.
+ *
  * Example:
  * ```tsx
  * const value = createMemo(() => ...)

@@ -8,8 +8,7 @@ import type { v3f } from 'typegpu/data'
 import type { DrawModeFn } from './drawMode'
 
 export const ColorGradingUniforms = struct({
-  accumulatedIterationCount: f32,
-  factor: f32,
+  countAdjustmentFactor: f32,
   exposure: f32,
 })
 
@@ -70,7 +69,7 @@ export function createColorGradingPipeline(
       let pos2u = vec2u(in.pos.xy);
       let tex = textureLoad(outputTexture, pos2u, 0);
       let count = tex.a;
-      let adjustedCount = count * uniforms.factor / uniforms.accumulatedIterationCount;
+      let adjustedCount = count * uniforms.countAdjustmentFactor;
       let value = uniforms.exposure * pow(log(adjustedCount + 1), 0.4545);
       let ab = tex.gb / count;
       let rgb = gamutClipPreserveChroma(vec3f(drawMode(value), ab));
