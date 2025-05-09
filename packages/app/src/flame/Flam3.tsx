@@ -20,6 +20,11 @@ import type { v3f } from 'typegpu/data'
 import type { DrawModeFn } from './drawMode'
 import type { FlameFunction } from './flameFunction'
 
+/**
+ * TODO: This factor is fine tuned to look good for the default example.
+ * Consider dynamically computing the correct factor to use.
+ */
+const COUNT_ADJUSTMENT_FACTOR = 0.02
 export const MAX_POINT_COUNT = 4e6
 export const MAX_INNER_ITERS = 15
 
@@ -80,11 +85,14 @@ export function Flam3(props: Flam3Props) {
     }
   }
 
-  const factor = createMemo(() => {
+  const countAdjustmentFactor = createMemo(() => {
     // height is used because camera.zoom is proportional to
     // 1 / viewport.height in world-space
     const { height } = canvasSize()
-    return (0.02 * (camera.zoom() * height) ** 2) / props.pointCount
+    return (
+      (COUNT_ADJUSTMENT_FACTOR * (camera.zoom() * height) ** 2) /
+      props.pointCount
+    )
   })
 
   const points = root
@@ -97,8 +105,7 @@ export function Flam3(props: Flam3Props) {
 
   const colorGradingUniforms = root
     .createBuffer(ColorGradingUniforms, {
-      accumulatedIterationCount: 0,
-      factor: 1,
+      countAdjustmentFactor: 1,
       exposure: 1,
     })
     .$usage('uniform')
@@ -190,7 +197,7 @@ export function Flam3(props: Flam3Props) {
       postprocessTexture,
     )
 
-    let count = 0
+    let renderAccumulationIndex = 0
     let clearRequested = true
     createEffect(() => {
       runSkipIfs.update(props.flameFunctions)
@@ -199,11 +206,10 @@ export function Flam3(props: Flam3Props) {
       // this is in a separate effect because we don't
       // want to run ifs.update if not necessary
       createEffect(() => {
-        count = 0
+        renderAccumulationIndex = 0
         camera.update()
         colorGradingUniforms.writePartial({
-          accumulatedIterationCount: 0,
-          factor: factor(),
+          countAdjustmentFactor: countAdjustmentFactor(),
         })
 
         clearRequested = true
@@ -242,9 +248,10 @@ export function Flam3(props: Flam3Props) {
         computeUniforms.write({
           seed: randomVec4u(),
         })
-        count += 1
+        renderAccumulationIndex += 1
         colorGradingUniforms.writePartial({
-          accumulatedIterationCount: count,
+          countAdjustmentFactor:
+            countAdjustmentFactor() / renderAccumulationIndex,
         })
 
         // Encode commands to do the computation
