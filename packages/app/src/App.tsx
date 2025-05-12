@@ -277,7 +277,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                 class={ui.addFlameButton}
                 onClick={() => {
                   setFlameFunctions((draft) => {
-                    draft.push(defaultTransform)
+                    draft.push(structuredClone(defaultTransform))
                   })
                 }}
               >
