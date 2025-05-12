@@ -11,6 +11,7 @@ import { Dynamic } from 'solid-js/web'
 import { vec3f } from 'typegpu/data'
 import ui from './App.module.css'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
+import { Checkbox } from './components/Checkbox/Checkbox'
 import { Card } from './components/ControlCard/ControlCard'
 import { FlameColorEditor } from './components/FlameColorEditor/FlameColorEditor'
 import { Modal, useRequestModal } from './components/Modal/Modal'
@@ -57,6 +58,14 @@ function formatPercent(x: number) {
     return `100 %`
   }
   return `${(x * 100).toFixed(1)} %`
+}
+
+const defaultTransform: FlameFunction = {
+  probability: 0.1,
+  color: { x: 0, y: 0 },
+  preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+  postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+  variations: [{ type: 'linear', weight: 1 }],
 }
 
 function App(props: { flameFromQuery?: FlameFunction[] }) {
@@ -225,7 +234,18 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               </Card>
             )}
           </For>
-
+          <Card class={ui.addFlameCard}>
+            <button
+              class={ui.addFlameButton}
+              onClick={() => {
+                setFlameFunctions((draft) => {
+                  draft.push(defaultTransform)
+                })
+              }}
+            >
+              <Plus />
+            </button>
+          </Card>
           <Card>
             <Slider
               label="Resolution"
@@ -270,20 +290,20 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               max={5000}
               step={1}
               onInput={setRenderInterval}
-              formatValue={(value) => value.toString()}
+              formatValue={(value) => `${value.toString()} ms`}
             />
             <label class={ui.labeledInput}>
               Adaptive filter
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={adaptiveFilterEnabled()}
-                onInput={(ev) => setAdaptiveFilterEnabled(ev.target.checked)}
+                onChange={(checked) => setAdaptiveFilterEnabled(checked)}
               />
               <span></span>
             </label>
             <label class={ui.labeledInput}>
               Background Color
               <input
+                class={ui.backgroundColorPicker}
                 type="color"
                 onInput={(ev) =>
                   setBackgroundColor(hexToRgbNorm(ev.target.value))
@@ -294,6 +314,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
             <label class={ui.labeledInput}>
               Draw Mode
               <select
+                class={ui.varInputType}
                 onChange={(ev) =>
                   setDrawMode(() =>
                     ev.target.value === 'light' ? lightMode : paintMode,
@@ -305,7 +326,10 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               </select>
               <span></span>
             </label>
+          </Card>
+          <Card class={ui.addFlameCard}>
             <button
+              class={ui.addFlameButton}
               onClick={async () => {
                 const [selectedExampleId, setSelectedExampleId] =
                   createSignal<ExampleID>('empty')
@@ -345,24 +369,6 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               }}
             >
               Load Example
-            </button>
-          </Card>
-          <Card class={ui.addFlameCard}>
-            <button
-              class={ui.addFlameButton}
-              onClick={() => {
-                setFlameFunctions((draft) => {
-                  draft.push({
-                    probability: 0.1,
-                    color: { x: 0, y: 0 },
-                    preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-                    postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-                    variations: [{ type: 'linear', weight: 1 }],
-                  })
-                })
-              }}
-            >
-              <Plus />
             </button>
           </Card>
           <Card class={ui.addFlameCard}>

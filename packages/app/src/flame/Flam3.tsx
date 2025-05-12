@@ -224,6 +224,13 @@ export function Flam3(props: Flam3Props) {
       rafLoop.redraw()
     })
 
+    createEffect(() => {
+      // redraw when these change
+      const _ = props.backgroundColor
+      runColorGradingPipeline()
+      rafLoop.redraw()
+    })
+
     const rafLoop = createAnimationFrame(
       () => {
         if (clearRequested) {
