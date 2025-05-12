@@ -1,4 +1,5 @@
 import { createEffect, on } from 'solid-js'
+import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 
 /**
  * Scrolls the element into view when a signal triggers.
@@ -19,11 +20,15 @@ export function scrollIntoViewAndFocusOnChange(
   trigger: () => unknown,
   el: HTMLElement,
 ) {
+  const history = useChangeHistory()
   createEffect(
     on(
       trigger,
       () => {
-        if (el.matches(':is(:active),:has(:active)')) {
+        if (
+          !history.isUndoingOrRedoing() ||
+          el.matches(':is(:active),:has(:active)')
+        ) {
           // don't scroll if the user is actively manipulating the element
           // as this could cause an unexpected layout shift
           return

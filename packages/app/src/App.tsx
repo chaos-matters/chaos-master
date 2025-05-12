@@ -69,7 +69,7 @@ const defaultTransform: FlameFunction = {
 }
 
 function App(props: { flameFromQuery?: FlameFunction[] }) {
-  const [pixelRatio, setPixelRatio] = createSignal(0.5)
+  const [pixelRatio, setPixelRatio] = createSignal(1)
   const [skipIters, setSkipIters] = createSignal(15)
   const [pointCount, setPointCount] = createSignal(1e6)
   const [exposure, setExposure] = createSignal(0.25)
@@ -328,7 +328,11 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                 max={5000}
                 step={1}
                 onInput={setRenderInterval}
-                formatValue={(value) => `${value.toString()} ms`}
+                formatValue={(value) =>
+                  value < 1000
+                    ? `${value.toFixed(0)} ms`
+                    : `${(value / 1000).toFixed(1)} s`
+                }
               />
               <label class={ui.labeledInput}>
                 Adaptive filter

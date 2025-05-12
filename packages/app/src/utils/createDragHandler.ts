@@ -1,3 +1,5 @@
+import { createEffect, onCleanup } from 'solid-js'
+
 export type CreateClickAndDragHandler = (event: PointerEvent) =>
   | {
       onPointerMove?: (event: PointerEvent) => void
@@ -46,7 +48,20 @@ export function createDragHandler(
   createHandlers: CreateClickAndDragHandler,
   { deadZoneRadius = 0, setActive }: Options = {},
 ) {
+  const unmountController = new AbortController()
+  const unmountSignal = unmountController.signal
+
+  createEffect(() => {
+    onCleanup(() => {
+      unmountController.abort()
+    })
+  })
+
   return (initEvent: PointerEvent) => {
+    const cleanupController = new AbortController()
+    const cleanupSignal = cleanupController.signal
+    const signal = AbortSignal.any([unmountSignal, cleanupSignal])
+
     // ignore non-left mouse button clicks
     if (initEvent.button !== 0) {
       return
@@ -76,11 +91,16 @@ export function createDragHandler(
       }
     }
 
-    function onPointerUp_(event: PointerEvent) {
-      event.preventDefault()
-      event.stopImmediatePropagation()
+    function onPointerUp_(event: PointerEvent | undefined) {
+      if (cleanupSignal.aborted) {
+        // already cleaned up
+        return
+      }
+      cleanupController.abort()
+      event?.preventDefault()
+      event?.stopImmediatePropagation()
       onDone?.()
-      cleanup()
+      setActive?.(false)
     }
 
     function preventDefaultIfMoved(event: Event) {
@@ -90,22 +110,15 @@ export function createDragHandler(
       }
     }
 
-    document.addEventListener('pointermove', onPointerMove_)
-    document.addEventListener('pointerup', onPointerUp_)
-    document.addEventListener('pointercancel', onPointerUp_)
+    document.addEventListener('pointermove', onPointerMove_, { signal })
+    document.addEventListener('pointerup', onPointerUp_, { signal })
+    document.addEventListener('pointercancel', onPointerUp_, { signal })
     document.addEventListener('click', preventDefaultIfMoved, {
-      once: true,
       capture: true,
+      signal,
     })
-
-    function cleanup() {
-      document.removeEventListener('pointermove', onPointerMove_)
-      document.removeEventListener('pointerup', onPointerUp_)
-      document.removeEventListener('pointercancel', onPointerUp_)
-      document.removeEventListener('click', preventDefaultIfMoved, {
-        capture: true,
-      })
-      setActive?.(false)
-    }
+    signal.addEventListener('abort', () => {
+      onPointerUp_(undefined)
+    })
   }
 }

@@ -47,7 +47,7 @@ export function Slider(props: SliderProps) {
         value={value()}
         onInput={(ev) => {
           if (!history.isPreviewing()) {
-            history.startPreview()
+            history.startPreview(`Edit ${props.label}`)
           }
           props.onInput(ev.target.valueAsNumber)
         }}

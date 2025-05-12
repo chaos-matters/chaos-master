@@ -36,6 +36,7 @@ export type ChangeHistory<T> = {
   readonly hasRedo: () => boolean
   readonly startPreview: (description?: string) => void
   readonly isPreviewing: () => boolean
+  readonly isUndoingOrRedoing: () => boolean
   readonly commit: () => void
 }
 
@@ -44,6 +45,8 @@ export function createStoreHistory<T extends object>([store, setStore]: [
   SetStoreFunction<T>,
 ]) {
   const [stackIndex, setStackIndex] = createSignal(-1)
+  const [isUndoingOrRedoing, setIsUndoingOrRedoing] =
+    createSignal<boolean>(false)
   const [stack, setStack] = createSignal<HistoryItem[]>([], { equals: false })
   const [preview, setPreview] = createSignal<HistoryItem | undefined>(
     undefined,
@@ -181,18 +184,30 @@ export function createStoreHistory<T extends object>([store, setStore]: [
     })
   }
 
+  function wrapIntoUndoing(fn: () => void) {
+    return () => {
+      try {
+        setIsUndoingOrRedoing(true)
+        fn()
+      } finally {
+        setIsUndoingOrRedoing(false)
+      }
+    }
+  }
+
   return [
     store,
     set,
     {
-      replace,
-      undo,
-      redo,
+      undo: wrapIntoUndoing(undo),
+      redo: wrapIntoUndoing(redo),
       hasUndo,
       hasRedo,
+      isUndoingOrRedoing,
       startPreview,
       isPreviewing,
       commit,
+      replace,
     } satisfies ChangeHistory<T>,
   ] as const
 }
