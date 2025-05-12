@@ -57,6 +57,9 @@ export function createStoreHistory<T extends object>([store, setStore]: [
   const isPreviewing = () => Boolean(preview())
 
   function add(item: HistoryItem) {
+    if (item.forwardPatches.length === 0 && item.backwardPatches.length === 0) {
+      return
+    }
     setStack((p) => {
       p.splice(stackIndex() + 1, Infinity, item)
       setStackIndex(p.length - 1)

@@ -1,0 +1,40 @@
+.checkbox {
+  appearance: none;
+  margin: 0;
+  width: 1.2em;
+  height: 1.2em;
+  border: 2px solid #333;
+  border-radius: 0.4em;
+  display: grid;
+  place-items: center;
+
+  &::before {
+    content: '';
+    display: block;
+    width: 1em;
+    height: 1em;
+    opacity: 0;
+    background-color: var(--color);
+    /* manually drawn and fine tuned */
+    mask-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 11"><path d="M 2.5 5.5 L 4.5 7.5 L 8.5 3" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+  }
+
+  &:hover {
+    --color: white;
+  }
+
+  &:checked {
+    border: none;
+    background: linear-gradient(
+      to bottom,
+      var(--color),
+      oklab(from var(--color) calc(l * 0.8) a b)
+    );
+    background-size: cover;
+
+    &::before {
+      opacity: 1;
+      background-color: black;
+    }
+  }
+}

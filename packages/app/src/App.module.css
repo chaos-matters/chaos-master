@@ -178,3 +178,20 @@
     color: white;
   }
 }
+
+.background-color-picker {
+  border: 2px solid #333;
+  border-radius: 0.5rem;
+  padding: 0;
+
+  &::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+  &::-webkit-color-swatch {
+    border: none;
+  }
+
+  &:focus {
+    border-color: #555;
+  }
+}
