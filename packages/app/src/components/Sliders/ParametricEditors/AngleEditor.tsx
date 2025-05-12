@@ -17,7 +17,7 @@ export function AngleEditor(props: AngleEditorProps) {
   const value = createMemo(() => props.value)
 
   const startRotating = createDragHandler((initEvent) => {
-    history.startPreview('Edit angle')
+    history.startPreview(`Edit ${props.name ?? 'angle'}`)
     const el = initEvent.currentTarget
     if (!(el instanceof HTMLElement)) {
       throw new Error('unreachable code')

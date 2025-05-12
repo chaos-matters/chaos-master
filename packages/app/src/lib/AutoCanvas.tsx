@@ -64,6 +64,7 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
     context.configure({
       device,
       format: canvasFormat,
+      alphaMode: 'opaque',
     })
     return { context, canvasFormat }
   }
