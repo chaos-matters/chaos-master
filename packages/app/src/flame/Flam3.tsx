@@ -1,7 +1,6 @@
 import { createEffect, createMemo, onCleanup } from 'solid-js'
-import { arrayOf, vec4f, vec4u } from 'typegpu/data'
+import { arrayOf, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
-import { randomVec4u } from '@/utils/randomVec4u'
 import { usePointer } from '@/utils/usePointer'
 import { useCamera } from '../lib/CameraContext'
 import { useCanvas } from '../lib/CanvasContext'
@@ -12,7 +11,7 @@ import {
   ColorGradingUniforms,
   createColorGradingPipeline,
 } from './colorGrading'
-import { ComputeUniforms, createIFSPipeline } from './ifsPipeline'
+import { createIFSPipeline } from './ifsPipeline'
 import { createInitPointsPipeline } from './initPoints'
 import { createRenderPointsPipeline } from './renderPoints'
 import { outputTextureFormat, Point } from './variations/types'
@@ -167,29 +166,14 @@ export function Flam3(props: Flam3Props) {
     const { accumulationTexture, postprocessTexture } = o
     const outputTextureView = root.unwrap(accumulationTexture).createView()
 
-    const computeUniforms = root
-      .createBuffer(ComputeUniforms, { seed: vec4u() })
-      .$usage('uniform')
-
-    const runInitPoints = createInitPointsPipeline(
-      root,
-      points,
-      computeUniforms,
-    )
+    const runInitPoints = createInitPointsPipeline(root, points)
     const runSkipIfs = createIFSPipeline(
       root,
       props.skipIters,
       points,
-      computeUniforms,
       props.flameFunctions,
     )
-    const runIfs = createIFSPipeline(
-      root,
-      1,
-      points,
-      computeUniforms,
-      props.flameFunctions,
-    )
+    const runIfs = createIFSPipeline(root, 1, points, props.flameFunctions)
     const renderPoints = createRenderPointsPipeline(root, camera, points)
     const runBlur = createBlurPipeline(
       root,
@@ -253,9 +237,6 @@ export function Flam3(props: Flam3Props) {
           device.queue.submit([encoder.finish()])
         }
         camera.update()
-        computeUniforms.write({
-          seed: randomVec4u(),
-        })
         renderAccumulationIndex += 1
         colorGradingUniforms.writePartial({
           countAdjustmentFactor:

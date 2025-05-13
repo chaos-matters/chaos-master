@@ -1,16 +1,10 @@
 import { tgpu } from 'typegpu'
 import { arrayOf } from 'typegpu/data'
-import { hash, random, randomState, setSeed } from '@/shaders/random'
+import { random, randomState, setSeed } from '@/shaders/random'
 import { wgsl } from '@/utils/wgsl'
 import { PI } from './constants'
-import { ComputeUniforms } from './ifsPipeline'
 import { Point, VariationInfo } from './variations/types'
-import type {
-  LayoutEntryToInput,
-  StorageFlag,
-  TgpuBuffer,
-  TgpuRoot,
-} from 'typegpu'
+import type { StorageFlag, TgpuBuffer, TgpuRoot } from 'typegpu'
 import type { WgslArray } from 'typegpu/data'
 
 const { ceil } = Math
@@ -22,23 +16,16 @@ const bindGroupLayout = tgpu.bindGroupLayout({
     storage: (length: number) => arrayOf(Point, length),
     access: 'mutable',
   },
-  computeUniforms: {
-    uniform: ComputeUniforms,
-  },
 })
 
 export function createInitPointsPipeline(
   root: TgpuRoot,
   points: TgpuBuffer<WgslArray<typeof Point>> & StorageFlag,
-  computeUniforms: LayoutEntryToInput<
-    (typeof bindGroupLayout)['entries']['computeUniforms']
-  >,
 ) {
   const { device } = root
 
   const bindGroup = root.createBindGroup(bindGroupLayout, {
     points,
-    computeUniforms,
   })
 
   const initPointsShaderCode = wgsl/* wgsl */ `
@@ -47,7 +34,6 @@ export function createInitPointsPipeline(
       setSeed,
       randomState,
       random,
-      hash,
       PI,
       VariationInfo: VariationInfo,
     }}
@@ -64,7 +50,7 @@ export function createInitPointsPipeline(
 
       let pointIndex = workgroup_index * ${INIT_GROUP_SIZE} + local_invocation_index;
       var point = points[pointIndex];
-      setSeed((computeUniforms.seed ^ point.seed) + hash(1234 * pointIndex + point.seed.x));
+      setSeed(point.seed + pointIndex);
 
       // uniform disk
       let r = sqrt(random());
