@@ -1,26 +1,21 @@
 import { tgpu } from 'typegpu'
-import { arrayOf, struct, vec4u } from 'typegpu/data'
-import { hash, random, randomState, setSeed } from '@/shaders/random'
+import { arrayOf, struct } from 'typegpu/data'
+import { random, randomState, setSeed } from '@/shaders/random'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { wgsl } from '@/utils/wgsl'
 import { createFlameWgsl, extractFlameUniforms } from './transformFunction'
 import { AffineParams, Point, transformAffine } from './variations/types'
-import type { StorageFlag, TgpuBuffer, TgpuRoot, UniformFlag } from 'typegpu'
-import type { Vec4u, WgslArray, WgslStruct } from 'typegpu/data'
+import type { StorageFlag, TgpuBuffer, TgpuRoot } from 'typegpu'
+import type { WgslArray } from 'typegpu/data'
 import type { FlameDescriptor, TransformRecord } from './transformFunction'
 
 const { ceil } = Math
 const IFS_GROUP_SIZE = 16
 
-export const ComputeUniforms = struct({
-  seed: vec4u,
-})
-
 export function createIFSPipeline(
   root: TgpuRoot,
   insideShaderCount: number,
   points: TgpuBuffer<WgslArray<typeof Point>> & StorageFlag,
-  computeUniforms: TgpuBuffer<WgslStruct<{ seed: Vec4u }>> & UniformFlag,
   transforms: TransformRecord,
 ) {
   const { device } = root
@@ -45,9 +40,6 @@ export function createIFSPipeline(
       storage: (length: number) => arrayOf(Point, length),
       access: 'mutable',
     },
-    computeUniforms: {
-      uniform: ComputeUniforms,
-    },
     flameUniforms: {
       storage: FlameUniforms,
       access: 'readonly',
@@ -58,7 +50,6 @@ export function createIFSPipeline(
 
   const bindGroup = root.createBindGroup(bindGroupLayout, {
     points,
-    computeUniforms,
     flameUniforms: flameUniformsBuffer,
   })
 
@@ -67,7 +58,6 @@ export function createIFSPipeline(
       ...bindGroupLayout.bound,
       ...flamesObj,
       Point,
-      hash,
       setSeed,
       random,
       randomState,
@@ -91,8 +81,7 @@ export function createIFSPipeline(
 
       var point = points[pointIndex];
 
-      var seed = (computeUniforms.seed ^ point.seed) + hash(1234 * pointIndex + point.seed.x);
-      setSeed(seed);
+      setSeed(point.seed);
 
       for (var i = 0; i < ITER_COUNT; i += 1) {
         let flameIndex = random();

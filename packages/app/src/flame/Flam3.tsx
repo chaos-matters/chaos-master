@@ -1,7 +1,6 @@
 import { createEffect, createMemo, onCleanup } from 'solid-js'
-import { arrayOf, u32, vec3f, vec4f, vec4u } from 'typegpu/data'
+import { arrayOf, u32, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
-import { randomVec4u } from '@/utils/randomVec4u'
 import { usePointer } from '@/utils/usePointer'
 import { useCamera } from '../lib/CameraContext'
 import { useCanvas } from '../lib/CanvasContext'
@@ -17,7 +16,7 @@ import {
   createHistogramPipeline,
   HISTOGRAM_BIN_COUNT,
 } from './histogramPipeline'
-import { ComputeUniforms, createIFSPipeline } from './ifsPipeline'
+import { createIFSPipeline } from './ifsPipeline'
 import { createInitPointsPipeline } from './initPoints'
 import { createRenderHistogramPipeline } from './renderHistogram'
 import { createRenderPointsPipeline } from './renderPoints'
@@ -170,10 +169,6 @@ export function Flam3(props: Flam3Props) {
     )
   })
 
-  const computeUniforms = root
-    .createBuffer(ComputeUniforms, { seed: vec4u() })
-    .$usage('uniform')
-
   const renderPoints = createRenderPointsPipeline(root, camera, points)
 
   const histogramBuffer = root
@@ -221,16 +216,11 @@ export function Flam3(props: Flam3Props) {
     const { accumulationTexture } = o
     const outputTextureView = root.unwrap(accumulationTexture).createView()
 
-    const runInitPoints = createInitPointsPipeline(
-      root,
-      points,
-      computeUniforms,
-    )
+    const runInitPoints = createInitPointsPipeline(root, points)
     const ifsPipeline = createIFSPipeline(
       root,
       props.flameDescriptor.renderSettings.skipIters,
       points,
-      computeUniforms,
       props.flameDescriptor.transforms,
     )
 
@@ -294,9 +284,6 @@ export function Flam3(props: Flam3Props) {
           device.queue.submit([encoder.finish()])
         }
         camera.update()
-        computeUniforms.write({
-          seed: randomVec4u(),
-        })
         renderAccumulationIndex += 1
         colorGradingUniforms.writePartial({
           countAdjustmentFactor:
