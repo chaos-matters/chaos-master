@@ -14,7 +14,9 @@ import { AffineEditor } from './components/AffineEditor/AffineEditor'
 import { Checkbox } from './components/Checkbox/Checkbox'
 import { Card } from './components/ControlCard/ControlCard'
 import { FlameColorEditor } from './components/FlameColorEditor/FlameColorEditor'
-import { Modal, useRequestModal } from './components/Modal/Modal'
+import { createLoadExampleFlame } from './components/LoadExampleFlameModal/LoadExampleFlameModal'
+import { Modal } from './components/Modal/Modal'
+import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
 import { Slider } from './components/Sliders/Slider'
 import { SoftwareVersion } from './components/SoftwareVersion/SoftwareVersion'
 import { ChangeHistoryContextProvider } from './contexts/ChangeHistoryContext'
@@ -49,14 +51,10 @@ import { hexToRgbNorm } from './utils/hexToRgb'
 import {
   compressJsonQueryParam,
   decodeJsonQueryParam,
-  encodeJsonQueryParam,
 } from './utils/jsonQueryParam'
 import { sum } from './utils/sum'
 import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
-import type { ExampleID } from './flame/examples'
 import type { FlameFunction } from './flame/flameFunction'
-
-const { navigator } = window
 
 function formatPercent(x: number) {
   if (x === 1) {
@@ -84,7 +82,6 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
     DEFAULT_RENDER_INTERVAL_MS,
   )
   const [onExportImage, setOnExportImage] = createSignal<ExportImageType>()
-  const finalRenderInterval = () => (onExportImage() ? 0 : renderInterval())
   const [backgroundColor, setBackgroundColor] = createSignal(vec3f(0, 0, 0))
   const [adaptiveFilterEnabled, setAdaptiveFilterEnabled] = createSignal(true)
   const [showSidebar, setShowSidebar] = createSignal(true)
@@ -95,7 +92,14 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
   const totalProbability = createMemo(() =>
     sum(flameFunctions.map((f) => f.probability)),
   )
-  const requestModal = useRequestModal()
+
+  const { loadExampleModalIsOpen, showLoadExampleFlameModal } =
+    createLoadExampleFlame(history)
+
+  const finalRenderInterval = () =>
+    loadExampleModalIsOpen() ? Infinity : onExportImage() ? 0 : renderInterval()
+
+  const { showShareLinkModal } = createShareLinkModal(flameFunctions)
 
   useKeyboardShortcuts({
     Escape: () => {
@@ -402,45 +406,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
             <Card class={ui.buttonCard}>
               <button
                 class={ui.addFlameButton}
-                onClick={async () => {
-                  const [selectedExampleId, setSelectedExampleId] =
-                    createSignal<ExampleID>('empty')
-                  const result = await requestModal({
-                    title: 'Load Example Flame',
-                    message: () => (
-                      <>
-                        <p>You can undo this operation.</p>
-                        <select
-                          value={selectedExampleId()}
-                          onChange={(ev) =>
-                            setSelectedExampleId(ev.target.value as ExampleID)
-                          }
-                        >
-                          <For each={Object.keys(examples) as ExampleID[]}>
-                            {(exampleId) => (
-                              <option value={exampleId}>{exampleId}</option>
-                            )}
-                          </For>
-                        </select>
-                      </>
-                    ),
-                    options: {
-                      cancel: (props) => (
-                        <button onClick={props.onClick}>Cancel</button>
-                      ),
-                      load: (props) => (
-                        <button onClick={props.onClick}>Load</button>
-                      ),
-                    },
-                  })
-                  if (result === 'cancel') {
-                    return
-                  }
-                  // structuredClone required in order to not modify the original, as store in solidjs does
-                  history.replace(
-                    structuredClone(examples[selectedExampleId()]),
-                  )
-                }}
+                onClick={showLoadExampleFlameModal}
               >
                 Load Example
               </button>
@@ -456,23 +422,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               </button>
             </Card>
             <Card class={ui.buttonCard}>
-              <button
-                class={ui.addFlameButton}
-                onClick={async () => {
-                  const encoded = await encodeJsonQueryParam(flameFunctions)
-                  const url = `${window.location.origin}/?flame=${encoded}`
-                  await navigator.clipboard.writeText(url)
-                  await requestModal({
-                    title: 'Flame URL copied to clipboard!',
-                    message: url,
-                    options: {
-                      ok: (props) => (
-                        <button onClick={props.onClick}>OK</button>
-                      ),
-                    },
-                  })
-                }}
-              >
+              <button class={ui.addFlameButton} onClick={showShareLinkModal}>
                 Share Link
               </button>
             </Card>
