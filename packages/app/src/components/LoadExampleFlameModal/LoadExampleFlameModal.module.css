@@ -1,0 +1,30 @@
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  gap: 0.5rem;
+  max-width: 65rem;
+  justify-items: stretch;
+}
+
+.canvas-container {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border: 1px solid #111;
+  border-radius: 0.5rem;
+
+  &:hover {
+    border: 1px solid #555;
+  }
+}
+
+.gallery-title {
+  position: absolute;
+  width: 100%;
+  bottom: 0;
+  padding-inline: 0.5rem;
+  padding-block: 0.25rem;
+  color: #aaa;
+  background-color: #111d;
+  font-size: small;
+}

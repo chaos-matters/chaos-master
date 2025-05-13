@@ -1,24 +1,20 @@
-import { createContext, createSignal, For, onMount, Show } from 'solid-js'
+import { createContext, createSignal, onMount, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { useContextSafe } from '@/utils/useContextSafe'
 import ui from './Modal.module.css'
 import type { JSX, ParentProps } from 'solid-js'
 
-export type ModalConfig<T extends string> = {
-  title: string | (() => JSX.Element)
-  message: string | (() => JSX.Element)
-  options: Record<T, (props: { onClick: () => void }) => JSX.Element>
+export type ModalConfig<T> = {
   class?: string
+  content: (props: { respond: (value: T) => void }) => JSX.Element
 }
 
 /** Helper function that allows typescript to infer the correct response type. */
-export function defineModal<T extends string>(modal: ModalConfig<T>) {
+export function defineModal<T>(modal: ModalConfig<T>) {
   return modal
 }
 
-export type RequestModalFn = <T extends string>(
-  config: ModalConfig<T>,
-) => Promise<T>
+export type RequestModalFn = <T = void>(config: ModalConfig<T>) => Promise<T>
 
 export const ModalContext = createContext<RequestModalFn>()
 
@@ -37,7 +33,7 @@ function showModal(dialog: HTMLDialogElement) {
   })
 }
 
-type ModalInstance<T extends string> = {
+type ModalInstance<T> = {
   config: ModalConfig<T>
   resolve: (value: T) => void
 }
@@ -58,25 +54,21 @@ type ModalProps = {
  * async function onClick() {
  *   ...
  *   const response = await requestModal({
- *     title: "Are you sure?",
- *     message: () => (
+ *     content: ({ respond }) => (
  *       <>
- *         You are about to delete 3 items
- *         <br />
- *         Be careful!
+ *         <h1>Are you sure?</h1>
+ *         <p>
+ *           You are about to delete 3 items.
+ *         </p>
+ *         <footer>
+ *           <button onClick={() => respond('keep')}>
+ *             Cancel
+ *           </button>
+ *           <button onClick={() => respond('delete')}>
+ *             Delete
+ *           </button>
+ *         </footer
  *       </>
- *     options: {
- *       delete: (props) => (
- *         <Button onClick={props.onClick}>
- *           Delete
- *         </Button>
- *       ),
- *       keep: (props) => (
- *         <Button autofocus onClick={props.onClick}>
- *           Keep
- *         </Button>
- *       ),
- *     }
  *   })
  *   if (response === 'keep') {
  *     return
@@ -87,12 +79,12 @@ type ModalProps = {
  */
 export function Modal(props: ParentProps<ModalProps>) {
   const [modalInstances, setModalInstances] = createSignal<
-    Array<ModalInstance<string>>
+    Array<ModalInstance<unknown>>
   >([])
 
-  function requestModal<T extends string>(config: ModalConfig<T>): Promise<T> {
+  function requestModal<T>(config: ModalConfig<T>): Promise<T> {
     const { resolve, promise } = Promise.withResolvers<T>()
-    const instance: ModalInstance<string> = {
+    const instance: ModalInstance<unknown> = {
       config,
       // @ts-expect-error this can't be modeled in ts
       resolve,
@@ -111,41 +103,26 @@ export function Modal(props: ParentProps<ModalProps>) {
           {(instance) => {
             const {
               resolve,
-              config: {
-                title: Title,
-                message: Message,
-                options,
-                class: class_,
-              },
+              config: { content: Content, class: class_ },
             } = instance
+
+            function respond(option: unknown) {
+              resolve(option)
+              setModalInstances((instances) =>
+                instances.filter((ins) => ins !== instance),
+              )
+            }
+
             return (
               <dialog
                 ref={showModal}
+                class=""
                 classList={{ [ui.modal]: true, [class_ ?? '']: true }}
                 onCancel={(ev) => {
                   ev.preventDefault()
                 }}
               >
-                <div class={ui.title}>
-                  {typeof Title === 'string' ? Title : <Title />}
-                </div>
-                <div class={ui.message}>
-                  {typeof Message === 'string' ? Message : <Message />}
-                </div>
-                <div class={ui.options}>
-                  <For each={Object.entries(options)}>
-                    {([option, OptionElement]) => (
-                      <OptionElement
-                        onClick={() => {
-                          resolve(option)
-                          setModalInstances((instances) =>
-                            instances.filter((ins) => ins !== instance),
-                          )
-                        }}
-                      />
-                    )}
-                  </For>
-                </div>
+                <Content respond={respond} />
               </dialog>
             )
           }}
