@@ -26,7 +26,7 @@ import type { FlameFunction } from './flameFunction'
  */
 const COUNT_ADJUSTMENT_FACTOR = 0.02
 export const MAX_POINT_COUNT = 4e6
-export const MAX_INNER_ITERS = 15
+export const MAX_INNER_ITERS = 30
 
 type Flam3Props = {
   skipIters: number

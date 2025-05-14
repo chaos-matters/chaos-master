@@ -1,8 +1,8 @@
+import { oklabToRgb } from '@typegpu/color'
 import { tgpu } from 'typegpu'
 import { f32, struct } from 'typegpu/data'
 import { alphaBlend } from '@/utils/blendModes'
 import { wgsl } from '@/utils/wgsl'
-import { gamutClipPreserveChroma } from './oklab'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 import type { v3f } from 'typegpu/data'
 import type { DrawModeFn } from './drawMode'
@@ -43,7 +43,7 @@ export function createColorGradingPipeline(
   const renderShaderCode = wgsl/* wgsl */ `
     ${{
       ...bindGroupLayout.bound,
-      gamutClipPreserveChroma,
+      oklabToRgb,
       drawMode,
     }}
 
@@ -74,7 +74,7 @@ export function createColorGradingPipeline(
       let adjustedCount = count * uniforms.countAdjustmentFactor;
       let value = uniforms.exposure * pow(log(adjustedCount + 1), 0.4545);
       let ab = tex.gb / count;
-      let rgb = gamutClipPreserveChroma(vec3f(drawMode(value), ab));
+      let rgb = oklabToRgb(vec3f(drawMode(value), ab));
       let edgeFade = smoothstep(1, 0.98, max(abs(in.uv.x), abs(in.uv.y)));
       return vec4f(rgb, value * mix(1.0, edgeFade, uniforms.edgeFade));
     }
