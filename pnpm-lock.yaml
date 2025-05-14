@@ -63,8 +63,8 @@ importers:
   packages/app:
     dependencies:
       '@typegpu/color':
-        specifier: 0.0.3
-        version: 0.0.3(typegpu@0.5.7)
+        specifier: 0.0.4
+        version: 0.0.4(typegpu@0.5.7)
       '@vercel/analytics':
         specifier: 1.5.0
         version: 1.5.0
@@ -641,8 +641,8 @@ packages:
   '@tybys/wasm-util@0.9.0':
     resolution: {integrity: sha512-6+7nlbMVX/PVDCwaIQ8nTOPveOcFLSt8GcXdx8hD0bt39uWxYT88uXzqTd4fTvqta7oeUJqudepapKNt2DYJFw==}
 
-  '@typegpu/color@0.0.3':
-    resolution: {integrity: sha512-VQUPEChwNJucRiwISpxTMOy2/ILrWomGWkdSk3dLnn58fHPnD+uf1AC3xLS9J0075/3PAyKzlGC/JC62kKap1Q==}
+  '@typegpu/color@0.0.4':
+    resolution: {integrity: sha512-95WS+HRKyoE+QrcInz13rMm6UcHgt/wxiGrV7opxgBJrWlK6ly9dRarFSc9i2asb/4CMjO7FymHOWVmdnHbc/w==}
     peerDependencies:
       typegpu: ^0.5.7
 
@@ -2813,7 +2813,7 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
-  '@typegpu/color@0.0.3(typegpu@0.5.7)':
+  '@typegpu/color@0.0.4(typegpu@0.5.7)':
     dependencies:
       typegpu: 0.5.7
 
