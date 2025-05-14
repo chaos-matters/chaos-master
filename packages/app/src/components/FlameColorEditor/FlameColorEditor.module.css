@@ -37,7 +37,7 @@
 
 .handle-circle {
   r: 0.3rem;
-  fill: oklab(0.7 var(--a) var(--b));
+  fill: var(--color);
   stroke: white;
   stroke-width: 1px;
   transition: r 250ms;

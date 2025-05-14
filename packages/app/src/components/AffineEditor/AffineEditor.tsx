@@ -3,7 +3,6 @@ import { vec2f } from 'typegpu/data'
 import { vec2 } from 'wgpu-matrix'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { PI } from '@/flame/constants'
-import { gamutClipPreserveChroma } from '@/flame/oklab'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { useCamera } from '@/lib/CameraContext'
 import { useCanvas } from '@/lib/CanvasContext'
@@ -15,6 +14,7 @@ import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'
 import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
 import { wgsl } from '@/utils/wgsl'
+import { handleColor } from '../FlameColorEditor/FlameColorEditor'
 import ui from './AffineEditor.module.css'
 import type { v2f } from 'typegpu/data'
 import type { FlameFunction } from '@/flame/flameFunction'
@@ -40,7 +40,6 @@ function Grid() {
         clipToWorld: camera.wgsl.clipToWorld,
         resolution: camera.wgsl.resolution,
         pixelRatio: camera.wgsl.pixelRatio,
-        gamutClipPreserveChroma,
         PI,
       }}
 
@@ -306,7 +305,7 @@ function AffineHandle(props: {
         // because otherwise WheelZoomCamera2D steals the event
         // due to solidjs event delegation.
         on:pointerdown={startDragging}
-        style={{ '--a': props.color.x, '--b': props.color.y }}
+        style={{ '--color': handleColor(props.color) }}
       >
         <circle class={ui.handleCircle} cx={p(x())} cy={p(y())} />
         <circle class={ui.handleCircleGrabArea} cx={p(x())} cy={p(y())} />

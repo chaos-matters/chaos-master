@@ -1,9 +1,9 @@
+import { oklabToRgb } from '@typegpu/color'
 import { createEffect, createMemo, createSignal, For } from 'solid-js'
 import { vec2f } from 'typegpu/data'
 import { vec2 } from 'wgpu-matrix'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { PI } from '@/flame/constants'
-import { gamutClipPreserveChroma } from '@/flame/oklab'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { useCamera } from '@/lib/CameraContext'
 import { useCanvas } from '@/lib/CanvasContext'
@@ -13,13 +13,18 @@ import { createZoom, WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { createAnimationFrame } from '@/utils/createAnimationFrame'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'
-import { maxLength2 } from '@/utils/maxLength'
 import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
 import { wgsl } from '@/utils/wgsl'
 import ui from './FlameColorEditor.module.css'
 import type { v2f } from 'typegpu/data'
 import type { FlameFunction } from '@/flame/flameFunction'
 import type { HistorySetter } from '@/utils/createStoreHistory'
+
+const HANDLE_LIGHTNESS = 0.68
+
+export function handleColor(color: v2f) {
+  return `oklab(${HANDLE_LIGHTNESS} ${color.x} ${color.y})`
+}
 
 function Gradient() {
   const camera = useCamera()
@@ -32,7 +37,7 @@ function Gradient() {
         clipToWorld: camera.wgsl.clipToWorld,
         resolution: camera.wgsl.resolution,
         pixelRatio: camera.wgsl.pixelRatio,
-        gamutClipPreserveChroma,
+        oklabToRgb,
         PI,
       }}
 
@@ -54,12 +59,6 @@ function Gradient() {
           vec4f(pos[vertexIndex], 0.0, 1.0), 
           pos[vertexIndex]
         );
-      }
-
-      fn clampLength(v: vec2f, maxLength: f32) -> vec2f {
-        const eps = 0.0001;
-        let l = length(v);
-        return min(l, maxLength) * v / max(eps, l);
       }
 
       fn sdBox(p: vec2f, size: vec2f) -> f32{
@@ -87,7 +86,8 @@ function Gradient() {
         let gridRadialLineAA = saturate(2 * (min(0.5, 10 * pxWidth / r) - gridRadial) / gridRadialW);
         let fadeToCenter = smoothstep(0.005, 0.05, r);
         let gridAA = max(gridCircleLineAA, gridRadialLineAA * fadeToCenter) + borderAA;
-        return vec4f(gamutClipPreserveChroma(vec3f(0.7 - 0.05 * gridAA, clampLength(worldPos, 0.2))), 1);
+        let rgb = oklabToRgb(vec3f(${HANDLE_LIGHTNESS} - 0.05 * gridAA, worldPos));
+        return vec4f(rgb, 1);
       }
     `
 
@@ -161,8 +161,7 @@ function FlameColorHandle(props: {
         const position = clipToWorld(eventToClip(ev, canvas))
         const diff = vec2.sub(position, grabPosition, vec2f())
         const color = vec2.add(initialColor, diff, vec2f())
-        const clampedColor = maxLength2(color, 0.3)
-        props.setColor(clampedColor)
+        props.setColor(color)
       },
       onDone() {
         changeHistory.commit()
@@ -176,7 +175,7 @@ function FlameColorHandle(props: {
       // because otherwise WheelZoomCamera2D steals the event
       // due to solidjs event delegation.
       on:pointerdown={startDragging}
-      style={{ '--a': props.color.x, '--b': props.color.y }}
+      style={{ '--color': handleColor(props.color) }}
     >
       <circle
         class={ui.handleCircle}
