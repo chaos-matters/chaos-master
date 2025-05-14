@@ -1,7 +1,7 @@
 import { empty } from './empty'
 import { example1 } from './example1'
-import type { FlameFunction } from '../flameFunction'
 import { linear1 } from './linear1'
+import type { FlameFunction } from '../flameFunction'
 
 export const examples = {
   example1,
