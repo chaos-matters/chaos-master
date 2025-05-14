@@ -19,6 +19,7 @@ import { outputTextureFormat, Point } from './variations/types'
 import type { v3f } from 'typegpu/data'
 import type { DrawModeFn } from './drawMode'
 import type { FlameFunction } from './flameFunction'
+import type { ExportImageType } from '@/App'
 
 /**
  * TODO: This factor is fine tuned to look good for the default example.
@@ -32,6 +33,7 @@ type Flam3Props = {
   skipIters: number
   pointCount: number
   renderInterval: number
+  onExportImage: ExportImageType | undefined
   drawMode: DrawModeFn
   backgroundColor: v3f
   exposure: number
@@ -303,6 +305,7 @@ export function Flam3(props: Flam3Props) {
         // _readCountUnderPointer(count)
 
         device.queue.submit([encoder.finish()])
+        props.onExportImage?.(canvas)
       },
       () => props.renderInterval,
       () => device.queue.onSubmittedWorkDone(),

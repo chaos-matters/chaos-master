@@ -67,14 +67,17 @@ const defaultTransform: FlameFunction = {
   postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
   variations: [{ type: 'linear', weight: 1 }],
 }
+export type ExportImageType = (canvas: HTMLCanvasElement) => void
 
 function App(props: { flameFromQuery?: FlameFunction[] }) {
   const [pixelRatio, setPixelRatio] = createSignal(1)
   const [skipIters, setSkipIters] = createSignal(15)
   const [pointCount, setPointCount] = createSignal(1e6)
   const [exposure, setExposure] = createSignal(0.25)
-  const [renderInterval, setRenderInterval] = createSignal(1)
   const [drawMode, setDrawMode] = createSignal(lightMode)
+  const [renderInterval, setRenderInterval] = createSignal(1)
+  const [onExportImage, setOnExportImage] = createSignal<ExportImageType>()
+  const finalRenderInterval = () => (onExportImage() ? 0 : renderInterval())
   const [backgroundColor, setBackgroundColor] = createSignal(vec3f(0, 0, 0))
   const [adaptiveFilterEnabled, setAdaptiveFilterEnabled] = createSignal(true)
   const [showSidebar, setShowSidebar] = createSignal(true)
@@ -116,6 +119,21 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
       }
     },
   })
+  const exportCanvasImage = (canvas: HTMLCanvasElement) => {
+    setOnExportImage(undefined)
+    canvas.toBlob(async (blob) => {
+      if (!blob) return
+      const imgData = await blob.arrayBuffer()
+      const pngBytes = new Uint8Array(imgData)
+      const encodedFlames = await compressJsonQueryParam(flameFunctions)
+      const imgExtData = addFlameDataToPng(encodedFlames, pngBytes)
+      const fileUrlExt = URL.createObjectURL(imgExtData)
+      const downloadLink = window.document.createElement('a')
+      downloadLink.href = fileUrlExt
+      downloadLink.download = 'flame.png'
+      downloadLink.click()
+    })
+  }
 
   return (
     <ChangeHistoryContextProvider value={history}>
@@ -132,7 +150,8 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                   exposure={exposure()}
                   adaptiveFilterEnabled={adaptiveFilterEnabled()}
                   flameFunctions={flameFunctions}
-                  renderInterval={renderInterval()}
+                  renderInterval={finalRenderInterval()}
+                  onExportImage={onExportImage()}
                 />
               </WheelZoomCamera2D>
             </AutoCanvas>
@@ -419,29 +438,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               <button
                 class={ui.addFlameButton}
                 onClick={() => {
-                  // TODO: fetch this canvas in a more robust way
-                  const canvas = document
-                    .getElementsByClassName(ui.canvas)
-                    .item(0)
-                  if (!(canvas instanceof HTMLCanvasElement)) {
-                    return
-                  }
-                  canvas.toBlob(async (blob) => {
-                    if (!blob) return
-                    const imgData = await blob.arrayBuffer()
-                    const pngBytes = new Uint8Array(imgData)
-                    const encodedFlames =
-                      await compressJsonQueryParam(flameFunctions)
-                    const imgExtData = addFlameDataToPng(
-                      encodedFlames,
-                      pngBytes,
-                    )
-                    const fileUrlExt = URL.createObjectURL(imgExtData)
-                    const downloadLink = document.createElement('a')
-                    downloadLink.href = fileUrlExt
-                    downloadLink.download = 'flame.png'
-                    downloadLink.click()
-                  })
+                  setOnExportImage(() => exportCanvasImage)
                 }}
               >
                 Export PNG
