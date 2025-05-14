@@ -11,7 +11,7 @@
   },
   "license": "AGPL-3.0-only",
   "dependencies": {
-    "@typegpu/color": "0.0.3",
+    "@typegpu/color": "0.0.4",
     "@vercel/analytics": "1.5.0",
     "solid-js": "1.9.6",
     "structurajs": "0.12.6",
