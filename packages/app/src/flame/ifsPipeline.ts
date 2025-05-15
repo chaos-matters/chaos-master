@@ -1,13 +1,13 @@
 import { tgpu } from 'typegpu'
 import { arrayOf, struct, vec4u } from 'typegpu/data'
 import { hash, random, randomState, setSeed } from '@/shaders/random'
-import { range } from '@/utils/range'
+import { recordEntries, recordKeys } from '@/utils/record'
 import { wgsl } from '@/utils/wgsl'
-import { createFlameWgsl, extractFlameUniforms } from './flameFunction'
+import { createFlameWgsl, extractFlameUniforms } from './transformFunction'
 import { AffineParams, Point, transformAffine } from './variations/types'
 import type { StorageFlag, TgpuBuffer, TgpuRoot, UniformFlag } from 'typegpu'
 import type { Vec4u, WgslArray, WgslStruct } from 'typegpu/data'
-import type { FlameFunction } from './flameFunction'
+import type { TransformRecord } from './transformFunction'
 
 const { ceil } = Math
 const IFS_GROUP_SIZE = 16
@@ -21,17 +21,23 @@ export function createIFSPipeline(
   insideShaderCount: number,
   points: TgpuBuffer<WgslArray<typeof Point>> & StorageFlag,
   computeUniforms: TgpuBuffer<WgslStruct<{ seed: Vec4u }>> & UniformFlag,
-  flameFunctions: FlameFunction[],
+  transforms: TransformRecord,
 ) {
   const { device } = root
-
-  const flames = flameFunctions.map(createFlameWgsl)
-  const flamesObj = Object.fromEntries(
-    flames.map((f, i) => [`flame${i}`, f.fnImpl]),
+  const flames = Object.fromEntries(
+    recordEntries(transforms).map(([tid, tr]) => [tid, createFlameWgsl(tr)]),
   )
 
+  const flamesObj = Object.fromEntries(
+    recordKeys(transforms).map((tid) => [`flame${tid}`, flames[tid]!.fnImpl]),
+  )
   const FlameUniforms = struct(
-    Object.fromEntries(flames.map((f, i) => [`flame${i}`, f.Uniforms])),
+    Object.fromEntries(
+      recordKeys(transforms).map((tid) => [
+        `flame${tid}`,
+        flames[tid]!.Uniforms,
+      ]),
+    ),
   )
 
   const bindGroupLayout = tgpu.bindGroupLayout({
@@ -91,12 +97,12 @@ export function createIFSPipeline(
       for (var i = 0; i < ITER_COUNT; i += 1) {
         let flameIndex = random();
         var probabilitySum = 0.;
-        ${range(flameFunctions.length)
+        ${Object.keys(transforms)
           .map(
-            (i) => /* wgsl */ `
-            probabilitySum += flameUniforms.flame${i}.probability;
+            (tid) => /* wgsl */ `
+            probabilitySum += flameUniforms.flame${tid}.probability;
             if (flameIndex < probabilitySum) {
-              point = flame${i}(point, flameUniforms.flame${i});
+              point = flame${tid}(point, flameUniforms.flame${tid});
               continue;
             }
           `,
@@ -132,8 +138,8 @@ export function createIFSPipeline(
         1,
       )
     },
-    update: (flameFunctions: FlameFunction[]) => {
-      flameUniformsBuffer.write(extractFlameUniforms(flameFunctions))
+    update: (tr: TransformRecord) => {
+      flameUniformsBuffer.write(extractFlameUniforms(tr))
     },
   }
 }

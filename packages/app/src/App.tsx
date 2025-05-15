@@ -9,6 +9,7 @@ import {
 import { createStore } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { vec3f, vec4f } from 'typegpu/data'
+import { recordEntries } from '@/utils/record'
 import ui from './App.module.css'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
 import { Button } from './components/Button/Button'
@@ -31,6 +32,7 @@ import {
 import { lightMode, paintMode } from './flame/drawMode'
 import { examples } from './flame/examples'
 import { Flam3, MAX_INNER_ITERS, MAX_POINT_COUNT } from './flame/Flam3'
+import { generateTransformId } from './flame/transformFunction'
 import {
   isParametricType,
   isVariationType,
@@ -53,9 +55,11 @@ import {
 import { sum } from './utils/sum'
 import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
 import type { Setter } from 'solid-js'
-import type { v3f } from 'typegpu/data'
 import type { DrawModeFn } from './flame/drawMode'
-import type { FlameFunction } from './flame/flameFunction'
+import type {
+  FlameDescriptor,
+  TransformFunction,
+} from './flame/transformFunction'
 
 const EDGE_FADE_COLOR = {
   light: vec4f(0.96, 0.96, 0.96, 1),
@@ -69,17 +73,20 @@ function formatPercent(x: number) {
   return `${(x * 100).toFixed(1)} %`
 }
 
-const defaultTransform: FlameFunction = {
-  probability: 0.1,
-  color: { x: 0, y: 0 },
-  preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-  postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-  variations: [{ type: 'linear', weight: 1 }],
+function newDefaultTransform(): TransformFunction {
+  return {
+    probability: 0.1,
+    color: { x: 0, y: 0 },
+    preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+    postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+    variations: { [generateTransformId()]: { type: 'linear', weight: 1 } },
+  }
 }
+
 export type ExportImageType = (canvas: HTMLCanvasElement) => void
 
 type AppProps = {
-  flameFromQuery?: FlameFunction[]
+  flameFromQuery?: FlameDescriptor
   drawMode: DrawModeFn
   setDrawMode: Setter<DrawModeFn>
 }
@@ -87,22 +94,23 @@ type AppProps = {
 function App(props: AppProps) {
   const theme = useTheme()
   const [pixelRatio, setPixelRatio] = createSignal(DEFAULT_RESOLUTION)
-  const [skipIters, setSkipIters] = createSignal(20)
   const [pointCount, setPointCount] = createSignal(DEFAULT_POINT_COUNT)
-  const [exposure, setExposure] = createSignal(0.25)
   const [renderInterval, setRenderInterval] = createSignal(
     DEFAULT_RENDER_INTERVAL_MS,
   )
   const [onExportImage, setOnExportImage] = createSignal<ExportImageType>()
-  const [backgroundColor, setBackgroundColor] = createSignal<v3f>()
   const [adaptiveFilterEnabled, setAdaptiveFilterEnabled] = createSignal(true)
   const [showSidebar, setShowSidebar] = createSignal(true)
   const [zoom, setZoom] = createZoom(1, [0, Infinity])
-  const [flameFunctions, setFlameFunctions, history] = createStoreHistory(
-    createStore(structuredClone(props.flameFromQuery ?? examples.example1)),
+  const [flameDescriptor, setFlameDescriptor, history] = createStoreHistory(
+    createStore(
+      structuredClone(
+        props.flameFromQuery ? props.flameFromQuery : examples.example1,
+      ),
+    ),
   )
   const totalProbability = createMemo(() =>
-    sum(flameFunctions.map((f) => f.probability)),
+    sum(Object.values(flameDescriptor.transforms).map((f) => f.probability)),
   )
 
   const { loadModalIsOpen, showLoadFlameModal } = createLoadFlame(history)
@@ -110,7 +118,7 @@ function App(props: AppProps) {
   const finalRenderInterval = () =>
     loadModalIsOpen() ? Infinity : onExportImage() ? 0 : renderInterval()
 
-  const { showShareLinkModal } = createShareLinkModal(flameFunctions)
+  const { showShareLinkModal } = createShareLinkModal(flameDescriptor)
 
   useKeyboardShortcuts({
     KeyF: () => {
@@ -153,7 +161,7 @@ function App(props: AppProps) {
       if (!blob) return
       const imgData = await blob.arrayBuffer()
       const pngBytes = new Uint8Array(imgData)
-      const encodedFlames = await compressJsonQueryParam(flameFunctions)
+      const encodedFlames = await compressJsonQueryParam(flameDescriptor)
       const imgExtData = addFlameDataToPng(encodedFlames, pngBytes)
       const fileUrlExt = URL.createObjectURL(imgExtData)
       const downloadLink = window.document.createElement('a')
@@ -162,9 +170,6 @@ function App(props: AppProps) {
       downloadLink.click()
     })
   }
-
-  const backgroundColorFinal = () =>
-    backgroundColor() ?? (theme() === 'light' ? vec3f(1) : vec3f(0))
 
   return (
     <ChangeHistoryContextProvider value={history}>
@@ -177,13 +182,9 @@ function App(props: AppProps) {
             <AutoCanvas class={ui.canvas} pixelRatio={pixelRatio()}>
               <WheelZoomCamera2D zoom={[zoom, setZoom]}>
                 <Flam3
-                  skipIters={skipIters()}
                   pointCount={pointCount()}
-                  drawMode={props.drawMode}
-                  backgroundColor={backgroundColorFinal()}
-                  exposure={exposure()}
                   adaptiveFilterEnabled={adaptiveFilterEnabled()}
-                  flameFunctions={flameFunctions}
+                  flameDescriptor={flameDescriptor}
                   renderInterval={finalRenderInterval()}
                   onExportImage={onExportImage()}
                   edgeFadeColor={
@@ -203,21 +204,30 @@ function App(props: AppProps) {
         <Show when={showSidebar()}>
           <div class={ui.sidebar}>
             <AffineEditor
-              flameFunctions={flameFunctions}
-              setFlameFunctions={setFlameFunctions}
+              transforms={flameDescriptor.transforms}
+              setTransforms={(setFn) => {
+                setFlameDescriptor((draft) => {
+                  setFn(draft.transforms)
+                })
+              }}
             />
             <FlameColorEditor
-              flameFunctions={flameFunctions}
-              setFlameFunctions={setFlameFunctions}
+              transforms={flameDescriptor.transforms}
+              setTransforms={(setFn) => {
+                setFlameDescriptor((draft) => {
+                  setFn(draft.transforms)
+                })
+              }}
             />
-            <For each={flameFunctions}>
-              {(flame, i) => (
+            <For each={recordEntries(flameDescriptor.transforms)}>
+              {([tid, transform]) => (
                 <Card>
                   <button
                     class={ui.deleteFlameButton}
                     onClick={() => {
-                      setFlameFunctions((draft) => {
-                        draft.splice(i(), 1)
+                      setFlameDescriptor((draft) => {
+                        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+                        delete draft.transforms[tid]
                       })
                     }}
                   >
@@ -225,21 +235,21 @@ function App(props: AppProps) {
                   </button>
                   <Slider
                     label="Probability"
-                    value={flame.probability}
+                    value={transform.probability}
                     min={0}
                     max={1}
                     step={0.001}
                     onInput={(probability) => {
-                      setFlameFunctions((draft) => {
-                        draft[i()]!.probability = probability
+                      setFlameDescriptor((draft) => {
+                        draft.transforms[tid]!.probability = probability
                       })
                     }}
                     formatValue={(value) =>
                       formatPercent(value / totalProbability())
                     }
                   />
-                  <For each={flame.variations}>
-                    {(variation, j) => (
+                  <For each={recordEntries(transform.variations)}>
+                    {([vid, variation]) => (
                       <>
                         <select
                           class={ui.select}
@@ -249,11 +259,9 @@ function App(props: AppProps) {
                             if (!isVariationType(type)) {
                               return
                             }
-                            setFlameFunctions((draft) => {
-                              draft[i()]!.variations[j()] = getVariationDefault(
-                                type,
-                                variation.weight,
-                              )
+                            setFlameDescriptor((draft) => {
+                              draft.transforms[tid]!.variations[vid] =
+                                getVariationDefault(type, variation.weight)
                             })
                           }}
                         >
@@ -267,8 +275,9 @@ function App(props: AppProps) {
                           max={1}
                           step={0.001}
                           onInput={(weight) => {
-                            setFlameFunctions((draft) => {
-                              draft[i()]!.variations[j()]!.weight = weight
+                            setFlameDescriptor((draft) => {
+                              draft.transforms[tid]!.variations[vid]!.weight =
+                                weight
                             })
                           }}
                           formatValue={formatPercent}
@@ -281,17 +290,16 @@ function App(props: AppProps) {
                             <Dynamic
                               {...getParamsEditor(variation)}
                               setValue={(value) => {
-                                setFlameFunctions((draft) => {
-                                  const i_ = i()
-                                  const j_ = j()
+                                setFlameDescriptor((draft) => {
+                                  const variationDraft =
+                                    draft.transforms[tid]?.variations[vid]
                                   if (
-                                    !isParametricType(
-                                      draft[i_]!.variations[j_]!,
-                                    )
+                                    variationDraft === undefined ||
+                                    !isParametricType(variationDraft)
                                   ) {
                                     throw new Error(`Unreachable code`)
                                   }
-                                  draft[i_]!.variations[j_].params = value
+                                  variationDraft.params = value
                                 })
                               }}
                             />
@@ -307,8 +315,10 @@ function App(props: AppProps) {
               <button
                 class={ui.addFlameButton}
                 onClick={() => {
-                  setFlameFunctions((draft) => {
-                    draft.push(structuredClone(defaultTransform))
+                  setFlameDescriptor((draft) => {
+                    draft.transforms[generateTransformId()] = structuredClone(
+                      newDefaultTransform(),
+                    )
                   })
                 }}
               >
@@ -318,20 +328,28 @@ function App(props: AppProps) {
             <Card>
               <Slider
                 label="Exposure"
-                value={exposure()}
+                value={flameDescriptor.renderSettings.exposure}
                 min={-4}
                 max={4}
                 step={0.001}
-                onInput={setExposure}
+                onInput={(newExp) => {
+                  setFlameDescriptor((draft) => {
+                    draft.renderSettings.exposure = newExp
+                  })
+                }}
                 formatValue={(value) => value.toString()}
               />
               <Slider
                 label="Skip Iterations"
-                value={skipIters()}
+                value={flameDescriptor.renderSettings.skipIters}
                 min={0}
                 max={MAX_INNER_ITERS}
                 step={1}
-                onInput={setSkipIters}
+                onInput={(newSkipIters) => {
+                  setFlameDescriptor((draft) => {
+                    draft.renderSettings.skipIters = newSkipIters
+                  })
+                }}
                 formatValue={(value) => value.toString()}
               />
               <label class={ui.labeledInput}>
@@ -361,14 +379,29 @@ function App(props: AppProps) {
               <label class={ui.labeledInput}>
                 Background Color
                 <ColorPicker
-                  value={backgroundColorFinal()}
-                  setValue={setBackgroundColor}
+                  value={vec3f(
+                    ...(flameDescriptor.renderSettings.backgroundColor ?? [
+                      0, 0, 0,
+                    ]),
+                  )}
+                  setValue={(newBgColor) => {
+                    setFlameDescriptor((draft) => {
+                      draft.renderSettings.backgroundColor = newBgColor
+                    })
+                  }}
                 />
               </label>
-              <Show when={backgroundColor() !== undefined} fallback={<span />}>
+              <Show
+                when={
+                  flameDescriptor.renderSettings.backgroundColor !== undefined
+                }
+                fallback={<span />}
+              >
                 <Button
                   onClick={() => {
-                    setBackgroundColor(undefined)
+                    setFlameDescriptor((draft) => {
+                      delete draft.renderSettings.backgroundColor
+                    })
                   }}
                 >
                   Auto

@@ -13,12 +13,13 @@ import { createZoom, WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { createAnimationFrame } from '@/utils/createAnimationFrame'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'
+import { recordEntries } from '@/utils/record'
 import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
 import { wgsl } from '@/utils/wgsl'
 import { handleColor } from '../FlameColorEditor/FlameColorEditor'
 import ui from './AffineEditor.module.css'
 import type { v2f } from 'typegpu/data'
-import type { FlameFunction } from '@/flame/flameFunction'
+import type { TransformRecord } from '@/flame/transformFunction'
 import type { AffineParams } from '@/flame/variations/types'
 import type { HistorySetter } from '@/utils/createStoreHistory'
 
@@ -344,14 +345,14 @@ function AffineHandle(props: {
 }
 
 export function AffineEditor(props: {
-  flameFunctions: FlameFunction[]
-  setFlameFunctions: HistorySetter<FlameFunction[]>
+  transforms: TransformRecord
+  setTransforms: HistorySetter<TransformRecord>
 }) {
   const [div, setDiv] = createSignal<HTMLDivElement>()
   const [zoom, setZoom] = createZoom(0.9, [0.5, 20])
 
   const scrollTrigger = () => {
-    props.flameFunctions.forEach((f) => f.preAffine)
+    Object.values(props.transforms).forEach((tr) => tr.preAffine)
   }
 
   return (
@@ -381,14 +382,14 @@ export function AffineEditor(props: {
                   <path d="M 0 0 L 10 5 L 0 10 z" />
                 </marker>
               </defs>
-              <For each={props.flameFunctions}>
-                {(flameFunction, i) => (
+              <For each={recordEntries(props.transforms)}>
+                {([tid, transform]) => (
                   <AffineHandle
-                    transform={flameFunction.preAffine}
-                    color={vec2f(flameFunction.color.x, flameFunction.color.y)}
+                    transform={transform.preAffine}
+                    color={vec2f(transform.color.x, transform.color.y)}
                     setTransform={(affine) => {
-                      props.setFlameFunctions((draft) => {
-                        draft[i()]!['preAffine'] = affine
+                      props.setTransforms((draft) => {
+                        draft[tid]!.preAffine = affine
                       })
                     }}
                   />

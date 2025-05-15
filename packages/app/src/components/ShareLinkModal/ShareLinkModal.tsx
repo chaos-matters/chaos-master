@@ -3,13 +3,13 @@ import { Button } from '../Button/Button'
 import { useRequestModal } from '../Modal/Modal'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './ShareLink.module.css'
-import type { FlameFunction } from '@/flame/flameFunction'
+import type { FlameDescriptor } from '@/flame/transformFunction'
 
 const { navigator } = globalThis
 
 type ShareLinkModalProps = {
   url: string
-  flameFunctions: FlameFunction[]
+  flameDescriptor: FlameDescriptor
   respond: () => void
 }
 
@@ -28,7 +28,7 @@ function ShareLinkModal(props: ShareLinkModalProps) {
         <Button
           onClick={async () => {
             await navigator.clipboard.writeText(
-              JSON.stringify(props.flameFunctions),
+              JSON.stringify(props.flameDescriptor),
             )
           }}
         >
@@ -39,11 +39,11 @@ function ShareLinkModal(props: ShareLinkModalProps) {
   )
 }
 
-export function createShareLinkModal(flameFunctions: FlameFunction[]) {
+export function createShareLinkModal(flameDescriptor: FlameDescriptor) {
   const requestModal = useRequestModal()
 
   async function showShareLinkModal() {
-    const encoded = await encodeJsonQueryParam(flameFunctions)
+    const encoded = await encodeJsonQueryParam(flameDescriptor)
     const url = `${window.location.origin}/?flame=${encoded}`
     await navigator.clipboard.writeText(url)
     await requestModal({
@@ -51,7 +51,7 @@ export function createShareLinkModal(flameFunctions: FlameFunction[]) {
       content: ({ respond }) => (
         <ShareLinkModal
           url={url}
-          flameFunctions={flameFunctions}
+          flameDescriptor={flameDescriptor}
           respond={respond}
         />
       ),
