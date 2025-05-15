@@ -5,7 +5,7 @@ import { example3 } from './example3'
 import { example4 } from './example4'
 import { example5 } from './example5'
 import { linear1 } from './linear1'
-import type { FlameFunction } from '../flameFunction'
+import type { FlameDescriptor } from '../flameFunction'
 
 export const examples = {
   empty,
@@ -15,5 +15,5 @@ export const examples = {
   example4,
   example5,
   linear1,
-} satisfies Record<string, FlameFunction[]>
+} satisfies Record<string, FlameDescriptor>
 export type ExampleID = keyof typeof examples
