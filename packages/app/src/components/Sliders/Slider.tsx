@@ -1,5 +1,6 @@
 import { createMemo, Show } from 'solid-js'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
+import { createDragHandler } from '@/utils/createDragHandler'
 import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
 import ui from './Slider.module.css'
 
@@ -30,6 +31,20 @@ export function Slider(props: SliderProps) {
     return ((value() - min()) / range) * 100
   }
 
+  // Dragging the slider handle is handled by the browser,
+  // but we still want to startPreview and commit to history once.
+  const commitHandler = createDragHandler(
+    () => {
+      history.startPreview(`Edit ${props.label}`)
+      return {
+        onDone() {
+          history.commit()
+        },
+      }
+    },
+    { preventDefault: false },
+  )
+
   return (
     <label class={ui.label} classList={{ [props.class ?? '']: true }}>
       <Show when={label()}>
@@ -45,15 +60,9 @@ export function Slider(props: SliderProps) {
         max={max()}
         step={step()}
         value={value()}
+        onPointerDown={commitHandler}
         onInput={(ev) => {
-          if (!history.isPreviewing()) {
-            history.startPreview(`Edit ${props.label}`)
-          }
           props.onInput(ev.target.valueAsNumber)
-        }}
-        onChange={(ev) => {
-          props.onInput(ev.target.valueAsNumber)
-          history.commit()
         }}
         style={{
           '--fill-percent': `${(props.trackFill ?? true) ? fillPercentage() : 0}%`,
