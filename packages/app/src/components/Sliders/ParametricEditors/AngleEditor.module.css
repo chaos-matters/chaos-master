@@ -26,6 +26,7 @@
   border: 2px solid rgba(255, 255, 255, 0.2);
   cursor: pointer;
   outline: none;
+  touch-action: none;
 
   /* when scrolling into view on change, how much to over-scroll */
   scroll-margin-block: 8rem;

@@ -5,6 +5,10 @@ import {
   enableStandardPatches,
   produceWithPatches,
 } from 'structurajs'
+import {
+  compressPatches,
+  forwardBackwardPatchPairDoesNothing,
+} from './compressPatches'
 import type { SetStoreFunction, Store } from 'solid-js/store'
 import type { Patch } from 'structurajs'
 
@@ -59,12 +63,22 @@ export function createStoreHistory<T extends object>([store, setStore]: [
   const hasRedo = () => stackIndex() < stack().length - 1
   const isPreviewing = () => Boolean(preview())
 
-  function add(item: HistoryItem) {
-    if (item.forwardPatches.length === 0 && item.backwardPatches.length === 0) {
+  function addToStack(item: HistoryItem) {
+    const forwardPatches = compressPatches(item.forwardPatches)
+    const backwardPatches = compressPatches(item.backwardPatches)
+    if (forwardPatches.length === 0 && backwardPatches.length === 0) {
       return
     }
+    if (forwardBackwardPatchPairDoesNothing(forwardPatches, backwardPatches)) {
+      return
+    }
+    const compressedItem: HistoryItem = {
+      forwardPatches,
+      backwardPatches,
+      description: item.description,
+    }
     setStack((p) => {
-      p.splice(stackIndex() + 1, Infinity, item)
+      p.splice(stackIndex() + 1, Infinity, compressedItem)
       setStackIndex(p.length - 1)
       return p
     })
@@ -125,29 +139,22 @@ export function createStoreHistory<T extends object>([store, setStore]: [
   }
 
   const set: HistorySetter<T> = (setFn, description) => {
+    const [_, forwardPatches, backwardPatches] = produceWithPatches(
+      unwrap(store),
+      (draft) => {
+        setFn(draft as T)
+      },
+    )
     batch(() => {
+      setStore(produce(setFn))
       const preview_ = preview()
       if (preview_) {
-        const [_, forwardPatches, backwardPatches] = produceWithPatches(
-          unwrap(store),
-          (draft) => {
-            setFn(draft as T)
-          },
-        )
-        setStore(produce(setFn))
         preview_.forwardPatches.push(...forwardPatches)
         preview_.backwardPatches.unshift(...backwardPatches)
         setPreview(preview_)
-        return
+      } else {
+        addToStack({ forwardPatches, backwardPatches, description })
       }
-      const [_, forwardPatches, backwardPatches] = produceWithPatches(
-        unwrap(store),
-        (draft) => {
-          setFn(draft as T)
-        },
-      )
-      setStore(produce(setFn))
-      add({ forwardPatches, backwardPatches, description })
     })
   }
 
@@ -163,12 +170,12 @@ export function createStoreHistory<T extends object>([store, setStore]: [
 
   function commit() {
     const item = preview()
-    if (!item) {
-      console.warn('No preview to commit')
-      return
-    }
     batch(() => {
-      add(item)
+      if (item) {
+        addToStack(item)
+      } else {
+        console.warn('No preview to commit')
+      }
       setPreview(undefined)
     })
   }
@@ -180,7 +187,7 @@ export function createStoreHistory<T extends object>([store, setStore]: [
         () => value,
       )
       setStore(value)
-      add({ forwardPatches, backwardPatches, description })
+      addToStack({ forwardPatches, backwardPatches, description })
     })
   }
 

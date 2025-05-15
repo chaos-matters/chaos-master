@@ -16,7 +16,7 @@ function manhattanDistance(p1: Point, p2: Point) {
 
 type Options = {
   deadZoneRadius?: number
-  setActive?: (active: boolean) => void
+  preventDefault?: boolean
 }
 
 /**
@@ -46,7 +46,7 @@ type Options = {
  */
 export function createDragHandler(
   createHandlers: CreateClickAndDragHandler,
-  { deadZoneRadius = 0, setActive }: Options = {},
+  { deadZoneRadius = 0, preventDefault = true }: Options = {},
 ) {
   const unmountController = new AbortController()
   const unmountSignal = unmountController.signal
@@ -69,22 +69,27 @@ export function createDragHandler(
     const handlers = createHandlers(initEvent)
     if (!handlers) return
 
-    initEvent.preventDefault()
-    initEvent.stopImmediatePropagation()
+    if (preventDefault) {
+      initEvent.preventDefault()
+      initEvent.stopImmediatePropagation()
+    }
+
     if (
       initEvent.target instanceof HTMLElement ||
       initEvent.target instanceof SVGElement
     ) {
       initEvent.target.setPointerCapture(initEvent.pointerId)
     }
-    setActive?.(true)
 
     const { onPointerMove, onDone } = handlers
     let moved = false
 
     function onPointerMove_(event: PointerEvent) {
-      event.preventDefault()
-      event.stopImmediatePropagation()
+      if (preventDefault) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+      }
+
       if (moved || manhattanDistance(initEvent, event) >= deadZoneRadius) {
         onPointerMove?.(event)
         moved = true
@@ -100,11 +105,10 @@ export function createDragHandler(
       event?.preventDefault()
       event?.stopImmediatePropagation()
       onDone?.()
-      setActive?.(false)
     }
 
     function preventDefaultIfMoved(event: Event) {
-      if (moved) {
+      if (moved && preventDefault) {
         event.preventDefault()
         event.stopImmediatePropagation()
       }
