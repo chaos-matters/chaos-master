@@ -14,6 +14,7 @@ type SliderProps = {
   onInput: (value: number) => void
   formatValue?: (value: number) => string
   trackFill?: boolean
+  trackFillValue?: number
 }
 
 export function Slider(props: SliderProps) {
@@ -27,6 +28,11 @@ export function Slider(props: SliderProps) {
     props.formatValue ? props.formatValue(value()) : value().toFixed(2)
 
   const fillPercentage = () => {
+    if (props.trackFillValue !== undefined) {
+      const newMax = (value() - min()) / (max() - min())
+      const newMaxPercent = newMax * 100
+      return Math.min(props.trackFillValue * newMaxPercent, newMaxPercent)
+    }
     const range = max() - min()
     return ((value() - min()) / range) * 100
   }

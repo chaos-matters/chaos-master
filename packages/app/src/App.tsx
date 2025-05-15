@@ -9,7 +9,7 @@ import {
 } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
-import { vec3f, vec4f } from 'typegpu/data'
+import { vec2f, vec3f, vec4f } from 'typegpu/data'
 import { recordEntries, recordKeys } from '@/utils/record'
 import ui from './App.module.css'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
@@ -28,12 +28,15 @@ import { ChangeHistoryContextProvider } from './contexts/ChangeHistoryContext'
 import { ThemeContextProvider, useTheme } from './contexts/ThemeContext'
 import {
   DEFAULT_POINT_COUNT,
+  DEFAULT_QUALITY,
   DEFAULT_RENDER_INTERVAL_MS,
   DEFAULT_RESOLUTION,
+  DEFAULT_ZOOM_LEVEL,
 } from './defaults'
 import { drawModeToImplFn } from './flame/drawMode'
 import { examples } from './flame/examples'
-import { Flam3, MAX_INNER_ITERS, MAX_POINT_COUNT } from './flame/Flam3'
+import { Flam3, MAX_INNER_ITERS } from './flame/Flam3'
+import { renderStats } from './flame/renderStats'
 import {
   generateTransformId,
   generateVariationId,
@@ -50,7 +53,11 @@ import {
 import { Cross, Plus } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
 import { Root } from './lib/Root'
-import { createZoom, WheelZoomCamera2D } from './lib/WheelZoomCamera2D'
+import {
+  createPosition,
+  createZoom,
+  WheelZoomCamera2D,
+} from './lib/WheelZoomCamera2D'
 import { createStoreHistory } from './utils/createStoreHistory'
 import { addFlameDataToPng } from './utils/flameInPng'
 import {
@@ -96,15 +103,13 @@ type AppProps = {
 
 function App(props: AppProps) {
   const { theme, setTheme } = useTheme()
+  const [quality, setQuality] = createSignal(DEFAULT_QUALITY)
   const [pixelRatio, setPixelRatio] = createSignal(DEFAULT_RESOLUTION)
-  const [pointCount, setPointCount] = createSignal(DEFAULT_POINT_COUNT)
-  const [renderInterval, setRenderInterval] = createSignal(
-    DEFAULT_RENDER_INTERVAL_MS,
-  )
   const [onExportImage, setOnExportImage] = createSignal<ExportImageType>()
   const [adaptiveFilterEnabled, setAdaptiveFilterEnabled] = createSignal(true)
   const [showSidebar, setShowSidebar] = createSignal(true)
-  const [zoom, setZoom] = createZoom(1, [0, Infinity])
+  const [zoom, setZoom] = createZoom(DEFAULT_ZOOM_LEVEL, [0.01, Infinity])
+  const [position, setPosition] = createPosition(vec2f())
   const [flameDescriptor, setFlameDescriptor, history] = createStoreHistory(
     createStore(
       structuredClone(
@@ -119,10 +124,18 @@ function App(props: AppProps) {
   const { loadModalIsOpen, showLoadFlameModal } = createLoadFlame(history)
 
   const finalRenderInterval = () =>
-    loadModalIsOpen() ? Infinity : onExportImage() ? 0 : renderInterval()
+    loadModalIsOpen()
+      ? Infinity
+      : onExportImage()
+        ? 0
+        : DEFAULT_RENDER_INTERVAL_MS
 
   const { showShareLinkModal } = createShareLinkModal(flameDescriptor)
 
+  const renderStatsProgress = () => {
+    const { accumulatedPointCount, qualityPointCountLimit } = renderStats()
+    return accumulatedPointCount / qualityPointCountLimit
+  }
   useKeyboardShortcuts({
     KeyF: () => {
       document.startViewTransition(() => {
@@ -159,6 +172,7 @@ function App(props: AppProps) {
       return true
     },
   })
+
   const exportCanvasImage = (canvas: HTMLCanvasElement) => {
     setOnExportImage(undefined)
     canvas.toBlob(async (blob) => {
@@ -199,9 +213,13 @@ function App(props: AppProps) {
             classList={{ [ui.fullscreen]: !showSidebar() }}
           >
             <AutoCanvas class={ui.canvas} pixelRatio={pixelRatio()}>
-              <WheelZoomCamera2D zoom={[zoom, setZoom]}>
+              <WheelZoomCamera2D
+                zoom={[zoom, setZoom]}
+                position={[position, setPosition]}
+              >
                 <Flam3
-                  pointCount={pointCount()}
+                  quality={quality()}
+                  pointCountPerBatch={DEFAULT_POINT_COUNT}
                   adaptiveFilterEnabled={adaptiveFilterEnabled()}
                   flameDescriptor={flameDescriptor}
                   renderInterval={finalRenderInterval()}
@@ -217,6 +235,7 @@ function App(props: AppProps) {
         <ViewControls
           zoom={zoom()}
           setZoom={setZoom}
+          setPosition={setPosition}
           pixelRatio={pixelRatio()}
           setPixelRatio={setPixelRatio}
         />
@@ -428,25 +447,18 @@ function App(props: AppProps) {
                 </Button>
               </Show>
               <Slider
-                label="Point Count"
-                value={pointCount()}
-                min={1e3}
-                max={MAX_POINT_COUNT}
-                step={1e4}
-                onInput={setPointCount}
-                formatValue={(value) => `${(value / 1000).toFixed(0)} K`}
-              />
-              <Slider
-                label="Render Interval"
-                value={renderInterval()}
-                min={1}
-                max={5000}
-                step={1}
-                onInput={setRenderInterval}
+                label="Quality"
+                value={quality()}
+                trackFill={true}
+                trackFillValue={renderStatsProgress()}
+                min={0.7}
+                max={1}
+                step={0.001}
+                onInput={(quality) => {
+                  setQuality(quality)
+                }}
                 formatValue={(value) =>
-                  value < 1000
-                    ? `${value.toFixed(0)} ms`
-                    : `${(value / 1000).toFixed(1)} s`
+                  value === 1 ? 'Infinite' : `${(value * 100).toFixed(1)} %`
                 }
               />
             </Card>

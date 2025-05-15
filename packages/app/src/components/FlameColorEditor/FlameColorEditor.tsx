@@ -10,7 +10,11 @@ import { useCamera } from '@/lib/CameraContext'
 import { useCanvas } from '@/lib/CanvasContext'
 import { Root } from '@/lib/Root'
 import { useRootContext } from '@/lib/RootContext'
-import { createZoom, WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
+import {
+  createPosition,
+  createZoom,
+  WheelZoomCamera2D,
+} from '@/lib/WheelZoomCamera2D'
 import { createAnimationFrame } from '@/utils/createAnimationFrame'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'
@@ -205,6 +209,7 @@ export function FlameColorEditor(props: {
 }) {
   const [div, setDiv] = createSignal<HTMLDivElement>()
   const [zoom, setZoom] = createZoom(4, [2, 20])
+  const [position, setPosition] = createPosition(vec2f())
 
   const scrollTrigger = () => {
     Object.values(props.transforms).forEach((tr) => tr.color)
@@ -220,7 +225,11 @@ export function FlameColorEditor(props: {
     >
       <Root adapterOptions={{ powerPreference: 'high-performance' }}>
         <AutoCanvas class={ui.canvas} pixelRatio={1}>
-          <WheelZoomCamera2D eventTarget={div()} zoom={[zoom, setZoom]}>
+          <WheelZoomCamera2D
+            eventTarget={div()}
+            zoom={[zoom, setZoom]}
+            position={[position, setPosition]}
+          >
             <Gradient />
             <svg class={ui.svg}>
               <For each={recordEntries(props.transforms)}>

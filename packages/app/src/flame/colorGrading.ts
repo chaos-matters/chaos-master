@@ -6,7 +6,7 @@ import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 import type { DrawModeFn } from './drawMode'
 
 export const ColorGradingUniforms = struct({
-  countAdjustmentFactor: f32,
+  averagePointCountPerBucketInv: f32,
   exposure: f32,
   backgroundColor: vec4f,
   /** Adds a slight fade towards the edge of the viewport */
@@ -72,7 +72,7 @@ export function createColorGradingPipeline(
       let pos2u = vec2u(in.pos.xy);
       let tex = textureLoad(outputTexture, pos2u, 0);
       let count = tex.a;
-      let adjustedCount = count * uniforms.countAdjustmentFactor;
+      let adjustedCount = 0.1 * count * uniforms.averagePointCountPerBucketInv;
       let value = uniforms.exposure * pow(log(adjustedCount + 1), 0.4545);
       let ab = tex.gb / count;
       let rgb = saturate(oklabToRgb(vec3f(drawMode(value), ab)));
@@ -103,20 +103,10 @@ export function createColorGradingPipeline(
     },
   })
   return {
-    run: (encoder: GPUCommandEncoder, context: GPUCanvasContext) => {
-      const pass = encoder.beginRenderPass({
-        colorAttachments: [
-          {
-            loadOp: 'clear',
-            storeOp: 'store',
-            view: context.getCurrentTexture().createView(),
-          },
-        ],
-      })
+    run: (pass: GPURenderPassEncoder) => {
       pass.setPipeline(renderPipeline)
       pass.setBindGroup(0, root.unwrap(bindGroup))
       pass.draw(3, 1)
-      pass.end()
     },
   }
 }

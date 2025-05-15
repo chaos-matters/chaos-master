@@ -7,3 +7,7 @@ export const DEFAULT_RESOLUTION = parseFloat(
 export const DEFAULT_RENDER_INTERVAL_MS = parseFloat(
   import.meta.env.VITE_DEFAULT_RENDER_INTERVAL_MS,
 )
+export const DEFAULT_ZOOM_LEVEL = parseFloat(
+  import.meta.env.VITE_DEFAULT_ZOOM_LEVEL,
+)
+export const DEFAULT_QUALITY = parseFloat(import.meta.env.VITE_DEFAULT_QUALITY)

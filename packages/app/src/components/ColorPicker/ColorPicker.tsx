@@ -17,7 +17,7 @@ export function ColorPicker(props: ColorPickerProps) {
         [ui.transparent]: props.value === undefined,
       }}
       type="color"
-      value={props.value ? rgbNormToHex(props.value) : undefined}
+      value={props.value ? rgbNormToHex(props.value) : '#000000'}
       onInput={(ev) => {
         props.setValue(hexToRgbNorm(ev.target.value))
       }}

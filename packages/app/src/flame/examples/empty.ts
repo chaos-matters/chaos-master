@@ -3,6 +3,7 @@ import type { FlameDescriptor } from '../transformFunction'
 
 export const empty: FlameDescriptor = {
   renderSettings: {
+    quality: 1,
     exposure: 0.25,
     skipIters: 20,
     drawMode: 'light',

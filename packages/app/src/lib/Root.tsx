@@ -28,7 +28,7 @@ export function Root(props: ParentProps<RootProps>) {
       }
       console.info(`Using ${adapter.info.vendor} adapter.`)
       device = await adapter.requestDevice({
-        requiredFeatures: ['float32-blendable'],
+        requiredFeatures: ['float32-blendable', 'timestamp-query'],
       })
       root = tgpu.initFromDevice({ device })
       return { adapter, device, root }
