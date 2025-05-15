@@ -1,6 +1,7 @@
 import { createEffect, createMemo, onCleanup } from 'solid-js'
-import { arrayOf, vec4f, vec4u } from 'typegpu/data'
+import { arrayOf, vec3f, vec4f, vec4u } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
+import { useTheme } from '@/contexts/ThemeContext'
 import { randomVec4u } from '@/utils/randomVec4u'
 import { usePointer } from '@/utils/usePointer'
 import { useCamera } from '../lib/CameraContext'
@@ -12,13 +13,13 @@ import {
   ColorGradingUniforms,
   createColorGradingPipeline,
 } from './colorGrading'
+import { drawModeToImplFn } from './drawMode'
 import { ComputeUniforms, createIFSPipeline } from './ifsPipeline'
 import { createInitPointsPipeline } from './initPoints'
 import { createRenderPointsPipeline } from './renderPoints'
 import { outputTextureFormat, Point } from './variations/types'
-import type { v3f, v4f } from 'typegpu/data'
-import type { DrawModeFn } from './drawMode'
-import type { FlameFunction } from './flameFunction'
+import type { v4f } from 'typegpu/data'
+import type { FlameDescriptor } from './transformFunction'
 import type { ExportImageType } from '@/App'
 
 /**
@@ -30,15 +31,11 @@ export const MAX_POINT_COUNT = 4e6
 export const MAX_INNER_ITERS = 30
 
 type Flam3Props = {
-  skipIters: number
   pointCount: number
   renderInterval: number
   onExportImage: ExportImageType | undefined
-  drawMode: DrawModeFn
-  backgroundColor: v3f
-  exposure: number
   adaptiveFilterEnabled: boolean
-  flameFunctions: FlameFunction[]
+  flameDescriptor: FlameDescriptor
   edgeFadeColor: v4f
 }
 
@@ -48,6 +45,13 @@ export function Flam3(props: Flam3Props) {
   const { context, canvasSize, pixelRatio, canvas, canvasFormat } = useCanvas()
   const pointer = usePointer(canvas)
   const queryBuffer = root.createBuffer(vec4f, vec4f())
+  const theme = useTheme()
+  const backgroundColorFinal = () => {
+    if (props.flameDescriptor.renderSettings.backgroundColor === undefined) {
+      return theme() === 'light' ? vec3f(1) : vec3f(0)
+    }
+    return vec3f(...props.flameDescriptor.renderSettings.backgroundColor)
+  }
 
   function _readCountUnderPointer(frameIndex: number) {
     const o = outputTextures()
@@ -157,7 +161,7 @@ export function Flam3(props: Flam3Props) {
       colorGradingUniforms,
       props.adaptiveFilterEnabled ? postprocessTexture : accumulationTexture,
       canvasFormat,
-      props.drawMode,
+      drawModeToImplFn[props.flameDescriptor.renderSettings.drawMode],
     )
   })
 
@@ -197,16 +201,16 @@ export function Flam3(props: Flam3Props) {
     )
     const ifsPipeline = createIFSPipeline(
       root,
-      props.skipIters,
+      props.flameDescriptor.renderSettings.skipIters,
       points,
       computeUniforms,
-      props.flameFunctions,
+      props.flameDescriptor.transforms,
     )
 
     let renderAccumulationIndex = 0
     let clearRequested = true
     createEffect(() => {
-      ifsPipeline.update(props.flameFunctions)
+      ifsPipeline.update(props.flameDescriptor)
 
       // this is in a separate effect because we don't
       // want to run ifs.update if not necessary
@@ -224,16 +228,16 @@ export function Flam3(props: Flam3Props) {
 
     createEffect(() => {
       colorGradingUniforms.writePartial({
-        exposure: 2 * Math.exp(props.exposure),
+        exposure: 2 * Math.exp(props.flameDescriptor.renderSettings.exposure),
         edgeFadeColor: props.onExportImage ? vec4f(0) : props.edgeFadeColor,
-        backgroundColor: vec4f(props.backgroundColor, 1),
+        backgroundColor: vec4f(backgroundColorFinal(), 1),
       })
       rafLoop.redraw()
     })
 
     createEffect(() => {
       // redraw when these change
-      const _ = props.backgroundColor
+      const _ = backgroundColorFinal()
       const __ = colorGradingPipeline()
       rafLoop.redraw()
     })

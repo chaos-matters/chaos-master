@@ -1,6 +1,6 @@
 import { decodeBase64, encodeBase64 } from './base64'
 import { sum } from './sum'
-import type { FlameFunction } from '@/flame/flameFunction'
+import type { FlameDescriptor } from '@/flame/transformFunction'
 
 const format: CompressionFormat = 'deflate'
 
@@ -51,7 +51,7 @@ export async function decompressJsonQuery(compressedBytes: Uint8Array) {
   }
 
   // TODO: use valibot or something to validate this
-  return JSON.parse(chunks.join()) as FlameFunction[]
+  return JSON.parse(chunks.join()) as FlameDescriptor
 }
 
 export async function decodeJsonQueryParam(param: string) {

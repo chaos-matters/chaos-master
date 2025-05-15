@@ -1,11 +1,11 @@
 import type { FlameDescriptor } from '../transformFunction'
 
-export const example4: FlameDescriptor = {
+export const example6: FlameDescriptor = {
   renderSettings: {
     exposure: 0.25,
     skipIters: 20,
-    drawMode: 'light',
-    backgroundColor: [0, 0, 0],
+    drawMode: 'paint',
+    backgroundColor: [157 / 255, 108 / 255, 108 / 255],
   },
   transforms: {
     c67f51f5_8e1d_435e_bc36_cc90566d431d: {

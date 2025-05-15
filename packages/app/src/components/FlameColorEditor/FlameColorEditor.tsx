@@ -14,12 +14,13 @@ import { createZoom, WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { createAnimationFrame } from '@/utils/createAnimationFrame'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'
+import { recordEntries } from '@/utils/record'
 import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
 import { wgsl } from '@/utils/wgsl'
 import ui from './FlameColorEditor.module.css'
 import type { v2f } from 'typegpu/data'
 import type { Theme } from '@/contexts/ThemeContext'
-import type { FlameFunction } from '@/flame/flameFunction'
+import type { TransformRecord } from '@/flame/transformFunction'
 import type { HistorySetter } from '@/utils/createStoreHistory'
 
 const HANDLE_LIGHTNESS = {
@@ -199,14 +200,14 @@ function FlameColorHandle(props: {
 }
 
 export function FlameColorEditor(props: {
-  flameFunctions: FlameFunction[]
-  setFlameFunctions: HistorySetter<FlameFunction[]>
+  transforms: TransformRecord
+  setTransforms: HistorySetter<TransformRecord>
 }) {
   const [div, setDiv] = createSignal<HTMLDivElement>()
   const [zoom, setZoom] = createZoom(4, [2, 20])
 
   const scrollTrigger = () => {
-    props.flameFunctions.forEach((f) => f.color)
+    Object.values(props.transforms).forEach((tr) => tr.color)
   }
 
   return (
@@ -222,13 +223,13 @@ export function FlameColorEditor(props: {
           <WheelZoomCamera2D eventTarget={div()} zoom={[zoom, setZoom]}>
             <Gradient />
             <svg class={ui.svg}>
-              <For each={props.flameFunctions}>
-                {(flameFunction, i) => (
+              <For each={recordEntries(props.transforms)}>
+                {([tid, transform]) => (
                   <FlameColorHandle
-                    color={vec2f(flameFunction.color.x, flameFunction.color.y)}
+                    color={vec2f(transform.color.x, transform.color.y)}
                     setColor={(color) => {
-                      props.setFlameFunctions((draft) => {
-                        draft[i()]!.color = { x: color.x, y: color.y }
+                      props.setTransforms((draft) => {
+                        draft[tid]!.color = { x: color.x, y: color.y }
                       })
                     }}
                   />
