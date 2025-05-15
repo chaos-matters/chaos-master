@@ -18,7 +18,7 @@ import { createRenderPointsPipeline } from './renderPoints'
 import { outputTextureFormat, Point } from './variations/types'
 import type { v3f } from 'typegpu/data'
 import type { DrawModeFn } from './drawMode'
-import type { FlameFunction } from './flameFunction'
+import type { TransformFunction } from './flameFunction'
 import type { ExportImageType } from '@/App'
 
 /**
@@ -37,8 +37,9 @@ type Flam3Props = {
   drawMode: DrawModeFn
   backgroundColor: v3f
   exposure: number
+  quality: number
   adaptiveFilterEnabled: boolean
-  flameFunctions: FlameFunction[]
+  transforms: TransformFunction[]
 }
 
 export function Flam3(props: Flam3Props) {
@@ -183,14 +184,14 @@ export function Flam3(props: Flam3Props) {
       props.skipIters,
       points,
       computeUniforms,
-      props.flameFunctions,
+      props.transforms,
     )
     const runIfs = createIFSPipeline(
       root,
       1,
       points,
       computeUniforms,
-      props.flameFunctions,
+      props.transforms,
     )
     const renderPoints = createRenderPointsPipeline(root, camera, points)
     const runBlur = createBlurPipeline(
@@ -203,8 +204,8 @@ export function Flam3(props: Flam3Props) {
     let renderAccumulationIndex = 0
     let clearRequested = true
     createEffect(() => {
-      runSkipIfs.update(props.flameFunctions)
-      runIfs.update(props.flameFunctions)
+      runSkipIfs.update(props.transforms)
+      runIfs.update(props.transforms)
 
       // this is in a separate effect because we don't
       // want to run ifs.update if not necessary

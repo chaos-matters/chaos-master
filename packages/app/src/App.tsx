@@ -49,7 +49,7 @@ import {
 import { sum } from './utils/sum'
 import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
 import type { ExampleID } from './flame/examples'
-import type { FlameFunction } from './flame/flameFunction'
+import type { FlameDescriptor, TransformFunction } from './flame/flameFunction'
 
 const { navigator } = window
 
@@ -60,7 +60,7 @@ function formatPercent(x: number) {
   return `${(x * 100).toFixed(1)} %`
 }
 
-const defaultTransform: FlameFunction = {
+const defaultTransform: TransformFunction = {
   probability: 0.1,
   color: { x: 0, y: 0 },
   preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
@@ -69,24 +69,37 @@ const defaultTransform: FlameFunction = {
 }
 export type ExportImageType = (canvas: HTMLCanvasElement) => void
 
-function App(props: { flameFromQuery?: FlameFunction[] }) {
+function App(props: { flameFromQuery?: FlameDescriptor }) {
   const [pixelRatio, setPixelRatio] = createSignal(1)
-  const [skipIters, setSkipIters] = createSignal(15)
   const [pointCount, setPointCount] = createSignal(1e6)
-  const [exposure, setExposure] = createSignal(0.25)
+  const [quality, setQuality] = createSignal(
+    props.flameFromQuery ? props.flameFromQuery.renderSettings.quality : 1,
+  )
+  const [exposure, setExposure] = createSignal(
+    props.flameFromQuery ? props.flameFromQuery.renderSettings.exposure : 0.25,
+  )
+  const [skipIters, setSkipIters] = createSignal(
+    props.flameFromQuery ? props.flameFromQuery.renderSettings.skipIters : 15,
+  )
   const [drawMode, setDrawMode] = createSignal(lightMode)
-  const [renderInterval, setRenderInterval] = createSignal(1)
+  const [renderInterval, setRenderInterval] = createSignal(100)
   const [onExportImage, setOnExportImage] = createSignal<ExportImageType>()
   const finalRenderInterval = () => (onExportImage() ? 0 : renderInterval())
   const [backgroundColor, setBackgroundColor] = createSignal(vec3f(0, 0, 0))
   const [adaptiveFilterEnabled, setAdaptiveFilterEnabled] = createSignal(true)
   const [showSidebar, setShowSidebar] = createSignal(true)
   const [zoom, setZoom] = createZoom(1, [0, Infinity])
-  const [flameFunctions, setFlameFunctions, history] = createStoreHistory(
-    createStore(structuredClone(props.flameFromQuery ?? examples.example1)),
+  const [transforms, setTransforms, history] = createStoreHistory(
+    createStore(
+      structuredClone(
+        props.flameFromQuery
+          ? props.flameFromQuery.transforms
+          : examples.example1.transforms,
+      ),
+    ),
   )
   const totalProbability = createMemo(() =>
-    sum(flameFunctions.map((f) => f.probability)),
+    sum(transforms.map((f) => f.probability)),
   )
   const requestModal = useRequestModal()
 
@@ -125,7 +138,15 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
       if (!blob) return
       const imgData = await blob.arrayBuffer()
       const pngBytes = new Uint8Array(imgData)
-      const encodedFlames = await compressJsonQueryParam(flameFunctions)
+      const exportJsonObj: FlameDescriptor = {
+        renderSettings: {
+          quality: quality(),
+          exposure: exposure(),
+          skipIters: skipIters(),
+        },
+        transforms: transforms,
+      }
+      const encodedFlames = await compressJsonQueryParam(exportJsonObj)
       const imgExtData = addFlameDataToPng(encodedFlames, pngBytes)
       const fileUrlExt = URL.createObjectURL(imgExtData)
       const downloadLink = window.document.createElement('a')
@@ -147,9 +168,10 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                   pointCount={pointCount()}
                   drawMode={drawMode()}
                   backgroundColor={backgroundColor()}
+                  quality={quality()}
                   exposure={exposure()}
                   adaptiveFilterEnabled={adaptiveFilterEnabled()}
-                  flameFunctions={flameFunctions}
+                  transforms={transforms}
                   renderInterval={finalRenderInterval()}
                   onExportImage={onExportImage()}
                 />
@@ -191,20 +213,20 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
         <Show when={showSidebar()}>
           <div class={ui.sidebar}>
             <AffineEditor
-              flameFunctions={flameFunctions}
-              setFlameFunctions={setFlameFunctions}
+              transforms={transforms}
+              setTransforms={setTransforms}
             />
             <FlameColorEditor
-              flameFunctions={flameFunctions}
-              setFlameFunctions={setFlameFunctions}
+              transforms={transforms}
+              setTransforms={setTransforms}
             />
-            <For each={flameFunctions}>
+            <For each={transforms}>
               {(flame, i) => (
                 <Card>
                   <button
                     class={ui.deleteFlameButton}
                     onClick={() => {
-                      setFlameFunctions((draft) => {
+                      setTransforms((draft) => {
                         draft.splice(i(), 1)
                       })
                     }}
@@ -218,7 +240,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                     max={1}
                     step={0.001}
                     onInput={(probability) => {
-                      setFlameFunctions((draft) => {
+                      setTransforms((draft) => {
                         draft[i()]!.probability = probability
                       })
                     }}
@@ -237,7 +259,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                             if (!isVariationType(type)) {
                               return
                             }
-                            setFlameFunctions((draft) => {
+                            setTransforms((draft) => {
                               draft[i()]!.variations[j()] = getVariationDefault(
                                 type,
                                 variation.weight,
@@ -255,7 +277,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                           max={1}
                           step={0.001}
                           onInput={(weight) => {
-                            setFlameFunctions((draft) => {
+                            setTransforms((draft) => {
                               draft[i()]!.variations[j()]!.weight = weight
                             })
                           }}
@@ -269,7 +291,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                             <Dynamic
                               {...getParamsEditor(variation)}
                               setValue={(value) => {
-                                setFlameFunctions((draft) => {
+                                setTransforms((draft) => {
                                   const i_ = i()
                                   const j_ = j()
                                   if (
@@ -295,7 +317,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               <button
                 class={ui.addFlameButton}
                 onClick={() => {
-                  setFlameFunctions((draft) => {
+                  setTransforms((draft) => {
                     draft.push(structuredClone(defaultTransform))
                   })
                 }}
@@ -330,6 +352,15 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                 step={1e4}
                 onInput={setPointCount}
                 formatValue={(value) => `${(value / 1000).toFixed(0)} K`}
+              />
+              <Slider
+                label="Quality"
+                value={quality()}
+                min={1}
+                max={100}
+                step={1}
+                onInput={setQuality}
+                formatValue={(value) => value.toString()}
               />
               <Slider
                 label="Exposure"
@@ -425,10 +456,12 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                   if (result === 'cancel') {
                     return
                   }
+                  const flameDesc = examples[selectedExampleId()]
                   // structuredClone required in order to not modify the original, as store in solidjs does
-                  history.replace(
-                    structuredClone(examples[selectedExampleId()]),
-                  )
+                  history.replace(structuredClone(flameDesc.transforms))
+                  setExposure(flameDesc.renderSettings.exposure)
+                  setQuality(flameDesc.renderSettings.quality)
+                  setSkipIters(flameDesc.renderSettings.skipIters)
                 }}
               >
                 Load Example
@@ -448,7 +481,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               <button
                 class={ui.addFlameButton}
                 onClick={async () => {
-                  const encoded = await encodeJsonQueryParam(flameFunctions)
+                  const encoded = await encodeJsonQueryParam(transforms)
                   const url = `${window.location.origin}/?flame=${encoded}`
                   await navigator.clipboard.writeText(url)
                   await requestModal({
@@ -479,9 +512,15 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                       reader.onload = async (e) => {
                         const fr = e.target
                         const arrBuf = new Uint8Array(fr?.result as ArrayBuffer)
-                        const newFlameFunctions =
+                        const newFlameDesriptor =
                           await extractFlameFromPng(arrBuf)
-                        history.replace(structuredClone(newFlameFunctions))
+
+                        history.replace(
+                          structuredClone(newFlameDesriptor.transforms),
+                        )
+                        setExposure(newFlameDesriptor.renderSettings.exposure)
+                        setQuality(newFlameDesriptor.renderSettings.quality)
+                        setSkipIters(newFlameDesriptor.renderSettings.skipIters)
                       }
                       reader.onerror = function () {
                         console.warn(reader.error)
