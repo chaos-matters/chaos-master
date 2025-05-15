@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For } from 'solid-js'
+import { createSignal, For } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
 import { examples } from '@/flame/examples'
 import { Flam3 } from '@/flame/Flam3'
@@ -18,23 +18,16 @@ import type { ChangeHistory } from '@/utils/createStoreHistory'
 const CANCEL = 'cancel'
 
 function Preview(props: { flameDescriptor: FlameDescriptor }) {
-  const [renderInterval, setRenderInterval] = createSignal(1)
-
-  createEffect(() => {
-    setTimeout(() => {
-      setRenderInterval(Infinity)
-    }, 3000)
-  })
-
   return (
     <Root adapterOptions={{ powerPreference: 'high-performance' }}>
       <AutoCanvas pixelRatio={1}>
         <Camera2D position={vec2f()} fovy={1}>
           <Flam3
-            pointCount={1e4}
+            quality={0.8}
+            pointCountPerBatch={2e4}
             adaptiveFilterEnabled={true}
             flameDescriptor={props.flameDescriptor}
-            renderInterval={renderInterval()}
+            renderInterval={1}
             onExportImage={undefined}
             edgeFadeColor={vec4f(0)}
           />

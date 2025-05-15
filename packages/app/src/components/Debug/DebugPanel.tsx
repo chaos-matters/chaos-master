@@ -2,17 +2,18 @@ import { createSignal, Show } from 'solid-js'
 import { isDev } from 'solid-js/web'
 import { renderStats } from '@/flame/renderStats'
 import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
-import { VERSION } from '@/version'
-import { createShowHelp } from '../HelpModal/HelpModal'
-import { QuestionMark } from '../QuestionMark/QuestionMark'
-import ui from './SoftwareVersion.module.css'
+import ui from './DebugPanel.module.css'
 
 const bigNumberFormatter = Intl.NumberFormat('en', { notation: 'compact' })
 
-export function SoftwareVersion() {
-  const showHelp = createShowHelp()
+function convertNanoToMilliSeconds(valueNs: number): number {
+  return valueNs / 1e6
+}
+export function DebugPanel() {
   const [showDebugPanel, setShowDebugPanel] = createSignal(isDev)
-
+  const formatValueForPanel = (value: number) => {
+    return `${convertNanoToMilliSeconds(value).toFixed(2)} ms`
+  }
   useKeyboardShortcuts({
     KeyM: (ev) => {
       if (ev.metaKey || ev.ctrlKey) {
@@ -29,19 +30,16 @@ export function SoftwareVersion() {
             {bigNumberFormatter.format(renderStats().qualityPointCountLimit)}{' '}
             Iters
           </p>
-          <p>{(renderStats().timing.ifsNs / 1e6).toFixed(2)} ms IFS</p>
+          <p>{formatValueForPanel(renderStats().timing.ifsNs)} IFS</p>
           <p>
-            {(renderStats().timing.renderPointsNs / 1e6).toFixed(2)} ms Render
+            {formatValueForPanel(renderStats().timing.renderPointsNs)} Render
           </p>
-          <p>{(renderStats().timing.blurNs / 1e6).toFixed(2)} ms Blur</p>
+          <p>{formatValueForPanel(renderStats().timing.blurNs)} Blur</p>
           <p>
-            {(renderStats().timing.colorGradingNs / 1e6).toFixed(2)} ms Grading
+            {formatValueForPanel(renderStats().timing.colorGradingNs)} Grading
           </p>
         </div>
       </Show>
-      <button class={ui.version} onClick={showHelp}>
-        Chaos Master v{VERSION} <sup>alpha</sup> <QuestionMark />
-      </button>
     </div>
   )
 }

@@ -1,6 +1,8 @@
-import { createEffect, createMemo, onCleanup } from 'solid-js'
+import { createEffect, createMemo, createSignal, onCleanup } from 'solid-js'
 import { arrayOf, vec3f, vec4f, vec4u } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
+import { setRenderStats } from '@/flame/renderStats'
+import { createTimestampQuery } from '@/utils/createTimestampQuery'
 import { randomVec4u } from '@/utils/randomVec4u'
 import { usePointer } from '@/utils/usePointer'
 import { useCamera } from '../lib/CameraContext'
@@ -25,12 +27,12 @@ import type { ExportImageType } from '@/App'
  * TODO: This factor is fine tuned to look good for the default example.
  * Consider dynamically computing the correct factor to use.
  */
-const COUNT_ADJUSTMENT_FACTOR = 0.02
 export const MAX_POINT_COUNT = 4e6
 export const MAX_INNER_ITERS = 30
 
 type Flam3Props = {
-  pointCount: number
+  quality: number
+  pointCountPerBatch: number
   renderInterval: number
   onExportImage: ExportImageType | undefined
   adaptiveFilterEnabled: boolean
@@ -44,6 +46,8 @@ export function Flam3(props: Flam3Props) {
   const { context, canvasSize, pixelRatio, canvas, canvasFormat } = useCanvas()
   const pointer = usePointer(canvas)
   const queryBuffer = root.createBuffer(vec4f, vec4f())
+  const [maxPointsCount, setMaxPointsCount] = createSignal(0)
+
   const backgroundColorFinal = () => {
     if (props.flameDescriptor.renderSettings.backgroundColor === undefined) {
       return props.flameDescriptor.renderSettings.drawMode === 'light'
@@ -51,6 +55,16 @@ export function Flam3(props: Flam3Props) {
         : vec3f(1)
     }
     return vec3f(...props.flameDescriptor.renderSettings.backgroundColor)
+  }
+
+  const bucketProbabilityInv = () => {
+    const { height } = canvasSize()
+    const unitSquareArea = (height ** 2 * camera.zoom() ** 2) / 4
+    return unitSquareArea
+  }
+  const qualityPointCountLimit = () => {
+    const q = props.quality
+    return bucketProbabilityInv() / (q ** 2 - 2 * q + 1)
   }
 
   function _readCountUnderPointer(frameIndex: number) {
@@ -87,19 +101,18 @@ export function Flam3(props: Flam3Props) {
         .read()
         .then((value) => {
           console.info(x, y, value.w)
+          console.info('Accu', frameIndex)
         })
         .catch(() => {})
     }
   }
 
-  const countAdjustmentFactor = createMemo(() => {
-    // height is used because camera.zoom is proportional to
-    // 1 / viewport.height in world-space
-    const { height } = canvasSize()
-    return (
-      (COUNT_ADJUSTMENT_FACTOR * (camera.zoom() * height) ** 2) /
-      props.pointCount
-    )
+  createEffect(() => {
+    setMaxPointsCount(qualityPointCountLimit())
+    setRenderStats((prev) => ({
+      ...prev,
+      qualityPointCountLimit: maxPointsCount(),
+    }))
   })
 
   const points = root
@@ -112,7 +125,7 @@ export function Flam3(props: Flam3Props) {
 
   const colorGradingUniforms = root
     .createBuffer(ColorGradingUniforms, {
-      countAdjustmentFactor: 1,
+      averagePointCountPerBucketInv: 0,
       exposure: 1,
       backgroundColor: vec4f(0, 0, 0, 0),
       edgeFadeColor: vec4f(0, 0, 0, 0.8),
@@ -185,6 +198,17 @@ export function Flam3(props: Flam3Props) {
     )
   })
 
+  const continueRendering = (accumulatedPointCount: number) => {
+    return accumulatedPointCount <= qualityPointCountLimit()
+  }
+
+  const timestampQuery = createTimestampQuery(device, [
+    'ifs',
+    'renderPoints',
+    'blur',
+    'colorGrading',
+  ])
+
   createEffect(() => {
     const o = outputTextures()
     if (!o) {
@@ -207,7 +231,7 @@ export function Flam3(props: Flam3Props) {
       props.flameDescriptor.transforms,
     )
 
-    let renderAccumulationIndex = 0
+    let accumulatedPointCount = 0
     let clearRequested = true
     createEffect(() => {
       ifsPipeline.update(props.flameDescriptor)
@@ -215,10 +239,10 @@ export function Flam3(props: Flam3Props) {
       // this is in a separate effect because we don't
       // want to run ifs.update if not necessary
       createEffect(() => {
-        renderAccumulationIndex = 0
         camera.update()
+        accumulatedPointCount = 0
         colorGradingUniforms.writePartial({
-          countAdjustmentFactor: countAdjustmentFactor(),
+          averagePointCountPerBucketInv: 0,
         })
 
         clearRequested = true
@@ -244,6 +268,7 @@ export function Flam3(props: Flam3Props) {
 
     const rafLoop = createAnimationFrame(
       () => {
+        const pointCountPerBatch = props.pointCountPerBatch
         const colorGradingPipeline_ = colorGradingPipeline()
         if (colorGradingPipeline_ === undefined) {
           return
@@ -270,19 +295,21 @@ export function Flam3(props: Flam3Props) {
         computeUniforms.write({
           seed: randomVec4u(),
         })
-        renderAccumulationIndex += 1
+        accumulatedPointCount += pointCountPerBatch
         colorGradingUniforms.writePartial({
-          countAdjustmentFactor:
-            countAdjustmentFactor() / renderAccumulationIndex,
+          averagePointCountPerBucketInv:
+            bucketProbabilityInv() / accumulatedPointCount,
         })
 
         // Encode commands to do the computation
         const encoder = device.createCommandEncoder()
 
         {
-          const pass = encoder.beginComputePass()
-          runInitPoints(pass, props.pointCount)
-          ifsPipeline.run(pass, props.pointCount)
+          const pass = encoder.beginComputePass({
+            timestampWrites: timestampQuery.timestampWrites.ifs,
+          })
+          runInitPoints(pass, pointCountPerBatch)
+          ifsPipeline.run(pass, pointCountPerBatch)
           pass.end()
         }
 
@@ -295,25 +322,63 @@ export function Flam3(props: Flam3Props) {
                 storeOp: 'store',
               },
             ],
+            timestampWrites: timestampQuery.timestampWrites.renderPoints,
           })
-          renderPoints(pass, props.pointCount)
+          renderPoints(pass, pointCountPerBatch)
           pass.end()
         }
 
         if (props.adaptiveFilterEnabled) {
-          const pass = encoder.beginComputePass()
+          const pass = encoder.beginComputePass({
+            timestampWrites: timestampQuery.timestampWrites.blur,
+          })
           runBlur()?.(pass)
           pass.end()
         }
 
-        colorGradingPipeline_.run(encoder, context)
+        {
+          const pass = encoder.beginRenderPass({
+            colorAttachments: [
+              {
+                loadOp: 'clear',
+                storeOp: 'store',
+                view: context.getCurrentTexture().createView(),
+              },
+            ],
+            timestampWrites: timestampQuery.timestampWrites.colorGrading,
+          })
+          colorGradingPipeline_.run(pass)
+          pass.end()
+        }
 
-        // _readCountUnderPointer(count)
+        //_readCountUnderPointer(renderAccumulationIndex)
+
+        timestampQuery.write(encoder)
 
         device.queue.submit([encoder.finish()])
+
+        timestampQuery
+          .read()
+          .then((timing) => {
+            setRenderStats((prev) => ({
+              ...prev,
+              accumulatedPointCount: accumulatedPointCount,
+              timing: {
+                ifsNs: timing.ifs,
+                renderPointsNs: timing.renderPoints,
+                blurNs: props.adaptiveFilterEnabled ? timing.blur : 0,
+                colorGradingNs: timing.colorGrading,
+              },
+            }))
+          })
+          .catch(() => {})
+
         props.onExportImage?.(canvas)
       },
-      () => props.renderInterval,
+      () =>
+        continueRendering(accumulatedPointCount)
+          ? props.renderInterval
+          : Infinity,
       () => device.queue.onSubmittedWorkDone(),
     )
   })

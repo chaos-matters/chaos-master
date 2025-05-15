@@ -6,7 +6,6 @@ export const example1: FlameDescriptor = {
     exposure: 0.25,
     skipIters: 20,
     drawMode: 'light',
-    backgroundColor: [0, 0, 0],
   },
   transforms: {
     [tid('55d4c43f_14b8_4554_a9d1_a94eda857811')]: {

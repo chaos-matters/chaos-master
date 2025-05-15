@@ -18,9 +18,25 @@ import type { v2f } from 'typegpu/data'
 
 type WheelZoomCamera2DProps = {
   zoom: Signal<number>
+  position: Signal<v2f>
   eventTarget?: HTMLElement
 }
 
+export function createPosition(initPos: v2f): Signal<v2f> {
+  const [position, _setPosition] = createSignal(initPos)
+  const setPosition: Setter<v2f> = (value) => {
+    if (typeof value === 'function') {
+      _setPosition((prev) => {
+        return value(prev)
+      })
+    } else {
+      _setPosition(value)
+    }
+    return position()
+  }
+
+  return [position, setPosition]
+}
 export function createZoom(
   initZoom: number,
   zoomRange: [number, number],
@@ -45,9 +61,9 @@ export function createZoom(
 export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
   const { canvas } = useCanvas()
   const [zoom, setZoom] = props.zoom
+  const [position, setPosition] = props.position
   const el = createMemo(() => props.eventTarget ?? canvas)
 
-  const [position, setPosition] = createSignal(vec2f())
   let clipToWorld: (clip: v2f) => v2f | undefined
 
   const pan = createDragHandler((initEvent) => {

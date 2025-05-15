@@ -1,4 +1,5 @@
 import { For, Show } from 'solid-js'
+import { vec2f } from 'typegpu/data'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { Minus, Plus, Redo, Undo } from '@/icons'
 import { Button } from '../Button/Button'
@@ -6,11 +7,13 @@ import { ButtonGroup } from '../Button/ButtonGroup'
 import { SoftwareVersion } from '../SoftwareVersion/SoftwareVersion'
 import ui from './ViewControls.module.css'
 import type { Setter } from 'solid-js'
+import type { v2f} from 'typegpu/data';
 
 type ViewControlProps = {
   pixelRatio: number
   setPixelRatio: Setter<number>
   zoom: number
+  setPosition: Setter<v2f>
   setZoom: Setter<number>
 }
 
@@ -42,6 +45,7 @@ export function ViewControls(props: ViewControlProps) {
       </ButtonGroup>
       <ButtonGroup>
         <Button
+          disabled={props.zoom <= 0.01}
           onClick={() => {
             props.setZoom((p) => p * 0.9)
           }}
@@ -51,6 +55,7 @@ export function ViewControls(props: ViewControlProps) {
         <Button
           onClick={() => {
             props.setZoom(1)
+            props.setPosition(vec2f())
           }}
           style={{ 'min-width': '4rem' }}
         >

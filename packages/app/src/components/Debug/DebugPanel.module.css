@@ -1,5 +1,4 @@
-.appInfo,
-.version {
+.appInfo {
   --color: var(--neutral-500);
   --color-hover: black;
   --bg-color: #fffd;
@@ -25,25 +24,6 @@
   cursor: pointer;
   z-index: -1;
   text-align: end;
-
-  &:hover {
-    color: var(--color-hover);
-  }
-}
-
-.version {
-  position: absolute;
-  color: var(--color);
-  padding-inline: var(--space-2);
-  padding-block: var(--space-1);
-  line-height: 1;
-  right: 0;
-  bottom: 0;
-  font-size: small;
-  border-top-left-radius: var(--space-2);
-  background-color: var(--bg-color);
-  cursor: pointer;
-  z-index: -1;
 
   &:hover {
     color: var(--color-hover);
