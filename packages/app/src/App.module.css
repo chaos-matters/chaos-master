@@ -1,6 +1,8 @@
-.fullscreen {
+@reference 'tailwindcss';
+
+.layout {
+  @apply grid;
   height: 100dvh;
-  display: grid;
   grid-template-columns: auto 1fr;
   grid-template-rows: 1fr auto;
   grid-template-areas:
@@ -30,10 +32,8 @@
 }
 
 .viewport-controls {
+  @apply flex gap-2 p-2;
   grid-area: viewport-controls;
-  display: flex;
-  padding: 0.5rem;
-  gap: 0.5rem;
 }
 
 .button-group {
@@ -98,13 +98,8 @@
 }
 
 .sidebar {
+  @apply flex w-[26rem] flex-col gap-2 overflow-y-auto p-2;
   grid-area: sidebar;
-  width: 26rem;
-  display: flex;
-  flex-direction: column;
-  padding: 0.5rem;
-  gap: 0.5rem;
-  overflow-y: auto;
   scrollbar-color: #5558 transparent;
 }
 
@@ -123,20 +118,8 @@
   }
 }
 
-.load-image-type {
-  display: none;
-  padding: 1rem;
-}
-
-.add-flame-card.add-flame-card {
-  display: flex;
-  padding: 0;
-  align-items: stretch;
-  flex-direction: column;
-
-  &:hover {
-    background: none;
-  }
+.button-card.button-card {
+  @apply flex flex-col items-stretch p-0 hover:bg-transparent;
 }
 
 .add-flame-button {
@@ -167,8 +150,8 @@
   position: absolute;
   top: 0.2rem;
   right: 0.2rem;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 0.8rem;
+  height: 0.8rem;
   display: flex;
   align-items: center;
   justify-content: center;
