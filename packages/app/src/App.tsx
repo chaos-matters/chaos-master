@@ -144,7 +144,11 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
 
   return (
     <ChangeHistoryContextProvider value={history}>
-      <div class={ui.layout}>
+      <div
+        class="bg-black"
+        classList={{ [ui.layout]: true }}
+        data-theme={drawMode() === lightMode ? 'dark' : undefined}
+      >
         <Root adapterOptions={{ powerPreference: 'high-performance' }}>
           <div class={ui.canvasContainer}>
             <AutoCanvas class={ui.canvas} pixelRatio={pixelRatio()}>
