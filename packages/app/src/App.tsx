@@ -137,7 +137,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
 
   return (
     <ChangeHistoryContextProvider value={history}>
-      <div class={ui.fullscreen}>
+      <div class={ui.layout}>
         <Root adapterOptions={{ powerPreference: 'high-performance' }}>
           <div class={ui.canvasContainer}>
             <AutoCanvas class={ui.canvas} pixelRatio={pixelRatio()}>
@@ -291,7 +291,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                 </Card>
               )}
             </For>
-            <Card class={ui.addFlameCard}>
+            <Card class={ui.buttonCard}>
               <button
                 class={ui.addFlameButton}
                 onClick={() => {
@@ -388,7 +388,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                 <span></span>
               </label>
             </Card>
-            <Card class={ui.addFlameCard}>
+            <Card class={ui.buttonCard}>
               <button
                 class={ui.addFlameButton}
                 onClick={async () => {
@@ -434,7 +434,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                 Load Example
               </button>
             </Card>
-            <Card class={ui.addFlameCard}>
+            <Card class={ui.buttonCard}>
               <button
                 class={ui.addFlameButton}
                 onClick={() => {
@@ -444,7 +444,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                 Export PNG
               </button>
             </Card>
-            <Card class={ui.addFlameCard}>
+            <Card class={ui.buttonCard}>
               <button
                 class={ui.addFlameButton}
                 onClick={async () => {
@@ -465,11 +465,11 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                 Share Link
               </button>
             </Card>
-            <Card class={ui.addFlameCard}>
+            <Card class={ui.buttonCard}>
               <label class={ui.addFlameButton}>
                 Load Flame From Image
                 <input
-                  class={ui.loadImageType}
+                  class="hidden"
                   type="file"
                   accept="image/png"
                   onChange={(ev) => {
