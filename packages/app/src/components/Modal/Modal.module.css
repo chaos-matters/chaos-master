@@ -1,3 +1,5 @@
+@import '../../index.css';
+
 .modal {
   display: flex;
   flex-direction: column;
@@ -9,6 +11,7 @@
   animation: 200ms appear;
   white-space: break-spaces;
   background-color: black;
+  margin: auto;
 }
 
 ::backdrop {
@@ -30,6 +33,13 @@
   justify-content: flex-end;
   gap: 0.5rem;
   padding-top: 3.25rem;
+
+  & button {
+    @apply text-neutral-300;
+    &:hover {
+      @apply text-neutral-50;
+    }
+  }
 }
 
 @keyframes appear {

@@ -1,8 +1,8 @@
-@reference 'tailwindcss';
+@reference './index.css';
 
 .layout {
-  @apply grid;
   height: 100dvh;
+  display: grid;
   grid-template-columns: auto 1fr;
   grid-template-rows: 1fr auto;
   grid-template-areas:
