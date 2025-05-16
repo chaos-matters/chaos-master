@@ -18,6 +18,11 @@ import { Modal, useRequestModal } from './components/Modal/Modal'
 import { Slider } from './components/Sliders/Slider'
 import { SoftwareVersion } from './components/SoftwareVersion/SoftwareVersion'
 import { ChangeHistoryContextProvider } from './contexts/ChangeHistoryContext'
+import {
+  DEFAULT_POINT_COUNT,
+  DEFAULT_RENDER_INTERVAL_MS,
+  DEFAULT_RESOLUTION,
+} from './defaults'
 import { lightMode, paintMode } from './flame/drawMode'
 import { examples } from './flame/examples'
 import { Flam3, MAX_INNER_ITERS, MAX_POINT_COUNT } from './flame/Flam3'
@@ -70,12 +75,14 @@ const defaultTransform: FlameFunction = {
 export type ExportImageType = (canvas: HTMLCanvasElement) => void
 
 function App(props: { flameFromQuery?: FlameFunction[] }) {
-  const [pixelRatio, setPixelRatio] = createSignal(1)
-  const [skipIters, setSkipIters] = createSignal(15)
-  const [pointCount, setPointCount] = createSignal(1e6)
+  const [pixelRatio, setPixelRatio] = createSignal(DEFAULT_RESOLUTION)
+  const [skipIters, setSkipIters] = createSignal(20)
+  const [pointCount, setPointCount] = createSignal(DEFAULT_POINT_COUNT)
   const [exposure, setExposure] = createSignal(0.25)
   const [drawMode, setDrawMode] = createSignal(lightMode)
-  const [renderInterval, setRenderInterval] = createSignal(1)
+  const [renderInterval, setRenderInterval] = createSignal(
+    DEFAULT_RENDER_INTERVAL_MS,
+  )
   const [onExportImage, setOnExportImage] = createSignal<ExportImageType>()
   const finalRenderInterval = () => (onExportImage() ? 0 : renderInterval())
   const [backgroundColor, setBackgroundColor] = createSignal(vec3f(0, 0, 0))
