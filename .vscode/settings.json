@@ -9,9 +9,6 @@
   "emmet.excludeLanguages": ["typescriptreact"],
   "typescript.tsdk": "node_modules/typescript/lib",
   "typescript.enablePromptUseWorkspaceTsdk": true,
-  "files.associations": {
-    "*.css": "tailwindcss"
-  },
   "workbench.editorAssociations": {
     "*.svg": "default"
   }

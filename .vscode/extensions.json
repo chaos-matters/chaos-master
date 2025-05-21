@@ -1,7 +1,6 @@
 {
   "recommendations": [
     "PolyMeilex.wgsl",
-    "bradlc.vscode-tailwindcss",
     "dbaeumer.vscode-eslint",
     "esbenp.prettier-vscode",
     "ggsimm.wgsl-literal"

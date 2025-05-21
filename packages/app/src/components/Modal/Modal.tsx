@@ -116,8 +116,8 @@ export function Modal(props: ParentProps<ModalProps>) {
             return (
               <dialog
                 ref={showModal}
-                class=""
-                classList={{ [ui.modal]: true, [class_ ?? '']: true }}
+                class={ui.modal}
+                classList={{ [class_ ?? '']: true }}
                 onCancel={(ev) => {
                   ev.preventDefault()
                 }}
