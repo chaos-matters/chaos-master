@@ -1,14 +1,13 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
-@import 'tailwindcss';
-
-@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
 html,
 body {
+  margin: 0;
   overflow: hidden;
   overscroll-behavior: none;
 }
 
 * {
+  box-sizing: border-box;
   font-family: Inter;
 }

@@ -148,11 +148,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
 
   return (
     <ChangeHistoryContextProvider value={history}>
-      <div
-        class="bg-black"
-        classList={{ [ui.layout]: true }}
-        data-theme={drawMode() === lightMode ? 'dark' : undefined}
-      >
+      <div class={ui.layout}>
         <Root adapterOptions={{ powerPreference: 'high-performance' }}>
           <div class={ui.canvasContainer}>
             <AutoCanvas class={ui.canvas} pixelRatio={pixelRatio()}>
@@ -430,8 +426,8 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               <label class={ui.addFlameButton}>
                 Load Flame From Image
                 <input
-                  class="hidden"
                   type="file"
+                  hidden
                   accept="image/png"
                   onChange={(ev) => {
                     const file = ev.target.files?.item(0)
