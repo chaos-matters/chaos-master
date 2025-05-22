@@ -22,8 +22,10 @@
   /* allow pointer events to act correctly on touch devices */
   touch-action: none;
 
-  /* allow canvas fade to go under the sidebar a bit */
-  margin-left: -0.4rem;
+  &:not(.fullscreen) {
+    /* allow canvas fade to go under the sidebar a bit */
+    margin-left: -0.4rem;
+  }
 }
 
 .canvas {

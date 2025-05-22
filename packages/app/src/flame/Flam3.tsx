@@ -39,6 +39,7 @@ type Flam3Props = {
   exposure: number
   adaptiveFilterEnabled: boolean
   flameFunctions: FlameFunction[]
+  edgeFade: boolean
 }
 
 export function Flam3(props: Flam3Props) {
@@ -223,6 +224,7 @@ export function Flam3(props: Flam3Props) {
     createEffect(() => {
       colorGradingUniforms.writePartial({
         exposure: 2 * Math.exp(props.exposure),
+        edgeFade: props.edgeFade && !props.onExportImage ? 0.8 : 0,
       })
       rafLoop.redraw()
     })

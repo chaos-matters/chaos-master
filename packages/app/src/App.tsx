@@ -150,7 +150,10 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
     <ChangeHistoryContextProvider value={history}>
       <div class={ui.layout}>
         <Root adapterOptions={{ powerPreference: 'high-performance' }}>
-          <div class={ui.canvasContainer}>
+          <div
+            class={ui.canvasContainer}
+            classList={{ [ui.fullscreen]: !showSidebar() }}
+          >
             <AutoCanvas class={ui.canvas} pixelRatio={pixelRatio()}>
               <WheelZoomCamera2D zoom={[zoom, setZoom]}>
                 <Flam3
@@ -163,6 +166,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                   flameFunctions={flameFunctions}
                   renderInterval={finalRenderInterval()}
                   onExportImage={onExportImage()}
+                  edgeFade={showSidebar()}
                 />
               </WheelZoomCamera2D>
             </AutoCanvas>
