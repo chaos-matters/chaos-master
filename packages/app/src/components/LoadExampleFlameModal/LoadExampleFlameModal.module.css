@@ -6,19 +6,41 @@
   justify-items: stretch;
 }
 
+.gallery-title {
+  display: flex;
+  justify-content: space-between;
+
+  & h1 {
+    margin: 0;
+  }
+}
+
+.close-button {
+  appearance: none;
+  border: none;
+  background: none;
+  color: #aaa;
+  cursor: pointer;
+
+  &:hover {
+    color: white;
+  }
+}
+
 .canvas-container {
   position: relative;
   overflow: hidden;
   aspect-ratio: 16 / 9;
   border: 1px solid #111;
   border-radius: 0.5rem;
+  cursor: pointer;
 
   &:hover {
     border: 1px solid #555;
   }
 }
 
-.gallery-title {
+.item-title {
   position: absolute;
   width: 100%;
   bottom: 0;
