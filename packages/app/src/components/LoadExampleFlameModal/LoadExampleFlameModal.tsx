@@ -3,22 +3,48 @@ import { vec2f, vec3f } from 'typegpu/data'
 import { lightMode } from '@/flame/drawMode'
 import { examples } from '@/flame/examples'
 import { Flam3 } from '@/flame/Flam3'
+import Cross from '@/icons/cross.svg'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
 import { Root } from '@/lib/Root'
+import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
 import { useRequestModal } from '../Modal/Modal'
 import ui from './LoadExampleFlameModal.module.css'
 import type { ExampleID } from '@/flame/examples'
 import type { FlameFunction } from '@/flame/flameFunction'
 import type { ChangeHistory } from '@/utils/createStoreHistory'
 
+const CANCEL = Symbol('CANCEL')
+
 type LoadExampleFlameModalProps = {
-  respond: (value: ExampleID) => void
+  respond: (value: ExampleID | typeof CANCEL) => void
 }
 
 function LoadExampleFlameModal(props: LoadExampleFlameModalProps) {
+  useKeyboardShortcuts(
+    {
+      Escape: () => {
+        props.respond(CANCEL)
+        return true
+      },
+    },
+    // force it to go before sidebar closing event
+    // using the capturing phase
+    { capture: true },
+  )
   return (
     <>
+      <div class={ui.galleryTitle}>
+        <h1>Example Gallery</h1>
+        <button
+          class={ui.closeButton}
+          onClick={() => {
+            props.respond(CANCEL)
+          }}
+        >
+          <Cross width="1rem" height="1rem" />
+        </button>
+      </div>
       <p>You can undo this operation.</p>
       <div class={ui.gallery}>
         <For each={Object.keys(examples) as ExampleID[]}>
@@ -46,7 +72,7 @@ function LoadExampleFlameModal(props: LoadExampleFlameModalProps) {
                   </Camera2D>
                 </AutoCanvas>
               </Root>
-              <div class={ui.galleryTitle}>{exampleId}</div>
+              <div class={ui.itemTitle}>{exampleId}</div>
             </div>
           )}
         </For>
@@ -54,8 +80,6 @@ function LoadExampleFlameModal(props: LoadExampleFlameModalProps) {
     </>
   )
 }
-
-const CANCEL = Symbol('CANCEL')
 
 export function createLoadExampleFlame(
   history: ChangeHistory<FlameFunction[]>,

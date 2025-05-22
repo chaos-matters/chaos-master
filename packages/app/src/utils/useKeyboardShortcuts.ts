@@ -31,6 +31,7 @@ function letBrowserHandleActiveInput(el: Element | null, ev: KeyboardEvent) {
 
 export function useKeyboardShortcuts(
   shortcuts: Record<string, (ev: KeyboardEvent) => boolean | undefined>,
+  options?: AddEventListenerOptions,
 ) {
   createEffect(() => {
     function onKeydown(ev: KeyboardEvent) {
@@ -40,11 +41,12 @@ export function useKeyboardShortcuts(
       const action = shortcuts[ev.code]
       if (action?.(ev) === true) {
         ev.preventDefault()
+        ev.stopImmediatePropagation()
       }
     }
-    document.addEventListener('keydown', onKeydown)
+    document.addEventListener('keydown', onKeydown, options)
     onCleanup(() => {
-      document.removeEventListener('keydown', onKeydown)
+      document.removeEventListener('keydown', onKeydown, options)
     })
   })
 }
