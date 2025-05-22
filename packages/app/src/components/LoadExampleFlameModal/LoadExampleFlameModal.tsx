@@ -49,8 +49,8 @@ function LoadExampleFlameModal(props: LoadExampleFlameModalProps) {
       <div class={ui.gallery}>
         <For each={Object.keys(examples) as ExampleID[]}>
           {(exampleId) => (
-            <div
-              class={ui.canvasContainer}
+            <button
+              class={ui.item}
               onClick={() => {
                 props.respond(exampleId)
               }}
@@ -68,12 +68,13 @@ function LoadExampleFlameModal(props: LoadExampleFlameModalProps) {
                       flameFunctions={examples[exampleId]}
                       renderInterval={Infinity}
                       onExportImage={() => {}}
+                      edgeFade={false}
                     />
                   </Camera2D>
                 </AutoCanvas>
               </Root>
               <div class={ui.itemTitle}>{exampleId}</div>
-            </div>
+            </button>
           )}
         </For>
       </div>

@@ -5,24 +5,13 @@
   gap: 1rem;
   border-radius: 1rem;
   border: 2px solid #161616;
-  animation: 200ms appear;
   white-space: break-spaces;
   background-color: #050505;
   color: #aaa;
   margin: auto;
+  view-transition-name: modal;
 }
 
 ::backdrop {
   backdrop-filter: brightness(50%) blur(10px);
-  animation: 500ms appear;
-}
-
-@keyframes appear {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
 }

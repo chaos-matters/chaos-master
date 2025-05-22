@@ -89,7 +89,9 @@ export function Modal(props: ParentProps<ModalProps>) {
       // @ts-expect-error this can't be modeled in ts
       resolve,
     }
-    setModalInstances((prev) => [...prev, instance])
+    document.startViewTransition(() => {
+      setModalInstances((prev) => [...prev, instance])
+    })
     return promise
   }
 
@@ -107,10 +109,13 @@ export function Modal(props: ParentProps<ModalProps>) {
             } = instance
 
             function respond(option: unknown) {
-              resolve(option)
-              setModalInstances((instances) =>
-                instances.filter((ins) => ins !== instance),
-              )
+              const transition = document.startViewTransition(() => {
+                resolve(option)
+                setModalInstances((instances) =>
+                  instances.filter((ins) => ins !== instance),
+                )
+              })
+              return transition.finished
             }
 
             return (
