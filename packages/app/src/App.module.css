@@ -106,10 +106,10 @@
   border: none;
   border-radius: 100vh;
   position: absolute;
-  top: 0.2rem;
-  right: 0.2rem;
-  width: 0.8rem;
-  height: 0.8rem;
+  top: 0;
+  right: 0;
+  width: 1.5rem;
+  height: 1.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
