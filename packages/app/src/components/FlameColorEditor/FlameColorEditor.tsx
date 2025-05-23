@@ -17,7 +17,7 @@ import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
 import { wgsl } from '@/utils/wgsl'
 import ui from './FlameColorEditor.module.css'
 import type { v2f } from 'typegpu/data'
-import type { FlameFunction } from '@/flame/flameFunction'
+import type { TransformFunction } from '@/flame/flameFunction'
 import type { HistorySetter } from '@/utils/createStoreHistory'
 
 const HANDLE_LIGHTNESS = 0.68
@@ -192,14 +192,14 @@ function FlameColorHandle(props: {
 }
 
 export function FlameColorEditor(props: {
-  flameFunctions: FlameFunction[]
-  setFlameFunctions: HistorySetter<FlameFunction[]>
+  transforms: TransformFunction[]
+  setTransforms: HistorySetter<TransformFunction[]>
 }) {
   const [div, setDiv] = createSignal<HTMLDivElement>()
   const [zoom, setZoom] = createZoom(4, [2, 20])
 
   const scrollTrigger = () => {
-    props.flameFunctions.forEach((f) => f.color)
+    props.transforms.forEach((f) => f.color)
   }
 
   return (
@@ -215,12 +215,12 @@ export function FlameColorEditor(props: {
           <WheelZoomCamera2D eventTarget={div()} zoom={[zoom, setZoom]}>
             <Gradient />
             <svg class={ui.svg}>
-              <For each={props.flameFunctions}>
+              <For each={props.transforms}>
                 {(flameFunction, i) => (
                   <FlameColorHandle
                     color={vec2f(flameFunction.color.x, flameFunction.color.y)}
                     setColor={(color) => {
-                      props.setFlameFunctions((draft) => {
+                      props.setTransforms((draft) => {
                         draft[i()]!.color = { x: color.x, y: color.y }
                       })
                     }}

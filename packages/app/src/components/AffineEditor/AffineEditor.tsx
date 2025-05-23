@@ -17,7 +17,7 @@ import { wgsl } from '@/utils/wgsl'
 import { handleColor } from '../FlameColorEditor/FlameColorEditor'
 import ui from './AffineEditor.module.css'
 import type { v2f } from 'typegpu/data'
-import type { FlameFunction } from '@/flame/flameFunction'
+import type { TransformFunction } from '@/flame/flameFunction'
 import type { AffineParams } from '@/flame/variations/types'
 import type { HistorySetter } from '@/utils/createStoreHistory'
 
@@ -315,14 +315,14 @@ function AffineHandle(props: {
 }
 
 export function AffineEditor(props: {
-  flameFunctions: FlameFunction[]
-  setFlameFunctions: HistorySetter<FlameFunction[]>
+  transforms: TransformFunction[]
+  setTransforms: HistorySetter<TransformFunction[]>
 }) {
   const [div, setDiv] = createSignal<HTMLDivElement>()
   const [zoom, setZoom] = createZoom(0.9, [0.5, 20])
 
   const scrollTrigger = () => {
-    props.flameFunctions.forEach((f) => f.preAffine)
+    props.transforms.forEach((f) => f.preAffine)
   }
 
   return (
@@ -352,13 +352,13 @@ export function AffineEditor(props: {
                   <path d="M 0 0 L 10 5 L 0 10 z" />
                 </marker>
               </defs>
-              <For each={props.flameFunctions}>
+              <For each={props.transforms}>
                 {(flameFunction, i) => (
                   <AffineHandle
                     transform={flameFunction.preAffine}
                     color={vec2f(flameFunction.color.x, flameFunction.color.y)}
                     setTransform={(affine) => {
-                      props.setFlameFunctions((draft) => {
+                      props.setTransforms((draft) => {
                         draft[i()]!['preAffine'] = affine
                       })
                     }}

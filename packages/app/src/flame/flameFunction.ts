@@ -13,12 +13,23 @@ import type {
   TransformVariationDescriptor,
 } from './variations'
 
-export type FlameFunction = {
+export type RenderSettings = {
+  exposure: number
+  skipIters: number
+}
+
+export type TransformFunction = {
   probability: number
   preAffine: AffineParams
   postAffine: AffineParams
   color: { x: number; y: number }
   variations: TransformVariationDescriptor[]
+}
+
+export type FlameDescriptor = {
+  renderSettings: RenderSettings
+  transforms: TransformFunction[]
+  // transformOrder: number[]
 }
 
 const FlameUniformsBase = struct({
@@ -54,7 +65,7 @@ function variationInvocation(name: TransformVariation, j: number) {
 
 export function createFlameWgsl({
   variations,
-}: Pick<FlameFunction, 'variations'>) {
+}: Pick<TransformFunction, 'variations'>) {
   const Uniforms = struct({
     ...FlameUniformsBase.propTypes,
     ...Object.fromEntries(
@@ -88,7 +99,7 @@ export function createFlameWgsl({
   }
 }
 
-export function extractFlameUniforms(flames: FlameFunction[]) {
+export function extractFlameUniforms(flames: TransformFunction[]) {
   const totalProbability = sum(flames.map((f) => f.probability))
   return Object.fromEntries(
     flames.map(({ variations, probability, color, ...flame }, i) => [

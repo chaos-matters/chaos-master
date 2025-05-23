@@ -11,7 +11,7 @@ import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
 import { useRequestModal } from '../Modal/Modal'
 import ui from './LoadExampleFlameModal.module.css'
 import type { ExampleID } from '@/flame/examples'
-import type { FlameFunction } from '@/flame/flameFunction'
+import type { FlameDescriptor } from '@/flame/flameFunction'
 import type { ChangeHistory } from '@/utils/createStoreHistory'
 
 const CANCEL = Symbol('CANCEL')
@@ -59,13 +59,13 @@ function LoadExampleFlameModal(props: LoadExampleFlameModalProps) {
                 <AutoCanvas pixelRatio={1}>
                   <Camera2D position={vec2f()} fovy={1}>
                     <Flam3
-                      skipIters={15}
+                      skipIters={examples[exampleId].renderSettings.skipIters}
                       pointCount={1e5}
                       drawMode={lightMode}
                       backgroundColor={vec3f()}
-                      exposure={0.25}
+                      exposure={examples[exampleId].renderSettings.exposure}
                       adaptiveFilterEnabled={true}
-                      flameFunctions={examples[exampleId]}
+                      transforms={examples[exampleId].transforms}
                       renderInterval={Infinity}
                       onExportImage={() => {}}
                       edgeFade={false}
@@ -83,7 +83,7 @@ function LoadExampleFlameModal(props: LoadExampleFlameModalProps) {
 }
 
 export function createLoadExampleFlame(
-  history: ChangeHistory<FlameFunction[]>,
+  history: ChangeHistory<FlameDescriptor>,
 ) {
   const requestModal = useRequestModal()
   const [loadExampleModalIsOpen, setLoadExampleModalIsOpen] =
