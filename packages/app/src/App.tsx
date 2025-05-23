@@ -11,6 +11,8 @@ import { Dynamic } from 'solid-js/web'
 import { vec3f } from 'typegpu/data'
 import ui from './App.module.css'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
+import { Button } from './components/Button/Button'
+import { ButtonGroup } from './components/Button/ButtonGroup'
 import { Checkbox } from './components/Checkbox/Checkbox'
 import { Card } from './components/ControlCard/ControlCard'
 import { FlameColorEditor } from './components/FlameColorEditor/FlameColorEditor'
@@ -173,35 +175,55 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
           </div>
         </Root>
         <div class={ui.viewportControls}>
-          <div class={ui.buttonGroup}>
-            <button onClick={() => setZoom((p) => p * 0.9)}>
+          <ButtonGroup>
+            <For each={[1, 2, 4]}>
+              {(divider) => {
+                const pixelRatio_ = 1 / divider
+                return (
+                  <Button
+                    active={pixelRatio() === pixelRatio_}
+                    onClick={() => setPixelRatio(pixelRatio_)}
+                    style={{ 'min-width': '3rem' }}
+                  >
+                    <Show when={divider !== 1} fallback={'Full'}>
+                      <span>
+                        <sup>1</sup>/<sub>{divider}</sub>
+                      </span>
+                    </Show>
+                  </Button>
+                )
+              }}
+            </For>
+          </ButtonGroup>
+          <ButtonGroup>
+            <Button onClick={() => setZoom((p) => p * 0.9)}>
               <Minus />
-            </button>
-            <button class={ui.resetZoomButton} onClick={() => setZoom(1)}>
+            </Button>
+            <Button onClick={() => setZoom(1)} style={{ 'min-width': '4rem' }}>
               {(zoom() * 100).toFixed(0)}%
-            </button>
-            <button onClick={() => setZoom((p) => p / 0.9)}>
+            </Button>
+            <Button onClick={() => setZoom((p) => p / 0.9)}>
               <Plus />
-            </button>
-          </div>
-          <div class={ui.buttonGroup}>
-            <button
+            </Button>
+          </ButtonGroup>
+          <ButtonGroup>
+            <Button
               disabled={!history.hasUndo()}
               onClick={() => {
                 history.undo()
               }}
             >
               <Undo />
-            </button>
-            <button
+            </Button>
+            <Button
               disabled={!history.hasRedo()}
               onClick={() => {
                 history.redo()
               }}
             >
               <Redo />
-            </button>
-          </div>
+            </Button>
+          </ButtonGroup>
         </div>
         <Show when={showSidebar()}>
           <div class={ui.sidebar}>
@@ -320,12 +342,12 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
             </Card>
             <Card>
               <Slider
-                label="Resolution"
-                value={pixelRatio()}
-                min={0.125}
-                max={1}
-                step={0.125}
-                onInput={setPixelRatio}
+                label="Exposure"
+                value={exposure()}
+                min={-4}
+                max={4}
+                step={0.001}
+                onInput={setExposure}
                 formatValue={(value) => value.toString()}
               />
               <Slider
@@ -337,53 +359,11 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                 onInput={setSkipIters}
                 formatValue={(value) => value.toString()}
               />
-              <Slider
-                label="Point Count"
-                value={pointCount()}
-                min={1e3}
-                max={MAX_POINT_COUNT}
-                step={1e4}
-                onInput={setPointCount}
-                formatValue={(value) => `${(value / 1000).toFixed(0)} K`}
-              />
-              <Slider
-                label="Exposure"
-                value={exposure()}
-                min={-4}
-                max={4}
-                step={0.001}
-                onInput={setExposure}
-                formatValue={(value) => value.toString()}
-              />
-              <Slider
-                label="Render Interval"
-                value={renderInterval()}
-                min={1}
-                max={5000}
-                step={1}
-                onInput={setRenderInterval}
-                formatValue={(value) =>
-                  value < 1000
-                    ? `${value.toFixed(0)} ms`
-                    : `${(value / 1000).toFixed(1)} s`
-                }
-              />
               <label class={ui.labeledInput}>
                 Adaptive filter
                 <Checkbox
                   checked={adaptiveFilterEnabled()}
                   onChange={(checked) => setAdaptiveFilterEnabled(checked)}
-                />
-                <span></span>
-              </label>
-              <label class={ui.labeledInput}>
-                Background Color
-                <input
-                  class={ui.backgroundColorPicker}
-                  type="color"
-                  onInput={(ev) =>
-                    setBackgroundColor(hexToRgbNorm(ev.target.value))
-                  }
                 />
                 <span></span>
               </label>
@@ -402,6 +382,39 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                 </select>
                 <span></span>
               </label>
+              <label class={ui.labeledInput}>
+                Background Color
+                <input
+                  class={ui.backgroundColorPicker}
+                  type="color"
+                  onInput={(ev) =>
+                    setBackgroundColor(hexToRgbNorm(ev.target.value))
+                  }
+                />
+                <span></span>
+              </label>
+              <Slider
+                label="Point Count"
+                value={pointCount()}
+                min={1e3}
+                max={MAX_POINT_COUNT}
+                step={1e4}
+                onInput={setPointCount}
+                formatValue={(value) => `${(value / 1000).toFixed(0)} K`}
+              />
+              <Slider
+                label="Render Interval"
+                value={renderInterval()}
+                min={1}
+                max={5000}
+                step={1}
+                onInput={setRenderInterval}
+                formatValue={(value) =>
+                  value < 1000
+                    ? `${value.toFixed(0)} ms`
+                    : `${(value / 1000).toFixed(1)} s`
+                }
+              />
             </Card>
             <Card class={ui.buttonCard}>
               <button
