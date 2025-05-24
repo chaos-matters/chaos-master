@@ -8,12 +8,13 @@ import {
 } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
-import { vec3f } from 'typegpu/data'
+import { vec3f, vec4f } from 'typegpu/data'
 import ui from './App.module.css'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
 import { Button } from './components/Button/Button'
 import { ButtonGroup } from './components/Button/ButtonGroup'
 import { Checkbox } from './components/Checkbox/Checkbox'
+import { ColorPicker } from './components/ColorPicker/ColorPicker'
 import { Card } from './components/ControlCard/ControlCard'
 import { FlameColorEditor } from './components/FlameColorEditor/FlameColorEditor'
 import { createLoadExampleFlame } from './components/LoadExampleFlameModal/LoadExampleFlameModal'
@@ -22,6 +23,7 @@ import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal
 import { Slider } from './components/Sliders/Slider'
 import { SoftwareVersion } from './components/SoftwareVersion/SoftwareVersion'
 import { ChangeHistoryContextProvider } from './contexts/ChangeHistoryContext'
+import { ThemeContextProvider, useTheme } from './contexts/ThemeContext'
 import {
   DEFAULT_POINT_COUNT,
   DEFAULT_RENDER_INTERVAL_MS,
@@ -49,14 +51,21 @@ import { Root } from './lib/Root'
 import { createZoom, WheelZoomCamera2D } from './lib/WheelZoomCamera2D'
 import { createStoreHistory } from './utils/createStoreHistory'
 import { addFlameDataToPng, extractFlameFromPng } from './utils/flameInPng'
-import { hexToRgbNorm } from './utils/hexToRgb'
 import {
   compressJsonQueryParam,
   decodeJsonQueryParam,
 } from './utils/jsonQueryParam'
 import { sum } from './utils/sum'
 import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
+import type { Setter } from 'solid-js'
+import type { v3f } from 'typegpu/data'
+import type { DrawModeFn } from './flame/drawMode'
 import type { FlameFunction } from './flame/flameFunction'
+
+const EDGE_FADE_COLOR = {
+  light: vec4f(0.96, 0.96, 0.96, 1),
+  dark: vec4f(0, 0, 0, 0.8),
+}
 
 function formatPercent(x: number) {
   if (x === 1) {
@@ -74,17 +83,23 @@ const defaultTransform: FlameFunction = {
 }
 export type ExportImageType = (canvas: HTMLCanvasElement) => void
 
-function App(props: { flameFromQuery?: FlameFunction[] }) {
+type AppProps = {
+  flameFromQuery?: FlameFunction[]
+  drawMode: DrawModeFn
+  setDrawMode: Setter<DrawModeFn>
+}
+
+function App(props: AppProps) {
+  const theme = useTheme()
   const [pixelRatio, setPixelRatio] = createSignal(DEFAULT_RESOLUTION)
   const [skipIters, setSkipIters] = createSignal(20)
   const [pointCount, setPointCount] = createSignal(DEFAULT_POINT_COUNT)
   const [exposure, setExposure] = createSignal(0.25)
-  const [drawMode, setDrawMode] = createSignal(lightMode)
   const [renderInterval, setRenderInterval] = createSignal(
     DEFAULT_RENDER_INTERVAL_MS,
   )
   const [onExportImage, setOnExportImage] = createSignal<ExportImageType>()
-  const [backgroundColor, setBackgroundColor] = createSignal(vec3f(0, 0, 0))
+  const [backgroundColor, setBackgroundColor] = createSignal<v3f>()
   const [adaptiveFilterEnabled, setAdaptiveFilterEnabled] = createSignal(true)
   const [showSidebar, setShowSidebar] = createSignal(true)
   const [zoom, setZoom] = createZoom(1, [0, Infinity])
@@ -131,6 +146,12 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
         return true
       }
     },
+    KeyD: () => {
+      props.setDrawMode((p: unknown) =>
+        p === lightMode ? paintMode : lightMode,
+      )
+      return true
+    },
   })
   const exportCanvasImage = (canvas: HTMLCanvasElement) => {
     setOnExportImage(undefined)
@@ -148,6 +169,9 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
     })
   }
 
+  const backgroundColorFinal = () =>
+    backgroundColor() ?? (theme() === 'light' ? vec3f(1) : vec3f(0))
+
   return (
     <ChangeHistoryContextProvider value={history}>
       <div class={ui.layout}>
@@ -161,14 +185,16 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                 <Flam3
                   skipIters={skipIters()}
                   pointCount={pointCount()}
-                  drawMode={drawMode()}
-                  backgroundColor={backgroundColor()}
+                  drawMode={props.drawMode}
+                  backgroundColor={backgroundColorFinal()}
                   exposure={exposure()}
                   adaptiveFilterEnabled={adaptiveFilterEnabled()}
                   flameFunctions={flameFunctions}
                   renderInterval={finalRenderInterval()}
                   onExportImage={onExportImage()}
-                  edgeFade={showSidebar()}
+                  edgeFadeColor={
+                    showSidebar() ? EDGE_FADE_COLOR[theme()] : vec4f(0)
+                  }
                 />
               </WheelZoomCamera2D>
             </AutoCanvas>
@@ -267,7 +293,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
                     {(variation, j) => (
                       <>
                         <select
-                          class={ui.varInputType}
+                          class={ui.select}
                           value={variation.type}
                           onInput={(ev) => {
                             const type = ev.target.value
@@ -370,9 +396,10 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               <label class={ui.labeledInput}>
                 Draw Mode
                 <select
-                  class={ui.varInputType}
+                  class={ui.select}
+                  value={props.drawMode === lightMode ? 'light' : 'paint'}
                   onChange={(ev) =>
-                    setDrawMode(() =>
+                    props.setDrawMode(() =>
                       ev.target.value === 'light' ? lightMode : paintMode,
                     )
                   }
@@ -384,15 +411,20 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
               </label>
               <label class={ui.labeledInput}>
                 Background Color
-                <input
-                  class={ui.backgroundColorPicker}
-                  type="color"
-                  onInput={(ev) =>
-                    setBackgroundColor(hexToRgbNorm(ev.target.value))
-                  }
+                <ColorPicker
+                  value={backgroundColorFinal()}
+                  setValue={setBackgroundColor}
                 />
-                <span></span>
               </label>
+              <Show when={backgroundColor() !== undefined} fallback={<span />}>
+                <Button
+                  onClick={() => {
+                    setBackgroundColor(undefined)
+                  }}
+                >
+                  Auto
+                </Button>
+              </Show>
               <Slider
                 label="Point Count"
                 value={pointCount()}
@@ -477,6 +509,7 @@ function App(props: { flameFromQuery?: FlameFunction[] }) {
 }
 
 export function Wrappers() {
+  const [drawMode, setDrawMode] = createSignal(lightMode)
   const [flameFromQuery] = createResource(async () => {
     const param = new URLSearchParams(window.location.search)
     const flameDef = param.get('flame')
@@ -490,12 +523,18 @@ export function Wrappers() {
     return undefined
   })
   return (
-    <Modal>
-      <Suspense>
-        <Show when={flameFromQuery.state === 'ready'}>
-          <App flameFromQuery={flameFromQuery()} />
-        </Show>
-      </Suspense>
-    </Modal>
+    <ThemeContextProvider value={drawMode() === paintMode ? 'light' : 'dark'}>
+      <Modal>
+        <Suspense>
+          <Show when={flameFromQuery.state === 'ready'}>
+            <App
+              flameFromQuery={flameFromQuery()}
+              drawMode={drawMode()}
+              setDrawMode={setDrawMode}
+            />
+          </Show>
+        </Suspense>
+      </Modal>
+    </ThemeContextProvider>
   )
 }

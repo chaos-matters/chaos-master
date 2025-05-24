@@ -1,5 +1,5 @@
 /* @refresh reload */
-import './index.css'
+import './styles/index.css'
 import { inject } from '@vercel/analytics'
 import { render } from 'solid-js/web'
 import { Wrappers } from './App'

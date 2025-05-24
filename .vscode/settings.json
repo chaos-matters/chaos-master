@@ -11,5 +11,15 @@
   "typescript.enablePromptUseWorkspaceTsdk": true,
   "workbench.editorAssociations": {
     "*.svg": "default"
+  },
+  "highlight.regexes": {
+    "(var\\()": {
+      "filterLanguageRegex": "css",
+      "decorations": [{ "color": "#8885" }]
+    },
+    "(var\\(--[\\w\\-]+)(\\))": {
+      "filterLanguageRegex": "css",
+      "decorations": [{}, { "color": "#8885" }]
+    }
   }
 }

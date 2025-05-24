@@ -3,6 +3,7 @@
     "PolyMeilex.wgsl",
     "dbaeumer.vscode-eslint",
     "esbenp.prettier-vscode",
-    "ggsimm.wgsl-literal"
+    "ggsimm.wgsl-literal",
+    "vunguyentuan.vscode-css-variables"
   ]
 }

@@ -1,7 +1,7 @@
 .editor-card {
   display: grid;
   grid-template-areas: 'overlap';
-  border-radius: 1rem;
+  border-radius: var(--space-3);
   overflow: hidden;
   min-height: 25vh;
 
@@ -52,21 +52,38 @@
 
 .handle-box {
   fill: none;
-  stroke: white;
+  stroke: black;
   stroke-linejoin: round;
   stroke-linecap: round;
   stroke-width: 1px;
   vector-effect: non-scaling-stroke;
+
+  [data-theme='dark'] & {
+    stroke: white;
+  }
 }
 
 .handle-box-grab-area {
+  fill: none;
   stroke: transparent;
+  stroke-linejoin: round;
+  stroke-linecap: round;
   stroke-width: 0.5rem;
+  vector-effect: non-scaling-stroke;
   cursor: nesw-resize;
-  /* otherwise transparent fill is not hoverable */
+
+  /* otherwise transparent stroke is not hoverable */
   pointer-events: all;
 }
 
 .dashed {
   stroke-dasharray: 5px 3px;
+}
+
+.arrow-head {
+  fill: black;
+
+  [data-theme='dark'] & {
+    fill: white;
+  }
 }
