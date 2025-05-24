@@ -1,10 +1,24 @@
 .label {
+  --color: var(--neutral-600);
+  --hover-color: black;
+  --track-color-filled: var(--neutral-400);
+  --track-color-empty: var(--neutral-200);
+
+  [data-theme='dark'] & {
+    --color: var(--neutral-400);
+    --hover-color: white;
+    --track-color-filled: var(--neutral-600);
+    --track-color-empty: var(--neutral-800);
+  }
+}
+
+.label {
   display: contents;
   color: var(--color);
 
   &:hover,
   &:focus-within {
-    --color: white;
+    --color: var(--hover-color);
   }
 }
 
@@ -17,7 +31,6 @@
   background: transparent;
   outline: none;
   position: relative;
-  accent-color: var(--color);
   margin: 0;
 
   /* when scrolling into view on change, how much to over-scroll */
@@ -29,6 +42,15 @@
     height: 14px;
     border-radius: 100vh;
     cursor: pointer;
+
+    background: linear-gradient(
+      to bottom,
+      oklab(from var(--color) calc(l + 0.2) a b),
+      var(--color)
+    );
+  }
+
+  [data-theme='dark'] &::-webkit-slider-thumb {
     background: linear-gradient(
       to bottom,
       var(--color),
@@ -37,7 +59,7 @@
   }
 
   /* track */
-  isolation: isolate; /* allows sorting track below thumb */
+  isolation: isolate; /* allows sorting the track below the thumb */
   &::before {
     display: block;
     position: absolute;
@@ -48,9 +70,9 @@
     top: calc(50% - 2px);
     background: linear-gradient(
       to right,
-      #555,
-      #555 var(--fill-percent),
-      #3338 var(--fill-percent)
+      var(--track-color-filled),
+      var(--track-color-filled) var(--fill-percent),
+      var(--track-color-empty) var(--fill-percent)
     );
     height: 4px;
     z-index: -1;

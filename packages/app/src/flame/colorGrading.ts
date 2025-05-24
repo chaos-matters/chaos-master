@@ -1,17 +1,16 @@
 import { oklabToRgb } from '@typegpu/color'
 import { tgpu } from 'typegpu'
-import { f32, struct } from 'typegpu/data'
-import { alphaBlend } from '@/utils/blendModes'
+import { f32, struct, vec4f } from 'typegpu/data'
 import { wgsl } from '@/utils/wgsl'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
-import type { v3f } from 'typegpu/data'
 import type { DrawModeFn } from './drawMode'
 
 export const ColorGradingUniforms = struct({
   countAdjustmentFactor: f32,
   exposure: f32,
+  backgroundColor: vec4f,
   /** Adds a slight fade towards the edge of the viewport */
-  edgeFade: f32,
+  edgeFadeColor: vec4f,
 })
 
 const bindGroupLayout = tgpu.bindGroupLayout({
@@ -68,15 +67,18 @@ export function createColorGradingPipeline(
     }
 
     @fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
+      let edgeFade = uniforms.edgeFadeColor.a * smoothstep(0.98, 1, max(abs(in.uv.x), abs(in.uv.y)));
+      let backgroundColor = mix(uniforms.backgroundColor, uniforms.edgeFadeColor, edgeFade);
       let pos2u = vec2u(in.pos.xy);
       let tex = textureLoad(outputTexture, pos2u, 0);
       let count = tex.a;
       let adjustedCount = count * uniforms.countAdjustmentFactor;
       let value = uniforms.exposure * pow(log(adjustedCount + 1), 0.4545);
       let ab = tex.gb / count;
-      let rgb = oklabToRgb(vec3f(drawMode(value), ab));
-      let edgeFade = smoothstep(1, 0.98, max(abs(in.uv.x), abs(in.uv.y)));
-      return vec4f(rgb, value * mix(1.0, edgeFade, uniforms.edgeFade));
+      let rgb = saturate(oklabToRgb(vec3f(drawMode(value), ab)));
+      let alpha = saturate(value) * (1 - edgeFade);
+      let rgba = vec4f(rgb, alpha);
+      return mix(backgroundColor, rgba, alpha);
     }
   `
 
@@ -96,27 +98,16 @@ export function createColorGradingPipeline(
       targets: [
         {
           format: canvasFormat,
-          blend: alphaBlend,
         },
       ],
     },
   })
-  return (
-    encoder: GPUCommandEncoder,
-    context: GPUCanvasContext,
-    backgroundColor: v3f,
-  ) => {
+  return (encoder: GPUCommandEncoder, context: GPUCanvasContext) => {
     const pass = encoder.beginRenderPass({
       colorAttachments: [
         {
           loadOp: 'clear',
           storeOp: 'store',
-          clearValue: [
-            backgroundColor.x,
-            backgroundColor.y,
-            backgroundColor.z,
-            1,
-          ],
           view: context.getCurrentTexture().createView(),
         },
       ],

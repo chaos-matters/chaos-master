@@ -1,0 +1,16 @@
+/*
+* Used for spacing out elements using paddings, gaps, margins, border-radius.
+* Not to be used for sizing (width, height, border thickness etc).
+*/
+:root {
+  --spacing: 0.25rem;
+  --space-h: calc(var(--spacing) * 0.5);
+  --space-1: var(--spacing);
+  --space-2: calc(var(--spacing) * 2);
+  --space-3: calc(var(--spacing) * 3);
+  --space-4: calc(var(--spacing) * 4);
+  --space-5: calc(var(--spacing) * 5);
+  --space-6: calc(var(--spacing) * 6);
+  --space-7: calc(var(--spacing) * 7);
+  --space-8: calc(var(--spacing) * 8);
+}

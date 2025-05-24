@@ -1,5 +1,5 @@
 import { createSignal, For } from 'solid-js'
-import { vec2f, vec3f } from 'typegpu/data'
+import { vec2f, vec3f, vec4f } from 'typegpu/data'
 import { lightMode } from '@/flame/drawMode'
 import { examples } from '@/flame/examples'
 import { Flam3 } from '@/flame/Flam3'
@@ -8,6 +8,7 @@ import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
 import { Root } from '@/lib/Root'
 import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
+import { Button } from '../Button/Button'
 import { useRequestModal } from '../Modal/Modal'
 import ui from './LoadExampleFlameModal.module.css'
 import type { ExampleID } from '@/flame/examples'
@@ -36,14 +37,13 @@ function LoadExampleFlameModal(props: LoadExampleFlameModalProps) {
     <>
       <div class={ui.galleryTitle}>
         <h1>Example Gallery</h1>
-        <button
-          class={ui.closeButton}
+        <Button
           onClick={() => {
             props.respond(CANCEL)
           }}
         >
           <Cross width="1rem" height="1rem" />
-        </button>
+        </Button>
       </div>
       <p>You can undo this operation.</p>
       <div class={ui.gallery}>
@@ -62,13 +62,13 @@ function LoadExampleFlameModal(props: LoadExampleFlameModalProps) {
                       skipIters={15}
                       pointCount={1e5}
                       drawMode={lightMode}
-                      backgroundColor={vec3f()}
                       exposure={0.25}
                       adaptiveFilterEnabled={true}
                       flameFunctions={examples[exampleId]}
                       renderInterval={Infinity}
                       onExportImage={() => {}}
-                      edgeFade={false}
+                      edgeFadeColor={vec4f(0)}
+                      backgroundColor={vec3f(0)}
                     />
                   </Camera2D>
                 </AutoCanvas>

@@ -1,0 +1,12 @@
+/**
+ * Dark mode is achieved by setting a `data-theme='dark'` attribute on <body>.
+ * You can style components differently for dark mode by nesting a `[data-theme='dark'] &` selector.
+ */
+
+/* Color the body based on theme */
+body {
+  background-color: var(--neutral-100);
+  &[data-theme='dark'] {
+    background-color: black;
+  }
+}
