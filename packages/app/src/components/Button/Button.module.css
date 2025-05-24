@@ -1,21 +1,39 @@
 .button {
+  --radius: var(--space-1);
+  --color: var(--neutral-600);
+  --color-disabled: var(--neutral-400);
+  --bg-color: var(--neutral-100);
+  --hover-color: black;
+  --hover-bg-color: white;
+
+  [data-theme='dark'] & {
+    --color: var(--neutral-400);
+    --color-disabled: var(--neutral-600);
+    --bg-color: var(--neutral-950);
+    --hover-color: white;
+    --hover-bg-color: var(--neutral-900);
+  }
+}
+
+.button {
   display: flex;
-  color: #aaa;
-  background-color: #111e;
+  color: var(--color);
+  background-color: var(--bg-color);
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: 0.5rem;
+  border-radius: var(--radius);
   line-height: 1;
-  padding-inline: 0.4rem;
-  padding-block: 0.2rem;
+  padding-inline: var(--space-1);
+  padding-block: var(--space-1);
+  font-size: small;
 
   &:not(:disabled) {
     cursor: pointer;
   }
 
   &:disabled {
-    color: #555;
+    color: var(--color-disabled);
   }
 
   &:active:not(:disabled) {
@@ -23,33 +41,41 @@
   }
 
   &:is(:hover, .active):not(:disabled) {
-    color: white;
-    background-color: #222;
+    color: var(--hover-color);
+    background-color: var(--hover-bg-color);
   }
 
   & > svg {
-    width: 24px;
+    width: 20px;
+  }
+}
+
+.button-group {
+  --shadow-color: #0003;
+  --radius: var(--space-1);
+  [data-theme='dark'] & {
+    --shadow-color: #000a;
   }
 }
 
 .button-group {
   display: flex;
   align-items: stretch;
-  border-radius: 0.5rem;
+  border-radius: var(--space-1);
   user-select: none;
-  box-shadow: 0 0 2.5px 1px black;
+  box-shadow: 0 0 2.5px 1px var(--shadow-color);
 
   & > .button {
     border-radius: 0;
 
     &:first-child {
-      border-top-left-radius: 0.5rem;
-      border-bottom-left-radius: 0.5rem;
+      border-top-left-radius: var(--radius);
+      border-bottom-left-radius: var(--radius);
     }
 
     &:last-child {
-      border-top-right-radius: 0.5rem;
-      border-bottom-right-radius: 0.5rem;
+      border-top-right-radius: var(--radius);
+      border-bottom-right-radius: var(--radius);
     }
   }
 }

@@ -108,14 +108,16 @@ export function Modal(props: ParentProps<ModalProps>) {
               config: { content: Content, class: class_ },
             } = instance
 
-            function respond(option: unknown) {
+            async function respond(option: unknown) {
               const transition = document.startViewTransition(() => {
-                resolve(option)
                 setModalInstances((instances) =>
                   instances.filter((ins) => ins !== instance),
                 )
               })
-              return transition.finished
+              // Let the transition finish before resolving because
+              // resolving might be expensive and make the UI stutter.
+              await transition.finished
+              resolve(option)
             }
 
             return (

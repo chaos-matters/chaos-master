@@ -1,7 +1,7 @@
 .editor-card {
   display: grid;
   grid-template-areas: 'overlap';
-  border-radius: 1rem;
+  border-radius: var(--space-3);
   overflow: hidden;
   min-height: 25vh;
 

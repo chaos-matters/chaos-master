@@ -16,7 +16,7 @@ import { ComputeUniforms, createIFSPipeline } from './ifsPipeline'
 import { createInitPointsPipeline } from './initPoints'
 import { createRenderPointsPipeline } from './renderPoints'
 import { outputTextureFormat, Point } from './variations/types'
-import type { v3f } from 'typegpu/data'
+import type { v3f, v4f } from 'typegpu/data'
 import type { DrawModeFn } from './drawMode'
 import type { FlameFunction } from './flameFunction'
 import type { ExportImageType } from '@/App'
@@ -39,7 +39,7 @@ type Flam3Props = {
   exposure: number
   adaptiveFilterEnabled: boolean
   flameFunctions: FlameFunction[]
-  edgeFade: boolean
+  edgeFadeColor: v4f
 }
 
 export function Flam3(props: Flam3Props) {
@@ -110,7 +110,8 @@ export function Flam3(props: Flam3Props) {
     .createBuffer(ColorGradingUniforms, {
       countAdjustmentFactor: 1,
       exposure: 1,
-      edgeFade: 0.8,
+      backgroundColor: vec4f(0, 0, 0, 0),
+      edgeFadeColor: vec4f(0, 0, 0, 0.8),
     })
     .$usage('uniform')
 
@@ -224,7 +225,8 @@ export function Flam3(props: Flam3Props) {
     createEffect(() => {
       colorGradingUniforms.writePartial({
         exposure: 2 * Math.exp(props.exposure),
-        edgeFade: props.edgeFade && !props.onExportImage ? 0.8 : 0,
+        edgeFadeColor: props.onExportImage ? vec4f(0) : props.edgeFadeColor,
+        backgroundColor: vec4f(props.backgroundColor, 1),
       })
       rafLoop.redraw()
     })
@@ -302,7 +304,7 @@ export function Flam3(props: Flam3Props) {
           pass.end()
         }
 
-        runColorGradingPipeline()?.(encoder, context, props.backgroundColor)
+        runColorGradingPipeline()?.(encoder, context)
 
         // _readCountUnderPointer(count)
 

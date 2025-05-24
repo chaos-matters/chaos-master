@@ -1,13 +1,35 @@
 .checkbox {
+  --color: var(--neutral-500);
+  --color-hover: black;
+  --border-color: var(--neutral-500);
+  --border-color-hover: black;
+  --check-color: white;
+
+  [data-theme='dark'] & {
+    --color: var(--neutral-400);
+    --color-hover: white;
+    --border-color: var(--neutral-700);
+    --border-color-hover: var(--neutral-500);
+    --check-color: black;
+  }
+}
+
+.checkbox {
   appearance: none;
+  outline: none;
   margin: 0;
   width: 1.2em;
   height: 1.2em;
-  border: 2px solid #333;
-  border-radius: 0.4em;
+  border: 2px solid var(--border-color);
+  border-radius: var(--space-1);
   display: grid;
   place-items: center;
   cursor: pointer;
+
+  &:hover:not(:disabled) {
+    --color: var(--color-hover);
+    --border-color: var(--border-color-hover);
+  }
 
   &::before {
     content: '';
@@ -18,11 +40,6 @@
     background-color: var(--color);
     /* manually drawn and fine tuned */
     mask-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 11 11"><path d="M 2.5 5.5 L 4.5 7.5 L 8.5 3" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>');
-  }
-
-  &:hover:not(:disabled) {
-    --color: white;
-    border-color: #555;
   }
 
   &:checked {
@@ -36,7 +53,7 @@
 
     &::before {
       opacity: 1;
-      background-color: black;
+      background-color: var(--check-color);
     }
   }
 }

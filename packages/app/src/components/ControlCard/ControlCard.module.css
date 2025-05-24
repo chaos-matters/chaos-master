@@ -1,19 +1,23 @@
 .content {
-  --color: #aaa;
   display: grid;
   grid-template-columns: 1fr 1.5fr 0.5fr;
   align-items: center;
   justify-items: stretch;
-  padding: 1rem;
-  gap: 1rem;
-
-  color: var(--color);
-  background-color: #080808;
-  border: 0.16rem solid #161616;
-  border-radius: 1.2rem;
-
-  font-size: 14px;
+  padding: var(--space-3);
+  gap: var(--space-3);
+  border: 2px solid;
+  border-radius: var(--space-3);
+  font-size: small;
 
   /* required for delete button to position absolutely */
   position: relative;
+
+  color: var(--neutral-600);
+  border-color: var(--neutral-200);
+  background-color: white;
+  [data-theme='dark'] & {
+    color: var(--neutral-400);
+    border-color: var(--neutral-900);
+    background-color: var(--neutral-950);
+  }
 }

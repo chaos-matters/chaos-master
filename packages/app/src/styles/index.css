@@ -1,17 +1,19 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+@import './preflight.css';
+@import './designSystem/layout.css';
+@import './designSystem/colors.css';
+@import './designSystem/dark-mode.css';
 
 :root {
   interpolate-size: allow-keywords;
 }
 
 body {
-  margin: 0;
   overflow: hidden;
   overscroll-behavior: none;
 }
 
 * {
-  box-sizing: border-box;
   font-family: Inter;
   font-variant-numeric: tabular-nums;
 }

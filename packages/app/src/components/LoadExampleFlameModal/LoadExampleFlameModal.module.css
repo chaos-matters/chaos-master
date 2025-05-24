@@ -1,4 +1,20 @@
 .gallery {
+  --item-text-color: var(--neutral-700);
+  --item-text-color-hover: black;
+  --item-title-bg-color: #fffb;
+  --item-border-color: var(--neutral-200);
+  --item-border-color-hover: var(--neutral-400);
+
+  [data-theme='dark'] & {
+    --item-text-color: var(--neutral-400);
+    --item-text-color-hover: white;
+    --item-title-bg-color: rgb(from var(--neutral-900) r g b / 80%);
+    --item-border-color: var(--neutral-800);
+    --item-border-color-hover: var(--neutral-600);
+  }
+}
+
+.gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
   gap: 0.5rem;
@@ -15,31 +31,21 @@
   }
 }
 
-.close-button {
-  appearance: none;
-  border: none;
-  background: none;
-  color: #aaa;
-  cursor: pointer;
-
-  &:hover {
-    color: white;
-  }
-}
-
 .item {
   padding: 0;
   margin: 0;
   position: relative;
   overflow: hidden;
   aspect-ratio: 16 / 9;
-  border: 1px solid #111;
+  border: 1px solid var(--item-border-color);
   border-radius: 0.5rem;
   cursor: pointer;
   background: none;
+  color: var(--item-text-color);
 
   &:hover {
-    border: 1px solid #555;
+    color: var(--item-text-color-hover);
+    border: 1px solid var(--item-border-color-hover);
   }
 }
 
@@ -49,7 +55,6 @@
   bottom: 0;
   padding-inline: 0.5rem;
   padding-block: 0.25rem;
-  color: #aaa;
-  background-color: #111d;
+  background-color: var(--item-title-bg-color);
   font-size: small;
 }

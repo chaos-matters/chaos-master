@@ -10,7 +10,7 @@ export function Button(props: ButtonProps) {
   const [c, attrs] = splitProps(props, ['children', 'class', 'active'])
   return (
     <button
-      class={`${c.class} ${ui.button} ${c.active === true ? ui.active : ''}`}
+      class={`${c.class ?? ''} ${ui.button} ${c.active === true ? ui.active : ''}`}
       {...attrs}
     >
       {c.children}
