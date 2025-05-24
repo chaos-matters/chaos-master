@@ -1,10 +1,24 @@
 .label {
+  --color: var(--neutral-600);
+  --hover-color: black;
+  --track-color: var(--neutral-100);
+  --track-border-color: var(--neutral-300);
+
+  [data-theme='dark'] & {
+    --color: var(--neutral-400);
+    --hover-color: white;
+    --track-color: var(--neutral-800);
+    --track-border-color: var(--neutral-700);
+  }
+}
+
+.label {
   display: contents;
   color: var(--color);
 
   &:hover,
   &:focus-within {
-    --color: white;
+    --color: var(--hover-color);
   }
 }
 
@@ -21,8 +35,8 @@
   width: 36px;
   height: 36px;
   border-radius: 100vh;
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: var(--track-color);
+  border: 2px solid var(--track-border-color);
   cursor: pointer;
   outline: none;
   touch-action: none;

@@ -1,17 +1,29 @@
 .modal {
+  --text-color: var(--neutral-700);
+  --bg-color: white;
+  --border-color: var(--neutral-200);
+
+  [data-theme='dark'] & {
+    --text-color: var(--neutral-400);
+    --bg-color: var(--neutral-950);
+    --border-color: var(--neutral-700);
+  }
+}
+
+.modal {
   display: flex;
   flex-direction: column;
   padding: 1rem;
   gap: 1rem;
   border-radius: 1rem;
-  border: 2px solid #161616;
+  border: 2px solid var(--border-color);
   white-space: break-spaces;
-  background-color: #050505;
-  color: #aaa;
+  background-color: var(--bg-color);
+  color: var(--text-color);
   margin: auto;
   view-transition-name: modal;
 }
 
 ::backdrop {
-  backdrop-filter: brightness(50%) blur(10px);
+  backdrop-filter: contrast(50%) blur(10px);
 }

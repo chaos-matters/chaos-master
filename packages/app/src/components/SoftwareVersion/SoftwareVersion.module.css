@@ -1,12 +1,22 @@
 .version {
+  --color: var(--neutral-500);
+  --bg-color: #fffd;
+
+  [data-theme='dark'] & {
+    --color: var(--neutral-600);
+    --bg-color: #000d;
+  }
+}
+
+.version {
   position: absolute;
-  color: #fff5;
-  padding-inline: 0.5rem;
-  padding-block: 0.25rem;
+  color: var(--color);
+  padding-inline: var(--space-2);
+  padding-block: var(--space-1);
   line-height: 1;
   right: 0;
   bottom: 0;
   font-size: small;
-  border-top-left-radius: 0.5rem;
-  background-color: #000d;
+  border-top-left-radius: var(--space-2);
+  background-color: var(--bg-color);
 }

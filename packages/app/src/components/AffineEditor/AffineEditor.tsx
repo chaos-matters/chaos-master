@@ -2,6 +2,7 @@ import { createEffect, createMemo, createSignal, For } from 'solid-js'
 import { vec2f } from 'typegpu/data'
 import { vec2 } from 'wgpu-matrix'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
+import { useTheme } from '@/contexts/ThemeContext'
 import { PI } from '@/flame/constants'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { useCamera } from '@/lib/CameraContext'
@@ -23,6 +24,26 @@ import type { HistorySetter } from '@/utils/createStoreHistory'
 
 const { sqrt } = Math
 
+const BACKGROUND_COLOR = {
+  light: 1,
+  dark: 0.02,
+}
+
+const AXIS_GRAY = {
+  light: 0.72,
+  dark: 0.3,
+}
+
+const MAJOR_TICK_GRAY = {
+  light: 0.85,
+  dark: 0.13,
+}
+
+const MINOR_TICK_GRAY = {
+  light: 0.95,
+  dark: 0.05,
+}
+
 function vec2Normalize(a: v2f) {
   // vec2.normalize has inexplicable 1e-5 check so we implement our own
   const len = sqrt(a.x * a.x + a.y * a.y) || 1
@@ -30,6 +51,7 @@ function vec2Normalize(a: v2f) {
 }
 
 function Grid() {
+  const theme = useTheme()
   const camera = useCamera()
   const { device, root } = useRootContext()
   const { context, canvasFormat } = useCanvas()
@@ -83,7 +105,7 @@ function Grid() {
       @fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
         let halfRes = 0.5 * resolution();
         let pxRatio = pixelRatio();
-        let border = sdBoxRound(in.pos.xy - halfRes, halfRes - 3 * pxRatio, 13 * pxRatio);
+        let border = sdBoxRound(in.pos.xy - halfRes, halfRes - 2 * pxRatio, 10 * pxRatio);
         let borderAA = saturate(border);
 
         let worldPos = clipToWorld(in.clip);
@@ -101,7 +123,13 @@ function Grid() {
         let axisH = lines(abs(worldPos.y), pxWidth);
         let axis = max(axisH, axisV);
 
-        let gray = max(0.3 * axis, max(0.05 * max(borderAA, minor), 0.15 * major));
+        const backgroundGray = ${BACKGROUND_COLOR[theme()]};
+        const axisGray = ${AXIS_GRAY[theme()]};
+        const majorGray = ${MAJOR_TICK_GRAY[theme()]};
+        const minorGray = ${MINOR_TICK_GRAY[theme()]};
+        var gray = mix(backgroundGray, minorGray, minor);
+        gray = mix(gray, majorGray, max(borderAA, major));
+        gray = mix(gray, axisGray, axis);
         return vec4f(0.02 + vec3f(gray), 1);
       }
     `
@@ -161,6 +189,7 @@ function AffineHandle(props: {
   color: v2f
   setTransform: (pos: AffineParams) => void
 }) {
+  const theme = useTheme()
   const { canvas, canvasSize } = useCanvas()
   const {
     js: { worldToClip, clipToWorld },
@@ -264,7 +293,7 @@ function AffineHandle(props: {
         <g transform={`scale(1, -1) matrix(${clipTransform()})`}>
           <path class={ui.handleBox} d={corners} />
           <path
-            classList={{ [ui.handleBox]: true, [ui.handleBoxGrabArea]: true }}
+            class={ui.handleBoxGrabArea}
             d={corners}
             // TODO: temporarily using on:pointerdown and not onPointerDown
             // because otherwise WheelZoomCamera2D steals the event
@@ -273,13 +302,13 @@ function AffineHandle(props: {
           />
           <path class={ui.handleBox} d="M 0,0 V 1" marker-end="url(#arrow)" />
           <path
-            classList={{ [ui.handleBox]: true, [ui.handleBoxGrabArea]: true }}
+            class={ui.handleBoxGrabArea}
             d="M 0,0 V 1"
             on:pointerdown={scaleY}
           />
           <path class={ui.handleBox} d="M 0,0 L 1,0" marker-end="url(#arrow)" />
           <path
-            classList={{ [ui.handleBox]: true, [ui.handleBoxGrabArea]: true }}
+            class={ui.handleBoxGrabArea}
             d="M 0,0 L 1,0"
             on:pointerdown={scaleX}
           />
@@ -288,12 +317,12 @@ function AffineHandle(props: {
             d="M 0,0 V -1 M 0,0 L -1,0"
           />
           <path
-            classList={{ [ui.handleBox]: true, [ui.handleBoxGrabArea]: true }}
+            class={ui.handleBoxGrabArea}
             d="M 0,0 V -1"
             on:pointerdown={scaleNegY}
           />
           <path
-            classList={{ [ui.handleBox]: true, [ui.handleBoxGrabArea]: true }}
+            class={ui.handleBoxGrabArea}
             d="M 0,0 L -1,0"
             on:pointerdown={scaleNegX}
           />
@@ -305,7 +334,7 @@ function AffineHandle(props: {
         // because otherwise WheelZoomCamera2D steals the event
         // due to solidjs event delegation.
         on:pointerdown={startDragging}
-        style={{ '--color': handleColor(props.color) }}
+        style={{ '--color': handleColor(theme(), props.color) }}
       >
         <circle class={ui.handleCircle} cx={p(x())} cy={p(y())} />
         <circle class={ui.handleCircleGrabArea} cx={p(x())} cy={p(y())} />
@@ -341,13 +370,13 @@ export function AffineEditor(props: {
               <defs>
                 <marker
                   id="arrow"
+                  class={ui.arrowHead}
                   viewBox="0 0 10 10"
                   refX="5"
                   refY="5"
                   markerWidth="6"
                   markerHeight="6"
                   orient="auto-start-reverse"
-                  fill="white"
                 >
                   <path d="M 0 0 L 10 5 L 0 10 z" />
                 </marker>
