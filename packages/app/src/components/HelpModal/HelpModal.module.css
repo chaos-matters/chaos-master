@@ -1,6 +1,14 @@
+.help-modal {
+  width: 30rem;
+}
+
 .title {
   display: flex;
   justify-content: space-between;
+}
+
+.section-title {
+  margin-bottom: calc(-1 * var(--space-2));
 }
 
 .shortcuts-grid {
@@ -63,4 +71,10 @@
   padding-inline: var(--space-2);
   padding-block: var(--space-1);
   box-shadow: 0 2px 2px var(--shadow-color);
+}
+
+.gpu-information {
+  font-size: small;
+  color: var(--neutral-500);
+  padding-inline-start: var(--space-3);
 }

@@ -1,5 +1,6 @@
-import { For } from 'solid-js'
+import { createResource, For, Show, Suspense } from 'solid-js'
 import Cross from '@/icons/cross.svg'
+import { formatBytes } from '@/utils/formatBytes'
 import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
 import { VERSION } from '@/version'
 import { Button } from '../Button/Button'
@@ -57,11 +58,28 @@ function KeyCombination(props: { keyCombination: KeyCombination }) {
   )
 }
 
+const { navigator } = globalThis
+
+async function getGPUDeviceInformation() {
+  const adapter = await navigator.gpu.requestAdapter({
+    powerPreference: 'high-performance',
+  })
+  if (!adapter) {
+    throw new Error(`WebGPU is not supported`)
+  }
+  const { info, limits } = adapter
+  return {
+    displayName: `${info.vendor} ${info.architecture}`,
+    maxBufferSize: limits.maxBufferSize,
+  }
+}
+
 type HelpModalProps = {
   respond: () => void
 }
 
 function HelpModal(props: HelpModalProps) {
+  const [gpuDeviceInfo] = createResource(getGPUDeviceInformation)
   useKeyboardShortcuts(
     {
       Escape: () => {
@@ -87,7 +105,7 @@ function HelpModal(props: HelpModalProps) {
           <Cross width="1rem" height="1rem" />
         </Button>
       </div>
-      <p>Keyboard Shortcuts</p>
+      <h2 class={ui.sectionTitle}>Keyboard Shortcuts</h2>
       <div class={ui.shortcutsGrid}>
         <For each={shortcuts}>
           {({ description, keyCombinations }) => (
@@ -104,6 +122,19 @@ function HelpModal(props: HelpModalProps) {
           )}
         </For>
       </div>
+      <h2 class={ui.sectionTitle}>GPU Information</h2>
+      <div class={ui.gpuInformation}>
+        <Suspense fallback={<>Loading...</>}>
+          <Show when={gpuDeviceInfo()} keyed>
+            {(deviceInfo) => (
+              <>
+                <p>Adapter: {deviceInfo.displayName}</p>
+                <p>Max Buffer Size: {formatBytes(deviceInfo.maxBufferSize)}</p>
+              </>
+            )}
+          </Show>
+        </Suspense>
+      </div>
     </>
   )
 }
@@ -113,6 +144,7 @@ export function createShowHelp() {
 
   async function showHelp() {
     await requestModal({
+      class: ui.helpModal,
       content: ({ respond }) => <HelpModal respond={respond} />,
     })
   }
