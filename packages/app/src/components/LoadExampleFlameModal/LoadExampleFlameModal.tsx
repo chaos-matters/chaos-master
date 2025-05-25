@@ -1,4 +1,4 @@
-import { createSignal, For } from 'solid-js'
+import { createEffect, createSignal, For } from 'solid-js'
 import { vec2f, vec3f, vec4f } from 'typegpu/data'
 import { lightMode } from '@/flame/drawMode'
 import { examples } from '@/flame/examples'
@@ -22,6 +22,14 @@ type LoadExampleFlameModalProps = {
 }
 
 function LoadExampleFlameModal(props: LoadExampleFlameModalProps) {
+  const [renderInterval, setRenderInterval] = createSignal(1)
+
+  createEffect(() => {
+    setTimeout(() => {
+      setRenderInterval(Infinity)
+    }, 2000)
+  })
+
   useKeyboardShortcuts(
     {
       Escape: () => {
@@ -60,12 +68,12 @@ function LoadExampleFlameModal(props: LoadExampleFlameModalProps) {
                   <Camera2D position={vec2f()} fovy={1}>
                     <Flam3
                       skipIters={15}
-                      pointCount={1e5}
+                      pointCount={5e3}
                       drawMode={lightMode}
                       exposure={0.25}
                       adaptiveFilterEnabled={true}
                       flameFunctions={examples[exampleId]}
-                      renderInterval={Infinity}
+                      renderInterval={renderInterval()}
                       onExportImage={() => {}}
                       edgeFadeColor={vec4f(0)}
                       backgroundColor={vec3f(0)}

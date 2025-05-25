@@ -180,16 +180,9 @@ export function Flam3(props: Flam3Props) {
       points,
       computeUniforms,
     )
-    const runSkipIfs = createIFSPipeline(
-      root,
-      props.skipIters,
-      points,
-      computeUniforms,
-      props.flameFunctions,
-    )
     const runIfs = createIFSPipeline(
       root,
-      1,
+      props.skipIters,
       points,
       computeUniforms,
       props.flameFunctions,
@@ -205,7 +198,6 @@ export function Flam3(props: Flam3Props) {
     let renderAccumulationIndex = 0
     let clearRequested = true
     createEffect(() => {
-      runSkipIfs.update(props.flameFunctions)
       runIfs.update(props.flameFunctions)
 
       // this is in a separate effect because we don't
@@ -274,12 +266,6 @@ export function Flam3(props: Flam3Props) {
         {
           const pass = encoder.beginComputePass()
           runInitPoints(pass, props.pointCount)
-          runSkipIfs.run(pass, props.pointCount)
-          pass.end()
-        }
-
-        {
-          const pass = encoder.beginComputePass()
           runIfs.run(pass, props.pointCount)
           pass.end()
         }
