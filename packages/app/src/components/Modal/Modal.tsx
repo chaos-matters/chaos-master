@@ -89,9 +89,7 @@ export function Modal(props: ParentProps<ModalProps>) {
       // @ts-expect-error this can't be modeled in ts
       resolve,
     }
-    document.startViewTransition(() => {
-      setModalInstances((prev) => [...prev, instance])
-    })
+    setModalInstances((prev) => [...prev, instance])
     return promise
   }
 
@@ -100,7 +98,12 @@ export function Modal(props: ParentProps<ModalProps>) {
       <ModalContext.Provider value={requestModal}>
         {props.children}
       </ModalContext.Provider>
-      <Portal mount={props.mount}>
+      <Portal
+        mount={props.mount}
+        ref={(el) => {
+          el.classList.add(ui.root)
+        }}
+      >
         <Show when={modalInstances()[0]} keyed>
           {(instance) => {
             const {

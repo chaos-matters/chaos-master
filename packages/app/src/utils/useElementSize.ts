@@ -23,16 +23,18 @@ export function useElementSize(
       return
     }
     const observer = new ResizeObserver((entries) => {
-      const entry = entries[0]?.devicePixelContentBoxSize[0]
+      const contentBox = entries[0]?.contentBoxSize[0]
+      const pixelContentBox = entries[0]?.devicePixelContentBoxSize[0]
       // Don't measure the element if not connected to the document.
       // Element existing but not connected to document can happen while
       // Suspense mechanism is rendering the fallback.
-      if (!t.isConnected || !entry) {
+      if (!t.isConnected || !contentBox || !pixelContentBox) {
         return
       }
-      const { width, height } = t.getBoundingClientRect()
-      const widthPX = entry.inlineSize
-      const heightPX = entry.blockSize
+      const width = contentBox.inlineSize
+      const height = contentBox.blockSize
+      const widthPX = pixelContentBox.inlineSize
+      const heightPX = pixelContentBox.blockSize
       const newSize: ElementSize = {
         width,
         height,

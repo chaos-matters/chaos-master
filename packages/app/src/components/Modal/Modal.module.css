@@ -1,3 +1,8 @@
+.root {
+  isolation: isolate;
+  contain: strict;
+}
+
 .modal {
   --text-color: var(--neutral-700);
   --bg-color: white;
@@ -7,6 +12,15 @@
     --text-color: var(--neutral-400);
     --bg-color: var(--neutral-950);
     --border-color: var(--neutral-700);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 
@@ -22,8 +36,13 @@
   color: var(--text-color);
   margin: auto;
   view-transition-name: modal;
+  opacity: 0;
+  animation: fade-in 400ms forwards;
+  outline: none;
 }
 
 ::backdrop {
   backdrop-filter: contrast(50%) blur(10px);
+  opacity: 0;
+  animation: fade-in 400ms forwards;
 }

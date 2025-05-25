@@ -146,7 +146,7 @@ export function Flam3(props: Flam3Props) {
     return { accumulationTexture, postprocessTexture }
   })
 
-  const runColorGradingPipeline = createMemo(() => {
+  const colorGradingPipeline = createMemo(() => {
     const o = outputTextures()
     if (!o) {
       return undefined
@@ -161,44 +161,52 @@ export function Flam3(props: Flam3Props) {
     )
   })
 
+  const computeUniforms = root
+    .createBuffer(ComputeUniforms, { seed: vec4u() })
+    .$usage('uniform')
+
+  const renderPoints = createRenderPointsPipeline(root, camera, points)
+
+  const runBlur = createMemo(() => {
+    const o = outputTextures()
+    if (!o) {
+      return undefined
+    }
+    const { accumulationTexture, postprocessTexture } = o
+    return createBlurPipeline(
+      root,
+      accumulationTexture.props.size,
+      accumulationTexture,
+      postprocessTexture,
+    )
+  })
+
   createEffect(() => {
-    console.info('Creating everything from scratch.')
     const o = outputTextures()
     if (!o) {
       return undefined
     }
 
-    const { accumulationTexture, postprocessTexture } = o
+    const { accumulationTexture } = o
     const outputTextureView = root.unwrap(accumulationTexture).createView()
-
-    const computeUniforms = root
-      .createBuffer(ComputeUniforms, { seed: vec4u() })
-      .$usage('uniform')
 
     const runInitPoints = createInitPointsPipeline(
       root,
       points,
       computeUniforms,
     )
-    const runIfs = createIFSPipeline(
+    const ifsPipeline = createIFSPipeline(
       root,
       props.skipIters,
       points,
       computeUniforms,
       props.flameFunctions,
     )
-    const renderPoints = createRenderPointsPipeline(root, camera, points)
-    const runBlur = createBlurPipeline(
-      root,
-      accumulationTexture.props.size,
-      accumulationTexture,
-      postprocessTexture,
-    )
 
     let renderAccumulationIndex = 0
     let clearRequested = true
     createEffect(() => {
-      runIfs.update(props.flameFunctions)
+      ifsPipeline.update(props.flameFunctions)
 
       // this is in a separate effect because we don't
       // want to run ifs.update if not necessary
@@ -226,12 +234,16 @@ export function Flam3(props: Flam3Props) {
     createEffect(() => {
       // redraw when these change
       const _ = props.backgroundColor
-      runColorGradingPipeline()
+      const __ = colorGradingPipeline()
       rafLoop.redraw()
     })
 
     const rafLoop = createAnimationFrame(
       () => {
+        const colorGradingPipeline_ = colorGradingPipeline()
+        if (colorGradingPipeline_ === undefined) {
+          return
+        }
         if (clearRequested) {
           clearRequested = false
           const encoder = device.createCommandEncoder()
@@ -266,7 +278,7 @@ export function Flam3(props: Flam3Props) {
         {
           const pass = encoder.beginComputePass()
           runInitPoints(pass, props.pointCount)
-          runIfs.run(pass, props.pointCount)
+          ifsPipeline.run(pass, props.pointCount)
           pass.end()
         }
 
@@ -286,11 +298,11 @@ export function Flam3(props: Flam3Props) {
 
         if (props.adaptiveFilterEnabled) {
           const pass = encoder.beginComputePass()
-          runBlur(pass)
+          runBlur()?.(pass)
           pass.end()
         }
 
-        runColorGradingPipeline()?.(encoder, context)
+        colorGradingPipeline_.run(encoder, context)
 
         // _readCountUnderPointer(count)
 
