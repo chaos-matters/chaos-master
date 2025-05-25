@@ -16,17 +16,20 @@
 }
 
 .button {
-  display: flex;
   color: var(--color);
   background-color: var(--bg-color);
   align-items: center;
   justify-content: center;
   border: none;
   border-radius: var(--radius);
+  padding: var(--space-2);
   line-height: 1;
-  padding-inline: var(--space-1);
-  padding-block: var(--space-1);
   font-size: small;
+
+  /* increase horizontal padding if no icon is present */
+  &:not(:has(svg)) {
+    padding-inline: var(--space-3);
+  }
 
   &:not(:disabled) {
     cursor: pointer;
@@ -46,7 +49,10 @@
   }
 
   & > svg {
-    width: 20px;
+    box-sizing: content-box;
+    width: 16px;
+    padding: var(--space-2);
+    margin: calc(-1 * var(--space-2));
   }
 }
 
