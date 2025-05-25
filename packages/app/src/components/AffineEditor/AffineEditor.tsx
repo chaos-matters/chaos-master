@@ -290,8 +290,11 @@ function AffineHandle(props: {
   return (
     <>
       <svg viewBox={`-${aspect()} -1 ${2 * aspect()} 2`}>
-        <g transform={`scale(1, -1) matrix(${clipTransform()})`}>
-          <path class={ui.handleBox} d={corners} />
+        <g
+          class={ui.handleBox}
+          transform={`scale(1, -1) matrix(${clipTransform()})`}
+        >
+          <path d={corners} />
           <path
             class={ui.handleBoxGrabArea}
             d={corners}
@@ -300,22 +303,19 @@ function AffineHandle(props: {
             // due to solidjs event delegation.
             on:pointerdown={scaleBoth}
           />
-          <path class={ui.handleBox} d="M 0,0 V 1" marker-end="url(#arrow)" />
+          <path d="M 0,0 V 1" marker-end="url(#arrow)" />
           <path
             class={ui.handleBoxGrabArea}
             d="M 0,0 V 1"
             on:pointerdown={scaleY}
           />
-          <path class={ui.handleBox} d="M 0,0 L 1,0" marker-end="url(#arrow)" />
+          <path d="M 0,0 L 1,0" marker-end="url(#arrow)" />
           <path
             class={ui.handleBoxGrabArea}
             d="M 0,0 L 1,0"
             on:pointerdown={scaleX}
           />
-          <path
-            classList={{ [ui.handleBox]: true, [ui.dashed]: true }}
-            d="M 0,0 V -1 M 0,0 L -1,0"
-          />
+          <path class={ui.dashed} d="M 0,0 V -1 M 0,0 L -1,0" />
           <path
             class={ui.handleBoxGrabArea}
             d="M 0,0 V -1"
