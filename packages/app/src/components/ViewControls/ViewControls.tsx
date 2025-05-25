@@ -6,6 +6,7 @@ import Redo from '@/icons/redo.svg'
 import Undo from '@/icons/undo.svg'
 import { Button } from '../Button/Button'
 import { ButtonGroup } from '../Button/ButtonGroup'
+import { SoftwareVersion } from '../SoftwareVersion/SoftwareVersion'
 import ui from './ViewControls.module.css'
 import type { Setter } from 'solid-js'
 
@@ -84,6 +85,7 @@ export function ViewControls(props: ViewControlProps) {
           <Redo />
         </Button>
       </ButtonGroup>
+      <SoftwareVersion />
     </div>
   )
 }

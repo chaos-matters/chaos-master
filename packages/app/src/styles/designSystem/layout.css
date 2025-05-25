@@ -14,3 +14,8 @@
   --space-7: calc(var(--spacing) * 7);
   --space-8: calc(var(--spacing) * 8);
 }
+
+:root {
+  /* for border-radius */
+  --round: 100vh;
+}

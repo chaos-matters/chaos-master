@@ -119,7 +119,7 @@
 
 .delete-flame-button {
   border: none;
-  border-radius: 100vh;
+  border-radius: var(--round);
   position: absolute;
   top: var(--space-h);
   right: var(--space-h);
