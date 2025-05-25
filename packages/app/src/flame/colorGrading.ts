@@ -102,19 +102,21 @@ export function createColorGradingPipeline(
       ],
     },
   })
-  return (encoder: GPUCommandEncoder, context: GPUCanvasContext) => {
-    const pass = encoder.beginRenderPass({
-      colorAttachments: [
-        {
-          loadOp: 'clear',
-          storeOp: 'store',
-          view: context.getCurrentTexture().createView(),
-        },
-      ],
-    })
-    pass.setPipeline(renderPipeline)
-    pass.setBindGroup(0, root.unwrap(bindGroup))
-    pass.draw(3, 1)
-    pass.end()
+  return {
+    run: (encoder: GPUCommandEncoder, context: GPUCanvasContext) => {
+      const pass = encoder.beginRenderPass({
+        colorAttachments: [
+          {
+            loadOp: 'clear',
+            storeOp: 'store',
+            view: context.getCurrentTexture().createView(),
+          },
+        ],
+      })
+      pass.setPipeline(renderPipeline)
+      pass.setBindGroup(0, root.unwrap(bindGroup))
+      pass.draw(3, 1)
+      pass.end()
+    },
   }
 }

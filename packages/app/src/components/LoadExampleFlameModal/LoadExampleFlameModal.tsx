@@ -7,8 +7,10 @@ import Cross from '@/icons/cross.svg'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
 import { Root } from '@/lib/Root'
+import { recordKeys } from '@/utils/recordKeys'
 import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
 import { Button } from '../Button/Button'
+import { DelayedShow } from '../DelayedShow/DelayedShow'
 import { useRequestModal } from '../Modal/Modal'
 import ui from './LoadExampleFlameModal.module.css'
 import type { ExampleID } from '@/flame/examples'
@@ -17,19 +19,42 @@ import type { ChangeHistory } from '@/utils/createStoreHistory'
 
 const CANCEL = Symbol('CANCEL')
 
-type LoadExampleFlameModalProps = {
-  respond: (value: ExampleID | typeof CANCEL) => void
-}
-
-function LoadExampleFlameModal(props: LoadExampleFlameModalProps) {
+function Preview(props: { flameFunctions: FlameFunction[] }) {
   const [renderInterval, setRenderInterval] = createSignal(1)
 
   createEffect(() => {
     setTimeout(() => {
       setRenderInterval(Infinity)
-    }, 2000)
+    }, 3000)
   })
 
+  return (
+    <Root adapterOptions={{ powerPreference: 'high-performance' }}>
+      <AutoCanvas pixelRatio={1}>
+        <Camera2D position={vec2f()} fovy={1}>
+          <Flam3
+            skipIters={15}
+            pointCount={1e4}
+            drawMode={lightMode}
+            exposure={0.25}
+            adaptiveFilterEnabled={true}
+            flameFunctions={props.flameFunctions}
+            renderInterval={renderInterval()}
+            onExportImage={() => {}}
+            edgeFadeColor={vec4f(0)}
+            backgroundColor={vec3f(0)}
+          />
+        </Camera2D>
+      </AutoCanvas>
+    </Root>
+  )
+}
+
+type LoadExampleFlameModalProps = {
+  respond: (value: ExampleID | typeof CANCEL) => void
+}
+
+function LoadExampleFlameModal(props: LoadExampleFlameModalProps) {
   useKeyboardShortcuts(
     {
       Escape: () => {
@@ -55,32 +80,17 @@ function LoadExampleFlameModal(props: LoadExampleFlameModalProps) {
       </div>
       <p>You can undo this operation.</p>
       <div class={ui.gallery}>
-        <For each={Object.keys(examples) as ExampleID[]}>
-          {(exampleId) => (
+        <For each={recordKeys(examples)}>
+          {(exampleId, i) => (
             <button
               class={ui.item}
               onClick={() => {
                 props.respond(exampleId)
               }}
             >
-              <Root adapterOptions={{ powerPreference: 'high-performance' }}>
-                <AutoCanvas pixelRatio={1}>
-                  <Camera2D position={vec2f()} fovy={1}>
-                    <Flam3
-                      skipIters={15}
-                      pointCount={5e3}
-                      drawMode={lightMode}
-                      exposure={0.25}
-                      adaptiveFilterEnabled={true}
-                      flameFunctions={examples[exampleId]}
-                      renderInterval={renderInterval()}
-                      onExportImage={() => {}}
-                      edgeFadeColor={vec4f(0)}
-                      backgroundColor={vec3f(0)}
-                    />
-                  </Camera2D>
-                </AutoCanvas>
-              </Root>
+              <DelayedShow delayMs={i() * 50}>
+                <Preview flameFunctions={examples[exampleId]} />
+              </DelayedShow>
               <div class={ui.itemTitle}>{exampleId}</div>
             </button>
           )}

@@ -349,11 +349,11 @@ function App(props: AppProps) {
                 <select
                   class={ui.select}
                   value={props.drawMode === lightMode ? 'light' : 'paint'}
-                  onChange={(ev) =>
+                  onChange={(ev) => {
                     props.setDrawMode(() =>
                       ev.target.value === 'light' ? lightMode : paintMode,
                     )
-                  }
+                  }}
                 >
                   <option value="light">Light</option>
                   <option value="paint">Paint</option>
@@ -480,7 +480,11 @@ export function Wrappers() {
             <App
               flameFromQuery={flameFromQuery()}
               drawMode={drawMode()}
-              setDrawMode={setDrawMode}
+              setDrawMode={(mode) => {
+                document.startViewTransition(() => {
+                  setDrawMode(mode)
+                })
+              }}
             />
           </Show>
         </Suspense>
