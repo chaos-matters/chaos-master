@@ -51,15 +51,27 @@
 }
 
 .handle-box {
-  fill: none;
-  stroke: black;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-  stroke-width: 1px;
-  vector-effect: non-scaling-stroke;
+  --color: var(--neutral-400);
+  --color-hover: black;
 
   [data-theme='dark'] & {
-    stroke: white;
+    --color: var(--neutral-400);
+    --color-hover: white;
+  }
+}
+
+.handle-box {
+  :where(& path) {
+    fill: none;
+    stroke: var(--color);
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    stroke-width: 1px;
+    vector-effect: non-scaling-stroke;
+  }
+
+  :where(&:hover path) {
+    stroke: var(--color-hover);
   }
 }
 
