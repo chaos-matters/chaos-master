@@ -25,10 +25,6 @@
 .gallery-title {
   display: flex;
   justify-content: space-between;
-
-  & h1 {
-    margin: 0;
-  }
 }
 
 .item {

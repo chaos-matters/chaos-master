@@ -40,7 +40,7 @@
     appearance: none;
     width: 14px;
     height: 14px;
-    border-radius: 100vh;
+    border-radius: var(--round);
     cursor: pointer;
 
     background: linear-gradient(
@@ -63,7 +63,7 @@
   &::before {
     display: block;
     position: absolute;
-    border-radius: 100vh;
+    border-radius: var(--round);
     content: '';
     left: 0;
     right: 0;

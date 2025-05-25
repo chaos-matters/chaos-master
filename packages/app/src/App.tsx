@@ -20,7 +20,6 @@ import { createLoadExampleFlame } from './components/LoadExampleFlameModal/LoadE
 import { Modal } from './components/Modal/Modal'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
 import { Slider } from './components/Sliders/Slider'
-import { SoftwareVersion } from './components/SoftwareVersion/SoftwareVersion'
 import { ViewControls } from './components/ViewControls/ViewControls'
 import { ChangeHistoryContextProvider } from './contexts/ChangeHistoryContext'
 import { ThemeContextProvider, useTheme } from './contexts/ThemeContext'
@@ -454,7 +453,6 @@ function App(props: AppProps) {
             </Card>
           </div>
         </Show>
-        <SoftwareVersion />
       </div>
     </ChangeHistoryContextProvider>
   )
