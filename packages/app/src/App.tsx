@@ -12,7 +12,6 @@ import { vec3f, vec4f } from 'typegpu/data'
 import ui from './App.module.css'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
 import { Button } from './components/Button/Button'
-import { ButtonGroup } from './components/Button/ButtonGroup'
 import { Checkbox } from './components/Checkbox/Checkbox'
 import { ColorPicker } from './components/ColorPicker/ColorPicker'
 import { Card } from './components/ControlCard/ControlCard'
@@ -22,6 +21,7 @@ import { Modal } from './components/Modal/Modal'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
 import { Slider } from './components/Sliders/Slider'
 import { SoftwareVersion } from './components/SoftwareVersion/SoftwareVersion'
+import { ViewControls } from './components/ViewControls/ViewControls'
 import { ChangeHistoryContextProvider } from './contexts/ChangeHistoryContext'
 import { ThemeContextProvider, useTheme } from './contexts/ThemeContext'
 import {
@@ -42,10 +42,7 @@ import {
   getVariationDefault,
 } from './flame/variations/parametric'
 import Cross from './icons/cross.svg'
-import Minus from './icons/minus.svg'
 import Plus from './icons/plus.svg'
-import Redo from './icons/redo.svg'
-import Undo from './icons/undo.svg'
 import { AutoCanvas } from './lib/AutoCanvas'
 import { Root } from './lib/Root'
 import { createZoom, WheelZoomCamera2D } from './lib/WheelZoomCamera2D'
@@ -200,57 +197,12 @@ function App(props: AppProps) {
             </AutoCanvas>
           </div>
         </Root>
-        <div class={ui.viewportControls}>
-          <ButtonGroup>
-            <For each={[1, 2, 4]}>
-              {(divider) => {
-                const pixelRatio_ = 1 / divider
-                return (
-                  <Button
-                    active={pixelRatio() === pixelRatio_}
-                    onClick={() => setPixelRatio(pixelRatio_)}
-                    style={{ 'min-width': '3rem' }}
-                  >
-                    <Show when={divider !== 1} fallback={'Full'}>
-                      <span>
-                        <sup>1</sup>/<sub>{divider}</sub>
-                      </span>
-                    </Show>
-                  </Button>
-                )
-              }}
-            </For>
-          </ButtonGroup>
-          <ButtonGroup>
-            <Button onClick={() => setZoom((p) => p * 0.9)}>
-              <Minus />
-            </Button>
-            <Button onClick={() => setZoom(1)} style={{ 'min-width': '4rem' }}>
-              {(zoom() * 100).toFixed(0)}%
-            </Button>
-            <Button onClick={() => setZoom((p) => p / 0.9)}>
-              <Plus />
-            </Button>
-          </ButtonGroup>
-          <ButtonGroup>
-            <Button
-              disabled={!history.hasUndo()}
-              onClick={() => {
-                history.undo()
-              }}
-            >
-              <Undo />
-            </Button>
-            <Button
-              disabled={!history.hasRedo()}
-              onClick={() => {
-                history.redo()
-              }}
-            >
-              <Redo />
-            </Button>
-          </ButtonGroup>
-        </div>
+        <ViewControls
+          zoom={zoom()}
+          setZoom={setZoom}
+          pixelRatio={pixelRatio()}
+          setPixelRatio={setPixelRatio}
+        />
         <Show when={showSidebar()}>
           <div class={ui.sidebar}>
             <AffineEditor
