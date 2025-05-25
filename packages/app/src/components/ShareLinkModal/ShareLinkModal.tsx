@@ -1,4 +1,5 @@
 import { encodeJsonQueryParam } from '@/utils/jsonQueryParam'
+import { Button } from '../Button/Button'
 import { useRequestModal } from '../Modal/Modal'
 import ui from './ShareLink.module.css'
 import type { FlameFunction } from '@/flame/flameFunction'
@@ -13,11 +14,11 @@ type ShareLinkModalProps = {
 
 function ShareLinkModal(props: ShareLinkModalProps) {
   return (
-    <div class={ui.container}>
+    <>
       <h1>Flame URL copied to clipboard!</h1>
       <p>{props.url}</p>
-      <footer>
-        <button
+      <footer class={ui.footer}>
+        <Button
           onClick={async () => {
             await navigator.clipboard.writeText(
               JSON.stringify(props.flameFunctions),
@@ -25,16 +26,16 @@ function ShareLinkModal(props: ShareLinkModalProps) {
           }}
         >
           Copy JSON
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={() => {
             props.respond()
           }}
         >
           Close
-        </button>
+        </Button>
       </footer>
-    </div>
+    </>
   )
 }
 
@@ -46,6 +47,7 @@ export function createShareLinkModal(flameFunctions: FlameFunction[]) {
     const url = `${window.location.origin}/?flame=${encoded}`
     await navigator.clipboard.writeText(url)
     await requestModal({
+      class: ui.container,
       content: ({ respond }) => (
         <ShareLinkModal
           url={url}
