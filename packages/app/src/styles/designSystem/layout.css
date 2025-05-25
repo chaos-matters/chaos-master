@@ -1,6 +1,6 @@
 /*
 * Used for spacing out elements using paddings, gaps, margins, border-radius.
-* Not to be used for sizing (width, height, border thickness etc).
+* Not to be used for sizing (width, height, border thickness, etc).
 */
 :root {
   --spacing: 0.25rem;
