@@ -1,0 +1,14 @@
+.title {
+  display: flex;
+  justify-content: space-between;
+  color: var(--neutral-950);
+
+  [data-theme='dark'] & {
+    color: var(--neutral-300);
+  }
+}
+
+.close-button {
+  /* inset the button slightly so it is closer to the frame, but still large click target */
+  margin: calc(-1 * var(--space-1));
+}

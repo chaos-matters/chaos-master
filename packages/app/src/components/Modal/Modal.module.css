@@ -27,9 +27,9 @@
 .modal {
   display: flex;
   flex-direction: column;
-  padding: 1rem;
-  gap: 1rem;
-  border-radius: 1rem;
+  padding: var(--space-4);
+  gap: var(--space-4);
+  border-radius: var(--space-4);
   border: 2px solid var(--border-color);
   white-space: break-spaces;
   background-color: var(--bg-color);
