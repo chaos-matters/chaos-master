@@ -3,15 +3,13 @@ import { vec2f, vec3f, vec4f } from 'typegpu/data'
 import { lightMode } from '@/flame/drawMode'
 import { examples } from '@/flame/examples'
 import { Flam3 } from '@/flame/Flam3'
-import Cross from '@/icons/cross.svg'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
 import { Root } from '@/lib/Root'
 import { recordKeys } from '@/utils/recordKeys'
-import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
-import { Button } from '../Button/Button'
 import { DelayedShow } from '../DelayedShow/DelayedShow'
 import { useRequestModal } from '../Modal/Modal'
+import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './LoadExampleFlameModal.module.css'
 import type { ExampleID } from '@/flame/examples'
 import type { FlameFunction } from '@/flame/flameFunction'
@@ -40,7 +38,7 @@ function Preview(props: { flameFunctions: FlameFunction[] }) {
             adaptiveFilterEnabled={true}
             flameFunctions={props.flameFunctions}
             renderInterval={renderInterval()}
-            onExportImage={() => {}}
+            onExportImage={undefined}
             edgeFadeColor={vec4f(0)}
             backgroundColor={vec3f(0)}
           />
@@ -55,29 +53,15 @@ type LoadExampleFlameModalProps = {
 }
 
 function LoadExampleFlameModal(props: LoadExampleFlameModalProps) {
-  useKeyboardShortcuts(
-    {
-      Escape: () => {
-        props.respond(CANCEL)
-        return true
-      },
-    },
-    // force it to go before sidebar closing event
-    // using the capturing phase
-    { capture: true },
-  )
   return (
     <>
-      <div class={ui.galleryTitle}>
-        <h1>Example Gallery</h1>
-        <Button
-          onClick={() => {
-            props.respond(CANCEL)
-          }}
-        >
-          <Cross width="1rem" height="1rem" />
-        </Button>
-      </div>
+      <ModalTitleBar
+        onClose={() => {
+          props.respond(CANCEL)
+        }}
+      >
+        Example Gallery
+      </ModalTitleBar>
       <p>You can undo this operation.</p>
       <div class={ui.gallery}>
         <For each={recordKeys(examples)}>

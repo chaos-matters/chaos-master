@@ -2,11 +2,6 @@
   width: 30rem;
 }
 
-.title {
-  display: flex;
-  justify-content: space-between;
-}
-
 .section-title {
   margin-bottom: calc(-1 * var(--space-2));
 }

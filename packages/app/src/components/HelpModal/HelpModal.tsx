@@ -1,10 +1,8 @@
 import { createResource, For, Show, Suspense } from 'solid-js'
-import Cross from '@/icons/cross.svg'
 import { formatBytes } from '@/utils/formatBytes'
-import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
 import { VERSION } from '@/version'
-import { Button } from '../Button/Button'
 import { useRequestModal } from '../Modal/Modal'
+import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './HelpModal.module.css'
 
 type KeyCombination = {
@@ -20,8 +18,8 @@ type ShortcutDescriptor = {
 
 const shortcuts: ShortcutDescriptor[] = [
   {
-    keyCombinations: [{ key: 'Esc' }],
-    description: 'Close sidebar',
+    keyCombinations: [{ key: 'F' }],
+    description: 'Fullscreen (close sidebar)',
   },
   {
     keyCombinations: [{ key: 'Z', ctrl: true }],
@@ -80,31 +78,15 @@ type HelpModalProps = {
 
 function HelpModal(props: HelpModalProps) {
   const [gpuDeviceInfo] = createResource(getGPUDeviceInformation)
-  useKeyboardShortcuts(
-    {
-      Escape: () => {
-        props.respond()
-        return true
-      },
-    },
-    // force it to go before sidebar closing event
-    // using the capturing phase
-    { capture: true },
-  )
   return (
     <>
-      <div class={ui.title}>
-        <h1>
-          Chaos Master v{VERSION} <sup>alpha</sup>
-        </h1>
-        <Button
-          onClick={() => {
-            props.respond()
-          }}
-        >
-          <Cross width="1rem" height="1rem" />
-        </Button>
-      </div>
+      <ModalTitleBar
+        onClose={() => {
+          props.respond()
+        }}
+      >
+        Chaos Master v{VERSION} <sup>alpha</sup>
+      </ModalTitleBar>
       <h2 class={ui.sectionTitle}>Keyboard Shortcuts</h2>
       <div class={ui.shortcutsGrid}>
         <For each={shortcuts}>

@@ -1,6 +1,7 @@
 import { encodeJsonQueryParam } from '@/utils/jsonQueryParam'
 import { Button } from '../Button/Button'
 import { useRequestModal } from '../Modal/Modal'
+import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './ShareLink.module.css'
 import type { FlameFunction } from '@/flame/flameFunction'
 
@@ -15,7 +16,13 @@ type ShareLinkModalProps = {
 function ShareLinkModal(props: ShareLinkModalProps) {
   return (
     <>
-      <h1>Flame URL copied to clipboard!</h1>
+      <ModalTitleBar
+        onClose={() => {
+          props.respond()
+        }}
+      >
+        Flame URL copied to clipboard!
+      </ModalTitleBar>
       <p>{props.url}</p>
       <footer class={ui.footer}>
         <Button
@@ -26,13 +33,6 @@ function ShareLinkModal(props: ShareLinkModalProps) {
           }}
         >
           Copy JSON
-        </Button>
-        <Button
-          onClick={() => {
-            props.respond()
-          }}
-        >
-          Close
         </Button>
       </footer>
     </>

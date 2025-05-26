@@ -40,8 +40,7 @@ import {
   getParamsEditor,
   getVariationDefault,
 } from './flame/variations/parametric'
-import Cross from './icons/cross.svg'
-import Plus from './icons/plus.svg'
+import { Cross, Plus } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
 import { Root } from './lib/Root'
 import { createZoom, WheelZoomCamera2D } from './lib/WheelZoomCamera2D'
@@ -115,7 +114,7 @@ function App(props: AppProps) {
   const { showShareLinkModal } = createShareLinkModal(flameFunctions)
 
   useKeyboardShortcuts({
-    Escape: () => {
+    KeyF: () => {
       document.startViewTransition(() => {
         setShowSidebar((p) => !p)
       })
