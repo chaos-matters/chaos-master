@@ -2,7 +2,7 @@ import { createResource, For, Show, Suspense } from 'solid-js'
 import { GitHub } from '@/icons'
 import { formatBytes } from '@/utils/formatBytes'
 import { VERSION } from '@/version'
-import { useRequestModal } from '../Modal/Modal'
+import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './HelpModal.module.css'
 
