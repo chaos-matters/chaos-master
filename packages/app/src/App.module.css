@@ -71,6 +71,12 @@
   }
 }
 
+.action-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-2);
+}
+
 .button-card.button-card {
   display: flex;
   padding: 0;

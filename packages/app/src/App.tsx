@@ -16,7 +16,7 @@ import { Checkbox } from './components/Checkbox/Checkbox'
 import { ColorPicker } from './components/ColorPicker/ColorPicker'
 import { Card } from './components/ControlCard/ControlCard'
 import { FlameColorEditor } from './components/FlameColorEditor/FlameColorEditor'
-import { createLoadExampleFlame } from './components/LoadExampleFlameModal/LoadExampleFlameModal'
+import { createLoadFlame } from './components/LoadFlameModal/LoadFlameModal'
 import { Modal } from './components/Modal/Modal'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
 import { Slider } from './components/Sliders/Slider'
@@ -45,7 +45,7 @@ import { AutoCanvas } from './lib/AutoCanvas'
 import { Root } from './lib/Root'
 import { createZoom, WheelZoomCamera2D } from './lib/WheelZoomCamera2D'
 import { createStoreHistory } from './utils/createStoreHistory'
-import { addFlameDataToPng, extractFlameFromPng } from './utils/flameInPng'
+import { addFlameDataToPng } from './utils/flameInPng'
 import {
   compressJsonQueryParam,
   decodeJsonQueryParam,
@@ -105,11 +105,10 @@ function App(props: AppProps) {
     sum(flameFunctions.map((f) => f.probability)),
   )
 
-  const { loadExampleModalIsOpen, showLoadExampleFlameModal } =
-    createLoadExampleFlame(history)
+  const { loadModalIsOpen, showLoadFlameModal } = createLoadFlame(history)
 
   const finalRenderInterval = () =>
-    loadExampleModalIsOpen() ? Infinity : onExportImage() ? 0 : renderInterval()
+    loadModalIsOpen() ? Infinity : onExportImage() ? 0 : renderInterval()
 
   const { showShareLinkModal } = createShareLinkModal(flameFunctions)
 
@@ -398,58 +397,28 @@ function App(props: AppProps) {
                 }
               />
             </Card>
-            <Card class={ui.buttonCard}>
-              <button
-                class={ui.addFlameButton}
-                onClick={showLoadExampleFlameModal}
-              >
-                Load Example
-              </button>
-            </Card>
-            <Card class={ui.buttonCard}>
-              <button
-                class={ui.addFlameButton}
-                onClick={() => {
-                  setOnExportImage(() => exportCanvasImage)
-                }}
-              >
-                Export PNG
-              </button>
-            </Card>
-            <Card class={ui.buttonCard}>
-              <button class={ui.addFlameButton} onClick={showShareLinkModal}>
-                Share Link
-              </button>
-            </Card>
-            <Card class={ui.buttonCard}>
-              <label class={ui.addFlameButton}>
-                Load Flame From Image
-                <input
-                  type="file"
-                  hidden
-                  accept="image/png"
-                  onChange={(ev) => {
-                    const file = ev.target.files?.item(0)
-                    if (file && file.type === 'image/png') {
-                      const reader = new FileReader()
-                      reader.onload = async (e) => {
-                        const fr = e.target
-                        const arrBuf = new Uint8Array(fr?.result as ArrayBuffer)
-                        const newFlameFunctions =
-                          await extractFlameFromPng(arrBuf)
-                        history.replace(structuredClone(newFlameFunctions))
-                      }
-                      reader.onerror = function () {
-                        console.warn(reader.error)
-                      }
-                      reader.readAsArrayBuffer(file)
-                      // reset target value so same file can be reuploaded
-                      ev.target.value = ''
-                    }
+            <div class={ui.actionButtons}>
+              <Card class={ui.buttonCard}>
+                <button class={ui.addFlameButton} onClick={showLoadFlameModal}>
+                  Load Flame
+                </button>
+              </Card>
+              <Card class={ui.buttonCard}>
+                <button
+                  class={ui.addFlameButton}
+                  onClick={() => {
+                    setOnExportImage(() => exportCanvasImage)
                   }}
-                />
-              </label>
-            </Card>
+                >
+                  Export PNG
+                </button>
+              </Card>
+              <Card class={ui.buttonCard}>
+                <button class={ui.addFlameButton} onClick={showShareLinkModal}>
+                  Share Link
+                </button>
+              </Card>
+            </div>
           </div>
         </Show>
       </div>

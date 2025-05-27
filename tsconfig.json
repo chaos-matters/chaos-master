@@ -18,7 +18,8 @@
     "types": [
       "vite-plugin-solid-svg/types-component-solid",
       "vite/client",
-      "@webgpu/types"
+      "@webgpu/types",
+      "@types/wicg-file-system-access"
     ],
     "plugins": [
       {
