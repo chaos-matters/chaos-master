@@ -1,7 +1,6 @@
 import { createResource, For, Show, Suspense } from 'solid-js'
 import { GitHub } from '@/icons'
 import { formatBytes } from '@/utils/formatBytes'
-import { sum } from '@/utils/sum'
 import { VERSION } from '@/version'
 import { useRequestModal } from '../Modal/Modal'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
@@ -72,16 +71,14 @@ async function getGPUDeviceInformation() {
   // This property exists only when WebGPU Developer Features flag is set
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const memoryHeaps: { size: number }[] | undefined = (info as any).memoryHeaps
-  const totalHeap = memoryHeaps
-    ? sum(memoryHeaps.map((m) => m.size))
-    : undefined
+  const heaps = memoryHeaps?.map((m) => m.size)
 
   return {
     description: info.description,
     vendor: info.vendor,
     architecture: info.architecture,
     maxBufferSize: limits.maxBufferSize,
-    totalHeap,
+    heaps,
   }
 }
 
@@ -134,10 +131,17 @@ function HelpModal(props: HelpModalProps) {
                   <p>Name: {deviceInfo.description}</p>
                 ) : undefined}
                 <p>Vendor: {deviceInfo.vendor}</p>
-                <p>Architecture: {deviceInfo.architecture}</p>
+                {deviceInfo.architecture !== '' ? (
+                  <p>Architecture: {deviceInfo.architecture}</p>
+                ) : undefined}
                 <p>Max Buffer Size: {formatBytes(deviceInfo.maxBufferSize)}</p>
-                {deviceInfo.totalHeap !== undefined && (
-                  <p>Total VRAM: {formatBytes(deviceInfo.totalHeap)}</p>
+                {deviceInfo.heaps !== undefined && (
+                  <p>
+                    Total VRAM:{' '}
+                    {deviceInfo.heaps
+                      .map((size) => formatBytes(size))
+                      .join(' + ')}
+                  </p>
                 )}
               </>
             )}
