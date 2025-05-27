@@ -1,0 +1,23 @@
+.dropzone {
+  --color: var(--neutral-800);
+
+  [data-theme='dark'] & {
+    --color: var(--neutral-200);
+  }
+}
+
+.dropzone::before {
+  content: '';
+  position: absolute;
+  display: none;
+  inset: 0;
+  background-color: rgb(from var(--color) r g b / 25%);
+  opacity: 0.3;
+  z-index: 1;
+  box-shadow: inset 0 0 10vh 5vh var(--color);
+  pointer-events: none;
+}
+
+.dropzone.dropping::before {
+  display: block;
+}

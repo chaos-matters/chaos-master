@@ -17,6 +17,7 @@ import { Button } from './components/Button/Button'
 import { Checkbox } from './components/Checkbox/Checkbox'
 import { ColorPicker } from './components/ColorPicker/ColorPicker'
 import { Card } from './components/ControlCard/ControlCard'
+import { Dropzone } from './components/Dropzone/Dropzone'
 import { FlameColorEditor } from './components/FlameColorEditor/FlameColorEditor'
 import { createLoadFlame } from './components/LoadFlameModal/LoadFlameModal'
 import { Modal } from './components/Modal/Modal'
@@ -58,6 +59,7 @@ import {
 } from './utils/jsonQueryParam'
 import { sum } from './utils/sum'
 import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
+import { useLoadFlameFromFile } from './utils/useLoadFlameFromFile'
 import type { DrawMode } from './flame/drawMode'
 import type {
   FlameDescriptor,
@@ -179,9 +181,18 @@ function App(props: AppProps) {
     )
   })
 
+  const loadFlameFromFile = useLoadFlameFromFile()
+
+  async function onDrop(file: File) {
+    const flameDescriptor = await loadFlameFromFile(file)
+    if (flameDescriptor) {
+      history.replace(flameDescriptor)
+    }
+  }
+
   return (
     <ChangeHistoryContextProvider value={history}>
-      <div class={ui.layout}>
+      <Dropzone class={ui.layout} onDrop={onDrop}>
         <Root adapterOptions={{ powerPreference: 'high-performance' }}>
           <div
             class={ui.canvasContainer}
@@ -463,7 +474,7 @@ function App(props: AppProps) {
             </div>
           </div>
         </Show>
-      </div>
+      </Dropzone>
     </ChangeHistoryContextProvider>
   )
 }
@@ -481,6 +492,7 @@ export function Wrappers() {
     }
     return undefined
   })
+
   return (
     <ThemeContextProvider>
       <Modal>

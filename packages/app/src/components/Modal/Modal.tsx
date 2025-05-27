@@ -1,26 +1,9 @@
-import { createContext, createSignal, onMount, Show } from 'solid-js'
+import { createSignal, onMount, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
-import { useContextSafe } from '@/utils/useContextSafe'
 import ui from './Modal.module.css'
-import type { JSX, ParentProps } from 'solid-js'
-
-export type ModalConfig<T> = {
-  class?: string
-  content: (props: { respond: (value: T) => void }) => JSX.Element
-}
-
-/** Helper function that allows typescript to infer the correct response type. */
-export function defineModal<T>(modal: ModalConfig<T>) {
-  return modal
-}
-
-export type RequestModalFn = <T = void>(config: ModalConfig<T>) => Promise<T>
-
-export const ModalContext = createContext<RequestModalFn>()
-
-export function useRequestModal() {
-  return useContextSafe(ModalContext, 'useRequestModal', 'Modal')
-}
+import { ModalContext } from './ModalContext'
+import type { ParentProps } from 'solid-js'
+import type { ModalConfig } from './ModalContext'
 
 function showModal(dialog: HTMLDialogElement) {
   onMount(() => {
