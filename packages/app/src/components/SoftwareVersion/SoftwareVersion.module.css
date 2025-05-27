@@ -28,14 +28,3 @@
     color: var(--color-hover);
   }
 }
-
-.help {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--round);
-  border: 1px solid currentColor;
-  width: 1rem;
-  height: 1rem;
-  margin-left: var(--space-2);
-}

@@ -56,6 +56,7 @@ type LoadFlameModalProps = {
 function LoadFlameModal(props: LoadFlameModalProps) {
   async function loadFromFile() {
     const [fileHandle] = await window.showOpenFilePicker({
+      id: 'load-flame-from-file',
       types: [{ accept: { 'image/png': ['.png'] } }],
     })
     const file = await fileHandle.getFile()

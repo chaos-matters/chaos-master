@@ -1,0 +1,9 @@
+.question-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--round);
+  border: 1px solid currentColor;
+  width: 1.25em;
+  height: 1.25em;
+}
