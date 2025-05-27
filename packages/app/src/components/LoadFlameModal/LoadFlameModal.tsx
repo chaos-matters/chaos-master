@@ -16,7 +16,7 @@ import ui from './LoadFlameModal.module.css'
 import type { FlameFunction } from '@/flame/flameFunction'
 import type { ChangeHistory } from '@/utils/createStoreHistory'
 
-const CANCEL = Symbol('CANCEL')
+const CANCEL = 'cancel'
 
 function Preview(props: { flameFunctions: FlameFunction[] }) {
   const [renderInterval, setRenderInterval] = createSignal(1)
@@ -55,10 +55,16 @@ type LoadFlameModalProps = {
 
 function LoadFlameModal(props: LoadFlameModalProps) {
   async function loadFromFile() {
-    const [fileHandle] = await window.showOpenFilePicker({
-      id: 'load-flame-from-file',
-      types: [{ accept: { 'image/png': ['.png'] } }],
-    })
+    const fileHandles = await window
+      .showOpenFilePicker({
+        id: 'load-flame-from-file',
+        types: [{ accept: { 'image/png': ['.png'] } }],
+      })
+      .catch(() => undefined)
+    if (!fileHandles) {
+      return
+    }
+    const [fileHandle] = fileHandles
     const file = await fileHandle.getFile()
     const arrBuf = new Uint8Array(await file.arrayBuffer())
     const newFlameFunctions = await extractFlameFromPng(arrBuf)
