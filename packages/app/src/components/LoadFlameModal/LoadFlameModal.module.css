@@ -22,6 +22,13 @@
   justify-items: stretch;
 }
 
+.undo-message {
+  font-style: italic;
+  font-size: small;
+  color: var(--neutral-500);
+  margin-left: var(--space-3);
+}
+
 .item {
   padding: 0;
   margin: 0;

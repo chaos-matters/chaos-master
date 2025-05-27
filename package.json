@@ -11,6 +11,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.27.0",
+    "@types/wicg-file-system-access": "^2023.10.6",
     "@typescript-eslint/parser": "^8.32.1",
     "@webgpu/types": "^0.1.60",
     "cloc": "^2.4.0-cloc",

@@ -6,12 +6,13 @@ import { Flam3 } from '@/flame/Flam3'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
 import { Root } from '@/lib/Root'
+import { extractFlameFromPng } from '@/utils/flameInPng'
 import { recordKeys } from '@/utils/recordKeys'
+import { Button } from '../Button/Button'
 import { DelayedShow } from '../DelayedShow/DelayedShow'
 import { useRequestModal } from '../Modal/Modal'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
-import ui from './LoadExampleFlameModal.module.css'
-import type { ExampleID } from '@/flame/examples'
+import ui from './LoadFlameModal.module.css'
 import type { FlameFunction } from '@/flame/flameFunction'
 import type { ChangeHistory } from '@/utils/createStoreHistory'
 
@@ -48,11 +49,21 @@ function Preview(props: { flameFunctions: FlameFunction[] }) {
   )
 }
 
-type LoadExampleFlameModalProps = {
-  respond: (value: ExampleID | typeof CANCEL) => void
+type LoadFlameModalProps = {
+  respond: (flameDescriptor: FlameFunction[] | typeof CANCEL) => void
 }
 
-function LoadExampleFlameModal(props: LoadExampleFlameModalProps) {
+function LoadFlameModal(props: LoadFlameModalProps) {
+  async function loadFromFile() {
+    const [fileHandle] = await window.showOpenFilePicker({
+      types: [{ accept: { 'image/png': ['.png'] } }],
+    })
+    const file = await fileHandle.getFile()
+    const arrBuf = new Uint8Array(await file.arrayBuffer())
+    const newFlameFunctions = await extractFlameFromPng(arrBuf)
+    props.respond(newFlameFunctions)
+  }
+
   return (
     <>
       <ModalTitleBar
@@ -60,16 +71,20 @@ function LoadExampleFlameModal(props: LoadExampleFlameModalProps) {
           props.respond(CANCEL)
         }}
       >
-        Example Gallery
+        Load Flame
+        <span class={ui.undoMessage}>You can undo this operation.</span>
       </ModalTitleBar>
-      <p>You can undo this operation.</p>
-      <div class={ui.gallery}>
+      <section>
+        From disk <Button onClick={loadFromFile}>Choose File</Button>
+      </section>
+      <h2>Example Gallery</h2>
+      <section class={ui.gallery}>
         <For each={recordKeys(examples)}>
           {(exampleId, i) => (
             <button
               class={ui.item}
               onClick={() => {
-                props.respond(exampleId)
+                props.respond(examples[exampleId])
               }}
             >
               <DelayedShow delayMs={i() * 50}>
@@ -79,33 +94,30 @@ function LoadExampleFlameModal(props: LoadExampleFlameModalProps) {
             </button>
           )}
         </For>
-      </div>
+      </section>
     </>
   )
 }
 
-export function createLoadExampleFlame(
-  history: ChangeHistory<FlameFunction[]>,
-) {
+export function createLoadFlame(history: ChangeHistory<FlameFunction[]>) {
   const requestModal = useRequestModal()
-  const [loadExampleModalIsOpen, setLoadExampleModalIsOpen] =
-    createSignal(false)
+  const [loadModalIsOpen, setLoadModalIsOpen] = createSignal(false)
 
-  async function showLoadExampleFlameModal() {
-    setLoadExampleModalIsOpen(true)
-    const result = await requestModal<ExampleID | typeof CANCEL>({
-      content: ({ respond }) => <LoadExampleFlameModal respond={respond} />,
+  async function showLoadFlameModal() {
+    setLoadModalIsOpen(true)
+    const result = await requestModal<FlameFunction[] | typeof CANCEL>({
+      content: ({ respond }) => <LoadFlameModal respond={respond} />,
     })
-    setLoadExampleModalIsOpen(false)
+    setLoadModalIsOpen(false)
     if (result === CANCEL) {
       return
     }
     // structuredClone required in order to not modify the original, as store in solidjs does
-    history.replace(structuredClone(examples[result]))
+    history.replace(structuredClone(result))
   }
 
   return {
-    showLoadExampleFlameModal,
-    loadExampleModalIsOpen,
+    showLoadFlameModal,
+    loadModalIsOpen,
   }
 }
