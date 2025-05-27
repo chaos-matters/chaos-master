@@ -1,5 +1,7 @@
 import { createResource, For, Show, Suspense } from 'solid-js'
+import { GitHub } from '@/icons'
 import { formatBytes } from '@/utils/formatBytes'
+import { sum } from '@/utils/sum'
 import { VERSION } from '@/version'
 import { useRequestModal } from '../Modal/Modal'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
@@ -66,9 +68,20 @@ async function getGPUDeviceInformation() {
     throw new Error(`WebGPU is not supported`)
   }
   const { info, limits } = adapter
+
+  // This property exists only when WebGPU Developer Features flag is set
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const memoryHeaps: { size: number }[] | undefined = (info as any).memoryHeaps
+  const totalHeap = memoryHeaps
+    ? sum(memoryHeaps.map((m) => m.size))
+    : undefined
+
   return {
-    displayName: `${info.vendor} ${info.architecture}`,
+    description: info.description,
+    vendor: info.vendor,
+    architecture: info.architecture,
     maxBufferSize: limits.maxBufferSize,
+    totalHeap,
   }
 }
 
@@ -87,6 +100,13 @@ function HelpModal(props: HelpModalProps) {
       >
         Chaos Master v{VERSION} <sup>alpha</sup>
       </ModalTitleBar>
+      <a
+        class={ui.githubLink}
+        href="https://github.com/chaos-matters/chaos-master"
+        target="_blank"
+      >
+        <GitHub /> View source
+      </a>
       <h2 class={ui.sectionTitle}>Keyboard Shortcuts</h2>
       <div class={ui.shortcutsGrid}>
         <For each={shortcuts}>
@@ -110,8 +130,15 @@ function HelpModal(props: HelpModalProps) {
           <Show when={gpuDeviceInfo()} keyed>
             {(deviceInfo) => (
               <>
-                <p>Adapter: {deviceInfo.displayName}</p>
+                {deviceInfo.description !== '' ? (
+                  <p>Name: {deviceInfo.description}</p>
+                ) : undefined}
+                <p>Vendor: {deviceInfo.vendor}</p>
+                <p>Architecture: {deviceInfo.architecture}</p>
                 <p>Max Buffer Size: {formatBytes(deviceInfo.maxBufferSize)}</p>
+                {deviceInfo.totalHeap !== undefined && (
+                  <p>Total VRAM: {formatBytes(deviceInfo.totalHeap)}</p>
+                )}
               </>
             )}
           </Show>

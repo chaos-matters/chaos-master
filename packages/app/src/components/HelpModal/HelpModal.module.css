@@ -73,3 +73,29 @@
   color: var(--neutral-500);
   padding-inline-start: var(--space-3);
 }
+
+.github-link {
+  --color: var(--neutral-700);
+  --color-hover: black;
+
+  [data-theme='dark'] & {
+    --color: var(--neutral-400);
+    --color-hover: white;
+  }
+}
+
+.github-link {
+  display: flex;
+  gap: var(--space-2);
+  color: var(--color);
+
+  &:hover {
+    color: var(--color-hover);
+  }
+
+  & > svg {
+    display: inline;
+    width: 1.5rem;
+    fill: currentColor;
+  }
+}
