@@ -16,7 +16,9 @@ import type {
 } from './variations'
 
 type TransformId = string & { __brand: 'TransformId' }
+type VariationId = string & { __brand: 'VariationId' }
 export type TransformRecord = Record<TransformId, TransformFunction>
+export type VariationRecord = Record<VariationId, TransformVariationDescriptor>
 
 export type RenderSettings = {
   exposure: number
@@ -30,7 +32,7 @@ export type TransformFunction = {
   preAffine: AffineParams
   postAffine: AffineParams
   color: { x: number; y: number }
-  variations: Record<TransformId, TransformVariationDescriptor>
+  variations: VariationRecord
 }
 
 export type FlameDescriptor = {
@@ -60,7 +62,7 @@ function variationUniforms(name: TransformVariation) {
   return VariantUniformsBase
 }
 
-function variationInvocation(name: TransformVariation, vid: TransformId) {
+function variationInvocation(name: TransformVariation, vid: VariationId) {
   switch (transformVariations[name].type) {
     case 'simple':
       return `${name}(pre, VariationInfo(uniforms.variation${vid}.weight, uniforms.preAffine))`
@@ -71,6 +73,10 @@ function variationInvocation(name: TransformVariation, vid: TransformId) {
 
 export function generateTransformId(): TransformId {
   return window.crypto.randomUUID().replaceAll('-', '_') as TransformId
+}
+
+export function generateVariationId(): VariationId {
+  return window.crypto.randomUUID().replaceAll('-', '_') as VariationId
 }
 
 export function createFlameWgsl({
@@ -115,7 +121,9 @@ export function createFlameWgsl({
   }
 }
 
-export function extractFlameUniforms(transforms: TransformRecord) {
+export function extractFlameUniforms({
+  transforms,
+}: Pick<FlameDescriptor, 'transforms'>) {
   const totalProbability = sum(
     Object.values(transforms).map((tr) => tr.probability),
   )

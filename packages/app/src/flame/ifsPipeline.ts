@@ -7,7 +7,7 @@ import { createFlameWgsl, extractFlameUniforms } from './transformFunction'
 import { AffineParams, Point, transformAffine } from './variations/types'
 import type { StorageFlag, TgpuBuffer, TgpuRoot, UniformFlag } from 'typegpu'
 import type { Vec4u, WgslArray, WgslStruct } from 'typegpu/data'
-import type { TransformRecord } from './transformFunction'
+import type { FlameDescriptor, TransformRecord } from './transformFunction'
 
 const { ceil } = Math
 const IFS_GROUP_SIZE = 16
@@ -138,8 +138,8 @@ export function createIFSPipeline(
         1,
       )
     },
-    update: (tr: TransformRecord) => {
-      flameUniformsBuffer.write(extractFlameUniforms(tr))
+    update: (flameDescriptor: FlameDescriptor) => {
+      flameUniformsBuffer.write(extractFlameUniforms(flameDescriptor))
     },
   }
 }
