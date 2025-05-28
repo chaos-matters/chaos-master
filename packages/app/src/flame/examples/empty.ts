@@ -1,3 +1,4 @@
+import { tid, vid } from './util'
 import type { FlameDescriptor } from '../transformFunction'
 
 export const empty: FlameDescriptor = {
@@ -8,13 +9,16 @@ export const empty: FlameDescriptor = {
     backgroundColor: [0, 0, 0],
   },
   transforms: {
-    d2523f69_dd2d_49cb_b14f_d9448e0bfb31: {
+    [tid('d2523f69_dd2d_49cb_b14f_d9448e0bfb31')]: {
       probability: 1,
       preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
       postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
       color: { x: 0, y: 0 },
       variations: {
-        bc571c35_0b03_4865_a765_d00cd71031a6: { type: 'linear', weight: 1 },
+        [vid('bc571c35_0b03_4865_a765_d00cd71031a6')]: {
+          type: 'linear',
+          weight: 1,
+        },
       },
     },
   },

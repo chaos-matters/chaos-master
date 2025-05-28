@@ -1,3 +1,4 @@
+import { tid, vid } from './util'
 import type { FlameDescriptor } from '../transformFunction'
 
 export const example5: FlameDescriptor = {
@@ -8,7 +9,7 @@ export const example5: FlameDescriptor = {
     backgroundColor: [0, 0, 0],
   },
   transforms: {
-    bec1f24c_4484_4d8e_b806_bc70b85dcc50: {
+    [tid('bec1f24c_4484_4d8e_b806_bc70b85dcc50')]: {
       probability: 1,
       preAffine: {
         c: -0.23227298567827398,
@@ -21,10 +22,13 @@ export const example5: FlameDescriptor = {
       postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
       color: { x: -0.192324205046832, y: -0.06138839974585364 },
       variations: {
-        '97de1881_f3e5_4aef_a024_9f743da0c15b': { type: 'linear', weight: 1 },
+        [vid('97de1881_f3e5_4aef_a024_9f743da0c15b')]: {
+          type: 'linear',
+          weight: 1,
+        },
       },
     },
-    '7ce78372_ac3f_4789_b788_216398e9eaf2': {
+    [tid('7ce78372_ac3f_4789_b788_216398e9eaf2')]: {
       probability: 1,
       color: { x: 0.20365052173511372, y: -0.007286952126410687 },
       preAffine: {
@@ -37,10 +41,13 @@ export const example5: FlameDescriptor = {
       },
       postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
       variations: {
-        b1d6773c_8abe_4ddb_8f0b_f5cd8262ab7d: { type: 'linear', weight: 1 },
+        [vid('b1d6773c_8abe_4ddb_8f0b_f5cd8262ab7d')]: {
+          type: 'linear',
+          weight: 1,
+        },
       },
     },
-    f9b419f1_17ab_45c5_bad1_5484dd7ceb7b: {
+    [tid('f9b419f1_17ab_45c5_bad1_5484dd7ceb7b')]: {
       probability: 1,
       color: { x: -0.16144200626959246, y: 0.06739811912225704 },
       preAffine: {
@@ -53,10 +60,13 @@ export const example5: FlameDescriptor = {
       },
       postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
       variations: {
-        '085aed69_bbef_4113_95e5_002f5b536de7': { type: 'linear', weight: 1 },
+        [vid('085aed69_bbef_4113_95e5_002f5b536de7')]: {
+          type: 'linear',
+          weight: 1,
+        },
       },
     },
-    e9c75ab0_3c5d_40cd_8e47_21acbaca2bf3: {
+    [tid('e9c75ab0_3c5d_40cd_8e47_21acbaca2bf3')]: {
       probability: 0.956,
       color: { x: 0.051724137931034475, y: -0.12539184952978055 },
       preAffine: {
@@ -69,7 +79,7 @@ export const example5: FlameDescriptor = {
       },
       postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
       variations: {
-        a52476d5_bca8_4f54_8a1c_d1856f5e8cdb: {
+        [vid('a52476d5_bca8_4f54_8a1c_d1856f5e8cdb')]: {
           type: 'juliaN',
           params: { power: 8, dist: 6.82 },
           weight: 0.706,
