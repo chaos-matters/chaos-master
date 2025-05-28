@@ -12,8 +12,12 @@ export function ColorPicker(props: ColorPickerProps) {
   return (
     <input
       class={`${ui.colorPicker} ${props.class ?? ''}`}
+      classList={{
+        [props.class ?? '']: true,
+        [ui.transparent]: props.value === undefined,
+      }}
       type="color"
-      value={props.value ? rgbNormToHex(props.value) : 'transparent'}
+      value={props.value ? rgbNormToHex(props.value) : undefined}
       onInput={(ev) => {
         props.setValue(hexToRgbNorm(ev.target.value))
       }}

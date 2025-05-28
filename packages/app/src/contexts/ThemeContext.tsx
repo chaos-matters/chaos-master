@@ -1,6 +1,6 @@
-import { createContext, createEffect } from 'solid-js'
+import { createContext, createEffect, createSignal } from 'solid-js'
 import { useContextSafe } from '@/utils/useContextSafe'
-import type { Accessor, ContextProviderComponent } from 'solid-js'
+import type { Accessor, ParentProps } from 'solid-js'
 
 export type Theme = 'light' | 'dark'
 
@@ -10,14 +10,16 @@ function applyThemeToBody(theme: Accessor<Theme>) {
   })
 }
 
-const ThemeContext = createContext<Accessor<Theme>>()
+const ThemeContext = createContext<{
+  theme: Accessor<Theme>
+  setTheme: (value: Theme) => void
+}>()
 
-export const ThemeContextProvider: ContextProviderComponent<Theme> = (
-  props,
-) => {
-  applyThemeToBody(() => props.value)
+export function ThemeContextProvider(props: ParentProps) {
+  const [theme, setTheme] = createSignal<Theme>('dark')
+  applyThemeToBody(theme)
   return (
-    <ThemeContext.Provider value={() => props.value}>
+    <ThemeContext.Provider value={{ theme, setTheme }}>
       {props.children}
     </ThemeContext.Provider>
   )

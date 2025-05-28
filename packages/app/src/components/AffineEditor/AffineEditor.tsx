@@ -52,7 +52,7 @@ function vec2Normalize(a: v2f) {
 }
 
 function Grid() {
-  const theme = useTheme()
+  const { theme } = useTheme()
   const camera = useCamera()
   const { device, root } = useRootContext()
   const { context, canvasFormat } = useCanvas()
@@ -190,7 +190,7 @@ function AffineHandle(props: {
   color: v2f
   setTransform: (pos: AffineParams) => void
 }) {
-  const theme = useTheme()
+  const { theme } = useTheme()
   const { canvas, canvasSize } = useCanvas()
   const {
     js: { worldToClip, clipToWorld },

@@ -1,4 +1,4 @@
-.title {
+.bar {
   display: flex;
   justify-content: space-between;
   color: var(--neutral-950);
@@ -6,6 +6,12 @@
   [data-theme='dark'] & {
     color: var(--neutral-300);
   }
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
 }
 
 .close-button {

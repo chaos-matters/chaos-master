@@ -23,8 +23,8 @@ export function ModalTitleBar(props: ParentProps<ModalTitleBarProps>) {
     },
   })
   return (
-    <h1 class={ui.title}>
-      <span>{props.children}</span>
+    <h1 class={ui.bar}>
+      <span class={ui.title}>{props.children}</span>
       <Show when={props.onClose} keyed>
         {(onClose) => (
           <Button
