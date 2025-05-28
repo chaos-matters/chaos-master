@@ -1,4 +1,5 @@
 import {
+  createEffect,
   createMemo,
   createResource,
   createSignal,
@@ -92,6 +93,7 @@ type AppProps = {
 }
 
 function App(props: AppProps) {
+  const { theme, setTheme } = useTheme()
   const [pixelRatio, setPixelRatio] = createSignal(DEFAULT_RESOLUTION)
   const [pointCount, setPointCount] = createSignal(DEFAULT_POINT_COUNT)
   const [renderInterval, setRenderInterval] = createSignal(
@@ -171,306 +173,298 @@ function App(props: AppProps) {
     })
   }
 
+  createEffect(() => {
+    setTheme(
+      flameDescriptor.renderSettings.drawMode === 'light' ? 'dark' : 'light',
+    )
+  })
+
   return (
-    <ThemeContextProvider
-      value={
-        flameDescriptor.renderSettings.drawMode === 'paint' ? 'light' : 'dark'
-      }
-    >
-      <ChangeHistoryContextProvider value={history}>
-        <div class={ui.layout}>
-          <Root adapterOptions={{ powerPreference: 'high-performance' }}>
-            <div
-              class={ui.canvasContainer}
-              classList={{ [ui.fullscreen]: !showSidebar() }}
-            >
-              <AutoCanvas class={ui.canvas} pixelRatio={pixelRatio()}>
-                <WheelZoomCamera2D zoom={[zoom, setZoom]}>
-                  <Flam3
-                    pointCount={pointCount()}
-                    adaptiveFilterEnabled={adaptiveFilterEnabled()}
-                    flameDescriptor={flameDescriptor}
-                    renderInterval={finalRenderInterval()}
-                    onExportImage={onExportImage()}
-                    edgeFadeColor={
-                      showSidebar() ? EDGE_FADE_COLOR[useTheme()()] : vec4f(0)
+    <ChangeHistoryContextProvider value={history}>
+      <div class={ui.layout}>
+        <Root adapterOptions={{ powerPreference: 'high-performance' }}>
+          <div
+            class={ui.canvasContainer}
+            classList={{ [ui.fullscreen]: !showSidebar() }}
+          >
+            <AutoCanvas class={ui.canvas} pixelRatio={pixelRatio()}>
+              <WheelZoomCamera2D zoom={[zoom, setZoom]}>
+                <Flam3
+                  pointCount={pointCount()}
+                  adaptiveFilterEnabled={adaptiveFilterEnabled()}
+                  flameDescriptor={flameDescriptor}
+                  renderInterval={finalRenderInterval()}
+                  onExportImage={onExportImage()}
+                  edgeFadeColor={
+                    showSidebar() ? EDGE_FADE_COLOR[theme()] : vec4f(0)
+                  }
+                />
+              </WheelZoomCamera2D>
+            </AutoCanvas>
+          </div>
+        </Root>
+        <ViewControls
+          zoom={zoom()}
+          setZoom={setZoom}
+          pixelRatio={pixelRatio()}
+          setPixelRatio={setPixelRatio}
+        />
+        <Show when={showSidebar()}>
+          <div class={ui.sidebar}>
+            <AffineEditor
+              transforms={flameDescriptor.transforms}
+              setTransforms={(setFn) => {
+                setFlameDescriptor((draft) => {
+                  setFn(draft.transforms)
+                })
+              }}
+            />
+            <FlameColorEditor
+              transforms={flameDescriptor.transforms}
+              setTransforms={(setFn) => {
+                setFlameDescriptor((draft) => {
+                  setFn(draft.transforms)
+                })
+              }}
+            />
+            <For each={recordEntries(flameDescriptor.transforms)}>
+              {([tid, transform]) => (
+                <Card>
+                  <button
+                    class={ui.deleteFlameButton}
+                    onClick={() => {
+                      setFlameDescriptor((draft) => {
+                        delete draft.transforms[tid]
+                      })
+                    }}
+                  >
+                    <Cross />
+                  </button>
+                  <Slider
+                    label="Probability"
+                    value={transform.probability}
+                    min={0}
+                    max={1}
+                    step={0.001}
+                    onInput={(probability) => {
+                      setFlameDescriptor((draft) => {
+                        draft.transforms[tid]!.probability = probability
+                      })
+                    }}
+                    formatValue={(value) =>
+                      formatPercent(value / totalProbability())
                     }
                   />
-                </WheelZoomCamera2D>
-              </AutoCanvas>
-            </div>
-          </Root>
-          <ViewControls
-            zoom={zoom()}
-            setZoom={setZoom}
-            pixelRatio={pixelRatio()}
-            setPixelRatio={setPixelRatio}
-          />
-          <Show when={showSidebar()}>
-            <div class={ui.sidebar}>
-              <AffineEditor
-                transforms={flameDescriptor.transforms}
-                setTransforms={(setFn) => {
+                  <For each={recordEntries(transform.variations)}>
+                    {([vid, variation]) => (
+                      <>
+                        <select
+                          class={ui.select}
+                          value={variation.type}
+                          onInput={(ev) => {
+                            const type = ev.target.value
+                            if (!isVariationType(type)) {
+                              return
+                            }
+                            setFlameDescriptor((draft) => {
+                              draft.transforms[tid]!.variations[vid] =
+                                getVariationDefault(type, variation.weight)
+                            })
+                          }}
+                        >
+                          {variationTypes.map((varName) => (
+                            <option value={varName}>{varName}</option>
+                          ))}
+                        </select>
+                        <Slider
+                          value={variation.weight}
+                          min={0}
+                          max={1}
+                          step={0.001}
+                          onInput={(weight) => {
+                            setFlameDescriptor((draft) => {
+                              draft.transforms[tid]!.variations[vid]!.weight =
+                                weight
+                            })
+                          }}
+                          formatValue={formatPercent}
+                        />
+                        <Show
+                          when={isParametricType(variation) && variation}
+                          keyed
+                        >
+                          {(variation) => (
+                            <Dynamic
+                              {...getParamsEditor(variation)}
+                              setValue={(value) => {
+                                setFlameDescriptor((draft) => {
+                                  const variationDraft =
+                                    draft.transforms[tid]?.variations[vid]
+                                  if (
+                                    variationDraft === undefined ||
+                                    !isParametricType(variationDraft)
+                                  ) {
+                                    throw new Error(`Unreachable code`)
+                                  }
+                                  variationDraft.params = value
+                                })
+                              }}
+                            />
+                          )}
+                        </Show>
+                      </>
+                    )}
+                  </For>
+                </Card>
+              )}
+            </For>
+            <Card class={ui.buttonCard}>
+              <button
+                class={ui.addFlameButton}
+                onClick={() => {
                   setFlameDescriptor((draft) => {
-                    setFn(draft.transforms)
+                    draft.transforms[generateTransformId()] = structuredClone(
+                      newDefaultTransform(),
+                    )
                   })
                 }}
-              />
-              <FlameColorEditor
-                transforms={flameDescriptor.transforms}
-                setTransforms={(setFn) => {
+              >
+                <Plus />
+              </button>
+            </Card>
+            <Card>
+              <Slider
+                label="Exposure"
+                value={flameDescriptor.renderSettings.exposure}
+                min={-4}
+                max={4}
+                step={0.001}
+                onInput={(newExp) => {
                   setFlameDescriptor((draft) => {
-                    setFn(draft.transforms)
+                    draft.renderSettings.exposure = newExp
                   })
                 }}
+                formatValue={(value) => value.toString()}
               />
-              <For each={recordEntries(flameDescriptor.transforms)}>
-                {([tid, transform]) => (
-                  <Card>
-                    <button
-                      class={ui.deleteFlameButton}
-                      onClick={() => {
-                        setFlameDescriptor((draft) => {
-                          delete draft.transforms[tid]
-                        })
-                      }}
-                    >
-                      <Cross />
-                    </button>
-                    <Slider
-                      label="Probability"
-                      value={transform.probability}
-                      min={0}
-                      max={1}
-                      step={0.001}
-                      onInput={(probability) => {
-                        setFlameDescriptor((draft) => {
-                          draft.transforms[tid]!.probability = probability
-                        })
-                      }}
-                      formatValue={(value) =>
-                        formatPercent(value / totalProbability())
-                      }
-                    />
-                    <For each={recordEntries(transform.variations)}>
-                      {([vid, variation]) => (
-                        <>
-                          <select
-                            class={ui.select}
-                            value={variation.type}
-                            onInput={(ev) => {
-                              const type = ev.target.value
-                              if (!isVariationType(type)) {
-                                return
-                              }
-                              setFlameDescriptor((draft) => {
-                                draft.transforms[tid]!.variations[vid] =
-                                  getVariationDefault(type, variation.weight)
-                              })
-                            }}
-                          >
-                            {variationTypes.map((varName) => (
-                              <option value={varName}>{varName}</option>
-                            ))}
-                          </select>
-                          <Slider
-                            value={variation.weight}
-                            min={0}
-                            max={1}
-                            step={0.001}
-                            onInput={(weight) => {
-                              setFlameDescriptor((draft) => {
-                                draft.transforms[tid]!.variations[vid]!.weight =
-                                  weight
-                              })
-                            }}
-                            formatValue={formatPercent}
-                          />
-                          <Show
-                            when={isParametricType(variation) && variation}
-                            keyed
-                          >
-                            {(variation) => (
-                              <Dynamic
-                                {...getParamsEditor(variation)}
-                                setValue={(value) => {
-                                  setFlameDescriptor((draft) => {
-                                    const variationDraft =
-                                      draft.transforms[tid]?.variations[vid]
-                                    if (
-                                      variationDraft === undefined ||
-                                      !isParametricType(variationDraft)
-                                    ) {
-                                      throw new Error(`Unreachable code`)
-                                    }
-                                    variationDraft.params = value
-                                  })
-                                }}
-                              />
-                            )}
-                          </Show>
-                        </>
-                      )}
-                    </For>
-                  </Card>
-                )}
-              </For>
+              <Slider
+                label="Skip Iterations"
+                value={flameDescriptor.renderSettings.skipIters}
+                min={0}
+                max={MAX_INNER_ITERS}
+                step={1}
+                onInput={(newSkipIters) => {
+                  setFlameDescriptor((draft) => {
+                    draft.renderSettings.skipIters = newSkipIters
+                  })
+                }}
+                formatValue={(value) => value.toString()}
+              />
+              <label class={ui.labeledInput}>
+                Adaptive filter
+                <Checkbox
+                  checked={adaptiveFilterEnabled()}
+                  onChange={(checked) => setAdaptiveFilterEnabled(checked)}
+                />
+                <span></span>
+              </label>
+              <label class={ui.labeledInput}>
+                Draw Mode
+                <select
+                  class={ui.select}
+                  value={flameDescriptor.renderSettings.drawMode}
+                  onChange={(ev) => {
+                    setFlameDescriptor((draft) => {
+                      draft.renderSettings.drawMode = ev.currentTarget
+                        .value as DrawMode
+                    })
+                  }}
+                >
+                  <For each={recordKeys(drawModeToImplFn)}>
+                    {(drawMode) => <option value={drawMode}>{drawMode}</option>}
+                  </For>
+                </select>
+                <span></span>
+              </label>
+              <label class={ui.labeledInput}>
+                Background Color
+                <ColorPicker
+                  value={
+                    flameDescriptor.renderSettings.backgroundColor
+                      ? vec3f(...flameDescriptor.renderSettings.backgroundColor)
+                      : undefined
+                  }
+                  setValue={(newBgColor) => {
+                    setFlameDescriptor((draft) => {
+                      draft.renderSettings.backgroundColor = newBgColor
+                    })
+                  }}
+                />
+              </label>
+              <Show
+                when={
+                  flameDescriptor.renderSettings.backgroundColor !== undefined
+                }
+                fallback={<span />}
+              >
+                <Button
+                  onClick={() => {
+                    setFlameDescriptor((draft) => {
+                      delete draft.renderSettings.backgroundColor
+                    })
+                  }}
+                >
+                  Auto
+                </Button>
+              </Show>
+              <Slider
+                label="Point Count"
+                value={pointCount()}
+                min={1e3}
+                max={MAX_POINT_COUNT}
+                step={1e4}
+                onInput={setPointCount}
+                formatValue={(value) => `${(value / 1000).toFixed(0)} K`}
+              />
+              <Slider
+                label="Render Interval"
+                value={renderInterval()}
+                min={1}
+                max={5000}
+                step={1}
+                onInput={setRenderInterval}
+                formatValue={(value) =>
+                  value < 1000
+                    ? `${value.toFixed(0)} ms`
+                    : `${(value / 1000).toFixed(1)} s`
+                }
+              />
+            </Card>
+            <div class={ui.actionButtons}>
+              <Card class={ui.buttonCard}>
+                <button class={ui.addFlameButton} onClick={showLoadFlameModal}>
+                  Load Flame
+                </button>
+              </Card>
               <Card class={ui.buttonCard}>
                 <button
                   class={ui.addFlameButton}
                   onClick={() => {
-                    setFlameDescriptor((draft) => {
-                      draft.transforms[generateTransformId()] = structuredClone(
-                        newDefaultTransform(),
-                      )
-                    })
+                    setOnExportImage(() => exportCanvasImage)
                   }}
                 >
-                  <Plus />
+                  Export PNG
                 </button>
               </Card>
-              <Card>
-                <Slider
-                  label="Exposure"
-                  value={flameDescriptor.renderSettings.exposure}
-                  min={-4}
-                  max={4}
-                  step={0.001}
-                  onInput={(newExp) => {
-                    setFlameDescriptor((draft) => {
-                      draft.renderSettings.exposure = newExp
-                    })
-                  }}
-                  formatValue={(value) => value.toString()}
-                />
-                <Slider
-                  label="Skip Iterations"
-                  value={flameDescriptor.renderSettings.skipIters}
-                  min={0}
-                  max={MAX_INNER_ITERS}
-                  step={1}
-                  onInput={(newSkipIters) => {
-                    setFlameDescriptor((draft) => {
-                      draft.renderSettings.skipIters = newSkipIters
-                    })
-                  }}
-                  formatValue={(value) => value.toString()}
-                />
-                <label class={ui.labeledInput}>
-                  Adaptive filter
-                  <Checkbox
-                    checked={adaptiveFilterEnabled()}
-                    onChange={(checked) => setAdaptiveFilterEnabled(checked)}
-                  />
-                  <span></span>
-                </label>
-                <label class={ui.labeledInput}>
-                  Draw Mode
-                  <select
-                    class={ui.select}
-                    value={flameDescriptor.renderSettings.drawMode}
-                    onChange={(ev) => {
-                      setFlameDescriptor((draft) => {
-                        draft.renderSettings.drawMode = ev.currentTarget
-                          .value as DrawMode
-                      })
-                    }}
-                  >
-                    <For each={recordKeys(drawModeToImplFn)}>
-                      {(drawMode) => (
-                        <option value={drawMode}>{drawMode}</option>
-                      )}
-                    </For>
-                  </select>
-                  <span></span>
-                </label>
-                <label class={ui.labeledInput}>
-                  Background Color
-                  <ColorPicker
-                    value={vec3f(
-                      ...(flameDescriptor.renderSettings.backgroundColor ?? [
-                        0, 0, 0,
-                      ]),
-                    )}
-                    setValue={(newBgColor) => {
-                      setFlameDescriptor((draft) => {
-                        draft.renderSettings.backgroundColor = newBgColor
-                      })
-                    }}
-                  />
-                </label>
-                <Show
-                  when={
-                    flameDescriptor.renderSettings.backgroundColor !== undefined
-                  }
-                  fallback={<span />}
-                >
-                  <Button
-                    onClick={() => {
-                      setFlameDescriptor((draft) => {
-                        delete draft.renderSettings.backgroundColor
-                      })
-                    }}
-                  >
-                    Auto
-                  </Button>
-                </Show>
-                <Slider
-                  label="Point Count"
-                  value={pointCount()}
-                  min={1e3}
-                  max={MAX_POINT_COUNT}
-                  step={1e4}
-                  onInput={setPointCount}
-                  formatValue={(value) => `${(value / 1000).toFixed(0)} K`}
-                />
-                <Slider
-                  label="Render Interval"
-                  value={renderInterval()}
-                  min={1}
-                  max={5000}
-                  step={1}
-                  onInput={setRenderInterval}
-                  formatValue={(value) =>
-                    value < 1000
-                      ? `${value.toFixed(0)} ms`
-                      : `${(value / 1000).toFixed(1)} s`
-                  }
-                />
+              <Card class={ui.buttonCard}>
+                <button class={ui.addFlameButton} onClick={showShareLinkModal}>
+                  Share Link
+                </button>
               </Card>
-              <div class={ui.actionButtons}>
-                <Card class={ui.buttonCard}>
-                  <button
-                    class={ui.addFlameButton}
-                    onClick={showLoadFlameModal}
-                  >
-                    Load Flame
-                  </button>
-                </Card>
-                <Card class={ui.buttonCard}>
-                  <button
-                    class={ui.addFlameButton}
-                    onClick={() => {
-                      setOnExportImage(() => exportCanvasImage)
-                    }}
-                  >
-                    Export PNG
-                  </button>
-                </Card>
-                <Card class={ui.buttonCard}>
-                  <button
-                    class={ui.addFlameButton}
-                    onClick={showShareLinkModal}
-                  >
-                    Share Link
-                  </button>
-                </Card>
-              </div>
             </div>
-          </Show>
-        </div>
-      </ChangeHistoryContextProvider>
-    </ThemeContextProvider>
+          </div>
+        </Show>
+      </div>
+    </ChangeHistoryContextProvider>
   )
 }
 
@@ -488,12 +482,14 @@ export function Wrappers() {
     return undefined
   })
   return (
-    <Modal>
-      <Suspense>
-        <Show when={flameFromQuery.state === 'ready'}>
-          <App flameFromQuery={flameFromQuery()} />
-        </Show>
-      </Suspense>
-    </Modal>
+    <ThemeContextProvider>
+      <Modal>
+        <Suspense>
+          <Show when={flameFromQuery.state === 'ready'}>
+            <App flameFromQuery={flameFromQuery()} />
+          </Show>
+        </Suspense>
+      </Modal>
+    </ThemeContextProvider>
   )
 }

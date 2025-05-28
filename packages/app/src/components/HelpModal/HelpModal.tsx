@@ -95,15 +95,18 @@ function HelpModal(props: HelpModalProps) {
           props.respond()
         }}
       >
-        Chaos Master v{VERSION} <sup>alpha</sup>
+        <a
+          class={ui.githubLink}
+          href="https://github.com/chaos-matters/chaos-master"
+          target="_blank"
+        >
+          <GitHub />
+        </a>{' '}
+        <span>
+          Chaos Master v{VERSION} <sup>alpha</sup>{' '}
+        </span>
       </ModalTitleBar>
-      <a
-        class={ui.githubLink}
-        href="https://github.com/chaos-matters/chaos-master"
-        target="_blank"
-      >
-        <GitHub /> View source
-      </a>
+
       <h2 class={ui.sectionTitle}>Keyboard Shortcuts</h2>
       <div class={ui.shortcutsGrid}>
         <For each={shortcuts}>

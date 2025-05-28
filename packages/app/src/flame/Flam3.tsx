@@ -1,7 +1,6 @@
 import { createEffect, createMemo, onCleanup } from 'solid-js'
 import { arrayOf, vec3f, vec4f, vec4u } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
-import { useTheme } from '@/contexts/ThemeContext'
 import { randomVec4u } from '@/utils/randomVec4u'
 import { usePointer } from '@/utils/usePointer'
 import { useCamera } from '../lib/CameraContext'
@@ -45,10 +44,11 @@ export function Flam3(props: Flam3Props) {
   const { context, canvasSize, pixelRatio, canvas, canvasFormat } = useCanvas()
   const pointer = usePointer(canvas)
   const queryBuffer = root.createBuffer(vec4f, vec4f())
-  const theme = useTheme()
   const backgroundColorFinal = () => {
     if (props.flameDescriptor.renderSettings.backgroundColor === undefined) {
-      return theme() === 'light' ? vec3f(1) : vec3f(0)
+      return props.flameDescriptor.renderSettings.drawMode === 'light'
+        ? vec3f(0)
+        : vec3f(1)
     }
     return vec3f(...props.flameDescriptor.renderSettings.backgroundColor)
   }

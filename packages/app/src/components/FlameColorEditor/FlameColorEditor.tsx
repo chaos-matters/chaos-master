@@ -34,7 +34,7 @@ export function handleColor(theme: Theme, color: v2f) {
 
 function Gradient() {
   const camera = useCamera()
-  const theme = useTheme()
+  const { theme } = useTheme()
   const { device, root } = useRootContext()
   const { context, canvasFormat } = useCanvas()
 
@@ -152,7 +152,7 @@ function FlameColorHandle(props: {
   color: v2f
   setColor: (color: v2f) => void
 }) {
-  const theme = useTheme()
+  const { theme } = useTheme()
   const { canvas } = useCanvas()
   const {
     js: { worldToClip, clipToWorld },
