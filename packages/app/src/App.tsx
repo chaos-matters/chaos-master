@@ -231,7 +231,6 @@ function App(props: AppProps) {
                       class={ui.deleteFlameButton}
                       onClick={() => {
                         setFlameDescriptor((draft) => {
-                          // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
                           delete draft.transforms[tid]
                         })
                       }}

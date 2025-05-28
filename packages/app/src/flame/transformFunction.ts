@@ -15,8 +15,8 @@ import type {
   TransformVariationDescriptor,
 } from './variations'
 
-type TransformId = string & { __brand: 'TransformId' }
-type VariationId = string & { __brand: 'VariationId' }
+export type TransformId = string & { __brand: 'TransformId' }
+export type VariationId = string & { __brand: 'VariationId' }
 export type TransformRecord = Record<TransformId, TransformFunction>
 export type VariationRecord = Record<VariationId, TransformVariationDescriptor>
 
