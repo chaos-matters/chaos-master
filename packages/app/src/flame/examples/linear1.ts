@@ -5,7 +5,7 @@ export const linear1: FlameDescriptor = {
     exposure: 1,
     skipIters: 20,
     drawMode: 'light',
-    backgroundColor: { r: 0, g: 0, b: 0 },
+    backgroundColor: [0, 0, 0],
   },
   transforms: {
     '5d4334f1_2d86_4790_b1f7_0959ce03486d': {
