@@ -7,6 +7,8 @@ type RenderStats = {
     renderPointsNs: number
     blurNs: number
     colorGradingNs: number
+    histogramComputeNs: number
+    histogramRenderNs: number
   }
 }
 
@@ -16,6 +18,8 @@ export const [renderStats, setRenderStats] = createSignal<RenderStats>({
     renderPointsNs: 0,
     blurNs: 0,
     colorGradingNs: 0,
+    histogramComputeNs: 0,
+    histogramRenderNs: 0,
   },
 })
 

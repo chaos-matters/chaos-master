@@ -1,5 +1,5 @@
 import { createEffect, createMemo, onCleanup } from 'solid-js'
-import { arrayOf, vec3f, vec4f, vec4u } from 'typegpu/data'
+import { arrayOf, u32, vec3f, vec4f, vec4u } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import {
   accumulatedPointCount,
@@ -19,8 +19,13 @@ import {
   createColorGradingPipeline,
 } from './colorGrading'
 import { drawModeToImplFn } from './drawMode'
+import {
+  createHistogramPipeline,
+  HISTOGRAM_BIN_COUNT,
+} from './histogramPipeline'
 import { ComputeUniforms, createIFSPipeline } from './ifsPipeline'
 import { createInitPointsPipeline } from './initPoints'
+import { createRenderHistogramPipeline } from './renderHistogram'
 import { createRenderPointsPipeline } from './renderPoints'
 import { outputTextureFormat, Point } from './variations/types'
 import type { v4f } from 'typegpu/data'
@@ -189,6 +194,29 @@ export function Flam3(props: Flam3Props) {
 
   const renderPoints = createRenderPointsPipeline(root, camera, points)
 
+  const histogramBuffer = root
+    .createBuffer(arrayOf(u32, HISTOGRAM_BIN_COUNT))
+    .$usage('storage')
+
+  const computeHistogram = createMemo(() => {
+    const { width, height } = canvasSize()
+    const o = outputTextures()
+    if (!o) {
+      return undefined
+    }
+    const { accumulationTexture, postprocessTexture } = o
+    return createHistogramPipeline(
+      root,
+      [width, height],
+      colorGradingUniforms,
+      props.adaptiveFilterEnabled ? postprocessTexture : accumulationTexture,
+      // @ts-expect-error non-atomic not assignable to atomic
+      histogramBuffer,
+    )
+  })
+
+  const renderHistogram = createRenderHistogramPipeline(root, histogramBuffer)
+
   const runBlur = createMemo(() => {
     const o = outputTextures()
     if (!o) {
@@ -212,6 +240,11 @@ export function Flam3(props: Flam3Props) {
     'renderPoints',
     'blur',
     'colorGrading',
+  ])
+
+  const histogramTimestampQuery = createTimestampQuery(device, [
+    'histogramCompute',
+    'histogramRender',
   ])
 
   function estimateIterationCount(
@@ -390,25 +423,57 @@ export function Flam3(props: Flam3Props) {
             colorGradingPipeline_.run(pass)
             pass.end()
           }
+
+          encoder.clearBuffer(histogramBuffer.buffer)
+
+          {
+            const pass = encoder.beginComputePass({
+              timestampWrites:
+                histogramTimestampQuery.timestampWrites.histogramCompute,
+            })
+            computeHistogram()?.(pass)
+            pass.end()
+          }
+
+          {
+            const pass = encoder.beginRenderPass({
+              colorAttachments: [
+                {
+                  loadOp: 'load',
+                  storeOp: 'store',
+                  view: context.getCurrentTexture().createView(),
+                },
+              ],
+              timestampWrites:
+                histogramTimestampQuery.timestampWrites.histogramRender,
+            })
+            renderHistogram(pass, HISTOGRAM_BIN_COUNT)
+            pass.end()
+          }
         }
 
         //_readCountUnderPointer(renderAccumulationIndex)
 
         timestampQuery.write(encoder)
+        histogramTimestampQuery.write(encoder)
 
         device.queue.submit([encoder.finish()])
 
+        histogramTimestampQuery.read().catch(() => {})
         timestampQuery
           .read()
           .then(() => {
             const timing = timestampQuery.average
-            if (timing) {
+            const histogramTiming = histogramTimestampQuery.average
+            if (timing && histogramTiming) {
               setRenderStats(() => ({
                 timing: {
                   ifsNs: timing.ifs,
                   renderPointsNs: timing.renderPoints,
                   blurNs: props.adaptiveFilterEnabled ? timing.blur : 0,
                   colorGradingNs: timing.colorGrading,
+                  histogramComputeNs: histogramTiming.histogramCompute,
+                  histogramRenderNs: histogramTiming.histogramRender,
                 },
               }))
             }

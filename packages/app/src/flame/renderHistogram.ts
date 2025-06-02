@@ -47,7 +47,7 @@ export function createRenderHistogramPipeline(
       let binWidth = 1 / f32(binCount);
       let count = histogram[instance_index];
       let x = (f32(instance_index) + vertex.x) * binWidth;
-      let y = vertex.y * log2(f32(count)) / 20;
+      let y = vertex.y * log2(f32(count + 1)) / 50;
 
       return VertexOutput(
         vec4f(x * 2 - 1, y * 2 - 1, 0, 1)

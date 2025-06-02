@@ -41,6 +41,14 @@ export function DebugPanel() {
         <p>
           {formatValueForPanel(renderStats().timing.colorGradingNs)} Grading
         </p>
+        <p>
+          {formatValueForPanel(renderStats().timing.histogramComputeNs)} Hist.
+          Compute
+        </p>
+        <p>
+          {formatValueForPanel(renderStats().timing.histogramRenderNs)} Hist.
+          Render
+        </p>
       </div>
     </Show>
   )

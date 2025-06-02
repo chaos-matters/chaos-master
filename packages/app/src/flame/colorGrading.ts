@@ -1,4 +1,4 @@
-import { oklabToRgb } from '@typegpu/color'
+import { oklabGamutClip, oklabGamutClipSlot, oklabToRgb } from '@typegpu/color'
 import { tgpu } from 'typegpu'
 import { f32, struct, vec4f } from 'typegpu/data'
 import { wgsl } from '@/utils/wgsl'
@@ -42,7 +42,10 @@ export function createColorGradingPipeline(
   const renderShaderCode = wgsl/* wgsl */ `
     ${{
       ...bindGroupLayout.bound,
-      oklabToRgb,
+      oklabToRgb: oklabToRgb.with(
+        oklabGamutClipSlot,
+        oklabGamutClip.preserveChroma,
+      ),
       drawMode,
     }}
 

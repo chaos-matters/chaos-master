@@ -4,9 +4,9 @@ import { wgsl } from '@/utils/wgsl'
 import { ColorGradingUniforms } from './colorGrading'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 
-export const HISTOGRAM_BIN_COUNT = 1024
-const GROUP_SIZE_X = 8
-const GROUP_SIZE_Y = 4
+export const HISTOGRAM_BIN_COUNT = 256
+const GROUP_SIZE_X = 32
+const GROUP_SIZE_Y = 1
 
 const { ceil } = Math
 
@@ -59,7 +59,7 @@ export function createHistogramPipeline(
       let count = centralTexel.a;
       let adjustedCount = count * uniforms.averagePointCountPerBucketInv;
       let binCount = arrayLength(&histogram);
-      let bin = clamp(u32(adjustedCount * 2000), 0, binCount);
+      let bin = clamp(u32(adjustedCount * 200), 0, binCount);
       atomicAdd(&histogram[bin], 1u);
     }
   `
