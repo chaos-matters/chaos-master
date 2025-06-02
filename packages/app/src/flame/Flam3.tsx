@@ -1,5 +1,5 @@
 import { createEffect, createMemo, onCleanup } from 'solid-js'
-import { arrayOf, vec3f, vec4f, vec4u } from 'typegpu/data'
+import { arrayOf, u32, vec3f, vec4f, vec4u } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { randomVec4u } from '@/utils/randomVec4u'
 import { usePointer } from '@/utils/usePointer'
@@ -13,8 +13,13 @@ import {
   createColorGradingPipeline,
 } from './colorGrading'
 import { drawModeToImplFn } from './drawMode'
+import {
+  createHistogramPipeline,
+  HISTOGRAM_BIN_COUNT,
+} from './histogramPipeline'
 import { ComputeUniforms, createIFSPipeline } from './ifsPipeline'
 import { createInitPointsPipeline } from './initPoints'
+import { createRenderHistogramPipeline } from './renderHistogram'
 import { createRenderPointsPipeline } from './renderPoints'
 import { outputTextureFormat, Point } from './variations/types'
 import type { v4f } from 'typegpu/data'
@@ -171,6 +176,29 @@ export function Flam3(props: Flam3Props) {
 
   const renderPoints = createRenderPointsPipeline(root, camera, points)
 
+  const histogramBuffer = root
+    .createBuffer(arrayOf(u32, HISTOGRAM_BIN_COUNT))
+    .$usage('storage')
+
+  const computeHistogram = createMemo(() => {
+    const { width, height } = canvasSize()
+    const o = outputTextures()
+    if (!o) {
+      return undefined
+    }
+    const { accumulationTexture } = o
+    return createHistogramPipeline(
+      root,
+      [width, height],
+      colorGradingUniforms,
+      accumulationTexture,
+      // @ts-expect-error non-atomic not assignable to atomic
+      histogramBuffer,
+    )
+  })
+
+  const renderHistogram = createRenderHistogramPipeline(root, histogramBuffer)
+
   const runBlur = createMemo(() => {
     const o = outputTextures()
     if (!o) {
@@ -306,7 +334,34 @@ export function Flam3(props: Flam3Props) {
           pass.end()
         }
 
+        {
+          encoder.clearBuffer(
+            histogramBuffer.buffer,
+            0,
+            HISTOGRAM_BIN_COUNT * 4,
+          )
+          const pass = encoder.beginComputePass()
+          computeHistogram()?.(pass)
+          pass.end()
+        }
+
         colorGradingPipeline_.run(encoder, context)
+
+        {
+          const pass = encoder.beginRenderPass({
+            colorAttachments: [
+              {
+                loadOp: 'load',
+                storeOp: 'store',
+                view: context.getCurrentTexture().createView(),
+              },
+            ],
+          })
+          const { width, height } = context.canvas
+          pass.setViewport(0, height / 2 - 100, width, height / 2, 0, 1)
+          renderHistogram(pass, HISTOGRAM_BIN_COUNT)
+          pass.end()
+        }
 
         // _readCountUnderPointer(count)
 

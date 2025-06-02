@@ -42,7 +42,11 @@ export function createBlurPipeline(
     @compute @workgroup_size(${GROUP_SIZE_X}, ${GROUP_SIZE_Y}, 1) fn blur(
       @builtin(global_invocation_id) global_invocation_id: vec3u
     ) {
+      let dims = vec2i(textureDimensions(accumulationTexture));
       let uv = vec2i(global_invocation_id.xy);
+      if (uv.x >= dims.x || uv.y >= dims.y) {
+        return;
+      }
       let centralTexel = textureLoad(accumulationTexture, uv, 0);
       let count = centralTexel.a;
       let stdDev = 10 + sqrt(count);
@@ -53,7 +57,11 @@ export function createBlurPipeline(
         for(var i = -HALF_SIZE; i <= HALF_SIZE; i += 1) {
           if (i == 0 && j == 0) { continue; }
           let shift = vec2i(i, j);
-          let texel = textureLoad(accumulationTexture, uv + shift, 0);
+          let pixelCoord = uv + shift;
+          if (pixelCoord.x < 0 || pixelCoord.y < 0 || pixelCoord.x >= dims.x || pixelCoord.y >= dims.y) {
+            continue;
+          }
+          let texel = textureLoad(accumulationTexture, pixelCoord, 0);
           let stdDiff = min(stdDev / (abs(texel.a - count) + 1), 1);
           let shiftDiff = smoothstep(3, 0, length(vec2f(shift)));
           let weight = stdDiff * shiftDiff;
