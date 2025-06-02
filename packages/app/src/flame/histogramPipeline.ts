@@ -2,11 +2,11 @@ import { tgpu } from 'typegpu'
 import { arrayOf, atomic, u32 } from 'typegpu/data'
 import { wgsl } from '@/utils/wgsl'
 import { ColorGradingUniforms } from './colorGrading'
+import { Bucket, BUCKET_FIXED_POINT_MULTIPLIER_INV } from './types'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 
-export const HISTOGRAM_BIN_COUNT = 1024
-const GROUP_SIZE_X = 8
-const GROUP_SIZE_Y = 4
+export const HISTOGRAM_BIN_COUNT = 256
+const GROUP_SIZE = 32
 
 const { ceil } = Math
 
@@ -14,8 +14,9 @@ const bindGroupLayout = tgpu.bindGroupLayout({
   uniforms: {
     uniform: ColorGradingUniforms,
   },
-  accumulationTexture: {
-    texture: 'unfilterable-float',
+  accumulationBuffer: {
+    storage: (length: number) => arrayOf(Bucket, length),
+    access: 'readonly',
   },
   histogram: {
     storage: (length: number) => arrayOf(atomic(u32), length),
@@ -27,8 +28,8 @@ export function createHistogramPipeline(
   root: TgpuRoot,
   textureSize: [number, number],
   uniforms: LayoutEntryToInput<(typeof bindGroupLayout)['entries']['uniforms']>,
-  accumulationTexture: LayoutEntryToInput<
-    (typeof bindGroupLayout)['entries']['accumulationTexture']
+  accumulationBuffer: LayoutEntryToInput<
+    (typeof bindGroupLayout)['entries']['accumulationBuffer']
   >,
   histogram: LayoutEntryToInput<
     (typeof bindGroupLayout)['entries']['histogram']
@@ -38,7 +39,7 @@ export function createHistogramPipeline(
 
   const bindGroup = root.createBindGroup(bindGroupLayout, {
     uniforms,
-    accumulationTexture,
+    accumulationBuffer,
     histogram,
   })
 
@@ -47,19 +48,26 @@ export function createHistogramPipeline(
       ...bindGroupLayout.bound,
     }}
 
-    @compute @workgroup_size(${GROUP_SIZE_X}, ${GROUP_SIZE_Y}, 1) fn run(
-      @builtin(global_invocation_id) global_invocation_id: vec3u
+    @compute @workgroup_size(${GROUP_SIZE}, 1, 1) fn run(
+      @builtin(num_workgroups) numWorkgroups: vec3<u32>,
+      @builtin(workgroup_id) workgroupId : vec3<u32>,
+      @builtin(local_invocation_index) localInvocationIndex: u32
     ) {
-      let dims = vec2i(textureDimensions(accumulationTexture));
-      let uv = vec2i(global_invocation_id.xy);
-      if (uv.x >= dims.x || uv.y >= dims.y) {
+      let workgroupIndex =
+        workgroupId.x +
+        workgroupId.y * numWorkgroups.x +
+        workgroupId.z * numWorkgroups.x * numWorkgroups.y;
+
+      let threadIndex = workgroupIndex * ${GROUP_SIZE} + localInvocationIndex;
+
+      if (threadIndex >= arrayLength(&accumulationBuffer)) {
         return;
       }
-      let centralTexel = textureLoad(accumulationTexture, uv, 0);
-      let count = centralTexel.a;
+      let texel = accumulationBuffer[threadIndex];
+      let count = f32(texel.count) * ${BUCKET_FIXED_POINT_MULTIPLIER_INV};
       let adjustedCount = count * uniforms.averagePointCountPerBucketInv;
       let binCount = arrayLength(&histogram);
-      let bin = clamp(u32(adjustedCount * 2000), 0, binCount);
+      let bin = clamp(u32(adjustedCount * 200), 0, binCount);
       atomicAdd(&histogram[bin], 1u);
     }
   `
@@ -82,8 +90,8 @@ export function createHistogramPipeline(
     pass.setPipeline(pipeline)
     pass.setBindGroup(0, root.unwrap(bindGroup))
     pass.dispatchWorkgroups(
-      ceil(width / GROUP_SIZE_X),
-      ceil(height / GROUP_SIZE_Y),
+      ceil((width * height) / (GROUP_SIZE * GROUP_SIZE)),
+      GROUP_SIZE,
       1,
     )
   }
