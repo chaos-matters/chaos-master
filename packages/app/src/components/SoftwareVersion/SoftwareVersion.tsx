@@ -1,6 +1,10 @@
 import { createSignal, Show } from 'solid-js'
 import { isDev } from 'solid-js/web'
-import { renderStats } from '@/flame/renderStats'
+import {
+  accumulatedPointCount,
+  qualityPointCountLimit,
+  renderStats,
+} from '@/flame/renderStats'
 import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
 import { VERSION } from '@/version'
 import { createShowHelp } from '../HelpModal/HelpModal'
@@ -25,9 +29,8 @@ export function SoftwareVersion() {
       <Show when={showDebugPanel()}>
         <div class={ui.appInfo}>
           <p>
-            {bigNumberFormatter.format(renderStats().accumulatedPointCount)} /{' '}
-            {bigNumberFormatter.format(renderStats().qualityPointCountLimit)}{' '}
-            Iters
+            {bigNumberFormatter.format(accumulatedPointCount())} /{' '}
+            {bigNumberFormatter.format(qualityPointCountLimit()?.() ?? 0)} Iters
           </p>
           <p>{(renderStats().timing.ifsNs / 1e6).toFixed(2)} ms IFS</p>
           <p>

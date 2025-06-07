@@ -28,13 +28,9 @@ export function Slider(props: SliderProps) {
     props.formatValue ? props.formatValue(value()) : value().toFixed(2)
 
   const fillPercentage = () => {
-    if (props.trackFillValue !== undefined) {
-      const newMax = (value() - min()) / (max() - min())
-      const newMaxPercent = newMax * 100
-      return Math.min(props.trackFillValue * newMaxPercent, newMaxPercent)
-    }
     const range = max() - min()
-    return ((value() - min()) / range) * 100
+    const v = props.trackFillValue ?? value()
+    return ((v - min()) / range) * 100
   }
 
   // Dragging the slider handle is handled by the browser,
