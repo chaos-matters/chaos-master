@@ -37,6 +37,10 @@ const shortcuts: ShortcutDescriptor[] = [
     keyCombinations: [{ key: 'D' }],
     description: 'Toggle draw mode',
   },
+  {
+    keyCombinations: [{ key: 'M', ctrl: true }],
+    description: 'Toggle debug panel',
+  },
 ]
 
 function isMac() {

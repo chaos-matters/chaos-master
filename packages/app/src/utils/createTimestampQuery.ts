@@ -1,6 +1,9 @@
+import { sum } from './sum'
+
 export function createTimestampQuery<T extends string>(
   device: GPUDevice,
   timestampNames: T[],
+  avgCount = 5,
 ) {
   const timestampQuerySet = device.createQuerySet({
     type: 'timestamp',
@@ -48,6 +51,8 @@ export function createTimestampQuery<T extends string>(
     }
   }
 
+  const latest: Record<T, number>[] = []
+
   async function read() {
     await timestampMappable.mapAsync(GPUMapMode.READ)
     const times = new BigInt64Array(timestampMappable.getMappedRange())
@@ -58,6 +63,10 @@ export function createTimestampQuery<T extends string>(
       ]),
     ) as Record<T, number>
     timestampMappable.unmap()
+    latest.push(results)
+    if (latest.length > avgCount) {
+      latest.shift()
+    }
     return results
   }
 
@@ -65,5 +74,17 @@ export function createTimestampQuery<T extends string>(
     timestampWrites,
     write,
     read,
+    get average(): Readonly<Record<T, number>> | undefined {
+      const count = latest.length
+      if (count < avgCount) {
+        return undefined
+      }
+      return Object.fromEntries(
+        timestampNames.map((name) => [
+          name,
+          sum(latest.map((current) => current[name])) / count,
+        ]),
+      ) as Readonly<Record<T, number>>
+    },
   }
 }

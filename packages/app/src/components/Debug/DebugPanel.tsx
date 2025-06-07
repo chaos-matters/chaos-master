@@ -22,7 +22,8 @@ export function DebugPanel() {
   useKeyboardShortcuts({
     KeyM: (ev) => {
       if (ev.metaKey || ev.ctrlKey) {
-        return setShowDebugPanel(!showDebugPanel())
+        setShowDebugPanel(!showDebugPanel())
+        return true
       }
     },
   })

@@ -27,14 +27,10 @@ import type { v4f } from 'typegpu/data'
 import type { FlameDescriptor } from './transformFunction'
 import type { ExportImageType } from '@/App'
 
-const { sqrt } = Math
+const { sqrt, floor } = Math
 
-/**
- * TODO: This factor is fine tuned to look good for the default example.
- * Consider dynamically computing the correct factor to use.
- */
-export const MAX_POINT_COUNT = 4e6
-export const MAX_INNER_ITERS = 30
+const OUTPUT_EVERY_FRAME_BATCH_INDEX = 20
+const OUTPUT_INTERVAL_BATCH_INDEX = 10
 
 type Flam3Props = {
   quality: number
@@ -121,7 +117,7 @@ export function Flam3(props: Flam3Props) {
   }
 
   const points = root
-    .createBuffer(arrayOf(Point, MAX_POINT_COUNT))
+    .createBuffer(arrayOf(Point, props.pointCountPerBatch))
     .$usage('storage')
 
   onCleanup(() => {
@@ -218,6 +214,19 @@ export function Flam3(props: Flam3Props) {
     'colorGrading',
   ])
 
+  function estimateIterationCount(
+    timings: NonNullable<typeof timestampQuery.average>,
+    shouldRenderFinalImage: boolean,
+  ) {
+    const { ifs, renderPoints, blur, colorGrading } = timings
+    const frameBudgetNs = 14e6
+    const paintTimeNs =
+      Number(shouldRenderFinalImage) *
+      (colorGrading + Number(props.adaptiveFilterEnabled) * blur)
+    const batchTimeNs = ifs + renderPoints
+    return clamp(floor((frameBudgetNs - paintTimeNs) / batchTimeNs), 1, 100)
+  }
+
   createEffect(() => {
     const o = outputTextures()
     if (!o) {
@@ -240,7 +249,9 @@ export function Flam3(props: Flam3Props) {
       props.flameDescriptor.transforms,
     )
 
+    let batchIndex = 0
     let accumulatedPointCount = 0
+    let forceDrawToScreen = false
     let clearRequested = true
     createEffect(() => {
       ifsPipeline.update(props.flameDescriptor)
@@ -249,11 +260,8 @@ export function Flam3(props: Flam3Props) {
       // want to run ifs.update if not necessary
       createEffect(() => {
         camera.update()
+        batchIndex = 0
         accumulatedPointCount = 0
-        colorGradingUniforms.writePartial({
-          averagePointCountPerBucketInv: 0,
-        })
-
         clearRequested = true
         rafLoop.redraw()
       })
@@ -266,17 +274,31 @@ export function Flam3(props: Flam3Props) {
         backgroundColor: vec4f(backgroundColorFinal(), 1),
       })
       rafLoop.redraw()
+      forceDrawToScreen = true
     })
 
     createEffect(() => {
       // redraw when these change
-      const _ = backgroundColorFinal()
       const __ = colorGradingPipeline()
       rafLoop.redraw()
+      forceDrawToScreen = true
     })
 
     const rafLoop = createAnimationFrame(
       () => {
+        /**
+         * Rendering to screen is expensive because it involves
+         * blurring and color grading. We only want to do this
+         * in the beginning while the image is still forming.
+         * Later on, we can trade off rendering to screen for
+         * convergence speed.
+         */
+        const shouldRenderFinalImage =
+          forceDrawToScreen ||
+          batchIndex < OUTPUT_EVERY_FRAME_BATCH_INDEX ||
+          batchIndex % OUTPUT_INTERVAL_BATCH_INDEX === 0 ||
+          props.onExportImage !== undefined
+
         const pointCountPerBatch = props.pointCountPerBatch
         const colorGradingPipeline_ = colorGradingPipeline()
         if (colorGradingPipeline_ === undefined) {
@@ -300,64 +322,74 @@ export function Flam3(props: Flam3Props) {
           }
           device.queue.submit([encoder.finish()])
         }
-        camera.update()
         computeUniforms.write({
           seed: randomVec4u(),
         })
-        accumulatedPointCount += pointCountPerBatch
-        colorGradingUniforms.writePartial({
-          averagePointCountPerBucketInv:
-            bucketProbabilityInv() / accumulatedPointCount,
-        })
 
-        // Encode commands to do the computation
         const encoder = device.createCommandEncoder()
 
-        {
-          const pass = encoder.beginComputePass({
-            timestampWrites: timestampQuery.timestampWrites.ifs,
-          })
-          runInitPoints(pass, pointCountPerBatch)
-          ifsPipeline.run(pass, pointCountPerBatch)
-          pass.end()
+        const timings = timestampQuery.average
+        const iterationCount = timings
+          ? estimateIterationCount(timings, shouldRenderFinalImage)
+          : 1
+
+        for (let i = 0; i < iterationCount; i++) {
+          {
+            const pass = encoder.beginComputePass({
+              timestampWrites: timestampQuery.timestampWrites.ifs,
+            })
+            runInitPoints(pass, pointCountPerBatch)
+            ifsPipeline.run(pass, pointCountPerBatch)
+            pass.end()
+          }
+
+          {
+            const pass = encoder.beginRenderPass({
+              colorAttachments: [
+                {
+                  view: outputTextureView,
+                  loadOp: 'load',
+                  storeOp: 'store',
+                },
+              ],
+              timestampWrites: timestampQuery.timestampWrites.renderPoints,
+            })
+            renderPoints(pass, pointCountPerBatch)
+            pass.end()
+          }
+
+          accumulatedPointCount += pointCountPerBatch
         }
 
-        {
-          const pass = encoder.beginRenderPass({
-            colorAttachments: [
-              {
-                view: outputTextureView,
-                loadOp: 'load',
-                storeOp: 'store',
-              },
-            ],
-            timestampWrites: timestampQuery.timestampWrites.renderPoints,
-          })
-          renderPoints(pass, pointCountPerBatch)
-          pass.end()
-        }
+        setAccumulatedPointCount(accumulatedPointCount)
 
-        if (props.adaptiveFilterEnabled) {
-          const pass = encoder.beginComputePass({
-            timestampWrites: timestampQuery.timestampWrites.blur,
+        if (shouldRenderFinalImage) {
+          colorGradingUniforms.writePartial({
+            averagePointCountPerBucketInv:
+              bucketProbabilityInv() / accumulatedPointCount,
           })
-          runBlur()?.(pass)
-          pass.end()
-        }
+          if (props.adaptiveFilterEnabled) {
+            const pass = encoder.beginComputePass({
+              timestampWrites: timestampQuery.timestampWrites.blur,
+            })
+            runBlur()?.(pass)
+            pass.end()
+          }
 
-        {
-          const pass = encoder.beginRenderPass({
-            colorAttachments: [
-              {
-                loadOp: 'clear',
-                storeOp: 'store',
-                view: context.getCurrentTexture().createView(),
-              },
-            ],
-            timestampWrites: timestampQuery.timestampWrites.colorGrading,
-          })
-          colorGradingPipeline_.run(pass)
-          pass.end()
+          {
+            const pass = encoder.beginRenderPass({
+              colorAttachments: [
+                {
+                  loadOp: 'clear',
+                  storeOp: 'store',
+                  view: context.getCurrentTexture().createView(),
+                },
+              ],
+              timestampWrites: timestampQuery.timestampWrites.colorGrading,
+            })
+            colorGradingPipeline_.run(pass)
+            pass.end()
+          }
         }
 
         //_readCountUnderPointer(renderAccumulationIndex)
@@ -366,23 +398,27 @@ export function Flam3(props: Flam3Props) {
 
         device.queue.submit([encoder.finish()])
 
-        const accumulatedPointCountCopy = accumulatedPointCount
         timestampQuery
           .read()
-          .then((timing) => {
-            setAccumulatedPointCount(accumulatedPointCountCopy)
-            setRenderStats(() => ({
-              timing: {
-                ifsNs: timing.ifs,
-                renderPointsNs: timing.renderPoints,
-                blurNs: props.adaptiveFilterEnabled ? timing.blur : 0,
-                colorGradingNs: timing.colorGrading,
-              },
-            }))
+          .then(() => {
+            const timing = timestampQuery.average
+            if (timing) {
+              setRenderStats(() => ({
+                timing: {
+                  ifsNs: timing.ifs,
+                  renderPointsNs: timing.renderPoints,
+                  blurNs: props.adaptiveFilterEnabled ? timing.blur : 0,
+                  colorGradingNs: timing.colorGrading,
+                },
+              }))
+            }
           })
           .catch(() => {})
 
         props.onExportImage?.(canvas)
+
+        batchIndex += 1
+        forceDrawToScreen = false
       },
       () =>
         continueRendering(accumulatedPointCount)

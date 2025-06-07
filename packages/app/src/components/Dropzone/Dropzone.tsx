@@ -1,6 +1,18 @@
-import { createSignal } from 'solid-js'
+import { createEffect, createSignal, onCleanup } from 'solid-js'
 import ui from './Dropzone.module.css'
 import type { ParentProps } from 'solid-js'
+
+function preventDraggingAnyElement() {
+  createEffect(() => {
+    function preventDefault(ev: Event) {
+      ev.preventDefault()
+    }
+    document.addEventListener('dragstart', preventDefault)
+    onCleanup(() => {
+      document.removeEventListener('dragstart', preventDefault)
+    })
+  })
+}
 
 type DropzoneProps = {
   class?: string
@@ -9,6 +21,8 @@ type DropzoneProps = {
 
 export function Dropzone(props: ParentProps<DropzoneProps>) {
   const [dropping, setDropping] = createSignal(false)
+
+  preventDraggingAnyElement()
 
   return (
     <div

@@ -35,7 +35,7 @@ import {
 } from './defaults'
 import { drawModeToImplFn } from './flame/drawMode'
 import { examples } from './flame/examples'
-import { Flam3, MAX_INNER_ITERS } from './flame/Flam3'
+import { Flam3 } from './flame/Flam3'
 import {
   accumulatedPointCount,
   currentQuality,
@@ -386,7 +386,7 @@ function App(props: AppProps) {
                 label="Skip Iterations"
                 value={flameDescriptor.renderSettings.skipIters}
                 min={0}
-                max={MAX_INNER_ITERS}
+                max={30}
                 step={1}
                 onInput={(newSkipIters) => {
                   setFlameDescriptor((draft) => {
