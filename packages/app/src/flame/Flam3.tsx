@@ -1,7 +1,13 @@
-import { createEffect, createMemo, createSignal, onCleanup } from 'solid-js'
+import { createEffect, createMemo, onCleanup } from 'solid-js'
 import { arrayOf, vec3f, vec4f, vec4u } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
-import { setRenderStats } from '@/flame/renderStats'
+import {
+  accumulatedPointCount,
+  setAccumulatedPointCount,
+  setCurrentQuality,
+  setQualityPointCountLimit,
+  setRenderStats,
+} from '@/flame/renderStats'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
 import { randomVec4u } from '@/utils/randomVec4u'
 import { usePointer } from '@/utils/usePointer'
@@ -22,6 +28,8 @@ import { outputTextureFormat, Point } from './variations/types'
 import type { v4f } from 'typegpu/data'
 import type { FlameDescriptor } from './transformFunction'
 import type { ExportImageType } from '@/App'
+
+const { sqrt } = Math
 
 /**
  * TODO: This factor is fine tuned to look good for the default example.
@@ -46,7 +54,6 @@ export function Flam3(props: Flam3Props) {
   const { context, canvasSize, pixelRatio, canvas, canvasFormat } = useCanvas()
   const pointer = usePointer(canvas)
   const queryBuffer = root.createBuffer(vec4f, vec4f())
-  const [maxPointsCount, setMaxPointsCount] = createSignal(0)
 
   const backgroundColorFinal = () => {
     if (props.flameDescriptor.renderSettings.backgroundColor === undefined) {
@@ -62,10 +69,16 @@ export function Flam3(props: Flam3Props) {
     const unitSquareArea = (height ** 2 * camera.zoom() ** 2) / 4
     return unitSquareArea
   }
+
   const qualityPointCountLimit = () => {
     const q = props.quality
     return bucketProbabilityInv() / (q ** 2 - 2 * q + 1)
   }
+
+  setCurrentQuality(
+    () => () => 1 - sqrt(bucketProbabilityInv() / accumulatedPointCount()),
+  )
+  setQualityPointCountLimit(() => qualityPointCountLimit)
 
   function _readCountUnderPointer(frameIndex: number) {
     const o = outputTextures()
@@ -106,14 +119,6 @@ export function Flam3(props: Flam3Props) {
         .catch(() => {})
     }
   }
-
-  createEffect(() => {
-    setMaxPointsCount(qualityPointCountLimit())
-    setRenderStats((prev) => ({
-      ...prev,
-      qualityPointCountLimit: maxPointsCount(),
-    }))
-  })
 
   const points = root
     .createBuffer(arrayOf(Point, MAX_POINT_COUNT))
@@ -360,9 +365,8 @@ export function Flam3(props: Flam3Props) {
         timestampQuery
           .read()
           .then((timing) => {
-            setRenderStats((prev) => ({
-              ...prev,
-              accumulatedPointCount: accumulatedPointCount,
+            setAccumulatedPointCount(accumulatedPointCount)
+            setRenderStats(() => ({
               timing: {
                 ifsNs: timing.ifs,
                 renderPointsNs: timing.renderPoints,
