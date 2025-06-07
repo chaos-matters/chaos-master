@@ -15,6 +15,7 @@ type SliderProps = {
   formatValue?: (value: number) => string
   trackFill?: boolean
   trackFillValue?: number
+  animateFill?: boolean
 }
 
 export function Slider(props: SliderProps) {
@@ -28,13 +29,9 @@ export function Slider(props: SliderProps) {
     props.formatValue ? props.formatValue(value()) : value().toFixed(2)
 
   const fillPercentage = () => {
-    if (props.trackFillValue !== undefined) {
-      const newMax = (value() - min()) / (max() - min())
-      const newMaxPercent = newMax * 100
-      return Math.min(props.trackFillValue * newMaxPercent, newMaxPercent)
-    }
     const range = max() - min()
-    return ((value() - min()) / range) * 100
+    const v = props.trackFillValue ?? value()
+    return ((v - min()) / range) * 100
   }
 
   // Dragging the slider handle is handled by the browser,
@@ -52,7 +49,12 @@ export function Slider(props: SliderProps) {
   )
 
   return (
-    <label class={ui.label} classList={{ [props.class ?? '']: true }}>
+    <label
+      class={ui.label}
+      classList={{
+        [props.class ?? '']: true,
+      }}
+    >
       <Show when={label()}>
         <span>{label()}</span>
       </Show>
@@ -61,6 +63,9 @@ export function Slider(props: SliderProps) {
           scrollIntoViewAndFocusOnChange(value, el)
         }}
         class={ui.slider}
+        classList={{
+          [ui.animateFill]: props.animateFill,
+        }}
         type="range"
         min={min()}
         max={max()}

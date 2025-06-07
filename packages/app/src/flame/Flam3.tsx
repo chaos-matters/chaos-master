@@ -1,7 +1,11 @@
-import { createEffect, createMemo, createSignal, onCleanup } from 'solid-js'
+import { createEffect, createMemo, onCleanup } from 'solid-js'
 import { arrayOf, vec3f, vec4f, vec4u } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
-import { setRenderStats } from '@/flame/renderStats'
+import {
+  accumulatedPointCount,
+  setAccumulatedPointCount,
+  setRenderStats,
+} from '@/flame/renderStats'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
 import { randomVec4u } from '@/utils/randomVec4u'
 import { usePointer } from '@/utils/usePointer'
@@ -23,6 +27,8 @@ import type { v4f } from 'typegpu/data'
 import type { FlameDescriptor } from './transformFunction'
 import type { ExportImageType } from '@/App'
 
+const { sqrt } = Math
+
 /**
  * TODO: This factor is fine tuned to look good for the default example.
  * Consider dynamically computing the correct factor to use.
@@ -38,6 +44,8 @@ type Flam3Props = {
   adaptiveFilterEnabled: boolean
   flameDescriptor: FlameDescriptor
   edgeFadeColor: v4f
+  setCurrentQuality?: (fn: () => number) => void
+  setQualityPointCountLimit?: (fn: () => number) => void
 }
 
 export function Flam3(props: Flam3Props) {
@@ -46,7 +54,6 @@ export function Flam3(props: Flam3Props) {
   const { context, canvasSize, pixelRatio, canvas, canvasFormat } = useCanvas()
   const pointer = usePointer(canvas)
   const queryBuffer = root.createBuffer(vec4f, vec4f())
-  const [maxPointsCount, setMaxPointsCount] = createSignal(0)
 
   const backgroundColorFinal = () => {
     if (props.flameDescriptor.renderSettings.backgroundColor === undefined) {
@@ -62,10 +69,16 @@ export function Flam3(props: Flam3Props) {
     const unitSquareArea = (height ** 2 * camera.zoom() ** 2) / 4
     return unitSquareArea
   }
+
   const qualityPointCountLimit = () => {
     const q = props.quality
     return bucketProbabilityInv() / (q ** 2 - 2 * q + 1)
   }
+
+  props.setCurrentQuality?.(
+    () => 1 - sqrt(bucketProbabilityInv() / accumulatedPointCount()),
+  )
+  props.setQualityPointCountLimit?.(qualityPointCountLimit)
 
   function _readCountUnderPointer(frameIndex: number) {
     const o = outputTextures()
@@ -107,14 +120,6 @@ export function Flam3(props: Flam3Props) {
     }
   }
 
-  createEffect(() => {
-    setMaxPointsCount(qualityPointCountLimit())
-    setRenderStats((prev) => ({
-      ...prev,
-      qualityPointCountLimit: maxPointsCount(),
-    }))
-  })
-
   const points = root
     .createBuffer(arrayOf(Point, MAX_POINT_COUNT))
     .$usage('storage')
@@ -131,6 +136,10 @@ export function Flam3(props: Flam3Props) {
       edgeFadeColor: vec4f(0, 0, 0, 0.8),
     })
     .$usage('uniform')
+
+  onCleanup(() => {
+    colorGradingUniforms.destroy()
+  })
 
   const outputTextures = createMemo(() => {
     const { width, height } = canvasSize()
@@ -357,12 +366,12 @@ export function Flam3(props: Flam3Props) {
 
         device.queue.submit([encoder.finish()])
 
+        const accumulatedPointCountCopy = accumulatedPointCount
         timestampQuery
           .read()
           .then((timing) => {
-            setRenderStats((prev) => ({
-              ...prev,
-              accumulatedPointCount: accumulatedPointCount,
+            setAccumulatedPointCount(accumulatedPointCountCopy)
+            setRenderStats(() => ({
               timing: {
                 ifsNs: timing.ifs,
                 renderPointsNs: timing.renderPoints,

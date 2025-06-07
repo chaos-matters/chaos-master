@@ -15,6 +15,7 @@ Q = 1 - sqrt(Np) / Np
 
 Q = 1 - sqrt(N * 1 / A) / (N * (1/A))
 Q = 1 - sqrt(N / A) * A / N
+Q = 1 - sqrt(A / N)
 Q^2 - 2Q + 1 = A / N
 
 Number of points required for achieving quality Q:
