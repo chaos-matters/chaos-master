@@ -114,9 +114,20 @@ export function createDragHandler(
       }
     }
 
+    /**
+     * Stop dragging if another touch is detected,
+     * to allow for multi-touch specific gestures.
+     */
+    function onTouchStart(event: TouchEvent) {
+      if (event.touches.length >= 2) {
+        onPointerUp_(undefined)
+      }
+    }
+
     document.addEventListener('pointermove', onPointerMove_, { signal })
     document.addEventListener('pointerup', onPointerUp_, { signal })
     document.addEventListener('pointercancel', onPointerUp_, { signal })
+    document.addEventListener('touchstart', onTouchStart, { signal })
     document.addEventListener('click', preventDefaultIfMoved, {
       capture: true,
       signal,
