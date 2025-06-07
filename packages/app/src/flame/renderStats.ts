@@ -1,8 +1,7 @@
 import { createSignal } from 'solid-js'
+import type { Accessor } from 'solid-js'
 
 type RenderStats = {
-  accumulatedPointCount: number
-  qualityPointCountLimit: number
   timing: {
     ifsNs: number
     renderPointsNs: number
@@ -11,9 +10,7 @@ type RenderStats = {
   }
 }
 
-const [renderStats, setRenderStats] = createSignal<RenderStats>({
-  accumulatedPointCount: 0,
-  qualityPointCountLimit: 0,
+export const [renderStats, setRenderStats] = createSignal<RenderStats>({
   timing: {
     ifsNs: 0,
     renderPointsNs: 0,
@@ -22,4 +19,12 @@ const [renderStats, setRenderStats] = createSignal<RenderStats>({
   },
 })
 
-export { renderStats, setRenderStats }
+export const [accumulatedPointCount, setAccumulatedPointCount] = createSignal(0)
+
+export const [currentQuality, setCurrentQuality] = createSignal<
+  Accessor<number>
+>(() => 0)
+
+export const [qualityPointCountLimit, setQualityPointCountLimit] = createSignal<
+  Accessor<number>
+>(() => 0)

@@ -36,7 +36,13 @@ import {
 import { drawModeToImplFn } from './flame/drawMode'
 import { examples } from './flame/examples'
 import { Flam3, MAX_INNER_ITERS } from './flame/Flam3'
-import { renderStats } from './flame/renderStats'
+import {
+  accumulatedPointCount,
+  currentQuality,
+  qualityPointCountLimit,
+  setCurrentQuality,
+  setQualityPointCountLimit,
+} from './flame/renderStats'
 import {
   generateTransformId,
   generateVariationId,
@@ -132,10 +138,6 @@ function App(props: AppProps) {
 
   const { showShareLinkModal } = createShareLinkModal(flameDescriptor)
 
-  const renderStatsProgress = () => {
-    const { accumulatedPointCount, qualityPointCountLimit } = renderStats()
-    return accumulatedPointCount / qualityPointCountLimit
-  }
   useKeyboardShortcuts({
     KeyF: () => {
       document.startViewTransition(() => {
@@ -226,6 +228,10 @@ function App(props: AppProps) {
                   onExportImage={onExportImage()}
                   edgeFadeColor={
                     showSidebar() ? EDGE_FADE_COLOR[theme()] : vec4f(0)
+                  }
+                  setCurrentQuality={(fn) => setCurrentQuality(() => fn)}
+                  setQualityPointCountLimit={(fn) =>
+                    setQualityPointCountLimit(() => fn)
                   }
                 />
               </WheelZoomCamera2D>
@@ -450,7 +456,10 @@ function App(props: AppProps) {
                 label="Quality"
                 value={quality()}
                 trackFill={true}
-                trackFillValue={renderStatsProgress()}
+                trackFillValue={Math.min(currentQuality()(), quality())}
+                animateFill={
+                  accumulatedPointCount() < qualityPointCountLimit()()
+                }
                 min={0.7}
                 max={1}
                 step={0.001}
