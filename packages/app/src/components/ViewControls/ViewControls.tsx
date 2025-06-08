@@ -7,7 +7,7 @@ import { ButtonGroup } from '../Button/ButtonGroup'
 import { SoftwareVersion } from '../SoftwareVersion/SoftwareVersion'
 import ui from './ViewControls.module.css'
 import type { Setter } from 'solid-js'
-import type { v2f} from 'typegpu/data';
+import type { v2f } from 'typegpu/data'
 
 type ViewControlProps = {
   pixelRatio: number

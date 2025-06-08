@@ -17,11 +17,20 @@ import type { ChangeHistory } from '@/utils/createStoreHistory'
 
 const CANCEL = 'cancel'
 
+function zoomToFovy(zoom: number, fovyMin = 1, fovyMax = 60): number {
+  return fovyMin + (1 - zoom) * (fovyMax - fovyMin)
+}
+
 function Preview(props: { flameDescriptor: FlameDescriptor }) {
   return (
     <Root adapterOptions={{ powerPreference: 'high-performance' }}>
       <AutoCanvas pixelRatio={1}>
-        <Camera2D position={vec2f()} fovy={1}>
+        <Camera2D
+          position={vec2f(
+            ...props.flameDescriptor.renderSettings.camera.position,
+          )}
+          fovy={zoomToFovy(props.flameDescriptor.renderSettings.camera.zoom)}
+        >
           <Flam3
             quality={0.8}
             pointCountPerBatch={2e4}
