@@ -12,7 +12,10 @@ export function createTimestampQuery<T extends string>(
 
   const timestampBuffer = device.createBuffer({
     size: timestampQuerySet.count * BigInt64Array.BYTES_PER_ELEMENT,
-    usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
+    usage:
+      GPUBufferUsage.QUERY_RESOLVE |
+      GPUBufferUsage.COPY_SRC |
+      GPUBufferUsage.COPY_DST,
   })
 
   const timestampMappable = device.createBuffer({
@@ -30,6 +33,10 @@ export function createTimestampQuery<T extends string>(
       },
     ]),
   ) as Record<T, GPUComputePassTimestampWrites>
+
+  function clear(encoder: GPUCommandEncoder) {
+    encoder.clearBuffer(timestampBuffer)
+  }
 
   function write(encoder: GPUCommandEncoder) {
     encoder.resolveQuerySet(
@@ -54,7 +61,9 @@ export function createTimestampQuery<T extends string>(
   const latest: Record<T, number>[] = []
 
   async function read() {
-    await timestampMappable.mapAsync(GPUMapMode.READ)
+    if (timestampMappable.mapState !== 'mapped') {
+      await timestampMappable.mapAsync(GPUMapMode.READ)
+    }
     const times = new BigInt64Array(timestampMappable.getMappedRange())
     const results = Object.fromEntries(
       timestampNames.map((name, i) => [
@@ -72,6 +81,7 @@ export function createTimestampQuery<T extends string>(
 
   return {
     timestampWrites,
+    clear,
     write,
     read,
     get average(): Readonly<Record<T, number>> | undefined {

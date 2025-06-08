@@ -1,4 +1,5 @@
 import { tgpu } from 'typegpu'
+import { arrayOf, vec4f } from 'typegpu/data'
 import { wgsl } from '@/utils/wgsl'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 
@@ -8,8 +9,9 @@ const GROUP_SIZE_Y = 4
 const { ceil } = Math
 
 const bindGroupLayout = tgpu.bindGroupLayout({
-  accumulationTexture: {
-    texture: 'unfilterable-float',
+  accumulationTextureBuffer: {
+    storage: (length: number) => arrayOf(vec4f, length),
+    access: 'readonly',
   },
   postprocessTexture: {
     storageTexture: 'rgba32float',
@@ -20,8 +22,8 @@ const bindGroupLayout = tgpu.bindGroupLayout({
 export function createBlurPipeline(
   root: TgpuRoot,
   textureSize: [number, number],
-  accumulationTexture: LayoutEntryToInput<
-    (typeof bindGroupLayout)['entries']['accumulationTexture']
+  accumulationTextureBuffer: LayoutEntryToInput<
+    (typeof bindGroupLayout)['entries']['accumulationTextureBuffer']
   >,
   postprocessTexture: LayoutEntryToInput<
     (typeof bindGroupLayout)['entries']['postprocessTexture']
@@ -30,7 +32,7 @@ export function createBlurPipeline(
   const { device } = root
 
   const bindGroup = root.createBindGroup(bindGroupLayout, {
-    accumulationTexture,
+    accumulationTextureBuffer,
     postprocessTexture,
   })
 
@@ -42,17 +44,17 @@ export function createBlurPipeline(
     @compute @workgroup_size(${GROUP_SIZE_X}, ${GROUP_SIZE_Y}, 1) fn blur(
       @builtin(global_invocation_id) global_invocation_id: vec3u
     ) {
-      let dims = vec2i(textureDimensions(accumulationTexture));
+      let dims = vec2i(textureDimensions(postprocessTexture));
       let uv = vec2i(global_invocation_id.xy);
       if (uv.x >= dims.x || uv.y >= dims.y) {
         return;
       }
-      let centralTexel = textureLoad(accumulationTexture, uv, 0);
+      let centralTexel = accumulationTextureBuffer[uv.y * dims.x + uv.x];
       let count = centralTexel.a;
       let stdDev = 10 + sqrt(count);
       var total = centralTexel;
       var totalWeight = 1.0;
-      const HALF_SIZE = 2;
+      const HALF_SIZE = 0;
       for(var j = -HALF_SIZE; j <= HALF_SIZE; j += 1) {
         for(var i = -HALF_SIZE; i <= HALF_SIZE; i += 1) {
           if (i == 0 && j == 0) { continue; }
@@ -61,7 +63,7 @@ export function createBlurPipeline(
           if (pixelCoord.x < 0 || pixelCoord.y < 0 || pixelCoord.x >= dims.x || pixelCoord.y >= dims.y) {
             continue;
           }
-          let texel = textureLoad(accumulationTexture, pixelCoord, 0);
+          let texel = accumulationTextureBuffer[pixelCoord.y * dims.x + pixelCoord.x];
           let stdDiff = min(stdDev / (abs(texel.a - count) + 1), 1);
           let shiftDiff = smoothstep(3, 0, length(vec2f(shift)));
           let weight = stdDiff * shiftDiff;
