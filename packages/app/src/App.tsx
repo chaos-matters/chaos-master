@@ -10,6 +10,7 @@ import {
 import { createStore } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { vec2f, vec3f, vec4f } from 'typegpu/data'
+import { clamp } from 'typegpu/std'
 import { recordEntries, recordKeys } from '@/utils/record'
 import ui from './App.module.css'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
@@ -31,7 +32,6 @@ import {
   DEFAULT_QUALITY,
   DEFAULT_RENDER_INTERVAL_MS,
   DEFAULT_RESOLUTION,
-  DEFAULT_ZOOM_LEVEL,
 } from './defaults'
 import { drawModeToImplFn } from './flame/drawMode'
 import { examples } from './flame/examples'
@@ -59,11 +59,7 @@ import {
 import { Cross, Plus } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
 import { Root } from './lib/Root'
-import {
-  createPosition,
-  createZoom,
-  WheelZoomCamera2D,
-} from './lib/WheelZoomCamera2D'
+import { WheelZoomCamera2D } from './lib/WheelZoomCamera2D'
 import { createStoreHistory } from './utils/createStoreHistory'
 import { addFlameDataToPng } from './utils/flameInPng'
 import {
@@ -73,6 +69,8 @@ import {
 import { sum } from './utils/sum'
 import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
 import { useLoadFlameFromFile } from './utils/useLoadFlameFromFile'
+import type { Setter } from 'solid-js'
+import type { v2f } from 'typegpu/data'
 import type { DrawMode } from './flame/drawMode'
 import type {
   FlameDescriptor,
@@ -114,8 +112,6 @@ function App(props: AppProps) {
   const [onExportImage, setOnExportImage] = createSignal<ExportImageType>()
   const [adaptiveFilterEnabled, setAdaptiveFilterEnabled] = createSignal(true)
   const [showSidebar, setShowSidebar] = createSignal(true)
-  const [zoom, setZoom] = createZoom(DEFAULT_ZOOM_LEVEL, [0.01, Infinity])
-  const [position, setPosition] = createPosition(vec2f())
   const [flameDescriptor, setFlameDescriptor, history] = createStoreHistory(
     createStore(
       structuredClone(
@@ -137,6 +133,37 @@ function App(props: AppProps) {
         : DEFAULT_RENDER_INTERVAL_MS
 
   const { showShareLinkModal } = createShareLinkModal(flameDescriptor)
+
+  const setFlameZoom: Setter<number> = (value) => {
+    if (typeof value === 'function') {
+      setFlameDescriptor((draft) => {
+        draft.renderSettings.camera.zoom = clamp(
+          value(draft.renderSettings.camera.zoom),
+          0.01,
+          Infinity,
+        )
+      })
+    } else {
+      setFlameDescriptor((draft) => {
+        draft.renderSettings.camera.zoom = clamp(value, 0.01, Infinity)
+      })
+    }
+    return flameDescriptor.renderSettings.camera.zoom
+  }
+  const setFlamePosition: Setter<v2f> = (value) => {
+    if (typeof value === 'function') {
+      setFlameDescriptor((draft) => {
+        draft.renderSettings.camera.position = value(
+          vec2f(...draft.renderSettings.camera.position),
+        )
+      })
+    } else {
+      setFlameDescriptor((draft) => {
+        draft.renderSettings.camera.position = value
+      })
+    }
+    return flameDescriptor.renderSettings.camera.position
+  }
 
   useKeyboardShortcuts({
     KeyF: () => {
@@ -218,8 +245,15 @@ function App(props: AppProps) {
           >
             <AutoCanvas class={ui.canvas} pixelRatio={pixelRatio()}>
               <WheelZoomCamera2D
-                zoom={[zoom, setZoom]}
-                position={[position, setPosition]}
+                zoom={[
+                  () => flameDescriptor.renderSettings.camera.zoom,
+                  setFlameZoom,
+                ]}
+                position={[
+                  () =>
+                    vec2f(...flameDescriptor.renderSettings.camera.position),
+                  setFlamePosition,
+                ]}
               >
                 <Flam3
                   quality={quality()}
@@ -241,9 +275,9 @@ function App(props: AppProps) {
           </div>
         </Root>
         <ViewControls
-          zoom={zoom()}
-          setZoom={setZoom}
-          setPosition={setPosition}
+          zoom={flameDescriptor.renderSettings.camera.zoom}
+          setZoom={setFlameZoom}
+          setPosition={setFlamePosition}
           pixelRatio={pixelRatio()}
           setPixelRatio={setPixelRatio}
         />
