@@ -16,6 +16,10 @@ type SliderProps = {
   trackFill?: boolean
   trackFillValue?: number
   animateFill?: boolean
+  nonlinearity?: {
+    forward: (value: number) => number
+    inverse: (value: number) => number
+  }
 }
 
 export function Slider(props: SliderProps) {
@@ -28,9 +32,18 @@ export function Slider(props: SliderProps) {
   const formatValue = () =>
     props.formatValue ? props.formatValue(value()) : value().toFixed(2)
 
+  const nonlinearValue = () =>
+    props.nonlinearity?.forward(props.value) ?? props.value
+
+  const nonlinearFillValue = () =>
+    props.trackFillValue !== undefined
+      ? (props.nonlinearity?.forward(props.trackFillValue) ??
+        props.trackFillValue)
+      : undefined
+
   const fillPercentage = () => {
     const range = max() - min()
-    const v = props.trackFillValue ?? value()
+    const v = nonlinearFillValue() ?? value()
     return ((v - min()) / range) * 100
   }
 
@@ -70,10 +83,11 @@ export function Slider(props: SliderProps) {
         min={min()}
         max={max()}
         step={step()}
-        value={value()}
+        value={nonlinearValue()}
         onPointerDown={commitHandler}
         onInput={(ev) => {
-          props.onInput(ev.target.valueAsNumber)
+          const newValue = ev.target.valueAsNumber
+          props.onInput(props.nonlinearity?.inverse(newValue) ?? newValue)
         }}
         style={{
           '--fill-percent': `${(props.trackFill ?? true) ? fillPercentage() : 0}%`,

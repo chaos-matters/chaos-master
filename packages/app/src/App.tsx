@@ -452,7 +452,7 @@ function App(props: AppProps) {
                 animateFill={
                   accumulatedPointCount() < qualityPointCountLimit()()
                 }
-                min={0.7}
+                min={0}
                 max={1}
                 step={0.001}
                 onInput={(quality) => {
@@ -461,6 +461,10 @@ function App(props: AppProps) {
                 formatValue={(value) =>
                   value === 1 ? 'Infinite' : `${(value * 100).toFixed(1)} %`
                 }
+                nonlinearity={{
+                  forward: (v) => 0.001 / (v ** 2 - 2 * v + 1) - 0.001,
+                  inverse: (v) => 1 - Math.sqrt(0.001 / (v + 0.001)),
+                }}
               />
               <label class={ui.labeledInput}>
                 Adaptive filter
