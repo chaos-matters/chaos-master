@@ -25,6 +25,7 @@ export type RenderSettings = {
   skipIters: number
   drawMode: DrawMode
   backgroundColor?: [number, number, number]
+  camera: { zoom: number; position: [number, number] }
 }
 
 export type TransformFunction = {

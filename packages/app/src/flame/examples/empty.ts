@@ -3,11 +3,14 @@ import type { FlameDescriptor } from '../transformFunction'
 
 export const empty: FlameDescriptor = {
   renderSettings: {
-    quality: 1,
     exposure: 0.25,
     skipIters: 20,
     drawMode: 'light',
     backgroundColor: [0, 0, 0],
+    camera: {
+      zoom: 1,
+      position: [0, 0],
+    },
   },
   transforms: {
     [tid('d2523f69_dd2d_49cb_b14f_d9448e0bfb31')]: {

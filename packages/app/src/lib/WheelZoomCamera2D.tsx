@@ -37,6 +37,7 @@ export function createPosition(initPos: v2f): Signal<v2f> {
 
   return [position, setPosition]
 }
+
 export function createZoom(
   initZoom: number,
   zoomRange: [number, number],
