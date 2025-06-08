@@ -396,14 +396,6 @@ function App(props: AppProps) {
                 formatValue={(value) => value.toString()}
               />
               <label class={ui.labeledInput}>
-                Adaptive filter
-                <Checkbox
-                  checked={adaptiveFilterEnabled()}
-                  onChange={(checked) => setAdaptiveFilterEnabled(checked)}
-                />
-                <span></span>
-              </label>
-              <label class={ui.labeledInput}>
                 Draw Mode
                 <select
                   class={ui.select}
@@ -470,6 +462,14 @@ function App(props: AppProps) {
                   value === 1 ? 'Infinite' : `${(value * 100).toFixed(1)} %`
                 }
               />
+              <label class={ui.labeledInput}>
+                Adaptive filter
+                <Checkbox
+                  checked={adaptiveFilterEnabled()}
+                  onChange={(checked) => setAdaptiveFilterEnabled(checked)}
+                />
+                <span></span>
+              </label>
             </Card>
             <div class={ui.actionButtons}>
               <Card class={ui.buttonCard}>
