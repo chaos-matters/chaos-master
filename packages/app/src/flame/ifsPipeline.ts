@@ -1,5 +1,5 @@
 import { tgpu } from 'typegpu'
-import { arrayOf, struct, vec2u, vec4f, vec4u } from 'typegpu/data'
+import { arrayOf, struct, vec2i, vec4f, vec4u } from 'typegpu/data'
 import { hash, random, randomState, setSeed } from '@/shaders/random'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { wgsl } from '@/utils/wgsl'
@@ -58,7 +58,7 @@ export function createIFSPipeline(
       access: 'readonly',
     },
     outputTextureDimension: {
-      uniform: vec2u,
+      uniform: vec2i,
     },
     outputTextureBuffer: {
       storage: (length: number) => arrayOf(vec4f, length),
@@ -69,7 +69,7 @@ export function createIFSPipeline(
   const flameUniformsBuffer = root.createBuffer(FlameUniforms).$usage('storage')
 
   const outputTextureDimensionBuffer = root
-    .createBuffer(vec2u, vec2u(...outputTextureDimension))
+    .createBuffer(vec2i, vec2i(...outputTextureDimension))
     .$usage('uniform')
 
   const bindGroup = root.createBindGroup(bindGroupLayout, {
@@ -139,18 +139,29 @@ export function createIFSPipeline(
       }
 
       let clip = worldToClip(point.position);
-      // antialiasing jitter
-      let screen = vec2f(outputTextureDimension) * (clip * vec2f(0.5, -0.5) + 0.5);
-      let jittered = screen + (2 * vec2f(random(), random()) - 1);
+      let outputTextureDimensionF = vec2f(outputTextureDimension);
+      let screen = outputTextureDimensionF * (clip * vec2f(0.5, -0.5) + 0.5);
 
-      let screenU = vec2u(jittered);
-      if (screenU.x < 0 || screenU.y < 0 || screenU.x >= outputTextureDimension.x || screenU.y >= outputTextureDimension.y) {
-        return;
-      }
-      let pixelIndex = screenU.y * outputTextureDimension.x + screenU.x;
-      outputTextureBuffer[pixelIndex] += vec4f(0, point.color, 1);
+      // antialiasing jitter
+      let jittered = screen + (vec2f(random(), random()) - 0.5);
+      let screenI = vec2i(jittered);
 
       pointRandomSeeds[pointIndex] = randomState;
+
+      if (
+        // important to check the real coordinates and not integer,
+        // because negative values > -1 end up on-screen causing
+        // a double-counting on the first row/column
+        jittered.x < 0 || jittered.y < 0 ||
+        jittered.x > outputTextureDimensionF.x
+        // not necessary to check y, it will just fall out of buffer
+        // jittered.y > outputTextureDimensionF.y
+      ) {
+        return;
+      }
+
+      let pixelIndex = screenI.y * outputTextureDimension.x + screenI.x;
+      outputTextureBuffer[pixelIndex] += vec4f(0, point.color, 1);
     }
   `
 

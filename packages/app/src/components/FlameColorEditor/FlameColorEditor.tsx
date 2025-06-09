@@ -223,7 +223,7 @@ export function FlameColorEditor(props: {
       }}
       class={ui.editorCard}
     >
-      <Root adapterOptions={{ powerPreference: 'high-performance' }}>
+      <Root>
         <AutoCanvas class={ui.canvas} pixelRatio={1}>
           <WheelZoomCamera2D
             eventTarget={div()}

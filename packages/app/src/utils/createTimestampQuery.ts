@@ -4,18 +4,18 @@ export function createTimestampQuery<T extends string>(
   device: GPUDevice,
   timestampNames: T[],
   avgCount = 5,
+  pairLocationCount = 32,
 ) {
+  const timestampCount = timestampNames.length
+
   const timestampQuerySet = device.createQuerySet({
     type: 'timestamp',
-    count: 8,
+    count: timestampCount * 2 * pairLocationCount * 2,
   })
 
   const timestampBuffer = device.createBuffer({
     size: timestampQuerySet.count * BigInt64Array.BYTES_PER_ELEMENT,
-    usage:
-      GPUBufferUsage.QUERY_RESOLVE |
-      GPUBufferUsage.COPY_SRC |
-      GPUBufferUsage.COPY_DST,
+    usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
   })
 
   const timestampMappable = device.createBuffer({
@@ -23,19 +23,18 @@ export function createTimestampQuery<T extends string>(
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
   })
 
-  const timestampWrites = Object.fromEntries(
-    timestampNames.map((name, i) => [
-      name,
-      {
-        querySet: timestampQuerySet,
-        beginningOfPassWriteIndex: i * 2,
-        endOfPassWriteIndex: i * 2 + 1,
-      },
-    ]),
-  ) as Record<T, GPUComputePassTimestampWrites>
-
-  function clear(encoder: GPUCommandEncoder) {
-    encoder.clearBuffer(timestampBuffer)
+  function timestampWrites(frameId: number) {
+    const locationIndex = (frameId % pairLocationCount) * timestampCount * 2
+    return Object.fromEntries(
+      timestampNames.map((name, i) => [
+        name,
+        {
+          querySet: timestampQuerySet,
+          beginningOfPassWriteIndex: locationIndex + i * 2,
+          endOfPassWriteIndex: locationIndex + i * 2 + 1,
+        },
+      ]),
+    ) as Record<T, GPUComputePassTimestampWrites>
   }
 
   function write(encoder: GPUCommandEncoder) {
@@ -60,15 +59,19 @@ export function createTimestampQuery<T extends string>(
 
   const latest: Record<T, number>[] = []
 
-  async function read() {
-    if (timestampMappable.mapState !== 'mapped') {
-      await timestampMappable.mapAsync(GPUMapMode.READ)
+  async function read(frameId: number) {
+    if (timestampMappable.mapState !== 'unmapped') {
+      return
     }
+    const locationIndex = (frameId % pairLocationCount) * timestampCount * 2
+    await timestampMappable.mapAsync(GPUMapMode.READ)
     const times = new BigInt64Array(timestampMappable.getMappedRange())
     const results = Object.fromEntries(
       timestampNames.map((name, i) => [
         name,
-        Number(times[i * 2 + 1]! - times[i * 2]!),
+        Number(
+          times[locationIndex + i * 2 + 1]! - times[locationIndex + i * 2]!,
+        ),
       ]),
     ) as Record<T, number>
     timestampMappable.unmap()
@@ -76,25 +79,25 @@ export function createTimestampQuery<T extends string>(
     if (latest.length > avgCount) {
       latest.shift()
     }
-    return results
+  }
+
+  function average(): Readonly<Record<T, number>> | undefined {
+    const count = latest.length
+    if (count < avgCount) {
+      return undefined
+    }
+    return Object.fromEntries(
+      timestampNames.map((name) => [
+        name,
+        sum(latest.map((current) => current[name])) / count,
+      ]),
+    ) as Readonly<Record<T, number>>
   }
 
   return {
     timestampWrites,
-    clear,
     write,
     read,
-    get average(): Readonly<Record<T, number>> | undefined {
-      const count = latest.length
-      if (count < avgCount) {
-        return undefined
-      }
-      return Object.fromEntries(
-        timestampNames.map((name) => [
-          name,
-          sum(latest.map((current) => current[name])) / count,
-        ]),
-      ) as Readonly<Record<T, number>>
-    },
+    average,
   }
 }
