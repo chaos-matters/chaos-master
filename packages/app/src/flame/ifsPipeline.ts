@@ -140,14 +140,14 @@ export function createIFSPipeline(
 
       let clip = worldToClip(point.position);
       // antialiasing jitter
-      let pxScale = 1 / clipToPixels(vec2f(1, 1));
-      let jittered = clip + pxScale * (2 * vec2f(random(), random()) - 1);
+      let screen = vec2f(outputTextureDimension) * (clip * vec2f(0.5, -0.5) + 0.5);
+      let jittered = screen + (2 * vec2f(random(), random()) - 1);
 
-      let screen = vec2u(vec2f(outputTextureDimension) * (jittered * vec2f(1, -1) * 0.5 + 0.5));
-      if (screen.x < 0 || screen.y < 0 || screen.x >= outputTextureDimension.x || screen.y >= outputTextureDimension.y) {
+      let screenU = vec2u(jittered);
+      if (screenU.x < 0 || screenU.y < 0 || screenU.x >= outputTextureDimension.x || screenU.y >= outputTextureDimension.y) {
         return;
       }
-      let pixelIndex = screen.y * outputTextureDimension.x + screen.x;
+      let pixelIndex = screenU.y * outputTextureDimension.x + screenU.x;
       outputTextureBuffer[pixelIndex] += vec4f(0, point.color, 1);
 
       pointRandomSeeds[pointIndex] = randomState;
