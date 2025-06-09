@@ -171,13 +171,15 @@ export function Flam3(props: Flam3Props) {
     shouldRenderFinalImage: boolean,
   ) {
     const { ifs } = ifsTimings
+    if (ifs <= 0) {
+      return 1
+    }
     const { adaptiveFilter, colorGrading } = renderTimings
     const frameBudgetNs = 14e6
     const paintTimeNs =
       Number(shouldRenderFinalImage) *
       (colorGrading + Number(props.adaptiveFilterEnabled) * adaptiveFilter)
-    const batchTimeNs = Math.max(ifs, 0)
-    return clamp(floor((frameBudgetNs - paintTimeNs) / batchTimeNs), 1, 100)
+    return clamp(floor((frameBudgetNs - paintTimeNs) / ifs), 1, 100)
   }
 
   createEffect(() => {
