@@ -19,9 +19,7 @@ import {
 } from './colorGrading'
 import { drawModeToImplFn } from './drawMode'
 import { ComputeUniforms, createIFSPipeline } from './ifsPipeline'
-import { createInitPointsPipeline } from './initPoints'
-import { createRenderPointsPipeline } from './renderPoints'
-import { outputTextureFormat, Point } from './variations/types'
+import { outputTextureFormat } from './variations/types'
 import type { v4f } from 'typegpu/data'
 import type { FlameDescriptor } from './transformFunction'
 import type { ExportImageType } from '@/App'
@@ -73,12 +71,12 @@ export function Flam3(props: Flam3Props) {
   )
   props.setQualityPointCountLimit?.(qualityPointCountLimit)
 
-  const points = root
-    .createBuffer(arrayOf(Point, props.pointCountPerBatch))
+  const pointRandomSeeds = root
+    .createBuffer(arrayOf(vec4u, props.pointCountPerBatch))
     .$usage('storage')
 
   onCleanup(() => {
-    points.destroy()
+    pointRandomSeeds.destroy()
   })
 
   const colorGradingUniforms = root
@@ -142,21 +140,6 @@ export function Flam3(props: Flam3Props) {
     .createBuffer(ComputeUniforms, { seed: vec4u() })
     .$usage('uniform')
 
-  const renderPoints = createMemo(() => {
-    const o = outputTextures()
-    if (!o) {
-      return undefined
-    }
-    const { postprocessTexture, accumulationTextureBuffer } = o
-    return createRenderPointsPipeline(
-      root,
-      camera,
-      points,
-      postprocessTexture.props.size,
-      accumulationTextureBuffer,
-    )
-  })
-
   const runBlur = createMemo(() => {
     const o = outputTextures()
     if (!o) {
@@ -187,13 +170,13 @@ export function Flam3(props: Flam3Props) {
     renderTimings: NonNullable<typeof renderQuery.average>,
     shouldRenderFinalImage: boolean,
   ) {
-    const { ifs, renderPoints } = ifsTimings
+    const { ifs } = ifsTimings
     const { adaptiveFilter, colorGrading } = renderTimings
     const frameBudgetNs = 14e6
     const paintTimeNs =
       Number(shouldRenderFinalImage) *
       (colorGrading + Number(props.adaptiveFilterEnabled) * adaptiveFilter)
-    const batchTimeNs = ifs + Math.max(0, renderPoints)
+    const batchTimeNs = Math.max(ifs, 0)
     return clamp(floor((frameBudgetNs - paintTimeNs) / batchTimeNs), 1, 100)
   }
 
@@ -203,19 +186,17 @@ export function Flam3(props: Flam3Props) {
       return undefined
     }
 
-    const { accumulationTextureBuffer } = o
+    const { accumulationTextureBuffer, postprocessTexture } = o
 
-    const runInitPoints = createInitPointsPipeline(
-      root,
-      points,
-      computeUniforms,
-    )
     const ifsPipeline = createIFSPipeline(
       root,
+      camera,
       props.flameDescriptor.renderSettings.skipIters,
-      points,
+      pointRandomSeeds,
       computeUniforms,
       props.flameDescriptor.transforms,
+      postprocessTexture.props.size,
+      accumulationTextureBuffer,
     )
 
     let batchIndex = 0
@@ -311,25 +292,11 @@ export function Flam3(props: Flam3Props) {
 
         {
           for (let i = 0; i < iterationCount; i++) {
-            {
-              const pass = encoder.beginComputePass({})
-              runInitPoints(pass, pointCountPerBatch)
-              pass.end()
-            }
-            {
-              const pass = encoder.beginComputePass({
-                timestampWrites: ifsQuery.timestampWrites.ifs,
-              })
-              ifsPipeline.run(pass, pointCountPerBatch)
-              pass.end()
-            }
-            {
-              const pass = encoder.beginComputePass({
-                timestampWrites: ifsQuery.timestampWrites.renderPoints,
-              })
-              renderPoints()?.(pass, pointCountPerBatch)
-              pass.end()
-            }
+            const pass = encoder.beginComputePass({
+              timestampWrites: ifsQuery.timestampWrites.ifs,
+            })
+            ifsPipeline.run(pass, pointCountPerBatch)
+            pass.end()
           }
 
           accumulatedPointCount += pointCountPerBatch * iterationCount

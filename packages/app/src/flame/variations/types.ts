@@ -1,5 +1,5 @@
 import { tgpu } from 'typegpu'
-import { f32, struct, vec2f, vec4u } from 'typegpu/data'
+import { f32, struct, vec2f } from 'typegpu/data'
 import type { TgpuFn } from 'typegpu'
 import type { AnyWgslData, Infer, Vec2f } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
@@ -60,7 +60,6 @@ export const Point = struct({
   position: vec2f,
   /** OkLab a and b. */
   color: vec2f,
-  seed: vec4u,
 })
 
 export const outputTextureFormat = 'rgba32float'
