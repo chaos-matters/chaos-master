@@ -80,6 +80,7 @@ export function createBlurPipeline(
   })
 
   const blurPipeline = device.createComputePipeline({
+    label: 'BlurPIP',
     layout: device.createPipelineLayout({
       bindGroupLayouts: [root.unwrap(bindGroupLayout)],
     }),

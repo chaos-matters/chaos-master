@@ -90,6 +90,7 @@ export function createColorGradingPipeline(
   })
 
   const renderPipeline = device.createRenderPipeline({
+    label: 'CGPip',
     layout: device.createPipelineLayout({
       bindGroupLayouts: [root.unwrap(bindGroupLayout)],
     }),

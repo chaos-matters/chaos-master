@@ -120,6 +120,7 @@ export function createIFSPipeline(
   })
 
   const ifsPipeline = device.createComputePipeline({
+    label: 'IFSPip',
     layout: device.createPipelineLayout({
       bindGroupLayouts: [root.unwrap(bindGroupLayout)],
     }),

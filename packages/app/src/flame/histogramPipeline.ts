@@ -69,6 +69,7 @@ export function createHistogramPipeline(
   })
 
   const pipeline = device.createComputePipeline({
+    label: 'HistPip',
     layout: device.createPipelineLayout({
       bindGroupLayouts: [root.unwrap(bindGroupLayout)],
     }),

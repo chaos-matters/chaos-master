@@ -96,6 +96,7 @@ export function createRenderPointsPipeline(
   })
 
   const renderPointsPipeline = device.createComputePipeline({
+    label: 'RPPip',
     layout: device.createPipelineLayout({
       bindGroupLayouts: [
         root.unwrap(camera.BindGroupLayout),

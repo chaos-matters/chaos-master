@@ -81,6 +81,7 @@ export function createInitPointsPipeline(
   })
 
   const initPointsPipeline = device.createComputePipeline({
+    label: 'IPPip',
     layout: device.createPipelineLayout({
       bindGroupLayouts: [root.unwrap(bindGroupLayout)],
     }),

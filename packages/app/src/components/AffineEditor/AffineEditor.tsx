@@ -144,6 +144,7 @@ function Grid() {
     })
 
     const renderPipeline = device.createRenderPipeline({
+      label: 'GridPip',
       layout: device.createPipelineLayout({
         bindGroupLayouts: [root.unwrap(camera.BindGroupLayout)],
       }),

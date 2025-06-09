@@ -107,6 +107,7 @@ function Gradient() {
     })
 
     const renderPipeline = device.createRenderPipeline({
+      label: 'MRPip',
       layout: device.createPipelineLayout({
         bindGroupLayouts: [root.unwrap(camera.BindGroupLayout)],
       }),

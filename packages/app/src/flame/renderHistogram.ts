@@ -60,10 +60,12 @@ export function createRenderHistogramPipeline(
   `
 
   const module = device.createShaderModule({
+    label: 'shDevRHistPip',
     code: renderHistogramShaderCode,
   })
 
   const renderHistogramPipeline = device.createRenderPipeline({
+    label: 'RHistPip',
     layout: device.createPipelineLayout({
       bindGroupLayouts: [root.unwrap(bindGroupLayout)],
     }),
