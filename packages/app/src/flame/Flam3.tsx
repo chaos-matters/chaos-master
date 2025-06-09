@@ -158,23 +158,20 @@ export function Flam3(props: Flam3Props) {
     return accumulatedPointCount <= qualityPointCountLimit()
   }
 
-  const ifsQuery = createTimestampQuery(device, ['ifs', 'renderPoints'])
-
-  const renderQuery = createTimestampQuery(device, [
+  const timestampQuery = createTimestampQuery(device, [
     'adaptiveFilter',
     'colorGrading',
+    'ifs',
   ])
 
   function estimateIterationCount(
-    ifsTimings: NonNullable<typeof ifsQuery.average>,
-    renderTimings: NonNullable<typeof renderQuery.average>,
+    timings: NonNullable<ReturnType<typeof timestampQuery.average>>,
     shouldRenderFinalImage: boolean,
   ) {
-    const { ifs } = ifsTimings
+    const { ifs, adaptiveFilter, colorGrading } = timings
     if (ifs <= 0) {
       return 1
     }
-    const { adaptiveFilter, colorGrading } = renderTimings
     const frameBudgetNs = 14e6
     const paintTimeNs =
       Number(shouldRenderFinalImage) *
@@ -237,7 +234,7 @@ export function Flam3(props: Flam3Props) {
     })
 
     const rafLoop = createAnimationFrame(
-      () => {
+      (frameId) => {
         /**
          * Rendering to screen is expensive because it involves
          * blurring and color grading. We only want to do this
@@ -268,41 +265,34 @@ export function Flam3(props: Flam3Props) {
           seed: randomVec4u(),
         })
 
-        const ifsTimings = ifsQuery.average
-        const renderTimings = renderQuery.average
-        const iterationCount =
-          ifsTimings && renderTimings
-            ? estimateIterationCount(
-                ifsTimings,
-                renderTimings,
-                shouldRenderFinalImage,
-              )
-            : 1
+        const timings = timestampQuery.average()
+        const iterationCount = timings
+          ? estimateIterationCount(timings, shouldRenderFinalImage)
+          : 1
 
-        if (ifsTimings && renderTimings) {
+        if (timings) {
           setRenderStats(() => ({
             timing: {
-              ifsNs: ifsTimings.ifs,
-              renderPointsNs: ifsTimings.renderPoints,
-              blurNs: props.adaptiveFilterEnabled
-                ? renderTimings.adaptiveFilter
-                : 0,
-              colorGradingNs: renderTimings.colorGrading,
+              ifsNs: timings.ifs,
+              renderPointsNs: 0,
+              blurNs: props.adaptiveFilterEnabled ? timings.adaptiveFilter : 0,
+              colorGradingNs: timings.colorGrading,
             },
           }))
         }
 
+        const timestampWrites = timestampQuery.timestampWrites(frameId)
+
         {
           for (let i = 0; i < iterationCount; i++) {
             const pass = encoder.beginComputePass({
-              timestampWrites: ifsQuery.timestampWrites.ifs,
+              timestampWrites: timestampWrites.ifs,
             })
             ifsPipeline.run(pass, pointCountPerBatch)
             pass.end()
           }
 
           accumulatedPointCount += pointCountPerBatch * iterationCount
-          ifsQuery.write(encoder)
         }
 
         setAccumulatedPointCount(accumulatedPointCount)
@@ -314,7 +304,7 @@ export function Flam3(props: Flam3Props) {
           })
           if (props.adaptiveFilterEnabled) {
             const pass = encoder.beginComputePass({
-              timestampWrites: renderQuery.timestampWrites.adaptiveFilter,
+              timestampWrites: timestampWrites.adaptiveFilter,
             })
             runBlur()?.(pass)
             pass.end()
@@ -322,6 +312,7 @@ export function Flam3(props: Flam3Props) {
 
           {
             const pass = encoder.beginRenderPass({
+              timestampWrites: timestampWrites.colorGrading,
               colorAttachments: [
                 {
                   loadOp: 'clear',
@@ -329,21 +320,21 @@ export function Flam3(props: Flam3Props) {
                   view: context.getCurrentTexture().createView(),
                 },
               ],
-              timestampWrites: renderQuery.timestampWrites.colorGrading,
             })
             colorGradingPipeline_.run(pass)
             pass.end()
           }
-          renderQuery.write(encoder)
         }
 
         //_readCountUnderPointer(renderAccumulationIndex)
 
+        timestampQuery.write(encoder)
         device.queue.submit([encoder.finish()])
 
-        ifsQuery.read().catch(() => {})
-        renderQuery.read().catch(() => {})
-
+        device.queue
+          .onSubmittedWorkDone()
+          .then(() => timestampQuery.read(frameId))
+          .catch(() => {})
         props.onExportImage?.(canvas)
 
         batchIndex += 1

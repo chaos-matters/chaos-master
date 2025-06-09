@@ -1,7 +1,7 @@
 import { createEffect, onCleanup } from 'solid-js'
 
 export function createAnimationFrame(
-  fn: () => void,
+  fn: (frameId: number) => void,
   minDeltaTime = () => 0,
   hold?: () => Promise<void>,
 ) {
@@ -16,7 +16,7 @@ export function createAnimationFrame(
       const passedEnoughTime = time - lastTime >= minDeltaTime()
       if (framesNotPending && (lastTime === 0 || passedEnoughTime)) {
         lastTime = time
-        fn()
+        fn(frameId)
         if (hold) {
           framesPending.add(time)
           hold()
