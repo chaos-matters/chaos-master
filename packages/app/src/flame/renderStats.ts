@@ -4,7 +4,6 @@ import type { Accessor } from 'solid-js'
 type RenderStats = {
   timing: {
     ifsNs: number
-    renderPointsNs: number
     blurNs: number
     colorGradingNs: number
   }
@@ -13,7 +12,6 @@ type RenderStats = {
 export const [renderStats, setRenderStats] = createSignal<RenderStats>({
   timing: {
     ifsNs: 0,
-    renderPointsNs: 0,
     blurNs: 0,
     colorGradingNs: 0,
   },

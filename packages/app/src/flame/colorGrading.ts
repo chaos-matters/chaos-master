@@ -1,6 +1,6 @@
 import { oklabGamutClip, oklabGamutClipSlot, oklabToRgb } from '@typegpu/color'
 import { tgpu } from 'typegpu'
-import { f32, struct, vec4f } from 'typegpu/data'
+import { arrayOf, f32, struct, vec2i, vec4f } from 'typegpu/data'
 import { wgsl } from '@/utils/wgsl'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 import type { DrawModeFn } from './drawMode'
@@ -17,26 +17,35 @@ const bindGroupLayout = tgpu.bindGroupLayout({
   uniforms: {
     uniform: ColorGradingUniforms,
   },
-  outputTexture: {
-    texture: 'unfilterable-float',
-    visibility: ['fragment'],
+  textureSize: {
+    uniform: vec2i,
+  },
+  accumulationBuffer: {
+    storage: (length: number) => arrayOf(vec4f, length),
+    access: 'readonly',
   },
 })
 
 export function createColorGradingPipeline(
   root: TgpuRoot,
   uniforms: LayoutEntryToInput<(typeof bindGroupLayout)['entries']['uniforms']>,
-  outputTexture: LayoutEntryToInput<
-    (typeof bindGroupLayout)['entries']['outputTexture']
+  textureSize: readonly [number, number],
+  accumulationBuffer: LayoutEntryToInput<
+    (typeof bindGroupLayout)['entries']['accumulationBuffer']
   >,
   canvasFormat: GPUTextureFormat,
   drawMode: DrawModeFn,
 ) {
   const { device } = root
 
+  const textureSizeBuffer = root
+    .createBuffer(vec2i, vec2i(...textureSize))
+    .$usage('uniform')
+
   const bindGroup = root.createBindGroup(bindGroupLayout, {
     uniforms,
-    outputTexture,
+    accumulationBuffer,
+    textureSize: textureSizeBuffer,
   })
 
   const renderShaderCode = wgsl/* wgsl */ `
@@ -72,8 +81,9 @@ export function createColorGradingPipeline(
     @fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
       let edgeFade = uniforms.edgeFadeColor.a * smoothstep(0.98, 1, max(abs(in.uv.x), abs(in.uv.y)));
       let backgroundColor = mix(uniforms.backgroundColor, uniforms.edgeFadeColor, edgeFade);
-      let pos2u = vec2u(in.pos.xy);
-      let tex = textureLoad(outputTexture, pos2u, 0);
+      let pos2i = vec2i(in.pos.xy);
+      let texelIndex = pos2i.y * textureSize.x + pos2i.x;
+      let tex = accumulationBuffer[texelIndex];
       let count = tex.a;
       let adjustedCount = 0.1 * count * uniforms.averagePointCountPerBucketInv;
       let value = uniforms.exposure * pow(log(adjustedCount + 1), 0.4545);

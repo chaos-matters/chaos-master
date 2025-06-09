@@ -25,7 +25,7 @@ export function createIFSPipeline(
   pointRandomSeeds: TgpuBuffer<WgslArray<Vec4u>> & StorageFlag,
   computeUniforms: TgpuBuffer<WgslStruct<{ seed: Vec4u }>> & UniformFlag,
   transforms: TransformRecord,
-  outputTextureDimension: [number, number],
+  outputTextureDimension: readonly [number, number],
   outputTextureBuffer: TgpuBuffer<WgslArray<Vec4f>> & StorageFlag,
 ) {
   const { device } = root

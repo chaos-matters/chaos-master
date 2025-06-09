@@ -19,7 +19,6 @@ import {
 } from './colorGrading'
 import { drawModeToImplFn } from './drawMode'
 import { ComputeUniforms, createIFSPipeline } from './ifsPipeline'
-import { outputTextureFormat } from './variations/types'
 import type { v4f } from 'typegpu/data'
 import type { FlameDescriptor } from './transformFunction'
 import type { ExportImageType } from '@/App'
@@ -98,26 +97,23 @@ export function Flam3(props: Flam3Props) {
       return
     }
 
-    const accumulationTextureBuffer = root
+    const accumulationBuffer = root
       .createBuffer(arrayOf(vec4f, width * height))
       .$usage('storage')
 
-    const postprocessTexture = root['~unstable']
-      .createTexture({
-        format: outputTextureFormat,
-        size: [width, height],
-      })
-      .$usage('sampled', 'storage')
-      .$name('outputTexture')
+    const postprocessBuffer = root
+      .createBuffer(arrayOf(vec4f, width * height))
+      .$usage('storage')
 
     onCleanup(() => {
-      postprocessTexture.destroy()
-      accumulationTextureBuffer.destroy()
+      accumulationBuffer.destroy()
+      postprocessBuffer.destroy()
     })
 
     return {
-      postprocessTexture,
-      accumulationTextureBuffer,
+      accumulationBuffer,
+      postprocessBuffer,
+      textureSize: [width, height] as const,
     }
   })
 
@@ -126,11 +122,12 @@ export function Flam3(props: Flam3Props) {
     if (!o) {
       return undefined
     }
-    const { postprocessTexture } = o
+    const { textureSize, postprocessBuffer, accumulationBuffer } = o
     return createColorGradingPipeline(
       root,
       colorGradingUniforms,
-      postprocessTexture,
+      textureSize,
+      props.adaptiveFilterEnabled ? postprocessBuffer : accumulationBuffer,
       canvasFormat,
       drawModeToImplFn[props.flameDescriptor.renderSettings.drawMode],
     )
@@ -145,12 +142,12 @@ export function Flam3(props: Flam3Props) {
     if (!o) {
       return undefined
     }
-    const { accumulationTextureBuffer, postprocessTexture } = o
+    const { textureSize, accumulationBuffer, postprocessBuffer } = o
     return createBlurPipeline(
       root,
-      postprocessTexture.props.size,
-      accumulationTextureBuffer,
-      postprocessTexture,
+      textureSize,
+      accumulationBuffer,
+      postprocessBuffer,
     )
   })
 
@@ -185,7 +182,7 @@ export function Flam3(props: Flam3Props) {
       return undefined
     }
 
-    const { accumulationTextureBuffer, postprocessTexture } = o
+    const { textureSize, accumulationBuffer } = o
 
     const ifsPipeline = createIFSPipeline(
       root,
@@ -194,8 +191,8 @@ export function Flam3(props: Flam3Props) {
       pointRandomSeeds,
       computeUniforms,
       props.flameDescriptor.transforms,
-      postprocessTexture.props.size,
-      accumulationTextureBuffer,
+      textureSize,
+      accumulationBuffer,
     )
 
     let batchIndex = 0
@@ -258,7 +255,7 @@ export function Flam3(props: Flam3Props) {
 
         if (clearRequested) {
           clearRequested = false
-          encoder.clearBuffer(accumulationTextureBuffer.buffer)
+          encoder.clearBuffer(accumulationBuffer.buffer)
         }
 
         computeUniforms.write({
@@ -274,7 +271,6 @@ export function Flam3(props: Flam3Props) {
           setRenderStats(() => ({
             timing: {
               ifsNs: timings.ifs,
-              renderPointsNs: 0,
               blurNs: props.adaptiveFilterEnabled ? timings.adaptiveFilter : 0,
               colorGradingNs: timings.colorGrading,
             },
