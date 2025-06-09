@@ -6,24 +6,19 @@ import { wgsl } from '@/utils/wgsl'
 import { PI } from './constants'
 import { createFlameWgsl, extractFlameUniforms } from './transformFunction'
 import { AffineParams, Point, transformAffine } from './variations/types'
-import type { StorageFlag, TgpuBuffer, TgpuRoot, UniformFlag } from 'typegpu'
-import type { Vec4f, Vec4u, WgslArray, WgslStruct } from 'typegpu/data'
+import type { StorageFlag, TgpuBuffer, TgpuRoot } from 'typegpu'
+import type { Vec4f, Vec4u, WgslArray } from 'typegpu/data'
 import type { FlameDescriptor, TransformRecord } from './transformFunction'
 import type { CameraContext } from '@/lib/CameraContext'
 
 const { ceil } = Math
 const IFS_GROUP_SIZE = 16
 
-export const ComputeUniforms = struct({
-  seed: vec4u,
-})
-
 export function createIFSPipeline(
   root: TgpuRoot,
   camera: CameraContext,
   insideShaderCount: number,
   pointRandomSeeds: TgpuBuffer<WgslArray<Vec4u>> & StorageFlag,
-  computeUniforms: TgpuBuffer<WgslStruct<{ seed: Vec4u }>> & UniformFlag,
   transforms: TransformRecord,
   outputTextureDimension: readonly [number, number],
   outputTextureBuffer: TgpuBuffer<WgslArray<Vec4f>> & StorageFlag,
@@ -50,9 +45,6 @@ export function createIFSPipeline(
       storage: (length: number) => arrayOf(vec4u, length),
       access: 'mutable',
     },
-    computeUniforms: {
-      uniform: ComputeUniforms,
-    },
     flameUniforms: {
       storage: FlameUniforms,
       access: 'readonly',
@@ -74,7 +66,6 @@ export function createIFSPipeline(
 
   const bindGroup = root.createBindGroup(bindGroupLayout, {
     pointRandomSeeds,
-    computeUniforms,
     flameUniforms: flameUniformsBuffer,
     outputTextureDimension: outputTextureDimensionBuffer,
     outputTextureBuffer,
@@ -112,7 +103,7 @@ export function createIFSPipeline(
       let pointIndex = workgroupIndex * ${IFS_GROUP_SIZE} + localInvocationIndex;
 
       let pointSeed = pointRandomSeeds[pointIndex];
-      var seed = (computeUniforms.seed ^ pointSeed) + hash(1234 * pointIndex + pointSeed.x);
+      var seed = pointSeed + hash(1234 * pointIndex + pointSeed.x);
       setSeed(seed);
 
       var point = Point();
