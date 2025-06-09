@@ -103,7 +103,7 @@ export function createFlameWgsl({
         .join('\n')}
       p = transformAffine(uniforms.postAffine, p);
       let color = mix(point.color, uniforms.color, 0.4);
-      return Point(p, color, point.seed);
+      return Point(p, color);
     }
   `.$uses({
     transformAffine,
