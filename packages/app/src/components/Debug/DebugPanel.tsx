@@ -36,7 +36,6 @@ export function DebugPanel() {
           {bigNumberFormatter.format(qualityPointCountLimit()())} Iters
         </p>
         <p>{formatValueForPanel(renderStats().timing.ifsNs)} IFS</p>
-        <p>{formatValueForPanel(renderStats().timing.renderPointsNs)} Render</p>
         <p>{formatValueForPanel(renderStats().timing.blurNs)} Blur</p>
         <p>
           {formatValueForPanel(renderStats().timing.colorGradingNs)} Grading
