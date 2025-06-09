@@ -7,7 +7,6 @@ import {
   setRenderStats,
 } from '@/flame/renderStats'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
-import { randomVec4u } from '@/utils/randomVec4u'
 import { useCamera } from '../lib/CameraContext'
 import { useCanvas } from '../lib/CanvasContext'
 import { useRootContext } from '../lib/RootContext'
@@ -18,7 +17,7 @@ import {
   createColorGradingPipeline,
 } from './colorGrading'
 import { drawModeToImplFn } from './drawMode'
-import { ComputeUniforms, createIFSPipeline } from './ifsPipeline'
+import { createIFSPipeline } from './ifsPipeline'
 import type { v4f } from 'typegpu/data'
 import type { FlameDescriptor } from './transformFunction'
 import type { ExportImageType } from '@/App'
@@ -133,10 +132,6 @@ export function Flam3(props: Flam3Props) {
     )
   })
 
-  const computeUniforms = root
-    .createBuffer(ComputeUniforms, { seed: vec4u() })
-    .$usage('uniform')
-
   const runBlur = createMemo(() => {
     const o = outputTextures()
     if (!o) {
@@ -189,7 +184,6 @@ export function Flam3(props: Flam3Props) {
       camera,
       props.flameDescriptor.renderSettings.skipIters,
       pointRandomSeeds,
-      computeUniforms,
       props.flameDescriptor.transforms,
       textureSize,
       accumulationBuffer,
@@ -257,10 +251,6 @@ export function Flam3(props: Flam3Props) {
           clearRequested = false
           encoder.clearBuffer(accumulationBuffer.buffer)
         }
-
-        computeUniforms.write({
-          seed: randomVec4u(),
-        })
 
         const timings = timestampQuery.average()
         const iterationCount = timings
