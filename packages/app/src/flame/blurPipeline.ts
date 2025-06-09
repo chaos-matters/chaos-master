@@ -3,8 +3,8 @@ import { arrayOf, vec2i, vec4f } from 'typegpu/data'
 import { wgsl } from '@/utils/wgsl'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 
-const GROUP_SIZE_X = 8
-const GROUP_SIZE_Y = 4
+const GROUP_SIZE_X = 16
+const GROUP_SIZE_Y = 8
 
 const { ceil } = Math
 
@@ -49,37 +49,64 @@ export function createBlurPipeline(
       ...bindGroupLayout.bound,
     }}
 
-    @compute @workgroup_size(${GROUP_SIZE_X}, ${GROUP_SIZE_Y}, 1) fn blur(
-      @builtin(global_invocation_id) global_invocation_id: vec3u
-    ) {
-      let uv = vec2i(global_invocation_id.xy);
-      if (uv.x >= textureSize.x || uv.y >= textureSize.y) {
+    const PAD: i32 = 2;
+    const GROUP_SIZE_X: i32 = ${GROUP_SIZE_X};
+    const GROUP_SIZE_Y: i32 = ${GROUP_SIZE_Y};
+    const TILE_WIDTH: i32 = ${GROUP_SIZE_X} + 2 * PAD;
+    const TILE_HEIGHT: i32 = ${GROUP_SIZE_Y} + 2 * PAD;
+
+    var<workgroup> tile: array<array<vec4f, TILE_WIDTH>, TILE_HEIGHT>;
+
+    @compute @workgroup_size(GROUP_SIZE_X, GROUP_SIZE_Y, 1)
+    fn blur(@builtin(local_invocation_id) local_id: vec3u,
+            @builtin(global_invocation_id) global_id: vec3u,
+            @builtin(workgroup_id) workgroup_id: vec3u) {
+
+      let gid = vec2i(global_id.xy);
+      let lid = vec2i(local_id.xy);
+
+      // Workgroup origin in texel space
+      let group_origin = vec2i(workgroup_id.xy) * vec2i(GROUP_SIZE_X, GROUP_SIZE_Y);
+
+      // Load tile into shared memory
+      for (var dy = lid.y; dy < TILE_HEIGHT; dy += GROUP_SIZE_Y) {
+        for (var dx = lid.x; dx < TILE_WIDTH; dx += GROUP_SIZE_X) {
+          let coord = group_origin + vec2i(dx - PAD, dy - PAD);
+          let clamped = clamp(coord, vec2i(0), vec2i(textureSize) - vec2i(1));
+          let index = clamped.y * textureSize.x + clamped.x;
+          tile[dy][dx] = accumulationBuffer[index];
+        }
+      }
+
+      workgroupBarrier();
+
+      // Compute adaptive blur
+      if (gid.x >= textureSize.x || gid.y >= textureSize.y) {
         return;
       }
-      let texelIndex = uv.y * textureSize.x + uv.x;
-      let centralTexel = accumulationBuffer[texelIndex];
+
+      let localX = lid.x + PAD;
+      let localY = lid.y + PAD;
+      let centralTexel = tile[localY][localX];
       let count = centralTexel.a;
-      let stdDev = 10 + sqrt(count);
+      let stdDev = 10.0 + sqrt(count);
       var total = centralTexel;
       var totalWeight = 1.0;
-      const HALF_SIZE = 2;
-      for(var j = -HALF_SIZE; j <= HALF_SIZE; j += 1) {
-        for(var i = -HALF_SIZE; i <= HALF_SIZE; i += 1) {
+
+      for (var j = -PAD; j <= PAD; j++) {
+        for (var i = -PAD; i <= PAD; i++) {
           if (i == 0 && j == 0) { continue; }
-          let shift = vec2i(i, j);
-          let pixelCoord = uv + shift;
-          if (pixelCoord.x < 0 || pixelCoord.y < 0 || pixelCoord.x >= textureSize.x || pixelCoord.y >= textureSize.y) {
-            continue;
-          }
-          let texel = accumulationBuffer[pixelCoord.y * textureSize.x + pixelCoord.x];
-          let stdDiff = min(stdDev / (abs(texel.a - count) + 1), 1);
-          let shiftDiff = smoothstep(3, 0, length(vec2f(shift)));
+          let sample = tile[localY + j][localX + i];
+          let stdDiff = min(stdDev / (abs(sample.a - count) + 1.0), 1.0);
+          let shiftDiff = smoothstep(3, 0, length(vec2f(f32(i), f32(j))));
           let weight = stdDiff * shiftDiff;
-          total += texel * weight;
+          total += sample * weight;
           totalWeight += weight;
         }
       }
-      postprocessBuffer[texelIndex] = total / totalWeight;
+
+      let outIndex = gid.y * textureSize.x + gid.x;
+      postprocessBuffer[outIndex] = total / totalWeight;
     }
   `
 
