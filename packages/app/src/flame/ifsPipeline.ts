@@ -1,18 +1,19 @@
 import { tgpu } from 'typegpu'
-import { arrayOf, struct, vec2i, vec4f, vec4u } from 'typegpu/data'
+import { arrayOf, struct, vec2i, vec4u } from 'typegpu/data'
 import { hash, random, randomState, setSeed } from '@/shaders/random'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { wgsl } from '@/utils/wgsl'
 import { PI } from './constants'
 import { createFlameWgsl, extractFlameUniforms } from './transformFunction'
-import { AffineParams, Point, transformAffine } from './variations/types'
+import { AtomicBucket, Point } from './types'
+import { AffineParams, transformAffine } from './variations/types'
 import type { StorageFlag, TgpuBuffer, TgpuRoot } from 'typegpu'
-import type { Vec4f, Vec4u, WgslArray } from 'typegpu/data'
+import type { Vec4u, WgslArray } from 'typegpu/data'
 import type { FlameDescriptor, TransformRecord } from './transformFunction'
 import type { CameraContext } from '@/lib/CameraContext'
 
 const { ceil } = Math
-const IFS_GROUP_SIZE = 16
+const IFS_GROUP_SIZE = 32
 
 export function createIFSPipeline(
   root: TgpuRoot,
@@ -21,7 +22,7 @@ export function createIFSPipeline(
   pointRandomSeeds: TgpuBuffer<WgslArray<Vec4u>> & StorageFlag,
   transforms: TransformRecord,
   outputTextureDimension: readonly [number, number],
-  outputTextureBuffer: TgpuBuffer<WgslArray<Vec4f>> & StorageFlag,
+  accumulationBuffer: TgpuBuffer<WgslArray<typeof AtomicBucket>> & StorageFlag,
 ) {
   const { device } = root
   const flames = Object.fromEntries(
@@ -52,8 +53,8 @@ export function createIFSPipeline(
     outputTextureDimension: {
       uniform: vec2i,
     },
-    outputTextureBuffer: {
-      storage: (length: number) => arrayOf(vec4f, length),
+    accumulationBuffer: {
+      storage: (length: number) => arrayOf(AtomicBucket, length),
       access: 'mutable',
     },
   })
@@ -68,7 +69,7 @@ export function createIFSPipeline(
     pointRandomSeeds,
     flameUniforms: flameUniformsBuffer,
     outputTextureDimension: outputTextureDimensionBuffer,
-    outputTextureBuffer,
+    accumulationBuffer,
   })
 
   const ifsShaderCode = wgsl/* wgsl */ `
@@ -101,6 +102,10 @@ export function createIFSPipeline(
         workgroupId.z * numWorkgroups.x * numWorkgroups.y;
 
       let pointIndex = workgroupIndex * ${IFS_GROUP_SIZE} + localInvocationIndex;
+
+      if (pointIndex >= arrayLength(&pointRandomSeeds)) {
+        return;
+      }
 
       let pointSeed = pointRandomSeeds[pointIndex];
       var seed = pointSeed + hash(1234 * pointIndex + pointSeed.x);
@@ -152,7 +157,9 @@ export function createIFSPipeline(
       }
 
       let pixelIndex = screenI.y * outputTextureDimension.x + screenI.x;
-      outputTextureBuffer[pixelIndex] += vec4f(0, point.color, 1);
+      atomicAdd(&accumulationBuffer[pixelIndex].count, 1000);
+      atomicAdd(&accumulationBuffer[pixelIndex].color.a, i32(point.color.x * 1000));
+      atomicAdd(&accumulationBuffer[pixelIndex].color.b, i32(point.color.y * 1000));
     }
   `
 

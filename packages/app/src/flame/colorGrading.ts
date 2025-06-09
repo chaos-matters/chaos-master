@@ -2,6 +2,7 @@ import { oklabGamutClip, oklabGamutClipSlot, oklabToRgb } from '@typegpu/color'
 import { tgpu } from 'typegpu'
 import { arrayOf, f32, struct, vec2i, vec4f } from 'typegpu/data'
 import { wgsl } from '@/utils/wgsl'
+import { Bucket } from './types'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 import type { DrawModeFn } from './drawMode'
 
@@ -21,7 +22,7 @@ const bindGroupLayout = tgpu.bindGroupLayout({
     uniform: vec2i,
   },
   accumulationBuffer: {
-    storage: (length: number) => arrayOf(vec4f, length),
+    storage: (length: number) => arrayOf(Bucket, length),
     access: 'readonly',
   },
 })
@@ -84,10 +85,10 @@ export function createColorGradingPipeline(
       let pos2i = vec2i(in.pos.xy);
       let texelIndex = pos2i.y * textureSize.x + pos2i.x;
       let tex = accumulationBuffer[texelIndex];
-      let count = tex.a;
+      let count = f32(tex.count) * 0.001;
+      let ab = vec2f(f32(tex.color.a), f32(tex.color.b)) * 0.001 / count;
       let adjustedCount = 0.1 * count * uniforms.averagePointCountPerBucketInv;
       let value = uniforms.exposure * pow(log(adjustedCount + 1), 0.4545);
-      let ab = tex.gb / count;
       let rgb = saturate(oklabToRgb(vec3f(drawMode(value), ab)));
       let alpha = saturate(value) * (1 - edgeFade);
       let rgba = vec4f(rgb, alpha);
