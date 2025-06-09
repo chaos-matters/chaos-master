@@ -56,12 +56,6 @@ export const parametricVariation = <T extends AnyWgslData>(
     .$uses(dependencyMap),
 })
 
-export const Point = struct({
-  position: vec2f,
-  /** OkLab a and b. */
-  color: vec2f,
-})
-
 export const outputTextureFormat = 'rgba32float'
 
 export const transformAffine = tgpu['~unstable'].fn(

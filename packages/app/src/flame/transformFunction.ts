@@ -2,10 +2,10 @@ import { tgpu } from 'typegpu'
 import { f32, struct, vec2f } from 'typegpu/data'
 import { recordEntries } from '@/utils/record'
 import { sum } from '@/utils/sum'
+import { Point } from './types'
 import { transformVariations } from './variations'
 import {
   AffineParams,
-  Point,
   transformAffine,
   VariationInfo,
 } from './variations/types'

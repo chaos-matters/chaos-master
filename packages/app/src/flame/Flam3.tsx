@@ -18,6 +18,7 @@ import {
 } from './colorGrading'
 import { drawModeToImplFn } from './drawMode'
 import { createIFSPipeline } from './ifsPipeline'
+import { Bucket } from './types'
 import type { v4f } from 'typegpu/data'
 import type { FlameDescriptor } from './transformFunction'
 import type { ExportImageType } from '@/App'
@@ -97,11 +98,11 @@ export function Flam3(props: Flam3Props) {
     }
 
     const accumulationBuffer = root
-      .createBuffer(arrayOf(vec4f, width * height))
+      .createBuffer(arrayOf(Bucket, width * height))
       .$usage('storage')
 
     const postprocessBuffer = root
-      .createBuffer(arrayOf(vec4f, width * height))
+      .createBuffer(arrayOf(Bucket, width * height))
       .$usage('storage')
 
     onCleanup(() => {
@@ -186,6 +187,7 @@ export function Flam3(props: Flam3Props) {
       pointRandomSeeds,
       props.flameDescriptor.transforms,
       textureSize,
+      // @ts-expect-error Waiting for atomics fix
       accumulationBuffer,
     )
 
@@ -311,8 +313,6 @@ export function Flam3(props: Flam3Props) {
             pass.end()
           }
         }
-
-        //_readCountUnderPointer(renderAccumulationIndex)
 
         timestampQuery.write(encoder)
         device.queue.submit([encoder.finish()])

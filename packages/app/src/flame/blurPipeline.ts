@@ -1,6 +1,7 @@
 import { tgpu } from 'typegpu'
-import { arrayOf, vec2i, vec4f } from 'typegpu/data'
+import { arrayOf, vec2i } from 'typegpu/data'
 import { wgsl } from '@/utils/wgsl'
+import { Bucket } from './types'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 
 const GROUP_SIZE_X = 8
@@ -13,11 +14,11 @@ const bindGroupLayout = tgpu.bindGroupLayout({
     uniform: vec2i,
   },
   accumulationBuffer: {
-    storage: (length: number) => arrayOf(vec4f, length),
+    storage: (length: number) => arrayOf(Bucket, length),
     access: 'readonly',
   },
   postprocessBuffer: {
-    storage: (length: number) => arrayOf(vec4f, length),
+    storage: (length: number) => arrayOf(Bucket, length),
     access: 'mutable',
   },
 })
@@ -56,30 +57,36 @@ export function createBlurPipeline(
       if (uv.x >= textureSize.x || uv.y >= textureSize.y) {
         return;
       }
+
       let texelIndex = uv.y * textureSize.x + uv.x;
       let centralTexel = accumulationBuffer[texelIndex];
-      let count = centralTexel.a;
+      let count = f32(centralTexel.count) * 0.001;
       let stdDev = 10 + sqrt(count);
-      var total = centralTexel;
+      var totalColorA = f32(centralTexel.color.a);
+      var totalColorB = f32(centralTexel.color.b);
+      var totalCount = count;
       var totalWeight = 1.0;
       const HALF_SIZE = 2;
       for(var j = -HALF_SIZE; j <= HALF_SIZE; j += 1) {
         for(var i = -HALF_SIZE; i <= HALF_SIZE; i += 1) {
           if (i == 0 && j == 0) { continue; }
           let shift = vec2i(i, j);
-          let pixelCoord = uv + shift;
-          if (pixelCoord.x < 0 || pixelCoord.y < 0 || pixelCoord.x >= textureSize.x || pixelCoord.y >= textureSize.y) {
-            continue;
-          }
+          let pixelCoord = clamp(uv + shift, vec2i(0), textureSize - 1);
           let texel = accumulationBuffer[pixelCoord.y * textureSize.x + pixelCoord.x];
-          let stdDiff = min(stdDev / (abs(texel.a - count) + 1), 1);
+          let texelCount = f32(texel.count) * 0.001;
+          let stdDiff = min(stdDev / (abs(texelCount - count) + 1), 1);
           let shiftDiff = smoothstep(3, 0, length(vec2f(shift)));
           let weight = stdDiff * shiftDiff;
-          total += texel * weight;
+          totalColorA += f32(texel.color.a) * weight;
+          totalColorB += f32(texel.color.b) * weight;
+          totalCount += texelCount * weight;
           totalWeight += weight;
         }
       }
-      postprocessBuffer[texelIndex] = total / totalWeight;
+
+      postprocessBuffer[texelIndex].count = u32(1000 * totalCount / totalWeight);
+      postprocessBuffer[texelIndex].color.a = i32(totalColorA / totalWeight);
+      postprocessBuffer[texelIndex].color.b = i32(totalColorB / totalWeight);
     }
   `
 
