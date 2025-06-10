@@ -260,7 +260,12 @@ export function Flam3(props: Flam3Props) {
           : 1
 
         if (timings) {
-          setRenderTimings(timings)
+          setRenderTimings({
+            ...timings,
+            adaptiveFilterMs: props.adaptiveFilterEnabled
+              ? timings.adaptiveFilterMs
+              : 0,
+          })
         }
 
         const timestampWrites = timestampQuery.timestampWrites(frameId)
