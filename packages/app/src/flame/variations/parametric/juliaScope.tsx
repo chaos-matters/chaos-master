@@ -1,21 +1,14 @@
-import { f32, struct } from 'typegpu/data'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { PI } from '@/flame/constants'
+import { schemaToF32Struct } from '@/flame/valibot/schemaUtil'
+import { JuliaScopeParamsSchema } from '@/flame/valibot/variationSchema'
 import { parametricVariation } from '@/flame/variations/types'
 import { random } from '@/shaders/random'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export const JuliaScopeParams = struct({
-  power: f32,
-  dist: f32,
-})
-
-export const JuliaScopeParamsDefaults: Infer<typeof JuliaScopeParams> = {
-  power: 1,
-  dist: 5,
-}
+const JuliaScopeParams = schemaToF32Struct(JuliaScopeParamsSchema.entries)
 
 export const JuliaScopeParamsEditor: EditorFor<
   Infer<typeof JuliaScopeParams>
@@ -38,7 +31,6 @@ export const JuliaScopeParamsEditor: EditorFor<
 
 export const juliaScope = parametricVariation(
   JuliaScopeParams,
-  JuliaScopeParamsDefaults,
   JuliaScopeParamsEditor,
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo, P: JuliaScopeParams) -> vec2f {

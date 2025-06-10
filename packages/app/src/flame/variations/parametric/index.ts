@@ -1,3 +1,4 @@
+import { parametricVariations } from '@/flame/valibot/variationSchema'
 import { isParametric, transformVariations } from '..'
 import type {
   ParametricVariationDescriptor,
@@ -15,7 +16,7 @@ export function getVariationDefault(
   }
   return {
     type,
-    params: transformVariations[type].paramDefaults,
+    params: parametricVariations[type].defaults,
     weight,
   } as TransformVariationDescriptor
 }

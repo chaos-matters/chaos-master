@@ -1,20 +1,13 @@
-import { f32, struct } from 'typegpu/data'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { PI } from '@/flame/constants'
+import { schemaToF32Struct } from '@/flame/valibot/schemaUtil'
+import { Fan2ParamsSchema } from '@/flame/valibot/variationSchema'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-const Fan2Params = struct({
-  x: f32,
-  y: f32,
-})
-
-export const Fan2ParamsDefaults: Infer<typeof Fan2Params> = {
-  x: 1,
-  y: 1,
-}
+const Fan2Params = schemaToF32Struct(Fan2ParamsSchema.entries)
 
 export const Fan2ParamsEditor: EditorFor<Infer<typeof Fan2Params>> = (
   props,
@@ -37,7 +30,6 @@ export const Fan2ParamsEditor: EditorFor<Infer<typeof Fan2Params>> = (
 
 export const fan2 = parametricVariation(
   Fan2Params,
-  Fan2ParamsDefaults,
   Fan2ParamsEditor,
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo, P: FanParams) -> vec2f {

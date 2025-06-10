@@ -9,37 +9,25 @@ import {
   transformAffine,
   VariationInfo,
 } from './variations/types'
-import type { DrawMode } from './drawMode'
+import type { InferOutput } from 'valibot'
+import type {
+  FlameDescriptorSchema,
+  TransformFunctionSchema,
+  transformIdSchema,
+  variationIdSchema,
+} from './valibot/flameSchema'
 import type {
   TransformVariation,
   TransformVariationDescriptor,
 } from './variations'
 
-export type TransformId = string & { __brand: 'TransformId' }
-export type VariationId = string & { __brand: 'VariationId' }
+export type TransformId = InferOutput<typeof transformIdSchema>
+export type VariationId = InferOutput<typeof variationIdSchema>
+export type FlameDescriptor = InferOutput<typeof FlameDescriptorSchema>
+export type TransformFunction = InferOutput<typeof TransformFunctionSchema>
+
 export type TransformRecord = Record<TransformId, TransformFunction>
 export type VariationRecord = Record<VariationId, TransformVariationDescriptor>
-
-export type RenderSettings = {
-  exposure: number
-  skipIters: number
-  drawMode: DrawMode
-  backgroundColor?: [number, number, number]
-  camera: { zoom: number; position: [number, number] }
-}
-
-export type TransformFunction = {
-  probability: number
-  preAffine: AffineParams
-  postAffine: AffineParams
-  color: { x: number; y: number }
-  variations: VariationRecord
-}
-
-export type FlameDescriptor = {
-  renderSettings: RenderSettings
-  transforms: TransformRecord
-}
 
 const FlameUniformsBase = struct({
   probability: f32,
