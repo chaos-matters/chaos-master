@@ -44,7 +44,7 @@ export default tseslint.config(
       // this is caught by ts already and eslint doesn't understand @/
       'import-x/no-unresolved': 'off',
 
-      'no-console': ['error', { allow: ['info', 'warn', 'error'] }],
+      'no-console': ['error', { allow: ['info', 'warn', 'error', 'table'] }],
       'no-throw-literal': 'error',
       'no-useless-concat': 'error',
       'prefer-template': 'error',

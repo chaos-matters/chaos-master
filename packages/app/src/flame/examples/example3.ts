@@ -1,15 +1,10 @@
-import { tid, vid } from './util'
-import type { FlameDescriptor } from '../transformFunction'
+import { defineExample, tid, vid } from './util'
 
-export const example3: FlameDescriptor = {
+export const example3 = defineExample({
   renderSettings: {
-    exposure: 0.2,
+    exposure: 0.25,
     skipIters: 20,
     drawMode: 'light',
-    camera: {
-      zoom: 1,
-      position: [0, 0],
-    },
   },
   transforms: {
     [tid('2fa2980e_6df0_4735_8334_052f42d6639d')]: {
@@ -71,4 +66,4 @@ export const example3: FlameDescriptor = {
       },
     },
   },
-}
+})

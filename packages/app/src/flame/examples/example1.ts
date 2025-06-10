@@ -1,7 +1,11 @@
-import { tid, vid } from './util'
-import type { FlameDescriptor } from '../transformFunction'
+import { latestSchemaVersion } from '../schema/flameSchema'
+import { defineExample, tid, vid } from './util'
 
-export const example1: FlameDescriptor = {
+export const example1 = defineExample({
+  version: latestSchemaVersion,
+  metadata: {
+    author: 'deluksic',
+  },
   renderSettings: {
     exposure: 0.25,
     skipIters: 20,
@@ -74,4 +78,4 @@ export const example1: FlameDescriptor = {
       },
     },
   },
-}
+})
