@@ -1,3 +1,4 @@
+import { convertNanoToMilliSeconds } from './convertSeconds'
 import { sum } from './sum'
 
 export function createTimestampQuery<T extends string>(
@@ -74,8 +75,10 @@ export function createTimestampQuery<T extends string>(
     const results = Object.fromEntries(
       timestampNames.map((name, i) => [
         name,
-        Number(
-          times[locationIndex + i * 2 + 1]! - times[locationIndex + i * 2]!,
+        convertNanoToMilliSeconds(
+          Number(
+            times[locationIndex + i * 2 + 1]! - times[locationIndex + i * 2]!,
+          ),
         ),
       ]),
     ) as Record<T, number>

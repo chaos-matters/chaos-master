@@ -2,22 +2,25 @@ import { createSignal, Show } from 'solid-js'
 import { isDev } from 'solid-js/web'
 import {
   accumulatedPointCount,
+  iterationSpeedPointPerSec,
   qualityPointCountLimit,
-  renderStats,
+  renderTimings,
 } from '@/flame/renderStats'
 import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
 import ui from './DebugPanel.module.css'
 
 const bigNumberFormatter = Intl.NumberFormat('en', { notation: 'compact' })
 
-function convertNanoToMilliSeconds(valueNs: number): number {
-  return valueNs / 1e6
+function formatIterationSpeed(pointPerSec: number | undefined) {
+  return pointPerSec !== undefined && Number.isFinite(pointPerSec)
+    ? bigNumberFormatter.format(pointPerSec)
+    : '?'
 }
 
 export function DebugPanel() {
   const [showDebugPanel, setShowDebugPanel] = createSignal(isDev)
-  const formatValueForPanel = (value: number) => {
-    return `${convertNanoToMilliSeconds(value).toFixed(2)} ms`
+  const formatValueForPanel = (ms: number) => {
+    return `${ms.toFixed(2)} ms`
   }
   useKeyboardShortcuts({
     KeyM: (ev) => {
@@ -35,11 +38,10 @@ export function DebugPanel() {
           {bigNumberFormatter.format(accumulatedPointCount())} /{' '}
           {bigNumberFormatter.format(qualityPointCountLimit()())} Iters
         </p>
-        <p>{formatValueForPanel(renderStats().timing.ifsNs)} IFS</p>
-        <p>{formatValueForPanel(renderStats().timing.blurNs)} Blur</p>
-        <p>
-          {formatValueForPanel(renderStats().timing.colorGradingNs)} Grading
-        </p>
+        <p>{formatIterationSpeed(iterationSpeedPointPerSec())} Iters / sec</p>
+        <p>{formatValueForPanel(renderTimings().ifsMs)} IFS</p>
+        <p>{formatValueForPanel(renderTimings().adaptiveFilterMs)} Blur</p>
+        <p>{formatValueForPanel(renderTimings().colorGradingMs)} Grading</p>
       </div>
     </Show>
   )
