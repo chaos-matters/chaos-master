@@ -11,14 +11,11 @@ export function useLoadFlameFromFile() {
       return
     }
     const arrBuf = new Uint8Array(arrayBuffer)
-    const newFlameDescriptor = await extractFlameFromPng(arrBuf).catch(
-      () => undefined,
-    )
-    if (!newFlameDescriptor) {
-      await alert(`Could not find Flame Description in '${file.name}'.`)
-      return
+    try {
+      return await extractFlameFromPng(arrBuf)
+    } catch (_) {
+      await alert(`No valid flame found in '${file.name}'.`)
     }
-    return newFlameDescriptor
   }
 
   return loadFromFile
