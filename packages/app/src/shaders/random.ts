@@ -54,7 +54,6 @@ export const hash = tgpu['~unstable'].fn([u32], u32)/* wgsl */ `
     return x;
   }
 `
-
 export const randomUnitDisk = tgpu['~unstable'].fn([], vec2f)/* wgsl */ `
   () -> vec2f {
     let r = sqrt(random());

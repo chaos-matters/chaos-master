@@ -74,13 +74,12 @@ export const camera2DPixelRatio = tgpu['~unstable'].fn([], f32)/* wgsl */ `
 
 type Camera2DProps = {
   position: v2f
-  fovy: number
+  zoom: number
 }
 
 export function Camera2D(props: ParentProps<Camera2DProps>) {
   const { root } = useRootContext()
   const { canvasSize, pixelRatio } = useCanvas()
-  const zoom = () => 1 / props.fovy
 
   const uniformsBuffer = root
     .createBuffer(Camera2DUniforms)
@@ -92,11 +91,12 @@ export function Camera2D(props: ParentProps<Camera2DProps>) {
   })
 
   const uniforms = createMemo(() => {
-    const { position, fovy } = props
+    const { position, zoom } = props
     const { x, y } = position
     const { width, height } = canvasSize()
     const aspect = width / height
     const viewMatrix4 = mat4x4f()
+    const fovy = 1 / zoom
     mat4.ortho(
       x - aspect * fovy,
       x + aspect * fovy,
@@ -154,7 +154,7 @@ export function Camera2D(props: ParentProps<Camera2DProps>) {
           worldToClip,
           clipToWorld,
         },
-        zoom,
+        zoom: () => props.zoom,
       }}
     >
       {props.children}

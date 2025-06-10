@@ -1,18 +1,22 @@
-import { f32, struct } from 'typegpu/data'
+import * as v from 'valibot'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { random } from '@/shaders/random'
+import { schemaToF32Struct } from '@/utils/schemaUtil'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
+import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export const GridParams = struct({
-  divisions: f32,
-  size: f32,
-  jitterNearIntersectionsDistance: f32,
+export const GridParamsSchema = v.object({
+  divisions: v.number(),
+  size: v.number(),
+  jitterNearIntersectionsDistance: v.number(),
 })
 
-export const GridParamsDefaults: Infer<typeof GridParams> = {
+const GridParams = schemaToF32Struct(GridParamsSchema.entries)
+
+const GridParamsDefaults: InferOutput<typeof GridParamsSchema> = {
   divisions: 10.0,
   size: 1.0,
   jitterNearIntersectionsDistance: 0.002,
