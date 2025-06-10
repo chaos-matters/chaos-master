@@ -4,6 +4,11 @@ export function createTimestampQuery<T extends string>(
   device: GPUDevice,
   timestampNames: T[],
   avgCount = 5,
+  /**
+   * Each timestamp pair can be written into N different locations,
+   * changing location each frame. This seems to help with preventing
+   * a race condition while reading the timestamps.
+   */
   pairLocationCount = 32,
 ) {
   const timestampCount = timestampNames.length

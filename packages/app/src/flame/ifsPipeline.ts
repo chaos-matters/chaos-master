@@ -5,7 +5,7 @@ import { recordEntries, recordKeys } from '@/utils/record'
 import { wgsl } from '@/utils/wgsl'
 import { PI } from './constants'
 import { createFlameWgsl, extractFlameUniforms } from './transformFunction'
-import { AtomicBucket, Point } from './types'
+import { AtomicBucket, BUCKET_FIXED_POINT_MULTIPLIER, Point } from './types'
 import { AffineParams, transformAffine } from './variations/types'
 import type { StorageFlag, TgpuBuffer, TgpuRoot } from 'typegpu'
 import type { Vec4u, WgslArray } from 'typegpu/data'
@@ -157,9 +157,10 @@ export function createIFSPipeline(
       }
 
       let pixelIndex = screenI.y * outputTextureDimension.x + screenI.x;
-      atomicAdd(&accumulationBuffer[pixelIndex].count, 1000);
-      atomicAdd(&accumulationBuffer[pixelIndex].color.a, i32(point.color.x * 1000));
-      atomicAdd(&accumulationBuffer[pixelIndex].color.b, i32(point.color.y * 1000));
+      const fixed_m = ${BUCKET_FIXED_POINT_MULTIPLIER};
+      atomicAdd(&accumulationBuffer[pixelIndex].count, 1 * fixed_m);
+      atomicAdd(&accumulationBuffer[pixelIndex].color.a, i32(point.color.x * fixed_m));
+      atomicAdd(&accumulationBuffer[pixelIndex].color.b, i32(point.color.y * fixed_m));
     }
   `
 
