@@ -46,11 +46,6 @@ export function Flam3(props: Flam3Props) {
   const { context, canvasSize, canvas, canvasFormat } = useCanvas()
 
   const backgroundColorFinal = () => {
-    if (props.flameDescriptor.renderSettings.backgroundColor === undefined) {
-      return props.flameDescriptor.renderSettings.drawMode === 'light'
-        ? vec3f(0)
-        : vec3f(1)
-    }
     return vec3f(...props.flameDescriptor.renderSettings.backgroundColor)
   }
 

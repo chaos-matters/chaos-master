@@ -1,24 +1,15 @@
-import { f32, struct } from 'typegpu/data'
 import { AngleEditor } from '@/components/Sliders/ParametricEditors/AngleEditor'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
+import { PieParamsSchema } from '@/flame/valibot/index'
+import { schemaToF32Struct } from '@/flame/valibot/schemaUtil'
 import { random } from '@/shaders/random'
 import { PI } from '../../constants'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export const PieParams = struct({
-  slices: f32,
-  rotation: f32,
-  thickness: f32,
-})
-
-export const PieParamsDefaults: Infer<typeof PieParams> = {
-  slices: 6,
-  rotation: Math.PI,
-  thickness: 0.5,
-}
+export const PieParams = schemaToF32Struct(PieParamsSchema.entries)
 
 export const PieParamsEditor: EditorFor<Infer<typeof PieParams>> = (props) => (
   <>
@@ -40,7 +31,6 @@ export const PieParamsEditor: EditorFor<Infer<typeof PieParams>> = (props) => (
 
 export const pie = parametricVariation(
   PieParams,
-  PieParamsDefaults,
   PieParamsEditor,
   /* wgsl */ `(_pos: vec2f, _varInfo: VariationInfo, P: PieParams) -> vec2f {
     let p1 = P.slices;

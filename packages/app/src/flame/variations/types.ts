@@ -2,9 +2,11 @@ import { tgpu } from 'typegpu'
 import { f32, struct, vec2f } from 'typegpu/data'
 import type { TgpuFn } from 'typegpu'
 import type { AnyWgslData, Infer, Vec2f } from 'typegpu/data'
+import type { InferOutput } from 'valibot'
+import type { AffineParamsSchema } from '../valibot/flameSchema'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export type AffineParams = Infer<typeof AffineParams>
+export type AffineParams = InferOutput<typeof AffineParamsSchema>
 // prettier-ignore
 export const AffineParams = struct({
   a: f32, b: f32, c: f32,
@@ -25,7 +27,6 @@ export type SimpleVariation = {
 export type ParametricVariation<T extends AnyWgslData> = {
   type: 'parametric'
   paramShema: T
-  paramDefaults: Infer<T>
   editor: EditorFor<Infer<T>> | undefined
   fn: TgpuFn<[Vec2f, typeof VariationInfo, T], Vec2f>
 }
@@ -42,14 +43,12 @@ export const simpleVariation = (
 
 export const parametricVariation = <T extends AnyWgslData>(
   paramShema: T,
-  paramDefaults: Infer<T>,
   editor: EditorFor<Infer<T>> | undefined,
   wgsl: string,
   dependencyMap: Record<string, unknown> = {},
 ): ParametricVariation<T> => ({
   type: 'parametric',
   paramShema,
-  paramDefaults,
   editor,
   fn: tgpu['~unstable']
     .fn([vec2f, VariationInfo, paramShema], vec2f)(wgsl)

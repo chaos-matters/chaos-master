@@ -16,6 +16,7 @@
     "solid-js": "1.9.7",
     "structurajs": "0.12.6",
     "typegpu": "0.5.8",
+    "valibot": "^1.1.0",
     "wgpu-matrix": "3.4.0"
   }
 }

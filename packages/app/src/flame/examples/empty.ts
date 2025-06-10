@@ -1,7 +1,7 @@
-import { tid, vid } from './util'
+import { tid, validateExample, vid } from './util'
 import type { FlameDescriptor } from '../transformFunction'
 
-export const empty: FlameDescriptor = {
+export const empty: FlameDescriptor = validateExample({
   renderSettings: {
     exposure: 0.25,
     skipIters: 20,
@@ -26,4 +26,4 @@ export const empty: FlameDescriptor = {
       },
     },
   },
-}
+})

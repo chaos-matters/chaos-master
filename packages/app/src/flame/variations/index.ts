@@ -52,6 +52,7 @@ import {
   waves,
 } from './simpleVariations'
 import type { Infer } from 'typegpu/data'
+import type { TransformVariationDescriptor } from '../valibot/variationSchema'
 import type { ParametricVariation } from './types'
 
 export const transformVariations = {
@@ -110,6 +111,17 @@ export const transformVariations = {
 
 export type TransformVariation = keyof typeof transformVariations
 export const variationTypes = Object.keys(transformVariations)
+export const transformVariationNames = Object.keys(
+  transformVariations,
+) as TransformVariation[]
+
+export type ParametricVariationDescriptor = {
+  [K in TransformVariation]: (typeof transformVariations)[K] extends ParametricVariation<
+    infer P
+  >
+    ? { type: K; weight: number; params: Infer<P> }
+    : never
+}[TransformVariation]
 
 export function isParametric(
   name: TransformVariation,
@@ -119,7 +131,7 @@ export function isParametric(
 
 export function isParametricType(
   v: TransformVariationDescriptor,
-): v is Extract<TransformVariationDescriptor, { params: unknown }> {
+): v is ParametricVariationDescriptor {
   return 'params' in v
 }
 export function isVariationType(
@@ -127,24 +139,3 @@ export function isVariationType(
 ): maybeType is TransformVariation {
   return variationTypes.includes(maybeType)
 }
-
-export type ParametricTransformParams<T extends TransformVariation> =
-  (typeof transformVariations)[T] extends ParametricVariation<infer P>
-    ? Infer<P>
-    : never
-
-export type TransformVariationDescriptor = {
-  [K in TransformVariation]: (typeof transformVariations)[K] extends ParametricVariation<
-    infer P
-  >
-    ? { type: K; weight: number; params: Infer<P> }
-    : { type: K; weight: number }
-}[TransformVariation]
-
-export type ParametricVariationDescriptor = {
-  [K in TransformVariation]: (typeof transformVariations)[K] extends ParametricVariation<
-    infer P
-  >
-    ? { type: K; weight: number; params: Infer<P> }
-    : never
-}[TransformVariation]

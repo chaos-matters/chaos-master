@@ -1,22 +1,13 @@
-import { f32, struct } from 'typegpu/data'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
+import { GridParamsSchema } from '@/flame/valibot/index'
+import { schemaToF32Struct } from '@/flame/valibot/schemaUtil'
 import { random } from '@/shaders/random'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export const GridParams = struct({
-  divisions: f32,
-  size: f32,
-  jitterNearIntersectionsDistance: f32,
-})
-
-export const GridParamsDefaults: Infer<typeof GridParams> = {
-  divisions: 10.0,
-  size: 1.0,
-  jitterNearIntersectionsDistance: 0.002,
-}
+const GridParams = schemaToF32Struct(GridParamsSchema.entries)
 
 export const GridParamsEditor: EditorFor<Infer<typeof GridParams>> = (
   props,
@@ -49,7 +40,6 @@ export const GridParamsEditor: EditorFor<Infer<typeof GridParams>> = (
 
 export const grid = parametricVariation(
   GridParams,
-  GridParamsDefaults,
   GridParamsEditor,
   /* wgsl */ `
   (_pos: vec2f, _varInfo: VariationInfo, P: GridParams) -> vec2f {

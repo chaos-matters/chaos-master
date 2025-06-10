@@ -1,23 +1,12 @@
-import { f32, struct } from 'typegpu/data'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
+import { PdjParamsSchema } from '@/flame/valibot/index'
+import { schemaToF32Struct } from '@/flame/valibot/schemaUtil'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export const PdjParams = struct({
-  a: f32,
-  b: f32,
-  c: f32,
-  d: f32,
-})
-
-export const PdjParamsDefaults: Infer<typeof PdjParams> = {
-  a: 1,
-  b: 2,
-  c: 3,
-  d: 4,
-}
+export const PdjParams = schemaToF32Struct(PdjParamsSchema.entries)
 
 export const PdjParamsEditor: EditorFor<Infer<typeof PdjParams>> = (props) => (
   <>
@@ -50,7 +39,6 @@ export const PdjParamsEditor: EditorFor<Infer<typeof PdjParams>> = (props) => (
 
 export const pdjVar = parametricVariation(
   PdjParams,
-  PdjParamsDefaults,
   PdjParamsEditor,
   /* wgsl */ `(pos: vec2f, _varInfo: VariationInfo, P: PdjParams) -> vec2f {
     let p1 = P.a;
