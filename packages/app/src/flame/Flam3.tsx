@@ -152,9 +152,9 @@ export function Flam3(props: Flam3Props) {
   }
 
   const timestampQuery = createTimestampQuery(device, [
+    'ifs',
     'adaptiveFilter',
     'colorGrading',
-    'ifs',
   ])
 
   function estimateIterationCount(

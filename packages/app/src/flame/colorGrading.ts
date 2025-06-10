@@ -2,7 +2,7 @@ import { oklabGamutClip, oklabGamutClipSlot, oklabToRgb } from '@typegpu/color'
 import { tgpu } from 'typegpu'
 import { arrayOf, f32, struct, vec2i, vec4f } from 'typegpu/data'
 import { wgsl } from '@/utils/wgsl'
-import { Bucket } from './types'
+import { Bucket, BUCKET_FIXED_POINT_MULTIPLIER_INV } from './types'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 import type { DrawModeFn } from './drawMode'
 
@@ -79,14 +79,16 @@ export function createColorGradingPipeline(
       );
     }
 
+    const fixed_m_inv = ${BUCKET_FIXED_POINT_MULTIPLIER_INV};
+
     @fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
       let edgeFade = uniforms.edgeFadeColor.a * smoothstep(0.98, 1, max(abs(in.uv.x), abs(in.uv.y)));
       let backgroundColor = mix(uniforms.backgroundColor, uniforms.edgeFadeColor, edgeFade);
       let pos2i = vec2i(in.pos.xy);
       let texelIndex = pos2i.y * textureSize.x + pos2i.x;
       let tex = accumulationBuffer[texelIndex];
-      let count = f32(tex.count) * 0.001;
-      let ab = vec2f(f32(tex.color.a), f32(tex.color.b)) * 0.001 / count;
+      let count = f32(tex.count) * fixed_m_inv;
+      let ab = vec2f(f32(tex.color.a), f32(tex.color.b)) * fixed_m_inv / count;
       let adjustedCount = 0.1 * count * uniforms.averagePointCountPerBucketInv;
       let value = uniforms.exposure * pow(log(adjustedCount + 1), 0.4545);
       let rgb = saturate(oklabToRgb(vec3f(drawMode(value), ab)));

@@ -6,6 +6,10 @@ export const Point = struct({
   color: vec2f,
 })
 
+export const BUCKET_FIXED_POINT_MULTIPLIER = 1000
+export const BUCKET_FIXED_POINT_MULTIPLIER_INV =
+  1 / BUCKET_FIXED_POINT_MULTIPLIER
+
 export const Bucket = struct({
   /** Fixed point multiplier 1000 */
   count: u32,

@@ -1,7 +1,11 @@
 import { tgpu } from 'typegpu'
 import { arrayOf, vec2i } from 'typegpu/data'
 import { wgsl } from '@/utils/wgsl'
-import { Bucket } from './types'
+import {
+  Bucket,
+  BUCKET_FIXED_POINT_MULTIPLIER,
+  BUCKET_FIXED_POINT_MULTIPLIER_INV,
+} from './types'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 
 const GROUP_SIZE_X = 8
@@ -50,6 +54,9 @@ export function createBlurPipeline(
       ...bindGroupLayout.bound,
     }}
 
+    const fixed_m = ${BUCKET_FIXED_POINT_MULTIPLIER};
+    const fixed_m_inv = ${BUCKET_FIXED_POINT_MULTIPLIER_INV};
+
     @compute @workgroup_size(${GROUP_SIZE_X}, ${GROUP_SIZE_Y}, 1) fn blur(
       @builtin(global_invocation_id) global_invocation_id: vec3u
     ) {
@@ -60,8 +67,8 @@ export function createBlurPipeline(
 
       let texelIndex = uv.y * textureSize.x + uv.x;
       let centralTexel = accumulationBuffer[texelIndex];
-      let count = f32(centralTexel.count) * 0.001;
-      let stdDev = 10 + sqrt(count);
+      let count = f32(centralTexel.count);
+      let stdDev = (10 + sqrt(count * fixed_m_inv)) * fixed_m;
       var totalColorA = f32(centralTexel.color.a);
       var totalColorB = f32(centralTexel.color.b);
       var totalCount = count;
@@ -73,7 +80,7 @@ export function createBlurPipeline(
           let shift = vec2i(i, j);
           let pixelCoord = clamp(uv + shift, vec2i(0), textureSize - 1);
           let texel = accumulationBuffer[pixelCoord.y * textureSize.x + pixelCoord.x];
-          let texelCount = f32(texel.count) * 0.001;
+          let texelCount = f32(texel.count);
           let stdDiff = min(stdDev / (abs(texelCount - count) + 1), 1);
           let shiftDiff = smoothstep(3, 0, length(vec2f(shift)));
           let weight = stdDiff * shiftDiff;
@@ -84,7 +91,7 @@ export function createBlurPipeline(
         }
       }
 
-      postprocessBuffer[texelIndex].count = u32(1000 * totalCount / totalWeight);
+      postprocessBuffer[texelIndex].count = u32(totalCount / totalWeight);
       postprocessBuffer[texelIndex].color.a = i32(totalColorA / totalWeight);
       postprocessBuffer[texelIndex].color.b = i32(totalColorB / totalWeight);
     }
