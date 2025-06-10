@@ -14,6 +14,7 @@ import type {
   TransformVariation,
   TransformVariationDescriptor,
 } from './variations'
+import * as v from 'valibot'
 
 export type TransformId = string & { __brand: 'TransformId' }
 export type VariationId = string & { __brand: 'VariationId' }
@@ -40,6 +41,33 @@ export type FlameDescriptor = {
   renderSettings: RenderSettings
   transforms: TransformRecord
 }
+const AffineParamsSchema = v.unknown()
+const TransformVariationSchema = v.unknown()
+const TransformFunctionSchema = v.object({
+  probability: v.number(),
+  preAffine: v.object(AffineParamsSchema),
+  postAffine: v.object(AffineParamsSchema),
+  color: v.object({
+    x: v.number(),
+    y: v.number()
+  }),
+  variations: v.record(v.brand(v.string, 'VariationId'), v.object({TransformVariationSchema)){
+  }
+})
+const RenderSettingsSchema = v.object({
+  exposure: v.number(),
+  skipIters: v.number(),
+  drawMode: v.number(),
+  backgroundColor: v.array(v.number(), [v.length(3)]),
+  camera: v.object({
+    zoom: v.number(),
+    position: v.array(v.number(), [v.length(2)]),
+  }),
+})
+const FlameDescriptorSchema = v.object({
+  renderSettings: v.object(RenderSettingsSchema),
+  transforms: v.record(v.brand(v.string(), 'TransformId'), TransformFuntionSchema)
+})
 
 const FlameUniformsBase = struct({
   probability: f32,
