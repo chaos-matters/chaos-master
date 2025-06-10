@@ -4,7 +4,7 @@ import { clamp } from 'typegpu/std'
 import {
   accumulatedPointCount,
   setAccumulatedPointCount,
-  setRenderStats,
+  setRenderTimings,
 } from '@/flame/renderStats'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
 import { useCamera } from '../lib/CameraContext'
@@ -152,24 +152,24 @@ export function Flam3(props: Flam3Props) {
   }
 
   const timestampQuery = createTimestampQuery(device, [
-    'ifs',
-    'adaptiveFilter',
-    'colorGrading',
+    'ifsMs',
+    'adaptiveFilterMs',
+    'colorGradingMs',
   ])
 
   function estimateIterationCount(
     timings: NonNullable<ReturnType<typeof timestampQuery.average>>,
     shouldRenderFinalImage: boolean,
   ) {
-    const { ifs, adaptiveFilter, colorGrading } = timings
-    if (ifs <= 0) {
+    const { ifsMs, adaptiveFilterMs, colorGradingMs } = timings
+    if (ifsMs <= 0) {
       return 1
     }
-    const frameBudgetNs = 14e6
-    const paintTimeNs =
+    const frameBudgetMs = 14
+    const paintTimeMs =
       Number(shouldRenderFinalImage) *
-      (colorGrading + Number(props.adaptiveFilterEnabled) * adaptiveFilter)
-    return clamp(floor((frameBudgetNs - paintTimeNs) / ifs), 1, 100)
+      (colorGradingMs + Number(props.adaptiveFilterEnabled) * adaptiveFilterMs)
+    return clamp(floor((frameBudgetMs - paintTimeMs) / ifsMs), 1, 100)
   }
 
   createEffect(() => {
@@ -260,13 +260,7 @@ export function Flam3(props: Flam3Props) {
           : 1
 
         if (timings) {
-          setRenderStats(() => ({
-            timing: {
-              ifsNs: timings.ifs,
-              blurNs: props.adaptiveFilterEnabled ? timings.adaptiveFilter : 0,
-              colorGradingNs: timings.colorGrading,
-            },
-          }))
+          setRenderTimings(timings)
         }
 
         const timestampWrites = timestampQuery.timestampWrites(frameId)
@@ -274,7 +268,7 @@ export function Flam3(props: Flam3Props) {
         {
           for (let i = 0; i < iterationCount; i++) {
             const pass = encoder.beginComputePass({
-              timestampWrites: timestampWrites.ifs,
+              timestampWrites: timestampWrites.ifsMs,
             })
             ifsPipeline.run(pass, pointCountPerBatch)
             pass.end()
@@ -292,7 +286,7 @@ export function Flam3(props: Flam3Props) {
           })
           if (props.adaptiveFilterEnabled) {
             const pass = encoder.beginComputePass({
-              timestampWrites: timestampWrites.adaptiveFilter,
+              timestampWrites: timestampWrites.adaptiveFilterMs,
             })
             runBlur()?.(pass)
             pass.end()
@@ -300,7 +294,7 @@ export function Flam3(props: Flam3Props) {
 
           {
             const pass = encoder.beginRenderPass({
-              timestampWrites: timestampWrites.colorGrading,
+              timestampWrites: timestampWrites.colorGradingMs,
               colorAttachments: [
                 {
                   loadOp: 'clear',
