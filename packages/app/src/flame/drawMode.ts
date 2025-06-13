@@ -17,4 +17,3 @@ export const drawModeToImplFn = {
   light: lightMode,
   paint: paintMode,
 }
-export type DrawMode = keyof typeof drawModeToImplFn
