@@ -46,7 +46,6 @@ export const parametricVariation = <T extends AnyWgslData>(
   editor: EditorFor<Infer<T>> | undefined,
   wgsl: string,
   dependencyMap: Record<string, unknown> = {},
-  paramDefaults?: Infer<T>,
 ): ParametricVariation<T> => ({
   type: 'parametric',
   paramShema,

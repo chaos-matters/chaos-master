@@ -1,10 +1,10 @@
 import { f32, struct } from 'typegpu/data'
+import * as v from 'valibot'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
-import * as v from 'valibot'
 
 export const BlobParamsSchema = {
   high: v.number(),

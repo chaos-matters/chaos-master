@@ -454,7 +454,7 @@ function App(props: AppProps) {
                 Background Color
                 <ColorPicker
                   value={
-                    flameDescriptor.renderSettings.backgroundColor
+                    flameDescriptor.renderSettings.backgroundColor !== null
                       ? vec3f(...flameDescriptor.renderSettings.backgroundColor)
                       : undefined
                   }
@@ -466,15 +466,13 @@ function App(props: AppProps) {
                 />
               </label>
               <Show
-                when={
-                  flameDescriptor.renderSettings.backgroundColor !== undefined
-                }
+                when={flameDescriptor.renderSettings.backgroundColor !== null}
                 fallback={<span />}
               >
                 <Button
                   onClick={() => {
                     setFlameDescriptor((draft) => {
-                      delete draft.renderSettings.backgroundColor
+                      draft.renderSettings.backgroundColor = null
                     })
                   }}
                 >

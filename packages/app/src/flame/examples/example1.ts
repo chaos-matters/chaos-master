@@ -1,7 +1,7 @@
 import * as v from 'valibot'
 import { FlameDescriptorSchema } from '../valibot/flameSchema'
 import { tid, vid } from './util'
-import { FlameDescriptor } from '../transformFunction'
+import type { FlameDescriptor } from '../transformFunction'
 
 const exData: unknown = {
   renderSettings: {

@@ -1,5 +1,4 @@
 import * as v from 'valibot'
-import { drawModeToImplFn } from '../drawMode'
 import { TransformVariationSchema } from './variationSchema'
 
 // todo: move to defaults file/module
@@ -13,12 +12,13 @@ const cameraDefault: { zoom: number; position: [number, number] } = {
 export const transformIdSchema = v.pipe(v.string(), v.brand('TransformId'))
 export const variationIdSchema = v.pipe(v.string(), v.brand('VariationId'))
 export const variationTypeSchema = v.pipe(v.string(), v.brand('VariationType'))
-const drawModeKeysSchema = v.object(
-  Object.fromEntries(
-    Object.keys(drawModeToImplFn).map((key) => [key, v.any()]),
-  ),
-)
-export const DrawModeSchema = v.keyof(drawModeKeysSchema)
+// const drawModeKeysSchema = v.object(
+//   Object.fromEntries(
+//     Object.keys(drawModeToImplFn).map((key) => [key, v.any()]),
+//   ),
+// )
+// export const DrawModeSchema = v.keyof(drawModeKeysSchema)
+export const DrawModeSchema = v.union([v.literal('light'), v.literal('paint')])
 
 export const AffineParamsSchema = v.object({
   a: v.number(),
@@ -52,10 +52,7 @@ const RenderSettingsSchema = v.object({
   skipIters: v.number(),
   drawMode: DrawModeSchema,
   backgroundColor: v.fallback(
-    v.optional(
-      v.tuple([v.number(), v.number(), v.number()]),
-      backgroundColorDefault,
-    ),
+    v.nullable(v.tuple([v.number(), v.number(), v.number()])),
     backgroundColorDefault,
   ),
   camera: v.fallback(cameraObjSchema, cameraDefault),

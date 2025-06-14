@@ -1,3 +1,4 @@
+import { parametricVariations } from '@/flame/valibot/variationSchema'
 import { isParametric, transformVariations } from '..'
 import type {
   ParametricVariationDescriptor,
@@ -5,7 +6,6 @@ import type {
   TransformVariationDescriptor,
 } from '..'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
-import { parametricVariations } from '@/flame/valibot/variationSchema'
 
 export function getVariationDefault(
   type: TransformVariation,
