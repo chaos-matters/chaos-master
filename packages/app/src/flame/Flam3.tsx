@@ -255,9 +255,11 @@ export function Flam3(props: Flam3Props) {
         }
 
         const timings = timestampQuery.average()
-        const iterationCount = timings
-          ? estimateIterationCount(timings, shouldRenderFinalImage)
-          : 1
+        const iterationCount = continueRendering(accumulatedPointCount)
+          ? timings
+            ? estimateIterationCount(timings, shouldRenderFinalImage)
+            : 1
+          : 0
 
         if (timings) {
           setRenderTimings({
