@@ -1,18 +1,24 @@
 import * as v from 'valibot'
 import { drawModeToImplFn } from '../drawMode'
+import { TransformVariationSchema } from './variationSchema'
 
-const transformIdSchema = v.pipe(v.string(), v.brand('TransformId'))
-const variationIdSchema = v.pipe(v.string(), v.brand('VariationId'))
+// todo: move to defaults file/module
+// DEFAULT values and schema fallbacks
+const backgroundColorDefault: [number, number, number] = [0, 0, 0]
+const cameraDefault: { zoom: number; position: [number, number] } = {
+  zoom: 1,
+  position: [0, 0],
+}
+
+export const transformIdSchema = v.pipe(v.string(), v.brand('TransformId'))
+export const variationIdSchema = v.pipe(v.string(), v.brand('VariationId'))
+export const variationTypeSchema = v.pipe(v.string(), v.brand('VariationType'))
 const drawModeKeysSchema = v.object(
   Object.fromEntries(
     Object.keys(drawModeToImplFn).map((key) => [key, v.any()]),
   ),
 )
-const DrawModeSchema = v.keyof(drawModeKeysSchema)
-
-export type TransformId = v.InferOutput<typeof transformIdSchema>
-export type VariationId = v.InferOutput<typeof variationIdSchema>
-export type DrawMode = v.InferOutput<typeof DrawModeSchema>
+export const DrawModeSchema = v.keyof(drawModeKeysSchema)
 
 export const AffineParamsSchema = v.object({
   a: v.number(),
@@ -22,7 +28,6 @@ export const AffineParamsSchema = v.object({
   e: v.number(),
   f: v.number(),
 })
-export const TransformVariationSchema = v.unknown()
 export const TransformFunctionSchema = v.object({
   probability: v.number(),
   preAffine: AffineParamsSchema,
@@ -34,18 +39,26 @@ export const TransformFunctionSchema = v.object({
   variations: v.record(variationIdSchema, TransformVariationSchema),
 })
 
+const cameraObjSchema = v.object({
+  zoom: v.optional(v.number(), cameraDefault.zoom),
+  position: v.fallback(
+    v.optional(v.tuple([v.number(), v.number()]), cameraDefault.position),
+    cameraDefault.position,
+  ),
+})
+
 const RenderSettingsSchema = v.object({
   exposure: v.number(),
   skipIters: v.number(),
   drawMode: DrawModeSchema,
-  backgroundColor: v.pipe(
-    v.fallback(v.array(v.number()), [0, 0, 0]),
-    v.length(3),
+  backgroundColor: v.fallback(
+    v.optional(
+      v.tuple([v.number(), v.number(), v.number()]),
+      backgroundColorDefault,
+    ),
+    backgroundColorDefault,
   ),
-  camera: v.object({
-    zoom: v.number(),
-    position: v.pipe(v.array(v.number()), v.length(2)),
-  }),
+  camera: v.fallback(cameraObjSchema, cameraDefault),
 })
 
 export const FlameDescriptorSchema = v.object({

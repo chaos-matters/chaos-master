@@ -9,34 +9,20 @@ import {
   transformAffine,
   VariationInfo,
 } from './variations/types'
+import type { InferOutput } from 'valibot'
+import type {
+  FlameDescriptorSchema,
+  TransformFunctionSchema,
+  transformIdSchema,
+  variationIdSchema,
+} from './valibot/flameSchema'
 import type {
   TransformVariation,
   TransformVariationDescriptor,
 } from './variations'
-import {
-  FlameDescriptorSchema,
-  TransformFunctionSchema,
-  TransformId,
-  VariationId,
-} from './valibot/flameSchema'
-import { InferOutput } from 'valibot'
 
-// export type RenderSettings = {
-//   exposure: number
-//   skipIters: number
-//   drawMode: DrawMode
-//   backgroundColor?: [number, number, number]
-//   camera: { zoom: number; position: [number, number] }
-// }
-//
-// export type TransformFunction = {
-//   probability: number
-//   preAffine: AffineParams
-//   postAffine: AffineParams
-//   color: { x: number; y: number }
-//   variations: VariationRecord
-// }
-
+export type TransformId = InferOutput<typeof transformIdSchema>
+export type VariationId = InferOutput<typeof variationIdSchema>
 export type FlameDescriptor = InferOutput<typeof FlameDescriptorSchema>
 export type TransformFunction = InferOutput<typeof TransformFunctionSchema>
 

@@ -2,6 +2,8 @@ import { tgpu } from 'typegpu'
 import { f32 } from 'typegpu/data'
 import type { TgpuFn } from 'typegpu'
 import type { F32 } from 'typegpu/data'
+import { DrawModeSchema } from './valibot/flameSchema'
+import { InferOutput } from 'valibot'
 
 export type DrawModeFn = TgpuFn<[F32], F32>
 const drawModeFn = tgpu['~unstable'].fn([f32], f32)
@@ -17,3 +19,5 @@ export const drawModeToImplFn = {
   light: lightMode,
   paint: paintMode,
 }
+
+export type DrawMode = InferOutput<typeof DrawModeSchema>
