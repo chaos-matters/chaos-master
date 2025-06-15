@@ -13,6 +13,7 @@
     "@eslint/js": "^9.29.0",
     "@types/wicg-file-system-access": "^2023.10.6",
     "@typescript-eslint/parser": "^8.34.0",
+    "@vitejs/plugin-basic-ssl": "^2.0.0",
     "@webgpu/types": "^0.1.61",
     "cloc": "2.4.0-cloc",
     "eslint": "^9.29.0",

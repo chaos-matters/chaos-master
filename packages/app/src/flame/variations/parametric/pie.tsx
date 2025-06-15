@@ -17,7 +17,7 @@ export const PieParams = struct({
 export const PieParamsDefaults: Infer<typeof PieParams> = {
   slices: 6,
   rotation: Math.PI,
-  thickness: 1,
+  thickness: 0.5,
 }
 
 export const PieParamsEditor: EditorFor<Infer<typeof PieParams>> = (props) => (

@@ -38,8 +38,7 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
       const { widthPX, heightPX } = scaledCanvasSize(size)
       el.width = widthPX
       el.height = heightPX
-      el.style.width = `${size.width.toFixed(0)}px`
-      el.style.height = `${size.height.toFixed(0)}px`
+      el.style.width = `100%`
     },
   )
 
