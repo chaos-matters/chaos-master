@@ -1,10 +1,10 @@
+import ssl from '@vitejs/plugin-basic-ssl'
 import { defineConfig } from 'vite'
-import mkcert from 'vite-plugin-mkcert'
 import solidPlugin from 'vite-plugin-solid'
 import solidSvg from 'vite-plugin-solid-svg'
 
 export default defineConfig({
-  plugins: [solidPlugin(), solidSvg({ defaultAsComponent: true }), mkcert()],
+  plugins: [solidPlugin(), solidSvg({ defaultAsComponent: true }), ssl()],
   resolve: {
     alias: {
       '@': '/src',

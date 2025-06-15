@@ -93,7 +93,7 @@ function formatPercent(x: number) {
 
 function newDefaultTransform(): TransformFunction {
   return {
-    probability: 0.1,
+    probability: 1,
     color: { x: 0, y: 0 },
     preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
     postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
@@ -167,9 +167,11 @@ function App(props: AppProps) {
       }
     },
     KeyD: () => {
-      setFlameDescriptor((draft) => {
-        draft.renderSettings.drawMode =
-          draft.renderSettings.drawMode === 'light' ? 'paint' : 'light'
+      document.startViewTransition(() => {
+        setFlameDescriptor((draft) => {
+          draft.renderSettings.drawMode =
+            draft.renderSettings.drawMode === 'light' ? 'paint' : 'light'
+        })
       })
       return true
     },
@@ -401,9 +403,11 @@ function App(props: AppProps) {
                   class={ui.select}
                   value={flameDescriptor.renderSettings.drawMode}
                   onChange={(ev) => {
-                    setFlameDescriptor((draft) => {
-                      draft.renderSettings.drawMode = ev.currentTarget
-                        .value as DrawMode
+                    const mode = ev.currentTarget.value as DrawMode
+                    document.startViewTransition(() => {
+                      setFlameDescriptor((draft) => {
+                        draft.renderSettings.drawMode = mode
+                      })
                     })
                   }}
                 >

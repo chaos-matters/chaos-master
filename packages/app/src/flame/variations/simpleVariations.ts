@@ -1,4 +1,4 @@
-import { random } from '@/shaders/random'
+import { random, randomUnitDisk } from '@/shaders/random'
 import { PI } from '../constants'
 import { simpleVariation } from './types'
 
@@ -57,11 +57,9 @@ export const linear = simpleVariation(/* wgsl */ `
 export const randomDisk = simpleVariation(
   /* wgsl */ `
   (_pos: vec2f, _varInfo: VariationInfo) -> vec2f {
-    let r = sqrt(random());
-    let theta = random() * 2 * PI;
-    return r * vec2f(cos(theta), sin(theta));
+    return randomUnitDisk();
   }`,
-  { random, PI },
+  { randomUnitDisk },
 )
 
 export const gaussian = simpleVariation(

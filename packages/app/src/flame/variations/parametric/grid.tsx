@@ -15,7 +15,7 @@ export const GridParams = struct({
 export const GridParamsDefaults: Infer<typeof GridParams> = {
   divisions: 10.0,
   size: 1.0,
-  jitterNearIntersectionsDistance: 0.1,
+  jitterNearIntersectionsDistance: 0.002,
 }
 
 export const GridParamsEditor: EditorFor<Infer<typeof GridParams>> = (
