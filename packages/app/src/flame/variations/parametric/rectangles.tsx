@@ -1,19 +1,15 @@
-import { f32, struct } from 'typegpu/data'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
+import { schemaToF32Struct } from '@/flame/valibot/schemaUtil'
+import { RectanglesParamsSchema } from '@/flame/valibot/variationSchema'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export const RectanglesParams = struct({
-  x: f32,
-  y: f32,
-})
+export const RectanglesParams = schemaToF32Struct(
+  RectanglesParamsSchema.entries,
+)
 
-export const RectanglesParamsDefaults: Infer<typeof RectanglesParams> = {
-  x: 2,
-  y: 4,
-}
 export const RectanglesParamsEditor: EditorFor<
   Infer<typeof RectanglesParams>
 > = (props) => (
@@ -35,7 +31,6 @@ export const RectanglesParamsEditor: EditorFor<
 
 export const rectanglesVar = parametricVariation(
   RectanglesParams,
-  RectanglesParamsDefaults,
   RectanglesParamsEditor,
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo, P: RectanglesParams) -> vec2f {

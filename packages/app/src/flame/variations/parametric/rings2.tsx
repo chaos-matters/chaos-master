@@ -1,17 +1,12 @@
-import { f32, struct } from 'typegpu/data'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
+import { schemaToF32Struct } from '@/flame/valibot/schemaUtil'
+import { Rings2ParamsSchema } from '@/flame/valibot/variationSchema'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export const Rings2Params = struct({
-  val: f32,
-})
-
-export const Rings2ParamsDefaults: Infer<typeof Rings2Params> = {
-  val: 6,
-}
+export const Rings2Params = schemaToF32Struct(Rings2ParamsSchema.entries)
 
 export const Rings2ParamsEditor: EditorFor<Infer<typeof Rings2Params>> = (
   props,
@@ -28,7 +23,6 @@ export const Rings2ParamsEditor: EditorFor<Infer<typeof Rings2Params>> = (
 
 export const rings2 = parametricVariation(
   Rings2Params,
-  Rings2ParamsDefaults,
   Rings2ParamsEditor,
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo, P: RingsParams) -> vec2f {

@@ -1,19 +1,13 @@
-import { f32, struct } from 'typegpu/data'
-import * as v from 'valibot'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
+import { schemaToF32Struct } from '@/flame/valibot/schemaUtil'
+import { BlobParamsSchema } from '@/flame/valibot/variationSchema'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export const BlobParamsSchema = {
-  high: v.number(),
-  low: v.number(),
-  waves: v.number(),
-}
-const BlobParams = struct(
-  Object.fromEntries(Object.keys(BlobParamsSchema).map((key) => [key, f32])),
-)
+const BlobParams = schemaToF32Struct(BlobParamsSchema.entries)
+
 export const BlobParamsEditor: EditorFor<Infer<typeof BlobParams>> = (
   props,
 ) => (

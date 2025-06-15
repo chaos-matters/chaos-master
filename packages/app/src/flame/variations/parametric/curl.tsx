@@ -1,19 +1,12 @@
-import { f32, struct } from 'typegpu/data'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
+import { schemaToF32Struct } from '@/flame/valibot/schemaUtil'
+import { CurlParamsSchema } from '@/flame/valibot/variationSchema'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export const CurlParams = struct({
-  c1: f32,
-  c2: f32,
-})
-
-export const CurlParamsDefaults: Infer<typeof CurlParams> = {
-  c1: 1,
-  c2: 1,
-}
+const CurlParams = schemaToF32Struct(CurlParamsSchema.entries)
 
 export const CurlParamsEditor: EditorFor<Infer<typeof CurlParams>> = (
   props,
@@ -36,7 +29,6 @@ export const CurlParamsEditor: EditorFor<Infer<typeof CurlParams>> = (
 
 export const curlVar = parametricVariation(
   CurlParams,
-  CurlParamsDefaults,
   CurlParamsEditor,
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo, P: CurlParams) -> vec2f {

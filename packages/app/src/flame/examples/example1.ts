@@ -1,9 +1,6 @@
-import * as v from 'valibot'
-import { FlameDescriptorSchema } from '../valibot/flameSchema'
-import { tid, vid } from './util'
-import type { FlameDescriptor } from '../transformFunction'
+import { tid, validateExample, vid } from './util'
 
-const exData: unknown = {
+export const example1 = validateExample({
   renderSettings: {
     exposure: 0.25,
     skipIters: 20,
@@ -76,14 +73,4 @@ const exData: unknown = {
       },
     },
   },
-}
-
-let example1: FlameDescriptor
-const result = v.safeParse(FlameDescriptorSchema, exData)
-if (!result.success) {
-  console.warn(result.issues)
-} else {
-  example1 = result.output
-}
-
-export { example1 }
+})

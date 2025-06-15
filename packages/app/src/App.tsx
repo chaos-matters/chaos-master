@@ -42,6 +42,10 @@ import {
   generateVariationId,
 } from './flame/transformFunction'
 import {
+  backgroundColorDefault,
+  backgroundColorDefaultWhite,
+} from './flame/valibot/flameSchema'
+import {
   isParametricType,
   isVariationType,
   variationTypes,
@@ -109,7 +113,7 @@ function App(props: AppProps) {
   const [flameDescriptor, setFlameDescriptor, history] = createStoreHistory(
     createStore(
       structuredClone(
-        props.flameFromQuery ? props.flameFromQuery : examples.empty,
+        props.flameFromQuery ? props.flameFromQuery : examples.example1,
       ),
     ),
   )
@@ -453,11 +457,9 @@ function App(props: AppProps) {
               <label class={ui.labeledInput}>
                 Background Color
                 <ColorPicker
-                  value={
-                    flameDescriptor.renderSettings.backgroundColor !== null
-                      ? vec3f(...flameDescriptor.renderSettings.backgroundColor)
-                      : undefined
-                  }
+                  value={vec3f(
+                    ...flameDescriptor.renderSettings.backgroundColor,
+                  )}
                   setValue={(newBgColor) => {
                     setFlameDescriptor((draft) => {
                       draft.renderSettings.backgroundColor = newBgColor
@@ -466,13 +468,21 @@ function App(props: AppProps) {
                 />
               </label>
               <Show
-                when={flameDescriptor.renderSettings.backgroundColor !== null}
+                when={
+                  flameDescriptor.renderSettings.backgroundColor !==
+                  (flameDescriptor.renderSettings.drawMode === 'light'
+                    ? backgroundColorDefault
+                    : backgroundColorDefaultWhite)
+                }
                 fallback={<span />}
               >
                 <Button
                   onClick={() => {
                     setFlameDescriptor((draft) => {
-                      draft.renderSettings.backgroundColor = null
+                      draft.renderSettings.backgroundColor =
+                        flameDescriptor.renderSettings.drawMode === 'light'
+                          ? backgroundColorDefault
+                          : backgroundColorDefaultWhite
                     })
                   }}
                 >

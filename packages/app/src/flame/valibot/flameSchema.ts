@@ -3,7 +3,8 @@ import { TransformVariationSchema } from './variationSchema'
 
 // todo: move to defaults file/module
 // DEFAULT values and schema fallbacks
-const backgroundColorDefault: [number, number, number] = [0, 0, 0]
+export const backgroundColorDefault: [number, number, number] = [0, 0, 0]
+export const backgroundColorDefaultWhite: [number, number, number] = [1, 1, 1]
 const cameraDefault: { zoom: number; position: [number, number] } = {
   zoom: 1,
   position: [0, 0],
@@ -52,7 +53,7 @@ const RenderSettingsSchema = v.object({
   skipIters: v.number(),
   drawMode: DrawModeSchema,
   backgroundColor: v.fallback(
-    v.nullable(v.tuple([v.number(), v.number(), v.number()])),
+    v.tuple([v.number(), v.number(), v.number()]),
     backgroundColorDefault,
   ),
   camera: v.fallback(cameraObjSchema, cameraDefault),
