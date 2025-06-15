@@ -1,6 +1,12 @@
 import { tgpu } from 'typegpu'
 import { arrayOf, struct, vec2i, vec4u } from 'typegpu/data'
-import { hash, random, randomState, setSeed } from '@/shaders/random'
+import {
+  hash,
+  random,
+  randomState,
+  randomUnitDisk,
+  setSeed,
+} from '@/shaders/random'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { wgsl } from '@/utils/wgsl'
 import { PI } from './constants'
@@ -87,6 +93,7 @@ export function createIFSPipeline(
       PI,
       worldToClip: camera.wgsl.worldToClip,
       clipToPixels: camera.wgsl.clipToPixels,
+      randomUnitDisk,
     }}
 
     const ITER_COUNT = ${insideShaderCount};
@@ -112,11 +119,7 @@ export function createIFSPipeline(
       setSeed(seed);
 
       var point = Point();
-
-      // uniform disk
-      let r = sqrt(random());
-      let theta = random() * 2 * PI;
-      point.position = r * vec2f(cos(theta), sin(theta));
+      point.position = randomUnitDisk();
 
       for (var i = 0; i < ITER_COUNT; i += 1) {
         let flameIndex = random();
@@ -139,7 +142,7 @@ export function createIFSPipeline(
       let screen = outputTextureDimensionF * (clip * vec2f(0.5, -0.5) + 0.5);
 
       // antialiasing jitter
-      let jittered = screen + (vec2f(random(), random()) - 0.5);
+      let jittered = screen + randomUnitDisk();
       let screenI = vec2i(jittered);
 
       pointRandomSeeds[pointIndex] = randomState;

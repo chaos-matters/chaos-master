@@ -1,6 +1,6 @@
 {
   "name": "chaos-master",
-  "version": "0.6.6",
+  "version": "0.6.7",
   "description": "WebGPU based IFS Flame Generator for Artists & Explorers",
   "type": "module",
   "scripts": {
