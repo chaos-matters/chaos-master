@@ -108,9 +108,9 @@ export function Camera2D(props: ParentProps<Camera2DProps>) {
     )
     // prettier-ignore
     const viewMatrix = mat3x3f(
-      viewMatrix4.columns[0]!.xyw,
-      viewMatrix4.columns[1]!.xyw,
-      viewMatrix4.columns[3]!.xyw,
+      viewMatrix4.columns[0].xyw,
+      viewMatrix4.columns[1].xyw,
+      viewMatrix4.columns[3].xyw,
     )
     const viewMatrixInverse = mat3.inverse(viewMatrix, mat3x3f())
     return {

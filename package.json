@@ -10,25 +10,24 @@
     "lines": "cloc packages --exclude-dir=node_modules,dist --by-file-by-lang --not-match-f='(.*[.]d[.]ts|.*[.]stories[.].*|.*[.]test[.].*|.*[.]json)'"
   },
   "devDependencies": {
-    "@eslint/js": "^9.27.0",
+    "@eslint/js": "^9.29.0",
     "@types/wicg-file-system-access": "^2023.10.6",
-    "@typescript-eslint/parser": "^8.32.1",
-    "@webgpu/types": "^0.1.60",
-    "cloc": "^2.4.0-cloc",
-    "eslint": "^9.27.0",
-    "eslint-import-resolver-typescript": "^4.3.5",
-    "eslint-plugin-import-x": "^4.12.2",
+    "@typescript-eslint/parser": "^8.34.0",
+    "@webgpu/types": "^0.1.61",
+    "cloc": "2.4.0-cloc",
+    "eslint": "^9.29.0",
+    "eslint-import-resolver-typescript": "^4.4.3",
+    "eslint-plugin-import-x": "^4.15.2",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "jsdom": "^26.1.0",
     "prettier": "^3.5.3",
     "typescript": "^5.8.3",
-    "typescript-eslint": "^8.32.1",
+    "typescript-eslint": "^8.34.0",
     "typescript-plugin-css-modules": "^5.1.0",
     "vite": "^6.3.5",
-    "vite-plugin-mkcert": "^1.17.8",
     "vite-plugin-solid": "^2.11.6",
     "vite-plugin-solid-svg": "^0.8.1",
-    "vitest": "^3.1.4"
+    "vitest": "^3.2.3"
   },
   "pnpm": {
     "ignoredBuiltDependencies": [
@@ -37,6 +36,11 @@
     ],
     "onlyBuiltDependencies": [
       "esbuild"
-    ]
+    ],
+    "overrides": {
+      "less": "link:./.pnpm-noop",
+      "sass": "link:./.pnpm-noop",
+      "stylus": "link:./.pnpm-noop"
+    }
   }
 }

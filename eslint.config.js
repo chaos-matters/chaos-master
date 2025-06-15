@@ -1,12 +1,13 @@
 import eslint from '@eslint/js'
 import tsParser from '@typescript-eslint/parser'
-import importX from 'eslint-plugin-import-x'
+import { importX } from 'eslint-plugin-import-x'
 import simpleImportSort from 'eslint-plugin-simple-import-sort'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
   {
     ignores: [
+      '.pnpm-noop',
       '**/*.css.d.ts',
       '**/coverage',
       '**/dist',
@@ -39,7 +40,9 @@ export default tseslint.config(
       'import-x/no-named-as-default': 'error',
       'import-x/no-useless-path-segments': 'error',
       'import-x/no-named-as-default-member': 'off',
-      'import-x/no-unresolved': 'off', // TODO: figure out how to resolve @/ imports
+
+      // this is caught by ts already and eslint doesn't understand @/
+      'import-x/no-unresolved': 'off',
 
       'no-console': ['error', { allow: ['info', 'warn', 'error'] }],
       'no-throw-literal': 'error',
