@@ -5,6 +5,7 @@ import {
   random,
   randomState,
   randomUnitDisk,
+  randomUnitSquare,
   setSeed,
 } from '@/shaders/random'
 import { recordEntries, recordKeys } from '@/utils/record'
@@ -94,6 +95,7 @@ export function createIFSPipeline(
       worldToClip: camera.wgsl.worldToClip,
       clipToPixels: camera.wgsl.clipToPixels,
       randomUnitDisk,
+      randomUnitSquare,
     }}
 
     const ITER_COUNT = ${insideShaderCount};
@@ -119,8 +121,10 @@ export function createIFSPipeline(
       setSeed(seed);
 
       var point = Point();
-      point.position = randomUnitDisk();
 
+      // point.position = vec2f(0.5, 0.5); //randomUnitDisk();
+      // point.position = randomUnitDisk();
+      point.position = randomUnitSquare();
       for (var i = 0; i < ITER_COUNT; i += 1) {
         let flameIndex = random();
         var probabilitySum = 0.;
@@ -142,7 +146,7 @@ export function createIFSPipeline(
       let screen = outputTextureDimensionF * (clip * vec2f(0.5, -0.5) + 0.5);
 
       // antialiasing jitter
-      let jittered = screen + randomUnitDisk();
+      let jittered = screen+ randomUnitDisk();
       let screenI = vec2i(jittered);
 
       pointRandomSeeds[pointIndex] = randomState;

@@ -1,13 +1,24 @@
 import * as v from 'valibot'
+import { generateTransformId, generateVariationId } from '../transformFunction'
 import { TransformVariationSchema } from './variationSchema'
+import type { DrawMode } from '../drawMode'
 
 // todo: move to defaults file/module
 // DEFAULT values and schema fallbacks
+const latestValibotVersion = '1.0'
+const flameDescriptorVersionDefault = latestValibotVersion
 export const backgroundColorDefault: [number, number, number] = [0, 0, 0]
 export const backgroundColorDefaultWhite: [number, number, number] = [1, 1, 1]
 const cameraDefault: { zoom: number; position: [number, number] } = {
   zoom: 1,
   position: [0, 0],
+}
+const renderSettingsDefult = {
+  exposure: 0.25,
+  skipIters: 20,
+  drawMode: 'light' as DrawMode,
+  backgroundColor: backgroundColorDefault,
+  camera: cameraDefault,
 }
 
 export const transformIdSchema = v.pipe(v.string(), v.brand('TransformId'))
@@ -29,6 +40,20 @@ export const AffineParamsSchema = v.object({
   e: v.number(),
   f: v.number(),
 })
+
+const variationArraySchema = v.pipe(
+  v.array(TransformVariationSchema),
+  v.transform((variations) =>
+    Object.fromEntries(
+      variations.map((variation) => [generateVariationId(), variation]),
+    ),
+  ),
+)
+
+const variationRecordSchema = v.record(
+  variationIdSchema,
+  TransformVariationSchema,
+)
 export const TransformFunctionSchema = v.object({
   probability: v.number(),
   preAffine: AffineParamsSchema,
@@ -37,7 +62,7 @@ export const TransformFunctionSchema = v.object({
     x: v.number(),
     y: v.number(),
   }),
-  variations: v.record(variationIdSchema, TransformVariationSchema),
+  variations: v.union([variationArraySchema, variationRecordSchema]),
 })
 
 const cameraObjSchema = v.object({
@@ -48,18 +73,37 @@ const cameraObjSchema = v.object({
   ),
 })
 
-const RenderSettingsSchema = v.object({
-  exposure: v.number(),
-  skipIters: v.number(),
-  drawMode: DrawModeSchema,
-  backgroundColor: v.fallback(
-    v.tuple([v.number(), v.number(), v.number()]),
-    backgroundColorDefault,
-  ),
-  camera: v.fallback(cameraObjSchema, cameraDefault),
-})
+const RenderSettingsSchema = v.fallback(
+  v.object({
+    exposure: v.number(),
+    skipIters: v.number(),
+    drawMode: DrawModeSchema,
+    backgroundColor: v.fallback(
+      v.tuple([v.number(), v.number(), v.number()]),
+      backgroundColorDefault,
+    ),
+    camera: v.fallback(cameraObjSchema, cameraDefault),
+  }),
+  renderSettingsDefult,
+)
 
-export const FlameDescriptorSchema = v.object({
+const transformArraySchema = v.pipe(
+  v.array(TransformFunctionSchema),
+  v.transform((transforms) => ({
+    metadata: flameDescriptorVersionDefault,
+    renderSettings: renderSettingsDefult,
+    transforms: Object.fromEntries(
+      transforms.map((transform) => [generateTransformId(), transform]),
+    ),
+  })),
+)
+const flameTransformsSchema = v.object({
+  metadata: v.fallback(v.string(), flameDescriptorVersionDefault),
   renderSettings: RenderSettingsSchema,
   transforms: v.record(transformIdSchema, TransformFunctionSchema),
 })
+
+export const FlameDescriptorSchema = v.union([
+  transformArraySchema,
+  flameTransformsSchema,
+])

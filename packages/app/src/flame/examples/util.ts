@@ -14,11 +14,11 @@ export function vid(variationId: string): VariationId {
   return variationId as VariationId
 }
 
-export function validateExample(data: unknown): FlameDescriptor {
+export function validateExample(data: unknown): FlameDescriptor | undefined {
   const result = safeParse(FlameDescriptorSchema, data)
   if (!result.success) {
     console.warn(result.issues)
-    return data as FlameDescriptor
+    return undefined
   } else {
     return result.output
   }
