@@ -64,8 +64,8 @@ function LoadFlameModal(props: LoadFlameModalProps) {
     const [fileHandle] = fileHandles
     const file = await fileHandle.getFile()
     const arrBuf = new Uint8Array(await file.arrayBuffer())
-    const newFlameDescriptor = await extractFlameFromPng(arrBuf)
-    props.respond(newFlameDescriptor)
+    const pngFlameJson = await extractFlameFromPng(arrBuf)
+    props.respond(pngFlameJson)
   }
 
   return (

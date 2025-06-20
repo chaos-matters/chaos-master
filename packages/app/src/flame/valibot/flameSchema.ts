@@ -1,5 +1,4 @@
 import * as v from 'valibot'
-import { generateTransformId, generateVariationId } from '../transformFunction'
 import { TransformVariationSchema } from './variationSchema'
 import type { DrawMode } from '../drawMode'
 
@@ -20,16 +19,14 @@ const renderSettingsDefult = {
   backgroundColor: backgroundColorDefault,
   camera: cameraDefault,
 }
+const metadataDefault = {
+  version: flameDescriptorVersionDefault,
+  author: 'unknown',
+}
 
 export const transformIdSchema = v.pipe(v.string(), v.brand('TransformId'))
 export const variationIdSchema = v.pipe(v.string(), v.brand('VariationId'))
 export const variationTypeSchema = v.pipe(v.string(), v.brand('VariationType'))
-// const drawModeKeysSchema = v.object(
-//   Object.fromEntries(
-//     Object.keys(drawModeToImplFn).map((key) => [key, v.any()]),
-//   ),
-// )
-// export const DrawModeSchema = v.keyof(drawModeKeysSchema)
 export const DrawModeSchema = v.union([v.literal('light'), v.literal('paint')])
 
 export const AffineParamsSchema = v.object({
@@ -40,15 +37,6 @@ export const AffineParamsSchema = v.object({
   e: v.number(),
   f: v.number(),
 })
-
-const variationArraySchema = v.pipe(
-  v.array(TransformVariationSchema),
-  v.transform((variations) =>
-    Object.fromEntries(
-      variations.map((variation) => [generateVariationId(), variation]),
-    ),
-  ),
-)
 
 const variationRecordSchema = v.record(
   variationIdSchema,
@@ -62,7 +50,7 @@ export const TransformFunctionSchema = v.object({
     x: v.number(),
     y: v.number(),
   }),
-  variations: v.union([variationArraySchema, variationRecordSchema]),
+  variations: variationRecordSchema,
 })
 
 const cameraObjSchema = v.object({
@@ -87,23 +75,13 @@ const RenderSettingsSchema = v.fallback(
   renderSettingsDefult,
 )
 
-const transformArraySchema = v.pipe(
-  v.array(TransformFunctionSchema),
-  v.transform((transforms) => ({
-    metadata: flameDescriptorVersionDefault,
-    renderSettings: renderSettingsDefult,
-    transforms: Object.fromEntries(
-      transforms.map((transform) => [generateTransformId(), transform]),
-    ),
-  })),
+const flameMetadataSchema = v.fallback(
+  v.object({ version: v.string(), author: v.string() }),
+  metadataDefault,
 )
-const flameTransformsSchema = v.object({
-  metadata: v.fallback(v.string(), flameDescriptorVersionDefault),
+
+export const FlameDescriptorSchema = v.object({
+  metadata: flameMetadataSchema,
   renderSettings: RenderSettingsSchema,
   transforms: v.record(transformIdSchema, TransformFunctionSchema),
 })
-
-export const FlameDescriptorSchema = v.union([
-  transformArraySchema,
-  flameTransformsSchema,
-])
