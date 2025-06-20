@@ -150,10 +150,17 @@ export async function extractFlameFromPng(imageData: Uint8Array) {
   throw new Error('Cannot find flame data. ')
 }
 
+export function insertFlameMetadataToPng(
+  flameData: Uint8Array,
+  imageData: Uint8Array,
+) {
+  return insertZtxtChunk(imageData, flameData)
+}
+
 export function addFlameDataToPng(
   flameData: Uint8Array,
   imageData: Uint8Array,
 ): Blob {
-  const newImageData = insertZtxtChunk(imageData, flameData)
+  const newImageData = insertFlameMetadataToPng(flameData, imageData)
   return new Blob([newImageData], { type: 'image/png' })
 }

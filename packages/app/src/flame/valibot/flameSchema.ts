@@ -20,6 +20,10 @@ const renderSettingsDefult = {
   backgroundColor: backgroundColorDefault,
   camera: cameraDefault,
 }
+const metadataDefault = {
+  version: flameDescriptorVersionDefault,
+  author: 'unknown',
+}
 
 export const transformIdSchema = v.pipe(v.string(), v.brand('TransformId'))
 export const variationIdSchema = v.pipe(v.string(), v.brand('VariationId'))
@@ -97,8 +101,14 @@ const transformArraySchema = v.pipe(
     ),
   })),
 )
+
+const flameMetadataSchema = v.fallback(
+  v.object({ version: v.string(), author: v.string() }),
+  metadataDefault,
+)
+
 const flameTransformsSchema = v.object({
-  metadata: v.fallback(v.string(), flameDescriptorVersionDefault),
+  metadata: flameMetadataSchema,
   renderSettings: RenderSettingsSchema,
   transforms: v.record(transformIdSchema, TransformFunctionSchema),
 })
