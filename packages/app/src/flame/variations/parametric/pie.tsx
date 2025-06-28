@@ -7,9 +7,16 @@ import { random } from '@/shaders/random'
 import { PI } from '../../constants'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
+import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
 export const PieParams = schemaToF32Struct(PieParamsSchema.entries)
+
+const PieParamsDefaults: InferOutput<typeof PieParamsSchema> = {
+  slices: 6,
+  rotation: Math.PI,
+  thickness: 0.5,
+}
 
 export const PieParamsEditor: EditorFor<Infer<typeof PieParams>> = (props) => (
   <>
@@ -31,6 +38,7 @@ export const PieParamsEditor: EditorFor<Infer<typeof PieParams>> = (props) => (
 
 export const pie = parametricVariation(
   PieParams,
+  PieParamsDefaults,
   PieParamsEditor,
   /* wgsl */ `(_pos: vec2f, _varInfo: VariationInfo, P: PieParams) -> vec2f {
     let p1 = P.slices;

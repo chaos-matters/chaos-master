@@ -134,6 +134,7 @@ export function isParametricType(
 ): v is ParametricVariationDescriptor {
   return 'params' in v
 }
+
 export function isVariationType(
   maybeType: string,
 ): maybeType is TransformVariation {

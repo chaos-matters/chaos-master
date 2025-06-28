@@ -23,9 +23,9 @@ const metadataDefault = {
   author: 'unknown',
 }
 
-export const transformIdSchema = v.pipe(v.string(), v.brand('TransformId'))
-export const variationIdSchema = v.pipe(v.string(), v.brand('VariationId'))
-export const variationTypeSchema = v.pipe(v.string(), v.brand('VariationType'))
+export const TransformIdSchema = v.pipe(v.string(), v.brand('TransformId'))
+export const VariationIdSchema = v.pipe(v.string(), v.brand('VariationId'))
+export const VariationTypeSchema = v.pipe(v.string(), v.brand('VariationType'))
 export const DrawModeSchema = v.union([v.literal('light'), v.literal('paint')])
 
 export const AffineParamsSchema = v.object({
@@ -37,8 +37,8 @@ export const AffineParamsSchema = v.object({
   f: v.number(),
 })
 
-const variationRecordSchema = v.record(
-  variationIdSchema,
+const VariationRecordSchema = v.record(
+  VariationIdSchema,
   TransformVariationSchema,
 )
 export const TransformFunctionSchema = v.object({
@@ -49,7 +49,7 @@ export const TransformFunctionSchema = v.object({
     x: v.number(),
     y: v.number(),
   }),
-  variations: variationRecordSchema,
+  variations: VariationRecordSchema,
 })
 
 const cameraObjSchema = v.object({
@@ -74,13 +74,13 @@ const RenderSettingsSchema = v.fallback(
   renderSettingsDefult,
 )
 
-const flameMetadataSchema = v.fallback(
+const FlameMetadataSchema = v.fallback(
   v.object({ version: v.string(), author: v.string() }),
   metadataDefault,
 )
 
 export const FlameDescriptorSchema = v.object({
-  metadata: flameMetadataSchema,
+  metadata: FlameMetadataSchema,
   renderSettings: RenderSettingsSchema,
-  transforms: v.record(transformIdSchema, TransformFunctionSchema),
+  transforms: v.record(TransformIdSchema, TransformFunctionSchema),
 })
