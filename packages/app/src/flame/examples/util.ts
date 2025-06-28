@@ -1,5 +1,5 @@
 import { flatten, safeParse } from 'valibot'
-import { FlameDescriptorSchema } from '../valibot/flameSchema'
+import { FlameDescriptorSchema } from '../schema/flameSchema'
 import type { FlatErrors } from 'valibot'
 import type {
   FlameDescriptor,

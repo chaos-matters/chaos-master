@@ -1,13 +1,16 @@
+import * as v from 'valibot'
 import { AngleEditor } from '@/components/Sliders/ParametricEditors/AngleEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
-import { RadialBlurParamsSchema } from '@/flame/valibot/index'
-import { schemaToF32Struct } from '@/flame/valibot/schemaUtil'
 import { random } from '@/shaders/random'
+import { schemaToF32Struct } from '@/utils/schemaUtil'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
+export const RadialBlurParamsSchema = v.object({
+  angle: v.number(),
+})
 export const RadialBlurParams = schemaToF32Struct(
   RadialBlurParamsSchema.entries,
 )

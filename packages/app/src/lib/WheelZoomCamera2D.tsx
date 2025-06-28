@@ -144,7 +144,7 @@ export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
   })
 
   return (
-    <Camera2D position={position()} fovy={1 / zoom()}>
+    <Camera2D position={position()} zoom={zoom()}>
       {(() => {
         const { js } = useCamera()
         // steal clipToWorld from the camera

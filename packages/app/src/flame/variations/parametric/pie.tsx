@@ -1,14 +1,20 @@
+import * as v from 'valibot'
 import { AngleEditor } from '@/components/Sliders/ParametricEditors/AngleEditor'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
-import { PieParamsSchema } from '@/flame/valibot/index'
-import { schemaToF32Struct } from '@/flame/valibot/schemaUtil'
 import { random } from '@/shaders/random'
+import { schemaToF32Struct } from '@/utils/schemaUtil'
 import { PI } from '../../constants'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
+
+export const PieParamsSchema = v.object({
+  slices: v.number(),
+  rotation: v.number(),
+  thickness: v.number(),
+})
 
 export const PieParams = schemaToF32Struct(PieParamsSchema.entries)
 

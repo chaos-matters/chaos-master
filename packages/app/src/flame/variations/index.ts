@@ -52,7 +52,7 @@ import {
   waves,
 } from './simpleVariations'
 import type { Infer } from 'typegpu/data'
-import type { TransformVariationDescriptor } from '../valibot/variationSchema'
+import type { TransformVariationDescriptor } from '../schema/variationSchema'
 import type { ParametricVariation } from './types'
 
 export const transformVariations = {

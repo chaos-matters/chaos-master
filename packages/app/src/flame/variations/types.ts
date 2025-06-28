@@ -3,7 +3,7 @@ import { f32, struct, vec2f } from 'typegpu/data'
 import type { TgpuFn } from 'typegpu'
 import type { AnyWgslData, Infer, Vec2f } from 'typegpu/data'
 import type { InferOutput } from 'valibot'
-import type { AffineParamsSchema } from '../valibot/flameSchema'
+import type { AffineParamsSchema } from '../schema/flameSchema'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
 export type AffineParams = InferOutput<typeof AffineParamsSchema>

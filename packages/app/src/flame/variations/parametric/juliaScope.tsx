@@ -1,13 +1,18 @@
+import * as v from 'valibot'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { PI } from '@/flame/constants'
-import { JuliaScopeParamsSchema } from '@/flame/valibot/index'
-import { schemaToF32Struct } from '@/flame/valibot/schemaUtil'
 import { parametricVariation } from '@/flame/variations/types'
 import { random } from '@/shaders/random'
+import { schemaToF32Struct } from '@/utils/schemaUtil'
 import type { Infer } from 'typegpu/data'
 import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
+
+export const JuliaScopeParamsSchema = v.object({
+  power: v.number(),
+  dist: v.number(),
+})
 
 const JuliaScopeParams = schemaToF32Struct(JuliaScopeParamsSchema.entries)
 

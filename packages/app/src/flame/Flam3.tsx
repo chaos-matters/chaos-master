@@ -22,6 +22,10 @@ import { Bucket } from './types'
 import type { v4f } from 'typegpu/data'
 import type { FlameDescriptor } from './transformFunction'
 import type { ExportImageType } from '@/App'
+import {
+  backgroundColorDefault,
+  backgroundColorDefaultWhite,
+} from './schema/flameSchema'
 
 const { sqrt, floor } = Math
 
@@ -46,6 +50,11 @@ export function Flam3(props: Flam3Props) {
   const { context, canvasSize, canvas, canvasFormat } = useCanvas()
 
   const backgroundColorFinal = () => {
+    if (props.flameDescriptor.renderSettings.backgroundColor === undefined) {
+      return props.flameDescriptor.renderSettings.drawMode === 'light'
+        ? vec3f(...backgroundColorDefault)
+        : vec3f(...backgroundColorDefaultWhite)
+    }
     return vec3f(...props.flameDescriptor.renderSettings.backgroundColor)
   }
 

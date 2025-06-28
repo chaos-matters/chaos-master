@@ -15,7 +15,7 @@ import type {
   TransformFunctionSchema,
   TransformIdSchema,
   VariationIdSchema,
-} from './valibot/flameSchema'
+} from './schema/flameSchema'
 import type { TransformVariation } from './variations'
 
 export type TransformId = InferOutput<typeof TransformIdSchema>

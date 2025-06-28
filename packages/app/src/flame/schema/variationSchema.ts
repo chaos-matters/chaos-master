@@ -27,14 +27,17 @@ export const transformVariationsParamsSchemas = recordEntries(
 
 const transformVariationSchemas = transformVariationsParamsSchemas.map(
   ([key, paramSchema]) =>
-    v.strictObject({
+    v.object({
       type: v.literal(key),
       weight: v.number(),
       params: v.optional(paramSchema),
     }),
 )
 
-export const TransformVariationSchema = v.union(transformVariationSchemas)
+export const TransformVariationSchema = v.variant(
+  'type',
+  transformVariationSchemas,
+)
 export type TransformVariationDescriptor = v.InferOutput<
   typeof TransformVariationSchema
 >

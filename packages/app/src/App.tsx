@@ -48,10 +48,6 @@ import {
   generateVariationId,
 } from './flame/transformFunction'
 import {
-  backgroundColorDefault,
-  backgroundColorDefaultWhite,
-} from './flame/valibot/flameSchema'
-import {
   isParametricType,
   isVariationType,
   variationTypes,
@@ -458,9 +454,11 @@ function App(props: AppProps) {
               <label class={ui.labeledInput}>
                 Background Color
                 <ColorPicker
-                  value={vec3f(
-                    ...flameDescriptor.renderSettings.backgroundColor,
-                  )}
+                  value={
+                    flameDescriptor.renderSettings.backgroundColor
+                      ? vec3f(...flameDescriptor.renderSettings.backgroundColor)
+                      : undefined
+                  }
                   setValue={(newBgColor) => {
                     setFlameDescriptor((draft) => {
                       draft.renderSettings.backgroundColor = newBgColor
@@ -470,20 +468,14 @@ function App(props: AppProps) {
               </label>
               <Show
                 when={
-                  flameDescriptor.renderSettings.backgroundColor !==
-                  (flameDescriptor.renderSettings.drawMode === 'light'
-                    ? backgroundColorDefault
-                    : backgroundColorDefaultWhite)
+                  flameDescriptor.renderSettings.backgroundColor !== undefined
                 }
                 fallback={<span />}
               >
                 <Button
                   onClick={() => {
                     setFlameDescriptor((draft) => {
-                      draft.renderSettings.backgroundColor =
-                        flameDescriptor.renderSettings.drawMode === 'light'
-                          ? backgroundColorDefault
-                          : backgroundColorDefaultWhite
+                      delete draft.renderSettings.backgroundColor
                     })
                   }}
                 >

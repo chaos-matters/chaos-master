@@ -1,12 +1,19 @@
+import * as v from 'valibot'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { PI } from '@/flame/constants'
-import { NgonParamsSchema } from '@/flame/valibot/index'
-import { schemaToF32Struct } from '@/flame/valibot/schemaUtil'
+import { schemaToF32Struct } from '@/utils/schemaUtil'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
+
+export const NgonParamsSchema = v.object({
+  power: v.number(),
+  sides: v.number(),
+  corners: v.number(),
+  circle: v.number(),
+})
 
 const NgonParams = schemaToF32Struct(NgonParamsSchema.entries)
 

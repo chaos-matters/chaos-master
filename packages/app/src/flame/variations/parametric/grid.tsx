@@ -1,12 +1,18 @@
+import * as v from 'valibot'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
-import { GridParamsSchema } from '@/flame/valibot/index'
-import { schemaToF32Struct } from '@/flame/valibot/schemaUtil'
 import { random } from '@/shaders/random'
+import { schemaToF32Struct } from '@/utils/schemaUtil'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
+
+export const GridParamsSchema = v.object({
+  divisions: v.number(),
+  size: v.number(),
+  jitterNearIntersectionsDistance: v.number(),
+})
 
 const GridParams = schemaToF32Struct(GridParamsSchema.entries)
 
