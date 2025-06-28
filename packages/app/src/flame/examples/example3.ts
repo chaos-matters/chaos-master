@@ -1,15 +1,11 @@
-import { tid, validateExample, vid } from './util'
+import { tid, validateFlame, vid } from './util'
 import type { FlameDescriptor } from '../transformFunction'
 
-export const example3: FlameDescriptor = validateExample({
+export const example3: FlameDescriptor = validateFlame({
   renderSettings: {
-    exposure: 0.2,
+    exposure: 0.25,
     skipIters: 20,
     drawMode: 'light',
-    camera: {
-      zoom: 1,
-      position: [0, 0],
-    },
   },
   transforms: {
     [tid('2fa2980e_6df0_4735_8334_052f42d6639d')]: {

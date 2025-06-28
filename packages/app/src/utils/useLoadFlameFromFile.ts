@@ -1,5 +1,4 @@
 import { useAlert } from '@/components/Modal/useAlert'
-import { validateExample } from '@/flame/examples/util'
 import { extractFlameFromPng } from './flameInPng'
 
 export function useLoadFlameFromFile() {
@@ -12,13 +11,10 @@ export function useLoadFlameFromFile() {
       return
     }
     const arrBuf = new Uint8Array(arrayBuffer)
-    const extractedData: unknown = await extractFlameFromPng(arrBuf).catch(
-      () => undefined,
-    )
     try {
-      return validateExample(extractedData)
+      return await extractFlameFromPng(arrBuf)
     } catch (_) {
-      await alert(`Could not validate Flame Description in '${file.name}'.`)
+      await alert(`No valid flame found in '${file.name}'.`)
     }
   }
 

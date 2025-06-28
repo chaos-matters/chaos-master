@@ -216,7 +216,7 @@ export function Flam3(props: Flam3Props) {
 
     createEffect(() => {
       // redraw when these change
-      const __ = colorGradingPipeline()
+      const _ = colorGradingPipeline()
       rafLoop.redraw()
       forceDrawToScreen = true
     })

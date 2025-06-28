@@ -1,7 +1,6 @@
 import { createSignal, For } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
 import { examples } from '@/flame/examples'
-import { validateExample } from '@/flame/examples/util'
 import { Flam3 } from '@/flame/Flam3'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
@@ -65,11 +64,11 @@ function LoadFlameModal(props: LoadFlameModalProps) {
     const [fileHandle] = fileHandles
     const file = await fileHandle.getFile()
     const arrBuf = new Uint8Array(await file.arrayBuffer())
-    const flameJsonData = await extractFlameFromPng(arrBuf)
     try {
-      props.respond(validateExample(flameJsonData))
+      const flameDescriptor = await extractFlameFromPng(arrBuf)
+      props.respond(flameDescriptor)
     } catch (_) {
-      alert(`Could not validate Flame Description in '${file.name}'.`)
+      alert(`No valid flame found in '${file.name}'.`)
     }
   }
 

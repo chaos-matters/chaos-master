@@ -4,10 +4,14 @@ import { Rings2ParamsSchema } from '@/flame/valibot/index'
 import { schemaToF32Struct } from '@/flame/valibot/schemaUtil'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
+import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
 export const Rings2Params = schemaToF32Struct(Rings2ParamsSchema.entries)
 
+const Rings2ParamsDefaults: InferOutput<typeof Rings2ParamsSchema> = {
+  val: 6,
+}
 export const Rings2ParamsEditor: EditorFor<Infer<typeof Rings2Params>> = (
   props,
 ) => (
@@ -23,6 +27,7 @@ export const Rings2ParamsEditor: EditorFor<Infer<typeof Rings2Params>> = (
 
 export const rings2 = parametricVariation(
   Rings2Params,
+  Rings2ParamsDefaults,
   Rings2ParamsEditor,
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo, P: RingsParams) -> vec2f {

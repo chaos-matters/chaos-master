@@ -23,9 +23,9 @@ const metadataDefault = {
   author: 'unknown',
 }
 
-export const transformIdSchema = v.pipe(v.string(), v.brand('TransformId'))
-export const variationIdSchema = v.pipe(v.string(), v.brand('VariationId'))
-export const variationTypeSchema = v.pipe(v.string(), v.brand('VariationType'))
+export const TransformIdSchema = v.pipe(v.string(), v.brand('TransformId'))
+export const VariationIdSchema = v.pipe(v.string(), v.brand('VariationId'))
+export const VariationTypeSchema = v.pipe(v.string(), v.brand('VariationType'))
 export const DrawModeSchema = v.union([v.literal('light'), v.literal('paint')])
 
 export const AffineParamsSchema = v.object({
@@ -37,8 +37,8 @@ export const AffineParamsSchema = v.object({
   f: v.number(),
 })
 
-const variationRecordSchema = v.record(
-  variationIdSchema,
+const VariationRecordSchema = v.record(
+  VariationIdSchema,
   TransformVariationSchema,
 )
 export const TransformFunctionSchema = v.object({
@@ -49,38 +49,48 @@ export const TransformFunctionSchema = v.object({
     x: v.number(),
     y: v.number(),
   }),
-  variations: variationRecordSchema,
+  variations: VariationRecordSchema,
 })
 
-const cameraObjSchema = v.object({
+const CameraObjSchema = v.object({
   zoom: v.optional(v.number(), cameraDefault.zoom),
-  position: v.fallback(
-    v.optional(v.tuple([v.number(), v.number()]), cameraDefault.position),
+  position: v.optional(
+    v.tuple([v.number(), v.number()]),
     cameraDefault.position,
   ),
 })
 
-const RenderSettingsSchema = v.fallback(
-  v.object({
-    exposure: v.number(),
+const RenderSettingsSchema = v.optional(
+  v.strictObject({
+    exposure: v.pipe(
+      v.number(),
+      v.minValue(-4, 'The exposure should be in range [-4, 4]'),
+      v.maxValue(4, 'The exposure should be in range [-4, 4]'),
+    ),
     skipIters: v.number(),
-    drawMode: DrawModeSchema,
-    backgroundColor: v.fallback(
+    drawMode: v.optional(DrawModeSchema, renderSettingsDefult.drawMode),
+    backgroundColor: v.optional(
       v.tuple([v.number(), v.number(), v.number()]),
       backgroundColorDefault,
     ),
-    camera: v.fallback(cameraObjSchema, cameraDefault),
+    camera: v.optional(CameraObjSchema, cameraDefault),
   }),
   renderSettingsDefult,
 )
 
-const flameMetadataSchema = v.fallback(
-  v.object({ version: v.string(), author: v.string() }),
+const FlameMetadataSchema = v.optional(
+  v.object({
+    version: v.pipe(
+      v.string(),
+      v.nonEmpty('Please specify a non-empty string for version'),
+    ),
+    author: v.string(),
+  }),
   metadataDefault,
 )
 
-export const FlameDescriptorSchema = v.object({
-  metadata: flameMetadataSchema,
+export const FlameDescriptorSchema = v.strictObject({
+  metadata: FlameMetadataSchema,
   renderSettings: RenderSettingsSchema,
-  transforms: v.record(transformIdSchema, TransformFunctionSchema),
+  transforms: v.record(TransformIdSchema, TransformFunctionSchema),
 })

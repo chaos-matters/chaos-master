@@ -5,9 +5,16 @@ import { schemaToF32Struct } from '@/flame/valibot/schemaUtil'
 import { random } from '@/shaders/random'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
+import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
 const GridParams = schemaToF32Struct(GridParamsSchema.entries)
+
+const GridParamsDefaults: InferOutput<typeof GridParamsSchema> = {
+  divisions: 10.0,
+  size: 1.0,
+  jitterNearIntersectionsDistance: 0.002,
+}
 
 export const GridParamsEditor: EditorFor<Infer<typeof GridParams>> = (
   props,
@@ -40,6 +47,7 @@ export const GridParamsEditor: EditorFor<Infer<typeof GridParams>> = (
 
 export const grid = parametricVariation(
   GridParams,
+  GridParamsDefaults,
   GridParamsEditor,
   /* wgsl */ `
   (_pos: vec2f, _varInfo: VariationInfo, P: GridParams) -> vec2f {

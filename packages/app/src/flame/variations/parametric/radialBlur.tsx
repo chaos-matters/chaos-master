@@ -1,13 +1,20 @@
 import { AngleEditor } from '@/components/Sliders/ParametricEditors/AngleEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
-import { RadialBlurParamsShema } from '@/flame/valibot/index'
+import { RadialBlurParamsSchema } from '@/flame/valibot/index'
 import { schemaToF32Struct } from '@/flame/valibot/schemaUtil'
 import { random } from '@/shaders/random'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
+import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export const RadialBlurParams = schemaToF32Struct(RadialBlurParamsShema.entries)
+export const RadialBlurParams = schemaToF32Struct(
+  RadialBlurParamsSchema.entries,
+)
+
+const RadialBlurParamsDefaults: InferOutput<typeof RadialBlurParamsSchema> = {
+  angle: Math.PI,
+}
 
 export const RadialBlurEditor: EditorFor<Infer<typeof RadialBlurParams>> = (
   props,
@@ -19,6 +26,7 @@ export const RadialBlurEditor: EditorFor<Infer<typeof RadialBlurParams>> = (
 
 export const radialBlurVar = parametricVariation(
   RadialBlurParams,
+  RadialBlurParamsDefaults,
   RadialBlurEditor,
   /* wgsl */ `
   (pos: vec2f, varInfo: VariationInfo, P: RadialBlurParams) -> vec2f {

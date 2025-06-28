@@ -1,3 +1,4 @@
+import { validateFlame } from '@/flame/examples/util'
 import { decodeBase64, encodeBase64 } from './base64'
 import { sum } from './sum'
 
@@ -49,7 +50,7 @@ export async function decompressJsonQuery(compressedBytes: Uint8Array) {
     chunks.push(chunk)
   }
 
-  return JSON.parse(chunks.join())
+  return validateFlame(JSON.parse(chunks.join()))
 }
 
 export async function decodeJsonQueryParam(param: string) {

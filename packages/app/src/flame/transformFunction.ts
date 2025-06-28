@@ -13,13 +13,13 @@ import type { InferOutput } from 'valibot'
 import type {
   FlameDescriptorSchema,
   TransformFunctionSchema,
-  transformIdSchema,
-  variationIdSchema,
+  TransformIdSchema,
+  VariationIdSchema,
 } from './valibot/flameSchema'
 import type { TransformVariation } from './variations'
 
-export type TransformId = InferOutput<typeof transformIdSchema>
-export type VariationId = InferOutput<typeof variationIdSchema>
+export type TransformId = InferOutput<typeof TransformIdSchema>
+export type VariationId = InferOutput<typeof VariationIdSchema>
 export type FlameDescriptor = InferOutput<typeof FlameDescriptorSchema>
 export type TransformFunction = InferOutput<typeof TransformFunctionSchema>
 

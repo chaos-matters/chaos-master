@@ -5,11 +5,17 @@ import { PerspectiveParamsSchema } from '@/flame/valibot/index'
 import { schemaToF32Struct } from '@/flame/valibot/schemaUtil'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
+import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
 export const PerspectiveParams = schemaToF32Struct(
   PerspectiveParamsSchema.entries,
 )
+const PerspectiveParamsDefaults: InferOutput<typeof PerspectiveParamsSchema> = {
+  angle: Math.PI,
+  dist: 3,
+}
+
 export const PerspectiveParamsEditor: EditorFor<
   Infer<typeof PerspectiveParams>
 > = (props) => (
@@ -26,6 +32,7 @@ export const PerspectiveParamsEditor: EditorFor<
 
 export const perspective = parametricVariation(
   PerspectiveParams,
+  PerspectiveParamsDefaults,
   PerspectiveParamsEditor,
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo, P: PerspectiveParams) -> vec2f {

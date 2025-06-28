@@ -1,7 +1,7 @@
-import { tid, validateExample, vid } from './util'
+import { tid, validateFlame, vid } from './util'
 import type { FlameDescriptor } from '../transformFunction'
 
-export const linear1: FlameDescriptor = validateExample({
+export const linear1: FlameDescriptor = validateFlame({
   renderSettings: {
     exposure: 1,
     skipIters: 20,

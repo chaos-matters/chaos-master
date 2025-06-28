@@ -4,9 +4,16 @@ import { BlobParamsSchema } from '@/flame/valibot/index'
 import { schemaToF32Struct } from '@/flame/valibot/schemaUtil'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
+import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
 const BlobParams = schemaToF32Struct(BlobParamsSchema.entries)
+
+const BlobParamsDefaults: InferOutput<typeof BlobParamsSchema> = {
+  high: 2,
+  low: 1,
+  waves: 1,
+}
 
 export const BlobParamsEditor: EditorFor<Infer<typeof BlobParams>> = (
   props,
@@ -33,6 +40,7 @@ export const BlobParamsEditor: EditorFor<Infer<typeof BlobParams>> = (
 
 export const blob = parametricVariation(
   BlobParams,
+  BlobParamsDefaults,
   BlobParamsEditor,
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo, P: BlobParams) -> vec2f {

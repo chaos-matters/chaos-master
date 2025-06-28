@@ -6,10 +6,15 @@ import { schemaToF32Struct } from '@/flame/valibot/schemaUtil'
 import { random } from '@/shaders/random'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
+import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
 const JuliaNParams = schemaToF32Struct(JuliaNParamsSchema.entries)
 
+const JuliaNParamsDefaults: InferOutput<typeof JuliaNParamsSchema> = {
+  power: 1,
+  dist: 5,
+}
 export const JuliaNParamsEditor: EditorFor<Infer<typeof JuliaNParams>> = (
   props,
 ) => (
@@ -31,6 +36,7 @@ export const JuliaNParamsEditor: EditorFor<Infer<typeof JuliaNParams>> = (
 
 export const juliaN = parametricVariation(
   JuliaNParams,
+  JuliaNParamsDefaults,
   JuliaNParamsEditor,
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo, P: JuliaNParams) -> vec2f {
