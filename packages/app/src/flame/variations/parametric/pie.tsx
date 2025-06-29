@@ -1,20 +1,24 @@
-import { f32, struct } from 'typegpu/data'
+import * as v from 'valibot'
 import { AngleEditor } from '@/components/Sliders/ParametricEditors/AngleEditor'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { random } from '@/shaders/random'
+import { schemaToF32Struct } from '@/utils/schemaUtil'
 import { PI } from '../../constants'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
+import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export const PieParams = struct({
-  slices: f32,
-  rotation: f32,
-  thickness: f32,
+export const PieParamsSchema = v.object({
+  slices: v.number(),
+  rotation: v.number(),
+  thickness: v.number(),
 })
 
-export const PieParamsDefaults: Infer<typeof PieParams> = {
+export const PieParams = schemaToF32Struct(PieParamsSchema.entries)
+
+const PieParamsDefaults: InferOutput<typeof PieParamsSchema> = {
   slices: 6,
   rotation: Math.PI,
   thickness: 0.5,

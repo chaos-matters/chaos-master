@@ -18,6 +18,10 @@ import {
 } from './colorGrading'
 import { drawModeToImplFn } from './drawMode'
 import { createIFSPipeline } from './ifsPipeline'
+import {
+  backgroundColorDefault,
+  backgroundColorDefaultWhite,
+} from './schema/flameSchema'
 import { Bucket } from './types'
 import type { v4f } from 'typegpu/data'
 import type { FlameDescriptor } from './transformFunction'
@@ -48,8 +52,8 @@ export function Flam3(props: Flam3Props) {
   const backgroundColorFinal = () => {
     if (props.flameDescriptor.renderSettings.backgroundColor === undefined) {
       return props.flameDescriptor.renderSettings.drawMode === 'light'
-        ? vec3f(0)
-        : vec3f(1)
+        ? vec3f(...backgroundColorDefault)
+        : vec3f(...backgroundColorDefaultWhite)
     }
     return vec3f(...props.flameDescriptor.renderSettings.backgroundColor)
   }
@@ -221,7 +225,7 @@ export function Flam3(props: Flam3Props) {
 
     createEffect(() => {
       // redraw when these change
-      const __ = colorGradingPipeline()
+      const _ = colorGradingPipeline()
       rafLoop.redraw()
       forceDrawToScreen = true
     })

@@ -17,10 +17,6 @@ import type { ChangeHistory } from '@/utils/createStoreHistory'
 
 const CANCEL = 'cancel'
 
-function zoomToFovy(zoom: number, fovyMin = 1, fovyMax = 60): number {
-  return fovyMin + (1 - zoom) * (fovyMax - fovyMin)
-}
-
 function Preview(props: { flameDescriptor: FlameDescriptor }) {
   return (
     <Root adapterOptions={{ powerPreference: 'high-performance' }}>
@@ -29,7 +25,7 @@ function Preview(props: { flameDescriptor: FlameDescriptor }) {
           position={vec2f(
             ...props.flameDescriptor.renderSettings.camera.position,
           )}
-          fovy={zoomToFovy(props.flameDescriptor.renderSettings.camera.zoom)}
+          zoom={props.flameDescriptor.renderSettings.camera.zoom}
         >
           <Flam3
             quality={0.8}
@@ -64,8 +60,12 @@ function LoadFlameModal(props: LoadFlameModalProps) {
     const [fileHandle] = fileHandles
     const file = await fileHandle.getFile()
     const arrBuf = new Uint8Array(await file.arrayBuffer())
-    const newFlameDescriptor = await extractFlameFromPng(arrBuf)
-    props.respond(newFlameDescriptor)
+    try {
+      const flameDescriptor = await extractFlameFromPng(arrBuf)
+      props.respond(flameDescriptor)
+    } catch (_) {
+      alert(`No valid flame found in '${file.name}'.`)
+    }
   }
 
   return (

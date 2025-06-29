@@ -44,6 +44,10 @@ import {
   setQualityPointCountLimit,
 } from './flame/renderStats'
 import {
+  MAX_CAMERA_ZOOM_VALUE,
+  MIN_CAMERA_ZOOM_VALUE,
+} from './flame/schema/flameSchema'
+import {
   generateTransformId,
   generateVariationId,
 } from './flame/transformFunction'
@@ -139,13 +143,17 @@ function App(props: AppProps) {
       setFlameDescriptor((draft) => {
         draft.renderSettings.camera.zoom = clamp(
           value(draft.renderSettings.camera.zoom),
-          0.01,
-          Infinity,
+          MIN_CAMERA_ZOOM_VALUE,
+          MAX_CAMERA_ZOOM_VALUE,
         )
       })
     } else {
       setFlameDescriptor((draft) => {
-        draft.renderSettings.camera.zoom = clamp(value, 0.01, Infinity)
+        draft.renderSettings.camera.zoom = clamp(
+          value,
+          MIN_CAMERA_ZOOM_VALUE,
+          MAX_CAMERA_ZOOM_VALUE,
+        )
       })
     }
     return flameDescriptor.renderSettings.camera.zoom

@@ -1,20 +1,23 @@
-import { f32, struct } from 'typegpu/data'
+import * as v from 'valibot'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { PI } from '@/flame/constants'
+import { schemaToF32Struct } from '@/utils/schemaUtil'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
+import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-const NgonParams = struct({
-  // some of those could be ints
-  power: f32,
-  sides: f32,
-  corners: f32,
-  circle: f32,
+export const NgonParamsSchema = v.object({
+  power: v.number(),
+  sides: v.number(),
+  corners: v.number(),
+  circle: v.number(),
 })
 
-export const NgonParamsDefaults: Infer<typeof NgonParams> = {
+const NgonParams = schemaToF32Struct(NgonParamsSchema.entries)
+
+const NgonParamsDefaults: InferOutput<typeof NgonParamsSchema> = {
   power: 2,
   sides: 3,
   corners: 4,

@@ -1,22 +1,25 @@
-import { f32, struct } from 'typegpu/data'
+import * as v from 'valibot'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { PI } from '@/flame/constants'
 import { random } from '@/shaders/random'
+import { schemaToF32Struct } from '@/utils/schemaUtil'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
+import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export const JuliaNParams = struct({
-  power: f32,
-  dist: f32,
+export const JuliaNParamsSchema = v.object({
+  power: v.number(),
+  dist: v.number(),
 })
 
-export const JuliaNParamsDefaults: Infer<typeof JuliaNParams> = {
+const JuliaNParams = schemaToF32Struct(JuliaNParamsSchema.entries)
+
+const JuliaNParamsDefaults: InferOutput<typeof JuliaNParamsSchema> = {
   power: 1,
   dist: 5,
 }
-
 export const JuliaNParamsEditor: EditorFor<Infer<typeof JuliaNParams>> = (
   props,
 ) => (
