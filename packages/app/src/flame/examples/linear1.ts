@@ -1,7 +1,6 @@
 import { tid, validateFlame, vid } from './util'
 
 export const linear1 = validateFlame({
-  metadata: { version: '1.0', author: 'unknown' },
   renderSettings: {
     exposure: 1,
     skipIters: 20,

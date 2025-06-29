@@ -22,7 +22,7 @@ const renderSettingsDefult: v.InferOutput<typeof RenderSettingsSchema> = {
   backgroundColor: backgroundColorDefault,
   camera: cameraDefault,
 }
-const latestSchemaVersion = '1.0'
+export const latestSchemaVersion = '1.0'
 const MAX_LENGTH_AUTHOR_STRING = 255
 const MAX_LENGTH_VERSION_STRING = 10
 const metadataDefault = {
@@ -93,15 +93,20 @@ const RenderSettingsSchema = v.object({
 })
 
 const FlameMetadataSchema = v.object({
-  version: v.pipe(
-    v.string(),
-    v.nonEmpty('Please specify a non-empty string for version'),
-    v.maxLength(MAX_LENGTH_VERSION_STRING),
+  author: v.optional(
+    v.pipe(v.string(), v.maxLength(MAX_LENGTH_AUTHOR_STRING)),
+    metadataDefault.author,
   ),
-  author: v.pipe(v.string(), v.maxLength(MAX_LENGTH_AUTHOR_STRING)),
 })
 
+const FlameDescriptorVersionSchema = v.pipe(
+  v.string(),
+  v.nonEmpty('Please specify a non-empty version'),
+  v.maxLength(MAX_LENGTH_VERSION_STRING),
+)
+
 export const FlameDescriptorSchema = v.object({
+  version: v.optional(FlameDescriptorVersionSchema),
   metadata: v.optional(FlameMetadataSchema, metadataDefault),
   renderSettings: v.optional(RenderSettingsSchema, renderSettingsDefult),
   transforms: v.record(TransformIdSchema, TransformFunctionSchema),

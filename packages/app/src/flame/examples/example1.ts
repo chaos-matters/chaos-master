@@ -1,6 +1,11 @@
+import { latestSchemaVersion } from '../schema/flameSchema'
 import { tid, validateFlame, vid } from './util'
 
 export const example1 = validateFlame({
+  version: latestSchemaVersion,
+  metadata: {
+    author: 'deluksic',
+  },
   renderSettings: {
     exposure: 0.25,
     skipIters: 20,
