@@ -1,3 +1,4 @@
+import { recordKeys } from '@/utils/record'
 import { blob } from './parametric/blob'
 import { curlVar } from './parametric/curl'
 import { fan2 } from './parametric/fan2'
@@ -111,9 +112,7 @@ export const transformVariations = {
 
 export type TransformVariation = keyof typeof transformVariations
 export const variationTypes = Object.keys(transformVariations)
-export const transformVariationNames = Object.keys(
-  transformVariations,
-) as TransformVariation[]
+export const transformVariationNames = recordKeys(transformVariations)
 
 export type ParametricVariationDescriptor = {
   [K in TransformVariation]: (typeof transformVariations)[K] extends ParametricVariation<

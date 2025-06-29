@@ -1,7 +1,6 @@
 import { tid, validateFlame, vid } from './util'
-import type { FlameDescriptor } from '../transformFunction'
 
-const linearData = {
+export const linear1 = validateFlame({
   metadata: { version: '1.0', author: 'unknown' },
   renderSettings: {
     exposure: 1,
@@ -32,7 +31,7 @@ const linearData = {
         },
       },
     },
-    [vid('42316a5a_d01b_4577_8dae_8107f2eecded')]: {
+    [tid('42316a5a_d01b_4577_8dae_8107f2eecded')]: {
       probability: 0.293,
       preAffine: {
         a: 1.6053602749419031,
@@ -45,7 +44,10 @@ const linearData = {
       postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
       color: { x: -0.031047370799169666, y: 0.0937664949455789 },
       variations: {
-        c07f1b17_9072_461e_9dc8_c5ceaaabf71d: { type: 'linear', weight: 0.566 },
+        [vid('c07f1b17_9072_461e_9dc8_c5ceaaabf71d')]: {
+          type: 'linear',
+          weight: 0.566,
+        },
       },
     },
     [tid('2f4887e6_852d_4b71_b4ac_0c9be63d7870')]: {
@@ -87,6 +89,4 @@ const linearData = {
       },
     },
   },
-}
-
-export const linear1: FlameDescriptor = validateFlame(linearData)
+})

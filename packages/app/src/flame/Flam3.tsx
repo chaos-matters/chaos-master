@@ -18,14 +18,14 @@ import {
 } from './colorGrading'
 import { drawModeToImplFn } from './drawMode'
 import { createIFSPipeline } from './ifsPipeline'
-import { Bucket } from './types'
-import type { v4f } from 'typegpu/data'
-import type { FlameDescriptor } from './transformFunction'
-import type { ExportImageType } from '@/App'
 import {
   backgroundColorDefault,
   backgroundColorDefaultWhite,
 } from './schema/flameSchema'
+import { Bucket } from './types'
+import type { v4f } from 'typegpu/data'
+import type { FlameDescriptor } from './transformFunction'
+import type { ExportImageType } from '@/App'
 
 const { sqrt, floor } = Math
 

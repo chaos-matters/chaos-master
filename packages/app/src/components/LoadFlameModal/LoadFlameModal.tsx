@@ -28,8 +28,8 @@ function Preview(props: { flameDescriptor: FlameDescriptor }) {
           zoom={props.flameDescriptor.renderSettings.camera.zoom}
         >
           <Flam3
-            quality={0.95}
-            pointCountPerBatch={1e5}
+            quality={0.8}
+            pointCountPerBatch={2e4}
             adaptiveFilterEnabled={true}
             flameDescriptor={props.flameDescriptor}
             renderInterval={1}
