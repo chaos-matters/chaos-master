@@ -1,28 +1,22 @@
-import * as v from 'valibot'
+import { f32, struct } from 'typegpu/data'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
-import { schemaToF32Struct } from '@/utils/schemaUtil'
-import { parametricVariation } from '../types'
+import { parametricVariation } from './types'
 import type { Infer } from 'typegpu/data'
-import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export const RectanglesParamsSchema = v.object({
-  x: v.number(),
-  y: v.number(),
+type RectanglesParams = Infer<typeof RectanglesParams>
+const RectanglesParams = struct({
+  x: f32,
+  y: f32,
 })
 
-export const RectanglesParams = schemaToF32Struct(
-  RectanglesParamsSchema.entries,
-)
-
-const RectanglesParamsDefaults: InferOutput<typeof RectanglesParamsSchema> = {
+const RectanglesParamsDefaults: RectanglesParams = {
   x: 2,
   y: 4,
 }
-export const RectanglesParamsEditor: EditorFor<
-  Infer<typeof RectanglesParams>
-> = (props) => (
+
+const RectanglesParamsEditor: EditorFor<RectanglesParams> = (props) => (
   <>
     <RangeEditor
       {...editorProps(props, 'x', 'x')}
@@ -40,6 +34,7 @@ export const RectanglesParamsEditor: EditorFor<
 )
 
 export const rectanglesVar = parametricVariation(
+  'rectanglesVar',
   RectanglesParams,
   RectanglesParamsDefaults,
   RectanglesParamsEditor,

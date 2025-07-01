@@ -3,7 +3,7 @@ import { Button } from '../Button/Button'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './ShareLink.module.css'
-import type { FlameDescriptor } from '@/flame/transformFunction'
+import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 const { navigator } = globalThis
 

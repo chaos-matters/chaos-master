@@ -2,28 +2,17 @@ import { tgpu } from 'typegpu'
 import { f32, struct, vec2f } from 'typegpu/data'
 import { recordEntries } from '@/utils/record'
 import { sum } from '@/utils/sum'
+import { AffineParams, transformAffine } from './affineTranform'
 import { Point } from './types'
-import { transformVariations } from './variations'
-import {
-  AffineParams,
-  transformAffine,
-  VariationInfo,
-} from './variations/types'
-import type { InferOutput } from 'valibot'
+import { isParametricVariationType, transformVariations } from './variations'
+import { VariationInfo } from './variations/simple/types'
 import type {
-  FlameDescriptorSchema,
-  TransformFunctionSchema,
-  TransformIdSchema,
-  VariationIdSchema,
+  FlameDescriptor,
+  TransformFunction,
+  TransformId,
+  VariationId,
 } from './schema/flameSchema'
-import type { TransformVariation } from './variations'
-
-export type TransformId = InferOutput<typeof TransformIdSchema>
-export type VariationId = InferOutput<typeof VariationIdSchema>
-export type FlameDescriptor = InferOutput<typeof FlameDescriptorSchema>
-export type TransformFunction = InferOutput<typeof TransformFunctionSchema>
-
-export type TransformRecord = Record<TransformId, TransformFunction>
+import type { TransformVariationType } from './variations'
 
 const FlameUniformsBase = struct({
   probability: f32,
@@ -36,24 +25,24 @@ const VariantUniformsBase = struct({
   weight: f32,
 }).$name('VariantUniformsBase')
 
-function variationUniforms(name: TransformVariation) {
-  const tf = transformVariations[name]
-  if (tf.type === 'parametric') {
+function variationUniforms(variationType: TransformVariationType) {
+  if (isParametricVariationType(variationType)) {
     return struct({
       ...VariantUniformsBase.propTypes,
-      params: tf.paramShema,
-    }).$name(`VariationUniforms_${name}`)
+      params: transformVariations[variationType].paramStruct,
+    }).$name(`VariationUniforms_${variationType}`)
   }
   return VariantUniformsBase
 }
 
-function variationInvocation(name: TransformVariation, vid: VariationId) {
-  switch (transformVariations[name].type) {
-    case 'simple':
-      return `${name}(pre, VariationInfo(uniforms.variation${vid}.weight, uniforms.preAffine))`
-    case 'parametric':
-      return `${name}(pre, VariationInfo(uniforms.variation${vid}.weight, uniforms.preAffine), uniforms.variation${vid}.params)`
+function variationInvocation(
+  variationType: TransformVariationType,
+  vid: VariationId,
+) {
+  if (isParametricVariationType(variationType)) {
+    return `${variationType}(pre, VariationInfo(uniforms.variation${vid}.weight, uniforms.preAffine), uniforms.variation${vid}.params)`
   }
+  return `${variationType}(pre, VariationInfo(uniforms.variation${vid}.weight, uniforms.preAffine))`
 }
 
 export function generateTransformId(): TransformId {

@@ -1,29 +1,24 @@
-import * as v from 'valibot'
+import { f32, struct } from 'typegpu/data'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
-import { schemaToF32Struct } from '@/utils/schemaUtil'
-import { parametricVariation } from '../types'
+import { parametricVariation } from './types'
 import type { Infer } from 'typegpu/data'
-import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export const BlobParamsSchema = v.object({
-  high: v.number(),
-  low: v.number(),
-  waves: v.number(),
+type BlobParams = Infer<typeof BlobParams>
+const BlobParams = struct({
+  high: f32,
+  low: f32,
+  waves: f32,
 })
 
-const BlobParams = schemaToF32Struct(BlobParamsSchema.entries)
-
-const BlobParamsDefaults: InferOutput<typeof BlobParamsSchema> = {
+const BlobParamsDefaults: BlobParams = {
   high: 2,
   low: 1,
   waves: 1,
 }
 
-export const BlobParamsEditor: EditorFor<Infer<typeof BlobParams>> = (
-  props,
-) => (
+const BlobParamsEditor: EditorFor<BlobParams> = (props) => (
   <>
     <RangeEditor
       {...editorProps(props, 'low', 'Low')}
@@ -45,6 +40,7 @@ export const BlobParamsEditor: EditorFor<Infer<typeof BlobParams>> = (
 )
 
 export const blob = parametricVariation(
+  'blob',
   BlobParams,
   BlobParamsDefaults,
   BlobParamsEditor,

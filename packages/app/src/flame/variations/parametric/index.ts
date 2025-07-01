@@ -1,31 +1,29 @@
-import { isParametric, transformVariations } from '..'
-import type { ParametricVariationDescriptor, TransformVariation } from '..'
-import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
-import type { TransformVariationDescriptor } from '@/flame/schema/variationSchema'
+import { blob } from './blob'
+import { curlVar } from './curl'
+import { fan2 } from './fan2'
+import { grid } from './grid'
+import { juliaN } from './juliaN'
+import { juliaScope } from './juliaScope'
+import { ngonVar } from './ngon'
+import { pdjVar } from './pdj'
+import { perspective } from './perspective'
+import { pie } from './pie'
+import { radialBlurVar } from './radialBlur'
+import { rectanglesVar } from './rectangles'
+import { rings2 } from './rings2'
 
-export function getVariationDefault(
-  type: TransformVariation,
-  weight: number,
-): TransformVariationDescriptor {
-  if (!isParametric(type)) {
-    return { type, weight } as TransformVariationDescriptor
-  }
-  return {
-    type,
-    params: transformVariations[type].paramDefaults,
-    weight,
-  } as TransformVariationDescriptor
-}
-
-export function getParamsEditor<T extends ParametricVariationDescriptor>(
-  variation: T,
-): { component: EditorFor<T['params']>; value: T['params'] } {
-  return {
-    component: transformVariations[variation.type].editor as EditorFor<
-      T['params']
-    >,
-    get value() {
-      return variation.params
-    },
-  }
+export const parametricVariations = {
+  blob,
+  curlVar,
+  fan2,
+  grid,
+  juliaN,
+  juliaScope,
+  ngonVar,
+  pdjVar,
+  perspective,
+  pie,
+  radialBlurVar,
+  rectanglesVar,
+  rings2,
 }

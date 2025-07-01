@@ -1,141 +1,50 @@
 import { recordKeys } from '@/utils/record'
-import { blob } from './parametric/blob'
-import { curlVar } from './parametric/curl'
-import { fan2 } from './parametric/fan2'
-import { grid } from './parametric/grid'
-import { juliaN } from './parametric/juliaN'
-import { juliaScope } from './parametric/juliaScope'
-import { ngonVar } from './parametric/ngon'
-import { pdjVar } from './parametric/pdj'
-import { perspective } from './parametric/perspective'
-import { pie } from './parametric/pie'
-import { radialBlurVar } from './parametric/radialBlur'
-import { rectanglesVar } from './parametric/rectangles'
-import { rings2 } from './parametric/rings2'
-import {
-  archVar,
-  bent,
-  bladeVar,
-  blurVar,
-  bubble,
-  cosine,
-  crossVar,
-  cylinder,
-  diamond,
-  disc,
-  exponential,
-  exVar,
-  eyefish,
-  fan,
-  fisheye,
-  gaussian,
-  handkerchief,
-  heart,
-  horseshoe,
-  hyperbolic,
-  julia,
-  linear,
-  noise,
-  polar,
-  popcorn,
-  power,
-  randomDisk,
-  raysVar,
-  rings,
-  secantVar,
-  sinusoidal,
-  spherical,
-  spiral,
-  squareVar,
-  swirl,
-  tangentVar,
-  twintrianVar,
-  waves,
-} from './simpleVariations'
-import type { Infer } from 'typegpu/data'
-import type { TransformVariationDescriptor } from '../schema/variationSchema'
-import type { ParametricVariation } from './types'
+import * as v from '@/valibot'
+import { parametricVariations } from './parametric'
+import * as simpleVariations from './simple'
 
 export const transformVariations = {
-  linear,
-  sinusoidal,
-  spherical,
-  swirl,
-  popcorn,
-  pie,
-  randomDisk,
-  gaussian,
-  grid,
-  horseshoe,
-  polar,
-  handkerchief,
-  heart,
-  disc,
-  spiral,
-  hyperbolic,
-  diamond,
-  exVar,
-  julia,
-  bent,
-  waves,
-  fisheye,
-  eyefish,
-  exponential,
-  power,
-  cosine,
-  rings,
-  fan,
-  blob,
-  pdjVar,
-  fan2,
-  rings2,
-  bubble,
-  cylinder,
-  perspective,
-  noise,
-  juliaN,
-  juliaScope,
-  blurVar,
-  radialBlurVar,
-  ngonVar,
-  curlVar,
-  rectanglesVar,
-  archVar,
-  tangentVar,
-  squareVar,
-  raysVar,
-  bladeVar,
-  secantVar,
-  twintrianVar,
-  crossVar,
+  ...simpleVariations,
+  ...parametricVariations,
 }
 
-export type TransformVariation = keyof typeof transformVariations
-export const variationTypes = Object.keys(transformVariations)
-export const transformVariationNames = recordKeys(transformVariations)
+export type TransformVariationDescriptor = v.InferOutput<
+  typeof TransformVariationDescriptor
+>
+export const TransformVariationDescriptor = v.variant(
+  'type',
+  Object.values(transformVariations).map(
+    (variation) => variation.DescriptorSchema,
+  ),
+)
 
-export type ParametricVariationDescriptor = {
-  [K in TransformVariation]: (typeof transformVariations)[K] extends ParametricVariation<
-    infer P
-  >
-    ? { type: K; weight: number; params: Infer<P> }
-    : never
-}[TransformVariation]
+export type TransformVariationType = keyof typeof transformVariations
+export const variationTypes = recordKeys(transformVariations)
 
-export function isParametric(
-  name: TransformVariation,
-): name is ParametricVariationDescriptor['type'] {
-  return transformVariations[name].type === 'parametric'
+type ParametricVariationType = (typeof parametricVariationTypes)[number]
+const parametricVariationTypes = Object.values(parametricVariations).map(
+  (o) => o.DescriptorSchema.entries.type.literal,
+)
+
+export type ParametricVariationDescriptor = Extract<
+  TransformVariationDescriptor,
+  { type: ParametricVariationType }
+>
+
+export function isParametricVariationType(
+  variationType: TransformVariationType,
+): variationType is ParametricVariationType {
+  return (parametricVariationTypes as string[]).includes(variationType)
 }
 
-export function isParametricType(
+export function isParametricVariation(
   v: TransformVariationDescriptor,
 ): v is ParametricVariationDescriptor {
-  return 'params' in v
+  return isParametricVariationType(v.type)
 }
 
 export function isVariationType(
   maybeType: string,
-): maybeType is TransformVariation {
-  return variationTypes.includes(maybeType)
+): maybeType is TransformVariationType {
+  return (variationTypes as string[]).includes(maybeType)
 }

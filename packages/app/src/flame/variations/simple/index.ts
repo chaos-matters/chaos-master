@@ -1,8 +1,10 @@
 import { random, randomUnitDisk } from '@/shaders/random'
-import { PI } from '../constants'
+import { PI } from '../../constants'
 import { simpleVariation } from './types'
 
-export const waves = simpleVariation(/* wgsl */ `
+export const waves = simpleVariation(
+  'waves',
+  /* wgsl */ `
   (pos: vec2f, varInfo: VariationInfo) -> vec2f {
     let T = varInfo.affineCoefs;
     let xSinArg = pos.y / (T.c * T.c); 
@@ -11,18 +13,24 @@ export const waves = simpleVariation(/* wgsl */ `
       pos.x + T.b * sin(xSinArg),
       pos.y + T.e * sin(ySinArg),
     );
-  }`)
+  }`,
+)
 
-export const popcorn = simpleVariation(/* wgsl */ `
+export const popcorn = simpleVariation(
+  'popcorn',
+  /* wgsl */ `
   (pos: vec2f, varInfo: VariationInfo) -> vec2f {
     let T = varInfo.affineCoefs;
     return pos + vec2f(
       T.c * sin(tan(3 * pos.y)),
       T.f * sin(tan(3 * pos.x)),
     );
-  }`)
+  }`,
+)
 
-export const rings = simpleVariation(/* wgsl */ `
+export const rings = simpleVariation(
+  'rings',
+  /* wgsl */ `
   (pos: vec2f, varInfo: VariationInfo) -> vec2f {
     let T = varInfo.affineCoefs;
     let c2 = T.c * T.c;
@@ -30,9 +38,11 @@ export const rings = simpleVariation(/* wgsl */ `
     let theta = atan2(pos.y, pos.x);
     let factor = (r + c2) % (2 * c2) - c2 + r * (1 - c2);
     return factor * vec2f(cos(theta), sin(theta));
-  }`)
+  }`,
+)
 
 export const fan = simpleVariation(
+  'fan',
   /* wgsl */ `
   (pos: vec2f, varInfo: VariationInfo) -> vec2f {
     let T = varInfo.affineCoefs;
@@ -49,12 +59,16 @@ export const fan = simpleVariation(
   }`,
   { PI },
 )
-export const linear = simpleVariation(/* wgsl */ `
+export const linear = simpleVariation(
+  'linear',
+  /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     return pos;
-  }`)
+  }`,
+)
 
 export const randomDisk = simpleVariation(
+  'randomDisk',
   /* wgsl */ `
   (_pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     return randomUnitDisk();
@@ -63,6 +77,7 @@ export const randomDisk = simpleVariation(
 )
 
 export const gaussian = simpleVariation(
+  'gaussian',
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let r = random() + random() + random() + random() - 2;
@@ -72,18 +87,26 @@ export const gaussian = simpleVariation(
   { random, PI },
 )
 
-export const sinusoidal = simpleVariation(/* wgsl */ `
+export const sinusoidal = simpleVariation(
+  'sinusoidal',
+  /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     return vec2f(sin(pos.x), sin(pos.y));
-  }`)
+  }`,
+)
 
-export const spherical = simpleVariation(/* wgsl */ `
+export const spherical = simpleVariation(
+  'spherical',
+  /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let r2 = dot(pos, pos);
     return pos / r2;
-  }`)
+  }`,
+)
 
-export const swirl = simpleVariation(/* wgsl */ `
+export const swirl = simpleVariation(
+  'swirl',
+  /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let r2 = dot(pos, pos);
     let s2 = sin(r2);
@@ -92,18 +115,23 @@ export const swirl = simpleVariation(/* wgsl */ `
       pos.x * s2 - pos.y * c2,
       pos.x * c2 + pos.y * s2,
     );
-  }`)
+  }`,
+)
 
-export const horseshoe = simpleVariation(/* wgsl */ `
+export const horseshoe = simpleVariation(
+  'horseshoe',
+  /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let r = length(pos); 
     return vec2f(
       (pos.x - pos.y) * (pos.x + pos.y),
       2 * pos.x * pos.y
     ) / r;
-  }`)
+  }`,
+)
 
 export const polar = simpleVariation(
+  'polar',
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let r = length(pos); 
@@ -113,21 +141,28 @@ export const polar = simpleVariation(
   { PI },
 )
 
-export const handkerchief = simpleVariation(/* wgsl */ `
+export const handkerchief = simpleVariation(
+  'handkerchief',
+  /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let r = length(pos); 
     let theta = atan2(pos.y, pos.x);
     return r * vec2f(sin(theta + r), cos(theta - r));
-  }`)
+  }`,
+)
 
-export const heart = simpleVariation(/* wgsl */ `
+export const heart = simpleVariation(
+  'heart',
+  /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let r = length(pos); 
     let theta = atan2(pos.y, pos.x);
     return r * vec2f(sin(theta * r), -cos(theta * r));
-  }`)
+  }`,
+)
 
 export const disc = simpleVariation(
+  'disc',
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let r = length(pos);
@@ -139,6 +174,7 @@ export const disc = simpleVariation(
 )
 
 export const spiral = simpleVariation(
+  'spiral',
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let r = length(pos);
@@ -152,21 +188,29 @@ export const spiral = simpleVariation(
   { PI },
 )
 
-export const hyperbolic = simpleVariation(/* wgsl */ `
+export const hyperbolic = simpleVariation(
+  'hyperbolic',
+  /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let r = length(pos);
     let theta = atan2(pos.y, pos.x);
     return vec2f(sin(theta) / r, r * cos(theta));
-  }`)
+  }`,
+)
 
-export const diamond = simpleVariation(/* wgsl */ `
+export const diamond = simpleVariation(
+  'diamond',
+  /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let r = length(pos);
     let theta = atan2(pos.y, pos.x);
     return vec2f(sin(theta) * cos(r), cos(theta) * sin(r));
-  }`)
+  }`,
+)
 
-export const exVar = simpleVariation(/* wgsl */ `
+export const exVar = simpleVariation(
+  'exVar',
+  /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let r = length(pos);
     let theta = atan2(pos.y, pos.x);
@@ -175,9 +219,11 @@ export const exVar = simpleVariation(/* wgsl */ `
     let p03 = p0 * p0 * p0;
     let p13 = p1 * p1 * p1;
     return r * vec2f((p03 + p13), (p03 - p13));
-  }`)
+  }`,
+)
 
 export const julia = simpleVariation(
+  'julia',
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let sqrtr = sqrt(length(pos));
@@ -190,28 +236,38 @@ export const julia = simpleVariation(
   { random, PI },
 )
 
-export const bent = simpleVariation(/* wgsl */ `
+export const bent = simpleVariation(
+  'bent',
+  /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let fx = select(pos.x, 2.0 * pos.x, pos.x < 0);
     let fy = select(pos.y, pos.y / 2.0, pos.y < 0);
     return vec2f(fx, fy);
-  }`)
+  }`,
+)
 
-export const fisheye = simpleVariation(/* wgsl */ `
+export const fisheye = simpleVariation(
+  'fisheye',
+  /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let r = length(pos);
     let factor = 2 / (r + 1); 
     return factor * pos.yx;
-  }`)
+  }`,
+)
 
-export const eyefish = simpleVariation(/* wgsl */ `
+export const eyefish = simpleVariation(
+  'eyefish',
+  /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let r = length(pos);
     let factor = 2 / (r + 1); 
     return factor * pos;
-  }`)
+  }`,
+)
 
 export const exponential = simpleVariation(
+  'exponential',
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let factor = exp(pos.x - 1);
@@ -221,16 +277,20 @@ export const exponential = simpleVariation(
   { PI },
 )
 
-export const power = simpleVariation(/* wgsl */ `
+export const power = simpleVariation(
+  'power',
+  /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let r = length(pos);
     let theta = atan2(pos.y, pos.x);
     let sinTheta = sin(theta);
     let factor = pow(r, sinTheta);
     return factor * vec2f(cos(theta), sinTheta);
-  }`)
+  }`,
+)
 
 export const cosine = simpleVariation(
+  'cosine',
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let piX = PI * pos.x;
@@ -242,20 +302,27 @@ export const cosine = simpleVariation(
   { PI },
 )
 
-export const bubble = simpleVariation(/* wgsl */ `
+export const bubble = simpleVariation(
+  'bubble',
+  /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let r = length(pos);
     let r2 = r * r;
     let factor = 4 / (r2 + 4);
     return factor * vec2f(pos.x, pos.y);
-  }`)
+  }`,
+)
 
-export const cylinder = simpleVariation(/* wgsl */ `
+export const cylinder = simpleVariation(
+  'cylinder',
+  /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     return vec2f(sin(pos.x), pos.y);
-  }`)
+  }`,
+)
 
 export const noise = simpleVariation(
+  'noise',
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let rand = random();
@@ -266,6 +333,7 @@ export const noise = simpleVariation(
 )
 
 export const blurVar = simpleVariation(
+  'blurVar',
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let rand = random();
@@ -276,6 +344,7 @@ export const blurVar = simpleVariation(
 )
 
 export const archVar = simpleVariation(
+  'archVar',
   /* wgsl */ `
   (pos: vec2f, varInfo: VariationInfo) -> vec2f {
     let weight = varInfo.weight;
@@ -288,15 +357,19 @@ export const archVar = simpleVariation(
   { random, PI },
 )
 
-export const tangentVar = simpleVariation(/* wgsl */ `
+export const tangentVar = simpleVariation(
+  'tangentVar',
+  /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     return vec2f(
       sin(pos.x) / cos(pos.y), 
       tan(pos.y)
     );
-  }`)
+  }`,
+)
 
 export const squareVar = simpleVariation(
+  'squareVar',
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let randX = random();
@@ -310,6 +383,7 @@ export const squareVar = simpleVariation(
 )
 
 export const raysVar = simpleVariation(
+  'raysVar',
   /* wgsl */ `
   (pos: vec2f, varInfo: VariationInfo) -> vec2f {
     let weight = varInfo.weight;
@@ -326,6 +400,7 @@ export const raysVar = simpleVariation(
 )
 
 export const bladeVar = simpleVariation(
+  'bladeVar',
   /* wgsl */ `
   (pos: vec2f, varInfo: VariationInfo) -> vec2f {
     let weight = varInfo.weight;
@@ -341,6 +416,7 @@ export const bladeVar = simpleVariation(
 )
 
 export const secantVar = simpleVariation(
+  'secantVar',
   /* wgsl */ `
   (pos: vec2f, varInfo: VariationInfo) -> vec2f {
     let weight = varInfo.weight;
@@ -355,6 +431,7 @@ export const secantVar = simpleVariation(
 )
 
 export const twintrianVar = simpleVariation(
+  'twintrianVar',
   /* wgsl */ `
   (pos: vec2f, varInfo: VariationInfo) -> vec2f {
     let weight = varInfo.weight;
@@ -371,6 +448,7 @@ export const twintrianVar = simpleVariation(
 )
 
 export const crossVar = simpleVariation(
+  'crossVar',
   /* wgsl */ `
   (pos: vec2f, _varInfo: VariationInfo) -> vec2f {
     let squareDiff = (pos.x * pos.x - pos.y * pos.y);

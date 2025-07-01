@@ -1,29 +1,23 @@
-import * as v from 'valibot'
+import { f32, struct } from 'typegpu/data'
 import { AngleEditor } from '@/components/Sliders/ParametricEditors/AngleEditor'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
-import { schemaToF32Struct } from '@/utils/schemaUtil'
-import { parametricVariation } from '../types'
+import { parametricVariation } from './types'
 import type { Infer } from 'typegpu/data'
-import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export const PerspectiveParamsSchema = v.object({
-  angle: v.number(),
-  dist: v.number(),
+type PerspectiveParams = Infer<typeof PerspectiveParams>
+const PerspectiveParams = struct({
+  angle: f32,
+  dist: f32,
 })
 
-export const PerspectiveParams = schemaToF32Struct(
-  PerspectiveParamsSchema.entries,
-)
-const PerspectiveParamsDefaults: InferOutput<typeof PerspectiveParamsSchema> = {
+const PerspectiveParamsDefaults: PerspectiveParams = {
   angle: Math.PI,
   dist: 3,
 }
 
-export const PerspectiveParamsEditor: EditorFor<
-  Infer<typeof PerspectiveParams>
-> = (props) => (
+const PerspectiveParamsEditor: EditorFor<PerspectiveParams> = (props) => (
   <>
     <AngleEditor {...editorProps(props, 'angle', 'Angle')} />
     <RangeEditor
@@ -36,6 +30,7 @@ export const PerspectiveParamsEditor: EditorFor<
 )
 
 export const perspective = parametricVariation(
+  'perspective',
   PerspectiveParams,
   PerspectiveParamsDefaults,
   PerspectiveParamsEditor,

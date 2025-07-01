@@ -1,28 +1,23 @@
-import * as v from 'valibot'
+import { f32, struct } from 'typegpu/data'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { PI } from '@/flame/constants'
-import { schemaToF32Struct } from '@/utils/schemaUtil'
-import { parametricVariation } from '../types'
+import { parametricVariation } from './types'
 import type { Infer } from 'typegpu/data'
-import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export const Fan2ParamsSchema = v.object({
-  x: v.number(),
-  y: v.number(),
+type Fan2Params = Infer<typeof Fan2Params>
+const Fan2Params = struct({
+  x: f32,
+  y: f32,
 })
 
-const Fan2Params = schemaToF32Struct(Fan2ParamsSchema.entries)
-
-const Fan2ParamsDefaults: InferOutput<typeof Fan2ParamsSchema> = {
+const Fan2ParamsDefaults: Fan2Params = {
   x: 1,
   y: 1,
 }
 
-export const Fan2ParamsEditor: EditorFor<Infer<typeof Fan2Params>> = (
-  props,
-) => (
+const Fan2ParamsEditor: EditorFor<Fan2Params> = (props) => (
   <>
     <RangeEditor
       {...editorProps(props, 'x', 'X')}
@@ -40,6 +35,7 @@ export const Fan2ParamsEditor: EditorFor<Infer<typeof Fan2Params>> = (
 )
 
 export const fan2 = parametricVariation(
+  'fan2',
   Fan2Params,
   Fan2ParamsDefaults,
   Fan2ParamsEditor,

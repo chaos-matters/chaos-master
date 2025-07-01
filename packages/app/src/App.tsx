@@ -52,14 +52,11 @@ import {
   generateVariationId,
 } from './flame/transformFunction'
 import {
-  isParametricType,
+  isParametricVariation,
   isVariationType,
   variationTypes,
 } from './flame/variations'
-import {
-  getParamsEditor,
-  getVariationDefault,
-} from './flame/variations/parametric'
+import { getParamsEditor, getVariationDefault } from './flame/variations/utils'
 import { Cross, Plus } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
 import { Root } from './lib/Root'
@@ -79,7 +76,7 @@ import type { DrawMode } from './flame/drawMode'
 import type {
   FlameDescriptor,
   TransformFunction,
-} from './flame/transformFunction'
+} from './flame/schema/flameSchema'
 
 const EDGE_FADE_COLOR = {
   light: vec4f(0.96, 0.96, 0.96, 1),
@@ -370,7 +367,7 @@ function App(props: AppProps) {
                           formatValue={formatPercent}
                         />
                         <Show
-                          when={isParametricType(variation) && variation}
+                          when={isParametricVariation(variation) && variation}
                           keyed
                         >
                           {(variation) => (
@@ -382,7 +379,7 @@ function App(props: AppProps) {
                                     draft.transforms[tid]?.variations[vid]
                                   if (
                                     variationDraft === undefined ||
-                                    !isParametricType(variationDraft)
+                                    !isParametricVariation(variationDraft)
                                   ) {
                                     throw new Error(`Unreachable code`)
                                   }

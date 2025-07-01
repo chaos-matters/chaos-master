@@ -1,29 +1,26 @@
-import * as v from 'valibot'
+import { f32, struct } from 'typegpu/data'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
-import { schemaToF32Struct } from '@/utils/schemaUtil'
-import { parametricVariation } from '../types'
+import { parametricVariation } from './types'
 import type { Infer } from 'typegpu/data'
-import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export const PdjParamsSchema = v.object({
-  a: v.number(),
-  b: v.number(),
-  c: v.number(),
-  d: v.number(),
+type PdjParams = Infer<typeof PdjParams>
+const PdjParams = struct({
+  a: f32,
+  b: f32,
+  c: f32,
+  d: f32,
 })
 
-export const PdjParams = schemaToF32Struct(PdjParamsSchema.entries)
-
-const PdjParamsDefaults: InferOutput<typeof PdjParamsSchema> = {
+const PdjParamsDefaults: PdjParams = {
   a: 1,
   b: 2,
   c: 3,
   d: 4,
 }
 
-export const PdjParamsEditor: EditorFor<Infer<typeof PdjParams>> = (props) => (
+const PdjParamsEditor: EditorFor<PdjParams> = (props) => (
   <>
     <RangeEditor
       {...editorProps(props, 'a', 'a')}
@@ -53,6 +50,7 @@ export const PdjParamsEditor: EditorFor<Infer<typeof PdjParams>> = (props) => (
 )
 
 export const pdjVar = parametricVariation(
+  'pdjVar',
   PdjParams,
   PdjParamsDefaults,
   PdjParamsEditor,

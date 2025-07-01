@@ -1,32 +1,27 @@
-import * as v from 'valibot'
+import { f32, struct } from 'typegpu/data'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { PI } from '@/flame/constants'
-import { schemaToF32Struct } from '@/utils/schemaUtil'
-import { parametricVariation } from '../types'
+import { parametricVariation } from './types'
 import type { Infer } from 'typegpu/data'
-import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export const NgonParamsSchema = v.object({
-  power: v.number(),
-  sides: v.number(),
-  corners: v.number(),
-  circle: v.number(),
+type NgonParams = Infer<typeof NgonParams>
+const NgonParams = struct({
+  power: f32,
+  sides: f32,
+  corners: f32,
+  circle: f32,
 })
 
-const NgonParams = schemaToF32Struct(NgonParamsSchema.entries)
-
-const NgonParamsDefaults: InferOutput<typeof NgonParamsSchema> = {
+const NgonParamsDefaults: NgonParams = {
   power: 2,
   sides: 3,
   corners: 4,
   circle: 4,
 }
 
-export const NgonParamsEditor: EditorFor<Infer<typeof NgonParams>> = (
-  props,
-) => (
+const NgonParamsEditor: EditorFor<NgonParams> = (props) => (
   <>
     <RangeEditor
       {...editorProps(props, 'power', 'Power')}
@@ -56,6 +51,7 @@ export const NgonParamsEditor: EditorFor<Infer<typeof NgonParams>> = (
 )
 
 export const ngonVar = parametricVariation(
+  'ngonVar',
   NgonParams,
   NgonParamsDefaults,
   NgonParamsEditor,
