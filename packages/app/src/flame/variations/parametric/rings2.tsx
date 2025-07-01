@@ -1,24 +1,20 @@
-import * as v from 'valibot'
+import { f32, struct } from 'typegpu/data'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
-import { schemaToF32Struct } from '@/utils/schemaUtil'
-import { parametricVariation } from '../types'
+import { parametricVariation } from './types'
 import type { Infer } from 'typegpu/data'
-import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export const Rings2ParamsSchema = v.object({
-  val: v.number(),
+type Rings2Params = Infer<typeof Rings2Params>
+const Rings2Params = struct({
+  val: f32,
 })
 
-export const Rings2Params = schemaToF32Struct(Rings2ParamsSchema.entries)
-
-const Rings2ParamsDefaults: InferOutput<typeof Rings2ParamsSchema> = {
+const Rings2ParamsDefaults: Rings2Params = {
   val: 6,
 }
-export const Rings2ParamsEditor: EditorFor<Infer<typeof Rings2Params>> = (
-  props,
-) => (
+
+const Rings2ParamsEditor: EditorFor<Rings2Params> = (props) => (
   <>
     <RangeEditor
       {...editorProps(props, 'val', 'Value')}
@@ -30,6 +26,7 @@ export const Rings2ParamsEditor: EditorFor<Infer<typeof Rings2Params>> = (
 )
 
 export const rings2 = parametricVariation(
+  'rings2',
   Rings2Params,
   Rings2ParamsDefaults,
   Rings2ParamsEditor,

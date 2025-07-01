@@ -1,29 +1,24 @@
-import * as v from 'valibot'
+import { f32, struct } from 'typegpu/data'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { PI } from '@/flame/constants'
-import { parametricVariation } from '@/flame/variations/types'
 import { random } from '@/shaders/random'
-import { schemaToF32Struct } from '@/utils/schemaUtil'
+import { parametricVariation } from './types'
 import type { Infer } from 'typegpu/data'
-import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export const JuliaScopeParamsSchema = v.object({
-  power: v.number(),
-  dist: v.number(),
+type JuliaScopeParams = Infer<typeof JuliaScopeParams>
+const JuliaScopeParams = struct({
+  power: f32,
+  dist: f32,
 })
 
-const JuliaScopeParams = schemaToF32Struct(JuliaScopeParamsSchema.entries)
-
-const JuliaScopeParamsDefaults: InferOutput<typeof JuliaScopeParamsSchema> = {
+const JuliaScopeParamsDefaults: JuliaScopeParams = {
   power: 1,
   dist: 5,
 }
 
-export const JuliaScopeParamsEditor: EditorFor<
-  Infer<typeof JuliaScopeParams>
-> = (props) => (
+const JuliaScopeParamsEditor: EditorFor<JuliaScopeParams> = (props) => (
   <>
     <RangeEditor
       {...editorProps(props, 'power', 'Power')}
@@ -41,6 +36,7 @@ export const JuliaScopeParamsEditor: EditorFor<
 )
 
 export const juliaScope = parametricVariation(
+  'juliaScope',
   JuliaScopeParams,
   JuliaScopeParamsDefaults,
   JuliaScopeParamsEditor,

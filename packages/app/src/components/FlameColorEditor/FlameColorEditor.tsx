@@ -24,7 +24,7 @@ import { wgsl } from '@/utils/wgsl'
 import ui from './FlameColorEditor.module.css'
 import type { v2f } from 'typegpu/data'
 import type { Theme } from '@/contexts/ThemeContext'
-import type { TransformRecord } from '@/flame/transformFunction'
+import type { TransformRecord } from '@/flame/schema/flameSchema'
 import type { HistorySetter } from '@/utils/createStoreHistory'
 
 const HANDLE_LIGHTNESS = {

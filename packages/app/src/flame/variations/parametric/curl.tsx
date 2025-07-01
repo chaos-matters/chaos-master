@@ -1,26 +1,22 @@
-import * as v from 'valibot'
+import { f32, struct } from 'typegpu/data'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
-import { schemaToF32Struct } from '@/utils/schemaUtil'
-import { parametricVariation } from '../types'
+import { parametricVariation } from './types'
 import type { Infer } from 'typegpu/data'
-import type { InferOutput } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
-export const CurlParamsSchema = v.object({
-  c1: v.number(),
-  c2: v.number(),
+type CurlParams = Infer<typeof CurlParams>
+const CurlParams = struct({
+  c1: f32,
+  c2: f32,
 })
 
-const CurlParams = schemaToF32Struct(CurlParamsSchema.entries)
-
-const CurlParamsDefaults: InferOutput<typeof CurlParamsSchema> = {
+const CurlParamsDefaults: CurlParams = {
   c1: 1,
   c2: 1,
 }
-export const CurlParamsEditor: EditorFor<Infer<typeof CurlParams>> = (
-  props,
-) => (
+
+const CurlParamsEditor: EditorFor<CurlParams> = (props) => (
   <>
     <RangeEditor
       {...editorProps(props, 'c1', 'C1')}
@@ -38,6 +34,7 @@ export const CurlParamsEditor: EditorFor<Infer<typeof CurlParams>> = (
 )
 
 export const curlVar = parametricVariation(
+  'curlVar',
   CurlParams,
   CurlParamsDefaults,
   CurlParamsEditor,

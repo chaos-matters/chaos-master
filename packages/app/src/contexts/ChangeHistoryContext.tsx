@@ -1,6 +1,6 @@
 import { createContext } from 'solid-js'
 import { useContextSafe } from '@/utils/useContextSafe'
-import type { FlameDescriptor } from '@/flame/transformFunction'
+import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { ChangeHistory } from '@/utils/createStoreHistory'
 
 const ChangeHistoryContext = createContext<ChangeHistory<FlameDescriptor>>()

@@ -9,13 +9,11 @@ import {
 } from '@/shaders/random'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { wgsl } from '@/utils/wgsl'
-import { PI } from './constants'
 import { createFlameWgsl, extractFlameUniforms } from './transformFunction'
 import { AtomicBucket, BUCKET_FIXED_POINT_MULTIPLIER, Point } from './types'
-import { AffineParams, transformAffine } from './variations/types'
 import type { StorageFlag, TgpuBuffer, TgpuRoot } from 'typegpu'
 import type { Vec4u, WgslArray } from 'typegpu/data'
-import type { FlameDescriptor, TransformRecord } from './transformFunction'
+import type { FlameDescriptor, TransformRecord } from './schema/flameSchema'
 import type { CameraContext } from '@/lib/CameraContext'
 
 const { ceil } = Math
@@ -88,11 +86,7 @@ export function createIFSPipeline(
       setSeed,
       random,
       randomState,
-      AffineParams,
-      transformAffine,
-      PI,
       worldToClip: camera.wgsl.worldToClip,
-      clipToPixels: camera.wgsl.clipToPixels,
       randomUnitDisk,
     }}
 

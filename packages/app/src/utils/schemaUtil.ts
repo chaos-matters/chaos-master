@@ -1,12 +1,13 @@
-import { f32, struct } from 'typegpu/data'
 import { recordKeys } from '@/utils/record'
+import * as v from '@/valibot'
+import type { BaseData, WgslStruct } from 'typegpu/data'
 
-export function schemaToF32Struct<T extends Record<string, unknown>>(
-  schema: T,
+export function structToSchema<T extends Record<string, BaseData>>(
+  struct: WgslStruct<T>,
 ) {
-  const obj = {} as Record<keyof T, typeof f32>
-  for (const key of recordKeys(schema)) {
-    obj[key] = f32
+  const obj = {} as Record<keyof T, v.NumberSchema<undefined>>
+  for (const key of recordKeys(struct.propTypes)) {
+    obj[key] = v.number()
   }
-  return struct(obj)
+  return v.object(obj)
 }

@@ -23,8 +23,8 @@ import { wgsl } from '@/utils/wgsl'
 import { handleColor } from '../FlameColorEditor/FlameColorEditor'
 import ui from './AffineEditor.module.css'
 import type { v2f } from 'typegpu/data'
-import type { TransformRecord } from '@/flame/transformFunction'
-import type { AffineParams } from '@/flame/variations/types'
+import type { AffineParams } from '@/flame/affineTranform'
+import type { TransformRecord } from '@/flame/schema/flameSchema'
 import type { HistorySetter } from '@/utils/createStoreHistory'
 
 const { sqrt } = Math

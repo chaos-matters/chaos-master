@@ -20,11 +20,12 @@ import { drawModeToImplFn } from './drawMode'
 import { createIFSPipeline } from './ifsPipeline'
 import {
   backgroundColorDefault,
-  backgroundColorDefaultWhite,
+  backgroundColorDefaultWhite
 } from './schema/flameSchema'
 import { Bucket } from './types'
 import type { v4f } from 'typegpu/data'
-import type { FlameDescriptor } from './transformFunction'
+import type {
+  FlameDescriptor} from './schema/flameSchema';
 import type { ExportImageType } from '@/App'
 
 const { sqrt, floor } = Math

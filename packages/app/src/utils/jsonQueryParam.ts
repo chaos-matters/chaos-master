@@ -1,4 +1,4 @@
-import { validateFlame } from '@/flame/examples/util'
+import { validateFlame } from '@/flame/schema/flameSchema'
 import { decodeBase64, encodeBase64 } from './base64'
 import { sum } from './sum'
 
