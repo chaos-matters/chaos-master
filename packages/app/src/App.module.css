@@ -214,3 +214,55 @@
 .variation-button:hover::before {
   left: 100%;
 }
+
+.variation-button:hover {
+  border: 1px solid var(--neutral-500);
+}
+
+.pills-container {
+  display: grid;
+  grid-template-columns: auto auto auto auto;
+  grid-column-gap: 1rem;
+}
+
+.pill {
+  padding: 0.2rem 0.2rem;
+  font-weight: bold;
+  color: var(--neutral-200);
+  background: linear-gradient(45deg, #6e45e2, #88d3ce);
+  border-radius: 20px;
+  cursor: pointer;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  text-transform: uppercase;
+  user-select: none;
+  text-align: center;
+}
+
+.pill:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.pill:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.pilllow {
+  background: linear-gradient(45deg, #ff6b6b, #ff8e53);
+}
+
+.pillmid {
+  background: linear-gradient(45deg, #b68b32, #feca57);
+}
+
+.pillhigh {
+  background: linear-gradient(45deg, #54a0ff, #00ddeb);
+}
+
+.pillultra {
+  background: linear-gradient(45deg, #5f27cd, #54a0ff);
+}

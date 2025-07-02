@@ -575,6 +575,40 @@ function App(props: AppProps) {
                 }
               />
             </Card>
+            <div class={ui.pillsContainer}>
+              <div
+                onClick={() => {
+                  setQuality(0.75)
+                }}
+                classList={{ [ui.pill]: true, [ui.pilllow]: true }}
+              >
+                Low
+              </div>
+              <div
+                onClick={() => {
+                  setQuality(0.85)
+                }}
+                classList={{ [ui.pill]: true, [ui.pillmid]: true }}
+              >
+                Mid
+              </div>
+              <div
+                onClick={() => {
+                  setQuality(0.95)
+                }}
+                classList={{ [ui.pill]: true, [ui.pillhigh]: true }}
+              >
+                High
+              </div>
+              <div
+                onClick={() => {
+                  setQuality(0.99)
+                }}
+                classList={{ [ui.pill]: true, [ui.pillultra]: true }}
+              >
+                Ultra
+              </div>
+            </div>
             <Card>
               <label class={ui.labeledInput}>
                 Adaptive filter
