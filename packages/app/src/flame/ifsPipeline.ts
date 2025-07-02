@@ -9,10 +9,12 @@ import {
 } from '@/shaders/random'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { wgsl } from '@/utils/wgsl'
+import { colorInitModeToImplFn } from './colorInitMode'
 import { createFlameWgsl, extractFlameUniforms } from './transformFunction'
 import { AtomicBucket, BUCKET_FIXED_POINT_MULTIPLIER, Point } from './types'
 import type { StorageFlag, TgpuBuffer, TgpuRoot } from 'typegpu'
 import type { Vec4u, WgslArray } from 'typegpu/data'
+import type { ColorInitMode } from './colorInitMode'
 import type { FlameDescriptor, TransformRecord } from './schema/flameSchema'
 import type { Bucket } from './types'
 import type { CameraContext } from '@/lib/CameraContext'
@@ -28,6 +30,7 @@ export function createIFSPipeline(
   transforms: TransformRecord,
   outputTextureDimension: readonly [number, number],
   accumulationBuffer: TgpuBuffer<WgslArray<typeof Bucket>> & StorageFlag,
+  colorInitType: ColorInitMode = 'colorInitZero',
 ) {
   const { device } = root
   const flames = Object.fromEntries(
@@ -77,6 +80,7 @@ export function createIFSPipeline(
     accumulationBuffer,
   })
 
+  const colorInitMode = colorInitModeToImplFn[colorInitType]
   const ifsShaderCode = wgsl /* wgsl */ `
     ${{
       ...camera.BindGroupLayout.bound,
@@ -89,6 +93,7 @@ export function createIFSPipeline(
       randomState,
       worldToClip: camera.wgsl.worldToClip,
       randomUnitDisk,
+      colorInitMode,
     }}
 
     const ITER_COUNT = ${insideShaderCount};
@@ -115,6 +120,7 @@ export function createIFSPipeline(
 
       var point = Point();
       point.position = randomUnitDisk();
+      point.color = colorInitMode(point.position);
 
       for (var i = 0; i < ITER_COUNT; i += 1) {
         let flameIndex = random();

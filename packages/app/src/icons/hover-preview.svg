@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" role="img" aria-labelledby="cursorTitle">
+  <title id="cursorTitle">Hover Preview — Pointer with Motion</title>
+  <style>
+    .ml { fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round }
+    .cursor { fill:currentColor }
+    @keyframes pulseLine {
+      0% { opacity: 0.95; transform: translateX(0); }
+      50% { opacity: 0.35; transform: translateX(2px); }
+      100% { opacity: 0.95; transform: translateX(0); }
+    }
+    .ml-anim { animation: pulseLine 1s ease-in-out infinite; transform-origin: center; }
+    .ml-anim.delay { animation-delay: 0.25s; }
+  </style>
+
+  <!-- trailing motion lines -->
+  <g transform="translate(4,28)">
+    <path class="ml ml-anim" d="M0 4 H10" />
+    <path class="ml ml-anim delay" d="M0 10 H14" />
+    <path class="ml" d="M0 -2 H8" opacity="0.6"/>
+  </g>
+
+  <!-- cursor arrow (classic UI pointer) -->
+  <g transform="translate(20,10)">
+    <path class="cursor" d="M0 0 L0 40 L10 30 L20 50 L26 46 L16 26 L30 26 Z" />
+  </g>
+</svg>
