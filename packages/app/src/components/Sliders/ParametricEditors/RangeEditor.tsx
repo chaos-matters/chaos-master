@@ -23,7 +23,6 @@ export function RangeEditor(props: RangeEditorProps) {
       min={props.min}
       max={props.max}
       step={props.step}
-      trackFill={false}
       label={props.name}
       formatValue={(value) => value.toFixed(decimals())}
     />

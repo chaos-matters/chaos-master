@@ -1,0 +1,57 @@
+.pill {
+  --color: var(--neutral-600);
+  --hover-color: black;
+  --track-color-filled: var(--neutral-400);
+  --track-color-empty: var(--neutral-200);
+
+  [data-theme='dark'] & {
+    --color: var(--neutral-400);
+    --hover-color: white;
+    --track-color-filled: var(--neutral-700);
+    --track-color-empty: var(--neutral-800);
+  }
+}
+
+.pills-container {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-2);
+  grid-column: span 2;
+  overflow: hidden;
+}
+
+.pill {
+  position: relative;
+  padding: var(--space-1) var(--space-1);
+  min-width: 3rem;
+  z-index: 1;
+
+  color: var(--color);
+  background: var(--track-color-empty);
+  border-radius: 4px;
+  cursor: pointer;
+
+  text-align: center;
+  text-transform: uppercase;
+  user-select: none;
+
+  &::before {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+    inset: 0;
+    z-index: -1;
+
+    border-radius: 4px;
+    background: linear-gradient(
+      to right,
+      var(--track-color-filled),
+      var(--track-color-filled) var(--fill-percent),
+      var(--track-color-empty) var(--fill-percent)
+    );
+  }
+}
+
+.selected-pill {
+  color: var(--color);
+}

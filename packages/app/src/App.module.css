@@ -298,6 +298,7 @@
 .variation-button-color {
   filter: drop-shadow(0 1px 2px black);
 }
+
 .variation-button-color-circle {
   r: 0.3rem;
   cx: 0.6rem;
