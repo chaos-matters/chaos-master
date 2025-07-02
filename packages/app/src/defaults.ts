@@ -12,6 +12,10 @@ export const DEFAULT_ZOOM_LEVEL = parseFloat(
 )
 export const DEFAULT_QUALITY = parseFloat(import.meta.env.VITE_DEFAULT_QUALITY)
 
+export const DEFAULT_ULTRA_QUALITY = parseFloat(
+  import.meta.env.VITE_DEFAULT_ULTRA_QUALITY,
+)
+
 export const DEFAULT_VARIATION_SHOW_DELAY_MS = parseFloat(
   import.meta.env.VITE_DEFAULT_VARIATION_SHOW_DELAY_MS,
 )

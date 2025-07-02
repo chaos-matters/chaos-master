@@ -51,29 +51,6 @@
       var(--track-color-empty) var(--fill-percent)
     );
   }
-
-  &.animate-fill::before {
-    --pattern-size: 10px;
-    --angle: -30deg;
-    --pattern-width: calc(var(--pattern-size) / sin(var(--angle)));
-    animation: slide-stripes 2s linear infinite;
-    background:
-      linear-gradient(
-        to right,
-        transparent,
-        transparent var(--fill-percent),
-        var(--track-color-empty) var(--fill-percent)
-      ),
-      repeating-linear-gradient(
-        var(--angle),
-        var(--track-color-filled),
-        var(--track-color-filled) calc(0.4 * var(--pattern-size)),
-        var(--track-color-empty) var(--pattern-size)
-      );
-    background-size:
-      100% 100%,
-      200% 100%;
-  }
 }
 
 .value {
@@ -149,13 +126,5 @@
       var(--color),
       oklab(from var(--color) calc(l * 0.75) a b)
     );
-  }
-}
-
-@keyframes slide-stripes {
-  from {
-    background-position:
-      0 0,
-      var(--pattern-width) 0;
   }
 }
