@@ -191,7 +191,6 @@ export function Flam3(props: Flam3Props) {
       pointRandomSeeds,
       props.flameDescriptor.transforms,
       textureSize,
-      // @ts-expect-error Waiting for atomics fix
       accumulationBuffer,
     )
 

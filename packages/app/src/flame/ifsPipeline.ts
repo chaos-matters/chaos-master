@@ -14,6 +14,7 @@ import { AtomicBucket, BUCKET_FIXED_POINT_MULTIPLIER, Point } from './types'
 import type { StorageFlag, TgpuBuffer, TgpuRoot } from 'typegpu'
 import type { Vec4u, WgslArray } from 'typegpu/data'
 import type { FlameDescriptor, TransformRecord } from './schema/flameSchema'
+import type { Bucket } from './types'
 import type { CameraContext } from '@/lib/CameraContext'
 
 const { ceil } = Math
@@ -26,7 +27,7 @@ export function createIFSPipeline(
   pointRandomSeeds: TgpuBuffer<WgslArray<Vec4u>> & StorageFlag,
   transforms: TransformRecord,
   outputTextureDimension: readonly [number, number],
-  accumulationBuffer: TgpuBuffer<WgslArray<typeof AtomicBucket>> & StorageFlag,
+  accumulationBuffer: TgpuBuffer<WgslArray<typeof Bucket>> & StorageFlag,
 ) {
   const { device } = root
   const flames = Object.fromEntries(

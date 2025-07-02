@@ -78,7 +78,7 @@ importers:
     dependencies:
       '@typegpu/color':
         specifier: 0.0.5
-        version: 0.0.5(typegpu@0.5.8)
+        version: 0.0.5(typegpu@0.5.9)
       '@vercel/analytics':
         specifier: 1.5.0
         version: 1.5.0
@@ -89,8 +89,8 @@ importers:
         specifier: 0.12.6
         version: 0.12.6
       typegpu:
-        specifier: 0.5.8
-        version: 0.5.8
+        specifier: 0.5.9
+        version: 0.5.9
       valibot:
         specifier: ^1.1.0
         version: 1.1.0(typescript@5.8.3)
@@ -1687,8 +1687,8 @@ packages:
   typed-binary@4.3.2:
     resolution: {integrity: sha512-HT3pIBM2njCZUmeczDaQUUErGiM6GXFCqMsHegE12HCoBtvHCkfR10JJni0TeGOTnLilTd6YFyj+YhflqQDrDQ==}
 
-  typegpu@0.5.8:
-    resolution: {integrity: sha512-4uyIxeY61YFYIrq8Cxt/RyuRg0BSO0VfP3EzCepGK+xpdtq7erlhg+42P2Eo1GUV2zrcvZEvupFeBN4BAwDahw==}
+  typegpu@0.5.9:
+    resolution: {integrity: sha512-nDNLd58UjottLj7NF7MVrbuAd7nSZSSifkR7lmdhnNU+1TvveN+cgunve7IRZQEO5LKKeEFsGbwLBCiGqfyTZA==}
     engines: {node: '>=12.20.0'}
 
   typescript-eslint@8.34.0:
@@ -2307,9 +2307,9 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
-  '@typegpu/color@0.0.5(typegpu@0.5.8)':
+  '@typegpu/color@0.0.5(typegpu@0.5.9)':
     dependencies:
-      typegpu: 0.5.8
+      typegpu: 0.5.9
 
   '@types/babel__core@7.20.5':
     dependencies:
@@ -3379,7 +3379,7 @@ snapshots:
 
   typed-binary@4.3.2: {}
 
-  typegpu@0.5.8:
+  typegpu@0.5.9:
     dependencies:
       tinyest: 0.1.1
       typed-binary: 4.3.2
