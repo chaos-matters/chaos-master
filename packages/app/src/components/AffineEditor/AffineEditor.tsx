@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, For } from 'solid-js'
 import { vec2f } from 'typegpu/data'
-import { vec2 } from 'wgpu-matrix'
+import { add, dot, length, sub } from 'typegpu/std'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { PI } from '@/flame/constants'
@@ -53,6 +53,10 @@ function vec2Normalize(a: v2f) {
   // vec2.normalize has inexplicable 1e-5 check so we implement our own
   const len = sqrt(a.x * a.x + a.y * a.y) || 1
   return vec2f(a.x / len, a.y / len)
+}
+
+function cross2d(a: v2f, b: v2f) {
+  return a.x * b.y - a.y * b.x
 }
 
 function Grid() {
@@ -208,8 +212,8 @@ function AffineHandle(props: {
     // prettier-ignore
     const { a, b, c, d, e, f } = props.transform
     const zero = worldToClip(vec2f(0, 0))
-    const x = vec2.sub(worldToClip(vec2f(a, d)), zero, vec2f())
-    const y = vec2.sub(worldToClip(vec2f(b, e)), zero, vec2f())
+    const x = sub(worldToClip(vec2f(a, d)), zero)
+    const y = sub(worldToClip(vec2f(b, e)), zero)
     const t = worldToClip(vec2f(c, f))
     const s = aspect()
     return [x.x * s, y.x * s, x.y, y.y, t.x * s, t.y]
@@ -222,11 +226,10 @@ function AffineHandle(props: {
     return {
       onPointerMove(ev) {
         const evPosition = clipToWorld(eventToClip(ev, canvas))
-        const diff = vec2.sub(evPosition, grabPosition, vec2f())
-        const position = vec2.add(
+        const diff = sub(evPosition, grabPosition)
+        const position = add(
           vec2f(initialTransform.c, initialTransform.f),
           diff,
-          vec2f(),
         )
         props.setTransform({
           ...initialTransform,
@@ -249,14 +252,13 @@ function AffineHandle(props: {
 
       function onPointerMove(ev: PointerEvent) {
         const evPosition = clipToWorld(eventToClip(ev, canvas))
-        const grabDiff = vec2.sub(grabPosition, center, vec2f())
-        const evDiff = vec2.sub(evPosition, center, vec2f())
-        const ratio = vec2.length(evDiff) / vec2.length(grabDiff)
+        const grabDiff = sub(grabPosition, center)
+        const evDiff = sub(evPosition, center)
+        const ratio = length(evDiff) / length(grabDiff)
         const grabNorm = vec2Normalize(grabDiff)
         const evNorm = vec2Normalize(evDiff)
-        const cos = ev.ctrlKey || ev.metaKey ? 1 : vec2.dot(evNorm, grabNorm)
-        const sin =
-          ev.ctrlKey || ev.metaKey ? 0 : vec2.cross(evNorm, grabNorm)[2]!
+        const cos = ev.ctrlKey || ev.metaKey ? 1 : dot(evNorm, grabNorm)
+        const sin = ev.ctrlKey || ev.metaKey ? 0 : cross2d(evNorm, grabNorm)
         props.setTransform({
           ...rest,
           a: xFactor === 0 ? a : (a * cos + b * sin) * ratio * xFactor,

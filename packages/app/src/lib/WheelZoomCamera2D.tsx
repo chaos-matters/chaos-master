@@ -7,7 +7,6 @@ import {
 } from 'solid-js'
 import { vec2f } from 'typegpu/data'
 import { clamp, sub } from 'typegpu/std'
-import { vec2 } from 'wgpu-matrix'
 import { Camera2D } from '@/lib/Camera2D'
 import { useCamera } from '@/lib/CameraContext'
 import { useCanvas } from '@/lib/CanvasContext'
@@ -81,7 +80,7 @@ export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
         if (!pos) {
           return
         }
-        setPosition((p) => vec2.sub(p, vec2.sub(pos, grabPosition), vec2f()))
+        setPosition((p) => sub(p, sub(pos, grabPosition)))
       },
     }
   })

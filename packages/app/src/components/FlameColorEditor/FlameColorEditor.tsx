@@ -1,7 +1,7 @@
 import { oklabToRgb } from '@typegpu/color'
 import { createEffect, createMemo, createSignal, For } from 'solid-js'
 import { vec2f } from 'typegpu/data'
-import { vec2 } from 'wgpu-matrix'
+import { add, sub } from 'typegpu/std'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { PI } from '@/flame/constants'
@@ -171,8 +171,8 @@ function FlameColorHandle(props: {
     return {
       onPointerMove(ev) {
         const position = clipToWorld(eventToClip(ev, canvas))
-        const diff = vec2.sub(position, grabPosition, vec2f())
-        const color = vec2.add(initialColor, diff, vec2f())
+        const diff = sub(position, grabPosition)
+        const color = add(initialColor, diff)
         props.setColor(color)
       },
       onDone() {
