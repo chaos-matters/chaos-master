@@ -24,6 +24,7 @@ import { createLoadFlame } from './components/LoadFlameModal/LoadFlameModal'
 import { Modal } from './components/Modal/Modal'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
 import { Slider } from './components/Sliders/Slider'
+import { createVariationSelector } from './components/VariationSelector/VariationSelector'
 import { ViewControls } from './components/ViewControls/ViewControls'
 import { ChangeHistoryContextProvider } from './contexts/ChangeHistoryContext'
 import { ThemeContextProvider, useTheme } from './contexts/ThemeContext'
@@ -33,6 +34,7 @@ import {
   DEFAULT_RENDER_INTERVAL_MS,
   DEFAULT_RESOLUTION,
 } from './defaults'
+import { colorInitModeToImplFn } from './flame/colorInitMode'
 import { drawModeToImplFn } from './flame/drawMode'
 import { examples } from './flame/examples'
 import { Flam3 } from './flame/Flam3'
@@ -51,12 +53,8 @@ import {
   generateTransformId,
   generateVariationId,
 } from './flame/transformFunction'
-import {
-  isParametricVariation,
-  isVariationType,
-  variationTypes,
-} from './flame/variations'
-import { getParamsEditor, getVariationDefault } from './flame/variations/utils'
+import { isParametricVariation, isVariationType } from './flame/variations'
+import { getParamsEditor } from './flame/variations/utils'
 import { Cross, Plus } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
 import { Root } from './lib/Root'
@@ -72,6 +70,7 @@ import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
 import { useLoadFlameFromFile } from './utils/useLoadFlameFromFile'
 import type { Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
+import type { ColorInitMode } from './flame/colorInitMode'
 import type { DrawMode } from './flame/drawMode'
 import type {
   FlameDescriptor,
@@ -116,15 +115,15 @@ function App(props: AppProps) {
   const [flameDescriptor, setFlameDescriptor, history] = createStoreHistory(
     createStore(
       structuredClone(
-        props.flameFromQuery ? props.flameFromQuery : examples.example1,
+        props.flameFromQuery ? props.flameFromQuery : examples.empty,
       ),
     ),
   )
   const totalProbability = createMemo(() =>
     sum(Object.values(flameDescriptor.transforms).map((f) => f.probability)),
   )
-
   const { loadModalIsOpen, showLoadFlameModal } = createLoadFlame(history)
+  const { showVariationSelector } = createVariationSelector(history)
 
   const finalRenderInterval = () =>
     loadModalIsOpen()
@@ -335,24 +334,41 @@ function App(props: AppProps) {
                   <For each={recordEntries(transform.variations)}>
                     {([vid, variation]) => (
                       <>
-                        <select
-                          class={ui.select}
+                        <button
+                          class={ui.variationButton}
                           value={variation.type}
-                          onInput={(ev) => {
-                            const type = ev.target.value
-                            if (!isVariationType(type)) {
-                              return
-                            }
-                            setFlameDescriptor((draft) => {
-                              draft.transforms[tid]!.variations[vid] =
-                                getVariationDefault(type, variation.weight)
-                            })
+                          onClick={(_) => {
+                            showVariationSelector(
+                              variation,
+                              structuredClone(
+                                JSON.parse(JSON.stringify(flameDescriptor)),
+                              ),
+                              tid,
+                              vid,
+                            )
+                              .then((newValue) => {
+                                if (
+                                  newValue === undefined ||
+                                  !isVariationType(newValue.variation.type)
+                                ) {
+                                  return
+                                }
+                                setFlameDescriptor((draft) => {
+                                  draft.transforms[tid] = newValue.transform
+                                  // draft.transforms[tid]!.variations[vid] =
+                                  // newVariation
+                                })
+                              })
+                              .catch((err: unknown) => {
+                                console.warn(
+                                  'Cannot load this variation, reason: ',
+                                  err,
+                                )
+                              })
                           }}
                         >
-                          {variationTypes.map((varName) => (
-                            <option value={varName}>{varName}</option>
-                          ))}
-                        </select>
+                          {variation.type}
+                        </button>
                         <Slider
                           value={variation.weight}
                           min={0}
@@ -458,6 +474,28 @@ function App(props: AppProps) {
                 <span></span>
               </label>
               <label class={ui.labeledInput}>
+                Color Init Mode
+                <select
+                  class={ui.select}
+                  value={flameDescriptor.renderSettings.colorInitMode}
+                  onChange={(ev) => {
+                    const mode = ev.currentTarget.value as ColorInitMode
+                    document.startViewTransition(() => {
+                      setFlameDescriptor((draft) => {
+                        draft.renderSettings.colorInitMode = mode
+                      })
+                    })
+                  }}
+                >
+                  <For each={recordKeys(colorInitModeToImplFn)}>
+                    {(colorInitMode) => (
+                      <option value={colorInitMode}>{colorInitMode}</option>
+                    )}
+                  </For>
+                </select>
+                <span></span>
+              </label>
+              <label class={ui.labeledInput}>
                 Background Color
                 <ColorPicker
                   value={
@@ -506,6 +544,8 @@ function App(props: AppProps) {
                   value === 1 ? 'Infinite' : `${(value * 100).toFixed(1)} %`
                 }
               />
+            </Card>
+            <Card>
               <label class={ui.labeledInput}>
                 Adaptive filter
                 <Checkbox

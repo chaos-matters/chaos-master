@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 40" role="img" aria-labelledby="eyeTitle">
+  <title id="eyeTitle">Hover Preview — Eye</title>
+  <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Eye outline -->
+    <path d="M2 20C9 7 23 2 32 2s23 5 30 18c-7 13-21 18-30 18S9 33 2 20z"/>
+    <!-- Iris -->
+    <circle cx="32" cy="20" r="7" fill="currentColor" stroke="none"/>
+    <!-- Shine -->
+    <circle cx="29" cy="17" r="2.2" fill="#fff" stroke="none" opacity="0.95"/>
+    <!-- subtle iris ring -->
+    <circle cx="32" cy="20" r="3.6" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+  </g>
+</svg>

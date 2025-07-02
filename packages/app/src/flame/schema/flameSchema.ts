@@ -1,6 +1,7 @@
 import { prettyPrintValibotErrors } from '@/utils/prettyPrintValibotErrors'
 import * as v from '@/valibot'
 import { AffineParamsSchema } from '../affineTranform'
+import { ColorInitMode } from '../colorInitMode'
 import { DrawMode } from '../drawMode'
 import { TransformVariationDescriptor } from '../variations'
 
@@ -22,6 +23,7 @@ const renderSettingsDefault: RenderSettings = {
   drawMode: 'light',
   backgroundColor: backgroundColorDefault,
   camera: cameraDefault,
+  colorInitMode: 'colorInitZero',
 }
 export const latestSchemaVersion = '1.0'
 const MAX_LENGTH_AUTHOR_STRING = 255
@@ -79,6 +81,7 @@ const RenderSettings = v.object({
     v.maxValue(MAX_SKIP_ITERS_VALUE),
   ),
   drawMode: v.optional(DrawMode, 'light'),
+  colorInitMode: v.optional(ColorInitMode, 'colorInitZero'),
   backgroundColor: v.optional(
     v.tuple([ColorValueSchema, ColorValueSchema, ColorValueSchema]),
   ),

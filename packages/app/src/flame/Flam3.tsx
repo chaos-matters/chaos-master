@@ -192,6 +192,7 @@ export function Flam3(props: Flam3Props) {
       props.flameDescriptor.transforms,
       textureSize,
       accumulationBuffer,
+      props.flameDescriptor.renderSettings.colorInitMode,
     )
 
     let batchIndex = 0
