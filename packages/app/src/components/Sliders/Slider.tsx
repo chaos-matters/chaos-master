@@ -13,9 +13,6 @@ type SliderProps = {
   step?: number
   onInput: (value: number) => void
   formatValue?: (value: number) => string
-  trackFill?: boolean
-  trackFillValue?: number
-  animateFill?: boolean
 }
 
 export function Slider(props: SliderProps) {
@@ -30,8 +27,7 @@ export function Slider(props: SliderProps) {
 
   const fillPercentage = () => {
     const range = max() - min()
-    const v = props.trackFillValue ?? value()
-    return ((v - min()) / range) * 100
+    return ((value() - min()) / range) * 100
   }
 
   // Dragging the slider handle is handled by the browser,
@@ -60,11 +56,8 @@ export function Slider(props: SliderProps) {
       </Show>
       <div
         class={ui.sliderWrapper}
-        classList={{
-          [ui.animateFill]: props.animateFill,
-        }}
         style={{
-          '--fill-percent': `${(props.trackFill ?? true) ? fillPercentage() : 0}%`,
+          '--fill-percent': `${fillPercentage()}%`,
         }}
       >
         <input

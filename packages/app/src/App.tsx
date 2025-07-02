@@ -30,6 +30,11 @@ import {
 } from './components/FlameColorEditor/FlameColorEditor'
 import { createLoadFlame } from './components/LoadFlameModal/LoadFlameModal'
 import { Modal } from './components/Modal/Modal'
+import {
+  getPresetFromQuality,
+  QualityPresets,
+  qualityPresets,
+} from './components/Quality/QualityPresets'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
 import { Slider } from './components/Sliders/Slider'
 import { createVariationSelector } from './components/VariationSelector/VariationSelector'
@@ -48,7 +53,6 @@ import { examples } from './flame/examples'
 import { Flam3 } from './flame/Flam3'
 import {
   accumulatedPointCount,
-  currentQuality,
   qualityPointCountLimit,
   setCurrentQuality,
   setQualityPointCountLimit,
@@ -78,6 +82,7 @@ import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
 import { useLoadFlameFromFile } from './utils/useLoadFlameFromFile'
 import type { Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
+import type { QualityPreset } from './components/Quality/QualityPresets'
 import type { ColorInitMode } from './flame/colorInitMode'
 import type { DrawMode } from './flame/drawMode'
 import type {
@@ -115,7 +120,9 @@ type AppProps = {
 
 function App(props: AppProps) {
   const { theme, setTheme } = useTheme()
-  const [quality, setQuality] = createSignal(DEFAULT_QUALITY)
+  const [qualityPreset, setQualityPreset] = createSignal<QualityPreset>(
+    getPresetFromQuality(DEFAULT_QUALITY),
+  )
   const [pixelRatio, setPixelRatio] = createSignal(DEFAULT_RESOLUTION)
   const [onExportImage, setOnExportImage] = createSignal<ExportImageType>()
   const [adaptiveFilterEnabled, setAdaptiveFilterEnabled] = createSignal(true)
@@ -268,7 +275,7 @@ function App(props: AppProps) {
                 ]}
               >
                 <Flam3
-                  quality={quality()}
+                  quality={qualityPresets[qualityPreset()]}
                   pointCountPerBatch={DEFAULT_POINT_COUNT}
                   adaptiveFilterEnabled={adaptiveFilterEnabled()}
                   flameDescriptor={flameDescriptor}
@@ -332,7 +339,13 @@ function App(props: AppProps) {
                     class={ui.deleteFlameButton}
                     onClick={() => {
                       setFlameDescriptor((draft) => {
-                        delete draft.transforms[tid]
+                        if (recordKeys(draft.transforms).length === 1) {
+                          draft.transforms[tid] = structuredClone(
+                            newDefaultTransform(),
+                          )
+                        } else {
+                          delete draft.transforms[tid]
+                        }
                       })
                     }}
                   >
@@ -425,7 +438,17 @@ function App(props: AppProps) {
                             class={ui.deleteVariationButton}
                             onClick={() => {
                               setFlameDescriptor((draft) => {
-                                delete draft.transforms[tid]!.variations[vid]
+                                if (
+                                  recordKeys(draft.transforms[tid]!.variations)
+                                    .length === 1
+                                ) {
+                                  draft.transforms[tid]!.variations[vid] =
+                                    structuredClone(
+                                      getVariationDefault(variation.type, 1),
+                                    )
+                                } else {
+                                  delete draft.transforms[tid]!.variations[vid]
+                                }
                               })
                             }}
                           >
@@ -591,24 +614,14 @@ function App(props: AppProps) {
                   Auto
                 </Button>
               </Show>
-              <Slider
-                label="Quality"
-                value={quality()}
-                trackFill={true}
-                trackFillValue={Math.min(currentQuality()(), quality())}
-                animateFill={
-                  accumulatedPointCount() < qualityPointCountLimit()()
+              <div>Quality</div>
+              <QualityPresets
+                selectedPreset={qualityPreset()}
+                setQualityPreset={setQualityPreset}
+                fillPercentage={
+                  (accumulatedPointCount() / qualityPointCountLimit()()) * 100
                 }
-                min={0.7}
-                max={1}
-                step={0.001}
-                onInput={(quality) => {
-                  setQuality(quality)
-                }}
-                formatValue={(value) =>
-                  value === 1 ? 'Infinite' : `${(value * 100).toFixed(1)} %`
-                }
-              />
+              ></QualityPresets>
             </Card>
             <Card>
               <label class={ui.labeledInput}>
