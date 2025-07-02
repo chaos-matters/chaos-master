@@ -1,7 +1,8 @@
 import { createMemo } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { f32, mat3x3f, mat4x4f, struct, vec2f, vec3f } from 'typegpu/data'
-import { mat3, mat4, vec3 } from 'wgpu-matrix'
+import { mul } from 'typegpu/std'
+import { mat3, mat4 } from 'wgpu-matrix'
 import { CameraContextProvider } from './CameraContext'
 import { useCanvas } from './CanvasContext'
 import { useRootContext } from './RootContext'
@@ -122,15 +123,11 @@ export function Camera2D(props: ParentProps<Camera2DProps>) {
   })
 
   function worldToClip({ x, y }: v2f) {
-    return vec3.transformMat3(vec3f(x, y, 1), uniforms().viewMatrix, vec3f()).xy
+    return mul(uniforms().viewMatrix, vec3f(x, y, 1)).xy
   }
 
   function clipToWorld({ x, y }: v2f) {
-    return vec3.transformMat3(
-      vec3f(x, y, 1),
-      uniforms().viewMatrixInverse,
-      vec3f(),
-    ).xy
+    return mul(uniforms().viewMatrixInverse, vec3f(x, y, 1)).xy
   }
 
   function update() {

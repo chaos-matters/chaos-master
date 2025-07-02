@@ -16,7 +16,7 @@ const cameraDefault: { zoom: number; position: [number, number] } = {
 const MAX_SKIP_ITERS_VALUE = 30
 const MIN_EXPOSURE_VALUE = -4
 const MAX_EXPOSURE_VALUE = 4
-const renderSettingsDefult: v.InferOutput<typeof RenderSettings> = {
+const renderSettingsDefault: RenderSettings = {
   exposure: 0.25,
   skipIters: 20,
   drawMode: 'light',
@@ -64,6 +64,8 @@ const CameraObjSchema = v.object({
 })
 
 const ColorValueSchema = v.pipe(v.number(), v.minValue(0), v.maxValue(1))
+
+type RenderSettings = v.InferOutput<typeof RenderSettings>
 const RenderSettings = v.object({
   exposure: v.pipe(
     v.number(),
@@ -103,7 +105,7 @@ export type FlameDescriptor = v.InferOutput<typeof FlameDescriptor>
 export const FlameDescriptor = v.object({
   version: v.optional(FlameDescriptorVersion),
   metadata: v.optional(FlameMetadata, metadataDefault),
-  renderSettings: v.optional(RenderSettings, renderSettingsDefult),
+  renderSettings: v.optional(RenderSettings, renderSettingsDefault),
   transforms: TransformRecord,
 })
 
