@@ -115,7 +115,7 @@ function App(props: AppProps) {
   const [flameDescriptor, setFlameDescriptor, history] = createStoreHistory(
     createStore(
       structuredClone(
-        props.flameFromQuery ? props.flameFromQuery : examples.empty,
+        props.flameFromQuery ? props.flameFromQuery : examples.example1,
       ),
     ),
   )
@@ -123,10 +123,11 @@ function App(props: AppProps) {
     sum(Object.values(flameDescriptor.transforms).map((f) => f.probability)),
   )
   const { loadModalIsOpen, showLoadFlameModal } = createLoadFlame(history)
-  const { showVariationSelector } = createVariationSelector(history)
+  const { showVariationSelector, varSelectorModalIsOpen } =
+    createVariationSelector(history)
 
   const finalRenderInterval = () =>
-    loadModalIsOpen()
+    loadModalIsOpen() || varSelectorModalIsOpen()
       ? Infinity
       : onExportImage()
         ? 0
@@ -339,7 +340,9 @@ function App(props: AppProps) {
                           value={variation.type}
                           onClick={(_) => {
                             showVariationSelector(
-                              variation,
+                              structuredClone(
+                                JSON.parse(JSON.stringify(variation)),
+                              ),
                               structuredClone(
                                 JSON.parse(JSON.stringify(flameDescriptor)),
                               ),
@@ -354,9 +357,13 @@ function App(props: AppProps) {
                                   return
                                 }
                                 setFlameDescriptor((draft) => {
-                                  draft.transforms[tid] = newValue.transform
-                                  // draft.transforms[tid]!.variations[vid] =
-                                  // newVariation
+                                  // todo: what else to update
+                                  // from preview selector, if one transform can have multiple
+                                  // variations, then transform preAffine should be preserved?
+                                  draft.transforms[tid]!.preAffine =
+                                    newValue.transform.preAffine
+                                  draft.transforms[tid]!.variations[vid] =
+                                    newValue.variation
                                 })
                               })
                               .catch((err: unknown) => {

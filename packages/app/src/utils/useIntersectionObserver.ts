@@ -11,7 +11,10 @@ export function useIntersectionObserver(
       return
     }
     const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
+      if (entry === undefined) {
+        return
+      }
+      if (entry.isIntersecting && onIntersect !== undefined) {
         onIntersect()
       }
     })
