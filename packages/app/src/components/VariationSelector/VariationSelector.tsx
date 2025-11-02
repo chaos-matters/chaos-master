@@ -63,8 +63,8 @@ function PreviewFinalFlame(props: {
           ]}
         >
           <Flam3
-            quality={0.99}
-            pointCountPerBatch={4e6}
+            quality={0.95}
+            pointCountPerBatch={1e6}
             adaptiveFilterEnabled={false}
             flameDescriptor={props.flame}
             renderInterval={10}
@@ -87,7 +87,7 @@ function Preview(props: { flame: FlameDescriptor }) {
         >
           <Flam3
             quality={0.99}
-            pointCountPerBatch={4e6}
+            pointCountPerBatch={1e5}
             adaptiveFilterEnabled={false}
             flameDescriptor={props.flame}
             renderInterval={10}
@@ -236,12 +236,15 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
   const applySelection = () => {
     const itemId = selectedItemId()
     if (itemId !== null) {
-      const variationFlame = variationExamples[itemId]
-      if (variationFlame !== undefined) {
+      const selectedItem = variationExamples[itemId]
+      if (selectedItem !== undefined) {
         const [transform, variation] =
-          getTransformFromPreviewFlame(variationFlame)
+          getTransformFromPreviewFlame(selectedItem)
         if (transform !== undefined && variation !== undefined) {
-          props.respond({ transform, variation })
+          props.respond({
+            transform,
+            variation: structuredClone(JSON.parse(JSON.stringify(variation))),
+          })
           return true
         }
       }
@@ -273,6 +276,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                 const variation = getVarFromPreviewFlame(variationExample)
                 return (
                   variation && (
+                    // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
                     <Show when={i() < examplesShown()}>
                       <div>
                         <button
@@ -289,7 +293,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                             }
                           }}
                         >
-                          <DelayedShow delayMs={i() * 30}>
+                          <DelayedShow delayMs={i() * 50}>
                             <Preview flame={variationExample} />
                           </DelayedShow>
                           <div class={ui.itemTitle}>{variation.type}</div>
@@ -298,6 +302,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                           <div class={ui.itemParams}>
                             <Show
                               when={
+                                // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
                                 isParametricVariation(variation) && variation
                               }
                               keyed

@@ -66,7 +66,7 @@ function Grid() {
   const { context, canvasFormat } = useCanvas()
 
   createEffect(() => {
-    const renderShaderCode = wgsl/* wgsl */ `
+    const renderShaderCode = wgsl /* wgsl */ `
       ${{
         clipToWorld: camera.wgsl.clipToWorld,
         resolution: camera.wgsl.resolution,
