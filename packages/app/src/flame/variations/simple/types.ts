@@ -19,7 +19,7 @@ export type SimpleVariation<K extends string> = {
     },
     undefined
   >
-  fn: TgpuFn<[Vec2f, typeof VariationInfo], Vec2f>
+  fn: TgpuFn<(pos: Vec2f, info: typeof VariationInfo) => Vec2f>
 }
 
 export function simpleVariation<K extends string>(
@@ -32,8 +32,6 @@ export function simpleVariation<K extends string>(
       type: v.literal(variationKey),
       weight: v.number(),
     }),
-    fn: tgpu['~unstable']
-      .fn([vec2f, VariationInfo], vec2f)(wgsl)
-      .$uses(dependencyMap),
+    fn: tgpu.fn([vec2f, VariationInfo], vec2f)(wgsl).$uses(dependencyMap),
   }
 }

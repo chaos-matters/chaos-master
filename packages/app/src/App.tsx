@@ -367,6 +367,7 @@ function App(props: AppProps) {
                           formatValue={formatPercent}
                         />
                         <Show
+                          // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
                           when={isParametricVariation(variation) && variation}
                           keyed
                         >

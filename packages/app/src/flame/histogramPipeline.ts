@@ -1,5 +1,5 @@
 import { tgpu } from 'typegpu'
-import { arrayOf, atomic, u32 } from 'typegpu/data'
+import { arrayOf, atomic, f32, texture2d, u32 } from 'typegpu/data'
 import { wgsl } from '@/utils/wgsl'
 import { ColorGradingUniforms } from './colorGrading'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
@@ -15,7 +15,7 @@ const bindGroupLayout = tgpu.bindGroupLayout({
     uniform: ColorGradingUniforms,
   },
   accumulationTexture: {
-    texture: 'unfilterable-float',
+    texture: texture2d(f32),
   },
   histogram: {
     storage: (length: number) => arrayOf(atomic(u32), length),
@@ -42,7 +42,7 @@ export function createHistogramPipeline(
     histogram,
   })
 
-  const moduleCode = wgsl/* wgsl */ `
+  const moduleCode = wgsl /* wgsl */ `
     ${{
       ...bindGroupLayout.bound,
     }}

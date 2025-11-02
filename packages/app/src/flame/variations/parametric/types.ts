@@ -30,7 +30,13 @@ type ParametricVariation<
   paramStruct: WgslStruct<T>
   paramDefaults: Infer<WgslStruct<T>>
   editor: EditorFor<Infer<WgslStruct<T>>>
-  fn: TgpuFn<[Vec2f, typeof VariationInfo, WgslStruct<T>], Vec2f>
+  fn: TgpuFn<
+    (
+      pos: Vec2f,
+      variationInfo: typeof VariationInfo,
+      params: WgslStruct<T>,
+    ) => Vec2f
+  >
 }
 
 export function parametricVariationDescriptor<
@@ -64,7 +70,7 @@ export function parametricVariation<
     paramStruct,
     paramDefaults,
     editor,
-    fn: tgpu['~unstable']
+    fn: tgpu
       .fn([vec2f, VariationInfo, paramStruct], vec2f)(wgsl)
       .$uses(dependencyMap),
   }

@@ -1,10 +1,11 @@
 import eslint from '@eslint/js'
 import tsParser from '@typescript-eslint/parser'
+import { defineConfig } from 'eslint/config'
 import { importX } from 'eslint-plugin-import-x'
 import simpleImportSort from 'eslint-plugin-simple-import-sort'
 import tseslint from 'typescript-eslint'
 
-export default tseslint.config(
+export default defineConfig(
   {
     ignores: [
       '.pnpm-noop',
@@ -40,6 +41,10 @@ export default tseslint.config(
       'import-x/no-named-as-default': 'error',
       'import-x/no-useless-path-segments': 'error',
       'import-x/no-named-as-default-member': 'off',
+
+      // Turned off for eslint@9.39.0
+      // @see https://github.com/eslint/eslint/issues/20272
+      '@typescript-eslint/unified-signatures': 'off',
 
       // this is caught by ts already and eslint doesn't understand @/
       'import-x/no-unresolved': 'off',
