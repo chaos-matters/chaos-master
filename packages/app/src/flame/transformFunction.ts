@@ -65,7 +65,7 @@ export function createFlameWgsl({
       ]),
     ),
   }).$name(`FlameUniforms`)
-  const fnImpl = tgpu['~unstable'].fn([Point, Uniforms], Point)/* wgsl */ `
+  const fnImpl = tgpu.fn([Point, Uniforms], Point) /* wgsl */ `
     (point: Point, uniforms: Uniforms) -> Point {
       let pre = transformAffine(uniforms.preAffine, point.position);
       var p = vec2f(0);

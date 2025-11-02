@@ -142,14 +142,14 @@ function HelpModal(props: HelpModalProps) {
                   <p>Architecture: {deviceInfo.architecture}</p>
                 ) : undefined}
                 <p>Max Buffer Size: {formatBytes(deviceInfo.maxBufferSize)}</p>
-                {deviceInfo.heaps !== undefined && (
+                {deviceInfo.heaps ? (
                   <p>
                     Total VRAM:{' '}
                     {deviceInfo.heaps
                       .map((size) => formatBytes(size))
                       .join(' + ')}
                   </p>
-                )}
+                ) : undefined}
               </>
             )}
           </Show>

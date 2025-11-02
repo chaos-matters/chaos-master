@@ -21,10 +21,10 @@ export const AffineParams = struct({
   f: f32,
 })
 
-export const transformAffine = tgpu['~unstable'].fn(
+export const transformAffine = tgpu.fn(
   [AffineParams, vec2f],
   vec2f,
-)/* wgsl */ `
+) /* wgsl */ `
   (T: AffineParams, p: vec2f) -> vec2f {
     return vec2f(
       T.a * p.x + T.b * p.y + T.c,
