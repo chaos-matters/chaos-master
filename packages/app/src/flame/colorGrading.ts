@@ -22,7 +22,7 @@ const bindGroupLayout = tgpu.bindGroupLayout({
     uniform: vec2i,
   },
   accumulationBuffer: {
-    storage: (length: number) => arrayOf(Bucket, length),
+    storage: arrayOf(Bucket),
     access: 'readonly',
   },
 })
@@ -49,7 +49,7 @@ export function createColorGradingPipeline(
     textureSize: textureSizeBuffer,
   })
 
-  const renderShaderCode = wgsl/* wgsl */ `
+  const renderShaderCode = wgsl /* wgsl */ `
     ${{
       ...bindGroupLayout.bound,
       oklabToRgb: oklabToRgb.with(

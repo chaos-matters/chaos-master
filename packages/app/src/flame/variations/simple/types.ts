@@ -3,9 +3,9 @@ import { f32, struct, vec2f } from 'typegpu/data'
 import * as v from '@/valibot'
 import { AffineParams } from '../../affineTranform'
 import type { TgpuFn } from 'typegpu'
-import type { Infer, Vec2f } from 'typegpu/data'
+import type { Infer, v2f, Vec2f } from 'typegpu/data'
 
-export type VariationInfoType = Infer<typeof VariationInfo>
+export type VariationInfo = Infer<typeof VariationInfo>
 export const VariationInfo = struct({
   weight: f32,
   affineCoefs: AffineParams,
@@ -24,14 +24,13 @@ export type SimpleVariation<K extends string> = {
 
 export function simpleVariation<K extends string>(
   variationKey: K,
-  wgsl: string,
-  dependencyMap: Record<string, unknown> = {},
+  impl: (pos: v2f, varInfo: VariationInfo) => v2f,
 ): SimpleVariation<K> {
   return {
     DescriptorSchema: v.object({
       type: v.literal(variationKey),
       weight: v.number(),
     }),
-    fn: tgpu.fn([vec2f, VariationInfo], vec2f)(wgsl).$uses(dependencyMap),
+    fn: tgpu.fn([vec2f, VariationInfo], vec2f)(impl),
   }
 }

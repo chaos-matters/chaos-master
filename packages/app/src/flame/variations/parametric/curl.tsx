@@ -1,4 +1,4 @@
-import { f32, struct } from 'typegpu/data'
+import { f32, struct, vec2f } from 'typegpu/data'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { parametricVariation } from './types'
@@ -38,18 +38,15 @@ export const curlVar = parametricVariation(
   CurlParams,
   CurlParamsDefaults,
   CurlParamsEditor,
-  /* wgsl */ `
-  (pos: vec2f, _varInfo: VariationInfo, P: CurlParams) -> vec2f {
-    let p1 = P.c1; 
-    let p2 = P.c2; 
-    let squareDiff = (pos.x * pos.x - pos.y * pos.y);
-    let t1 = 1 + p1 * pos.x + p2 * squareDiff; 
-    let t2 = p1 * pos.y + 2 * p2 * pos.x * pos.y;
-    let tSqSum = t1 * t1 + t2 * t2;
-    let factor = 1 / (tSqSum);
-    return factor * vec2f(
-        pos.x * t1 + pos.y * t2,
-        pos.y * t1 - pos.x * t2
-      );
-  }`,
+  (pos, _varInfo, P) => {
+    'use gpu'
+    const p1 = P.c1
+    const p2 = P.c2
+    const squareDiff = pos.x * pos.x - pos.y * pos.y
+    const t1 = 1 + p1 * pos.x + p2 * squareDiff
+    const t2 = p1 * pos.y + 2 * p2 * pos.x * pos.y
+    const tSqSum = t1 * t1 + t2 * t2
+    const factor = 1 / tSqSum
+    return vec2f(pos.x * t1 + pos.y * t2, pos.y * t1 - pos.x * t2).mul(factor)
+  },
 )

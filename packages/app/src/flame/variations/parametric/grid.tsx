@@ -1,4 +1,5 @@
-import { f32, struct } from 'typegpu/data'
+import { f32, struct, vec2f } from 'typegpu/data'
+import { abs, round, select } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { random } from '@/shaders/random'
@@ -51,20 +52,22 @@ export const grid = parametricVariation(
   GridParams,
   GridParamsDefaults,
   GridParamsEditor,
-  /* wgsl */ `
-  (_pos: vec2f, _varInfo: VariationInfo, P: GridParams) -> vec2f {
-    let D = P.jitterNearIntersectionsDistance;
-    let divs = select(P.divisions, 1, random() > 0.8);
-    let pos = P.size * (2 * vec2f(random(), random()) - 1);
-    let jitter = 2 * D * (2 * vec2f(random(), random()) - 1);
-    let rounded = round(divs * pos) / divs;
-    let diff = abs(pos - rounded);
-    let jittered = select(pos, pos + jitter, diff < vec2f(D));
+  (_pos, _varInfo, P) => {
+    'use gpu'
+    const D = P.jitterNearIntersectionsDistance
+    const divs = select(P.divisions, 1, random() > 0.8)
+    const pos = vec2f(random(), random()).mul(2).sub(1).mul(P.size)
+    const jitter = vec2f(random(), random())
+      .mul(2)
+      .sub(1)
+      .mul(2 * D)
+    const rounded = round(pos.mul(divs)).div(divs)
+    const diff = abs(pos.sub(rounded))
+    const jittered = select(pos, pos.add(jitter), diff < vec2f(D))
     return select(
       vec2f(rounded.x, jittered.y),
       vec2f(jittered.x, rounded.y),
-      random() > 0.5
-    );
-  }`,
-  { random },
+      random() > 0.5,
+    )
+  },
 )

@@ -1,4 +1,5 @@
-import { f32, struct } from 'typegpu/data'
+import { f32, struct, vec2f } from 'typegpu/data'
+import { atan2, cos, length, sin } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { parametricVariation } from './types'
@@ -44,16 +45,16 @@ export const blob = parametricVariation(
   BlobParams,
   BlobParamsDefaults,
   BlobParamsEditor,
-  /* wgsl */ `
-  (pos: vec2f, _varInfo: VariationInfo, P: BlobParams) -> vec2f {
-    let p1 = P.high;
-    let p2 = P.low;
-    let p3 = P.waves;
-    let r = length(pos);
-    let theta = atan2(pos.y, pos.x);
-    let sinWavesTheta = sin(p3 * theta);
-    let sinFactor = (p1 - p2) / 2;
-    let blobFact = r * (p2 + sinFactor * (sinWavesTheta + 1));
-    return blobFact * vec2f(cos(theta), sin(theta));
-  }`,
+  (pos, _varInfo, P) => {
+    'use gpu'
+    const p1 = P.high
+    const p2 = P.low
+    const p3 = P.waves
+    const r = length(pos)
+    const theta = atan2(pos.y, pos.x)
+    const sinWavesTheta = sin(p3 * theta)
+    const sinFactor = (p1 - p2) / 2
+    const blobFact = r * (p2 + sinFactor * (sinWavesTheta + 1))
+    return vec2f(cos(theta), sin(theta)).mul(blobFact)
+  },
 )

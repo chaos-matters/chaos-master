@@ -1,4 +1,5 @@
-import { f32, struct } from 'typegpu/data'
+import { f32, struct, vec2f } from 'typegpu/data'
+import { abs, atan2, cos, length, pow, select, sin, trunc } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { PI } from '@/flame/constants'
@@ -40,17 +41,16 @@ export const juliaScope = parametricVariation(
   JuliaScopeParams,
   JuliaScopeParamsDefaults,
   JuliaScopeParamsEditor,
-  /* wgsl */ `
-  (pos: vec2f, _varInfo: VariationInfo, P: JuliaScopeParams) -> vec2f {
-    let p1 = P.power; 
-    let p2 = P.dist; 
-    let p3 = trunc(abs(p1) * random()); 
-    let r = length(pos);
-    let phi = atan2(pos.y, pos.x);
-    let lambda = select(-1.0, 1.0, random() > 0.5);
-    let t = (lambda * phi + 2 * PI * p3) / p1;
-    let factor = pow(r, p2 / p1);
-    return factor * vec2f(cos(t), sin(t));
-  }`,
-  { PI, random },
+  (pos, _varInfo, P) => {
+    'use gpu'
+    const p1 = P.power
+    const p2 = P.dist
+    const p3 = trunc(abs(p1) * random())
+    const r = length(pos)
+    const phi = atan2(pos.y, pos.x)
+    const lambda = select(-1.0, 1.0, random() > 0.5)
+    const t = (lambda * phi + 2 * PI.$ * p3) / p1
+    const factor = pow(r, p2 / p1)
+    return vec2f(cos(t), sin(t)).mul(factor)
+  },
 )

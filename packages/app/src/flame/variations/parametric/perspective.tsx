@@ -1,4 +1,5 @@
-import { f32, struct } from 'typegpu/data'
+import { f32, struct, vec2f } from 'typegpu/data'
+import { cos, sin } from 'typegpu/std'
 import { AngleEditor } from '@/components/Sliders/ParametricEditors/AngleEditor'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
@@ -34,11 +35,11 @@ export const perspective = parametricVariation(
   PerspectiveParams,
   PerspectiveParamsDefaults,
   PerspectiveParamsEditor,
-  /* wgsl */ `
-  (pos: vec2f, _varInfo: VariationInfo, P: PerspectiveParams) -> vec2f {
-    let p1 = P.angle; 
-    let p2 = P.dist; 
-    let factor = p2 / (p2 - pos.y * sin(p1));
-    return factor * vec2f(pos.x, pos.y * cos(p1));
-  }`,
+  (pos, _varInfo, P) => {
+    'use gpu'
+    const p1 = P.angle
+    const p2 = P.dist
+    const factor = p2 / (p2 - pos.y * sin(p1))
+    return vec2f(pos.x, pos.y * cos(p1)).mul(factor)
+  },
 )

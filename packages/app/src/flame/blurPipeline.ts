@@ -18,11 +18,11 @@ const bindGroupLayout = tgpu.bindGroupLayout({
     uniform: vec2i,
   },
   accumulationBuffer: {
-    storage: (length: number) => arrayOf(Bucket, length),
+    storage: arrayOf(Bucket),
     access: 'readonly',
   },
   postprocessBuffer: {
-    storage: (length: number) => arrayOf(Bucket, length),
+    storage: arrayOf(Bucket),
     access: 'mutable',
   },
 })
@@ -49,7 +49,7 @@ export function createBlurPipeline(
     textureSize: textureSizeBuffer,
   })
 
-  const blurCode = wgsl/* wgsl */ `
+  const blurCode = wgsl /* wgsl */ `
     ${{
       ...bindGroupLayout.bound,
     }}
