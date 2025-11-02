@@ -1,4 +1,5 @@
-import { f32, struct } from 'typegpu/data'
+import { f32, struct, vec2f } from 'typegpu/data'
+import { floor } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { parametricVariation } from './types'
@@ -38,15 +39,12 @@ export const rectanglesVar = parametricVariation(
   RectanglesParams,
   RectanglesParamsDefaults,
   RectanglesParamsEditor,
-  /* wgsl */ `
-  (pos: vec2f, _varInfo: VariationInfo, P: RectanglesParams) -> vec2f {
-    let p1 = P.x; 
-    let p2 = P.y; 
-    let p1Fact = (2 * floor(pos.x / p1) + 1);
-    let p2Fact = (2 * floor(pos.y / p2) + 1);
-    return vec2f(
-        p1Fact * p1 - pos.x,
-        p2Fact * p2 - pos.y,
-      );
-  }`,
+  (pos, _varInfo, P) => {
+    'use gpu'
+    const p1 = P.x
+    const p2 = P.y
+    const p1Fact = 2 * floor(pos.x / p1) + 1
+    const p2Fact = 2 * floor(pos.y / p2) + 1
+    return vec2f(p1Fact * p1 - pos.x, p2Fact * p2 - pos.y)
+  },
 )

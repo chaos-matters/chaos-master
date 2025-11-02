@@ -48,7 +48,7 @@ export function createIFSPipeline(
 
   const bindGroupLayout = tgpu.bindGroupLayout({
     pointRandomSeeds: {
-      storage: (length: number) => arrayOf(vec4u, length),
+      storage: arrayOf(vec4u),
       access: 'mutable',
     },
     flameUniforms: {
@@ -59,7 +59,7 @@ export function createIFSPipeline(
       uniform: vec2i,
     },
     accumulationBuffer: {
-      storage: (length: number) => arrayOf(AtomicBucket, length),
+      storage: arrayOf(AtomicBucket),
       access: 'mutable',
     },
   })
@@ -77,7 +77,7 @@ export function createIFSPipeline(
     accumulationBuffer,
   })
 
-  const ifsShaderCode = wgsl/* wgsl */ `
+  const ifsShaderCode = wgsl /* wgsl */ `
     ${{
       ...camera.BindGroupLayout.bound,
       ...bindGroupLayout.bound,

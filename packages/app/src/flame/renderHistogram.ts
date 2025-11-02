@@ -7,7 +7,7 @@ import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 const bindGroupLayout = tgpu
   .bindGroupLayout({
     histogram: {
-      storage: (length: number) => arrayOf(u32, length),
+      storage: arrayOf(u32),
       access: 'readonly',
     },
   })
@@ -25,7 +25,7 @@ export function createRenderHistogramPipeline(
     histogram,
   })
 
-  const renderHistogramShaderCode = wgsl/* wgsl */ `
+  const renderHistogramShaderCode = wgsl /* wgsl */ `
     ${{
       ...bindGroupLayout.bound,
     }}

@@ -16,9 +16,10 @@ const bindGroupLayout = tgpu.bindGroupLayout({
   },
   accumulationTexture: {
     texture: texture2d(f32),
+    sampleType: 'unfilterable-float',
   },
   histogram: {
-    storage: (length: number) => arrayOf(atomic(u32), length),
+    storage: arrayOf(atomic(u32)),
     access: 'mutable',
   },
 })

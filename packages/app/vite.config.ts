@@ -1,4 +1,5 @@
 import ssl from '@vitejs/plugin-basic-ssl'
+import typegpuPlugin from 'unplugin-typegpu/vite'
 import { defineConfig } from 'vite'
 import bundleAnalyzer from 'vite-bundle-analyzer'
 import solidPlugin from 'vite-plugin-solid'
@@ -11,6 +12,7 @@ export default defineConfig({
   plugins: [
     solidPlugin(),
     solidSvg({ defaultAsComponent: true }),
+    typegpuPlugin({}),
     ssl(),
     ANALYZE_BUNDLE ? bundleAnalyzer() : undefined,
   ],

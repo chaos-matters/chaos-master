@@ -1,4 +1,5 @@
-import { f32, struct } from 'typegpu/data'
+import { f32, struct, vec2f } from 'typegpu/data'
+import { cos, sin } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { parametricVariation } from './types'
@@ -54,14 +55,15 @@ export const pdjVar = parametricVariation(
   PdjParams,
   PdjParamsDefaults,
   PdjParamsEditor,
-  /* wgsl */ `(pos: vec2f, _varInfo: VariationInfo, P: PdjParams) -> vec2f {
-    let p1 = P.a;
-    let p2 = P.b;
-    let p3 = P.c;
-    let p4 = P.d;
+  (pos, _varInfo, P) => {
+    'use gpu'
+    const p1 = P.a
+    const p2 = P.b
+    const p3 = P.c
+    const p4 = P.d
     return vec2f(
       sin(p1 * pos.y) - cos(p2 * pos.x),
-      sin(p3 * pos.x) - cos(p4 * pos.y)
-    );
-  }`,
+      sin(p3 * pos.x) - cos(p4 * pos.y),
+    )
+  },
 )

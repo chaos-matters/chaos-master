@@ -9,11 +9,11 @@ export type CameraContext = {
   bindGroup: TgpuBindGroup
   BindGroupLayout: TgpuBindGroupLayout
   wgsl: {
-    worldToClip: TgpuFn<[Vec2f], Vec2f>
-    clipToWorld: TgpuFn<[Vec2f], Vec2f>
-    clipToPixels: TgpuFn<[Vec2f], Vec2f>
-    resolution: TgpuFn<[], Vec2f>
-    pixelRatio: TgpuFn<[], F32>
+    worldToClip: TgpuFn<(pos: Vec2f) => Vec2f>
+    clipToWorld: TgpuFn<(pos: Vec2f) => Vec2f>
+    clipToPixels: TgpuFn<(pos: Vec2f) => Vec2f>
+    resolution: TgpuFn<() => Vec2f>
+    pixelRatio: TgpuFn<() => F32>
   }
   js: {
     worldToClip: (clip: v2f) => v2f

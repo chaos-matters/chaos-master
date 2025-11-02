@@ -24,11 +24,6 @@ export const AffineParams = struct({
 export const transformAffine = tgpu.fn(
   [AffineParams, vec2f],
   vec2f,
-) /* wgsl */ `
-  (T: AffineParams, p: vec2f) -> vec2f {
-    return vec2f(
-      T.a * p.x + T.b * p.y + T.c,
-      T.d * p.x + T.e * p.y + T.f
-    );
-  }
-`
+)((T, p) => {
+  return vec2f(T.a * p.x + T.b * p.y + T.c, T.d * p.x + T.e * p.y + T.f)
+})

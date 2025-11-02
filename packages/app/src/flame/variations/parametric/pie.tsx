@@ -1,4 +1,5 @@
-import { f32, struct } from 'typegpu/data'
+import { f32, struct, vec2f } from 'typegpu/data'
+import { cos, sin, trunc } from 'typegpu/std'
 import { AngleEditor } from '@/components/Sliders/ParametricEditors/AngleEditor'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
@@ -44,16 +45,16 @@ export const pie = parametricVariation(
   PieParams,
   PieParamsDefaults,
   PieParamsEditor,
-  /* wgsl */ `(_pos: vec2f, _varInfo: VariationInfo, P: PieParams) -> vec2f {
-    let p1 = P.slices;
-    let p2 = P.rotation;
-    let p3 = P.thickness;
-    let r1 = random();
-    let r2 = random();
-    let r3 = random();
-    let t1 = trunc(r1 * p1 + 0.5);
-    let t2 = p2 + (t1 + r2 * p3) * 2 * PI / p1;
-    return r3 * vec2f(cos(t2), sin(t2));
-  }`,
-  { random, PI },
+  (_pos, _varInfo, P) => {
+    'use gpu'
+    const p1 = P.slices
+    const p2 = P.rotation
+    const p3 = P.thickness
+    const r1 = random()
+    const r2 = random()
+    const r3 = random()
+    const t1 = trunc(r1 * p1 + 0.5)
+    const t2 = p2 + ((t1 + r2 * p3) * 2 * PI.$) / p1
+    return vec2f(cos(t2), sin(t2)).mul(r3)
+  },
 )

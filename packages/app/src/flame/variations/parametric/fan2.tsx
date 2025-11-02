@@ -1,4 +1,5 @@
-import { f32, struct } from 'typegpu/data'
+import { f32, struct, vec2f } from 'typegpu/data'
+import { atan2, cos, length, select, sin, trunc } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { PI } from '@/flame/constants'
@@ -39,19 +40,18 @@ export const fan2 = parametricVariation(
   Fan2Params,
   Fan2ParamsDefaults,
   Fan2ParamsEditor,
-  /* wgsl */ `
-  (pos: vec2f, _varInfo: VariationInfo, P: FanParams) -> vec2f {
-    let p1 = PI * P.x * P.x;
-    let p2 = P.y; 
-    let theta = atan2(pos.y, pos.x);
-    let t = theta + p2 - p1 * trunc((2 * theta * p2) / p1); 
-    let r = length(pos); 
+  (pos, _varInfo, P) => {
+    'use gpu'
+    const p1 = PI.$ * P.x * P.x
+    const p2 = P.y
+    const theta = atan2(pos.y, pos.x)
+    const t = theta + p2 - p1 * trunc((2 * theta * p2) / p1)
+    const r = length(pos)
 
-    let p1half = p1 / 2;
-    let trueAngle = theta - p1half;
-    let falseAngle = theta + p1half;
-    let angle = select(falseAngle, trueAngle, t > p1half);
-    return r * vec2f(sin(angle), cos(angle));
-  }`,
-  { PI },
+    const p1half = p1 / 2
+    const trueAngle = theta - p1half
+    const falseAngle = theta + p1half
+    const angle = select(falseAngle, trueAngle, t > p1half)
+    return vec2f(sin(angle), cos(angle)).mul(r)
+  },
 )
