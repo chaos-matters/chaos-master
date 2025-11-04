@@ -57,7 +57,7 @@ import {
   generateVariationId,
 } from './flame/transformFunction'
 import { isParametricVariation, isVariationType } from './flame/variations'
-import { getParamsEditor } from './flame/variations/utils'
+import { getParamsEditor, getVariationDefault } from './flame/variations/utils'
 import { Cross, Plus } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
 import { Root } from './lib/Root'
@@ -425,6 +425,20 @@ function App(props: AppProps) {
                       </>
                     )}
                   </For>
+                  <Card class={ui.buttonCard}>
+                    <button
+                      class={ui.addTransformVariationButton}
+                      onClick={() => {
+                        setFlameDescriptor((draft) => {
+                          draft.transforms[tid]!.variations[
+                            generateVariationId()
+                          ] = structuredClone(getVariationDefault('linear', 1))
+                        })
+                      }}
+                    >
+                      <Plus />
+                    </button>
+                  </Card>
                 </Card>
               )}
             </For>

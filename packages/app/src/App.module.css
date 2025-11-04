@@ -123,6 +123,34 @@
   }
 }
 
+.add-transform-variation-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  appearance: none;
+  border: none;
+  background: none;
+  height: 2rem;
+  padding: 1rem;
+  cursor: pointer;
+
+  color: var(--neutral-700);
+  &:hover {
+    color: black;
+  }
+
+  & > svg {
+    height: 24px;
+  }
+
+  [data-theme='dark'] & {
+    color: var(--neutral-400);
+    &:hover {
+      color: white;
+    }
+  }
+}
+
 .delete-flame-button {
   border: none;
   border-radius: var(--round);
