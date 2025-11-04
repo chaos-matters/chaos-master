@@ -63,7 +63,7 @@ function PreviewFinalFlame(props: {
           ]}
         >
           <Flam3
-            quality={0.95}
+            quality={0.99}
             pointCountPerBatch={1e6}
             adaptiveFilterEnabled={false}
             flameDescriptor={props.flame}

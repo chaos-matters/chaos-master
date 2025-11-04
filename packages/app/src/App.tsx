@@ -19,7 +19,10 @@ import { Checkbox } from './components/Checkbox/Checkbox'
 import { ColorPicker } from './components/ColorPicker/ColorPicker'
 import { Card } from './components/ControlCard/ControlCard'
 import { Dropzone } from './components/Dropzone/Dropzone'
-import { FlameColorEditor } from './components/FlameColorEditor/FlameColorEditor'
+import {
+  FlameColorEditor,
+  handleColor,
+} from './components/FlameColorEditor/FlameColorEditor'
 import { createLoadFlame } from './components/LoadFlameModal/LoadFlameModal'
 import { Modal } from './components/Modal/Modal'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
@@ -337,6 +340,12 @@ function App(props: AppProps) {
                       <>
                         <button
                           class={ui.variationButton}
+                          style={{
+                            '--color': handleColor(
+                              theme(),
+                              vec2f(transform.color.x, transform.color.y),
+                            ),
+                          }}
                           value={variation.type}
                           onClick={(_) => {
                             showVariationSelector(

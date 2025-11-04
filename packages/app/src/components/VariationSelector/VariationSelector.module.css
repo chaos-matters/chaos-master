@@ -34,7 +34,7 @@ dialog.modal-no-scroll {
 }
 
 .sentinel {
-  height: 1px;
+  height: 2rem;
 }
 
 .gallery {
@@ -45,6 +45,8 @@ dialog.modal-no-scroll {
   justify-items: start;
   overflow-y: auto;
   height: 100%;
+
+  min-height: 0;
 }
 
 .undo-message {
