@@ -151,8 +151,13 @@
 }
 
 .variation-button {
-  background: linear-gradient(135deg, #555, #444);
-  color: #fff;
+  /* background: linear-gradient(135deg, #555, #444); */
+  background: linear-gradient(
+    to bottom,
+    var(--color),
+    oklab(from var(--color) calc(l * 0.8) a b)
+  );
+  color: white;
   border: none;
   padding: 0.3rem 0.3rem;
   border-radius: 4px;
@@ -180,8 +185,4 @@
 
 .variation-button:hover::before {
   left: 100%;
-}
-
-.variation-button:hover {
-  border: 1px solid var(--neutral-500);
 }
