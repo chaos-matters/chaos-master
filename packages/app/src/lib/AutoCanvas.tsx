@@ -38,6 +38,7 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
       const { widthPX, heightPX } = scaledCanvasSize(size)
       el.width = widthPX
       el.height = heightPX
+      // TODO: without this, for different resolutions, makes the preview moved
       el.style.width = `100%`
     },
   )

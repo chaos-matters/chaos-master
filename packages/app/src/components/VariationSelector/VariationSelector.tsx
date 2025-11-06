@@ -131,7 +131,13 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
     )
   }
   const [sentinel, setSentinel] = createSignal<HTMLDivElement | null>(null)
-  useIntersectionObserver(() => sentinel(), loadMoreExamples)
+  const [scrollableSidebar, setScrollableSidebar] =
+    createSignal<HTMLDivElement | null>(null)
+  useIntersectionObserver(
+    () => sentinel(),
+    () => scrollableSidebar(),
+    loadMoreExamples,
+  )
 
   const [previewFlame, setPreviewFlame] = createStoreHistory(
     createStore<FlameDescriptor>(structuredClone(props.currentFlame)),
@@ -202,7 +208,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
             if (previewTr !== undefined) {
               previewTr.preAffine = transform.preAffine
               previewTr.variations[props.variationId] = variation
-              // todo: see what else to copy from variation flame setup
+              // TODO: see what else to copy from variation flame setup
               draft.renderSettings.exposure =
                 selectedItem.renderSettings.exposure
               // copy over initial camera settings
@@ -253,7 +259,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
   }
   useKeyboardShortcuts({
     Enter: () => {
-      // todo: sometimes goes out of focus, and does not trigger on Enter
+      // TODO: sometimes goes out of focus, and does not trigger on Enter
       return applySelection()
     },
   })
@@ -268,8 +274,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
         <span class={ui.undoMessage}>You can undo this operation.</span>
       </ModalTitleBar>
       <section class={ui.variationPreview}>
-        <div class={ui.modalItem}>
-          <h2 class={ui.selectorColumnTitle}>Variation Gallery</h2>
+        <div ref={setScrollableSidebar} class={ui.variationSelectorSidebar}>
           <section class={ui.gallery}>
             <For each={recordEntries(variationExamples)}>
               {([id, variationExample], i) => {
@@ -343,7 +348,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
             <div ref={setSentinel} class={ui.sentinel}></div>
           </section>
         </div>
-        <div class={ui.modalItem}>
+        <div class={ui.variationSelectorPreview}>
           <div>
             <h2 class={ui.selectorColumnTitle}>
               Preview: Flame{' '}

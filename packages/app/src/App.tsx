@@ -340,12 +340,6 @@ function App(props: AppProps) {
                       <>
                         <button
                           class={ui.variationButton}
-                          style={{
-                            '--color': handleColor(
-                              theme(),
-                              vec2f(transform.color.x, transform.color.y),
-                            ),
-                          }}
                           value={variation.type}
                           onClick={(_) => {
                             showVariationSelector(
@@ -366,9 +360,9 @@ function App(props: AppProps) {
                                   return
                                 }
                                 setFlameDescriptor((draft) => {
-                                  // todo: what else to update
-                                  // from preview selector, if one transform can have multiple
-                                  // variations, then transform preAffine should be preserved?
+                                  // TODO: what else to update from preview selector,
+                                  // if one transform can have multiple variations,
+                                  // then transform preAffine should be preserved?
                                   draft.transforms[tid]!.preAffine =
                                     newValue.transform.preAffine
                                   draft.transforms[tid]!.variations[vid] =
@@ -383,7 +377,22 @@ function App(props: AppProps) {
                               })
                           }}
                         >
-                          {variation.type}
+                          <svg class={ui.variationButtonSvgColor}>
+                            <g
+                              class={ui.variationButtonColor}
+                              style={{
+                                '--color': handleColor(
+                                  theme(),
+                                  vec2f(transform.color.x, transform.color.y),
+                                ),
+                              }}
+                            >
+                              <circle class={ui.variationButtonColorCircle} />
+                            </g>
+                          </svg>
+                          <div class={ui.variationButtonText}>
+                            {variation.type}
+                          </div>
                         </button>
                         <Slider
                           value={variation.weight}
