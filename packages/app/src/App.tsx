@@ -556,24 +556,41 @@ function App(props: AppProps) {
                   Auto
                 </Button>
               </Show>
-              <Slider
-                label="Quality"
-                value={quality()}
-                trackFill={true}
-                trackFillValue={Math.min(currentQuality()(), quality())}
-                animateFill={
-                  accumulatedPointCount() < qualityPointCountLimit()()
-                }
-                min={0.7}
-                max={1}
-                step={0.001}
-                onInput={(quality) => {
-                  setQuality(quality)
-                }}
-                formatValue={(value) =>
-                  value === 1 ? 'Infinite' : `${(value * 100).toFixed(1)} %`
-                }
-              />
+              <div>Quality</div>
+              <div class={ui.pillsContainer}>
+                <div
+                  onClick={() => {
+                    setQuality(0.75)
+                  }}
+                  classList={{ [ui.pill]: true, [ui.pilllow]: true }}
+                >
+                  Low
+                </div>
+                <div
+                  onClick={() => {
+                    setQuality(0.85)
+                  }}
+                  classList={{ [ui.pill]: true, [ui.pillmid]: true }}
+                >
+                  Mid
+                </div>
+                <div
+                  onClick={() => {
+                    setQuality(0.95)
+                  }}
+                  classList={{ [ui.pill]: true, [ui.pillhigh]: true }}
+                >
+                  High
+                </div>
+                <div
+                  onClick={() => {
+                    setQuality(0.99)
+                  }}
+                  classList={{ [ui.pill]: true, [ui.pillultra]: true }}
+                >
+                  Ultra
+                </div>
+              </div>
             </Card>
             <Card>
               <label class={ui.labeledInput}>
