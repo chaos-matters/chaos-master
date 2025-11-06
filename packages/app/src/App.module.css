@@ -226,11 +226,11 @@
 }
 
 .pill {
-  padding: 0.2rem 0.2rem;
+  padding: 0.4rem 0.4rem;
   font-weight: bold;
   color: var(--neutral-200);
-  background: linear-gradient(45deg, #6e45e2, #88d3ce);
-  border-radius: 20px;
+  background: linear-gradient(135deg, #555, #444);
+  border-radius: 12px;
   cursor: pointer;
   transition:
     transform 0.2s,
