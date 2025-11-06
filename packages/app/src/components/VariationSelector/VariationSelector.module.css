@@ -27,26 +27,28 @@ dialog.modal-no-scroll {
   overflow: hidden;
 }
 
-.modal-item {
+.variation-selector-sidebar {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.variation-selector-preview {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
 }
 
 .sentinel {
-  height: 2rem;
+  min-height: 3rem;
 }
 
 .gallery {
   display: grid;
-  grid-template-columns: repeat(2, minmax(8rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(12rem, auto));
   gap: 0.2rem;
-  max-width: 45rem;
-  justify-items: start;
-  overflow-y: auto;
-  height: 100%;
-
-  min-height: 0;
+  justify-items: stretch;
+  min-height: 100%;
 }
 
 .undo-message {
@@ -57,6 +59,8 @@ dialog.modal-no-scroll {
 }
 
 .item {
+  display: block;
+  width: 100%;
   padding: 0;
   margin: 0;
   position: relative;

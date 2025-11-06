@@ -3,6 +3,7 @@ import type { Accessor } from 'solid-js'
 
 export function useIntersectionObserver(
   target: Accessor<HTMLElement | null | undefined>,
+  root: Accessor<HTMLElement | null | undefined>,
   onIntersect?: () => void,
 ) {
   createEffect(() => {
@@ -20,9 +21,7 @@ export function useIntersectionObserver(
         }
       },
       {
-        root: t.parentElement,
-        rootMargin: '0px 0px 200px 0px',
-        threshold: 0.1,
+        root: root(),
       },
     )
     observer.observe(t)

@@ -16,4 +16,5 @@ body {
 * {
   font-family: Inter;
   font-variant-numeric: tabular-nums;
+  scrollbar-color: #5558 transparent;
 }
