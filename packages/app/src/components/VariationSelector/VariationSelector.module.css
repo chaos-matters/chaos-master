@@ -17,30 +17,55 @@
 .variation-preview {
   display: grid;
   grid-template-columns: 1fr 2fr;
+  grid-template-rows: 50% auto;
+  grid-template-areas:
+    'variations flame'
+    'variation-options flame';
   gap: 0.3rem;
-  /* justify-items: stretch; */
   height: 90vh;
   min-width: 90vw;
+
+  @media (max-height: 1000px) and (min-height: 400px) {
+    grid-template-rows: 40% auto;
+    height: 70vh;
+    min-width: 75vw;
+  }
 }
 
-dialog.modal-no-scroll {
+.modal-no-scroll {
   overflow: hidden;
+  @media (max-height: 1000px) and (min-height: 400px) {
+    overflow: auto;
+  }
 }
 
 .variation-selector-sidebar {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+
+  grid-area: variations;
 }
 
 .variation-selector-preview {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  grid-area: flame;
 }
 
-.sentinel {
-  min-height: 3rem;
+.variation-selector-sidebar-options {
+  grid-area: variation-options;
+  gap: var(--space-4);
+  margin-top: var(--space-1);
+}
+
+.affine-editor {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  margin-top: var(--space-3);
+  max-height: 40%;
 }
 
 .gallery {
@@ -48,7 +73,12 @@ dialog.modal-no-scroll {
   grid-template-columns: repeat(auto-fit, minmax(12rem, auto));
   gap: 0.2rem;
   justify-items: stretch;
-  min-height: 100%;
+  max-height: 50%;
+  padding-bottom: var(--space-3);
+}
+
+.sentinel {
+  min-height: 2rem;
 }
 
 .undo-message {
@@ -80,8 +110,6 @@ dialog.modal-no-scroll {
     background: #1a1a1a;
     border-radius: 0.5rem;
     border: 2px solid transparent;
-    /* border-image: linear-gradient(45deg, #ff6bcb, #00b7eb, #8a2be2, #ff4500) 1; */
-    /* box-shadow: 0 0 10px rgba(255, 107, 203, 0.5); */
     [data-theme='dark'] & {
       background: linear-gradient(
           45deg,
@@ -97,8 +125,9 @@ dialog.modal-no-scroll {
   }
 }
 
-.selector-column-title {
-  margin-bottom: 0.5rem;
+.preview-title {
+  display: flex;
+  align-items: center;
 }
 
 .item-title {
@@ -114,8 +143,14 @@ dialog.modal-no-scroll {
 .item-params {
   display: grid;
   grid-template-columns: auto 1fr auto;
-  grid-column-gap: 1rem;
+
+  max-height: 30%;
+  gap: var(--space-3);
+  font-size: small;
+
+  align-items: center;
   justify-items: stretch;
+
   & > :first-child {
     justify-self: start;
   }
@@ -135,6 +170,10 @@ dialog.modal-no-scroll {
     'preview'
     'preview-controls';
   overflow: hidden;
+
+  @media (max-height: 1000px) and (min-height: 400px) {
+    max-height: 75vh;
+  }
 
   /* Start a stacking context so canvas doesn't go behind body */
   isolation: isolate;
