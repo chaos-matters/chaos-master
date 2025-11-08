@@ -177,6 +177,33 @@
   }
 }
 
+.delete-variation-button {
+  border: none;
+  border-radius: var(--round);
+  position: absolute;
+  top: var(--space-h);
+  right: var(--space-h);
+  width: 0.8rem;
+  height: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  cursor: pointer;
+
+  color: var(--neutral-600);
+  &:hover {
+    color: black;
+  }
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500);
+    &:hover {
+      color: white;
+    }
+  }
+}
+
 .variation-button {
   background: linear-gradient(135deg, #555, #444);
   color: white;
@@ -214,6 +241,9 @@
 }
 
 .variation-button-svg-color {
+  /* margin-top: 1rem; */
+  top: 0px;
+  left: 0px;
   position: absolute;
   pointer-events: none; /* allow clicks through badge */
   transform-origin: center;

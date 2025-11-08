@@ -310,6 +310,19 @@ function App(props: AppProps) {
             <For each={recordEntries(flameDescriptor.transforms)}>
               {([tid, transform]) => (
                 <Card>
+                  <svg class={ui.variationButtonSvgColor}>
+                    <g
+                      class={ui.variationButtonColor}
+                      style={{
+                        '--color': handleColor(
+                          theme(),
+                          vec2f(transform.color.x, transform.color.y),
+                        ),
+                      }}
+                    >
+                      <circle class={ui.variationButtonColorCircle} />
+                    </g>
+                  </svg>
                   <button
                     class={ui.deleteFlameButton}
                     onClick={() => {
@@ -377,23 +390,11 @@ function App(props: AppProps) {
                               })
                           }}
                         >
-                          <svg class={ui.variationButtonSvgColor}>
-                            <g
-                              class={ui.variationButtonColor}
-                              style={{
-                                '--color': handleColor(
-                                  theme(),
-                                  vec2f(transform.color.x, transform.color.y),
-                                ),
-                              }}
-                            >
-                              <circle class={ui.variationButtonColorCircle} />
-                            </g>
-                          </svg>
                           <div class={ui.variationButtonText}>
                             {variation.type}
                           </div>
                         </button>
+
                         <Slider
                           value={variation.weight}
                           min={0}
@@ -431,9 +432,20 @@ function App(props: AppProps) {
                             />
                           )}
                         </Show>
+                        <button
+                          class={ui.deleteVariationButton}
+                          onClick={() => {
+                            setFlameDescriptor((draft) => {
+                              delete draft.transforms[tid]!.variations[vid]
+                            })
+                          }}
+                        >
+                          <Cross />
+                        </button>
                       </>
                     )}
                   </For>
+
                   <Card class={ui.buttonCard}>
                     <button
                       class={ui.addTransformVariationButton}
