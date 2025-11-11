@@ -177,18 +177,56 @@
   }
 }
 
+.transform-grid {
+  display: grid;
+  align-items: center;
+  justify-items: stretch;
+  border: 2px solid;
+  border-radius: var(--space-3);
+  font-size: small;
+
+  padding: var(--space-3);
+  gap: var(--space-3);
+  /* required for delete button to position absolutely */
+  position: relative;
+
+  color: var(--neutral-600);
+  border-color: var(--neutral-200);
+  background-color: white;
+  [data-theme='dark'] & {
+    color: var(--neutral-400);
+    border-color: var(--neutral-900);
+    background-color: var(--neutral-950);
+  }
+}
+
+.transform-grid-first-row {
+  padding-top: var(--space-2);
+}
+
+.transform-grid-row {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 0.5fr;
+
+  justify-items: stretch;
+  gap: var(--space-3);
+  font-size: small;
+
+  align-items: center;
+
+  /* required for delete button to position absolutely */
+  position: relative;
+}
+
 .delete-variation-button {
+  top: -0.5rem;
+  right: -0.5rem;
   border: none;
   border-radius: var(--round);
   position: absolute;
-  top: var(--space-h);
-  right: var(--space-h);
   width: 0.8rem;
   height: 0.8rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: transparent;
+
   cursor: pointer;
 
   color: var(--neutral-600);
