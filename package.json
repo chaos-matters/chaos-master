@@ -10,27 +10,27 @@
     "lines": "cloc packages --exclude-dir=node_modules,dist --by-file-by-lang --not-match-f='(.*[.]d[.]ts|.*[.]stories[.].*|.*[.]test[.].*|.*[.]json)'"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.0",
+    "@eslint/js": "^9.39.1",
     "@types/wicg-file-system-access": "^2023.10.7",
-    "@typescript-eslint/parser": "^8.46.2",
+    "@typescript-eslint/parser": "^8.48.1",
     "@vitejs/plugin-basic-ssl": "^2.1.0",
-    "@webgpu/types": "^0.1.66",
+    "@webgpu/types": "^0.1.67",
     "cloc": "2.6.0-cloc",
-    "eslint": "^9.39.0",
+    "eslint": "^9.39.1",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import-x": "^4.16.1",
     "eslint-plugin-simple-import-sort": "^12.1.1",
-    "jsdom": "^27.1.0",
-    "prettier": "^3.6.2",
+    "jsdom": "^27.2.0",
+    "prettier": "^3.7.4",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.46.2",
+    "typescript-eslint": "^8.48.1",
     "typescript-plugin-css-modules": "^5.2.0",
     "unplugin-typegpu": "^0.8.0",
-    "vite": "^7.1.12",
+    "vite": "^7.2.6",
     "vite-bundle-analyzer": "^1.2.3",
     "vite-plugin-solid": "^2.11.10",
     "vite-plugin-solid-svg": "^0.8.1",
-    "vitest": "^4.0.6"
+    "vitest": "^4.0.15"
   },
   "pnpm": {
     "ignoredBuiltDependencies": [

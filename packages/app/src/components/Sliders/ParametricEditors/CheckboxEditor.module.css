@@ -1,0 +1,35 @@
+.label {
+  --color: var(--neutral-600);
+  --hover-color: black;
+  --track-color: var(--neutral-100);
+  --track-border-color: var(--neutral-300);
+
+  [data-theme='dark'] & {
+    --color: var(--neutral-400);
+    --hover-color: white;
+    --track-color: var(--neutral-800);
+    --track-border-color: var(--neutral-700);
+  }
+}
+
+.label span {
+  user-select: none;
+}
+
+.label {
+  display: contents;
+  color: var(--color);
+
+  &:hover,
+  &:focus-within {
+    --color: var(--hover-color);
+  }
+}
+
+.name {
+  justify-self: end;
+}
+
+.value {
+  justify-self: end;
+}

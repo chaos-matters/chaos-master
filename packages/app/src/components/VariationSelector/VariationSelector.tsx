@@ -290,7 +290,6 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                 const variation = getVarFromPreviewFlame(variationExample)
                 return (
                   variation && (
-                    // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
                     <div>
                       <button
                         class={ui.item}
@@ -330,14 +329,10 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
               const variation = getVarFromPreviewFlame(variationExample)
               return (
                 variation && (
-                  // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
                   <>
                     <Show when={selectedItemId() === id}>
                       <Show
-                        when={
-                          // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-                          isParametricVariation(variation) && variation
-                        }
+                        when={isParametricVariation(variation) && variation}
                         keyed
                       >
                         {(variation) => (

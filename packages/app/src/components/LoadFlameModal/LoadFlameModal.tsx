@@ -1,5 +1,6 @@
 import { createSignal, For } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
+import { DEFAULT_QUALITY } from '@/defaults'
 import { examples } from '@/flame/examples'
 import { Flam3 } from '@/flame/Flam3'
 import { AutoCanvas } from '@/lib/AutoCanvas'
@@ -32,7 +33,7 @@ function Preview(props: { flameDescriptor: FlameDescriptor }) {
           zoom={props.flameDescriptor.renderSettings.camera.zoom}
         >
           <Flam3
-            quality={0.8}
+            quality={DEFAULT_QUALITY}
             pointCountPerBatch={2e4}
             adaptiveFilterEnabled={true}
             flameDescriptor={props.flameDescriptor}

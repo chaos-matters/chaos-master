@@ -108,7 +108,12 @@ function newDefaultTransform(): TransformFunction {
     color: { x: 0, y: 0 },
     preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
     postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-    variations: { [generateVariationId()]: { type: 'linear', weight: 1 } },
+    variations: {
+      [generateVariationId()]: {
+        type: 'linear',
+        weight: 1,
+      },
+    },
   }
 }
 
@@ -456,7 +461,6 @@ function App(props: AppProps) {
                           </button>
                         </div>
                         <Show
-                          // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
                           when={isParametricVariation(variation) && variation}
                           keyed
                         >
