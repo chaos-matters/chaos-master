@@ -1,4 +1,4 @@
-import { vec2f } from 'typegpu/data'
+import { f32, vec2f } from 'typegpu/data'
 import {
   atan2,
   cos,
@@ -166,7 +166,7 @@ export const julia = simpleVariation('julia', (pos, _varInfo) => {
   'use gpu'
   const sqrtr = sqrt(length(pos))
   const theta = atan2(pos.y, pos.x)
-  const omega = select(0, PI.$, random() > 0.5)
+  const omega = f32(select(0, PI.$, random() > 0.5))
   const angle = theta / 2.0 + omega
   return vec2f(cos(angle), sin(angle)).mul(sqrtr)
 })

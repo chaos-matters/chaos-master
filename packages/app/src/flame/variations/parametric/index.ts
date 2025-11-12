@@ -2,6 +2,9 @@ import { blob } from './blob'
 import { curlVar } from './curl'
 import { fan2 } from './fan2'
 import { grid } from './grid'
+import { invCircle } from './invCircle'
+import { invCircle2 } from './invCircle2'
+import { invEllipse } from './invEllipse'
 import { juliaN } from './juliaN'
 import { juliaScope } from './juliaScope'
 import { ngonVar } from './ngon'
@@ -26,4 +29,7 @@ export const parametricVariations = {
   radialBlurVar,
   rectanglesVar,
   rings2,
+  invCircle,
+  invCircle2,
+  invEllipse,
 }

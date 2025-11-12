@@ -24,6 +24,7 @@ export function RangeEditor(props: RangeEditorProps) {
       max={props.max}
       step={props.step}
       label={props.name}
+      trackFill={false}
       formatValue={(value) => value.toFixed(decimals())}
     />
   )

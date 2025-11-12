@@ -1,4 +1,5 @@
 import { createMemo, Show } from 'solid-js'
+import { clamp } from 'typegpu/std'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
@@ -11,6 +12,7 @@ type SliderProps = {
   min?: number
   max?: number
   step?: number
+  trackFill?: boolean
   onInput: (value: number) => void
   formatValue?: (value: number) => string
 }
@@ -21,7 +23,9 @@ export function Slider(props: SliderProps) {
   const min = () => props.min ?? 0
   const max = () => props.max ?? 1
   const step = () => props.step ?? 0.01
-  const value = createMemo(() => props.value)
+  const value = createMemo(() => {
+    return clamp(props.value, min(), max())
+  })
   const formatValue = () =>
     props.formatValue ? props.formatValue(value()) : value().toFixed(2)
 
@@ -57,7 +61,7 @@ export function Slider(props: SliderProps) {
       <div
         class={ui.sliderWrapper}
         style={{
-          '--fill-percent': `${fillPercentage()}%`,
+          '--fill-percent': `${(props.trackFill ?? true) ? fillPercentage() : 0}%`,
         }}
       >
         <input
