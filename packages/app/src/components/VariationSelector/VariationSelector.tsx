@@ -82,7 +82,7 @@ function PreviewFinalFlame(props: {
   )
 }
 
-function Preview(props: { flame: FlameDescriptor }) {
+function VariationPreview(props: { flame: FlameDescriptor }) {
   return (
     <Root adapterOptions={{ powerPreference: 'high-performance' }}>
       <AutoCanvas pixelRatio={1}>
@@ -128,7 +128,10 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
     createStore<Record<string, FlameDescriptor>>(variationPreviewFlames),
   )
   const [selectedItemId, setSelectedItemId] = createSignal<string | null>(null)
-  const [touchlessPreview, setTouchlessPreview] = createSignal<boolean>(false)
+  const [selectedPreviewItemId, setSelectedPreviewItemId] = createSignal<
+    string | null
+  >(null)
+  const [touchlessPreview, setTouchlessPreview] = createSignal<boolean>(true)
   const [examplesShown, setExamplesShown] = createSignal<number>(lazyLoadAmount)
   const loadMoreExamples = () => {
     setExamplesShown((prev) =>
@@ -201,7 +204,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
     return [undefined, undefined]
   }
   const setPreviewFlameShowcaseVariation = () => {
-    const itemId = selectedItemId()
+    const itemId = getPreviewSelectionId()
     if (itemId !== null) {
       const selectedItem = variationExamples[itemId]
       if (selectedItem) {
@@ -241,6 +244,15 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
   }
   const toggleSelectedItem = (idToToggle: string) => {
     setSelectedItemId(selectedItemId() === idToToggle ? null : idToToggle)
+    setPreviewFlameShowcaseVariation()
+  }
+
+  const getPreviewSelectionId = () => {
+    return selectedPreviewItemId() ?? selectedItemId() ?? null
+  }
+
+  const setPreviewSelection = (id: string | null) => {
+    setSelectedPreviewItemId(id)
     setPreviewFlameShowcaseVariation()
   }
 
@@ -302,14 +314,17 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                           }}
                           onMouseEnter={() => {
                             if (touchlessPreview()) {
-                              toggleSelectedItem(id)
+                              setPreviewSelection(id)
                             }
+                          }}
+                          onMouseLeave={() => {
+                            setPreviewSelection(null)
                           }}
                         >
                           <DelayedShow
                             delayMs={i() * DEFAULT_VARIATION_SHOW_DELAY_MS}
                           >
-                            <Preview flame={variationExample} />
+                            <VariationPreview flame={variationExample} />
                           </DelayedShow>
                           <div class={ui.itemTitle}>{variation.type}</div>
                         </button>
