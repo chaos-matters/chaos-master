@@ -16,15 +16,12 @@ export function useIntersectionObserver(
         if (entry === undefined) {
           return
         }
-        console.info('Log', entry, root())
         if (entry.isIntersecting && onIntersect !== undefined) {
           onIntersect()
         }
       },
       {
         root: root(),
-        rootMargin: '200px',
-        threshold: 0.2,
       },
     )
     observer.observe(t)
