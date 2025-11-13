@@ -351,6 +351,7 @@ function AffineHandle(props: {
 }
 
 export function AffineEditor(props: {
+  class?: string
   transforms: TransformRecord
   setTransforms: HistorySetter<TransformRecord>
 }) {
@@ -369,6 +370,9 @@ export function AffineEditor(props: {
         scrollIntoViewAndFocusOnChange(scrollTrigger, el)
       }}
       class={ui.editorCard}
+      classList={{
+        [props.class ?? '']: true,
+      }}
     >
       <Root>
         <AutoCanvas class={ui.canvas} pixelRatio={1}>

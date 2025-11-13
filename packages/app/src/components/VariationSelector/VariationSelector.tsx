@@ -390,63 +390,59 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
               )
             }}
           </For>
-          <div class={ui.affineEditor}>
-            <AffineEditor
-              transforms={{
-                [props.transformId]:
-                  previewFlame.transforms[props.transformId]!,
-              }}
-              setTransforms={(setFn) => {
-                setPreviewFlame((draft) => {
-                  setFn(draft.transforms)
-                })
-              }}
+          <AffineEditor
+            class={ui.affineEditor}
+            transforms={{
+              [props.transformId]: previewFlame.transforms[props.transformId]!,
+            }}
+            setTransforms={(setFn) => {
+              setPreviewFlame((draft) => {
+                setFn(draft.transforms)
+              })
+            }}
+          />
+        </div>
+        <div class={ui.flamePreview}>
+          <div class={ui.flamePreviewFlame}>
+            <PreviewFinalFlame
+              flame={previewFlame}
+              setFlamePosition={setFlamePosition}
+              setFlameZoom={setFlameZoom}
             />
           </div>
-        </div>
-        <div class={ui.variationSelectorPreview}>
-          <div class={ui.flamePreview}>
-            <div class={ui.flamePreviewFlame}>
-              <PreviewFinalFlame
-                flame={previewFlame}
-                setFlamePosition={setFlamePosition}
-                setFlameZoom={setFlameZoom}
-              />
-            </div>
-            <div class={ui.flamePreviewControls}>
-              <ButtonGroup>
-                <Button
-                  onClick={() => {
-                    setFlameZoom(1)
-                    setFlamePosition(vec2f())
-                  }}
-                  style={{ 'min-width': '4rem' }}
-                >
-                  {(previewFlame.renderSettings.camera.zoom * 100).toFixed(0)}%
-                </Button>
+          <div class={ui.flamePreviewControls}>
+            <ButtonGroup>
+              <Button
+                onClick={() => {
+                  setFlameZoom(1)
+                  setFlamePosition(vec2f())
+                }}
+                style={{ 'min-width': '4rem' }}
+              >
+                {(previewFlame.renderSettings.camera.zoom * 100).toFixed(0)}%
+              </Button>
 
-                <Button
-                  onClick={() => {
-                    setTouchlessPreview(!touchlessPreview())
-                  }}
-                >
-                  {touchlessPreview() ? <HoverEyePreview /> : <HoverPreview />}
-                </Button>
-              </ButtonGroup>
-              <ButtonGroup>
-                <Button
-                  onClick={() => {
-                    applySelection()
-                  }}
-                  disabled={selectedItemId() === null}
-                >
-                  Apply
-                  <Show when={selectedItemId() !== null}>
-                    <span> {selectedItemId()} variation</span>
-                  </Show>
-                </Button>
-              </ButtonGroup>
-            </div>
+              <Button
+                onClick={() => {
+                  setTouchlessPreview(!touchlessPreview())
+                }}
+              >
+                {touchlessPreview() ? <HoverEyePreview /> : <HoverPreview />}
+              </Button>
+            </ButtonGroup>
+            <ButtonGroup>
+              <Button
+                onClick={() => {
+                  applySelection()
+                }}
+                disabled={selectedItemId() === null}
+              >
+                Apply
+                <Show when={selectedItemId() !== null}>
+                  <span> {selectedItemId()} variation</span>
+                </Show>
+              </Button>
+            </ButtonGroup>
           </div>
         </div>
       </section>

@@ -17,26 +17,16 @@
 .variation-preview {
   display: grid;
   grid-template-columns: 1fr 2fr;
-  grid-template-rows: 50% auto;
+  grid-template-rows: 1fr auto;
   grid-template-areas:
     'variations flame'
     'variation-options flame';
-  gap: 0.3rem;
-  height: 90vh;
-  min-width: 90vw;
-
-  @media (max-height: 1000px) and (min-height: 400px) {
-    grid-template-rows: 40% auto;
-    height: 70vh;
-    min-width: 75vw;
-  }
+  gap: var(--space-3);
+  overflow: hidden;
 }
 
 .modal-no-scroll {
   overflow: hidden;
-  @media (max-height: 1000px) and (min-height: 400px) {
-    overflow: auto;
-  }
 }
 
 .variation-selector-sidebar {
@@ -47,25 +37,11 @@
   grid-area: variations;
 }
 
-.variation-selector-preview {
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  grid-area: flame;
-}
-
 .variation-selector-sidebar-options {
   grid-area: variation-options;
-  gap: var(--space-4);
-  margin-top: var(--space-1);
-}
-
-.affine-editor {
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
-  margin-top: var(--space-3);
-  max-height: 40%;
+  gap: var(--space-4);
 }
 
 .gallery {
@@ -73,8 +49,11 @@
   grid-template-columns: repeat(auto-fit, minmax(12rem, auto));
   gap: 0.2rem;
   justify-items: stretch;
-  max-height: 50%;
   padding-bottom: var(--space-3);
+}
+
+.affine-editor {
+  max-height: 25vh;
 }
 
 .sentinel {
@@ -85,18 +64,15 @@
   font-style: italic;
   font-size: small;
   color: var(--neutral-500);
-  margin-left: var(--space-3);
 }
 
 .item {
   display: block;
   width: 100%;
-  padding: 0;
-  margin: 0;
   position: relative;
   overflow: hidden;
   aspect-ratio: 16 / 9;
-  border: 1px solid var(--item-border-color);
+  border: 2px solid var(--item-border-color);
   border-radius: 0.5rem;
   cursor: pointer;
   background: none;
@@ -104,8 +80,9 @@
 
   &:hover {
     color: var(--item-text-color-hover);
-    border: 1px solid var(--item-border-color-hover);
+    border: 2px solid var(--item-border-color-hover);
   }
+
   &.selected {
     background: #1a1a1a;
     border-radius: 0.5rem;
@@ -144,7 +121,6 @@
   display: grid;
   grid-template-columns: auto 1fr auto;
 
-  max-height: 30%;
   gap: var(--space-3);
   font-size: small;
 
@@ -163,17 +139,13 @@
 }
 
 .flame-preview {
+  grid-area: flame;
   display: grid;
-  height: 100%;
   grid-template-rows: 1fr auto;
   grid-template-areas:
     'preview'
     'preview-controls';
   overflow: hidden;
-
-  @media (max-height: 1000px) and (min-height: 400px) {
-    max-height: 75vh;
-  }
 
   /* Start a stacking context so canvas doesn't go behind body */
   isolation: isolate;
