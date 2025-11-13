@@ -298,3 +298,7 @@
   stroke-width: 1px;
   transition: r 250ms;
 }
+
+.affine-editor {
+  min-height: 25vh;
+}

@@ -292,6 +292,7 @@ function App(props: AppProps) {
         <Show when={showSidebar()}>
           <div class={ui.sidebar}>
             <AffineEditor
+              class={ui.affineEditor}
               transforms={flameDescriptor.transforms}
               setTransforms={(setFn) => {
                 setFlameDescriptor((draft) => {
