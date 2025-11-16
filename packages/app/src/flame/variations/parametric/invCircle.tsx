@@ -13,7 +13,7 @@ const InvCircleParams = struct({
 })
 
 const InvCircleParamsDefaults: InvCircleParams = {
-  radius: 2,
+  radius: 1,
   a: 0,
   b: 0,
 }
@@ -22,20 +22,20 @@ const InvCircleParamsEditor: EditorFor<InvCircleParams> = (props) => (
   <>
     <RangeEditor
       {...editorProps(props, 'radius', 'Radius')}
-      min={1}
-      max={200}
-      step={1}
+      min={-3}
+      max={3}
+      step={0.1}
     />
     <RangeEditor
       {...editorProps(props, 'a', 'a')}
-      min={0}
-      max={20}
+      min={-10}
+      max={10}
       step={0.1}
     />
     <RangeEditor
       {...editorProps(props, 'b', 'b')}
-      min={0}
-      max={20}
+      min={-10}
+      max={10}
       step={0.1}
     />
   </>

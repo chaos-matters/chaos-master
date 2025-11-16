@@ -108,7 +108,13 @@ function newDefaultTransform(): TransformFunction {
     color: { x: 0, y: 0 },
     preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
     postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-    variations: { [generateVariationId()]: { type: 'linear', weight: 1 } },
+    variations: {
+      [generateVariationId()]: {
+        type: 'invCircle',
+        weight: 1,
+        params: { radius: 1, a: 0, b: 0 },
+      },
+    },
   }
 }
 
@@ -130,7 +136,7 @@ function App(props: AppProps) {
   const [flameDescriptor, setFlameDescriptor, history] = createStoreHistory(
     createStore(
       structuredClone(
-        props.flameFromQuery ? props.flameFromQuery : examples.invCircleEx,
+        props.flameFromQuery ? props.flameFromQuery : examples.invCircleFrac,
       ),
     ),
   )
