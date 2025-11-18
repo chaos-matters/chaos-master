@@ -1,0 +1,109 @@
+/* src/components/WebGPUNotSupported.module.css */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&display=swap');
+
+.fallback {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Orbitron', 'Segoe UI', sans-serif;
+  background: radial-gradient(circle at center, #001122 0%, #000 70%);
+  color: #0ff;
+  overflow: hidden;
+  text-align: center;
+  padding: 2rem;
+}
+
+.content {
+  position: relative;
+  z-index: 2;
+  max-width: 720px;
+}
+
+.title {
+  font-size: 4.5rem;
+  margin-bottom: 1rem;
+  background: linear-gradient(90deg, #0ff, #0f9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+}
+
+.text {
+  font-size: 1.3rem;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+  opacity: 0.9;
+}
+
+.btn {
+  display: inline-block;
+  padding: 14px 36px;
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #000;
+  background: #0ff;
+  border-radius: 50px;
+  text-decoration: none;
+  box-shadow: 0 0 30px rgba(0, 255, 255, 0.6);
+  transition: all 0.3s ease;
+}
+
+.btn:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 0 50px rgba(0, 255, 255, 0.9);
+}
+
+.hint {
+  margin-top: 3rem;
+  font-size: 0.9rem;
+  opacity: 0.6;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.12;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.2;
+    transform: scale(1.05);
+  }
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .title {
+    font-size: 3rem;
+  }
+  .text {
+    font-size: 1.1rem;
+  }
+}
+
+.github-link {
+  --color-hover: black;
+
+  [data-theme='dark'] & {
+    --color-hover: white;
+  }
+}
+.github-link {
+  display: inline-flex;
+  gap: var(--space-2);
+  color: currentColor;
+
+  &:hover {
+    color: var(--color-hover);
+  }
+
+  & > svg {
+    display: inline;
+    width: 1.5rem;
+    fill: currentColor;
+  }
+}

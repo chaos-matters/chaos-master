@@ -7,7 +7,6 @@ import { PI } from '@/flame/constants'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { useCamera } from '@/lib/CameraContext'
 import { useCanvas } from '@/lib/CanvasContext'
-import { Root } from '@/lib/Root'
 import { useRootContext } from '@/lib/RootContext'
 import {
   createPosition,
@@ -374,46 +373,45 @@ export function AffineEditor(props: {
         [props.class ?? '']: true,
       }}
     >
-      <Root>
-        <AutoCanvas class={ui.canvas} pixelRatio={1}>
-          <WheelZoomCamera2D
-            eventTarget={div()}
-            zoom={[zoom, setZoom]}
-            position={[position, setPosition]}
-          >
-            <Grid />
-            <svg class={ui.svg}>
-              <defs>
-                <marker
-                  id="arrow"
-                  class={ui.arrowHead}
-                  viewBox="0 0 10 10"
-                  refX="5"
-                  refY="5"
-                  markerWidth="6"
-                  markerHeight="6"
-                  orient="auto-start-reverse"
-                >
-                  <path d="M 0 0 L 10 5 L 0 10 z" />
-                </marker>
-              </defs>
-              <For each={recordEntries(props.transforms)}>
-                {([tid, transform]) => (
-                  <AffineHandle
-                    transform={transform.preAffine}
-                    color={vec2f(transform.color.x, transform.color.y)}
-                    setTransform={(affine) => {
-                      props.setTransforms((draft) => {
-                        draft[tid]!.preAffine = affine
-                      })
-                    }}
-                  />
-                )}
-              </For>
-            </svg>
-          </WheelZoomCamera2D>
-        </AutoCanvas>
-      </Root>
+      <AutoCanvas class={ui.canvas} pixelRatio={1}>
+        <WheelZoomCamera2D
+          eventTarget={div()}
+          zoom={[zoom, setZoom]}
+          position={[position, setPosition]}
+        >
+          <Grid />
+          <svg class={ui.svg}>
+            <defs>
+              <marker
+                id="arrow"
+                class={ui.arrowHead}
+                viewBox="0 0 10 10"
+                refX="5"
+                refY="5"
+                markerWidth="0.09"
+                markerHeight="0.09"
+                markerUnits="userSpaceOnUse"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 0 L 10 5 L 0 10 z" />
+              </marker>
+            </defs>
+            <For each={recordEntries(props.transforms)}>
+              {([tid, transform]) => (
+                <AffineHandle
+                  transform={transform.preAffine}
+                  color={vec2f(transform.color.x, transform.color.y)}
+                  setTransform={(affine) => {
+                    props.setTransforms((draft) => {
+                      draft[tid]!.preAffine = affine
+                    })
+                  }}
+                />
+              )}
+            </For>
+          </svg>
+        </WheelZoomCamera2D>
+      </AutoCanvas>
     </div>
   )
 }
