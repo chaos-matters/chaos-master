@@ -21,6 +21,7 @@
   grid-template-areas:
     'variations flame'
     'variation-options flame';
+  width: 90vw;
   gap: var(--space-3);
   overflow: hidden;
 }
