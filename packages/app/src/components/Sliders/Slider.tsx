@@ -58,27 +58,31 @@ export function Slider(props: SliderProps) {
       <Show when={label()}>
         <span>{label()}</span>
       </Show>
-      <input
-        ref={(el) => {
-          scrollIntoViewAndFocusOnChange(value, el)
-        }}
-        class={ui.slider}
+      <div
+        class={ui.sliderWrapper}
         classList={{
           [ui.animateFill]: props.animateFill,
-        }}
-        type="range"
-        min={min()}
-        max={max()}
-        step={step()}
-        value={value()}
-        onPointerDown={commitHandler}
-        onInput={(ev) => {
-          props.onInput(ev.target.valueAsNumber)
         }}
         style={{
           '--fill-percent': `${(props.trackFill ?? true) ? fillPercentage() : 0}%`,
         }}
-      />
+      >
+        <input
+          ref={(el) => {
+            scrollIntoViewAndFocusOnChange(value, el)
+          }}
+          class={ui.slider}
+          type="range"
+          min={min()}
+          max={max()}
+          step={step()}
+          value={value()}
+          onPointerDown={commitHandler}
+          onInput={(ev) => {
+            props.onInput(ev.target.valueAsNumber)
+          }}
+        />
+      </div>
       <span class={ui.value}>{formatValue()}</span>
     </label>
   )

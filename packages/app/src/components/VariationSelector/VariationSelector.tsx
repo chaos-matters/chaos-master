@@ -55,7 +55,7 @@ function PreviewFinalFlame(props: {
   setFlameZoom: Setter<number>
 }) {
   return (
-    <Root adapterOptions={{ powerPreference: 'high-performance' }}>
+    <>
       <AutoCanvas class={ui.canvas} pixelRatio={1}>
         <WheelZoomCamera2D
           zoom={[
@@ -73,19 +73,18 @@ function PreviewFinalFlame(props: {
             adaptiveFilterEnabled={false}
             flameDescriptor={props.flame}
             renderInterval={10}
-            onExportImage={undefined}
             edgeFadeColor={vec4f(0)}
           />
         </WheelZoomCamera2D>
       </AutoCanvas>
-    </Root>
+    </>
   )
 }
 
 function VariationPreview(props: { flame: FlameDescriptor }) {
   return (
-    <Root adapterOptions={{ powerPreference: 'high-performance' }}>
-      <AutoCanvas class={ui.canvas} pixelRatio={1}>
+    <>
+      <AutoCanvas pixelRatio={1}>
         <Camera2D
           position={vec2f(...props.flame.renderSettings.camera.position)}
           zoom={props.flame.renderSettings.camera.zoom}
@@ -96,12 +95,11 @@ function VariationPreview(props: { flame: FlameDescriptor }) {
             adaptiveFilterEnabled={false}
             flameDescriptor={props.flame}
             renderInterval={10}
-            onExportImage={undefined}
             edgeFadeColor={vec4f(0)}
           />
         </Camera2D>
       </AutoCanvas>
-    </Root>
+    </>
   )
 }
 type RespondType =
@@ -284,7 +282,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
     },
   })
   return (
-    <>
+    <Root adapterOptions={{ powerPreference: 'high-performance' }}>
       <ModalTitleBar
         onClose={() => {
           props.respond(CANCEL)
@@ -446,7 +444,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
           </div>
         </div>
       </section>
-    </>
+    </Root>
   )
 }
 
@@ -467,15 +465,17 @@ export function createVariationSelector(
     const result = await requestModal<RespondType>({
       class: ui.modalNoScroll,
       content: ({ respond }) => (
-        <ChangeHistoryContextProvider value={history}>
-          <ShowVariationSelector
-            currentVar={currentVar}
-            currentFlame={currentFlame}
-            transformId={tid}
-            variationId={vid}
-            respond={respond}
-          />
-        </ChangeHistoryContextProvider>
+        <Root adapterOptions={{ powerPreference: 'high-performance' }}>
+          <ChangeHistoryContextProvider value={history}>
+            <ShowVariationSelector
+              currentVar={currentVar}
+              currentFlame={currentFlame}
+              transformId={tid}
+              variationId={vid}
+              respond={respond}
+            />
+          </ChangeHistoryContextProvider>
+        </Root>
       ),
     })
     setVarSelectorModalIsOpen(false)

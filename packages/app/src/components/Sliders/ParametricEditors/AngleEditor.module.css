@@ -12,6 +12,10 @@
   }
 }
 
+.label span {
+  user-select: none;
+}
+
 .label {
   display: contents;
   color: var(--color);

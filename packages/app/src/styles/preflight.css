@@ -169,6 +169,11 @@ object {
   vertical-align: middle; /* 2 */
 }
 
+canvas,
+svg {
+  user-select: none;
+  -webkit-user-select: none;
+}
 /*
   Constrain images and videos to the parent width and preserve their intrinsic aspect ratio. (https://github.com/mozdevs/cssremedy/issues/14)
 */
@@ -316,6 +321,8 @@ button,
 input:where([type='button'], [type='reset'], [type='submit']),
 ::file-selector-button {
   appearance: button;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /*

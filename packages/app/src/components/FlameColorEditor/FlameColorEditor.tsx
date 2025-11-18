@@ -8,7 +8,6 @@ import { PI } from '@/flame/constants'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { useCamera } from '@/lib/CameraContext'
 import { useCanvas } from '@/lib/CanvasContext'
-import { Root } from '@/lib/Root'
 import { useRootContext } from '@/lib/RootContext'
 import {
   createPosition,
@@ -223,31 +222,29 @@ export function FlameColorEditor(props: {
       }}
       class={ui.editorCard}
     >
-      <Root>
-        <AutoCanvas class={ui.canvas} pixelRatio={1}>
-          <WheelZoomCamera2D
-            eventTarget={div()}
-            zoom={[zoom, setZoom]}
-            position={[position, setPosition]}
-          >
-            <Gradient />
-            <svg class={ui.svg}>
-              <For each={recordEntries(props.transforms)}>
-                {([tid, transform]) => (
-                  <FlameColorHandle
-                    color={vec2f(transform.color.x, transform.color.y)}
-                    setColor={(color) => {
-                      props.setTransforms((draft) => {
-                        draft[tid]!.color = { x: color.x, y: color.y }
-                      })
-                    }}
-                  />
-                )}
-              </For>
-            </svg>
-          </WheelZoomCamera2D>
-        </AutoCanvas>
-      </Root>
+      <AutoCanvas class={ui.canvas} pixelRatio={1}>
+        <WheelZoomCamera2D
+          eventTarget={div()}
+          zoom={[zoom, setZoom]}
+          position={[position, setPosition]}
+        >
+          <Gradient />
+          <svg class={ui.svg}>
+            <For each={recordEntries(props.transforms)}>
+              {([tid, transform]) => (
+                <FlameColorHandle
+                  color={vec2f(transform.color.x, transform.color.y)}
+                  setColor={(color) => {
+                    props.setTransforms((draft) => {
+                      draft[tid]!.color = { x: color.x, y: color.y }
+                    })
+                  }}
+                />
+              )}
+            </For>
+          </svg>
+        </WheelZoomCamera2D>
+      </AutoCanvas>
     </div>
   )
 }

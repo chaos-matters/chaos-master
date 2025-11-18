@@ -3,6 +3,7 @@ import {
   createMemo,
   createResource,
   createSignal,
+  ErrorBoundary,
   For,
   Show,
   Suspense,
@@ -11,6 +12,7 @@ import { createStore } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { vec2f, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
+import { exportPngIOS, isIOS } from '@/appleUtils'
 import { recordEntries, recordKeys } from '@/utils/record'
 import ui from './App.module.css'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
@@ -19,6 +21,10 @@ import { Checkbox } from './components/Checkbox/Checkbox'
 import { ColorPicker } from './components/ColorPicker/ColorPicker'
 import { Card } from './components/ControlCard/ControlCard'
 import { Dropzone } from './components/Dropzone/Dropzone'
+import {
+  AppCrashed,
+  WebgpuNotSupported,
+} from './components/ErrorHandling/ErrorHandling'
 import {
   FlameColorEditor,
   handleColor,
@@ -211,14 +217,12 @@ function App(props: AppProps) {
       return true
     },
   })
-
-  const exportCanvasImage = (canvas: HTMLCanvasElement) => {
-    setOnExportImage(undefined)
+  const exportPng = (canvas: HTMLCanvasElement, flame: FlameDescriptor) => {
     canvas.toBlob(async (blob) => {
       if (!blob) return
       const imgData = await blob.arrayBuffer()
       const pngBytes = new Uint8Array(imgData)
-      const encodedFlames = await compressJsonQueryParam(flameDescriptor)
+      const encodedFlames = await compressJsonQueryParam(flame)
       const imgExtData = addFlameDataToPng(encodedFlames, pngBytes)
       const fileUrlExt = URL.createObjectURL(imgExtData)
       const downloadLink = window.document.createElement('a')
@@ -226,6 +230,15 @@ function App(props: AppProps) {
       downloadLink.download = 'flame.png'
       downloadLink.click()
     })
+  }
+  const exportCanvasImage = (canvas: HTMLCanvasElement) => {
+    console.info('Exporting image...image?')
+    setOnExportImage(undefined)
+    if (isIOS()) {
+      exportPngIOS(canvas, flameDescriptor)
+    } else {
+      exportPng(canvas, flameDescriptor)
+    }
   }
 
   createEffect(() => {
@@ -246,7 +259,7 @@ function App(props: AppProps) {
   return (
     <ChangeHistoryContextProvider value={history}>
       <Dropzone class={ui.layout} onDrop={onDrop}>
-        <Root adapterOptions={{ powerPreference: 'high-performance' }}>
+        <>
           <div
             class={ui.canvasContainer}
             classList={{ [ui.fullscreen]: !showSidebar() }}
@@ -281,7 +294,7 @@ function App(props: AppProps) {
               </WheelZoomCamera2D>
             </AutoCanvas>
           </div>
-        </Root>
+        </>
         <ViewControls
           zoom={flameDescriptor.renderSettings.camera.zoom}
           setZoom={setFlameZoom}
@@ -335,7 +348,6 @@ function App(props: AppProps) {
                     <Cross />
                   </button>
                   <div
-                    // class={ui.transformGridRow}
                     classList={{
                       [ui.transformGridRow]: true,
                       [ui.transformGridFirstRow]: true,
@@ -516,7 +528,7 @@ function App(props: AppProps) {
                 formatValue={(value) => value.toString()}
               />
               <label class={ui.labeledInput}>
-                Draw Mode
+                <span>Draw Mode</span>
                 <select
                   class={ui.select}
                   value={flameDescriptor.renderSettings.drawMode}
@@ -536,7 +548,7 @@ function App(props: AppProps) {
                 <span></span>
               </label>
               <label class={ui.labeledInput}>
-                Color Init Mode
+                <span>Color Init Mode</span>
                 <select
                   class={ui.select}
                   value={flameDescriptor.renderSettings.colorInitMode}
@@ -558,7 +570,7 @@ function App(props: AppProps) {
                 <span></span>
               </label>
               <label class={ui.labeledInput}>
-                Background Color
+                <span>Background Color</span>
                 <ColorPicker
                   value={
                     flameDescriptor.renderSettings.backgroundColor
@@ -576,7 +588,7 @@ function App(props: AppProps) {
                 when={
                   flameDescriptor.renderSettings.backgroundColor !== undefined
                 }
-                fallback={<span />}
+                fallback={<span class={ui.noSelect} />}
               >
                 <Button
                   onClick={() => {
@@ -609,7 +621,7 @@ function App(props: AppProps) {
             </Card>
             <Card>
               <label class={ui.labeledInput}>
-                Adaptive filter
+                <span>Adaptive filter</span>
                 <Checkbox
                   checked={adaptiveFilterEnabled()}
                   onChange={(checked) => setAdaptiveFilterEnabled(checked)}
@@ -660,14 +672,32 @@ export function Wrappers() {
     return undefined
   })
 
+  const errorHandler = (err: unknown, _: () => void) => {
+    if (err instanceof Error) {
+      if (err.cause === 'WebGPU') {
+        return <WebgpuNotSupported />
+      }
+    }
+    console.error(err)
+    return <AppCrashed />
+  }
+
   return (
     <ThemeContextProvider>
       <Modal>
-        <Suspense>
-          <Show when={flameFromQuery.state === 'ready'}>
-            <App flameFromQuery={flameFromQuery()} />
-          </Show>
-        </Suspense>
+        <ErrorBoundary fallback={errorHandler}>
+          <Root
+            adapterOptions={{
+              powerPreference: 'high-performance',
+            }}
+          >
+            <Suspense>
+              <Show when={flameFromQuery.state === 'ready'}>
+                <App flameFromQuery={flameFromQuery()} />
+              </Show>
+            </Suspense>
+          </Root>
+        </ErrorBoundary>
       </Modal>
     </ThemeContextProvider>
   )
