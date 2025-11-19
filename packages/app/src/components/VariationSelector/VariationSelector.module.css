@@ -139,6 +139,12 @@
   }
 }
 
+.canvas {
+    image-rendering: pixelated;
+    /* allow pointer events to act correctly on touch devices */
+    touch-action: none;
+}
+
 .flame-preview {
   grid-area: flame;
   display: grid;
