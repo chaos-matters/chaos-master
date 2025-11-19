@@ -56,7 +56,7 @@ function PreviewFinalFlame(props: {
 }) {
   return (
     <Root adapterOptions={{ powerPreference: 'high-performance' }}>
-      <AutoCanvas pixelRatio={1}>
+      <AutoCanvas class={ui.canvas} pixelRatio={1}>
         <WheelZoomCamera2D
           zoom={[
             () => props.flame.renderSettings.camera.zoom,
@@ -85,7 +85,7 @@ function PreviewFinalFlame(props: {
 function VariationPreview(props: { flame: FlameDescriptor }) {
   return (
     <Root adapterOptions={{ powerPreference: 'high-performance' }}>
-      <AutoCanvas pixelRatio={1}>
+      <AutoCanvas class={ui.canvas} pixelRatio={1}>
         <Camera2D
           position={vec2f(...props.flame.renderSettings.camera.position)}
           zoom={props.flame.renderSettings.camera.zoom}
