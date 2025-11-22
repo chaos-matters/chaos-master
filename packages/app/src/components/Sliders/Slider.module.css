@@ -12,6 +12,11 @@
   }
 }
 
+.label span {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 .label {
   display: contents;
   color: var(--color);
@@ -22,49 +27,21 @@
   }
 }
 
-.value {
-  justify-self: end;
-}
-
-.slider {
-  appearance: none;
-  background: transparent;
-  outline: none;
+.slider-wrapper {
+  display: block;
   position: relative;
-  margin: 0;
-
-  /* when scrolling into view on change, how much to over-scroll */
-  scroll-margin-block: 8rem;
-
-  &::-webkit-slider-thumb {
-    appearance: none;
-    width: 14px;
-    height: 14px;
-    border-radius: var(--round);
-    cursor: pointer;
-
-    background: linear-gradient(
-      to bottom,
-      oklab(from var(--color) calc(l + 0.2) a b),
-      var(--color)
-    );
-  }
-
-  [data-theme='dark'] &::-webkit-slider-thumb {
-    background: linear-gradient(
-      to bottom,
-      var(--color),
-      oklab(from var(--color) calc(l * 0.75) a b)
-    );
-  }
-
   /* track */
   isolation: isolate; /* allows sorting the track below the thumb */
+
+  /* make the grab area a bit bigger than slider itself */
+  height: 20px;
+
   &::before {
     display: block;
     position: absolute;
     border-radius: var(--round);
     content: '';
+    height: 4px;
     left: 0;
     right: 0;
     top: calc(50% - 2px);
@@ -74,8 +51,6 @@
       var(--track-color-filled) var(--fill-percent),
       var(--track-color-empty) var(--fill-percent)
     );
-    height: 4px;
-    z-index: -1;
   }
 
   &.animate-fill::before {
@@ -99,6 +74,78 @@
     background-size:
       100% 100%,
       200% 100%;
+  }
+}
+
+.value {
+  justify-self: end;
+}
+
+.slider {
+  appearance: none;
+  background: transparent;
+  outline: none;
+  position: absolute;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+
+  /* when scrolling into view on change, how much to over-scroll */
+  scroll-margin-block: 8rem;
+  &::-moz-range-track {
+    background: transparent;
+    border: none;
+    height: 100%;
+  }
+  &::-webkit-slider-runnable-track {
+    background: transparent;
+    border: none;
+    height: 100%;
+  }
+
+  &::-moz-range-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: var(--round);
+    cursor: pointer;
+    /* TODO: positioning slider thumb really hardcoded, any better way of doing this? */
+    margin-top: 0.18rem;
+
+    background: linear-gradient(
+      to bottom,
+      oklab(from var(--color) calc(l + 0.2) a b),
+      var(--color)
+    );
+  }
+  &::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: var(--round);
+    cursor: pointer;
+    /* TODO: positioning slider thumb really hardcoded, any better way of doing this? */
+    margin-top: 0.18rem;
+
+    background: linear-gradient(
+      to bottom,
+      oklab(from var(--color) calc(l + 0.2) a b),
+      var(--color)
+    );
+  }
+  [data-theme='dark'] &::-moz-range-thumb {
+    background: linear-gradient(
+      to bottom,
+      var(--color),
+      oklab(from var(--color) calc(l * 0.75) a b)
+    );
+  }
+  [data-theme='dark'] &::-webkit-slider-thumb {
+    background: linear-gradient(
+      to bottom,
+      var(--color),
+      oklab(from var(--color) calc(l * 0.75) a b)
+    );
   }
 }
 

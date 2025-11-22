@@ -33,7 +33,7 @@ export function DebugPanel() {
 
   return (
     <Show when={showDebugPanel()}>
-      <div class={ui.appInfo}>
+      <div class={ui.debugInfo}>
         <p>
           {bigNumberFormatter.format(accumulatedPointCount())} /{' '}
           {bigNumberFormatter.format(qualityPointCountLimit()())} Iters

@@ -23,12 +23,29 @@ export function useElementSize(
       return
     }
     const observer = new ResizeObserver((entries) => {
-      const contentBox = entries[0]?.contentBoxSize[0]
-      const pixelContentBox = entries[0]?.devicePixelContentBoxSize[0]
+      let pixelContentBox
+      let contentBox
+      const entry = entries[0]!
+
+      if (!Array.isArray(entry.devicePixelContentBoxSize)) {
+        // Safari support (ios)
+        contentBox = Array.isArray(entry.contentBoxSize)
+          ? entry.contentBoxSize[0]
+          : entry.contentBoxSize
+
+        const dpr = window.devicePixelRatio || 1
+        pixelContentBox = {
+          inlineSize: contentBox.inlineSize * dpr,
+          blockSize: contentBox.blockSize * dpr,
+        }
+      } else {
+        contentBox = entry.contentBoxSize[0]
+        pixelContentBox = entry.devicePixelContentBoxSize[0]
+      }
       // Don't measure the element if not connected to the document.
       // Element existing but not connected to document can happen while
       // Suspense mechanism is rendering the fallback.
-      if (!t.isConnected || !contentBox || !pixelContentBox) {
+      if (!t.isConnected) {
         return
       }
       const width = contentBox.inlineSize

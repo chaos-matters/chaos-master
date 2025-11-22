@@ -1,5 +1,6 @@
 import { createResource, For, Show, Suspense } from 'solid-js'
 import { GitHub } from '@/icons'
+import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
 import { formatBytes } from '@/utils/formatBytes'
 import { VERSION } from '@/version'
 import { useRequestModal } from '../Modal/ModalContext'
@@ -43,9 +44,11 @@ const shortcuts: ShortcutDescriptor[] = [
   },
 ]
 
+const { navigator } = globalThis
+
 function isMac() {
   // eslint-disable-next-line @typescript-eslint/no-deprecated
-  return globalThis.navigator.platform.indexOf('Mac') !== -1
+  return navigator.platform.indexOf('Mac') !== -1
 }
 
 const ctrlKey = isMac() ? '⌘ ' : 'Ctrl + '
@@ -61,17 +64,11 @@ function KeyCombination(props: { keyCombination: KeyCombination }) {
   )
 }
 
-const { navigator } = globalThis
-
 async function getGPUDeviceInformation() {
-  const adapter = await navigator.gpu.requestAdapter({
+  const { adapter } = await getWebgpuComponents({
     powerPreference: 'high-performance',
   })
-  if (!adapter) {
-    throw new Error(`WebGPU is not supported`)
-  }
   const { info, limits } = adapter
-
   // This property exists only when WebGPU Developer Features flag is set
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const memoryHeaps: { size: number }[] | undefined = (info as any).memoryHeaps

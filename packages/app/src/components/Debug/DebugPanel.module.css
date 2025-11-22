@@ -1,4 +1,4 @@
-.appInfo {
+.debug-info {
   --color: var(--neutral-500);
   --color-hover: black;
   --bg-color: #fffd;
@@ -10,7 +10,7 @@
   }
 }
 
-.appInfo {
+.debug-info {
   position: absolute;
   color: var(--color);
   padding-inline: var(--space-2);
@@ -28,4 +28,7 @@
   &:hover {
     color: var(--color-hover);
   }
+
+  user-select: none;
+  -webkit-user-select: none;
 }

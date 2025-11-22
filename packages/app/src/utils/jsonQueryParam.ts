@@ -24,10 +24,25 @@ export async function compressJsonQueryParam(obj: unknown) {
   await writer.write(JSON.stringify(obj))
   await writer.close()
 
+  const compressReader = compress.readable.getReader()
   const chunks = []
-  for await (const chunk of compress.readable) {
-    chunks.push(chunk)
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    while (true) {
+      const { done, value } = await compressReader.read()
+      if (done) {
+        break
+      }
+      chunks.push(value)
+    }
+  } finally {
+    compressReader.releaseLock()
   }
+  // TODO: figure out why this works everywhere but not on ios (safari v26)
+  // for await (const chunk of compress.readable) {
+  //   console.info('Chunk', chunk.length)
+  //   chunks.push(chunk)
+  // }
   return concatBuffers(chunks)
 }
 
@@ -54,5 +69,6 @@ export async function decompressJsonQuery(compressedBytes: Uint8Array) {
 }
 
 export async function decodeJsonQueryParam(param: string) {
+  console.info('Decode...')
   return decompressJsonQuery(decodeBase64(param))
 }

@@ -36,10 +36,10 @@ type Flam3Props = {
   quality: number
   pointCountPerBatch: number
   renderInterval: number
-  onExportImage: ExportImageType | undefined
   adaptiveFilterEnabled: boolean
   flameDescriptor: FlameDescriptor
   edgeFadeColor: v4f
+  onExportImage?: ExportImageType
   setCurrentQuality?: (fn: () => number) => void
   setQualityPointCountLimit?: (fn: () => number) => void
 }

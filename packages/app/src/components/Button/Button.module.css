@@ -25,6 +25,8 @@
   padding: var(--space-2);
   line-height: 1;
   font-size: small;
+  user-select: none;
+  -webkit-user-select: none;
 
   /* increase horizontal padding if no icon is present */
   &:not(:has(svg)) {

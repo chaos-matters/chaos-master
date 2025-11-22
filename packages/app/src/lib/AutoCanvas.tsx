@@ -1,5 +1,6 @@
 import { createEffect, createSignal, Show } from 'solid-js'
 import { useElementSize } from '@/utils/useElementSize'
+import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { CanvasContextProvider } from './CanvasContext'
 import { useRootContext } from './RootContext'
 import type { ParentProps } from 'solid-js'
@@ -12,10 +13,14 @@ const { min, max, floor } = Math
 type AutoCanvasProps = {
   class?: string
   pixelRatio?: number
+  onVisibilityChange?: (isVisible: boolean) => void
 }
 
 export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
   const { device } = useRootContext()
+
+  let canEl: HTMLCanvasElement | null
+  const [canvas, setCanvas] = createSignal<HTMLCanvasElement>()
 
   const scaledCanvasSize = (size: ElementSize): ElementSize => {
     const pixelRatio = props.pixelRatio ?? 1
@@ -27,7 +32,6 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
     }
   }
 
-  const [canvas, setCanvas] = createSignal<HTMLCanvasElement>()
   const canvasSize = useElementSize(
     () => canvas()?.parentElement,
     (size) => {
@@ -55,10 +59,11 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
     el.height = heightPX
   })
 
-  function createContext(canvas: HTMLCanvasElement) {
-    const context = canvas.getContext('webgpu')
+  function createContext(canEl: HTMLCanvasElement) {
     const canvasFormat = navigator.gpu.getPreferredCanvasFormat()
+    const context = canEl.getContext('webgpu')
     if (!context) {
+      console.info('Context not available for some reason', context)
       throw new Error(`GPUCanvasContext failed to initialize.`)
     }
     context.configure({
@@ -69,9 +74,23 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
     return { context, canvasFormat }
   }
 
+  createEffect(() => {
+    if (canEl) {
+      setCanvas(canEl)
+      if (props.onVisibilityChange) {
+        useIntersectionObserver(canvas, props.onVisibilityChange)
+      }
+    }
+  })
+
   return (
     <>
-      <canvas ref={setCanvas} class={props.class} />
+      <canvas
+        ref={(el) => {
+          canEl = el
+        }}
+        class={props.class}
+      />
       <Show when={canvas()} keyed>
         {(canvas) => (
           <CanvasContextProvider

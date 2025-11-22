@@ -140,9 +140,9 @@
 }
 
 .canvas {
-    image-rendering: pixelated;
-    /* allow pointer events to act correctly on touch devices */
-    touch-action: none;
+  image-rendering: pixelated;
+  /* allow pointer events to act correctly on touch devices, use only on dynamic (move/zoom) canvases */
+  touch-action: none;
 }
 
 .flame-preview {

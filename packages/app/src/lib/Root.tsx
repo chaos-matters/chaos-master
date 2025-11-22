@@ -1,10 +1,9 @@
 import { createResource, onCleanup, Show } from 'solid-js'
 import { tgpu } from 'typegpu'
+import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
 import { RootContextProvider } from './RootContext'
 import type { ParentProps } from 'solid-js'
 import type { TgpuRoot } from 'typegpu'
-
-const { navigator } = window
 
 type RootProps = {
   adapterOptions?: GPURequestAdapterOptions
@@ -12,24 +11,23 @@ type RootProps = {
 
 export function Root(props: ParentProps<RootProps>) {
   const [webgpu] = createResource(
-    () => ({ adapterOptions: props.adapterOptions }),
+    () => ({
+      adapterOptions: props.adapterOptions,
+    }),
     async ({ adapterOptions }) => {
       let root: TgpuRoot | undefined = undefined
-      let device: GPUDevice | undefined = undefined
       onCleanup(() => {
         root?.destroy()
-        device?.destroy()
+        // Unsupported in some browsers, firefox crashes when this gets run
+        //  with new WebGPU singleton interface, the devices should not be destroyed here
+        // device?.destroy()
       })
-      const adapter = await navigator.gpu.requestAdapter(adapterOptions)
-      if (!adapter) {
-        throw new Error(
-          `Failed to get GPUAdapter, make sure to use a browser with WebGPU support.`,
-        )
-      }
-      console.info(`Using ${adapter.info.vendor} adapter.`)
-      device = await adapter.requestDevice({
+
+      const { adapter, device } = await getWebgpuComponents(adapterOptions, {
         requiredFeatures: ['timestamp-query'],
       })
+
+      // TODO: see whether it makes sense to make tgpu singleton as well, check docs
       root = tgpu.initFromDevice({ device })
       return { adapter, device, root }
     },

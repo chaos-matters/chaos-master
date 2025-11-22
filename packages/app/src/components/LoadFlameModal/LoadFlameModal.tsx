@@ -19,7 +19,11 @@ const CANCEL = 'cancel'
 
 function Preview(props: { flameDescriptor: FlameDescriptor }) {
   return (
-    <Root adapterOptions={{ powerPreference: 'high-performance' }}>
+    <Root
+      adapterOptions={{
+        powerPreference: 'high-performance',
+      }}
+    >
       <AutoCanvas pixelRatio={1}>
         <Camera2D
           position={vec2f(
@@ -46,19 +50,55 @@ type LoadFlameModalProps = {
   respond: (flameDescriptor: FlameDescriptor | typeof CANCEL) => void
 }
 
+// cross-browser PNG file picker
+// - uses File System Access API when available (Chromium)
+// - falls back to a hidden <input type="file"> for Firefox and Safari (including iOS)
+async function pickPngFile(): Promise<File | null> {
+  try {
+    if ('showOpenFilePicker' in window) {
+      const fileHandles = await window
+        .showOpenFilePicker({
+          id: 'load-flame-from-file',
+          types: [{ accept: { 'image/png': ['.png'] } }],
+        })
+        .catch(() => undefined)
+      if (!fileHandles) {
+        return null
+      }
+      const [fileHandle] = fileHandles
+      return await fileHandle.getFile()
+    }
+  } catch (_) {
+    // fall through to input-based picker any failure
+  }
+
+  // fallback: hidden input element (works on Firefox and Safari/iOS)
+  return await new Promise<File | null>((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/png,.png'
+    input.style.position = 'fixed'
+    input.style.left = '-9999px'
+    input.style.width = '1px'
+    input.style.height = '1px'
+    input.addEventListener('change', () => {
+      const file = input.files && input.files[0] ? input.files[0] : null
+      resolve(file ?? null)
+      input.remove()
+    })
+    input.addEventListener('cancel', () => {
+      resolve(null)
+      input.remove()
+    })
+    document.body.appendChild(input)
+    input.click()
+  })
+}
+
 function LoadFlameModal(props: LoadFlameModalProps) {
   async function loadFromFile() {
-    const fileHandles = await window
-      .showOpenFilePicker({
-        id: 'load-flame-from-file',
-        types: [{ accept: { 'image/png': ['.png'] } }],
-      })
-      .catch(() => undefined)
-    if (!fileHandles) {
-      return
-    }
-    const [fileHandle] = fileHandles
-    const file = await fileHandle.getFile()
+    const file = await pickPngFile()
+    if (!file) return
     const arrBuf = new Uint8Array(await file.arrayBuffer())
     try {
       const flameDescriptor = await extractFlameFromPng(arrBuf)
