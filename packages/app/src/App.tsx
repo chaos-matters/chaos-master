@@ -12,7 +12,6 @@ import { createStore } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { vec2f, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
-import { exportPngIOS, isIOS } from '@/appleUtils'
 import { recordEntries, recordKeys } from '@/utils/record'
 import ui from './App.module.css'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
@@ -217,12 +216,13 @@ function App(props: AppProps) {
       return true
     },
   })
-  const exportPng = (canvas: HTMLCanvasElement, flame: FlameDescriptor) => {
+  const exportCanvasImage = (canvas: HTMLCanvasElement) => {
+    setOnExportImage(undefined)
     canvas.toBlob(async (blob) => {
       if (!blob) return
       const imgData = await blob.arrayBuffer()
       const pngBytes = new Uint8Array(imgData)
-      const encodedFlames = await compressJsonQueryParam(flame)
+      const encodedFlames = await compressJsonQueryParam(flameDescriptor)
       const imgExtData = addFlameDataToPng(encodedFlames, pngBytes)
       const fileUrlExt = URL.createObjectURL(imgExtData)
       const downloadLink = window.document.createElement('a')
@@ -230,15 +230,6 @@ function App(props: AppProps) {
       downloadLink.download = 'flame.png'
       downloadLink.click()
     })
-  }
-  const exportCanvasImage = (canvas: HTMLCanvasElement) => {
-    console.info('Exporting image...image?')
-    setOnExportImage(undefined)
-    if (isIOS()) {
-      exportPngIOS(canvas, flameDescriptor)
-    } else {
-      exportPng(canvas, flameDescriptor)
-    }
   }
 
   createEffect(() => {
