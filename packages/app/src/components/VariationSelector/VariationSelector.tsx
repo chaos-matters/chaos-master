@@ -6,6 +6,7 @@ import { clamp } from 'typegpu/std'
 import { ChangeHistoryContextProvider } from '@/contexts/ChangeHistoryContext'
 import {
   DEFAULT_VARIATION_PREVIEW_POINT_COUNT,
+  DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS,
   DEFAULT_VARIATION_SHOW_DELAY_MS,
 } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
@@ -27,7 +28,6 @@ import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { createStoreHistory } from '@/utils/createStoreHistory'
 import { recordEntries } from '@/utils/record'
-import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
 import { AffineEditor } from '../AffineEditor/AffineEditor'
 import { Button } from '../Button/Button'
@@ -72,7 +72,7 @@ function PreviewFinalFlame(props: {
             pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT}
             adaptiveFilterEnabled={false}
             flameDescriptor={props.flame}
-            renderInterval={10}
+            renderInterval={DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS}
             edgeFadeColor={vec4f(0)}
           />
         </WheelZoomCamera2D>
@@ -82,9 +82,15 @@ function PreviewFinalFlame(props: {
 }
 
 function VariationPreview(props: { flame: FlameDescriptor }) {
+  const [renderInterval, setRenderInterval] = createSignal<number>(Infinity)
+  const onVisibilityChange = (isVisible: boolean) => {
+    setRenderInterval(
+      isVisible ? DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS : Infinity,
+    )
+  }
   return (
     <>
-      <AutoCanvas pixelRatio={1}>
+      <AutoCanvas onVisibilityChange={onVisibilityChange} pixelRatio={1}>
         <Camera2D
           position={vec2f(...props.flame.renderSettings.camera.position)}
           zoom={props.flame.renderSettings.camera.zoom}
@@ -94,7 +100,7 @@ function VariationPreview(props: { flame: FlameDescriptor }) {
             pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT}
             adaptiveFilterEnabled={false}
             flameDescriptor={props.flame}
-            renderInterval={10}
+            renderInterval={renderInterval()}
             edgeFadeColor={vec4f(0)}
           />
         </Camera2D>
@@ -115,7 +121,6 @@ type VariationSelectorModalProps = {
   variationId: VariationId
   respond: (value: RespondType) => void
 }
-const lazyLoadAmount = 10
 const variationPreviewFlames: Record<string, FlameDescriptor> =
   Object.fromEntries(
     variationTypes.map((name) => [name, getVariationPreviewFlame(name)]),
@@ -130,20 +135,6 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
     string | null
   >(null)
   const [touchlessPreview, setTouchlessPreview] = createSignal<boolean>(true)
-  const [examplesShown, setExamplesShown] = createSignal<number>(lazyLoadAmount)
-  const loadMoreExamples = () => {
-    setExamplesShown((prev) =>
-      Math.min(prev + lazyLoadAmount, variationTypes.length),
-    )
-  }
-  const [sentinel, setSentinel] = createSignal<HTMLDivElement | null>(null)
-  const [scrollableSidebar, setScrollableSidebar] =
-    createSignal<HTMLDivElement | null>(null)
-  useIntersectionObserver(
-    () => sentinel(),
-    () => scrollableSidebar(),
-    loadMoreExamples,
-  )
 
   const [previewFlame, setPreviewFlame] = createStoreHistory(
     createStore<FlameDescriptor>(structuredClone(props.currentFlame)),
@@ -292,7 +283,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
         <span class={ui.undoMessage}>You can undo this operation.</span>
       </ModalTitleBar>
       <section class={ui.variationPreview}>
-        <div ref={setScrollableSidebar} class={ui.variationSelectorSidebar}>
+        <div class={ui.variationSelectorSidebar}>
           <section class={ui.gallery}>
             <For each={recordEntries(variationExamples)}>
               {([id, variationExample], i) => {
@@ -300,39 +291,36 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                 return (
                   variation && (
                     // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-                    <Show when={i() < examplesShown()}>
-                      <div>
-                        <button
-                          class={ui.item}
-                          classList={{
-                            [ui.selected]: selectedItemId() === id,
-                          }}
-                          onClick={() => {
-                            toggleSelectedItem(id)
-                          }}
-                          onMouseEnter={() => {
-                            if (touchlessPreview()) {
-                              setPreviewSelection(id)
-                            }
-                          }}
-                          onMouseLeave={() => {
-                            setPreviewSelection(null)
-                          }}
+                    <div>
+                      <button
+                        class={ui.item}
+                        classList={{
+                          [ui.selected]: selectedItemId() === id,
+                        }}
+                        onClick={() => {
+                          toggleSelectedItem(id)
+                        }}
+                        onMouseEnter={() => {
+                          if (touchlessPreview()) {
+                            setPreviewSelection(id)
+                          }
+                        }}
+                        onMouseLeave={() => {
+                          setPreviewSelection(null)
+                        }}
+                      >
+                        <DelayedShow
+                          delayMs={i() * DEFAULT_VARIATION_SHOW_DELAY_MS}
                         >
-                          <DelayedShow
-                            delayMs={i() * DEFAULT_VARIATION_SHOW_DELAY_MS}
-                          >
-                            <VariationPreview flame={variationExample} />
-                          </DelayedShow>
-                          <div class={ui.itemTitle}>{variation.type}</div>
-                        </button>
-                      </div>
-                    </Show>
+                          <VariationPreview flame={variationExample} />
+                        </DelayedShow>
+                        <div class={ui.itemTitle}>{variation.type}</div>
+                      </button>
+                    </div>
                   )
                 )
               }}
             </For>
-            <div ref={setSentinel} class={ui.sentinel}></div>
           </section>
         </div>
 
