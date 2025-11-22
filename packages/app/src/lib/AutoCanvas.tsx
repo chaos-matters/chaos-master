@@ -1,5 +1,6 @@
 import { createEffect, createSignal, Show } from 'solid-js'
 import { useElementSize } from '@/utils/useElementSize'
+import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { CanvasContextProvider } from './CanvasContext'
 import { useRootContext } from './RootContext'
 import type { ParentProps } from 'solid-js'
@@ -12,6 +13,7 @@ const { min, max, floor } = Math
 type AutoCanvasProps = {
   class?: string
   pixelRatio?: number
+  onVisibilityChange?: (isVisible: boolean) => void
 }
 
 export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
@@ -75,12 +77,20 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
   createEffect(() => {
     if (canEl) {
       setCanvas(canEl)
+      if (props.onVisibilityChange) {
+        useIntersectionObserver(canvas, props.onVisibilityChange)
+      }
     }
   })
 
   return (
     <>
-      <canvas ref={(el) => (canEl = el)} class={props.class} />
+      <canvas
+        ref={(el) => {
+          canEl = el
+        }}
+        class={props.class}
+      />
       <Show when={canvas()} keyed>
         {(canvas) => (
           <CanvasContextProvider
