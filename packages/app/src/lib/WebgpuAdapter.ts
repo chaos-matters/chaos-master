@@ -3,7 +3,7 @@ let gpuAdapter: GPUAdapter | null = null
 
 const { navigator } = globalThis
 
-function failIfWebgpuAdapterUnavailable(
+function assertIfWebgpuAdapterUnavailable(
   adapter: GPUAdapter | null,
 ): asserts adapter {
   if (!adapter) {
@@ -15,7 +15,7 @@ function failIfWebgpuAdapterUnavailable(
   }
 }
 
-function failIfWebgpuDeviceUnavailable(
+function assertIfWebgpuDeviceUnavailable(
   device: GPUDevice | null,
 ): asserts device {
   if (!device) {
@@ -27,7 +27,7 @@ function failIfWebgpuDeviceUnavailable(
   }
 }
 
-function failIfWebgpuUnsupported() {
+function assertIfWebgpuUnsupported() {
   // Check to ensure the user agent supports WebGPU.
   if (!('gpu' in navigator)) {
     console.error('User agent doesn’t support WebGPU.')
@@ -38,7 +38,7 @@ function failIfWebgpuUnsupported() {
   }
 }
 
-function failIfRequiredWebgpuFeaturesNotAvailable(
+function assertRequiredWebgpuFeaturesNotAvailable(
   adapter: GPUAdapter,
   requiredFeatures: Iterable<GPUFeatureName>,
 ) {
@@ -56,7 +56,7 @@ export async function initializeWebgpuDevice(
   adapterPreferences?: GPURequestAdapterOptions,
   deviceFeatures?: GPUDeviceDescriptor,
 ) {
-  failIfWebgpuUnsupported()
+  assertIfWebgpuUnsupported()
 
   // Request an adapter.
   gpuAdapter = await navigator.gpu.requestAdapter({
@@ -64,7 +64,7 @@ export async function initializeWebgpuDevice(
   })
 
   // requestAdapter may resolve with null if no suitable adapters are found.
-  failIfWebgpuAdapterUnavailable(gpuAdapter)
+  assertIfWebgpuAdapterUnavailable(gpuAdapter)
   if (gpuAdapter.info.vendor !== '') {
     console.info(`Using ${gpuAdapter.info.vendor} WebGPU adapter.`)
   }
@@ -73,15 +73,10 @@ export async function initializeWebgpuDevice(
   // Note that the promise will reject if invalid options are passed to the optional
   // dictionary. To avoid the promise rejecting always check any features and limits
   // against the adapters features and limits prior to calling requestDevice().
-  if (
-    deviceFeatures !== undefined &&
-    deviceFeatures.requiredFeatures !== undefined
-  ) {
-    failIfRequiredWebgpuFeaturesNotAvailable(
-      gpuAdapter,
-      deviceFeatures.requiredFeatures,
-    )
-  }
+  assertRequiredWebgpuFeaturesNotAvailable(
+    gpuAdapter,
+    deviceFeatures?.requiredFeatures ?? [],
+  )
   gpuDevice = await gpuAdapter.requestDevice(deviceFeatures)
 
   // requestDevice will never return null, but if a valid device request can’t be
@@ -116,7 +111,7 @@ export async function getWebgpuComponents(
     await initializeWebgpuDevice(adapterPreferences, deviceFeatures)
   }
 
-  failIfWebgpuAdapterUnavailable(gpuAdapter)
-  failIfWebgpuDeviceUnavailable(gpuDevice)
+  assertIfWebgpuAdapterUnavailable(gpuAdapter)
+  assertIfWebgpuDeviceUnavailable(gpuDevice)
   return { adapter: gpuAdapter, device: gpuDevice }
 }

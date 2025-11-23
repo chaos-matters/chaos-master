@@ -35,7 +35,7 @@ export function encodeBase64(
   return base64
 }
 
-export function decodeBase64(base64: string): Uint8Array {
+export function decodeBase64(base64: string): Uint8Array<ArrayBuffer> {
   let bufferLength = (base64.length * 3) / 4
 
   if (base64.at(-1) === '=') {
