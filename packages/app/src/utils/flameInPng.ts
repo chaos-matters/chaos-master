@@ -26,10 +26,7 @@ function getUint32ValueInArrayBuffer(value: number) {
   return new Uint8Array(buffer)
 }
 
-function insertZtxtChunk(
-  imageData: Uint8Array,
-  encodedDataBytes: Uint8Array,
-): Uint8Array {
+function insertZtxtChunk(imageData: Uint8Array, encodedDataBytes: Uint8Array) {
   // construct zTXt chunk data: [keywordBytes] + [compressionMethod] + [encodedData]
   const ztxtChunkData = concatBuffers([
     keywordBytes,

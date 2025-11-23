@@ -63,7 +63,6 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
     const canvasFormat = navigator.gpu.getPreferredCanvasFormat()
     const context = canEl.getContext('webgpu')
     if (!context) {
-      console.info('Context not available for some reason', context)
       throw new Error(`GPUCanvasContext failed to initialize.`)
     }
     context.configure({
