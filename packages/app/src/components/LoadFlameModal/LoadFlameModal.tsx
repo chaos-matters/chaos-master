@@ -50,9 +50,6 @@ type LoadFlameModalProps = {
   respond: (flameDescriptor: FlameDescriptor | typeof CANCEL) => void
 }
 
-// cross-browser PNG file picker
-// - uses File System Access API when available (Chromium)
-// - falls back to a hidden <input type="file"> for Firefox and Safari (including iOS)
 async function pickPngFile(): Promise<File | null> {
   try {
     if ('showOpenFilePicker' in window) {
@@ -103,7 +100,8 @@ function LoadFlameModal(props: LoadFlameModalProps) {
     try {
       const flameDescriptor = await extractFlameFromPng(arrBuf)
       props.respond(flameDescriptor)
-    } catch (_) {
+    } catch (err) {
+      console.warn(err)
       alert(`No valid flame found in '${file.name}'.`)
     }
   }

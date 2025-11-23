@@ -25,7 +25,10 @@ export function useElementSize(
     const observer = new ResizeObserver((entries) => {
       let pixelContentBox
       let contentBox
-      const entry = entries[0]!
+      const entry = entries[0]
+      if (!entry) {
+        return
+      }
 
       if (!Array.isArray(entry.devicePixelContentBoxSize)) {
         // Safari support (ios)

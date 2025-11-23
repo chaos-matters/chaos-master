@@ -20,7 +20,7 @@ import type { Bucket } from './types'
 import type { CameraContext } from '@/lib/CameraContext'
 
 const { ceil } = Math
-const IFS_GROUP_SIZE = 32
+const IFS_GROUP_SIZE = 64
 
 export function createIFSPipeline(
   root: TgpuRoot,
