@@ -65,6 +65,8 @@ function KeyCombination(props: { keyCombination: KeyCombination }) {
 }
 
 async function getGPUDeviceInformation() {
+  // theoretically getting a new adapter seems better here, as we should not
+  // hold onto adapters after a device was created from it
   const { adapter } = await getWebgpuComponents({
     powerPreference: 'high-performance',
   })

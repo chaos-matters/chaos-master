@@ -16,7 +16,18 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
   )
 }
 
-render(() => <Wrappers />, root)
+let dispose: () => void
+function mount() {
+  if (root) {
+    dispose = render(() => <Wrappers />, root)
+  }
+}
+export function reloadApp() {
+  dispose()
+  mount()
+}
+mount()
+
 inject({
   mode: import.meta.env.PROD ? 'production' : 'development',
 })

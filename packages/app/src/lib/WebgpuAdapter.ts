@@ -1,3 +1,5 @@
+import { reloadApp } from '..'
+
 let gpuDevice: GPUDevice | null = null
 let gpuAdapter: GPUAdapter | null = null
 
@@ -32,7 +34,7 @@ function assertIfWebgpuUnsupported() {
   if (!('gpu' in navigator)) {
     console.error('User agent doesn’t support WebGPU.')
     throw new Error(
-      `Failed to get GPUAdapter, make sure to use a browser with webgpu support.`,
+      `Failed to initialize application, make sure to use a browser with webgpu support.`,
       { cause: 'WebGPU' },
     )
   }
@@ -89,6 +91,7 @@ export async function initializeWebgpuDevice(
       console.warn(`WebGPU device was lost: ${info.message}`)
 
       gpuAdapter = null
+      gpuDevice = null
 
       // Many causes for lost devices are transient, so applications should try getting a
       // new device once a previous one has been lost unless the loss was caused by the
@@ -96,8 +99,8 @@ export async function initializeWebgpuDevice(
       // created with the previous device (buffers, textures, etc.) will need to be
       // re-created with the new one.
       if (info.reason !== 'destroyed') {
-        console.info('Reinitializing Webgpu device...')
-        await initializeWebgpuDevice(adapterPreferences, deviceFeatures)
+        console.info('Reloading app because WebGPU device was lost...')
+        reloadApp()
       }
     })
     .catch(console.error)

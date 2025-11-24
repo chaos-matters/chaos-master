@@ -8,8 +8,8 @@ export function WebgpuNotSupported() {
         <h1 class={ui.title}>CHAOS MASTER</h1>
 
         <p class={ui.text}>
-          Your browser or device currently does not support{' '}
-          <strong>WebGPU</strong>.
+          Your browser or device currently cannot show <strong>WebGPU</strong>{' '}
+          graphics.
         </p>
 
         <a
@@ -23,7 +23,7 @@ export function WebgpuNotSupported() {
 
         <div class={ui.hint}>
           Try the latest Chrome, Firefox, or Safari (on supported hardware) for
-          the full experience.
+          the full experience or restart browser to try again.
         </div>
       </div>
     </div>
