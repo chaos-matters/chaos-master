@@ -1,21 +1,25 @@
-import { f32, struct, vec2f } from 'typegpu/data'
+import { f32, i32, struct, vec2f } from 'typegpu/data'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { parametricVariation } from './types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
+import { CheckboxEditor } from '@/components/Sliders/ParametricEditors/Checkbox'
+import { ComplexInfo } from '../simple/types'
 
 type InvCircleParams = Infer<typeof InvCircleParams>
-const InvCircleParams = struct({
+let InvCircleParams = struct({
   radius: f32,
   a: f32,
   b: f32,
+  restricted: i32,
 })
 
 const InvCircleParamsDefaults: InvCircleParams = {
   radius: 1,
   a: 0,
   b: 0,
+  restricted: 1,
 }
 
 const InvCircleParamsEditor: EditorFor<InvCircleParams> = (props) => (
@@ -38,6 +42,7 @@ const InvCircleParamsEditor: EditorFor<InvCircleParams> = (props) => (
       max={10}
       step={0.1}
     />
+    <CheckboxEditor {...editorProps(props, 'restricted', 'Restricted')} />
   </>
 )
 
@@ -53,6 +58,16 @@ export const invCircle = parametricVariation(
     const d2 = dx * dx + dy * dy
     // d2 should not be 0, Ic(0,0) = Inf, Ic(Inf) = 0
     const r2 = P.radius * P.radius
+    // restricted/unrestricted circle handling
+    ComplexInfo out; = {
+            
+            
+        }
+    if (P.restricted == 1) {
+      if (d2 < r2) {
+        _varInfo.restrictNext = 1
+      }
+    }
     const u = P.a + (r2 * dx) / d2
     const v = P.b + (r2 * dy) / d2
     return vec2f(u, v)

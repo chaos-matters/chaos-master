@@ -112,7 +112,7 @@ function newDefaultTransform(): TransformFunction {
       [generateVariationId()]: {
         type: 'invCircle',
         weight: 1,
-        params: { radius: 1, a: 0, b: 0 },
+        params: { radius: 1, a: 0, b: 0, restrictNext: 0, restricted: 1 },
       },
     },
   }
@@ -136,7 +136,9 @@ function App(props: AppProps) {
   const [flameDescriptor, setFlameDescriptor, history] = createStoreHistory(
     createStore(
       structuredClone(
-        props.flameFromQuery ? props.flameFromQuery : examples.invCircleFrac,
+        props.flameFromQuery
+          ? props.flameFromQuery
+          : examples.gridTestInvCircle,
       ),
     ),
   )

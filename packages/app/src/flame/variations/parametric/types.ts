@@ -2,7 +2,7 @@ import { tgpu } from 'typegpu'
 import { vec2f } from 'typegpu/data'
 import { structToSchema } from '@/utils/schemaUtil'
 import * as v from '@/valibot'
-import { VariationInfo } from '../simple/types'
+import { ComplexInfo, VariationInfo } from '../simple/types'
 import type { TgpuFn } from 'typegpu'
 import type { BaseData, Infer, v2f, Vec2f, WgslStruct } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
@@ -39,6 +39,20 @@ type ParametricVariation<
   >
 }
 
+type ComplexVariation<K extends string, T extends Record<string, BaseData>> = {
+  DescriptorSchema: ParametricVariationDescriptor<K, T>
+  paramStruct: WgslStruct<T>
+  paramDefaults: Infer<WgslStruct<T>>
+  editor: EditorFor<Infer<WgslStruct<T>>>
+  fn: TgpuFn<
+    (
+      pos: Vec2f,
+      variationInfo: typeof VariationInfo,
+      params: WgslStruct<T>,
+    ) => ComplexInfo
+  >
+}
+
 export function parametricVariationDescriptor<
   K extends string,
   T extends Record<string, BaseData>,
@@ -70,5 +84,28 @@ export function parametricVariation<
     paramDefaults,
     editor,
     fn: tgpu.fn([vec2f, VariationInfo, paramStruct], vec2f)(impl),
+  }
+}
+
+export function compexVariation<
+  K extends string,
+  T extends Record<string, BaseData>,
+>(
+  variationKey: K,
+  paramStruct: WgslStruct<T>,
+  paramDefaults: Infer<WgslStruct<T>>,
+  editor: EditorFor<Infer<WgslStruct<T>>>,
+  impl: (
+    pos: v2f,
+    varInfo: VariationInfo,
+    params: Infer<WgslStruct<T>>,
+  ) => ComplexInfo,
+): ComplexVariation<K, T> {
+  return {
+    DescriptorSchema: parametricVariationDescriptor(variationKey, paramStruct),
+    paramStruct,
+    paramDefaults,
+    editor,
+    fn: tgpu.fn([vec2f, VariationInfo, paramStruct], ComplexInfo)(impl),
   }
 }
