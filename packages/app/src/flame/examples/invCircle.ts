@@ -191,7 +191,7 @@ export const gridTestInvCircle = defineExample({
       variations: {
         bc571c35_0b03_4865_a765_d00cd71031a6: {
           type: 'invCircle',
-          params: { radius: 1, a: 0, b: 0, restrictNext: 0, restricted: 1 },
+          params: { radius: 1, cx: 0, cy: 0, restricted: 1 },
           weight: 1,
         },
       },

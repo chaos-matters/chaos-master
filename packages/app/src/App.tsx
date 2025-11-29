@@ -65,7 +65,11 @@ import {
   generateTransformId,
   generateVariationId,
 } from './flame/transformFunction'
-import { isParametricVariation, isVariationType } from './flame/variations'
+import {
+  isComplexVariation,
+  isParametricVariation,
+  isVariationType,
+} from './flame/variations'
 import { getParamsEditor, getVariationDefault } from './flame/variations/utils'
 import { Cross, Plus } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
@@ -112,7 +116,7 @@ function newDefaultTransform(): TransformFunction {
       [generateVariationId()]: {
         type: 'invCircle',
         weight: 1,
-        params: { radius: 1, a: 0, b: 0, restrictNext: 0, restricted: 1 },
+        params: { radius: 1, cx: 0, cy: 0, restricted: 1 },
       },
     },
   }
@@ -464,8 +468,11 @@ function App(props: AppProps) {
                           </button>
                         </div>
                         <Show
-                          // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-                          when={isParametricVariation(variation) && variation}
+                          when={
+                            (isParametricVariation(variation) ||
+                              isComplexVariation(variation)) &&
+                            variation
+                          }
                           keyed
                         >
                           {(variation) => (
@@ -478,7 +485,8 @@ function App(props: AppProps) {
                                       draft.transforms[tid]?.variations[vid]
                                     if (
                                       variationDraft === undefined ||
-                                      !isParametricVariation(variationDraft)
+                                      (!isParametricVariation(variationDraft) &&
+                                        !isComplexVariation(variationDraft))
                                     ) {
                                       throw new Error(`Unreachable code`)
                                     }

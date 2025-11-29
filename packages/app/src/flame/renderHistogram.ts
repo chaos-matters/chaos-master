@@ -2,6 +2,7 @@ import { tgpu } from 'typegpu'
 import { arrayOf, u32 } from 'typegpu/data'
 import { alphaBlend } from '@/utils/blendModes'
 import { wgsl } from '@/utils/wgsl'
+import { ComplexInfo } from './variations/parametric/types'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 
 const bindGroupLayout = tgpu
@@ -28,6 +29,7 @@ export function createRenderHistogramPipeline(
   const renderHistogramShaderCode = wgsl /* wgsl */ `
     ${{
       ...bindGroupLayout.bound,
+      ComplexInfo,
     }}
 
     struct VertexOutput {

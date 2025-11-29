@@ -1,7 +1,11 @@
 import { produce, unfreeze } from 'structurajs'
 import { defineExample } from '../examples/util'
 import { generateTransformId, generateVariationId } from '../transformFunction'
-import { isParametricVariationType, transformVariations } from '.'
+import {
+  isComplexVariationType,
+  isParametricVariationType,
+  transformVariations,
+} from '.'
 import type { FlameDescriptor } from '../schema/flameSchema'
 import type {
   ParametricVariationDescriptor,
@@ -14,7 +18,7 @@ export function getVariationDefault(
   type: TransformVariationType,
   weight: number,
 ): TransformVariationDescriptor {
-  if (!isParametricVariationType(type)) {
+  if (!isParametricVariationType(type) && !isComplexVariationType(type)) {
     return { type, weight } as TransformVariationDescriptor
   }
   return {

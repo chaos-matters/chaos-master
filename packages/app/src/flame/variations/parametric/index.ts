@@ -27,5 +27,8 @@ export const parametricVariations = {
   radialBlurVar,
   rectanglesVar,
   rings2,
+}
+
+export const complexVariations = {
   invCircle,
 }

@@ -1,11 +1,12 @@
 import { recordKeys } from '@/utils/record'
 import * as v from '@/valibot'
-import { parametricVariations } from './parametric'
+import { complexVariations, parametricVariations } from './parametric'
 import * as simpleVariations from './simple'
 
 export const transformVariations = {
   ...simpleVariations,
   ...parametricVariations,
+  ...complexVariations,
 }
 
 export type TransformVariationDescriptor = v.InferOutput<
@@ -25,7 +26,15 @@ type ParametricVariationType = (typeof parametricVariationTypes)[number]
 const parametricVariationTypes = Object.values(parametricVariations).map(
   (o) => o.DescriptorSchema.entries.type.literal,
 )
+type ComplexVariationType = (typeof complexVariationTypes)[number]
+const complexVariationTypes = Object.values(complexVariations).map(
+  (o) => o.DescriptorSchema.entries.type.literal,
+)
 
+export type ComplexVariationDescriptor = Extract<
+  TransformVariationDescriptor,
+  { type: ComplexVariationType }
+>
 export type ParametricVariationDescriptor = Extract<
   TransformVariationDescriptor,
   { type: ParametricVariationType }
@@ -36,11 +45,21 @@ export function isParametricVariationType(
 ): variationType is ParametricVariationType {
   return (parametricVariationTypes as string[]).includes(variationType)
 }
+export function isComplexVariationType(
+  variationType: TransformVariationType,
+): variationType is ComplexVariationType {
+  return (complexVariationTypes as string[]).includes(variationType)
+}
 
 export function isParametricVariation(
   v: TransformVariationDescriptor,
 ): v is ParametricVariationDescriptor {
   return isParametricVariationType(v.type)
+}
+export function isComplexVariation(
+  v: TransformVariationDescriptor,
+): v is ComplexVariationDescriptor {
+  return isComplexVariationType(v.type)
 }
 
 export function isVariationType(

@@ -4,7 +4,12 @@ import { recordEntries } from '@/utils/record'
 import { sum } from '@/utils/sum'
 import { AffineParams, transformAffine } from './affineTranform'
 import { Point } from './types'
-import { isParametricVariationType, transformVariations } from './variations'
+import {
+  isComplexVariationType,
+  isParametricVariationType,
+  transformVariations,
+} from './variations'
+import { ComplexInfo } from './variations/parametric/types'
 import { VariationInfo } from './variations/simple/types'
 import type {
   FlameDescriptor,
@@ -26,7 +31,8 @@ const VariantUniformsBase = struct({
 }).$name('VariantUniformsBase')
 
 function variationUniforms(variationType: TransformVariationType) {
-  if (isParametricVariationType(variationType)) {
+  // Both parametric and complex variations have parameter structs
+  if (isParametricVariationType(variationType) || isComplexVariationType(variationType)) {
     return struct({
       ...VariantUniformsBase.propTypes,
       params: transformVariations[variationType].paramStruct,
@@ -39,7 +45,9 @@ function variationInvocation(
   variationType: TransformVariationType,
   vid: VariationId,
 ) {
-  if (isParametricVariationType(variationType)) {
+  if (isComplexVariationType(variationType)) {
+    return `(${variationType}(pre, VariationInfo(uniforms.variation${vid}.weight, uniforms.preAffine), uniforms.variation${vid}.params)).transformed`
+  } else if (isParametricVariationType(variationType)) {
     return `${variationType}(pre, VariationInfo(uniforms.variation${vid}.weight, uniforms.preAffine), uniforms.variation${vid}.params)`
   }
   return `${variationType}(pre, VariationInfo(uniforms.variation${vid}.weight, uniforms.preAffine))`
@@ -88,6 +96,7 @@ export function createFlameWgsl({
       ]),
     ),
     VariationInfo,
+    ComplexInfo,
   })
   return {
     Uniforms,

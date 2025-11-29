@@ -1,5 +1,5 @@
 import { tgpu } from 'typegpu'
-import { f32, i32, struct, vec2f } from 'typegpu/data'
+import { f32, struct, vec2f } from 'typegpu/data'
 import * as v from '@/valibot'
 import { AffineParams } from '../../affineTranform'
 import type { TgpuFn } from 'typegpu'
@@ -9,10 +9,6 @@ export type VariationInfo = Infer<typeof VariationInfo>
 export const VariationInfo = struct({
   weight: f32,
   affineCoefs: AffineParams,
-})
-export type ComplexInfo = Infer<typeof ComplexInfo>
-export const ComplexInfo = struct({
-  restrictNext: i32,
 })
 
 export type SimpleVariation<K extends string> = {

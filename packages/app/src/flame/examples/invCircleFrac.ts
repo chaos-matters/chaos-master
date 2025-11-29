@@ -30,7 +30,7 @@ export const invCircleFrac2 = defineExample({
         f4bd8d90_690a_4378_9bdb_a9542c69ede2: {
           type: 'invCircle',
           weight: 1,
-          params: { radius: 1, a: -1.2, b: 0 },
+          params: { radius: 1, cx: -1.2, cy: 0, restricted: 1 },
         },
       },
     },
@@ -50,7 +50,7 @@ export const invCircleFrac2 = defineExample({
         f5a402db_3eee_46b4_b8be_b379d5513afd: {
           type: 'invCircle',
           weight: 1,
-          params: { radius: 1, a: 1.2, b: 0 },
+          params: { radius: 1, cx: 1.2, cy: 0, restricted: 1 },
         },
       },
     },
@@ -70,7 +70,7 @@ export const invCircleFrac2 = defineExample({
         '709e0303_c73f_43d0_9406_e24fe4c888d9': {
           type: 'invCircle',
           weight: 1,
-          params: { radius: 0.9, a: 0, b: 1 },
+          params: { radius: 0.9, cx: 0, cy: 1, restricted: 1 },
         },
       },
     },
@@ -90,7 +90,7 @@ export const invCircleFrac2 = defineExample({
         '9500488b_9603_4e62_88b7_c5d078b2d85d': {
           type: 'invCircle',
           weight: 1,
-          params: { radius: 0.9, a: 0, b: -1 },
+          params: { radius: 0.9, cx: 0, cy: -1, restricted: 1 },
         },
       },
     },
@@ -110,7 +110,7 @@ export const invCircleFrac2 = defineExample({
         '83b9e42b_faec_4da0_9d80_b214fe82e8d1': {
           type: 'invCircle',
           weight: 1,
-          params: { radius: 0.6, a: 0, b: 0 },
+          params: { radius: 0.6, cx: 0, cy: 0, restricted: 1 },
         },
       },
     },
@@ -147,7 +147,7 @@ export const invCircleFrac = defineExample({
         f4bd8d90_690a_4378_9bdb_a9542c69ede2: {
           type: 'invCircle',
           weight: 1,
-          params: { radius: 0.3, a: 1.4, b: 0 },
+          params: { radius: 0.3, cx: 1.4, cy: 0, restricted: 1 },
         },
       },
     },
@@ -167,7 +167,7 @@ export const invCircleFrac = defineExample({
         f5a402db_3eee_46b4_b8be_b379d5513afd: {
           type: 'invCircle',
           weight: 1,
-          params: { radius: 1, a: 0, b: 0 },
+          params: { radius: 1, cx: 0, cy: 0, restricted: 1 },
         },
       },
     },
@@ -187,7 +187,7 @@ export const invCircleFrac = defineExample({
         '709e0303_c73f_43d0_9406_e24fe4c888d9': {
           type: 'invCircle',
           weight: 1,
-          params: { radius: 0.3, a: -1.4, b: 1 },
+          params: { radius: 0.3, cx: -1.4, cy: 1, restricted: 1 },
         },
       },
     },
@@ -207,7 +207,7 @@ export const invCircleFrac = defineExample({
         '9500488b_9603_4e62_88b7_c5d078b2d85d': {
           type: 'invCircle',
           weight: 1,
-          params: { radius: 0.3, a: 0, b: 1.4 },
+          params: { radius: 0.3, cx: 0, cy: 1.4, restricted: 1 },
         },
       },
     },
@@ -227,7 +227,7 @@ export const invCircleFrac = defineExample({
         bfc50fb7_c8fa_4817_8887_f99365e5e140: {
           type: 'invCircle',
           weight: 1,
-          params: { radius: 1, a: 0, b: -1.4 },
+          params: { radius: 1, cx: 0, cy: -1.4, restricted: 1 },
         },
       },
     },
