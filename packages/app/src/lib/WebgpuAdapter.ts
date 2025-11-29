@@ -58,21 +58,15 @@ export async function initializeWebgpuDevice(
 ) {
   assertIfWebgpuUnsupported()
 
-  // Request an adapter.
   gpuAdapter = await navigator.gpu.requestAdapter({
     ...adapterPreferences,
   })
 
-  // requestAdapter may resolve with null if no suitable adapters are found.
   assertIfWebgpuAdapterUnavailable(gpuAdapter)
   if (gpuAdapter.info.vendor !== '') {
     console.info(`Using ${gpuAdapter.info.vendor} WebGPU adapter.`)
   }
 
-  // Request a device.
-  // Note that the promise will reject if invalid options are passed to the optional
-  // dictionary. To avoid the promise rejecting always check any features and limits
-  // against the adapters features and limits prior to calling requestDevice().
   assertRequiredWebgpuFeaturesNotAvailable(
     gpuAdapter,
     deviceFeatures?.requiredFeatures ?? [],

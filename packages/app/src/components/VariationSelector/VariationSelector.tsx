@@ -273,7 +273,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
     },
   })
   return (
-    <Root adapterOptions={{ powerPreference: 'high-performance' }}>
+    <>
       <ModalTitleBar
         onClose={() => {
           props.respond(CANCEL)
@@ -432,7 +432,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
           </div>
         </div>
       </section>
-    </Root>
+    </>
   )
 }
 
