@@ -376,17 +376,20 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
               )
             }}
           </For>
-          <AffineEditor
-            class={ui.affineEditor}
-            transforms={{
-              [props.transformId]: previewFlame.transforms[props.transformId]!,
-            }}
-            setTransforms={(setFn) => {
-              setPreviewFlame((draft) => {
-                setFn(draft.transforms)
-              })
-            }}
-          />
+          <Show when={selectedItemId()}>
+            <AffineEditor
+              class={ui.affineEditor}
+              transforms={{
+                [props.transformId]:
+                  previewFlame.transforms[props.transformId]!,
+              }}
+              setTransforms={(setFn) => {
+                setPreviewFlame((draft) => {
+                  setFn(draft.transforms)
+                })
+              }}
+            />
+          </Show>
         </div>
         <div class={ui.flamePreview}>
           <div class={ui.flamePreviewFlame}>
