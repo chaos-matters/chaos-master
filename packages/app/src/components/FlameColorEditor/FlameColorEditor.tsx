@@ -1,5 +1,11 @@
 import { oklabToRgb } from '@typegpu/color'
-import { createEffect, createMemo, createSignal, For } from 'solid-js'
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  onCleanup,
+} from 'solid-js'
 import { vec2f } from 'typegpu/data'
 import { add, sub } from 'typegpu/std'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
@@ -25,6 +31,7 @@ import type { v2f } from 'typegpu/data'
 import type { Theme } from '@/contexts/ThemeContext'
 import type { TransformRecord } from '@/flame/schema/flameSchema'
 import type { HistorySetter } from '@/utils/createStoreHistory'
+import { onMount } from 'solid-js/types/server/reactive.js'
 
 const HANDLE_LIGHTNESS = {
   light: 0.8,
@@ -214,6 +221,12 @@ export function FlameColorEditor(props: {
     Object.values(props.transforms).forEach((tr) => tr.color)
   }
 
+  createEffect(() => {
+    console.info('Setting up flame color..')
+  })
+  onCleanup(() => {
+    console.info('Cleaning up flame color')
+  })
   return (
     <div
       ref={(el) => {

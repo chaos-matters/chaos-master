@@ -7,6 +7,7 @@ export function useContextSafe<T>(
   providerComponentName: string,
 ) {
   const maybeContext = useContext(context)
+  // console.info('Context is', providerComponentName, hookName)
   if (maybeContext === undefined) {
     throw new Error(
       `Called '${hookName}' outside of ${

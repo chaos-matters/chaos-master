@@ -1,4 +1,4 @@
-import { createEffect, createSignal, Show } from 'solid-js'
+import { createEffect, createSignal, onCleanup, Show } from 'solid-js'
 import { useElementSize } from '@/utils/useElementSize'
 import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { CanvasContextProvider } from './CanvasContext'
@@ -32,6 +32,9 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
     }
   }
 
+  onCleanup(() => {
+    console.info('Cleaning auto canvas')
+  })
   const canvasSize = useElementSize(
     () => canvas()?.parentElement,
     (size) => {
@@ -49,10 +52,17 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
 
   // also update canvas size when props.pixelRatio changes
   createEffect(() => {
+    console.info('Creating canvas...')
+    if (!canEl) {
+      return
+    }
     const el = canvas()
     const size = canvasSize()
     if (!el || !size) {
       return
+    }
+    if (props.onVisibilityChange) {
+      useIntersectionObserver(canvas, props.onVisibilityChange)
     }
     const { widthPX, heightPX } = scaledCanvasSize(size)
     el.width = widthPX
@@ -60,6 +70,7 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
   })
 
   function createContext(canEl: HTMLCanvasElement) {
+    console.info('Creating context....')
     const canvasFormat = navigator.gpu.getPreferredCanvasFormat()
     const context = canEl.getContext('webgpu')
     if (!context) {
@@ -70,15 +81,18 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
       format: canvasFormat,
       alphaMode: 'opaque',
     })
+    onCleanup(() => {
+      if (context) {
+        console.info('Cleaning context....unconfiguring')
+        context.unconfigure?.()
+      }
+    })
     return { context, canvasFormat }
   }
 
   createEffect(() => {
     if (canEl) {
       setCanvas(canEl)
-      if (props.onVisibilityChange) {
-        useIntersectionObserver(canvas, props.onVisibilityChange)
-      }
     }
   })
 

@@ -56,27 +56,27 @@ function PreviewFinalFlame(props: {
 }) {
   return (
     <>
-      <AutoCanvas class={ui.canvas} pixelRatio={1}>
-        <WheelZoomCamera2D
-          zoom={[
-            () => props.flame.renderSettings.camera.zoom,
-            props.setFlameZoom,
-          ]}
-          position={[
-            () => vec2f(...props.flame.renderSettings.camera.position),
-            props.setFlamePosition,
-          ]}
-        >
-          <Flam3
-            quality={0.99}
-            pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT}
-            adaptiveFilterEnabled={false}
-            flameDescriptor={props.flame}
-            renderInterval={DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS}
-            edgeFadeColor={vec4f(0)}
-          />
-        </WheelZoomCamera2D>
-      </AutoCanvas>
+      {/* <AutoCanvas class={ui.canvas} pixelRatio={1}> */}
+      {/*   <WheelZoomCamera2D */}
+      {/*     zoom={[ */}
+      {/*       () => props.flame.renderSettings.camera.zoom, */}
+      {/*       props.setFlameZoom, */}
+      {/*     ]} */}
+      {/*     position={[ */}
+      {/*       () => vec2f(...props.flame.renderSettings.camera.position), */}
+      {/*       props.setFlamePosition, */}
+      {/*     ]} */}
+      {/*   > */}
+      {/*     <Flam3 */}
+      {/*       quality={0.99} */}
+      {/*       pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT} */}
+      {/*       adaptiveFilterEnabled={false} */}
+      {/*       flameDescriptor={props.flame} */}
+      {/*       renderInterval={DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS} */}
+      {/*       edgeFadeColor={vec4f(0)} */}
+      {/*     /> */}
+      {/*   </WheelZoomCamera2D> */}
+      {/* </AutoCanvas> */}
     </>
   )
 }
@@ -90,21 +90,24 @@ function VariationPreview(props: { flame: FlameDescriptor }) {
   }
   return (
     <>
-      <AutoCanvas onVisibilityChange={onVisibilityChange} pixelRatio={1}>
-        <Camera2D
-          position={vec2f(...props.flame.renderSettings.camera.position)}
-          zoom={props.flame.renderSettings.camera.zoom}
-        >
-          <Flam3
-            quality={0.99}
-            pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT}
-            adaptiveFilterEnabled={false}
-            flameDescriptor={props.flame}
-            renderInterval={renderInterval()}
-            edgeFadeColor={vec4f(0)}
-          />
-        </Camera2D>
-      </AutoCanvas>
+      {/* <AutoCanvas onVisibilityChange={onVisibilityChange} pixelRatio={1}> */}
+      {/*   <WheelZoomCamera2D */}
+      {/*     zoom={[() => props.flame.renderSettings.camera.zoom, () => undefined]} */}
+      {/*     position={[ */}
+      {/*       () => vec2f(...props.flame.renderSettings.camera.position), */}
+      {/*       () => undefined, */}
+      {/*     ]} */}
+      {/*   > */}
+      {/*     <Flam3 */}
+      {/*       quality={0.99} */}
+      {/*       pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT} */}
+      {/*       adaptiveFilterEnabled={false} */}
+      {/*       flameDescriptor={props.flame} */}
+      {/*       renderInterval={renderInterval()} */}
+      {/*       edgeFadeColor={vec4f(0)} */}
+      {/*     /> */}
+      {/*   </WheelZoomCamera2D> */}
+      {/* </AutoCanvas> */}
     </>
   )
 }
@@ -273,7 +276,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
     },
   })
   return (
-    <>
+    <Root adapterOptions={{ powerPreference: 'high-performance' }}>
       <ModalTitleBar
         onClose={() => {
           props.respond(CANCEL)
@@ -376,20 +379,20 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
               )
             }}
           </For>
-          <Show when={selectedItemId()}>
-            <AffineEditor
-              class={ui.affineEditor}
-              transforms={{
-                [props.transformId]:
-                  previewFlame.transforms[props.transformId]!,
-              }}
-              setTransforms={(setFn) => {
-                setPreviewFlame((draft) => {
-                  setFn(draft.transforms)
-                })
-              }}
-            />
-          </Show>
+          {/* <Show when={selectedItemId()}> */}
+          {/*   <AffineEditor */}
+          {/*     class={ui.affineEditor} */}
+          {/*     transforms={{ */}
+          {/*       [props.transformId]: */}
+          {/*         previewFlame.transforms[props.transformId]!, */}
+          {/*     }} */}
+          {/*     setTransforms={(setFn) => { */}
+          {/*       setPreviewFlame((draft) => { */}
+          {/*         setFn(draft.transforms) */}
+          {/*       }) */}
+          {/*     }} */}
+          {/*   /> */}
+          {/* </Show> */}
         </div>
         <div class={ui.flamePreview}>
           <div class={ui.flamePreviewFlame}>
@@ -435,7 +438,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
           </div>
         </div>
       </section>
-    </>
+    </Root>
   )
 }
 
@@ -456,19 +459,18 @@ export function createVariationSelector(
     const result = await requestModal<RespondType>({
       class: ui.modalNoScroll,
       content: ({ respond }) => (
-        <Root adapterOptions={{ powerPreference: 'high-performance' }}>
-          <ChangeHistoryContextProvider value={history}>
-            <ShowVariationSelector
-              currentVar={currentVar}
-              currentFlame={currentFlame}
-              transformId={tid}
-              variationId={vid}
-              respond={respond}
-            />
-          </ChangeHistoryContextProvider>
-        </Root>
+        <ChangeHistoryContextProvider value={history}>
+          <ShowVariationSelector
+            currentVar={currentVar}
+            currentFlame={currentFlame}
+            transformId={tid}
+            variationId={vid}
+            respond={respond}
+          />
+        </ChangeHistoryContextProvider>
       ),
     })
+    console.info('Closing modal...')
     setVarSelectorModalIsOpen(false)
     if (result === CANCEL) {
       return

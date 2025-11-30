@@ -26,6 +26,7 @@ export function useElementSize(
       let pixelContentBox
       let contentBox
       const entry = entries[0]
+      console.info('Resizing', entry)
       if (!entry) {
         return
       }
@@ -49,6 +50,7 @@ export function useElementSize(
       // Element existing but not connected to document can happen while
       // Suspense mechanism is rendering the fallback.
       if (!t.isConnected) {
+        console.info("T wasn't connected", t)
         return
       }
       const width = contentBox.inlineSize
