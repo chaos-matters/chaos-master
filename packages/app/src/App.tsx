@@ -110,8 +110,9 @@ function newDefaultTransform(): TransformFunction {
     postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
     variations: {
       [generateVariationId()]: {
-        type: 'linear',
+        type: 'cannabisBlur',
         weight: 1,
+        params: { fill: 1 },
       },
     },
   }
@@ -135,7 +136,7 @@ function App(props: AppProps) {
   const [flameDescriptor, setFlameDescriptor, history] = createStoreHistory(
     createStore(
       structuredClone(
-        props.flameFromQuery ? props.flameFromQuery : examples.example1,
+        props.flameFromQuery ? props.flameFromQuery : examples.halfBlurEx1,
       ),
     ),
   )

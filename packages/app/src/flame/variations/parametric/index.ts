@@ -2,6 +2,7 @@ import { blob } from './blob'
 import { curlVar } from './curl'
 import { fan2 } from './fan2'
 import { grid } from './grid'
+import { cannabisBlur } from './halfblur'
 import { invCircle } from './invCircle'
 import { invCircle2 } from './invCircle2'
 import { invEllipse } from './invEllipse'
@@ -32,4 +33,5 @@ export const parametricVariations = {
   invCircle,
   invCircle2,
   invEllipse,
+  cannabisBlur,
 }
