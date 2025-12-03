@@ -5,7 +5,7 @@
 
   [data-theme='dark'] & {
     --color: var(--neutral-600);
-    --color-hover: white;
+    --color-hover: #c34545;
     --bg-color: #000d;
   }
 }
