@@ -1,12 +1,14 @@
 .pill {
   --color: var(--neutral-600);
-  --hover-color: black;
+  --hover-color: var(--neutral-300);
+  --selected-color: var(--neutral-600);
   --track-color-filled: var(--neutral-400);
   --track-color-empty: var(--neutral-200);
 
   [data-theme='dark'] & {
     --color: var(--neutral-400);
-    --hover-color: white;
+    --hover-color: var(--neutral-700);
+    --selected-color: var(--neutral-400);
     --track-color-filled: var(--neutral-700);
     --track-color-empty: var(--neutral-800);
   }
@@ -53,5 +55,14 @@
 }
 
 .selected-pill {
-  color: var(--color);
+  color: var(--selected-color);
+  border: solid 1px var(--track-color-filled);
+}
+
+.pill:not(.selected-pill):hover::before {
+  background: transparent;
+}
+
+.pill:not(.selected-pill):hover {
+  background-color: var(--hover-color);
 }

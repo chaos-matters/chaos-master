@@ -614,14 +614,14 @@ function App(props: AppProps) {
                   Auto
                 </Button>
               </Show>
-              <div>Quality</div>
+              <div class={ui.noSelect}>Quality</div>
               <QualityPresets
                 selectedPreset={qualityPreset()}
                 setQualityPreset={setQualityPreset}
                 fillPercentage={
                   (accumulatedPointCount() / qualityPointCountLimit()()) * 100
                 }
-              ></QualityPresets>
+              />
             </Card>
             <Card>
               <label class={ui.labeledInput}>
