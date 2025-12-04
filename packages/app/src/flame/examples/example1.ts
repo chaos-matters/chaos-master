@@ -23,36 +23,6 @@ export const example1 = defineExample({
       color: { x: 0.1, y: 0.25 },
       variations: {
         [vid('44890d73_369c_4ed1_a1f5_1d7adf71a8ff')]: {
-          type: 'cannabisBlur',
-          weight: 1,
-          params: { fill: 1 },
-        },
-      },
-    },
-  },
-})
-export const example2 = defineExample({
-  version: latestSchemaVersion,
-  metadata: {
-    author: 'deluksic',
-  },
-  renderSettings: {
-    exposure: 0.25,
-    skipIters: 20,
-    drawMode: 'light',
-    camera: {
-      zoom: 1,
-      position: [0, 0],
-    },
-  },
-  transforms: {
-    [tid('55d4c43f_14b8_4554_a9d1_a94eda857811')]: {
-      probability: 0.4,
-      preAffine: { a: 0.8, b: 0, c: 0.5, d: 0, e: 0.6, f: 0 },
-      postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-      color: { x: 0.1, y: 0.25 },
-      variations: {
-        [vid('44890d73_369c_4ed1_a1f5_1d7adf71a8ff')]: {
           type: 'linear',
           weight: 1,
         },

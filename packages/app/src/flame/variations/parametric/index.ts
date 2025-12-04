@@ -15,6 +15,7 @@ import { pie } from './pie'
 import { radialBlurVar } from './radialBlur'
 import { rectanglesVar } from './rectangles'
 import { rings2 } from './rings2'
+import { lorenzAttractor } from './lorenzAttractor'
 
 export const parametricVariations = {
   blob,
@@ -34,4 +35,5 @@ export const parametricVariations = {
   invCircle2,
   invEllipse,
   cannabisBlur,
+  lorenzAttractor,
 }
