@@ -1,4 +1,6 @@
 import { blob } from './blob'
+import { circus } from './circus'
+import { cpowVar } from './cpowVar'
 import { curlVar } from './curl'
 import { fan2 } from './fan2'
 import { grid } from './grid'
@@ -16,6 +18,7 @@ import { rectanglesVar } from './rectangles'
 import { rings2 } from './rings2'
 
 export const parametricVariations = {
+  circus,
   blob,
   curlVar,
   fan2,
@@ -32,4 +35,5 @@ export const parametricVariations = {
   invCircle,
   invCircle2,
   invEllipse,
+  cpowVar,
 }

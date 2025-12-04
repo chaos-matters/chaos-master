@@ -303,3 +303,15 @@ export const crossVar = simpleVariation('crossVar', (pos, _varInfo) => {
   const fact = sqrt(1 / (squareDiff * squareDiff))
   return vec2f(pos.x, pos.y).mul(fact)
 })
+
+export const idiscVar = simpleVariation('idiscVar', (pos, _varInfo) => {
+  'use gpu'
+  const M_1_PI_F = 0.31830988618379
+  const a = PI.$ / (length(pos) + 1.0)
+  const theta = atan2(pos.y, pos.x)
+  const r = theta * M_1_PI_F
+  const s = sin(a)
+  const c = cos(a)
+
+  return vec2f(r * c, r * s)
+})

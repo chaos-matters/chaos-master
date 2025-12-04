@@ -135,7 +135,7 @@ function App(props: AppProps) {
   const [flameDescriptor, setFlameDescriptor, history] = createStoreHistory(
     createStore(
       structuredClone(
-        props.flameFromQuery ? props.flameFromQuery : examples.example1,
+        props.flameFromQuery ? props.flameFromQuery : examples.empty,
       ),
     ),
   )

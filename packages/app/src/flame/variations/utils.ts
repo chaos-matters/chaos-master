@@ -243,6 +243,20 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
         }
       }),
     ),
+    circus: unfreeze(
+      produce(getDefaultFlameByVarType('circus'), (draft) => {
+        draft.transforms[transformPreviewId]!.preAffine = {
+          a: 1.5067596708863726,
+          b: -0.11207495085714227,
+          c: 0.003943048417568207,
+          d: 0.11207495085714227,
+          e: 1.5067596708863726,
+          f: 0.011692757718265057,
+        }
+        draft.renderSettings.exposure = 0.666
+        draft.renderSettings.camera.zoom = 0.5
+      }),
+    ),
   }
 
 export function getVariationPreviewFlame(
