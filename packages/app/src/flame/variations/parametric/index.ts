@@ -11,6 +11,7 @@ import { invCircle2 } from './invCircle2'
 import { invEllipse } from './invEllipse'
 import { juliaN } from './juliaN'
 import { juliaScope } from './juliaScope'
+import { lissajousVar } from './lissajousVar'
 import { ngonVar } from './ngon'
 import { pdjVar } from './pdj'
 import { perspective } from './perspective'
@@ -18,6 +19,11 @@ import { pie } from './pie'
 import { radialBlurVar } from './radialBlur'
 import { rectanglesVar } from './rectangles'
 import { rings2 } from './rings2'
+import { squishVar } from './squishVar'
+import { starBlurVar } from './starBlur'
+import { swirl3Var } from './swirl3Var'
+import { synthVar } from './synthVar'
+import { tradeVar } from './tradeVar'
 import { tunnelVar } from './tunnelVar'
 
 export const parametricVariations = {
@@ -34,6 +40,7 @@ export const parametricVariations = {
   invEllipse,
   juliaN,
   juliaScope,
+  lissajousVar,
   ngonVar,
   pdjVar,
   perspective,
@@ -41,5 +48,10 @@ export const parametricVariations = {
   radialBlurVar,
   rectanglesVar,
   rings2,
+  starBlurVar,
+  squishVar,
+  synthVar,
+  swirl3Var,
   tunnelVar,
+  tradeVar,
 }

@@ -16,6 +16,7 @@ import {
 } from '@/flame/schema/flameSchema'
 import { isParametricVariation, variationTypes } from '@/flame/variations'
 import {
+  getNormalizedVariationName,
   getParamsEditor,
   getVariationPreviewFlame,
   transformPreviewId,
@@ -313,7 +314,9 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                         >
                           <VariationPreview flame={variationExample} />
                         </DelayedShow>
-                        <div class={ui.itemTitle}>{variation.type}</div>
+                        <div class={ui.itemTitle}>
+                          {getNormalizedVariationName(variation.type)}
+                        </div>
                       </button>
                     </div>
                   )

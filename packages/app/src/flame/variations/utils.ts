@@ -10,6 +10,12 @@ import type {
 } from '.'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
+export function getNormalizedVariationName(
+  type: TransformVariationType,
+): string {
+  return type.replaceAll(/var/gi, '')
+}
+
 export function getVariationDefault(
   type: TransformVariationType,
   weight: number,
@@ -260,6 +266,17 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
     tunnelVar: unfreeze(
       produce(getDefaultFlameByVarType('tunnelVar'), (draft) => {
         draft.renderSettings.exposure = -1.0
+      }),
+    ),
+    tradeVar: unfreeze(
+      produce(getDefaultFlameByVarType('tradeVar'), (draft) => {
+        draft.renderSettings.camera.zoom = 0.75
+        draft.renderSettings.exposure = 0.42
+        draft.transforms[transformPreviewId]!.variations[variationPreviewId] = {
+          type: 'tradeVar',
+          weight: 1.0,
+          params: { r1: 1.21, d1: 0.53, r2: 1.76, d2: 0.4 },
+        }
       }),
     ),
   }

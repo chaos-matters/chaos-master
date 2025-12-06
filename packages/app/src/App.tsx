@@ -66,7 +66,11 @@ import {
   generateVariationId,
 } from './flame/transformFunction'
 import { isParametricVariation, isVariationType } from './flame/variations'
-import { getParamsEditor, getVariationDefault } from './flame/variations/utils'
+import {
+  getNormalizedVariationName,
+  getParamsEditor,
+  getVariationDefault,
+} from './flame/variations/utils'
 import { Cross, Plus } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
 import { Root } from './lib/Root'
@@ -109,10 +113,7 @@ function newDefaultTransform(): TransformFunction {
     preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
     postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
     variations: {
-      [generateVariationId()]: {
-        type: 'linear',
-        weight: 1,
-      },
+      [generateVariationId()]: getVariationDefault('linear', 1.0),
     },
   }
 }
@@ -423,7 +424,7 @@ function App(props: AppProps) {
                             }}
                           >
                             <div class={ui.variationButtonText}>
-                              {variation.type}
+                              {getNormalizedVariationName(variation.type)}
                             </div>
                           </button>
                           <Slider

@@ -327,13 +327,12 @@ export const butterflyVar = simpleVariation('butterflyVar', (pos, _varInfo) => {
   return vec2f(r * pos.x, r * y2)
 })
 
-export const unpolarVar = simpleVariation('unpolarVar', (pos, varInfo) => {
+export const unpolarVar = simpleVariation('unpolarVar', (pos, _varInfo) => {
   'use gpu'
-  // Java: vvar = pAmount / M_PI; vvar_2 = vvar * 0.5;
-  // pAmount is handled by the framework (varInfo.weight), so we compute the rest:
-  // vvar_2 = (1.0 / PI) * 0.5
-  const vvar_2 = (varInfo.weight * 0.5) / PI.$
-  // const vvar_2 = 0.5 / PI.$
+  // TODO: consider moving weight calculation inside variations, as they differ in some cases,
+  // not all need weight calculation
+  // const vvar_2 = (varInfo.weight * 0.5) / PI.$
+  const vvar_2 = 0.5 / PI.$
 
   const r = exp(pos.y)
   const s = sin(pos.x)
@@ -341,6 +340,38 @@ export const unpolarVar = simpleVariation('unpolarVar', (pos, varInfo) => {
 
   const newX = vvar_2 * r * s
   const newY = vvar_2 * r * c
+
+  return vec2f(newX, newY)
+})
+
+export const squarizeVar = simpleVariation('squarizeVar', (pos, _varInfo) => {
+  'use gpu'
+  const s = length(pos)
+  let a = atan2(pos.y, pos.x)
+  if (a < 0.0) {
+    a += 2.0 * PI.$
+  }
+  const p = 4.0 * s * a * (1.0 / PI.$)
+
+  let newX = 0.0
+  let newY = 0.0
+
+  if (p <= 1.0 * s) {
+    newX = s
+    newY = p
+  } else if (p <= 3.0 * s) {
+    newX = 2.0 * s - p
+    newY = s
+  } else if (p <= 5.0 * s) {
+    newX = -s
+    newY = 4.0 * s - p
+  } else if (p <= 7.0 * s) {
+    newX = -(6.0 * s - p)
+    newY = -s
+  } else {
+    newX = s
+    newY = -(8.0 * s - p)
+  }
 
   return vec2f(newX, newY)
 })

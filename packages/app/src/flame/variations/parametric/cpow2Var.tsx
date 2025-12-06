@@ -72,7 +72,7 @@ export const cpow2Var = parametricVariation(
     if (a < 0) {
       n++
     }
-    a += 2 * PI.$ * n
+    a += 2 * PI.$ * f32(n)
     if (cos(a * inv_range) < random() * 2.0 - 1.0) {
       a -= full_range
     }
