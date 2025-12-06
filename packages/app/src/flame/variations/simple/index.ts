@@ -1,5 +1,6 @@
 import { f32, vec2f } from 'typegpu/data'
 import {
+  abs,
   atan2,
   cos,
   cosh,
@@ -314,4 +315,32 @@ export const idiscVar = simpleVariation('idiscVar', (pos, _varInfo) => {
   const c = cos(a)
 
   return vec2f(r * c, r * s)
+})
+
+export const butterflyVar = simpleVariation('butterflyVar', (pos, _varInfo) => {
+  'use gpu'
+  const y2 = pos.y * 2
+  const wx = 4 / sqrt(3 * PI.$)
+  const denominator = dot(vec2f(pos.x, y2), vec2f(pos.x, y2))
+  const r = wx * sqrt(abs(pos.y * pos.x) / (denominator + 1e-10))
+
+  return vec2f(r * pos.x, r * y2)
+})
+
+export const unpolarVar = simpleVariation('unpolarVar', (pos, varInfo) => {
+  'use gpu'
+  // Java: vvar = pAmount / M_PI; vvar_2 = vvar * 0.5;
+  // pAmount is handled by the framework (varInfo.weight), so we compute the rest:
+  // vvar_2 = (1.0 / PI) * 0.5
+  const vvar_2 = (varInfo.weight * 0.5) / PI.$
+  // const vvar_2 = 0.5 / PI.$
+
+  const r = exp(pos.y)
+  const s = sin(pos.x)
+  const c = cos(pos.x)
+
+  const newX = vvar_2 * r * s
+  const newY = vvar_2 * r * c
+
+  return vec2f(newX, newY)
 })

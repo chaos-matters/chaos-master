@@ -3,8 +3,9 @@ import { defineExample, tid, vid } from './util'
 export const empty = defineExample({
   renderSettings: {
     exposure: 0.25,
-    skipIters: 20,
+    skipIters: 1,
     drawMode: 'light',
+    colorInitMode: 'colorInitPosition',
     backgroundColor: [0, 0, 0],
     camera: {
       zoom: 1,

@@ -1,5 +1,7 @@
 import { blob } from './blob'
 import { circus } from './circus'
+import { cliffordVar } from './cliffordVar'
+import { cpow2Var } from './cpow2Var'
 import { cpowVar } from './cpowVar'
 import { curlVar } from './curl'
 import { fan2 } from './fan2'
@@ -16,13 +18,20 @@ import { pie } from './pie'
 import { radialBlurVar } from './radialBlur'
 import { rectanglesVar } from './rectangles'
 import { rings2 } from './rings2'
+import { tunnelVar } from './tunnelVar'
 
 export const parametricVariations = {
-  circus,
   blob,
+  cliffordVar,
+  circus,
+  cpowVar,
+  cpow2Var,
   curlVar,
   fan2,
   grid,
+  invCircle,
+  invCircle2,
+  invEllipse,
   juliaN,
   juliaScope,
   ngonVar,
@@ -32,8 +41,5 @@ export const parametricVariations = {
   radialBlurVar,
   rectanglesVar,
   rings2,
-  invCircle,
-  invCircle2,
-  invEllipse,
-  cpowVar,
+  tunnelVar,
 }

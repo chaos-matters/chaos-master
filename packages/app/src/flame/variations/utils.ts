@@ -257,6 +257,11 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
         draft.renderSettings.camera.zoom = 0.5
       }),
     ),
+    tunnelVar: unfreeze(
+      produce(getDefaultFlameByVarType('tunnelVar'), (draft) => {
+        draft.renderSettings.exposure = -1.0
+      }),
+    ),
   }
 
 export function getVariationPreviewFlame(
