@@ -16,7 +16,7 @@ import {
   tan,
 } from 'typegpu/std'
 import { random, randomUnitDisk } from '@/shaders/random'
-import { PI } from '../../constants'
+import { EPS, PI } from '../../constants'
 import { simpleVariation } from './types'
 
 export const waves = simpleVariation('waves', (pos, varInfo) => {
@@ -372,6 +372,90 @@ export const squarizeVar = simpleVariation('squarizeVar', (pos, _varInfo) => {
     newX = s
     newY = -(8.0 * s - p)
   }
+
+  return vec2f(newX, newY)
+})
+
+export const sinusoidalVar = simpleVariation(
+  'sinusoidalVar',
+  (pos, _varInfo) => {
+    'use gpu'
+    return vec2f(sin(pos.x), sin(pos.y))
+  },
+)
+
+export const scryVar = simpleVariation('scryVar', (pos, varInfo) => {
+  'use gpu'
+  const t = dot(pos, pos)
+  // Java: d = (sqrt(t) * (t + 1.0 / pAmount));
+  // Note: We protect against division by zero if weight is 0
+  const weight = select(varInfo.weight, EPS.$, varInfo.weight === 0.0)
+  const d = sqrt(t) * (t + 1.0 / weight)
+
+  if (d === 0.0) {
+    // Java returns without modifying pVarTP (effectively adding 0)
+    return vec2f(0.0, 0.0)
+  }
+
+  const r = 1.0 / d
+  const newX = pos.x * r
+  const newY = pos.y * r
+
+  return vec2f(newX, newY)
+})
+
+export const tanhVar = simpleVariation('tanhVar', (pos, _varInfo) => {
+  'use gpu'
+  const tanhsin = sin(2.0 * pos.y)
+  const tanhcos = cos(2.0 * pos.y)
+  const tanhsinh = sinh(2.0 * pos.x)
+  const tanhcosh = cosh(2.0 * pos.x)
+
+  const d = tanhcos + tanhcosh
+
+  if (d === 0.0) {
+    return vec2f(0.0, 0.0)
+  }
+
+  const tanhden = 1.0 / d
+  const newX = tanhden * tanhsinh
+  const newY = tanhden * tanhsin
+
+  return vec2f(newX, newY)
+})
+
+export const twoFaceVar = simpleVariation('twoFaceVar', (pos, _varInfo) => {
+  'use gpu'
+  // TODO: refactor when weight calculation becomes per variation
+  let factor = f32(1.0) // This represents 'r' normalized by weight
+  if (pos.x > 0.0) {
+    const denom = pos.x * pos.x + pos.y * pos.y
+    factor /= denom
+  }
+
+  const newX = factor * pos.x
+  const newY = factor * pos.y
+
+  return vec2f(newX, newY)
+})
+
+export const pyramidVar = simpleVariation('pyramidVar', (pos, _varInfo) => {
+  'use gpu'
+  const x = pos.x * pos.x * pos.x
+  const y = pos.y * pos.y * pos.y
+
+  // r = pAmount / (|x| + |y| + |z|)
+  // The framework handles the multiplication by weight (pAmount) *after* we return.
+  // However, here 'r' is inversely proportional to the coordinate magnitude.
+  // Java: r = pAmount / (...)
+  // pVarTP += x * r => x * pAmount / (...)
+  // We should return x / (...) so that when multiplied by weight, it matches.
+
+  const div = abs(x) + abs(y) + 0.000000001
+  const r = 1.0 / div
+
+  const newX = x * r
+  const newY = y * r
 
   return vec2f(newX, newY)
 })

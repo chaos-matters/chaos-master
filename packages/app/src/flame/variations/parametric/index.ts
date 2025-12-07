@@ -6,6 +6,7 @@ import { cpowVar } from './cpowVar'
 import { curlVar } from './curl'
 import { fan2 } from './fan2'
 import { grid } from './grid'
+import { hexesVar } from './hexesVar'
 import { invCircle } from './invCircle'
 import { invCircle2 } from './invCircle2'
 import { invEllipse } from './invEllipse'
@@ -18,9 +19,14 @@ import { ngonVar } from './ngon'
 import { pdjVar } from './pdj'
 import { perspective } from './perspective'
 import { pie } from './pie'
+import { pixelFlowVar } from './pixelFlowVar'
+import { popcorn2Var } from './popcorn2Var'
 import { radialBlurVar } from './radialBlur'
 import { rectanglesVar } from './rectangles'
 import { rings2 } from './rings2'
+import { rippleVar } from './rippleVar'
+import { sinusGridVar } from './sinusGridVar'
+import { spirographVar } from './spirographVar'
 import { squishVar } from './squishVar'
 import { starBlurVar } from './starBlur'
 import { swirl3Var } from './swirl3Var'
@@ -36,6 +42,7 @@ export const parametricVariations = {
   curlVar,
   fan2,
   grid,
+  hexesVar,
   invCircle,
   invCircle2,
   invEllipse,
@@ -48,10 +55,15 @@ export const parametricVariations = {
   pdjVar,
   perspective,
   pie,
+  pixelFlowVar,
+  popcorn2Var,
   radialBlurVar,
   rectanglesVar,
   rings2,
+  rippleVar,
   starBlurVar,
+  sinusGridVar,
+  spirographVar,
   squishVar,
   swirl3Var,
   tunnelVar,

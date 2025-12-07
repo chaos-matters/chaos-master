@@ -313,6 +313,43 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
         }
       }),
     ),
+    popcorn2Var: unfreeze(
+      produce(getDefaultFlameByVarType('popcorn2Var'), (draft) => {
+        draft.renderSettings.camera.zoom = 0.5
+        draft.renderSettings.exposure = 0.6
+        draft.transforms[getTransformPreviewTid('popcorn2Var')]!.variations[
+          getTransformPreviewVid('popcorn2Var')
+        ] = {
+          type: 'popcorn2Var',
+          weight: 1.0,
+          params: { x: -1.28, y: -0.94, c: -2.49 },
+        }
+      }),
+    ),
+    spirographVar: unfreeze(
+      produce(getDefaultFlameByVarType('spirographVar'), (draft) => {
+        draft.renderSettings.camera.zoom = 0.2
+        draft.renderSettings.camera.position = [-1.6, -2.0]
+        draft.renderSettings.exposure = 1.2
+        draft.transforms[getTransformPreviewTid('spirographVar')]!.variations[
+          getTransformPreviewVid('spirographVar')
+        ] = {
+          type: 'spirographVar',
+          weight: 1.0,
+          params: {
+            a: 3.25,
+            b: 1.96,
+            d: -3.53,
+            tmin: -3.2,
+            tmax: -7.7,
+            ymin: -0.48,
+            ymax: -3.15,
+            c1: -1.04,
+            c2: -2.16,
+          },
+        }
+      }),
+    ),
   }
 
 export function getVariationPreviewFlame(
