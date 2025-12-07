@@ -45,8 +45,10 @@ function variationInvocation(
   return `${variationType}(pre, VariationInfo(uniforms.variation${vid}.weight, uniforms.preAffine))`
 }
 
-export function generateTransformId(): TransformId {
-  return window.crypto.randomUUID().replaceAll('-', '_') as TransformId
+export function generateTransformId(identifier: string = ''): TransformId {
+  return `_${identifier}__${window.crypto
+    .randomUUID()
+    .replaceAll('-', '_')}` as TransformId
 }
 
 export function generateVariationId(): VariationId {

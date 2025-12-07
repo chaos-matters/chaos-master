@@ -18,6 +18,7 @@ import { parametricVariation } from './types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
+// TODO: Not included yet, since its quite a heavy variation (slows down whole app)
 const SynthVarParams = struct({
   a: f32,
   mode: f32,
@@ -609,10 +610,9 @@ export const synthVar = parametricVariation(
   SynthVarParamsEditor,
   (pos, _varInfo, P) => {
     'use gpu'
-    const EPS = 0.000001
     const mode = floor(P.mode)
-    let Vx = pos.x
-    let Vy = pos.y
+    let Vx = f32(pos.x)
+    let Vy = f32(pos.y)
     let radius = f32(0.0)
     let theta = f32(0.0)
     let theta_factor = f32(0.0)
@@ -649,7 +649,7 @@ export const synthVar = parametricVariation(
       newY = interpolate(Vy, theta_factor, P.smoothFact)
     } else if (mode === MODE_SPHERICAL) {
       // MODE_SPHERICAL
-      radius = pow(Vx * Vx + Vy * Vy + EPS, (P.power + 1.0) / 2.0)
+      radius = pow(Vx * Vx + Vy * Vy + EPS.$, (P.power + 1.0) / 2.0)
       theta = atan2(Vx, Vy)
       theta_factor = synthValue(theta, P)
       radius = interpolate(radius, theta_factor, P.smoothFact)
@@ -674,7 +674,7 @@ export const synthVar = parametricVariation(
       theta = 2.0 * PI.$ * random() - PI.$
       Vx = radius * sin(theta)
       Vy = radius * cos(theta)
-      radius = pow(radius * radius + EPS, P.power / 2.0)
+      radius = pow(radius * radius + EPS.$, P.power / 2.0)
       theta_factor = synthValue(theta, P)
       radius = interpolate(radius, theta_factor, P.smoothFact)
       // Note: Java code adds Vx*radius, Vy*radius to pVarTP
@@ -685,7 +685,7 @@ export const synthVar = parametricVariation(
       // MODE_BLUR_NEW
       radius = 0.5 * (random() + random())
       theta = 2.0 * PI.$ * random() - PI.$
-      radius = pow(radius * radius + EPS, -P.power / 2.0)
+      radius = pow(radius * radius + EPS.$, -P.power / 2.0)
       theta_factor = synthValue(theta, P)
       radius = interpolate(radius, theta_factor, P.smoothFact)
       s = sin(theta)
@@ -705,7 +705,7 @@ export const synthVar = parametricVariation(
     } else if (mode === MODE_BLUR_RING2) {
       // MODE_BLUR_RING2
       theta = 2.0 * PI.$ * random() - PI.$
-      radius = pow(random() + EPS, P.power)
+      radius = pow(random() + EPS.$, P.power)
       radius = synthValue(theta, P) + 0.1 * radius
       s = sin(theta)
       c = cos(theta)
@@ -713,7 +713,7 @@ export const synthVar = parametricVariation(
       newY = radius * c
     } else if (mode === MODE_SHIFTNSTRETCH) {
       // MODE_SHIFTNSTRETCH
-      radius = pow(Vx * Vx + Vy * Vy + EPS, P.power / 2.0)
+      radius = pow(Vx * Vx + Vy * Vy + EPS.$, P.power / 2.0)
       theta = atan2(Vx, Vy) - 1.0 + synthValue(radius, P)
       s = sin(theta)
       c = cos(theta)
@@ -721,7 +721,7 @@ export const synthVar = parametricVariation(
       newY = radius * c
     } else if (mode === MODE_SHIFTTANGENT) {
       // MODE_SHIFTTANGENT
-      radius = pow(Vx * Vx + Vy * Vy + EPS, P.power / 2.0)
+      radius = pow(Vx * Vx + Vy * Vy + EPS.$, P.power / 2.0)
       theta = atan2(Vx, Vy)
       s = sin(theta)
       c = cos(theta)
@@ -732,7 +732,7 @@ export const synthVar = parametricVariation(
       newY = Vy
     } else if (mode === MODE_SHIFTTHETA) {
       // MODE_SHIFTTHETA
-      radius = pow(Vx * Vx + Vy * Vy + EPS, P.power / 2.0)
+      radius = pow(Vx * Vx + Vy * Vy + EPS.$, P.power / 2.0)
       theta = atan2(Vx, Vy) - 1.0 + synthValue(radius, P)
       s = sin(theta)
       c = cos(theta)
@@ -768,7 +768,7 @@ export const synthVar = parametricVariation(
       newY = Vy + (synthValue(Vy, P) - 1.0 + (1.0 - P.mix) * sin(Vy))
     } else if (mode === MODE_SWIRL) {
       // MODE_SWIRL
-      radius = pow(Vx * Vx + Vy * Vy + EPS, P.power / 2.0)
+      radius = pow(Vx * Vx + Vy * Vy + EPS.$, P.power / 2.0)
       const pair = synthsincos(radius, P)
       s = pair.x
       c = pair.y
@@ -776,7 +776,7 @@ export const synthVar = parametricVariation(
       newY = c * Vx + s * Vy
     } else if (mode === MODE_HYPERBOLIC) {
       // MODE_HYPERBOLIC
-      radius = pow(Vx * Vx + Vy * Vy + EPS, P.power / 2.0)
+      radius = pow(Vx * Vx + Vy * Vy + EPS.$, P.power / 2.0)
       theta = atan2(Vx, Vy)
       const pair = synthsincos(theta, P)
       s = pair.x
@@ -785,7 +785,7 @@ export const synthVar = parametricVariation(
       newY = c * radius
     } else if (mode === MODE_JULIA) {
       // MODE_JULIA
-      radius = pow(Vx * Vx + Vy * Vy + EPS, P.power / 4.0)
+      radius = pow(Vx * Vx + Vy * Vy + EPS.$, P.power / 4.0)
       theta = atan2(Vx, Vy) / 2.0
       if (random() < 0.5) {
         theta += PI.$
@@ -798,7 +798,7 @@ export const synthVar = parametricVariation(
     } else if (mode === MODE_DISC) {
       // MODE_DISC
       theta = atan2(Vx, Vy) / PI.$
-      radius = PI.$ * pow(Vx * Vx + Vy * Vy + EPS, P.power / 2.0)
+      radius = PI.$ * pow(Vx * Vx + Vy * Vy + EPS.$, P.power / 2.0)
       const pair = synthsincos(radius, P)
       s = pair.x
       c = pair.y
@@ -808,7 +808,7 @@ export const synthVar = parametricVariation(
       // MODE_RINGS
       radius = sqrt(Vx * Vx + Vy * Vy)
       theta = atan2(Vx, Vy)
-      const mu = P.power * P.power + EPS
+      const mu = P.power * P.power + EPS.$
       // Java: radius += -2.0 * mu * (int) ((radius + mu) / (2.0 * mu)) + radius * (1.0 - mu);
       // (int) is floor.
       const term = floor((radius + mu) / (2.0 * mu))
@@ -820,7 +820,7 @@ export const synthVar = parametricVariation(
       newY = c * radius
     } else if (mode === MODE_CYLINDER) {
       // MODE_CYLINDER
-      radius = pow(Vx * Vx + Vy * Vy + EPS, P.power / 2.0)
+      radius = pow(Vx * Vx + Vy * Vy + EPS.$, P.power / 2.0)
       const pair = synthsincos(Vx, P)
       s = pair.x
       c = pair.y

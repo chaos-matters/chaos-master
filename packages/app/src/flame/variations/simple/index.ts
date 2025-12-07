@@ -353,8 +353,8 @@ export const squarizeVar = simpleVariation('squarizeVar', (pos, _varInfo) => {
   }
   const p = 4.0 * s * a * (1.0 / PI.$)
 
-  let newX = 0.0
-  let newY = 0.0
+  let newX = f32(0.0)
+  let newY = f32(0.0)
 
   if (p <= 1.0 * s) {
     newX = s

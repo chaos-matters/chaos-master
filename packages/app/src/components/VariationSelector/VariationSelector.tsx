@@ -18,9 +18,9 @@ import { isParametricVariation, variationTypes } from '@/flame/variations'
 import {
   getNormalizedVariationName,
   getParamsEditor,
+  getTransformPreviewTid,
+  getTransformPreviewVid,
   getVariationPreviewFlame,
-  transformPreviewId,
-  variationPreviewId,
 } from '@/flame/variations/utils'
 import { HoverEyePreview, HoverPreview } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
@@ -351,8 +351,10 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                                     ) => {
                                       const variationDraft =
                                         draft[id]?.transforms[
-                                          transformPreviewId
-                                        ]?.variations[variationPreviewId]
+                                          getTransformPreviewTid(variation.type)
+                                        ]?.variations[
+                                          getTransformPreviewVid(variation.type)
+                                        ]
                                       if (
                                         variationDraft === undefined ||
                                         !isParametricVariation(variationDraft)

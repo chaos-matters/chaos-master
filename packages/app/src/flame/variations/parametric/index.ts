@@ -24,7 +24,6 @@ import { rings2 } from './rings2'
 import { squishVar } from './squishVar'
 import { starBlurVar } from './starBlur'
 import { swirl3Var } from './swirl3Var'
-import { synthVar } from './synthVar'
 import { tradeVar } from './tradeVar'
 import { tunnelVar } from './tunnelVar'
 
@@ -54,7 +53,6 @@ export const parametricVariations = {
   rings2,
   starBlurVar,
   squishVar,
-  synthVar,
   swirl3Var,
   tunnelVar,
   tradeVar,

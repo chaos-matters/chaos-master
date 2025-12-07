@@ -21,7 +21,6 @@ export function wgsl(
   }
   return tgpu.resolve({
     template: stringParts.join(''),
-
     externals: Object.assign({}, ...externals),
   })
 }
