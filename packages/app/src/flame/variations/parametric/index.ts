@@ -11,6 +11,8 @@ import { invCircle2 } from './invCircle2'
 import { invEllipse } from './invEllipse'
 import { juliaN } from './juliaN'
 import { juliaScope } from './juliaScope'
+import { linearTVar } from './linearTVar'
+import { lineVar } from './lineVar'
 import { lissajousVar } from './lissajousVar'
 import { ngonVar } from './ngon'
 import { pdjVar } from './pdj'
@@ -41,6 +43,8 @@ export const parametricVariations = {
   juliaN,
   juliaScope,
   lissajousVar,
+  linearTVar,
+  lineVar,
   ngonVar,
   pdjVar,
   perspective,
