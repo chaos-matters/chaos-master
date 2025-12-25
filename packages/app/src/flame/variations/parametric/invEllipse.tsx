@@ -71,7 +71,7 @@ export const invEllipse = parametricVariation(
     // restricted/unrestricted elipse handling
     if (P.restricted === 1) {
       if (denom < 1) {
-        return pos
+        return vec2f(pos);
       }
     }
     const u = P.h + dx / denom
