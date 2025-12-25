@@ -1,10 +1,8 @@
 import { tgpu } from 'typegpu'
 
-type Wgsl = Parameters<typeof tgpu.resolve>['0']['externals']
-
 export function wgsl(
   strings: TemplateStringsArray,
-  ...externalsOrStrings: (Wgsl | string | number)[]
+  ...externalsOrStrings: (object | string | number)[]
 ) {
   const externals = []
   const stringParts = []

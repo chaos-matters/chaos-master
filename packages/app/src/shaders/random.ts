@@ -21,7 +21,7 @@ const lcgStep = tgpu.fn(
 })
 
 export const setSeed = tgpu.fn([vec4u])((newRandomState) => {
-  randomState.$ = newRandomState
+  randomState.$ = vec4u(newRandomState);
 })
 
 export const random = tgpu.fn(
