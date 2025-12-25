@@ -61,7 +61,7 @@ export const fan = simpleVariation('fan', (pos, varInfo) => {
 
 export const linear = simpleVariation('linear', (pos, _varInfo) => {
   'use gpu'
-  return pos
+  return vec2f(pos);
 })
 
 export const randomDisk = simpleVariation('randomDisk', (_pos, _varInfo) => {
