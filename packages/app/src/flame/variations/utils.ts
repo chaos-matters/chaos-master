@@ -3,11 +3,7 @@ import { defineExample } from '../examples/util'
 import { generateTransformId, generateVariationId } from '../transformFunction'
 import { isParametricVariationType, transformVariations } from '.'
 import type { FlameDescriptor } from '../schema/flameSchema'
-import type {
-  ParametricVariationDescriptor,
-  TransformVariationDescriptor,
-  TransformVariationType,
-} from '.'
+import type { ParametricVariationDescriptor, TransformVariationDescriptor, TransformVariationType, } from '.'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
 export function getVariationDefault(

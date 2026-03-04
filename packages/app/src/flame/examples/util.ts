@@ -1,9 +1,5 @@
 import { validateFlame } from '../schema/flameSchema'
-import type {
-  FlameDescriptor,
-  TransformId,
-  VariationId,
-} from '../schema/flameSchema'
+import type { FlameDescriptor, TransformId, VariationId, } from '../schema/flameSchema'
 import type { InferInput } from '@/valibot'
 
 export function tid(transformId: string): TransformId {

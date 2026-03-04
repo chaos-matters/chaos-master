@@ -1,27 +1,17 @@
 import { createEffect, createMemo, onCleanup } from 'solid-js'
 import { arrayOf, vec3f, vec4f, vec4u } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
-import {
-  accumulatedPointCount,
-  setAccumulatedPointCount,
-  setRenderTimings,
-} from '@/flame/renderStats'
+import { accumulatedPointCount, setAccumulatedPointCount, setRenderTimings, } from '@/flame/renderStats'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
 import { useCamera } from '../lib/CameraContext'
 import { useCanvas } from '../lib/CanvasContext'
 import { useRootContext } from '../lib/RootContext'
 import { createAnimationFrame } from '../utils/createAnimationFrame'
 import { createBlurPipeline } from './blurPipeline'
-import {
-  ColorGradingUniforms,
-  createColorGradingPipeline,
-} from './colorGrading'
+import { ColorGradingUniforms, createColorGradingPipeline, } from './colorGrading'
 import { drawModeToImplFn } from './drawMode'
 import { createIFSPipeline } from './ifsPipeline'
-import {
-  backgroundColorDefault,
-  backgroundColorDefaultWhite,
-} from './schema/flameSchema'
+import { backgroundColorDefault, backgroundColorDefaultWhite, } from './schema/flameSchema'
 import { Bucket } from './types'
 import type { v4f } from 'typegpu/data'
 import type { FlameDescriptor } from './schema/flameSchema'

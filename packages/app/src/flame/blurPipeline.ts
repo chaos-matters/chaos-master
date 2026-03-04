@@ -1,20 +1,7 @@
 import { tgpu } from 'typegpu'
 import { arrayOf, builtin, f32, i32, u32, vec2f, vec2i } from 'typegpu/data'
-import {
-  abs,
-  add,
-  clamp,
-  length,
-  min,
-  smoothstep,
-  sqrt,
-  sub,
-} from 'typegpu/std'
-import {
-  Bucket,
-  BUCKET_FIXED_POINT_MULTIPLIER,
-  BUCKET_FIXED_POINT_MULTIPLIER_INV,
-} from './types'
+import { abs, add, clamp, length, min, smoothstep, sqrt, sub, } from 'typegpu/std'
+import { Bucket, BUCKET_FIXED_POINT_MULTIPLIER, BUCKET_FIXED_POINT_MULTIPLIER_INV, } from './types'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 
 const GROUP_SIZE_X = 8

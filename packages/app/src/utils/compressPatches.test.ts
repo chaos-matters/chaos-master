@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  compressPatches,
-  forwardBackwardPatchPairDoesNothing,
-} from './compressPatches'
+import { compressPatches, forwardBackwardPatchPairDoesNothing, } from './compressPatches'
 import type { Patch } from 'structurajs'
 
 describe('compressPatches', () => {

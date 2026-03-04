@@ -1,10 +1,4 @@
-import {
-  batch,
-  createEffect,
-  createMemo,
-  createSignal,
-  onCleanup,
-} from 'solid-js'
+import { batch, createEffect, createMemo, createSignal, onCleanup, } from 'solid-js'
 import { vec2f } from 'typegpu/data'
 import { clamp, sub } from 'typegpu/std'
 import { Camera2D } from '@/lib/Camera2D'

@@ -1,13 +1,4 @@
-import {
-  createEffect,
-  createMemo,
-  createResource,
-  createSignal,
-  ErrorBoundary,
-  For,
-  Show,
-  Suspense,
-} from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, ErrorBoundary, For, Show, Suspense, } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { vec2f, vec3f, vec4f } from 'typegpu/data'
@@ -20,51 +11,25 @@ import { Checkbox } from './components/Checkbox/Checkbox'
 import { ColorPicker } from './components/ColorPicker/ColorPicker'
 import { Card } from './components/ControlCard/ControlCard'
 import { Dropzone } from './components/Dropzone/Dropzone'
-import {
-  AppCrashed,
-  WebgpuNotSupported,
-} from './components/ErrorHandling/ErrorHandling'
-import {
-  FlameColorEditor,
-  handleColor,
-} from './components/FlameColorEditor/FlameColorEditor'
+import { AppCrashed, WebgpuNotSupported, } from './components/ErrorHandling/ErrorHandling'
+import { FlameColorEditor, handleColor, } from './components/FlameColorEditor/FlameColorEditor'
 import { createLoadFlame } from './components/LoadFlameModal/LoadFlameModal'
 import { Modal } from './components/Modal/Modal'
-import {
-  getPresetFromQuality,
-  QualityPresets,
-  qualityPresets,
-} from './components/Quality/QualityPresets'
+import { getPresetFromQuality, QualityPresets, qualityPresets, } from './components/Quality/QualityPresets'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
 import { Slider } from './components/Sliders/Slider'
 import { createVariationSelector } from './components/VariationSelector/VariationSelector'
 import { ViewControls } from './components/ViewControls/ViewControls'
 import { ChangeHistoryContextProvider } from './contexts/ChangeHistoryContext'
 import { ThemeContextProvider, useTheme } from './contexts/ThemeContext'
-import {
-  DEFAULT_POINT_COUNT,
-  DEFAULT_QUALITY,
-  DEFAULT_RENDER_INTERVAL_MS,
-  DEFAULT_RESOLUTION,
-} from './defaults'
+import { DEFAULT_POINT_COUNT, DEFAULT_QUALITY, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_RESOLUTION, } from './defaults'
 import { colorInitModeToImplFn } from './flame/colorInitMode'
 import { drawModeToImplFn } from './flame/drawMode'
 import { examples } from './flame/examples'
 import { Flam3 } from './flame/Flam3'
-import {
-  accumulatedPointCount,
-  qualityPointCountLimit,
-  setCurrentQuality,
-  setQualityPointCountLimit,
-} from './flame/renderStats'
-import {
-  MAX_CAMERA_ZOOM_VALUE,
-  MIN_CAMERA_ZOOM_VALUE,
-} from './flame/schema/flameSchema'
-import {
-  generateTransformId,
-  generateVariationId,
-} from './flame/transformFunction'
+import { accumulatedPointCount, qualityPointCountLimit, setCurrentQuality, setQualityPointCountLimit, } from './flame/renderStats'
+import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from './flame/schema/flameSchema'
+import { generateTransformId, generateVariationId, } from './flame/transformFunction'
 import { isParametricVariation, isVariationType } from './flame/variations'
 import { getParamsEditor, getVariationDefault } from './flame/variations/utils'
 import { Cross, Plus } from './icons'
@@ -73,10 +38,7 @@ import { Root } from './lib/Root'
 import { WheelZoomCamera2D } from './lib/WheelZoomCamera2D'
 import { createStoreHistory } from './utils/createStoreHistory'
 import { addFlameDataToPng } from './utils/flameInPng'
-import {
-  compressJsonQueryParam,
-  decodeJsonQueryParam,
-} from './utils/jsonQueryParam'
+import { compressJsonQueryParam, decodeJsonQueryParam, } from './utils/jsonQueryParam'
 import { sum } from './utils/sum'
 import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
 import { useLoadFlameFromFile } from './utils/useLoadFlameFromFile'
@@ -85,10 +47,7 @@ import type { v2f } from 'typegpu/data'
 import type { QualityPreset } from './components/Quality/QualityPresets'
 import type { ColorInitMode } from './flame/colorInitMode'
 import type { DrawMode } from './flame/drawMode'
-import type {
-  FlameDescriptor,
-  TransformFunction,
-} from './flame/schema/flameSchema'
+import type { FlameDescriptor, TransformFunction, } from './flame/schema/flameSchema'
 
 const EDGE_FADE_COLOR = {
   light: vec4f(0.96, 0.96, 0.96, 1),

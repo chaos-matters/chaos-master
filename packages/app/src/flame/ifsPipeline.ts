@@ -1,23 +1,7 @@
 import { tgpu } from 'typegpu'
-import {
-  arrayOf,
-  builtin,
-  f32,
-  i32,
-  struct,
-  u32,
-  vec2f,
-  vec2i,
-  vec4u,
-} from 'typegpu/data'
+import { arrayOf, builtin, f32, i32, struct, u32, vec2f, vec2i, vec4u, } from 'typegpu/data'
 import { add, arrayLength, atomicAdd, mul } from 'typegpu/std'
-import {
-  hash,
-  random,
-  randomState,
-  randomUnitDisk,
-  setSeed,
-} from '@/shaders/random'
+import { hash, random, randomState, randomUnitDisk, setSeed, } from '@/shaders/random'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { colorInitModeToImplFn } from './colorInitMode'
 import { createFlameWgsl, extractFlameUniforms } from './transformFunction'

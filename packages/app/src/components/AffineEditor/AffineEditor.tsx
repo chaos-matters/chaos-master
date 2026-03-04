@@ -2,30 +2,14 @@ import { sdRoundedBox2d } from '@typegpu/sdf'
 import { createEffect, createMemo, createSignal, For } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { builtin, vec2f, vec3f, vec4f } from 'typegpu/data'
-import {
-  abs,
-  add,
-  dot,
-  dpdx,
-  fract,
-  length,
-  max,
-  mix,
-  mul,
-  saturate,
-  sub,
-} from 'typegpu/std'
+import { abs, add, dot, dpdx, fract, length, max, mix, mul, saturate, sub, } from 'typegpu/std'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { useCamera } from '@/lib/CameraContext'
 import { useCanvas } from '@/lib/CanvasContext'
 import { useRootContext } from '@/lib/RootContext'
-import {
-  createPosition,
-  createZoom,
-  WheelZoomCamera2D,
-} from '@/lib/WheelZoomCamera2D'
+import { createPosition, createZoom, WheelZoomCamera2D, } from '@/lib/WheelZoomCamera2D'
 import { createAnimationFrame } from '@/utils/createAnimationFrame'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'

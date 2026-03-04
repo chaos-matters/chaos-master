@@ -1,19 +1,5 @@
 import { f32, vec2f } from 'typegpu/data'
-import {
-  atan2,
-  cos,
-  cosh,
-  dot,
-  exp,
-  length,
-  log,
-  pow,
-  select,
-  sin,
-  sinh,
-  sqrt,
-  tan,
-} from 'typegpu/std'
+import { atan2, cos, cosh, dot, exp, length, log, pow, select, sin, sinh, sqrt, tan, } from 'typegpu/std'
 import { random, randomUnitDisk } from '@/shaders/random'
 import { PI } from '../../constants'
 import { simpleVariation } from './types'
@@ -61,7 +47,7 @@ export const fan = simpleVariation('fan', (pos, varInfo) => {
 
 export const linear = simpleVariation('linear', (pos, _varInfo) => {
   'use gpu'
-  return vec2f(pos);
+  return vec2f(pos)
 })
 
 export const randomDisk = simpleVariation('randomDisk', (_pos, _varInfo) => {
