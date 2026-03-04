@@ -1,9 +1,22 @@
+import { sdRoundedBox2d } from '@typegpu/sdf'
 import { createEffect, createMemo, createSignal, For } from 'solid-js'
-import { vec2f } from 'typegpu/data'
-import { add, dot, length, sub } from 'typegpu/std'
+import { tgpu } from 'typegpu'
+import { builtin, vec2f, vec3f, vec4f } from 'typegpu/data'
+import {
+  abs,
+  add,
+  dot,
+  dpdx,
+  fract,
+  length,
+  max,
+  mix,
+  mul,
+  saturate,
+  sub,
+} from 'typegpu/std'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useTheme } from '@/contexts/ThemeContext'
-import { PI } from '@/flame/constants'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { useCamera } from '@/lib/CameraContext'
 import { useCanvas } from '@/lib/CanvasContext'
@@ -18,15 +31,12 @@ import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'
 import { recordEntries } from '@/utils/record'
 import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
-import { wgsl } from '@/utils/wgsl'
 import { handleColor } from '../FlameColorEditor/FlameColorEditor'
 import ui from './AffineEditor.module.css'
 import type { v2f } from 'typegpu/data'
 import type { AffineParams } from '@/flame/affineTranform'
 import type { TransformRecord } from '@/flame/schema/flameSchema'
 import type { HistorySetter } from '@/utils/createStoreHistory'
-
-const { sqrt } = Math
 
 const BACKGROUND_COLOR = {
   light: 1,
@@ -48,9 +58,35 @@ const MINOR_TICK_GRAY = {
   dark: 0.05,
 }
 
+function triangle(x: number) {
+  'use gpu'
+  return abs(fract(x - 0.5) - 0.5)
+}
+
+function lines(x: number, pxWidth: number): number {
+  'use gpu'
+  return saturate((2 * (2 * pxWidth - x)) / pxWidth)
+}
+
+const VertexOutput = {
+  pos: builtin.position,
+  clip: vec2f,
+}
+
+const vertex = tgpu.vertexFn({
+  in: { vertexIndex: builtin.vertexIndex },
+  out: VertexOutput,
+})(({ vertexIndex }) => {
+  'use gpu'
+  const pos = [vec2f(-1, -1), vec2f(3, -1), vec2f(-1, 3)]
+  return {
+    pos: vec4f(pos[vertexIndex]!, 0.0, 1.0),
+    clip: pos[vertexIndex]!,
+  }
+})
+
 function vec2Normalize(a: v2f) {
-  // vec2.normalize has inexplicable 1e-5 check so we implement our own
-  const len = sqrt(a.x * a.x + a.y * a.y) || 1
+  const len = length(a) || 1
   return vec2f(a.x / len, a.y / len)
 }
 
@@ -65,102 +101,50 @@ function Grid() {
   const { context, canvasFormat } = useCanvas()
 
   createEffect(() => {
-    const renderShaderCode = wgsl /* wgsl */ `
-      ${{
-        clipToWorld: camera.wgsl.clipToWorld,
-        resolution: camera.wgsl.resolution,
-        pixelRatio: camera.wgsl.pixelRatio,
-        PI,
-      }}
+    const backgroundGray = BACKGROUND_COLOR[theme()]
+    const axisGray = AXIS_GRAY[theme()]
+    const majorGray = MAJOR_TICK_GRAY[theme()]
+    const minorGray = MINOR_TICK_GRAY[theme()]
 
-      const pos = array(
-        vec2f(-1, -1),
-        vec2f(3, -1),
-        vec2f(-1, 3)
-      );
+    const fragment = tgpu.fragmentFn({
+      in: VertexOutput,
+      out: vec4f,
+    })(({ pos, clip }) => {
+      'use gpu'
+      const halfRes = mul(0.5, camera.wgsl.resolution())
+      const pxRatio = camera.wgsl.pixelRatio()
+      const border = sdRoundedBox2d(
+        sub(pos.xy, halfRes),
+        sub(halfRes, 2 * pxRatio),
+        10 * pxRatio,
+      )
+      const borderAA = saturate(border)
 
-      struct VertexOutput {
-        @builtin(position) pos: vec4f,
-        @location(0) clip: vec2f
-      }
+      const worldPos = camera.wgsl.clipToWorld(clip)
+      const pxWidth = dpdx(worldPos.x)
 
-      @vertex fn vs(
-        @builtin(vertex_index) vertexIndex : u32
-      ) -> VertexOutput {
-        return VertexOutput(
-          vec4f(pos[vertexIndex], 0.0, 1.0), 
-          pos[vertexIndex]
-        );
-      }
+      const minorV = lines(triangle(10 * worldPos.x), 10 * pxWidth)
+      const minorH = lines(triangle(10 * worldPos.y), 10 * pxWidth)
+      const minor = max(minorH, minorV)
 
-      fn triangle(x: f32) -> f32 {
-        return abs(fract(x - 0.5) - 0.5);
-      }
+      const majorV = lines(triangle(worldPos.x), pxWidth)
+      const majorH = lines(triangle(worldPos.y), pxWidth)
+      const major = max(majorH, majorV)
 
-      fn lines(x: f32, pxWidth: f32) -> f32 {
-        return saturate(2 * (2 * pxWidth - x) / pxWidth);
-      }
+      const axisV = lines(abs(worldPos.x), pxWidth)
+      const axisH = lines(abs(worldPos.y), pxWidth)
+      const axis = max(axisH, axisV)
 
-      fn sdBox(p: vec2f, size: vec2f) -> f32{
-        let d = abs(p) - size;
-        return length(max(d, vec2f(0))) + min(max(d.x, d.y), 0);
-      }
-
-      fn sdBoxRound(p: vec2f, size: vec2f, r: f32) -> f32{
-        return sdBox(p, size - r) - r;
-      }
-
-      @fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
-        let halfRes = 0.5 * resolution();
-        let pxRatio = pixelRatio();
-        let border = sdBoxRound(in.pos.xy - halfRes, halfRes - 2 * pxRatio, 10 * pxRatio);
-        let borderAA = saturate(border);
-
-        let worldPos = clipToWorld(in.clip);
-        let pxWidth = dpdx(worldPos.x);
-
-        let minorV = lines(triangle(10 * worldPos.x), 10 * pxWidth);
-        let minorH = lines(triangle(10 * worldPos.y), 10 * pxWidth);
-        let minor = max(minorH, minorV);
-
-        let majorV = lines(triangle(worldPos.x), pxWidth);
-        let majorH = lines(triangle(worldPos.y), pxWidth);
-        let major = max(majorH, majorV);
-
-        let axisV = lines(abs(worldPos.x), pxWidth);
-        let axisH = lines(abs(worldPos.y), pxWidth);
-        let axis = max(axisH, axisV);
-
-        const backgroundGray = ${BACKGROUND_COLOR[theme()]};
-        const axisGray = ${AXIS_GRAY[theme()]};
-        const majorGray = ${MAJOR_TICK_GRAY[theme()]};
-        const minorGray = ${MINOR_TICK_GRAY[theme()]};
-        var gray = mix(backgroundGray, minorGray, minor);
-        gray = mix(gray, majorGray, max(borderAA, major));
-        gray = mix(gray, axisGray, axis);
-        return vec4f(0.02 + vec3f(gray), 1);
-      }
-    `
-
-    const renderModule = device.createShaderModule({
-      code: renderShaderCode,
+      let gray = mix(backgroundGray, minorGray, minor)
+      gray = mix(gray, majorGray, max(borderAA, major))
+      gray = mix(gray, axisGray, axis)
+      return vec4f(add(0.02, vec3f(gray)), 1)
     })
 
-    const renderPipeline = device.createRenderPipeline({
-      layout: device.createPipelineLayout({
-        bindGroupLayouts: [root.unwrap(camera.BindGroupLayout)],
-      }),
-      vertex: {
-        module: renderModule,
-      },
-      fragment: {
-        module: renderModule,
-        targets: [
-          {
-            format: canvasFormat,
-          },
-        ],
-      },
+    const renderPipeline = root.createRenderPipeline({
+      vertex,
+      fragment,
+      targets: { format: canvasFormat },
     })
 
     createEffect(() => {
@@ -180,8 +164,8 @@ function Grid() {
             },
           ],
         })
+        pass.setPipeline(root.unwrap(renderPipeline))
         pass.setBindGroup(0, root.unwrap(camera.bindGroup))
-        pass.setPipeline(renderPipeline)
         pass.draw(3)
         pass.end()
         device.queue.submit([encoder.finish()])

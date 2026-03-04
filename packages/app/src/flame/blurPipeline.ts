@@ -1,6 +1,15 @@
 import { tgpu } from 'typegpu'
-import { arrayOf, vec2i } from 'typegpu/data'
-import { wgsl } from '@/utils/wgsl'
+import { arrayOf, builtin, f32, i32, u32, vec2f, vec2i } from 'typegpu/data'
+import {
+  abs,
+  add,
+  clamp,
+  length,
+  min,
+  smoothstep,
+  sqrt,
+  sub,
+} from 'typegpu/std'
 import {
   Bucket,
   BUCKET_FIXED_POINT_MULTIPLIER,
@@ -37,8 +46,6 @@ export function createBlurPipeline(
     (typeof bindGroupLayout)['entries']['postprocessBuffer']
   >,
 ) {
-  const { device } = root
-
   const textureSizeBuffer = root
     .createBuffer(vec2i, vec2i(...textureSize))
     .$usage('uniform')
@@ -49,70 +56,59 @@ export function createBlurPipeline(
     textureSize: textureSizeBuffer,
   })
 
-  const blurCode = wgsl /* wgsl */ `
-    ${{
-      ...bindGroupLayout.bound,
-    }}
-
-    const fixed_m = ${BUCKET_FIXED_POINT_MULTIPLIER};
-    const fixed_m_inv = ${BUCKET_FIXED_POINT_MULTIPLIER_INV};
-
-    @compute @workgroup_size(${GROUP_SIZE_X}, ${GROUP_SIZE_Y}, 1) fn blur(
-      @builtin(global_invocation_id) global_invocation_id: vec3u
-    ) {
-      let uv = vec2i(global_invocation_id.xy);
-      if (uv.x >= textureSize.x || uv.y >= textureSize.y) {
-        return;
-      }
-
-      let texelIndex = uv.y * textureSize.x + uv.x;
-      let centralTexel = accumulationBuffer[texelIndex];
-      let count = f32(centralTexel.count);
-      let stdDev = (10 + sqrt(count * fixed_m_inv)) * fixed_m;
-      var totalColorA = f32(centralTexel.color.a);
-      var totalColorB = f32(centralTexel.color.b);
-      var totalCount = count;
-      var totalWeight = 1.0;
-      const HALF_SIZE = 2;
-      for(var j = -HALF_SIZE; j <= HALF_SIZE; j += 1) {
-        for(var i = -HALF_SIZE; i <= HALF_SIZE; i += 1) {
-          if (i == 0 && j == 0) { continue; }
-          let shift = vec2i(i, j);
-          let pixelCoord = clamp(uv + shift, vec2i(0), textureSize - 1);
-          let texel = accumulationBuffer[pixelCoord.y * textureSize.x + pixelCoord.x];
-          let texelCount = f32(texel.count);
-          let stdDiff = min(stdDev / (abs(texelCount - count) + 1), 1);
-          let shiftDiff = smoothstep(3, 0, length(vec2f(shift)));
-          let weight = stdDiff * shiftDiff;
-          totalColorA += f32(texel.color.a) * weight;
-          totalColorB += f32(texel.color.b) * weight;
-          totalCount += texelCount * weight;
-          totalWeight += weight;
-        }
-      }
-
-      postprocessBuffer[texelIndex].count = u32(totalCount / totalWeight);
-      postprocessBuffer[texelIndex].color.a = i32(totalColorA / totalWeight);
-      postprocessBuffer[texelIndex].color.b = i32(totalColorB / totalWeight);
+  const blur = tgpu.computeFn({
+    in: { globalInvocationId: builtin.globalInvocationId },
+    workgroupSize: [GROUP_SIZE_X, GROUP_SIZE_Y, 1],
+  })(({ globalInvocationId }) => {
+    const uv = vec2i(globalInvocationId.xy)
+    const textureSize = bindGroupLayout.$.textureSize
+    const accumulationBuffer = bindGroupLayout.$.accumulationBuffer
+    const postprocessBuffer = bindGroupLayout.$.postprocessBuffer
+    if (uv.x >= textureSize.x || uv.y >= textureSize.y) {
+      return
     }
-  `
 
-  const blurModule = device.createShaderModule({
-    code: blurCode,
+    const texelIndex = uv.y * textureSize.x + uv.x
+    const centralTexel = accumulationBuffer[texelIndex]!
+    const count = f32(centralTexel.count)
+    const stdDev =
+      (10 + sqrt(count * BUCKET_FIXED_POINT_MULTIPLIER_INV)) *
+      BUCKET_FIXED_POINT_MULTIPLIER
+    let totalColorA = f32(centralTexel.color.a)
+    let totalColorB = f32(centralTexel.color.b)
+    let totalCount = count
+    let totalWeight = f32(1.0)
+    const HALF_SIZE = 2
+    for (let j = -HALF_SIZE; j <= HALF_SIZE; j += 1) {
+      for (let i = -HALF_SIZE; i <= HALF_SIZE; i += 1) {
+        if (i === 0 && j === 0) {
+          continue
+        }
+        const shift = vec2i(i, j)
+        const pixelCoord = clamp(add(uv, shift), vec2i(0), sub(textureSize, 1))
+        const texel =
+          accumulationBuffer[pixelCoord.y * textureSize.x + pixelCoord.x]!
+        const texelCount = f32(texel.count)
+        const stdDiff = min(stdDev / (abs(texelCount - count) + 1), 1)
+        const shiftDiff = smoothstep(3, 0, length(vec2f(shift)))
+        const weight = stdDiff * shiftDiff
+        totalColorA += f32(texel.color.a) * weight
+        totalColorB += f32(texel.color.b) * weight
+        totalCount += texelCount * weight
+        totalWeight += weight
+      }
+    }
+
+    postprocessBuffer[texelIndex]!.count = u32(totalCount / totalWeight)
+    postprocessBuffer[texelIndex]!.color.a = i32(totalColorA / totalWeight)
+    postprocessBuffer[texelIndex]!.color.b = i32(totalColorB / totalWeight)
   })
 
-  const blurPipeline = device.createComputePipeline({
-    layout: device.createPipelineLayout({
-      bindGroupLayouts: [root.unwrap(bindGroupLayout)],
-    }),
-    compute: {
-      module: blurModule,
-    },
-  })
+  const blurPipeline = root.createComputePipeline({ compute: blur })
 
   return (pass: GPUComputePassEncoder) => {
     const [width, height] = textureSize
-    pass.setPipeline(blurPipeline)
+    pass.setPipeline(root.unwrap(blurPipeline))
     pass.setBindGroup(0, root.unwrap(bindGroup))
     pass.dispatchWorkgroups(
       ceil(width / GROUP_SIZE_X),

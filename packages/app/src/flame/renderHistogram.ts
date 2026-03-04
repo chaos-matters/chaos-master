@@ -27,7 +27,7 @@ export function createRenderHistogramPipeline(
 
   const renderHistogramShaderCode = wgsl /* wgsl */ `
     ${{
-      ...bindGroupLayout.bound,
+      layout: bindGroupLayout,
     }}
 
     struct VertexOutput {
@@ -43,9 +43,9 @@ export function createRenderHistogramPipeline(
 
     @vertex fn vs(@builtin(vertex_index) vertex_index: u32, @builtin(instance_index) instance_index: u32) -> VertexOutput {
       let vertex = rectangle[vertex_index];
-      let binCount = arrayLength(&histogram);
+      let binCount = arrayLength(&layout.$.histogram);
       let binWidth = 1 / f32(binCount);
-      let count = histogram[instance_index];
+      let count = layout.$.histogram[instance_index];
       let x = (f32(instance_index) + vertex.x) * binWidth;
       let y = vertex.y * log2(f32(count)) / 20;
 

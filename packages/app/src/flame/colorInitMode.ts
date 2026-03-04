@@ -5,15 +5,17 @@ import * as v from '@/valibot'
 import type { TgpuFn } from 'typegpu'
 import type { Vec2f } from 'typegpu/data'
 
-export type ColorInitModeFn = TgpuFn<[Vec2f], Vec2f>
+export type ColorInitModeFn = TgpuFn<(pos: Vec2f) => Vec2f>
 const colorInitModeFn = tgpu.fn([vec2f], vec2f)
-export const colorInitModeZero = colorInitModeFn(
-  /* wgsl */ ` (pos: vec2f) -> vec2f { return vec2f(0, 0); }`,
-)
+export const colorInitModeZero = colorInitModeFn(() => {
+  'use gpu'
+  return vec2f(0)
+})
 
-export const colorInitModePosition = colorInitModeFn(
-  /* wgsl */ `(pos: vec2f) -> vec2f { return pos; }`,
-)
+export const colorInitModePosition = colorInitModeFn((pos) => {
+  'use gpu'
+  return vec2f(pos)
+})
 
 export const colorInitModeToImplFn = {
   colorInitZero: colorInitModeZero,
