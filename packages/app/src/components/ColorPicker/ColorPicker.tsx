@@ -1,3 +1,4 @@
+import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { hexToRgbNorm, rgbNormToHex } from '@/utils/hexToRgb'
 import ui from './ColorPicker.module.css'
 import type { v3f } from 'typegpu/data'
@@ -9,6 +10,7 @@ type ColorPickerProps = {
 }
 
 export function ColorPicker(props: ColorPickerProps) {
+  const history = useChangeHistory()
   return (
     <input
       class={`${ui.colorPicker} ${props.class ?? ''}`}
@@ -18,8 +20,14 @@ export function ColorPicker(props: ColorPickerProps) {
       }}
       type="color"
       value={props.value ? rgbNormToHex(props.value) : '#000000'}
+      onClick={() => {
+        history.startPreview('Change Background Color')
+      }}
       onInput={(ev) => {
         props.setValue(hexToRgbNorm(ev.target.value))
+      }}
+      onChange={() => {
+        history.commit()
       }}
     />
   )
