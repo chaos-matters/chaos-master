@@ -1,6 +1,6 @@
 {
   "name": "chaos-master",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "description": "WebGPU based IFS Flame Generator for Artists & Explorers",
   "type": "module",
   "scripts": {
@@ -12,12 +12,13 @@
   },
   "license": "AGPL-3.0-only",
   "dependencies": {
-    "@typegpu/color": "0.9.0",
-    "@vercel/analytics": "1.5.0",
-    "solid-js": "1.9.10",
+    "@typegpu/color": "0.10.0",
+    "@typegpu/sdf": "0.10.0",
+    "@vercel/analytics": "1.6.1",
+    "solid-js": "1.9.11",
     "structurajs": "0.12.6",
-    "typegpu": "0.9.0",
+    "typegpu": "0.10.1",
     "valibot": "1.2.0",
-    "wgpu-matrix": "3.4.0"
+    "wgpu-matrix": "3.4.2"
   }
 }

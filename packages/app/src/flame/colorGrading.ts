@@ -1,7 +1,26 @@
-import { oklabGamutClip, oklabGamutClipSlot, oklabToRgb } from '@typegpu/color'
+import { oklabToRgb } from '@typegpu/color'
 import { tgpu } from 'typegpu'
-import { arrayOf, f32, struct, vec2i, vec4f } from 'typegpu/data'
-import { wgsl } from '@/utils/wgsl'
+import {
+  arrayOf,
+  builtin,
+  f32,
+  struct,
+  vec2f,
+  vec2i,
+  vec3f,
+  vec4f,
+} from 'typegpu/data'
+import {
+  abs,
+  div,
+  log,
+  max,
+  mix,
+  mul,
+  pow,
+  saturate,
+  smoothstep,
+} from 'typegpu/std'
 import { Bucket, BUCKET_FIXED_POINT_MULTIPLIER_INV } from './types'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 import type { DrawModeFn } from './drawMode'
@@ -37,8 +56,6 @@ export function createColorGradingPipeline(
   canvasFormat: GPUTextureFormat,
   drawMode: DrawModeFn,
 ) {
-  const { device } = root
-
   const textureSizeBuffer = root
     .createBuffer(vec2i, vec2i(...textureSize))
     .$usage('uniform')
@@ -49,78 +66,64 @@ export function createColorGradingPipeline(
     textureSize: textureSizeBuffer,
   })
 
-  const renderShaderCode = wgsl /* wgsl */ `
-    ${{
-      ...bindGroupLayout.bound,
-      oklabToRgb: oklabToRgb.with(
-        oklabGamutClipSlot,
-        oklabGamutClip.preserveChroma,
+  const VertexOutput = {
+    pos: builtin.position,
+    uv: vec2f,
+  }
+
+  const vertex = tgpu.vertexFn({
+    in: { vertexIndex: builtin.vertexIndex },
+    out: VertexOutput,
+  })(({ vertexIndex }) => {
+    const pos = [vec2f(-1, -1), vec2f(3, -1), vec2f(-1, 3)]
+    return {
+      pos: vec4f(pos[vertexIndex]!, 0.0, 1.0),
+      uv: pos[vertexIndex]!,
+    }
+  })
+
+  const fragment = tgpu.fragmentFn({
+    in: VertexOutput,
+    out: vec4f,
+  })(({ pos, uv }) => {
+    const uniforms = bindGroupLayout.$.uniforms
+    const textureSize = bindGroupLayout.$.textureSize
+    const accumulationBuffer = bindGroupLayout.$.accumulationBuffer
+    const edgeFade =
+      uniforms.edgeFadeColor.a * smoothstep(0.98, 1, max(abs(uv.x), abs(uv.y)))
+    const backgroundColor = mix(
+      uniforms.backgroundColor,
+      uniforms.edgeFadeColor,
+      edgeFade,
+    )
+    const pos2i = vec2i(pos.xy)
+    const texelIndex = pos2i.y * textureSize.x + pos2i.x
+    const tex = accumulationBuffer[texelIndex]!
+    const count = f32(tex.count) * BUCKET_FIXED_POINT_MULTIPLIER_INV
+    const ab = div(
+      mul(
+        vec2f(f32(tex.color.a), f32(tex.color.b)),
+        BUCKET_FIXED_POINT_MULTIPLIER_INV,
       ),
-      drawMode,
-    }}
-
-    const pos = array(
-      vec2f(-1, -1),
-      vec2f(3, -1),
-      vec2f(-1, 3)
-    );
-
-    struct VertexOutput {
-      @builtin(position) pos: vec4f,
-      @location(0) uv: vec2f
-    }
-
-    @vertex fn vs(
-      @builtin(vertex_index) vertexIndex : u32
-    ) -> VertexOutput {
-      return VertexOutput(
-        vec4f(pos[vertexIndex], 0.0, 1.0), 
-        pos[vertexIndex]
-      );
-    }
-
-    const fixed_m_inv = ${BUCKET_FIXED_POINT_MULTIPLIER_INV};
-
-    @fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
-      let edgeFade = uniforms.edgeFadeColor.a * smoothstep(0.98, 1, max(abs(in.uv.x), abs(in.uv.y)));
-      let backgroundColor = mix(uniforms.backgroundColor, uniforms.edgeFadeColor, edgeFade);
-      let pos2i = vec2i(in.pos.xy);
-      let texelIndex = pos2i.y * textureSize.x + pos2i.x;
-      let tex = accumulationBuffer[texelIndex];
-      let count = f32(tex.count) * fixed_m_inv;
-      let ab = vec2f(f32(tex.color.a), f32(tex.color.b)) * fixed_m_inv / count;
-      let adjustedCount = 0.1 * count * uniforms.averagePointCountPerBucketInv;
-      let value = uniforms.exposure * pow(log(adjustedCount + 1), 0.4545);
-      let rgb = saturate(oklabToRgb(vec3f(drawMode(value), ab)));
-      let alpha = saturate(value) * (1 - edgeFade);
-      let rgba = vec4f(rgb, alpha);
-      return mix(backgroundColor, rgba, alpha);
-    }
-  `
-
-  const renderModule = device.createShaderModule({
-    code: renderShaderCode,
+      count,
+    )
+    const adjustedCount = 0.1 * count * uniforms.averagePointCountPerBucketInv
+    const value = uniforms.exposure * pow(log(adjustedCount + 1), 0.4545)
+    const rgb = saturate(oklabToRgb(vec3f(drawMode(value), ab)))
+    const alpha = saturate(value) * (1 - edgeFade)
+    const rgba = vec4f(rgb, alpha)
+    return mix(backgroundColor, rgba, alpha)
   })
 
-  const renderPipeline = device.createRenderPipeline({
-    layout: device.createPipelineLayout({
-      bindGroupLayouts: [root.unwrap(bindGroupLayout)],
-    }),
-    vertex: {
-      module: renderModule,
-    },
-    fragment: {
-      module: renderModule,
-      targets: [
-        {
-          format: canvasFormat,
-        },
-      ],
-    },
+  const renderPipeline = root.createRenderPipeline({
+    vertex,
+    fragment,
+    targets: { format: canvasFormat },
   })
+
   return {
     run: (pass: GPURenderPassEncoder) => {
-      pass.setPipeline(renderPipeline)
+      pass.setPipeline(root.unwrap(renderPipeline))
       pass.setBindGroup(0, root.unwrap(bindGroup))
       pass.draw(3, 1)
     },

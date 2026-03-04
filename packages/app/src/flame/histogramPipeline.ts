@@ -45,23 +45,24 @@ export function createHistogramPipeline(
 
   const moduleCode = wgsl /* wgsl */ `
     ${{
-      ...bindGroupLayout.bound,
+      layout: bindGroupLayout,
     }}
 
     @compute @workgroup_size(${GROUP_SIZE_X}, ${GROUP_SIZE_Y}, 1) fn run(
       @builtin(global_invocation_id) global_invocation_id: vec3u
     ) {
-      let dims = vec2i(textureDimensions(accumulationTexture));
+      let uniforms = layout.$.uniforms;
+      let dims = vec2i(textureDimensions(layout.$.accumulationTexture));
       let uv = vec2i(global_invocation_id.xy);
       if (uv.x >= dims.x || uv.y >= dims.y) {
         return;
       }
-      let centralTexel = textureLoad(accumulationTexture, uv, 0);
+      let centralTexel = textureLoad(layout.$.accumulationTexture, uv, 0);
       let count = centralTexel.a;
       let adjustedCount = count * uniforms.averagePointCountPerBucketInv;
-      let binCount = arrayLength(&histogram);
+      let binCount = arrayLength(&layout.$.histogram);
       let bin = clamp(u32(adjustedCount * 2000), 0, binCount);
-      atomicAdd(&histogram[bin], 1u);
+      atomicAdd(&layout.$.histogram[bin], 1u);
     }
   `
 
