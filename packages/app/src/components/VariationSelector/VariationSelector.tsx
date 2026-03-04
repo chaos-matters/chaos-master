@@ -4,23 +4,11 @@ import { Dynamic } from 'solid-js/web'
 import { vec2f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { ChangeHistoryContextProvider } from '@/contexts/ChangeHistoryContext'
-import {
-  DEFAULT_VARIATION_PREVIEW_POINT_COUNT,
-  DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS,
-  DEFAULT_VARIATION_SHOW_DELAY_MS,
-} from '@/defaults'
+import { DEFAULT_VARIATION_PREVIEW_POINT_COUNT, DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS, DEFAULT_VARIATION_SHOW_DELAY_MS, } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
-import {
-  MAX_CAMERA_ZOOM_VALUE,
-  MIN_CAMERA_ZOOM_VALUE,
-} from '@/flame/schema/flameSchema'
+import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from '@/flame/schema/flameSchema'
 import { isParametricVariation, variationTypes } from '@/flame/variations'
-import {
-  getParamsEditor,
-  getVariationPreviewFlame,
-  transformPreviewId,
-  variationPreviewId,
-} from '@/flame/variations/utils'
+import { getParamsEditor, getVariationPreviewFlame, transformPreviewId, variationPreviewId, } from '@/flame/variations/utils'
 import { HoverEyePreview, HoverPreview } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
@@ -38,12 +26,7 @@ import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './VariationSelector.module.css'
 import type { Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
-import type {
-  FlameDescriptor,
-  TransformFunction,
-  TransformId,
-  VariationId,
-} from '@/flame/schema/flameSchema'
+import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from '@/flame/schema/flameSchema'
 import type { TransformVariationDescriptor } from '@/flame/variations'
 import type { ChangeHistory } from '@/utils/createStoreHistory'
 

@@ -1,14 +1,7 @@
 import { batch, createSignal } from 'solid-js'
 import { produce, unwrap } from 'solid-js/store'
-import {
-  applyPatchesMutatively,
-  enableStandardPatches,
-  produceWithPatches,
-} from 'structurajs'
-import {
-  compressPatches,
-  forwardBackwardPatchPairDoesNothing,
-} from './compressPatches'
+import { applyPatchesMutatively, enableStandardPatches, produceWithPatches, } from 'structurajs'
+import { compressPatches, forwardBackwardPatchPairDoesNothing, } from './compressPatches'
 import type { SetStoreFunction, Store } from 'solid-js/store'
 import type { Patch } from 'structurajs'
 

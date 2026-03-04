@@ -1,26 +1,7 @@
 import { oklabToRgb } from '@typegpu/color'
 import { tgpu } from 'typegpu'
-import {
-  arrayOf,
-  builtin,
-  f32,
-  struct,
-  vec2f,
-  vec2i,
-  vec3f,
-  vec4f,
-} from 'typegpu/data'
-import {
-  abs,
-  div,
-  log,
-  max,
-  mix,
-  mul,
-  pow,
-  saturate,
-  smoothstep,
-} from 'typegpu/std'
+import { arrayOf, builtin, f32, struct, vec2f, vec2i, vec3f, vec4f, } from 'typegpu/data'
+import { abs, div, log, max, mix, mul, pow, saturate, smoothstep, } from 'typegpu/std'
 import { Bucket, BUCKET_FIXED_POINT_MULTIPLIER_INV } from './types'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 import type { DrawModeFn } from './drawMode'

@@ -1,11 +1,6 @@
 import { createSignal, Show } from 'solid-js'
 import { isDev } from 'solid-js/web'
-import {
-  accumulatedPointCount,
-  iterationSpeedPointPerSec,
-  qualityPointCountLimit,
-  renderTimings,
-} from '@/flame/renderStats'
+import { accumulatedPointCount, iterationSpeedPointPerSec, qualityPointCountLimit, renderTimings, } from '@/flame/renderStats'
 import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
 import ui from './DebugPanel.module.css'
 

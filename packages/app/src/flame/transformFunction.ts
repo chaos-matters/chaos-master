@@ -6,12 +6,7 @@ import { AffineParams, transformAffine } from './affineTranform'
 import { Point } from './types'
 import { isParametricVariationType, transformVariations } from './variations'
 import { VariationInfo } from './variations/simple/types'
-import type {
-  FlameDescriptor,
-  TransformFunction,
-  TransformId,
-  VariationId,
-} from './schema/flameSchema'
+import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from './schema/flameSchema'
 import type { TransformVariationType } from './variations'
 
 const FlameUniformsBase = struct({
