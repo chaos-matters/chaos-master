@@ -13,8 +13,6 @@ import type { FlameDescriptor, TransformRecord } from './schema/flameSchema'
 import type { Bucket } from './types'
 import type { CameraContext } from '@/lib/CameraContext'
 
-type AnyAtomic = Parameters<typeof atomicAdd>[0]
-
 const { ceil } = Math
 const IFS_GROUP_SIZE = 64
 
@@ -157,34 +155,31 @@ export function createIFSPipeline(
     const screenI = vec2i(jittered)
     const pixelIndex = screenI.y * outputTextureDimension.x + screenI.x
     const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
+    atomicAdd(accumulationBuffer[pixelIndex]!.count, u32(1 * fixed_m))
     atomicAdd(
-      accumulationBuffer[pixelIndex]!.count as unknown as AnyAtomic,
-      u32(1 * fixed_m),
-    )
-    atomicAdd(
-      accumulationBuffer[pixelIndex]!.color.a as unknown as AnyAtomic,
+      accumulationBuffer[pixelIndex]!.color.a,
       i32(point.color.x * f32(fixed_m)),
     )
     atomicAdd(
-      accumulationBuffer[pixelIndex]!.color.b as unknown as AnyAtomic,
+      accumulationBuffer[pixelIndex]!.color.b,
       i32(point.color.y * f32(fixed_m)),
     )
   })
 
-  const ifsPipeline = root.createComputePipeline({
-    compute: ifsCompute,
-  })
+  const ifsPipeline = root
+    .createComputePipeline({ compute: ifsCompute })
+    .with(camera.bindGroup)
+    .with(bindGroup)
 
   return {
     run: (pass: GPUComputePassEncoder, pointCount: number) => {
-      pass.setPipeline(root.unwrap(ifsPipeline))
-      pass.setBindGroup(0, root.unwrap(bindGroup))
-      pass.setBindGroup(1, root.unwrap(camera.bindGroup))
-      pass.dispatchWorkgroups(
-        ceil(pointCount / (IFS_GROUP_SIZE * IFS_GROUP_SIZE)),
-        IFS_GROUP_SIZE,
-        1,
-      )
+      ifsPipeline
+        .with(pass)
+        .dispatchWorkgroups(
+          ceil(pointCount / (IFS_GROUP_SIZE * IFS_GROUP_SIZE)),
+          IFS_GROUP_SIZE,
+          1,
+        )
     },
     update: (flameDescriptor: FlameDescriptor) => {
       flameUniformsBuffer.write(extractFlameUniforms(flameDescriptor))

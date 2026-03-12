@@ -96,17 +96,17 @@ export function createColorGradingPipeline(
     return mix(backgroundColor, rgba, alpha)
   })
 
-  const renderPipeline = root.createRenderPipeline({
-    vertex,
-    fragment,
-    targets: { format: canvasFormat },
-  })
+  const renderPipeline = root
+    .createRenderPipeline({
+      vertex,
+      fragment,
+      targets: { format: canvasFormat },
+    })
+    .with(bindGroup)
 
   return {
     run: (pass: GPURenderPassEncoder) => {
-      pass.setPipeline(root.unwrap(renderPipeline))
-      pass.setBindGroup(0, root.unwrap(bindGroup))
-      pass.draw(3, 1)
+      renderPipeline.with(pass).draw(3)
     },
   }
 }

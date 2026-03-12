@@ -1,12 +1,12 @@
 import { tgpu } from 'typegpu'
-import { arrayOf, atomic, f32, texture2d, u32 } from 'typegpu/data'
-import { wgsl } from '@/utils/wgsl'
+import { arrayOf, atomic, builtin, f32, u32 } from 'typegpu/data'
+import { arrayLength, atomicAdd, clamp } from 'typegpu/std'
 import { ColorGradingUniforms } from './colorGrading'
+import { Bucket, BUCKET_FIXED_POINT_MULTIPLIER_INV } from './types'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 
-export const HISTOGRAM_BIN_COUNT = 1024
-const GROUP_SIZE_X = 8
-const GROUP_SIZE_Y = 4
+export const HISTOGRAM_BIN_COUNT = 256
+const GROUP_SIZE = 32
 
 const { ceil } = Math
 
@@ -14,9 +14,9 @@ const bindGroupLayout = tgpu.bindGroupLayout({
   uniforms: {
     uniform: ColorGradingUniforms,
   },
-  accumulationTexture: {
-    texture: texture2d(f32),
-    sampleType: 'unfilterable-float',
+  accumulationBuffer: {
+    storage: (length: number) => arrayOf(Bucket, length),
+    access: 'readonly',
   },
   histogram: {
     storage: arrayOf(atomic(u32)),
@@ -28,65 +28,56 @@ export function createHistogramPipeline(
   root: TgpuRoot,
   textureSize: [number, number],
   uniforms: LayoutEntryToInput<(typeof bindGroupLayout)['entries']['uniforms']>,
-  accumulationTexture: LayoutEntryToInput<
-    (typeof bindGroupLayout)['entries']['accumulationTexture']
+  accumulationBuffer: LayoutEntryToInput<
+    (typeof bindGroupLayout)['entries']['accumulationBuffer']
   >,
   histogram: LayoutEntryToInput<
     (typeof bindGroupLayout)['entries']['histogram']
   >,
 ) {
-  const { device } = root
-
   const bindGroup = root.createBindGroup(bindGroupLayout, {
     uniforms,
-    accumulationTexture,
+    accumulationBuffer,
     histogram,
   })
 
-  const moduleCode = wgsl /* wgsl */ `
-    ${{
-      layout: bindGroupLayout,
-    }}
-
-    @compute @workgroup_size(${GROUP_SIZE_X}, ${GROUP_SIZE_Y}, 1) fn run(
-      @builtin(global_invocation_id) global_invocation_id: vec3u
-    ) {
-      let uniforms = layout.$.uniforms;
-      let dims = vec2i(textureDimensions(layout.$.accumulationTexture));
-      let uv = vec2i(global_invocation_id.xy);
-      if (uv.x >= dims.x || uv.y >= dims.y) {
-        return;
-      }
-      let centralTexel = textureLoad(layout.$.accumulationTexture, uv, 0);
-      let count = centralTexel.a;
-      let adjustedCount = count * uniforms.averagePointCountPerBucketInv;
-      let binCount = arrayLength(&layout.$.histogram);
-      let bin = clamp(u32(adjustedCount * 2000), 0, binCount);
-      atomicAdd(&layout.$.histogram[bin], 1u);
-    }
-  `
-
-  const module = device.createShaderModule({
-    code: moduleCode,
-  })
-
-  const pipeline = device.createComputePipeline({
-    layout: device.createPipelineLayout({
-      bindGroupLayouts: [root.unwrap(bindGroupLayout)],
-    }),
-    compute: {
-      module: module,
+  const compute = tgpu.computeFn({
+    workgroupSize: [GROUP_SIZE, 1, 1],
+    in: {
+      numWorkgroups: builtin.numWorkgroups,
+      workgroupId: builtin.workgroupId,
+      localInvocationIndex: builtin.localInvocationIndex,
     },
+  })(({ numWorkgroups, workgroupId, localInvocationIndex }) => {
+    const uniforms = bindGroupLayout.$.uniforms
+    const workgroupIndex =
+      workgroupId.x +
+      workgroupId.y * numWorkgroups.x +
+      workgroupId.z * numWorkgroups.x * numWorkgroups.y
+
+    const threadIndex = workgroupIndex * GROUP_SIZE + localInvocationIndex
+
+    if (threadIndex >= arrayLength(bindGroupLayout.$.accumulationBuffer)) {
+      return
+    }
+    const texel = bindGroupLayout.$.accumulationBuffer[threadIndex]!
+    const count = f32(texel.count) * BUCKET_FIXED_POINT_MULTIPLIER_INV
+    const adjustedCount = count * uniforms.averagePointCountPerBucketInv
+    const binCount = arrayLength(bindGroupLayout.$.histogram)
+    const bin = clamp(u32(adjustedCount * 200), 0, binCount)
+    atomicAdd(bindGroupLayout.$.histogram[bin]!, 1)
   })
+
+  const pipeline = root.createComputePipeline({ compute }).with(bindGroup)
 
   return (pass: GPUComputePassEncoder) => {
     const [width, height] = textureSize
-    pass.setPipeline(pipeline)
-    pass.setBindGroup(0, root.unwrap(bindGroup))
-    pass.dispatchWorkgroups(
-      ceil(width / GROUP_SIZE_X),
-      ceil(height / GROUP_SIZE_Y),
-      1,
-    )
+    pipeline
+      .with(pass)
+      .dispatchWorkgroups(
+        ceil((width * height) / (GROUP_SIZE * GROUP_SIZE)),
+        GROUP_SIZE,
+        1,
+      )
   }
 }

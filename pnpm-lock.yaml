@@ -63,7 +63,7 @@ importers:
         version: 5.2.0(typescript@5.9.3)
       unplugin-typegpu:
         specifier: ^0.10.0
-        version: 0.10.0(typegpu@0.10.1)
+        version: 0.10.0(typegpu@0.10.2)
       vite:
         specifier: ^7.3.1
         version: 7.3.1
@@ -84,10 +84,10 @@ importers:
     dependencies:
       '@typegpu/color':
         specifier: 0.10.0
-        version: 0.10.0(typegpu@0.10.1)
+        version: 0.10.0(typegpu@0.10.2)
       '@typegpu/sdf':
         specifier: 0.10.0
-        version: 0.10.0(typegpu@0.10.1)
+        version: 0.10.0(typegpu@0.10.2)
       '@vercel/analytics':
         specifier: 1.6.1
         version: 1.6.1
@@ -98,8 +98,8 @@ importers:
         specifier: 0.12.6
         version: 0.12.6
       typegpu:
-        specifier: 0.10.1
-        version: 0.10.1
+        specifier: 0.10.2
+        version: 0.10.2
       valibot:
         specifier: 1.2.0
         version: 1.2.0(typescript@5.9.3)
@@ -1699,8 +1699,8 @@ packages:
   typed-binary@4.3.2:
     resolution: {integrity: sha512-HT3pIBM2njCZUmeczDaQUUErGiM6GXFCqMsHegE12HCoBtvHCkfR10JJni0TeGOTnLilTd6YFyj+YhflqQDrDQ==}
 
-  typegpu@0.10.1:
-    resolution: {integrity: sha512-2TmNs924fCBlzzR6Yl7lUDACt1Ti/I89p+bBiO9GKqfwUlPO6y4Ji6yIoMz0mmllp3PiJri4lCTvZdyR5ZRuHQ==}
+  typegpu@0.10.2:
+    resolution: {integrity: sha512-5DZRvNtsbvRM++MONmwxfX0+vYAZgPKnGNCB8nnr3jwXo/gaOJ51WcgKRU8cHvK0RvMikCCVdolwBeEC0B9m7A==}
     engines: {node: '>=12.20.0'}
 
   typescript-eslint@8.56.1:
@@ -2338,13 +2338,13 @@ snapshots:
       tslib: 2.8.1
     optional: true
 
-  '@typegpu/color@0.10.0(typegpu@0.10.1)':
+  '@typegpu/color@0.10.0(typegpu@0.10.2)':
     dependencies:
-      typegpu: 0.10.1
+      typegpu: 0.10.2
 
-  '@typegpu/sdf@0.10.0(typegpu@0.10.1)':
+  '@typegpu/sdf@0.10.0(typegpu@0.10.2)':
     dependencies:
-      typegpu: 0.10.1
+      typegpu: 0.10.2
 
   '@types/babel__core@7.20.5':
     dependencies:
@@ -3386,7 +3386,7 @@ snapshots:
 
   typed-binary@4.3.2: {}
 
-  typegpu@0.10.1:
+  typegpu@0.10.2:
     dependencies:
       tinyest: 0.3.0
       tsover-runtime: 0.0.5
@@ -3430,7 +3430,7 @@ snapshots:
 
   undici@7.22.0: {}
 
-  unplugin-typegpu@0.10.0(typegpu@0.10.1):
+  unplugin-typegpu@0.10.0(typegpu@0.10.2):
     dependencies:
       '@babel/standalone': 7.29.1
       defu: 6.1.4
@@ -3440,7 +3440,7 @@ snapshots:
       picomatch: 4.0.3
       tinyest: 0.3.0
       tinyest-for-wgsl: 0.3.0
-      typegpu: 0.10.1
+      typegpu: 0.10.2
       unplugin: 2.3.11
 
   unplugin@2.3.11:

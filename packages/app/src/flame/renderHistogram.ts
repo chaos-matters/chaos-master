@@ -1,7 +1,7 @@
 import { tgpu } from 'typegpu'
-import { arrayOf, u32 } from 'typegpu/data'
+import { arrayOf, builtin, f32, u32, vec2f, vec4f } from 'typegpu/data'
+import { arrayLength, log2 } from 'typegpu/std'
 import { alphaBlend } from '@/utils/blendModes'
-import { wgsl } from '@/utils/wgsl'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 
 const bindGroupLayout = tgpu
@@ -18,75 +18,46 @@ export function createRenderHistogramPipeline(
   histogram: LayoutEntryToInput<
     (typeof bindGroupLayout)['entries']['histogram']
   >,
+  canvasFormat: GPUTextureFormat,
 ) {
-  const { device } = root
-
   const bindGroup = root.createBindGroup(bindGroupLayout, {
     histogram,
   })
 
-  const renderHistogramShaderCode = wgsl /* wgsl */ `
-    ${{
-      layout: bindGroupLayout,
-    }}
+  const VertexOutput = {
+    position: builtin.position,
+  }
 
-    struct VertexOutput {
-      @builtin(position) position: vec4f
-    }
-
-    const rectangle = array(
-      vec2f(0, 0),
-      vec2f(1, 0),
-      vec2f(0, 1),
-      vec2f(1, 1)
-    );
-
-    @vertex fn vs(@builtin(vertex_index) vertex_index: u32, @builtin(instance_index) instance_index: u32) -> VertexOutput {
-      let vertex = rectangle[vertex_index];
-      let binCount = arrayLength(&layout.$.histogram);
-      let binWidth = 1 / f32(binCount);
-      let count = layout.$.histogram[instance_index];
-      let x = (f32(instance_index) + vertex.x) * binWidth;
-      let y = vertex.y * log2(f32(count)) / 20;
-
-      return VertexOutput(
-        vec4f(x * 2 - 1, y * 2 - 1, 0, 1)
-      );
-    }
-
-    @fragment fn fs(in: VertexOutput) -> @location(0) vec4f {
-      return vec4f(1, 1, 1, 1);
-    }
-  `
-
-  const module = device.createShaderModule({
-    code: renderHistogramShaderCode,
+  const vertex = tgpu.vertexFn({
+    in: {
+      vertexIndex: builtin.vertexIndex,
+      instanceIndex: builtin.instanceIndex,
+    },
+    out: VertexOutput,
+  })(({ vertexIndex, instanceIndex }) => {
+    const rectangle = [vec2f(0, 0), vec2f(1, 0), vec2f(0, 1), vec2f(1, 1)]
+    const vertex = rectangle[vertexIndex]!
+    const binCount = arrayLength(bindGroupLayout.$.histogram)
+    const binWidth = 1 / f32(binCount)
+    const count = bindGroupLayout.$.histogram[instanceIndex]!
+    const x = (f32(instanceIndex) + vertex.x) * binWidth
+    const y = (vertex.y * log2(f32(count + 1))) / 50
+    return { position: vec4f(x * 2 - 1, y * 2 - 1, 0, 1) }
   })
 
-  const renderHistogramPipeline = device.createRenderPipeline({
-    layout: device.createPipelineLayout({
-      bindGroupLayouts: [root.unwrap(bindGroupLayout)],
-    }),
-    primitive: {
-      topology: 'triangle-strip',
-    },
-    vertex: {
-      module,
-    },
-    fragment: {
-      module,
-      targets: [
-        {
-          format: globalThis.navigator.gpu.getPreferredCanvasFormat(),
-          blend: alphaBlend,
-        },
-      ],
-    },
-  })
+  const fragment = tgpu.fragmentFn({ in: VertexOutput, out: vec4f })(() =>
+    vec4f(1),
+  )
+  const pipeline = root
+    .createRenderPipeline({
+      vertex,
+      fragment,
+      primitive: { topology: 'triangle-strip' },
+      targets: { format: canvasFormat, blend: alphaBlend },
+    })
+    .with(bindGroup)
 
   return (pass: GPURenderPassEncoder, binCount: number) => {
-    pass.setPipeline(renderHistogramPipeline)
-    pass.setBindGroup(0, root.unwrap(bindGroup))
-    pass.draw(4, binCount)
+    pipeline.with(pass).draw(4, binCount)
   }
 }

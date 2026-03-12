@@ -91,16 +91,18 @@ export function createBlurPipeline(
     postprocessBuffer[texelIndex]!.color.b = i32(totalColorB / totalWeight)
   })
 
-  const blurPipeline = root.createComputePipeline({ compute: blur })
+  const blurPipeline = root
+    .createComputePipeline({ compute: blur })
+    .with(bindGroup)
 
   return (pass: GPUComputePassEncoder) => {
     const [width, height] = textureSize
-    pass.setPipeline(root.unwrap(blurPipeline))
-    pass.setBindGroup(0, root.unwrap(bindGroup))
-    pass.dispatchWorkgroups(
-      ceil(width / GROUP_SIZE_X),
-      ceil(height / GROUP_SIZE_Y),
-      1,
-    )
+    blurPipeline
+      .with(pass)
+      .dispatchWorkgroups(
+        ceil(width / GROUP_SIZE_X),
+        ceil(height / GROUP_SIZE_Y),
+        1,
+      )
   }
 }
