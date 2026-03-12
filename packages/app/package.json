@@ -17,7 +17,7 @@
     "@vercel/analytics": "1.6.1",
     "solid-js": "1.9.11",
     "structurajs": "0.12.6",
-    "typegpu": "0.10.1",
+    "typegpu": "0.10.2",
     "valibot": "1.2.0",
     "wgpu-matrix": "3.4.2"
   }
