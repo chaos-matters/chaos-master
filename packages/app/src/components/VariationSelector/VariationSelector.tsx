@@ -8,7 +8,7 @@ import { DEFAULT_VARIATION_PREVIEW_POINT_COUNT, DEFAULT_VARIATION_PREVIEW_RENDER
 import { Flam3 } from '@/flame/Flam3'
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from '@/flame/schema/flameSchema'
 import { isParametricVariation, variationTypes } from '@/flame/variations'
-import { getParamsEditor, getVariationPreviewFlame, transformPreviewId, variationPreviewId, } from '@/flame/variations/utils'
+import { getNormalizedVariationName, getParamsEditor, getTransformPreviewTid, getTransformPreviewVid, getVariationPreviewFlame, } from '@/flame/variations/utils'
 import { HoverEyePreview, HoverPreview } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
@@ -188,6 +188,18 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
             if (previewTr !== undefined) {
               previewTr.preAffine = transform.preAffine
               previewTr.variations[props.variationId] = variation
+              // in general we are swapping target variation with the selected preview one,
+              // this might not be exact as the variation preview is, as
+              // some variation previews are artifitially beutified by adding extra variations,
+              // if one wants to check such output in the preview itself -- uncomment below
+              // for (const [varId, customVar] of recordEntries(
+              //   transform.variations,
+              // )) {
+              //   if (variation.type !== customVar.type) {
+              //     previewTr.variations[varId] = customVar
+              //   }
+              // }
+
               // TODO: see what else to copy from variation flame setup
               draft.renderSettings.exposure =
                 selectedItem.renderSettings.exposure
@@ -296,7 +308,9 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                         >
                           <VariationPreview flame={variationExample} />
                         </DelayedShow>
-                        <div class={ui.itemTitle}>{variation.type}</div>
+                        <div class={ui.itemTitle}>
+                          {getNormalizedVariationName(variation.type)}
+                        </div>
                       </button>
                     </div>
                   )
@@ -331,8 +345,10 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                                     ) => {
                                       const variationDraft =
                                         draft[id]?.transforms[
-                                          transformPreviewId
-                                        ]?.variations[variationPreviewId]
+                                          getTransformPreviewTid(variation.type)
+                                        ]?.variations[
+                                          getTransformPreviewVid(variation.type)
+                                        ]
                                       if (
                                         variationDraft === undefined ||
                                         !isParametricVariation(variationDraft)

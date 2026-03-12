@@ -5,6 +5,7 @@ export const empty = defineExample({
     exposure: 0.25,
     skipIters: 20,
     drawMode: 'light',
+    colorInitMode: 'colorInitZero',
     backgroundColor: [0, 0, 0],
     camera: {
       zoom: 1,
