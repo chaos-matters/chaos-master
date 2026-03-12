@@ -25,13 +25,13 @@ import { ThemeContextProvider, useTheme } from './contexts/ThemeContext'
 import { DEFAULT_POINT_COUNT, DEFAULT_QUALITY, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_RESOLUTION, } from './defaults'
 import { colorInitModeToImplFn } from './flame/colorInitMode'
 import { drawModeToImplFn } from './flame/drawMode'
-import { examples } from './flame/examples'
+import { example1 } from './flame/examples/example1'
 import { Flam3 } from './flame/Flam3'
 import { accumulatedPointCount, qualityPointCountLimit, setCurrentQuality, setQualityPointCountLimit, } from './flame/renderStats'
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from './flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from './flame/transformFunction'
 import { isParametricVariation, isVariationType } from './flame/variations'
-import { getParamsEditor, getVariationDefault } from './flame/variations/utils'
+import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } from './flame/variations/utils'
 import { Cross, Plus } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
 import { Root } from './lib/Root'
@@ -68,10 +68,7 @@ function newDefaultTransform(): TransformFunction {
     preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
     postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
     variations: {
-      [generateVariationId()]: {
-        type: 'linear',
-        weight: 1,
-      },
+      [generateVariationId()]: getVariationDefault('linear', 1.0),
     },
   }
 }
@@ -93,9 +90,7 @@ function App(props: AppProps) {
   const [showSidebar, setShowSidebar] = createSignal(true)
   const [flameDescriptor, setFlameDescriptor, history] = createStoreHistory(
     createStore(
-      structuredClone(
-        props.flameFromQuery ? props.flameFromQuery : examples.example1,
-      ),
+      structuredClone(props.flameFromQuery ? props.flameFromQuery : example1),
     ),
   )
   const totalProbability = createMemo(() =>
@@ -137,13 +132,12 @@ function App(props: AppProps) {
   const setFlamePosition: Setter<v2f> = (value) => {
     if (typeof value === 'function') {
       setFlameDescriptor((draft) => {
-        draft.renderSettings.camera.position = value(
-          vec2f(...draft.renderSettings.camera.position),
-        )
+        const newPos = value(vec2f(...draft.renderSettings.camera.position))
+        draft.renderSettings.camera.position = [newPos.x, newPos.y]
       })
     } else {
       setFlameDescriptor((draft) => {
-        draft.renderSettings.camera.position = value
+        draft.renderSettings.camera.position = [value.x, value.y]
       })
     }
     return flameDescriptor.renderSettings.camera.position
@@ -382,7 +376,7 @@ function App(props: AppProps) {
                             }}
                           >
                             <div class={ui.variationButtonText}>
-                              {variation.type}
+                              {getNormalizedVariationName(variation.type)}
                             </div>
                           </button>
                           <Slider

@@ -145,9 +145,10 @@ export function createIFSPipeline(
       // a double-counting on the first row/column
       jittered.x < 0 ||
       jittered.y < 0 ||
-      jittered.x > outputTextureDimensionF.x
-      // not necessary to check y, it will just fall out of buffer
-      // jittered.y > outputTextureDimensionF.y
+      jittered.x > outputTextureDimensionF.x ||
+      // TODO: skipping this causes weird white dots artifacts for some variations (probs infinite
+      // values get mapped to the clip space somehow)
+      jittered.y > outputTextureDimensionF.y
     ) {
       return
     }

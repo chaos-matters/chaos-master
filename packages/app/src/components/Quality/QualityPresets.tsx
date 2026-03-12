@@ -1,5 +1,5 @@
 import { For } from 'solid-js'
-import { DEFAULT_ULTRA_QUALITY } from '@/defaults'
+import { DEFAULT_HIGH_QUALITY, DEFAULT_ULTRA_QUALITY } from '@/defaults'
 import { recordKeys } from '@/utils/record'
 import ui from './QualityPresets.module.css'
 import type { Setter } from 'solid-js'
@@ -7,7 +7,7 @@ import type { Setter } from 'solid-js'
 export const qualityPresets = {
   low: 0.75,
   mid: 0.85,
-  high: 0.95,
+  high: DEFAULT_HIGH_QUALITY,
   ultra: DEFAULT_ULTRA_QUALITY,
 } satisfies Record<string, number>
 export type QualityPreset = keyof typeof qualityPresets
