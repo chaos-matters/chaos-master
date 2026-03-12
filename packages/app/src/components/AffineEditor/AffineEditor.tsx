@@ -125,11 +125,13 @@ function Grid() {
       return vec4f(add(0.02, vec3f(gray)), 1)
     })
 
-    const renderPipeline = root.createRenderPipeline({
-      vertex,
-      fragment,
-      targets: { format: canvasFormat },
-    })
+    const renderPipeline = root
+      .createRenderPipeline({
+        vertex,
+        fragment,
+        targets: { format: canvasFormat },
+      })
+      .with(camera.bindGroup)
 
     createEffect(() => {
       camera.update()
@@ -148,9 +150,7 @@ function Grid() {
             },
           ],
         })
-        pass.setPipeline(root.unwrap(renderPipeline))
-        pass.setBindGroup(0, root.unwrap(camera.bindGroup))
-        pass.draw(3)
+        renderPipeline.with(pass).draw(3)
         pass.end()
         device.queue.submit([encoder.finish()])
       },
