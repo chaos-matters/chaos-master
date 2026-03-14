@@ -1,4 +1,5 @@
 import { oklabToRgb } from '@typegpu/color'
+import { onCleanup } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { arrayOf, builtin, f32, struct, vec2f, vec2i, vec3f, vec4f, } from 'typegpu/data'
 import { abs, div, log, max, mix, mul, pow, saturate, smoothstep, } from 'typegpu/std'
@@ -40,6 +41,10 @@ export function createColorGradingPipeline(
   const textureSizeBuffer = root
     .createBuffer(vec2i, vec2i(...textureSize))
     .$usage('uniform')
+
+  onCleanup(() => {
+    textureSizeBuffer.destroy()
+  })
 
   const bindGroup = root.createBindGroup(bindGroupLayout, {
     uniforms,
