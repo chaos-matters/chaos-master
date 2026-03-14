@@ -29,6 +29,12 @@ export function createTimestampQuery<T extends string>(
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
   })
 
+  // TODO: find out why there's a warning if we do this
+  // onCleanup(() => {
+  //   timestampBuffer.destroy()
+  //   timestampMappable.destroy()
+  // })
+
   function timestampWrites(frameId: number) {
     const locationIndex = (frameId % pairLocationCount) * timestampCount * 2
     return Object.fromEntries(

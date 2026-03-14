@@ -1,5 +1,6 @@
+import { onCleanup } from 'solid-js'
 import { tgpu } from 'typegpu'
-import { arrayOf, builtin, f32, i32, struct, u32, vec2f, vec2i, vec4u, } from 'typegpu/data'
+import { arrayOf, builtin, f32, i32, struct, u32, vec2f, vec2i, vec2u, } from 'typegpu/data'
 import { add, arrayLength, atomicAdd, mul } from 'typegpu/std'
 import { hash, random, randomState, randomUnitDisk, setSeed, } from '@/shaders/random'
 import { recordEntries, recordKeys } from '@/utils/record'
@@ -7,7 +8,7 @@ import { colorInitModeToImplFn } from './colorInitMode'
 import { createFlameWgsl, extractFlameUniforms } from './transformFunction'
 import { AtomicBucket, BUCKET_FIXED_POINT_MULTIPLIER, Point } from './types'
 import type { StorageFlag, TgpuBuffer, TgpuRoot } from 'typegpu'
-import type { Vec4u, WgslArray } from 'typegpu/data'
+import type { Vec2u, WgslArray } from 'typegpu/data'
 import type { ColorInitMode } from './colorInitMode'
 import type { FlameDescriptor, TransformRecord } from './schema/flameSchema'
 import type { Bucket } from './types'
@@ -20,7 +21,7 @@ export function createIFSPipeline(
   root: TgpuRoot,
   camera: CameraContext,
   insideShaderCount: number,
-  pointRandomSeeds: TgpuBuffer<WgslArray<Vec4u>> & StorageFlag,
+  pointRandomSeeds: TgpuBuffer<WgslArray<Vec2u>> & StorageFlag,
   transforms: TransformRecord,
   outputTextureDimension: readonly [number, number],
   accumulationBuffer: TgpuBuffer<WgslArray<typeof Bucket>> & StorageFlag,
@@ -44,7 +45,7 @@ export function createIFSPipeline(
 
   const bindGroupLayout = tgpu.bindGroupLayout({
     pointRandomSeeds: {
-      storage: arrayOf(vec4u),
+      storage: arrayOf(vec2u),
       access: 'mutable',
     },
     flameUniforms: {
@@ -61,10 +62,14 @@ export function createIFSPipeline(
   })
 
   const flameUniformsBuffer = root.createBuffer(FlameUniforms).$usage('storage')
-
   const outputTextureDimensionBuffer = root
     .createBuffer(vec2i, vec2i(...outputTextureDimension))
     .$usage('uniform')
+
+  onCleanup(() => {
+    flameUniformsBuffer.destroy()
+    outputTextureDimensionBuffer.destroy()
+  })
 
   const bindGroup = root.createBindGroup(bindGroupLayout, {
     pointRandomSeeds,
@@ -117,7 +122,7 @@ export function createIFSPipeline(
     }
 
     const pointSeed = pointRandomSeeds[pointIndex]!
-    const seed = add(pointSeed, hash(1234 * pointIndex + pointSeed.x))
+    const seed = add(pointSeed, hash(pointIndex))
     setSeed(seed)
 
     let point = Point()
@@ -135,7 +140,7 @@ export function createIFSPipeline(
       add(mul(clip, vec2f(0.5, -0.5)), 0.5),
     )
 
-    bindGroupLayout.$.pointRandomSeeds[pointIndex] = vec4u(randomState.$)
+    bindGroupLayout.$.pointRandomSeeds[pointIndex] = vec2u(randomState.$)
 
     // antialiasing jitter
     const jittered = add(screen, randomUnitDisk())

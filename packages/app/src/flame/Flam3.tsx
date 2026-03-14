@@ -1,5 +1,5 @@
 import { createEffect, createMemo, onCleanup } from 'solid-js'
-import { arrayOf, vec3f, vec4f, vec4u } from 'typegpu/data'
+import { arrayOf, vec2u, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { accumulatedPointCount, setAccumulatedPointCount, setRenderTimings, } from '@/flame/renderStats'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
@@ -65,7 +65,7 @@ export function Flam3(props: Flam3Props) {
   props.setQualityPointCountLimit?.(qualityPointCountLimit)
 
   const pointRandomSeeds = root
-    .createBuffer(arrayOf(vec4u, props.pointCountPerBatch))
+    .createBuffer(arrayOf(vec2u, props.pointCountPerBatch))
     .$usage('storage')
 
   onCleanup(() => {

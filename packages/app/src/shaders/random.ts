@@ -1,43 +1,47 @@
+/**
+ * Implements xoroshiro64++ random number generator with vec2u state
+ * https://prng.di.unimi.it/xoroshiro64starstar.c
+ */
+
 import { tgpu } from 'typegpu'
-import { f32, u32, vec2f, vec4u } from 'typegpu/data'
+import { u32, vec2f, vec2u } from 'typegpu/data'
 import { bitcastU32toF32, cos, mul, sin, sqrt } from 'typegpu/std'
 import { PI } from '@/flame/constants'
+import type { v2u } from 'typegpu/data'
 
-export const randomState = tgpu.privateVar(vec4u, vec4u(0, 0, 0, 0))
+export const randomState = tgpu.privateVar(vec2u, vec2u(0, 0))
 
-const tausStep = tgpu.fn(
-  [u32, u32, u32, u32, u32],
+const rotl = tgpu.fn(
+  [u32, u32],
   u32,
-)((z, S1, S2, S3, M) => {
-  const b = ((z << S1) ^ z) >> S2
-  return ((z & M) << S3) ^ b
+)((x: number, k: number) => {
+  return (x << k) | (x >> (32 - k))
 })
 
-const lcgStep = tgpu.fn(
-  [u32, u32, u32],
-  u32,
-)((z, A, C) => {
-  return A * z + C
-})
+export function setSeed(seed: v2u) {
+  'use gpu'
+  randomState.$ = vec2u(seed)
+}
 
-export const setSeed = tgpu.fn([vec4u])((newRandomState) => {
-  randomState.$ = vec4u(newRandomState)
-})
+export function next() {
+  'use gpu'
+  const s0 = randomState.$[0]
+  let s1 = randomState.$[1]
+  const result = rotl(s0 * 0x9e3779bb, 5) * 5
 
-export const random = tgpu.fn(
-  [],
-  f32,
-)(() => {
-  const s = randomState.$
-  const x = tausStep(s.x, 13, 19, 12, 4294967294)
-  const y = tausStep(s.y, 2, 25, 4, 4294967288)
-  const z = tausStep(s.z, 3, 11, 17, 4294967280)
-  const w = lcgStep(s.w, 1664525, 1013904223)
-  setSeed(vec4u(x, y, z, w))
+  s1 ^= s0
+  randomState.$[0] = rotl(s0, 26) ^ s1 ^ (s1 << 9) // a, b
+  randomState.$[1] = rotl(s1, 13) // c
 
-  const a = x ^ y ^ z ^ w
+  return result
+}
+
+export function random() {
+  'use gpu'
+  next()
+  const a = randomState.$.x
   return bitcastU32toF32((a & 0x007fffff) | 0x3f800000) - 1.0
-})
+}
 
 export const hash = tgpu.fn(
   [u32],

@@ -1,4 +1,4 @@
-import { createMemo } from 'solid-js'
+import { createMemo, onCleanup } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { f32, mat3x3f, mat4x4f, struct, vec2f, vec3f } from 'typegpu/data'
 import { div, mul } from 'typegpu/std'
@@ -77,6 +77,10 @@ export function Camera2D(props: ParentProps<Camera2DProps>) {
     .createBuffer(Camera2DUniforms)
     .$usage('uniform')
     .$name('Camera2DUniforms')
+
+  onCleanup(() => {
+    uniformsBuffer.destroy()
+  })
 
   const uniformBindGroup = root.createBindGroup(Camera2DBindGroupLayout, {
     camera2DUniforms: uniformsBuffer,
