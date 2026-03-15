@@ -1,6 +1,6 @@
-import { createSignal, For } from 'solid-js'
+import { createMemo, createSignal, For } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
-import { DEFAULT_QUALITY } from '@/defaults'
+import { createGateContext } from '@/contexts/GateContext'
 import { examples } from '@/flame/examples'
 import { Flam3 } from '@/flame/Flam3'
 import { AutoCanvas } from '@/lib/AutoCanvas'
@@ -8,8 +8,8 @@ import { Camera2D } from '@/lib/Camera2D'
 import { Root } from '@/lib/Root'
 import { extractFlameFromPng } from '@/utils/flameInPng'
 import { recordEntries } from '@/utils/record'
+import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { Button } from '../Button/Button'
-import { DelayedShow } from '../DelayedShow/DelayedShow'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './LoadFlameModal.module.css'
@@ -18,14 +18,38 @@ import type { ChangeHistory } from '@/utils/createStoreHistory'
 
 const CANCEL = 'cancel'
 
-function Preview(props: { flameDescriptor: FlameDescriptor }) {
+const { Provider: ComputeGate, useGate: useComputeGate } = createGateContext<{
+  isVisible: boolean
+  doneComputing: boolean
+}>('Compute', (state) => (state.doneComputing ? 0 : state.isVisible ? 2 : 1))
+
+function Preview(props: {
+  exampleId: string
+  flameDescriptor: FlameDescriptor
+}) {
+  const [canvas, setCanvas] = createSignal<HTMLCanvasElement>()
+  const [isDone, setIsDone] = createSignal<boolean>(false)
+  const intersection = useIntersectionObserver(canvas)
+  const isVisible = createMemo(() => intersection()?.isIntersecting)
+  const allowed = useComputeGate(() => {
+    const isVisible_ = isVisible()
+    if (isVisible_ === undefined) {
+      return undefined
+    }
+    return {
+      isVisible: isVisible_,
+      doneComputing: isDone(),
+      name: props.exampleId,
+    }
+  })
+
   return (
     <Root
       adapterOptions={{
         powerPreference: 'high-performance',
       }}
     >
-      <AutoCanvas pixelRatio={1}>
+      <AutoCanvas ref={setCanvas} pixelRatio={1}>
         <Camera2D
           position={vec2f(
             ...props.flameDescriptor.renderSettings.camera.position,
@@ -33,13 +57,14 @@ function Preview(props: { flameDescriptor: FlameDescriptor }) {
           zoom={props.flameDescriptor.renderSettings.camera.zoom}
         >
           <Flam3
-            quality={DEFAULT_QUALITY}
+            run={allowed()}
+            quality={0.9}
             pointCountPerBatch={2e4}
             adaptiveFilterEnabled={true}
             flameDescriptor={props.flameDescriptor}
             renderInterval={1}
-            onExportImage={undefined}
             edgeFadeColor={vec4f(0)}
+            setIsDone={setIsDone}
           />
         </Camera2D>
       </AutoCanvas>
@@ -122,21 +147,21 @@ function LoadFlameModal(props: LoadFlameModalProps) {
       </section>
       <h2>Example Gallery</h2>
       <section class={ui.gallery}>
-        <For each={recordEntries(examples)}>
-          {([exampleId, example], i) => (
-            <button
-              class={ui.item}
-              onClick={() => {
-                props.respond(example)
-              }}
-            >
-              <DelayedShow delayMs={i() * 50}>
-                <Preview flameDescriptor={example} />
-              </DelayedShow>
-              <div class={ui.itemTitle}>{exampleId}</div>
-            </button>
-          )}
-        </For>
+        <ComputeGate capacity={5}>
+          <For each={recordEntries(examples)}>
+            {([exampleId, example]) => (
+              <button
+                class={ui.item}
+                onClick={() => {
+                  props.respond(example)
+                }}
+              >
+                <Preview exampleId={exampleId} flameDescriptor={example} />
+                <div class={ui.itemTitle}>{exampleId}</div>
+              </button>
+            )}
+          </For>
+        </ComputeGate>
       </section>
     </>
   )
@@ -148,15 +173,18 @@ export function createLoadFlame(history: ChangeHistory<FlameDescriptor>) {
 
   async function showLoadFlameModal() {
     setLoadModalIsOpen(true)
-    const result = await requestModal<FlameDescriptor | typeof CANCEL>({
-      content: ({ respond }) => <LoadFlameModal respond={respond} />,
-    })
-    setLoadModalIsOpen(false)
-    if (result === CANCEL) {
-      return
+    try {
+      const result = await requestModal<FlameDescriptor | typeof CANCEL>({
+        content: ({ respond }) => <LoadFlameModal respond={respond} />,
+      })
+      if (result === CANCEL) {
+        return
+      }
+      // structuredClone required in order to not modify the original, as store in solidjs does
+      history.replace(structuredClone(result))
+    } finally {
+      setLoadModalIsOpen(false)
     }
-    // structuredClone required in order to not modify the original, as store in solidjs does
-    history.replace(structuredClone(result))
   }
 
   return {
