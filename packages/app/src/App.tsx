@@ -25,7 +25,7 @@ import { ThemeContextProvider, useTheme } from './contexts/ThemeContext'
 import { DEFAULT_POINT_COUNT, DEFAULT_QUALITY, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_RESOLUTION, } from './defaults'
 import { colorInitModeToImplFn } from './flame/colorInitMode'
 import { drawModeToImplFn } from './flame/drawMode'
-import { example1 } from './flame/examples/example1'
+import { empty } from './flame/examples/empty'
 import { Flam3 } from './flame/Flam3'
 import { accumulatedPointCount, qualityPointCountLimit, setCurrentQuality, setQualityPointCountLimit, } from './flame/renderStats'
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from './flame/schema/flameSchema'
@@ -89,9 +89,7 @@ function App(props: AppProps) {
   const [adaptiveFilterEnabled, setAdaptiveFilterEnabled] = createSignal(true)
   const [showSidebar, setShowSidebar] = createSignal(true)
   const [flameDescriptor, setFlameDescriptor, history] = createStoreHistory(
-    createStore(
-      structuredClone(props.flameFromQuery ? props.flameFromQuery : example1),
-    ),
+    createStore(structuredClone(props.flameFromQuery ?? empty)),
   )
   const totalProbability = createMemo(() =>
     sum(Object.values(flameDescriptor.transforms).map((f) => f.probability)),
