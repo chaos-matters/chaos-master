@@ -100,12 +100,9 @@ function App(props: AppProps) {
   const { showVariationSelector, varSelectorModalIsOpen } =
     createVariationSelector(history)
 
+  const shouldRun = () => !loadModalIsOpen() && !varSelectorModalIsOpen()
   const finalRenderInterval = () =>
-    loadModalIsOpen() || varSelectorModalIsOpen()
-      ? Infinity
-      : onExportImage()
-        ? 0
-        : DEFAULT_RENDER_INTERVAL_MS
+    onExportImage() ? 0 : DEFAULT_RENDER_INTERVAL_MS
 
   const { showShareLinkModal } = createShareLinkModal(flameDescriptor)
 
@@ -233,6 +230,7 @@ function App(props: AppProps) {
                 ]}
               >
                 <Flam3
+                  run={shouldRun()}
                   quality={qualityPresets[qualityPreset()]}
                   pointCountPerBatch={DEFAULT_POINT_COUNT}
                   adaptiveFilterEnabled={adaptiveFilterEnabled()}

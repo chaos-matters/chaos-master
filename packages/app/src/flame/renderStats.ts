@@ -26,7 +26,7 @@ type AccumulationValueTime = {
 const ACCUMULATION_BUFFER_SIZE = 100
 const accumulationValues: AccumulationValueTime[] = []
 
-function setAccumulatedPointCount(value: number) {
+function setAccumulatedPointCountGlobal(value: number) {
   setAccumulatedPointCount_(value)
   const timeMs = performance.now()
   accumulationValues.push({ value, timeMs })
@@ -48,7 +48,7 @@ function setAccumulatedPointCount(value: number) {
 
 export {
   accumulatedPointCount,
-  setAccumulatedPointCount,
+  setAccumulatedPointCountGlobal,
   iterationSpeedPointPerSec,
 }
 

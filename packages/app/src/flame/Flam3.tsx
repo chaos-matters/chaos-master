@@ -1,7 +1,7 @@
-import { createEffect, createMemo, onCleanup } from 'solid-js'
+import { createEffect, createMemo, createSignal, onCleanup, untrack, } from 'solid-js'
 import { arrayOf, vec2u, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
-import { accumulatedPointCount, setAccumulatedPointCount, setRenderTimings, } from '@/flame/renderStats'
+import { setAccumulatedPointCountGlobal, setRenderTimings, } from '@/flame/renderStats'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
 import { useCamera } from '../lib/CameraContext'
 import { useCanvas } from '../lib/CanvasContext'
@@ -23,6 +23,7 @@ const OUTPUT_EVERY_FRAME_BATCH_INDEX = 20
 const OUTPUT_INTERVAL_BATCH_INDEX = 10
 
 type Flam3Props = {
+  run: boolean
   quality: number
   pointCountPerBatch: number
   renderInterval: number
@@ -32,12 +33,14 @@ type Flam3Props = {
   onExportImage?: ExportImageType
   setCurrentQuality?: (fn: () => number) => void
   setQualityPointCountLimit?: (fn: () => number) => void
+  setIsDone?: (done: boolean) => void
 }
 
 export function Flam3(props: Flam3Props) {
   const camera = useCamera()
   const { root, device } = useRootContext()
   const { context, canvasSize, canvas, canvasFormat } = useCanvas()
+  const [accumulatedPointCount, setAccumulatedPointCount] = createSignal(0)
 
   const backgroundColorFinal = () => {
     if (props.flameDescriptor.renderSettings.backgroundColor === undefined) {
@@ -167,6 +170,13 @@ export function Flam3(props: Flam3Props) {
   }
 
   createEffect(() => {
+    // don't even compile if its not allowed to run
+    const run = untrack(() => props.run)
+    if (!run) {
+      // track when false so when it changes to true, it starts compilation
+      const _ = props.run
+      return
+    }
     const o = outputTextures()
     if (!o) {
       return undefined
@@ -185,8 +195,8 @@ export function Flam3(props: Flam3Props) {
       props.flameDescriptor.renderSettings.colorInitMode,
     )
 
+    setAccumulatedPointCount(0)
     let batchIndex = 0
-    let accumulatedPointCount = 0
     let forceDrawToScreen = false
     let clearRequested = true
     createEffect(() => {
@@ -197,7 +207,7 @@ export function Flam3(props: Flam3Props) {
       createEffect(() => {
         camera.update()
         batchIndex = 0
-        accumulatedPointCount = 0
+        setAccumulatedPointCount(0)
         clearRequested = true
         rafLoop.redraw()
       })
@@ -222,6 +232,10 @@ export function Flam3(props: Flam3Props) {
 
     const rafLoop = createAnimationFrame(
       (frameId) => {
+        if (!props.run) {
+          return
+        }
+
         /**
          * Rendering to screen is expensive because it involves
          * blurring and color grading. We only want to do this
@@ -249,7 +263,7 @@ export function Flam3(props: Flam3Props) {
         }
 
         const timings = timestampQuery.average()
-        const iterationCount = continueRendering(accumulatedPointCount)
+        const iterationCount = continueRendering(accumulatedPointCount())
           ? timings
             ? estimateIterationCount(timings, shouldRenderFinalImage)
             : 1
@@ -275,15 +289,17 @@ export function Flam3(props: Flam3Props) {
             pass.end()
           }
 
-          accumulatedPointCount += pointCountPerBatch * iterationCount
+          setAccumulatedPointCount(
+            (p) => p + pointCountPerBatch * iterationCount,
+          )
         }
 
-        setAccumulatedPointCount(accumulatedPointCount)
+        setAccumulatedPointCountGlobal(accumulatedPointCount())
 
         if (shouldRenderFinalImage) {
           colorGradingUniforms.writePartial({
             averagePointCountPerBucketInv:
-              bucketProbabilityInv() / accumulatedPointCount,
+              bucketProbabilityInv() / accumulatedPointCount(),
           })
           if (props.adaptiveFilterEnabled) {
             const pass = encoder.beginComputePass({
@@ -321,10 +337,11 @@ export function Flam3(props: Flam3Props) {
         batchIndex += 1
         forceDrawToScreen = false
       },
-      () =>
-        continueRendering(accumulatedPointCount)
-          ? props.renderInterval
-          : Infinity,
+      () => {
+        const shouldContinue = continueRendering(accumulatedPointCount())
+        props.setIsDone?.(!shouldContinue)
+        return shouldContinue ? props.renderInterval : Infinity
+      },
       () => device.queue.onSubmittedWorkDone(),
     )
   })
