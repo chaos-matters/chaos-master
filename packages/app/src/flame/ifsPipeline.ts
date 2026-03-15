@@ -162,13 +162,11 @@ export function createIFSPipeline(
     const pixelIndex = screenI.y * outputTextureDimension.x + screenI.x
     const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
     atomicAdd(accumulationBuffer[pixelIndex]!.count, u32(1 * fixed_m))
+    const a = i32(point.color.x * f32(fixed_m))
+    const b = i32(point.color.x * f32(fixed_m))
     atomicAdd(
-      accumulationBuffer[pixelIndex]!.color.a,
-      i32(point.color.x * f32(fixed_m)),
-    )
-    atomicAdd(
-      accumulationBuffer[pixelIndex]!.color.b,
-      i32(point.color.y * f32(fixed_m)),
+      accumulationBuffer[pixelIndex]!.color,
+      (u32(a) << u32(16)) + (u32(b) & 0x0ffff),
     )
   })
 

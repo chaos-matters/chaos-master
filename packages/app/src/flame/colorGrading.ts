@@ -1,7 +1,7 @@
 import { oklabToRgb } from '@typegpu/color'
 import { onCleanup } from 'solid-js'
 import { tgpu } from 'typegpu'
-import { arrayOf, builtin, f32, struct, vec2f, vec2i, vec3f, vec4f, } from 'typegpu/data'
+import { arrayOf, builtin, f32, i32, struct, vec2f, vec2i, vec3f, vec4f, } from 'typegpu/data'
 import { abs, div, log, max, mix, mul, pow, saturate, smoothstep, } from 'typegpu/std'
 import { Bucket, BUCKET_FIXED_POINT_MULTIPLIER_INV } from './types'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
@@ -86,11 +86,10 @@ export function createColorGradingPipeline(
     const texelIndex = pos2i.y * textureSize.x + pos2i.x
     const tex = accumulationBuffer[texelIndex]!
     const count = f32(tex.count) * BUCKET_FIXED_POINT_MULTIPLIER_INV
+    const a = i32(tex.color >> 16)
+    const b = i32(tex.color & 0x0ffff)
     const ab = div(
-      mul(
-        vec2f(f32(tex.color.a), f32(tex.color.b)),
-        BUCKET_FIXED_POINT_MULTIPLIER_INV,
-      ),
+      mul(vec2f(f32(a), f32(b)), BUCKET_FIXED_POINT_MULTIPLIER_INV),
       count,
     )
     const adjustedCount = 0.1 * count * uniforms.averagePointCountPerBucketInv

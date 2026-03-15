@@ -66,8 +66,10 @@ export function createBlurPipeline(
     const stdDev =
       (10 + sqrt(count * BUCKET_FIXED_POINT_MULTIPLIER_INV)) *
       BUCKET_FIXED_POINT_MULTIPLIER
-    let totalColorA = f32(centralTexel.color.a)
-    let totalColorB = f32(centralTexel.color.b)
+    const a = i32(centralTexel.color >> 16)
+    const b = i32(centralTexel.color & 0x0ffff)
+    let totalColorA = f32(a)
+    let totalColorB = f32(b)
     let totalCount = count
     let totalWeight = f32(1.0)
     const HALF_SIZE = 2
@@ -84,16 +86,20 @@ export function createBlurPipeline(
         const stdDiff = min(stdDev / (abs(texelCount - count) + 1), 1)
         const shiftDiff = smoothstep(3, 0, length(vec2f(shift)))
         const weight = stdDiff * shiftDiff
-        totalColorA += f32(texel.color.a) * weight
-        totalColorB += f32(texel.color.b) * weight
+        const a = i32(texel.color >> 16)
+        const b = i32(texel.color & 0x0ffff)
+        totalColorA += f32(a) * weight
+        totalColorB += f32(b) * weight
         totalCount += texelCount * weight
         totalWeight += weight
       }
     }
 
     postprocessBuffer[texelIndex]!.count = u32(totalCount / totalWeight)
-    postprocessBuffer[texelIndex]!.color.a = i32(totalColorA / totalWeight)
-    postprocessBuffer[texelIndex]!.color.b = i32(totalColorB / totalWeight)
+    const a_ = i32(totalColorA / totalWeight)
+    const b_ = i32(totalColorB / totalWeight)
+    postprocessBuffer[texelIndex]!.color =
+      (u32(a_) << u32(16)) + (u32(b_) & 0x0ffff)
   })
 
   const blurPipeline = root
