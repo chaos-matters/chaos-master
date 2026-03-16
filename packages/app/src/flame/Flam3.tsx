@@ -30,13 +30,15 @@ type Flam3Props = {
   adaptiveFilterEnabled: boolean
   flameDescriptor: FlameDescriptor
   edgeFadeColor: v4f
-  onExportImage?: ExportImageType
+  trackPerformance?: boolean
+  exportImage?: ExportImageType
   setCurrentQuality?: (fn: () => number) => void
   setQualityPointCountLimit?: (fn: () => number) => void
   setIsDone?: (done: boolean) => void
 }
 
 export function Flam3(props: Flam3Props) {
+  const exportedImages = new WeakSet()
   const camera = useCamera()
   const { root, device } = useRootContext()
   const { context, canvasSize, canvas, canvasFormat } = useCanvas()
@@ -72,7 +74,9 @@ export function Flam3(props: Flam3Props) {
     .$usage('storage')
 
   onCleanup(() => {
-    pointRandomSeeds.destroy()
+    requestAnimationFrame(() => {
+      pointRandomSeeds.destroy()
+    })
   })
 
   const colorGradingUniforms = root
@@ -85,7 +89,9 @@ export function Flam3(props: Flam3Props) {
     .$usage('uniform')
 
   onCleanup(() => {
-    colorGradingUniforms.destroy()
+    requestAnimationFrame(() => {
+      colorGradingUniforms.destroy()
+    })
   })
 
   const outputTextures = createMemo(() => {
@@ -103,8 +109,10 @@ export function Flam3(props: Flam3Props) {
       .$usage('storage')
 
     onCleanup(() => {
-      accumulationBuffer.destroy()
-      postprocessBuffer.destroy()
+      requestAnimationFrame(() => {
+        accumulationBuffer.destroy()
+        postprocessBuffer.destroy()
+      })
     })
 
     return {
@@ -148,14 +156,19 @@ export function Flam3(props: Flam3Props) {
     return accumulatedPointCount <= qualityPointCountLimit()
   }
 
-  const timestampQuery = createTimestampQuery(device, [
-    'ifsMs',
-    'adaptiveFilterMs',
-    'colorGradingMs',
-  ])
+  const timestampQuery =
+    props.trackPerformance === true
+      ? createTimestampQuery(device, [
+          'ifsMs',
+          'adaptiveFilterMs',
+          'colorGradingMs',
+        ])
+      : undefined
 
   function estimateIterationCount(
-    timings: NonNullable<ReturnType<typeof timestampQuery.average>>,
+    timings: NonNullable<
+      Readonly<Record<'ifsMs' | 'adaptiveFilterMs' | 'colorGradingMs', number>>
+    >,
     shouldRenderFinalImage: boolean,
   ) {
     const { ifsMs, adaptiveFilterMs, colorGradingMs } = timings
@@ -217,7 +230,7 @@ export function Flam3(props: Flam3Props) {
     createEffect(() => {
       colorGradingUniforms.writePartial({
         exposure: 2 * Math.exp(props.flameDescriptor.renderSettings.exposure),
-        edgeFadeColor: props.onExportImage ? vec4f(0) : props.edgeFadeColor,
+        edgeFadeColor: props.exportImage ? vec4f(0) : props.edgeFadeColor,
         backgroundColor: vec4f(backgroundColorFinal(), 1),
       })
       rafLoop.redraw()
@@ -233,7 +246,11 @@ export function Flam3(props: Flam3Props) {
 
     const rafLoop = createAnimationFrame(
       (frameId) => {
-        if (!props.run) {
+        const exportImage =
+          props.exportImage && !exportedImages.has(props.exportImage)
+            ? props.exportImage
+            : undefined
+        if (!props.run && !exportImage) {
           return
         }
 
@@ -248,7 +265,7 @@ export function Flam3(props: Flam3Props) {
           forceDrawToScreen ||
           batchIndex < OUTPUT_EVERY_FRAME_BATCH_INDEX ||
           batchIndex % OUTPUT_INTERVAL_BATCH_INDEX === 0 ||
-          props.onExportImage !== undefined
+          exportImage !== undefined
 
         const pointCountPerBatch = props.pointCountPerBatch
         const colorGradingPipeline_ = colorGradingPipeline()
@@ -263,11 +280,11 @@ export function Flam3(props: Flam3Props) {
           encoder.clearBuffer(accumulationBuffer.buffer)
         }
 
-        const timings = timestampQuery.average()
+        const timings = timestampQuery?.average()
         const iterationCount = continueRendering(accumulatedPointCount())
           ? timings
             ? estimateIterationCount(timings, shouldRenderFinalImage)
-            : 1
+            : 10
           : 0
 
         if (timings) {
@@ -279,12 +296,12 @@ export function Flam3(props: Flam3Props) {
           })
         }
 
-        const timestampWrites = timestampQuery.timestampWrites(frameId)
+        const timestampWrites = timestampQuery?.timestampWrites(frameId)
 
         {
           for (let i = 0; i < iterationCount; i++) {
             const pass = encoder.beginComputePass({
-              timestampWrites: timestampWrites.ifsMs,
+              timestampWrites: timestampWrites?.ifsMs,
             })
             ifsPipeline.run(pass, pointCountPerBatch)
             pass.end()
@@ -304,20 +321,21 @@ export function Flam3(props: Flam3Props) {
           })
           if (props.adaptiveFilterEnabled) {
             const pass = encoder.beginComputePass({
-              timestampWrites: timestampWrites.adaptiveFilterMs,
+              timestampWrites: timestampWrites?.adaptiveFilterMs,
             })
             runBlur()?.(pass)
             pass.end()
           }
 
           {
+            const canvasTexture = context.getCurrentTexture()
             const pass = encoder.beginRenderPass({
-              timestampWrites: timestampWrites.colorGradingMs,
+              timestampWrites: timestampWrites?.colorGradingMs,
               colorAttachments: [
                 {
                   loadOp: 'clear',
                   storeOp: 'store',
-                  view: context.getCurrentTexture().createView(),
+                  view: canvasTexture.createView(),
                 },
               ],
             })
@@ -326,14 +344,24 @@ export function Flam3(props: Flam3Props) {
           }
         }
 
-        timestampQuery.write(encoder)
+        timestampQuery?.write(encoder)
         device.queue.submit([encoder.finish()])
 
         device.queue
           .onSubmittedWorkDone()
-          .then(() => timestampQuery.read(frameId))
+          .then(() => {
+            timestampQuery?.read(frameId).catch(console.error)
+
+            if (exportImage) {
+              exportedImages.add(exportImage)
+              canvas.toBlob((blob) => {
+                if (blob) {
+                  exportImage(blob)
+                }
+              })
+            }
+          })
           .catch(() => {})
-        props.onExportImage?.(canvas)
 
         batchIndex += 1
         forceDrawToScreen = false

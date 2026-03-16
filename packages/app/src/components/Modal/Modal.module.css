@@ -42,7 +42,6 @@
 }
 
 ::backdrop {
-  backdrop-filter: contrast(50%) blur(10px);
-  opacity: 0;
+  background-color: rgba(from var(--bg-color) r g b / 80%);
   animation: fade-in 400ms forwards;
 }
