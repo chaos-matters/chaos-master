@@ -73,7 +73,7 @@ function newDefaultTransform(): TransformFunction {
   }
 }
 
-export type ExportImageType = (canvas: HTMLCanvasElement) => void
+export type ExportImageType = (blob: Blob) => void
 
 type AppProps = {
   flameFromQuery?: FlameDescriptor
@@ -178,20 +178,20 @@ function App(props: AppProps) {
       return true
     },
   })
-  const exportCanvasImage = (canvas: HTMLCanvasElement) => {
-    setOnExportImage(undefined)
-    canvas.toBlob(async (blob) => {
-      if (!blob) return
-      const imgData = await blob.arrayBuffer()
-      const pngBytes = new Uint8Array(imgData)
-      const encodedFlames = await compressJsonQueryParam(flameDescriptor)
-      const imgExtData = addFlameDataToPng(encodedFlames, pngBytes)
-      const fileUrlExt = URL.createObjectURL(imgExtData)
-      const downloadLink = window.document.createElement('a')
-      downloadLink.href = fileUrlExt
-      downloadLink.download = 'flame.png'
-      downloadLink.click()
-    })
+
+  async function exportCanvasImage() {
+    const { promise, resolve } = Promise.withResolvers<Blob>()
+    setOnExportImage(() => resolve)
+    const blob = await promise
+    const imgData = await blob.arrayBuffer()
+    const pngBytes = new Uint8Array(imgData)
+    const encodedFlames = await compressJsonQueryParam(flameDescriptor)
+    const imgExtData = addFlameDataToPng(encodedFlames, pngBytes)
+    const fileUrlExt = URL.createObjectURL(imgExtData)
+    const downloadLink = window.document.createElement('a')
+    downloadLink.href = fileUrlExt
+    downloadLink.download = 'flame.png'
+    downloadLink.click()
   }
 
   createEffect(() => {
@@ -231,15 +231,16 @@ function App(props: AppProps) {
               >
                 <Flam3
                   run={shouldRun()}
+                  trackPerformance
                   quality={qualityPresets[qualityPreset()]}
                   pointCountPerBatch={DEFAULT_POINT_COUNT}
                   adaptiveFilterEnabled={adaptiveFilterEnabled()}
                   flameDescriptor={flameDescriptor}
                   renderInterval={finalRenderInterval()}
-                  onExportImage={onExportImage()}
                   edgeFadeColor={
                     showSidebar() ? EDGE_FADE_COLOR[theme()] : vec4f(0)
                   }
+                  exportImage={onExportImage()}
                   setCurrentQuality={(fn) => setCurrentQuality(() => fn)}
                   setQualityPointCountLimit={(fn) =>
                     setQualityPointCountLimit(() => fn)
@@ -595,12 +596,7 @@ function App(props: AppProps) {
                 </button>
               </Card>
               <Card class={ui.buttonCard}>
-                <button
-                  class={ui.addFlameButton}
-                  onClick={() => {
-                    setOnExportImage(() => exportCanvasImage)
-                  }}
-                >
+                <button class={ui.addFlameButton} onClick={exportCanvasImage}>
                   Export PNG
                 </button>
               </Card>

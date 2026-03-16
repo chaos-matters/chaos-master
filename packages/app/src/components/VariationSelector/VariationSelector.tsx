@@ -1,11 +1,11 @@
-import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { vec2f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { ChangeHistoryContextProvider } from '@/contexts/ChangeHistoryContext'
 import { createGateContext } from '@/contexts/GateContext'
-import { DEFAULT_VARIATION_PREVIEW_POINT_COUNT, DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS, DEFAULT_VARIATION_SHOW_DELAY_MS, } from '@/defaults'
+import { DEFAULT_VARIATION_PREVIEW_POINT_COUNT, DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS, } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from '@/flame/schema/flameSchema'
 import { isParametricVariation, variationTypes } from '@/flame/variations'
@@ -21,12 +21,12 @@ import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
 import { AffineEditor } from '../AffineEditor/AffineEditor'
 import { Button } from '../Button/Button'
 import { ButtonGroup } from '../Button/ButtonGroup'
-import { DelayedShow } from '../DelayedShow/DelayedShow'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './VariationSelector.module.css'
 import type { Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
+import type { ExportImageType } from '@/App'
 import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from '@/flame/schema/flameSchema'
 import type { TransformVariationDescriptor } from '@/flame/variations'
 import type { ChangeHistory } from '@/utils/createStoreHistory'
@@ -38,12 +38,15 @@ type RenderStatus = 'low-quality' | 'high-quality' | 'done'
 const { Provider: ComputeGate, useGate: useComputeGate } = createGateContext<{
   isVisible: boolean
   renderStatus: RenderStatus
+  isSelected: boolean
 }>('Compute', (state) =>
-  !state.isVisible || state.renderStatus === 'done'
-    ? 0
-    : state.renderStatus === 'low-quality'
-      ? 2
-      : 1,
+  state.isSelected
+    ? 3
+    : !state.isVisible || state.renderStatus === 'done'
+      ? 0
+      : state.renderStatus === 'low-quality'
+        ? 2
+        : 1,
 )
 
 function PreviewFinalFlame(props: {
@@ -67,7 +70,7 @@ function PreviewFinalFlame(props: {
           run={true}
           quality={0.99}
           pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT}
-          adaptiveFilterEnabled={false}
+          adaptiveFilterEnabled={true}
           flameDescriptor={props.flame}
           renderInterval={DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS}
           edgeFadeColor={vec4f(0)}
@@ -77,10 +80,13 @@ function PreviewFinalFlame(props: {
   )
 }
 
-function VariationPreview(props: { flame: FlameDescriptor }) {
-  const [canvas, setCanvas] = createSignal<HTMLCanvasElement>()
+function VariationPreview(props: {
+  isSelected: boolean
+  flame: FlameDescriptor
+}) {
+  const [container, setContainer] = createSignal<HTMLElement>()
   const [quality, setQuality] = createSignal<() => number>()
-  const intersection = useIntersectionObserver(canvas)
+  const intersection = useIntersectionObserver(container)
   const isVisible = createMemo(() => intersection()?.isIntersecting)
   const renderStatus = createMemo<RenderStatus | undefined>(() => {
     const quality_ = quality()?.()
@@ -102,27 +108,64 @@ function VariationPreview(props: { flame: FlameDescriptor }) {
     return {
       isVisible: isVisible_,
       renderStatus: renderStatus_,
+      isSelected: props.isSelected,
     }
+  })
+  const [exportImage, setExportImage] = createSignal<ExportImageType>()
+  const [image, setImage] = createSignal<string>()
+
+  createEffect(async () => {
+    const container_ = container()
+    if (!container_ || renderStatus() !== 'done') {
+      return
+    }
+    const image_ = new Image()
+    image_.onload = () => {
+      setImage(image_.src)
+    }
+    onCleanup(() => {
+      URL.revokeObjectURL(image_.src)
+      image_.src = ''
+    })
+
+    const { promise, resolve } = Promise.withResolvers<Blob>()
+    setExportImage(() => resolve)
+    const blob = await promise
+    const src = URL.createObjectURL(blob)
+    image_.src = src
   })
 
   return (
-    <AutoCanvas ref={setCanvas} pixelRatio={1}>
-      <Camera2D
-        position={vec2f(...props.flame.renderSettings.camera.position)}
-        zoom={props.flame.renderSettings.camera.zoom}
-      >
-        <Flam3
-          run={allowed()}
-          quality={0.99}
-          pointCountPerBatch={2e4}
-          adaptiveFilterEnabled={false}
-          flameDescriptor={props.flame}
-          renderInterval={1}
-          edgeFadeColor={vec4f(0)}
-          setCurrentQuality={(fn) => setQuality(() => fn)}
-        />
-      </Camera2D>
-    </AutoCanvas>
+    <div
+      class={ui.stretch}
+      ref={setContainer}
+      style={{
+        outline: image() !== undefined ? `1px solid white` : undefined,
+        'outline-offset': '-1px',
+        ['--background']: `url('${image()}')`,
+      }}
+    >
+      <Show when={allowed() || image() === undefined}>
+        <AutoCanvas pixelRatio={1}>
+          <Camera2D
+            position={vec2f(...props.flame.renderSettings.camera.position)}
+            zoom={props.flame.renderSettings.camera.zoom}
+          >
+            <Flam3
+              run={allowed()}
+              quality={0.99}
+              pointCountPerBatch={5e4}
+              adaptiveFilterEnabled={false}
+              flameDescriptor={props.flame}
+              renderInterval={1}
+              exportImage={exportImage()}
+              edgeFadeColor={vec4f(0)}
+              setCurrentQuality={(fn) => setQuality(() => fn)}
+            />
+          </Camera2D>
+        </AutoCanvas>
+      </Show>
+    </div>
   )
 }
 type RespondType =
@@ -331,14 +374,15 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
           <section class={ui.gallery}>
             <ComputeGate capacity={5}>
               <For each={recordEntries(variationExamples)}>
-                {([id, variationExample], i) => {
+                {([id, variationExample]) => {
                   const variation = getVarFromPreviewFlame(variationExample)
+                  const isSelected = () => selectedItemId() === id
                   return (
                     variation && (
                       <button
                         class={ui.item}
                         classList={{
-                          [ui.selected]: selectedItemId() === id,
+                          [ui.selected]: isSelected(),
                         }}
                         onClick={() => {
                           toggleSelectedItem(id)
@@ -350,11 +394,10 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                           setHoveredItemId(undefined)
                         }}
                       >
-                        <DelayedShow
-                          delayMs={i() * DEFAULT_VARIATION_SHOW_DELAY_MS}
-                        >
-                          <VariationPreview flame={variationExample} />
-                        </DelayedShow>
+                        <VariationPreview
+                          isSelected={isSelected()}
+                          flame={variationExample}
+                        />
                         <div class={ui.itemTitle}>
                           {getNormalizedVariationName(variation.type)}
                         </div>

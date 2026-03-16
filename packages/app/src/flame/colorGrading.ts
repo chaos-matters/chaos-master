@@ -43,7 +43,9 @@ export function createColorGradingPipeline(
     .$usage('uniform')
 
   onCleanup(() => {
-    textureSizeBuffer.destroy()
+    requestAnimationFrame(() => {
+      textureSizeBuffer.destroy()
+    })
   })
 
   const bindGroup = root.createBindGroup(bindGroupLayout, {
