@@ -5,6 +5,7 @@ import { example4 } from './example4'
 import { example5 } from './example5'
 import { example6 } from './example6'
 import { example7 } from './example7'
+import { example8 } from './example8'
 import { initExample } from './initExample'
 import { invCircleEx1, invCircleEx2 } from './invCircle'
 import { invCircle2Ex1 } from './invCircle2'
@@ -20,6 +21,7 @@ export const examples = {
   example5,
   example6,
   example7,
+  example8,
   linear1,
   invCircleEx1,
   invCircleEx2,
