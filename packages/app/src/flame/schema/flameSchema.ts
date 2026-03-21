@@ -3,6 +3,7 @@ import * as v from '@/valibot'
 import { AffineParamsSchema } from '../affineTranform'
 import { ColorInitMode } from '../colorInitMode'
 import { DrawMode } from '../drawMode'
+import { PointInitMode } from '../pointInitMode'
 import { TransformVariationDescriptor } from '../variations'
 
 // default values and schema fallbacks
@@ -24,6 +25,7 @@ const renderSettingsDefault: RenderSettings = {
   backgroundColor: backgroundColorDefault,
   camera: cameraDefault,
   colorInitMode: 'colorInitZero',
+  pointInitMode: 'pointInitCircle',
 }
 export const latestSchemaVersion = '1.0'
 const MAX_LENGTH_AUTHOR_STRING = 255
@@ -82,6 +84,7 @@ const RenderSettings = v.object({
   ),
   drawMode: v.optional(DrawMode, 'light'),
   colorInitMode: v.optional(ColorInitMode, 'colorInitZero'),
+  pointInitMode: v.optional(PointInitMode, 'pointInitCircle'),
   backgroundColor: v.optional(
     v.tuple([ColorValueSchema, ColorValueSchema, ColorValueSchema]),
   ),

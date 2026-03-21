@@ -5,7 +5,9 @@ import * as v from '@/valibot'
 import type { TgpuFn } from 'typegpu'
 import type { Vec2f } from 'typegpu/data'
 
+// todo: unused?
 export type ColorInitModeFn = TgpuFn<(pos: Vec2f) => Vec2f>
+
 const colorInitModeFn = tgpu.fn([vec2f], vec2f)
 export const colorInitModeZero = colorInitModeFn(() => {
   'use gpu'
