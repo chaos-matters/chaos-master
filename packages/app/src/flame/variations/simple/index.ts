@@ -1,6 +1,7 @@
 import { f32, vec2f } from 'typegpu/data'
 import { abs, atan2, cos, cosh, dot, exp, length, log, pow, select, sin, sinh, sqrt, tan, } from 'typegpu/std'
-import { random, randomUnitDisk } from '@/shaders/random'
+import { pointInitModeCircle } from '@/flame/pointInitMode'
+import { random } from '@/shaders/random'
 import { EPS, PI } from '../../constants'
 import { simpleVariation } from './types'
 
@@ -52,7 +53,7 @@ export const linear = simpleVariation('linear', (pos, _varInfo) => {
 
 export const randomDisk = simpleVariation('randomDisk', (_pos, _varInfo) => {
   'use gpu'
-  return randomUnitDisk()
+  return pointInitModeCircle()
 })
 
 export const gaussian = simpleVariation('gaussian', (_pos, _varInfo) => {

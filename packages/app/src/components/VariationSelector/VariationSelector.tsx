@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
+import { produce, unfreeze } from 'structurajs'
 import { vec2f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { ChangeHistoryContextProvider } from '@/contexts/ChangeHistoryContext'
@@ -26,6 +27,7 @@ import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './VariationSelector.module.css'
 import type { Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
+import type { PointInitMode } from '@/flame/pointInitMode'
 import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from '@/flame/schema/flameSchema'
 import type { TransformVariationDescriptor } from '@/flame/variations'
 import type { ChangeHistory } from '@/utils/createStoreHistory'
@@ -104,14 +106,27 @@ type VariationSelectorModalProps = {
   variationId: VariationId
   respond: (value: RespondType) => void
 }
-const variationPreviewFlames: Record<string, FlameDescriptor> =
-  Object.fromEntries(
-    variationTypes.map((name) => [name, getVariationPreviewFlame(name)]),
+const variationPreviewFlames: (
+  p: PointInitMode,
+) => Record<string, FlameDescriptor> = (pointInitMode: PointInitMode) => {
+  // todo: temp mumbo jumbo to adjust point init mode for variation previews from main flame
+  return Object.fromEntries(
+    variationTypes.map((name) => [
+      name,
+      unfreeze(
+        produce(getVariationPreviewFlame(name), (draft) => {
+          draft.renderSettings.pointInitMode = pointInitMode
+        }),
+      ),
+    ]),
   )
+}
 
 function ShowVariationSelector(props: VariationSelectorModalProps) {
   const [variationExamples, setVariationExamples] = createStoreHistory(
-    createStore<Record<string, FlameDescriptor>>(variationPreviewFlames),
+    createStore<Record<string, FlameDescriptor>>(
+      variationPreviewFlames(props.currentFlame.renderSettings.pointInitMode),
+    ),
   )
   const [selectedItemId, setSelectedItemId] = createSignal<string | null>(null)
   const [selectedPreviewItemId, setSelectedPreviewItemId] = createSignal<

@@ -2,14 +2,16 @@ import { onCleanup } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { arrayOf, builtin, f32, i32, struct, u32, vec2f, vec2i, vec2u, } from 'typegpu/data'
 import { add, arrayLength, atomicAdd, mul } from 'typegpu/std'
-import { hash, random, randomState, randomUnitDisk, randomUnitSquare, setSeed, } from '@/shaders/random'
+import { hash, random, randomState, setSeed } from '@/shaders/random'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { colorInitModeToImplFn } from './colorInitMode'
+import { pointInitModeToImplFn } from './pointInitMode'
 import { createFlameWgsl, extractFlameUniforms } from './transformFunction'
 import { AtomicBucket, BUCKET_FIXED_POINT_MULTIPLIER, Point } from './types'
 import type { StorageFlag, TgpuBuffer, TgpuRoot } from 'typegpu'
 import type { Vec2u, WgslArray } from 'typegpu/data'
 import type { ColorInitMode } from './colorInitMode'
+import type { PointInitMode } from './pointInitMode'
 import type { FlameDescriptor, TransformRecord } from './schema/flameSchema'
 import type { Bucket } from './types'
 import type { CameraContext } from '@/lib/CameraContext'
@@ -26,6 +28,7 @@ export function createIFSPipeline(
   outputTextureDimension: readonly [number, number],
   accumulationBuffer: TgpuBuffer<WgslArray<typeof Bucket>> & StorageFlag,
   colorInitType: ColorInitMode = 'colorInitZero',
+  pointInitType: PointInitMode = 'pointInitCircle',
 ) {
   const flames = Object.fromEntries(
     recordEntries(transforms).map(([tid, tr]) => [tid, createFlameWgsl(tr)]),
@@ -79,6 +82,7 @@ export function createIFSPipeline(
   })
 
   const colorInitMode = colorInitModeToImplFn[colorInitType]
+  const pointInitMode = pointInitModeToImplFn[pointInitType]
 
   const executeRandomFlame = tgpu.fn([Point], Point) /* wgsl */ `
     (point: Point) -> Point {
@@ -126,7 +130,7 @@ export function createIFSPipeline(
     setSeed(seed)
 
     let point = Point()
-    point.position = randomUnitSquare()
+    point.position = pointInitMode(pointIndex)
     point.color = colorInitMode(point.position)
 
     for (let i = 0; i < insideShaderCount; i += 1) {
@@ -143,7 +147,7 @@ export function createIFSPipeline(
     bindGroupLayout.$.pointRandomSeeds[pointIndex] = vec2u(randomState.$)
 
     // antialiasing jitter
-    const jittered = add(screen, randomUnitDisk())
+    const jittered = add(screen, pointInitMode(pointIndex))
     if (
       // important to check the real coordinates and not integer,
       // because negative values > -1 end up on-screen causing
