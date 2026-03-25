@@ -1,3 +1,4 @@
+import { perlin2d } from '@typegpu/noise'
 import { tgpu } from 'typegpu'
 import { f32, u32, vec2f } from 'typegpu/data'
 import { cos, floor, log, mul, sin, sqrt } from 'typegpu/std'
@@ -5,22 +6,17 @@ import { random } from '@/shaders/random'
 import { recordKeys } from '@/utils/record'
 import * as v from '@/valibot'
 import { PI } from './constants'
-import type { TgpuFn } from 'typegpu'
-import type { U32, Vec2f } from 'typegpu/data'
-
-// todo: unused?
-export type PointModeFn = TgpuFn<(idx: U32) => Vec2f>
 
 const pointInitModeFn = tgpu.fn([u32], vec2f)
 
-export const pointInitModeCircle = pointInitModeFn(() => {
+export const pointInitModeCircle = pointInitModeFn((_index) => {
   'use gpu'
   const r = sqrt(random())
   const theta = random() * 2 * PI.$
   return mul(r, vec2f(cos(theta), sin(theta)))
 })
 
-export const pointInitModeSquare = pointInitModeFn(() => {
+export const pointInitModeSquare = pointInitModeFn((_index) => {
   'use gpu'
   const size = f32(1.0)
   const randxy = vec2f(random() - 0.5, random() - 0.5)
@@ -28,7 +24,7 @@ export const pointInitModeSquare = pointInitModeFn(() => {
   return mul(k, randxy)
 })
 
-export const pointInitModeCross = pointInitModeFn(() => {
+export const pointInitModeCross = pointInitModeFn((_index) => {
   'use gpu'
   const r1 = random()
   const r2 = random()
@@ -41,7 +37,7 @@ export const pointInitModeCross = pointInitModeFn(() => {
   }
 })
 
-export const pointInitModeTriangle = pointInitModeFn(() => {
+export const pointInitModeTriangle = pointInitModeFn((_index) => {
   'use gpu'
   const r1 = random()
   const r2 = random()
@@ -52,22 +48,20 @@ export const pointInitModeTriangle = pointInitModeFn(() => {
   const b = s * (f32(1.0) - r2)
   const c = s * r2
 
-  // Vertices for an equilateral-ish triangle fitting the -1 to 1 range:
-  // V1: (-1, -1), V2: (1, -1), V3: (0, 1)
   const x = a * -1.0 + b * 1.0 + c * 0.0
   const y = a * -1.0 + b * -1.0 + c * 1.0
 
   return vec2f(x, y)
 })
 
-export const pointInitModeGaussian = pointInitModeFn(() => {
+export const pointInitModeGaussian = pointInitModeFn((_index) => {
   'use gpu'
-  // Box-Muller transform requires non-zero inputs for the log function
+  // box-muller transform requires non-zero inputs for the log function
   // Adding a tiny epsilon to avoid log(0)
   const u1 = random() + f32(1e-6)
   const u2 = random()
 
-  // Standard deviation (sigma). 0.4 keeps most points within [-1, 1]
+  // todo: standard deviation (sigma), 0.4 keeps most points within [-1, 1]
   const sigma = f32(0.4)
   const radius = sigma * sqrt(f32(-2.0) * log(u1))
   const theta = u2 * f32(2.0) * PI.$
@@ -75,19 +69,18 @@ export const pointInitModeGaussian = pointInitModeFn(() => {
   return vec2f(radius * cos(theta), radius * sin(theta))
 })
 
-export const pointInitModeAnnulus = pointInitModeFn(() => {
+export const pointInitModeAnnulus = pointInitModeFn((_index) => {
   'use gpu'
   const inner = f32(0.4)
   const outer = f32(1.0)
 
-  // correct area distribution
   const r = sqrt(random() * (outer * outer - inner * inner) + inner * inner)
   const theta = random() * 2.0 * PI.$
 
   return vec2f(r * cos(theta), r * sin(theta))
 })
 
-export const pointInitModeStar = pointInitModeFn(() => {
+export const pointInitModeStar = pointInitModeFn((_index) => {
   'use gpu'
   const spikes = f32(5.0)
   const theta = random() * 2.0 * PI.$
@@ -99,7 +92,7 @@ export const pointInitModeStar = pointInitModeFn(() => {
   return vec2f(r * cos(theta), r * sin(theta))
 })
 
-export const pointInitModeHexagon = pointInitModeFn(() => {
+export const pointInitModeHexagon = pointInitModeFn((_index) => {
   'use gpu'
   const r1 = random()
   const r2 = random()
@@ -121,7 +114,8 @@ export const pointInitModeHexagon = pointInitModeFn(() => {
 
   return vec2f(a * v1.x + b * v2.x + c * v3.x, a * v1.y + b * v2.y + c * v3.y)
 })
-export const pointInitModeSpiral = pointInitModeFn(() => {
+
+export const pointInitModeSpiral = pointInitModeFn((_index) => {
   'use gpu'
   const t = random()
 
@@ -140,23 +134,29 @@ function halton(index: number, base: number): number {
   let r = f32(0.0)
   let i = index
 
-  while (i <= 0) {
-    f = f / base
-    r = r + f * (f32(i) % base)
-    i = floor(f32(i) / base)
+  while (i > 0) {
+    f = f / f32(base)
+    r = r + f * f32(i % base)
+    i = u32(floor(f32(i) / f32(base)))
   }
 
   return r
 }
 
-export const pointInitModeHalton = pointInitModeFn((idx) => {
+export const pointInitModeHalton = pointInitModeFn((index) => {
   'use gpu'
 
-  const x = halton(idx, f32(2.0))
-  const y = halton(idx, f32(3.0))
+  const x = halton(index + 1, u32(2))
+  const y = halton(index + 1, u32(3))
 
-  // map [0,1] → [-1,1]
-  return vec2f(x * f32(2.0) - f32(1.0), y * f32(2.0) - f32(1.0))
+  return vec2f(x, y).mul(2.0).sub(1.0)
+})
+
+export const pointInitModePerlin = pointInitModeFn((_index) => {
+  'use gpu'
+  const xy = vec2f(random(), random())
+  const nx = perlin2d.sample(xy.mul(0.9))
+  return vec2f(xy).add(nx)
 })
 
 export const pointInitModeToImplFn = {
@@ -170,7 +170,8 @@ export const pointInitModeToImplFn = {
   pointInitStar: pointInitModeStar,
   pointInitHexagon: pointInitModeHexagon,
   pointInitSpiral: pointInitModeSpiral,
-  // pointInitHalton: pointInitModeHalton,
+  pointInitHalton: pointInitModeHalton,
+  pointInitPerlin: pointInitModePerlin,
 }
 
 export type PointInitMode = v.InferOutput<typeof PointInitMode>

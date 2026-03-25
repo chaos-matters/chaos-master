@@ -109,7 +109,8 @@ type VariationSelectorModalProps = {
 const variationPreviewFlames: (
   p: PointInitMode,
 ) => Record<string, FlameDescriptor> = (pointInitMode: PointInitMode) => {
-  // todo: temp mumbo jumbo to adjust point init mode for variation previews from main flame
+  // TODO: temp mumbo jumbo to adjust point init mode for variation previews from main flame
+  // consider just adding point init option to previewer!
   return Object.fromEntries(
     variationTypes.map((name) => [
       name,
