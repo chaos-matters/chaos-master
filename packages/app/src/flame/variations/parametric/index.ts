@@ -17,6 +17,7 @@ import { lineVar } from './lineVar'
 import { lissajousVar } from './lissajousVar'
 import { ngonVar } from './ngon'
 import { pdjVar } from './pdj'
+import { perlinNoiseVar } from './perlinNoise'
 import { perspective } from './perspective'
 import { pie } from './pie'
 import { pixelFlowVar } from './pixelFlowVar'
@@ -58,6 +59,7 @@ export const parametricVariations = {
   pie,
   pixelFlowVar,
   popcorn2Var,
+  perlinNoiseVar,
   radialBlurVar,
   rectanglesVar,
   rings2,

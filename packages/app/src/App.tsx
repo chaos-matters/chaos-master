@@ -25,7 +25,7 @@ import { ThemeContextProvider, useTheme } from './contexts/ThemeContext'
 import { DEFAULT_POINT_COUNT, DEFAULT_QUALITY, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_RESOLUTION, } from './defaults'
 import { colorInitModeToImplFn } from './flame/colorInitMode'
 import { drawModeToImplFn } from './flame/drawMode'
-import { initExample } from './flame/examples/initExample'
+import { example1 } from './flame/examples/example1'
 import { Flam3 } from './flame/Flam3'
 import { pointInitModeToImplFn } from './flame/pointInitMode'
 import { accumulatedPointCount, qualityPointCountLimit, setCurrentQuality, setQualityPointCountLimit, } from './flame/renderStats'
@@ -92,9 +92,7 @@ function App(props: AppProps) {
   const [showSidebar, setShowSidebar] = createSignal(true)
   const [flameDescriptor, setFlameDescriptor, history] = createStoreHistory(
     createStore(
-      structuredClone(
-        props.flameFromQuery ? props.flameFromQuery : initExample,
-      ),
+      structuredClone(props.flameFromQuery ? props.flameFromQuery : example1),
     ),
   )
   const totalProbability = createMemo(() =>

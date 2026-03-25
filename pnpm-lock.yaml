@@ -85,6 +85,9 @@ importers:
       '@typegpu/color':
         specifier: 0.10.0
         version: 0.10.0(typegpu@0.10.2)
+      '@typegpu/noise':
+        specifier: 0.10.0
+        version: 0.10.0(typegpu@0.10.2)
       '@typegpu/sdf':
         specifier: 0.10.0
         version: 0.10.0(typegpu@0.10.2)
@@ -859,6 +862,11 @@ packages:
 
   '@typegpu/color@0.10.0':
     resolution: {integrity: sha512-mqCxs/kDeQIBTFYFR74OGS1uxZSZr5VQ0o9+cr4Vp7A9/XsAQIyLuzooMSnkfJ3ubT/kypzVktb0lkmvIahfUw==}
+    peerDependencies:
+      typegpu: ^0.10.0
+
+  '@typegpu/noise@0.10.0':
+    resolution: {integrity: sha512-ZIFEO+PAkq1mqAgL9J1b0GMWyIU/9ScbxD5VFP2nSbDMylGogCByCm6c0d4gMwnd7Fn4PrLRR5NIenTmaruFdA==}
     peerDependencies:
       typegpu: ^0.10.0
 
@@ -2799,6 +2807,10 @@ snapshots:
     optional: true
 
   '@typegpu/color@0.10.0(typegpu@0.10.2)':
+    dependencies:
+      typegpu: 0.10.2
+
+  '@typegpu/noise@0.10.0(typegpu@0.10.2)':
     dependencies:
       typegpu: 0.10.2
 

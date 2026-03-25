@@ -30,8 +30,12 @@ export function createIFSPipeline(
   colorInitType: ColorInitMode = 'colorInitZero',
   pointInitType: PointInitMode = 'pointInitCircle',
 ) {
+  let globId = 'IFS-PIP-'
   const flames = Object.fromEntries(
-    recordEntries(transforms).map(([tid, tr]) => [tid, createFlameWgsl(tr)]),
+    recordEntries(transforms).map(([tid, tr]) => {
+      globId += tid
+      return [tid, createFlameWgsl(tr)]
+    }),
   )
 
   const flamesObj = Object.fromEntries(
@@ -181,6 +185,7 @@ export function createIFSPipeline(
     .with(camera.bindGroup)
     .with(bindGroup)
 
+  ifsPipeline.$name(globId)
   return {
     run: (pass: GPUComputePassEncoder, pointCount: number) => {
       ifsPipeline

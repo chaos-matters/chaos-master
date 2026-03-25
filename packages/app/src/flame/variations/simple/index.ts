@@ -53,7 +53,7 @@ export const linear = simpleVariation('linear', (pos, _varInfo) => {
 
 export const randomDisk = simpleVariation('randomDisk', (_pos, _varInfo) => {
   'use gpu'
-  return pointInitModeCircle()
+  return pointInitModeCircle(0)
 })
 
 export const gaussian = simpleVariation('gaussian', (_pos, _varInfo) => {
