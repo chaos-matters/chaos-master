@@ -42,12 +42,12 @@ const MINOR_TICK_GRAY = {
   dark: 0.05,
 }
 
-function triangle(x: number) {
+const triangle = (x: number) => {
   'use gpu'
   return abs(fract(x - 0.5) - 0.5)
 }
 
-function lines(x: number, pxWidth: number): number {
+const lines = (x: number, pxWidth: number): number => {
   'use gpu'
   return saturate((2 * (2 * pxWidth - x)) / pxWidth)
 }
