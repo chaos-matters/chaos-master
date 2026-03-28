@@ -21,7 +21,7 @@ export const TransformVariationDescriptor = v.variant(
 export type TransformVariationType = keyof typeof transformVariations
 export const variationTypes = recordKeys(transformVariations)
 
-type ParametricVariationType = (typeof parametricVariationTypes)[number]
+export type ParametricVariationType = (typeof parametricVariationTypes)[number]
 const parametricVariationTypes = Object.values(parametricVariations).map(
   (o) => o.DescriptorSchema.entries.type.literal,
 )

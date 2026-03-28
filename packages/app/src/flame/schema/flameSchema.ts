@@ -1,4 +1,4 @@
-import { prettyPrintValibotErrors } from '@/utils/prettyPrintValibotErrors'
+import { prettyPrintValibotErrors, processValibotErrors, } from '@/utils/prettyPrintValibotErrors'
 import * as v from '@/valibot'
 import { AffineParamsSchema } from '../affineTranform'
 import { ColorInitMode } from '../colorInitMode'
@@ -27,10 +27,12 @@ const renderSettingsDefault: RenderSettings = {
 }
 export const latestSchemaVersion = '1.0'
 const MAX_LENGTH_AUTHOR_STRING = 255
+const MAX_LENGTH_DESC_STRING = 255
 const MAX_LENGTH_VERSION_STRING = 10
 const metadataDefault = {
   version: latestSchemaVersion,
   author: 'unknown',
+  description: '',
 }
 
 export type TransformId = v.InferOutput<typeof TransformId>
@@ -93,6 +95,10 @@ const FlameMetadata = v.object({
     v.pipe(v.string(), v.maxLength(MAX_LENGTH_AUTHOR_STRING)),
     metadataDefault.author,
   ),
+  description: v.optional(
+    v.pipe(v.string(), v.maxLength(MAX_LENGTH_DESC_STRING)),
+    metadataDefault.description,
+  ),
 })
 
 const FlameDescriptorVersion = v.pipe(
@@ -112,14 +118,25 @@ export const FlameDescriptor = v.object({
   transforms: TransformRecord,
 })
 
-export function validateFlame(data: unknown): FlameDescriptor {
+export function validateFlameWithErrors(
+  data: unknown,
+  errorCallback: ((err: string) => void) | undefined,
+  printToConsole: boolean = false,
+): FlameDescriptor | undefined {
   const result = v.safeParse(FlameDescriptor, data)
   if (!result.success) {
     const flatErrors = v.flatten<typeof FlameDescriptor>(result.issues)
-    prettyPrintValibotErrors(flatErrors)
-    throw new Error(
-      'This flame cannot be shown, please check console for more info.',
-    )
+    if (printToConsole) {
+      prettyPrintValibotErrors(flatErrors)
+    }
+    if (errorCallback) {
+      processValibotErrors(flatErrors, errorCallback)
+    }
+    return undefined
   }
   return result.output
+}
+
+export function validateFlame(data: unknown): FlameDescriptor | undefined {
+  return validateFlameWithErrors(data, undefined, true)
 }

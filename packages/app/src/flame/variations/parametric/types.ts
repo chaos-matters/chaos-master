@@ -47,6 +47,7 @@ export function parametricVariationDescriptor<
   paramStruct: WgslStruct<T>,
 ): ParametricVariationDescriptor<K, T> {
   const ParamSchema = structToSchema(paramStruct)
+
   return v.object({
     type: v.literal(variationType),
     weight: v.number(),

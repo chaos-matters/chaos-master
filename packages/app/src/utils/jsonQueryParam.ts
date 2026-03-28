@@ -1,4 +1,3 @@
-import { validateFlame } from '@/flame/schema/flameSchema'
 import { decodeBase64, encodeBase64 } from './base64'
 import { sum } from './sum'
 
@@ -50,6 +49,11 @@ export async function encodeJsonQueryParam(obj: unknown) {
   return encodeBase64(compressedQuery, { pad: '' })
 }
 
+export async function getFlameLink(obj: unknown) {
+  const encoded = await encodeJsonQueryParam(obj)
+  return `${window.location.origin}/?flame=${encoded}`
+}
+
 export async function decompressJsonQuery(
   compressedBytes: Uint8Array<ArrayBuffer>,
 ) {
@@ -82,7 +86,7 @@ export async function decompressJsonQuery(
   //   chunks.push(chunk)
   // }
 
-  return validateFlame(JSON.parse(chunks.join()))
+  return JSON.parse(chunks.join())
 }
 
 export async function decodeJsonQueryParam(param: string) {

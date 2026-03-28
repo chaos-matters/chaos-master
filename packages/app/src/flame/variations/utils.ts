@@ -1,7 +1,7 @@
 import { produce, unfreeze } from 'structurajs'
 import { defineExample } from '../examples/util'
 import { generateTransformId, generateVariationId } from '../transformFunction'
-import { isParametricVariationType, transformVariations } from '.'
+import { isParametricVariationType, transformVariations, variationTypes, } from '.'
 import type { FlameDescriptor, TransformId, VariationId, } from '../schema/flameSchema'
 import type { ParametricVariationDescriptor, TransformVariationDescriptor, TransformVariationType, } from '.'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
@@ -43,24 +43,90 @@ type FlameIds = {
   tid: TransformId
   vid: VariationId
 }
-const transformPreviewIds = Object.keys(transformVariations).reduce(
-  (acc, type) => {
-    acc[type as TransformVariationType] = {
-      // helps with debugging, the transform ID is marked with variation type for preview
-      // so the flame is easily identifiable, consider moving this to Flame name, which can
-      // prefix all shader transforms/flames
-      tid: generateTransformId(type),
-      vid: generateVariationId(),
-    }
-    return acc
-  },
-  {} as Record<TransformVariationType, FlameIds>,
-)
+let transformPreviewIds: Record<TransformVariationType, FlameIds> | null = null
+
+function getTransformPreviewIds(): Record<TransformVariationType, FlameIds> {
+  if (transformPreviewIds) return transformPreviewIds
+  transformPreviewIds = Object.keys(transformVariations).reduce(
+    (acc, type) => {
+      acc[type as TransformVariationType] = {
+        // helps with debugging, the transform ID is marked with variation type for preview
+        // so the flame is easily identifiable, consider moving this to Flame name, which can
+        // prefix all shader transforms/flames
+        tid: generateTransformId(type),
+        vid: generateVariationId(),
+      }
+      return acc
+    },
+    {} as Record<TransformVariationType, FlameIds>,
+  )
+  return transformPreviewIds
+}
 export function getTransformPreviewTid(type: TransformVariationType) {
-  return transformPreviewIds[type].tid
+  return getTransformPreviewIds()[type].tid
 }
 export function getTransformPreviewVid(type: TransformVariationType) {
-  return transformPreviewIds[type].vid
+  return getTransformPreviewIds()[type].vid
+}
+
+export function getTransformWithAllVariations() {
+  return defineExample({
+    renderSettings: {
+      exposure: 0.3,
+      skipIters: 1,
+      drawMode: 'light',
+      backgroundColor: [0, 0, 0],
+      camera: {
+        zoom: 1,
+        position: [0, 0],
+      },
+      colorInitMode: 'colorInitPosition',
+    },
+    transforms: {
+      [getTransformPreviewTid('linear')]: {
+        probability: 1,
+        preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+        postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+        color: { x: 0, y: 0 },
+        variations: Object.fromEntries(
+          variationTypes.map((name) => [
+            getTransformPreviewVid(name),
+            getVariationDefault(name, 1.0),
+          ]),
+        ),
+      },
+    },
+  })
+}
+
+export function getTransformsForEachVariation() {
+  return defineExample({
+    renderSettings: {
+      exposure: 0.3,
+      skipIters: 1,
+      drawMode: 'light',
+      backgroundColor: [0, 0, 0],
+      camera: {
+        zoom: 1,
+        position: [0, 0],
+      },
+      colorInitMode: 'colorInitPosition',
+    },
+    transforms: Object.fromEntries(
+      variationTypes.map((name) => [
+        getTransformPreviewTid(name),
+        {
+          probability: 1,
+          preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+          postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+          color: { x: 0, y: 0 },
+          variations: {
+            [getTransformPreviewVid(name)]: getVariationDefault(name, 1.0),
+          },
+        },
+      ]),
+    ),
+  })
 }
 
 export function getDefaultFlameByVarType(
@@ -92,8 +158,13 @@ export function getDefaultFlameByVarType(
   })
 }
 
-const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
-  {
+let previewFlamesGlob: Partial<
+  Record<TransformVariationType, FlameDescriptor>
+> | null
+
+function initPreviewFlames() {
+  if (previewFlamesGlob) return previewFlamesGlob
+  previewFlamesGlob = {
     horseshoe: unfreeze(
       produce(getDefaultFlameByVarType('horseshoe'), (draft) => {
         draft.transforms[getTransformPreviewTid('horseshoe')]!.preAffine = {
@@ -364,8 +435,11 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
       }),
     ),
   }
+  return previewFlamesGlob
+}
 export function getVariationPreviewFlame(
   type: TransformVariationType,
 ): FlameDescriptor {
+  const previewFlames = initPreviewFlames()
   return previewFlames[type] ?? getDefaultFlameByVarType(type)
 }

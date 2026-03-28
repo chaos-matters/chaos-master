@@ -11,5 +11,10 @@ export function vid(variationId: string): VariationId {
 }
 
 export function defineExample(example: InferInput<typeof FlameDescriptor>) {
-  return validateFlame(example)
+  const flame = validateFlame(example)
+  if (flame) {
+    return flame
+  } else {
+    throw new Error(`Stock example not valid: ${JSON.stringify(example)}!`)
+  }
 }
