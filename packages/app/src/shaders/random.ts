@@ -4,9 +4,8 @@
  */
 
 import { tgpu } from 'typegpu'
-import { u32, vec2f, vec2u } from 'typegpu/data'
-import { bitcastU32toF32, cos, mul, sin, sqrt } from 'typegpu/std'
-import { PI } from '@/flame/constants'
+import { u32, vec2u } from 'typegpu/data'
+import { bitcastU32toF32 } from 'typegpu/std'
 import type { v2u } from 'typegpu/data'
 
 export const randomState = tgpu.privateVar(vec2u, vec2u(0, 0))
@@ -55,13 +54,4 @@ export const hash = tgpu.fn(
   x *= u32(0x31848bab)
   x ^= x >> 14
   return x
-})
-
-export const randomUnitDisk = tgpu.fn(
-  [],
-  vec2f,
-)(() => {
-  const r = sqrt(random())
-  const theta = random() * 2 * PI.$
-  return mul(r, vec2f(cos(theta), sin(theta)))
 })
