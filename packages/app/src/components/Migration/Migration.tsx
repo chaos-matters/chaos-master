@@ -1,15 +1,14 @@
-import { createEffect, createSignal } from 'solid-js'
-import { createStore, unwrap } from 'solid-js/store'
+import { createEffect, createSignal, Show } from 'solid-js'
+import { unwrap } from 'solid-js/store'
 import { vec2f, vec4f } from 'typegpu/data'
 import { DEFAULT_QUALITY } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
-import { validateFlameWithErrors } from '@/flame/schema/flameSchema'
+import { latestSchemaVersion, validateFlameWithErrors, } from '@/flame/schema/flameSchema'
 import { getTransformsForEachVariation, getTransformWithAllVariations, } from '@/flame/variations/utils'
 import { Copy } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
 import { Root } from '@/lib/Root'
-import { createStoreHistory } from '@/utils/createStoreHistory'
 import { extractFlameFromPng } from '@/utils/flameInPng'
 import { getFlameLink } from '@/utils/jsonQueryParam'
 import { Button } from '../Button/Button'
@@ -107,9 +106,9 @@ function Migration(props: MigrationFlameModalProps) {
   const [sourceJson, setSourceJson] = createSignal('')
   const [inputFlameVersion, setInputFlameVersion] = createSignal('')
   const [outputData, setOutputData] = createSignal('')
-  const [previewFlame, setPreviewFlame] = createStoreHistory(
-    createStore<FlameDescriptor>(structuredClone(props.currentFlame)),
-  )
+  const [previewFlame, setPreviewFlame] = createSignal<
+    FlameDescriptor | undefined
+  >(structuredClone(props.currentFlame))
 
   function getPrettyJson(text: string): string {
     try {
@@ -141,18 +140,18 @@ function Migration(props: MigrationFlameModalProps) {
   })
 
   const setFlame = (flame: FlameDescriptor) => {
-    setPreviewFlame((draft) => {
-      draft.metadata = flame.metadata
-      draft.transforms = flame.transforms
-      draft.renderSettings = flame.renderSettings
-      draft.version = flame.version
-    })
+    setPreviewFlame(flame)
+    //         (draft) => {
+    //   draft.metadata = flame.metadata
+    //   draft.transforms = flame.transforms
+    //   draft.renderSettings = flame.renderSettings
+    //   draft.version = flame.version
+    // })
   }
 
   async function loadFromFile() {
     const file = await importFromFile()
     if (!file) return
-    const errorData: string[] = []
     try {
       if (file.type.startsWith('image/png')) {
         const arrBuf = new Uint8Array(await file.arrayBuffer())
@@ -160,29 +159,15 @@ function Migration(props: MigrationFlameModalProps) {
           () => undefined,
         )
         setSourceJson(getPrettyJson(JSON.stringify(extractedData)))
-        const newFlame = validateFlameWithErrors(
-          extractedData,
-          (err) => errorData.push(err),
-          true,
-        )
-        if (newFlame !== undefined) {
-          setFlame(newFlame)
-        }
+        validateInputJson()
       } else if (file.type.startsWith('application/json')) {
         const fileJson = await file.text()
         setSourceJson(getPrettyJson(fileJson))
-        const newFlame = validateFlameWithErrors(fileJson, (err) =>
-          errorData.push(err),
-        )
-        if (newFlame !== undefined) {
-          setFlame(newFlame)
-        }
+        validateInputJson()
       }
     } catch (err) {
       console.warn(err)
-      errorData.unshift(stringifyError(err))
     }
-    setOutputData(errorData.join('\n'))
   }
 
   function validateInputJson() {
@@ -195,15 +180,16 @@ function Migration(props: MigrationFlameModalProps) {
           (err) => errorData.push(err),
         )
         if (newFlame !== undefined) {
-          if (newFlame.version !== undefined) {
-            setInputFlameVersion(newFlame.version)
-          }
           setFlame(newFlame)
         }
       } catch (err) {
         console.warn(err)
         errorData.unshift(stringifyError(err))
       }
+    }
+    if (errorData.length !== 0) {
+      setPreviewFlame(undefined)
+      setInputFlameVersion('?.?')
     }
     setOutputData(errorData.join('\n'))
     return errorData
@@ -212,6 +198,17 @@ function Migration(props: MigrationFlameModalProps) {
   function handleMigrate() {
     setOutputData('')
     const errors = validateInputJson()
+    if (errors.length === 0) {
+      setPreviewFlame((draft) => {
+        if (draft !== undefined) {
+          draft.version = latestSchemaVersion
+          return draft
+        }
+      })
+      setOutputData(getPrettyJson(JSON.stringify(previewFlame())))
+    }
+    // TODO: find a neat way to fill in missing keys and variation params as a minimal
+    // migration strategy
     console.warn('migration not implemented')
     errors.forEach((err) => {
       console.info(err)
@@ -221,11 +218,13 @@ function Migration(props: MigrationFlameModalProps) {
   function handleCreateTransformsExampleSet() {
     const flames = getTransformsForEachVariation()
     setSourceJson(getPrettyJson(JSON.stringify(flames)))
+    validateInputJson()
   }
 
   function handleCreateVariationsExampleSet() {
     const flames = getTransformWithAllVariations()
     setSourceJson(getPrettyJson(JSON.stringify(flames)))
+    validateInputJson()
   }
 
   function isJsonString(value: string): boolean {
@@ -329,7 +328,7 @@ function Migration(props: MigrationFlameModalProps) {
             <div class={ui.textPanel}>
               <div class={ui.textPanelHeader}>
                 <h3 class={ui.textPanelTitle}>
-                  Output Flame (v{previewFlame.version})
+                  Output Flame (v{previewFlame.version ?? latestSchemaVersion})
                 </h3>
                 <button
                   class={ui.inlineCopyButton}
@@ -346,15 +345,19 @@ function Migration(props: MigrationFlameModalProps) {
               </div>
             </div>
             <section class={ui.previewFlame}>
-              <button
-                class={ui.item}
-                onClick={() => {
-                  props.respond(previewFlame)
-                }}
-              >
-                <Preview flameDescriptor={previewFlame} />
-                <div class={ui.itemTitle}>{previewFlame.metadata.author}</div>
-              </button>
+              <Show when={previewFlame()}>
+                <button
+                  class={ui.item}
+                  onClick={() => {
+                    props.respond(previewFlame())
+                  }}
+                >
+                  <Preview flameDescriptor={previewFlame()} />
+                  <div class={ui.itemTitle}>
+                    {previewFlame().metadata.author}
+                  </div>
+                </button>
+              </Show>
             </section>
           </div>
         </div>
