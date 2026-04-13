@@ -1,5 +1,5 @@
-import { createMemo, createSignal, createStore, createTrackedEffect, For, onCleanup, Show, } from 'solid-js'
 import { Dynamic } from '@solidjs/web'
+import { createMemo, createSignal, createStore, createTrackedEffect, For, onCleanup, Show, } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { ChangeHistoryContextProvider } from '@/contexts/ChangeHistoryContext'
@@ -113,7 +113,7 @@ function VariationPreview(props: {
   const [exportImage, setExportImage] = createSignal<ExportImageType>()
   const [image, setImage] = createSignal<string>()
 
-  createTrackedEffect(async () => {
+  createTrackedEffect(() => {
     const container_ = container()
     if (!container_ || renderStatus() !== 'done') {
       return
@@ -129,9 +129,10 @@ function VariationPreview(props: {
 
     const { promise, resolve } = Promise.withResolvers<Blob>()
     setExportImage(() => resolve)
-    const blob = await promise
-    const src = URL.createObjectURL(blob)
-    image_.src = src
+    void promise.then((blob) => {
+      const src = URL.createObjectURL(blob)
+      image_.src = src
+    })
   })
 
   return (

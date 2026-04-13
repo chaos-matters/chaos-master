@@ -74,7 +74,7 @@ export function Flam3(props: Flam3Props) {
     .$usage('storage')
 
   onCleanup(() => {
-    device.queue.onSubmittedWorkDone().then(() => {
+    void device.queue.onSubmittedWorkDone().then(() => {
       pointRandomSeeds.destroy()
     })
   })
@@ -89,7 +89,7 @@ export function Flam3(props: Flam3Props) {
     .$usage('uniform')
 
   onCleanup(() => {
-    device.queue.onSubmittedWorkDone().then(() => {
+    void device.queue.onSubmittedWorkDone().then(() => {
       colorGradingUniforms.destroy()
     })
   })
@@ -109,7 +109,7 @@ export function Flam3(props: Flam3Props) {
       .$usage('storage')
 
     onCleanup(() => {
-      device.queue.onSubmittedWorkDone().then(() => {
+      void device.queue.onSubmittedWorkDone().then(() => {
         accumulationBuffer.destroy()
         postprocessBuffer.destroy()
       })
@@ -137,7 +137,7 @@ export function Flam3(props: Flam3Props) {
       drawModeToImplFn[props.flameDescriptor.renderSettings.drawMode],
     )
     onCleanup(() => {
-      device.queue.onSubmittedWorkDone().then(() => {
+      void device.queue.onSubmittedWorkDone().then(() => {
         pipeline.destroy()
       })
     })
@@ -157,7 +157,7 @@ export function Flam3(props: Flam3Props) {
       postprocessBuffer,
     )
     onCleanup(() => {
-      device.queue.onSubmittedWorkDone().then(() => {
+      void device.queue.onSubmittedWorkDone().then(() => {
         pipeline.destroy()
       })
     })
