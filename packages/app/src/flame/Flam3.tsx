@@ -74,7 +74,7 @@ export function Flam3(props: Flam3Props) {
     .$usage('storage')
 
   onCleanup(() => {
-    requestAnimationFrame(() => {
+    device.queue.onSubmittedWorkDone().then(() => {
       pointRandomSeeds.destroy()
     })
   })
@@ -89,7 +89,7 @@ export function Flam3(props: Flam3Props) {
     .$usage('uniform')
 
   onCleanup(() => {
-    requestAnimationFrame(() => {
+    device.queue.onSubmittedWorkDone().then(() => {
       colorGradingUniforms.destroy()
     })
   })
@@ -109,7 +109,7 @@ export function Flam3(props: Flam3Props) {
       .$usage('storage')
 
     onCleanup(() => {
-      requestAnimationFrame(() => {
+      device.queue.onSubmittedWorkDone().then(() => {
         accumulationBuffer.destroy()
         postprocessBuffer.destroy()
       })
@@ -128,7 +128,7 @@ export function Flam3(props: Flam3Props) {
       return undefined
     }
     const { textureSize, postprocessBuffer, accumulationBuffer } = o
-    return createColorGradingPipeline(
+    const pipeline = createColorGradingPipeline(
       root,
       colorGradingUniforms,
       textureSize,
@@ -136,6 +136,12 @@ export function Flam3(props: Flam3Props) {
       canvasFormat,
       drawModeToImplFn[props.flameDescriptor.renderSettings.drawMode],
     )
+    onCleanup(() => {
+      device.queue.onSubmittedWorkDone().then(() => {
+        pipeline.destroy()
+      })
+    })
+    return pipeline
   })
 
   const runBlur = createMemo(() => {
@@ -144,12 +150,18 @@ export function Flam3(props: Flam3Props) {
       return undefined
     }
     const { textureSize, accumulationBuffer, postprocessBuffer } = o
-    return createBlurPipeline(
+    const pipeline = createBlurPipeline(
       root,
       textureSize,
       accumulationBuffer,
       postprocessBuffer,
     )
+    onCleanup(() => {
+      device.queue.onSubmittedWorkDone().then(() => {
+        pipeline.destroy()
+      })
+    })
+    return pipeline
   })
 
   const continueRendering = (accumulatedPointCount: number) => {
@@ -322,7 +334,7 @@ export function Flam3(props: Flam3Props) {
             const pass = encoder.beginComputePass({
               timestampWrites: timestampWrites?.adaptiveFilterMs,
             })
-            runBlur()?.(pass)
+            runBlur()?.run(pass)
             pass.end()
           }
 
