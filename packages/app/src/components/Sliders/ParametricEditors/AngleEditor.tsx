@@ -45,11 +45,11 @@ export function AngleEditor(props: AngleEditorProps) {
       <span class={ui.name}>{props.name}</span>
       <div
         ref={(el) => {
-          scrollIntoViewAndFocusOnChange(value, el)
+          scrollIntoViewAndFocusOnChange(history, value, el)
         }}
         class={ui.track}
         onPointerDown={startRotating}
-        tabIndex={0}
+        tabindex={0}
       >
         <div class={ui.indicator} style={{ '--angle': `${value()}rad` }}>
           <div class={ui.line} />

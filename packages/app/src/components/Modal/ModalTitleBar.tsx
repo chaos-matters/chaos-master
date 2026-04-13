@@ -26,7 +26,9 @@ export function ModalTitleBar(props: ParentProps<ModalTitleBarProps>) {
     <h1 class={ui.bar}>
       <span class={ui.title}>{props.children}</span>
       <Show when={props.onClose} keyed>
-        {(onClose) => (
+        {(onCloseAccessor) => {
+          const onClose = onCloseAccessor()
+          return (
           <Button
             class={ui.closeButton}
             onClick={() => {
@@ -35,7 +37,8 @@ export function ModalTitleBar(props: ParentProps<ModalTitleBarProps>) {
           >
             <Cross width="1rem" />
           </Button>
-        )}
+          )
+        }}
       </Show>
     </h1>
   )

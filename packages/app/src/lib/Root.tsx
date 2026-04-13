@@ -1,4 +1,4 @@
-import { createResource, onCleanup, Show } from 'solid-js'
+import { createMemo, Loading, onCleanup, Show } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
 import { RootContextProvider } from './RootContext'
@@ -10,36 +10,36 @@ type RootProps = {
 }
 
 export function Root(props: ParentProps<RootProps>) {
-  const [webgpu] = createResource(
-    () => ({
-      adapterOptions: props.adapterOptions,
-    }),
-    async ({ adapterOptions }) => {
-      let root: TgpuRoot | undefined = undefined
-      onCleanup(() => {
-        root?.destroy()
-        // Unsupported in some browsers, firefox crashes when this gets run
-        //  with new WebGPU singleton interface, the devices should not be destroyed here
-        // device?.destroy()
-      })
+  // In Solid v2, createResource is replaced by async createMemo + Loading
+  const webgpu = createMemo(async () => {
+    let root: TgpuRoot | undefined = undefined
+    onCleanup(() => {
+      root?.destroy()
+    })
 
-      const { adapter, device } = await getWebgpuComponents(adapterOptions, {
+    const { adapter, device } = await getWebgpuComponents(
+      props.adapterOptions,
+      {
         requiredFeatures: ['timestamp-query'],
-      })
+      },
+    )
 
-      // TODO: see whether it makes sense to make tgpu singleton as well, check docs
-      root = tgpu.initFromDevice({ device })
-      return { adapter, device, root }
-    },
-  )
+    root = tgpu.initFromDevice({ device })
+    return { adapter, device, root }
+  })
 
   return (
-    <Show when={webgpu()} keyed>
-      {(webgpu) => (
-        <RootContextProvider value={webgpu}>
-          {props.children}
-        </RootContextProvider>
-      )}
-    </Show>
+    <Loading>
+      <Show when={webgpu()} keyed>
+        {(webgpuAccessor) => {
+          const webgpu = webgpuAccessor()
+          return (
+          <RootContextProvider value={webgpu}>
+            {props.children}
+          </RootContextProvider>
+          )
+        }}
+      </Show>
+    </Loading>
   )
 }

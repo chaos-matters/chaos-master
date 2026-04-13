@@ -1,4 +1,4 @@
-import { createEffect, createSignal, Show } from 'solid-js'
+import { createTrackedEffect, createSignal, Show } from 'solid-js'
 import type { JSX, ParentProps } from 'solid-js'
 
 type DelayedShowProps = {
@@ -11,7 +11,7 @@ type DelayedShowProps = {
  */
 export function DelayedShow(props: ParentProps<DelayedShowProps>) {
   const [show, setShow] = createSignal(false)
-  createEffect(() => {
+  createTrackedEffect(() => {
     setTimeout(() => {
       setShow(true)
     }, props.delayMs)

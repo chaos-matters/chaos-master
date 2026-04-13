@@ -1,4 +1,4 @@
-import { createEffect, createSignal, Show } from 'solid-js'
+import { createSignal, createTrackedEffect, Show } from 'solid-js'
 import { useElementSize } from '@/utils/useElementSize'
 import { CanvasContextProvider } from './CanvasContext'
 import { useRootContext } from './RootContext'
@@ -45,7 +45,7 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
   )
 
   // also update canvas size when props.pixelRatio changes
-  createEffect(() => {
+  createTrackedEffect(() => {
     const el = canvas()
     const size = canvasSize()
     if (!el || !size) {
@@ -80,7 +80,9 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
         class={props.class}
       />
       <Show when={canvas()} keyed>
-        {(canvas) => (
+        {(canvasAccessor) => {
+          const canvas = canvasAccessor()
+          return (
           <CanvasContextProvider
             value={{
               canvas,
@@ -101,7 +103,8 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
           >
             {props.children}
           </CanvasContextProvider>
-        )}
+          )
+        }}
       </Show>
     </>
   )

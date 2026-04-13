@@ -1,4 +1,4 @@
-import { createEffect, onCleanup } from 'solid-js'
+import { createTrackedEffect, onCleanup } from 'solid-js'
 import { hasExactlyTwoElements } from './assertArray'
 
 const { hypot } = Math
@@ -30,7 +30,7 @@ export function createPinchHandler(createHandlers: CreatePinchHandler) {
   const unmountController = new AbortController()
   const unmountSignal = unmountController.signal
 
-  createEffect(() => {
+  createTrackedEffect(() => {
     onCleanup(() => {
       unmountController.abort()
     })

@@ -5,7 +5,7 @@ import type { ChangeHistory } from '@/utils/createStoreHistory'
 
 const ChangeHistoryContext = createContext<ChangeHistory<FlameDescriptor>>()
 
-export const ChangeHistoryContextProvider = ChangeHistoryContext.Provider
+export const ChangeHistoryContextProvider = ChangeHistoryContext
 
 export function useChangeHistory() {
   return useContextSafe(

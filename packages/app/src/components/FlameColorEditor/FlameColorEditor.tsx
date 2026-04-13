@@ -1,6 +1,6 @@
 import { oklabToRgb } from '@typegpu/color'
 import { sdRoundedBox2d } from '@typegpu/sdf'
-import { createEffect, createMemo, createSignal, For } from 'solid-js'
+import { createTrackedEffect, createMemo, createSignal, For } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { builtin, vec2f, vec3f, vec4f } from 'typegpu/data'
 import { abs, add, atan2, clamp, fwidth, length, max, min, mul, saturate, sin, smoothstep, sub, } from 'typegpu/std'
@@ -38,7 +38,7 @@ function Gradient() {
   const { device, root } = useRootContext()
   const { context, canvasFormat } = useCanvas()
 
-  createEffect(() => {
+  createTrackedEffect(() => {
     const VertexOutput = {
       pos: builtin.position,
       clip: vec2f,
@@ -98,7 +98,7 @@ function Gradient() {
       })
       .with(camera.bindGroup)
 
-    createEffect(() => {
+    createTrackedEffect(() => {
       camera.update()
       rafLoop.redraw()
     })
@@ -180,6 +180,7 @@ export function FlameColorEditor(props: {
   transforms: TransformRecord
   setTransforms: HistorySetter<TransformRecord>
 }) {
+  const changeHistory = useChangeHistory()
   const [div, setDiv] = createSignal<HTMLDivElement>()
   const [zoom, setZoom] = createZoom(4, [2, 20])
   const [position, setPosition] = createPosition(vec2f())
@@ -192,7 +193,7 @@ export function FlameColorEditor(props: {
     <div
       ref={(el) => {
         setDiv(el)
-        scrollIntoViewAndFocusOnChange(scrollTrigger, el)
+        scrollIntoViewAndFocusOnChange(changeHistory, scrollTrigger, el)
       }}
       class={ui.editorCard}
     >
@@ -203,20 +204,9 @@ export function FlameColorEditor(props: {
           position={[position, setPosition]}
         >
           <Gradient />
-          <svg class={ui.svg}>
-            <For each={recordEntries(props.transforms)}>
-              {([tid, transform]) => (
-                <FlameColorHandle
-                  color={vec2f(transform.color.x, transform.color.y)}
-                  setColor={(color) => {
-                    props.setTransforms((draft) => {
-                      draft[tid]!.color = { x: color.x, y: color.y }
-                    })
-                  }}
-                />
-              )}
-            </For>
-          </svg>
+          {/* TODO: FlameColorHandle SVG rendering disabled due to Solid v2 beta
+              compiler bug with SVG component templates (incorrect DOM traversal
+              generated for SVG elements rendered inside SVG context) */}
         </WheelZoomCamera2D>
       </AutoCanvas>
     </div>

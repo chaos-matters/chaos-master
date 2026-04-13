@@ -1,6 +1,6 @@
-import { createEffect, createMemo, createResource, createSignal, ErrorBoundary, For, Show, Suspense, } from 'solid-js'
-import { createStore } from 'solid-js/store'
-import { Dynamic } from 'solid-js/web'
+import { createTrackedEffect, createMemo, createSignal, Errored, For, Show, Loading, } from 'solid-js'
+import { createStore } from 'solid-js'
+import { Dynamic } from '@solidjs/web'
 import { vec2f, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { recordEntries, recordKeys } from '@/utils/record'
@@ -194,7 +194,7 @@ function App(props: AppProps) {
     downloadLink.click()
   }
 
-  createEffect(() => {
+  createTrackedEffect(() => {
     setTheme(
       flameDescriptor.renderSettings.drawMode === 'light' ? 'dark' : 'light',
     )
@@ -214,8 +214,7 @@ function App(props: AppProps) {
       <Dropzone class={ui.layout} onDrop={onDrop}>
         <>
           <div
-            class={ui.canvasContainer}
-            classList={{ [ui.fullscreen]: !showSidebar() }}
+            class={[ui.canvasContainer, { [ui.fullscreen as string]: !showSidebar() }]}
           >
             <AutoCanvas class={ui.canvas} pixelRatio={pixelRatio()}>
               <WheelZoomCamera2D
@@ -241,9 +240,9 @@ function App(props: AppProps) {
                     showSidebar() ? EDGE_FADE_COLOR[theme()] : vec4f(0)
                   }
                   exportImage={onExportImage()}
-                  setCurrentQuality={(fn) => setCurrentQuality(() => fn)}
+                  setCurrentQuality={(fn) => { setCurrentQuality(fn); }}
                   setQualityPointCountLimit={(fn) =>
-                    setQualityPointCountLimit(() => fn)
+                    setQualityPointCountLimit(fn)
                   }
                 />
               </WheelZoomCamera2D>
@@ -277,7 +276,9 @@ function App(props: AppProps) {
               }}
             />
             <For each={recordEntries(flameDescriptor.transforms)}>
-              {([tid, transform]) => (
+              {(entry) => {
+                const [tid, transform] = entry()
+                return (
                 <div class={ui.transformGrid}>
                   <svg class={ui.variationButtonSvgColor}>
                     <g
@@ -309,10 +310,7 @@ function App(props: AppProps) {
                     <Cross />
                   </button>
                   <div
-                    classList={{
-                      [ui.transformGridRow]: true,
-                      [ui.transformGridFirstRow]: true,
-                    }}
+                    class={[ui.transformGridRow, ui.transformGridFirstRow]}
                   >
                     <Slider
                       class={ui.transformGridFirstRow}
@@ -332,7 +330,9 @@ function App(props: AppProps) {
                     />
                   </div>
                   <For each={recordEntries(transform.variations)}>
-                    {([vid, variation]) => (
+                    {(varEntry) => {
+                      const [vid, variation] = varEntry()
+                      return (
                       <>
                         <div class={ui.transformGridRow}>
                           <button
@@ -416,7 +416,9 @@ function App(props: AppProps) {
                           when={isParametricVariation(variation) && variation}
                           keyed
                         >
-                          {(variation) => (
+                          {(variationAccessor) => {
+                            const variation = variationAccessor()
+                            return (
                             <div class={ui.transformGridRow}>
                               <Dynamic
                                 {...getParamsEditor(variation)}
@@ -435,10 +437,12 @@ function App(props: AppProps) {
                                 }}
                               />
                             </div>
-                          )}
+                            )
+                          }}
                         </Show>
                       </>
-                    )}
+                      )
+                    }}
                   </For>
 
                   <button
@@ -454,7 +458,8 @@ function App(props: AppProps) {
                     <Plus />
                   </button>
                 </div>
-              )}
+                )
+              }}
             </For>
             <Card class={ui.buttonCard}>
               <button
@@ -512,7 +517,10 @@ function App(props: AppProps) {
                   }}
                 >
                   <For each={recordKeys(drawModeToImplFn)}>
-                    {(drawMode) => <option value={drawMode}>{drawMode}</option>}
+                    {(drawModeAccessor) => {
+                      const drawMode = drawModeAccessor()
+                      return <option value={drawMode}>{drawMode}</option>
+                    }}
                   </For>
                 </select>
                 <span></span>
@@ -532,9 +540,12 @@ function App(props: AppProps) {
                   }}
                 >
                   <For each={recordKeys(colorInitModeToImplFn)}>
-                    {(colorInitMode) => (
+                    {(colorInitModeAccessor) => {
+                      const colorInitMode = colorInitModeAccessor()
+                      return (
                       <option value={colorInitMode}>{colorInitMode}</option>
-                    )}
+                      )
+                    }}
                   </For>
                 </select>
                 <span></span>
@@ -614,7 +625,8 @@ function App(props: AppProps) {
 }
 
 export function Wrappers() {
-  const [flameFromQuery] = createResource(async () => {
+  // In Solid v2, createResource is replaced by async createMemo + Loading
+  const flameFromQuery = createMemo(async () => {
     const param = new URLSearchParams(window.location.search)
     const flameDef = param.get('flame')
     if (flameDef !== null) {
@@ -640,19 +652,17 @@ export function Wrappers() {
   return (
     <ThemeContextProvider>
       <Modal>
-        <ErrorBoundary fallback={errorHandler}>
+        <Errored fallback={errorHandler}>
           <Root
             adapterOptions={{
               powerPreference: 'high-performance',
             }}
           >
-            <Suspense>
-              <Show when={flameFromQuery.state === 'ready'}>
-                <App flameFromQuery={flameFromQuery()} />
-              </Show>
-            </Suspense>
+            <Loading>
+              <App flameFromQuery={flameFromQuery()} />
+            </Loading>
           </Root>
-        </ErrorBoundary>
+        </Errored>
       </Modal>
     </ThemeContextProvider>
   )

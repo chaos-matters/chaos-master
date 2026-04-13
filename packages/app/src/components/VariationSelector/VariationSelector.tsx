@@ -1,6 +1,6 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
-import { createStore, produce } from 'solid-js/store'
-import { Dynamic } from 'solid-js/web'
+import { createMemo, createSignal, createTrackedEffect, For, onCleanup, Show, } from 'solid-js'
+import { createStore } from 'solid-js'
+import { Dynamic } from '@solidjs/web'
 import { vec2f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { ChangeHistoryContextProvider } from '@/contexts/ChangeHistoryContext'
@@ -114,7 +114,7 @@ function VariationPreview(props: {
   const [exportImage, setExportImage] = createSignal<ExportImageType>()
   const [image, setImage] = createSignal<string>()
 
-  createEffect(async () => {
+  createTrackedEffect(async () => {
     const container_ = container()
     if (!container_ || renderStatus() !== 'done') {
       return
@@ -207,44 +207,36 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
 
   const setFlameZoom: Setter<number> = (value) => {
     if (typeof value === 'function') {
-      setPreviewFlame(
-        produce((draft) => {
-          draft.renderSettings.camera.zoom = clamp(
-            value(draft.renderSettings.camera.zoom),
-            MIN_CAMERA_ZOOM_VALUE,
-            MAX_CAMERA_ZOOM_VALUE,
-          )
-        }),
-      )
+      setPreviewFlame((draft) => {
+        draft.renderSettings.camera.zoom = clamp(
+          value(draft.renderSettings.camera.zoom),
+          MIN_CAMERA_ZOOM_VALUE,
+          MAX_CAMERA_ZOOM_VALUE,
+        )
+      })
     } else {
-      setPreviewFlame(
-        produce((draft) => {
-          draft.renderSettings.camera.zoom = clamp(
-            value,
-            MIN_CAMERA_ZOOM_VALUE,
-            MAX_CAMERA_ZOOM_VALUE,
-          )
-        }),
-      )
+      setPreviewFlame((draft) => {
+        draft.renderSettings.camera.zoom = clamp(
+          value,
+          MIN_CAMERA_ZOOM_VALUE,
+          MAX_CAMERA_ZOOM_VALUE,
+        )
+      })
     }
     return previewFlame.renderSettings.camera.zoom
   }
 
   const setFlamePosition: Setter<v2f> = (value) => {
     if (typeof value === 'function') {
-      setPreviewFlame(
-        produce((draft) => {
-          draft.renderSettings.camera.position = value(
-            vec2f(...draft.renderSettings.camera.position),
-          )
-        }),
-      )
+      setPreviewFlame((draft) => {
+        draft.renderSettings.camera.position = value(
+          vec2f(...draft.renderSettings.camera.position),
+        )
+      })
     } else {
-      setPreviewFlame(
-        produce((draft) => {
-          draft.renderSettings.camera.position = value
-        }),
-      )
+      setPreviewFlame((draft) => {
+        draft.renderSettings.camera.position = value
+      })
     }
     return previewFlame.renderSettings.camera.position
   }
@@ -270,7 +262,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
   }
 
   // TODO: convert to computed
-  createEffect(() => {
+  createTrackedEffect(() => {
     const itemId = getPreviewSelectionId()
     if (itemId !== undefined) {
       const selectedItem = variationExamples[itemId]
@@ -278,51 +270,33 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
         const [transform, variation] =
           getTransformFromPreviewFlame(selectedItem)
         if (transform !== undefined && variation !== undefined) {
-          setPreviewFlame(
-            produce((draft: FlameDescriptor) => {
-              const previewTr = draft.transforms[props.transformId]
-              if (previewTr !== undefined) {
-                previewTr.preAffine = transform.preAffine
-                previewTr.variations[props.variationId] = variation
-                // in general we are swapping target variation with the selected preview one,
-                // this might not be exact as the variation preview is, as
-                // some variation previews are artificially beautified by adding extra variations,
-                // if one wants to check such output in the preview itself -- uncomment below
-                // for (const [varId, customVar] of recordEntries(
-                //   transform.variations,
-                // )) {
-                //   if (variation.type !== customVar.type) {
-                //     previewTr.variations[varId] = customVar
-                //   }
-                // }
-
-                // TODO: see what else to copy from variation flame setup
-                draft.renderSettings.exposure =
-                  selectedItem.renderSettings.exposure
-                // copy over initial camera settings
-                draft.renderSettings.camera.zoom =
-                  selectedItem.renderSettings.camera.zoom
-                draft.renderSettings.camera.position =
-                  selectedItem.renderSettings.camera.position
-              }
-            }),
-          )
+          setPreviewFlame((draft: FlameDescriptor) => {
+            const previewTr = draft.transforms[props.transformId]
+            if (previewTr !== undefined) {
+              previewTr.preAffine = transform.preAffine
+              previewTr.variations[props.variationId] = variation
+              draft.renderSettings.exposure =
+                selectedItem.renderSettings.exposure
+              draft.renderSettings.camera.zoom =
+                selectedItem.renderSettings.camera.zoom
+              draft.renderSettings.camera.position =
+                selectedItem.renderSettings.camera.position
+            }
+          })
         }
       }
     } else {
-      setPreviewFlame(
-        produce((draft: FlameDescriptor) => {
-          const previewTr = draft.transforms[props.transformId]
-          if (previewTr !== undefined) {
-            const originalTransform =
-              props.currentFlame.transforms[props.transformId]
-            if (originalTransform !== undefined) {
-              previewTr.preAffine = originalTransform.preAffine
-            }
-            previewTr.variations[props.variationId] = props.currentVar
+      setPreviewFlame((draft: FlameDescriptor) => {
+        const previewTr = draft.transforms[props.transformId]
+        if (previewTr !== undefined) {
+          const originalTransform =
+            props.currentFlame.transforms[props.transformId]
+          if (originalTransform !== undefined) {
+            previewTr.preAffine = originalTransform.preAffine
           }
-        }),
-      )
+          previewTr.variations[props.variationId] = props.currentVar
+        }
+      })
     }
   })
 
@@ -374,16 +348,14 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
           <section class={ui.gallery}>
             <ComputeGate capacity={5}>
               <For each={recordEntries(variationExamples)}>
-                {([id, variationExample]) => {
+                {(entry) => {
+                  const [id, variationExample] = entry()
                   const variation = getVarFromPreviewFlame(variationExample)
                   const isSelected = () => selectedItemId() === id
                   return (
                     variation && (
                       <button
-                        class={ui.item}
-                        classList={{
-                          [ui.selected]: isSelected(),
-                        }}
+                        class={[ui.item, { [ui.selected as string]: isSelected() }]}
                         onClick={() => {
                           toggleSelectedItem(id)
                         }}
@@ -412,7 +384,8 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
 
         <div class={ui.variationSelectorSidebarOptions}>
           <For each={recordEntries(variationExamples)}>
-            {([id, variationExample], _) => {
+            {(entry) => {
+              const [id, variationExample] = entry()
               const variation = getVarFromPreviewFlame(variationExample)
               return (
                 variation && (
@@ -422,7 +395,9 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                         when={isParametricVariation(variation) && variation}
                         keyed
                       >
-                        {(variation) => (
+                        {(variationAccessor) => {
+                          const variation = variationAccessor()
+                          return (
                           <>
                             <h2>Variation Parameters</h2>
                             <div class={ui.itemParams}>
@@ -430,35 +405,32 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                                 {...getParamsEditor(variation)}
                                 setValue={(value) => {
                                   setVariationExamples(
-                                    produce(
-                                      (
-                                        draft: Record<string, FlameDescriptor>,
-                                      ) => {
-                                        const variationDraft =
-                                          draft[id]?.transforms[
-                                            getTransformPreviewTid(
-                                              variation.type,
-                                            )
-                                          ]?.variations[
-                                            getTransformPreviewVid(
-                                              variation.type,
-                                            )
-                                          ]
-                                        if (
-                                          variationDraft === undefined ||
-                                          !isParametricVariation(variationDraft)
-                                        ) {
-                                          throw new Error(`Unreachable code`)
-                                        }
-                                        variationDraft.params = value
-                                      },
-                                    ),
+                                    (draft: Record<string, FlameDescriptor>) => {
+                                      const variationDraft =
+                                        draft[id]?.transforms[
+                                          getTransformPreviewTid(
+                                            variation.type,
+                                          )
+                                        ]?.variations[
+                                          getTransformPreviewVid(
+                                            variation.type,
+                                          )
+                                        ]
+                                      if (
+                                        variationDraft === undefined ||
+                                        !isParametricVariation(variationDraft)
+                                      ) {
+                                        throw new Error(`Unreachable code`)
+                                      }
+                                      variationDraft.params = value
+                                    },
                                   )
                                 }}
                               />
                             </div>
                           </>
-                        )}
+                          )
+                        }}
                       </Show>
                     </Show>
                   </>
@@ -474,11 +446,9 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                   previewFlame.transforms[props.transformId]!,
               }}
               setTransforms={(setFn) => {
-                setPreviewFlame(
-                  produce((draft) => {
-                    setFn(draft.transforms)
-                  }),
-                )
+                setPreviewFlame((draft) => {
+                  setFn(draft.transforms)
+                })
               }}
             />
           </Show>

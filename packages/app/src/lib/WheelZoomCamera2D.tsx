@@ -1,4 +1,4 @@
-import { batch, createEffect, createMemo, createSignal, onCleanup, } from 'solid-js'
+import { createTrackedEffect, createMemo, createSignal, flush, onCleanup, } from 'solid-js'
 import { vec2f } from 'typegpu/data'
 import { clamp, sub } from 'typegpu/std'
 import { Camera2D } from '@/lib/Camera2D'
@@ -81,17 +81,17 @@ export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
 
   function zoomKeepPointInPlace(world: v2f, ratio: number) {
     const oldZoom = zoom()
-    batch(() => {
-      const newZoom = setZoom(oldZoom * ratio)
-      // actual ratio can be different due to min/max zoom level clamping
-      const actualRatio = oldZoom / newZoom
-      setPosition(({ x, y }) =>
-        vec2f(
-          x + (world.x - x) * (1 - actualRatio),
-          y + (world.y - y) * (1 - actualRatio),
-        ),
-      )
-    })
+    // In v2, updates are microtask-batched by default. Use flush() for synchronous settling.
+    const newZoom = setZoom(oldZoom * ratio)
+    flush()
+    // actual ratio can be different due to min/max zoom level clamping
+    const actualRatio = oldZoom / newZoom
+    setPosition(({ x, y }) =>
+      vec2f(
+        x + (world.x - x) * (1 - actualRatio),
+        y + (world.y - y) * (1 - actualRatio),
+      ),
+    )
   }
 
   function onWheel(ev: WheelEvent) {
@@ -124,7 +124,7 @@ export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
     }
   })
 
-  createEffect(() => {
+  createTrackedEffect(() => {
     const eventTarget = el()
     eventTarget.addEventListener('pointerdown', startPanning)
     eventTarget.addEventListener('touchmove', startPinch)

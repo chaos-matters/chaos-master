@@ -1,4 +1,4 @@
-import { createResource, For, Show, Suspense } from 'solid-js'
+import { createMemo, For, Show, Loading } from 'solid-js'
 import { GitHub } from '@/icons'
 import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
 import { formatBytes } from '@/utils/formatBytes'
@@ -88,7 +88,8 @@ type HelpModalProps = {
 }
 
 function HelpModal(props: HelpModalProps) {
-  const [gpuDeviceInfo] = createResource(getGPUDeviceInformation)
+  // In Solid v2, createResource is replaced by async createMemo + Loading
+  const gpuDeviceInfo = createMemo(() => getGPUDeviceInformation())
   return (
     <>
       <ModalTitleBar
@@ -111,25 +112,33 @@ function HelpModal(props: HelpModalProps) {
       <h2 class={ui.sectionTitle}>Keyboard Shortcuts</h2>
       <div class={ui.shortcutsGrid}>
         <For each={shortcuts}>
-          {({ description, keyCombinations }) => (
+          {(shortcutAccessor) => {
+            const { description, keyCombinations } = shortcutAccessor()
+            return (
             <div class={ui.shortcutRow}>
               <span class={ui.shortcutDescription}>{description}</span>
               <div class={ui.keyCombinations}>
                 <For each={keyCombinations}>
-                  {(keyCombination) => (
+                  {(keyCombinationAccessor) => {
+                    const keyCombination = keyCombinationAccessor()
+                    return (
                     <KeyCombination keyCombination={keyCombination} />
-                  )}
+                    )
+                  }}
                 </For>
               </div>
             </div>
-          )}
+            )
+          }}
         </For>
       </div>
       <h2 class={ui.sectionTitle}>GPU Information</h2>
       <div class={ui.gpuInformation}>
-        <Suspense fallback={<>Loading...</>}>
+        <Loading fallback={<>Loading...</>}>
           <Show when={gpuDeviceInfo()} keyed>
-            {(deviceInfo) => (
+            {(deviceInfoAccessor) => {
+              const deviceInfo = deviceInfoAccessor()
+              return (
               <>
                 {deviceInfo.description !== '' ? (
                   <p>Name: {deviceInfo.description}</p>
@@ -148,9 +157,10 @@ function HelpModal(props: HelpModalProps) {
                   </p>
                 ) : undefined}
               </>
-            )}
+              )
+            }}
           </Show>
-        </Suspense>
+        </Loading>
       </div>
     </>
   )

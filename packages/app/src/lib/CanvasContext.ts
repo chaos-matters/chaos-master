@@ -9,7 +9,7 @@ const CanvasContext = createContext<{
   canvasFormat: GPUTextureFormat
 }>()
 
-export const CanvasContextProvider = CanvasContext.Provider
+export const CanvasContextProvider = CanvasContext
 
 export function useCanvas() {
   return useContextSafe(CanvasContext, 'useCanvas', 'CanvasContext')

@@ -30,7 +30,8 @@ export function QualityPresets(props: QualityPresetsProps) {
   return (
     <div class={ui.pillsContainer}>
       <For each={recordKeys(qualityPresets)}>
-        {(presetName) => {
+        {(presetNameAccessor) => {
+          const presetName = presetNameAccessor()
           const isSelected = () => presetName === props.selectedPreset
           const fillPercent = () =>
             isSelected() ? Math.min(100, Math.max(0, props.fillPercentage)) : 0
@@ -39,10 +40,7 @@ export function QualityPresets(props: QualityPresetsProps) {
               onClick={() => {
                 props.setQualityPreset(presetName)
               }}
-              class={ui.pill}
-              classList={{
-                [ui.selectedPill]: isSelected(),
-              }}
+              class={[ui.pill, { [ui.selectedPill as string]: isSelected() }]}
               style={{
                 '--fill-percent': `${fillPercent()}%`,
               }}

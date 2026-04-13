@@ -1,4 +1,4 @@
-import { createEffect, createSignal, onCleanup } from 'solid-js'
+import { createTrackedEffect, createSignal, onCleanup } from 'solid-js'
 import type { Accessor } from 'solid-js'
 
 export type ElementSize = {
@@ -17,7 +17,7 @@ export function useElementSize(
   onChange?: (size: ElementSize) => void,
 ) {
   const [size, setSize] = createSignal<ElementSize>()
-  createEffect(() => {
+  createTrackedEffect(() => {
     const t = target()
     if (!t) {
       return

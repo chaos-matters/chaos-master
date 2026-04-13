@@ -1,4 +1,4 @@
-import { createEffect, createSignal, onCleanup } from 'solid-js'
+import { createSignal, createTrackedEffect, onCleanup } from 'solid-js'
 import type { Accessor } from 'solid-js'
 
 export function useIntersectionObserver(
@@ -7,7 +7,7 @@ export function useIntersectionObserver(
 ) {
   const [intersection, setIntersection] =
     createSignal<IntersectionObserverEntry>()
-  createEffect(() => {
+  createTrackedEffect(() => {
     const t = target()
     if (!t) {
       return

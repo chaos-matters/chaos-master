@@ -1,4 +1,4 @@
-import { createEffect, onCleanup } from 'solid-js'
+import { createTrackedEffect, onCleanup } from 'solid-js'
 
 export function createAnimationFrame(
   fn: (frameId: number) => void,
@@ -7,7 +7,7 @@ export function createAnimationFrame(
 ) {
   let lastTime = 0
 
-  createEffect(() => {
+  createTrackedEffect(() => {
     let frameId: number
     const framesPending = new Set<number>()
 

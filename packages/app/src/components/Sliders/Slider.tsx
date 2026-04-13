@@ -50,10 +50,7 @@ export function Slider(props: SliderProps) {
 
   return (
     <label
-      class={ui.label}
-      classList={{
-        [props.class ?? '']: true,
-      }}
+      class={[ui.label, props.class]}
     >
       <Show when={label()}>
         <span>{label()}</span>
@@ -66,7 +63,7 @@ export function Slider(props: SliderProps) {
       >
         <input
           ref={(el) => {
-            scrollIntoViewAndFocusOnChange(value, el)
+            scrollIntoViewAndFocusOnChange(history, value, el)
           }}
           class={ui.slider}
           type="range"

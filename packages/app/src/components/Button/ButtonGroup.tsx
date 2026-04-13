@@ -7,7 +7,7 @@ type ButtonGroupProps = {
 
 export function ButtonGroup(props: ParentProps<ButtonGroupProps>) {
   return (
-    <div class={ui.buttonGroup} classList={{ [props.class ?? '']: true }}>
+    <div class={[ui.buttonGroup, props.class]}>
       {props.children}
     </div>
   )

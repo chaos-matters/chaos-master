@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, onCleanup, untrack, } from 'solid-js'
+import { createMemo, createSignal, createTrackedEffect, onCleanup, untrack, } from 'solid-js'
 import { arrayOf, vec2u, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { setAccumulatedPointCountGlobal, setRenderTimings, } from '@/flame/renderStats'
@@ -194,7 +194,7 @@ export function Flam3(props: Flam3Props) {
     return clamp(floor((frameBudgetMs - paintTimeMs) / ifsMs), 1, 100)
   }
 
-  createEffect(() => {
+  createTrackedEffect(() => {
     // don't even compile if its not allowed to run
     const run = untrack(() => props.run)
     if (!run) {
@@ -224,12 +224,12 @@ export function Flam3(props: Flam3Props) {
     let batchIndex = 0
     let forceDrawToScreen = false
     let clearRequested = true
-    createEffect(() => {
+    createTrackedEffect(() => {
       ifsPipeline.update(props.flameDescriptor)
 
       // this is in a separate effect because we don't
       // want to run ifs.update if not necessary
-      createEffect(() => {
+      createTrackedEffect(() => {
         camera.update()
         batchIndex = 0
         setAccumulatedPointCount(0)
@@ -238,7 +238,7 @@ export function Flam3(props: Flam3Props) {
       })
     })
 
-    createEffect(() => {
+    createTrackedEffect(() => {
       colorGradingUniforms.writePartial({
         exposure: 2 * Math.exp(props.flameDescriptor.renderSettings.exposure),
         edgeFadeColor: props.exportImage ? vec4f(0) : props.edgeFadeColor,
@@ -248,7 +248,7 @@ export function Flam3(props: Flam3Props) {
       forceDrawToScreen = true
     })
 
-    createEffect(() => {
+    createTrackedEffect(() => {
       // redraw when these change
       const _ = colorGradingPipeline()
       rafLoop.redraw()

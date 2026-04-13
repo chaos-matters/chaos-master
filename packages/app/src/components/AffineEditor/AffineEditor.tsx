@@ -1,5 +1,5 @@
 import { sdRoundedBox2d } from '@typegpu/sdf'
-import { createEffect, createMemo, createSignal, For } from 'solid-js'
+import { createTrackedEffect, createMemo, createSignal, For } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { builtin, vec2f, vec3f, vec4f } from 'typegpu/data'
 import { abs, add, dot, dpdx, fract, length, max, mix, mul, saturate, sub, } from 'typegpu/std'
@@ -84,7 +84,7 @@ function Grid() {
   const { device, root } = useRootContext()
   const { context, canvasFormat } = useCanvas()
 
-  createEffect(() => {
+  createTrackedEffect(() => {
     const backgroundGray = BACKGROUND_COLOR[theme()]
     const axisGray = AXIS_GRAY[theme()]
     const majorGray = MAJOR_TICK_GRAY[theme()]
@@ -133,7 +133,7 @@ function Grid() {
       })
       .with(camera.bindGroup)
 
-    createEffect(() => {
+    createTrackedEffect(() => {
       camera.update()
       rafLoop.redraw()
     })
@@ -262,46 +262,44 @@ function AffineHandle(props: {
   const scaleNegX = startScalingRotating(-1, 0)
   const scaleNegY = startScalingRotating(0, -1)
   return (
-    <>
-      <svg viewBox={`-${aspect()} -1 ${2 * aspect()} 2`}>
-        <g
-          class={ui.handleBox}
-          transform={`scale(1, -1) matrix(${clipTransform()})`}
-        >
-          <path d={corners} />
-          <path
-            class={ui.handleBoxGrabArea}
-            d={corners}
-            // TODO: temporarily using on:pointerdown and not onPointerDown
-            // because otherwise WheelZoomCamera2D steals the event
-            // due to solidjs event delegation.
-            on:pointerdown={scaleBoth}
-          />
-          <path d="M 0,0 V 1" marker-end="url(#arrow)" />
-          <path
-            class={ui.handleBoxGrabArea}
-            d="M 0,0 V 1"
-            on:pointerdown={scaleY}
-          />
-          <path d="M 0,0 L 1,0" marker-end="url(#arrow)" />
-          <path
-            class={ui.handleBoxGrabArea}
-            d="M 0,0 L 1,0"
-            on:pointerdown={scaleX}
-          />
-          <path class={ui.dashed} d="M 0,0 V -1 M 0,0 L -1,0" />
-          <path
-            class={ui.handleBoxGrabArea}
-            d="M 0,0 V -1"
-            on:pointerdown={scaleNegY}
-          />
-          <path
-            class={ui.handleBoxGrabArea}
-            d="M 0,0 L -1,0"
-            on:pointerdown={scaleNegX}
-          />
-        </g>
-      </svg>
+    <svg viewBox={`-${aspect()} -1 ${2 * aspect()} 2`}>
+      <g
+        class={ui.handleBox}
+        transform={`scale(1, -1) matrix(${clipTransform()})`}
+      >
+        <path d={corners} />
+        <path
+          class={ui.handleBoxGrabArea}
+          d={corners}
+          // TODO: temporarily using on:pointerdown and not onPointerDown
+          // because otherwise WheelZoomCamera2D steals the event
+          // due to solidjs event delegation.
+          on:pointerdown={scaleBoth}
+        />
+        <path d="M 0,0 V 1" marker-end="url(#arrow)" />
+        <path
+          class={ui.handleBoxGrabArea}
+          d="M 0,0 V 1"
+          on:pointerdown={scaleY}
+        />
+        <path d="M 0,0 L 1,0" marker-end="url(#arrow)" />
+        <path
+          class={ui.handleBoxGrabArea}
+          d="M 0,0 L 1,0"
+          on:pointerdown={scaleX}
+        />
+        <path class={ui.dashed} d="M 0,0 V -1 M 0,0 L -1,0" />
+        <path
+          class={ui.handleBoxGrabArea}
+          d="M 0,0 V -1"
+          on:pointerdown={scaleNegY}
+        />
+        <path
+          class={ui.handleBoxGrabArea}
+          d="M 0,0 L -1,0"
+          on:pointerdown={scaleNegX}
+        />
+      </g>
       <g
         class={ui.handle}
         // TODO: temporarily using on:pointerdown and not onPointerDown
@@ -313,7 +311,7 @@ function AffineHandle(props: {
         <circle class={ui.handleCircle} cx={p(x())} cy={p(y())} />
         <circle class={ui.handleCircleGrabArea} cx={p(x())} cy={p(y())} />
       </g>
-    </>
+    </svg>
   )
 }
 
@@ -322,6 +320,7 @@ export function AffineEditor(props: {
   transforms: TransformRecord
   setTransforms: HistorySetter<TransformRecord>
 }) {
+  const changeHistory = useChangeHistory()
   const [div, setDiv] = createSignal<HTMLDivElement>()
   const [zoom, setZoom] = createZoom(0.9, [0.5, 20])
   const [position, setPosition] = createPosition(vec2f())
@@ -334,12 +333,9 @@ export function AffineEditor(props: {
     <div
       ref={(el) => {
         setDiv(el)
-        scrollIntoViewAndFocusOnChange(scrollTrigger, el)
+        scrollIntoViewAndFocusOnChange(changeHistory, scrollTrigger, el)
       }}
-      class={ui.editorCard}
-      classList={{
-        [props.class ?? '']: true,
-      }}
+      class={[ui.editorCard, props.class]}
     >
       <AutoCanvas class={ui.canvas} pixelRatio={1}>
         <WheelZoomCamera2D
@@ -364,19 +360,24 @@ export function AffineEditor(props: {
                 <path d="M 0 0 L 10 5 L 0 10 z" />
               </marker>
             </defs>
-            <For each={recordEntries(props.transforms)}>
-              {([tid, transform]) => (
-                <AffineHandle
-                  transform={transform.preAffine}
-                  color={vec2f(transform.color.x, transform.color.y)}
-                  setTransform={(affine) => {
-                    props.setTransforms((draft) => {
-                      draft[tid]!.preAffine = affine
-                    })
-                  }}
-                />
-              )}
-            </For>
+            <g>
+              <For each={recordEntries(props.transforms)}>
+                {(entry) => {
+                  const [tid, transform] = entry()
+                  return (
+                  <AffineHandle
+                    transform={transform.preAffine}
+                    color={vec2f(transform.color.x, transform.color.y)}
+                    setTransform={(affine) => {
+                      props.setTransforms((draft) => {
+                        draft[tid]!.preAffine = affine
+                      })
+                    }}
+                  />
+                  )
+                }}
+              </For>
+            </g>
           </svg>
         </WheelZoomCamera2D>
       </AutoCanvas>

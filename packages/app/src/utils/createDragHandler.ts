@@ -1,4 +1,4 @@
-import { createEffect, onCleanup } from 'solid-js'
+import { createTrackedEffect, onCleanup } from 'solid-js'
 
 export type CreateClickAndDragHandler = (event: PointerEvent) =>
   | {
@@ -51,7 +51,7 @@ export function createDragHandler(
   const unmountController = new AbortController()
   const unmountSignal = unmountController.signal
 
-  createEffect(() => {
+  createTrackedEffect(() => {
     onCleanup(() => {
       unmountController.abort()
     })

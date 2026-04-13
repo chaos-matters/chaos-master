@@ -1,7 +1,7 @@
 /* @refresh reload */
 import './styles/index.css'
 import { inject } from '@vercel/analytics'
-import { render } from 'solid-js/web'
+import { render } from '@solidjs/web'
 import { Wrappers } from './App'
 
 const root = document.getElementById('root')

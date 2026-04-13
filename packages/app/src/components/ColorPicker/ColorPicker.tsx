@@ -13,11 +13,7 @@ export function ColorPicker(props: ColorPickerProps) {
   const history = useChangeHistory()
   return (
     <input
-      class={`${ui.colorPicker} ${props.class ?? ''}`}
-      classList={{
-        [props.class ?? '']: true,
-        [ui.transparent]: props.value === undefined,
-      }}
+      class={[ui.colorPicker, props.class, { [ui.transparent as string]: props.value === undefined }]}
       type="color"
       value={props.value ? rgbNormToHex(props.value) : '#000000'}
       onClick={() => {

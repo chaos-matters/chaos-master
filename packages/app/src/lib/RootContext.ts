@@ -8,7 +8,7 @@ const RootContext = createContext<{
   root: TgpuRoot
 }>()
 
-export const RootContextProvider = RootContext.Provider
+export const RootContextProvider = RootContext
 
 export function useRootContext() {
   return useContextSafe(RootContext, 'useRootContext', 'RootContext')

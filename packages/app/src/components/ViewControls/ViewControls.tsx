@@ -23,7 +23,8 @@ export function ViewControls(props: ViewControlProps) {
     <div class={ui.viewControls}>
       <ButtonGroup>
         <For each={[1, 2, 4]}>
-          {(divider) => {
+          {(dividerAccessor) => {
+            const divider = dividerAccessor()
             const pixelRatio_ = 1 / divider
             return (
               <Button

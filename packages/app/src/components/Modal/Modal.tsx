@@ -1,12 +1,12 @@
-import { createSignal, onMount, Show } from 'solid-js'
-import { Portal } from 'solid-js/web'
+import { createSignal, onSettled, Show } from 'solid-js'
+import { Portal } from '@solidjs/web'
 import ui from './Modal.module.css'
 import { ModalContext } from './ModalContext'
 import type { ParentProps } from 'solid-js'
 import type { ModalConfig } from './ModalContext'
 
 function showModal(dialog: HTMLDialogElement) {
-  onMount(() => {
+  onSettled(() => {
     if (dialog.isConnected) {
       dialog.showModal()
     } else {
@@ -22,7 +22,7 @@ type ModalInstance<T> = {
 }
 
 type ModalProps = {
-  mount?: Node | undefined
+  mount?: Element | undefined
 }
 /**
  * Allows the subtree to request modals in
@@ -78,17 +78,18 @@ export function Modal(props: ParentProps<ModalProps>) {
 
   return (
     <>
-      <ModalContext.Provider value={requestModal}>
+      <ModalContext value={requestModal}>
         {props.children}
-      </ModalContext.Provider>
+      </ModalContext>
       <Portal
         mount={props.mount}
-        ref={(el) => {
-          el.classList.add(ui.root)
+        ref={(el: Element) => {
+          el.classList.add(ui.root!)
         }}
       >
         <Show when={modalInstances()[0]} keyed>
-          {(instance) => {
+          {(instanceAccessor) => {
+            const instance = instanceAccessor()
             const {
               resolve,
               config: { content: Content, class: class_ },
@@ -106,8 +107,7 @@ export function Modal(props: ParentProps<ModalProps>) {
             return (
               <dialog
                 ref={showModal}
-                class={ui.modal}
-                classList={{ [class_ ?? '']: true }}
+                class={[ui.modal, class_]}
                 onCancel={(ev) => {
                   ev.preventDefault()
                 }}

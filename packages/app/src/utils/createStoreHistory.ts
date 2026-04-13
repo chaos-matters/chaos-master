@@ -1,8 +1,7 @@
-import { batch, createSignal } from 'solid-js'
-import { produce, unwrap } from 'solid-js/store'
+import { createSignal, flush, snapshot } from 'solid-js'
 import { applyPatchesMutatively, enableStandardPatches, produceWithPatches, } from 'structurajs'
 import { compressPatches, forwardBackwardPatchPairDoesNothing, } from './compressPatches'
-import type { SetStoreFunction, Store } from 'solid-js/store'
+import type { StoreSetter, Store } from 'solid-js'
 import type { Patch } from 'structurajs'
 
 // Three "immer"-like libraries were considered
@@ -39,7 +38,7 @@ export type ChangeHistory<T> = {
 
 export function createStoreHistory<T extends object>([store, setStore]: [
   Store<T>,
-  SetStoreFunction<T>,
+  StoreSetter<T>,
 ]) {
   const [stackIndex, setStackIndex] = createSignal(-1)
   const [isUndoingOrRedoing, setIsUndoingOrRedoing] =
@@ -89,17 +88,16 @@ export function createStoreHistory<T extends object>([store, setStore]: [
       return
     }
     const { backwardPatches } = item
+    // In Solid v2, setStore accepts a draft callback directly (produce built-in)
     let swapWhole = undefined as T | undefined
-    setStore(
-      produce((draft) => {
-        const value = applyPatchesMutatively(draft, backwardPatches)
-        if (value !== draft) {
-          swapWhole = value as T
-        }
-      }),
-    )
+    setStore((draft) => {
+      const value = applyPatchesMutatively(draft, backwardPatches)
+      if (value !== draft) {
+        swapWhole = value as T
+      }
+    })
     if (swapWhole !== undefined) {
-      setStore(swapWhole)
+      setStore(() => swapWhole as T)
     }
     setStackIndex(i - 1)
   }
@@ -117,38 +115,36 @@ export function createStoreHistory<T extends object>([store, setStore]: [
     }
     const { forwardPatches } = item
     let swapWhole = undefined as T | undefined
-    setStore(
-      produce((draft) => {
-        const value = applyPatchesMutatively(draft, forwardPatches)
-        if (value !== draft) {
-          swapWhole = value as T
-        }
-      }),
-    )
+    setStore((draft) => {
+      const value = applyPatchesMutatively(draft, forwardPatches)
+      if (value !== draft) {
+        swapWhole = value as T
+      }
+    })
     if (swapWhole !== undefined) {
-      setStore(swapWhole)
+      setStore(() => swapWhole as T)
     }
     setStackIndex(i)
   }
 
   const set: HistorySetter<T> = (setFn, description) => {
+    // snapshot replaces unwrap in v2
     const [_, forwardPatches, backwardPatches] = produceWithPatches(
-      unwrap(store),
+      snapshot(store),
       (draft) => {
         setFn(draft as T)
       },
     )
-    batch(() => {
-      setStore(produce(setFn))
-      const preview_ = preview()
-      if (preview_) {
-        preview_.forwardPatches.push(...forwardPatches)
-        preview_.backwardPatches.unshift(...backwardPatches)
-        setPreview(preview_)
-      } else {
-        addToStack({ forwardPatches, backwardPatches, description })
-      }
-    })
+    // In v2, batch is removed — updates are microtask-batched by default
+    setStore(setFn)
+    const preview_ = preview()
+    if (preview_) {
+      preview_.forwardPatches.push(...forwardPatches)
+      preview_.backwardPatches.unshift(...backwardPatches)
+      setPreview(preview_)
+    } else {
+      addToStack({ forwardPatches, backwardPatches, description })
+    }
   }
 
   function startPreview(description?: string) {
@@ -163,25 +159,21 @@ export function createStoreHistory<T extends object>([store, setStore]: [
 
   function commit() {
     const item = preview()
-    batch(() => {
-      if (item) {
-        addToStack(item)
-      } else {
-        console.warn('No preview to commit')
-      }
-      setPreview(undefined)
-    })
+    if (item) {
+      addToStack(item)
+    } else {
+      console.warn('No preview to commit')
+    }
+    setPreview(undefined)
   }
 
   function replace(value: T, description?: string) {
-    batch(() => {
-      const [_, forwardPatches, backwardPatches] = produceWithPatches(
-        structuredClone(unwrap(store)),
-        () => value,
-      )
-      setStore(value)
-      addToStack({ forwardPatches, backwardPatches, description })
-    })
+    const [_, forwardPatches, backwardPatches] = produceWithPatches(
+      structuredClone(snapshot(store)),
+      () => value,
+    )
+    setStore(() => value)
+    addToStack({ forwardPatches, backwardPatches, description })
   }
 
   function wrapIntoUndoing(fn: () => void) {

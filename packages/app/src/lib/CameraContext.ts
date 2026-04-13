@@ -23,7 +23,7 @@ export type CameraContext = {
 }
 const CameraContext = createContext<CameraContext>()
 
-export const CameraContextProvider = CameraContext.Provider
+export const CameraContextProvider = CameraContext
 
 export function useCamera() {
   return useContextSafe(CameraContext, 'useCamera', 'CameraContext')

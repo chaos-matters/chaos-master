@@ -1,4 +1,4 @@
-import { createEffect, createSignal, onCleanup } from 'solid-js'
+import { createTrackedEffect, createSignal, onCleanup } from 'solid-js'
 
 function createAbortOnCleanup() {
   const ctrl = new AbortController()
@@ -10,7 +10,7 @@ function createAbortOnCleanup() {
 
 export function usePointer(element: HTMLElement) {
   const [pointer, setPointer] = createSignal<PointerEvent | undefined>()
-  createEffect(() => {
+  createTrackedEffect(() => {
     const signal = createAbortOnCleanup()
     element.addEventListener(
       'pointermove',

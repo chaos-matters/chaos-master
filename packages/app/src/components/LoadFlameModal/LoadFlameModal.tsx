@@ -149,7 +149,9 @@ function LoadFlameModal(props: LoadFlameModalProps) {
       <section class={ui.gallery}>
         <ComputeGate capacity={5}>
           <For each={recordEntries(examples)}>
-            {([exampleId, example]) => (
+            {(entry) => {
+              const [exampleId, example] = entry()
+              return (
               <button
                 class={ui.item}
                 onClick={() => {
@@ -159,7 +161,8 @@ function LoadFlameModal(props: LoadFlameModalProps) {
                 <Preview exampleId={exampleId} flameDescriptor={example} />
                 <div class={ui.itemTitle}>{exampleId}</div>
               </button>
-            )}
+              )
+            }}
           </For>
         </ComputeGate>
       </section>

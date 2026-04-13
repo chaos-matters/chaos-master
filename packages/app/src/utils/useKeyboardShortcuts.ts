@@ -1,4 +1,4 @@
-import { createEffect, onCleanup } from 'solid-js'
+import { createTrackedEffect, onCleanup } from 'solid-js'
 
 const letBrowserHandleInputTypes = new Set([
   'checkbox',
@@ -33,7 +33,7 @@ export function useKeyboardShortcuts(
   shortcuts: Record<string, (ev: KeyboardEvent) => boolean | undefined>,
   options?: AddEventListenerOptions,
 ) {
-  createEffect(() => {
+  createTrackedEffect(() => {
     function onKeydown(ev: KeyboardEvent) {
       if (letBrowserHandleActiveInput(document.activeElement, ev)) {
         return

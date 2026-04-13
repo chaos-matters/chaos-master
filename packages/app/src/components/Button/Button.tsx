@@ -1,4 +1,4 @@
-import { splitProps } from 'solid-js'
+import { omit } from 'solid-js'
 import ui from './Button.module.css'
 import type { JSX } from 'solid-js'
 
@@ -7,13 +7,13 @@ type ButtonProps = JSX.ButtonHTMLAttributes<HTMLButtonElement> & {
 }
 
 export function Button(props: ButtonProps) {
-  const [c, attrs] = splitProps(props, ['children', 'class', 'active'])
+  const attrs = omit(props, 'children', 'class', 'active')
   return (
     <button
-      class={`${c.class ?? ''} ${ui.button} ${c.active === true ? ui.active : ''}`}
+      class={`${props.class ?? ''} ${ui.button} ${props.active === true ? ui.active : ''}`}
       {...attrs}
     >
-      {c.children}
+      {props.children}
     </button>
   )
 }
