@@ -1,5 +1,5 @@
-import { createSignal, onSettled, Show } from 'solid-js'
 import { Portal } from '@solidjs/web'
+import { createSignal, onSettled, Show } from 'solid-js'
 import ui from './Modal.module.css'
 import { ModalContext } from './ModalContext'
 import type { ParentProps } from 'solid-js'

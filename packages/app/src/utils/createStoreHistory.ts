@@ -1,7 +1,7 @@
-import { createSignal, flush, snapshot } from 'solid-js'
+import { createSignal, snapshot } from 'solid-js'
 import { applyPatchesMutatively, enableStandardPatches, produceWithPatches, } from 'structurajs'
 import { compressPatches, forwardBackwardPatchPairDoesNothing, } from './compressPatches'
-import type { StoreSetter, Store } from 'solid-js'
+import type { Store,StoreSetter } from 'solid-js'
 import type { Patch } from 'structurajs'
 
 // Three "immer"-like libraries were considered

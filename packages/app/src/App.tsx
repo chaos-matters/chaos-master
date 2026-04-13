@@ -1,6 +1,5 @@
-import { createTrackedEffect, createMemo, createSignal, Errored, For, Show, Loading, } from 'solid-js'
-import { createStore } from 'solid-js'
 import { Dynamic } from '@solidjs/web'
+import { createMemo, createSignal, createStore,createTrackedEffect, Errored, For, Loading,Show   } from 'solid-js'
 import { vec2f, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { recordEntries, recordKeys } from '@/utils/record'
@@ -242,7 +241,7 @@ function App(props: AppProps) {
                   exportImage={onExportImage()}
                   setCurrentQuality={(fn) => { setCurrentQuality(fn); }}
                   setQualityPointCountLimit={(fn) =>
-                    setQualityPointCountLimit(fn)
+                    { setQualityPointCountLimit(fn); }
                   }
                 />
               </WheelZoomCamera2D>

@@ -18,17 +18,17 @@ const renderTimingsSignal = runWithOwner(null, () =>
     adaptiveFilterMs: 0,
     colorGradingMs: 0,
   }),
-)!
+)
 
 export const renderTimings = renderTimingsSignal[0]
 export const setRenderTimings = renderTimingsSignal[1]
 
 const accumulatedPointCountSignal = runWithOwner(null, () =>
   createSignal(0),
-)!
+)
 const iterationSpeedSignal = runWithOwner(null, () =>
   createSignal<number>(),
-)!
+)
 
 const [accumulatedPointCount, setAccumulatedPointCount_] =
   accumulatedPointCountSignal
@@ -71,7 +71,7 @@ export {
 // function-first-arg creates a writable memo. Wrap in a tuple.
 const currentQualitySignal = runWithOwner(null, () =>
   createSignal<[Accessor<number>]>([() => 0]),
-)!
+)
 const [_currentQuality, _setCurrentQuality] = currentQualitySignal
 export const currentQuality = (): Accessor<number> => _currentQuality()[0]
 export function setCurrentQuality(fn: Accessor<number>) {
@@ -80,7 +80,7 @@ export function setCurrentQuality(fn: Accessor<number>) {
 
 const qualityPointCountLimitSignal = runWithOwner(null, () =>
   createSignal<[Accessor<number>]>([() => 0]),
-)!
+)
 const [_qualityPointCountLimit, _setQualityPointCountLimit] =
   qualityPointCountLimitSignal
 export const qualityPointCountLimit = (): Accessor<number> =>

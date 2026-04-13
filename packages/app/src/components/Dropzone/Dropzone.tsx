@@ -1,4 +1,4 @@
-import { createTrackedEffect, createSignal, onCleanup } from 'solid-js'
+import { createSignal, createTrackedEffect, onCleanup } from 'solid-js'
 import ui from './Dropzone.module.css'
 import type { ParentProps } from 'solid-js'
 

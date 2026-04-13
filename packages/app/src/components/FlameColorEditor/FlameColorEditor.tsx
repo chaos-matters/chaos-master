@@ -1,6 +1,6 @@
 import { oklabToRgb } from '@typegpu/color'
 import { sdRoundedBox2d } from '@typegpu/sdf'
-import { createTrackedEffect, createMemo, createSignal, For } from 'solid-js'
+import { createMemo, createSignal, createTrackedEffect } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { builtin, vec2f, vec3f, vec4f } from 'typegpu/data'
 import { abs, add, atan2, clamp, fwidth, length, max, min, mul, saturate, sin, smoothstep, sub, } from 'typegpu/std'
@@ -15,7 +15,6 @@ import { createPosition, createZoom, WheelZoomCamera2D, } from '@/lib/WheelZoomC
 import { createAnimationFrame } from '@/utils/createAnimationFrame'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'
-import { recordEntries } from '@/utils/record'
 import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
 import ui from './FlameColorEditor.module.css'
 import type { v2f } from 'typegpu/data'
@@ -125,7 +124,7 @@ function Gradient() {
   return null
 }
 
-function FlameColorHandle(props: {
+function _FlameColorHandle(props: {
   color: v2f
   setColor: (color: v2f) => void
 }) {

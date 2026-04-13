@@ -1,5 +1,5 @@
 import { sdRoundedBox2d } from '@typegpu/sdf'
-import { createTrackedEffect, createMemo, createSignal, For } from 'solid-js'
+import { createMemo, createSignal, createTrackedEffect, For } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { builtin, vec2f, vec3f, vec4f } from 'typegpu/data'
 import { abs, add, dot, dpdx, fract, length, max, mix, mul, saturate, sub, } from 'typegpu/std'

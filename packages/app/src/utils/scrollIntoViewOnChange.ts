@@ -18,6 +18,7 @@ import type { ChangeHistory } from '@/utils/createStoreHistory'
  * ```
  */
 export function scrollIntoViewAndFocusOnChange(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   history: ChangeHistory<any>,
   trigger: () => unknown,
   el: HTMLElement,

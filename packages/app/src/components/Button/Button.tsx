@@ -10,7 +10,7 @@ export function Button(props: ButtonProps) {
   const attrs = omit(props, 'children', 'class', 'active')
   return (
     <button
-      class={`${props.class ?? ''} ${ui.button} ${props.active === true ? ui.active : ''}`}
+      class={[props.class as string, ui.button, { [ui.active as string]: props.active === true }]}
       {...attrs}
     >
       {props.children}
