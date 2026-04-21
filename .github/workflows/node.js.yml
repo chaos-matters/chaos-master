@@ -32,7 +32,10 @@ jobs:
 
     - name: 🧹 Lint code
       run: pnpm lint
-      
+
+    - name: 🔍 Type check
+      run: pnpm --filter chaos-master exec tsc --noEmit
+
     - name: 🧪 Run tests
       run: pnpm --filter chaos-master run test
       

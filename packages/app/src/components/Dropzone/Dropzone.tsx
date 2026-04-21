@@ -29,7 +29,7 @@ export function Dropzone(props: ParentProps<DropzoneProps>) {
       class={ui.dropzone}
       classList={{
         [props.class ?? '']: true,
-        [ui.dropping]: dropping(),
+        [ui.dropping as string]: dropping(),
       }}
       onDragEnter={() => {
         setDropping(true)

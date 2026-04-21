@@ -9,7 +9,7 @@ export function Checkbox(props: CheckboxProps) {
   return (
     <input
       type="checkbox"
-      classList={{ [ui.checkbox]: true }}
+      classList={{ [ui.checkbox as string]: true }}
       checked={props.checked}
       onChange={(ev) => {
         props.onChange(ev.target.checked, ev)
