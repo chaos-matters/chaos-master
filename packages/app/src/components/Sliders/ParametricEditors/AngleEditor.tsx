@@ -1,6 +1,7 @@
 import { createMemo } from 'solid-js'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { createDragHandler } from '@/utils/createDragHandler'
+import { getElementCenter } from '@/utils/eventToClip'
 import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
 import ui from './AngleEditor.module.css'
 import type { EditorProps } from './types'
@@ -23,9 +24,7 @@ export function AngleEditor(props: AngleEditorProps) {
       throw new Error('unreachable code')
     }
     el.focus()
-    const rect = el.getBoundingClientRect()
-    const centerX = rect.left + rect.width / 2
-    const centerY = rect.top + rect.height / 2
+    const { centerX, centerY } = getElementCenter(el)
     const setAngle = (ev: PointerEvent) => {
       let newAngle = -1 * Math.atan2(ev.clientY - centerY, ev.clientX - centerX)
       if (newAngle < 0) {

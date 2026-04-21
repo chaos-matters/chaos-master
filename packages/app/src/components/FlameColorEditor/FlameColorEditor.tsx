@@ -17,6 +17,7 @@ import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'
 import { recordEntries } from '@/utils/record'
 import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
+import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import ui from './FlameColorEditor.module.css'
 import type { v2f } from 'typegpu/data'
 import type { Theme } from '@/contexts/ThemeContext'
@@ -32,7 +33,7 @@ export function handleColor(theme: Theme, color: v2f) {
   return `oklab(${HANDLE_LIGHTNESS[theme]} ${color.x} ${color.y})`
 }
 
-function Gradient() {
+function Gradient(props: { isVisible: () => boolean }) {
   const camera = useCamera()
   const { theme } = useTheme()
   const { device, root } = useRootContext()
@@ -121,7 +122,7 @@ function Gradient() {
         pass.end()
         device.queue.submit([encoder.finish()])
       },
-      () => Infinity,
+      () => (props.isVisible() ? 0 : Infinity),
     )
   })
   return null
@@ -185,6 +186,9 @@ export function FlameColorEditor(props: {
   const [div, setDiv] = createSignal<HTMLDivElement>()
   const [zoom, setZoom] = createZoom(4, [2, 20])
   const [position, setPosition] = createPosition(vec2f())
+  const [isVisible, setIsVisible] = createSignal(true)
+
+  useIntersectionObserver(div, (visible) => setIsVisible(visible))
 
   const scrollTrigger = () => {
     Object.values(props.transforms).forEach((tr) => tr.color)
@@ -204,7 +208,7 @@ export function FlameColorEditor(props: {
           zoom={[zoom, setZoom]}
           position={[position, setPosition]}
         >
-          <Gradient />
+          <Gradient isVisible={isVisible} />
           <svg class={ui.svg}>
             <For each={recordEntries(props.transforms)}>
               {([tid, transform]) => (
