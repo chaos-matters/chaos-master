@@ -217,7 +217,7 @@ function App(props: AppProps) {
         <>
           <div
             class={ui.canvasContainer}
-            classList={{ [ui.fullscreen]: !showSidebar() }}
+            classList={{ [ui.fullscreen as string]: !showSidebar() }}
           >
             <AutoCanvas class={ui.canvas} pixelRatio={pixelRatio()}>
               <WheelZoomCamera2D
@@ -312,8 +312,8 @@ function App(props: AppProps) {
                   </button>
                   <div
                     classList={{
-                      [ui.transformGridRow]: true,
-                      [ui.transformGridFirstRow]: true,
+                      [ui.transformGridRow as string]: true,
+                      [ui.transformGridFirstRow as string]: true,
                     }}
                   >
                     <Slider

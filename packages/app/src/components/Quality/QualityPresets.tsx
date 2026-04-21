@@ -41,7 +41,7 @@ export function QualityPresets(props: QualityPresetsProps) {
               }}
               class={ui.pill}
               classList={{
-                [ui.selectedPill]: isSelected(),
+                [ui.selectedPill as string]: isSelected(),
               }}
               style={{
                 '--fill-percent': `${fillPercent()}%`,

@@ -16,7 +16,7 @@ export function ColorPicker(props: ColorPickerProps) {
       class={`${ui.colorPicker} ${props.class ?? ''}`}
       classList={{
         [props.class ?? '']: true,
-        [ui.transparent]: props.value === undefined,
+        [ui.transparent as string]: props.value === undefined,
       }}
       type="color"
       value={props.value ? rgbNormToHex(props.value) : '#000000'}
