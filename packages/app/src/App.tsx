@@ -14,6 +14,7 @@ import { Dropzone } from './components/Dropzone/Dropzone'
 import { AppCrashed, WebgpuNotSupported, } from './components/ErrorHandling/ErrorHandling'
 import { FlameColorEditor, handleColor, } from './components/FlameColorEditor/FlameColorEditor'
 import { createLoadFlame } from './components/LoadFlameModal/LoadFlameModal'
+import { createMigrationModal } from './components/Migration/Migration'
 import { Modal } from './components/Modal/Modal'
 import { getPresetFromQuality, QualityPresets, qualityPresets, } from './components/Quality/QualityPresets'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
@@ -53,6 +54,18 @@ const EDGE_FADE_COLOR = {
   light: vec4f(0.96, 0.96, 0.96, 1),
   dark: vec4f(0, 0, 0, 0.8),
 }
+const NON_TEXT_INPUT_TYPES = new Set([
+  'button',
+  'checkbox',
+  'color',
+  'file',
+  'hidden',
+  'image',
+  'radio',
+  'range',
+  'reset',
+  'submit',
+])
 
 function formatPercent(x: number) {
   if (x === 1) {
@@ -108,6 +121,32 @@ function App(props: AppProps) {
         : DEFAULT_RENDER_INTERVAL_MS
 
   const { showShareLinkModal } = createShareLinkModal(flameDescriptor)
+  const { showMigrationModal, loadModalIsOpen: migrationModalIsOpen } =
+    createMigrationModal(history)
+
+  function isEditableElement(el: EventTarget | null): boolean {
+    if (!(el instanceof HTMLElement)) {
+      return false
+    }
+    if (el.isContentEditable) {
+      return true
+    }
+    if (el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
+      return true
+    }
+    if (el instanceof HTMLInputElement) {
+      return !NON_TEXT_INPUT_TYPES.has(el.type)
+    }
+    return false
+  }
+
+  function shouldIgnoreGlobalShortcut(ev: KeyboardEvent): boolean {
+    return (
+      migrationModalIsOpen() ||
+      isEditableElement(ev.target) ||
+      isEditableElement(document.activeElement)
+    )
+  }
 
   const setFlameZoom: Setter<number> = (value) => {
     if (typeof value === 'function') {
@@ -144,13 +183,19 @@ function App(props: AppProps) {
   }
 
   useKeyboardShortcuts({
-    KeyF: () => {
+    KeyF: (ev) => {
+      if (shouldIgnoreGlobalShortcut(ev)) {
+        return
+      }
       document.startViewTransition(() => {
         setShowSidebar((p) => !p)
       })
       return true
     },
     KeyZ: (ev) => {
+      if (shouldIgnoreGlobalShortcut(ev)) {
+        return
+      }
       if (ev.metaKey || ev.ctrlKey) {
         if (ev.shiftKey) {
           if (history.hasRedo()) {
@@ -166,12 +211,18 @@ function App(props: AppProps) {
       }
     },
     KeyY: (ev) => {
+      if (shouldIgnoreGlobalShortcut(ev)) {
+        return
+      }
       if ((ev.metaKey || ev.ctrlKey) && history.hasRedo()) {
         history.redo()
         return true
       }
     },
-    KeyD: () => {
+    KeyD: (ev) => {
+      if (shouldIgnoreGlobalShortcut(ev)) {
+        return
+      }
       document.startViewTransition(() => {
         setFlameDescriptor((draft) => {
           draft.renderSettings.drawMode =
@@ -609,6 +660,20 @@ function App(props: AppProps) {
               <Card class={ui.buttonCard}>
                 <button class={ui.addFlameButton} onClick={showShareLinkModal}>
                   Share Link
+                </button>
+              </Card>
+              <Card class={ui.buttonCard}>
+                <button
+                  class={ui.addFlameButton}
+                  onClick={(_) =>
+                    showMigrationModal(
+                      structuredClone(
+                        JSON.parse(JSON.stringify(flameDescriptor)),
+                      ),
+                    )
+                  }
+                >
+                  Migration
                 </button>
               </Card>
             </div>

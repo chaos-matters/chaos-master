@@ -1,4 +1,4 @@
-import { encodeJsonQueryParam } from '@/utils/jsonQueryParam'
+import { getFlameLink } from '@/utils/jsonQueryParam'
 import { Button } from '../Button/Button'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
@@ -43,8 +43,7 @@ export function createShareLinkModal(flameDescriptor: FlameDescriptor) {
   const requestModal = useRequestModal()
 
   async function showShareLinkModal() {
-    const encoded = await encodeJsonQueryParam(flameDescriptor)
-    const url = `${window.location.origin}/?flame=${encoded}`
+    const url = await getFlameLink(flameDescriptor)
     await navigator.clipboard.writeText(url)
     await requestModal({
       class: ui.container,

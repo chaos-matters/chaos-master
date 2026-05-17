@@ -4,7 +4,6 @@ export function prettyPrintValibotErrors(
   flatErrors: ReturnType<typeof flatten>,
 ) {
   const { root, nested, other } = flatErrors
-
   if (root !== undefined) {
     console.warn('Root issues: ')
     console.table(root)
@@ -23,4 +22,19 @@ export function prettyPrintValibotErrors(
     console.warn('Other issues: ')
     console.table(other)
   }
+}
+export function processValibotErrors(
+  flatErrors: ReturnType<typeof flatten>,
+  errCallback: (err: string) => void,
+) {
+  const { root, nested, other } = flatErrors
+  root?.forEach(errCallback)
+  if (nested !== undefined) {
+    Object.entries(nested).forEach(([key, value]) => {
+      errCallback(
+        `${key}: ${Array.isArray(value) ? value.join(' & ') : 'Unknown Issue'}`,
+      )
+    })
+  }
+  other?.forEach(errCallback)
 }
