@@ -106,10 +106,12 @@ function Gradient() {
     const rafLoop = createAnimationFrame(
       () => {
         const encoder = device.createCommandEncoder()
+        const canvasTexture = context.getCurrentTexture()
+        canvasTexture.label = 'FlameColorEditor_CanvasTexture'
         const pass = encoder.beginRenderPass({
           colorAttachments: [
             {
-              view: context.getCurrentTexture().createView(),
+              view: canvasTexture.createView(),
               loadOp: 'clear',
               storeOp: 'store',
             },

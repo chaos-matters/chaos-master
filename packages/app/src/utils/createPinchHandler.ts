@@ -77,7 +77,10 @@ export function createPinchHandler(createHandlers: CreatePinchHandler) {
       inProgress = false
     }
 
-    document.addEventListener('touchmove', onTouchMove, { signal })
+    document.addEventListener('touchmove', onTouchMove, {
+      signal,
+      passive: false,
+    })
     document.addEventListener('touchend', onTouchEnd, { signal })
     signal.addEventListener('abort', () => {
       onTouchEnd()

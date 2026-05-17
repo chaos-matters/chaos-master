@@ -127,7 +127,7 @@ export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
   createEffect(() => {
     const eventTarget = el()
     eventTarget.addEventListener('pointerdown', startPanning)
-    eventTarget.addEventListener('touchmove', startPinch)
+    eventTarget.addEventListener('touchmove', startPinch, { passive: false })
     eventTarget.addEventListener('wheel', onWheel, { passive: false })
     onCleanup(() => {
       eventTarget.removeEventListener('pointerdown', startPanning)
