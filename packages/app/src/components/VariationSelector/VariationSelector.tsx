@@ -118,25 +118,32 @@ function VariationPreview(props: {
   const [exportImage, setExportImage] = createSignal<ExportImageType>()
   const [image, setImage] = createSignal<string>()
 
-  createEffect(async () => {
-    const container_ = container()
-    if (!container_ || renderStatus() !== 'done') {
+  createEffect(() => {
+    if (!container() || renderStatus() !== 'done') {
       return
     }
-    const image_ = new Image()
-    image_.onload = () => {
-      setImage(image_.src)
-    }
-    onCleanup(() => {
-      URL.revokeObjectURL(image_.src)
-      image_.src = ''
-    })
 
     const { promise, resolve } = Promise.withResolvers<Blob>()
     setExportImage(() => resolve)
-    const blob = await promise
-    const src = URL.createObjectURL(blob)
-    image_.src = src
+
+    let cancelled = false
+    let objectUrl: string | undefined
+
+    void promise.then((blob) => {
+      if (cancelled) return
+      objectUrl = URL.createObjectURL(blob)
+      const img = new Image()
+      img.onload = () => {
+        if (!cancelled) setImage(img.src)
+      }
+      img.src = objectUrl
+    })
+
+    onCleanup(() => {
+      cancelled = true
+      if (objectUrl !== undefined) URL.revokeObjectURL(objectUrl)
+      setExportImage(undefined)
+    })
   })
 
   return (
@@ -145,7 +152,7 @@ function VariationPreview(props: {
       classList={{ [ui.stretchDone]: image() !== undefined }}
       ref={setContainer}
       style={{
-        ['--background']: image() ? `url('${image()}')` : undefined,
+        ['--background']: image() !== undefined ? `url('${image()}')` : undefined,
       }}
     >
       <Show when={allowed() || image() === undefined}>

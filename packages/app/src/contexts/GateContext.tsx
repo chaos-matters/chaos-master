@@ -1,5 +1,4 @@
 import { createContext, createMemo, createSignal, onCleanup, onMount, } from 'solid-js'
-import { isDefined } from '@/utils/isDefined'
 import { useContextSafe } from '@/utils/useContextSafe'
 import type { Accessor, ParentProps, Setter } from 'solid-js'
 
@@ -53,22 +52,20 @@ export function createGateContext<T>(
     const allowedItems = createMemo<Set<symbol>>((prev) => {
       const capacity = props.capacity
       const items_ = items()
-      const itemsWithPriority = [...items_.entries()].map(([id, state]) => {
-        const state_ = state()
-        if (state_ === undefined) {
-          return undefined
-        }
-        return {
-          id,
-          priority: priority(state_),
-          wasAllowed: prev?.has(id) ?? false,
-        }
-      })
-      if (itemsWithPriority.some((item) => item === undefined)) {
-        return new Set()
-      }
-      const orderedItems = itemsWithPriority
-        .filter(isDefined)
+      const orderedItems = [...items_.entries()]
+        .flatMap(([id, state]) => {
+          const state_ = state()
+          if (state_ === undefined) {
+            return []
+          }
+          return [
+            {
+              id,
+              priority: priority(state_),
+              wasAllowed: prev?.has(id) ?? false,
+            },
+          ]
+        })
         .filter((item) => item.priority > 0)
         .sort(
           (a, b) =>
