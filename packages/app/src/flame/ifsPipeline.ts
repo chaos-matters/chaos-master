@@ -2,8 +2,8 @@ import { onCleanup } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { arrayOf, builtin, f32, i32, struct, u32, vec2f, vec2i, vec2u, } from 'typegpu/data'
 import { add, arrayLength, atomicAdd, mul } from 'typegpu/std'
-import { hash, random, randomState, setSeed } from '@/shaders/random'
 import { camera2DWorldToClip } from '@/lib/Camera2D'
+import { hash, random, randomState, setSeed } from '@/shaders/random'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { vramLog } from '@/utils/vramLog'
 import { colorInitModeToImplFn } from './colorInitMode'
@@ -57,10 +57,10 @@ export function createIFSPipeline(
   let cached = pipelineCache.get(sig)
   if (!cached) {
     const flames = Object.fromEntries(
-    recordEntries(transforms).map(([tid, tr]) => {
-      globId += tid
-      return [tid, createFlameWgsl(tr)]
-    }),
+      recordEntries(transforms).map(([tid, tr]) => {
+        globId += tid
+        return [tid, createFlameWgsl(tr)]
+      }),
     )
 
     const flamesObj = Object.fromEntries(
@@ -94,7 +94,7 @@ export function createIFSPipeline(
     })
 
     const colorInitMode = colorInitModeToImplFn[colorInitType]
-  const pointInitMode = pointInitModeToImplFn[pointInitType]
+    const pointInitMode = pointInitModeToImplFn[pointInitType]
 
     const executeRandomFlame = tgpu.fn([Point], Point) /* wgsl */ `
       (point: Point) -> Point {
@@ -142,7 +142,7 @@ export function createIFSPipeline(
       setSeed(seed)
 
       let point = Point()
-    point.position = pointInitMode(pointIndex)
+      point.position = pointInitMode(pointIndex)
       point.color = colorInitMode(point.position)
 
       for (let i = 0; i < insideShaderCount; i += 1) {
@@ -159,7 +159,7 @@ export function createIFSPipeline(
       bindGroupLayout.$.pointRandomSeeds[pointIndex] = vec2u(randomState.$)
 
       // antialiasing jitter
-    const jittered = add(screen, pointInitMode(pointIndex))
+      const jittered = add(screen, pointInitMode(pointIndex))
       if (
         // important to check the real coordinates and not integer,
         // because negative values > -1 end up on-screen causing

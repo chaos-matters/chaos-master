@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
-import { createStore, produce } from 'solid-js/store'
+import { createStore } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { produce, unfreeze } from 'structurajs'
 import { vec2f, vec4f } from 'typegpu/data'
@@ -29,8 +29,8 @@ import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './VariationSelector.module.css'
 import type { Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
-import type { PointInitMode } from '@/flame/pointInitMode'
 import type { ExportImageType } from '@/App'
+import type { PointInitMode } from '@/flame/pointInitMode'
 import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from '@/flame/schema/flameSchema'
 import type { TransformVariationDescriptor } from '@/flame/variations'
 import type { ChangeHistory } from '@/utils/createStoreHistory'
@@ -264,11 +264,8 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
       variationPreviewFlames(props.previewPointInitMode),
     ),
   )
-  const [selectedItemId, setSelectedItemId] = createSignal<string | null>(null)
+  const [selectedItemId, setSelectedItemId] = createSignal<string>()
   const [hoveredItemId, setHoveredItemId] = createSignal<string>()
-  const [selectedPreviewItemId, setSelectedPreviewItemId] = createSignal<
-    string | null
-  >(null)
   const [touchlessPreview, setTouchlessPreview] = createSignal<boolean>(true)
   const getPreviewSelectionId = () => {
     return (
@@ -671,11 +668,11 @@ export function createVariationSelector(
             transformId={tid}
             variationId={vid}
             respond={respond}
-              previewPointInitMode={
-                previewPointInitMode() ??
-                currentFlame.renderSettings.pointInitMode
-              }
-              setPreviewPointInitMode={setPreviewPointInitMode}
+            previewPointInitMode={
+              previewPointInitMode() ??
+              currentFlame.renderSettings.pointInitMode
+            }
+            setPreviewPointInitMode={setPreviewPointInitMode}
           />
         </ChangeHistoryContextProvider>
       ),
