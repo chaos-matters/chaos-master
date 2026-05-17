@@ -18,10 +18,7 @@ export const pointInitModeCircle = pointInitModeFn((_index) => {
 
 export const pointInitModeSquare = pointInitModeFn((_index) => {
   'use gpu'
-  const size = f32(1.0)
-  const randxy = vec2f(random() - 0.5, random() - 0.5)
-  const k = f32(size * 2.0 - size)
-  return mul(k, randxy)
+  return vec2f(random(), random()).mul(2.0).sub(1.0)
 })
 
 export const pointInitModeCross = pointInitModeFn((_index) => {
@@ -34,6 +31,19 @@ export const pointInitModeCross = pointInitModeFn((_index) => {
     return vec2f(t, t)
   } else {
     return vec2f(t, -t)
+  }
+})
+
+export const pointInitModePlus = pointInitModeFn((_index) => {
+  'use gpu'
+  const r1 = random()
+  const r2 = random()
+
+  const t = r1 * 2.0 - 1.0
+  if (r2 < 0.5) {
+    return vec2f(t, 0.0)
+  } else {
+    return vec2f(0.0, t)
   }
 })
 
@@ -61,7 +71,7 @@ export const pointInitModeGaussian = pointInitModeFn((_index) => {
   const u1 = random() + f32(1e-6)
   const u2 = random()
 
-  // todo: standard deviation (sigma), 0.4 keeps most points within [-1, 1]
+  // standard deviation (sigma), 0.4 keeps most points within [-1, 1]
   const sigma = f32(0.4)
   const radius = sigma * sqrt(f32(-2.0) * log(u1))
   const theta = u2 * f32(2.0) * PI.$
@@ -154,15 +164,16 @@ export const pointInitModeHalton = pointInitModeFn((index) => {
 
 export const pointInitModePerlin = pointInitModeFn((_index) => {
   'use gpu'
-  const xy = vec2f(random(), random())
+  const xy = vec2f(random(), random()).mul(2.0).sub(1.0)
   const nx = perlin2d.sample(xy.mul(0.9))
-  return vec2f(xy).add(nx)
+  return xy.add(nx)
 })
 
 export const pointInitModeToImplFn = {
   pointInitCircle: pointInitModeCircle,
   pointInitSquare: pointInitModeSquare,
   pointInitCross: pointInitModeCross,
+  pointInitPlus: pointInitModePlus,
   pointInitTriangle: pointInitModeTriangle,
   pointInitGaussian: pointInitModeGaussian,
 
