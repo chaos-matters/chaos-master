@@ -142,11 +142,10 @@ function VariationPreview(props: {
   return (
     <div
       class={ui.stretch}
+      classList={{ [ui.stretchDone]: image() !== undefined }}
       ref={setContainer}
       style={{
-        outline: image() !== undefined ? `1px solid white` : undefined,
-        'outline-offset': '-1px',
-        ['--background']: `url('${image()}')`,
+        ['--background']: image() ? `url('${image()}')` : undefined,
       }}
     >
       <Show when={allowed() || image() === undefined}>
