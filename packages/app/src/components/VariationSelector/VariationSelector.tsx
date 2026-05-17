@@ -7,6 +7,7 @@ import { clamp } from 'typegpu/std'
 import { ChangeHistoryContextProvider } from '@/contexts/ChangeHistoryContext'
 import { DEFAULT_VARIATION_PREVIEW_POINT_COUNT, DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS, DEFAULT_VARIATION_SHOW_DELAY_MS, } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
+import { pointInitModeToImplFn } from '@/flame/pointInitMode'
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from '@/flame/schema/flameSchema'
 import { isParametricVariation, variationTypes } from '@/flame/variations'
 import { getNormalizedVariationName, getParamsEditor, getTransformPreviewTid, getTransformPreviewVid, getVariationPreviewFlame, } from '@/flame/variations/utils'
@@ -16,7 +17,7 @@ import { Camera2D } from '@/lib/Camera2D'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { createStoreHistory } from '@/utils/createStoreHistory'
-import { recordEntries } from '@/utils/record'
+import { recordEntries, recordKeys } from '@/utils/record'
 import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
 import { AffineEditor } from '../AffineEditor/AffineEditor'
 import { Button } from '../Button/Button'
@@ -105,12 +106,12 @@ type VariationSelectorModalProps = {
   transformId: TransformId
   variationId: VariationId
   respond: (value: RespondType) => void
+  previewPointInitMode: PointInitMode
+  setPreviewPointInitMode: (mode: PointInitMode) => void
 }
 const variationPreviewFlames: (
   p: PointInitMode,
 ) => Record<string, FlameDescriptor> = (pointInitMode: PointInitMode) => {
-  // TODO: temp mumbo jumbo to adjust point init mode for variation previews from main flame
-  // consider just adding point init option to previewer!
   return Object.fromEntries(
     variationTypes.map((name) => [
       name,
@@ -126,7 +127,7 @@ const variationPreviewFlames: (
 function ShowVariationSelector(props: VariationSelectorModalProps) {
   const [variationExamples, setVariationExamples] = createStoreHistory(
     createStore<Record<string, FlameDescriptor>>(
-      variationPreviewFlames(props.currentFlame.renderSettings.pointInitMode),
+      variationPreviewFlames(props.previewPointInitMode),
     ),
   )
   const [selectedItemId, setSelectedItemId] = createSignal<string | null>(null)
@@ -136,7 +137,13 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
   const [touchlessPreview, setTouchlessPreview] = createSignal<boolean>(true)
 
   const [previewFlame, setPreviewFlame] = createStoreHistory(
-    createStore<FlameDescriptor>(structuredClone(props.currentFlame)),
+    createStore<FlameDescriptor>(
+      unfreeze(
+        produce(structuredClone(props.currentFlame), (draft) => {
+          draft.renderSettings.pointInitMode = props.previewPointInitMode
+        }),
+      ),
+    ),
   )
 
   const setFlameZoom: Setter<number> = (value) => {
@@ -411,6 +418,33 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
           </div>
           <div class={ui.flamePreviewControls}>
             <ButtonGroup>
+              <select
+                class={ui.select}
+                value={props.previewPointInitMode}
+                onChange={(ev) => {
+                  const mode = ev.currentTarget.value as PointInitMode
+                  props.setPreviewPointInitMode(mode)
+                  setVariationExamples((draft) => {
+                    for (const id in draft) {
+                      const item = draft[id]
+                      if (item) {
+                        item.renderSettings.pointInitMode = mode
+                      }
+                    }
+                  })
+                  setPreviewFlame((draft) => {
+                    draft.renderSettings.pointInitMode = mode
+                  })
+                }}
+              >
+                <For each={recordKeys(pointInitModeToImplFn)}>
+                  {(pointInitMode) => (
+                    <option value={pointInitMode}>{pointInitMode}</option>
+                  )}
+                </For>
+              </select>
+            </ButtonGroup>
+            <ButtonGroup>
               <Button
                 onClick={() => {
                   setFlameZoom(1)
@@ -456,6 +490,10 @@ export function createVariationSelector(
   const [varSelectorModalIsOpen, setVarSelectorModalIsOpen] =
     createSignal(false)
 
+  const [previewPointInitMode, setPreviewPointInitMode] = createSignal<
+    PointInitMode | undefined
+  >(undefined)
+
   async function showVariationSelector(
     currentVar: TransformVariationDescriptor,
     currentFlame: FlameDescriptor,
@@ -474,6 +512,11 @@ export function createVariationSelector(
               transformId={tid}
               variationId={vid}
               respond={respond}
+              previewPointInitMode={
+                previewPointInitMode() ??
+                currentFlame.renderSettings.pointInitMode
+              }
+              setPreviewPointInitMode={setPreviewPointInitMode}
             />
           </ChangeHistoryContextProvider>
         </Root>
