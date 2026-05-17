@@ -95,12 +95,21 @@ export function Modal(props: ParentProps<ModalProps>) {
             } = instance
 
             function respond(option: unknown) {
-              document.startViewTransition(() => {
+              if ('startViewTransition' in document) {
+                const transition = document.startViewTransition(() => {
+                  resolve(option)
+                  setModalInstances((instances) =>
+                    instances.filter((ins) => ins !== instance),
+                  )
+                })
+                transition.ready.catch(() => {})
+                transition.finished.catch(() => {})
+              } else {
                 resolve(option)
                 setModalInstances((instances) =>
                   instances.filter((ins) => ins !== instance),
                 )
-              })
+              }
             }
 
             return (

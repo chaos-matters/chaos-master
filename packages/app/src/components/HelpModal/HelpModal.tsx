@@ -2,7 +2,7 @@ import { createResource, For, Show, Suspense } from 'solid-js'
 import { GitHub } from '@/icons'
 import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
 import { formatBytes } from '@/utils/formatBytes'
-import { VERSION } from '@/version'
+import { COMMIT_HASH, VERSION } from '@/version'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './HelpModal.module.css'
@@ -105,6 +105,7 @@ function HelpModal(props: HelpModalProps) {
         </a>{' '}
         <span>
           Chaos Master v{VERSION} <sup>alpha</sup>{' '}
+          <span class={ui.pillBadge}>{COMMIT_HASH}</span>
         </span>
       </ModalTitleBar>
 

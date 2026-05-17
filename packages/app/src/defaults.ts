@@ -31,3 +31,17 @@ export const DEFAULT_VARIATION_PREVIEW_POINT_COUNT = parseFloat(
 export const DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS = parseFloat(
   import.meta.env.VITE_DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS,
 )
+
+// Set to 'true' in .env.local to enable per-frame GPU timing.
+// Disabled by default: resolveQuerySet(384 slots) every frame causes device loss
+// on Firefox/Linux with GFX1201 (RDNA4) due to a wgpu/RADV timestamp-query bug.
+export const TRACK_PERFORMANCE =
+  import.meta.env.VITE_TRACK_PERFORMANCE === 'true'
+
+// Enable comprehensive WebGPU buffer lifecycle logging.
+// Set VITE_DEBUG_VRAM=true in .env.local to trace memory leaks.
+export const DEBUG_VRAM = import.meta.env.VITE_DEBUG_VRAM === 'true'
+
+export const COMPUTE_GATE_CAPACITY = parseFloat(
+  import.meta.env.VITE_COMPUTE_GATE_CAPACITY ?? '2',
+)

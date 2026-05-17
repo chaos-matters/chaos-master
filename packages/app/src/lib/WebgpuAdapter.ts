@@ -73,27 +73,46 @@ export async function initializeWebgpuDevice(
   )
   gpuDevice = await gpuAdapter.requestDevice(deviceFeatures)
 
-  // requestDevice will never return null, but if a valid device request can’t be
+  // requestDevice will never return null, but if a valid device request can't be
   // fulfilled for some reason it may resolve to a device which has already been lost.
   // Additionally, devices can be lost at any time after creation for a variety of reasons
-  // (ie: browser resource management, driver updates), so it’s a good idea to always
+  // (ie: browser resource management, driver updates), so it's a good idea to always
   // handle lost devices gracefully.
+  //
+  // Retry limit: on Firefox/Linux with GFX1201 an OOM device loss causes SolidJS reactive
+  // effects to immediately hammer the dead device with new resource creation calls, each of
+  // which also fails, causing another device loss, triggering another retry — indefinitely.
+  // Root.tsx holds a stale device reference that cannot be updated without remounting the
+  // resource, so retrying more than once has no practical benefit and only makes the spiral
+  // worse. One retry covers genuinely transient losses (driver update, GPU reset). After
+  // that, the user must reload.
+  const MAX_DEVICE_LOSS_RETRIES = 1
+  let deviceLossRetryCount = 0
+
   gpuDevice.lost
     .then(async (info) => {
       console.warn(`WebGPU device was lost: ${info.message}.`)
 
       gpuAdapter = null
 
-      // Many causes for lost devices are transient, so applications should try getting a
-      // new device once a previous one has been lost unless the loss was caused by the
-      // application intentionally destroying the device. Note that any WebGPU resources
-      // created with the previous device (buffers, textures, etc.) will need to be
-      // re-created with the new one.
-      if (info.reason !== 'destroyed') {
+      if (
+        info.reason !== 'destroyed' &&
+        deviceLossRetryCount < MAX_DEVICE_LOSS_RETRIES
+      ) {
+        deviceLossRetryCount += 1
         console.info(
           'Trying to get WebGPU device again, if this fails, reload application to try again',
         )
+        // Brief backoff to let the GPU process recover before requesting a new device.
+        await new Promise((resolve) => setTimeout(resolve, 500))
         await initializeWebgpuDevice(adapterPreferences, deviceFeatures)
+      } else {
+        deviceLossRetryCount = 0
+        if (info.reason !== 'destroyed') {
+          console.error(
+            'WebGPU device lost and retry limit reached. Reload the page to recover.',
+          )
+        }
       }
     })
     .catch(console.error)

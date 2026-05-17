@@ -13,6 +13,7 @@ type AutoCanvasProps = {
   class?: string
   ref?: (el: HTMLCanvasElement) => void
   pixelRatio?: number
+  fixedResolution?: { width: number; height: number }
 }
 
 export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
@@ -29,31 +30,34 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
     }
   }
 
-  const canvasSize = useElementSize(
-    () => canvas()?.parentElement,
-    (size) => {
-      const el = canvas()
-      if (!el) {
-        return
-      }
-      const { widthPX, heightPX } = scaledCanvasSize(size)
-      el.width = widthPX
-      el.height = heightPX
-      // TODO: without this, for different resolutions, makes the preview moved
-      el.style.width = `100%`
-    },
+  const autoSize = useElementSize(() =>
+    props.fixedResolution ? undefined : canvas()?.parentElement,
   )
 
-  // also update canvas size when props.pixelRatio changes
+  const activeSize = (): ElementSize | undefined => {
+    if (props.fixedResolution) {
+      return {
+        width: props.fixedResolution.width,
+        height: props.fixedResolution.height,
+        widthPX: props.fixedResolution.width,
+        heightPX: props.fixedResolution.height,
+      }
+    }
+    return autoSize()
+  }
+
   createEffect(() => {
     const el = canvas()
-    const size = canvasSize()
+    const size = activeSize()
     if (!el || !size) {
       return
     }
     const { widthPX, heightPX } = scaledCanvasSize(size)
     el.width = widthPX
     el.height = heightPX
+    el.style.width = `100%`
+    el.style.height = `100%`
+    el.style.display = `block`
   })
 
   function createContext(canEl: HTMLCanvasElement) {
@@ -87,7 +91,7 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
               ...createContext(canvas),
               pixelRatio: () => props.pixelRatio ?? 1,
               canvasSize: () => {
-                const size = canvasSize()
+                const size = activeSize()
                 if (!size) {
                   return { width: 0, height: 0 }
                 }

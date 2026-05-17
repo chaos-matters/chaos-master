@@ -3,6 +3,7 @@ import { onCleanup } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { arrayOf, builtin, f32, struct, vec2f, vec2i, vec3f, vec4f, } from 'typegpu/data'
 import { abs, div, log, max, mix, mul, pow, saturate, smoothstep, } from 'typegpu/std'
+import { vramLog } from '@/utils/vramLog'
 import { Bucket, BUCKET_FIXED_POINT_MULTIPLIER_INV } from './types'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 import type { DrawModeFn } from './drawMode'
@@ -41,11 +42,16 @@ export function createColorGradingPipeline(
   const textureSizeBuffer = root
     .createBuffer(vec2i, vec2i(...textureSize))
     .$usage('uniform')
+  vramLog('[colorGrading] Created textureSizeBuffer')
 
+  // NOTE: synchronous destroy, no requestAnimationFrame wrapper.
+  // WebGPU spec §5.1.4 allows destroying a buffer referenced by pending GPU commands —
+  // the driver handles it. rAF-delayed cleanup creates a window where old and new buffers
+  // coexist if this pipeline factory is called again before the rAF fires (e.g. on canvas
+  // resize or rapid modal reopen). See Flam3.tsx pointRandomSeeds note for full rationale.
   onCleanup(() => {
-    requestAnimationFrame(() => {
-      textureSizeBuffer.destroy()
-    })
+    vramLog('[colorGrading] Destroying textureSizeBuffer')
+    textureSizeBuffer.destroy()
   })
 
   const bindGroup = root.createBindGroup(bindGroupLayout, {

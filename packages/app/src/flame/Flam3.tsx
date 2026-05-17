@@ -1,8 +1,8 @@
 import { createEffect, createMemo, createSignal, onCleanup, untrack, } from 'solid-js'
 import { arrayOf, vec2u, vec3f, vec4f } from 'typegpu/data'
-import { clamp } from 'typegpu/std'
 import { setAccumulatedPointCountGlobal, setRenderTimings, } from '@/flame/renderStats'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
+import { vramLog } from '@/utils/vramLog'
 import { useCamera } from '../lib/CameraContext'
 import { useCanvas } from '../lib/CanvasContext'
 import { useRootContext } from '../lib/RootContext'
@@ -72,11 +72,18 @@ export function Flam3(props: Flam3Props) {
   const pointRandomSeeds = root
     .createBuffer(arrayOf(vec2u, props.pointCountPerBatch))
     .$usage('storage')
+  vramLog('[Flam3] Created pointRandomSeeds buffer')
 
+  // NOTE: destroy() is called synchronously here, without a requestAnimationFrame wrapper.
+  // WebGPU spec §5.1.4 allows destroying a buffer that is still referenced by pending GPU
+  // commands — the driver handles it safely. The previous rAF wrapper caused a race: when
+  // the variation selector modal was closed and quickly reopened, new buffers were allocated
+  // before the rAF callbacks from the previous session fired. This left both old and new
+  // buffers alive simultaneously, doubling peak GPU memory usage and triggering OOM on
+  // Firefox/GFX1201 whose wgpu/Vulkan memory budget is already constrained.
   onCleanup(() => {
-    requestAnimationFrame(() => {
-      pointRandomSeeds.destroy()
-    })
+    vramLog('[Flam3] Destroying pointRandomSeeds buffer')
+    pointRandomSeeds.destroy()
   })
 
   const colorGradingUniforms = root
@@ -87,11 +94,13 @@ export function Flam3(props: Flam3Props) {
       edgeFadeColor: vec4f(0, 0, 0, 0.8),
     })
     .$usage('uniform')
+  vramLog('[Flam3] Created colorGradingUniforms buffer')
 
+  // NOTE: synchronous destroy — see note above on pointRandomSeeds for the rationale.
+  // rAF-delayed cleanup is never safe when a component can be remounted rapidly.
   onCleanup(() => {
-    requestAnimationFrame(() => {
-      colorGradingUniforms.destroy()
-    })
+    vramLog('[Flam3] Destroying colorGradingUniforms buffer')
+    colorGradingUniforms.destroy()
   })
 
   const outputTextures = createMemo(() => {
@@ -107,12 +116,21 @@ export function Flam3(props: Flam3Props) {
     const postprocessBuffer = root
       .createBuffer(arrayOf(Bucket, width * height))
       .$usage('storage')
+    vramLog(
+      `[Flam3] Created accumulationBuffer & postprocessBuffer (${width}x${height})`,
+    )
 
+    // NOTE: synchronous destroy — see note above on pointRandomSeeds for the rationale.
+    // These are the largest buffers (width × height × 12 bytes each at full canvas resolution).
+    // The rAF delay here was especially harmful: canvasSize() changes also trigger this memo
+    // to re-run, and the delayed cleanup meant old large buffers overlapped with new ones on
+    // every resize event, not just on modal reopen.
     onCleanup(() => {
-      requestAnimationFrame(() => {
-        accumulationBuffer.destroy()
-        postprocessBuffer.destroy()
-      })
+      vramLog(
+        `[Flam3] Destroying accumulationBuffer & postprocessBuffer (${width}x${height})`,
+      )
+      accumulationBuffer.destroy()
+      postprocessBuffer.destroy()
     })
 
     return {
@@ -182,6 +200,21 @@ export function Flam3(props: Flam3Props) {
     return clamp(floor((frameBudgetMs - paintTimeMs) / ifsMs), 1, 100)
   }
 
+  const pipelineSignature = createMemo(() => {
+    const flame = props.flameDescriptor
+    return JSON.stringify({
+      skipIters: flame.renderSettings.skipIters,
+      colorInitMode: flame.renderSettings.colorInitMode,
+      transforms: Object.entries(flame.transforms).map(([tid, tr]) => ({
+        tid,
+        variations: Object.entries(tr.variations).map(([vid, v]) => ({
+          vid,
+          type: v.type,
+        })),
+      })),
+    })
+  })
+
   createEffect(() => {
     // don't even compile if its not allowed to run
     const run = untrack(() => props.run)
@@ -197,15 +230,17 @@ export function Flam3(props: Flam3Props) {
 
     const { textureSize, accumulationBuffer } = o
 
+    pipelineSignature() // track structural changes
+
     const ifsPipeline = createIFSPipeline(
       root,
       camera,
-      props.flameDescriptor.renderSettings.skipIters,
+      untrack(() => props.flameDescriptor.renderSettings.skipIters),
       pointRandomSeeds,
-      props.flameDescriptor.transforms,
+      untrack(() => props.flameDescriptor.transforms),
       textureSize,
       accumulationBuffer,
-      props.flameDescriptor.renderSettings.colorInitMode,
+      untrack(() => props.flameDescriptor.renderSettings.colorInitMode),
     )
 
     setAccumulatedPointCount(0)
@@ -328,6 +363,7 @@ export function Flam3(props: Flam3Props) {
 
           {
             const canvasTexture = context.getCurrentTexture()
+            canvasTexture.label = 'Flam3_CanvasTexture'
             const pass = encoder.beginRenderPass({
               timestampWrites: timestampWrites?.colorGradingMs,
               colorAttachments: [
@@ -346,19 +382,19 @@ export function Flam3(props: Flam3Props) {
         timestampQuery?.write(encoder)
         device.queue.submit([encoder.finish()])
 
+        if (exportImage) {
+          exportedImages.add(exportImage)
+          canvas.toBlob((blob) => {
+            if (blob) {
+              exportImage(blob)
+            }
+          })
+        }
+
         device.queue
           .onSubmittedWorkDone()
           .then(() => {
             timestampQuery?.read(frameId).catch(console.error)
-
-            if (exportImage) {
-              exportedImages.add(exportImage)
-              canvas.toBlob((blob) => {
-                if (blob) {
-                  exportImage(blob)
-                }
-              })
-            }
           })
           .catch(() => {})
 
