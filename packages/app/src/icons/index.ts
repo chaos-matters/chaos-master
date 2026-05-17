@@ -1,3 +1,4 @@
+import Changelog from './changelog.svg'
 import Cross from './cross.svg'
 import GitHub from './github.svg'
 import HoverEyePreview from './hover-eye-preview.svg'
@@ -8,4 +9,14 @@ import Redo from './redo.svg'
 import Undo from './undo.svg'
 
 // Re-exported for easier auto-importing in components
-export { Cross, GitHub, Minus, Plus, Redo, Undo, HoverPreview, HoverEyePreview }
+export {
+  Changelog,
+  Cross,
+  GitHub,
+  Minus,
+  Plus,
+  Redo,
+  Undo,
+  HoverPreview,
+  HoverEyePreview,
+}

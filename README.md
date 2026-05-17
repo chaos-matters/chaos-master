@@ -4,4 +4,4 @@
 
 WebGPU based IFS Flame Generator for Artists and Explorers
 
-[chaos-master.vercel.app](https://chaos-master.vercel.app)
+[chaos-master.vercel.app](https://chaos-master.vercel.app) | [dev.chaos-master.com](https://dev.chaos-master.com)

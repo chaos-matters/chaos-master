@@ -44,8 +44,6 @@ jobs:
           echo "Target Branch: ${{ github.base_ref }}"
 
       - uses: pnpm/action-setup@v4
-        with:
-          version: latest
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -89,7 +87,7 @@ jobs:
           packageManager: 'pnpm'
           workingDirectory: 'packages/app'
 
-      # Deploys to dev-chaos-master.com when pushing to the main branch
+      # Deploys to dev.chaos-master.com when pushing to the main branch
       - name: Deploy to Dev Environment
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: cloudflare/wrangler-action@v3

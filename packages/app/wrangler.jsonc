@@ -2,9 +2,7 @@
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "chaos-master",
   "compatibility_date": "2026-05-17",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
+  "compatibility_flags": ["nodejs_compat"],
   "observability": {
     "enabled": false,
     "head_sampling_rate": 1,
@@ -12,17 +10,17 @@
       "enabled": true,
       "head_sampling_rate": 1,
       "persist": true,
-      "invocation_logs": true
+      "invocation_logs": true,
     },
     "traces": {
       "enabled": false,
       "persist": true,
-      "head_sampling_rate": 1
-    }
+      "head_sampling_rate": 1,
+    },
   },
   // Modern Cloudflare Assets configuration
   "assets": {
-    "directory": "dist"
+    "directory": "dist",
   },
   "env": {
     "prod": {
@@ -30,30 +28,30 @@
       "routes": [
         {
           "pattern": "chaos-master.com",
-          "custom_domain": true
-        }
+          "custom_domain": true,
+        },
       ],
       "build": {
-        "command": "pnpm run build"
-      }
+        "command": "pnpm run build",
+      },
     },
     "dev": {
       "name": "chaos-master-dev",
       "routes": [
         {
-          "pattern": "dev-chaos-master.com",
-          "custom_domain": true
-        }
+          "pattern": "dev.chaos-master.com",
+          "custom_domain": true,
+        },
       ],
       "build": {
-        "command": "pnpm run build:dev"
-      }
+        "command": "pnpm run build:dev",
+      },
     },
     "preview": {
       "name": "chaos-master-preview",
       "vars": {
-        "ENVIRONMENT": "preview"
-      }
-    }
-  }
+        "ENVIRONMENT": "preview",
+      },
+    },
+  },
 }

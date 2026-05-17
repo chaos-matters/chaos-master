@@ -41,7 +41,9 @@
       "unrs-resolver"
     ],
     "onlyBuiltDependencies": [
-      "esbuild"
+      "esbuild",
+      "sharp",
+      "workerd"
     ],
     "overrides": {
       "less": "link:./.pnpm-noop",

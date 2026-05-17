@@ -77,17 +77,15 @@ export function Modal(props: ParentProps<ModalProps>) {
   }
 
   return (
-    <>
-      <ModalContext.Provider value={requestModal}>
-        {props.children}
-      </ModalContext.Provider>
+    <ModalContext.Provider value={requestModal}>
+      {props.children}
       <Portal
         mount={props.mount}
         ref={(el) => {
           el.classList.add(ui.root)
         }}
       >
-        <Show when={modalInstances()[0]} keyed>
+        <Show when={modalInstances().at(-1)} keyed>
           {(instance) => {
             const {
               resolve,
@@ -118,6 +116,6 @@ export function Modal(props: ParentProps<ModalProps>) {
           }}
         </Show>
       </Portal>
-    </>
+    </ModalContext.Provider>
   )
 }
