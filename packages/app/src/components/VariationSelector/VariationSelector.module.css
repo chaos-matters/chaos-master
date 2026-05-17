@@ -176,5 +176,13 @@
   width: 100%;
   height: 100%;
   background-image: var(--background);
-  background-size: contain;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transition: background-image 150ms ease-in;
+}
+
+.stretch-done {
+  outline: 1px solid var(--item-border-color-hover);
+  outline-offset: -1px;
 }
