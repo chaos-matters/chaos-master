@@ -6,7 +6,7 @@ import { vec2f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { ChangeHistoryContextProvider } from '@/contexts/ChangeHistoryContext'
 import { createGateContext } from '@/contexts/GateContext'
-import { DEFAULT_VARIATION_PREVIEW_POINT_COUNT, DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS, } from '@/defaults'
+import { COMPUTE_GATE_CAPACITY, DEFAULT_VARIATION_PREVIEW_POINT_COUNT, DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS, } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
 import { pointInitModeToImplFn } from '@/flame/pointInitMode'
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from '@/flame/schema/flameSchema'
@@ -15,12 +15,12 @@ import { getNormalizedVariationName, getParamsEditor, getTransformPreviewTid, ge
 import { HoverEyePreview, HoverPreview } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
-import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { createStoreHistory } from '@/utils/createStoreHistory'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
+import { vramLog } from '@/utils/vramLog'
 import { AffineEditor } from '../AffineEditor/AffineEditor'
 import { Button } from '../Button/Button'
 import { ButtonGroup } from '../Button/ButtonGroup'
@@ -87,6 +87,7 @@ function PreviewFinalFlame(props: {
 function VariationPreview(props: {
   isSelected: boolean
   flame: FlameDescriptor
+  name: string
 }) {
   const [container, setContainer] = createSignal<HTMLElement>()
   const [quality, setQuality] = createSignal<() => number>()
@@ -118,6 +119,22 @@ function VariationPreview(props: {
   const [exportImage, setExportImage] = createSignal<ExportImageType>()
   const [image, setImage] = createSignal<string>()
 
+  // Once the gate grants this preview its first compute slot, latch it mounted
+  // until the image is captured. Without this, scrolling mid-render unmounts the
+  // Flam3, causing repeated buffer allocation/deallocation cycles that exhaust
+  // the GPU memory budget under Firefox/GFX1201.
+  const [everAllowed, setEverAllowed] = createSignal(false)
+  createEffect(() => {
+    if (allowed()) setEverAllowed(true)
+  })
+
+  // Prevent WebGPU buffer allocation churn by keeping the component mounted
+  // even when scrolled out of view, until it finishes rendering to a blob.
+  const [everVisible, setEverVisible] = createSignal(false)
+  createEffect(() => {
+    if (isVisible() === true) setEverVisible(true)
+  })
+
   createEffect(() => {
     if (!container() || renderStatus() !== 'done') {
       return
@@ -146,17 +163,50 @@ function VariationPreview(props: {
     })
   })
 
+  // Add mount/unmount logging
+  createEffect(() => {
+    const isMounted =
+      image() === undefined && (allowed() || everAllowed() || everVisible())
+
+    if (isMounted) {
+      vramLog(`[VariationPreview] Mounted WebGPU canvas for '${props.name}'`)
+      onCleanup(() => {
+        vramLog(
+          `[VariationPreview] Unmounted WebGPU canvas for '${props.name}'`,
+        )
+      })
+    }
+  })
+
   return (
     <div
       class={ui.stretch}
       classList={{ [ui.stretchDone]: image() !== undefined }}
       ref={setContainer}
       style={{
-        ['--background']: image() !== undefined ? `url('${image()}')` : undefined,
+        ['--background']:
+          image() !== undefined ? `url('${image()}')` : undefined,
       }}
     >
-      <Show when={allowed() || image() === undefined}>
-        <AutoCanvas pixelRatio={1}>
+      {/*
+       * Mount the WebGPU canvas only when the image has not yet been captured AND:
+       * - The preview is in the viewport (initial lazy mount — avoids allocating GPU
+       *   buffers for all 57+ variations simultaneously on the modal's GPUDevice), OR
+       * - The gate has ever granted this preview a compute slot (everAllowed latch) —
+       *   keeps the Flam3 mounted through scroll events so a render in progress is not
+       *   interrupted and forced to restart from scratch, OR
+       * - The preview is currently actively computing (allowed).
+       * Once image() is set the Show hides, freeing all GPU resources permanently.
+       */}
+      <Show
+        when={
+          image() === undefined && (allowed() || everAllowed() || everVisible())
+        }
+      >
+        <AutoCanvas
+          pixelRatio={1}
+          fixedResolution={{ width: 256, height: 144 }}
+        >
           <Camera2D
             position={vec2f(...props.flame.renderSettings.camera.position)}
             zoom={props.flame.renderSettings.camera.zoom}
@@ -405,7 +455,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
       <section class={ui.variationPreview}>
         <div class={ui.variationSelectorSidebar}>
           <section class={ui.gallery}>
-            <ComputeGate capacity={5}>
+            <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
               <For each={recordEntries(variationExamples)}>
                 {([id, variationExample]) => {
                   const variation = getVarFromPreviewFlame(variationExample)
@@ -430,7 +480,9 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                         <VariationPreview
                           isSelected={isSelected()}
                           flame={variationExample}
+                          name={variation.type}
                         />
+
                         <div class={ui.itemTitle}>
                           {getNormalizedVariationName(variation.type)}
                         </div>
@@ -612,22 +664,20 @@ export function createVariationSelector(
     const result = await requestModal<RespondType>({
       class: ui.modalNoScroll,
       content: ({ respond }) => (
-        <Root adapterOptions={{ powerPreference: 'high-performance' }}>
-          <ChangeHistoryContextProvider value={history}>
-            <ShowVariationSelector
-              currentVar={currentVar}
-              currentFlame={currentFlame}
-              transformId={tid}
-              variationId={vid}
-              respond={respond}
+        <ChangeHistoryContextProvider value={history}>
+          <ShowVariationSelector
+            currentVar={currentVar}
+            currentFlame={currentFlame}
+            transformId={tid}
+            variationId={vid}
+            respond={respond}
               previewPointInitMode={
                 previewPointInitMode() ??
                 currentFlame.renderSettings.pointInitMode
               }
               setPreviewPointInitMode={setPreviewPointInitMode}
-            />
-          </ChangeHistoryContextProvider>
-        </Root>
+          />
+        </ChangeHistoryContextProvider>
       ),
     })
     setVarSelectorModalIsOpen(false)

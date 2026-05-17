@@ -1,3 +1,4 @@
+import { onCleanup } from 'solid-js'
 import { convertNanoToMilliSeconds } from './convertSeconds'
 import { sum } from './sum'
 
@@ -29,11 +30,15 @@ export function createTimestampQuery<T extends string>(
     usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
   })
 
-  // TODO: find out why there's a warning if we do this
-  // onCleanup(() => {
-  //   timestampBuffer.destroy()
-  //   timestampMappable.destroy()
-  // })
+  onCleanup(() => {
+    // Unmap before destroying to avoid warnings if a mapAsync is still pending
+    if (timestampMappable.mapState === 'mapped') {
+      timestampMappable.unmap()
+    }
+    timestampBuffer.destroy()
+    timestampMappable.destroy()
+    timestampQuerySet.destroy()
+  })
 
   function timestampWrites(frameId: number) {
     const locationIndex = (frameId % pairLocationCount) * timestampCount * 2

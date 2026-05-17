@@ -22,7 +22,7 @@ import { createVariationSelector } from './components/VariationSelector/Variatio
 import { ViewControls } from './components/ViewControls/ViewControls'
 import { ChangeHistoryContextProvider } from './contexts/ChangeHistoryContext'
 import { ThemeContextProvider, useTheme } from './contexts/ThemeContext'
-import { DEFAULT_POINT_COUNT, DEFAULT_QUALITY, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_RESOLUTION, } from './defaults'
+import { DEFAULT_POINT_COUNT, DEFAULT_QUALITY, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_RESOLUTION, TRACK_PERFORMANCE, } from './defaults'
 import { colorInitModeToImplFn } from './flame/colorInitMode'
 import { drawModeToImplFn } from './flame/drawMode'
 import { example1 } from './flame/examples/example1'
@@ -233,7 +233,7 @@ function App(props: AppProps) {
               >
                 <Flam3
                   run={shouldRun()}
-                  trackPerformance
+                  trackPerformance={TRACK_PERFORMANCE}
                   quality={qualityPresets[qualityPreset()]}
                   pointCountPerBatch={DEFAULT_POINT_COUNT}
                   adaptiveFilterEnabled={adaptiveFilterEnabled()}
@@ -663,21 +663,21 @@ export function Wrappers() {
 
   return (
     <ThemeContextProvider>
-      <Modal>
-        <ErrorBoundary fallback={errorHandler}>
-          <Root
-            adapterOptions={{
-              powerPreference: 'high-performance',
-            }}
-          >
+      <ErrorBoundary fallback={errorHandler}>
+        <Root
+          adapterOptions={{
+            powerPreference: 'high-performance',
+          }}
+        >
+          <Modal>
             <Suspense>
               <Show when={flameFromQuery.state === 'ready'}>
                 <App flameFromQuery={flameFromQuery()} />
               </Show>
             </Suspense>
-          </Root>
-        </ErrorBoundary>
-      </Modal>
+          </Modal>
+        </Root>
+      </ErrorBoundary>
     </ThemeContextProvider>
   )
 }

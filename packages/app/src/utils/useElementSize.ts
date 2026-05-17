@@ -22,14 +22,15 @@ export function useElementSize(
     if (!t) {
       return
     }
+    let resizeTimeout: number | undefined
     const observer = new ResizeObserver((entries) => {
-      let pixelContentBox
-      let contentBox
       const entry = entries[0]
-      if (!entry) {
+      if (!entry || !t.isConnected) {
         return
       }
 
+      let pixelContentBox
+      let contentBox
       if (!Array.isArray(entry.devicePixelContentBoxSize)) {
         // Safari support (ios)
         contentBox = Array.isArray(entry.contentBoxSize)
@@ -45,27 +46,34 @@ export function useElementSize(
         contentBox = entry.contentBoxSize[0]
         pixelContentBox = entry.devicePixelContentBoxSize[0]
       }
-      // Don't measure the element if not connected to the document.
-      // Element existing but not connected to document can happen while
-      // Suspense mechanism is rendering the fallback.
-      if (!t.isConnected) {
-        return
-      }
-      const width = contentBox.inlineSize
-      const height = contentBox.blockSize
-      const widthPX = pixelContentBox.inlineSize
-      const heightPX = pixelContentBox.blockSize
+
       const newSize: ElementSize = {
-        width,
-        height,
-        widthPX,
-        heightPX,
+        width: contentBox.inlineSize,
+        height: contentBox.blockSize,
+        widthPX: pixelContentBox.inlineSize,
+        heightPX: pixelContentBox.blockSize,
       }
-      onChange?.(newSize)
-      setSize(newSize)
+
+      // Debounce the canvas resizing.
+      // Resizing a browser window triggers this at 60fps.
+      // Every trigger causes AutoCanvas to change the HTMLCanvasElement resolution,
+      // which cascades into Flam3 instantly reallocating all WebGPU buffers for
+      // the new resolution. Rapidly allocating and destroying buffers at 60fps
+      // severely fragments the Vulkan memory pool on wgpu/Firefox and immediately
+      // causes OOMs, especially when multiple variation previews are on-screen.
+      // A 100ms debounce ensures buffers are only reallocated once the drag stops.
+      // CSS layout keeps the canvas visually stretched in the meantime.
+      if (resizeTimeout !== undefined) {
+        window.clearTimeout(resizeTimeout)
+      }
+      resizeTimeout = window.setTimeout(() => {
+        onChange?.(newSize)
+        setSize(newSize)
+      }, 100)
     })
     observer.observe(t)
     onCleanup(() => {
+      if (resizeTimeout !== undefined) window.clearTimeout(resizeTimeout)
       observer.disconnect()
     })
   })

@@ -1,6 +1,7 @@
 import { createMemo, createSignal, For } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
 import { createGateContext } from '@/contexts/GateContext'
+import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { examples } from '@/flame/examples'
 import { Flam3 } from '@/flame/Flam3'
 import { AutoCanvas } from '@/lib/AutoCanvas'
@@ -147,7 +148,7 @@ function LoadFlameModal(props: LoadFlameModalProps) {
       </section>
       <h2>Example Gallery</h2>
       <section class={ui.gallery}>
-        <ComputeGate capacity={5}>
+        <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
           <For each={recordEntries(examples)}>
             {([exampleId, example]) => (
               <button
