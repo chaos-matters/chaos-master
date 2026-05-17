@@ -1,5 +1,6 @@
 import { createEffect, createMemo, createSignal, onCleanup, untrack, } from 'solid-js'
 import { arrayOf, vec2u, vec3f, vec4f } from 'typegpu/data'
+import { clamp } from 'typegpu/std'
 import { setAccumulatedPointCountGlobal, setRenderTimings, } from '@/flame/renderStats'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
 import { vramLog } from '@/utils/vramLog'
@@ -16,7 +17,6 @@ import { Bucket } from './types'
 import type { v4f } from 'typegpu/data'
 import type { FlameDescriptor } from './schema/flameSchema'
 import type { ExportImageType } from '@/App'
-import { clamp } from 'typegpu/std'
 
 const { sqrt, floor } = Math
 
