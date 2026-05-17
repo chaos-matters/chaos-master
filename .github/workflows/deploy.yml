@@ -1,0 +1,175 @@
+name: Build & Deploy
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy App
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Debug Info
+        run: |
+          echo "Event: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Target Branch: ${{ github.base_ref }}"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build app
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ "${{ github.event.inputs.environment }}" == "dev" ]]; then
+              pnpm --filter chaos-master run build:dev
+            else
+              pnpm --filter chaos-master run build
+            fi
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            pnpm --filter chaos-master run build:dev
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            pnpm --filter chaos-master run build:dev
+          else
+            pnpm --filter chaos-master run build
+          fi
+
+      - name: Verify build output
+        run: |
+          test -f packages/app/dist/index.html || exit 1
+          echo "Build artifacts verified"
+
+      # Manual Deploy via workflow_dispatch
+      - name: Manual Deploy
+        if: github.event_name == 'workflow_dispatch'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --env ${{ github.event.inputs.environment }}
+          packageManager: 'pnpm'
+          workingDirectory: 'packages/app'
+
+      # Deploys to dev-chaos-master.com when pushing to the main branch
+      - name: Deploy to Dev Environment
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --env dev
+          packageManager: 'pnpm'
+          workingDirectory: 'packages/app'
+
+      # Deploys to preview on PRs
+      - name: Deploy PR Preview
+        id: deploy-preview
+        if: github.event_name == 'pull_request'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --env preview
+          packageManager: 'pnpm'
+          workingDirectory: 'packages/app'
+
+      # Post or update PR comment with preview link from template
+      - name: Post Preview Link
+        if: github.event_name == 'pull_request' && steps.deploy-preview.outputs.deployment-url != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            const templatePath = path.join(process.env.GITHUB_WORKSPACE, '.github/workflows/pr-deployment-table.md');
+            let body = fs.readFileSync(templatePath, 'utf8');
+            
+            const url = '${{ steps.deploy-preview.outputs.deployment-url }}';
+            const commit = context.sha.substring(0, 7);
+            const commitUrl = `${context.server_url}/${context.repo.owner}/${context.repo.repo}/commit/${context.sha}`;
+            const logsUrl = `${context.server_url}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const updated = new Date().toUTCString();
+            
+            body = body
+              .replace(/PREVIEW_URL/g, url)
+              .replace('COMMIT_SHA', commit)
+              .replace('COMMIT_URL', commitUrl)
+              .replace('LOGS_URL', logsUrl)
+              .replace('UPDATED_TIME', updated);
+            
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && comment.body.includes('Deploying with Cloudflare Workers')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body
+              });
+            }
+
+      # Deploys to chaos-master.com when pushing a tag starting with 'v'
+      - name: Deploy to Production Environment
+        if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --env prod
+          packageManager: 'pnpm'
+          workingDirectory: 'packages/app'

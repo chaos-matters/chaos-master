@@ -7,7 +7,9 @@
   "scripts": {
     "fmt": "prettier packages --check",
     "lint": "eslint",
-    "lines": "cloc packages --exclude-dir=node_modules,dist --by-file-by-lang --not-match-f='(.*[.]d[.]ts|.*[.]stories[.].*|.*[.]test[.].*|.*[.]json)'"
+    "lines": "cloc packages --exclude-dir=node_modules,dist --by-file-by-lang --not-match-f='(.*[.]d[.]ts|.*[.]stories[.].*|.*[.]test[.].*|.*[.]json)'",
+    "deploy:dev": "pnpm --filter chaos-master deploy:dev",
+    "deploy:prod": "pnpm --filter chaos-master deploy:prod"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
