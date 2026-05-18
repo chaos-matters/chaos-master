@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack, } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { produce, unfreeze } from 'structurajs'
@@ -33,7 +33,7 @@ import type { ExportImageType } from '@/App'
 import type { PointInitMode } from '@/flame/pointInitMode'
 import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from '@/flame/schema/flameSchema'
 import type { TransformVariationDescriptor } from '@/flame/variations'
-import type { HistorySetter, ChangeHistory } from '@/utils/createStoreHistory'
+import type { ChangeHistory, HistorySetter } from '@/utils/createStoreHistory'
 
 const CANCEL = 'cancel'
 
@@ -126,7 +126,7 @@ function VariationPreview(props: {
     // Do NOT touch quality or exportImage here — resetting quality triggers
     // renderStatus -> allowed -> everAllowed in a cascade that overflows the
     // SolidJS update queue. Those signals are managed by their own effects.
-    props.version
+    void props.version
     setImage(undefined)
   })
 
@@ -145,8 +145,6 @@ function VariationPreview(props: {
   createEffect(() => {
     if (isVisible() === true) setEverVisible(true)
   })
-
-
 
   createEffect(() => {
     if (!container() || renderStatus() !== 'done') {
@@ -298,8 +296,6 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
       ),
     ),
   )
-
-
 
   const setFlameZoom: Setter<number> = (value) => {
     if (typeof value === 'function') {
@@ -468,44 +464,44 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
       <section class={ui.variationPreview}>
         <div class={ui.variationSelectorSidebar}>
           <section class={ui.gallery}>
-                  <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
-                  <For each={recordEntries(variationExamples)}>
-                    {([id, variationExample]) => {
-                      const variation = getVarFromPreviewFlame(variationExample)
-                      const isSelected = () => selectedItemId() === id
-                      return (
-                        variation && (
-                          <button
-                            class={ui.item}
-                            classList={{
-                              [ui.selected]: isSelected(),
-                            }}
-                            onClick={() => {
-                              toggleSelectedItem(id)
-                            }}
-                            onMouseEnter={() => {
-                              setHoveredItemId(id)
-                            }}
-                            onMouseLeave={() => {
-                              setHoveredItemId(undefined)
-                            }}
-                          >
-                            <VariationPreview
-                              version={version()}
-                              isSelected={isSelected()}
-                              flame={variationExample}
-                              name={variation.type}
-                            />
+            <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
+              <For each={recordEntries(variationExamples)}>
+                {([id, variationExample]) => {
+                  const variation = getVarFromPreviewFlame(variationExample)
+                  const isSelected = () => selectedItemId() === id
+                  return (
+                    variation && (
+                      <button
+                        class={ui.item}
+                        classList={{
+                          [ui.selected]: isSelected(),
+                        }}
+                        onClick={() => {
+                          toggleSelectedItem(id)
+                        }}
+                        onMouseEnter={() => {
+                          setHoveredItemId(id)
+                        }}
+                        onMouseLeave={() => {
+                          setHoveredItemId(undefined)
+                        }}
+                      >
+                        <VariationPreview
+                          version={version()}
+                          isSelected={isSelected()}
+                          flame={variationExample}
+                          name={variation.type}
+                        />
 
-                            <div class={ui.itemTitle}>
-                              {getNormalizedVariationName(variation.type)}
-                            </div>
-                          </button>
-                        )
-                      )
-                    }}
-                  </For>
-                </ComputeGate>
+                        <div class={ui.itemTitle}>
+                          {getNormalizedVariationName(variation.type)}
+                        </div>
+                      </button>
+                    )
+                  )
+                }}
+              </For>
+            </ComputeGate>
           </section>
         </div>
 
@@ -534,13 +530,9 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                                     ) => {
                                       const variationDraft =
                                         draft[id]?.transforms[
-                                          getTransformPreviewTid(
-                                            variation.type,
-                                          )
+                                          getTransformPreviewTid(variation.type)
                                         ]?.variations[
-                                          getTransformPreviewVid(
-                                            variation.type,
-                                          )
+                                          getTransformPreviewVid(variation.type)
                                         ]
                                       if (
                                         variationDraft === undefined ||

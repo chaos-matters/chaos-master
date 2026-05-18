@@ -26,7 +26,7 @@ const pipelineCache = new Map<
   {
     FlameUniforms: ReturnType<typeof struct>
     bindGroupLayout: ReturnType<typeof tgpu.bindGroupLayout>
-    ifsCompute: any
+    ifsCompute: ReturnType<ReturnType<typeof tgpu.computeFn>>
   }
 >()
 

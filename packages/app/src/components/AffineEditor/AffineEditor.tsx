@@ -177,16 +177,23 @@ function AffineHandle(props: {
   const aspect = createMemo(() => canvasSize().width / canvasSize().height)
   const position = createMemo(() => vec2f(props.transform.c, props.transform.f))
   const clipPosition = createMemo(() => worldToClip(position()))
-  const clipTransform = createMemo(() => {
-    // prettier-ignore
-    const { a, b, c, d, e, f } = props.transform
-    const zero = worldToClip(vec2f(0, 0))
-    const x = sub(worldToClip(vec2f(a, d)), zero)
-    const y = sub(worldToClip(vec2f(b, e)), zero)
-    const t = worldToClip(vec2f(c, f))
-    const s = aspect()
-    return [x.x * s, y.x * s, x.y, y.y, t.x * s, t.y]
-  })
+  const clipTransform = createMemo(
+    (prev: number[]) => {
+      // prettier-ignore
+      const { a, b, c, d, e, f } = props.transform
+      const zero = worldToClip(vec2f(0, 0))
+      const x = sub(worldToClip(vec2f(a, d)), zero)
+      const y = sub(worldToClip(vec2f(b, e)), zero)
+      const t = worldToClip(vec2f(c, f))
+      const s = aspect()
+      const next = [x.x * s, y.x * s, x.y, y.y, t.x * s, t.y]
+      // worldToClip returns NaN/Infinity before the camera has completed its
+      // first update (canvas not yet sized). Keep the previous value so the SVG
+      // transform attribute is never set to "matrix(NaN, ...)".
+      return next.every(isFinite) ? next : prev
+    },
+    [1, 0, 0, 1, 0, 0],
+  )
   const startDragging = createDragHandler((initEvent) => {
     changeHistory.startPreview('Affine Translation')
 
