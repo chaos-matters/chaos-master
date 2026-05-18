@@ -1,4 +1,4 @@
-import { createResource, For, Show } from 'solid-js'
+import { createResource, For, JSX, Show } from 'solid-js'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './Changelog.module.css'
@@ -26,8 +26,8 @@ async function fetchChangelog(): Promise<ChangelogEntry[]> {
     const versionMatch = line.match(/^## \[([\d.]+)\] - ([\d-]+)/)
     if (versionMatch) {
       currentEntry = {
-        version: versionMatch[1],
-        date: versionMatch[2],
+        version: versionMatch[1]!,
+        date: versionMatch[2]!,
         sections: [],
       }
       entries.push(currentEntry)
@@ -39,7 +39,7 @@ async function fetchChangelog(): Promise<ChangelogEntry[]> {
       const sectionMatch = line.match(/^### (\w+)/)
       if (sectionMatch) {
         currentSection = {
-          title: sectionMatch[1],
+          title: sectionMatch[1]!,
           items: [],
         }
         currentEntry.sections.push(currentSection)
@@ -49,13 +49,50 @@ async function fetchChangelog(): Promise<ChangelogEntry[]> {
       if (currentSection) {
         const itemMatch = line.match(/^- (.*)/)
         if (itemMatch) {
-          currentSection.items.push(itemMatch[1])
+          currentSection.items.push(itemMatch[1]!)
         }
       }
     }
   }
 
   return entries
+}
+
+/**
+ * Renders a plain string that may contain inline markdown:
+ *   `code`  -> <code>
+ *   **bold** -> <strong>
+ *   _italic_ -> <em>
+ */
+function renderInline(text: string): JSX.Element {
+  // Split on any of our recognised tokens while keeping the delimiters.
+  const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*|_[^_]+_)/)
+
+  return (
+    <>
+      {parts.map((part) => {
+        if (part.startsWith('`') && part.endsWith('`')) {
+          return <code class={ui.code}>{part.slice(1, -1)}</code>
+        }
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong>{part.slice(2, -2)}</strong>
+        }
+        if (part.startsWith('_') && part.endsWith('_')) {
+          return <em>{part.slice(1, -1)}</em>
+        }
+        return <>{part}</>
+      })}
+    </>
+  )
+}
+
+const SECTION_ACCENT: Record<string, string> = {
+  Added: 'added',
+  Changed: 'changed',
+  Fixed: 'fixed',
+  Removed: 'removed',
+  Deprecated: 'deprecated',
+  Security: 'security',
 }
 
 type ChangelogProps = {
@@ -75,21 +112,37 @@ export function Changelog(props: ChangelogProps) {
         <span>Changelog</span>
       </ModalTitleBar>
       <div class={ui.content}>
-        <Show when={!entries.loading} fallback={<div>Loading...</div>}>
+        <Show
+          when={!entries.loading}
+          fallback={<div class={ui.loading}>Loading...</div>}
+        >
           <For each={entries()}>
-            {(entry) => (
-              <div class={ui.entry}>
-                <h3 class={ui.versionHeader}>
-                  <span class={ui.version}>v{entry.version}</span>
+            {(entry, i) => (
+              <div class={ui.entry} data-latest={i() === 0 ? '' : undefined}>
+                <div class={ui.versionHeader}>
+                  <div class={ui.versionLeft}>
+                    <span class={ui.versionBadge}>v{entry.version}</span>
+                    {i() === 0 && (
+                      <span class={ui.latestBadge}>Latest</span>
+                    )}
+                  </div>
                   <span class={ui.date}>{entry.date}</span>
-                </h3>
+                </div>
                 <For each={entry.sections}>
                   {(section) => (
                     <div class={ui.section}>
-                      <h4 class={ui.sectionTitle}>{section.title}</h4>
+                      <h4
+                        class={ui.sectionTitle}
+                        data-kind={SECTION_ACCENT[section.title] ?? 'other'}
+                      >
+                        <span class={ui.sectionDot} />
+                        {section.title}
+                      </h4>
                       <ul class={ui.list}>
                         <For each={section.items}>
-                          {(item) => <li class={ui.item}>{item}</li>}
+                          {(item) => (
+                            <li class={ui.item}>{renderInline(item)}</li>
+                          )}
                         </For>
                       </ul>
                     </div>
