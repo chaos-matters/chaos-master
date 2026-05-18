@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.9] - 2026-05-18
+
+### Added
+
+- Point initialization modes for the IFS pipeline: random square, random disc, and Perlin noise, each configurable per-flame.
+- Perlin noise variation (`perlinNoise`) in the parametric variation set.
+- `GateContext` to cap the number of concurrently running WebGPU flame instances in the variation selector, preventing GPU saturation.
+- VRAM usage logging utility (`vramLog`) for GPU memory diagnostics.
+- `isDefined` utility helper.
+- WebGPU/Firefox crash audit notes in `docs/audit/`.
+- Project conventions document in `docs/audit/`.
+- `sitemap.xml` for the deployed app.
+- Additional built-in example flame (`example8`).
+
+### Changed
+
+- Variation selector now kills preview canvases once a flame reaches high render quality, reducing idle GPU load.
+- Preview canvases are limited by an intersection-observer-gated concurrency pool, so off-screen thumbnails do not consume WebGPU resources.
+- Point init mode is now surfaced as a selector inside the variation selector previewer.
+- `AffineEditor` SVG matrix calculation guarded against non-finite values to prevent `NaN` attribute errors.
+- `VariationSelector` reactivity loop fixed: store reads inside side-effects are now wrapped with `untrack`/`void` to prevent `Maximum call stack size exceeded` crashes.
+- `ifsPipeline` refactored to decouple uniform updates from pipeline recompilation, reducing VRAM churn on Firefox/Linux AMD (RDNA4).
+- Blur and color-grading pipelines hardened against concurrent dispatch during rapid UI interactions.
+- `ComputeGate` capacity management updated for more predictable back-pressure behavior.
+- `HelpModal` content and layout updated.
+- Wrangler and domain configuration updated for dev and prod deployment targets.
+
+### Fixed
+
+- `TypeError: t is not a function` crash caused by redundant `produce()` wrappers around store setters in the variation selector.
+- SVG affine transform displaying `NaN` values when camera matrix contained non-finite entries.
+- Point init preview failing to update when the initialization mode was toggled, caused by incorrect `untrack` placement in `Flam3.tsx`.
+- Lint warnings for declaration-vs-usage shadowing in `AffineEditor` and related components.
+
 ## [0.7.8] - 2026-05-17
 
 ### Added
