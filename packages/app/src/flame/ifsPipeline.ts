@@ -26,7 +26,7 @@ const pipelineCache = new Map<
   {
     FlameUniforms: ReturnType<typeof struct>
     bindGroupLayout: ReturnType<typeof tgpu.bindGroupLayout>
-    ifsCompute: ReturnType<typeof tgpu.computeFn>
+    ifsCompute: any
   }
 >()
 
@@ -45,6 +45,7 @@ export function createIFSPipeline(
   const sig = JSON.stringify({
     insideShaderCount,
     colorInitType,
+    pointInitType,
     transforms: Object.entries(transforms).map(([tid, tr]) => ({
       tid,
       variations: Object.entries(tr.variations).map(([vid, v]) => ({
