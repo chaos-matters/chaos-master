@@ -100,7 +100,7 @@ function App(props: AppProps) {
   )
   const { loadModalIsOpen, showLoadFlameModal } = createLoadFlame(history)
   const { showVariationSelector, varSelectorModalIsOpen } =
-    createVariationSelector(history)
+    createVariationSelector(flameDescriptor, setFlameDescriptor, history)
 
   const shouldRun = () => !loadModalIsOpen() && !varSelectorModalIsOpen()
   const finalRenderInterval = () =>

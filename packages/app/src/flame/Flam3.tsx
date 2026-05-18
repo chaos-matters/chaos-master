@@ -206,6 +206,7 @@ export function Flam3(props: Flam3Props) {
     return JSON.stringify({
       skipIters: flame.renderSettings.skipIters,
       colorInitMode: flame.renderSettings.colorInitMode,
+      pointInitMode: flame.renderSettings.pointInitMode,
       transforms: Object.entries(flame.transforms).map(([tid, tr]) => ({
         tid,
         variations: Object.entries(tr.variations).map(([vid, v]) => ({
