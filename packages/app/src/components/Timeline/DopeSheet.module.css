@@ -59,6 +59,18 @@
   }
 }
 
+.zoomBtnActive {
+  background: var(--accent-color, #3b82f6);
+  border-color: var(--accent-color, #3b82f6);
+  color: white;
+
+  [data-theme='dark'] & {
+    background: var(--accent-color, #3b82f6);
+    border-color: var(--accent-color, #3b82f6);
+    color: white;
+  }
+}
+
 .zoomLabel {
   font-size: 10px;
   font-weight: 600;
