@@ -6,7 +6,7 @@ import { defineExample, tid, vid } from './util'
  * walls. Butterfly wings and hyperbolic curvature add iridescent glow.
  * Rendered in paint mode for luminous bloom.
  */
-export const example20 = defineExample({
+export const example25 = defineExample({
   renderSettings: {
     exposure: 0.28,
     skipIters: 20,
