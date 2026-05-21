@@ -35,6 +35,7 @@ export function DopeSheet(props: DopeSheetProps) {
   const totalFrames = () =>
     timeline.config().endFrame - timeline.config().startFrame
 
+  const [seekOnSelect, setSeekOnSelect] = createSignal(false)
   let containerRef: HTMLDivElement | undefined
   let tracksScrollRef!: HTMLDivElement
   let seekRulerRef!: HTMLDivElement
@@ -209,6 +210,14 @@ export function DopeSheet(props: DopeSheetProps) {
         >
           Fit
         </button>
+        <button
+          class={ui.zoomBtn}
+          classList={{ [ui.zoomBtnActive as string]: seekOnSelect() }}
+          onClick={() => setSeekOnSelect((v) => !v)}
+          title="Seek playhead to selected keyframe"
+        >
+          Seek
+        </button>
         <span class={ui.zoomHint}>(Alt+wheel or pinch to zoom)</span>
         <span class={ui.frameIndicator}>Frame {currentFrame()}</span>
       </div>
@@ -276,7 +285,9 @@ export function DopeSheet(props: DopeSheetProps) {
         selectedKeyframe={selectedKeyframe()}
         onSelectKeyframe={(path, frame) => {
           setSelectedKeyframe({ path, frame })
-          timeline.goToFrame(frame)
+          if (seekOnSelect() && frame !== currentFrame()) {
+            timeline.goToFrame(frame)
+          }
         }}
         onDragKeyframe={handleDragKeyframe}
         onContextMenu={handleContextMenu}
