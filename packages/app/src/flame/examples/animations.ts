@@ -94,6 +94,9 @@ const p19 = createAnimationPaths(examples.example19)
 const p20 = createAnimationPaths(examples.example20)
 const p21 = createAnimationPaths(examples.example21)
 const p22 = createAnimationPaths(examples.example22)
+const p23 = createAnimationPaths(examples.example23)
+const p24 = createAnimationPaths(examples.example24)
+const p25 = createAnimationPaths(examples.example25)
 
 // ---------------------------------------------------------------------------
 // Example 1 — multi-transform with swirl, popcorn, pie, gaussian, sinusoidal
@@ -4341,6 +4344,523 @@ const anim22c: AnimationDef = {
   ],
 }
 
+// Example 23 — Cosmic Swirl: fan2+swirl3Var spiral arms, juliaScope+curlVar core, horseshoe warp
+// Transform ordering (sorted): T0=fan2+swirl3Var, T1=juliaScope+curlVar, T2=horseshoe+swirl
+//
+//   T0: V0=fan2, V1=swirl3Var
+//   T1: V0=juliaScope, V1=curlVar
+//   T2: V0=horseshoe, V1=swirl
+// ---------------------------------------------------------------------------
+
+const ex23 = 'example23' as const
+
+const anim23a: AnimationDef = {
+  id: 'ex23-galactic-spin',
+  name: 'Galactic Spin',
+  description: 'Swirl arms rotate through log-spiral shift, julia power pulse, and camera zoom through the nebula',
+  exampleId: ex23,
+  tracks: [
+    {
+      parameterPath: p23.variationParam(0, 0, 'y'),
+      keyframes: [
+        { frame: 0, value: 0.75 },
+        { frame: 30, value: 0.3 },
+        { frame: 60, value: 0.95 },
+        { frame: 90, value: 0.75 },
+      ],
+    },
+    {
+      parameterPath: p23.variationParam(0, 1, 'shift'),
+      keyframes: [
+        { frame: 0, value: 4.5 },
+        { frame: 45, value: 2, easing: 'easeInOut' as const },
+        { frame: 90, value: 4.5 },
+      ],
+    },
+    {
+      parameterPath: p23.variationParam(1, 0, 'power'),
+      keyframes: [
+        { frame: 0, value: 4 },
+        { frame: 30, value: 2.5, easing: 'easeInOut' as const },
+        { frame: 60, value: 6, easing: 'easeInOut' as const },
+        { frame: 90, value: 4 },
+      ],
+    },
+    {
+      parameterPath: p23.variationParam(1, 1, 'c1'),
+      keyframes: [
+        { frame: 0, value: 1.2 },
+        { frame: 45, value: 2.5, easing: 'easeInOut' as const },
+        { frame: 90, value: 1.2 },
+      ],
+    },
+    {
+      parameterPath: 'camera.zoom',
+      keyframes: [
+        { frame: 0, value: 1.0 },
+        { frame: 40, value: 0.55, easing: 'easeInOut' as const },
+        { frame: 80, value: 1.5, easing: 'easeInOut' as const },
+        { frame: 90, value: 1.0 },
+      ],
+    },
+    {
+      parameterPath: 'camera.x',
+      keyframes: [
+        { frame: 0, value: 0 },
+        { frame: 45, value: 0.2, easing: 'easeInOut' as const },
+        { frame: 90, value: 0 },
+      ],
+    },
+    {
+      parameterPath: 'camera.y',
+      keyframes: [
+        { frame: 0, value: 0 },
+        { frame: 45, value: -0.15, easing: 'easeInOut' as const },
+        { frame: 90, value: 0 },
+      ],
+    },
+    {
+      parameterPath: 'vibrancy',
+      keyframes: [
+        { frame: 0, value: 0.65 },
+        { frame: 45, value: 0.9, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.65 },
+      ],
+    },
+    {
+      parameterPath: 'highlightPower',
+      keyframes: [
+        { frame: 0, value: 0.55 },
+        { frame: 30, value: 0.85, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.35 },
+        { frame: 90, value: 0.55 },
+      ],
+    },
+  ],
+}
+
+const anim23b: AnimationDef = {
+  id: 'ex23-probability-cosmos',
+  name: 'Probability Cosmos',
+  description: 'Transform probabilities shift, creating evolving structure as the nebula reforms itself',
+  exampleId: ex23,
+  tracks: [
+    {
+      parameterPath: p23.transformProbability(0),
+      keyframes: [
+        { frame: 0, value: 0.5 },
+        { frame: 25, value: 0.8 },
+        { frame: 50, value: 0.15 },
+        { frame: 75, value: 0.6 },
+        { frame: 90, value: 0.5 },
+      ],
+    },
+    {
+      parameterPath: p23.transformProbability(1),
+      keyframes: [
+        { frame: 0, value: 0.35 },
+        { frame: 25, value: 0.1 },
+        { frame: 50, value: 0.7 },
+        { frame: 75, value: 0.25 },
+        { frame: 90, value: 0.35 },
+      ],
+    },
+    {
+      parameterPath: p23.variationParam(1, 0, 'dist'),
+      keyframes: [
+        { frame: 0, value: 3 },
+        { frame: 30, value: 1, easing: 'easeInOut' as const },
+        { frame: 60, value: 5.5, easing: 'easeInOut' as const },
+        { frame: 90, value: 3 },
+      ],
+    },
+    {
+      parameterPath: p23.transformPreAffine(1, 'e'),
+      keyframes: [
+        { frame: 0, value: 0.35 },
+        { frame: 30, value: 0.6, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.2 },
+        { frame: 90, value: 0.35 },
+      ],
+    },
+    {
+      parameterPath: 'contrast',
+      keyframes: [
+        { frame: 0, value: 1.15 },
+        { frame: 45, value: 1.6, easing: 'easeInOut' as const },
+        { frame: 90, value: 1.15 },
+      ],
+    },
+    {
+      parameterPath: 'exposure',
+      keyframes: [
+        { frame: 0, value: 0.22 },
+        { frame: 45, value: 0.4, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.22 },
+      ],
+    },
+  ],
+}
+
+// ---------------------------------------------------------------------------
+// Example 24 — Crystal Lattice: hexes+ngonVar, rings2+perspective, linearTVar+spherical
+// Transform ordering (sorted): T0=hexesVar+ngonVar, T1=perspective+rings2, T2=linearTVar+spherical
+//
+//   T0: V0=hexesVar, V1=ngonVar
+//   T1: V0=perspective, V1=rings2
+//   T2: V0=linearTVar, V1=spherical
+// ---------------------------------------------------------------------------
+
+const ex24 = 'example24' as const
+
+const anim24a: AnimationDef = {
+  id: 'ex24-crystal-growth',
+  name: 'Crystal Growth',
+  description: 'Hex lattice cells breathe, n-gon sides morph, and rings2 pulses as the crystal lattice grows and contracts',
+  exampleId: ex24,
+  tracks: [
+    {
+      parameterPath: p24.variationParam(0, 0, 'cellsize'),
+      keyframes: [
+        { frame: 0, value: 0.14 },
+        { frame: 30, value: 0.08, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.22, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.14 },
+      ],
+    },
+    {
+      parameterPath: p24.variationParam(0, 0, 'power'),
+      keyframes: [
+        { frame: 0, value: 1.1 },
+        { frame: 45, value: 1.8, easing: 'easeInOut' as const },
+        { frame: 90, value: 1.1 },
+      ],
+    },
+    {
+      parameterPath: p24.variationParam(0, 1, 'sides'),
+      keyframes: [
+        { frame: 0, value: 5 },
+        { frame: 30, value: 3, easing: 'easeInOut' as const },
+        { frame: 60, value: 7, easing: 'easeInOut' as const },
+        { frame: 90, value: 5 },
+      ],
+    },
+    {
+      parameterPath: p24.variationParam(0, 1, 'circle'),
+      keyframes: [
+        { frame: 0, value: 3 },
+        { frame: 45, value: 1, easing: 'easeInOut' as const },
+        { frame: 90, value: 3 },
+      ],
+    },
+    {
+      parameterPath: p24.variationParam(1, 1, 'val'),
+      keyframes: [
+        { frame: 0, value: 5.5 },
+        { frame: 25, value: 3, easing: 'easeInOut' as const },
+        { frame: 50, value: 8, easing: 'easeInOut' as const },
+        { frame: 75, value: 4 },
+        { frame: 90, value: 5.5 },
+      ],
+    },
+    {
+      parameterPath: p24.variationParam(1, 0, 'angle'),
+      keyframes: [
+        { frame: 0, value: 0.6 },
+        { frame: 45, value: 1.2, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.6 },
+      ],
+    },
+    {
+      parameterPath: p24.variationParam(2, 0, 'powY'),
+      keyframes: [
+        { frame: 0, value: 1.3 },
+        { frame: 30, value: 0.6, easing: 'easeInOut' as const },
+        { frame: 60, value: 2.0, easing: 'easeInOut' as const },
+        { frame: 90, value: 1.3 },
+      ],
+    },
+    {
+      parameterPath: 'camera.zoom',
+      keyframes: [
+        { frame: 0, value: 1.05 },
+        { frame: 45, value: 0.7, easing: 'easeInOut' as const },
+        { frame: 90, value: 1.05 },
+      ],
+    },
+    {
+      parameterPath: 'exposure',
+      keyframes: [
+        { frame: 0, value: 0.26 },
+        { frame: 45, value: 0.45, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.26 },
+      ],
+    },
+  ],
+}
+
+const anim24b: AnimationDef = {
+  id: 'ex24-prismatic-shift',
+  name: 'Prismatic Shift',
+  description: 'Perspective depth warps the rings into 3D as probability flows shift the crystal structure',
+  exampleId: ex24,
+  tracks: [
+    {
+      parameterPath: p24.transformProbability(0),
+      keyframes: [
+        { frame: 0, value: 0.5 },
+        { frame: 30, value: 0.7 },
+        { frame: 60, value: 0.2 },
+        { frame: 90, value: 0.5 },
+      ],
+    },
+    {
+      parameterPath: p24.transformProbability(1),
+      keyframes: [
+        { frame: 0, value: 0.4 },
+        { frame: 30, value: 0.15 },
+        { frame: 60, value: 0.65 },
+        { frame: 90, value: 0.4 },
+      ],
+    },
+    {
+      parameterPath: p24.variationParam(1, 0, 'dist'),
+      keyframes: [
+        { frame: 0, value: 1.2 },
+        { frame: 30, value: 0.5, easing: 'easeInOut' as const },
+        { frame: 60, value: 2.0, easing: 'easeInOut' as const },
+        { frame: 90, value: 1.2 },
+      ],
+    },
+    {
+      parameterPath: p24.transformPostAffine(1, 'b'),
+      keyframes: [
+        { frame: 0, value: 0 },
+        { frame: 45, value: -0.3, easing: 'easeInOut' as const },
+        { frame: 90, value: 0 },
+      ],
+    },
+    {
+      parameterPath: p24.transformPostAffine(1, 'd'),
+      keyframes: [
+        { frame: 0, value: 0 },
+        { frame: 45, value: 0.3, easing: 'easeInOut' as const },
+        { frame: 90, value: 0 },
+      ],
+    },
+    {
+      parameterPath: 'vibrancy',
+      keyframes: [
+        { frame: 0, value: 0.6 },
+        { frame: 45, value: 0.95, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.6 },
+      ],
+    },
+    {
+      parameterPath: 'highlightPower',
+      keyframes: [
+        { frame: 0, value: 0.5 },
+        { frame: 30, value: 0.8, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.3 },
+        { frame: 90, value: 0.5 },
+      ],
+    },
+    {
+      parameterPath: 'skipIters',
+      keyframes: [
+        { frame: 0, value: 20 },
+        { frame: 45, value: 5, easing: 'easeInOut' as const },
+        { frame: 90, value: 20 },
+      ],
+    },
+  ],
+}
+
+// ---------------------------------------------------------------------------
+// Example 25 — Quantum Tunnel: tunnelVar+swirl, spirographVar+sinusoidal, butterflyVar+hyperbolic
+// Transform ordering (sorted): T0=tunnelVar+swirl, T1=spirographVar+sinusoidal, T2=butterflyVar+hyperbolic
+//
+//   T0: V0=tunnelVar, V1=swirl
+//   T1: V0=spirographVar, V1=sinusoidal
+//   T2: V0=butterflyVar, V1=hyperbolic
+// ---------------------------------------------------------------------------
+
+const ex25 = 'example25' as const
+
+const anim25a: AnimationDef = {
+  id: 'ex25-quantum-drift',
+  name: 'Quantum Drift',
+  description: 'Tunnel width shifts, spirograph epicycles morph through parameter space, camera drifts through the quantum corridor',
+  exampleId: ex25,
+  tracks: [
+    {
+      parameterPath: p25.variationParam(0, 0, 'Sx'),
+      keyframes: [
+        { frame: 0, value: 120 },
+        { frame: 30, value: 60, easing: 'easeInOut' as const },
+        { frame: 60, value: 200, easing: 'easeInOut' as const },
+        { frame: 90, value: 120 },
+      ],
+    },
+    {
+      parameterPath: p25.variationParam(0, 0, 'Sy'),
+      keyframes: [
+        { frame: 0, value: 40 },
+        { frame: 30, value: 80, easing: 'easeInOut' as const },
+        { frame: 60, value: 15, easing: 'easeInOut' as const },
+        { frame: 90, value: 40 },
+      ],
+    },
+    {
+      parameterPath: p25.variationParam(1, 0, 'a'),
+      keyframes: [
+        { frame: 0, value: 3.5 },
+        { frame: 30, value: 2, easing: 'easeInOut' as const },
+        { frame: 60, value: 5, easing: 'easeInOut' as const },
+        { frame: 90, value: 3.5 },
+      ],
+    },
+    {
+      parameterPath: p25.variationParam(1, 0, 'b'),
+      keyframes: [
+        { frame: 0, value: 1.8 },
+        { frame: 45, value: 3.2, easing: 'easeInOut' as const },
+        { frame: 90, value: 1.8 },
+      ],
+    },
+    {
+      parameterPath: p25.variationParam(1, 0, 'd'),
+      keyframes: [
+        { frame: 0, value: 0.3 },
+        { frame: 30, value: -0.5, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.8, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.3 },
+      ],
+    },
+    {
+      parameterPath: p25.variationParam(1, 0, 'c1'),
+      keyframes: [
+        { frame: 0, value: 0.2 },
+        { frame: 45, value: -1.5, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.2 },
+      ],
+    },
+    {
+      parameterPath: p25.variationParam(1, 0, 'c2'),
+      keyframes: [
+        { frame: 0, value: -0.15 },
+        { frame: 45, value: 1, easing: 'easeInOut' as const },
+        { frame: 90, value: -0.15 },
+      ],
+    },
+    {
+      parameterPath: 'camera.zoom',
+      keyframes: [
+        { frame: 0, value: 1.0 },
+        { frame: 40, value: 0.5, easing: 'easeIn' as const },
+        { frame: 70, value: 1.6, easing: 'easeOut' as const },
+        { frame: 90, value: 1.0 },
+      ],
+    },
+    {
+      parameterPath: 'camera.x',
+      keyframes: [
+        { frame: 0, value: 0 },
+        { frame: 45, value: -0.15, easing: 'easeInOut' as const },
+        { frame: 90, value: 0 },
+      ],
+    },
+    {
+      parameterPath: 'exposure',
+      keyframes: [
+        { frame: 0, value: 0.28 },
+        { frame: 45, value: 0.5, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.28 },
+      ],
+    },
+  ],
+}
+
+const anim25b: AnimationDef = {
+  id: 'ex25-iridescent-surge',
+  name: 'Iridescent Surge',
+  description: 'Butterfly iridescence blooms, hyperbolic curvature warps, and probability shifts cause the tunnel to surge with color',
+  exampleId: ex25,
+  tracks: [
+    {
+      parameterPath: p25.transformProbability(0),
+      keyframes: [
+        { frame: 0, value: 0.5 },
+        { frame: 25, value: 0.75 },
+        { frame: 50, value: 0.2 },
+        { frame: 75, value: 0.6 },
+        { frame: 90, value: 0.5 },
+      ],
+    },
+    {
+      parameterPath: p25.transformProbability(1),
+      keyframes: [
+        { frame: 0, value: 0.45 },
+        { frame: 25, value: 0.15 },
+        { frame: 50, value: 0.7 },
+        { frame: 75, value: 0.3 },
+        { frame: 90, value: 0.45 },
+      ],
+    },
+    {
+      parameterPath: p25.transformProbability(2),
+      keyframes: [
+        { frame: 0, value: 0.3 },
+        { frame: 45, value: 0.6, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.3 },
+      ],
+    },
+    {
+      parameterPath: p25.variationWeight(2, 0),
+      keyframes: [
+        { frame: 0, value: 0.8 },
+        { frame: 30, value: 0.3, easing: 'easeInOut' as const },
+        { frame: 60, value: 1.2, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.8 },
+      ],
+    },
+    {
+      parameterPath: p25.transformPostAffine(1, 'b'),
+      keyframes: [
+        { frame: 0, value: -0.15 },
+        { frame: 45, value: 0.3, easing: 'easeInOut' as const },
+        { frame: 90, value: -0.15 },
+      ],
+    },
+    {
+      parameterPath: 'vibrancy',
+      keyframes: [
+        { frame: 0, value: 0.7 },
+        { frame: 30, value: 0.95, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.4, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.7 },
+      ],
+    },
+    {
+      parameterPath: 'gamma',
+      keyframes: [
+        { frame: 0, value: 2.0 },
+        { frame: 45, value: 1.5, easing: 'easeInOut' as const },
+        { frame: 90, value: 2.0 },
+      ],
+    },
+    {
+      parameterPath: 'highlightPower',
+      keyframes: [
+        { frame: 0, value: 0.6 },
+        { frame: 45, value: 0.9, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.6 },
+      ],
+    },
+  ],
+}
+
+
 // ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
@@ -4407,6 +4927,12 @@ export const animationDefs: AnimationDef[] = [
   anim22a,
   anim22b,
   anim22c,
+  anim23a,
+  anim23b,
+  anim24a,
+  anim24b,
+  anim25a,
+  anim25b,
 ]
 
 /** Group animations by their example flame */

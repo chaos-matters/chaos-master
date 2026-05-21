@@ -6,7 +6,7 @@ import { defineExample, tid, vid } from './util'
  * overlay geometric mandalas while linear power distortion stretches
  * the structure into crystalline fractal forms.
  */
-export const example19 = defineExample({
+export const example24 = defineExample({
   renderSettings: {
     exposure: 0.26,
     skipIters: 20,

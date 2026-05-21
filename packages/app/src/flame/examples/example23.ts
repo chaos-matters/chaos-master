@@ -5,7 +5,7 @@ import { defineExample, tid, vid } from './util'
  * by swirl3Var logarithmic spirals. Julian fractal depth and curl distortion
  * create galactic dust lanes with rich color separation.
  */
-export const example18 = defineExample({
+export const example23 = defineExample({
   renderSettings: {
     exposure: 0.22,
     skipIters: 20,
