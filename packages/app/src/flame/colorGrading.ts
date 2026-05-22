@@ -1,8 +1,8 @@
 import { oklabToRgb } from '@typegpu/color'
+import { onCleanup } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { arrayOf, builtin, f32, i32, struct, vec2f, vec2i, vec3f, vec4f, } from 'typegpu/data'
 import { abs, add, clamp, cos, div, dot, fract, log, max, mix, mul, pow, saturate, sin, smoothstep, sub, } from 'typegpu/std'
-import { onCleanup } from 'solid-js'
 import { vramLog } from '@/utils/vramLog'
 import { Bucket, BUCKET_FIXED_POINT_MULTIPLIER_INV } from './types'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
@@ -209,7 +209,11 @@ export function createColorGradingPipeline(
     // Works regardless of gamut clipping — affects all bright pixels.
     const highlightMask = pow(saturate(value), f32(2))
     const lum = dot(rgb, vec3f(f32(0.299), f32(0.587), f32(0.114)))
-    const desaturatedRgb = mix(rgb, vec3f(lum), mul(uniforms.highlightPower, highlightMask))
+    const desaturatedRgb = mix(
+      rgb,
+      vec3f(lum),
+      mul(uniforms.highlightPower, highlightMask),
+    )
     rgb = saturate(desaturatedRgb)
 
     const flameAlpha = saturate(value) * (1 - edgeFade)
@@ -309,7 +313,11 @@ export function createColorGradingPipeline(
     // Works regardless of gamut clipping — affects all bright pixels.
     const highlightMask = pow(saturate(value), f32(2))
     const lum = dot(rgb, vec3f(f32(0.299), f32(0.587), f32(0.114)))
-    const desaturatedRgb = mix(rgb, vec3f(lum), mul(uniforms.highlightPower, highlightMask))
+    const desaturatedRgb = mix(
+      rgb,
+      vec3f(lum),
+      mul(uniforms.highlightPower, highlightMask),
+    )
     rgb = saturate(desaturatedRgb)
 
     const flameAlpha = saturate(value) * (1 - edgeFade)

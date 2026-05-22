@@ -43,19 +43,20 @@ const CANCEL = 'cancel'
 
 type RenderStatus = 'low-quality' | 'high-quality' | 'done'
 
-const { Provider: ComputeGate, useGate: useComputeGate } = createGateContext<{
-  isVisible: boolean
-  renderStatus: RenderStatus
-  isSelected: boolean
-}>('Compute', (state) =>
-  state.isSelected
-    ? 3
-    : !state.isVisible || state.renderStatus === 'done'
-      ? 0
-      : state.renderStatus === 'low-quality'
-        ? 2
-        : 1,
-)
+export const { Provider: ComputeGate, useGate: useComputeGate } =
+  createGateContext<{
+    isVisible: boolean
+    renderStatus: RenderStatus
+    isSelected: boolean
+  }>('Compute', (state) =>
+    state.isSelected
+      ? 3
+      : !state.isVisible || state.renderStatus === 'done'
+        ? 0
+        : state.renderStatus === 'low-quality'
+          ? 2
+          : 1,
+  )
 
 export function PreviewFinalFlame(props: {
   flame: FlameDescriptor
@@ -257,7 +258,8 @@ export const variationPreviewFlames: (
 
 function ShowVariationSelector(props: VariationSelectorModalProps) {
   const [version, setVersion] = createSignal(1)
-  const [previewPointInitMode, setPreviewPointInitMode] = createSignal<PointInitMode>(props.currentFlame.renderSettings.pointInitMode)
+  const [previewPointInitMode, setPreviewPointInitMode] =
+    createSignal<PointInitMode>(props.currentFlame.renderSettings.pointInitMode)
   const [searchQuery, setSearchQuery] = createSignal('')
   let searchBarTimeoutId: ReturnType<typeof setTimeout> | null = null
   const [searchBarVisible, setSearchBarVisible] = createSignal(false)
@@ -289,7 +291,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
         .includes(q)
     })
   }
-  
+
   const [selectedItemId, setSelectedItemId] = createSignal<string>()
   const [hoveredItemId, setHoveredItemId] = createSignal<string>()
   const [touchlessPreview, setTouchlessPreview] = createSignal<boolean>(true)
@@ -555,9 +557,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
           <Show when={searchBarVisible() && !searchQuery()}>
             <div class={ui.speedSearchBar}>
               <span class={ui.speedSearchLabel}>Search:</span>
-              <span class={ui.speedSearchQuery}>
-                {searchQuery() || ' '}
-              </span>
+              <span class={ui.speedSearchQuery}>{searchQuery() || ' '}</span>
             </div>
           </Show>
         </div>

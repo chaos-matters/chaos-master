@@ -132,7 +132,9 @@ function HelpModal(props: HelpModalProps) {
             classList={{
               [ui.pickerModeBtnActive!]: props.quickPickerMode === 'list',
             }}
-            onClick={() => props.onQuickPickerModeChange('list')}
+            onClick={() => {
+              props.onQuickPickerModeChange('list')
+            }}
           >
             List
           </button>
@@ -141,7 +143,9 @@ function HelpModal(props: HelpModalProps) {
             classList={{
               [ui.pickerModeBtnActive!]: props.quickPickerMode === 'gallery',
             }}
-            onClick={() => props.onQuickPickerModeChange('gallery')}
+            onClick={() => {
+              props.onQuickPickerModeChange('gallery')
+            }}
           >
             Gallery
           </button>

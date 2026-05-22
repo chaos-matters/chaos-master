@@ -51,4 +51,3 @@ export const COMPUTE_GATE_CAPACITY = parseFloat(
 
 export const CAMERA_UNDO_DEBOUNCE_MS =
   parseFloat(import.meta.env.VITE_CAMERA_UNDO_DEBOUNCE_MS) || 300
-

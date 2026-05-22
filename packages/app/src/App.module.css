@@ -93,7 +93,7 @@
     position: absolute;
     left: 0;
     right: 0;
-    top: -1px;          /* sits on top of the border */
+    top: -1px; /* sits on top of the border */
     height: 0;
     background: oklch(55% 0.12 240);
     border-radius: 0 0 2px 2px;
@@ -944,7 +944,6 @@
     transform: translateX(-50%) translateY(0);
   }
 }
-
 
 /* Tablet landscape: fluid sidebar */
 @media (max-width: 1200px) and (min-width: 769px) {

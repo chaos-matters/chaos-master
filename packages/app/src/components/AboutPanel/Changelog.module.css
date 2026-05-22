@@ -117,31 +117,45 @@
 /* Per-section accent colours */
 .sectionTitle[data-kind='added'] {
   color: oklch(76% 0.17 155);
-  .sectionDot { background: oklch(76% 0.17 155); }
+  .sectionDot {
+    background: oklch(76% 0.17 155);
+  }
 }
 .sectionTitle[data-kind='changed'] {
   color: oklch(78% 0.15 52);
-  .sectionDot { background: oklch(78% 0.15 52); }
+  .sectionDot {
+    background: oklch(78% 0.15 52);
+  }
 }
 .sectionTitle[data-kind='fixed'] {
   color: oklch(74% 0.16 260);
-  .sectionDot { background: oklch(74% 0.16 260); }
+  .sectionDot {
+    background: oklch(74% 0.16 260);
+  }
 }
 .sectionTitle[data-kind='removed'] {
   color: oklch(70% 0.18 20);
-  .sectionDot { background: oklch(70% 0.18 20); }
+  .sectionDot {
+    background: oklch(70% 0.18 20);
+  }
 }
 .sectionTitle[data-kind='deprecated'] {
   color: oklch(74% 0.15 35);
-  .sectionDot { background: oklch(74% 0.15 35); }
+  .sectionDot {
+    background: oklch(74% 0.15 35);
+  }
 }
 .sectionTitle[data-kind='security'] {
   color: oklch(72% 0.2 320);
-  .sectionDot { background: oklch(72% 0.2 320); }
+  .sectionDot {
+    background: oklch(72% 0.2 320);
+  }
 }
 .sectionTitle[data-kind='other'] {
   color: var(--neutral-400, #aaa);
-  .sectionDot { background: var(--neutral-500, #888); }
+  .sectionDot {
+    background: var(--neutral-500, #888);
+  }
 }
 
 /* ---- List ---- */

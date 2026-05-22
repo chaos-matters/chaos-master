@@ -17,13 +17,11 @@ const resolveCommitHash = (): string => {
   try {
     return execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim()
   } catch {
-
     return process.env.VITE_GIT_SHA ?? 'dev'
   }
 }
 
 const commitHash = resolveCommitHash()
-
 
 const ANALYZE_BUNDLE = Boolean(process.env.VITE_ANALYZE_BUNDLE)
 
