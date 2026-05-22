@@ -6,7 +6,7 @@ export const initExample = defineExample({
     skipIters: 1,
     drawMode: 'light',
     colorInitMode: 'colorInitPosition',
-    pointInitMode: 'pointInitTriangle',
+    pointInitMode: 'pointInitUnitDisk',
     backgroundColor: [0, 0, 0],
     camera: {
       zoom: 1,

@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, onCleanup } from 'solid-js'
 import { arrayOf, vec2u, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { useTimeline } from '@/contexts/TimelineContext'
-import { accumulatedPointCount, animationExportRunning, setAccumulatedPointCount, setRenderTimings, } from '@/flame/renderStats'
+import { accumulatedPointCount, animationExportRunning, setAccumulatedPointCountGlobal, setRenderTimings, } from '@/flame/renderStats'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
 import { applyTimelineToFlame } from '@/utils/timeline'
 import { useCamera } from '../lib/CameraContext'
@@ -478,7 +478,7 @@ export function Flam3(props: Flam3Props) {
           accumulatedPointCount_ += pointCountPerBatch * iterationCount
         }
 
-        setAccumulatedPointCount(accumulatedPointCount_)
+        setAccumulatedPointCountGlobal(accumulatedPointCount_)
         props.onAccumulatedPointCount?.(accumulatedPointCount_)
 
         if (shouldRenderFinalImage) {
