@@ -2,8 +2,47 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  width: 34rem;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+}
+
+.toggleField {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggleDisabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.75rem;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-color, #444);
+  border-radius: 4px;
+  background: var(--bg-input, #1a1a1a);
+  color: var(--text-color, #eee);
+  line-height: 1.4;
   word-break: break-all;
-  width: 30rem;
+}
+
+.copiedMsg {
+  font-size: 0.8rem;
+  color: var(--color-accent, #4caf50);
+  text-align: center;
 }
 
 .footer {

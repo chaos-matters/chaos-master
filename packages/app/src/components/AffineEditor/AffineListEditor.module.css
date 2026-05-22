@@ -1,0 +1,51 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 6px);
+  padding: var(--space-2, 6px);
+  min-height: 12rem;
+}
+
+.transformCard {
+  border: 1px solid var(--neutral-200);
+  border-radius: var(--space-2, 6px);
+  padding: var(--space-2, 6px);
+  background: var(--neutral-50);
+
+  [data-theme='dark'] & {
+    border-color: var(--neutral-800);
+    background: var(--neutral-900);
+  }
+}
+
+.transformHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.colorBadge {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.transformLabel {
+  font-family: monospace;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--accent-color, #3b82f6);
+}
+
+.coefficients {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px 8px;
+
+  label {
+    grid-column: auto;
+  }
+}

@@ -24,19 +24,19 @@ const Scry2VarParamsDefaults: Scry2VarParams = {
 const Scry2VarParamsEditor: EditorFor<Scry2VarParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'sides', 'Sides')}
+      {...editorProps(props, 'sides', 'Sides', props.dataParameterPath)}
       min={0}
       max={30}
       step={1}
     />
     <RangeEditor
-      {...editorProps(props, 'star', 'Star')}
+      {...editorProps(props, 'star', 'Star', props.dataParameterPath)}
       min={-1}
       max={1}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'circle', 'Circle')}
+      {...editorProps(props, 'circle', 'Circle', props.dataParameterPath)}
       min={-1}
       max={1}
       step={0.01}

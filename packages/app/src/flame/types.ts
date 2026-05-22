@@ -1,4 +1,4 @@
-import { atomic, i32, struct, u32, vec2f } from 'typegpu/data'
+import { atomic, f32, i32, struct, u32, vec2f } from 'typegpu/data'
 
 export const Point = struct({
   position: vec2f,
@@ -27,4 +27,8 @@ export const AtomicBucket = struct({
     a: atomic(i32),
     b: atomic(i32),
   }),
+})
+
+export const FilterParams = struct({
+  sigma: f32,
 })

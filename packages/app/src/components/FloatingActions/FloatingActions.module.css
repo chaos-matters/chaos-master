@@ -1,0 +1,138 @@
+.widget {
+  position: fixed;
+  z-index: 200;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  background: var(--neutral-50);
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  user-select: none;
+  transition: box-shadow 0.15s;
+  backdrop-filter: blur(8px);
+
+  [data-theme='dark'] & {
+    background: rgba(30, 30, 30, 0.92);
+    border-color: var(--neutral-700);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  }
+}
+
+.isDragging {
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  transition: none;
+
+  [data-theme='dark'] & {
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+  }
+}
+
+.handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  flex-shrink: 0;
+  cursor: grab;
+  color: var(--neutral-400);
+  border-right: 1px solid var(--neutral-200);
+  transition:
+    color 0.15s,
+    background 0.15s;
+
+  &:hover {
+    color: var(--neutral-600);
+    background: var(--neutral-100);
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  [data-theme='dark'] & {
+    color: var(--neutral-600);
+    border-right-color: var(--neutral-700);
+
+    &:hover {
+      color: var(--neutral-400);
+      background: rgba(255, 255, 255, 0.05);
+    }
+  }
+}
+
+.handleIcon {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+}
+
+.handleDot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.buttons {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  padding: 4px;
+  gap: 2px;
+}
+
+.button {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--neutral-500);
+  transition:
+    background 0.12s,
+    color 0.12s,
+    transform 0.1s;
+
+  & svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+  }
+
+  &:hover {
+    background: var(--neutral-100);
+    color: var(--neutral-800);
+  }
+
+  &:active {
+    transform: scale(0.92);
+  }
+
+  [data-theme='dark'] & {
+    color: var(--neutral-400);
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: white;
+    }
+  }
+}
+
+.separator {
+  width: 1px;
+  margin: 4px 2px;
+  background: var(--neutral-200);
+  flex-shrink: 0;
+
+  [data-theme='dark'] & {
+    background: var(--neutral-700);
+  }
+}

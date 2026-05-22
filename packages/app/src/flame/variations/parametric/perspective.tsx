@@ -20,9 +20,11 @@ const PerspectiveParamsDefaults: PerspectiveParams = {
 
 const PerspectiveParamsEditor: EditorFor<PerspectiveParams> = (props) => (
   <>
-    <AngleEditor {...editorProps(props, 'angle', 'Angle')} />
+    <AngleEditor
+      {...editorProps(props, 'angle', 'Angle', props.dataParameterPath)}
+    />
     <RangeEditor
-      {...editorProps(props, 'dist', 'Dist')}
+      {...editorProps(props, 'dist', 'Dist', props.dataParameterPath)}
       min={1}
       max={10}
       step={0.01}

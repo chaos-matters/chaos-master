@@ -19,7 +19,7 @@ const Swirl3VarParamsDefaults: Swirl3VarParams = {
 const Swirl3VarParamsEditor: EditorFor<Swirl3VarParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'shift', 'Shift')}
+      {...editorProps(props, 'shift', 'Shift', props.dataParameterPath)}
       min={0}
       max={25}
       step={0.01}

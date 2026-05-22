@@ -17,9 +17,12 @@ const letBrowserHandleCodes = new Set([
 ])
 
 function letBrowserHandleActiveInput(el: Element | null, ev: KeyboardEvent) {
-  if (el?.tagName !== 'INPUT') {
-    return false
+  if (!el) return false
+  // Always let the browser handle key events in text areas and selects
+  if (el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
+    return true
   }
+  if (el.tagName !== 'INPUT') return false
   const input = el as HTMLInputElement
   return (
     input.type === '' ||

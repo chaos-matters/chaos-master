@@ -11,7 +11,7 @@
 }
 
 .debug-info {
-  position: absolute;
+  position: fixed;
   color: var(--color);
   padding-inline: var(--space-2);
   padding-block: var(--space-1);
@@ -22,7 +22,7 @@
   border-bottom-left-radius: var(--space-2);
   background-color: var(--bg-color);
   cursor: pointer;
-  z-index: -1;
+  z-index: 10000;
   text-align: end;
 
   &:hover {

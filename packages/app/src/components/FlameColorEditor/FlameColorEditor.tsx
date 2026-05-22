@@ -17,7 +17,6 @@ import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'
 import { recordEntries } from '@/utils/record'
 import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
-import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import ui from './FlameColorEditor.module.css'
 import type { v2f } from 'typegpu/data'
 import type { Theme } from '@/contexts/ThemeContext'
@@ -30,10 +29,13 @@ const HANDLE_LIGHTNESS = {
 }
 
 export function handleColor(theme: Theme, color: v2f) {
-  return `oklab(${HANDLE_LIGHTNESS[theme]} ${color.x} ${color.y})`
+  const lightness = HANDLE_LIGHTNESS[theme]
+  // Use oklab() for the CSS --color variable so that relative color syntax
+  // (oklab(from var(--color) ...)) works in Slider/Checkbox CSS gradients
+  return `oklab(${lightness} ${color.x} ${color.y})`
 }
 
-function Gradient(props: { isVisible: () => boolean }) {
+function Gradient() {
   const camera = useCamera()
   const { theme } = useTheme()
   const { device, root } = useRootContext()
@@ -104,26 +106,21 @@ function Gradient(props: { isVisible: () => boolean }) {
       rafLoop.redraw()
     })
 
-    const rafLoop = createAnimationFrame(
-      () => {
-        const encoder = device.createCommandEncoder()
-        const canvasTexture = context.getCurrentTexture()
-        canvasTexture.label = 'FlameColorEditor_CanvasTexture'
-        const pass = encoder.beginRenderPass({
-          colorAttachments: [
-            {
-              view: canvasTexture.createView(),
-              loadOp: 'clear',
-              storeOp: 'store',
-            },
-          ],
-        })
-        renderPipeline.with(pass).draw(3)
-        pass.end()
-        device.queue.submit([encoder.finish()])
-      },
-      () => (props.isVisible() ? 0 : Infinity),
-    )
+    const rafLoop = createAnimationFrame(() => {
+      const encoder = device.createCommandEncoder()
+      const pass = encoder.beginRenderPass({
+        colorAttachments: [
+          {
+            view: context.getCurrentTexture().createView(),
+            loadOp: 'clear',
+            storeOp: 'store',
+          },
+        ],
+      })
+      renderPipeline.with(pass).draw(3)
+      pass.end()
+      device.queue.submit([encoder.finish()])
+    }, 0)
   })
   return null
 }
@@ -138,7 +135,10 @@ function FlameColorHandle(props: {
     js: { worldToClip, clipToWorld },
   } = useCamera()
   const changeHistory = useChangeHistory()
-  const clip = createMemo(() => worldToClip(props.color))
+  const clip = createMemo(() => {
+    const result = worldToClip(props.color)
+    return result
+  })
   const startDragging = createDragHandler((initEvent) => {
     changeHistory.startPreview('Flame color')
 
@@ -186,9 +186,6 @@ export function FlameColorEditor(props: {
   const [div, setDiv] = createSignal<HTMLDivElement>()
   const [zoom, setZoom] = createZoom(4, [2, 20])
   const [position, setPosition] = createPosition(vec2f())
-  const [isVisible, setIsVisible] = createSignal(true)
-
-  useIntersectionObserver(div, (visible) => setIsVisible(visible))
 
   const scrollTrigger = () => {
     Object.values(props.transforms).forEach((tr) => tr.color)
@@ -208,7 +205,7 @@ export function FlameColorEditor(props: {
           zoom={[zoom, setZoom]}
           position={[position, setPosition]}
         >
-          <Gradient isVisible={isVisible} />
+          <Gradient />
           <svg class={ui.svg}>
             <For each={recordEntries(props.transforms)}>
               {([tid, transform]) => (

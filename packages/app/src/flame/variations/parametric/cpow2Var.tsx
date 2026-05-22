@@ -27,25 +27,25 @@ const CPow2VarParamsDefaults: CPow2VarParams = {
 const CPow2VarParamsEditor: EditorFor<CPow2VarParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'r', 'R')}
+      {...editorProps(props, 'r', 'R', props.dataParameterPath)}
       min={0}
       max={2}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'a', 'A')}
+      {...editorProps(props, 'a', 'A', props.dataParameterPath)}
       min={-1}
       max={1}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'divisor', 'Divisor')}
+      {...editorProps(props, 'divisor', 'Divisor', props.dataParameterPath)}
       min={1}
       max={10}
       step={1}
     />
     <RangeEditor
-      {...editorProps(props, 'range', 'Range')}
+      {...editorProps(props, 'range', 'Range', props.dataParameterPath)}
       min={1}
       max={10}
       step={1}

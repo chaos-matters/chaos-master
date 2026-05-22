@@ -1,0 +1,79 @@
+.card {
+  /* CollapsibleCard is the visual container — header + content form one unit */
+}
+
+.collapsed .header {
+  /* Full border-radius on all corners when collapsed */
+  border-radius: var(--space-3);
+  border-bottom: 2px solid var(--neutral-200);
+  [data-theme='dark'] & {
+    border-bottom-color: var(--neutral-800);
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  background: var(--neutral-50);
+  border: 2px solid var(--neutral-200);
+  border-bottom: none;
+  border-radius: var(--space-3) var(--space-3) 0 0;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--neutral-500);
+  [data-theme='dark'] & {
+    background: var(--neutral-900);
+    border-color: var(--neutral-800);
+    color: var(--neutral-400);
+  }
+}
+
+.header:hover {
+  color: var(--neutral-700);
+  background: var(--neutral-100);
+  [data-theme='dark'] & {
+    color: var(--neutral-300);
+    background: var(--neutral-800);
+  }
+}
+
+.title {
+  user-select: none;
+}
+
+.chevron {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.15s ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.content {
+  border: 2px solid var(--neutral-200);
+  border-top: none;
+  border-radius: 0 0 var(--space-3) var(--space-3);
+  background: white;
+  [data-theme='dark'] & {
+    border-color: var(--neutral-800);
+    background: var(--neutral-950);
+  }
+}
+
+/* Inner card blends into our content container — suppress its top and bottom border/radius */
+.content > * {
+  border-top: none;
+  border-bottom: none;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}

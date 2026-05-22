@@ -1,5 +1,6 @@
 import ssl from '@vitejs/plugin-basic-ssl'
-import { execSync } from 'child_process'
+import { execSync } from 'node:child_process'
+import devtools from 'solid-devtools/vite'
 import typegpuPlugin from 'unplugin-typegpu/vite'
 import { defineConfig } from 'vite'
 import bundleAnalyzer from 'vite-bundle-analyzer'
@@ -14,9 +15,10 @@ const resolveCommitHash = (): string => {
     return fromEnv.slice(0, 7)
   }
   try {
-    return execSync('git rev-parse --short HEAD').toString().trim()
+    return execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim()
   } catch {
-    return 'dev'
+    // @ts-expect-error TS doesn't know about `process`
+    return process.env.VITE_GIT_SHA ?? 'dev'
   }
 }
 
@@ -30,6 +32,7 @@ export default defineConfig({
     solidPlugin(),
     solidSvg({ defaultAsComponent: true }),
     typegpuPlugin({}),
+    devtools(),
     ssl(),
     ANALYZE_BUNDLE ? bundleAnalyzer() : undefined,
   ],
@@ -39,6 +42,7 @@ export default defineConfig({
     },
   },
   define: {
+    __GIT_SHA__: JSON.stringify(commitHash),
     __COMMIT_HASH__: JSON.stringify(commitHash),
   },
   css: {
@@ -47,7 +51,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
+    port: 5173,
   },
   // necessary for github pages to work
   base: './',

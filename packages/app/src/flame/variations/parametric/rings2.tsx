@@ -18,7 +18,7 @@ const Rings2ParamsDefaults: Rings2Params = {
 const Rings2ParamsEditor: EditorFor<Rings2Params> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'val', 'Value')}
+      {...editorProps(props, 'val', 'Value', props.dataParameterPath)}
       min={1}
       max={20}
       step={0.01}

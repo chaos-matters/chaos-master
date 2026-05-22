@@ -4,6 +4,8 @@ import { clamp, sub } from 'typegpu/std'
 import { Camera2D } from '@/lib/Camera2D'
 import { useCamera } from '@/lib/CameraContext'
 import { useCanvas } from '@/lib/CanvasContext'
+import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
+import { CAMERA_UNDO_DEBOUNCE_MS } from '@/defaults'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { createPinchHandler } from '@/utils/createPinchHandler'
 import { eventToClip } from '@/utils/eventToClip'
@@ -16,6 +18,7 @@ type WheelZoomCamera2DProps = {
   zoom: Signal<number>
   position: Signal<v2f>
   eventTarget?: HTMLElement
+  interactive?: () => boolean
 }
 
 export function createPosition(initPos: v2f): Signal<v2f> {
@@ -60,13 +63,18 @@ export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
   const [zoom, setZoom] = props.zoom
   const [position, setPosition] = props.position
   const el = createMemo(() => props.eventTarget ?? canvas)
+  const changeHistory = useChangeHistory()
 
   let clipToWorld: (clip: v2f) => v2f | undefined
+  let wheelDebounceTimer: ReturnType<typeof setTimeout> | undefined
 
   const startPanning = createDragHandler((initEvent) => {
     const grabPosition = clipToWorld(eventToClip(initEvent, el()))
     if (!grabPosition) {
       return
+    }
+    if (!changeHistory.isPreviewing()) {
+      changeHistory.startPreview('Camera pan')
     }
     return {
       onPointerMove(event) {
@@ -75,6 +83,11 @@ export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
           return
         }
         setPosition((p) => sub(p, sub(pos, grabPosition)))
+      },
+      onDone() {
+        if (changeHistory.isPreviewing()) {
+          changeHistory.commit()
+        }
       },
     }
   })
@@ -101,7 +114,14 @@ export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
     if (!world) {
       return
     }
+    if (!changeHistory.isPreviewing()) {
+      changeHistory.startPreview('Camera zoom')
+    }
     zoomKeepPointInPlace(world, 1 - ev.deltaY * SCROLL_SENSITIVITY)
+    clearTimeout(wheelDebounceTimer)
+    wheelDebounceTimer = setTimeout(() => {
+      changeHistory.commit()
+    }, CAMERA_UNDO_DEBOUNCE_MS)
   }
 
   const startPinch = createPinchHandler((initEvent) => {
@@ -110,6 +130,9 @@ export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
       return
     }
     let prevDistance = initEvent.distance
+    if (!changeHistory.isPreviewing()) {
+      changeHistory.startPreview('Camera pinch')
+    }
     return {
       onPinchMove(event) {
         const pinchRatio = event.distance / prevDistance
@@ -121,11 +144,19 @@ export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
         zoomKeepPointInPlace(world, pinchRatio)
         prevDistance = event.distance
       },
+      onDone() {
+        if (changeHistory.isPreviewing()) {
+          changeHistory.commit()
+        }
+      },
     }
   })
 
   createEffect(() => {
     const eventTarget = el()
+    if (props.interactive?.() === false) {
+      return
+    }
     eventTarget.addEventListener('pointerdown', startPanning)
     eventTarget.addEventListener('touchmove', startPinch, { passive: false })
     eventTarget.addEventListener('wheel', onWheel, { passive: false })
@@ -133,6 +164,7 @@ export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
       eventTarget.removeEventListener('pointerdown', startPanning)
       eventTarget.removeEventListener('touchmove', startPinch)
       eventTarget.removeEventListener('wheel', onWheel)
+      clearTimeout(wheelDebounceTimer)
     })
   })
 

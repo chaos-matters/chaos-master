@@ -1,0 +1,532 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  background: var(--neutral-50, #fafafa);
+  border-radius: 8px 8px 0 0;
+  border: 1px solid var(--neutral-200, #e5e7eb);
+  border-bottom: none;
+  overflow: hidden;
+  touch-action: manipulation;
+
+  [data-theme='dark'] & {
+    background: var(--neutral-900, #111827);
+    border-color: var(--neutral-800, #1f2937);
+  }
+}
+
+/* ── Zoom toolbar ── */
+.zoomToolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  background: var(--neutral-50, #fafafa);
+  border-bottom: 1px solid var(--neutral-150, #e8e8e8);
+  flex-shrink: 0;
+  height: 22px;
+
+  [data-theme='dark'] & {
+    background: var(--neutral-875, #151a24);
+    border-bottom-color: var(--neutral-750, #2a3040);
+  }
+}
+
+.zoomBtn {
+  padding: 1px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  border: 1px solid var(--neutral-300, #d1d5db);
+  border-radius: 4px;
+  background: white;
+  color: var(--neutral-600, #4b5563);
+  cursor: pointer;
+  transition: all 0.1s;
+
+  [data-theme='dark'] & {
+    background: var(--neutral-800, #1f2937);
+    border-color: var(--neutral-600, #4b5563);
+    color: var(--neutral-300, #d1d5db);
+  }
+
+  &:hover {
+    background: var(--accent-color, #3b82f6);
+    border-color: var(--accent-color, #3b82f6);
+    color: white;
+  }
+}
+
+.zoomLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--neutral-500, #6b7280);
+  font-variant-numeric: tabular-nums;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-400, #9ca3af);
+  }
+}
+
+.zoomHint {
+  font-size: 9px;
+  color: var(--neutral-350, #b0b5bd);
+  margin-left: 2px;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500, #6b7280);
+  }
+}
+
+.frameIndicator {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--neutral-700, #374151);
+  background: var(--neutral-200, #e5e7eb);
+  padding: 1px 8px;
+  border-radius: 3px;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-200, #e5e7eb);
+    background: var(--neutral-700, #374151);
+  }
+}
+
+/* ── Seek ruler (top scrub area) ── */
+.seekRuler {
+  position: relative;
+  height: 22px;
+  background: var(--neutral-100, #f5f5f5);
+  border-bottom: 1px solid var(--neutral-200, #e5e7eb);
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+  /* Allow horizontal scroll but disable vertical pinch (handled by JS) */
+  touch-action: pan-x;
+
+  [data-theme='dark'] & {
+    background: var(--neutral-850, #1a1f2e);
+    border-bottom-color: var(--neutral-700, #374151);
+  }
+
+  &:hover {
+    background: var(--neutral-150, #eee);
+
+    [data-theme='dark'] & {
+      background: var(--neutral-800, #1f2937);
+    }
+  }
+}
+
+.seekRulerLane {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+}
+
+.seekLabel {
+  position: absolute;
+  top: 3px;
+  transform: translateX(-50%);
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--neutral-400, #9ca3af);
+  pointer-events: none;
+  letter-spacing: 0.02em;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500, #6b7280);
+  }
+}
+
+.seekPlayhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.seekPlayheadHead {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 8px solid var(--accent-color, #3b82f6);
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.2));
+}
+
+.seekPlayheadLine {
+  position: absolute;
+  top: 8px;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1.5px;
+  background: var(--accent-color, #3b82f6);
+  opacity: 0.6;
+}
+
+/* ── Tracks scroll area ── */
+.tracksScroll {
+  position: relative;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  min-height: 52px;
+  /* Allow both directions of scrolling + pointer events for keyframes */
+  touch-action: pan-y pan-x;
+}
+
+/* ── Track row ── */
+.trackRow {
+  display: flex;
+  border-bottom: 1px solid var(--neutral-100, #f3f4f6);
+  align-items: stretch;
+  transition: background 0.1s;
+
+  [data-theme='dark'] & {
+    border-bottom-color: var(--neutral-850, #1a1f2e);
+  }
+
+  &:nth-child(even) {
+    background: var(--neutral-50, #fafafa);
+
+    [data-theme='dark'] & {
+      background: var(--neutral-875, #151a24);
+    }
+  }
+
+  &:hover {
+    background: var(--neutral-100, #f0f0f0);
+
+    [data-theme='dark'] & {
+      background: var(--neutral-825, #1c2333);
+    }
+  }
+}
+
+.trackName {
+  width: 130px;
+  flex-shrink: 0;
+  padding: 1px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--neutral-500, #6b7280);
+  border-right: 1px solid var(--neutral-200, #e5e7eb);
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-450, #8590a0);
+    border-right-color: var(--neutral-750, #2a3040);
+  }
+}
+
+.lane {
+  position: relative;
+  flex: 1;
+  min-width: 100%;
+  cursor: pointer;
+}
+
+/* ── Empty state ── */
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 52px;
+  font-size: 11px;
+  color: var(--neutral-400, #9ca3af);
+  font-style: italic;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500, #6b7280);
+  }
+
+  kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    margin: 0 2px;
+    border: 1px solid var(--neutral-300, #d1d5db);
+    border-radius: 3px;
+    font-family: inherit;
+    font-size: 10px;
+    font-style: normal;
+    background: var(--neutral-50, #f9fafb);
+
+    [data-theme='dark'] & {
+      background: var(--neutral-800, #1f2937);
+      border-color: var(--neutral-600, #4b5563);
+    }
+  }
+}
+
+/* ── Keyframe diamond ── */
+.keyframeDot {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  /* Expand touch target to 36px while keeping visual size at 14px */
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -11px;
+  }
+}
+
+.keyframeDot svg {
+  width: 9px;
+  height: 9px;
+}
+
+.keyframeDot svg path {
+  fill: #eab308;
+  stroke: #ca8a04;
+  stroke-width: 0.6;
+  transition: fill 0.1s;
+}
+
+.keyframeDot:hover svg path {
+  fill: #facc15;
+  stroke: #a16207;
+}
+
+.selectedDot svg path {
+  fill: #60a5fa !important;
+  stroke: #2563eb !important;
+  stroke-width: 0.8 !important;
+}
+
+.atCurrentFrame svg {
+  transform: scale(1.25);
+}
+
+/* ── Track playhead (red line) ── */
+.playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #ef4444;
+  z-index: 5;
+  pointer-events: none;
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.3);
+}
+
+/* ── Inspector ── */
+.inspector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 10px;
+  border-top: 1px solid var(--neutral-200, #e5e7eb);
+  background: var(--neutral-50, #f9fafb);
+  font-size: 11px;
+  flex-shrink: 0;
+  min-height: 32px;
+
+  [data-theme='dark'] & {
+    border-top-color: var(--neutral-750, #2a3040);
+    background: var(--neutral-875, #151a24);
+  }
+}
+
+.inspectorLabel {
+  color: var(--neutral-600, #4b5563);
+  font-weight: 600;
+  font-size: 11px;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-300, #d1d5db);
+  }
+}
+
+.inspectorValue {
+  color: var(--neutral-700, #374151);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  background: var(--neutral-100, #f3f4f6);
+  padding: 2px 6px;
+  border-radius: 3px;
+  cursor: ew-resize;
+  user-select: none;
+  transition: background 0.1s;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-200, #e5e7eb);
+    background: var(--neutral-800, #1f2937);
+  }
+
+  &:hover {
+    background: var(--neutral-200, #e5e7eb);
+
+    [data-theme='dark'] & {
+      background: var(--neutral-700, #374151);
+    }
+  }
+}
+
+.inspectorValueInput {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  width: 56px;
+  padding: 2px 4px;
+  border: 1px solid var(--accent-color, #3b82f6);
+  border-radius: 3px;
+  background: var(--neutral-50, #f9fafb);
+  color: var(--neutral-900, #111827);
+  outline: none;
+  text-align: right;
+
+  [data-theme='dark'] & {
+    background: var(--neutral-800, #1f2937);
+    color: var(--neutral-100, #f3f4f6);
+  }
+}
+
+.inspectorValueReadonly {
+  color: var(--neutral-500, #6b7280);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 11px;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-400, #9ca3af);
+  }
+}
+
+.inspectorEasing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--neutral-600, #4b5563);
+  font-size: 11px;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-400, #9ca3af);
+  }
+
+  select {
+    font-size: 10px;
+    padding: 2px 5px;
+    border: 1px solid var(--neutral-300, #d1d5db);
+    border-radius: 4px;
+    background: white;
+    color: var(--neutral-700, #374151);
+    cursor: pointer;
+
+    [data-theme='dark'] & {
+      background: var(--neutral-800, #1f2937);
+      border-color: var(--neutral-600, #4b5563);
+      color: var(--neutral-300, #d1d5db);
+    }
+  }
+}
+
+.inspectorDelete {
+  margin-left: auto;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  border: 1px solid #ef4444;
+  border-radius: 4px;
+  background: transparent;
+  color: #ef4444;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: #ef4444;
+    color: white;
+  }
+}
+
+/* ── Mobile responsive ── */
+@media (max-width: 768px) {
+  .seekRuler {
+    height: 36px;
+    /* Taller touch target for scrubbing on mobile */
+  }
+
+  .seekLabel {
+    font-size: 10px;
+    top: 4px;
+  }
+
+  .zoomToolbar {
+    height: 32px;
+    padding: 2px 10px;
+  }
+
+  .zoomBtn {
+    padding: 4px 10px;
+    font-size: 11px;
+    min-height: 28px;
+    min-width: 36px;
+  }
+
+  .trackName {
+    width: 100px;
+    font-size: 9px;
+  }
+
+  .inspector {
+    padding: 6px 10px;
+    min-height: 40px;
+  }
+
+  .inspectorDelete {
+    padding: 6px 12px;
+    min-height: 32px;
+    min-width: 36px;
+  }
+}
+
+@media (max-width: 480px) {
+  .seekRuler {
+    height: 32px;
+  }
+
+  .zoomToolbar {
+    height: 28px;
+    padding: 2px 6px;
+    gap: 4px;
+  }
+
+  .zoomBtn {
+    padding: 3px 8px;
+    font-size: 10px;
+    min-height: 24px;
+  }
+
+  .trackName {
+    width: 80px;
+    font-size: 8px;
+  }
+
+  .seekLabel {
+    font-size: 9px;
+  }
+}

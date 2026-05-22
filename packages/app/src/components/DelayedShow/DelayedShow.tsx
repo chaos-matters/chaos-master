@@ -1,4 +1,4 @@
-import { createEffect, createSignal, Show } from 'solid-js'
+import { createEffect, createSignal, onCleanup, Show } from 'solid-js'
 import type { JSX, ParentProps } from 'solid-js'
 
 type DelayedShowProps = {
@@ -12,9 +12,12 @@ type DelayedShowProps = {
 export function DelayedShow(props: ParentProps<DelayedShowProps>) {
   const [show, setShow] = createSignal(false)
   createEffect(() => {
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       setShow(true)
     }, props.delayMs)
+    onCleanup(() => {
+      clearTimeout(timeoutId)
+    })
   })
   return (
     <Show when={show()} fallback={props.fallback}>

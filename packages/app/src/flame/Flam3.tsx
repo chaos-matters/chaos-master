@@ -1,22 +1,26 @@
-import { createEffect, createMemo, createSignal, onCleanup, untrack, } from 'solid-js'
+import { createEffect, createMemo, createSignal, onCleanup } from 'solid-js'
 import { arrayOf, vec2u, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
-import { setAccumulatedPointCountGlobal, setRenderTimings, } from '@/flame/renderStats'
+import { useTimeline } from '@/contexts/TimelineContext'
+import { accumulatedPointCount, animationExportRunning, setAccumulatedPointCount, setRenderTimings, } from '@/flame/renderStats'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
-import { vramLog } from '@/utils/vramLog'
+import { applyTimelineToFlame } from '@/utils/timeline'
 import { useCamera } from '../lib/CameraContext'
 import { useCanvas } from '../lib/CanvasContext'
 import { useRootContext } from '../lib/RootContext'
 import { createAnimationFrame } from '../utils/createAnimationFrame'
-import { createBlurPipeline } from './blurPipeline'
+import { createAdaptiveBlurPipeline } from './adaptiveBlurPipeline'
 import { ColorGradingUniforms, createColorGradingPipeline, } from './colorGrading'
+import { createDensityEstimationPipeline } from './densityEstimationPipeline'
 import { drawModeToImplFn } from './drawMode'
 import { createIFSPipeline } from './ifsPipeline'
 import { backgroundColorDefault, backgroundColorDefaultWhite, } from './schema/flameSchema'
-import { Bucket } from './types'
+import { Bucket, BUCKET_FIXED_POINT_MULTIPLIER, FilterParams } from './types'
 import type { v4f } from 'typegpu/data'
+import type { Palette } from './colorMap'
 import type { FlameDescriptor } from './schema/flameSchema'
 import type { ExportImageType } from '@/App'
+import type { FlameDescriptor as TimelineFlameDescriptor } from '@/utils/timeline'
 
 const { sqrt, floor } = Math
 
@@ -24,26 +28,31 @@ const OUTPUT_EVERY_FRAME_BATCH_INDEX = 20
 const OUTPUT_INTERVAL_BATCH_INDEX = 10
 
 type Flam3Props = {
-  run: boolean
   quality: number
   pointCountPerBatch: number
   renderInterval: number
   adaptiveFilterEnabled: boolean
+  animationEnabled: boolean
   flameDescriptor: FlameDescriptor
   edgeFadeColor: v4f
-  trackPerformance?: boolean
-  exportImage?: ExportImageType
+  onExportImage?: ExportImageType
   setCurrentQuality?: (fn: () => number) => void
   setQualityPointCountLimit?: (fn: () => number) => void
-  setIsDone?: (done: boolean) => void
+  palette?: () => Palette | undefined
+  outputAlpha?: boolean
+  onAccumulatedPointCount?: (count: number) => void
 }
 
 export function Flam3(props: Flam3Props) {
-  const exportedImages = new WeakSet()
   const camera = useCamera()
   const { root, device } = useRootContext()
   const { context, canvasSize, canvas, canvasFormat } = useCanvas()
-  const [accumulatedPointCount, setAccumulatedPointCount] = createSignal(0)
+  const timeline = useTimeline()
+
+  const [animatedFlame, setAnimatedFlame] =
+    createSignal<TimelineFlameDescriptor>(
+      JSON.parse(JSON.stringify(props.flameDescriptor)),
+    )
 
   const backgroundColorFinal = () => {
     if (props.flameDescriptor.renderSettings.backgroundColor === undefined) {
@@ -55,14 +64,29 @@ export function Flam3(props: Flam3Props) {
   }
 
   const bucketProbabilityInv = () => {
-    const { height } = canvasSize()
+    const size = canvasSize()
+    const height = size.height
     const unitSquareArea = (height ** 2 * camera.zoom() ** 2) / 4
     return unitSquareArea
   }
 
+  /** u32-safe point cap: prevents per-bucket atomic overflow at high quality */
+  const safeQualityCap = () => {
+    const size = canvasSize()
+    const totalBuckets = size.width * size.height
+    const MAX_U32 = 0xffffffff
+    const maxPointsPerBucket = Math.floor(
+      MAX_U32 / BUCKET_FIXED_POINT_MULTIPLIER,
+    )
+    // Conservative concentration factor — hottest buckets may be 25x above average
+    const concentrationFactor = 25
+    return Math.floor((maxPointsPerBucket * totalBuckets) / concentrationFactor)
+  }
+
   const qualityPointCountLimit = () => {
     const q = props.quality
-    return bucketProbabilityInv() / (q ** 2 - 2 * q + 1)
+    const rawLimit = bucketProbabilityInv() / (q ** 2 - 2 * q + 1)
+    return Math.min(rawLimit, safeQualityCap())
   }
 
   props.setCurrentQuality?.(
@@ -73,19 +97,6 @@ export function Flam3(props: Flam3Props) {
   const pointRandomSeeds = root
     .createBuffer(arrayOf(vec2u, props.pointCountPerBatch))
     .$usage('storage')
-  vramLog('[Flam3] Created pointRandomSeeds buffer')
-
-  // NOTE: destroy() is called synchronously here, without a requestAnimationFrame wrapper.
-  // WebGPU spec §5.1.4 allows destroying a buffer that is still referenced by pending GPU
-  // commands — the driver handles it safely. The previous rAF wrapper caused a race: when
-  // the variation selector modal was closed and quickly reopened, new buffers were allocated
-  // before the rAF callbacks from the previous session fired. This left both old and new
-  // buffers alive simultaneously, doubling peak GPU memory usage and triggering OOM on
-  // Firefox/GFX1201 whose wgpu/Vulkan memory budget is already constrained.
-  onCleanup(() => {
-    vramLog('[Flam3] Destroying pointRandomSeeds buffer')
-    pointRandomSeeds.destroy()
-  })
 
   const colorGradingUniforms = root
     .createBuffer(ColorGradingUniforms, {
@@ -93,16 +104,16 @@ export function Flam3(props: Flam3Props) {
       exposure: 1,
       backgroundColor: vec4f(0, 0, 0, 0),
       edgeFadeColor: vec4f(0, 0, 0, 0.8),
+      vibrancy: 0.5,
+      palettePhase: 0,
+      paletteSpeed: 0.5,
+      paletteEntryCount: 0,
+      contrast: 1,
+      gamma: 2.2,
+      highlightPower: 0.5,
+      outputAlpha: 0,
     })
     .$usage('uniform')
-  vramLog('[Flam3] Created colorGradingUniforms buffer')
-
-  // NOTE: synchronous destroy — see note above on pointRandomSeeds for the rationale.
-  // rAF-delayed cleanup is never safe when a component can be remounted rapidly.
-  onCleanup(() => {
-    vramLog('[Flam3] Destroying colorGradingUniforms buffer')
-    colorGradingUniforms.destroy()
-  })
 
   const outputTextures = createMemo(() => {
     const { width, height } = canvasSize()
@@ -117,26 +128,21 @@ export function Flam3(props: Flam3Props) {
     const postprocessBuffer = root
       .createBuffer(arrayOf(Bucket, width * height))
       .$usage('storage')
-    vramLog(
-      `[Flam3] Created accumulationBuffer & postprocessBuffer (${width}x${height})`,
-    )
 
-    // NOTE: synchronous destroy — see note above on pointRandomSeeds for the rationale.
-    // These are the largest buffers (width × height × 12 bytes each at full canvas resolution).
-    // The rAF delay here was especially harmful: canvasSize() changes also trigger this memo
-    // to re-run, and the delayed cleanup meant old large buffers overlapped with new ones on
-    // every resize event, not just on modal reopen.
+    const filterParamsBuffer = root
+      .createBuffer(arrayOf(FilterParams, width * height))
+      .$usage('storage')
+
     onCleanup(() => {
-      vramLog(
-        `[Flam3] Destroying accumulationBuffer & postprocessBuffer (${width}x${height})`,
-      )
       accumulationBuffer.destroy()
       postprocessBuffer.destroy()
+      filterParamsBuffer.destroy()
     })
 
     return {
       accumulationBuffer,
       postprocessBuffer,
+      filterParamsBuffer,
       textureSize: [width, height] as const,
     }
   })
@@ -147,47 +153,171 @@ export function Flam3(props: Flam3Props) {
       return undefined
     }
     const { textureSize, postprocessBuffer, accumulationBuffer } = o
+    const typedPostprocessBuffer = postprocessBuffer
+    const typedAccumulationBuffer = accumulationBuffer
     return createColorGradingPipeline(
       root,
       colorGradingUniforms,
       textureSize,
-      props.adaptiveFilterEnabled ? postprocessBuffer : accumulationBuffer,
+      props.adaptiveFilterEnabled
+        ? typedPostprocessBuffer
+        : typedAccumulationBuffer,
       canvasFormat,
       drawModeToImplFn[props.flameDescriptor.renderSettings.drawMode],
+      props.palette?.(),
+      animatedFlame().renderSettings.paletteMode ?? 0,
     )
   })
 
-  const runBlur = createMemo(() => {
+  const runAdaptiveFilter = createMemo(() => {
     const o = outputTextures()
     if (!o) {
       return undefined
     }
-    const { textureSize, accumulationBuffer, postprocessBuffer } = o
-    return createBlurPipeline(
-      root,
+    const {
       textureSize,
       accumulationBuffer,
       postprocessBuffer,
+      filterParamsBuffer,
+    } = o
+    const storedQuality =
+      animatedFlame().renderSettings.densityEstimationQuality ?? 5
+    // Map 0-1 quality slider (1=best) to qualityK (0.5=best, 20=worst).
+    // Values > 1 are old-format direct qualityK for backward compatibility.
+    const qualityK =
+      storedQuality > 1 ? storedQuality : 0.5 + (1 - storedQuality) * 19.5
+    const densityPipeline = createDensityEstimationPipeline(
+      root,
+      textureSize,
+      accumulationBuffer,
+      filterParamsBuffer,
+      qualityK,
     )
+    const blurPipeline = createAdaptiveBlurPipeline(
+      root,
+      textureSize,
+      accumulationBuffer,
+      filterParamsBuffer,
+      postprocessBuffer,
+    )
+    return {
+      run: (pass: GPUComputePassEncoder) => {
+        densityPipeline.run(pass)
+        blurPipeline.run(pass)
+      },
+    }
   })
 
   const continueRendering = (accumulatedPointCount: number) => {
     return accumulatedPointCount <= qualityPointCountLimit()
   }
 
-  const timestampQuery =
-    props.trackPerformance === true
-      ? createTimestampQuery(device, [
-          'ifsMs',
-          'adaptiveFilterMs',
-          'colorGradingMs',
-        ])
-      : undefined
+  const timestampQuery = createTimestampQuery(device, [
+    'ifsMs',
+    'adaptiveFilterMs',
+    'colorGradingMs',
+  ])
+
+  // Reads from animatedFlame() (not props.flameDescriptor) to ensure the
+  // fingerprint only changes AFTER the clone effect has updated animatedFlame.
+  // Also returns the flame snapshot so the pipeline creation uses the exact same
+  // value — re-reading untrack(animatedFlame) separately can return a different
+  // flame when outputTextures() memo re-evaluation causes nested effect flushes.
+  const parameterFingerprint = createMemo(() => {
+    const flame = animatedFlame()
+    const fp = JSON.stringify({
+      transforms: flame.transforms,
+      colorInitMode: flame.renderSettings.colorInitMode,
+      pointInitMode: flame.renderSettings.pointInitMode,
+      skipIters: flame.renderSettings.skipIters,
+    })
+    return { fingerprint: fp, flame }
+  })
+
+  // Clone flame descriptor and apply timeline keyframes.
+  // Explicitly read renderSettings and transforms sub-properties so SolidJS
+  // tracks them reliably. JSON.stringify on a store proxy may miss deep paths.
+  let cloneRunCount = 0
+  createEffect(() => {
+    const rs = props.flameDescriptor.renderSettings
+    const _rs = {
+      exposure: rs.exposure,
+      vibrancy: rs.vibrancy,
+      palettePhase: rs.palettePhase,
+      paletteSpeed: rs.paletteSpeed,
+      contrast: rs.contrast,
+      gamma: rs.gamma,
+      highlightPower: rs.highlightPower,
+      skipIters: rs.skipIters,
+      drawMode: rs.drawMode,
+      colorInitMode: rs.colorInitMode,
+      pointInitMode: rs.pointInitMode,
+      backgroundColor: rs.backgroundColor,
+      camera: rs.camera,
+    }
+    const _tids = Object.keys(props.flameDescriptor.transforms)
+    const flame = JSON.parse(JSON.stringify(props.flameDescriptor))
+    const enabled = props.animationEnabled
+    const hasTracks = timeline ? timeline.tracks().length : 0
+    // Read currentFrame in the reactive scope so scrubbing triggers re-run.
+    const frame = timeline?.currentFrame() ?? 0
+    if (timeline && enabled && hasTracks > 0) {
+      applyTimelineToFlame(timeline, flame)
+      cloneRunCount++
+      if (cloneRunCount <= 3 || cloneRunCount % 90 === 0) {
+        console.info(
+          `[flam3-clone] run #${cloneRunCount}`,
+          `frame=${frame}`,
+          `tracks=${hasTracks}`,
+          `enabled=${enabled}`,
+          `exposure=${_rs.exposure}`,
+        )
+      }
+    } else {
+      cloneRunCount++
+      if (cloneRunCount <= 3) {
+        console.info(
+          `[flam3-clone] run #${cloneRunCount}`,
+          '(no timeline apply)',
+          `enabled=${enabled}`,
+          `hasTracks=${hasTracks}`,
+          `exposure=${_rs.exposure}`,
+        )
+      }
+    }
+    setAnimatedFlame(flame)
+  })
+
+  /**
+   * Timeline animation playback loop.
+   * When isPlaying is true, advances the frame at the configured FPS rate.
+   */
+  createEffect(() => {
+    if (!timeline || !timeline.isPlaying()) {
+      console.info('[flam3-playback] stopped (isPlaying=false)')
+      return
+    }
+
+    const cfg = timeline.config()
+    const intervalMs = 1000 / cfg.fps
+    console.info(
+      `[flam3-playback] starting interval: fps=${cfg.fps} intervalMs=${
+        intervalMs
+      } tracks=${timeline.tracks().length}`,
+    )
+    const intervalId = window.setInterval(() => {
+      for (let i = 0; i < cfg.timeScale; i++) {
+        timeline.advanceFrame()
+      }
+    }, intervalMs)
+
+    onCleanup(() => {
+      clearInterval(intervalId)
+    })
+  })
 
   function estimateIterationCount(
-    timings: NonNullable<
-      Readonly<Record<'ifsMs' | 'adaptiveFilterMs' | 'colorGradingMs', number>>
-    >,
+    timings: NonNullable<ReturnType<typeof timestampQuery.average>>,
     shouldRenderFinalImage: boolean,
   ) {
     const { ifsMs, adaptiveFilterMs, colorGradingMs } = timings
@@ -201,108 +331,109 @@ export function Flam3(props: Flam3Props) {
     return clamp(floor((frameBudgetMs - paintTimeMs) / ifsMs), 1, 100)
   }
 
-  const pipelineSignature = createMemo(() => {
-    const flame = props.flameDescriptor
-    return JSON.stringify({
-      skipIters: flame.renderSettings.skipIters,
-      colorInitMode: flame.renderSettings.colorInitMode,
-      pointInitMode: flame.renderSettings.pointInitMode,
-      transforms: Object.entries(flame.transforms).map(([tid, tr]) => ({
-        tid,
-        variations: Object.entries(tr.variations).map(([vid, v]) => ({
-          vid,
-          type: v.type,
-        })),
-      })),
-    })
-  })
-
+  // Main render loop — follows the main branch pattern with plain `let` variables
+  // inside an outer effect, using rafLoop.redraw() for reactive triggers.
   createEffect(() => {
-    // don't even compile if its not allowed to run
-    const run = untrack(() => props.run)
-    if (!run) {
-      // track when false so when it changes to true, it starts compilation
-      const _ = props.run
-      return
-    }
+    const fpResult = parameterFingerprint()
     const o = outputTextures()
-    if (!o) {
+    if (!o || !fpResult) {
       return undefined
     }
 
     const { textureSize, accumulationBuffer } = o
-
-    pipelineSignature() // track structural changes
+    const { fingerprint: _fingerprint, flame } = fpResult
+    const typedAccumulationBuffer = accumulationBuffer
 
     const ifsPipeline = createIFSPipeline(
       root,
       camera,
-      untrack(() => props.flameDescriptor.renderSettings.skipIters),
+      flame.renderSettings.skipIters,
       pointRandomSeeds,
-      untrack(() => props.flameDescriptor.transforms),
+      flame.transforms as never,
       textureSize,
-      accumulationBuffer,
-      untrack(() => props.flameDescriptor.renderSettings.colorInitMode),
-      untrack(() => props.flameDescriptor.renderSettings.pointInitMode),
+      typedAccumulationBuffer,
+      flame.renderSettings.colorInitMode,
+      flame.renderSettings.pointInitMode,
     )
 
-    setAccumulatedPointCount(0)
     let batchIndex = 0
+    let accumulatedPointCount_ = 0
     let forceDrawToScreen = false
     let clearRequested = true
-    createEffect(() => {
-      ifsPipeline.update(props.flameDescriptor)
 
-      // this is in a separate effect because we don't
-      // want to run ifs.update if not necessary
-      createEffect(() => {
-        camera.update()
-        batchIndex = 0
-        setAccumulatedPointCount(0)
-        clearRequested = true
-        rafLoop.redraw()
-      })
+    // Update IFS pipeline uniforms when animatedFlame changes.
+    createEffect(() => {
+      const flame = animatedFlame()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ifsPipeline.update(flame as any)
     })
 
+    // Reset accumulation on structural parameter changes.
+    createEffect(() => {
+      parameterFingerprint()
+      if (!animationExportRunning()) resetAccumulation()
+    })
+
+    // Reset accumulation on animation frame change during playback or scrubbing.
+    // Without this, IFS points from different frames accumulate together.
+    createEffect(() => {
+      if (
+        !timeline ||
+        (!timeline.isPlaying() && !timeline.isScrubbing()) ||
+        animationExportRunning()
+      )
+        return
+      timeline.currentFrame()
+      resetAccumulation()
+    })
+
+    // Reset accumulation on camera pan/zoom.
+    createEffect(() => {
+      camera.update()
+      if (!animationExportRunning()) resetAccumulation()
+    })
+
+    function resetAccumulation() {
+      batchIndex = 0
+      accumulatedPointCount_ = 0
+      clearRequested = true
+      rafLoop.redraw()
+    }
+
+    // Update color grading uniforms.
     createEffect(() => {
       colorGradingUniforms.writePartial({
-        exposure: 2 * Math.exp(props.flameDescriptor.renderSettings.exposure),
-        edgeFadeColor: props.exportImage ? vec4f(0) : props.edgeFadeColor,
+        exposure: 2 * Math.exp(animatedFlame().renderSettings.exposure),
+        edgeFadeColor: props.onExportImage ? vec4f(0) : props.edgeFadeColor,
         backgroundColor: vec4f(backgroundColorFinal(), 1),
+        vibrancy: animatedFlame().renderSettings.vibrancy,
+        palettePhase: animatedFlame().renderSettings.palettePhase,
+        paletteSpeed: animatedFlame().renderSettings.paletteSpeed,
+        paletteEntryCount: props.palette?.()?.entries.length ?? 0,
+        contrast: animatedFlame().renderSettings.contrast ?? 1,
+        gamma: animatedFlame().renderSettings.gamma ?? 2.2,
+        highlightPower: animatedFlame().renderSettings.highlightPower ?? 0.5,
+        outputAlpha: props.outputAlpha ? 1 : 0,
       })
       rafLoop.redraw()
       forceDrawToScreen = true
     })
 
+    // Redraw when color grading pipeline or palette changes.
     createEffect(() => {
-      // redraw when these change
       const _ = colorGradingPipeline()
+      void props.palette?.()
       rafLoop.redraw()
       forceDrawToScreen = true
     })
 
     const rafLoop = createAnimationFrame(
       (frameId) => {
-        const exportImage =
-          props.exportImage && !exportedImages.has(props.exportImage)
-            ? props.exportImage
-            : undefined
-        if (!props.run && !exportImage) {
-          return
-        }
-
-        /**
-         * Rendering to screen is expensive because it involves
-         * blurring and color grading. We only want to do this
-         * in the beginning while the image is still forming.
-         * Later on, we can trade off rendering to screen for
-         * convergence speed.
-         */
         const shouldRenderFinalImage =
           forceDrawToScreen ||
           batchIndex < OUTPUT_EVERY_FRAME_BATCH_INDEX ||
           batchIndex % OUTPUT_INTERVAL_BATCH_INDEX === 0 ||
-          exportImage !== undefined
+          props.onExportImage !== undefined
 
         const pointCountPerBatch = props.pointCountPerBatch
         const colorGradingPipeline_ = colorGradingPipeline()
@@ -317,11 +448,11 @@ export function Flam3(props: Flam3Props) {
           encoder.clearBuffer(accumulationBuffer.buffer)
         }
 
-        const timings = timestampQuery?.average()
-        const iterationCount = continueRendering(accumulatedPointCount())
+        const timings = timestampQuery.average()
+        const iterationCount = continueRendering(accumulatedPointCount_)
           ? timings
             ? estimateIterationCount(timings, shouldRenderFinalImage)
-            : 10
+            : 1
           : 0
 
         if (timings) {
@@ -333,47 +464,47 @@ export function Flam3(props: Flam3Props) {
           })
         }
 
-        const timestampWrites = timestampQuery?.timestampWrites(frameId)
+        const timestampWrites = timestampQuery.timestampWrites(frameId)
 
         {
           for (let i = 0; i < iterationCount; i++) {
             const pass = encoder.beginComputePass({
-              timestampWrites: timestampWrites?.ifsMs,
+              timestampWrites: timestampWrites.ifsMs,
             })
             ifsPipeline.run(pass, pointCountPerBatch)
             pass.end()
           }
 
-          setAccumulatedPointCount(
-            (p) => p + pointCountPerBatch * iterationCount,
-          )
+          accumulatedPointCount_ += pointCountPerBatch * iterationCount
         }
 
-        setAccumulatedPointCountGlobal(accumulatedPointCount())
+        setAccumulatedPointCount(accumulatedPointCount_)
+        props.onAccumulatedPointCount?.(accumulatedPointCount_)
 
         if (shouldRenderFinalImage) {
+          const skipItersFactor =
+            1 + animatedFlame().renderSettings.skipIters * 0.05
           colorGradingUniforms.writePartial({
             averagePointCountPerBucketInv:
-              bucketProbabilityInv() / accumulatedPointCount(),
+              (bucketProbabilityInv() / accumulatedPointCount_) *
+              skipItersFactor,
           })
           if (props.adaptiveFilterEnabled) {
             const pass = encoder.beginComputePass({
-              timestampWrites: timestampWrites?.adaptiveFilterMs,
+              timestampWrites: timestampWrites.adaptiveFilterMs,
             })
-            runBlur()?.(pass)
+            runAdaptiveFilter()?.run(pass)
             pass.end()
           }
 
           {
-            const canvasTexture = context.getCurrentTexture()
-            canvasTexture.label = 'Flam3_CanvasTexture'
             const pass = encoder.beginRenderPass({
-              timestampWrites: timestampWrites?.colorGradingMs,
+              timestampWrites: timestampWrites.colorGradingMs,
               colorAttachments: [
                 {
                   loadOp: 'clear',
                   storeOp: 'store',
-                  view: canvasTexture.createView(),
+                  view: context.getCurrentTexture().createView(),
                 },
               ],
             })
@@ -382,35 +513,35 @@ export function Flam3(props: Flam3Props) {
           }
         }
 
-        timestampQuery?.write(encoder)
+        timestampQuery.write(encoder)
         device.queue.submit([encoder.finish()])
-
-        if (exportImage) {
-          exportedImages.add(exportImage)
-          canvas.toBlob((blob) => {
-            if (blob) {
-              exportImage(blob)
-            }
-          })
-        }
 
         device.queue
           .onSubmittedWorkDone()
-          .then(() => {
-            timestampQuery?.read(frameId).catch(console.error)
-          })
+          .then(() => timestampQuery.read(frameId))
           .catch(() => {})
+
+        props.onExportImage?.(canvas)
 
         batchIndex += 1
         forceDrawToScreen = false
       },
-      () => {
-        const shouldContinue = continueRendering(accumulatedPointCount())
-        props.setIsDone?.(!shouldContinue)
-        return shouldContinue ? props.renderInterval : Infinity
-      },
+      () =>
+        continueRendering(accumulatedPointCount_)
+          ? props.renderInterval
+          : Infinity,
       () => device.queue.onSubmittedWorkDone(),
     )
+
+    // When quality changes (up or down), force a redraw so the interval function
+    // re-evaluates continueRendering() with the updated point limit. Without this,
+    // quality downgrades may not immediately stop rendering because the RAF interval
+    // callback reads props.quality outside SolidJS tracking context.
+    createEffect(() => {
+      const q = props.quality
+      void q
+      rafLoop.redraw()
+    })
   })
   return null
 }

@@ -24,25 +24,25 @@ const CliffordVarParamsDefaults: CliffordVarParams = {
 const CliffordVarParamsEditor: EditorFor<CliffordVarParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'a', 'A')}
+      {...editorProps(props, 'a', 'A', props.dataParameterPath)}
       min={-3}
       max={3}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'b', 'B')}
+      {...editorProps(props, 'b', 'B', props.dataParameterPath)}
       min={-3}
       max={3}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'c', 'C')}
+      {...editorProps(props, 'c', 'C', props.dataParameterPath)}
       min={-3}
       max={3}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'd', 'D')}
+      {...editorProps(props, 'd', 'D', props.dataParameterPath)}
       min={-3}
       max={3}
       step={0.01}

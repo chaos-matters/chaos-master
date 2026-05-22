@@ -91,217 +91,222 @@ const SynthVarParamsEditor: EditorFor<SynthVarParams> = (props) => (
   <>
     {/* Base Parameters */}
     <RangeEditor
-      {...editorProps(props, 'a', 'A')}
+      {...editorProps(props, 'a', 'A', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}
     />
     {/* TODO: should be pickbox/selector for each enumearated mode above */}
     <RangeEditor
-      {...editorProps(props, 'mode', 'Mode')}
+      {...editorProps(props, 'mode', 'Mode', props.dataParameterPath)}
       min={0}
       max={19}
       step={1}
     />
     <RangeEditor
-      {...editorProps(props, 'power', 'Power')}
+      {...editorProps(props, 'power', 'Power', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'mix', 'Mix')}
+      {...editorProps(props, 'mix', 'Mix', props.dataParameterPath)}
       min={0}
       max={1}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'smoothFact', 'Smoothness')}
+      {...editorProps(
+        props,
+        'smoothFact',
+        'Smoothness',
+        props.dataParameterPath,
+      )}
       min={0}
       max={2}
       step={1}
     />
     {/* Group B */}
     <RangeEditor
-      {...editorProps(props, 'b', 'B')}
+      {...editorProps(props, 'b', 'B', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'b_type', 'B Type')}
+      {...editorProps(props, 'b_type', 'B Type', props.dataParameterPath)}
       min={0}
       max={8}
       step={1}
     />
     <RangeEditor
-      {...editorProps(props, 'b_skew', 'B Skew')}
+      {...editorProps(props, 'b_skew', 'B Skew', props.dataParameterPath)}
       min={-1}
       max={1}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'b_frq', 'B Freq')}
+      {...editorProps(props, 'b_frq', 'B Freq', props.dataParameterPath)}
       min={0}
       max={10}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'b_phs', 'B Phase')}
+      {...editorProps(props, 'b_phs', 'B Phase', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'b_layer', 'B Layer')}
+      {...editorProps(props, 'b_layer', 'B Layer', props.dataParameterPath)}
       min={0}
       max={3}
       step={1}
     />
     {/* Group C */}
     <RangeEditor
-      {...editorProps(props, 'c', 'C')}
+      {...editorProps(props, 'c', 'C', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'c_type', 'C Type')}
+      {...editorProps(props, 'c_type', 'C Type', props.dataParameterPath)}
       min={0}
       max={8}
       step={1}
     />
     <RangeEditor
-      {...editorProps(props, 'c_skew', 'C Skew')}
+      {...editorProps(props, 'c_skew', 'C Skew', props.dataParameterPath)}
       min={-1}
       max={1}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'c_frq', 'C Freq')}
+      {...editorProps(props, 'c_frq', 'C Freq', props.dataParameterPath)}
       min={0}
       max={10}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'c_phs', 'C Phase')}
+      {...editorProps(props, 'c_phs', 'C Phase', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'c_layer', 'C Layer')}
+      {...editorProps(props, 'c_layer', 'C Layer', props.dataParameterPath)}
       min={0}
       max={3}
       step={1}
     />
     {/* Group D */}
     <RangeEditor
-      {...editorProps(props, 'd', 'D')}
+      {...editorProps(props, 'd', 'D', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'd_type', 'D Type')}
+      {...editorProps(props, 'd_type', 'D Type', props.dataParameterPath)}
       min={0}
       max={8}
       step={1}
     />
     <RangeEditor
-      {...editorProps(props, 'd_skew', 'D Skew')}
+      {...editorProps(props, 'd_skew', 'D Skew', props.dataParameterPath)}
       min={-1}
       max={1}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'd_frq', 'D Freq')}
+      {...editorProps(props, 'd_frq', 'D Freq', props.dataParameterPath)}
       min={0}
       max={10}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'd_phs', 'D Phase')}
+      {...editorProps(props, 'd_phs', 'D Phase', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'd_layer', 'D Layer')}
+      {...editorProps(props, 'd_layer', 'D Layer', props.dataParameterPath)}
       min={0}
       max={3}
       step={1}
     />
     {/* Group E */}
     <RangeEditor
-      {...editorProps(props, 'e', 'E')}
+      {...editorProps(props, 'e', 'E', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'e_type', 'E Type')}
+      {...editorProps(props, 'e_type', 'E Type', props.dataParameterPath)}
       min={0}
       max={8}
       step={1}
     />
     <RangeEditor
-      {...editorProps(props, 'e_skew', 'E Skew')}
+      {...editorProps(props, 'e_skew', 'E Skew', props.dataParameterPath)}
       min={-1}
       max={1}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'e_frq', 'E Freq')}
+      {...editorProps(props, 'e_frq', 'E Freq', props.dataParameterPath)}
       min={0}
       max={10}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'e_phs', 'E Phase')}
+      {...editorProps(props, 'e_phs', 'E Phase', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'e_layer', 'E Layer')}
+      {...editorProps(props, 'e_layer', 'E Layer', props.dataParameterPath)}
       min={0}
       max={3}
       step={1}
     />
     {/* Group F */}
     <RangeEditor
-      {...editorProps(props, 'f', 'F')}
+      {...editorProps(props, 'f', 'F', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'f_type', 'F Type')}
+      {...editorProps(props, 'f_type', 'F Type', props.dataParameterPath)}
       min={0}
       max={8}
       step={1}
     />
     <RangeEditor
-      {...editorProps(props, 'f_skew', 'F Skew')}
+      {...editorProps(props, 'f_skew', 'F Skew', props.dataParameterPath)}
       min={-1}
       max={1}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'f_frq', 'F Freq')}
+      {...editorProps(props, 'f_frq', 'F Freq', props.dataParameterPath)}
       min={0}
       max={10}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'f_phs', 'F Phase')}
+      {...editorProps(props, 'f_phs', 'F Phase', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'f_layer', 'F Layer')}
+      {...editorProps(props, 'f_layer', 'F Layer', props.dataParameterPath)}
       min={0}
       max={3}
       step={1}

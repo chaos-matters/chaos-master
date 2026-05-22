@@ -26,25 +26,25 @@ const SinusGridVarParamsDefaults: SinusGridVarParams = {
 const SinusGridVarParamsEditor: EditorFor<SinusGridVarParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'ampx', 'Amp X')}
+      {...editorProps(props, 'ampx', 'Amp X', props.dataParameterPath)}
       min={0}
       max={2}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'ampy', 'Amp Y')}
+      {...editorProps(props, 'ampy', 'Amp Y', props.dataParameterPath)}
       min={0}
       max={2}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'freqx', 'Freq X')}
+      {...editorProps(props, 'freqx', 'Freq X', props.dataParameterPath)}
       min={0}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'freqy', 'Freq Y')}
+      {...editorProps(props, 'freqy', 'Freq Y', props.dataParameterPath)}
       min={0}
       max={5}
       step={0.01}

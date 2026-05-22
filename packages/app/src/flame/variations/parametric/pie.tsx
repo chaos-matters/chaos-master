@@ -25,14 +25,16 @@ const PieParamsDefaults: PieParams = {
 const PieParamsEditor: EditorFor<PieParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'slices', 'Slices')}
+      {...editorProps(props, 'slices', 'Slices', props.dataParameterPath)}
       min={1}
       max={200}
       step={1}
     />
-    <AngleEditor {...editorProps(props, 'rotation', 'Rotation')} />
+    <AngleEditor
+      {...editorProps(props, 'rotation', 'Rotation', props.dataParameterPath)}
+    />
     <RangeEditor
-      {...editorProps(props, 'thickness', 'Thickness')}
+      {...editorProps(props, 'thickness', 'Thickness', props.dataParameterPath)}
       min={0}
       max={2 * Math.PI}
       step={0.01}

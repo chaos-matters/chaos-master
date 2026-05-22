@@ -5,6 +5,7 @@ import * as v from '@/valibot'
 import { VariationInfo } from '../simple/types'
 import type { TgpuFn } from 'typegpu'
 import type { BaseData, Infer, v2f, Vec2f, WgslStruct } from 'typegpu/data'
+import type { BooleanSchema, OptionalSchema } from 'valibot'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
 type ParametricVariationDescriptor<
@@ -14,6 +15,7 @@ type ParametricVariationDescriptor<
   {
     readonly type: v.LiteralSchema<K, undefined>
     readonly weight: v.NumberSchema<undefined>
+    readonly visible: OptionalSchema<BooleanSchema<undefined>, true>
     readonly params: v.ObjectSchema<
       Record<keyof T, v.NumberSchema<undefined>>,
       undefined
@@ -50,6 +52,7 @@ export function parametricVariationDescriptor<
   return v.object({
     type: v.literal(variationType),
     weight: v.number(),
+    visible: v.optional(v.boolean(), true),
     params: ParamSchema,
   })
 }

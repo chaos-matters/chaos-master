@@ -36,56 +36,56 @@ const SpirographVarParamsDefaults: SpirographVarParams = {
 const SpirographVarParamsEditor: EditorFor<SpirographVarParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'a', 'A')}
+      {...editorProps(props, 'a', 'A', props.dataParameterPath)}
       min={0}
       max={10}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'b', 'B')}
+      {...editorProps(props, 'b', 'B', props.dataParameterPath)}
       min={0}
       max={10}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'd', 'D')}
+      {...editorProps(props, 'd', 'D', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'c1', 'C1')}
+      {...editorProps(props, 'c1', 'C1', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'c2', 'C2')}
+      {...editorProps(props, 'c2', 'C2', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}
     />
     {/* Range limits for T and Y typically vary widely in fractal usage */}
     <RangeEditor
-      {...editorProps(props, 'tmin', 'T Min')}
+      {...editorProps(props, 'tmin', 'T Min', props.dataParameterPath)}
       min={-10}
       max={10}
       step={0.1}
     />
     <RangeEditor
-      {...editorProps(props, 'tmax', 'T Max')}
+      {...editorProps(props, 'tmax', 'T Max', props.dataParameterPath)}
       min={-10}
       max={10}
       step={0.1}
     />
     <RangeEditor
-      {...editorProps(props, 'ymin', 'Y Min')}
+      {...editorProps(props, 'ymin', 'Y Min', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'ymax', 'Y Max')}
+      {...editorProps(props, 'ymax', 'Y Max', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}

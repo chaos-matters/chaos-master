@@ -1,0 +1,585 @@
+.container {
+  width: fit-content;
+  max-width: 92vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dialogBody {
+  display: grid;
+  grid-template-columns: auto 300px;
+  gap: 1.25rem;
+  padding: 0 1.25rem 1.25rem;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+    gap: 0.75rem;
+  }
+}
+
+/* ---------- Left — preview pane ---------- */
+
+.previewPane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--neutral-300) transparent;
+
+  [data-theme='dark'] & {
+    scrollbar-color: var(--neutral-600) transparent;
+  }
+}
+
+.previewCanvasWrap {
+  position: relative;
+}
+
+.previewCanvas {
+  border-radius: 12px;
+  overflow: hidden;
+  background: #111;
+  box-shadow:
+    0 0 0 1px var(--neutral-200),
+    0 4px 16px rgb(0 0 0 / 10%);
+  touch-action: none;
+
+  [data-theme='dark'] & {
+    box-shadow:
+      0 0 0 1px var(--neutral-700),
+      0 4px 16px rgb(0 0 0 / 30%);
+  }
+}
+
+.resizeHandle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 20px;
+  height: 20px;
+  cursor: nwse-resize;
+  border-radius: 0 0 12px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--neutral-400);
+  opacity: 0.4;
+  transition: opacity 0.15s;
+
+  &:hover {
+    opacity: 1;
+  }
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500);
+  }
+}
+
+.resizeHandle svg {
+  width: 12px;
+  height: 12px;
+}
+
+.aspectLock {
+  appearance: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--neutral-400);
+  transition: color 0.15s;
+
+  &:hover {
+    color: var(--neutral-600);
+  }
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500);
+
+    &:hover {
+      color: var(--neutral-300);
+    }
+  }
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.aspectLockLocked {
+  color: var(--accent-color, #6366f1);
+
+  &:hover {
+    color: color-mix(in oklab, var(--accent-color, #6366f1), #fff 20%);
+  }
+}
+
+.previewSizeLabel {
+  font-size: 0.62rem;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: var(--neutral-400);
+  text-align: center;
+  min-width: 60px;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500);
+  }
+}
+
+.previewToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.generateButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--accent-color, #6366f1);
+  border-radius: 8px;
+  background: linear-gradient(
+    135deg,
+    var(--accent-color, #6366f1),
+    color-mix(in oklab, var(--accent-color, #6366f1), #7c3aed 30%)
+  );
+  color: white;
+  font-size: 0.8rem;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    opacity 0.15s,
+    box-shadow 0.15s,
+    transform 0.1s;
+  box-shadow: 0 2px 8px
+    color-mix(in oklab, var(--accent-color, #6366f1), transparent 50%);
+
+  &:hover {
+    box-shadow: 0 4px 16px
+      color-mix(in oklab, var(--accent-color, #6366f1), transparent 40%);
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.btnIcon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* ---------- Right — controls pane ---------- */
+
+.controlsPane {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--neutral-300) transparent;
+
+  [data-theme='dark'] & {
+    scrollbar-color: var(--neutral-600) transparent;
+  }
+}
+
+/* ---------- Fields ---------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.fieldRow {
+  display: flex;
+  gap: 0.75rem;
+
+  & > .field {
+    flex: 1;
+  }
+}
+
+.fieldLabel {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--neutral-500);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-400);
+  }
+}
+
+.select {
+  width: 100%;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--neutral-200);
+  border-radius: 6px;
+  background: var(--neutral-50);
+  color: var(--neutral-900);
+  font-size: 0.78rem;
+  font-family: inherit;
+  cursor: pointer;
+
+  [data-theme='dark'] & {
+    background: var(--neutral-800);
+    border-color: var(--neutral-700);
+    color: var(--neutral-100);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent-color, #6366f1);
+    box-shadow: 0 0 0 2px
+      color-mix(in oklab, var(--accent-color, #6366f1), transparent 80%);
+  }
+}
+
+/* ---------- Slider + percentage ---------- */
+
+.sliderField {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pctLabel {
+  font-size: 0.72rem;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: var(--neutral-500);
+  min-width: 32px;
+  text-align: right;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-400);
+  }
+}
+
+/* ---------- Checkbox ---------- */
+
+.checkboxField {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--neutral-800);
+  cursor: pointer;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-200);
+  }
+}
+
+/* ---------- Variation palette section ---------- */
+
+.paletteSection {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+/* ---------- Footer ---------- */
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--neutral-200);
+
+  [data-theme='dark'] & {
+    border-color: var(--neutral-700);
+  }
+}
+
+/* ---------- Render settings collapsible ---------- */
+
+.collapsibleHeader {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 0.35rem 0;
+  border: none;
+  background: none;
+  font-size: 0.68rem;
+  font-family: inherit;
+  font-weight: 500;
+  color: var(--neutral-500);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: color 0.15s;
+
+  &:hover {
+    color: var(--neutral-800);
+  }
+
+  [data-theme='dark'] & {
+    color: var(--neutral-400);
+
+    &:hover {
+      color: var(--neutral-200);
+    }
+  }
+}
+
+.collapsibleExpanded .chevron {
+  transform: rotate(180deg);
+}
+
+.chevron {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.renderGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.renderField {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.renderLabel {
+  font-size: 0.65rem;
+  color: var(--neutral-500);
+  white-space: nowrap;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-400);
+  }
+}
+
+.renderLabelRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.randomizeToggle {
+  appearance: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 1px;
+  border-radius: 3px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--neutral-400);
+  transition: color 0.15s;
+
+  &:hover {
+    color: var(--neutral-600);
+  }
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500);
+
+    &:hover {
+      color: var(--neutral-300);
+    }
+  }
+
+  & svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.randomizeToggleActive {
+  color: #16a34a;
+
+  &:hover {
+    color: #15803d;
+  }
+
+  [data-theme='dark'] & {
+    color: #22c55e;
+
+    &:hover {
+      color: #4ade80;
+    }
+  }
+}
+
+/* ── History section ── */
+
+.historySection {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 4px;
+  flex: 1 0 auto;
+  min-height: 220px;
+  width: 100%;
+}
+
+.historyClear {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  padding: 2px;
+  border-radius: 4px;
+  color: var(--neutral-400);
+  transition:
+    color 0.15s,
+    background 0.15s;
+
+  &:hover {
+    color: #ef4444;
+    background: var(--neutral-100);
+  }
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500);
+
+    &:hover {
+      color: #f87171;
+      background: var(--neutral-800);
+    }
+  }
+}
+
+.historyGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-auto-rows: auto;
+  gap: 8px;
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--neutral-300) transparent;
+
+  [data-theme='dark'] & {
+    scrollbar-color: var(--neutral-600) transparent;
+  }
+}
+
+.historyItem {
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--neutral-50);
+  border: 1px solid var(--neutral-200);
+  transition: border-color 0.15s;
+  aspect-ratio: 1;
+
+  &:hover {
+    border-color: var(--accent-color, #6366f1);
+  }
+
+  [data-theme='dark'] & {
+    background: var(--neutral-850);
+    border-color: var(--neutral-700);
+  }
+
+  &.historyItemSelected {
+    border-color: var(--accent-color, #6366f1);
+    box-shadow: 0 0 0 1px
+      color-mix(in oklab, var(--accent-color, #6366f1), transparent 70%);
+
+    &:hover {
+      border-color: var(--accent-color, #6366f1);
+    }
+  }
+}
+
+.historyThumbBtn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.historyThumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  image-rendering: auto;
+}
+
+.historyActions {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 2px 4px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.65));
+  border-radius: 0 0 6px 6px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+.historyItem:hover .historyActions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.historyActionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+  }
+}

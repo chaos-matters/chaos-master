@@ -1,22 +1,50 @@
+import Bookmark from './bookmark.svg'
+import CameraIcon from './camera.svg'
 import Changelog from './changelog.svg'
+import ChevronDown from './chevron-down.svg'
 import Cross from './cross.svg'
+import Eye from './eye.svg'
+import EyeOff from './eye-off.svg'
+import FolderOpen from './folder-open.svg'
 import GitHub from './github.svg'
 import HoverEyePreview from './hover-eye-preview.svg'
 import HoverPreview from './hover-preview.svg'
+import Menu from './menu.svg'
 import Minus from './minus.svg'
+import Pause from './pause.svg'
+import PlayPause from './play-pause.svg'
 import Plus from './plus.svg'
 import Redo from './redo.svg'
+import Share from './share.svg'
+import Shuffle from './shuffle.svg'
+import SkipBack from './skip-back.svg'
+import SkipForward from './skip-forward.svg'
 import Undo from './undo.svg'
+import Zap from './zap.svg'
 
 // Re-exported for easier auto-importing in components
 export {
+  Bookmark,
+  CameraIcon,
   Changelog,
+  ChevronDown,
   Cross,
+  Eye,
+  EyeOff,
+  FolderOpen,
   GitHub,
+  HoverEyePreview,
+  HoverPreview,
+  Menu,
   Minus,
+  Pause,
+  PlayPause,
   Plus,
   Redo,
+  Share,
+  Shuffle,
+  SkipBack,
+  SkipForward,
   Undo,
-  HoverPreview,
-  HoverEyePreview,
+  Zap,
 }

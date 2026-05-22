@@ -18,7 +18,7 @@ const CircusParamsDefaults: CircusParams = {
 const CircusParamsEditor: EditorFor<CircusParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'scale', 'Scale')}
+      {...editorProps(props, 'scale', 'Scale', props.dataParameterPath)}
       min={0.01}
       max={5}
       step={0.01}

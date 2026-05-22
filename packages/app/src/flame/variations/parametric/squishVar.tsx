@@ -20,7 +20,7 @@ const SquishVarParamsDefaults: SquishVarParams = {
 const SquishVarParamsEditor: EditorFor<SquishVarParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'power', 'Power')}
+      {...editorProps(props, 'power', 'Power', props.dataParameterPath)}
       min={2}
       max={20}
       step={1}

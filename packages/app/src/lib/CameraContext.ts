@@ -20,6 +20,8 @@ export type CameraContext = {
     clipToWorld: (clip: v2f) => v2f
   }
   zoom: Accessor<number>
+  position: Accessor<v2f>
+  setPosition: (pos: v2f | ((prev: v2f) => v2f)) => v2f
 }
 const CameraContext = createContext<CameraContext>()
 

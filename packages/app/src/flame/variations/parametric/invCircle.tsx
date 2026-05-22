@@ -26,24 +26,31 @@ const InvCircleParamsEditor: EditorFor<InvCircleParams> = (props) => {
   return (
     <>
       <RangeEditor
-        {...editorProps(props, 'radius', 'Radius')}
+        {...editorProps(props, 'radius', 'Radius', props.dataParameterPath)}
         min={0}
         max={5}
         step={0.01}
       />
       <RangeEditor
-        {...editorProps(props, 'a', 'a')}
+        {...editorProps(props, 'a', 'a', props.dataParameterPath)}
         min={-4}
         max={4}
         step={0.01}
       />
       <RangeEditor
-        {...editorProps(props, 'b', 'b')}
+        {...editorProps(props, 'b', 'b', props.dataParameterPath)}
         min={-4}
         max={4}
         step={0.01}
       />
-      <CheckboxEditor {...editorProps(props, 'restricted', 'Restricted')} />
+      <CheckboxEditor
+        {...editorProps(
+          props,
+          'restricted',
+          'Restricted',
+          props.dataParameterPath,
+        )}
+      />
     </>
   )
 }

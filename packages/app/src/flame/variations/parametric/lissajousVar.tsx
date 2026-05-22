@@ -33,43 +33,43 @@ const LissajousVarParamsDefaults: LissajousVarParams = {
 const LissajousVarParamsEditor: EditorFor<LissajousVarParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'tmin', 'T Min')}
+      {...editorProps(props, 'tmin', 'T Min', props.dataParameterPath)}
       min={-10}
       max={10}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'tmax', 'T Max')}
+      {...editorProps(props, 'tmax', 'T Max', props.dataParameterPath)}
       min={-10}
       max={10}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'a', 'A')}
+      {...editorProps(props, 'a', 'A', props.dataParameterPath)}
       min={0}
       max={10}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'b', 'B')}
+      {...editorProps(props, 'b', 'B', props.dataParameterPath)}
       min={0}
       max={10}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'c', 'C')}
+      {...editorProps(props, 'c', 'C', props.dataParameterPath)}
       min={-1}
       max={1}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'd', 'D')}
+      {...editorProps(props, 'd', 'D', props.dataParameterPath)}
       min={-PI.$}
       max={PI.$}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'e', 'E')}
+      {...editorProps(props, 'e', 'E', props.dataParameterPath)}
       min={-1}
       max={1}
       step={0.01}

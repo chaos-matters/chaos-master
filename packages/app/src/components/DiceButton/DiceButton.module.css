@@ -1,0 +1,37 @@
+.diceButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--neutral-400);
+  border-radius: 4px;
+  transition:
+    color 0.15s ease,
+    transform 0.1s ease;
+
+  & svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &:hover {
+    color: var(--accent-color, #3b82f6);
+    transform: scale(1.15);
+  }
+
+  &:active {
+    transform: scale(0.9);
+  }
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500);
+
+    &:hover {
+      color: var(--accent-color, #3b82f6);
+    }
+  }
+}

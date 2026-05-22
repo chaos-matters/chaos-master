@@ -1,12 +1,12 @@
 import { createResource, For, Show, Suspense } from 'solid-js'
-import { Changelog, GitHub } from '@/icons'
+import { GitHub } from '@/icons'
 import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
 import { formatBytes } from '@/utils/formatBytes'
-import { COMMIT_HASH, VERSION } from '@/version'
-import { createShowChangelog } from '../AboutPanel/Changelog'
+import { GIT_SHA, VERSION } from '@/version'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './HelpModal.module.css'
+import type { QuickPickerMode } from '../QuickVariationPicker/QuickVariationPicker'
 
 type KeyCombination = {
   key: string
@@ -86,11 +86,12 @@ async function getGPUDeviceInformation() {
 
 type HelpModalProps = {
   respond: () => void
+  quickPickerMode: QuickPickerMode
+  onQuickPickerModeChange: (mode: QuickPickerMode) => void
 }
 
 function HelpModal(props: HelpModalProps) {
   const [gpuDeviceInfo] = createResource(getGPUDeviceInformation)
-  const showChangelog = createShowChangelog()
   return (
     <>
       <ModalTitleBar
@@ -98,27 +99,43 @@ function HelpModal(props: HelpModalProps) {
           props.respond()
         }}
       >
-        <div class={ui.titleBarActions}>
-          <a
-            class={ui.githubLink}
-            href="https://github.com/chaos-matters/chaos-master"
-            target="_blank"
-          >
-            <GitHub />
-          </a>
-          <button
-            class={ui.changelogIconButton}
-            onClick={showChangelog}
-            title="View Changelog"
-          >
-            <Changelog />
-          </button>
-        </div>
+        <a
+          class={ui.githubLink}
+          href="https://github.com/chaos-matters/chaos-master"
+          target="_blank"
+        >
+          <GitHub />
+        </a>{' '}
         <span>
           Chaos Master v{VERSION} <sup>alpha</sup>{' '}
-          <span class={ui.pillBadge}>{COMMIT_HASH}</span>
+          {GIT_SHA ? <span class={ui.gitSha}>{GIT_SHA}</span> : null}{' '}
         </span>
       </ModalTitleBar>
+
+      <h2 class={ui.sectionTitle}>Variation Picker</h2>
+      <div class={ui.pickerModeRow}>
+        <span class={ui.pickerModeLabel}>Default mode</span>
+        <div class={ui.pickerModeBtns}>
+          <button
+            class={ui.pickerModeBtn}
+            classList={{
+              [ui.pickerModeBtnActive!]: props.quickPickerMode === 'list',
+            }}
+            onClick={() => props.onQuickPickerModeChange('list')}
+          >
+            List
+          </button>
+          <button
+            class={ui.pickerModeBtn}
+            classList={{
+              [ui.pickerModeBtnActive!]: props.quickPickerMode === 'gallery',
+            }}
+            onClick={() => props.onQuickPickerModeChange('gallery')}
+          >
+            Gallery
+          </button>
+        </div>
+      </div>
 
       <h2 class={ui.sectionTitle}>Keyboard Shortcuts</h2>
       <div class={ui.shortcutsGrid}>
@@ -137,6 +154,37 @@ function HelpModal(props: HelpModalProps) {
           )}
         </For>
       </div>
+      <h2 class={ui.sectionTitle}>Guided Tours</h2>
+      <div class={ui.tourButtons}>
+        <button
+          class={ui.tourBtn}
+          onClick={() => {
+            window.location.hash = '#tour=app'
+            props.respond()
+          }}
+        >
+          App Tour
+        </button>
+        <button
+          class={ui.tourBtn}
+          onClick={() => {
+            window.location.hash = '#tour=sidebar'
+            props.respond()
+          }}
+        >
+          Sidebar Tour
+        </button>
+        <button
+          class={ui.tourBtn}
+          onClick={() => {
+            window.location.hash = '#tour=timeline'
+            props.respond()
+          }}
+        >
+          Timeline Tour
+        </button>
+      </div>
+
       <h2 class={ui.sectionTitle}>GPU Information</h2>
       <div class={ui.gpuInformation}>
         <Suspense fallback={<>Loading...</>}>
@@ -168,13 +216,22 @@ function HelpModal(props: HelpModalProps) {
   )
 }
 
-export function createShowHelp() {
+export function createShowHelp(
+  quickPickerMode: () => QuickPickerMode,
+  onQuickPickerModeChange: (mode: QuickPickerMode) => void,
+) {
   const requestModal = useRequestModal()
 
   async function showHelp() {
     await requestModal({
       class: ui.helpModal,
-      content: ({ respond }) => <HelpModal respond={respond} />,
+      content: ({ respond }) => (
+        <HelpModal
+          respond={respond}
+          quickPickerMode={quickPickerMode()}
+          onQuickPickerModeChange={onQuickPickerModeChange}
+        />
+      ),
     })
   }
 

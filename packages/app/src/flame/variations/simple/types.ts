@@ -4,6 +4,7 @@ import * as v from '@/valibot'
 import { AffineParams } from '../../affineTranform'
 import type { TgpuFn } from 'typegpu'
 import type { Infer, v2f, Vec2f } from 'typegpu/data'
+import type { BooleanSchema, OptionalSchema } from 'valibot'
 
 export type VariationInfo = Infer<typeof VariationInfo>
 export const VariationInfo = struct({
@@ -16,6 +17,7 @@ export type SimpleVariation<K extends string> = {
     {
       readonly type: v.LiteralSchema<K, undefined>
       readonly weight: v.NumberSchema<undefined>
+      readonly visible: OptionalSchema<BooleanSchema<undefined>, true>
     },
     undefined
   >
@@ -30,6 +32,7 @@ export function simpleVariation<K extends string>(
     DescriptorSchema: v.object({
       type: v.literal(variationKey),
       weight: v.number(),
+      visible: v.optional(v.boolean(), true),
     }),
     fn: tgpu.fn([vec2f, VariationInfo], vec2f)(impl),
   }

@@ -26,30 +26,37 @@ const InvEllipseParamsDefaults: InvEllipseParams = {
 const InvEllipseParamsEditor: EditorFor<InvEllipseParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'a', 'Major axis')}
+      {...editorProps(props, 'a', 'Major axis', props.dataParameterPath)}
       min={-10}
       max={10}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'b', 'Minor axis')}
+      {...editorProps(props, 'b', 'Minor axis', props.dataParameterPath)}
       min={-10}
       max={10}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'h', 'Center x')}
+      {...editorProps(props, 'h', 'Center x', props.dataParameterPath)}
       min={-10}
       max={10}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'k', 'Center y')}
+      {...editorProps(props, 'k', 'Center y', props.dataParameterPath)}
       min={-10}
       max={10}
       step={0.01}
     />
-    <CheckboxEditor {...editorProps(props, 'restricted', 'Restricted')} />
+    <CheckboxEditor
+      {...editorProps(
+        props,
+        'restricted',
+        'Restricted',
+        props.dataParameterPath,
+      )}
+    />
   </>
 )
 

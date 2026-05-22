@@ -1,5 +1,5 @@
 import { batch, createSignal } from 'solid-js'
-import { produce, unwrap } from 'solid-js/store'
+import { produce, reconcile, unwrap } from 'solid-js/store'
 import { applyPatchesMutatively, enableStandardPatches, produceWithPatches, } from 'structurajs'
 import { compressPatches, forwardBackwardPatchPairDoesNothing, } from './compressPatches'
 import type { SetStoreFunction, Store } from 'solid-js/store'
@@ -179,7 +179,7 @@ export function createStoreHistory<T extends object>([store, setStore]: [
         structuredClone(unwrap(store)),
         () => value,
       )
-      setStore(value)
+      setStore(reconcile(value))
       addToStack({ forwardPatches, backwardPatches, description })
     })
   }

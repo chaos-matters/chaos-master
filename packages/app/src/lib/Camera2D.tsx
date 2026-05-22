@@ -1,4 +1,4 @@
-import { createMemo, onCleanup } from 'solid-js'
+import { createMemo } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { f32, mat3x3f, mat4x4f, struct, vec2f, vec3f } from 'typegpu/data'
 import { div, mul } from 'typegpu/std'
@@ -78,18 +78,15 @@ export function Camera2D(props: ParentProps<Camera2DProps>) {
     .$usage('uniform')
     .$name('Camera2DUniforms')
 
-  onCleanup(() => {
-    uniformsBuffer.destroy()
-  })
-
   const uniformBindGroup = root.createBindGroup(Camera2DBindGroupLayout, {
     camera2DUniforms: uniformsBuffer,
   })
 
   const uniforms = createMemo(() => {
+    const size = canvasSize()
+    const { width, height } = size
     const { position, zoom } = props
     const { x, y } = position
-    const { width, height } = canvasSize()
     const aspect = width / height
     const viewMatrix4 = mat4x4f()
     const fovy = 1 / zoom
@@ -147,6 +144,15 @@ export function Camera2D(props: ParentProps<Camera2DProps>) {
           clipToWorld,
         },
         zoom: () => props.zoom,
+        position: () => props.position,
+        setPosition: (pos: v2f | ((prev: v2f) => v2f)) => {
+          if (typeof pos === 'function') {
+            props.position = pos(props.position)
+          } else {
+            props.position = pos
+          }
+          return props.position
+        },
       }}
     >
       {props.children}

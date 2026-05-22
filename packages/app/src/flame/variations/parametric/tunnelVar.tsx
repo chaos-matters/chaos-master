@@ -21,13 +21,13 @@ const TunnelVarParamsDefaults: TunnelVarParams = {
 const TunnelVarParamsEditor: EditorFor<TunnelVarParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'Sx', 'Sx')}
+      {...editorProps(props, 'Sx', 'Sx', props.dataParameterPath)}
       min={1}
       max={250}
       step={0.1}
     />
     <RangeEditor
-      {...editorProps(props, 'Sy', 'Sy')}
+      {...editorProps(props, 'Sy', 'Sy', props.dataParameterPath)}
       min={1}
       max={250}
       step={0.1}

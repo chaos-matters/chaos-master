@@ -1,3 +1,16 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  grid-column: span 2;
+}
+
+.pillsContainer {
+  display: grid;
+  gap: var(--space-2);
+  overflow: hidden;
+}
+
 .pill {
   --color: var(--neutral-600);
   --hover-color: var(--neutral-300);
@@ -12,14 +25,6 @@
     --track-color-filled: var(--neutral-700);
     --track-color-empty: var(--neutral-800);
   }
-}
-
-.pills-container {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-2);
-  grid-column: span 2;
-  overflow: hidden;
 }
 
 .pill {
@@ -44,15 +49,25 @@
   );
 }
 
-.selected-pill {
+.selectedPill {
   color: var(--selected-color);
-  border: solid 1px var(--track-color-filled);
+  border: 2px solid var(--accent-color, #6366f1);
+  padding: calc(var(--space-1) - 1px);
 }
 
-.pill:not(.selected-pill):hover {
+.pill:not(.selectedPill):hover {
   background: transparent;
+  background-color: var(--hover-color);
 }
 
-.pill:not(.selected-pill):hover {
-  background-color: var(--hover-color);
+.pointsRow {
+  font-size: 0.6rem;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: var(--neutral-400);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500);
+  }
 }

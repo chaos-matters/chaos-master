@@ -25,25 +25,25 @@ const TradeVarParamsDefaults: TradeVarParams = {
 const TradeVarParamsEditor: EditorFor<TradeVarParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'r1', 'R1')}
+      {...editorProps(props, 'r1', 'R1', props.dataParameterPath)}
       min={0}
       max={2}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'd1', 'D1')}
+      {...editorProps(props, 'd1', 'D1', props.dataParameterPath)}
       min={0}
       max={2}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'r2', 'R2')}
+      {...editorProps(props, 'r2', 'R2', props.dataParameterPath)}
       min={0}
       max={2}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'd2', 'D2')}
+      {...editorProps(props, 'd2', 'D2', props.dataParameterPath)}
       min={0}
       max={2}
       step={0.01}
