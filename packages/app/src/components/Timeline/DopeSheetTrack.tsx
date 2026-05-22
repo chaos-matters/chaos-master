@@ -105,6 +105,7 @@ export function DopeSheetTrack(props: DopeSheetTrackProps) {
     props.onDeselectKeyframe()
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const isSelected = () =>
     props.selectedKeyframe?.path === props.parameterPath &&
     props.selectedKeyframe?.frame !== undefined

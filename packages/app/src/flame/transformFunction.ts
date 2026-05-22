@@ -118,9 +118,7 @@ export function extractFlameUniforms({
           `flame${tid}`,
           {
             probability: isVisible ? probability / totalProbability : 0,
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             color: vec2f(color?.x ?? 0, color?.y ?? 0),
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
             preAffine: preAffine
               ? {
                   a: preAffine.a ?? 1,
@@ -162,7 +160,6 @@ export function extractFlameUniforms({
                   }
                   const isVarVisible = varVisible !== false
                   const typed: Record<string, unknown> = {
-                    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
                     weight: isVarVisible ? (rest.weight ?? 1) : 0,
                   }
                   const variationType = type as TransformVariationType

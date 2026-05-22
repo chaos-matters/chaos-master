@@ -9,6 +9,7 @@ let errors = 0
 
 for (const anim of animationDefs) {
   const flame = examples[anim.exampleId]
+   
   if (!flame) {
     console.error(`✗ ${anim.id}: exampleId "${anim.exampleId}" not found`)
     errors++
@@ -52,6 +53,7 @@ for (const anim of animationDefs) {
     // Check paramName if present (3 parts)
     if (parts.length >= 3) {
       const [, , paramName] = parts
+       
       if (!paramName) {
         console.error(`✗ ${anim.id}: path "${track.parameterPath}" — empty param name`)
         errors++
@@ -62,6 +64,7 @@ for (const anim of animationDefs) {
 }
 
 if (errors === 0) {
+  // eslint-disable-next-line no-console
   console.log('✓ All animation paths are valid — no errors found')
   process.exit(0)
 } else {

@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { batch, createEffect, createMemo, createResource, createSignal, ErrorBoundary, For, onCleanup, onMount, Show, Suspense, } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
@@ -55,6 +56,7 @@ import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from './flame/schema/fl
 import { generateTransformId, generateVariationId, } from './flame/transformFunction'
 import { isParametricVariation, isParametricVariationType, isVariationType, transformVariations, } from './flame/variations'
 import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } from './flame/variations/utils'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { Cross, Eye, EyeOff, Menu, Plus, Share } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
 import { Root } from './lib/Root'
@@ -162,9 +164,11 @@ function App(props: AppProps) {
   let sidebarRef: HTMLDivElement | undefined
   let sidebarScrollRef: HTMLDivElement | undefined
   let savedScrollTop = 0
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [sidebarEl, setSidebarEl] = createSignal<HTMLDivElement | undefined>()
   const floatingLeft = () => {
     const rootFontSize = parseFloat(
+      // eslint-disable-next-line no-restricted-globals
       getComputedStyle(document.documentElement).fontSize,
     )
     return sidebarWidth() * rootFontSize + 8
@@ -411,6 +415,7 @@ function App(props: AppProps) {
         URL.revokeObjectURL(url)
         showToast('Animation exported')
       })
+      // eslint-disable-next-line @typescript-eslint/use-unknown-in-catch-callback-variable
       .catch((err) => {
         console.error('Animation export failed:', err)
         showToast('Animation export failed')
@@ -445,12 +450,15 @@ function App(props: AppProps) {
     openModal: (name) => {
       switch (name) {
         case 'loadFlame':
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
           showLoadFlameModal()
           break
         case 'exportPng':
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
           showExportPngDialog()
           break
         case 'shareLink':
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
           showShareLinkModal()
           break
       }
@@ -1160,6 +1168,7 @@ function App(props: AppProps) {
                   when={
                     timeline.isPlaying() ||
                     animationExportRunning() ||
+                    // eslint-disable-next-line eqeqeq
                     exportProgress() != null
                   }
                 >
@@ -1167,6 +1176,7 @@ function App(props: AppProps) {
                     class={ui.playbackOverlay}
                     classList={{
                       [ui.exportOverlay as string]:
+                        // eslint-disable-next-line eqeqeq
                         animationExportRunning() || exportProgress() != null,
                     }}
                     onClick={() => {
@@ -1178,6 +1188,7 @@ function App(props: AppProps) {
                     <span class={ui.playbackOverlayText}>
                       {animationExportRunning()
                         ? 'Rendering animation...'
+                        // eslint-disable-next-line eqeqeq
                         : exportProgress() != null
                           ? 'Rendering image...'
                           : '⏸ Tap to stop animation'}

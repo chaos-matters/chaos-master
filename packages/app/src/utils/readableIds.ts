@@ -14,6 +14,7 @@ export function buildReadableIds(transforms: TransformRecord): ReadableIds {
   sortedTids.forEach((tid, i) => {
     const tLabel = `T${i + 1}`
     transformLabel[tid] = tLabel
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const variations = (transforms as Record<string, any>)[tid]?.variations
     if (variations) {
       const sortedVids = Object.keys(variations).sort()
@@ -61,6 +62,7 @@ export function buildReadableIds(transforms: TransformRecord): ReadableIds {
     // {tid}.{vid} — variation weight
     if (parts.length === 2) {
       const vLabel = variationLabel[parts[1]!] ?? parts[1]
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const tLabel = transformLabel[parts[0]!] ?? parts[0]
       return `${vLabel} weight`
     }

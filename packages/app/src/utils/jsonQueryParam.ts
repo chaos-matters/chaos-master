@@ -29,7 +29,6 @@ export async function compressJsonQueryParam(obj: unknown) {
   const compressReader = compress.readable.getReader()
   const chunks = []
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     while (true) {
       const { done, value } = await compressReader.read()
       if (done) {
@@ -66,7 +65,6 @@ export async function decompressJsonQuery(
   const decoderReader = decoder.readable.getReader()
   const chunks = []
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     while (true) {
       const { done, value } = await decoderReader.read()
       if (done) {

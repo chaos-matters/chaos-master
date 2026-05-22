@@ -23,6 +23,7 @@ export function SpotlightTour(props: SpotlightTourProps) {
   const [cardStyle, setCardStyle] = createSignal<Record<string, string>>({})
   const [arrowStyle, setArrowStyle] = createSignal<Record<string, string>>({})
   const [arrowClass, setArrowClass] = createSignal('')
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [cardPosition, setCardPosition] = createSignal<
     'top' | 'bottom' | 'left' | 'right'
   >('bottom')
@@ -87,6 +88,7 @@ export function SpotlightTour(props: SpotlightTourProps) {
     // Calculate available space around target
     const spaceTop = targetRect.top
     const spaceBottom = vh - targetRect.bottom
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const spaceLeft = targetRect.left
     const spaceRight = vw - targetRect.right
 

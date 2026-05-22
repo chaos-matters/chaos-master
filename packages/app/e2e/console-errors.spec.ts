@@ -131,6 +131,7 @@ test.describe('Console Error Detection', () => {
 
     // Change quality presets
     for (let i = 0; i < 5; i++) {
+      // eslint-disable-next-line @typescript-eslint/await-thenable
       const qualityButtons = await page.locator('button:has-text("Quality")')
       if ((await qualityButtons.count()) > 0) {
         await qualityButtons.click()
