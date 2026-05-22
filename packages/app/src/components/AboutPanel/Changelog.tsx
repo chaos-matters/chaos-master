@@ -1,7 +1,8 @@
-import { createResource, For, JSX, Show } from 'solid-js'
+import { createResource, For, Show } from 'solid-js'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './Changelog.module.css'
+import type { JSX } from 'solid-js'
 
 type ChangelogEntry = {
   version: string
@@ -122,9 +123,7 @@ export function Changelog(props: ChangelogProps) {
                 <div class={ui.versionHeader}>
                   <div class={ui.versionLeft}>
                     <span class={ui.versionBadge}>v{entry.version}</span>
-                    {i() === 0 && (
-                      <span class={ui.latestBadge}>Latest</span>
-                    )}
+                    {i() === 0 && <span class={ui.latestBadge}>Latest</span>}
                   </div>
                   <span class={ui.date}>{entry.date}</span>
                 </div>

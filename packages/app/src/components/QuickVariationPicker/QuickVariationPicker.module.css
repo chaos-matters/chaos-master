@@ -321,7 +321,6 @@
   }
 }
 
-
 .galleryItemActive {
   border-color: oklch(50% 0.1 240);
   border-width: 2px;

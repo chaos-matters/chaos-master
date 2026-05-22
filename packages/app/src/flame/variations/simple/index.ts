@@ -1,6 +1,5 @@
 import { f32, vec2f } from 'typegpu/data'
 import { abs, atan2, cos, cosh, dot, exp, length, log, pow, select, sin, sinh, sqrt, tan, } from 'typegpu/std'
-
 import { random, randomUnitDisk } from '@/shaders/random'
 import { EPS, PI } from '../../constants'
 import { simpleVariation } from './types'

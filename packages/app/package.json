@@ -14,7 +14,6 @@
     "deploy:prod": "pnpm exec wrangler deploy --env prod"
   },
   "license": "AGPL-3.0-only",
-
   "dependencies": {
     "@typegpu/color": "0.10.0",
     "@typegpu/sdf": "0.10.0",

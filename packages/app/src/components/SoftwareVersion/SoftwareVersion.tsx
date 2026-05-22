@@ -1,5 +1,5 @@
-import { VERSION } from '@/version'
 import { persistentSignal } from '@/utils/persistentSignal'
+import { VERSION } from '@/version'
 import { DebugPanel } from '../Debug/DebugPanel'
 import { createShowHelp } from '../HelpModal/HelpModal'
 import { QuestionMark } from '../QuestionMark/QuestionMark'

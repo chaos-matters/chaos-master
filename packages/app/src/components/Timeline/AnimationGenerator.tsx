@@ -143,7 +143,9 @@ export function AnimationControls(props: AnimationControlsProps) {
       </button>
       <button
         class={ui.genBtn}
-        onClick={() => props.timeline.clearAllTracks()}
+        onClick={() => {
+          props.timeline.clearAllTracks()
+        }}
         title="Clear all keyframes (undoable)"
       >
         Clear
@@ -197,9 +199,9 @@ export function AnimationGenerator(props: AnimationGeneratorProps) {
           {presets.map((preset) => (
             <button
               class={ui.pill}
-              onClick={() =>
+              onClick={() => {
                 preset.apply(props.flameDescriptor, props.timeline)
-              }
+              }}
               title={preset.label}
             >
               {preset.label}

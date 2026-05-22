@@ -121,4 +121,3 @@ export const randomGaussianCircle = tgpu.fn(
   const theta = random() * 2 * PI.$
   return vec2f(cos(theta), sin(theta)).mul(r)
 })
-

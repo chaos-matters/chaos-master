@@ -27,14 +27,13 @@ import { Modal } from './components/Modal/Modal'
 import { PaletteSelector } from './components/PaletteSelector/PaletteSelector'
 import { ProgressBar } from './components/ProgressBar/ProgressBar'
 import { defaultPills, getPresetFromQuality, QualityPresets, qualityPresets, } from './components/Quality/QualityPresets'
+import { QuickVariationPicker } from './components/QuickVariationPicker/QuickVariationPicker'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
 import { Slider } from './components/Sliders/Slider'
 import { SpotlightTour } from './components/SpotlightTour/SpotlightTour'
 import { KeyframeDiamond } from './components/Timeline/KeyframeDiamond'
 import { TimelineSection } from './components/Timeline/TimelineSection'
 import { createVariationSelector } from './components/VariationSelector/VariationSelector'
-import { QuickVariationPicker } from './components/QuickVariationPicker/QuickVariationPicker'
-import type { QuickPickerMode } from './components/QuickVariationPicker/QuickVariationPicker'
 import { ViewControls } from './components/ViewControls/ViewControls'
 import { WelcomeScreen } from './components/WelcomeScreen/WelcomeScreen'
 import { ChangeHistoryContextProvider } from './contexts/ChangeHistoryContext'
@@ -65,6 +64,7 @@ import { timelineTour } from './tours/timelineTour'
 import { createAnimationExport } from './utils/animationExport'
 import { createStoreHistory } from './utils/createStoreHistory'
 import { decodeSharePayload } from './utils/jsonQueryParam'
+import { persistentSignal } from './utils/persistentSignal'
 import { buildReadableIds } from './utils/readableIds'
 import { saveRecentFlame } from './utils/recentFlames'
 import { sum } from './utils/sum'
@@ -72,10 +72,10 @@ import { createTimelineState, resolveKeyframeValue } from './utils/timeline'
 import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
 import { useLoadFlameFromFile } from './utils/useLoadFlameFromFile'
 import { dismissWelcome, hasWelcomeBeenDismissed, } from './utils/welcomeDismissed'
-import { persistentSignal } from './utils/persistentSignal'
 import type { Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
 import type { QualityPreset } from './components/Quality/QualityPresets'
+import type { QuickPickerMode } from './components/QuickVariationPicker/QuickVariationPicker'
 import type { TourContext, TourGuide, } from './components/SpotlightTour/tourTypes'
 import type { ColorInitMode } from './flame/colorInitMode'
 import type { ColorMap, Palette } from './flame/colorMap'
@@ -260,7 +260,6 @@ function App(props: AppProps) {
       return flameDescriptor as unknown as FlameDescriptor
     }
   })
-
 
   const finalRenderInterval = () =>
     loadModalIsOpen() || varSelectorModalIsOpen()
@@ -821,7 +820,7 @@ function App(props: AppProps) {
               parts.length === 4 &&
               (parts[2] === 'preAffine' || parts[2] === 'postAffine')
             ) {
-              const affine = transforms[parts[1]!]?.[parts[2]!]
+              const affine = transforms[parts[1]!]?.[parts[2]]
               if (affine && parts[3]! in affine) {
                 affine[parts[3]!] = value as number
               }
@@ -985,7 +984,7 @@ function App(props: AppProps) {
 
   const startTimelineDrag = createDragHandler((initEvent) => {
     const handle = initEvent.currentTarget as HTMLElement
-    const container = handle.parentElement as HTMLElement | null
+    const container = handle.parentElement
     if (!container) return
     const startY = initEvent.clientY
     const startHeight = container.offsetHeight
@@ -1634,7 +1633,7 @@ function App(props: AppProps) {
                     </Card>
                     <CollapsibleCard title="Render">
                       <Card>
-<div
+                        <div
                           class={ui.parameterTarget}
                           onClick={() => {
                             setTargetedParameter('skipIters')

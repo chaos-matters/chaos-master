@@ -119,7 +119,9 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
         inputRef?.focus()
       }
     }, 60)
-    onCleanup(() => clearTimeout(tid))
+    onCleanup(() => {
+      clearTimeout(tid)
+    })
   })
 
   // Re-focus when switching to list mode
@@ -148,7 +150,9 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
           class={ui.headerBtn}
           classList={{ [ui.headerBtnActive!]: props.mode === 'list' }}
           title="List mode"
-          onClick={() => props.onModeChange('list')}
+          onClick={() => {
+            props.onModeChange('list')
+          }}
         >
           <ListIcon />
         </button>
@@ -156,7 +160,9 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
           class={ui.headerBtn}
           classList={{ [ui.headerBtnActive!]: props.mode === 'gallery' }}
           title="Preview gallery mode"
-          onClick={() => props.onModeChange('gallery')}
+          onClick={() => {
+            props.onModeChange('gallery')
+          }}
         >
           <GridIcon />
         </button>
@@ -221,47 +227,51 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
       <Show when={props.mode === 'gallery'}>
         <div class={ui.galleryList}>
           {(() => {
-            const previewFlames = variationPreviewFlames('pointInitGaussianDisk')
+            const previewFlames = variationPreviewFlames(
+              'pointInitGaussianDisk',
+            )
             return (
               <For each={variationTypes}>
                 {(type, i) => {
                   const flame = () => previewFlames[type]
-              return (
-                <button
-                  class={ui.galleryItem}
-                  classList={{ [ui.galleryItemActive!]: type === props.currentType }}
-                  title={getNormalizedVariationName(type)}
-                  onMouseEnter={() => props.onHoverType?.(type)}
-                  onMouseLeave={() => props.onHoverClear?.()}
-                  onClick={() => {
-                    props.onHoverClear?.()
-                    props.onSelect(type)
-                    props.onClose()
-                  }}
-                >
-                  <Show when={flame()} keyed>
-                    {(f) => (
-                      <DelayedShow delayMs={i() * 30}>
-                        <div class={ui.galleryCanvas}>
-                          <VariationPreview
-                            version={1}
-                            isSelected={type === props.currentType}
-                            name={type}
-                            flame={f}
-                          />
-                        </div>
-                      </DelayedShow>
-                    )}
-                  </Show>
-                  <div class={ui.galleryItemName}>
-                    {getNormalizedVariationName(type)}
-                  </div>
-                </button>
-              )
-            }}
-          </For>
-          )
-        })()}
+                  return (
+                    <button
+                      class={ui.galleryItem}
+                      classList={{
+                        [ui.galleryItemActive!]: type === props.currentType,
+                      }}
+                      title={getNormalizedVariationName(type)}
+                      onMouseEnter={() => props.onHoverType?.(type)}
+                      onMouseLeave={() => props.onHoverClear?.()}
+                      onClick={() => {
+                        props.onHoverClear?.()
+                        props.onSelect(type)
+                        props.onClose()
+                      }}
+                    >
+                      <Show when={flame()} keyed>
+                        {(f) => (
+                          <DelayedShow delayMs={i() * 30}>
+                            <div class={ui.galleryCanvas}>
+                              <VariationPreview
+                                version={1}
+                                isSelected={type === props.currentType}
+                                name={type}
+                                flame={f}
+                              />
+                            </div>
+                          </DelayedShow>
+                        )}
+                      </Show>
+                      <div class={ui.galleryItemName}>
+                        {getNormalizedVariationName(type)}
+                      </div>
+                    </button>
+                  )
+                }}
+              </For>
+            )
+          })()}
         </div>
       </Show>
     </div>
