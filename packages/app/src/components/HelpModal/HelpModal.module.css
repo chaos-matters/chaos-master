@@ -237,8 +237,44 @@
     background: oklch(28% 0.02 240);
     color: oklch(75% 0.08 240);
 
-    &:hover {
-      background: oklch(32% 0.025 240);
     }
+  }
+}
+
+/* ---- Title Bar Actions ---- */
+
+.titleBarActions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.changelogIconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: var(--neutral-400);
+  transition: color 0.15s;
+
+  &:hover {
+    color: var(--neutral-800);
+  }
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500);
+
+    &:hover {
+      color: var(--neutral-300);
+    }
+  }
+
+  & > svg {
+    width: 1.125rem;
+    height: 1.125rem;
+    fill: currentColor;
   }
 }

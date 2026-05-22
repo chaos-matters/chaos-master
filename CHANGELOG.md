@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-05-22
+
+### Added
+
+- **Timeline & DopeSheet**: A massive new keyframe animation system. Animate flame transforms and variations over time using a non-linear timeline editor.
+- **Auto-Animation Generator**: A one-click generative tool to automatically populate timeline tracks with smooth, mathematical interpolations and continuous rotations.
+- **Export Animations**: Render animated flames frame-by-frame directly in the browser and export them as image sequences or sprite sheets.
+- Advanced resize handles and UI layouts to seamlessly dock the Timeline at the bottom of the viewport.
+
+### Changed
+
+- Replaced old floating action widgets with a unified set of tools that seamlessly integrate the new timeline features.
+- Improved Palette Selector UI with softer padding and more elegant interactive elements.
+
 ## [0.7.9] - 2026-05-18
 
 ### Added

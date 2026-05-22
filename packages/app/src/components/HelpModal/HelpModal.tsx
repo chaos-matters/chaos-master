@@ -1,8 +1,9 @@
 import { createResource, For, Show, Suspense } from 'solid-js'
-import { GitHub } from '@/icons'
+import { Changelog, GitHub } from '@/icons'
 import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
 import { formatBytes } from '@/utils/formatBytes'
 import { GIT_SHA, VERSION } from '@/version'
+import { createShowChangelog } from '../AboutPanel/Changelog'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './HelpModal.module.css'
@@ -92,6 +93,7 @@ type HelpModalProps = {
 
 function HelpModal(props: HelpModalProps) {
   const [gpuDeviceInfo] = createResource(getGPUDeviceInformation)
+  const showChangelog = createShowChangelog()
   return (
     <>
       <ModalTitleBar
@@ -99,13 +101,22 @@ function HelpModal(props: HelpModalProps) {
           props.respond()
         }}
       >
-        <a
-          class={ui.githubLink}
-          href="https://github.com/chaos-matters/chaos-master"
-          target="_blank"
-        >
-          <GitHub />
-        </a>{' '}
+        <div class={ui.titleBarActions}>
+          <a
+            class={ui.githubLink}
+            href="https://github.com/chaos-matters/chaos-master"
+            target="_blank"
+          >
+            <GitHub />
+          </a>
+          <button
+            class={ui.changelogIconButton}
+            onClick={showChangelog}
+            title="View Changelog"
+          >
+            <Changelog />
+          </button>
+        </div>
         <span>
           Chaos Master v{VERSION} <sup>alpha</sup>{' '}
           {GIT_SHA ? <span class={ui.gitSha}>{GIT_SHA}</span> : null}{' '}
