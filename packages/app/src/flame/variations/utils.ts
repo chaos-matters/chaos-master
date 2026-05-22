@@ -78,7 +78,7 @@ export function getDefaultFlameByVarType(
         position: [0, 0],
       },
       colorInitMode: 'colorInitPosition',
-      pointInitMode: 'pointInitGaussian',
+      pointInitMode: 'pointInitGaussianDisk',
     },
     transforms: {
       [getTransformPreviewTid(type)]: {

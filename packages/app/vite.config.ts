@@ -9,7 +9,7 @@ import solidSvg from 'vite-plugin-solid-svg'
 
 const resolveCommitHash = (): string => {
   // Deno Deploy and GitHub Actions expose this automatically.
-  // @ts-expect-error TS doesn't know about `process`
+
   const fromEnv: string | undefined = process.env.GITHUB_SHA
   if (fromEnv !== undefined) {
     return fromEnv.slice(0, 7)
@@ -17,14 +17,14 @@ const resolveCommitHash = (): string => {
   try {
     return execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim()
   } catch {
-    // @ts-expect-error TS doesn't know about `process`
+
     return process.env.VITE_GIT_SHA ?? 'dev'
   }
 }
 
 const commitHash = resolveCommitHash()
 
-// @ts-expect-error TS doesn't know about `process`
+
 const ANALYZE_BUNDLE = Boolean(process.env.VITE_ANALYZE_BUNDLE)
 
 export default defineConfig({

@@ -1,5 +1,6 @@
 import { createEffect, createSignal, Show } from 'solid-js'
 import { useElementSize } from '@/utils/useElementSize'
+import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { CanvasContextProvider } from './CanvasContext'
 import { useRootContext } from './RootContext'
 import type { ParentProps } from 'solid-js'
@@ -15,6 +16,7 @@ type AutoCanvasProps = {
   pixelRatio?: number
   fixedResolution?: { width: number; height: number }
   alphaMode?: GPUCanvasAlphaMode
+  onVisibilityChange?: (isVisible: boolean) => void
 }
 
 export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
@@ -59,6 +61,13 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
     el.style.width = `100%`
     el.style.height = `100%`
     el.style.display = `block`
+  })
+
+  createEffect(() => {
+    const el = canvas()
+    if (el && props.onVisibilityChange) {
+      useIntersectionObserver(canvas, props.onVisibilityChange)
+    }
   })
 
   function createContext(canEl: HTMLCanvasElement) {

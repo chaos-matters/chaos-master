@@ -3,7 +3,7 @@ import { tgpu } from 'typegpu'
 import { arrayOf, builtin, f32, i32, struct, u32, vec2f, vec2i, vec2u, } from 'typegpu/data'
 import { add, arrayLength, atomicAdd, mul } from 'typegpu/std'
 import { camera2DWorldToClip } from '@/lib/Camera2D'
-import { hash, random, randomState, setSeed } from '@/shaders/random'
+import { hash, random, randomState, randomUnitDisk, setSeed } from '@/shaders/random'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { vramLog } from '@/utils/vramLog'
 import { colorInitModeToImplFn } from './colorInitMode'
@@ -39,7 +39,7 @@ export function createIFSPipeline(
   outputTextureDimension: readonly [number, number],
   accumulationBuffer: TgpuBuffer<WgslArray<typeof Bucket>> & StorageFlag,
   colorInitType: ColorInitMode = 'colorInitZero',
-  pointInitType: PointInitMode = 'pointInitCircle',
+  pointInitType: PointInitMode = 'pointInitUnitDisk',
 ) {
   let globId = 'IFS-PIP-'
   const sig = JSON.stringify({
@@ -143,7 +143,7 @@ export function createIFSPipeline(
       setSeed(seed)
 
       let point = Point()
-      point.position = pointInitMode(pointIndex)
+      point.position = pointInitMode()
       point.color = colorInitMode(point.position)
 
       for (let i = 0; i < insideShaderCount; i += 1) {
@@ -160,7 +160,7 @@ export function createIFSPipeline(
       bindGroupLayout.$.pointRandomSeeds[pointIndex] = vec2u(randomState.$)
 
       // antialiasing jitter
-      const jittered = add(screen, pointInitMode(pointIndex))
+      const jittered = add(screen, randomUnitDisk())
       if (
         // important to check the real coordinates and not integer,
         // because negative values > -1 end up on-screen causing

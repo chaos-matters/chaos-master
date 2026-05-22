@@ -91,9 +91,15 @@ importers:
       '@typegpu/color':
         specifier: 0.10.0
         version: 0.10.0(typegpu@0.10.2)
+      '@typegpu/noise':
+        specifier: 0.10.0
+        version: 0.10.0(typegpu@0.10.2)
       '@typegpu/sdf':
         specifier: 0.10.0
         version: 0.10.0(typegpu@0.10.2)
+      '@vercel/analytics':
+        specifier: 1.6.1
+        version: 1.6.1
       dexie:
         specifier: ^4.4.2
         version: 4.4.2
@@ -738,6 +744,11 @@ packages:
     peerDependencies:
       typegpu: ^0.10.0
 
+  '@typegpu/noise@0.10.0':
+    resolution: {integrity: sha512-ZIFEO+PAkq1mqAgL9J1b0GMWyIU/9ScbxD5VFP2nSbDMylGogCByCm6c0d4gMwnd7Fn4PrLRR5NIenTmaruFdA==}
+    peerDependencies:
+      typegpu: ^0.10.0
+
   '@typegpu/sdf@0.10.0':
     resolution: {integrity: sha512-q2P7xkpt/7IeyhrJ7Cd+3LgofCDNS/IFh9ZFCepyTIWBZLwhEjgAqOBl8Cbil8+SWkrKkIO6aJPWlhs+refDjg==}
     peerDependencies:
@@ -950,6 +961,32 @@ packages:
     resolution: {integrity: sha512-lrW200hZdbfRtztbygyaq/6jP6AKE8qQN2KvPcJ+x7wiD038YtnYtZ82IMNJ69GJibV7bwL3y9FgK+5w/pYt6g==}
     cpu: [x64]
     os: [win32]
+
+  '@vercel/analytics@1.6.1':
+    resolution: {integrity: sha512-oH9He/bEM+6oKlv3chWuOOcp8Y6fo6/PSro8hEkgCW3pu9/OiCXiUpRUogDh3Fs3LH2sosDrx8CxeOLBEE+afg==}
+    peerDependencies:
+      '@remix-run/react': ^2
+      '@sveltejs/kit': ^1 || ^2
+      next: '>= 13'
+      react: ^18 || ^19 || ^19.0.0-rc
+      svelte: '>= 4'
+      vue: ^3
+      vue-router: ^4
+    peerDependenciesMeta:
+      '@remix-run/react':
+        optional: true
+      '@sveltejs/kit':
+        optional: true
+      next:
+        optional: true
+      react:
+        optional: true
+      svelte:
+        optional: true
+      vue:
+        optional: true
+      vue-router:
+        optional: true
 
   '@vitejs/plugin-basic-ssl@2.1.4':
     resolution: {integrity: sha512-HXciTXN/sDBYWgeAD4V4s0DN0g72x5mlxQhHxtYu3Tt8BLa6MzcJZUyDVFCdtjNs3bfENVHVzOsmooTVuNgAAw==}
@@ -2603,6 +2640,10 @@ snapshots:
     dependencies:
       typegpu: 0.10.2
 
+  '@typegpu/noise@0.10.0(typegpu@0.10.2)':
+    dependencies:
+      typegpu: 0.10.2
+
   '@typegpu/sdf@0.10.0(typegpu@0.10.2)':
     dependencies:
       typegpu: 0.10.2
@@ -2808,6 +2849,8 @@ snapshots:
 
   '@unrs/resolver-binding-win32-x64-msvc@1.11.1':
     optional: true
+
+  '@vercel/analytics@1.6.1': {}
 
   '@vitejs/plugin-basic-ssl@2.1.4(vite@7.3.1(@types/node@25.6.0))':
     dependencies:
