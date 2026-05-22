@@ -236,7 +236,8 @@
   [data-theme='dark'] & {
     background: oklch(28% 0.02 240);
     color: oklch(75% 0.08 240);
-
+    &:hover {
+      background: oklch(32% 0.025 240);
     }
   }
 }

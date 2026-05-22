@@ -220,9 +220,12 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
       {/* Mode B: compact GPU gallery */}
       <Show when={props.mode === 'gallery'}>
         <div class={ui.galleryList}>
-          <For each={variationTypes}>
-            {(type, i) => {
-              const flame = () => variationPreviewFlames[type]
+          {(() => {
+            const previewFlames = variationPreviewFlames('pointInitGaussianDisk')
+            return (
+              <For each={variationTypes}>
+                {(type, i) => {
+                  const flame = () => previewFlames[type]
               return (
                 <button
                   class={ui.galleryItem}
@@ -240,7 +243,12 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
                     {(f) => (
                       <DelayedShow delayMs={i() * 30}>
                         <div class={ui.galleryCanvas}>
-                          <VariationPreview flame={f} />
+                          <VariationPreview
+                            version={1}
+                            isSelected={type === props.currentType}
+                            name={type}
+                            flame={f}
+                          />
                         </div>
                       </DelayedShow>
                     )}
@@ -252,6 +260,8 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
               )
             }}
           </For>
+          )
+        })()}
         </div>
       </Show>
     </div>

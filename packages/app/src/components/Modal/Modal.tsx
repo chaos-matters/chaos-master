@@ -77,10 +77,8 @@ export function Modal(props: ParentProps<ModalProps>) {
   }
 
   return (
-    <>
-      <ModalContext.Provider value={requestModal}>
-        {props.children}
-      </ModalContext.Provider>
+    <ModalContext.Provider value={requestModal}>
+      {props.children}
       <Portal
         mount={props.mount}
         ref={(el) => {
@@ -118,6 +116,6 @@ export function Modal(props: ParentProps<ModalProps>) {
           }}
         </Show>
       </Portal>
-    </>
+    </ModalContext.Provider>
   )
 }
