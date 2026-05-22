@@ -1121,6 +1121,7 @@ function App(props: AppProps) {
                         class={ui.timelineResizeHandle}
                         data-tour-target="timeline-handle"
                         onPointerDown={startTimelineDrag}
+                        title="Resize timeline"
                       />
                       <TimelineSection
                         formatTrackLabel={readableIds().formatTrackPath}
