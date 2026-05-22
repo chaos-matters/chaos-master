@@ -36,6 +36,7 @@ import { KeyframeDiamond } from './components/Timeline/KeyframeDiamond'
 import { TimelineSection } from './components/Timeline/TimelineSection'
 import { createVariationSelector } from './components/VariationSelector/VariationSelector'
 import { ViewControls } from './components/ViewControls/ViewControls'
+import { SoftwareVersion } from './components/SoftwareVersion/SoftwareVersion'
 import { WelcomeScreen } from './components/WelcomeScreen/WelcomeScreen'
 import { ChangeHistoryContextProvider } from './contexts/ChangeHistoryContext'
 import { CompactModeProvider, useCompactMode, } from './contexts/CompactModeContext'
@@ -137,6 +138,18 @@ type AppProps = {
 function App(props: AppProps) {
   const { theme, setTheme } = useTheme()
   const { targetedParameter, setTargetedParameter } = useKeyframeTarget()
+
+  createEffect(() => {
+    const path = targetedParameter()
+    if (path) {
+      // Find the element with the matching data-parameter-path
+      const el = document.querySelector(`[data-parameter-path="${path}"]`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      }
+    }
+  })
+
   const [qualityPreset, setQualityPreset] = createSignal<QualityPreset>(
     getPresetFromQuality(DEFAULT_QUALITY),
   )
@@ -859,6 +872,20 @@ function App(props: AppProps) {
             if (variation?.params) {
               variation.params[paramName] = value as number
             }
+          } else if (parts.length === 2 && parts[0] !== 'camera') {
+            const [transformId, variationId] = parts as [string, string]
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const transform = (draft.transforms as Record<string, any>)[
+              transformId
+            ] as
+              | {
+                  variations?: Record<string, { weight?: number }>
+                }
+              | undefined
+            const variation = transform?.variations?.[variationId]
+            if (variation) {
+              variation.weight = value as number
+            }
           }
           break
         }
@@ -917,9 +944,13 @@ function App(props: AppProps) {
 
   useKeyboardShortcuts({
     KeyF: () => {
-      document.startViewTransition(() => {
+      if ('startViewTransition' in document) {
+        document.startViewTransition(() => {
+          setShowSidebar((p) => !p)
+        })
+      } else {
         setShowSidebar((p) => !p)
-      })
+      }
       return true
     },
     KeyZ: (ev) => {
@@ -958,12 +989,17 @@ function App(props: AppProps) {
       }
     },
     KeyD: () => {
-      document.startViewTransition(() => {
+      const togglePaintMode = () => {
         setFlameDescriptor((draft) => {
           draft.renderSettings.drawMode =
             draft.renderSettings.drawMode === 'light' ? 'paint' : 'light'
         })
-      })
+      }
+      if ('startViewTransition' in document) {
+        document.startViewTransition(togglePaintMode)
+      } else {
+        togglePaintMode()
+      }
       return true
     },
     KeyI: (ev) => {
@@ -1188,8 +1224,8 @@ function App(props: AppProps) {
                     <span class={ui.playbackOverlayText}>
                       {animationExportRunning()
                         ? 'Rendering animation...'
-                        // eslint-disable-next-line eqeqeq
-                        : exportProgress() != null
+                        : // eslint-disable-next-line eqeqeq
+                          exportProgress() != null
                           ? 'Rendering image...'
                           : '⏸ Tap to stop animation'}
                     </span>
@@ -1271,7 +1307,7 @@ function App(props: AppProps) {
                         }}
                       />
                     </CollapsibleCard>
-                    <CollapsibleCard title="Color &amp; Palette">
+                    <CollapsibleCard title="Color">
                       <div
                         class={ui.parameterTarget}
                         onClick={() => {
@@ -1287,6 +1323,8 @@ function App(props: AppProps) {
                           }}
                         />
                       </div>
+                    </CollapsibleCard>
+                    <CollapsibleCard title="Palette" defaultOpen={false}>
                       <PaletteSelector
                         selectedPaletteId={selectedPaletteId()}
                         onSelect={handlePaletteSelect}
@@ -1681,11 +1719,16 @@ function App(props: AppProps) {
                               value={flameDescriptor.renderSettings.drawMode}
                               onChange={(ev) => {
                                 const mode = ev.currentTarget.value as DrawMode
-                                document.startViewTransition(() => {
+                                const update = () => {
                                   setFlameDescriptor((draft) => {
                                     draft.renderSettings.drawMode = mode
                                   })
-                                })
+                                }
+                                if ('startViewTransition' in document) {
+                                  document.startViewTransition(update)
+                                } else {
+                                  update()
+                                }
                               }}
                             >
                               <For each={recordKeys(drawModeToImplFn)}>
@@ -1716,11 +1759,16 @@ function App(props: AppProps) {
                               onChange={(ev) => {
                                 const mode = ev.currentTarget
                                   .value as ColorInitMode
-                                document.startViewTransition(() => {
+                                const update = () => {
                                   setFlameDescriptor((draft) => {
                                     draft.renderSettings.colorInitMode = mode
                                   })
-                                })
+                                }
+                                if ('startViewTransition' in document) {
+                                  document.startViewTransition(update)
+                                } else {
+                                  update()
+                                }
                               }}
                             >
                               <For each={recordKeys(colorInitModeToImplFn)}>
@@ -1753,11 +1801,16 @@ function App(props: AppProps) {
                               onChange={(ev) => {
                                 const mode = ev.currentTarget
                                   .value as PointInitMode
-                                document.startViewTransition(() => {
+                                const update = () => {
                                   setFlameDescriptor((draft) => {
                                     draft.renderSettings.pointInitMode = mode
                                   })
-                                })
+                                }
+                                if ('startViewTransition' in document) {
+                                  document.startViewTransition(update)
+                                } else {
+                                  update()
+                                }
                               }}
                             >
                               <For each={recordKeys(pointInitModeToImplFn)}>
@@ -2054,9 +2107,12 @@ function App(props: AppProps) {
                           <Checkbox
                             checked={showTimeline()}
                             onChange={(checked) => {
-                              document.startViewTransition(() => {
-                                setShowTimeline(checked)
-                              })
+                              const update = () => setShowTimeline(checked)
+                              if ('startViewTransition' in document) {
+                                document.startViewTransition(update)
+                              } else {
+                                update()
+                              }
                             }}
                           />
                         </label>
@@ -2117,6 +2173,7 @@ function App(props: AppProps) {
               hideDiceButtons={hideDiceButtons}
             />
             <SpotlightTour tourContext={tourContext} />
+            <SoftwareVersion />
           </Dropzone>
         </TimelineContextProvider>
       </ChangeHistoryContextProvider>
@@ -2177,13 +2234,21 @@ export function Wrappers() {
   const spotlightState = createSpotlightTourState(getTour)
 
   // Support #tour=app|sidebar|timeline hash URLs
-  createEffect(() => {
-    const hash = window.location.hash
-    const match = hash.match(/^#tour=(app|sidebar|timeline)$/)
-    if (match) {
-      spotlightState.startTour(match[1]!)
-      window.location.hash = ''
+  onMount(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash
+      const match = hash.match(/^#tour=(app|sidebar|timeline)$/)
+      if (match) {
+        spotlightState.startTour(match[1]!)
+        window.location.hash = ''
+      }
     }
+
+    window.addEventListener('hashchange', handleHashChange)
+    onCleanup(() => window.removeEventListener('hashchange', handleHashChange))
+
+    // Check initial hash on mount
+    handleHashChange()
   })
 
   // Log what gets passed to App

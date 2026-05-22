@@ -11,11 +11,11 @@
   gap: var(--space-2);
   flex-wrap: wrap;
   flex-shrink: 0;
-  padding-top: var(--space-1);
-  border-top: 1px solid var(--neutral-200);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--neutral-200);
 
   [data-theme='dark'] & {
-    border-top-color: var(--neutral-800);
+    border-bottom-color: var(--neutral-800);
   }
 }
 
@@ -71,33 +71,35 @@
 }
 
 .qualityActive {
-  background: var(--accent-color, #3b82f6);
-  border-color: var(--accent-color, #3b82f6);
+  background: var(--neutral-800);
+  border-color: var(--neutral-800);
   color: white;
 
   &:hover:not(:disabled) {
-    background: var(--accent-color, #3b82f6);
+    background: var(--neutral-700);
     color: white;
   }
 
   [data-theme='dark'] & {
-    background: var(--accent-color, #3b82f6);
-    border-color: var(--accent-color, #3b82f6);
-    color: white;
+    background: var(--neutral-200);
+    border-color: var(--neutral-200);
+    color: var(--neutral-900);
 
     &:hover:not(:disabled) {
-      background: var(--accent-color, #3b82f6);
-      color: white;
+      background: var(--neutral-300);
+      color: var(--neutral-900);
     }
   }
 }
 
 .generateButton {
   appearance: none;
-  border: 1px solid var(--accent-color, #3b82f6);
-  background: var(--accent-color, #3b82f6);
+  border: 1px solid var(--neutral-800);
+  background: var(--neutral-800);
   color: white;
-  padding: 0.3rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 600;
   border-radius: 6px;
   cursor: pointer;
   display: flex;
@@ -109,7 +111,8 @@
     transform 0.1s;
 
   &:hover {
-    opacity: 0.9;
+    background: var(--neutral-700);
+    border-color: var(--neutral-700);
   }
 
   &:active {
@@ -117,12 +120,13 @@
   }
 
   [data-theme='dark'] & {
-    border-color: var(--accent-color, #3b82f6);
-    background: var(--accent-color, #3b82f6);
-    color: white;
+    border-color: var(--neutral-200);
+    background: var(--neutral-200);
+    color: var(--neutral-900);
 
     &:hover {
-      opacity: 0.9;
+      background: var(--neutral-300);
+      border-color: var(--neutral-300);
     }
   }
 }
@@ -132,7 +136,9 @@
   border: 1px solid #ef4444;
   background: transparent;
   color: #ef4444;
-  padding: 0.3rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 600;
   border-radius: 6px;
   cursor: pointer;
   display: flex;

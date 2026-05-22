@@ -44,8 +44,9 @@ export function DopeSheet(props: DopeSheetProps) {
   const [containerHeight, setContainerHeight] = createSignal(200)
   const [zoomLevel, setZoomLevel] = createSignal(1)
   let containerRef: HTMLDivElement | undefined
-  let tracksScrollRef: HTMLDivElement | undefined
-  let seekLaneRef: HTMLDivElement | undefined
+  let tracksScrollRef!: HTMLDivElement
+  let seekRulerRef!: HTMLDivElement
+  let seekLaneRef!: HTMLDivElement | undefined
 
   const frameWidth = createMemo(() => {
     const h = containerHeight()
@@ -156,6 +157,14 @@ export function DopeSheet(props: DopeSheetProps) {
     path: string
     frame: number
   } | null>(null)
+
+  createEffect(() => {
+    const added = timeline.lastAddedKeyframe()
+    if (added) {
+      setSelectedKeyframe(added)
+    }
+  })
+
   const [contextMenu, setContextMenu] = createSignal<{
     x: number
     y: number
@@ -271,6 +280,7 @@ export function DopeSheet(props: DopeSheetProps) {
     const startX = e.clientX
     const startValue = currentValue
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    setTargetedParameter(sel.path)
 
     if (!changeHistory.isPreviewing()) {
       changeHistory.startPreview('Keyframe scrub')
@@ -278,10 +288,32 @@ export function DopeSheet(props: DopeSheetProps) {
     // Push undo once at start of scrub drag
     timeline.addKeyframe(sel.path, sel.frame, startValue, easing)
 
+    let step = 0.01
+    let min: number | undefined = undefined
+    let max: number | undefined = undefined
+    const domNode = document.querySelector(
+      `[data-parameter-path="${sel.path}"]`,
+    )
+    if (domNode) {
+      const stepAttr =
+        domNode.getAttribute('step') || domNode.getAttribute('data-step')
+      if (stepAttr) step = parseFloat(stepAttr) || 0.01
+
+      const minAttr =
+        domNode.getAttribute('min') || domNode.getAttribute('data-min')
+      if (minAttr) min = parseFloat(minAttr)
+
+      const maxAttr =
+        domNode.getAttribute('max') || domNode.getAttribute('data-max')
+      if (maxAttr) max = parseFloat(maxAttr)
+    }
+
     function onMove(ev: PointerEvent) {
       const dx = ev.clientX - startX
-      const sensitivity = ev.shiftKey ? 0.1 : 1
-      const newValue = startValue + dx * 0.01 * sensitivity
+      const sensitivity = ev.ctrlKey ? 0.01 : ev.shiftKey ? 0.1 : 1
+      let newValue = startValue + dx * step * sensitivity
+      if (min !== undefined) newValue = Math.max(min, newValue)
+      if (max !== undefined) newValue = Math.min(max, newValue)
       timeline.setKeyframeValue(sel.path, sel.frame, newValue, easing)
     }
 
@@ -366,8 +398,99 @@ export function DopeSheet(props: DopeSheetProps) {
         <span class={ui.frameIndicator}>Frame {currentFrame()}</span>
       </div>
 
+      {/* ── Inspector ── */}
+      <div class={ui.inspector}>
+        <Show
+          when={selectedKeyframeData()}
+          fallback={
+            <span class={ui.inspectorPlaceholder}>
+              Select a keyframe to edit
+            </span>
+          }
+        >
+          {(kf) => (
+            <>
+              <span class={ui.inspectorLabel}>
+                {props.formatTrackLabel
+                  ? props.formatTrackLabel(selectedKeyframe()!.path)
+                  : pathLabel(selectedKeyframe()!.path)}{' '}
+                @ frame {kf().frame}
+              </span>
+              {typeof kf().value === 'number' ? (
+                <Show
+                  when={inspectorEditing()}
+                  fallback={
+                    <span
+                      class={ui.inspectorValue}
+                      onPointerDown={(e) => {
+                        startInspectorScrub(e, kf().value as number)
+                      }}
+                      onDblClick={() => {
+                        startInspectorEdit(kf().value as number)
+                      }}
+                    >
+                      {String(kf().value)}
+                    </span>
+                  }
+                >
+                  <input
+                    ref={inspectorInputRef}
+                    class={ui.inspectorValueInput}
+                    type="text"
+                    value={inspectorEditValue()}
+                    onInput={(e) =>
+                      setInspectorEditValue(e.currentTarget.value)
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commitInspectorEdit()
+                      if (e.key === 'Escape') cancelInspectorEdit()
+                      e.stopPropagation()
+                    }}
+                    onBlur={commitInspectorEdit}
+                  />
+                </Show>
+              ) : (
+                <span class={ui.inspectorValueReadonly}>
+                  {formatKeyframeValue(kf().value)}
+                </span>
+              )}
+              <label class={ui.inspectorEasing}>
+                Easing:
+                <select
+                  value={kf().easing ?? 'linear'}
+                  onChange={(e) => {
+                    timeline.addKeyframe(
+                      selectedKeyframe()!.path,
+                      selectedKeyframe()!.frame,
+                      kf().value,
+                      e.currentTarget.value as EasingCurve,
+                    )
+                  }}
+                >
+                  <For each={EASING_OPTIONS}>
+                    {(opt) => <option value={opt}>{opt}</option>}
+                  </For>
+                </select>
+              </label>
+              <button
+                class={ui.inspectorDelete}
+                onClick={() => {
+                  timeline.removeKeyframe(
+                    selectedKeyframe()!.path,
+                    selectedKeyframe()!.frame,
+                  )
+                  setSelectedKeyframe(null)
+                }}
+              >
+                Delete
+              </button>
+            </>
+          )}
+        </Show>
+      </div>
+
       {/* ── Seek ruler ── */}
-      <div class={ui.seekRuler}>
+      <div class={ui.seekRuler} ref={seekRulerRef}>
         <div
           style={{
             width: `${TRACK_NAME_WIDTH}px`,
@@ -387,6 +510,10 @@ export function DopeSheet(props: DopeSheetProps) {
                 class={ui.seekLabel}
                 style={{
                   left: `${(frame - timeline.config().startFrame) * frameWidth()}px`,
+                  transform:
+                    frame === timeline.config().startFrame
+                      ? 'translateX(0)'
+                      : undefined,
                 }}
               >
                 {frame}
@@ -407,7 +534,15 @@ export function DopeSheet(props: DopeSheetProps) {
       </div>
 
       {/* ── Tracks ── */}
-      <div class={ui.tracksScroll} ref={tracksScrollRef}>
+      <div
+        class={ui.tracksScroll}
+        ref={tracksScrollRef}
+        onScroll={(e) => {
+          if (seekRulerRef) {
+            seekRulerRef.scrollLeft = e.currentTarget.scrollLeft
+          }
+        }}
+      >
         <Show
           when={activeTracks().length > 0}
           fallback={
@@ -428,9 +563,10 @@ export function DopeSheet(props: DopeSheetProps) {
                 endFrame={timeline.config().endFrame}
                 currentFrame={currentFrame()}
                 selectedKeyframe={selectedKeyframe()}
-                onSelectKeyframe={(path, frame) =>
+                onSelectKeyframe={(path, frame) => {
                   setSelectedKeyframe({ path, frame })
-                }
+                  timeline.goToFrame(frame)
+                }}
                 onDragKeyframe={handleDragKeyframe}
                 onContextMenu={handleContextMenu}
                 onDeselectKeyframe={() => setSelectedKeyframe(null)}
@@ -450,86 +586,6 @@ export function DopeSheet(props: DopeSheetProps) {
           }}
         />
       </div>
-
-      {/* ── Inspector ── */}
-      <Show when={selectedKeyframeData()}>
-        {(kf) => (
-          <div class={ui.inspector}>
-            <span class={ui.inspectorLabel}>
-              {props.formatTrackLabel
-                ? props.formatTrackLabel(selectedKeyframe()!.path)
-                : pathLabel(selectedKeyframe()!.path)}{' '}
-              @ frame {kf().frame}
-            </span>
-            {typeof kf().value === 'number' ? (
-              <Show
-                when={inspectorEditing()}
-                fallback={
-                  <span
-                    class={ui.inspectorValue}
-                    onPointerDown={(e) => {
-                      startInspectorScrub(e, kf().value as number)
-                    }}
-                    onDblClick={() => {
-                      startInspectorEdit(kf().value as number)
-                    }}
-                  >
-                    {String(kf().value)}
-                  </span>
-                }
-              >
-                <input
-                  ref={inspectorInputRef}
-                  class={ui.inspectorValueInput}
-                  type="text"
-                  value={inspectorEditValue()}
-                  onInput={(e) => setInspectorEditValue(e.currentTarget.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') commitInspectorEdit()
-                    if (e.key === 'Escape') cancelInspectorEdit()
-                    e.stopPropagation()
-                  }}
-                  onBlur={commitInspectorEdit}
-                />
-              </Show>
-            ) : (
-              <span class={ui.inspectorValueReadonly}>
-                {formatKeyframeValue(kf().value)}
-              </span>
-            )}
-            <label class={ui.inspectorEasing}>
-              Easing:
-              <select
-                value={kf().easing ?? 'linear'}
-                onChange={(e) => {
-                  timeline.addKeyframe(
-                    selectedKeyframe()!.path,
-                    selectedKeyframe()!.frame,
-                    kf().value,
-                    e.currentTarget.value as EasingCurve,
-                  )
-                }}
-              >
-                <For each={EASING_OPTIONS}>
-                  {(opt) => <option value={opt}>{opt}</option>}
-                </For>
-              </select>
-            </label>
-            <button
-              class={ui.inspectorDelete}
-              onClick={() => {
-                timeline.removeKeyframe(
-                  selectedKeyframe()!.path,
-                  selectedKeyframe()!.frame,
-                )
-                setSelectedKeyframe(null)
-              }}
-            >
-              Delete
-            </button>
-          </div>
-        )}
-      </Show>
 
       {/* ── Context menu ── */}
       <Show when={contextMenu()}>

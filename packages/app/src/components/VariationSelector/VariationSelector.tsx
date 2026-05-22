@@ -462,7 +462,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
 
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: speed search captures keyboard globally
-    <div onKeyDown={handleSpeedSearch}>
+    <div class={ui.variationSelectorWrapper} onKeyDown={handleSpeedSearch}>
       <ModalTitleBar
         onClose={() => {
           props.respond(CANCEL)

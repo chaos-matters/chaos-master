@@ -568,18 +568,7 @@ function RenderDialog(props: RenderDialogProps) {
           <Button onClick={props.onExport}>Export Image</Button>
         </Show>
         <Show when={props.exportTab === 'animation'}>
-          <Button onClick={props.onRenderAnimation}>
-            <svg
-              viewBox="0 0 16 16"
-              fill="currentColor"
-              width="14"
-              height="14"
-              style="margin-right:4px"
-            >
-              <path d="M4 2l10 6-10 6V2z" />
-            </svg>
-            Render Animation
-          </Button>
+          <Button onClick={props.onRenderAnimation}>Render Animation</Button>
         </Show>
       </footer>
     </>

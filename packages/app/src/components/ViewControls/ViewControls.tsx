@@ -5,7 +5,6 @@ import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { Minus, Plus, Redo, Undo } from '@/icons'
 import { Button } from '../Button/Button'
 import { ButtonGroup } from '../Button/ButtonGroup'
-import { SoftwareVersion } from '../SoftwareVersion/SoftwareVersion'
 import { KeyframeDiamond } from '../Timeline/KeyframeDiamond'
 import ui from './ViewControls.module.css'
 import type { Setter } from 'solid-js'
@@ -141,7 +140,6 @@ export function ViewControls(props: ViewControlProps) {
           <Redo />
         </Button>
       </ButtonGroup>
-      <SoftwareVersion />
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, onCleanup } from 'solid-js'
+import { createEffect, createMemo, createSignal, onCleanup, untrack } from 'solid-js'
 import { arrayOf, vec2u, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { useTimeline } from '@/contexts/TimelineContext'
@@ -219,20 +219,17 @@ export function Flam3(props: Flam3Props) {
     'colorGradingMs',
   ])
 
-  // Reads from animatedFlame() (not props.flameDescriptor) to ensure the
-  // fingerprint only changes AFTER the clone effect has updated animatedFlame.
   // Also returns the flame snapshot so the pipeline creation uses the exact same
   // value — re-reading untrack(animatedFlame) separately can return a different
   // flame when outputTextures() memo re-evaluation causes nested effect flushes.
   const parameterFingerprint = createMemo(() => {
     const flame = animatedFlame()
-    const fp = JSON.stringify({
+    return JSON.stringify({
       transforms: flame.transforms,
       colorInitMode: flame.renderSettings.colorInitMode,
       pointInitMode: flame.renderSettings.pointInitMode,
       skipIters: flame.renderSettings.skipIters,
     })
-    return { fingerprint: fp, flame }
   })
 
   // Clone flame descriptor and apply timeline keyframes.
@@ -335,14 +332,14 @@ export function Flam3(props: Flam3Props) {
   // Main render loop — follows the main branch pattern with plain `let` variables
   // inside an outer effect, using rafLoop.redraw() for reactive triggers.
   createEffect(() => {
-    const fpResult = parameterFingerprint()
+    const fingerprint = parameterFingerprint()
     const o = outputTextures()
-    if (!o || !fpResult) {
+    if (!o || !fingerprint) {
       return undefined
     }
 
     const { textureSize, accumulationBuffer } = o
-    const { fingerprint: _fingerprint, flame } = fpResult
+    const flame = untrack(animatedFlame)
     const typedAccumulationBuffer = accumulationBuffer
 
     const ifsPipeline = createIFSPipeline(

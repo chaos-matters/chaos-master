@@ -93,6 +93,10 @@ export function ScrubInput(props: ScrubInputProps) {
           selectedKeyframePath() === props.dataParameterPath,
       }}
       data-tour-target={props['data-tour-target']}
+      data-parameter-path={props.dataParameterPath}
+      data-step={step()}
+      data-min={props.min}
+      data-max={props.max}
       onDblClick={startEdit}
       onPointerDown={startScrub}
     >
