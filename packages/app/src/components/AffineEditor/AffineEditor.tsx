@@ -1,5 +1,5 @@
 import { sdRoundedBox2d } from '@typegpu/sdf'
-import { createEffect, createMemo, createSignal, For } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { builtin, vec2f, vec3f, vec4f } from 'typegpu/data'
 import { abs, add, dot, dpdx, fract, length, max, mix, mul, saturate, sub, } from 'typegpu/std'
@@ -15,9 +15,9 @@ import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'
 import { recordEntries } from '@/utils/record'
 import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
-import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { handleColor } from '../FlameColorEditor/FlameColorEditor'
 import ui from './AffineEditor.module.css'
+import { AffineListEditor } from './AffineListEditor'
 import type { v2f } from 'typegpu/data'
 import type { AffineParams } from '@/flame/affineTranform'
 import type { TransformRecord } from '@/flame/schema/flameSchema'
@@ -79,7 +79,7 @@ function cross2d(a: v2f, b: v2f) {
   return a.x * b.y - a.y * b.x
 }
 
-function Grid(props: { isVisible: () => boolean }) {
+function Grid() {
   const { theme } = useTheme()
   const camera = useCamera()
   const { device, root } = useRootContext()
@@ -142,12 +142,10 @@ function Grid(props: { isVisible: () => boolean }) {
     const rafLoop = createAnimationFrame(
       () => {
         const encoder = device.createCommandEncoder()
-        const canvasTexture = context.getCurrentTexture()
-        canvasTexture.label = 'AffineEditor_CanvasTexture'
         const pass = encoder.beginRenderPass({
           colorAttachments: [
             {
-              view: canvasTexture.createView(),
+              view: context.getCurrentTexture().createView(),
               loadOp: 'clear',
               storeOp: 'store',
             },
@@ -157,7 +155,7 @@ function Grid(props: { isVisible: () => boolean }) {
         pass.end()
         device.queue.submit([encoder.finish()])
       },
-      () => (props.isVisible() ? 0 : Infinity),
+      () => 0,
     )
   })
   return null
@@ -169,17 +167,25 @@ function AffineHandle(props: {
   setTransform: (pos: AffineParams) => void
 }) {
   const { theme } = useTheme()
-  const { canvas, canvasSize } = useCanvas()
   const {
     js: { worldToClip, clipToWorld },
   } = useCamera()
+  const { canvas, canvasSize } = useCanvas()
   const changeHistory = useChangeHistory()
 
   const aspect = createMemo(() => canvasSize().width / canvasSize().height)
   const position = createMemo(() => vec2f(props.transform.c, props.transform.f))
-  const clipPosition = createMemo(() => worldToClip(position()))
-  const clipTransform = createMemo(
-    (prev: number[]) => {
+  const clipPosition = createMemo(() => {
+    try {
+      const result = worldToClip(position())
+      return result
+    } catch {
+      // worldToClip may throw if camera hasn't initialized
+    }
+    return vec2f(0.5, 0.5)
+  })
+  const clipTransform = createMemo(() => {
+    try {
       // prettier-ignore
       const { a, b, c, d, e, f } = props.transform
       const zero = worldToClip(vec2f(0, 0))
@@ -187,14 +193,12 @@ function AffineHandle(props: {
       const y = sub(worldToClip(vec2f(b, e)), zero)
       const t = worldToClip(vec2f(c, f))
       const s = aspect()
-      const next = [x.x * s, y.x * s, x.y, y.y, t.x * s, t.y]
-      // worldToClip returns NaN/Infinity before the camera has completed its
-      // first update (canvas not yet sized). Keep the previous value so the SVG
-      // transform attribute is never set to "matrix(NaN, ...)".
-      return next.every(isFinite) ? next : prev
-    },
-    [1, 0, 0, 1, 0, 0],
-  )
+      return [x.x * s, y.x * s, x.y, y.y, t.x * s, t.y]
+    } catch {
+      // worldToClip may throw if camera hasn't initialized
+      return [0, 0, 0, 0, 0.5, 0.5]
+    }
+  })
   const startDragging = createDragHandler((initEvent) => {
     changeHistory.startPreview('Affine Translation')
 
@@ -327,6 +331,8 @@ function AffineHandle(props: {
   )
 }
 
+type Tab = 'grid' | 'list'
+
 export function AffineEditor(props: {
   class?: string
   transforms: TransformRecord
@@ -335,9 +341,7 @@ export function AffineEditor(props: {
   const [div, setDiv] = createSignal<HTMLDivElement>()
   const [zoom, setZoom] = createZoom(0.9, [0.5, 20])
   const [position, setPosition] = createPosition(vec2f())
-  const [isVisible, setIsVisible] = createSignal(true)
-
-  useIntersectionObserver(div, (visible) => setIsVisible(visible))
+  const [tab, setTab] = createSignal<Tab>('grid')
 
   const scrollTrigger = () => {
     Object.values(props.transforms).forEach((tr) => tr.preAffine)
@@ -352,47 +356,74 @@ export function AffineEditor(props: {
       class={ui.editorCard}
       classList={{
         [props.class ?? '']: true,
+        [ui.listMode as string]: tab() === 'list',
       }}
     >
-      <AutoCanvas class={ui.canvas} pixelRatio={1}>
-        <WheelZoomCamera2D
-          eventTarget={div()}
-          zoom={[zoom, setZoom]}
-          position={[position, setPosition]}
+      <div class={ui.tabs} data-tour-target="affine-tabs">
+        <button
+          class={ui.tab}
+          classList={{ [ui.tabActive as string]: tab() === 'grid' }}
+          onClick={() => setTab('grid')}
         >
-          <Grid isVisible={isVisible} />
-          <svg class={ui.svg}>
-            <defs>
-              <marker
-                id="arrow"
-                class={ui.arrowHead}
-                viewBox="0 0 10 10"
-                refX="5"
-                refY="5"
-                markerWidth="0.09"
-                markerHeight="0.09"
-                markerUnits="userSpaceOnUse"
-                orient="auto-start-reverse"
-              >
-                <path d="M 0 0 L 10 5 L 0 10 z" />
-              </marker>
-            </defs>
-            <For each={recordEntries(props.transforms)}>
-              {([tid, transform]) => (
-                <AffineHandle
-                  transform={transform.preAffine}
-                  color={vec2f(transform.color.x, transform.color.y)}
-                  setTransform={(affine) => {
-                    props.setTransforms((draft) => {
-                      draft[tid]!.preAffine = affine
-                    })
-                  }}
-                />
-              )}
-            </For>
-          </svg>
-        </WheelZoomCamera2D>
-      </AutoCanvas>
+          Grid
+        </button>
+        <button
+          class={ui.tab}
+          classList={{ [ui.tabActive as string]: tab() === 'list' }}
+          onClick={() => setTab('list')}
+        >
+          Coefs
+        </button>
+      </div>
+
+      <Show when={tab() === 'grid'}>
+        <AutoCanvas class={ui.canvas} pixelRatio={1}>
+          <WheelZoomCamera2D
+            eventTarget={div()}
+            zoom={[zoom, setZoom]}
+            position={[position, setPosition]}
+          >
+            <Grid />
+            <svg class={ui.svg}>
+              <defs>
+                <marker
+                  id="arrow"
+                  class={ui.arrowHead}
+                  viewBox="0 0 10 10"
+                  refX="5"
+                  refY="5"
+                  markerWidth="0.09"
+                  markerHeight="0.09"
+                  markerUnits="userSpaceOnUse"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 0 L 10 5 L 0 10 z" />
+                </marker>
+              </defs>
+              <For each={recordEntries(props.transforms)}>
+                {([tid, transform]) => (
+                  <AffineHandle
+                    transform={transform.preAffine}
+                    color={vec2f(transform.color.x, transform.color.y)}
+                    setTransform={(affine) => {
+                      props.setTransforms((draft) => {
+                        draft[tid]!.preAffine = affine
+                      })
+                    }}
+                  />
+                )}
+              </For>
+            </svg>
+          </WheelZoomCamera2D>
+        </AutoCanvas>
+      </Show>
+
+      <Show when={tab() === 'list'}>
+        <AffineListEditor
+          transforms={props.transforms}
+          setTransforms={props.setTransforms}
+        />
+      </Show>
     </div>
   )
 }

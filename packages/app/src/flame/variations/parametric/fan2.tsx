@@ -21,13 +21,13 @@ const Fan2ParamsDefaults: Fan2Params = {
 const Fan2ParamsEditor: EditorFor<Fan2Params> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'x', 'X')}
+      {...editorProps(props, 'x', 'X', props.dataParameterPath)}
       min={0}
       max={1}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'y', 'Y')}
+      {...editorProps(props, 'y', 'Y', props.dataParameterPath)}
       min={0}
       max={1}
       step={0.01}

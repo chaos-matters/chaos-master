@@ -1,0 +1,119 @@
+.ruler {
+  position: relative;
+  height: 24px;
+  background-color: var(--neutral-100);
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-top: 1px solid var(--neutral-200);
+  min-height: 24px;
+
+  [data-theme='dark'] & {
+    background-color: var(--neutral-950);
+    border-top-color: var(--neutral-800);
+  }
+
+  /* Hide scrollbar for cleaner look */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.ruler::-webkit-scrollbar {
+  display: none;
+}
+
+.markers {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  pointer-events: none;
+}
+
+.keyframeMarker {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  background-color: var(--accent-color, #3b82f6);
+  border-left: 1px solid white;
+
+  [data-theme='dark'] & {
+    background-color: var(--accent-color, #60a5fa);
+  }
+}
+
+.scale {
+  display: flex;
+  height: 100%;
+  pointer-events: none;
+  padding-left: var(--timeline-transport-width, 80px);
+
+  [data-theme='dark'] & {
+    padding-left: var(--timeline-transport-width, 70px);
+  }
+}
+
+.scale span {
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--neutral-600);
+  line-height: 24px;
+  user-select: none;
+  line-height: normal;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-400);
+  }
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+  .ruler {
+    height: 20px;
+    min-height: 20px;
+  }
+
+  .scale {
+    padding-left: var(--timeline-transport-width-mobile, 70px);
+
+    [data-theme='dark'] & {
+      padding-left: var(--timeline-transport-width-mobile, 60px);
+    }
+  }
+
+  .scale span {
+    font-size: 0.65rem;
+    line-height: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .ruler {
+    height: 16px;
+    min-height: 16px;
+  }
+
+  .markers {
+    /* Allow markers to scroll on very small screens */
+    overflow-x: auto;
+  }
+
+  .keyframeMarker {
+    width: 1px;
+  }
+
+  .scale {
+    padding-left: var(--timeline-transport-width-small, 60px);
+
+    [data-theme='dark'] & {
+      padding-left: var(--timeline-transport-width-small, 55px);
+    }
+  }
+
+  .scale span {
+    font-size: 0.55rem;
+    line-height: 16px;
+  }
+}

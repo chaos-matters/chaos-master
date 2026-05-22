@@ -17,12 +17,13 @@ export function getVariationDefault(
   weight: number,
 ): TransformVariationDescriptor {
   if (!isParametricVariationType(type)) {
-    return { type, weight } as TransformVariationDescriptor
+    return { type, weight, visible: true } as TransformVariationDescriptor
   }
   return {
     type,
-    params: transformVariations[type].paramDefaults,
+    params: { ...transformVariations[type].paramDefaults },
     weight,
+    visible: true,
   } as TransformVariationDescriptor
 }
 
@@ -187,6 +188,7 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
         ] = {
           type: 'ngonVar',
           weight: 1.0,
+          visible: true,
           params: {
             power: 2,
             sides: 6,
@@ -228,6 +230,7 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
         ] = {
           type: 'rectanglesVar',
           weight: 1.0,
+          visible: true,
           params: {
             x: 1,
             y: 1,
@@ -251,6 +254,7 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
         ] = {
           type: 'rings2',
           weight: 1.0,
+          visible: true,
           params: {
             val: 1.2,
           },
@@ -302,6 +306,7 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
         ] = {
           type: 'tradeVar',
           weight: 1.0,
+          visible: true,
           params: { r1: 1.21, d1: 0.53, r2: 1.76, d2: 0.4 },
         }
       }),
@@ -315,6 +320,7 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
         ] = {
           type: 'popcorn2Var',
           weight: 1.0,
+          visible: true,
           params: { x: -1.28, y: -0.94, c: -2.49 },
         }
       }),
@@ -329,6 +335,7 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
         ] = {
           type: 'spirographVar',
           weight: 1.0,
+          visible: true,
           params: {
             a: 3.25,
             b: 1.96,
@@ -352,6 +359,7 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
           [getTransformPreviewVid('pixelFlowVar')]: {
             type: 'pixelFlowVar',
             weight: 1.0,
+            visible: true,
             params: {
               angle: 149,
               len: 1.54,
@@ -360,7 +368,7 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
               enableDirectColor: 1,
             },
           },
-          [generateVariationId()]: { type: 'linear', weight: 1 },
+          [generateVariationId()]: { type: 'linear', weight: 1, visible: true },
         }
       }),
     ),

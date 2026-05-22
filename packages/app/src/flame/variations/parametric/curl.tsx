@@ -19,13 +19,13 @@ const CurlParamsDefaults: CurlParams = {
 const CurlParamsEditor: EditorFor<CurlParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'c1', 'C1')}
+      {...editorProps(props, 'c1', 'C1', props.dataParameterPath)}
       min={0}
       max={5}
       step={0.001}
     />
     <RangeEditor
-      {...editorProps(props, 'c2', 'C2')}
+      {...editorProps(props, 'c2', 'C2', props.dataParameterPath)}
       min={0}
       max={50}
       step={1}

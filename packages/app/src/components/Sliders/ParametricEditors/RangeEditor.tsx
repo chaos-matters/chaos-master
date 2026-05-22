@@ -26,6 +26,7 @@ export function RangeEditor(props: RangeEditorProps) {
       label={props.name}
       trackFill={false}
       formatValue={(value) => value.toFixed(decimals())}
+      dataParameterPath={props.dataParameterPath}
     />
   )
 }

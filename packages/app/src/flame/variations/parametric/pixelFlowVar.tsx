@@ -28,31 +28,36 @@ const PixelFlowVarParamsDefaults: PixelFlowVarParams = {
 const PixelFlowVarParamsEditor: EditorFor<PixelFlowVarParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'angle', 'Angle')}
+      {...editorProps(props, 'angle', 'Angle', props.dataParameterPath)}
       min={0}
       max={360}
       step={1}
     />
     <RangeEditor
-      {...editorProps(props, 'len', 'Length')}
+      {...editorProps(props, 'len', 'Length', props.dataParameterPath)}
       min={0}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'width', 'Width')}
+      {...editorProps(props, 'width', 'Width', props.dataParameterPath)}
       min={1}
       max={500}
       step={1}
     />
     <RangeEditor
-      {...editorProps(props, 'seed', 'Seed')}
+      {...editorProps(props, 'seed', 'Seed', props.dataParameterPath)}
       min={0}
       max={100000}
       step={1}
     />
     <RangeEditor
-      {...editorProps(props, 'enableDirectColor', 'Enable Direct Color')}
+      {...editorProps(
+        props,
+        'enableDirectColor',
+        'Enable Direct Color',
+        props.dataParameterPath,
+      )}
       min={0}
       max={1}
       step={1}

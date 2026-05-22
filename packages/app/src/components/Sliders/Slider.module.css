@@ -3,6 +3,7 @@
   --hover-color: black;
   --track-color-filled: var(--neutral-400);
   --track-color-empty: var(--neutral-200);
+  position: relative;
 
   [data-theme='dark'] & {
     --color: var(--neutral-400);
@@ -12,9 +13,37 @@
   }
 }
 
+.labelRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
 .label span {
   user-select: none;
   -webkit-user-select: none;
+}
+
+.label.targeted .labelRow {
+  border-left: 2.5px solid var(--accent-color, #3b82f6);
+  padding-left: 5px;
+  border-radius: 3px 0 0 3px;
+  background: color-mix(in srgb, var(--accent-color, #3b82f6) 6%, transparent);
+}
+
+.label.targeted .slider-wrapper {
+  background: color-mix(in srgb, var(--accent-color, #3b82f6) 4%, transparent);
+}
+
+.label.targeted .value {
+  background: color-mix(in srgb, var(--accent-color, #3b82f6) 6%, transparent);
+  border-radius: 0 3px 3px 0;
+}
+
+.label.targeted span {
+  color: var(--accent-color, #3b82f6);
+  font-weight: 500;
 }
 
 .label {
@@ -30,6 +59,7 @@
 .slider-wrapper {
   display: flex;
   position: relative;
+  width: 100%;
 
   /* make the grab area a bit bigger than slider itself */
   min-height: 20px;
@@ -55,6 +85,7 @@
 
 .value {
   justify-self: end;
+  white-space: nowrap;
 }
 
 .slider {
@@ -89,8 +120,6 @@
     height: 14px;
     border-radius: var(--round);
     cursor: pointer;
-    /* TODO: positioning slider thumb really hardcoded, any better way of doing this? */
-    margin-top: 0.18rem;
 
     background: linear-gradient(
       to bottom,
@@ -104,8 +133,8 @@
     height: 14px;
     border-radius: var(--round);
     cursor: pointer;
-    /* TODO: positioning slider thumb really hardcoded, any better way of doing this? */
-    margin-top: 0.18rem;
+    /* center 14px thumb within 20px track: (20-14)/2 = 3px */
+    margin-top: 3px;
 
     background: linear-gradient(
       to bottom,

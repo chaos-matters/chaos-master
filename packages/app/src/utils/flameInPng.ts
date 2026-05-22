@@ -1,5 +1,7 @@
 import { calculateCRC32 } from './crc32'
-import { concatBuffers, decompressJsonQuery } from './jsonQueryParam'
+import { concatBuffers, decompressJsonPayload } from './jsonQueryParam'
+import type { SharePayload } from './jsonQueryParam'
+import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 const PNG_HEADER_SIZE_IN_BYTES = 8
 const CHUNK_KEY_STRING = 'FlameJson'
@@ -112,10 +114,12 @@ async function readZtxtChunk(
       CHUNK_KEY_END_SIZE_IN_BYTES +
       CHUNK_COMPRESSION_SIZE_IN_BYTES,
   )
-  return await decompressJsonQuery(compressedData)
+  return await decompressJsonPayload(compressedData)
 }
 
-export async function extractFlameFromPng(imageData: Uint8Array) {
+export async function extractFlameFromPng(
+  imageData: Uint8Array,
+): Promise<{ flame: FlameDescriptor; animation?: SharePayload['animation'] }> {
   let imagePos = PNG_HEADER_SIZE_IN_BYTES
   while (imagePos < imageData.length) {
     const chunkLength = new DataView(imageData.buffer).getUint32(imagePos)

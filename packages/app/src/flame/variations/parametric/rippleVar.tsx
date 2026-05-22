@@ -34,49 +34,54 @@ const RippleVarParamsDefaults: RippleVarParams = {
 const RippleVarParamsEditor: EditorFor<RippleVarParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'frequency', 'Frequency')}
+      {...editorProps(props, 'frequency', 'Frequency', props.dataParameterPath)}
       min={0}
       max={10}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'velocity', 'Velocity')}
+      {...editorProps(props, 'velocity', 'Velocity', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'amplitude', 'Amplitude')}
+      {...editorProps(props, 'amplitude', 'Amplitude', props.dataParameterPath)}
       min={0}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'centerx', 'Center X')}
+      {...editorProps(props, 'centerx', 'Center X', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'centery', 'Center Y')}
+      {...editorProps(props, 'centery', 'Center Y', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'phase', 'Phase')}
+      {...editorProps(props, 'phase', 'Phase', props.dataParameterPath)}
       min={-1}
       max={1}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'scale', 'Scale')}
+      {...editorProps(props, 'scale', 'Scale', props.dataParameterPath)}
       min={0}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'fixed_dist_calc', 'Fixed Dist Calc')}
+      {...editorProps(
+        props,
+        'fixed_dist_calc',
+        'Fixed Dist Calc',
+        props.dataParameterPath,
+      )}
       min={0}
       max={1}
       step={1}

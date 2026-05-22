@@ -77,15 +77,17 @@ export function Modal(props: ParentProps<ModalProps>) {
   }
 
   return (
-    <ModalContext.Provider value={requestModal}>
-      {props.children}
+    <>
+      <ModalContext.Provider value={requestModal}>
+        {props.children}
+      </ModalContext.Provider>
       <Portal
         mount={props.mount}
         ref={(el) => {
-          (el as HTMLElement).classList.add(ui.root!)
+          ;(el as HTMLElement).classList.add(ui.root!)
         }}
       >
-        <Show when={modalInstances().at(-1)} keyed>
+        <Show when={modalInstances()[0]} keyed>
           {(instance) => {
             const {
               resolve,
@@ -93,21 +95,12 @@ export function Modal(props: ParentProps<ModalProps>) {
             } = instance
 
             function respond(option: unknown) {
-              if ('startViewTransition' in document) {
-                const transition = document.startViewTransition(() => {
-                  resolve(option)
-                  setModalInstances((instances) =>
-                    instances.filter((ins) => ins !== instance),
-                  )
-                })
-                transition.ready.catch(() => {})
-                transition.finished.catch(() => {})
-              } else {
+              document.startViewTransition(() => {
                 resolve(option)
                 setModalInstances((instances) =>
                   instances.filter((ins) => ins !== instance),
                 )
-              }
+              })
             }
 
             return (
@@ -125,6 +118,6 @@ export function Modal(props: ParentProps<ModalProps>) {
           }}
         </Show>
       </Portal>
-    </ModalContext.Provider>
+    </>
   )
 }

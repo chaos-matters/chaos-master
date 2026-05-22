@@ -21,13 +21,13 @@ const LinearTVarParamsDefaults: LinearTVarParams = {
 const LinearTVarParamsEditor: EditorFor<LinearTVarParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'powX', 'Pow X')}
+      {...editorProps(props, 'powX', 'Pow X', props.dataParameterPath)}
       min={0}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'powY', 'Pow Y')}
+      {...editorProps(props, 'powY', 'Pow Y', props.dataParameterPath)}
       min={0}
       max={5}
       step={0.01}

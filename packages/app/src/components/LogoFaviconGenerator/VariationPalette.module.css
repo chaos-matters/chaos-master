@@ -1,0 +1,157 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.scrollArea {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 4px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--neutral-300) transparent;
+
+  [data-theme='dark'] & {
+    scrollbar-color: var(--neutral-600) transparent;
+  }
+}
+
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0.22rem 0.45rem;
+  border-radius: 20px;
+  border: 1px solid transparent;
+  font-size: 0.68rem;
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s,
+    transform 0.15s,
+    opacity 0.15s,
+    box-shadow 0.15s;
+  user-select: none;
+  line-height: 1.3;
+}
+
+.pillLabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  min-width: 0;
+}
+
+.checkmark,
+.addIcon {
+  flex-shrink: 0;
+  font-size: 0.6rem;
+  width: 12px;
+  text-align: center;
+  opacity: 0.7;
+}
+
+.selected {
+  background: linear-gradient(
+    135deg,
+    var(--accent-color, #6366f1),
+    color-mix(in oklab, var(--accent-color, #6366f1), #7c3aed 40%)
+  );
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 1px 3px
+    color-mix(in oklab, var(--accent-color, #6366f1), transparent 60%);
+
+  &:hover {
+    box-shadow: 0 2px 6px
+      color-mix(in oklab, var(--accent-color, #6366f1), transparent 40%);
+  }
+}
+
+.deselected {
+  background: var(--neutral-100);
+  color: var(--neutral-500);
+  border-color: var(--neutral-200);
+  transform: scale(0.96);
+
+  [data-theme='dark'] & {
+    background: var(--neutral-800);
+    color: var(--neutral-400);
+    border-color: var(--neutral-700);
+  }
+
+  &:hover {
+    background: var(--neutral-200);
+    color: var(--neutral-700);
+    transform: scale(0.98);
+    border-color: var(--accent-color, #6366f1);
+
+    [data-theme='dark'] & {
+      background: var(--neutral-700);
+      color: var(--neutral-200);
+    }
+  }
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: 1px solid var(--neutral-200);
+
+  [data-theme='dark'] & {
+    border-color: var(--neutral-700);
+  }
+}
+
+.footerBtn {
+  font-size: 0.65rem;
+  font-family: inherit;
+  color: var(--accent-color, #6366f1);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition:
+    background 0.15s,
+    opacity 0.15s;
+
+  &:hover {
+    background: color-mix(
+      in oklab,
+      var(--accent-color, #6366f1),
+      transparent 85%
+    );
+  }
+}
+
+.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+
+  &:hover {
+    background: none;
+  }
+}
+
+.footerBadge {
+  margin-left: auto;
+  font-size: 0.62rem;
+  color: var(--neutral-400);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500);
+  }
+}

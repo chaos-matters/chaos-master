@@ -1,0 +1,78 @@
+.label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  grid-column: 1 / -1;
+  font-size: 0.7rem;
+  color: var(--neutral-600);
+  user-select: none;
+  cursor: ew-resize;
+  min-height: 20px;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-400);
+  }
+}
+
+.label.targeted {
+  outline: 1.5px solid var(--accent-color, #3b82f6);
+  outline-offset: -1px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent-color, #3b82f6) 6%, transparent);
+}
+
+.labelName {
+  font-weight: 500;
+  min-width: 12px;
+  text-align: right;
+  color: var(--neutral-500);
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500);
+  }
+}
+
+.value {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.65rem;
+  white-space: nowrap;
+  color: var(--neutral-800);
+  background: var(--neutral-100);
+  padding: 1px 6px;
+  border-radius: 3px;
+  min-width: 46px;
+  text-align: right;
+  cursor: ew-resize;
+  transition: background 0.1s;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-200);
+    background: var(--neutral-800);
+  }
+
+  &:hover {
+    background: var(--neutral-200);
+
+    [data-theme='dark'] & {
+      background: var(--neutral-700);
+    }
+  }
+}
+
+.input {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.65rem;
+  width: 52px;
+  padding: 1px 4px;
+  border: 1px solid var(--accent-color, #3b82f6);
+  border-radius: 3px;
+  background: var(--neutral-50);
+  color: var(--neutral-900);
+  outline: none;
+  text-align: right;
+
+  [data-theme='dark'] & {
+    background: var(--neutral-800);
+    color: var(--neutral-100);
+  }
+}

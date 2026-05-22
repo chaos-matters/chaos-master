@@ -24,25 +24,25 @@ const PdjParamsDefaults: PdjParams = {
 const PdjParamsEditor: EditorFor<PdjParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'a', 'a')}
+      {...editorProps(props, 'a', 'a', props.dataParameterPath)}
       min={1}
       max={15}
       step={0.1}
     />
     <RangeEditor
-      {...editorProps(props, 'b', 'b')}
+      {...editorProps(props, 'b', 'b', props.dataParameterPath)}
       min={1}
       max={15}
       step={0.1}
     />
     <RangeEditor
-      {...editorProps(props, 'c', 'c')}
+      {...editorProps(props, 'c', 'c', props.dataParameterPath)}
       min={1}
       max={15}
       step={0.1}
     />
     <RangeEditor
-      {...editorProps(props, 'd', 'd')}
+      {...editorProps(props, 'd', 'd', props.dataParameterPath)}
       min={1}
       max={15}
       step={0.1}

@@ -14,6 +14,7 @@ type AutoCanvasProps = {
   ref?: (el: HTMLCanvasElement) => void
   pixelRatio?: number
   fixedResolution?: { width: number; height: number }
+  alphaMode?: GPUCanvasAlphaMode
 }
 
 export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
@@ -69,7 +70,7 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
     context.configure({
       device,
       format: canvasFormat,
-      alphaMode: 'opaque',
+      alphaMode: props.alphaMode ?? 'opaque',
     })
     return { context, canvasFormat }
   }

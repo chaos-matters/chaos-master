@@ -20,13 +20,13 @@ const RectanglesParamsDefaults: RectanglesParams = {
 const RectanglesParamsEditor: EditorFor<RectanglesParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'x', 'x')}
+      {...editorProps(props, 'x', 'x', props.dataParameterPath)}
       min={1}
       max={20}
       step={0.1}
     />
     <RangeEditor
-      {...editorProps(props, 'y', 'y')}
+      {...editorProps(props, 'y', 'y', props.dataParameterPath)}
       min={1}
       max={20}
       step={0.1}

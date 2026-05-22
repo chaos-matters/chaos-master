@@ -1,5 +1,7 @@
 // We re-export only things we use to keep the bundle small
 export {
+  array,
+  boolean,
   brand,
   flatten,
   integer,
@@ -8,6 +10,7 @@ export {
   maxValue,
   minValue,
   nonEmpty,
+  null_,
   number,
   object,
   optional,
@@ -17,6 +20,7 @@ export {
   safeParse,
   string,
   tuple,
+  union,
   variant,
 } from 'valibot'
 export type {

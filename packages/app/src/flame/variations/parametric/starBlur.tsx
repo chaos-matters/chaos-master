@@ -23,13 +23,13 @@ const StarBlurVarParamsDefaults: StarBlurVarParams = {
 const StarBlurVarParamsEditor: EditorFor<StarBlurVarParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'power', 'Power')}
+      {...editorProps(props, 'power', 'Power', props.dataParameterPath)}
       min={1}
       max={50}
       step={1}
     />
     <RangeEditor
-      {...editorProps(props, 'range', 'Range')}
+      {...editorProps(props, 'range', 'Range', props.dataParameterPath)}
       min={0}
       max={1}
       step={0.01}

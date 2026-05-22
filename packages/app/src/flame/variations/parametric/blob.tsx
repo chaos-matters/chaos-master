@@ -22,17 +22,17 @@ const BlobParamsDefaults: BlobParams = {
 const BlobParamsEditor: EditorFor<BlobParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'low', 'Low')}
+      {...editorProps(props, 'low', 'Low', props.dataParameterPath)}
       min={0}
       max={props.value.high}
     />
     <RangeEditor
-      {...editorProps(props, 'high', 'High')}
+      {...editorProps(props, 'high', 'High', props.dataParameterPath)}
       min={props.value.low}
       max={20}
     />
     <RangeEditor
-      {...editorProps(props, 'waves', 'Waves')}
+      {...editorProps(props, 'waves', 'Waves', props.dataParameterPath)}
       min={-50}
       max={50}
       step={1}

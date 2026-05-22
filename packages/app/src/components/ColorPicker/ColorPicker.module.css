@@ -1,6 +1,6 @@
 .color-picker {
   border: 2px solid;
-  border-radius: var(--space-2);
+  border-radius: 0;
   padding: 0;
 
   &::-webkit-color-swatch-wrapper {

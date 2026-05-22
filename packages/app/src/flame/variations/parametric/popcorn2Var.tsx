@@ -23,19 +23,19 @@ const Popcorn2VarParamsDefaults: Popcorn2VarParams = {
 const Popcorn2VarParamsEditor: EditorFor<Popcorn2VarParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'x', 'X')}
+      {...editorProps(props, 'x', 'X', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'y', 'Y')}
+      {...editorProps(props, 'y', 'Y', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'c', 'C')}
+      {...editorProps(props, 'c', 'C', props.dataParameterPath)}
       min={-5}
       max={5}
       step={0.01}

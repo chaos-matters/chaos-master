@@ -1,54 +1,72 @@
-import { defineExample } from './util'
+import { defineExample, tid, vid } from './util'
 
+/**
+ * Tidal Spiral — ocean-like fluid swirls with fractal depth.
+ * Three transforms: swirl3Var spiral core, horseshoe+spherical distortion,
+ * and a juliaScope fractal bloom.
+ */
 export const example8 = defineExample({
-  version: '1.0',
-  metadata: { author: 'unknown' },
   renderSettings: {
-    exposure: 0.7,
-    skipIters: 9,
+    exposure: 0.3,
+    skipIters: 20,
     drawMode: 'light',
-    colorInitMode: 'colorInitZero',
-    backgroundColor: [0, 0, 0],
     camera: {
-      zoom: 0.5601340493210198,
-      position: [0.07790163159370422, 0.03288983553647995],
+      zoom: 1.2,
+      position: [0.05, -0.05],
     },
   },
   transforms: {
-    d2523f69_dd2d_49cb_b14f_d9448e0bfb31: {
-      probability: 1,
-      preAffine: {
-        c: 0,
-        f: 0,
-        a: 0.7898641581301579,
-        b: -0.48041598787693446,
-        d: 0.48041598787693446,
-        e: 0.7898641581301579,
-      },
+    // T0: Swirl3Var core — creates the main spiral vortex
+    [tid('a1b2c3d4_e5f6_7890_abcd_ef1234567890')]: {
+      probability: 0.8,
+      preAffine: { a: 0.6, b: 0.15, c: 0, d: -0.1, e: 0.55, f: 0.05 },
       postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-      color: { x: 0.17325051128864288, y: -0.15132109820842743 },
+      color: { x: 0.15, y: 0.4 },
       variations: {
-        bc571c35_0b03_4865_a765_d00cd71031a6: {
-          type: 'handkerchief',
-          weight: 0.832,
+        [vid('b1c2d3e4_f5a6_7890_cdef_0123456789ab')]: {
+          type: 'swirl3Var',
+          weight: 1,
+          params: { shift: 7.5 },
         },
-        f4cc71a4_265f_4e8b_b213_4c515c0af6db: { type: 'bubble', weight: 0.175 },
+        [vid('c1d2e3f4_a5b6_7890_1234_567890abcdef')]: {
+          type: 'linear',
+          weight: 0.3,
+        },
       },
     },
-    ___296f0c33_702b_4b0f_b03e_ca9e52521519: {
-      probability: 1,
-      color: { x: -0.13267171382904053, y: 0.20795078575611115 },
-      preAffine: {
-        c: -0.007231641560792923,
-        f: -1.110204815864563,
-        a: 1.1733442847170854,
-        b: 0.013805359003249187,
-        d: -0.013805359003249187,
-        e: 1.1733442847170854,
-      },
+    // T1: Horseshoe + Spherical — warped projections creating wave-like distortion
+    [tid('d1e2f3a4_b5c6_7890_2345_67890abcdef1')]: {
+      probability: 0.45,
+      preAffine: { a: 0.4, b: -0.3, c: 0.1, d: 0.25, e: 0.45, f: -0.15 },
       postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+      color: { x: -0.2, y: 0.15 },
       variations: {
-        '02a7d401_9691_404c_be9c_a816efefcb8f': { type: 'julia', weight: 1 },
+        [vid('e1f2a3b4_c5d6_7890_3456_7890abcdef12')]: {
+          type: 'horseshoe',
+          weight: 0.7,
+        },
+        [vid('f1a2b3c4_d5e6_7890_4567_890abcdef123')]: {
+          type: 'spherical',
+          weight: 0.3,
+        },
+        [vid('a1a2b3c4_d5e6_7890_5678_90abcdef1234')]: {
+          type: 'linear',
+          weight: 0.4,
+        },
+      },
+    },
+    // T2: JuliaScope fractal bloom — adds intricate fractal depth
+    [tid('b1b2c3d4_e5f6_7890_6789_0abcdef12345')]: {
+      probability: 0.2,
+      preAffine: { a: 0.35, b: 0, c: -0.05, d: 0, e: 0.35, f: 0.05 },
+      postAffine: { a: 0, b: -1, c: 0, d: 1, e: 0, f: 0 },
+      color: { x: 0, y: -0.3 },
+      variations: {
+        [vid('c1c2d3e4_f5a6_7890_7890_abcdef123456')]: {
+          type: 'juliaScope',
+          weight: 1,
+          params: { power: 2.5, dist: 2 },
+        },
       },
     },
   },

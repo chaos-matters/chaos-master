@@ -59,3 +59,42 @@ export const [currentQuality, setCurrentQuality] = createSignal<
 export const [qualityPointCountLimit, setQualityPointCountLimit] = createSignal<
   Accessor<number>
 >(() => 0)
+
+export const [forceDrawToScreen, setForceDrawToScreen] = createSignal(true)
+export const [clearRequested, setClearRequested] = createSignal(true)
+
+export type ExportProgress = {
+  current: number
+  target: number
+  pointsPerSec: number
+}
+
+export const [exportProgress, setExportProgress] = createSignal<
+  ExportProgress | undefined
+>(undefined)
+
+export const [exportQuality, setExportQuality] = createSignal<
+  number | undefined
+>(undefined)
+
+export type AnimationExportProgress = {
+  currentFrame: number
+  totalFrames: number
+  currentPointCount: number
+  targetPointsPerFrame: number
+  totalFramesComplete: number
+  currentTimelineFrame: number
+  startedAt: number
+}
+
+export const [animationExportProgress, setAnimationExportProgress] =
+  createSignal<AnimationExportProgress | undefined>(undefined)
+
+export const [animationExportRunning, setAnimationExportRunning] =
+  createSignal(false)
+
+export const [animationExportCancel, setAnimationExportCancel] = createSignal<
+  (() => void) | undefined
+>(undefined)
+
+export const [forceExportNow, setForceExportNow] = createSignal(false)

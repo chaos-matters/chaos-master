@@ -17,7 +17,9 @@ const RadialBlurParamsDefaults: RadialBlurParams = {
 }
 
 const RadialBlurEditor: EditorFor<Infer<typeof RadialBlurParams>> = (props) => (
-  <AngleEditor {...editorProps(props, 'angle', 'Angle')} />
+  <AngleEditor
+    {...editorProps(props, 'angle', 'Angle', props.dataParameterPath)}
+  />
 )
 
 export const radialBlurVar = parametricVariation(

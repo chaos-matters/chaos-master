@@ -25,25 +25,25 @@ const NgonParamsDefaults: NgonParams = {
 const NgonParamsEditor: EditorFor<NgonParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'power', 'Power')}
+      {...editorProps(props, 'power', 'Power', props.dataParameterPath)}
       min={0}
       max={8}
       step={1}
     />
     <RangeEditor
-      {...editorProps(props, 'sides', 'Sides')}
+      {...editorProps(props, 'sides', 'Sides', props.dataParameterPath)}
       min={1}
       max={15}
       step={1}
     />
     <RangeEditor
-      {...editorProps(props, 'corners', 'Corners')}
+      {...editorProps(props, 'corners', 'Corners', props.dataParameterPath)}
       min={1}
       max={15}
       step={1}
     />
     <RangeEditor
-      {...editorProps(props, 'circle', 'Circle')}
+      {...editorProps(props, 'circle', 'Circle', props.dataParameterPath)}
       min={0}
       max={30}
       step={0.1}

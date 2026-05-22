@@ -22,13 +22,13 @@ const JuliaScopeParamsDefaults: JuliaScopeParams = {
 const JuliaScopeParamsEditor: EditorFor<JuliaScopeParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'power', 'Power')}
+      {...editorProps(props, 'power', 'Power', props.dataParameterPath)}
       min={1}
       max={20}
       step={1}
     />
     <RangeEditor
-      {...editorProps(props, 'dist', 'Dist')}
+      {...editorProps(props, 'dist', 'Dist', props.dataParameterPath)}
       min={1}
       max={props.value.power + 1}
       step={0.01}

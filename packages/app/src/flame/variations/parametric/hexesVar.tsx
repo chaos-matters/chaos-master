@@ -27,25 +27,25 @@ const HexesVarParamsDefaults: HexesVarParams = {
 const HexesVarParamsEditor: EditorFor<HexesVarParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'cellsize', 'Cell Size')}
+      {...editorProps(props, 'cellsize', 'Cell Size', props.dataParameterPath)}
       min={0.01}
       max={1}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'power', 'Power')}
+      {...editorProps(props, 'power', 'Power', props.dataParameterPath)}
       min={0}
       max={5}
       step={1}
     />
     <RangeEditor
-      {...editorProps(props, 'rotate', 'Rotate')}
+      {...editorProps(props, 'rotate', 'Rotate', props.dataParameterPath)}
       min={0}
       max={1}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'scale', 'Scale')}
+      {...editorProps(props, 'scale', 'Scale', props.dataParameterPath)}
       min={0}
       max={3}
       step={0.01}

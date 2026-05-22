@@ -23,13 +23,13 @@ const GridParamsDefaults: GridParams = {
 const GridParamsEditor: EditorFor<GridParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'divisions', 'Divisions')}
+      {...editorProps(props, 'divisions', 'Divisions', props.dataParameterPath)}
       min={1}
       max={50}
       step={1}
     />
     <RangeEditor
-      {...editorProps(props, 'size', 'Size')}
+      {...editorProps(props, 'size', 'Size', props.dataParameterPath)}
       min={1}
       max={10}
       step={0.1}

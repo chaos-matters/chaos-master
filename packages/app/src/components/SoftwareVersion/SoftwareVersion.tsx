@@ -1,11 +1,15 @@
 import { VERSION } from '@/version'
+import { persistentSignal } from '@/utils/persistentSignal'
 import { DebugPanel } from '../Debug/DebugPanel'
 import { createShowHelp } from '../HelpModal/HelpModal'
 import { QuestionMark } from '../QuestionMark/QuestionMark'
 import ui from './SoftwareVersion.module.css'
+import type { QuickPickerMode } from '../QuickVariationPicker/QuickVariationPicker'
 
 export function SoftwareVersion() {
-  const showHelp = createShowHelp()
+  const [quickPickerMode, setQuickPickerMode] =
+    persistentSignal<QuickPickerMode>('quick-picker-mode', 'list')
+  const showHelp = createShowHelp(quickPickerMode, setQuickPickerMode)
   return (
     <div>
       <DebugPanel />

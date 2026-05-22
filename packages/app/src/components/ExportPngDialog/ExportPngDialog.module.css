@@ -1,0 +1,235 @@
+.container {
+  width: 48rem;
+  max-height: 80vh;
+}
+
+.tabBar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--color-border, #333);
+  padding: 0 1rem;
+}
+
+.tab {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--color-text-secondary, #999);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.tab:hover {
+  color: var(--color-text, #eee);
+}
+
+.tabActive {
+  color: var(--accent-color, #3b82f6);
+  border-bottom-color: var(--accent-color, #3b82f6);
+}
+
+.tabActive:hover {
+  color: var(--accent-color, #3b82f6);
+}
+
+.animationPreviewInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 0.5rem;
+  color: var(--color-text-secondary, #999);
+  font-size: 0.85rem;
+}
+
+.animationPreviewInfo p {
+  margin: 0;
+}
+
+.fieldRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.numberInput {
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.35rem;
+  border: 1px solid var(--color-border, #333);
+  background: var(--color-bg-input, #1a1a1a);
+  color: var(--color-text, #eee);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  width: 100%;
+}
+
+.dialogBody {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 1rem;
+  padding: 1rem;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.previewPane {
+  position: relative;
+  aspect-ratio: 1;
+  max-height: 420px;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: #111;
+}
+
+.previewToolbar {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 10;
+  display: flex;
+  gap: 0.35rem;
+}
+
+.renderModeToggle {
+  padding: 0.2rem 0.45rem;
+  border: 1px solid var(--color-border, #444);
+  border-radius: 0.3rem;
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--color-text-secondary, #999);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.renderModeToggle:hover {
+  background: rgba(0, 0, 0, 0.8);
+  color: var(--color-text, #eee);
+  border-color: var(--color-text-secondary, #888);
+}
+
+.renderModeActive {
+  background: var(--accent-color, #3b82f6);
+  border-color: var(--accent-color, #3b82f6);
+  color: #fff;
+}
+
+.renderModeActive:hover {
+  background: var(--accent-color, #3b82f6);
+  color: #fff;
+  border-color: var(--accent-color, #3b82f6);
+}
+
+.renderPreviewButton {
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--accent-color, #3b82f6);
+  border-radius: 0.3rem;
+  background: var(--accent-color, #3b82f6);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition:
+    background 0.15s,
+    opacity 0.15s;
+}
+
+.renderPreviewButton:hover {
+  opacity: 0.9;
+}
+
+.controlsPane {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary, #999);
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sliderField {
+  display: grid;
+  grid-template-columns: 70px 1fr 48px;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary, #999);
+}
+
+.select {
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.35rem;
+  border: 1px solid var(--color-border, #333);
+  background: var(--color-bg-input, #1a1a1a);
+  color: var(--color-text, #eee);
+  font-size: 0.85rem;
+}
+
+.rangeRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.rangeRow input[type='range'] {
+  flex: 1;
+}
+
+.rangeValue {
+  font-size: 0.8rem;
+  min-width: 2.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.bgColorRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.checkboxField {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary, #999);
+}
+
+.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--color-border, #333);
+  flex-shrink: 0;
+}

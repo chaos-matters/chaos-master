@@ -1,4 +1,4 @@
 export { version as VERSION } from '@/../package.json'
-declare const __COMMIT_HASH__: string
-export const COMMIT_HASH =
-  typeof __COMMIT_HASH__ !== 'undefined' ? __COMMIT_HASH__ : 'dev'
+
+declare const __GIT_SHA__: string
+export const GIT_SHA: string = __GIT_SHA__

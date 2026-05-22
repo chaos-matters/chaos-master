@@ -23,13 +23,13 @@ const LineVarParamsDefaults: LineVarParams = {
 const LineVarParamsEditor: EditorFor<LineVarParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'delta', 'Delta')}
+      {...editorProps(props, 'delta', 'Delta', props.dataParameterPath)}
       min={-1}
       max={1}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'phi', 'Phi')}
+      {...editorProps(props, 'phi', 'Phi', props.dataParameterPath)}
       min={0}
       max={1}
       step={0.01}

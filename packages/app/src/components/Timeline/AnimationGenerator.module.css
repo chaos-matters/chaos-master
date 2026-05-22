@@ -1,0 +1,160 @@
+/* ── Inline controls row (rendered in header) ── */
+.controlsRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* ── Gen / Colors button (matches Auto/Del style) ── */
+.genBtn {
+  padding: 2px 6px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  border: 1px solid var(--neutral-300);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--neutral-500);
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  transition: all 0.15s;
+  height: 22px;
+  line-height: 1;
+
+  [data-theme='dark'] & {
+    border-color: var(--neutral-700);
+    color: var(--neutral-500);
+  }
+
+  &:hover {
+    border-color: var(--accent-color, #6366f1);
+    color: var(--accent-color, #6366f1);
+    background: rgba(99, 102, 241, 0.06);
+  }
+
+  &:active {
+    background: rgba(99, 102, 241, 0.12);
+  }
+}
+
+.active {
+  border-color: var(--accent-color, #6366f1);
+  color: var(--accent-color, #6366f1);
+  background: rgba(99, 102, 241, 0.08);
+
+  &:hover {
+    border-color: var(--accent-color, #6366f1);
+    color: var(--accent-color, #6366f1);
+    background: rgba(99, 102, 241, 0.14);
+  }
+}
+
+/* ── Presets toggle ── */
+.presetsToggle {
+  padding: 2px 6px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  border: 1px solid var(--neutral-300);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--neutral-500);
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  transition: all 0.15s;
+  height: 22px;
+  line-height: 1;
+
+  [data-theme='dark'] & {
+    border-color: var(--neutral-700);
+    color: var(--neutral-500);
+  }
+
+  &:hover {
+    border-color: var(--neutral-400);
+    color: var(--neutral-700);
+
+    [data-theme='dark'] & {
+      border-color: var(--neutral-500);
+      color: var(--neutral-300);
+    }
+  }
+}
+
+.presetsToggleActive {
+  border-color: var(--accent-color, #6366f1);
+  color: var(--accent-color, #6366f1);
+  background: rgba(99, 102, 241, 0.08);
+
+  &:hover {
+    border-color: var(--accent-color, #6366f1);
+    color: var(--accent-color, #6366f1);
+    background: rgba(99, 102, 241, 0.12);
+  }
+}
+
+/* ── Presets panel wrapper ── */
+.wrapper {
+  border-bottom: 1px solid var(--neutral-150, #e8e8e8);
+  padding: 2px 8px;
+
+  [data-theme='dark'] & {
+    border-bottom-color: var(--neutral-800, #1f2937);
+  }
+}
+
+.presetsPanel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+/* ── Pill buttons ── */
+.pill {
+  position: relative;
+  padding: 2px 7px;
+  font-size: 0.58rem;
+  font-weight: 500;
+  border: 1px solid var(--neutral-250, #d4d4d4);
+  border-radius: 6px;
+  background: var(--neutral-50, #fafafa);
+  color: var(--neutral-600);
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+  user-select: none;
+
+  [data-theme='dark'] & {
+    border-color: var(--neutral-700, #374151);
+    background: var(--neutral-850, #1a1f2e);
+    color: var(--neutral-400);
+  }
+
+  &:hover {
+    border-color: var(--accent-color, #6366f1);
+    color: var(--accent-color, #6366f1);
+    background: rgba(99, 102, 241, 0.06);
+  }
+
+  &:active {
+    background: rgba(99, 102, 241, 0.14);
+    transform: scale(0.97);
+  }
+}
+
+/* ── Mobile ── */
+@media (max-width: 768px) {
+  .wrapper {
+    padding: 2px 4px;
+  }
+
+  .genBtn,
+  .presetsToggle {
+    padding: 1px 4px;
+    font-size: 0.55rem;
+    height: 18px;
+  }
+
+  .pill {
+    padding: 1px 5px;
+    font-size: 0.55rem;
+  }
+}

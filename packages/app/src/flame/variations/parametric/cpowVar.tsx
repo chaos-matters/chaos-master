@@ -24,19 +24,19 @@ const CPowVarParamsDefaults: CPowVarParams = {
 const CPowVarParamsEditor: EditorFor<CPowVarParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'r', 'r')}
+      {...editorProps(props, 'r', 'r', props.dataParameterPath)}
       min={0}
       max={100}
       step={0.1}
     />
     <RangeEditor
-      {...editorProps(props, 'i', 'i')}
+      {...editorProps(props, 'i', 'i', props.dataParameterPath)}
       min={0}
       max={100}
       step={0.1}
     />
     <RangeEditor
-      {...editorProps(props, 'power', 'power')}
+      {...editorProps(props, 'power', 'power', props.dataParameterPath)}
       min={0}
       max={100}
       step={0.1}

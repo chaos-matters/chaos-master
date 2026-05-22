@@ -4,6 +4,9 @@ export const DEFAULT_POINT_COUNT = parseFloat(
 export const DEFAULT_RESOLUTION = parseFloat(
   import.meta.env.VITE_DEFAULT_RESOLUTION,
 )
+export const DEFAULT_PREVIEW_PIXEL_RATIO = parseFloat(
+  import.meta.env.VITE_DEFAULT_PREVIEW_PIXEL_RATIO,
+)
 export const DEFAULT_RENDER_INTERVAL_MS = parseFloat(
   import.meta.env.VITE_DEFAULT_RENDER_INTERVAL_MS,
 )
@@ -45,3 +48,7 @@ export const DEBUG_VRAM = import.meta.env.VITE_DEBUG_VRAM === 'true'
 export const COMPUTE_GATE_CAPACITY = parseFloat(
   import.meta.env.VITE_COMPUTE_GATE_CAPACITY ?? '2',
 )
+
+export const CAMERA_UNDO_DEBOUNCE_MS =
+  parseFloat(import.meta.env.VITE_CAMERA_UNDO_DEBOUNCE_MS) || 300
+

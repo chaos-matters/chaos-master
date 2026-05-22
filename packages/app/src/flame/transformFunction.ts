@@ -4,7 +4,7 @@ import { recordEntries } from '@/utils/record'
 import { sum } from '@/utils/sum'
 import { AffineParams, transformAffine } from './affineTranform'
 import { Point } from './types'
-import { isParametricVariationType, transformVariations } from './variations'
+import { isParametricVariationType, isVariationType, transformVariations, } from './variations'
 import { VariationInfo } from './variations/simple/types'
 import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from './schema/flameSchema'
 import type { TransformVariationType } from './variations'
@@ -53,10 +53,19 @@ export function generateVariationId(): VariationId {
 export function createFlameWgsl({
   variations,
 }: Pick<TransformFunction, 'variations'>) {
+  const validVariations = Object.fromEntries(
+    Object.entries(variations).filter(([, v]) => {
+      if (isVariationType(v.type)) return true
+      console.warn(
+        `[createFlameWgsl] skipping unknown variation type "${v.type}"`,
+      )
+      return false
+    }),
+  ) as Record<VariationId, { type: TransformVariationType }>
   const Uniforms = struct({
     ...FlameUniformsBase.propTypes,
     ...Object.fromEntries(
-      Object.entries(variations).map(([vid, v]) => [
+      Object.entries(validVariations).map(([vid, v]) => [
         `variation${vid}`,
         variationUniforms(v.type),
       ]),
@@ -66,7 +75,7 @@ export function createFlameWgsl({
     (point: Point, uniforms: Uniforms) -> Point {
       let pre = transformAffine(uniforms.preAffine, point.position);
       var p = vec2f(0);
-      ${recordEntries(variations)
+      ${recordEntries(validVariations)
         .map(
           ([vid, { type }]) => /* wgsl */ `
             p += uniforms.variation${vid}.weight * ${variationInvocation(type, vid)};`,
@@ -79,7 +88,7 @@ export function createFlameWgsl({
   `.$uses({
     transformAffine,
     ...Object.fromEntries(
-      Object.values(variations).map((v) => [
+      Object.values(validVariations).map((v) => [
         v.type,
         transformVariations[v.type].fn,
       ]),
@@ -95,27 +104,110 @@ export function createFlameWgsl({
 export function extractFlameUniforms({
   transforms,
 }: Pick<FlameDescriptor, 'transforms'>) {
-  const totalProbability = sum(
-    Object.values(transforms).map((tr) => tr.probability),
-  )
+  const visibleTransforms = Object.values(transforms).filter((tr) => tr.visible)
+  const totalProbability =
+    sum(visibleTransforms.map((tr) => tr.probability)) || 1
   return Object.fromEntries(
     recordEntries(transforms).map(
-      ([tid, { variations, probability, color, ...transform }]) => [
-        `flame${tid}`,
-        {
-          probability: probability / totalProbability,
-          color: vec2f(color.x, color.y),
-          ...transform,
-          ...Object.fromEntries(
-            recordEntries(variations).map(
-              ([vid, { type: _, ...variation }]) => [
-                `variation${vid}`,
-                variation,
-              ],
+      ([
+        tid,
+        { variations, probability, color, preAffine, postAffine, visible },
+      ]) => {
+        const isVisible = visible
+        return [
+          `flame${tid}`,
+          {
+            probability: isVisible ? probability / totalProbability : 0,
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+            color: vec2f(color?.x ?? 0, color?.y ?? 0),
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+            preAffine: preAffine
+              ? {
+                  a: preAffine.a ?? 1,
+                  b: preAffine.b ?? 0,
+                  c: preAffine.c ?? 0,
+                  d: preAffine.d ?? 0,
+                  e: preAffine.e ?? 1,
+                  f: preAffine.f ?? 0,
+                }
+              : { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+            postAffine: postAffine
+              ? {
+                  a: postAffine.a ?? 1,
+                  b: postAffine.b ?? 0,
+                  c: postAffine.c ?? 0,
+                  d: postAffine.d ?? 0,
+                  e: postAffine.e ?? 1,
+                  f: postAffine.f ?? 0,
+                }
+              : { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+            ...Object.fromEntries(
+              recordEntries(variations ?? {})
+                .filter(([, v]) => {
+                  const vtype = (v as Record<string, unknown>).type as
+                    | string
+                    | undefined
+                  return vtype !== undefined && isVariationType(vtype)
+                })
+                .map(([vid, variation]) => {
+                  const {
+                    type,
+                    visible: varVisible,
+                    ...rest
+                  } = variation as {
+                    type: string
+                    weight: number
+                    visible?: boolean
+                    params?: Record<string, number>
+                  }
+                  const isVarVisible = varVisible !== false
+                  const typed: Record<string, unknown> = {
+                    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+                    weight: isVarVisible ? (rest.weight ?? 1) : 0,
+                  }
+                  const variationType = type as TransformVariationType
+                  const isParametric = isParametricVariationType(variationType)
+                  if (isParametric) {
+                    const defaults = transformVariations[variationType]
+                      .paramDefaults as Record<string, number>
+                    const safe: Record<string, number> = { ...defaults }
+                    if (rest.params) {
+                      for (const key of Object.keys(defaults)) {
+                        const val = rest.params[key]
+                        if (val !== undefined) {
+                          safe[key] = val
+                        }
+                      }
+                    } else {
+                      console.warn(
+                        `[extractFlameUniforms] params missing for ${variationType}`,
+                        'rest keys:',
+                        Object.keys(rest),
+                        'rest.params:',
+                        rest.params,
+                      )
+                    }
+                    typed.params = safe
+                  } else {
+                    if (rest.params) {
+                      typed.params = { ...rest.params }
+                    } else if (
+                      'params' in (variation as Record<string, unknown>)
+                    ) {
+                      console.warn(
+                        `[extractFlameUniforms] ${variationType} has params but NOT recognized as parametric. rest.params:`,
+                        rest.params,
+                        'variation.params:',
+                        (variation as Record<string, unknown>).params,
+                      )
+                    }
+                  }
+                  return [`variation${vid}`, typed]
+                }),
             ),
-          ),
-        },
-      ],
+          },
+        ]
+      },
     ),
   )
 }
