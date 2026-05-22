@@ -106,6 +106,7 @@ export function FloatingActions(props: Props) {
           class={ui.button}
           onClick={props.onLoadFlame}
           title="Load Flame"
+          data-tour-target="load-flame"
         >
           <FolderOpen />
         </button>
@@ -113,6 +114,7 @@ export function FloatingActions(props: Props) {
           class={ui.button}
           onClick={props.onSaveForLater}
           title="Save for Later"
+          data-tour-target="save-for-later"
         >
           <Bookmark />
         </button>
@@ -121,6 +123,7 @@ export function FloatingActions(props: Props) {
           class={ui.button}
           onClick={props.onRender}
           title="Render image or animation"
+          data-tour-target="export-png"
         >
           <CameraIcon />
         </button>
@@ -136,6 +139,7 @@ export function FloatingActions(props: Props) {
           class={ui.button}
           onClick={props.onShareLink}
           title="Share Link"
+          data-tour-target="share-link"
         >
           <Share />
         </button>
