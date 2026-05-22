@@ -6,7 +6,7 @@ import { vec2f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { ChangeHistoryContextProvider } from '@/contexts/ChangeHistoryContext'
 import { CompactModeProvider } from '@/contexts/CompactModeContext'
-import { createGateContext } from '@/contexts/GateContext'
+import { ComputeGate, useComputeGate } from '@/contexts/ComputeGateContext'
 import { KeyframeTargetProvider } from '@/contexts/KeyframeTargetContext'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { COMPUTE_GATE_CAPACITY, DEFAULT_VARIATION_PREVIEW_POINT_COUNT, DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS, DEFAULT_VARIATION_SHOW_DELAY_MS, } from '@/defaults'
@@ -36,6 +36,7 @@ import ui from './VariationSelector.module.css'
 import type { Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
 import type { ExportImageType } from '@/App'
+import type { RenderStatus } from '@/contexts/ComputeGateContext'
 import type { PointInitMode } from '@/flame/pointInitMode'
 import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from '@/flame/schema/flameSchema'
 import type { TransformVariationDescriptor } from '@/flame/variations'
@@ -43,23 +44,6 @@ import type { TransformVariationDescriptor } from '@/flame/variations'
 import type { ChangeHistory, HistorySetter } from '@/utils/createStoreHistory'
 
 const CANCEL = 'cancel'
-
-type RenderStatus = 'low-quality' | 'high-quality' | 'done'
-
-export const { Provider: ComputeGate, useGate: useComputeGate } =
-  createGateContext<{
-    isVisible: boolean
-    renderStatus: RenderStatus
-    isSelected: boolean
-  }>('Compute', (state) =>
-    state.isSelected
-      ? 3
-      : !state.isVisible || state.renderStatus === 'done'
-        ? 0
-        : state.renderStatus === 'low-quality'
-          ? 2
-          : 1,
-  )
 
 export function PreviewFinalFlame(props: {
   flame: FlameDescriptor

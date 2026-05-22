@@ -44,6 +44,7 @@ type Flam3Props = {
 }
 
 export function Flam3(props: Flam3Props) {
+  const exportedImages = new WeakSet<ExportImageType>()
   const camera = useCamera()
   const { root, device } = useRootContext()
   const { context, canvasSize, canvas, canvasFormat } = useCanvas()
@@ -429,11 +430,16 @@ export function Flam3(props: Flam3Props) {
 
     const rafLoop = createAnimationFrame(
       (frameId) => {
+        const currentExportCb =
+          props.onExportImage && !exportedImages.has(props.onExportImage)
+            ? props.onExportImage
+            : undefined
+
         const shouldRenderFinalImage =
           forceDrawToScreen ||
           batchIndex < OUTPUT_EVERY_FRAME_BATCH_INDEX ||
           batchIndex % OUTPUT_INTERVAL_BATCH_INDEX === 0 ||
-          props.onExportImage !== undefined
+          currentExportCb !== undefined
 
         const pointCountPerBatch = props.pointCountPerBatch
         const colorGradingPipeline_ = colorGradingPipeline()
@@ -516,12 +522,15 @@ export function Flam3(props: Flam3Props) {
         timestampQuery.write(encoder)
         device.queue.submit([encoder.finish()])
 
+        if (currentExportCb) {
+          exportedImages.add(currentExportCb)
+          currentExportCb(canvas)
+        }
+
         device.queue
           .onSubmittedWorkDone()
           .then(() => timestampQuery.read(frameId))
           .catch(() => {})
-
-        props.onExportImage?.(canvas)
 
         batchIndex += 1
         forceDrawToScreen = false
