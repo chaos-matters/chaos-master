@@ -252,8 +252,7 @@ export function SpotlightTour(props: SpotlightTourProps) {
     <Show when={tour.isActive() && step()}>
       <Portal>
         <div class={ui.overlay}>
-          {/* SVG mask backdrop */}
-          <svg class={ui.backdropSvg} width="100%" height="100%">
+          <svg width="0" height="0" style={{ position: 'absolute' }}>
             <defs>
               <mask id="spotlight-mask">
                 <rect width="100%" height="100%" fill="white" />
@@ -264,17 +263,29 @@ export function SpotlightTour(props: SpotlightTourProps) {
                   height={holeRect().height}
                   rx={8}
                   fill="black"
-                  data-hole="true"
                 />
               </mask>
             </defs>
-            <rect
-              width="100%"
-              height="100%"
-              fill="rgba(0, 0, 0, 0.5)"
-              mask="url(#spotlight-mask)"
-            />
-            {/* Glow ring around the highlighted element */}
+          </svg>
+
+          {/* Blurred backdrop with a hole punched out */}
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.65)',
+              'backdrop-filter': 'blur(6px)',
+              '-webkit-backdrop-filter': 'blur(6px)',
+              mask: 'url(#spotlight-mask)',
+              '-webkit-mask': 'url(#spotlight-mask)',
+              'pointer-events': 'none',
+              transition: 'background 300ms ease',
+            }}
+            class={ui.backdropBlur}
+          />
+
+          {/* Glow ring around the highlighted element */}
+          <svg class={ui.backdropSvg} width="100%" height="100%">
             <rect
               x={holeRect().x}
               y={holeRect().y}
@@ -282,8 +293,6 @@ export function SpotlightTour(props: SpotlightTourProps) {
               height={holeRect().height}
               rx={8}
               fill="none"
-              stroke="rgba(255, 255, 255, 0.35)"
-              stroke-width="2"
               class={ui.holeGlow}
             />
           </svg>

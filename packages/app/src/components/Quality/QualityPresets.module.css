@@ -51,8 +51,12 @@
 
 .selectedPill {
   color: var(--selected-color);
-  border: 2px solid var(--accent-color, #6366f1);
+  border: 2px solid var(--neutral-800);
   padding: calc(var(--space-1) - 1px);
+
+  [data-theme='dark'] & {
+    border-color: var(--neutral-300);
+  }
 }
 
 .pill:not(.selectedPill):hover {

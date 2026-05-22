@@ -13,12 +13,14 @@
 
 .holeGlow {
   transition: all 300ms ease;
-  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.25));
+  stroke: oklch(75% 0.15 240);
+  stroke-width: 3px;
+  filter: drop-shadow(0 0 10px oklch(75% 0.15 240 / 0.5));
 }
 
 [data-theme='light'] .holeGlow {
-  stroke: rgba(0, 0, 0, 0.3);
-  filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.15));
+  stroke: oklch(60% 0.18 240);
+  filter: drop-shadow(0 0 10px oklch(60% 0.18 240 / 0.4));
 }
 
 .card {

@@ -106,6 +106,7 @@
   flex-shrink: 0;
   display: flex;
   align-items: stretch;
+  overflow-x: hidden;
   /* Allow horizontal scroll but disable vertical pinch (handled by JS) */
   touch-action: pan-x;
 
@@ -329,6 +330,8 @@
   position: absolute;
   top: 0;
   bottom: 0;
+  left: 0;
+  transform: translateX(-50%);
   width: 2px;
   background: #ef4444;
   z-index: 5;
@@ -342,15 +345,25 @@
   align-items: center;
   gap: 10px;
   padding: 5px 10px;
-  border-top: 1px solid var(--neutral-200, #e5e7eb);
+  border-bottom: 1px solid var(--neutral-200, #e5e7eb);
   background: var(--neutral-50, #f9fafb);
   font-size: 11px;
   flex-shrink: 0;
   min-height: 32px;
 
   [data-theme='dark'] & {
-    border-top-color: var(--neutral-750, #2a3040);
+    border-bottom-color: var(--neutral-750, #2a3040);
     background: var(--neutral-875, #151a24);
+  }
+}
+
+.inspectorPlaceholder {
+  color: var(--neutral-400, #9ca3af);
+  font-style: italic;
+  font-size: 10px;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500, #6b7280);
   }
 }
 

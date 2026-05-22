@@ -184,7 +184,7 @@ export const pointInitModeToImplFn = {
   pointInitSpiral: pointInitModeSpiral,
   pointInitHalton: pointInitModeHalton,
   pointInitPerlin: pointInitModePerlin,
-  
+
   // Legacy keys mapped to equivalent new modes for backward compatibility
   pointInitUnitDisk: pointInitModeCircle,
   pointInitGaussianDisk: pointInitModeGaussian,

@@ -361,6 +361,11 @@ export function createTimelineState() {
   const [removeMode, setRemoveMode] = createSignal(false)
   const [animationEnabled, setAnimationEnabled] = createSignal(false)
 
+  const [lastAddedKeyframe, setLastAddedKeyframe] = createSignal<{
+    path: string
+    frame: number
+  } | null>(null)
+
   let valueResolverFn:
     | ((
         path: string,
@@ -463,6 +468,7 @@ export function createTimelineState() {
       }
       return [...prev, { parameterPath, keyframes: [{ frame, value, easing }] }]
     })
+    setLastAddedKeyframe({ path: parameterPath, frame })
     if (frame === currentFrame() && valueWriterFn) {
       valueWriterFn(parameterPath, value)
     }
@@ -936,6 +942,7 @@ export function createTimelineState() {
     setConfig,
     tracks,
     setTracks,
+    lastAddedKeyframe,
     isPlaying,
     setIsPlaying,
     isScrubbing,

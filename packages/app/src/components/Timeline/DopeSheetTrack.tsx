@@ -120,7 +120,7 @@ export function DopeSheetTrack(props: DopeSheetTrackProps) {
       >
         <For each={keyframes()}>
           {(kf) => {
-            const left = (kf.frame - props.startFrame) * props.frameWidth
+            const left = () => (kf.frame - props.startFrame) * props.frameWidth
             return (
               <div
                 class={ui.keyframeDot}
@@ -131,7 +131,7 @@ export function DopeSheetTrack(props: DopeSheetTrackProps) {
                   [ui.atCurrentFrame as string]:
                     kf.frame === props.currentFrame,
                 }}
-                style={{ left: `${left}px` }}
+                style={{ left: `${left()}px` }}
                 title={`Frame ${kf.frame}: ${String(kf.value)}`}
                 onPointerDown={(e) => {
                   handleDragStart(e, kf.frame)

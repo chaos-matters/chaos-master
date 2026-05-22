@@ -118,6 +118,7 @@ export function Slider(props: SliderProps) {
             max={max()}
             step={step()}
             value={value()}
+            data-parameter-path={props.dataParameterPath}
             onPointerDown={commitHandler}
             onInput={(ev) => {
               props.onInput(ev.target.valueAsNumber)

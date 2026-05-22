@@ -170,6 +170,66 @@ export function FramePreviewGallery(props: Props) {
         </div>
       </Show>
 
+      <div class={ui.toolbar}>
+        <div class={ui.qualityToggle}>
+          {(['low', 'mid', 'high'] as PreviewQuality[]).map((q) => (
+            <button
+              type="button"
+              class={ui.qualityButton}
+              classList={{
+                [ui.qualityActive as string]: previewQuality() === q,
+              }}
+              disabled={isGenerating()}
+              onClick={() => setPreviewQuality(q)}
+            >
+              {q.charAt(0).toUpperCase() + q.slice(1)}
+            </button>
+          ))}
+        </div>
+        <div class={ui.actions}>
+          <Show when={isGenerating()}>
+            <div class={ui.progressLabel}>
+              {progress()?.current ?? 0}/{progress()?.total ?? displayCount()}
+            </div>
+            <button
+              type="button"
+              class={ui.stopButton}
+              onClick={stopGeneration}
+              title="Stop generating"
+            >
+              Stop
+            </button>
+          </Show>
+          <Show when={!isGenerating()}>
+            <Show when={thumbnails().length > 0}>
+              <button
+                type="button"
+                class={ui.clearButton}
+                onClick={clearThumbnails}
+                title="Clear thumbnails"
+              >
+                <svg
+                  viewBox="0 0 16 16"
+                  fill="currentColor"
+                  width="14"
+                  height="14"
+                >
+                  <path d="M5 2V1h6v1h4v2h-1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4H1V2h4zm1 0h4v-.5a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5V2zM4 4v9h8V4H4zm2 1h1v7H6V5zm3 0h1v7H9V5z" />
+                </svg>
+              </button>
+            </Show>
+            <button
+              type="button"
+              class={ui.generateButton}
+              onClick={generatePreviews}
+              title="Generate previews"
+            >
+              Render Previews
+            </button>
+          </Show>
+        </div>
+      </div>
+
       <Show
         when={thumbnails().length > 0}
         fallback={
@@ -196,80 +256,6 @@ export function FramePreviewGallery(props: Props) {
           </For>
         </div>
       </Show>
-
-      <div class={ui.toolbar}>
-        <div class={ui.qualityToggle}>
-          {(['low', 'mid', 'high'] as PreviewQuality[]).map((q) => (
-            <button
-              type="button"
-              class={ui.qualityButton}
-              classList={{
-                [ui.qualityActive as string]: previewQuality() === q,
-              }}
-              disabled={isGenerating()}
-              onClick={() => setPreviewQuality(q)}
-            >
-              {q.charAt(0).toUpperCase() + q.slice(1)}
-            </button>
-          ))}
-        </div>
-        <div class={ui.actions}>
-          <Show when={isGenerating()}>
-            <button
-              type="button"
-              class={ui.stopButton}
-              onClick={stopGeneration}
-              title="Stop generating"
-            >
-              <svg
-                viewBox="0 0 16 16"
-                fill="currentColor"
-                width="14"
-                height="14"
-              >
-                <path d="M3 3h10v10H3V3z" />
-              </svg>
-            </button>
-            <div class={ui.progressLabel}>
-              {progress()?.current ?? 0}/{progress()?.total ?? displayCount()}
-            </div>
-          </Show>
-          <Show when={!isGenerating()}>
-            <Show when={thumbnails().length > 0}>
-              <button
-                type="button"
-                class={ui.clearButton}
-                onClick={clearThumbnails}
-                title="Clear thumbnails"
-              >
-                <svg
-                  viewBox="0 0 16 16"
-                  fill="currentColor"
-                  width="14"
-                  height="14"
-                >
-                  <path d="M5 2V1h6v1h4v2h-1v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4H1V2h4zm1 0h4v-.5a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5V2zM4 4v9h8V4H4zm2 1h1v7H6V5zm3 0h1v7H9V5z" />
-                </svg>
-              </button>
-            </Show>
-            <button
-              type="button"
-              class={ui.generateButton}
-              onClick={generatePreviews}
-              title="Generate previews"
-            >
-              <svg
-                viewBox="0 0 16 16"
-                fill="currentColor"
-                width="14"
-                height="14"
-              >
-                <path d="M4 2l10 6-10 6V2z" />
-              </svg>
-            </button>
-          </Show>
-        </div>
-      </div>
     </div>
   )
 }

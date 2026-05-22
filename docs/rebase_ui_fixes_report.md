@@ -26,3 +26,11 @@ This document details the root causes and solutions for several UI and rendering
 **Symptom**: The changelog icon appeared missing or improperly loaded.
 **Root Cause**: The SVG file (`changelog.svg`) was correctly implemented and identical to `main`. The issue was related to Vite's `vite-plugin-solid-svg` caching/HMR state not properly picking up the new SVG component during the active dev session. 
 **Fix**: Restarting the Vite dev server clears the cache and correctly loads the SVG as a SolidJS component.
+
+### 5. Version Info Clickability
+- **Root Cause:** The `SoftwareVersion` component (the version info pill at the bottom right) was rendered inside `ViewControls`. The `ViewControls` container has `isolation: isolate` to establish a new stacking context. Consequently, even though the version info pill had `position: fixed` and `z-index: 9999`, its stacking order was trapped within the `ViewControls` context. Because the Timeline is rendered *after* `ViewControls` in the DOM tree within the `.bottom-bar`, the Timeline naturally painted over the `ViewControls` context, intercepting all clicks on the version info pill when the timeline was expanded beneath it.
+- **Fix:** Moved `<SoftwareVersion />` out of `<ViewControls />` and placed it directly at the root of the `<App />` layout tree (inside `<Dropzone>`). This allows its `position: fixed` and high `z-index` to operate at the top-level layout stacking context, ensuring it is always painted on top of the timeline and remains clickable at all times.
+
+### 6. Guided Tour Buttons
+- **Root Cause:** The Guided Tour buttons in the About panel were changing `window.location.hash`, but the `App.tsx` code that listened for tours used a `createEffect` that only read the hash once on mount (because `window.location.hash` is not a reactive SolidJS signal). Thus, clicking the buttons changed the URL hash but did not trigger the tour logic.
+- **Fix:** Refactored the `createEffect` in `App.tsx` to an `onMount` block that explicitly binds to the browser's native `hashchange` event, ensuring that any clicks on the tour buttons (which mutate the hash) are properly intercepted and the respective tour is launched.
