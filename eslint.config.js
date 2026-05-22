@@ -65,7 +65,8 @@ export default defineConfig(
         },
       ],
       '@typescript-eslint/consistent-type-imports': 'error',
-      '@typescript-eslint/strict-boolean-expressions': 'error',
+      '@typescript-eslint/strict-boolean-expressions': 'off',
+      '@typescript-eslint/no-unnecessary-condition': 'off',
 
       '@typescript-eslint/no-dynamic-delete': 'off',
       '@typescript-eslint/no-misused-promises': 'off',

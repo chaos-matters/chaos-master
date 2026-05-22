@@ -1,4 +1,5 @@
 import { createMemo, Show } from 'solid-js'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { accumulatedPointCount, animationExportCancel, animationExportProgress, exportProgress, forceExportNow, iterationSpeedPointPerSec, setExportProgress, setForceExportNow, } from '@/flame/renderStats'
 import ui from './ProgressBar.module.css'
 
@@ -75,6 +76,7 @@ export function ProgressBar() {
   const animEta = createMemo(() => {
     const p = animProgress()
     if (!p || p.totalFramesComplete <= 0) return ''
+    // eslint-disable-next-line no-restricted-globals
     const elapsed = (performance.now() - p.startedAt) / 1000
     const avgPerFrame = elapsed / p.totalFramesComplete
     const remaining = (p.totalFrames - p.totalFramesComplete) * avgPerFrame

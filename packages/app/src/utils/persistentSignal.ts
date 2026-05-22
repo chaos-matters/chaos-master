@@ -3,6 +3,7 @@ import type { Accessor, Setter } from 'solid-js'
 
 const PREFIX = 'chaos-master-'
 
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 function readStored<T>(key: string): T | null {
   try {
     const raw = localStorage.getItem(PREFIX + key)

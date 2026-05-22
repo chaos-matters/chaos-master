@@ -68,7 +68,6 @@ export function FramePreviewGallery(props: Props) {
     const results: string[] = []
 
     for (let i = 0; i < displayCount(); i++) {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (aborted) break
 
       setProgress({ current: i + 1, total: displayCount() })
@@ -98,8 +97,6 @@ export function FramePreviewGallery(props: Props) {
         }
         requestAnimationFrame(tryResolve)
       })
-
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (aborted) break
 
       if (captureCanvasRef) {

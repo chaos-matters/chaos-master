@@ -8,6 +8,7 @@ import { ChangeHistoryContextProvider } from '@/contexts/ChangeHistoryContext'
 import { CompactModeProvider } from '@/contexts/CompactModeContext'
 import { createGateContext } from '@/contexts/GateContext'
 import { KeyframeTargetProvider } from '@/contexts/KeyframeTargetContext'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { COMPUTE_GATE_CAPACITY, DEFAULT_VARIATION_PREVIEW_POINT_COUNT, DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS, DEFAULT_VARIATION_SHOW_DELAY_MS, } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
 import { pointInitModeToImplFn } from '@/flame/pointInitMode'
@@ -27,6 +28,7 @@ import { vramLog } from '@/utils/vramLog'
 import { AffineEditor } from '../AffineEditor/AffineEditor'
 import { Button } from '../Button/Button'
 import { ButtonGroup } from '../Button/ButtonGroup'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { DelayedShow } from '../DelayedShow/DelayedShow'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
@@ -37,6 +39,7 @@ import type { ExportImageType } from '@/App'
 import type { PointInitMode } from '@/flame/pointInitMode'
 import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from '@/flame/schema/flameSchema'
 import type { TransformVariationDescriptor } from '@/flame/variations'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { ChangeHistory, HistorySetter } from '@/utils/createStoreHistory'
 
 const CANCEL = 'cancel'

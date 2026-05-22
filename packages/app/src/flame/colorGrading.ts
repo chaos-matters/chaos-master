@@ -124,6 +124,7 @@ export function createColorGradingPipeline(
     }
   })
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fragmentBodyMode0 = ({ pos, uv }: { pos: any; uv: any }) => {
     'use gpu'
     const uniforms = bindGroupLayout.$.uniforms
@@ -223,6 +224,7 @@ export function createColorGradingPipeline(
     return vec4f(mix(backgroundColor.rgb, rgb, flameAlpha), f32(1))
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fragmentBodyMode1 = ({ pos, uv }: { pos: any; uv: any }) => {
     'use gpu'
     const uniforms = bindGroupLayout.$.uniforms

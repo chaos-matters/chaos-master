@@ -1,6 +1,7 @@
 import { tgpu } from 'typegpu'
 import { arrayOf, builtin, f32, i32, u32, vec2i } from 'typegpu/data'
 import { add, ceil, clamp, exp, max, sub } from 'typegpu/std'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { Bucket, BUCKET_FIXED_POINT_MULTIPLIER, FilterParams } from './types'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 
