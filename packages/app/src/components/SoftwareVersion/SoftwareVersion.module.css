@@ -31,7 +31,7 @@
 }
 
 .version {
-  position: absolute;
+  position: fixed;
   color: var(--color);
   padding-inline: var(--space-2);
   padding-block: var(--space-1);
@@ -42,6 +42,7 @@
   border-top-left-radius: var(--space-2);
   background-color: var(--bg-color);
   cursor: pointer;
+  z-index: 9999;
 
   &:hover {
     color: var(--color-hover);

@@ -1,8 +1,10 @@
 import { createEffect, createSignal, For, onCleanup, onMount, Show, } from 'solid-js'
+import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { variationTypes } from '@/flame/variations'
 import { getNormalizedVariationName } from '@/flame/variations/utils'
 import { DelayedShow } from '../DelayedShow/DelayedShow'
 import { VariationPreview, variationPreviewFlames, } from '../VariationSelector/VariationSelector'
+import { ComputeGate } from '@/contexts/ComputeGateContext'
 import ui from './QuickVariationPicker.module.css'
 import type { TransformVariationType } from '@/flame/variations'
 
@@ -231,45 +233,47 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
               'pointInitGaussianDisk',
             )
             return (
-              <For each={variationTypes}>
-                {(type, i) => {
-                  const flame = () => previewFlames[type]
-                  return (
-                    <button
-                      class={ui.galleryItem}
-                      classList={{
-                        [ui.galleryItemActive!]: type === props.currentType,
-                      }}
-                      title={getNormalizedVariationName(type)}
-                      onMouseEnter={() => props.onHoverType?.(type)}
-                      onMouseLeave={() => props.onHoverClear?.()}
-                      onClick={() => {
-                        props.onHoverClear?.()
-                        props.onSelect(type)
-                        props.onClose()
-                      }}
-                    >
-                      <Show when={flame()} keyed>
-                        {(f) => (
-                          <DelayedShow delayMs={i() * 30}>
-                            <div class={ui.galleryCanvas}>
-                              <VariationPreview
-                                version={1}
-                                isSelected={type === props.currentType}
-                                name={type}
-                                flame={f}
-                              />
-                            </div>
-                          </DelayedShow>
-                        )}
-                      </Show>
-                      <div class={ui.galleryItemName}>
-                        {getNormalizedVariationName(type)}
-                      </div>
-                    </button>
-                  )
-                }}
-              </For>
+              <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
+                <For each={variationTypes}>
+                  {(type, i) => {
+                    const flame = () => previewFlames[type]
+                    return (
+                      <button
+                        class={ui.galleryItem}
+                        classList={{
+                          [ui.galleryItemActive!]: type === props.currentType,
+                        }}
+                        title={getNormalizedVariationName(type)}
+                        onMouseEnter={() => props.onHoverType?.(type)}
+                        onMouseLeave={() => props.onHoverClear?.()}
+                        onClick={() => {
+                          props.onHoverClear?.()
+                          props.onSelect(type)
+                          props.onClose()
+                        }}
+                      >
+                        <Show when={flame()} keyed>
+                          {(f) => (
+                            <DelayedShow delayMs={i() * 30}>
+                              <div class={ui.galleryCanvas}>
+                                <VariationPreview
+                                  version={1}
+                                  isSelected={type === props.currentType}
+                                  name={type}
+                                  flame={f}
+                                />
+                              </div>
+                            </DelayedShow>
+                          )}
+                        </Show>
+                        <div class={ui.galleryItemName}>
+                          {getNormalizedVariationName(type)}
+                        </div>
+                      </button>
+                    )
+                  }}
+                </For>
+              </ComputeGate>
             )
           })()}
         </div>

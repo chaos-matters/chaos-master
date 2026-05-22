@@ -14,12 +14,9 @@ export type EasingCurve =
   | 'bounce'
   | 'elastic'
 
-export type PointInitMode =
-  | 'pointInitUnitDisk'
-  | 'pointInitGaussianDisk'
-  | 'pointInitUnitSquare'
-  | 'pointInitModeGaussianSquare'
-  | 'pointInitModeGaussianCircle'
+import type { PointInitMode } from '@/flame/pointInitMode'
+
+export type { PointInitMode }
 
 /**
  * Expandable mapping of variation types to their available parameters.
@@ -208,12 +205,7 @@ export interface FlameDescriptor {
     skipIters: number
     drawMode: 'light' | 'paint'
     colorInitMode: 'colorInitZero' | 'colorInitPosition'
-    pointInitMode:
-      | 'pointInitUnitDisk'
-      | 'pointInitGaussianDisk'
-      | 'pointInitUnitSquare'
-      | 'pointInitModeGaussianSquare'
-      | 'pointInitModeGaussianCircle'
+    pointInitMode: PointInitMode
     vibrancy: number
     backgroundColor?: [number, number, number]
     camera?: {

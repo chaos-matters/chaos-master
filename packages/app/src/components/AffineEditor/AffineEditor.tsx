@@ -15,6 +15,7 @@ import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'
 import { recordEntries } from '@/utils/record'
 import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
+import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { handleColor } from '../FlameColorEditor/FlameColorEditor'
 import ui from './AffineEditor.module.css'
 import { AffineListEditor } from './AffineListEditor'
@@ -79,7 +80,7 @@ function cross2d(a: v2f, b: v2f) {
   return a.x * b.y - a.y * b.x
 }
 
-function Grid() {
+function Grid(props: { isVisible: () => boolean }) {
   const { theme } = useTheme()
   const camera = useCamera()
   const { device, root } = useRootContext()
@@ -155,7 +156,7 @@ function Grid() {
         pass.end()
         device.queue.submit([encoder.finish()])
       },
-      () => 0,
+      () => (props.isVisible() ? 0 : Infinity),
     )
   })
   return null
@@ -342,6 +343,9 @@ export function AffineEditor(props: {
   const [zoom, setZoom] = createZoom(0.9, [0.5, 20])
   const [position, setPosition] = createPosition(vec2f())
   const [tab, setTab] = createSignal<Tab>('grid')
+  const [isVisible, setIsVisible] = createSignal(true)
+
+  useIntersectionObserver(div, (visible) => setIsVisible(visible))
 
   const scrollTrigger = () => {
     Object.values(props.transforms).forEach((tr) => tr.preAffine)
@@ -383,7 +387,7 @@ export function AffineEditor(props: {
             zoom={[zoom, setZoom]}
             position={[position, setPosition]}
           >
-            <Grid />
+            <Grid isVisible={isVisible} />
             <svg class={ui.svg}>
               <defs>
                 <marker

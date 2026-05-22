@@ -85,7 +85,7 @@ export function Modal(props: ParentProps<ModalProps>) {
           ;(el as HTMLElement).classList.add(ui.root!)
         }}
       >
-        <Show when={modalInstances()[0]} keyed>
+        <Show when={modalInstances().at(-1)} keyed>
           {(instance) => {
             const {
               resolve,
@@ -93,12 +93,21 @@ export function Modal(props: ParentProps<ModalProps>) {
             } = instance
 
             function respond(option: unknown) {
-              document.startViewTransition(() => {
+              if ('startViewTransition' in document) {
+                const transition = document.startViewTransition(() => {
+                  resolve(option)
+                  setModalInstances((instances) =>
+                    instances.filter((ins) => ins !== instance),
+                  )
+                })
+                transition.ready.catch(() => {})
+                transition.finished.catch(() => {})
+              } else {
                 resolve(option)
                 setModalInstances((instances) =>
                   instances.filter((ins) => ins !== instance),
                 )
-              })
+              }
             }
 
             return (
