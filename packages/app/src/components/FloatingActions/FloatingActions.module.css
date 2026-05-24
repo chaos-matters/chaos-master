@@ -76,12 +76,43 @@
   background: currentColor;
 }
 
+.rows {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .buttons {
   display: flex;
   flex-direction: row;
   align-items: stretch;
   padding: 4px;
   gap: 2px;
+}
+
+.divider {
+  height: 1px;
+  margin: 0 6px;
+  background: var(--neutral-200);
+
+  [data-theme='dark'] & {
+    background: var(--neutral-700);
+  }
+}
+
+.toggleRow {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  padding: 4px;
+  gap: 2px;
+}
+
+.qualityRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 4px;
 }
 
 .button {
@@ -126,6 +157,68 @@
   }
 }
 
+.toggle {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--neutral-400);
+  transition:
+    background 0.12s,
+    color 0.12s,
+    transform 0.1s;
+
+  & svg {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+  }
+
+  &:hover {
+    background: var(--neutral-100);
+    color: var(--neutral-700);
+  }
+
+  &:active {
+    transform: scale(0.92);
+  }
+
+  [data-theme='dark'] & {
+    color: var(--neutral-600);
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--neutral-300);
+    }
+  }
+}
+
+.toggleActive {
+  background: oklch(92% 0.02 240);
+  color: oklch(40% 0.12 240);
+
+  &:hover {
+    background: oklch(89% 0.03 240);
+    color: oklch(35% 0.14 240);
+  }
+
+  [data-theme='dark'] & {
+    background: oklch(28% 0.04 240);
+    color: oklch(72% 0.1 240);
+
+    &:hover {
+      background: oklch(32% 0.05 240);
+      color: oklch(78% 0.1 240);
+    }
+  }
+}
+
 .separator {
   width: 1px;
   margin: 4px 2px;
@@ -136,4 +229,16 @@
     background: var(--neutral-700);
   }
 }
+
+.toggleSeparator {
+  width: 1px;
+  margin: 3px 2px;
+  background: var(--neutral-200);
+  flex-shrink: 0;
+
+  [data-theme='dark'] & {
+    background: var(--neutral-700);
+  }
+}
+
 .disabled { pointer-events: none; opacity: 0.5; }

@@ -11,7 +11,6 @@ import { recordEntries, recordKeys } from '@/utils/record'
 import ui from './App.module.css'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
 import { Button } from './components/Button/Button'
-import { Checkbox } from './components/Checkbox/Checkbox'
 import { CollapsibleCard } from './components/CollapsibleCard/CollapsibleCard'
 import { ColorPicker } from './components/ColorPicker/ColorPicker'
 import { Card } from './components/ControlCard/ControlCard'
@@ -28,7 +27,7 @@ import { createLogoFaviconGenerator } from './components/LogoFaviconGenerator/Lo
 import { Modal } from './components/Modal/Modal'
 import { PaletteSelector } from './components/PaletteSelector/PaletteSelector'
 import { ProgressBar } from './components/ProgressBar/ProgressBar'
-import { defaultPills, getPresetFromQuality, QualityPresets, qualityPresets, } from './components/Quality/QualityPresets'
+import { getPresetFromQuality, qualityPresets } from './components/Quality/QualityPresets'
 import { QuickVariationPicker } from './components/QuickVariationPicker/QuickVariationPicker'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
 import { Slider } from './components/Sliders/Slider'
@@ -1077,7 +1076,6 @@ function App(props: AppProps) {
   })
 
   return (
-    <CompactModeProvider>
       <ChangeHistoryContextProvider value={history}>
         <TimelineContextProvider value={timeline}>
           <Dropzone class={ui.layout} onDrop={onDrop}>
@@ -2101,83 +2099,10 @@ function App(props: AppProps) {
                             Auto
                           </Button>
                         </Show>
-                        <div class={ui.noSelect}>Quality</div>
-                        <QualityPresets
-                          pills={defaultPills}
-                          selectedKey={qualityPreset()}
-                          onSelect={(key) => {
-                            console.info(
-                              '[App] setQualityPreset',
-                              `key=${key}`,
-                              `current=${qualityPreset()}`,
-                            )
-                            setQualityPreset(key as QualityPreset)
-                          }}
-                          allPillsFill={true}
-                          currentPoints={accumulatedPointCount()}
-                          targetPoints={qualityPointCountLimit()()}
-                        />
+
                       </Card>
                     </CollapsibleCard>
-                    <CollapsibleCard title="Display">
-                      <div class={ui.displayGrid}>
-                        <label class={ui.labeledInput}>
-                          <span>Enable Animation</span>
-                          <Checkbox
-                            checked={animationEnabled()}
-                            onChange={(checked) => {
-                              console.info('[anim] checkbox toggled →', checked)
-                              setAnimationEnabled(checked)
-                            }}
-                          />
-                        </label>
-                        <label class={ui.labeledInput}>
-                          <span>Show Timeline</span>
-                          <Checkbox
-                            checked={showTimeline()}
-                            onChange={(checked) => {
-                              const update = () => setShowTimeline(checked)
-                              if ('startViewTransition' in document) {
-                                document.startViewTransition(update)
-                              } else {
-                                update()
-                              }
-                            }}
-                          />
-                        </label>
-                        <label class={ui.labeledInput}>
-                          <span>Adaptive filter</span>
-                          <Checkbox
-                            checked={adaptiveFilterEnabled()}
-                            onChange={(checked) =>
-                              setAdaptiveFilterEnabled(checked)
-                            }
-                          />
-                        </label>
-                        <label class={ui.labeledInput}>
-                          <span>Hide Randomizers</span>
-                          <Checkbox
-                            checked={hideDiceButtons()}
-                            onChange={(checked) => setHideDiceButtons(checked)}
-                          />
-                        </label>
-                        <CompactToggle />
-                        <Show when={animationEnabled()}>
-                          <label class={ui.labeledInput}>
-                            <span>Play / Pause</span>
-                            <button
-                              class={ui.playPauseBtn}
-                              onClick={() => {
-                                timeline.togglePlay()
-                              }}
-                              title="Play/Pause animation"
-                            >
-                              {timeline.isPlaying() ? '⏸' : '▶️'}
-                            </button>
-                          </label>
-                        </Show>
-                      </div>
-                    </CollapsibleCard>
+
                   </Show>
                 </div>
               </div>
@@ -2203,25 +2128,44 @@ function App(props: AppProps) {
                 })
               }}
               hideDiceButtons={hideDiceButtons}
+              setHideDiceButtons={setHideDiceButtons}
+              animationEnabled={animationEnabled}
+              setAnimationEnabled={(v) => {
+                console.info('[anim] floating toggle →', v)
+                setAnimationEnabled(v)
+              }}
+              showTimeline={showTimeline}
+              setShowTimeline={setShowTimeline}
+              adaptiveFilterEnabled={adaptiveFilterEnabled}
+              setAdaptiveFilterEnabled={setAdaptiveFilterEnabled}
+              isPlaying={() => timeline.isPlaying()}
+              togglePlay={() => {
+                if (!animationEnabled()) {
+                  setAnimationEnabled(true)
+                }
+                timeline.togglePlay()
+              }}
+              qualityPreset={qualityPreset}
+              setQualityPreset={(key) => {
+                console.info(
+                  '[App] setQualityPreset (floating)',
+                  `key=${key}`,
+                  `current=${qualityPreset()}`,
+                )
+                setQualityPreset(key as QualityPreset)
+              }}
+              accumulatedPointCount={accumulatedPointCount}
+              qualityPointCountLimit={qualityPointCountLimit()}
             />
             <SpotlightTour tourContext={tourContext} />
-            <SoftwareVersion showHelp={createShowHelp(quickPickerMode, setQuickPickerMode, sidebarLayoutMode, setSidebarLayoutMode)} />
+            <SoftwareVersion showHelp={createShowHelp(quickPickerMode, setQuickPickerMode, sidebarLayoutMode, setSidebarLayoutMode, isCompact, toggleCompact)} />
           </Dropzone>
         </TimelineContextProvider>
       </ChangeHistoryContextProvider>
-    </CompactModeProvider>
   )
 }
 
-function CompactToggle() {
-  const { isCompact, toggleCompact } = useCompactMode()
-  return (
-    <label class={ui.labeledInput} data-tour-target="compact-toggle">
-      <span>Compact UI</span>
-      <Checkbox checked={isCompact()} onChange={toggleCompact} />
-    </label>
-  )
-}
+
 
 export function Wrappers() {
   const [flameFromQuery] = createResource(async () => {
@@ -2314,7 +2258,8 @@ export function Wrappers() {
   }
 
   return (
-    <SpotlightTourContext.Provider value={spotlightState}>
+    <CompactModeProvider>
+      <SpotlightTourContext.Provider value={spotlightState}>
       <ThemeContextProvider>
         <KeyframeTargetProvider>
           <Modal>
@@ -2353,6 +2298,7 @@ export function Wrappers() {
           </Modal>
         </KeyframeTargetProvider>
       </ThemeContextProvider>
-    </SpotlightTourContext.Provider>
+      </SpotlightTourContext.Provider>
+    </CompactModeProvider>
   )
 }

@@ -2,6 +2,10 @@
   border: 2px solid;
   border-radius: 0;
   padding: 0;
+  width: 3rem;
+  height: 1.5rem;
+  justify-self: end;
+  cursor: pointer;
 
   &::-webkit-color-swatch-wrapper {
     padding: 0;
