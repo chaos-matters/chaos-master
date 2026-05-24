@@ -13,6 +13,7 @@ type Props = {
   onLogoFavicon: () => void
   onRandomizeColors: () => void
   hideDiceButtons: () => boolean
+  disabled?: boolean
 }
 
 export function FloatingActions(props: Props) {
@@ -87,7 +88,10 @@ export function FloatingActions(props: Props) {
     <div
       ref={widgetRef}
       class={ui.widget}
-      classList={{ [ui.isDragging as string]: dragging() }}
+      classList={{
+        [ui.isDragging as string]: dragging(),
+        [ui.disabled as string]: props.disabled,
+      }}
       style={{ left: `${left()}px`, top: `${top()}px` }}
     >
       <div

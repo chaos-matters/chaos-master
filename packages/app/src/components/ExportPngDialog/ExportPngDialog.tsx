@@ -1,3 +1,4 @@
+import { TimelineState, defaultConfig as defaultTimelineConfig } from '@/utils/timeline'
 import { createSignal, Show } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { vec2f, vec3f, vec4f } from 'typegpu/data'
@@ -15,6 +16,7 @@ import { addFlameDataToPng } from '@/utils/flameInPng'
 import { compressJsonQueryParam } from '@/utils/jsonQueryParam'
 import { persistentSignal } from '@/utils/persistentSignal'
 import { saveRecentFlame } from '@/utils/recentFlames'
+import { applyTimelineToFlameAtFrame } from '@/utils/timeline'
 import { Button } from '../Button/Button'
 import { Checkbox } from '../Checkbox/Checkbox'
 import { ColorPicker } from '../ColorPicker/ColorPicker'
@@ -577,8 +579,7 @@ function RenderDialog(props: RenderDialogProps) {
 
 export function createExportPngDialog(
   flameDescriptor: FlameDescriptor,
-  getTracks: () => TimelineTrack[],
-  getConfig: () => TimelineConfig,
+  getTimeline: () => TimelineState | undefined,
   getPixelRatio: () => number,
   setPixelRatio: Setter<number>,
   setOnExportImage: Setter<ExportImageType | undefined>,
@@ -592,7 +593,9 @@ export function createExportPngDialog(
   const requestModal = useRequestModal()
 
   function quickExport() {
-    const tracks = getTracks()
+    const timeline = getTimeline()
+    const tracks = timeline?.tracks() ?? []
+    const config = timeline?.config() ?? defaultTimelineConfig()
     const hasAnimation = tracks.length > 0
     const currentRatio = getPixelRatio()
 
@@ -605,8 +608,7 @@ export function createExportPngDialog(
           if (!blob) return
           const imgData = await blob.arrayBuffer()
           let pngBytes = new Uint8Array(imgData)
-          const config = getConfig()
-          const currentTracks = getTracks()
+          const currentTracks = timeline?.tracks() ?? []
           const payload = hasAnimation
             ? {
                 flame: flameDescriptor,
@@ -633,10 +635,12 @@ export function createExportPngDialog(
   }
 
   async function showExportPngDialog() {
-    const tracks = getTracks()
+    const timeline = getTimeline()
+    const tracks = timeline?.tracks() ?? []
+    const config = timeline?.config() ?? defaultTimelineConfig()
     const hasAnimation = tracks.length > 0
+    const currentFrame = timeline?.currentFrame() ?? 0
     const currentRatio = getPixelRatio()
-    const config = getConfig()
 
     const [resolution, setResolution] = persistentSignal(
       'export/resolution',
@@ -687,9 +691,12 @@ export function createExportPngDialog(
       true,
     )
 
-    const [previewDescriptor, setPreviewDescriptor] = createStore(
-      JSON.parse(JSON.stringify(flameDescriptor)),
-    )
+    const initialFlame = JSON.parse(JSON.stringify(flameDescriptor))
+    if (timeline && hasAnimation) {
+      applyTimelineToFlameAtFrame(timeline, initialFlame, currentFrame)
+    }
+
+    const [previewDescriptor, setPreviewDescriptor] = createStore(initialFlame)
 
     function handleExport() {
       const res = resolution()
@@ -754,8 +761,8 @@ export function createExportPngDialog(
             const imgData = await blob.arrayBuffer()
             let pngBytes = new Uint8Array(imgData)
             if (doEmbedFlame) {
-              const cfg = getConfig()
-              const currentTracks = getTracks()
+              const cfg = timeline?.config() ?? defaultTimelineConfig()
+              const currentTracks = timeline?.tracks() ?? []
               const doCondense = condenseHidden()
               const flame = doCondense
                 ? condenseFlameDescriptor(flameDescriptor)
