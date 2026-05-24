@@ -1,4 +1,5 @@
 import { prettyPrintValibotErrors } from '@/utils/prettyPrintValibotErrors'
+import { recordEntries } from '@/utils/record'
 import * as v from '@/valibot'
 import { AffineParamsSchema } from '../affineTranform'
 import { ColorInitMode } from '../colorInitMode'
@@ -176,12 +177,12 @@ export function condenseFlameDescriptor(
   descriptor: FlameDescriptor,
 ): FlameDescriptor {
   const condensed = JSON.parse(JSON.stringify(descriptor)) as FlameDescriptor
-  const visibleTransforms = Object.entries(condensed.transforms).filter(
+  const visibleTransforms = recordEntries(condensed.transforms).filter(
     ([, tr]) => tr.visible,
   )
   condensed.transforms = Object.fromEntries(
     visibleTransforms.map(([tid, tr]) => {
-      const visibleVariations = Object.entries(tr.variations).filter(
+      const visibleVariations = recordEntries(tr.variations).filter(
         ([, v]) => v.visible,
       )
       return [

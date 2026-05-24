@@ -170,7 +170,7 @@ function App(props: AppProps) {
   const [sidebarHidden, setSidebarHidden] = createSignal(false)
   const [sidebarLayoutMode, setSidebarLayoutMode] = persistentSignal<
     'compact' | 'wide'
-  >('sidebar-layout-mode', 'compact')
+  >('sidebar-layout-mode', 'wide')
   const sidebarWidth = createMemo(() =>
     sidebarLayoutMode() === 'wide' ? 26 : 21,
   )
@@ -294,7 +294,7 @@ function App(props: AppProps) {
     // If no palette was selected before, save the current "natural" colors
     if (selectedPaletteId() === '') {
       const colors: Record<string, { x: number; y: number }> = {}
-      for (const [tid, t] of Object.entries(flameDescriptor.transforms)) {
+      for (const [tid, t] of recordEntries(flameDescriptor.transforms)) {
         colors[tid] = { x: t.color.x, y: t.color.y }
       }
       setPrePaletteColors(colors)
@@ -319,7 +319,7 @@ function App(props: AppProps) {
     setSelectedPalette(undefined)
     setFlameDescriptor((draft) => {
       const saved = prePaletteColors()
-      for (const [tid, t] of Object.entries(draft.transforms)) {
+      for (const [tid, t] of recordEntries(draft.transforms)) {
         if (saved[tid]) {
           t.color = { x: saved[tid].x, y: saved[tid].y }
         }

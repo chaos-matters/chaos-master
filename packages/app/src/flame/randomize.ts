@@ -1,3 +1,4 @@
+import { recordEntries } from '@/utils/record'
 import { generateTransformId, generateVariationId } from './transformFunction'
 import { isParametricVariationType, transformVariations, variationTypes, } from './variations'
 import { getVariationDefault } from './variations/utils'
@@ -199,7 +200,7 @@ export function generateRandomFlame(
     }
 
     // Normalize variation weights to sum to 1
-    const varEntries = Object.entries(variations)
+    const varEntries = recordEntries(variations)
     const totalWeight = varEntries.reduce(
       (sum, [, v]) => sum + ((v as Record<string, unknown>).weight as number),
       0,

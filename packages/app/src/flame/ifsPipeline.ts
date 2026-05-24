@@ -46,9 +46,9 @@ export function createIFSPipeline(
     insideShaderCount,
     colorInitType,
     pointInitType,
-    transforms: Object.entries(transforms).map(([tid, tr]) => ({
-      tid,
-      variations: Object.entries(tr.variations).map(([vid, v]) => ({
+    transforms: recordEntries(transforms).map(([_, tr]) => ({
+      ...tr,
+      variations: recordEntries(tr.variations).map(([vid, v]) => ({
         vid,
         type: v.type,
       })),

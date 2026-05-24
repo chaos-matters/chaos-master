@@ -5,6 +5,7 @@ import { useTimeline } from '@/contexts/TimelineContext'
 import { DEBUG_MODE } from '@/defaults'
 import { accumulatedPointCount, animationExportRunning, setAccumulatedPointCountGlobal, setRenderTimings, } from '@/flame/renderStats'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
+import { recordEntries } from '@/utils/record'
 import { applyTimelineToFlame } from '@/utils/timeline'
 import { useCamera } from '../lib/CameraContext'
 import { useCanvas } from '../lib/CanvasContext'
@@ -225,19 +226,14 @@ export function Flam3(props: Flam3Props) {
   const parameterFingerprint = createMemo(() => {
     const flame = animatedFlame()
     return JSON.stringify({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      transforms: Object.entries(flame.transforms).map(
-        ([tid, t]: [string, any]) => ({
-          tid,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          variations: Object.entries(t.variations).map(
-            ([vid, v]: [string, any]) => ({
-              vid,
-              type: v.type,
-            }),
-          ),
-        }),
-      ),
+      transforms: recordEntries(flame.transforms).map(([tid, t]) => ({
+        tid,
+
+        variations: recordEntries(t.variations).map(([vid, v]) => ({
+          vid,
+          type: v.type,
+        })),
+      })),
       colorInitMode: flame.renderSettings.colorInitMode,
       pointInitMode: flame.renderSettings.pointInitMode,
       skipIters: Math.floor(flame.renderSettings.skipIters),

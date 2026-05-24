@@ -15,6 +15,7 @@ export type EasingCurve =
   | 'elastic'
 
 import type { PointInitMode } from '@/flame/pointInitMode'
+import type { TransformRecord } from '@/flame/schema/flameSchema'
 
 export type { PointInitMode }
 
@@ -221,7 +222,7 @@ export interface FlameDescriptor {
     gamma?: number
     highlightPower?: number
   }
-  transforms: Record<string, unknown>
+  transforms: TransformRecord
   metadata: {
     author: string
   }
