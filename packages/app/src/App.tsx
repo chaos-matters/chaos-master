@@ -1,4 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 import { batch, createEffect, createMemo, createResource, createSignal, ErrorBoundary, For, onCleanup, onMount, Show, Suspense, } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
@@ -22,9 +22,9 @@ import { AppCrashed, WebgpuNotSupported, } from './components/ErrorHandling/Erro
 import { createExportPngDialog } from './components/ExportPngDialog/ExportPngDialog'
 import { FlameColorEditor, handleColor, } from './components/FlameColorEditor/FlameColorEditor'
 import { FloatingActions } from './components/FloatingActions/FloatingActions'
+import { createShowHelp } from './components/HelpModal/HelpModal'
 import { createLoadFlame } from './components/LoadFlameModal/LoadFlameModal'
 import { createLogoFaviconGenerator } from './components/LogoFaviconGenerator/LogoFaviconGenerator'
-import { createShowHelp } from './components/HelpModal/HelpModal'
 import { Modal } from './components/Modal/Modal'
 import { PaletteSelector } from './components/PaletteSelector/PaletteSelector'
 import { ProgressBar } from './components/ProgressBar/ProgressBar'
@@ -32,12 +32,12 @@ import { defaultPills, getPresetFromQuality, QualityPresets, qualityPresets, } f
 import { QuickVariationPicker } from './components/QuickVariationPicker/QuickVariationPicker'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
 import { Slider } from './components/Sliders/Slider'
+import { SoftwareVersion } from './components/SoftwareVersion/SoftwareVersion'
 import { SpotlightTour } from './components/SpotlightTour/SpotlightTour'
 import { KeyframeDiamond } from './components/Timeline/KeyframeDiamond'
 import { TimelineSection } from './components/Timeline/TimelineSection'
 import { createVariationSelector } from './components/VariationSelector/VariationSelector'
 import { ViewControls } from './components/ViewControls/ViewControls'
-import { SoftwareVersion } from './components/SoftwareVersion/SoftwareVersion'
 import { WelcomeScreen } from './components/WelcomeScreen/WelcomeScreen'
 import { ChangeHistoryContextProvider } from './contexts/ChangeHistoryContext'
 import { CompactModeProvider, useCompactMode, } from './contexts/CompactModeContext'
@@ -50,7 +50,6 @@ import { applyColorMapToFlame } from './flame/colorMap'
 import { drawModeToImplFn } from './flame/drawMode'
 import { example1 } from './flame/examples/example1'
 import { Flam3 } from './flame/Flam3'
-import { defaultPalettes } from './flame/palettes'
 import { pointInitModeToImplFn } from './flame/pointInitMode'
 import { random01, randomizeAllColors, randomizeVariationParams, } from './flame/randomize'
 import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, exportProgress, exportQuality, qualityPointCountLimit, setCurrentQuality, setQualityPointCountLimit, } from './flame/renderStats'
@@ -167,9 +166,6 @@ function App(props: AppProps) {
     clearTimeout(toastTimer)
     toastTimer = setTimeout(() => setToastMessage(null), durationMs)
   }
-  const DEFAULT_SIDEBAR_WIDTH = 26
-  const SIDEBAR_MIN_WIDTH = 16
-  const SIDEBAR_MAX_WIDTH = 36
   const SIDEBAR_RESIZABLE = false
   const { isCompact, toggleCompact } = useCompactMode()
   const [showSidebar, setShowSidebar] = createSignal(true)
@@ -321,7 +317,7 @@ function App(props: AppProps) {
       const saved = prePaletteColors()
       for (const [tid, t] of Object.entries(draft.transforms)) {
         if (saved[tid]) {
-          t.color = { x: saved[tid]!.x, y: saved[tid]!.y }
+          t.color = { x: saved[tid].x, y: saved[tid].y }
         }
       }
     })
@@ -972,6 +968,7 @@ function App(props: AppProps) {
       return true
     },
     KeyZ: (ev) => {
+      if (animationExportRunning()) return false
       if (ev.metaKey || ev.ctrlKey) {
         if (ev.shiftKey) {
           if (timeline.hasTimelineRedo()) {
@@ -995,6 +992,7 @@ function App(props: AppProps) {
       }
     },
     KeyY: (ev) => {
+      if (animationExportRunning()) return false
       if (ev.metaKey || ev.ctrlKey) {
         if (timeline.hasTimelineRedo()) {
           timeline.timelineRedo()
@@ -1007,6 +1005,7 @@ function App(props: AppProps) {
       }
     },
     KeyD: () => {
+      if (animationExportRunning()) return false
       const togglePaintMode = () => {
         setFlameDescriptor((draft) => {
           draft.renderSettings.drawMode =
@@ -1021,6 +1020,7 @@ function App(props: AppProps) {
       return true
     },
     KeyI: (ev) => {
+      if (animationExportRunning()) return false
       if (ev.altKey) {
         const path = targetedParameter()
         if (path) {
@@ -1035,6 +1035,7 @@ function App(props: AppProps) {
       return true
     },
     Space: () => {
+      if (animationExportRunning()) return false
       if (!showTimeline()) return
       if (!animationEnabled()) {
         setAnimationEnabled(true)
@@ -1064,21 +1065,13 @@ function App(props: AppProps) {
     }
   })
 
-  const startSidebarDrag = createDragHandler((initEvent) => {
+  const startSidebarDrag = createDragHandler((_initEvent) => {
     const sidebar = sidebarRef
     if (!sidebar) return
-    const startX = initEvent.clientX
-    const startWidth = sidebar.getBoundingClientRect().width
 
     return {
-      onPointerMove(event) {
-        const dx = event.clientX - startX
-        const remWidth = (startWidth + dx) / 16
-        const clamped = Math.max(
-          SIDEBAR_MIN_WIDTH,
-          Math.min(SIDEBAR_MAX_WIDTH, remWidth),
-        )
-        setSidebarWidth(clamped)
+      onPointerMove() {
+        setSidebarWidth()
       },
     }
   })
@@ -1159,6 +1152,16 @@ function App(props: AppProps) {
                   <Show when={showTimeline()}>
                     <div
                       class={ui.timelineContainer}
+                      style={{
+                        'pointer-events':
+                          animationExportRunning() || exportProgress() !== undefined
+                            ? 'none'
+                            : 'auto',
+                        opacity:
+                          animationExportRunning() || exportProgress() !== undefined
+                            ? 0.5
+                            : 1,
+                      }}
                       onWheel={(ev) => {
                         if (!ev.ctrlKey && !ev.metaKey) return
                         ev.preventDefault()
@@ -1224,16 +1227,16 @@ function App(props: AppProps) {
                   when={
                     timeline.isPlaying() ||
                     animationExportRunning() ||
-                    // eslint-disable-next-line eqeqeq
-                    exportProgress() != null
+                     
+                    exportProgress() !== undefined
                   }
                 >
                   <div
                     class={ui.playbackOverlay}
                     classList={{
                       [ui.exportOverlay as string]:
-                        // eslint-disable-next-line eqeqeq
-                        animationExportRunning() || exportProgress() != null,
+                         
+                        animationExportRunning() || exportProgress() !== undefined,
                     }}
                     onClick={() => {
                       if (timeline.isPlaying()) {
@@ -1244,8 +1247,8 @@ function App(props: AppProps) {
                     <span class={ui.playbackOverlayText}>
                       {animationExportRunning()
                         ? 'Rendering animation...'
-                        : // eslint-disable-next-line eqeqeq
-                          exportProgress() != null
+                        :  
+                          exportProgress() !== undefined
                           ? 'Rendering image...'
                           : '⏸ Tap to stop animation'}
                     </span>
@@ -2170,6 +2173,9 @@ function App(props: AppProps) {
               </div>
             </Show>
             <FloatingActions
+              disabled={
+                animationExportRunning() || exportProgress() !== undefined
+              }
               initialLeft={floatingLeft()}
               initialTop={floatingTop()}
               onLoadFlame={showLoadFlameModal}
@@ -2261,7 +2267,7 @@ export function Wrappers() {
     }
 
     window.addEventListener('hashchange', handleHashChange)
-    onCleanup(() => window.removeEventListener('hashchange', handleHashChange))
+    onCleanup(() => { window.removeEventListener('hashchange', handleHashChange) })
 
     // Check initial hash on mount
     handleHashChange()

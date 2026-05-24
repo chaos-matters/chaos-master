@@ -1,6 +1,6 @@
+import { TRACK_PERFORMANCE } from '@/defaults'
 import { convertNanoToMilliSeconds } from './convertSeconds'
 import { sum } from './sum'
-import { TRACK_PERFORMANCE } from '@/defaults'
 
 export function createTimestampQuery<T extends string>(
   device: GPUDevice,
@@ -17,22 +17,22 @@ export function createTimestampQuery<T extends string>(
     const timings = Object.fromEntries(
       timestampNames.map((name) => [name, 1]), // dummy start at 1ms
     ) as Record<T, number>
-    const writeTimes: { time: number; divisor: number }[] = []
+    const writeTimes: { time: number; div: number }[] = []
 
     return {
       timestampWrites: () =>
         Object.fromEntries(
           timestampNames.map((name) => [name, undefined]),
         ) as Record<T, undefined>,
-      write: (encoder: GPUCommandEncoder, divisor = 1) => {
-        writeTimes.push({ time: globalThis.performance.now(), divisor })
+      write: (encoder: GPUCommandEncoder, div = 1) => {
+        writeTimes.push({ time: globalThis.performance.now(), div })
       },
-      read: async () => {
+      read: () => {
         const item = writeTimes.shift()
         if (item !== undefined) {
           const durationMs = globalThis.performance.now() - item.time
           // Assign total time divided by iterations to the first timestamp (ifsMs)
-          timings[timestampNames[0] as T] = Math.max(durationMs / item.divisor, 0.1)
+          timings[timestampNames[0] as T] = Math.max(durationMs / item.div, 0.1)
         }
       },
       average: () => timings,
@@ -73,7 +73,7 @@ export function createTimestampQuery<T extends string>(
     ) as Record<T, GPUComputePassTimestampWrites>
   }
 
-  function write(encoder: GPUCommandEncoder, divisor = 1) {
+  function write(encoder: GPUCommandEncoder, _div = 1) {
     encoder.resolveQuerySet(
       timestampQuerySet,
       0,
