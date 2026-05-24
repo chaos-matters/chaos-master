@@ -6,7 +6,6 @@ import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useCompactMode } from '@/contexts/CompactModeContext'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useTimeline } from '@/contexts/TimelineContext'
-import { createDragHandler } from '@/utils/createDragHandler'
 import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
 import ui from './Slider.module.css'
 
@@ -69,20 +68,6 @@ export function Slider(props: SliderProps) {
   )
 
   function FullSlider() {
-    // Dragging the slider handle is handled by the browser,
-    // but we still want to startPreview and commit to history once.
-    const commitHandler = createDragHandler(
-      () => {
-        history.startPreview(`Edit ${props.label}`)
-        return {
-          onDone() {
-            history.commit()
-          },
-        }
-      },
-      { preventDefault: false },
-    )
-
     return (
       <label
         class={ui.label}
@@ -119,7 +104,15 @@ export function Slider(props: SliderProps) {
             step={step()}
             value={value()}
             data-parameter-path={props.dataParameterPath}
-            onPointerDown={commitHandler}
+            onPointerDown={() => {
+              history.startPreview(`Edit ${props.label ?? 'slider'}`)
+            }}
+            onPointerUp={() => {
+              history.commit()
+            }}
+            onPointerCancel={() => {
+              history.commit()
+            }}
             onInput={(ev) => {
               props.onInput(ev.target.valueAsNumber)
               // Auto-keyframe: only for already-animated params when auto mode is on

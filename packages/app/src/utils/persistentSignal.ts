@@ -1,4 +1,5 @@
 import { createSignal } from 'solid-js'
+import { safeGetItem, safeSetItem } from './storage'
 import type { Accessor, Setter } from 'solid-js'
 
 const PREFIX = 'chaos-master-'
@@ -6,7 +7,7 @@ const PREFIX = 'chaos-master-'
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
 function readStored<T>(key: string): T | null {
   try {
-    const raw = localStorage.getItem(PREFIX + key)
+    const raw = safeGetItem(PREFIX + key)
     if (raw === null) return null
     return JSON.parse(raw) as T
   } catch {
@@ -16,7 +17,7 @@ function readStored<T>(key: string): T | null {
 
 function writeStored(key: string, value: unknown): void {
   try {
-    localStorage.setItem(PREFIX + key, JSON.stringify(value))
+    safeSetItem(PREFIX + key, JSON.stringify(value))
   } catch {
     // ignore (private mode, quota, etc.)
   }

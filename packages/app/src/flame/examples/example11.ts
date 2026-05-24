@@ -6,7 +6,7 @@ import { defineExample, tid, vid } from './util'
  */
 export const example11 = defineExample({
   renderSettings: {
-    exposure: 0.2,
+    exposure: -1.3,
     skipIters: 20,
     drawMode: 'light',
     camera: {

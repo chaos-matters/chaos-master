@@ -1,4 +1,6 @@
 import { validateFlame } from '@/flame/schema/flameSchema'
+import { deepClone } from '@/utils/clone'
+import { safeGetItem, safeRemoveItem, safeSetItem } from '@/utils/storage'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineTrack } from '@/utils/timeline'
 
@@ -30,7 +32,7 @@ function isValidRecentFlame(item: unknown): item is RecentFlame {
 
 export function loadRecentFlames(): RecentFlame[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = safeGetItem(STORAGE_KEY)
     if (raw === null) return []
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
@@ -53,23 +55,23 @@ export function saveRecentFlame(
   const entry: RecentFlame = {
     id,
     name: name ?? `Flame ${new Date().toLocaleDateString()}`,
-    flame: JSON.parse(JSON.stringify(flame)),
+    flame: deepClone(flame),
     savedAt: Date.now(),
   }
   // Only store tracks when there are actual keyframes
   if (tracks && tracks.length > 0) {
-    entry.tracks = JSON.parse(JSON.stringify(tracks))
+    entry.tracks = deepClone(tracks)
   }
   const updated = [entry, ...recent].slice(0, MAX_RECENT_FLAMES)
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+  safeSetItem(STORAGE_KEY, JSON.stringify(updated))
 }
 
 export function deleteRecentFlame(id: string): void {
   const recent = loadRecentFlames()
   const filtered = recent.filter((item) => item.id !== id)
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered))
+  safeSetItem(STORAGE_KEY, JSON.stringify(filtered))
 }
 
 export function clearRecentFlames(): void {
-  localStorage.removeItem(STORAGE_KEY)
+  safeRemoveItem(STORAGE_KEY)
 }

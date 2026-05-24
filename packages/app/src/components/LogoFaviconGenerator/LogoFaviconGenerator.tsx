@@ -9,6 +9,7 @@ import { variationTypes } from '@/flame/variations'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
+import { deepClone } from '@/utils/clone'
 import { encodeIco } from '@/utils/icoEncoder'
 import { addHistoryEntry, clearHistory, loadHistoryEntries, } from '@/utils/logoHistoryDB'
 import { persistentSignal } from '@/utils/persistentSignal'
@@ -1020,7 +1021,7 @@ export function createLogoFaviconGenerator(
     const renderSettings = () => flame.renderSettings
 
     function handleLoadHistory(entry: HistoryEntry) {
-      setFlame(reconcile(JSON.parse(JSON.stringify(entry.flame))))
+      setFlame(reconcile(deepClone(entry.flame)))
       setCameraZoom(1)
       setCameraPosition(vec2f(0, 0))
       setSelectedEntryTimestamp(entry.timestamp)
@@ -1036,7 +1037,7 @@ export function createLogoFaviconGenerator(
       const prevThumb = await captureThumbnail(HISTORY_THUMBNAIL_SIZE)
       if (prevThumb !== null) {
         const entry: HistoryEntry = {
-          flame: JSON.parse(JSON.stringify(flame)),
+          flame: deepClone(flame),
           thumbnail: prevThumb,
           timestamp: Date.now(),
         }
@@ -1084,7 +1085,7 @@ export function createLogoFaviconGenerator(
       } else {
         rs.vibrancy = prevRs.vibrancy
       }
-      setFlame(reconcile(JSON.parse(JSON.stringify(newFlame))))
+      setFlame(reconcile(deepClone(newFlame)))
       setCameraZoom(1)
       setCameraPosition(vec2f(0, 0))
     }
@@ -1158,7 +1159,7 @@ export function createLogoFaviconGenerator(
           flame={flame}
           onGenerate={handleGenerate}
           onLoadIntoMainView={() => {
-            history.replace(JSON.parse(JSON.stringify(flame)))
+            history.replace(deepClone(flame))
             respond()
           }}
           onDownloadPng={handleDownloadPng}

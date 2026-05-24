@@ -63,6 +63,7 @@ import { appTour } from './tours/appTour'
 import { sidebarTour } from './tours/sidebarTour'
 import { timelineTour } from './tours/timelineTour'
 import { createAnimationExport } from './utils/animationExport'
+import { deepClone } from './utils/clone'
 import { createStoreHistory } from './utils/createStoreHistory'
 import { decodeSharePayload } from './utils/jsonQueryParam'
 import { persistentSignal } from './utils/persistentSignal'
@@ -224,7 +225,7 @@ function App(props: AppProps) {
         : props.flameFromQuery?.flame
           ? 'query'
           : 'default',
-      transformCount: Object.keys(flameDescriptor.transforms).length,
+      transformCount: recordKeys(flameDescriptor.transforms).length,
       firstColor: Object.values(flameDescriptor.transforms)[0]?.color,
       queryFlamePresent: !!props.flameFromQuery?.flame,
       queryAnimPresent: !!props.flameFromQuery?.animation,
@@ -270,7 +271,7 @@ function App(props: AppProps) {
     const state = quickPickState()
     if (!hovered || !state) return flameDescriptor as unknown as FlameDescriptor
     try {
-      const clone: FlameDescriptor = JSON.parse(JSON.stringify(flameDescriptor))
+      const clone: FlameDescriptor = deepClone(flameDescriptor)
       const existingVar = clone.transforms[state.tid]?.variations[state.vid]
       if (existingVar) {
         clone.transforms[state.tid]!.variations[state.vid] = structuredClone(
@@ -1494,14 +1495,8 @@ function App(props: AppProps) {
                                     onContextMenu={(e) => {
                                       e.preventDefault()
                                       showVariationSelector(
-                                        structuredClone(
-                                          JSON.parse(JSON.stringify(variation)),
-                                        ),
-                                        structuredClone(
-                                          JSON.parse(
-                                            JSON.stringify(flameDescriptor),
-                                          ),
-                                        ),
+                                        deepClone(variation),
+                                        deepClone(flameDescriptor),
                                         tid,
                                         vid,
                                       )
@@ -2208,7 +2203,7 @@ export function Wrappers() {
           console.info('[share:resource] decode succeeded:', {
             hasFlame: !!result?.flame,
             transformCount: result?.flame
-              ? Object.keys(result.flame.transforms ?? {}).length
+              ? recordKeys(result.flame.transforms ?? {}).length
               : 0,
             hasAnimation: !!result?.animation,
             animTrackCount: result?.animation?.tracks?.length ?? 0,
@@ -2263,7 +2258,7 @@ export function Wrappers() {
         console.info('[share:wrappers] passing to App:', {
           hasFlame: !!fq.flame,
           transformCount: fq.flame
-            ? Object.keys(fq.flame.transforms ?? {}).length
+            ? recordKeys(fq.flame.transforms ?? {}).length
             : 0,
           hasAnimation: !!fq.animation,
           animTrackCount: fq.animation?.tracks?.length ?? 0,

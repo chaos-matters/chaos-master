@@ -1,5 +1,6 @@
 import { validateFlame } from '@/flame/schema/flameSchema'
 import { decodeBase64, encodeBase64 } from './base64'
+import { recordKeys } from './record'
 import { sum } from './sum'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineConfig, TimelineTrack } from '@/utils/timeline'
@@ -128,7 +129,7 @@ export async function encodeSharePayload(
   if (animation && animation.tracks.length > 0) {
     payload.animation = animation
   }
-  const transformKeys = Object.keys(flame.transforms ?? {})
+  const transformKeys = recordKeys(flame.transforms ?? {})
   const firstColor = transformKeys[0]
     ? (
         flame.transforms as Record<string, { color?: { x: number; y: number } }>
@@ -178,12 +179,12 @@ export async function decodeSharePayload(
     hasTransforms,
     hasFlame,
     hasAnimation: hasFlame && 'animation' in raw,
-    topKeys: Object.keys(raw ?? {}),
+    topKeys: recordKeys(raw ?? {}),
     rawTransformsCount: hasTransforms
-      ? Object.keys(raw.transforms ?? {}).length
+      ? recordKeys(raw.transforms ?? {}).length
       : undefined,
     rawFlameTransformsCount: hasFlame
-      ? Object.keys(raw.flame?.transforms ?? {}).length
+      ? recordKeys(raw.flame?.transforms ?? {}).length
       : undefined,
     rawFlameFirstColor: hasFlame
       ? (
@@ -199,7 +200,7 @@ export async function decodeSharePayload(
     const validated = validateFlame(raw)
     console.info(
       '[share:decode] old format, validated flame transforms:',
-      Object.keys(validated.transforms).length,
+      recordKeys(validated.transforms).length,
     )
     return { flame: validated }
   }
@@ -208,7 +209,7 @@ export async function decodeSharePayload(
     const validated = validateFlame(raw.flame)
     const firstColor = Object.values(validated.transforms ?? {})[0]?.color
     console.info('[share:decode] new format, validated:', {
-      transformCount: Object.keys(validated.transforms).length,
+      transformCount: recordKeys(validated.transforms).length,
       firstTransformColor: firstColor,
       hasAnimation: !!raw.animation,
       animTrackCount: raw.animation?.tracks?.length ?? 0,
