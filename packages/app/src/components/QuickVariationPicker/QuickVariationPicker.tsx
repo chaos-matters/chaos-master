@@ -1,10 +1,10 @@
 import { createEffect, createSignal, For, onCleanup, onMount, Show, } from 'solid-js'
+import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { variationTypes } from '@/flame/variations'
 import { getNormalizedVariationName } from '@/flame/variations/utils'
 import { DelayedShow } from '../DelayedShow/DelayedShow'
 import { VariationPreview, variationPreviewFlames, } from '../VariationSelector/VariationSelector'
-import { ComputeGate } from '@/contexts/ComputeGateContext'
 import ui from './QuickVariationPicker.module.css'
 import type { TransformVariationType } from '@/flame/variations'
 
