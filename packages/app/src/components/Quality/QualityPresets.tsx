@@ -29,6 +29,7 @@ type QualityPresetsProps = {
   allPillsFill?: boolean
   currentPoints?: number
   targetPoints?: number
+  compact?: boolean
 }
 
 export function getPresetFromQuality(
@@ -70,7 +71,7 @@ export function QualityPresets(props: QualityPresetsProps) {
   }
 
   return (
-    <div class={ui.wrapper}>
+    <div class={ui.wrapper} classList={{ [ui.compactWrapper as string]: props.compact }}>
       <div class={ui.pillsContainer} style={gridStyle()}>
         <For each={props.pills}>
           {(pill, index) => {
@@ -100,6 +101,7 @@ export function QualityPresets(props: QualityPresetsProps) {
                 class={ui.pill}
                 classList={{
                   [ui.selectedPill as string]: isSelected(),
+                  [ui.compactPill as string]: props.compact,
                 }}
                 style={{ '--fill-percent': `${fillPct()}%` }}
               >
@@ -110,7 +112,7 @@ export function QualityPresets(props: QualityPresetsProps) {
         </For>
       </div>
       <Show when={showPoints()}>
-        <div class={ui.pointsRow}>
+        <div class={ui.pointsRow} classList={{ [ui.compactPoints as string]: props.compact }}>
           {formatPointCount(props.currentPoints!)} /{' '}
           {formatPointCount(props.targetPoints!)}
         </div>

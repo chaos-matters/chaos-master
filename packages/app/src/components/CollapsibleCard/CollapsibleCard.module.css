@@ -70,10 +70,10 @@
 
 /* Inner card blends into our content container — suppress its top and bottom border/radius */
 .content > * {
-  border-top: none;
-  border-bottom: none;
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
+  border-top: none !important;
+  border-bottom: none !important;
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
 }

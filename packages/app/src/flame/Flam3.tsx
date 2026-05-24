@@ -382,10 +382,21 @@ export function Flam3(props: Flam3Props) {
       ifsPipeline.update(flame as any)
     })
 
-    // Reset accumulation when any flame parameter value changes
-    // (weights, affine, colors, etc.) without rebuilding the pipeline.
+    const accumulationFingerprint = createMemo(() => {
+      const flame = animatedFlame()
+      return JSON.stringify({
+        transforms: flame.transforms,
+        colorInitMode: flame.renderSettings.colorInitMode,
+        pointInitMode: flame.renderSettings.pointInitMode,
+        skipIters: flame.renderSettings.skipIters,
+        drawMode: flame.renderSettings.drawMode,
+      })
+    })
+
+    // Reset accumulation when any structural or rendering parameter changes
+    // (weights, affine, colors, etc.) but ignore color grading post-processing.
     createEffect(() => {
-      animatedFlame()
+      accumulationFingerprint()
       resetAccumulation()
     })
 

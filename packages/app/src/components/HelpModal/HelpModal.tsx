@@ -89,10 +89,12 @@ async function getGPUDeviceInformation() {
 
 type HelpModalProps = {
   respond: () => void
-  quickPickerMode: QuickPickerMode
+  quickPickerMode: () => QuickPickerMode
   onQuickPickerModeChange: (mode: QuickPickerMode) => void
-  sidebarLayoutMode: SidebarLayoutMode
+  sidebarLayoutMode: () => SidebarLayoutMode
   onSidebarLayoutModeChange: (mode: SidebarLayoutMode) => void
+  isCompact: () => boolean
+  onToggleCompact: () => void
 }
 
 function HelpModal(props: HelpModalProps) {
@@ -127,14 +129,14 @@ function HelpModal(props: HelpModalProps) {
         </span>
       </ModalTitleBar>
 
-      <h2 class={ui.sectionTitle}>Variation Picker</h2>
+      <h2 class={ui.sectionTitle}>General Settings</h2>
       <div class={ui.pickerModeRow}>
         <span class={ui.pickerModeLabel}>Default mode</span>
         <div class={ui.pickerModeBtns}>
           <button
             class={ui.pickerModeBtn}
             classList={{
-              [ui.pickerModeBtnActive!]: props.quickPickerMode === 'list',
+              [ui.pickerModeBtnActive!]: props.quickPickerMode() === 'list',
             }}
             onClick={() => {
               props.onQuickPickerModeChange('list')
@@ -145,7 +147,7 @@ function HelpModal(props: HelpModalProps) {
           <button
             class={ui.pickerModeBtn}
             classList={{
-              [ui.pickerModeBtnActive!]: props.quickPickerMode === 'gallery',
+              [ui.pickerModeBtnActive!]: props.quickPickerMode() === 'gallery',
             }}
             onClick={() => {
               props.onQuickPickerModeChange('gallery')
@@ -162,7 +164,7 @@ function HelpModal(props: HelpModalProps) {
           <button
             class={ui.pickerModeBtn}
             classList={{
-              [ui.pickerModeBtnActive!]: props.sidebarLayoutMode === 'compact',
+              [ui.pickerModeBtnActive!]: props.sidebarLayoutMode() === 'compact',
             }}
             onClick={() => {
               props.onSidebarLayoutModeChange('compact')
@@ -173,13 +175,33 @@ function HelpModal(props: HelpModalProps) {
           <button
             class={ui.pickerModeBtn}
             classList={{
-              [ui.pickerModeBtnActive!]: props.sidebarLayoutMode === 'wide',
+              [ui.pickerModeBtnActive!]: props.sidebarLayoutMode() === 'wide',
             }}
             onClick={() => {
               props.onSidebarLayoutModeChange('wide')
             }}
           >
             Wide
+          </button>
+        </div>
+      </div>
+
+      <div class={ui.pickerModeRow}>
+        <span class={ui.pickerModeLabel}>Compact UI</span>
+        <div class={ui.pickerModeBtns}>
+          <button
+            class={ui.pickerModeBtn}
+            classList={{ [ui.pickerModeBtnActive!]: !props.isCompact() }}
+            onClick={() => { if (props.isCompact()) props.onToggleCompact() }}
+          >
+            Off
+          </button>
+          <button
+            class={ui.pickerModeBtn}
+            classList={{ [ui.pickerModeBtnActive!]: props.isCompact() }}
+            onClick={() => { if (!props.isCompact()) props.onToggleCompact() }}
+          >
+            On
           </button>
         </div>
       </div>
@@ -268,6 +290,8 @@ export function createShowHelp(
   onQuickPickerModeChange: (mode: QuickPickerMode) => void,
   sidebarLayoutMode: () => SidebarLayoutMode,
   onSidebarLayoutModeChange: (mode: SidebarLayoutMode) => void,
+  isCompact: () => boolean,
+  onToggleCompact: () => void,
 ) {
   const requestModal = useRequestModal()
 
@@ -277,10 +301,12 @@ export function createShowHelp(
       content: ({ respond }) => (
         <HelpModal
           respond={respond}
-          quickPickerMode={quickPickerMode()}
+          quickPickerMode={quickPickerMode}
           onQuickPickerModeChange={onQuickPickerModeChange}
-          sidebarLayoutMode={sidebarLayoutMode()}
+          sidebarLayoutMode={sidebarLayoutMode}
           onSidebarLayoutModeChange={onSidebarLayoutModeChange}
+          isCompact={isCompact}
+          onToggleCompact={onToggleCompact}
         />
       ),
     })

@@ -69,6 +69,15 @@ export function AngleEditor(props: AngleEditorProps) {
           newAngle += 2 * Math.PI
         }
         props.setValue(newAngle)
+        // Auto-keyframe: only for already-animated params when auto mode is on
+        if (
+          timeline &&
+          props.dataParameterPath &&
+          timeline.autoKeyframe() &&
+          timeline.hasAnyKeyframes(props.dataParameterPath)
+        ) {
+          timeline.addKeyframeAtCurrentFrame(props.dataParameterPath)
+        }
       }
       setAngle(initEvent)
       return {

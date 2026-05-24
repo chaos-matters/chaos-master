@@ -485,6 +485,11 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                 if (e.key === 'Escape') {
                   setSearchQuery('')
                   e.stopPropagation()
+                } else if (e.key === 'Enter') {
+                  if (applySelection()) {
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }
                 }
               }}
             />

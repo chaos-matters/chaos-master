@@ -149,6 +149,7 @@
   overflow-y: auto;
   flex: 1;
   min-height: 0;
+  align-content: flex-start;
 }
 
 .affine-editor {
@@ -171,6 +172,7 @@
   position: relative;
   overflow: hidden;
   padding-bottom: 56.25%; /* 16:9 aspect ratio trick */
+  max-height: 180px;
   border: 2px solid var(--item-border-color);
   border-radius: 0.5rem;
   cursor: pointer;
