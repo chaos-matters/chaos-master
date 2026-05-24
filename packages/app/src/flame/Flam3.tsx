@@ -225,10 +225,18 @@ export function Flam3(props: Flam3Props) {
   const parameterFingerprint = createMemo(() => {
     const flame = animatedFlame()
     return JSON.stringify({
-      transforms: flame.transforms,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      transforms: Object.entries(flame.transforms).map(([tid, t]: [string, any]) => ({
+        tid,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        variations: Object.entries(t.variations).map(([vid, v]: [string, any]) => ({
+          vid,
+          type: v.type,
+        })),
+      })),
       colorInitMode: flame.renderSettings.colorInitMode,
       pointInitMode: flame.renderSettings.pointInitMode,
-      skipIters: flame.renderSettings.skipIters,
+      skipIters: Math.floor(flame.renderSettings.skipIters),
     })
   })
 
@@ -374,10 +382,11 @@ export function Flam3(props: Flam3Props) {
       ifsPipeline.update(flame as any)
     })
 
-    // Reset accumulation on structural parameter changes.
+    // Reset accumulation when any flame parameter value changes
+    // (weights, affine, colors, etc.) without rebuilding the pipeline.
     createEffect(() => {
-      parameterFingerprint()
-      if (!animationExportRunning()) resetAccumulation()
+      animatedFlame()
+      resetAccumulation()
     })
 
     // Reset accumulation on animation frame change during playback or scrubbing.
@@ -402,6 +411,7 @@ export function Flam3(props: Flam3Props) {
     function resetAccumulation() {
       batchIndex = 0
       accumulatedPointCount_ = 0
+      setAccumulatedPointCountGlobal(0)
       clearRequested = true
       rafLoop.redraw()
     }

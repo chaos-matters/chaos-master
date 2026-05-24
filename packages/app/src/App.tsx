@@ -1129,6 +1129,16 @@ function App(props: AppProps) {
                   <div
                     class={ui.viewControlsWrapper}
                     data-tour-target="view-controls"
+                    style={{
+                      'pointer-events':
+                        animationExportRunning() || exportProgress() !== undefined || timeline.isPlaying()
+                          ? 'none'
+                          : 'auto',
+                      opacity:
+                        animationExportRunning() || exportProgress() !== undefined || timeline.isPlaying()
+                          ? 0.5
+                          : 1,
+                    }}
                   >
                     <ViewControls
                       zoom={effectiveZoom()}
@@ -1154,11 +1164,11 @@ function App(props: AppProps) {
                       class={ui.timelineContainer}
                       style={{
                         'pointer-events':
-                          animationExportRunning() || exportProgress() !== undefined
+                          animationExportRunning() || exportProgress() !== undefined || timeline.isPlaying()
                             ? 'none'
                             : 'auto',
                         opacity:
-                          animationExportRunning() || exportProgress() !== undefined
+                          animationExportRunning() || exportProgress() !== undefined || timeline.isPlaying()
                             ? 0.5
                             : 1,
                       }}
