@@ -153,7 +153,10 @@ export function PaletteSelector(props: PaletteSelectorProps) {
                     props.selectedPaletteId === palette.id,
                 }}
                 onClick={() => {
-                  if (props.selectedPaletteId === palette.id && props.onUnselect) {
+                  if (
+                    props.selectedPaletteId === palette.id &&
+                    props.onUnselect
+                  ) {
                     props.onUnselect()
                   } else {
                     props.onSelect(palette)
@@ -193,7 +196,10 @@ export function PaletteSelector(props: PaletteSelectorProps) {
                     props.selectedPaletteId === palette.id,
                 }}
                 onClick={() => {
-                  if (props.selectedPaletteId === palette.id && props.onUnselect) {
+                  if (
+                    props.selectedPaletteId === palette.id &&
+                    props.onUnselect
+                  ) {
                     props.onUnselect()
                   } else {
                     props.onSelect(palette)

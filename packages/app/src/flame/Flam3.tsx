@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, onCleanup, untrack } from 'solid-js'
+import { createEffect, createMemo, createSignal, onCleanup, untrack, } from 'solid-js'
 import { arrayOf, vec2u, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { useTimeline } from '@/contexts/TimelineContext'
@@ -226,14 +226,18 @@ export function Flam3(props: Flam3Props) {
     const flame = animatedFlame()
     return JSON.stringify({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      transforms: Object.entries(flame.transforms).map(([tid, t]: [string, any]) => ({
-        tid,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        variations: Object.entries(t.variations).map(([vid, v]: [string, any]) => ({
-          vid,
-          type: v.type,
-        })),
-      })),
+      transforms: Object.entries(flame.transforms).map(
+        ([tid, t]: [string, any]) => ({
+          tid,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          variations: Object.entries(t.variations).map(
+            ([vid, v]: [string, any]) => ({
+              vid,
+              type: v.type,
+            }),
+          ),
+        }),
+      ),
       colorInitMode: flame.renderSettings.colorInitMode,
       pointInitMode: flame.renderSettings.pointInitMode,
       skipIters: Math.floor(flame.renderSettings.skipIters),
@@ -500,7 +504,7 @@ export function Flam3(props: Flam3Props) {
           const passDesc: GPUComputePassDescriptor = timestampWrites.ifsMs
             ? { timestampWrites: timestampWrites.ifsMs }
             : {}
-            
+
           const pass = encoder.beginComputePass(passDesc)
           for (let i = 0; i < iterationCount; i++) {
             ifsPipeline.run(pass, pointCountPerBatch)
@@ -522,9 +526,10 @@ export function Flam3(props: Flam3Props) {
               skipItersFactor,
           })
           if (props.adaptiveFilterEnabled) {
-            const passDesc: GPUComputePassDescriptor = timestampWrites.adaptiveFilterMs
-              ? { timestampWrites: timestampWrites.adaptiveFilterMs }
-              : {}
+            const passDesc: GPUComputePassDescriptor =
+              timestampWrites.adaptiveFilterMs
+                ? { timestampWrites: timestampWrites.adaptiveFilterMs }
+                : {}
             const pass = encoder.beginComputePass(passDesc)
             runAdaptiveFilter()?.run(pass)
             pass.end()
@@ -532,7 +537,9 @@ export function Flam3(props: Flam3Props) {
 
           {
             const passDesc: GPURenderPassDescriptor = {
-              ...(timestampWrites.colorGradingMs ? { timestampWrites: timestampWrites.colorGradingMs } : {}),
+              ...(timestampWrites.colorGradingMs
+                ? { timestampWrites: timestampWrites.colorGradingMs }
+                : {}),
               colorAttachments: [
                 {
                   loadOp: 'clear',

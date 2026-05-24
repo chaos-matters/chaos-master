@@ -164,7 +164,8 @@ function HelpModal(props: HelpModalProps) {
           <button
             class={ui.pickerModeBtn}
             classList={{
-              [ui.pickerModeBtnActive!]: props.sidebarLayoutMode() === 'compact',
+              [ui.pickerModeBtnActive!]:
+                props.sidebarLayoutMode() === 'compact',
             }}
             onClick={() => {
               props.onSidebarLayoutModeChange('compact')
@@ -192,14 +193,18 @@ function HelpModal(props: HelpModalProps) {
           <button
             class={ui.pickerModeBtn}
             classList={{ [ui.pickerModeBtnActive!]: !props.isCompact() }}
-            onClick={() => { if (props.isCompact()) props.onToggleCompact() }}
+            onClick={() => {
+              if (props.isCompact()) props.onToggleCompact()
+            }}
           >
             Off
           </button>
           <button
             class={ui.pickerModeBtn}
             classList={{ [ui.pickerModeBtnActive!]: props.isCompact() }}
-            onClick={() => { if (!props.isCompact()) props.onToggleCompact() }}
+            onClick={() => {
+              if (!props.isCompact()) props.onToggleCompact()
+            }}
           >
             On
           </button>

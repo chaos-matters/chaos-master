@@ -82,7 +82,7 @@ function Gradient(props: { isVisible: () => boolean }) {
       const gridCircleLineAA = saturate(
         (2 * (150 * pxWidth - gridCircle)) / gridCircleW,
       )
-      const circleFade = 1.0 - smoothstep(0.20, 0.21, r)
+      const circleFade = 1.0 - smoothstep(0.2, 0.21, r)
       const gridRadial = abs(sin(6 * atan2(worldPos.y, worldPos.x)))
       const gridRadialW = fwidth(gridRadial)
       const gridRadialLineAA = saturate(
@@ -90,7 +90,8 @@ function Gradient(props: { isVisible: () => boolean }) {
       )
       const fadeToCenter = smoothstep(0.005, 0.05, r)
       const gridAA =
-        max(gridCircleLineAA * circleFade, gridRadialLineAA * fadeToCenter) + borderAA
+        max(gridCircleLineAA * circleFade, gridRadialLineAA * fadeToCenter) +
+        borderAA
       const rgb = oklabToRgb(vec3f(themeColor - 0.08 * gridAA, worldPos))
       return vec4f(rgb, 1)
     })

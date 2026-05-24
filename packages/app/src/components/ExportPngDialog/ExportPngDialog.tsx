@@ -15,7 +15,7 @@ import { addFlameDataToPng } from '@/utils/flameInPng'
 import { compressJsonQueryParam } from '@/utils/jsonQueryParam'
 import { persistentSignal } from '@/utils/persistentSignal'
 import { saveRecentFlame } from '@/utils/recentFlames'
-import { applyTimelineToFlameAtFrame,defaultConfig as defaultTimelineConfig  } from '@/utils/timeline'
+import { applyTimelineToFlameAtFrame, defaultConfig as defaultTimelineConfig, } from '@/utils/timeline'
 import { Button } from '../Button/Button'
 import { Checkbox } from '../Checkbox/Checkbox'
 import { ColorPicker } from '../ColorPicker/ColorPicker'
@@ -30,7 +30,7 @@ import type { ExportImageType } from '@/App'
 import type { Palette } from '@/flame/colorMap'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { AnimationExportConfig } from '@/utils/animationExport'
-import type { TimelineConfig, TimelineState,TimelineTrack  } from '@/utils/timeline'
+import type { TimelineConfig, TimelineState, TimelineTrack, } from '@/utils/timeline'
 import type { VideoEncoderConfig } from '@/utils/videoEncoder'
 
 const QUALITY_MIN = 0.5
@@ -167,7 +167,11 @@ function RenderDialog(props: RenderDialogProps) {
           onClick={() => {
             if (props.hasAnimation) props.onExportTabChange('animation')
           }}
-          title={!props.hasAnimation ? 'Add keyframes to the timeline to enable animation export' : undefined}
+          title={
+            !props.hasAnimation
+              ? 'Add keyframes to the timeline to enable animation export'
+              : undefined
+          }
         >
           Animation
         </button>
@@ -572,7 +576,12 @@ function RenderDialog(props: RenderDialogProps) {
           <Button onClick={props.onExport}>Export Image</Button>
         </Show>
         <Show when={props.exportTab === 'animation'}>
-          <Button onClick={props.onRenderAnimation} disabled={!props.hasAnimation}>Render Animation</Button>
+          <Button
+            onClick={props.onRenderAnimation}
+            disabled={!props.hasAnimation}
+          >
+            Render Animation
+          </Button>
         </Show>
       </footer>
     </>
@@ -598,7 +607,7 @@ export function createExportPngDialog(
     const timeline = getTimeline()
     const tracks = timeline?.tracks() ?? []
     const config = timeline?.config() ?? defaultTimelineConfig()
-    const hasAnimation = tracks.some(track => track.keyframes.length > 0)
+    const hasAnimation = tracks.some((track) => track.keyframes.length > 0)
     const currentRatio = getPixelRatio()
 
     setPixelRatio(currentRatio)
@@ -640,7 +649,7 @@ export function createExportPngDialog(
     const timeline = getTimeline()
     const tracks = timeline?.tracks() ?? []
     const config = timeline?.config() ?? defaultTimelineConfig()
-    const hasAnimation = tracks.some(track => track.keyframes.length > 0)
+    const hasAnimation = tracks.some((track) => track.keyframes.length > 0)
     const currentFrame = timeline?.currentFrame() ?? 0
     const currentRatio = getPixelRatio()
 

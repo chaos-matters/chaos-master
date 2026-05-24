@@ -1,5 +1,5 @@
 import { createEffect, createSignal, Show } from 'solid-js'
-import { Bookmark, CameraIcon, Eye, FolderOpen, Pause, PlayPause, Share, Shuffle, Zap } from '@/icons'
+import { Bookmark, CameraIcon, Eye, FolderOpen, Pause, PlayPause, Share, Shuffle, Zap, } from '@/icons'
 import { defaultPills, QualityPresets } from '../Quality/QualityPresets'
 import ui from './FloatingActions.module.css'
 
@@ -213,8 +213,12 @@ export function FloatingActions(props: Props) {
           {/* Enable Animation */}
           <button
             class={ui.toggle}
-            classList={{ [ui.toggleActive as string]: props.animationEnabled() }}
-            onClick={() => { props.setAnimationEnabled(!props.animationEnabled()) }}
+            classList={{
+              [ui.toggleActive as string]: props.animationEnabled(),
+            }}
+            onClick={() => {
+              props.setAnimationEnabled(!props.animationEnabled())
+            }}
             title="Enable Animation"
           >
             <PlayPause />
@@ -227,7 +231,9 @@ export function FloatingActions(props: Props) {
             onClick={() => {
               const checked = !props.showTimeline()
               if ('startViewTransition' in document) {
-                document.startViewTransition(() => { props.setShowTimeline(checked) })
+                document.startViewTransition(() => {
+                  props.setShowTimeline(checked)
+                })
               } else {
                 props.setShowTimeline(checked)
               }
@@ -235,7 +241,15 @@ export function FloatingActions(props: Props) {
             title="Show Timeline"
           >
             {/* Timeline / rows icon */}
-            <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
+            <svg
+              viewBox="0 0 16 16"
+              width="13"
+              height="13"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.4"
+              stroke-linecap="round"
+            >
               <line x1="2" y1="4" x2="14" y2="4" />
               <line x1="2" y1="8" x2="10" y2="8" />
               <line x1="2" y1="12" x2="12" y2="12" />
@@ -245,8 +259,12 @@ export function FloatingActions(props: Props) {
           {/* Adaptive Filter */}
           <button
             class={ui.toggle}
-            classList={{ [ui.toggleActive as string]: props.adaptiveFilterEnabled() }}
-            onClick={() => { props.setAdaptiveFilterEnabled(!props.adaptiveFilterEnabled()) }}
+            classList={{
+              [ui.toggleActive as string]: props.adaptiveFilterEnabled(),
+            }}
+            onClick={() => {
+              props.setAdaptiveFilterEnabled(!props.adaptiveFilterEnabled())
+            }}
             title="Adaptive Filter"
           >
             <Eye />
@@ -257,18 +275,57 @@ export function FloatingActions(props: Props) {
           {/* Hide Randomizers */}
           <button
             class={ui.toggle}
-            classList={{ [ui.toggleActive as string]: !props.hideDiceButtons() }}
-            onClick={() => { props.setHideDiceButtons(!props.hideDiceButtons()) }}
-            title={props.hideDiceButtons() ? 'Show Randomizers' : 'Hide Randomizers'}
+            classList={{
+              [ui.toggleActive as string]: !props.hideDiceButtons(),
+            }}
+            onClick={() => {
+              props.setHideDiceButtons(!props.hideDiceButtons())
+            }}
+            title={
+              props.hideDiceButtons() ? 'Show Randomizers' : 'Hide Randomizers'
+            }
           >
             {/* Dice icon */}
-            <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+            <svg
+              viewBox="0 0 16 16"
+              width="13"
+              height="13"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
               <rect x="2" y="2" width="12" height="12" rx="2" />
-              <circle cx="5.5" cy="5.5" r="0.8" fill="currentColor" stroke="none" />
-              <circle cx="10.5" cy="5.5" r="0.8" fill="currentColor" stroke="none" />
+              <circle
+                cx="5.5"
+                cy="5.5"
+                r="0.8"
+                fill="currentColor"
+                stroke="none"
+              />
+              <circle
+                cx="10.5"
+                cy="5.5"
+                r="0.8"
+                fill="currentColor"
+                stroke="none"
+              />
               <circle cx="8" cy="8" r="0.8" fill="currentColor" stroke="none" />
-              <circle cx="5.5" cy="10.5" r="0.8" fill="currentColor" stroke="none" />
-              <circle cx="10.5" cy="10.5" r="0.8" fill="currentColor" stroke="none" />
+              <circle
+                cx="5.5"
+                cy="10.5"
+                r="0.8"
+                fill="currentColor"
+                stroke="none"
+              />
+              <circle
+                cx="10.5"
+                cy="10.5"
+                r="0.8"
+                fill="currentColor"
+                stroke="none"
+              />
             </svg>
           </button>
 
@@ -282,11 +339,20 @@ export function FloatingActions(props: Props) {
               onClick={props.togglePlay}
               title={props.isPlaying() ? 'Pause' : 'Play'}
             >
-              <Show when={props.isPlaying()} fallback={
-                <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor" stroke="none">
-                  <path d="M5 3l8 5-8 5V3z" />
-                </svg>
-              }>
+              <Show
+                when={props.isPlaying()}
+                fallback={
+                  <svg
+                    viewBox="0 0 16 16"
+                    width="13"
+                    height="13"
+                    fill="currentColor"
+                    stroke="none"
+                  >
+                    <path d="M5 3l8 5-8 5V3z" />
+                  </svg>
+                }
+              >
                 <Pause />
               </Show>
             </button>

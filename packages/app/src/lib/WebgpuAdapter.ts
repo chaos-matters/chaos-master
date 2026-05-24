@@ -1,3 +1,5 @@
+import { IS_DEV } from '@/defaults'
+
 let gpuDevice: GPUDevice | null = null
 let gpuAdapter: GPUAdapter | null = null
 
@@ -64,7 +66,7 @@ export async function initializeWebgpuDevice(
 
   assertIfWebgpuAdapterUnavailable(gpuAdapter)
   if (gpuAdapter.info.vendor !== '') {
-    console.info(`Using ${gpuAdapter.info.vendor} WebGPU adapter.`)
+    if (IS_DEV) console.info(`Using ${gpuAdapter.info.vendor} WebGPU adapter.`)
   }
 
   assertRequiredWebgpuFeaturesNotAvailable(
@@ -100,9 +102,10 @@ export async function initializeWebgpuDevice(
         deviceLossRetryCount < MAX_DEVICE_LOSS_RETRIES
       ) {
         deviceLossRetryCount += 1
-        console.info(
-          'Trying to get WebGPU device again, if this fails, reload application to try again',
-        )
+        if (IS_DEV)
+          console.info(
+            'Trying to get WebGPU device again, if this fails, reload application to try again',
+          )
         // Brief backoff to let the GPU process recover before requesting a new device.
         await new Promise((resolve) => setTimeout(resolve, 500))
         await initializeWebgpuDevice(adapterPreferences, deviceFeatures)
