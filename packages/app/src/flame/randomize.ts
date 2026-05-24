@@ -112,7 +112,10 @@ export function randomizeAllColors<T extends Record<string, unknown>>(
     const tid1 = keys[anchor1Idx]!
     ;(result as Record<string, unknown>)[tid1] = {
       ...((result as Record<string, unknown>)[tid1] as object),
-      color: { x: randomRange(0.2, 0.35) * (Math.random() > 0.5 ? 1 : -1), y: randomRange(0.2, 0.35) * (Math.random() > 0.5 ? 1 : -1) },
+      color: {
+        x: randomRange(0.2, 0.35) * (Math.random() > 0.5 ? 1 : -1),
+        y: randomRange(0.2, 0.35) * (Math.random() > 0.5 ? 1 : -1),
+      },
     }
   }
 

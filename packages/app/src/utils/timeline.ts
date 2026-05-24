@@ -580,7 +580,6 @@ export function createTimelineState() {
     return track.keyframes.filter((kf: KeyframeData) => kf.frame === frame)
   }
 
-
   /**
    * Handle keyframe overlap - warn if adding a keyframe at a frame with existing keyframes
    * Returns true if operation was successful, false if duplicate was detected

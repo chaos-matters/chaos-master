@@ -1,4 +1,3 @@
- 
 import { batch, createEffect, createMemo, createResource, createSignal, ErrorBoundary, For, onCleanup, onMount, Show, Suspense, } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
@@ -27,7 +26,7 @@ import { createLogoFaviconGenerator } from './components/LogoFaviconGenerator/Lo
 import { Modal } from './components/Modal/Modal'
 import { PaletteSelector } from './components/PaletteSelector/PaletteSelector'
 import { ProgressBar } from './components/ProgressBar/ProgressBar'
-import { getPresetFromQuality, qualityPresets } from './components/Quality/QualityPresets'
+import { getPresetFromQuality, qualityPresets, } from './components/Quality/QualityPresets'
 import { QuickVariationPicker } from './components/QuickVariationPicker/QuickVariationPicker'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
 import { Slider } from './components/Sliders/Slider'
@@ -169,9 +168,12 @@ function App(props: AppProps) {
   const { isCompact, toggleCompact } = useCompactMode()
   const [showSidebar, setShowSidebar] = createSignal(true)
   const [sidebarHidden, setSidebarHidden] = createSignal(false)
-  const [sidebarLayoutMode, setSidebarLayoutMode] =
-    persistentSignal<'compact' | 'wide'>('sidebar-layout-mode', 'compact')
-  const sidebarWidth = createMemo(() => (sidebarLayoutMode() === 'wide' ? 26 : 21))
+  const [sidebarLayoutMode, setSidebarLayoutMode] = persistentSignal<
+    'compact' | 'wide'
+  >('sidebar-layout-mode', 'compact')
+  const sidebarWidth = createMemo(() =>
+    sidebarLayoutMode() === 'wide' ? 26 : 21,
+  )
   const setSidebarWidth = () => {} // Drag resize disabled
   let sidebarRef: HTMLDivElement | undefined
   let sidebarScrollRef: HTMLDivElement | undefined
@@ -201,12 +203,13 @@ function App(props: AppProps) {
     }
   })
   const [showTimeline, setShowTimeline] = createSignal(true)
-  const [selectedPaletteId, setSelectedPaletteId] =
-    createSignal<string>('')
+  const [selectedPaletteId, setSelectedPaletteId] = createSignal<string>('')
   const [selectedPalette, setSelectedPalette] = createSignal<
     Palette | undefined
   >(undefined)
-  const [prePaletteColors, setPrePaletteColors] = createSignal<Record<string, { x: number; y: number }>>({})
+  const [prePaletteColors, setPrePaletteColors] = createSignal<
+    Record<string, { x: number; y: number }>
+  >({})
   const [flameDescriptor, setFlameDescriptor, history] = createStoreHistory(
     createStore(
       structuredClone(
@@ -214,17 +217,19 @@ function App(props: AppProps) {
       ),
     ),
   )
-  console.info('[share:app] store initialized', {
-    source: props.flameFromWelcome?.()
-      ? 'welcome'
-      : props.flameFromQuery?.flame
-        ? 'query'
-        : 'default',
-    transformCount: Object.keys(flameDescriptor.transforms).length,
-    firstColor: Object.values(flameDescriptor.transforms)[0]?.color,
-    queryFlamePresent: !!props.flameFromQuery?.flame,
-    queryAnimPresent: !!props.flameFromQuery?.animation,
-  })
+  if (IS_DEV) {
+    console.info('[share:app] store initialized', {
+      source: props.flameFromWelcome?.()
+        ? 'welcome'
+        : props.flameFromQuery?.flame
+          ? 'query'
+          : 'default',
+      transformCount: Object.keys(flameDescriptor.transforms).length,
+      firstColor: Object.values(flameDescriptor.transforms)[0]?.color,
+      queryFlamePresent: !!props.flameFromQuery?.flame,
+      queryAnimPresent: !!props.flameFromQuery?.animation,
+    })
+  }
   createEffect(() => {
     const newFlame = props.flameFromWelcome?.()
     if (newFlame !== undefined) {
@@ -324,11 +329,13 @@ function App(props: AppProps) {
   }
 
   onMount(() => {
-    console.info('[share:app] onMount', {
-      hasQueryFlame: !!props.flameFromQuery?.flame,
-      hasWelcomeFlame: !!props.flameFromWelcome?.(),
-      selectedPaletteId: selectedPaletteId(),
-    })
+    if (IS_DEV) {
+      console.info('[share:app] onMount', {
+        hasQueryFlame: !!props.flameFromQuery?.flame,
+        hasWelcomeFlame: !!props.flameFromWelcome?.(),
+        selectedPaletteId: selectedPaletteId(),
+      })
+    }
   })
 
   const setFlameZoom: Setter<number> = (value) => {
@@ -504,10 +511,12 @@ function App(props: AppProps) {
   // Sync animation enabled state into timeline so diamonds can gate on it
   createEffect(() => {
     const enabled = animationEnabled()
-    console.info(
-      '[anim] sync effect: setting timeline.animationEnabled →',
-      enabled,
-    )
+    if (IS_DEV) {
+      console.info(
+        '[anim] sync effect: setting timeline.animationEnabled →',
+        enabled,
+      )
+    }
     timeline.setAnimationEnabled(enabled)
   })
 
@@ -517,18 +526,20 @@ function App(props: AppProps) {
     if (!anim) return
     if (anim.tracks.length === 0) {
       // Plain flame loaded — clear animation state
-      console.info('[anim] clearing tracks — plain flame loaded')
+      if (IS_DEV) console.info('[anim] clearing tracks — plain flame loaded')
       timeline.loadTracks([])
       timeline.setIsPlaying(false)
       timeline.setAnimationEnabled(false)
       setAnimationEnabled(false)
     } else {
-      console.info(
-        '[anim] loading animation with',
-        anim.tracks.length,
-        'tracks:',
-        anim.tracks.map((t) => t.parameterPath),
-      )
+      if (IS_DEV) {
+        console.info(
+          '[anim] loading animation with',
+          anim.tracks.length,
+          'tracks:',
+          anim.tracks.map((t) => t.parameterPath),
+        )
+      }
       timeline.loadTracks(anim.tracks)
       timeline.setAnimationEnabled(true)
       setAnimationEnabled(true)
@@ -551,15 +562,17 @@ function App(props: AppProps) {
     if (!data || queryApplied) return
     queryApplied = true
 
-    console.info('[share] applying flame from shared URL')
+    if (IS_DEV) console.info('[share] applying flame from shared URL')
     history.replace(structuredClone(data.flame))
 
     if (data.animation && data.animation.tracks.length > 0) {
-      console.info(
-        '[anim] loading shared animation:',
-        data.animation.tracks.length,
-        'tracks',
-      )
+      if (IS_DEV) {
+        console.info(
+          '[anim] loading shared animation:',
+          data.animation.tracks.length,
+          'tracks',
+        )
+      }
       timeline.loadTracks(data.animation.tracks)
       timeline.setAnimationEnabled(true)
       setAnimationEnabled(true)
@@ -1076,260 +1089,274 @@ function App(props: AppProps) {
   })
 
   return (
-      <ChangeHistoryContextProvider value={history}>
-        <TimelineContextProvider value={timeline}>
-          <Dropzone class={ui.layout} onDrop={onDrop}>
-            <>
-              <div
-                class={ui.canvasContainer}
-                data-tour-target="canvas"
-                classList={{ [ui.fullscreen as string]: !showSidebar() }}
-              >
-                <AutoCanvas class={ui.canvas} pixelRatio={pixelRatio()}>
-                  <WheelZoomCamera2D
-                    zoom={[effectiveZoom, setFlameZoom]}
-                    position={[effectivePosition, setFlamePosition]}
-                    interactive={() => !timeline.isPlaying()}
-                  >
-                    <Flam3
-                      quality={
-                        exportQuality() ?? qualityPresets[qualityPreset()]
-                      }
-                      pointCountPerBatch={DEFAULT_POINT_COUNT}
-                      adaptiveFilterEnabled={adaptiveFilterEnabled()}
-                      animationEnabled={animationEnabled()}
-                      flameDescriptor={effectiveFlame()}
-                      renderInterval={finalRenderInterval()}
-                      onExportImage={onExportImage()}
-                      edgeFadeColor={
-                        showSidebar() ? EDGE_FADE_COLOR[theme()] : vec4f(0)
-                      }
-                      setCurrentQuality={(fn) => setCurrentQuality(() => fn)}
-                      setQualityPointCountLimit={(fn) =>
-                        setQualityPointCountLimit(() => fn)
-                      }
-                      palette={() => selectedPalette()}
-                    />
-                  </WheelZoomCamera2D>
-                </AutoCanvas>
-                <Show when={hoveredVariationType()} keyed>
-                  {(hv) => (
-                    <div class={ui.hoverPreviewBadge}>
-                      Previewing: {getNormalizedVariationName(hv)}
-                    </div>
-                  )}
-                </Show>
-                <Show when={toastMessage()}>
-                  {(msg) => <div class={ui.toast}>{msg()}</div>}
-                </Show>
-                <ProgressBar />
-                <div class={ui.bottomBar}>
+    <ChangeHistoryContextProvider value={history}>
+      <TimelineContextProvider value={timeline}>
+        <Dropzone class={ui.layout} onDrop={onDrop}>
+          <>
+            <div
+              class={ui.canvasContainer}
+              data-tour-target="canvas"
+              classList={{ [ui.fullscreen as string]: !showSidebar() }}
+            >
+              <AutoCanvas class={ui.canvas} pixelRatio={pixelRatio()}>
+                <WheelZoomCamera2D
+                  zoom={[effectiveZoom, setFlameZoom]}
+                  position={[effectivePosition, setFlamePosition]}
+                  interactive={() => !timeline.isPlaying()}
+                >
+                  <Flam3
+                    quality={exportQuality() ?? qualityPresets[qualityPreset()]}
+                    pointCountPerBatch={DEFAULT_POINT_COUNT}
+                    adaptiveFilterEnabled={adaptiveFilterEnabled()}
+                    animationEnabled={animationEnabled()}
+                    flameDescriptor={effectiveFlame()}
+                    renderInterval={finalRenderInterval()}
+                    onExportImage={onExportImage()}
+                    edgeFadeColor={
+                      showSidebar() ? EDGE_FADE_COLOR[theme()] : vec4f(0)
+                    }
+                    setCurrentQuality={(fn) => setCurrentQuality(() => fn)}
+                    setQualityPointCountLimit={(fn) =>
+                      setQualityPointCountLimit(() => fn)
+                    }
+                    palette={() => selectedPalette()}
+                  />
+                </WheelZoomCamera2D>
+              </AutoCanvas>
+              <Show when={hoveredVariationType()} keyed>
+                {(hv) => (
+                  <div class={ui.hoverPreviewBadge}>
+                    Previewing: {getNormalizedVariationName(hv)}
+                  </div>
+                )}
+              </Show>
+              <Show when={toastMessage()}>
+                {(msg) => <div class={ui.toast}>{msg()}</div>}
+              </Show>
+              <ProgressBar />
+              <div class={ui.bottomBar}>
+                <div
+                  class={ui.viewControlsWrapper}
+                  data-tour-target="view-controls"
+                  style={{
+                    'pointer-events':
+                      animationExportRunning() ||
+                      exportProgress() !== undefined ||
+                      timeline.isPlaying()
+                        ? 'none'
+                        : 'auto',
+                    opacity:
+                      animationExportRunning() ||
+                      exportProgress() !== undefined ||
+                      timeline.isPlaying()
+                        ? 0.5
+                        : 1,
+                  }}
+                >
+                  <ViewControls
+                    zoom={effectiveZoom()}
+                    setZoom={setFlameZoom}
+                    position={effectivePosition()}
+                    setPosition={setFlamePosition}
+                    pixelRatio={pixelRatio()}
+                    setPixelRatio={setPixelRatio}
+                    controlsDisabled={timeline.isPlaying()}
+                  />
+                  <Show when={isMobile()}>
+                    <button
+                      class={ui.sidebarToggle}
+                      onClick={() => setSidebarHidden((p) => !p)}
+                      aria-label="Toggle sidebar"
+                    >
+                      <Menu />
+                    </button>
+                  </Show>
+                </div>
+                <Show when={showTimeline()}>
                   <div
-                    class={ui.viewControlsWrapper}
-                    data-tour-target="view-controls"
+                    class={ui.timelineContainer}
                     style={{
                       'pointer-events':
-                        animationExportRunning() || exportProgress() !== undefined || timeline.isPlaying()
+                        animationExportRunning() ||
+                        exportProgress() !== undefined ||
+                        timeline.isPlaying()
                           ? 'none'
                           : 'auto',
                       opacity:
-                        animationExportRunning() || exportProgress() !== undefined || timeline.isPlaying()
+                        animationExportRunning() ||
+                        exportProgress() !== undefined ||
+                        timeline.isPlaying()
                           ? 0.5
                           : 1,
                     }}
+                    onWheel={(ev) => {
+                      if (!ev.ctrlKey && !ev.metaKey) return
+                      ev.preventDefault()
+                      const delta = -ev.deltaY * 0.5
+                      const container = ev.currentTarget as HTMLElement
+                      const currentHeight = container.offsetHeight
+                      const newHeight = Math.max(
+                        100,
+                        Math.min(
+                          window.innerHeight * 0.55,
+                          currentHeight + delta,
+                        ),
+                      )
+                      container.style.setProperty(
+                        '--timeline-height',
+                        `${newHeight}px`,
+                      )
+                    }}
                   >
-                    <ViewControls
-                      zoom={effectiveZoom()}
-                      setZoom={setFlameZoom}
-                      position={effectivePosition()}
-                      setPosition={setFlamePosition}
-                      pixelRatio={pixelRatio()}
-                      setPixelRatio={setPixelRatio}
-                      controlsDisabled={timeline.isPlaying()}
-                    />
-                    <Show when={isMobile()}>
-                      <button
-                        class={ui.sidebarToggle}
-                        onClick={() => setSidebarHidden((p) => !p)}
-                        aria-label="Toggle sidebar"
-                      >
-                        <Menu />
-                      </button>
-                    </Show>
-                  </div>
-                  <Show when={showTimeline()}>
                     <div
-                      class={ui.timelineContainer}
-                      style={{
-                        'pointer-events':
-                          animationExportRunning() || exportProgress() !== undefined || timeline.isPlaying()
-                            ? 'none'
-                            : 'auto',
-                        opacity:
-                          animationExportRunning() || exportProgress() !== undefined || timeline.isPlaying()
-                            ? 0.5
-                            : 1,
-                      }}
-                      onWheel={(ev) => {
-                        if (!ev.ctrlKey && !ev.metaKey) return
-                        ev.preventDefault()
-                        const delta = -ev.deltaY * 0.5
-                        const container = ev.currentTarget as HTMLElement
-                        const currentHeight = container.offsetHeight
-                        const newHeight = Math.max(
-                          100,
-                          Math.min(
-                            window.innerHeight * 0.55,
-                            currentHeight + delta,
-                          ),
-                        )
-                        container.style.setProperty(
-                          '--timeline-height',
-                          `${newHeight}px`,
-                        )
-                      }}
-                    >
-                      <div
-                        class={ui.timelineResizeHandle}
-                        data-tour-target="timeline-handle"
-                        onPointerDown={startTimelineDrag}
-                        title="Resize timeline"
-                      />
-                      <TimelineSection
-                        formatTrackLabel={readableIds().formatTrackPath}
-                        flameDescriptor={flameDescriptor}
-                      />
-                    </div>
-                  </Show>
-                </div>
-              </div>
-            </>
-            <Show when={IS_DEV}>
-              <DebugOverlay
-                animationEnabled={animationEnabled()}
-                flameDescriptor={flameDescriptor}
-              />
-            </Show>
-
-            <Show when={showSidebar()}>
-              <div
-                class={ui.sidebar}
-                classList={{
-                  [ui.sidebarLocked as string]: timeline.isPlaying(),
-                  [ui.sidebarHidden as string]: sidebarHidden(),
-                }}
-                style={{ '--sidebar-width': `${sidebarWidth()}rem` }}
-                data-tour-target="sidebar"
-                ref={(el) => {
-                  sidebarRef = el
-                  setSidebarEl(el)
-                }}
-              >
-                {SIDEBAR_RESIZABLE && (
-                  <div
-                    class={ui.sidebarResizeHandle}
-                    onPointerDown={startSidebarDrag}
-                  />
-                )}
-                <Show
-                  when={
-                    timeline.isPlaying() ||
-                    animationExportRunning() ||
-                     
-                    exportProgress() !== undefined
-                  }
-                >
-                  <div
-                    class={ui.playbackOverlay}
-                    classList={{
-                      [ui.exportOverlay as string]:
-                         
-                        animationExportRunning() || exportProgress() !== undefined,
-                    }}
-                    onClick={() => {
-                      if (timeline.isPlaying()) {
-                        timeline.togglePlay()
-                      }
-                    }}
-                  >
-                    <span class={ui.playbackOverlayText}>
-                      {animationExportRunning()
-                        ? 'Rendering animation...'
-                        :  
-                          exportProgress() !== undefined
-                          ? 'Rendering image...'
-                          : '⏸ Tap to stop animation'}
-                    </span>
-                    <Show when={animationExportRunning()}>
-                      <button
-                        class={ui.stopExportButton}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          const cancelFn = animationExportCancel()
-                          if (cancelFn) cancelFn()
-                        }}
-                        title="Stop rendering"
-                      >
-                        <svg
-                          viewBox="0 0 16 16"
-                          fill="currentColor"
-                          width="16"
-                          height="16"
-                        >
-                          <path d="M3 3h10v10H3V3z" />
-                        </svg>
-                      </button>
-                    </Show>
+                      class={ui.timelineResizeHandle}
+                      data-tour-target="timeline-handle"
+                      onPointerDown={startTimelineDrag}
+                      title="Resize timeline"
+                    />
+                    <TimelineSection
+                      formatTrackLabel={readableIds().formatTrackPath}
+                      flameDescriptor={flameDescriptor}
+                    />
                   </div>
                 </Show>
-                <div class={ui.sidebarScroll} ref={sidebarScrollRef}>
-                  <Show when={quickPickState()} keyed>
-                    {(state) => (
-                      <QuickVariationPicker
-                        currentType={
-                          flameDescriptor.transforms[state.tid]?.variations[
-                            state.vid
-                          ]?.type ?? state.type
-                        }
-                        onSelect={(newType) => {
-                          setFlameDescriptor((draft) => {
-                            const existingVar =
-                              draft.transforms[state.tid]?.variations[state.vid]
-                            if (existingVar) {
-                              draft.transforms[state.tid]!.variations[
-                                state.vid
-                              ] = structuredClone(
+              </div>
+            </div>
+          </>
+          <Show when={IS_DEV}>
+            <DebugOverlay
+              animationEnabled={animationEnabled()}
+              flameDescriptor={flameDescriptor}
+            />
+          </Show>
+
+          <Show when={showSidebar()}>
+            <div
+              class={ui.sidebar}
+              classList={{
+                [ui.sidebarLocked as string]: timeline.isPlaying(),
+                [ui.sidebarHidden as string]: sidebarHidden(),
+              }}
+              style={{ '--sidebar-width': `${sidebarWidth()}rem` }}
+              data-tour-target="sidebar"
+              ref={(el) => {
+                sidebarRef = el
+                setSidebarEl(el)
+              }}
+            >
+              {SIDEBAR_RESIZABLE && (
+                <div
+                  class={ui.sidebarResizeHandle}
+                  onPointerDown={startSidebarDrag}
+                />
+              )}
+              <Show
+                when={
+                  timeline.isPlaying() ||
+                  animationExportRunning() ||
+                  exportProgress() !== undefined
+                }
+              >
+                <div
+                  class={ui.playbackOverlay}
+                  classList={{
+                    [ui.exportOverlay as string]:
+                      animationExportRunning() ||
+                      exportProgress() !== undefined,
+                  }}
+                  onClick={() => {
+                    if (timeline.isPlaying()) {
+                      timeline.togglePlay()
+                    }
+                  }}
+                >
+                  <span class={ui.playbackOverlayText}>
+                    {animationExportRunning()
+                      ? 'Rendering animation...'
+                      : exportProgress() !== undefined
+                        ? 'Rendering image...'
+                        : '⏸ Tap to stop animation'}
+                  </span>
+                  <Show when={animationExportRunning()}>
+                    <button
+                      class={ui.stopExportButton}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const cancelFn = animationExportCancel()
+                        if (cancelFn) cancelFn()
+                      }}
+                      title="Stop rendering"
+                    >
+                      <svg
+                        viewBox="0 0 16 16"
+                        fill="currentColor"
+                        width="16"
+                        height="16"
+                      >
+                        <path d="M3 3h10v10H3V3z" />
+                      </svg>
+                    </button>
+                  </Show>
+                </div>
+              </Show>
+              <div class={ui.sidebarScroll} ref={sidebarScrollRef}>
+                <Show when={quickPickState()} keyed>
+                  {(state) => (
+                    <QuickVariationPicker
+                      currentType={
+                        flameDescriptor.transforms[state.tid]?.variations[
+                          state.vid
+                        ]?.type ?? state.type
+                      }
+                      onSelect={(newType) => {
+                        setFlameDescriptor((draft) => {
+                          const existingVar =
+                            draft.transforms[state.tid]?.variations[state.vid]
+                          if (existingVar) {
+                            draft.transforms[state.tid]!.variations[state.vid] =
+                              structuredClone(
                                 getVariationDefault(
                                   newType,
                                   existingVar.weight,
                                 ),
                               )
-                            }
-                          })
-                        }}
-                        onClose={() => {
-                          // Save scroll position before the Show block unmounts
-                          savedScrollTop = sidebarScrollRef?.scrollTop ?? 0
-                          setHoveredVariationType(null)
-                          setQuickPickState(null)
-                          // Restore after Solid re-renders the normal sidebar
-                          queueMicrotask(() => {
-                            if (sidebarScrollRef) {
-                              sidebarScrollRef.scrollTop = savedScrollTop
-                            }
-                          })
-                        }}
-                        onHoverType={(type) => setHoveredVariationType(type)}
-                        onHoverClear={() => setHoveredVariationType(null)}
-                        mode={quickPickerMode()}
-                        onModeChange={setQuickPickerMode}
-                      />
-                    )}
-                  </Show>
-                  <Show when={!quickPickState()}>
-                    <CollapsibleCard title="Affine">
-                      <AffineEditor
-                        class={ui.affineEditor}
+                          }
+                        })
+                      }}
+                      onClose={() => {
+                        // Save scroll position before the Show block unmounts
+                        savedScrollTop = sidebarScrollRef?.scrollTop ?? 0
+                        setHoveredVariationType(null)
+                        setQuickPickState(null)
+                        // Restore after Solid re-renders the normal sidebar
+                        queueMicrotask(() => {
+                          if (sidebarScrollRef) {
+                            sidebarScrollRef.scrollTop = savedScrollTop
+                          }
+                        })
+                      }}
+                      onHoverType={(type) => setHoveredVariationType(type)}
+                      onHoverClear={() => setHoveredVariationType(null)}
+                      mode={quickPickerMode()}
+                      onModeChange={setQuickPickerMode}
+                    />
+                  )}
+                </Show>
+                <Show when={!quickPickState()}>
+                  <CollapsibleCard title="Affine">
+                    <AffineEditor
+                      class={ui.affineEditor}
+                      transforms={flameDescriptor.transforms}
+                      setTransforms={(setFn) => {
+                        setFlameDescriptor((draft) => {
+                          setFn(draft.transforms)
+                        })
+                      }}
+                    />
+                  </CollapsibleCard>
+                  <CollapsibleCard title="Color">
+                    <div>
+                      <FlameColorEditor
                         transforms={flameDescriptor.transforms}
                         setTransforms={(setFn) => {
                           setFlameDescriptor((draft) => {
@@ -1337,857 +1364,856 @@ function App(props: AppProps) {
                           })
                         }}
                       />
-                    </CollapsibleCard>
-                    <CollapsibleCard title="Color">
-                      <div>
-                        <FlameColorEditor
-                          transforms={flameDescriptor.transforms}
-                          setTransforms={(setFn) => {
-                            setFlameDescriptor((draft) => {
-                              setFn(draft.transforms)
-                            })
-                          }}
-                        />
-                      </div>
-                    </CollapsibleCard>
-                    <CollapsibleCard title="Palette" defaultOpen={false}>
-                      <PaletteSelector
-                        selectedPaletteId={selectedPaletteId()}
-                        onSelect={handlePaletteSelect}
-                        onUnselect={handlePaletteUnselect}
-                      />
-                    </CollapsibleCard>
-                    <For each={recordEntries(flameDescriptor.transforms)}>
-                      {([tid, transform]) => (
-                        <CollapsibleCard
-                          title={readableIds().transformLabel[tid]!}
-                        >
-                          <div class={ui.transformGrid}>
-                            <svg class={ui.variationButtonSvgColor}>
-                              <g
-                                class={ui.variationButtonColor}
-                                style={{
-                                  '--color': handleColor(
-                                    theme(),
-                                    vec2f(transform.color.x, transform.color.y),
-                                  ),
-                                }}
-                              >
-                                <circle class={ui.variationButtonColorCircle} />
-                              </g>
-                            </svg>
-                            <Show when={animationEnabled()}>
-                              <span class={ui.readableId}>
-                                {readableIds().transformLabel[tid]}
-                              </span>
-                            </Show>
-                            <Show when={!hideDiceButtons()}>
-                              <DiceButton
-                                onClick={() => {
-                                  setFlameDescriptor((draft) => {
-                                    draft.transforms[tid]!.color = {
-                                      x: random01(),
-                                      y: random01(),
-                                    }
-                                  })
-                                }}
-                                title="Randomize transform color"
-                              />
-                            </Show>
-                            <button
-                              class={ui.visibilityButton}
-                              title={
-                                transform.visible
-                                  ? 'Hide transform'
-                                  : 'Show transform'
-                              }
-                              onClick={() => {
-                                setFlameDescriptor((draft) => {
-                                  draft.transforms[tid]!.visible =
-                                    !draft.transforms[tid]!.visible
-                                })
+                    </div>
+                  </CollapsibleCard>
+                  <CollapsibleCard title="Palette" defaultOpen={false}>
+                    <PaletteSelector
+                      selectedPaletteId={selectedPaletteId()}
+                      onSelect={handlePaletteSelect}
+                      onUnselect={handlePaletteUnselect}
+                    />
+                  </CollapsibleCard>
+                  <For each={recordEntries(flameDescriptor.transforms)}>
+                    {([tid, transform]) => (
+                      <CollapsibleCard
+                        title={readableIds().transformLabel[tid]!}
+                      >
+                        <div class={ui.transformGrid}>
+                          <svg class={ui.variationButtonSvgColor}>
+                            <g
+                              class={ui.variationButtonColor}
+                              style={{
+                                '--color': handleColor(
+                                  theme(),
+                                  vec2f(transform.color.x, transform.color.y),
+                                ),
                               }}
                             >
-                              {transform.visible ? <Eye /> : <EyeOff />}
-                            </button>
-                            <button
-                              class={ui.deleteFlameButton}
+                              <circle class={ui.variationButtonColorCircle} />
+                            </g>
+                          </svg>
+                          <Show when={animationEnabled()}>
+                            <span class={ui.readableId}>
+                              {readableIds().transformLabel[tid]}
+                            </span>
+                          </Show>
+                          <Show when={!hideDiceButtons()}>
+                            <DiceButton
                               onClick={() => {
                                 setFlameDescriptor((draft) => {
-                                  if (
-                                    recordKeys(draft.transforms).length === 1
-                                  ) {
-                                    draft.transforms[tid] = structuredClone(
-                                      newDefaultTransform(),
-                                    )
-                                  } else {
-                                    delete draft.transforms[tid]
+                                  draft.transforms[tid]!.color = {
+                                    x: random01(),
+                                    y: random01(),
                                   }
                                 })
                               }}
-                            >
-                              <Cross />
-                            </button>
-                            <div
-                              data-tour-target="probability"
-                              classList={{
-                                [ui.transformGridRow as string]: true,
-                                [ui.transformGridFirstRow as string]: true,
-                              }}
-                              onClick={() => {
-                                setTargetedParameter(
-                                  `transform.${tid}.probability`,
-                                )
-                              }}
-                            >
-                              <Slider
-                                class={ui.transformGridFirstRow}
-                                label="Probability"
-                                value={transform.probability}
-                                min={0}
-                                max={1}
-                                step={0.001}
-                                onInput={(probability) => {
-                                  setFlameDescriptor((draft) => {
-                                    draft.transforms[tid]!.probability =
-                                      probability
-                                  })
-                                }}
-                                formatValue={(value) =>
-                                  formatPercent(value / totalProbability())
+                              title="Randomize transform color"
+                            />
+                          </Show>
+                          <button
+                            class={ui.visibilityButton}
+                            title={
+                              transform.visible
+                                ? 'Hide transform'
+                                : 'Show transform'
+                            }
+                            onClick={() => {
+                              setFlameDescriptor((draft) => {
+                                draft.transforms[tid]!.visible =
+                                  !draft.transforms[tid]!.visible
+                              })
+                            }}
+                          >
+                            {transform.visible ? <Eye /> : <EyeOff />}
+                          </button>
+                          <button
+                            class={ui.deleteFlameButton}
+                            onClick={() => {
+                              setFlameDescriptor((draft) => {
+                                if (recordKeys(draft.transforms).length === 1) {
+                                  draft.transforms[tid] = structuredClone(
+                                    newDefaultTransform(),
+                                  )
+                                } else {
+                                  delete draft.transforms[tid]
                                 }
-                                dataParameterPath={`transform.${tid}.probability`}
-                              />
-                            </div>
-                            <For each={recordEntries(transform.variations)}>
-                              {([vid, variation]) => (
-                                <>
-                                  <div class={ui.transformGridRow}>
-                                    <button
-                                      class={ui.variationButton}
-                                      data-tour-target="variation-type"
-                                      value={variation.type}
-                                      title={getNormalizedVariationName(
-                                        variation.type,
-                                      )}
-                                      onClick={() => {
-                                        setQuickPickState({
-                                          tid,
-                                          vid,
-                                          type: variation.type,
-                                        })
-                                      }}
-                                      onContextMenu={(e) => {
-                                        e.preventDefault()
-                                        showVariationSelector(
-                                          structuredClone(
-                                            JSON.parse(
-                                              JSON.stringify(variation),
-                                            ),
+                              })
+                            }}
+                          >
+                            <Cross />
+                          </button>
+                          <div
+                            data-tour-target="probability"
+                            classList={{
+                              [ui.transformGridRow as string]: true,
+                              [ui.transformGridFirstRow as string]: true,
+                            }}
+                            onClick={() => {
+                              setTargetedParameter(
+                                `transform.${tid}.probability`,
+                              )
+                            }}
+                          >
+                            <Slider
+                              class={ui.transformGridFirstRow}
+                              label="Probability"
+                              value={transform.probability}
+                              min={0}
+                              max={1}
+                              step={0.001}
+                              onInput={(probability) => {
+                                setFlameDescriptor((draft) => {
+                                  draft.transforms[tid]!.probability =
+                                    probability
+                                })
+                              }}
+                              formatValue={(value) =>
+                                formatPercent(value / totalProbability())
+                              }
+                              dataParameterPath={`transform.${tid}.probability`}
+                            />
+                          </div>
+                          <For each={recordEntries(transform.variations)}>
+                            {([vid, variation]) => (
+                              <>
+                                <div class={ui.transformGridRow}>
+                                  <button
+                                    class={ui.variationButton}
+                                    data-tour-target="variation-type"
+                                    value={variation.type}
+                                    title={getNormalizedVariationName(
+                                      variation.type,
+                                    )}
+                                    onClick={() => {
+                                      setQuickPickState({
+                                        tid,
+                                        vid,
+                                        type: variation.type,
+                                      })
+                                    }}
+                                    onContextMenu={(e) => {
+                                      e.preventDefault()
+                                      showVariationSelector(
+                                        structuredClone(
+                                          JSON.parse(JSON.stringify(variation)),
+                                        ),
+                                        structuredClone(
+                                          JSON.parse(
+                                            JSON.stringify(flameDescriptor),
                                           ),
-                                          structuredClone(
-                                            JSON.parse(
-                                              JSON.stringify(flameDescriptor),
-                                            ),
-                                          ),
-                                          tid,
-                                          vid,
-                                        )
-                                          .then((newValue) => {
-                                            if (
-                                              newValue === undefined ||
-                                              !isVariationType(
-                                                newValue.variation.type,
-                                              )
-                                            ) {
-                                              return
-                                            }
-                                            setFlameDescriptor((draft) => {
-                                              draft.transforms[tid]!.preAffine =
-                                                newValue.transform.preAffine
-                                              draft.transforms[tid]!.variations[
-                                                vid
-                                              ] = newValue.variation
-                                            })
-                                          })
-                                          .catch((err: unknown) => {
-                                            console.warn(
-                                              'Cannot load this variation, reason: ',
-                                              err,
+                                        ),
+                                        tid,
+                                        vid,
+                                      )
+                                        .then((newValue) => {
+                                          if (
+                                            newValue === undefined ||
+                                            !isVariationType(
+                                              newValue.variation.type,
                                             )
-                                          })
-                                      }}
-                                    >
-                                      <div class={ui.variationButtonText}>
-                                        <Show when={animationEnabled()}>
-                                          <span class={ui.readableId}>
-                                            {readableIds().variationLabel[vid]}
-                                          </span>
-                                        </Show>
-                                        <span class={ui.variationName}>
-                                          {getNormalizedVariationName(
-                                            variation.type,
-                                          )}
-                                        </span>
-                                      </div>
-                                    </button>
-                                    <div
-                                      class={ui.sliderGridWrapper}
-                                      classList={{
-                                        [ui.parameterTarget as string]: true,
-                                      }}
-                                      onClick={() => {
-                                        setTargetedParameter(`${tid}.${vid}`)
-                                      }}
-                                    >
-                                      <Slider
-                                        value={variation.weight}
-                                        min={0}
-                                        max={1}
-                                        step={0.001}
-                                        dataParameterPath={`${tid}.${vid}`}
-                                        data-tour-target="variation-weight"
-                                        onInput={(weight) => {
+                                          ) {
+                                            return
+                                          }
                                           setFlameDescriptor((draft) => {
+                                            draft.transforms[tid]!.preAffine =
+                                              newValue.transform.preAffine
                                             draft.transforms[tid]!.variations[
                                               vid
-                                            ]!.weight = weight
+                                            ] = newValue.variation
                                           })
-                                        }}
-                                        formatValue={formatPercent}
-                                      />
+                                        })
+                                        .catch((err: unknown) => {
+                                          console.warn(
+                                            'Cannot load this variation, reason: ',
+                                            err,
+                                          )
+                                        })
+                                    }}
+                                  >
+                                    <div class={ui.variationButtonText}>
+                                      <Show when={animationEnabled()}>
+                                        <span class={ui.readableId}>
+                                          {readableIds().variationLabel[vid]}
+                                        </span>
+                                      </Show>
+                                      <span class={ui.variationName}>
+                                        {getNormalizedVariationName(
+                                          variation.type,
+                                        )}
+                                      </span>
                                     </div>
-                                    <Show when={!hideDiceButtons()}>
-                                      <DiceButton
-                                        onClick={() => {
-                                          setFlameDescriptor((draft) => {
-                                            const v =
-                                              draft.transforms[tid]!.variations[
-                                                vid
-                                              ]!
-                                            v.weight = random01()
-                                            const params =
-                                              randomizeVariationParams(v.type)
-                                            if (params) {
-                                              ;(
-                                                v as {
-                                                  params?: Record<
-                                                    string,
-                                                    number
-                                                  >
-                                                }
-                                              ).params = params
-                                            }
-                                          })
-                                        }}
-                                        title="Randomize variation"
-                                      />
-                                    </Show>
-                                    <button
-                                      class={ui.visibilityButton}
-                                      title={
-                                        variation.visible
-                                          ? 'Hide variation'
-                                          : 'Show variation'
-                                      }
+                                  </button>
+                                  <div
+                                    class={ui.sliderGridWrapper}
+                                    classList={{
+                                      [ui.parameterTarget as string]: true,
+                                    }}
+                                    onClick={() => {
+                                      setTargetedParameter(`${tid}.${vid}`)
+                                    }}
+                                  >
+                                    <Slider
+                                      value={variation.weight}
+                                      min={0}
+                                      max={1}
+                                      step={0.001}
+                                      dataParameterPath={`${tid}.${vid}`}
+                                      data-tour-target="variation-weight"
+                                      onInput={(weight) => {
+                                        setFlameDescriptor((draft) => {
+                                          draft.transforms[tid]!.variations[
+                                            vid
+                                          ]!.weight = weight
+                                        })
+                                      }}
+                                      formatValue={formatPercent}
+                                    />
+                                  </div>
+                                  <Show when={!hideDiceButtons()}>
+                                    <DiceButton
                                       onClick={() => {
                                         setFlameDescriptor((draft) => {
                                           const v =
                                             draft.transforms[tid]!.variations[
                                               vid
                                             ]!
-                                          v.visible = !v.visible
-                                        })
-                                      }}
-                                    >
-                                      {variation.visible ? <Eye /> : <EyeOff />}
-                                    </button>
-                                    <button
-                                      class={ui.deleteVariationButton}
-                                      onClick={() => {
-                                        setFlameDescriptor((draft) => {
-                                          if (
-                                            recordKeys(
-                                              draft.transforms[tid]!.variations,
-                                            ).length === 1
-                                          ) {
-                                            draft.transforms[tid]!.variations[
-                                              vid
-                                            ] = structuredClone(
-                                              getVariationDefault(
-                                                variation.type,
-                                                1,
-                                              ),
-                                            )
-                                          } else {
-                                            delete draft.transforms[tid]!
-                                              .variations[vid]
+                                          v.weight = random01()
+                                          const params =
+                                            randomizeVariationParams(v.type)
+                                          if (params) {
+                                            ;(
+                                              v as {
+                                                params?: Record<string, number>
+                                              }
+                                            ).params = params
                                           }
                                         })
                                       }}
-                                    >
-                                      <Cross />
-                                    </button>
-                                  </div>
-                                  <Show
-                                    when={
-                                      isParametricVariation(variation) &&
-                                      variation
-                                    }
-                                    keyed
-                                  >
-                                    {(variation) => (
-                                      <div
-                                        classList={{
-                                          [ui.transformGridRow as string]: true,
-                                          [ui.variationParamsRow as string]: true,
-                                          [ui.parameterTarget as string]: true,
-                                        }}
-                                        onClick={() => {
-                                          setTargetedParameter(`${tid}.${vid}`)
-                                        }}
-                                      >
-                                        <Dynamic
-                                          {...getParamsEditor(variation)}
-                                          dataParameterPath={`${tid}.${vid}`}
-                                          setValue={(value) => {
-                                            setFlameDescriptor((draft) => {
-                                              const variationDraft =
-                                                draft.transforms[tid]
-                                                  ?.variations[vid]
-                                              if (
-                                                variationDraft === undefined ||
-                                                !isParametricVariation(
-                                                  variationDraft,
-                                                )
-                                              ) {
-                                                throw new Error(
-                                                  `Unreachable code`,
-                                                )
-                                              }
-                                              variationDraft.params = value
-                                            })
-                                          }}
-                                        />
-                                      </div>
-                                    )}
+                                      title="Randomize variation"
+                                    />
                                   </Show>
-                                </>
-                              )}
-                            </For>
+                                  <button
+                                    class={ui.visibilityButton}
+                                    title={
+                                      variation.visible
+                                        ? 'Hide variation'
+                                        : 'Show variation'
+                                    }
+                                    onClick={() => {
+                                      setFlameDescriptor((draft) => {
+                                        const v =
+                                          draft.transforms[tid]!.variations[
+                                            vid
+                                          ]!
+                                        v.visible = !v.visible
+                                      })
+                                    }}
+                                  >
+                                    {variation.visible ? <Eye /> : <EyeOff />}
+                                  </button>
+                                  <button
+                                    class={ui.deleteVariationButton}
+                                    onClick={() => {
+                                      setFlameDescriptor((draft) => {
+                                        if (
+                                          recordKeys(
+                                            draft.transforms[tid]!.variations,
+                                          ).length === 1
+                                        ) {
+                                          draft.transforms[tid]!.variations[
+                                            vid
+                                          ] = structuredClone(
+                                            getVariationDefault(
+                                              variation.type,
+                                              1,
+                                            ),
+                                          )
+                                        } else {
+                                          delete draft.transforms[tid]!
+                                            .variations[vid]
+                                        }
+                                      })
+                                    }}
+                                  >
+                                    <Cross />
+                                  </button>
+                                </div>
+                                <Show
+                                  when={
+                                    isParametricVariation(variation) &&
+                                    variation
+                                  }
+                                  keyed
+                                >
+                                  {(variation) => (
+                                    <div
+                                      classList={{
+                                        [ui.transformGridRow as string]: true,
+                                        [ui.variationParamsRow as string]: true,
+                                        [ui.parameterTarget as string]: true,
+                                      }}
+                                      onClick={() => {
+                                        setTargetedParameter(`${tid}.${vid}`)
+                                      }}
+                                    >
+                                      <Dynamic
+                                        {...getParamsEditor(variation)}
+                                        dataParameterPath={`${tid}.${vid}`}
+                                        setValue={(value) => {
+                                          setFlameDescriptor((draft) => {
+                                            const variationDraft =
+                                              draft.transforms[tid]?.variations[
+                                                vid
+                                              ]
+                                            if (
+                                              variationDraft === undefined ||
+                                              !isParametricVariation(
+                                                variationDraft,
+                                              )
+                                            ) {
+                                              throw new Error(
+                                                `Unreachable code`,
+                                              )
+                                            }
+                                            variationDraft.params = value
+                                          })
+                                        }}
+                                      />
+                                    </div>
+                                  )}
+                                </Show>
+                              </>
+                            )}
+                          </For>
 
-                            <button
-                              class={ui.addTransformVariationButton}
-                              onClick={() => {
-                                setFlameDescriptor((draft) => {
-                                  draft.transforms[tid]!.variations[
-                                    generateVariationId()
-                                  ] = structuredClone(
-                                    getVariationDefault('linear', 1),
-                                  )
-                                })
-                              }}
-                            >
-                              Add variation
-                            </button>
-                          </div>
-                        </CollapsibleCard>
-                      )}
-                    </For>
-                    <Card class={ui.buttonCard}>
-                      <button
-                        class={ui.addFlameButton}
-                        onClick={() => {
-                          setFlameDescriptor((draft) => {
-                            draft.transforms[generateTransformId()] =
-                              structuredClone(newDefaultTransform())
-                          })
-                        }}
-                      >
-                        New transform
-                      </button>
-                    </Card>
-                    <CollapsibleCard title="Render">
-                      <Card>
-                        <div
-                          class={ui.parameterTarget}
-                          onClick={() => {
-                            setTargetedParameter('skipIters')
-                          }}
-                        >
-                          <Slider
-                            label="Skip Iterations"
-                            value={flameDescriptor.renderSettings.skipIters}
-                            min={0}
-                            max={30}
-                            step={1}
-                            onInput={(newSkipIters) => {
-                              setFlameDescriptor((draft) => {
-                                draft.renderSettings.skipIters = newSkipIters
-                              })
-                            }}
-                            formatValue={(value) => value.toString()}
-                            dataParameterPath="skipIters"
-                          />
-                        </div>
-                        <div
-                          class={ui.parameterTarget}
-                          onClick={() => {
-                            setTargetedParameter('drawMode')
-                          }}
-                        >
-                          <label class={ui.labeledInput}>
-                            <span>
-                              <KeyframeDiamond parameterPath="drawMode" />
-                              Draw Mode
-                            </span>
-                            <select
-                              class={ui.select}
-                              value={flameDescriptor.renderSettings.drawMode}
-                              onChange={(ev) => {
-                                const mode = ev.currentTarget.value as DrawMode
-                                const update = () => {
-                                  setFlameDescriptor((draft) => {
-                                    draft.renderSettings.drawMode = mode
-                                  })
-                                }
-                                if ('startViewTransition' in document) {
-                                  document.startViewTransition(update)
-                                } else {
-                                  update()
-                                }
-                              }}
-                            >
-                              <For each={recordKeys(drawModeToImplFn)}>
-                                {(drawMode) => (
-                                  <option value={drawMode}>{drawMode}</option>
-                                )}
-                              </For>
-                            </select>
-                            <span></span>
-                          </label>
-                        </div>
-                        <div
-                          class={ui.parameterTarget}
-                          onClick={() => {
-                            setTargetedParameter('colorInitMode')
-                          }}
-                        >
-                          <label class={ui.labeledInput}>
-                            <span>
-                              <KeyframeDiamond parameterPath="colorInitMode" />
-                              Color Init Mode
-                            </span>
-                            <select
-                              class={ui.select}
-                              value={
-                                flameDescriptor.renderSettings.colorInitMode
-                              }
-                              onChange={(ev) => {
-                                const mode = ev.currentTarget
-                                  .value as ColorInitMode
-                                const update = () => {
-                                  setFlameDescriptor((draft) => {
-                                    draft.renderSettings.colorInitMode = mode
-                                  })
-                                }
-                                if ('startViewTransition' in document) {
-                                  document.startViewTransition(update)
-                                } else {
-                                  update()
-                                }
-                              }}
-                            >
-                              <For each={recordKeys(colorInitModeToImplFn)}>
-                                {(colorInitMode) => (
-                                  <option value={colorInitMode}>
-                                    {colorInitMode}
-                                  </option>
-                                )}
-                              </For>
-                            </select>
-                            <span></span>
-                          </label>
-                        </div>
-                        <div
-                          class={ui.parameterTarget}
-                          onClick={() => {
-                            setTargetedParameter('pointInitMode')
-                          }}
-                        >
-                          <label class={ui.labeledInput}>
-                            <span>
-                              <KeyframeDiamond parameterPath="pointInitMode" />
-                              Point Init
-                            </span>
-                            <select
-                              class={ui.select}
-                              value={
-                                flameDescriptor.renderSettings.pointInitMode
-                              }
-                              onChange={(ev) => {
-                                const mode = ev.currentTarget
-                                  .value as PointInitMode
-                                const update = () => {
-                                  setFlameDescriptor((draft) => {
-                                    draft.renderSettings.pointInitMode = mode
-                                  })
-                                }
-                                if ('startViewTransition' in document) {
-                                  document.startViewTransition(update)
-                                } else {
-                                  update()
-                                }
-                              }}
-                            >
-                              <For each={recordKeys(pointInitModeToImplFn)}>
-                                {(pointInitMode) => (
-                                  <option value={pointInitMode}>
-                                    {pointInitMode}
-                                  </option>
-                                )}
-                              </For>
-                            </select>
-                            <span></span>
-                          </label>
-                        </div>
-                        <div
-                          class={ui.parameterTarget}
-                          onClick={() => {
-                            setTargetedParameter('exposure')
-                          }}
-                        >
-                          <Slider
-                            label="Exposure"
-                            value={flameDescriptor.renderSettings.exposure}
-                            min={-8}
-                            max={8}
-                            step={0.001}
-                            onInput={(newExp) => {
-                              setFlameDescriptor((draft) => {
-                                draft.renderSettings.exposure = newExp
-                              })
-                            }}
-                            formatValue={(value) => Number(value.toFixed(6)).toString()}
-                            dataParameterPath="exposure"
-                          />
-                        </div>
-                        <div
-                          class={ui.parameterTarget}
-                          onClick={() => {
-                            setTargetedParameter('vibrancy')
-                          }}
-                        >
-                          <Slider
-                            label="Vibrancy"
-                            value={flameDescriptor.renderSettings.vibrancy}
-                            min={0}
-                            max={3}
-                            step={0.05}
-                            onInput={(newVibrancy) => {
-                              setFlameDescriptor((draft) => {
-                                draft.renderSettings.vibrancy = newVibrancy
-                              })
-                            }}
-                            formatValue={(value) => value.toFixed(2)}
-                            dataParameterPath="vibrancy"
-                          />
-                        </div>
-                        <div
-                          class={ui.parameterTarget}
-                          onClick={() => {
-                            setTargetedParameter('contrast')
-                          }}
-                        >
-                          <Slider
-                            label="Contrast"
-                            value={flameDescriptor.renderSettings.contrast}
-                            min={0.01}
-                            max={20}
-                            step={0.01}
-                            onInput={(newVal) => {
-                              setFlameDescriptor((draft) => {
-                                draft.renderSettings.contrast = newVal
-                              })
-                            }}
-                            formatValue={(value) => value.toFixed(2)}
-                            dataParameterPath="contrast"
-                          />
-                        </div>
-                        <div
-                          class={ui.parameterTarget}
-                          onClick={() => {
-                            setTargetedParameter('gamma')
-                          }}
-                        >
-                          <Slider
-                            label="Gamma"
-                            value={flameDescriptor.renderSettings.gamma}
-                            min={0.1}
-                            max={8}
-                            step={0.01}
-                            onInput={(newVal) => {
-                              setFlameDescriptor((draft) => {
-                                draft.renderSettings.gamma = newVal
-                              })
-                            }}
-                            formatValue={(value) => value.toFixed(2)}
-                            dataParameterPath="gamma"
-                          />
-                        </div>
-                        <div
-                          class={ui.parameterTarget}
-                          onClick={() => {
-                            setTargetedParameter('highlightPower')
-                          }}
-                        >
-                          <Slider
-                            label="Highlight Power"
-                            value={
-                              flameDescriptor.renderSettings.highlightPower
-                            }
-                            min={0}
-                            max={2}
-                            step={0.01}
-                            onInput={(newVal) => {
-                              setFlameDescriptor((draft) => {
-                                draft.renderSettings.highlightPower = newVal
-                              })
-                            }}
-                            formatValue={(value) => value.toFixed(2)}
-                            dataParameterPath="highlightPower"
-                          />
-                        </div>
-                        <div
-                          class={ui.parameterTarget}
-                          onClick={() => {
-                            setTargetedParameter('paletteSpeed')
-                          }}
-                        >
-                          <Slider
-                            label="Palette Speed"
-                            value={flameDescriptor.renderSettings.paletteSpeed}
-                            min={0}
-                            max={30}
-                            step={0.1}
-                            onInput={(newVal) => {
-                              setFlameDescriptor((draft) => {
-                                draft.renderSettings.paletteSpeed = newVal
-                              })
-                            }}
-                            formatValue={(value) => value.toFixed(1)}
-                            dataParameterPath="paletteSpeed"
-                          />
-                        </div>
-                        <div
-                          class={ui.parameterTarget}
-                          onClick={() => {
-                            setTargetedParameter('paletteMode')
-                          }}
-                        >
-                          <label class={ui.labeledInput}>
-                            <span>Palette Mode</span>
-                            <select
-                              class={ui.select}
-                              value={
-                                flameDescriptor.renderSettings.paletteMode ?? 0
-                              }
-                              onChange={(ev) => {
-                                const mode = parseInt(
-                                  ev.currentTarget.value,
-                                ) as 0 | 1
-                                setFlameDescriptor((draft) => {
-                                  draft.renderSettings.paletteMode = mode
-                                })
-                              }}
-                            >
-                              <option value={0}>Density Shift</option>
-                              <option value={1}>Hue Rotation (flam3)</option>
-                            </select>
-                            <span></span>
-                          </label>
-                        </div>
-                        <div
-                          class={ui.parameterTarget}
-                          onClick={() => {
-                            setTargetedParameter('palettePhase')
-                          }}
-                        >
-                          <Slider
-                            label="Palette Phase"
-                            value={flameDescriptor.renderSettings.palettePhase}
-                            min={0}
-                            max={1}
-                            step={0.05}
-                            onInput={(newVal) => {
-                              setFlameDescriptor((draft) => {
-                                draft.renderSettings.palettePhase = newVal
-                              })
-                            }}
-                            formatValue={(value) => value.toFixed(2)}
-                            dataParameterPath="palettePhase"
-                          />
-                        </div>
-                        <div
-                          class={ui.parameterTarget}
-                          onClick={() => {
-                            setTargetedParameter('densityEstimationQuality')
-                          }}
-                        >
-                          <Slider
-                            label="Filter Quality"
-                            value={
-                              flameDescriptor.renderSettings
-                                .densityEstimationQuality ?? 0.8
-                            }
-                            min={0}
-                            max={1}
-                            step={0.01}
-                            onInput={(newVal) => {
-                              setFlameDescriptor((draft) => {
-                                draft.renderSettings.densityEstimationQuality =
-                                  newVal
-                              })
-                            }}
-                            formatValue={(value) => value.toFixed(2)}
-                            dataParameterPath="densityEstimationQuality"
-                          />
-                        </div>
-                        <div
-                          class={ui.parameterTarget}
-                          onClick={() => {
-                            setTargetedParameter('backgroundColor')
-                          }}
-                        >
-                          <label class={ui.labeledInput}>
-                            <span>
-                              <KeyframeDiamond parameterPath="backgroundColor" />
-                              Background Color
-                            </span>
-                            <ColorPicker
-                              value={
-                                flameDescriptor.renderSettings.backgroundColor
-                                  ? vec3f(
-                                      ...flameDescriptor.renderSettings
-                                        .backgroundColor,
-                                    )
-                                  : undefined
-                              }
-                              setValue={(newBgColor) => {
-                                setFlameDescriptor((draft) => {
-                                  draft.renderSettings.backgroundColor =
-                                    newBgColor
-                                })
-                              }}
-                            />
-                          </label>
-                        </div>
-                        <Show
-                          when={
-                            flameDescriptor.renderSettings.backgroundColor !==
-                            undefined
-                          }
-                          fallback={<span class={ui.noSelect} />}
-                        >
-                          <Button
+                          <button
+                            class={ui.addTransformVariationButton}
                             onClick={() => {
                               setFlameDescriptor((draft) => {
-                                delete draft.renderSettings.backgroundColor
+                                draft.transforms[tid]!.variations[
+                                  generateVariationId()
+                                ] = structuredClone(
+                                  getVariationDefault('linear', 1),
+                                )
                               })
                             }}
                           >
-                            Auto
-                          </Button>
-                        </Show>
-
-                      </Card>
-                    </CollapsibleCard>
-
-                  </Show>
-                </div>
+                            Add variation
+                          </button>
+                        </div>
+                      </CollapsibleCard>
+                    )}
+                  </For>
+                  <Card class={ui.buttonCard}>
+                    <button
+                      class={ui.addFlameButton}
+                      onClick={() => {
+                        setFlameDescriptor((draft) => {
+                          draft.transforms[generateTransformId()] =
+                            structuredClone(newDefaultTransform())
+                        })
+                      }}
+                    >
+                      New transform
+                    </button>
+                  </Card>
+                  <CollapsibleCard title="Render">
+                    <Card>
+                      <div
+                        class={ui.parameterTarget}
+                        onClick={() => {
+                          setTargetedParameter('skipIters')
+                        }}
+                      >
+                        <Slider
+                          label="Skip Iterations"
+                          value={flameDescriptor.renderSettings.skipIters}
+                          min={0}
+                          max={30}
+                          step={1}
+                          onInput={(newSkipIters) => {
+                            setFlameDescriptor((draft) => {
+                              draft.renderSettings.skipIters = newSkipIters
+                            })
+                          }}
+                          formatValue={(value) => value.toString()}
+                          dataParameterPath="skipIters"
+                        />
+                      </div>
+                      <div
+                        class={ui.parameterTarget}
+                        onClick={() => {
+                          setTargetedParameter('drawMode')
+                        }}
+                      >
+                        <label class={ui.labeledInput}>
+                          <span>
+                            <KeyframeDiamond parameterPath="drawMode" />
+                            Draw Mode
+                          </span>
+                          <select
+                            class={ui.select}
+                            value={flameDescriptor.renderSettings.drawMode}
+                            onChange={(ev) => {
+                              const mode = ev.currentTarget.value as DrawMode
+                              const update = () => {
+                                setFlameDescriptor((draft) => {
+                                  draft.renderSettings.drawMode = mode
+                                })
+                              }
+                              if ('startViewTransition' in document) {
+                                document.startViewTransition(update)
+                              } else {
+                                update()
+                              }
+                            }}
+                          >
+                            <For each={recordKeys(drawModeToImplFn)}>
+                              {(drawMode) => (
+                                <option value={drawMode}>{drawMode}</option>
+                              )}
+                            </For>
+                          </select>
+                          <span></span>
+                        </label>
+                      </div>
+                      <div
+                        class={ui.parameterTarget}
+                        onClick={() => {
+                          setTargetedParameter('colorInitMode')
+                        }}
+                      >
+                        <label class={ui.labeledInput}>
+                          <span>
+                            <KeyframeDiamond parameterPath="colorInitMode" />
+                            Color Init Mode
+                          </span>
+                          <select
+                            class={ui.select}
+                            value={flameDescriptor.renderSettings.colorInitMode}
+                            onChange={(ev) => {
+                              const mode = ev.currentTarget
+                                .value as ColorInitMode
+                              const update = () => {
+                                setFlameDescriptor((draft) => {
+                                  draft.renderSettings.colorInitMode = mode
+                                })
+                              }
+                              if ('startViewTransition' in document) {
+                                document.startViewTransition(update)
+                              } else {
+                                update()
+                              }
+                            }}
+                          >
+                            <For each={recordKeys(colorInitModeToImplFn)}>
+                              {(colorInitMode) => (
+                                <option value={colorInitMode}>
+                                  {colorInitMode}
+                                </option>
+                              )}
+                            </For>
+                          </select>
+                          <span></span>
+                        </label>
+                      </div>
+                      <div
+                        class={ui.parameterTarget}
+                        onClick={() => {
+                          setTargetedParameter('pointInitMode')
+                        }}
+                      >
+                        <label class={ui.labeledInput}>
+                          <span>
+                            <KeyframeDiamond parameterPath="pointInitMode" />
+                            Point Init
+                          </span>
+                          <select
+                            class={ui.select}
+                            value={flameDescriptor.renderSettings.pointInitMode}
+                            onChange={(ev) => {
+                              const mode = ev.currentTarget
+                                .value as PointInitMode
+                              const update = () => {
+                                setFlameDescriptor((draft) => {
+                                  draft.renderSettings.pointInitMode = mode
+                                })
+                              }
+                              if ('startViewTransition' in document) {
+                                document.startViewTransition(update)
+                              } else {
+                                update()
+                              }
+                            }}
+                          >
+                            <For each={recordKeys(pointInitModeToImplFn)}>
+                              {(pointInitMode) => (
+                                <option value={pointInitMode}>
+                                  {pointInitMode}
+                                </option>
+                              )}
+                            </For>
+                          </select>
+                          <span></span>
+                        </label>
+                      </div>
+                      <div
+                        class={ui.parameterTarget}
+                        onClick={() => {
+                          setTargetedParameter('exposure')
+                        }}
+                      >
+                        <Slider
+                          label="Exposure"
+                          value={flameDescriptor.renderSettings.exposure}
+                          min={-8}
+                          max={8}
+                          step={0.001}
+                          onInput={(newExp) => {
+                            setFlameDescriptor((draft) => {
+                              draft.renderSettings.exposure = newExp
+                            })
+                          }}
+                          formatValue={(value) =>
+                            Number(value.toFixed(6)).toString()
+                          }
+                          dataParameterPath="exposure"
+                        />
+                      </div>
+                      <div
+                        class={ui.parameterTarget}
+                        onClick={() => {
+                          setTargetedParameter('vibrancy')
+                        }}
+                      >
+                        <Slider
+                          label="Vibrancy"
+                          value={flameDescriptor.renderSettings.vibrancy}
+                          min={0}
+                          max={3}
+                          step={0.05}
+                          onInput={(newVibrancy) => {
+                            setFlameDescriptor((draft) => {
+                              draft.renderSettings.vibrancy = newVibrancy
+                            })
+                          }}
+                          formatValue={(value) => value.toFixed(2)}
+                          dataParameterPath="vibrancy"
+                        />
+                      </div>
+                      <div
+                        class={ui.parameterTarget}
+                        onClick={() => {
+                          setTargetedParameter('contrast')
+                        }}
+                      >
+                        <Slider
+                          label="Contrast"
+                          value={flameDescriptor.renderSettings.contrast}
+                          min={0.01}
+                          max={20}
+                          step={0.01}
+                          onInput={(newVal) => {
+                            setFlameDescriptor((draft) => {
+                              draft.renderSettings.contrast = newVal
+                            })
+                          }}
+                          formatValue={(value) => value.toFixed(2)}
+                          dataParameterPath="contrast"
+                        />
+                      </div>
+                      <div
+                        class={ui.parameterTarget}
+                        onClick={() => {
+                          setTargetedParameter('gamma')
+                        }}
+                      >
+                        <Slider
+                          label="Gamma"
+                          value={flameDescriptor.renderSettings.gamma}
+                          min={0.1}
+                          max={8}
+                          step={0.01}
+                          onInput={(newVal) => {
+                            setFlameDescriptor((draft) => {
+                              draft.renderSettings.gamma = newVal
+                            })
+                          }}
+                          formatValue={(value) => value.toFixed(2)}
+                          dataParameterPath="gamma"
+                        />
+                      </div>
+                      <div
+                        class={ui.parameterTarget}
+                        onClick={() => {
+                          setTargetedParameter('highlightPower')
+                        }}
+                      >
+                        <Slider
+                          label="Highlight Power"
+                          value={flameDescriptor.renderSettings.highlightPower}
+                          min={0}
+                          max={2}
+                          step={0.01}
+                          onInput={(newVal) => {
+                            setFlameDescriptor((draft) => {
+                              draft.renderSettings.highlightPower = newVal
+                            })
+                          }}
+                          formatValue={(value) => value.toFixed(2)}
+                          dataParameterPath="highlightPower"
+                        />
+                      </div>
+                      <div
+                        class={ui.parameterTarget}
+                        onClick={() => {
+                          setTargetedParameter('paletteSpeed')
+                        }}
+                      >
+                        <Slider
+                          label="Palette Speed"
+                          value={flameDescriptor.renderSettings.paletteSpeed}
+                          min={0}
+                          max={30}
+                          step={0.1}
+                          onInput={(newVal) => {
+                            setFlameDescriptor((draft) => {
+                              draft.renderSettings.paletteSpeed = newVal
+                            })
+                          }}
+                          formatValue={(value) => value.toFixed(1)}
+                          dataParameterPath="paletteSpeed"
+                        />
+                      </div>
+                      <div
+                        class={ui.parameterTarget}
+                        onClick={() => {
+                          setTargetedParameter('paletteMode')
+                        }}
+                      >
+                        <label class={ui.labeledInput}>
+                          <span>Palette Mode</span>
+                          <select
+                            class={ui.select}
+                            value={
+                              flameDescriptor.renderSettings.paletteMode ?? 0
+                            }
+                            onChange={(ev) => {
+                              const mode = parseInt(ev.currentTarget.value) as
+                                | 0
+                                | 1
+                              setFlameDescriptor((draft) => {
+                                draft.renderSettings.paletteMode = mode
+                              })
+                            }}
+                          >
+                            <option value={0}>Density Shift</option>
+                            <option value={1}>Hue Rotation (flam3)</option>
+                          </select>
+                          <span></span>
+                        </label>
+                      </div>
+                      <div
+                        class={ui.parameterTarget}
+                        onClick={() => {
+                          setTargetedParameter('palettePhase')
+                        }}
+                      >
+                        <Slider
+                          label="Palette Phase"
+                          value={flameDescriptor.renderSettings.palettePhase}
+                          min={0}
+                          max={1}
+                          step={0.05}
+                          onInput={(newVal) => {
+                            setFlameDescriptor((draft) => {
+                              draft.renderSettings.palettePhase = newVal
+                            })
+                          }}
+                          formatValue={(value) => value.toFixed(2)}
+                          dataParameterPath="palettePhase"
+                        />
+                      </div>
+                      <div
+                        class={ui.parameterTarget}
+                        onClick={() => {
+                          setTargetedParameter('densityEstimationQuality')
+                        }}
+                      >
+                        <Slider
+                          label="Filter Quality"
+                          value={
+                            flameDescriptor.renderSettings
+                              .densityEstimationQuality ?? 0.8
+                          }
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          onInput={(newVal) => {
+                            setFlameDescriptor((draft) => {
+                              draft.renderSettings.densityEstimationQuality =
+                                newVal
+                            })
+                          }}
+                          formatValue={(value) => value.toFixed(2)}
+                          dataParameterPath="densityEstimationQuality"
+                        />
+                      </div>
+                      <div
+                        class={ui.parameterTarget}
+                        onClick={() => {
+                          setTargetedParameter('backgroundColor')
+                        }}
+                      >
+                        <label class={ui.labeledInput}>
+                          <span>
+                            <KeyframeDiamond parameterPath="backgroundColor" />
+                            Background Color
+                          </span>
+                          <ColorPicker
+                            value={
+                              flameDescriptor.renderSettings.backgroundColor
+                                ? vec3f(
+                                    ...flameDescriptor.renderSettings
+                                      .backgroundColor,
+                                  )
+                                : undefined
+                            }
+                            setValue={(newBgColor) => {
+                              setFlameDescriptor((draft) => {
+                                draft.renderSettings.backgroundColor =
+                                  newBgColor
+                              })
+                            }}
+                          />
+                        </label>
+                      </div>
+                      <Show
+                        when={
+                          flameDescriptor.renderSettings.backgroundColor !==
+                          undefined
+                        }
+                        fallback={<span class={ui.noSelect} />}
+                      >
+                        <Button
+                          onClick={() => {
+                            setFlameDescriptor((draft) => {
+                              delete draft.renderSettings.backgroundColor
+                            })
+                          }}
+                        >
+                          Auto
+                        </Button>
+                      </Show>
+                    </Card>
+                  </CollapsibleCard>
+                </Show>
               </div>
-            </Show>
-            <FloatingActions
-              disabled={
-                animationExportRunning() || exportProgress() !== undefined
+            </div>
+          </Show>
+          <FloatingActions
+            disabled={
+              animationExportRunning() || exportProgress() !== undefined
+            }
+            initialLeft={floatingLeft()}
+            initialTop={floatingTop()}
+            onLoadFlame={showLoadFlameModal}
+            onSaveForLater={() => {
+              const tracks = timeline.tracks()
+              saveRecentFlame(
+                flameDescriptor,
+                undefined,
+                tracks.length > 0 ? tracks : undefined,
+              )
+              showToast(
+                tracks.length > 0
+                  ? 'Flame + animation saved for later'
+                  : 'Flame saved for later',
+              )
+            }}
+            onRender={showExportPngDialog}
+            onQuickExport={quickExport}
+            onShareLink={showShareLinkModal}
+            onLogoFavicon={showLogoFaviconGenerator}
+            onRandomizeColors={() => {
+              setFlameDescriptor((draft) => {
+                draft.transforms = randomizeAllColors(draft.transforms)
+              })
+            }}
+            hideDiceButtons={hideDiceButtons}
+            setHideDiceButtons={setHideDiceButtons}
+            animationEnabled={animationEnabled}
+            setAnimationEnabled={(v) => {
+              if (IS_DEV) console.info('[anim] floating toggle →', v)
+              setAnimationEnabled(v)
+            }}
+            showTimeline={showTimeline}
+            setShowTimeline={setShowTimeline}
+            adaptiveFilterEnabled={adaptiveFilterEnabled}
+            setAdaptiveFilterEnabled={setAdaptiveFilterEnabled}
+            isPlaying={() => timeline.isPlaying()}
+            togglePlay={() => {
+              if (!animationEnabled()) {
+                setAnimationEnabled(true)
               }
-              initialLeft={floatingLeft()}
-              initialTop={floatingTop()}
-              onLoadFlame={showLoadFlameModal}
-              onSaveForLater={() => {
-                saveRecentFlame(flameDescriptor)
-                showToast('Flame saved for later')
-              }}
-              onRender={showExportPngDialog}
-              onQuickExport={quickExport}
-              onShareLink={showShareLinkModal}
-              onLogoFavicon={showLogoFaviconGenerator}
-              onRandomizeColors={() => {
-                setFlameDescriptor((draft) => {
-                  draft.transforms = randomizeAllColors(draft.transforms)
-                })
-              }}
-              hideDiceButtons={hideDiceButtons}
-              setHideDiceButtons={setHideDiceButtons}
-              animationEnabled={animationEnabled}
-              setAnimationEnabled={(v) => {
-                console.info('[anim] floating toggle →', v)
-                setAnimationEnabled(v)
-              }}
-              showTimeline={showTimeline}
-              setShowTimeline={setShowTimeline}
-              adaptiveFilterEnabled={adaptiveFilterEnabled}
-              setAdaptiveFilterEnabled={setAdaptiveFilterEnabled}
-              isPlaying={() => timeline.isPlaying()}
-              togglePlay={() => {
-                if (!animationEnabled()) {
-                  setAnimationEnabled(true)
-                }
-                timeline.togglePlay()
-              }}
-              qualityPreset={qualityPreset}
-              setQualityPreset={(key) => {
+              timeline.togglePlay()
+            }}
+            qualityPreset={qualityPreset}
+            setQualityPreset={(key) => {
+              if (IS_DEV) {
                 console.info(
                   '[App] setQualityPreset (floating)',
                   `key=${key}`,
                   `current=${qualityPreset()}`,
                 )
-                setQualityPreset(key as QualityPreset)
-              }}
-              accumulatedPointCount={accumulatedPointCount}
-              qualityPointCountLimit={qualityPointCountLimit()}
-            />
-            <SpotlightTour tourContext={tourContext} />
-            <SoftwareVersion showHelp={createShowHelp(quickPickerMode, setQuickPickerMode, sidebarLayoutMode, setSidebarLayoutMode, isCompact, toggleCompact)} />
-          </Dropzone>
-        </TimelineContextProvider>
-      </ChangeHistoryContextProvider>
+              }
+              setQualityPreset(key as QualityPreset)
+            }}
+            accumulatedPointCount={accumulatedPointCount}
+            qualityPointCountLimit={qualityPointCountLimit()}
+          />
+          <SpotlightTour tourContext={tourContext} />
+          <SoftwareVersion
+            showHelp={createShowHelp(
+              quickPickerMode,
+              setQuickPickerMode,
+              sidebarLayoutMode,
+              setSidebarLayoutMode,
+              isCompact,
+              toggleCompact,
+            )}
+          />
+        </Dropzone>
+      </TimelineContextProvider>
+    </ChangeHistoryContextProvider>
   )
 }
-
-
 
 export function Wrappers() {
   const [flameFromQuery] = createResource(async () => {
     const param = new URLSearchParams(window.location.search)
     const flameDef = param.get('flame')
-    console.info(
-      '[share:resource] query param present:',
-      flameDef !== null,
-      'length:',
-      flameDef?.length ?? 0,
-    )
+    if (IS_DEV) {
+      console.info(
+        '[share:resource] query param present:',
+        flameDef !== null,
+        'length:',
+        flameDef?.length ?? 0,
+      )
+    }
     if (flameDef !== null) {
       try {
         const result = await decodeSharePayload(flameDef)
-        console.info('[share:resource] decode succeeded:', {
-          hasFlame: !!result?.flame,
-          transformCount: result?.flame
-            ? Object.keys(result.flame.transforms ?? {}).length
-            : 0,
-          hasAnimation: !!result?.animation,
-          animTrackCount: result?.animation?.tracks?.length ?? 0,
-        })
+        if (IS_DEV) {
+          console.info('[share:resource] decode succeeded:', {
+            hasFlame: !!result?.flame,
+            transformCount: result?.flame
+              ? Object.keys(result.flame.transforms ?? {}).length
+              : 0,
+            hasAnimation: !!result?.animation,
+            animTrackCount: result?.animation?.tracks?.length ?? 0,
+          })
+        }
         return result
       } catch (ex) {
         console.error('[share:resource] decode failed:', ex)
@@ -2221,7 +2247,9 @@ export function Wrappers() {
     }
 
     window.addEventListener('hashchange', handleHashChange)
-    onCleanup(() => { window.removeEventListener('hashchange', handleHashChange) })
+    onCleanup(() => {
+      window.removeEventListener('hashchange', handleHashChange)
+    })
 
     // Check initial hash on mount
     handleHashChange()
@@ -2231,14 +2259,16 @@ export function Wrappers() {
   createEffect(() => {
     const fq = flameFromQuery()
     if (fq !== undefined) {
-      console.info('[share:wrappers] passing to App:', {
-        hasFlame: !!fq.flame,
-        transformCount: fq.flame
-          ? Object.keys(fq.flame.transforms ?? {}).length
-          : 0,
-        hasAnimation: !!fq.animation,
-        animTrackCount: fq.animation?.tracks?.length ?? 0,
-      })
+      if (IS_DEV) {
+        console.info('[share:wrappers] passing to App:', {
+          hasFlame: !!fq.flame,
+          transformCount: fq.flame
+            ? Object.keys(fq.flame.transforms ?? {}).length
+            : 0,
+          hasAnimation: !!fq.animation,
+          animTrackCount: fq.animation?.tracks?.length ?? 0,
+        })
+      }
     }
   })
 
@@ -2260,44 +2290,44 @@ export function Wrappers() {
   return (
     <CompactModeProvider>
       <SpotlightTourContext.Provider value={spotlightState}>
-      <ThemeContextProvider>
-        <KeyframeTargetProvider>
-          <Modal>
-            <ErrorBoundary fallback={errorHandler}>
-              <Root
-                adapterOptions={{
-                  powerPreference: 'high-performance',
-                }}
-              >
-                <Suspense>
-                  <App
-                    flameFromQuery={flameFromQuery()}
-                    flameFromWelcome={selectedFlame}
-                    resetFlameFromWelcome={() => {
-                      setSelectedFlame(undefined)
-                    }}
-                  />
-                  {/* WelcomeScreen overlay on top */}
-                  <Show when={showWelcome()}>
-                    <WelcomeScreen
-                      showDontShowAgain={dontShowAgain()}
-                      onDontShowAgainChange={(checked) => {
-                        setDontShowAgain(checked)
-                        if (checked) {
-                          dismissWelcome()
-                        }
+        <ThemeContextProvider>
+          <KeyframeTargetProvider>
+            <Modal>
+              <ErrorBoundary fallback={errorHandler}>
+                <Root
+                  adapterOptions={{
+                    powerPreference: 'high-performance',
+                  }}
+                >
+                  <Suspense>
+                    <App
+                      flameFromQuery={flameFromQuery()}
+                      flameFromWelcome={selectedFlame}
+                      resetFlameFromWelcome={() => {
+                        setSelectedFlame(undefined)
                       }}
-                      onEnter={() => setShowWelcome(false)}
-                      onSelectFlame={(flame) => setSelectedFlame(() => flame)}
-                      onStartTour={handleStartTour}
                     />
-                  </Show>
-                </Suspense>
-              </Root>
-            </ErrorBoundary>
-          </Modal>
-        </KeyframeTargetProvider>
-      </ThemeContextProvider>
+                    {/* WelcomeScreen overlay on top */}
+                    <Show when={showWelcome()}>
+                      <WelcomeScreen
+                        showDontShowAgain={dontShowAgain()}
+                        onDontShowAgainChange={(checked) => {
+                          setDontShowAgain(checked)
+                          if (checked) {
+                            dismissWelcome()
+                          }
+                        }}
+                        onEnter={() => setShowWelcome(false)}
+                        onSelectFlame={(flame) => setSelectedFlame(() => flame)}
+                        onStartTour={handleStartTour}
+                      />
+                    </Show>
+                  </Suspense>
+                </Root>
+              </ErrorBoundary>
+            </Modal>
+          </KeyframeTargetProvider>
+        </ThemeContextProvider>
       </SpotlightTourContext.Provider>
     </CompactModeProvider>
   )

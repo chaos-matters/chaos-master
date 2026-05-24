@@ -1,6 +1,6 @@
 import { batch, createSignal, For, onCleanup, Show } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
-import { DEFAULT_QUALITY } from '@/defaults'
+import { DEFAULT_QUALITY, IS_DEV } from '@/defaults'
 import { examples } from '@/flame/examples'
 import { animationDefs, getAnimationFlame } from '@/flame/examples/animations'
 import { Flam3 } from '@/flame/Flam3'
@@ -270,7 +270,15 @@ function LoadFlameModal(props: LoadFlameModalProps) {
               <button
                 class={ui.item}
                 onClick={() => {
-                  props.respond(structuredClone(recent.flame))
+                  const clone = structuredClone(recent.flame)
+                  if (recent.tracks && recent.tracks.length > 0) {
+                    props.respond({
+                      flame: clone,
+                      tracks: structuredClone(recent.tracks),
+                    })
+                  } else {
+                    props.respond(clone)
+                  }
                 }}
               >
                 <DelayedShow delayMs={i() * 30}>
@@ -381,11 +389,12 @@ export function createLoadFlame(history: ChangeHistory<FlameDescriptor>) {
     }
     // Animation load: flame + keyframe tracks
     if (typeof result === 'object' && 'tracks' in result) {
-      console.info(
-        '[load] animation selected —',
-        result.tracks.length,
-        'tracks, batching flame + tracks atomically',
-      )
+      if (IS_DEV)
+        console.info(
+          '[load] animation selected —',
+          result.tracks.length,
+          'tracks, batching flame + tracks atomically',
+        )
       batch(() => {
         history.replace(structuredClone(result.flame))
         setLoadedAnimation({
@@ -399,7 +408,10 @@ export function createLoadFlame(history: ChangeHistory<FlameDescriptor>) {
       return result.flame
     }
     // Plain flame load — clear any animation tracks
-    console.info('[load] plain flame selected — batching flame + empty tracks')
+    if (IS_DEV)
+      console.info(
+        '[load] plain flame selected — batching flame + empty tracks',
+      )
     batch(() => {
       history.replace(structuredClone(result))
       setLoadedAnimation({ flame: structuredClone(result), tracks: [] })

@@ -1,5 +1,6 @@
 import { validateFlame } from '@/flame/schema/flameSchema'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { TimelineTrack } from '@/utils/timeline'
 
 const STORAGE_KEY = 'chaos-master-recent-flames'
 const MAX_RECENT_FLAMES = 10
@@ -9,6 +10,7 @@ export type RecentFlame = {
   name: string
   flame: FlameDescriptor
   savedAt: number
+  tracks?: TimelineTrack[]
 }
 
 function generateId(): string {
@@ -41,7 +43,11 @@ export function loadRecentFlames(): RecentFlame[] {
   }
 }
 
-export function saveRecentFlame(flame: FlameDescriptor, name?: string): void {
+export function saveRecentFlame(
+  flame: FlameDescriptor,
+  name?: string,
+  tracks?: TimelineTrack[],
+): void {
   const recent = loadRecentFlames()
   const id = generateId()
   const entry: RecentFlame = {
@@ -49,6 +55,10 @@ export function saveRecentFlame(flame: FlameDescriptor, name?: string): void {
     name: name ?? `Flame ${new Date().toLocaleDateString()}`,
     flame: JSON.parse(JSON.stringify(flame)),
     savedAt: Date.now(),
+  }
+  // Only store tracks when there are actual keyframes
+  if (tracks && tracks.length > 0) {
+    entry.tracks = JSON.parse(JSON.stringify(tracks))
   }
   const updated = [entry, ...recent].slice(0, MAX_RECENT_FLAMES)
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))

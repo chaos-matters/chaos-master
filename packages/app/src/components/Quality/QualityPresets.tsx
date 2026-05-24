@@ -71,7 +71,10 @@ export function QualityPresets(props: QualityPresetsProps) {
   }
 
   return (
-    <div class={ui.wrapper} classList={{ [ui.compactWrapper as string]: props.compact }}>
+    <div
+      class={ui.wrapper}
+      classList={{ [ui.compactWrapper as string]: props.compact }}
+    >
       <div class={ui.pillsContainer} style={gridStyle()}>
         <For each={props.pills}>
           {(pill, index) => {
@@ -112,7 +115,10 @@ export function QualityPresets(props: QualityPresetsProps) {
         </For>
       </div>
       <Show when={showPoints()}>
-        <div class={ui.pointsRow} classList={{ [ui.compactPoints as string]: props.compact }}>
+        <div
+          class={ui.pointsRow}
+          classList={{ [ui.compactPoints as string]: props.compact }}
+        >
           {formatPointCount(props.currentPoints!)} /{' '}
           {formatPointCount(props.targetPoints!)}
         </div>
