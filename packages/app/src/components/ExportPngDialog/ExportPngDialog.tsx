@@ -161,10 +161,13 @@ function RenderDialog(props: RenderDialogProps) {
           class={ui.tab}
           classList={{
             [ui.tabActive as string]: props.exportTab === 'animation',
+            [ui.disabled as string]: !props.hasAnimation,
           }}
+          disabled={!props.hasAnimation}
           onClick={() => {
-            props.onExportTabChange('animation')
+            if (props.hasAnimation) props.onExportTabChange('animation')
           }}
+          title={!props.hasAnimation ? 'Add keyframes to the timeline to enable animation export' : undefined}
         >
           Animation
         </button>
@@ -569,7 +572,7 @@ function RenderDialog(props: RenderDialogProps) {
           <Button onClick={props.onExport}>Export Image</Button>
         </Show>
         <Show when={props.exportTab === 'animation'}>
-          <Button onClick={props.onRenderAnimation}>Render Animation</Button>
+          <Button onClick={props.onRenderAnimation} disabled={!props.hasAnimation}>Render Animation</Button>
         </Show>
       </footer>
     </>
@@ -595,7 +598,7 @@ export function createExportPngDialog(
     const timeline = getTimeline()
     const tracks = timeline?.tracks() ?? []
     const config = timeline?.config() ?? defaultTimelineConfig()
-    const hasAnimation = tracks.length > 0
+    const hasAnimation = tracks.some(track => track.keyframes.length > 0)
     const currentRatio = getPixelRatio()
 
     setPixelRatio(currentRatio)
@@ -637,7 +640,7 @@ export function createExportPngDialog(
     const timeline = getTimeline()
     const tracks = timeline?.tracks() ?? []
     const config = timeline?.config() ?? defaultTimelineConfig()
-    const hasAnimation = tracks.length > 0
+    const hasAnimation = tracks.some(track => track.keyframes.length > 0)
     const currentFrame = timeline?.currentFrame() ?? 0
     const currentRatio = getPixelRatio()
 
@@ -663,10 +666,22 @@ export function createExportPngDialog(
       'image',
     )
 
+    // Force back to image tab if no keyframes exist
+    if (!hasAnimation && exportTab() === 'animation') {
+      setExportTab('image')
+    }
+
     // Animation tab state
     const [animationQuality, setAnimationQuality] = persistentSignal(
       'export/animation-quality',
       0.9,
+    )
+    // Default frame end to the last keyframe across all tracks,
+    // so we only render up to the last meaningful change.
+    const lastKeyframeFrame = tracks.reduce(
+      (max, track) =>
+        track.keyframes.reduce((m, kf) => Math.max(m, kf.frame), max),
+      0,
     )
     const [frameStart, setFrameStart] = persistentSignal(
       'export/frame-start',
@@ -674,7 +689,7 @@ export function createExportPngDialog(
     )
     const [frameEnd, setFrameEnd] = persistentSignal(
       'export/frame-end',
-      config.endFrame,
+      lastKeyframeFrame > 0 ? lastKeyframeFrame : config.endFrame,
     )
     const [animFps, setAnimFps] = persistentSignal(
       'export/anim-fps',
