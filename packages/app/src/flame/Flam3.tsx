@@ -4,6 +4,7 @@ import { clamp } from 'typegpu/std'
 import { useTimeline } from '@/contexts/TimelineContext'
 import { DEBUG_MODE } from '@/defaults'
 import { accumulatedPointCount, animationExportRunning, setAccumulatedPointCountGlobal, setRenderTimings, } from '@/flame/renderStats'
+import { deepClone } from '@/utils/clone'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
 import { recordEntries } from '@/utils/record'
 import { applyTimelineToFlame } from '@/utils/timeline'
@@ -52,9 +53,7 @@ export function Flam3(props: Flam3Props) {
   const timeline = useTimeline()
 
   const [animatedFlame, setAnimatedFlame] =
-    createSignal<TimelineFlameDescriptor>(
-      JSON.parse(JSON.stringify(props.flameDescriptor)),
-    )
+    createSignal<TimelineFlameDescriptor>(deepClone(props.flameDescriptor))
 
   const backgroundColorFinal = () => {
     if (props.flameDescriptor.renderSettings.backgroundColor === undefined) {
@@ -262,7 +261,7 @@ export function Flam3(props: Flam3Props) {
       camera: rs.camera,
     }
     const _tids = Object.keys(props.flameDescriptor.transforms)
-    const flame = JSON.parse(JSON.stringify(props.flameDescriptor))
+    const flame = deepClone(props.flameDescriptor)
     const enabled = props.animationEnabled
     const hasTracks = timeline ? timeline.tracks().length : 0
     // Read currentFrame in the reactive scope so scrubbing triggers re-run.

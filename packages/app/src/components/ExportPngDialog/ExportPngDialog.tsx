@@ -11,6 +11,7 @@ import { condenseFlameDescriptor, MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, 
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
+import { deepClone } from '@/utils/clone'
 import { addFlameDataToPng } from '@/utils/flameInPng'
 import { compressJsonQueryParam } from '@/utils/jsonQueryParam'
 import { persistentSignal } from '@/utils/persistentSignal'
@@ -712,7 +713,7 @@ export function createExportPngDialog(
       true,
     )
 
-    const initialFlame = JSON.parse(JSON.stringify(flameDescriptor))
+    const initialFlame = deepClone(flameDescriptor)
     if (timeline && hasAnimation) {
       applyTimelineToFlameAtFrame(timeline, initialFlame, currentFrame)
     }

@@ -66,9 +66,20 @@ export class CPUFlameRenderer {
   render(options: RaytracingOptions): RenderResult {
     const { width, height, quality, pointCountPerBatch } = options
 
+    if (width <= 0 || height <= 0) {
+      return {
+        canvas: { width: Math.max(0, width), height: Math.max(0, height) },
+        buckets: new Float32Array(0),
+        bucketsData: [],
+      }
+    }
+
     // Initialize buckets
     const bucketCount = width * height
     const bucketsData: BucketData[] = new Array(bucketCount)
+    for (let i = 0; i < bucketCount; i++) {
+      bucketsData[i] = { count: 0, colorA: 0, colorB: 0 }
+    }
 
     // Calculate how many points to render per frame
     const pointsPerFrame = pointCountPerBatch * Math.ceil(quality)

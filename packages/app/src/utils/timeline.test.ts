@@ -447,11 +447,13 @@ describe('Timeline Utilities', () => {
         expect(timeline.currentFrame()).toBe(0)
       })
 
-      it('should stop at end frame when loop disabled', () => {
+      it('should return to start frame and stop playing when loop disabled', () => {
         timeline.setConfig({ ...timeline.config(), loop: false })
+        timeline.setIsPlaying(true)
         timeline.setCurrentFrame(90)
         timeline.advanceFrame()
-        expect(timeline.currentFrame()).toBe(90)
+        expect(timeline.currentFrame()).toBe(0)
+        expect(timeline.isPlaying()).toBe(false)
       })
     })
 

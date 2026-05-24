@@ -1,3 +1,5 @@
+import { safeGetItem, safeRemoveItem, safeSetItem } from './storage'
+
 const WELCOME_DISMISSED_KEY = 'chaos-master-welcome-dismissed'
 
 export function hasWelcomeBeenDismissed(): boolean {
@@ -6,7 +8,7 @@ export function hasWelcomeBeenDismissed(): boolean {
     return false
   }
   try {
-    return localStorage.getItem(WELCOME_DISMISSED_KEY) === 'true'
+    return safeGetItem(WELCOME_DISMISSED_KEY) === 'true'
   } catch {
     return false
   }
@@ -14,7 +16,7 @@ export function hasWelcomeBeenDismissed(): boolean {
 
 export function dismissWelcome(): void {
   try {
-    localStorage.setItem(WELCOME_DISMISSED_KEY, 'true')
+    safeSetItem(WELCOME_DISMISSED_KEY, 'true')
   } catch {
     // ignore
   }
@@ -22,7 +24,7 @@ export function dismissWelcome(): void {
 
 export function resetWelcomeDismissal(): void {
   try {
-    localStorage.removeItem(WELCOME_DISMISSED_KEY)
+    safeRemoveItem(WELCOME_DISMISSED_KEY)
   } catch {
     // ignore
   }

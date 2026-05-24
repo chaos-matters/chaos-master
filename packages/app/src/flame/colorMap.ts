@@ -13,6 +13,8 @@
  * Maps with fewer entries than transforms will cycle through their entries.
  */
 
+import { safeGetItem, safeSetItem } from '@/utils/storage'
+
 export type ColorMapEntry = {
   /** OkLab 'a' channel (typically -1 to 1) */
   a: number
@@ -141,7 +143,7 @@ const CUSTOM_PALETTES_KEY = 'chaos-master-custom-palettes'
  */
 export function loadCustomPalettes(): Palette[] {
   try {
-    const raw = localStorage.getItem(CUSTOM_PALETTES_KEY)
+    const raw = safeGetItem(CUSTOM_PALETTES_KEY)
     if (raw === null || raw === '') return []
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
@@ -161,7 +163,7 @@ export function loadCustomPalettes(): Palette[] {
  * Save custom palettes to localStorage
  */
 export function saveCustomPalettes(palettes: Palette[]): void {
-  localStorage.setItem(CUSTOM_PALETTES_KEY, JSON.stringify(palettes))
+  safeSetItem(CUSTOM_PALETTES_KEY, JSON.stringify(palettes))
 }
 
 /**

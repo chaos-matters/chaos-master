@@ -178,7 +178,7 @@ export function resolveVariationParameter(
 
   // Check if there's a keyframe track for this parameter
   const timelineState = (
-    window as unknown as { currentTimeline?: WindowTimelineState }
+    globalThis as unknown as { currentTimeline?: WindowTimelineState }
   ).currentTimeline
 
   if (!timelineState) return null
@@ -776,10 +776,8 @@ export function createTimelineState() {
     const cfg = config()
     const next = currentFrame() + 1
     if (next > cfg.endFrame) {
-      if (cfg.loop) {
-        setCurrentFrame(cfg.startFrame)
-      } else {
-        setCurrentFrame(cfg.startFrame)
+      setCurrentFrame(cfg.startFrame)
+      if (!cfg.loop) {
         setIsPlaying(false)
       }
     } else {

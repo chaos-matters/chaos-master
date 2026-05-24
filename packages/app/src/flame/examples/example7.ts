@@ -2,7 +2,7 @@ import { defineExample, tid, vid } from './util'
 
 export const example7 = defineExample({
   renderSettings: {
-    exposure: 0.137,
+    exposure: 0.14,
     skipIters: 30,
     drawMode: 'light',
     backgroundColor: [119 / 255, 81 / 255, 210 / 255],

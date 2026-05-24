@@ -27,11 +27,12 @@ function ShareLinkModal(props: ShareLinkModalProps) {
 
   createEffect(() => {
     const include = includeAnimation()
-    const { flameDescriptor, tracks, config } = props
     void (async () => {
       const encoded = await encodeSharePayload(
-        flameDescriptor,
-        include && tracks.length > 0 ? { tracks, config } : undefined,
+        props.flameDescriptor,
+        include && props.tracks.length > 0
+          ? { tracks: props.tracks, config: props.config }
+          : undefined,
       )
       const newUrl = `${window.location.origin}/?flame=${encoded}`
       setUrl(newUrl)

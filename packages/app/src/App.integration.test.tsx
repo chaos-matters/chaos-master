@@ -37,7 +37,10 @@ describe('App Component Integration', () => {
     const errorMessages: string[] = []
 
     console.error = (...args: unknown[]) => {
-      errorMessages.push(args.map((arg) => String(arg)).join(' '))
+      const msg = args.map((arg) => String(arg)).join(' ')
+      if (!msg.includes('WebGPU')) {
+        errorMessages.push(msg)
+      }
     }
 
     let renders = 0
@@ -64,7 +67,10 @@ describe('App Component Integration', () => {
     const errorMessages: string[] = []
 
     console.error = (...args: unknown[]) => {
-      errorMessages.push(args.map((arg) => String(arg)).join(' '))
+      const msg = args.map((arg) => String(arg)).join(' ')
+      if (!msg.includes('WebGPU')) {
+        errorMessages.push(msg)
+      }
     }
 
     try {

@@ -20,6 +20,7 @@ import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
+import { deepClone } from '@/utils/clone'
 import { createStoreHistory } from '@/utils/createStoreHistory'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
@@ -419,7 +420,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
               ...transform,
               preAffine: previewFlame.transforms[props.transformId]!.preAffine,
             },
-            variation: structuredClone(JSON.parse(JSON.stringify(variation))),
+            variation: deepClone(variation),
           })
           return true
         }

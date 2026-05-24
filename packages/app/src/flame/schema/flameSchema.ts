@@ -1,3 +1,4 @@
+import { deepClone } from '@/utils/clone'
 import { prettyPrintValibotErrors } from '@/utils/prettyPrintValibotErrors'
 import { recordEntries } from '@/utils/record'
 import * as v from '@/valibot'
@@ -20,7 +21,7 @@ const _edgeFadeColorDefault: [number, number, number, number] = [0, 0, 0, 0.8]
 const MAX_SKIP_ITERS_VALUE = 30
 const MIN_EXPOSURE_VALUE = -8
 const MAX_EXPOSURE_VALUE = 8
-const renderSettingsDefault: RenderSettings = {
+export const renderSettingsDefault: RenderSettings = {
   exposure: 0.25,
   skipIters: 20,
   drawMode: 'light',
@@ -176,7 +177,7 @@ export function validateFlame(data: unknown): FlameDescriptor {
 export function condenseFlameDescriptor(
   descriptor: FlameDescriptor,
 ): FlameDescriptor {
-  const condensed = JSON.parse(JSON.stringify(descriptor)) as FlameDescriptor
+  const condensed = deepClone(descriptor)
   const visibleTransforms = recordEntries(condensed.transforms).filter(
     ([, tr]) => tr.visible,
   )
