@@ -41,6 +41,11 @@ export const DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS = parseFloat(
 export const TRACK_PERFORMANCE =
   import.meta.env.VITE_TRACK_PERFORMANCE === 'true'
 
+export const CANVAS_RESIZE_DEBOUNCE_MS = Number.parseInt(
+  import.meta.env.VITE_CANVAS_RESIZE_DEBOUNCE_MS ?? '300',
+  10,
+)
+
 // Enable comprehensive WebGPU buffer lifecycle logging.
 // Set VITE_DEBUG_VRAM=true in .env.local to trace memory leaks.
 export const DEBUG_VRAM = import.meta.env.VITE_DEBUG_VRAM === 'true'
@@ -51,3 +56,6 @@ export const COMPUTE_GATE_CAPACITY = parseFloat(
 
 export const CAMERA_UNDO_DEBOUNCE_MS =
   parseFloat(import.meta.env.VITE_CAMERA_UNDO_DEBOUNCE_MS) || 300
+
+export const DEBUG_MODE = import.meta.env.VITE_DEBUG_MODE === 'true'
+export const IS_DEV = import.meta.env.DEV

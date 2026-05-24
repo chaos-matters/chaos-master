@@ -82,12 +82,12 @@ export function randomizeAllColors<T extends Record<string, unknown>>(
     const color = {
       x:
         existingColor && strength < 1
-          ? randomPerturbation(existingColor.x, 0.15 * strength, [0, 1])
-          : random01(),
+          ? randomPerturbation(existingColor.x, 0.15 * strength, [-0.4, 0.4])
+          : randomRange(-0.4, 0.4),
       y:
         existingColor && strength < 1
-          ? randomPerturbation(existingColor.y, 0.15 * strength, [0, 1])
-          : random01(),
+          ? randomPerturbation(existingColor.y, 0.15 * strength, [-0.4, 0.4])
+          : randomRange(-0.4, 0.4),
     }
     ;(result as Record<string, unknown>)[tid] = {
       ...t,
@@ -112,7 +112,7 @@ export function randomizeAllColors<T extends Record<string, unknown>>(
     const tid1 = keys[anchor1Idx]!
     ;(result as Record<string, unknown>)[tid1] = {
       ...((result as Record<string, unknown>)[tid1] as object),
-      color: { x: 1, y: 1 },
+      color: { x: randomRange(0.2, 0.35) * (Math.random() > 0.5 ? 1 : -1), y: randomRange(0.2, 0.35) * (Math.random() > 0.5 ? 1 : -1) },
     }
   }
 
@@ -227,7 +227,7 @@ export function generateRandomFlame(
         e: randomizeAffineCoef(1, 'e', strength),
         f: randomizeAffineCoef(0, 'f', strength),
       },
-      color: { x: random01(), y: random01() },
+      color: { x: randomRange(-0.4, 0.4), y: randomRange(-0.4, 0.4) },
       variations,
       visible: true,
     }

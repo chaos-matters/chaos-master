@@ -2,6 +2,7 @@ import { createEffect, createMemo, createSignal, onCleanup, untrack } from 'soli
 import { arrayOf, vec2u, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { useTimeline } from '@/contexts/TimelineContext'
+import { DEBUG_MODE } from '@/defaults'
 import { accumulatedPointCount, animationExportRunning, setAccumulatedPointCountGlobal, setRenderTimings, } from '@/flame/renderStats'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
 import { applyTimelineToFlame } from '@/utils/timeline'
@@ -263,24 +264,28 @@ export function Flam3(props: Flam3Props) {
       applyTimelineToFlame(timeline, flame)
       cloneRunCount++
       if (cloneRunCount <= 3 || cloneRunCount % 90 === 0) {
-        console.info(
-          `[flam3-clone] run #${cloneRunCount}`,
-          `frame=${frame}`,
-          `tracks=${hasTracks}`,
-          `enabled=${enabled}`,
-          `exposure=${_rs.exposure}`,
-        )
+        if (DEBUG_MODE) {
+          console.info(
+            `[flam3-clone] run #${cloneRunCount}`,
+            `frame=${frame}`,
+            `tracks=${hasTracks}`,
+            `enabled=${enabled}`,
+            `exposure=${_rs.exposure}`,
+          )
+        }
       }
     } else {
       cloneRunCount++
       if (cloneRunCount <= 3) {
-        console.info(
-          `[flam3-clone] run #${cloneRunCount}`,
-          '(no timeline apply)',
-          `enabled=${enabled}`,
-          `hasTracks=${hasTracks}`,
-          `exposure=${_rs.exposure}`,
-        )
+        if (DEBUG_MODE) {
+          console.info(
+            `[flam3-clone] run #${cloneRunCount}`,
+            '(no timeline apply)',
+            `enabled=${enabled}`,
+            `hasTracks=${hasTracks}`,
+            `exposure=${_rs.exposure}`,
+          )
+        }
       }
     }
     setAnimatedFlame(flame)
@@ -292,17 +297,21 @@ export function Flam3(props: Flam3Props) {
    */
   createEffect(() => {
     if (!timeline || !timeline.isPlaying()) {
-      console.info('[flam3-playback] stopped (isPlaying=false)')
+      if (DEBUG_MODE) {
+        console.info('[flam3-playback] stopped (isPlaying=false)')
+      }
       return
     }
 
     const cfg = timeline.config()
     const intervalMs = 1000 / cfg.fps
-    console.info(
-      `[flam3-playback] starting interval: fps=${cfg.fps} intervalMs=${
-        intervalMs
-      } tracks=${timeline.tracks().length}`,
-    )
+    if (DEBUG_MODE) {
+      console.info(
+        `[flam3-playback] starting interval: fps=${cfg.fps} intervalMs=${
+          intervalMs
+        } tracks=${timeline.tracks().length}`,
+      )
+    }
     const intervalId = window.setInterval(() => {
       for (let i = 0; i < cfg.timeScale; i++) {
         timeline.advanceFrame()
@@ -345,7 +354,7 @@ export function Flam3(props: Flam3Props) {
     const ifsPipeline = createIFSPipeline(
       root,
       camera,
-      flame.renderSettings.skipIters,
+      Math.floor(flame.renderSettings.skipIters),
       pointRandomSeeds,
       flame.transforms as never,
       textureSize,

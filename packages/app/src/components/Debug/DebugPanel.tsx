@@ -1,5 +1,5 @@
 import { createSignal, Show } from 'solid-js'
-import { isDev } from 'solid-js/web'
+import { IS_DEV } from '@/defaults'
 import { accumulatedPointCount, iterationSpeedPointPerSec, qualityPointCountLimit, renderTimings, } from '@/flame/renderStats'
 import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
 import ui from './DebugPanel.module.css'
@@ -13,7 +13,7 @@ function formatIterationSpeed(pointPerSec: number | undefined) {
 }
 
 export function DebugPanel() {
-  const [showDebugPanel, setShowDebugPanel] = createSignal(isDev)
+  const [showDebugPanel, setShowDebugPanel] = createSignal(IS_DEV)
   const formatValueForPanel = (ms: number) => {
     return `${ms.toFixed(2)} ms`
   }

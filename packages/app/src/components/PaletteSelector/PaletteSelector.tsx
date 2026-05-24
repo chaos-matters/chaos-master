@@ -9,6 +9,7 @@ import type { Palette } from '@/flame/colorMap'
 type PaletteSelectorProps = {
   selectedPaletteId: string
   onSelect: (palette: Palette) => void
+  onUnselect?: () => void
 }
 
 export function PaletteSelector(props: PaletteSelectorProps) {
@@ -58,12 +59,16 @@ export function PaletteSelector(props: PaletteSelectorProps) {
     setForceUpdate((n) => n + 1)
     // Deselect if the deleted palette was selected
     if (props.selectedPaletteId === palette.id) {
-      const all = [
-        ...defaultPalettes,
-        ...displayedOfficialPalettes(),
-        ...customPalettes(),
-      ]
-      props.onSelect(all[0]!)
+      if (props.onUnselect) {
+        props.onUnselect()
+      } else {
+        const all = [
+          ...defaultPalettes,
+          ...displayedOfficialPalettes(),
+          ...customPalettes(),
+        ]
+        props.onSelect(all[0]!)
+      }
     }
   }
 
@@ -148,7 +153,11 @@ export function PaletteSelector(props: PaletteSelectorProps) {
                     props.selectedPaletteId === palette.id,
                 }}
                 onClick={() => {
-                  props.onSelect(palette)
+                  if (props.selectedPaletteId === palette.id && props.onUnselect) {
+                    props.onUnselect()
+                  } else {
+                    props.onSelect(palette)
+                  }
                 }}
                 onDblClick={() => {
                   handleEditCustom(palette)
@@ -184,7 +193,11 @@ export function PaletteSelector(props: PaletteSelectorProps) {
                     props.selectedPaletteId === palette.id,
                 }}
                 onClick={() => {
-                  props.onSelect(palette)
+                  if (props.selectedPaletteId === palette.id && props.onUnselect) {
+                    props.onUnselect()
+                  } else {
+                    props.onSelect(palette)
+                  }
                 }}
                 title={palette.name}
               >
