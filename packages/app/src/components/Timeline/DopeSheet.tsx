@@ -56,7 +56,8 @@ export function DopeSheet(props: DopeSheetProps) {
   const trackHeight = createMemo(() => {
     const h = containerHeight()
     const scale = Math.max(0.8, Math.min(3, h / 140))
-    return BASE_TRACK_HEIGHT * scale * zoomLevel()
+    // Minimum 18px so diamond keyframes (14px) remain clickable
+    return Math.max(18, BASE_TRACK_HEIGHT * scale * zoomLevel())
   })
 
   createEffect(() => {
@@ -73,17 +74,29 @@ export function DopeSheet(props: DopeSheetProps) {
     })
   })
 
-  // Sync horizontal scroll between tracks area and seek ruler lane
+  // Sync horizontal scroll between tracks area and seek ruler lane (bidirectional).
   createEffect(() => {
     const tracksEl = tracksScrollRef
     const seekLane = seekLaneRef
     if (!tracksEl || !seekLane) return
-    const syncScroll = () => {
+    let syncing = false
+    const syncTracksToLane = () => {
+      if (syncing) return
+      syncing = true
       seekLane.scrollLeft = tracksEl.scrollLeft
+      syncing = false
     }
-    tracksEl.addEventListener('scroll', syncScroll, { passive: true })
+    const syncLaneToTracks = () => {
+      if (syncing) return
+      syncing = true
+      tracksEl.scrollLeft = seekLane.scrollLeft
+      syncing = false
+    }
+    tracksEl.addEventListener('scroll', syncTracksToLane, { passive: true })
+    seekLane.addEventListener('scroll', syncLaneToTracks, { passive: true })
     onCleanup(() => {
-      tracksEl.removeEventListener('scroll', syncScroll)
+      tracksEl.removeEventListener('scroll', syncTracksToLane)
+      seekLane.removeEventListener('scroll', syncLaneToTracks)
     })
   })
 
@@ -105,8 +118,8 @@ export function DopeSheet(props: DopeSheetProps) {
     function onWheel(e: WheelEvent) {
       if (!e.altKey) return
       e.preventDefault()
-      const delta = -e.deltaY * 0.01
-      setZoomLevel(Math.max(0.3, Math.min(5, zoomLevel() + delta)))
+      const factor = Math.exp(-e.deltaY * 0.002)
+      setZoomLevel(Math.max(0.1, Math.min(5, zoomLevel() * factor)))
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     onCleanup(() => {
@@ -120,21 +133,26 @@ export function DopeSheet(props: DopeSheetProps) {
       onPinchMove(event) {
         const ratio = event.distance / prevDistance
         prevDistance = event.distance
-        setZoomLevel(Math.max(0.3, Math.min(5, zoomLevel() * ratio)))
+        setZoomLevel(Math.max(0.1, Math.min(5, zoomLevel() * ratio)))
       },
     }
   })
 
   function autoFitZoom() {
-    const lane = seekLaneRef
-    if (!lane) return
-    const availableWidth = lane.clientWidth - 16
+    // Use the fixed-width parent container as the reference, not the lane
+    // itself (whose width depends on the current zoom via min-width).
+    const ruler = seekRulerRef
+    if (!ruler) return
+    const availableWidth = ruler.clientWidth - TRACK_NAME_WIDTH - 16
     if (availableWidth <= 0 || totalFrames() <= 0) return
     const h = containerHeight()
     const containerScale = Math.max(0.8, Math.min(3, h / 140))
     const targetFrameWidth = availableWidth / totalFrames()
     const targetZoom = targetFrameWidth / (BASE_FRAME_WIDTH * containerScale)
-    setZoomLevel(Math.max(0.3, Math.min(5, targetZoom)))
+    setZoomLevel(Math.max(0.1, Math.min(5, targetZoom)))
+    // Reset scroll positions so the fitted content starts at the beginning.
+    if (tracksScrollRef) tracksScrollRef.scrollLeft = 0
+    if (seekLaneRef) seekLaneRef.scrollLeft = 0
   }
 
   // Auto-fit only on initial track appearance, not on incremental additions.
@@ -205,7 +223,7 @@ export function DopeSheet(props: DopeSheetProps) {
     const lane = (e.target as HTMLElement).closest(`.${ui.seekRulerLane}`)
     if (!lane) return
     const rect = lane.getBoundingClientRect()
-    const x = e.clientX - rect.left
+    const x = e.clientX - rect.left + lane.scrollLeft
     const frame = Math.round(x / frameWidth()) + timeline.config().startFrame
     const clampedFrame = Math.max(
       timeline.config().startFrame,
@@ -359,6 +377,10 @@ export function DopeSheet(props: DopeSheetProps) {
     for (let f = start; f <= end; f += step) {
       labels.push(f)
     }
+    // Always include the end frame so the full range is visible
+    if (labels[labels.length - 1] !== end) {
+      labels.push(end)
+    }
     return labels
   })
 
@@ -371,7 +393,7 @@ export function DopeSheet(props: DopeSheetProps) {
         <button
           class={ui.zoomBtn}
           onClick={() => {
-            setZoomLevel(Math.max(0.3, zoomLevel() - 0.2))
+            setZoomLevel(Math.max(0.1, zoomLevel() - 0.2))
           }}
           title="Zoom out (condense)"
         >
@@ -501,7 +523,7 @@ export function DopeSheet(props: DopeSheetProps) {
           ref={seekLaneRef}
           class={ui.seekRulerLane}
           data-tour-target="seek-ruler"
-          style={{ width: `${laneWidth()}px` }}
+          style={{ 'min-width': `${laneWidth()}px` }}
           onPointerDown={handleSeekPointerDown}
         >
           <For each={frameLabels()}>
@@ -538,8 +560,8 @@ export function DopeSheet(props: DopeSheetProps) {
         class={ui.tracksScroll}
         ref={tracksScrollRef}
         onScroll={(e) => {
-          if (seekRulerRef) {
-            seekRulerRef.scrollLeft = e.currentTarget.scrollLeft
+          if (seekLaneRef) {
+            seekLaneRef.scrollLeft = e.currentTarget.scrollLeft
           }
         }}
       >
