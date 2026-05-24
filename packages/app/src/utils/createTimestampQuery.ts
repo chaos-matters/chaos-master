@@ -14,14 +14,28 @@ export function createTimestampQuery<T extends string>(
   pairLocationCount = 32,
 ) {
   if (!TRACK_PERFORMANCE) {
+    const timings = Object.fromEntries(
+      timestampNames.map((name) => [name, 1]), // dummy start at 1ms
+    ) as Record<T, number>
+    const writeTimes: { time: number; divisor: number }[] = []
+
     return {
       timestampWrites: () =>
         Object.fromEntries(
           timestampNames.map((name) => [name, undefined]),
         ) as Record<T, undefined>,
-      write: () => {},
-      read: async () => {},
-      average: () => undefined,
+      write: (encoder: GPUCommandEncoder, divisor = 1) => {
+        writeTimes.push({ time: globalThis.performance.now(), divisor })
+      },
+      read: async () => {
+        const item = writeTimes.shift()
+        if (item !== undefined) {
+          const durationMs = globalThis.performance.now() - item.time
+          // Assign total time divided by iterations to the first timestamp (ifsMs)
+          timings[timestampNames[0] as T] = Math.max(durationMs / item.divisor, 0.1)
+        }
+      },
+      average: () => timings,
     }
   }
   const timestampCount = timestampNames.length
@@ -59,7 +73,7 @@ export function createTimestampQuery<T extends string>(
     ) as Record<T, GPUComputePassTimestampWrites>
   }
 
-  function write(encoder: GPUCommandEncoder) {
+  function write(encoder: GPUCommandEncoder, divisor = 1) {
     encoder.resolveQuerySet(
       timestampQuerySet,
       0,

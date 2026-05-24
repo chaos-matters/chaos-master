@@ -456,8 +456,7 @@ function App(props: AppProps) {
 
   const { showExportPngDialog, quickExport } = createExportPngDialog(
     flameDescriptor,
-    () => timeline.tracks(),
-    () => timeline.config(),
+    () => timeline,
     pixelRatio,
     setPixelRatio,
     setOnExportImage,

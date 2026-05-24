@@ -136,3 +136,4 @@
     background: var(--neutral-700);
   }
 }
+.disabled { pointer-events: none; opacity: 0.5; }

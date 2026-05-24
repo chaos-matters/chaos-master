@@ -45,7 +45,6 @@ type Flam3Props = {
 }
 
 export function Flam3(props: Flam3Props) {
-  const exportedImages = new WeakSet<ExportImageType>()
   const camera = useCamera()
   const { root, device } = useRootContext()
   const { context, canvasSize, canvas, canvasFormat } = useCanvas()
@@ -436,10 +435,7 @@ export function Flam3(props: Flam3Props) {
 
     const rafLoop = createAnimationFrame(
       (frameId) => {
-        const currentExportCb =
-          props.onExportImage && !exportedImages.has(props.onExportImage)
-            ? props.onExportImage
-            : undefined
+        const currentExportCb = props.onExportImage
 
         const shouldRenderFinalImage =
           forceDrawToScreen ||
@@ -479,13 +475,15 @@ export function Flam3(props: Flam3Props) {
         const timestampWrites = timestampQuery.timestampWrites(frameId)
 
         {
+          const passDesc: GPUComputePassDescriptor = timestampWrites.ifsMs
+            ? { timestampWrites: timestampWrites.ifsMs }
+            : {}
+            
+          const pass = encoder.beginComputePass(passDesc)
           for (let i = 0; i < iterationCount; i++) {
-            const pass = encoder.beginComputePass({
-              timestampWrites: timestampWrites.ifsMs,
-            })
             ifsPipeline.run(pass, pointCountPerBatch)
-            pass.end()
           }
+          pass.end()
 
           accumulatedPointCount_ += pointCountPerBatch * iterationCount
         }
@@ -502,16 +500,17 @@ export function Flam3(props: Flam3Props) {
               skipItersFactor,
           })
           if (props.adaptiveFilterEnabled) {
-            const pass = encoder.beginComputePass({
-              timestampWrites: timestampWrites.adaptiveFilterMs,
-            })
+            const passDesc: GPUComputePassDescriptor = timestampWrites.adaptiveFilterMs
+              ? { timestampWrites: timestampWrites.adaptiveFilterMs }
+              : {}
+            const pass = encoder.beginComputePass(passDesc)
             runAdaptiveFilter()?.run(pass)
             pass.end()
           }
 
           {
-            const pass = encoder.beginRenderPass({
-              timestampWrites: timestampWrites.colorGradingMs,
+            const passDesc: GPURenderPassDescriptor = {
+              ...(timestampWrites.colorGradingMs ? { timestampWrites: timestampWrites.colorGradingMs } : {}),
               colorAttachments: [
                 {
                   loadOp: 'clear',
@@ -519,17 +518,17 @@ export function Flam3(props: Flam3Props) {
                   view: context.getCurrentTexture().createView(),
                 },
               ],
-            })
+            }
+            const pass = encoder.beginRenderPass(passDesc)
             colorGradingPipeline_.run(pass)
             pass.end()
           }
         }
 
-        timestampQuery.write(encoder)
+        timestampQuery.write(encoder, iterationCount)
         device.queue.submit([encoder.finish()])
 
         if (currentExportCb) {
-          exportedImages.add(currentExportCb)
           currentExportCb(canvas)
         }
 

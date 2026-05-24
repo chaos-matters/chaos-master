@@ -253,7 +253,7 @@ export type TimelineConfig = {
   loop: boolean
 }
 
-function defaultConfig(): TimelineConfig {
+export function defaultConfig(): TimelineConfig {
   return { fps: 30, timeScale: 1, startFrame: 0, endFrame: 90, loop: true }
 }
 
