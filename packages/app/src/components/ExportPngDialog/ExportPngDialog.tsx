@@ -683,12 +683,10 @@ export function createExportPngDialog(
         track.keyframes.reduce((m, kf) => Math.max(m, kf.frame), max),
       0,
     )
-    const [frameStart, setFrameStart] = persistentSignal(
-      'export/frame-start',
-      config.startFrame,
-    )
-    const [frameEnd, setFrameEnd] = persistentSignal(
-      'export/frame-end',
+    // Compute frame range from the current animation's actual tracks every time
+    // the dialog opens, rather than persisting stale values across sessions.
+    const [frameStart, setFrameStart] = createSignal(config.startFrame)
+    const [frameEnd, setFrameEnd] = createSignal(
       lastKeyframeFrame > 0 ? lastKeyframeFrame : config.endFrame,
     )
     const [animFps, setAnimFps] = persistentSignal(

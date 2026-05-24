@@ -267,7 +267,8 @@ export function Flam3(props: Flam3Props) {
     const hasTracks = timeline ? timeline.tracks().length : 0
     // Read currentFrame in the reactive scope so scrubbing triggers re-run.
     const frame = timeline?.currentFrame() ?? 0
-    if (timeline && enabled && hasTracks > 0) {
+    const isActive = timeline?.isPlaying() || timeline?.isScrubbing()
+    if (timeline && enabled && hasTracks > 0 && isActive) {
       applyTimelineToFlame(timeline, flame)
       cloneRunCount++
       if (cloneRunCount <= 3 || cloneRunCount % 90 === 0) {

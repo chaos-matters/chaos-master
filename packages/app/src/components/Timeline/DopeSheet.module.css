@@ -127,7 +127,13 @@
 .seekRulerLane {
   position: relative;
   flex: 1;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Hide scrollbar — synced from tracksScroll via JS */
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .seekLabel {
