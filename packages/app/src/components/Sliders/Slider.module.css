@@ -18,6 +18,7 @@
   align-items: center;
   gap: 4px;
   min-width: 0;
+  padding-right: 4px;
 }
 
 .label span {

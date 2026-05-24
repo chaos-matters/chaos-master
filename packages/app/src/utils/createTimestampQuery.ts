@@ -1,5 +1,6 @@
 import { convertNanoToMilliSeconds } from './convertSeconds'
 import { sum } from './sum'
+import { TRACK_PERFORMANCE } from '@/defaults'
 
 export function createTimestampQuery<T extends string>(
   device: GPUDevice,
@@ -12,6 +13,17 @@ export function createTimestampQuery<T extends string>(
    */
   pairLocationCount = 32,
 ) {
+  if (!TRACK_PERFORMANCE) {
+    return {
+      timestampWrites: () =>
+        Object.fromEntries(
+          timestampNames.map((name) => [name, undefined]),
+        ) as Record<T, undefined>,
+      write: () => {},
+      read: async () => {},
+      average: () => undefined,
+    }
+  }
   const timestampCount = timestampNames.length
 
   const timestampQuerySet = device.createQuerySet({

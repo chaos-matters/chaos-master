@@ -24,6 +24,7 @@ import { FlameColorEditor, handleColor, } from './components/FlameColorEditor/Fl
 import { FloatingActions } from './components/FloatingActions/FloatingActions'
 import { createLoadFlame } from './components/LoadFlameModal/LoadFlameModal'
 import { createLogoFaviconGenerator } from './components/LogoFaviconGenerator/LogoFaviconGenerator'
+import { createShowHelp } from './components/HelpModal/HelpModal'
 import { Modal } from './components/Modal/Modal'
 import { PaletteSelector } from './components/PaletteSelector/PaletteSelector'
 import { ProgressBar } from './components/ProgressBar/ProgressBar'
@@ -43,7 +44,7 @@ import { CompactModeProvider, useCompactMode, } from './contexts/CompactModeCont
 import { createSpotlightTourState, SpotlightTourContext, } from './contexts/SpotlightTourContext'
 import { ThemeContextProvider, useTheme } from './contexts/ThemeContext'
 import { TimelineContextProvider } from './contexts/TimelineContext'
-import { DEFAULT_POINT_COUNT, DEFAULT_QUALITY, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_RESOLUTION, } from './defaults'
+import { DEFAULT_POINT_COUNT, DEFAULT_QUALITY, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_RESOLUTION, IS_DEV, } from './defaults'
 import { colorInitModeToImplFn } from './flame/colorInitMode'
 import { applyColorMapToFlame } from './flame/colorMap'
 import { drawModeToImplFn } from './flame/drawMode'
@@ -173,7 +174,10 @@ function App(props: AppProps) {
   const { isCompact, toggleCompact } = useCompactMode()
   const [showSidebar, setShowSidebar] = createSignal(true)
   const [sidebarHidden, setSidebarHidden] = createSignal(false)
-  const [sidebarWidth, setSidebarWidth] = createSignal(DEFAULT_SIDEBAR_WIDTH)
+  const [sidebarLayoutMode, setSidebarLayoutMode] =
+    persistentSignal<'compact' | 'wide'>('sidebar-layout-mode', 'compact')
+  const sidebarWidth = createMemo(() => (sidebarLayoutMode() === 'wide' ? 26 : 21))
+  const setSidebarWidth = () => {} // Drag resize disabled
   let sidebarRef: HTMLDivElement | undefined
   let sidebarScrollRef: HTMLDivElement | undefined
   let savedScrollTop = 0
@@ -203,10 +207,11 @@ function App(props: AppProps) {
   })
   const [showTimeline, setShowTimeline] = createSignal(true)
   const [selectedPaletteId, setSelectedPaletteId] =
-    createSignal<string>('default')
+    createSignal<string>('')
   const [selectedPalette, setSelectedPalette] = createSignal<
     Palette | undefined
   >(undefined)
+  const [prePaletteColors, setPrePaletteColors] = createSignal<Record<string, { x: number; y: number }>>({})
   const [flameDescriptor, setFlameDescriptor, history] = createStoreHistory(
     createStore(
       structuredClone(
@@ -286,6 +291,15 @@ function App(props: AppProps) {
         : DEFAULT_RENDER_INTERVAL_MS
 
   const handlePaletteSelect = (palette: Palette) => {
+    // If no palette was selected before, save the current "natural" colors
+    if (selectedPaletteId() === '') {
+      const colors: Record<string, { x: number; y: number }> = {}
+      for (const [tid, t] of Object.entries(flameDescriptor.transforms)) {
+        colors[tid] = { x: t.color.x, y: t.color.y }
+      }
+      setPrePaletteColors(colors)
+    }
+
     setSelectedPaletteId(palette.id)
     setSelectedPalette(palette)
     // Convert palette entries to color map entries and apply
@@ -300,21 +314,26 @@ function App(props: AppProps) {
     })
   }
 
+  const handlePaletteUnselect = () => {
+    setSelectedPaletteId('')
+    setSelectedPalette(undefined)
+    setFlameDescriptor((draft) => {
+      const saved = prePaletteColors()
+      for (const [tid, t] of Object.entries(draft.transforms)) {
+        if (saved[tid]) {
+          t.color = { x: saved[tid]!.x, y: saved[tid]!.y }
+        }
+      }
+    })
+    setPrePaletteColors({})
+  }
+
   onMount(() => {
     console.info('[share:app] onMount', {
       hasQueryFlame: !!props.flameFromQuery?.flame,
       hasWelcomeFlame: !!props.flameFromWelcome?.(),
       selectedPaletteId: selectedPaletteId(),
     })
-    // Don't override palette if flame came from shared URL or welcome selection
-    const hasFlameQuery = new URLSearchParams(window.location.search).has(
-      'flame',
-    )
-    if (hasFlameQuery || props.flameFromWelcome?.()) return
-    const defaultPalette = defaultPalettes.find((p) => p.id === 'default')
-    if (defaultPalette && !selectedPalette()) {
-      handlePaletteSelect(defaultPalette)
-    }
   })
 
   const setFlameZoom: Setter<number> = (value) => {
@@ -1175,10 +1194,12 @@ function App(props: AppProps) {
                 </div>
               </div>
             </>
-            <DebugOverlay
-              animationEnabled={animationEnabled()}
-              flameDescriptor={flameDescriptor}
-            />
+            <Show when={IS_DEV}>
+              <DebugOverlay
+                animationEnabled={animationEnabled()}
+                flameDescriptor={flameDescriptor}
+              />
+            </Show>
 
             <Show when={showSidebar()}>
               <div
@@ -1308,12 +1329,7 @@ function App(props: AppProps) {
                       />
                     </CollapsibleCard>
                     <CollapsibleCard title="Color">
-                      <div
-                        class={ui.parameterTarget}
-                        onClick={() => {
-                          setTargetedParameter('paletteSpeed')
-                        }}
-                      >
+                      <div>
                         <FlameColorEditor
                           transforms={flameDescriptor.transforms}
                           setTransforms={(setFn) => {
@@ -1328,6 +1344,7 @@ function App(props: AppProps) {
                       <PaletteSelector
                         selectedPaletteId={selectedPaletteId()}
                         onSelect={handlePaletteSelect}
+                        onUnselect={handlePaletteUnselect}
                       />
                     </CollapsibleCard>
                     <For each={recordEntries(flameDescriptor.transforms)}>
@@ -1841,7 +1858,7 @@ function App(props: AppProps) {
                                 draft.renderSettings.exposure = newExp
                               })
                             }}
-                            formatValue={(value) => value.toString()}
+                            formatValue={(value) => Number(value.toFixed(6)).toString()}
                             dataParameterPath="exposure"
                           />
                         </div>
@@ -2173,7 +2190,7 @@ function App(props: AppProps) {
               hideDiceButtons={hideDiceButtons}
             />
             <SpotlightTour tourContext={tourContext} />
-            <SoftwareVersion />
+            <SoftwareVersion showHelp={createShowHelp(quickPickerMode, setQuickPickerMode, sidebarLayoutMode, setSidebarLayoutMode)} />
           </Dropzone>
         </TimelineContextProvider>
       </ChangeHistoryContextProvider>

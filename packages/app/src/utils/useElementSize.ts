@@ -1,4 +1,5 @@
 import { createEffect, createSignal, onCleanup } from 'solid-js'
+import { CANVAS_RESIZE_DEBOUNCE_MS } from '@/defaults'
 import type { Accessor } from 'solid-js'
 
 export type ElementSize = {
@@ -61,7 +62,7 @@ export function useElementSize(
       // the new resolution. Rapidly allocating and destroying buffers at 60fps
       // severely fragments the Vulkan memory pool on wgpu/Firefox and immediately
       // causes OOMs, especially when multiple variation previews are on-screen.
-      // A 100ms debounce ensures buffers are only reallocated once the drag stops.
+      // A configured debounce ensures buffers are only reallocated once the drag stops.
       // CSS layout keeps the canvas visually stretched in the meantime.
       if (resizeTimeout !== undefined) {
         window.clearTimeout(resizeTimeout)
@@ -69,7 +70,7 @@ export function useElementSize(
       resizeTimeout = window.setTimeout(() => {
         onChange?.(newSize)
         setSize(newSize)
-      }, 100)
+      }, CANVAS_RESIZE_DEBOUNCE_MS)
     })
     observer.observe(t)
     onCleanup(() => {

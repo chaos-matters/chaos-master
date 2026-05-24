@@ -9,6 +9,8 @@ import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './HelpModal.module.css'
 import type { QuickPickerMode } from '../QuickVariationPicker/QuickVariationPicker'
 
+export type SidebarLayoutMode = 'compact' | 'wide'
+
 type KeyCombination = {
   key: string
   ctrl?: true
@@ -89,6 +91,8 @@ type HelpModalProps = {
   respond: () => void
   quickPickerMode: QuickPickerMode
   onQuickPickerModeChange: (mode: QuickPickerMode) => void
+  sidebarLayoutMode: SidebarLayoutMode
+  onSidebarLayoutModeChange: (mode: SidebarLayoutMode) => void
 }
 
 function HelpModal(props: HelpModalProps) {
@@ -148,6 +152,34 @@ function HelpModal(props: HelpModalProps) {
             }}
           >
             Gallery
+          </button>
+        </div>
+      </div>
+
+      <div class={ui.pickerModeRow}>
+        <span class={ui.pickerModeLabel}>Sidebar width</span>
+        <div class={ui.pickerModeBtns}>
+          <button
+            class={ui.pickerModeBtn}
+            classList={{
+              [ui.pickerModeBtnActive!]: props.sidebarLayoutMode === 'compact',
+            }}
+            onClick={() => {
+              props.onSidebarLayoutModeChange('compact')
+            }}
+          >
+            Compact
+          </button>
+          <button
+            class={ui.pickerModeBtn}
+            classList={{
+              [ui.pickerModeBtnActive!]: props.sidebarLayoutMode === 'wide',
+            }}
+            onClick={() => {
+              props.onSidebarLayoutModeChange('wide')
+            }}
+          >
+            Wide
           </button>
         </div>
       </div>
@@ -234,6 +266,8 @@ function HelpModal(props: HelpModalProps) {
 export function createShowHelp(
   quickPickerMode: () => QuickPickerMode,
   onQuickPickerModeChange: (mode: QuickPickerMode) => void,
+  sidebarLayoutMode: () => SidebarLayoutMode,
+  onSidebarLayoutModeChange: (mode: SidebarLayoutMode) => void,
 ) {
   const requestModal = useRequestModal()
 
@@ -245,6 +279,8 @@ export function createShowHelp(
           respond={respond}
           quickPickerMode={quickPickerMode()}
           onQuickPickerModeChange={onQuickPickerModeChange}
+          sidebarLayoutMode={sidebarLayoutMode()}
+          onSidebarLayoutModeChange={onSidebarLayoutModeChange}
         />
       ),
     })
