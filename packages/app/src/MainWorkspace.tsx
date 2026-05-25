@@ -1495,6 +1495,7 @@ export function MainWorkspace(props: AppProps) {
                                     classList={{
                                       [ui.parameterTarget as string]: true,
                                     }}
+                                    data-tour-target="variation-weight"
                                     onClick={() => {
                                       setTargetedParameter(`${tid}.${vid}`)
                                     }}
@@ -1505,7 +1506,6 @@ export function MainWorkspace(props: AppProps) {
                                       max={1}
                                       step={0.001}
                                       dataParameterPath={`${tid}.${vid}`}
-                                      data-tour-target="variation-weight"
                                       onInput={(weight) => {
                                         setFlameDescriptor((draft) => {
                                           draft.transforms[tid]!.variations[

@@ -33,7 +33,16 @@ export function SpotlightTour(props: SpotlightTourProps) {
 
   function findTarget(selector: string): Element | null {
     try {
-      return document.querySelector(selector)
+      const elements = document.querySelectorAll(selector)
+      for (let i = 0; i < elements.length; i++) {
+        const el = elements[i]!
+        const rect = el.getBoundingClientRect()
+        // Element must have dimensions to be considered visible
+        if (rect.width > 0 && rect.height > 0) {
+          return el
+        }
+      }
+      return null
     } catch {
       return null
     }

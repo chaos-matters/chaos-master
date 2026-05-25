@@ -39,12 +39,7 @@ export const sidebarTour: TourGuide = {
       description:
         'Controls how strongly a variation influences the transform. The keyframe diamond lets you animate this weight over time — visible in both compact and full modes.',
     },
-    {
-      target: '[data-tour-target="compact-toggle"]',
-      title: 'Compact Mode',
-      description:
-        'Toggle to condense sidebar editors. Sliders become compact ScrubInputs, saving vertical space. Keyframe diamonds stay visible in both modes.',
-    },
+
     {
       target: '[data-tour-target="auto-keyframe"]',
       title: 'Auto Keyframe Mode',

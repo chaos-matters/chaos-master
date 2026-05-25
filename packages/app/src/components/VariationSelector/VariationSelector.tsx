@@ -432,6 +432,10 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
     Enter: () => {
       return applySelection()
     },
+    Escape: () => {
+      props.respond(CANCEL)
+      return true
+    },
   })
 
   function handleSpeedSearch(e: KeyboardEvent) {
