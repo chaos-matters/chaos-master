@@ -2,7 +2,9 @@ import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 's
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useTimeline } from '@/contexts/TimelineContext'
-import { createPinchHandler } from '@/utils/createPinchHandler'
+import { useScrollSync } from './hooks/useScrollSync'
+import { useSeekScrubber } from './hooks/useSeekScrubber'
+import { useZoomGestures } from './hooks/useZoomGestures'
 import ui from './DopeSheet.module.css'
 import { DopeSheetTrack } from './DopeSheetTrack'
 import { KeyframeContextMenu } from './KeyframeContextMenu'
@@ -39,135 +41,23 @@ export function DopeSheet(props: DopeSheetProps) {
   const totalFrames = () =>
     timeline.config().endFrame - timeline.config().startFrame
 
-  // Dynamic frame width and track height based on container height
-  // and user-adjustable zoom level.
-  const [containerHeight, setContainerHeight] = createSignal(200)
-  const [zoomLevel, setZoomLevel] = createSignal(1)
   let containerRef: HTMLDivElement | undefined
   let tracksScrollRef!: HTMLDivElement
   let seekRulerRef!: HTMLDivElement
   let seekLaneRef!: HTMLDivElement | undefined
 
-  const frameWidth = createMemo(() => {
-    const h = containerHeight()
-    const scale = Math.max(0.8, Math.min(3, h / 140))
-    return BASE_FRAME_WIDTH * scale * zoomLevel()
-  })
-  const trackHeight = createMemo(() => {
-    const h = containerHeight()
-    const scale = Math.max(0.8, Math.min(3, h / 140))
-    // Minimum 18px so diamond keyframes (14px) remain clickable
-    return Math.max(18, BASE_TRACK_HEIGHT * scale * zoomLevel())
-  })
+  const { zoomLevel, setZoomLevel, frameWidth, trackHeight, autoFitZoom } = useZoomGestures(
+    () => containerRef,
+    () => seekRulerRef,
+    () => tracksScrollRef,
+    () => seekLaneRef,
+    totalFrames,
+    BASE_FRAME_WIDTH,
+    BASE_TRACK_HEIGHT,
+    TRACK_NAME_WIDTH
+  )
 
-  createEffect(() => {
-    const el = containerRef
-    if (!el) return
-    const ro = new ResizeObserver(([entry]) => {
-      if (entry) {
-        setContainerHeight(entry.contentRect.height)
-      }
-    })
-    ro.observe(el)
-    onCleanup(() => {
-      ro.disconnect()
-    })
-  })
-
-  // Sync horizontal scroll between tracks area and seek ruler lane (bidirectional).
-  createEffect(() => {
-    const tracksEl = tracksScrollRef
-    const seekLane = seekLaneRef
-    if (!tracksEl || !seekLane) return
-    let syncing = false
-    const syncTracksToLane = () => {
-      if (syncing) return
-      syncing = true
-      seekLane.scrollLeft = tracksEl.scrollLeft
-      syncing = false
-    }
-    const syncLaneToTracks = () => {
-      if (syncing) return
-      syncing = true
-      tracksEl.scrollLeft = seekLane.scrollLeft
-      syncing = false
-    }
-    tracksEl.addEventListener('scroll', syncTracksToLane, { passive: true })
-    seekLane.addEventListener('scroll', syncLaneToTracks, { passive: true })
-    onCleanup(() => {
-      tracksEl.removeEventListener('scroll', syncTracksToLane)
-      seekLane.removeEventListener('scroll', syncLaneToTracks)
-    })
-  })
-
-  // Pinch-to-zoom for touch devices
-  createEffect(() => {
-    const el = containerRef
-    if (!el) return
-    el.addEventListener('touchmove', startPinch, { passive: false })
-    onCleanup(() => {
-      el.removeEventListener('touchmove', startPinch)
-    })
-  })
-
-  // Alt+mouse-wheel zoom
-  createEffect(() => {
-    const el = containerRef
-    if (!el) return
-
-    function onWheel(e: WheelEvent) {
-      if (!e.altKey) return
-      e.preventDefault()
-      const factor = Math.exp(-e.deltaY * 0.002)
-      setZoomLevel(Math.max(0.1, Math.min(5, zoomLevel() * factor)))
-    }
-    el.addEventListener('wheel', onWheel, { passive: false })
-    onCleanup(() => {
-      el.removeEventListener('wheel', onWheel)
-    })
-  })
-
-  const startPinch = createPinchHandler((initEvent) => {
-    let prevDistance = initEvent.distance
-    return {
-      onPinchMove(event) {
-        const ratio = event.distance / prevDistance
-        prevDistance = event.distance
-        setZoomLevel(Math.max(0.1, Math.min(5, zoomLevel() * ratio)))
-      },
-    }
-  })
-
-  function autoFitZoom() {
-    // Use the fixed-width parent container as the reference, not the lane
-    // itself (whose width depends on the current zoom via min-width).
-    const ruler = seekRulerRef
-    if (!ruler) return
-    const availableWidth = ruler.clientWidth - TRACK_NAME_WIDTH - 16
-    if (availableWidth <= 0 || totalFrames() <= 0) return
-    const h = containerHeight()
-    const containerScale = Math.max(0.8, Math.min(3, h / 140))
-    const targetFrameWidth = availableWidth / totalFrames()
-    const targetZoom = targetFrameWidth / (BASE_FRAME_WIDTH * containerScale)
-    setZoomLevel(Math.max(0.1, Math.min(5, targetZoom)))
-    // Reset scroll positions so the fitted content starts at the beginning.
-    if (tracksScrollRef) tracksScrollRef.scrollLeft = 0
-    if (seekLaneRef) seekLaneRef.scrollLeft = 0
-  }
-
-  // Auto-fit only on initial track appearance, not on incremental additions.
-  // Prevents visual jump when user interactively adds keyframes.
-  let prevTrackPaths: Set<string> | undefined
-  createEffect(() => {
-    const tracks = timeline.tracks()
-    const paths = new Set(tracks.map((t) => t.parameterPath))
-    if (!prevTrackPaths) {
-      prevTrackPaths = paths
-      if (paths.size > 0) autoFitZoom()
-      return
-    }
-    prevTrackPaths = paths
-  })
+  useScrollSync(() => tracksScrollRef, () => seekLaneRef)
 
   const laneWidth = () => totalFrames() * frameWidth()
 
@@ -190,48 +80,7 @@ export function DopeSheet(props: DopeSheetProps) {
     frame: number
   } | null>(null)
 
-  // ── Seek ruler drag state ──
-  let seekDragging = false
-  let seekDragStartX = 0
-
-  function handleSeekPointerDown(e: PointerEvent) {
-    seekDragging = true
-    seekDragStartX = e.clientX
-    timeline.setIsScrubbing(true)
-    seekToPosition(e)
-    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
-
-    function onMove(ev: PointerEvent) {
-      if (!seekDragging) return
-      // 4px dead zone before dragging takes effect — prevents
-      // accidental frame changes during a simple click.
-      if (Math.abs(ev.clientX - seekDragStartX) < 4) return
-      seekToPosition(ev)
-    }
-
-    function onUp() {
-      seekDragging = false
-      timeline.setIsScrubbing(false)
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-    }
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-  }
-
-  function seekToPosition(e: PointerEvent) {
-    const lane = (e.target as HTMLElement).closest(`.${ui.seekRulerLane}`)
-    if (!lane) return
-    const rect = lane.getBoundingClientRect()
-    const x = e.clientX - rect.left + lane.scrollLeft
-    const frame = Math.round(x / frameWidth()) + timeline.config().startFrame
-    const clampedFrame = Math.max(
-      timeline.config().startFrame,
-      Math.min(timeline.config().endFrame, frame),
-    )
-    timeline.goToFrame(clampedFrame)
-  }
-
+  const { handleSeekPointerDown } = useSeekScrubber(frameWidth)
   function handleContextMenu(e: MouseEvent, path: string, frame: number) {
     setContextMenu({ x: e.clientX, y: e.clientY, path, frame })
   }
