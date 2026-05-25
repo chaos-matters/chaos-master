@@ -1,4 +1,4 @@
-import { createSignal, onMount, Show } from 'solid-js'
+import { createSignal, For, onMount } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import ui from './Modal.module.css'
 import { ModalContext } from './ModalContext'
@@ -85,7 +85,7 @@ export function Modal(props: ParentProps<ModalProps>) {
           ;(el as HTMLElement).classList.add(ui.root!)
         }}
       >
-        <Show when={modalInstances().at(-1)} keyed>
+        <For each={modalInstances()}>
           {(instance) => {
             const {
               resolve,
@@ -123,7 +123,7 @@ export function Modal(props: ParentProps<ModalProps>) {
               </dialog>
             )
           }}
-        </Show>
+        </For>
       </Portal>
     </ModalContext.Provider>
   )

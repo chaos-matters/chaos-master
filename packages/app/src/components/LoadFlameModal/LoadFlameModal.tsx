@@ -16,6 +16,7 @@ import { Button } from '../Button/Button'
 import { DelayedShow } from '../DelayedShow/DelayedShow'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
+import { ConfirmDeleteRecentModal, dontAskDeleteRecent, } from './ConfirmDeleteRecentModal'
 import ui from './LoadFlameModal.module.css'
 import type { AnimationDef } from '@/flame/examples/animations'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -235,8 +236,20 @@ function LoadFlameModal(props: LoadFlameModalProps) {
     }
   }
 
-  function handleDeleteRecent(e: MouseEvent, id: string) {
+  const requestModal = useRequestModal()
+
+  async function handleDeleteRecent(e: MouseEvent, id: string) {
     e.stopPropagation()
+
+    if (!dontAskDeleteRecent()) {
+      const confirmed = await requestModal<boolean>({
+        content: ({ respond }) => (
+          <ConfirmDeleteRecentModal respond={respond} />
+        ),
+      })
+      if (!confirmed) return
+    }
+
     deleteRecentFlame(id)
     setRecentFlames(loadRecentFlames())
   }
@@ -291,6 +304,7 @@ function LoadFlameModal(props: LoadFlameModalProps) {
                   </span>
                 </div>
                 <span
+                  class={ui.deleteBtn}
                   role="button"
                   tabIndex={0}
                   style={{
@@ -303,7 +317,6 @@ function LoadFlameModal(props: LoadFlameModalProps) {
                     border: 'none',
                     'border-radius': 'var(--space-1)',
                     cursor: 'pointer',
-                    opacity: '0',
                     color: 'white',
                     'line-height': '0',
                     width: '1.5rem',
@@ -313,10 +326,12 @@ function LoadFlameModal(props: LoadFlameModalProps) {
                     'justify-content': 'center',
                   }}
                   onClick={(e) => {
+                    // eslint-disable-next-line @typescript-eslint/no-floating-promises
                     handleDeleteRecent(e, recent.id)
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
+                      // eslint-disable-next-line @typescript-eslint/no-floating-promises
                       handleDeleteRecent(e as unknown as MouseEvent, recent.id)
                     }
                   }}

@@ -1,14 +1,12 @@
 import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
-import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useTimeline } from '@/contexts/TimelineContext'
 import ui from './DopeSheet.module.css'
-import { DopeSheetTrack } from './DopeSheetTrack'
 import { useScrollSync } from './hooks/useScrollSync'
 import { useSeekScrubber } from './hooks/useSeekScrubber'
 import { useZoomGestures } from './hooks/useZoomGestures'
 import { KeyframeContextMenu } from './KeyframeContextMenu'
-import type { EasingCurve } from '@/utils/timeline'
+import { TrackContextMenu } from './TrackContextMenu'
 
 function pathLabel(path: string): string {
   return path
@@ -20,22 +18,18 @@ function pathLabel(path: string): string {
 const BASE_FRAME_WIDTH = 24
 const BASE_TRACK_HEIGHT = 20
 const TRACK_NAME_WIDTH = 130
-const EASING_OPTIONS: EasingCurve[] = [
-  'linear',
-  'easeIn',
-  'easeOut',
-  'easeInOut',
-  'bounce',
-  'elastic',
-]
+
+import { DopeSheetGrid } from './DopeSheetGrid'
+import { KeyframeInspector } from './KeyframeInspector'
+import type { FlameDescriptor, TransformId, VariationId, } from '@/flame/schema/flameSchema'
 
 export interface DopeSheetProps {
   formatTrackLabel?: (path: string) => string
+  flameDescriptor?: FlameDescriptor
 }
 
 export function DopeSheet(props: DopeSheetProps) {
   const timeline = useTimeline()!
-  const changeHistory = useChangeHistory()
   const { setTargetedParameter, setSelectedKeyframePath } = useKeyframeTarget()
 
   const totalFrames = () =>
@@ -84,10 +78,20 @@ export function DopeSheet(props: DopeSheetProps) {
     frame: number
   } | null>(null)
 
+  const [trackContextMenu, setTrackContextMenu] = createSignal<{
+    x: number
+    y: number
+    path: string
+  } | null>(null)
+
   const { handleSeekPointerDown } = useSeekScrubber(frameWidth)
 
   function handleContextMenu(e: MouseEvent, path: string, frame: number) {
     setContextMenu({ x: e.clientX, y: e.clientY, path, frame })
+  }
+
+  function handleTrackContextMenu(e: MouseEvent, path: string) {
+    setTrackContextMenu({ x: e.clientX, y: e.clientY, path })
   }
 
   function handleDragKeyframe(
@@ -109,118 +113,53 @@ export function DopeSheet(props: DopeSheetProps) {
   const activeTracks = createMemo(() => {
     const all = timeline.tracks()
     const fmt = props.formatTrackLabel
+    const flame = props.flameDescriptor
+
     return all
-      .map((t) => ({
-        path: t.parameterPath,
-        label: fmt ? fmt(t.parameterPath) : pathLabel(t.parameterPath),
-      }))
+      .map((t) => {
+        let isOrphaned = false
+        const parts = t.parameterPath.split('.')
+        if (flame) {
+          if (parts[0] === 'transform' && parts.length >= 2) {
+            const tid = parts[1] as TransformId
+            // Handle global transform.color.x vs transform.<tid>.probability
+            if (tid !== 'color' && !flame.transforms[tid]) {
+              isOrphaned = true
+            }
+          } else if (
+            parts.length >= 2 &&
+            parts[0] !== 'transform' &&
+            parts[0] !== 'camera' &&
+            parts[0] !== 'skipIters' &&
+            parts[0] !== 'exposure' &&
+            parts[0] !== 'vibrancy' &&
+            parts[0] !== 'contrast' &&
+            parts[0] !== 'gamma' &&
+            parts[0] !== 'highlightPower' &&
+            parts[0] !== 'palettePhase' &&
+            parts[0] !== 'paletteSpeed' &&
+            parts[0] !== 'densityEstimationQuality'
+          ) {
+            // It's likely <tid>.<vid> or <tid>.<vid>.<param>
+            const tid = parts[0] as TransformId
+            const vid = parts[1] as VariationId
+            if (
+              !flame.transforms[tid] ||
+              !flame.transforms[tid].variations[vid]
+            ) {
+              isOrphaned = true
+            }
+          }
+        }
+
+        return {
+          path: t.parameterPath,
+          label: fmt ? fmt(t.parameterPath) : pathLabel(t.parameterPath),
+          isOrphaned,
+        }
+      })
       .sort((a, b) => a.label.localeCompare(b.label))
   })
-
-  const selectedKeyframeData = createMemo(() => {
-    const sel = selectedKeyframe()
-    if (!sel) return null
-    if (!timeline.hasKeyframeAtFrame(sel.path, sel.frame)) {
-      return null
-    }
-    const kf = timeline.getKeyframeAtFrame(sel.path, sel.frame)
-    if (!kf) return null
-    const val = kf.value
-    if (val === null || typeof val === 'boolean') return null
-    return { frame: kf.frame, value: val, easing: kf.easing, path: sel.path }
-  })
-
-  function formatKeyframeValue(
-    value:
-      | number
-      | string
-      | [number, number, number]
-      | [number, number, number, number],
-  ): string {
-    return Array.isArray(value) ? `[${value.join(', ')}]` : String(value)
-  }
-
-  const [inspectorEditing, setInspectorEditing] = createSignal(false)
-  const [inspectorEditValue, setInspectorEditValue] = createSignal('')
-  let inspectorInputRef: HTMLInputElement | undefined
-
-  function startInspectorScrub(e: PointerEvent, currentValue: number) {
-    if (inspectorEditing()) return
-    const sel = selectedKeyframe()!
-    const kf = timeline.getKeyframeAtFrame(sel.path, sel.frame)
-    const easing = kf?.easing
-    const startX = e.clientX
-    const startValue = currentValue
-    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
-    setTargetedParameter(sel.path)
-
-    if (!changeHistory.isPreviewing()) {
-      changeHistory.startPreview('Keyframe scrub')
-    }
-    // Push undo once at start of scrub drag
-    timeline.addKeyframe(sel.path, sel.frame, startValue, easing)
-
-    let step = 0.01
-    let min: number | undefined = undefined
-    let max: number | undefined = undefined
-    const domNode = document.querySelector(
-      `[data-parameter-path="${sel.path}"]`,
-    )
-    if (domNode) {
-      const stepAttr =
-        domNode.getAttribute('step') || domNode.getAttribute('data-step')
-      if (stepAttr) step = parseFloat(stepAttr) || 0.01
-
-      const minAttr =
-        domNode.getAttribute('min') || domNode.getAttribute('data-min')
-      if (minAttr) min = parseFloat(minAttr)
-
-      const maxAttr =
-        domNode.getAttribute('max') || domNode.getAttribute('data-max')
-      if (maxAttr) max = parseFloat(maxAttr)
-    }
-
-    function onMove(ev: PointerEvent) {
-      const dx = ev.clientX - startX
-      const sensitivity = ev.ctrlKey ? 0.01 : ev.shiftKey ? 0.1 : 1
-      let newValue = startValue + dx * step * sensitivity
-      if (min !== undefined) newValue = Math.max(min, newValue)
-      if (max !== undefined) newValue = Math.min(max, newValue)
-      timeline.setKeyframeValue(sel.path, sel.frame, newValue, easing)
-    }
-
-    function onUp() {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-      if (changeHistory.isPreviewing()) {
-        changeHistory.commit()
-      }
-    }
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-  }
-
-  function startInspectorEdit(currentValue: number) {
-    setInspectorEditValue(String(currentValue))
-    setInspectorEditing(true)
-    requestAnimationFrame(() => inspectorInputRef?.select())
-  }
-
-  function commitInspectorEdit() {
-    const parsed = parseFloat(inspectorEditValue())
-    if (!isNaN(parsed)) {
-      const sel = selectedKeyframe()!
-      const kf = timeline.getKeyframeAtFrame(sel.path, sel.frame)
-      if (kf) {
-        timeline.addKeyframe(sel.path, sel.frame, parsed, kf.easing)
-      }
-    }
-    setInspectorEditing(false)
-  }
-
-  function cancelInspectorEdit() {
-    setInspectorEditing(false)
-  }
 
   const frameLabels = createMemo(() => {
     const start = timeline.config().startFrame
@@ -274,96 +213,7 @@ export function DopeSheet(props: DopeSheetProps) {
         <span class={ui.frameIndicator}>Frame {currentFrame()}</span>
       </div>
 
-      {/* ── Inspector ── */}
-      <div class={ui.inspector}>
-        <Show
-          when={selectedKeyframeData()}
-          fallback={
-            <span class={ui.inspectorPlaceholder}>
-              Select a keyframe to edit
-            </span>
-          }
-        >
-          {(kf) => (
-            <>
-              <span class={ui.inspectorLabel}>
-                {props.formatTrackLabel
-                  ? props.formatTrackLabel(selectedKeyframe()!.path)
-                  : pathLabel(selectedKeyframe()!.path)}{' '}
-                @ frame {kf().frame}
-              </span>
-              {typeof kf().value === 'number' ? (
-                <Show
-                  when={inspectorEditing()}
-                  fallback={
-                    <span
-                      class={ui.inspectorValue}
-                      onPointerDown={(e) => {
-                        startInspectorScrub(e, kf().value as number)
-                      }}
-                      onDblClick={() => {
-                        startInspectorEdit(kf().value as number)
-                      }}
-                    >
-                      {String(kf().value)}
-                    </span>
-                  }
-                >
-                  <input
-                    ref={inspectorInputRef}
-                    class={ui.inspectorValueInput}
-                    type="text"
-                    value={inspectorEditValue()}
-                    onInput={(e) =>
-                      setInspectorEditValue(e.currentTarget.value)
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') commitInspectorEdit()
-                      if (e.key === 'Escape') cancelInspectorEdit()
-                      e.stopPropagation()
-                    }}
-                    onBlur={commitInspectorEdit}
-                  />
-                </Show>
-              ) : (
-                <span class={ui.inspectorValueReadonly}>
-                  {formatKeyframeValue(kf().value)}
-                </span>
-              )}
-              <label class={ui.inspectorEasing}>
-                Easing:
-                <select
-                  value={kf().easing ?? 'linear'}
-                  onChange={(e) => {
-                    timeline.addKeyframe(
-                      selectedKeyframe()!.path,
-                      selectedKeyframe()!.frame,
-                      kf().value,
-                      e.currentTarget.value as EasingCurve,
-                    )
-                  }}
-                >
-                  <For each={EASING_OPTIONS}>
-                    {(opt) => <option value={opt}>{opt}</option>}
-                  </For>
-                </select>
-              </label>
-              <button
-                class={ui.inspectorDelete}
-                onClick={() => {
-                  timeline.removeKeyframe(
-                    selectedKeyframe()!.path,
-                    selectedKeyframe()!.frame,
-                  )
-                  setSelectedKeyframe(null)
-                }}
-              >
-                Delete
-              </button>
-            </>
-          )}
-        </Show>
-      </div>
+      <KeyframeInspector selectedKeyframe={selectedKeyframe()} />
 
       {/* ── Seek ruler ── */}
       <div class={ui.seekRuler} ref={seekRulerRef}>
@@ -410,58 +260,30 @@ export function DopeSheet(props: DopeSheetProps) {
       </div>
 
       {/* ── Tracks ── */}
-      <div
-        class={ui.tracksScroll}
-        ref={tracksScrollRef}
+      <DopeSheetGrid
+        tracksScrollRef={(el) => (tracksScrollRef = el)}
         onScroll={(e) => {
           if (seekLaneRef) {
             seekLaneRef.scrollLeft = e.currentTarget.scrollLeft
           }
         }}
-      >
-        <Show
-          when={activeTracks().length > 0}
-          fallback={
-            <div class={ui.emptyState}>
-              No keyframes. Click a property and press <kbd>I</kbd> to insert
-              one.
-            </div>
-          }
-        >
-          <For each={activeTracks()}>
-            {(track) => (
-              <DopeSheetTrack
-                parameterPath={track.path}
-                label={track.label}
-                frameWidth={frameWidth()}
-                trackHeight={trackHeight()}
-                startFrame={timeline.config().startFrame}
-                endFrame={timeline.config().endFrame}
-                currentFrame={currentFrame()}
-                selectedKeyframe={selectedKeyframe()}
-                onSelectKeyframe={(path, frame) => {
-                  setSelectedKeyframe({ path, frame })
-                  timeline.goToFrame(frame)
-                }}
-                onDragKeyframe={handleDragKeyframe}
-                onContextMenu={handleContextMenu}
-                onDeselectKeyframe={() => setSelectedKeyframe(null)}
-              />
-            )}
-          </For>
-        </Show>
-
-        {/* Playhead line in tracks */}
-        <div
-          class={ui.playhead}
-          style={{
-            left: `${
-              TRACK_NAME_WIDTH +
-              (currentFrame() - timeline.config().startFrame) * frameWidth()
-            }px`,
-          }}
-        />
-      </div>
+        activeTracks={activeTracks()}
+        frameWidth={frameWidth()}
+        trackHeight={trackHeight()}
+        startFrame={timeline.config().startFrame}
+        endFrame={timeline.config().endFrame}
+        currentFrame={currentFrame()}
+        selectedKeyframe={selectedKeyframe()}
+        onSelectKeyframe={(path, frame) => {
+          setSelectedKeyframe({ path, frame })
+          timeline.goToFrame(frame)
+        }}
+        onDragKeyframe={handleDragKeyframe}
+        onContextMenu={handleContextMenu}
+        onTrackContextMenu={handleTrackContextMenu}
+        onDeselectKeyframe={() => setSelectedKeyframe(null)}
+        trackNameWidth={TRACK_NAME_WIDTH}
+      />
 
       {/* ── Context menu ── */}
       <Show when={contextMenu()}>
@@ -474,6 +296,28 @@ export function DopeSheet(props: DopeSheetProps) {
             onClose={() => setContextMenu(null)}
           />
         )}
+      </Show>
+
+      <Show when={trackContextMenu()}>
+        {(cm) => {
+          const track = activeTracks().find((t) => t.path === cm().path)
+          const isOrphaned = track?.isOrphaned ?? false
+          return (
+            <TrackContextMenu
+              x={cm().x}
+              y={cm().y}
+              parameterPath={cm().path}
+              isOrphaned={isOrphaned}
+              onClose={() => setTrackContextMenu(null)}
+              onClearAllInvalid={() => {
+                const orphanedPaths = activeTracks()
+                  .filter((t) => t.isOrphaned)
+                  .map((t) => t.path)
+                timeline.removeTracks(orphanedPaths)
+              }}
+            />
+          )
+        }}
       </Show>
     </div>
   )

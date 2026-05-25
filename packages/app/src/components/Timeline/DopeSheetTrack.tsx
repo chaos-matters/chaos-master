@@ -1,5 +1,6 @@
 import { For } from 'solid-js'
 import { useTimeline } from '@/contexts/TimelineContext'
+import { TriangleAlert } from '@/icons'
 import ui from './DopeSheet.module.css'
 import type { KeyframeData } from '@/utils/timeline'
 
@@ -15,7 +16,9 @@ type DopeSheetTrackProps = {
   onSelectKeyframe: (path: string, frame: number) => void
   onDragKeyframe: (path: string, oldFrame: number, newFrame: number) => void
   onContextMenu: (e: MouseEvent, path: string, frame: number) => void
+  onTrackContextMenu?: (e: MouseEvent, path: string) => void
   onDeselectKeyframe: () => void
+  isOrphaned?: boolean
 }
 
 export function DopeSheetTrack(props: DopeSheetTrackProps) {
@@ -111,8 +114,40 @@ export function DopeSheetTrack(props: DopeSheetTrackProps) {
     props.selectedKeyframe?.frame !== undefined
 
   return (
-    <div class={ui.trackRow} style={{ height: `${props.trackHeight}px` }}>
-      <div class={ui.trackName}>{props.label}</div>
+    <div
+      class={`${ui.trackRow} ${props.isOrphaned ? ui.orphanedTrack : ''}`}
+      style={{ height: `${props.trackHeight}px` }}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        props.onTrackContextMenu?.(e, props.parameterPath)
+      }}
+    >
+      <div class={ui.trackName}>
+        {props.isOrphaned && (
+          <span
+            title="Tracking target is missing. Please check if the target still exists in the flame, or remove these keyframes."
+            style={{
+              'margin-right': '6px',
+              'flex-shrink': 0,
+              display: 'flex',
+              'align-items': 'center',
+              color: '#ef4444',
+            }}
+          >
+            <TriangleAlert style={{ width: '12px', height: '12px' }} />
+          </span>
+        )}
+        <span
+          style={{
+            opacity: props.isOrphaned ? 0.5 : 1,
+            overflow: 'hidden',
+            'text-overflow': 'ellipsis',
+            'white-space': 'nowrap',
+          }}
+        >
+          {props.label}
+        </span>
+      </div>
       <div
         class={ui.lane}
         style={{ width: `${laneWidth()}px` }}
@@ -128,6 +163,7 @@ export function DopeSheetTrack(props: DopeSheetTrackProps) {
                   [ui.selectedDot as string]:
                     props.selectedKeyframe?.path === props.parameterPath &&
                     props.selectedKeyframe?.frame === kf.frame,
+                  [ui.orphanedDot as string]: props.isOrphaned,
                   [ui.atCurrentFrame as string]:
                     kf.frame === props.currentFrame,
                 }}

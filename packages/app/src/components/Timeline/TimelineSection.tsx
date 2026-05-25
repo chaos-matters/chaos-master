@@ -18,7 +18,6 @@ export function TimelineSection(props: TimelineSectionProps) {
   const timeline = useTimeline()!
   const [collapsed, setCollapsed] = createSignal(false)
   const [presetsExpanded, setPresetsExpanded] = createSignal(false)
-  const isPlaying = () => timeline.isPlaying()
   const autoKeyframe = () => timeline.autoKeyframe()
   const removeMode = () => timeline.removeMode()
   const config = createMemo(() => timeline.config())
@@ -29,22 +28,12 @@ export function TimelineSection(props: TimelineSectionProps) {
       class={ui.section}
       classList={{ [ui.collapsed as string]: collapsed() }}
       data-testid="timeline-section"
+      data-tour-target="timeline-section"
     >
       {/* Compact transport bar */}
       <div class={ui.header}>
         <div class={ui.headerLeft}>
-          <span
-            class={ui.playDot}
-            classList={{ [ui.playing as string]: isPlaying() }}
-            title={isPlaying() ? 'Playing' : 'Paused'}
-          />
           <span class={ui.headerTitle}>Timeline</span>
-          <span
-            class={ui.shortcutHint}
-            title="Space: play/pause · I: insert keyframe"
-          >
-            <kbd>Space</kbd> <kbd>I</kbd>
-          </span>
         </div>
 
         <TransportBar />
@@ -119,7 +108,10 @@ export function TimelineSection(props: TimelineSectionProps) {
           />
         </Show>
         <div class={ui.content}>
-          <DopeSheet formatTrackLabel={props.formatTrackLabel} />
+          <DopeSheet
+            formatTrackLabel={props.formatTrackLabel}
+            flameDescriptor={props.flameDescriptor}
+          />
         </div>
       </Show>
     </div>

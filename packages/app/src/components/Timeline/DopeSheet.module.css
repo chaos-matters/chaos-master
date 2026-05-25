@@ -327,6 +327,11 @@
   stroke-width: 0.8 !important;
 }
 
+.orphanedDot svg path {
+  fill: #ef4444 !important;
+  stroke: #b91c1c !important;
+}
+
 .atCurrentFrame svg {
   transform: scale(1.25);
 }
@@ -369,7 +374,7 @@
   font-size: 10px;
 
   [data-theme='dark'] & {
-    color: var(--neutral-500, #6b7280);
+    color: var(--neutral-400, #9ca3af);
   }
 }
 

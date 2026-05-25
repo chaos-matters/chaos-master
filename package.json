@@ -7,7 +7,7 @@
   "scripts": {
     "fmt": "prettier packages --check",
     "lint": "eslint",
-    "typecheck": "npx tsc --noEmit --project packages/app/tsconfig.json",
+    "typecheck": "tsc --noEmit --project packages/app/tsconfig.json",
     "test": "pnpm --filter chaos-master exec vitest run",
     "test:ui": "pnpm --filter chaos-master exec vitest --ui",
     "test:watch": "pnpm --filter chaos-master exec vitest",
