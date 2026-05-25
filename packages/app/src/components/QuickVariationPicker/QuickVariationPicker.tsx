@@ -133,18 +133,25 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
     }
   })
 
-  function handleKeyDown(e: KeyboardEvent) {
-    if (e.key === 'Escape') {
-      if (query()) {
-        setQuery('')
-      } else {
-        props.onClose()
+  createEffect(() => {
+    function handleGlobalKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        if (query()) {
+          setQuery('')
+        } else {
+          props.onClose()
+        }
+        e.preventDefault()
       }
     }
-  }
+    window.addEventListener('keydown', handleGlobalKeyDown)
+    onCleanup(() => {
+      window.removeEventListener('keydown', handleGlobalKeyDown)
+    })
+  })
 
   return (
-    <div class={ui.panel} onKeyDown={handleKeyDown}>
+    <div class={ui.panel}>
       {/* Header */}
       <div class={ui.header}>
         <span class={ui.headerTitle}>Select Variation</span>
