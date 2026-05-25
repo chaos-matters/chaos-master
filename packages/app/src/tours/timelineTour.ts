@@ -9,7 +9,7 @@ export const timelineTour: TourGuide = {
   nextTourLabel: 'App Tour',
   steps: [
     {
-      target: '[data-tour-target="timeline-handle"]',
+      target: '[data-tour-target="timeline-section"]',
       title: 'The Dope Sheet',
       description:
         'The timeline shows all animation tracks as a dope sheet. Drag the resize handle above to expand or collapse it. Press Space to play/pause.',

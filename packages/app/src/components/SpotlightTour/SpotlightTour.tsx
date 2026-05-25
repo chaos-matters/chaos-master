@@ -268,21 +268,67 @@ export function SpotlightTour(props: SpotlightTourProps) {
             </defs>
           </svg>
 
-          {/* Blurred backdrop with a hole punched out */}
-          <div
-            style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(0, 0, 0, 0.65)',
-              'backdrop-filter': 'blur(6px)',
-              '-webkit-backdrop-filter': 'blur(6px)',
-              mask: 'url(#spotlight-mask)',
-              '-webkit-mask': 'url(#spotlight-mask)',
-              'pointer-events': 'none',
-              transition: 'background 300ms ease',
-            }}
-            class={ui.backdropBlur}
-          />
+          {/* Blurred backdrop with a hole punched out (4 divs to bypass Chrome mask bug) */}
+          <div style={{ 'pointer-events': 'none', 'z-index': 1 }}>
+            {/* Top */}
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: `${holeRect().y}px`,
+                background: 'rgba(0, 0, 0, 0.4)',
+                'backdrop-filter': 'blur(2px)',
+                '-webkit-backdrop-filter': 'blur(2px)',
+                transition: 'height 300ms ease',
+              }}
+            />
+            {/* Bottom */}
+            <div
+              style={{
+                position: 'fixed',
+                top: `${holeRect().y + holeRect().height}px`,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0, 0, 0, 0.4)',
+                'backdrop-filter': 'blur(2px)',
+                '-webkit-backdrop-filter': 'blur(2px)',
+                transition: 'top 300ms ease',
+              }}
+            />
+            {/* Left */}
+            <div
+              style={{
+                position: 'fixed',
+                top: `${holeRect().y}px`,
+                left: 0,
+                width: `${holeRect().x}px`,
+                height: `${holeRect().height}px`,
+                background: 'rgba(0, 0, 0, 0.4)',
+                'backdrop-filter': 'blur(2px)',
+                '-webkit-backdrop-filter': 'blur(2px)',
+                transition:
+                  'top 300ms ease, width 300ms ease, height 300ms ease',
+              }}
+            />
+            {/* Right */}
+            <div
+              style={{
+                position: 'fixed',
+                top: `${holeRect().y}px`,
+                left: `${holeRect().x + holeRect().width}px`,
+                right: 0,
+                height: `${holeRect().height}px`,
+                background: 'rgba(0, 0, 0, 0.4)',
+                'backdrop-filter': 'blur(2px)',
+                '-webkit-backdrop-filter': 'blur(2px)',
+                transition:
+                  'top 300ms ease, left 300ms ease, height 300ms ease',
+              }}
+            />
+          </div>
 
           {/* Glow ring around the highlighted element */}
           <svg class={ui.backdropSvg} width="100%" height="100%">

@@ -1,5 +1,6 @@
 import { createSignal } from 'solid-js'
 import { applyEasing, clamp } from './easing'
+import { persistentSignal } from './persistentSignal'
 
 interface WindowTimelineState {
   tracks: () => TimelineTrack[]
@@ -358,7 +359,10 @@ export function createTimelineState() {
   })
   const [isPlaying, setIsPlaying] = createSignal(false)
   const [isScrubbing, setIsScrubbing] = createSignal(false)
-  const [autoKeyframe, setAutoKeyframe] = createSignal(false)
+  const [autoKeyframe, setAutoKeyframe] = persistentSignal(
+    'timeline-auto-keyframe',
+    true,
+  )
   const [removeMode, setRemoveMode] = createSignal(false)
   const [animationEnabled, setAnimationEnabled] = createSignal(false)
 
@@ -612,6 +616,19 @@ export function createTimelineState() {
   function removeKeyframesAtFrame(parameterPath: string, frame: number): void {
     pushUndo()
     removeKeyframeImpl(parameterPath, frame)
+  }
+
+  function removeTrack(parameterPath: string) {
+    pushUndo()
+    setTracks((prev) => prev.filter((t) => t.parameterPath !== parameterPath))
+  }
+
+  function removeTracks(parameterPaths: string[]) {
+    if (parameterPaths.length === 0) return
+    pushUndo()
+    setTracks((prev) =>
+      prev.filter((t) => !parameterPaths.includes(t.parameterPath)),
+    )
   }
 
   /**
@@ -961,6 +978,8 @@ export function createTimelineState() {
     getKeyframeAtFrame,
     getOverlappingKeyframes,
     addKeyframeWithOverlapCheck,
+    removeTrack,
+    removeTracks,
     removeKeyframesAtFrame,
     findClosestKeyframeBeforeFrame,
     splitKeyframeAtFrame,

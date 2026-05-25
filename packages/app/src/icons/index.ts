@@ -19,6 +19,7 @@ import Share from './share.svg'
 import Shuffle from './shuffle.svg'
 import SkipBack from './skip-back.svg'
 import SkipForward from './skip-forward.svg'
+import TriangleAlert from './triangle-alert.svg'
 import Undo from './undo.svg'
 import Zap from './zap.svg'
 
@@ -47,4 +48,5 @@ export {
   SkipForward,
   Undo,
   Zap,
+  TriangleAlert,
 }

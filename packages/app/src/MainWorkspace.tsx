@@ -1164,7 +1164,6 @@ export function MainWorkspace(props: AppProps) {
                   >
                     <div
                       class={ui.timelineResizeHandle}
-                      data-tour-target="timeline-handle"
                       onPointerDown={startTimelineDrag}
                       title="Resize timeline"
                     />

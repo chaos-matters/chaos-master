@@ -47,6 +47,21 @@
   }
 }
 
+.deleteBtn {
+  opacity: 0;
+  transition:
+    opacity 0.2s,
+    background-color 0.2s;
+}
+
+.item:hover .deleteBtn {
+  opacity: 1;
+}
+
+.deleteBtn:hover {
+  background-color: rgb(from var(--red-600) r g b / 90%) !important;
+}
+
 .item-title {
   position: absolute;
   width: 100%;

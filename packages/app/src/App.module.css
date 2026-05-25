@@ -587,9 +587,11 @@
 
   &::before {
     content: '+';
-    font-size: 0.75rem;
+    font-size: 0.85rem;
     font-weight: 400;
-    line-height: 1;
+    line-height: 0;
+    position: relative;
+    top: 1px;
   }
 
   &:hover {
