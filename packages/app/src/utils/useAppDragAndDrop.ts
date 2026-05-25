@@ -4,9 +4,12 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineTrack } from '@/utils/timeline'
 
 export function useAppDragAndDrop(
-  history: { replace: (v: any) => void },
-  setLoadedAnimation: (state: { flame: FlameDescriptor; tracks: TimelineTrack[] }) => void,
-  clearLoadedAnimation: () => void
+  history: { replace: (v: FlameDescriptor) => void },
+  setLoadedAnimation: (state: {
+    flame: FlameDescriptor
+    tracks: TimelineTrack[]
+  }) => void,
+  clearLoadedAnimation: () => void,
 ) {
   const loadFlameFromFile = useLoadFlameFromFile()
 

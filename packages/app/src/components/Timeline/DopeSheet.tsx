@@ -1,12 +1,12 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useTimeline } from '@/contexts/TimelineContext'
+import ui from './DopeSheet.module.css'
+import { DopeSheetTrack } from './DopeSheetTrack'
 import { useScrollSync } from './hooks/useScrollSync'
 import { useSeekScrubber } from './hooks/useSeekScrubber'
 import { useZoomGestures } from './hooks/useZoomGestures'
-import ui from './DopeSheet.module.css'
-import { DopeSheetTrack } from './DopeSheetTrack'
 import { KeyframeContextMenu } from './KeyframeContextMenu'
 import type { EasingCurve } from '@/utils/timeline'
 
@@ -46,18 +46,22 @@ export function DopeSheet(props: DopeSheetProps) {
   let seekRulerRef!: HTMLDivElement
   let seekLaneRef!: HTMLDivElement | undefined
 
-  const { zoomLevel, setZoomLevel, frameWidth, trackHeight, autoFitZoom } = useZoomGestures(
-    () => containerRef,
-    () => seekRulerRef,
+  const { zoomLevel, setZoomLevel, frameWidth, trackHeight, autoFitZoom } =
+    useZoomGestures(
+      () => containerRef,
+      () => seekRulerRef,
+      () => tracksScrollRef,
+      () => seekLaneRef,
+      totalFrames,
+      BASE_FRAME_WIDTH,
+      BASE_TRACK_HEIGHT,
+      TRACK_NAME_WIDTH,
+    )
+
+  useScrollSync(
     () => tracksScrollRef,
     () => seekLaneRef,
-    totalFrames,
-    BASE_FRAME_WIDTH,
-    BASE_TRACK_HEIGHT,
-    TRACK_NAME_WIDTH
   )
-
-  useScrollSync(() => tracksScrollRef, () => seekLaneRef)
 
   const laneWidth = () => totalFrames() * frameWidth()
 
@@ -81,6 +85,7 @@ export function DopeSheet(props: DopeSheetProps) {
   } | null>(null)
 
   const { handleSeekPointerDown } = useSeekScrubber(frameWidth)
+
   function handleContextMenu(e: MouseEvent, path: string, frame: number) {
     setContextMenu({ x: e.clientX, y: e.clientY, path, frame })
   }

@@ -1,4 +1,5 @@
-import { createContext, useContext, createSignal, JSX } from 'solid-js'
+import { createContext, createSignal, useContext } from 'solid-js'
+import type { JSX } from 'solid-js'
 
 interface ToastContextValue {
   toastMessage: () => string | null

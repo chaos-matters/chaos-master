@@ -1,14 +1,15 @@
-import { createEffect, onCleanup, Accessor } from 'solid-js'
+import { createEffect, onCleanup } from 'solid-js'
+import type { Accessor } from 'solid-js'
 
 export function useScrollSync(
   tracksScrollRef: Accessor<HTMLElement | undefined>,
-  seekLaneRef: Accessor<HTMLElement | undefined>
+  seekLaneRef: Accessor<HTMLElement | undefined>,
 ) {
   createEffect(() => {
     const tracksEl = tracksScrollRef()
     const seekLane = seekLaneRef()
     if (!tracksEl || !seekLane) return
-    
+
     let syncing = false
     const syncTracksToLane = () => {
       if (syncing) return
@@ -22,7 +23,7 @@ export function useScrollSync(
       tracksEl.scrollLeft = seekLane.scrollLeft
       syncing = false
     }
-    
+
     tracksEl.addEventListener('scroll', syncTracksToLane, { passive: true })
     seekLane.addEventListener('scroll', syncLaneToTracks, { passive: true })
     onCleanup(() => {

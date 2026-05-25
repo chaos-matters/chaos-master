@@ -1,11 +1,9 @@
 import { createSignal, Show } from 'solid-js'
-import { random01 } from '@/flame/randomize'
-import { recordEntries } from '@/utils/record'
 import ui from './AnimationGenerator.module.css'
+import { buildPresets, randomizeColorsParams, randomizeParams } from './presets'
+import type { PresetDef } from './presets'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
-import type { EasingCurve, TimelineState } from '@/utils/timeline'
-
-import { randomizeParams, randomizeColorsParams, buildPresets, PresetDef } from './presets'
+import type { TimelineState } from '@/utils/timeline'
 
 /* ──── AnimationControls (inline buttons for header) ──── */
 
@@ -85,8 +83,6 @@ type AnimationGeneratorProps = {
   timeline: TimelineState
   expanded: boolean
 }
-
-
 
 export function AnimationGenerator(props: AnimationGeneratorProps) {
   const presets: PresetDef[] = buildPresets()

@@ -1,6 +1,6 @@
 import { Show } from 'solid-js'
-import { useToast } from '@/contexts/ToastContext'
 import ui from '@/App.module.css'
+import { useToast } from '@/contexts/ToastContext'
 
 export function Toast() {
   const { toastMessage } = useToast()

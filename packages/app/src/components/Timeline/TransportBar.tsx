@@ -11,7 +11,9 @@ export function TransportBar() {
     <div class={ui.transportControls}>
       <button
         class={ui.transportBtn}
-        onClick={() => timeline.goToFrame(config().startFrame)}
+        onClick={() => {
+          timeline.goToFrame(config().startFrame)
+        }}
         title="Go to start"
         data-testid="go-to-start"
       >
@@ -21,7 +23,9 @@ export function TransportBar() {
       </button>
       <button
         class={ui.transportBtn}
-        onClick={() => timeline.goBackFrame()}
+        onClick={() => {
+          timeline.goBackFrame()
+        }}
         title="Previous frame"
         data-testid="previous-frame"
       >
@@ -33,7 +37,9 @@ export function TransportBar() {
         class={ui.transportBtn}
         classList={{ [ui.active as string]: isPlaying() }}
         data-tour-target="play-button"
-        onClick={() => timeline.togglePlay()}
+        onClick={() => {
+          timeline.togglePlay()
+        }}
         title="Play/Pause"
         data-testid={isPlaying() ? 'pause' : 'play'}
       >
@@ -49,7 +55,9 @@ export function TransportBar() {
       </button>
       <button
         class={ui.transportBtn}
-        onClick={() => timeline.advanceFrame()}
+        onClick={() => {
+          timeline.advanceFrame()
+        }}
         title="Next frame"
         data-testid="next-frame"
       >
@@ -59,7 +67,9 @@ export function TransportBar() {
       </button>
       <button
         class={ui.transportBtn}
-        onClick={() => timeline.goToFrame(config().endFrame)}
+        onClick={() => {
+          timeline.goToFrame(config().endFrame)
+        }}
         title="Go to end"
         data-testid="go-to-end"
       >

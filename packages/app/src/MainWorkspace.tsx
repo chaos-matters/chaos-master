@@ -1,10 +1,10 @@
-import { batch, createEffect, createMemo, createResource, createSignal, ErrorBoundary, For, onCleanup, onMount, Show, Suspense, } from 'solid-js'
-import { useToast } from '@/contexts/ToastContext'
+import { createEffect, createMemo, createSignal, For, onMount, Show, } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { vec2f, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
-import { KeyframeTargetProvider, useKeyframeTarget, } from '@/contexts/KeyframeTargetContext'
+import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
+import { useToast } from '@/contexts/ToastContext'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { recordEntries, recordKeys } from '@/utils/record'
@@ -17,14 +17,12 @@ import { Card } from './components/ControlCard/ControlCard'
 import { DebugOverlay } from './components/DebugOverlay'
 import { DiceButton } from './components/DiceButton/DiceButton'
 import { Dropzone } from './components/Dropzone/Dropzone'
-import { AppCrashed, WebgpuNotSupported, } from './components/ErrorHandling/ErrorHandling'
 import { createExportPngDialog } from './components/ExportPngDialog/ExportPngDialog'
 import { FlameColorEditor, handleColor, } from './components/FlameColorEditor/FlameColorEditor'
 import { FloatingActions } from './components/FloatingActions/FloatingActions'
 import { createShowHelp } from './components/HelpModal/HelpModal'
 import { createLoadFlame } from './components/LoadFlameModal/LoadFlameModal'
 import { createLogoFaviconGenerator } from './components/LogoFaviconGenerator/LogoFaviconGenerator'
-import { Modal } from './components/Modal/Modal'
 import { PaletteSelector } from './components/PaletteSelector/PaletteSelector'
 import { ProgressBar } from './components/ProgressBar/ProgressBar'
 import { getPresetFromQuality, qualityPresets, } from './components/Quality/QualityPresets'
@@ -37,11 +35,9 @@ import { KeyframeDiamond } from './components/Timeline/KeyframeDiamond'
 import { TimelineSection } from './components/Timeline/TimelineSection'
 import { createVariationSelector } from './components/VariationSelector/VariationSelector'
 import { ViewControls } from './components/ViewControls/ViewControls'
-import { WelcomeScreen } from './components/WelcomeScreen/WelcomeScreen'
 import { ChangeHistoryContextProvider } from './contexts/ChangeHistoryContext'
-import { CompactModeProvider, useCompactMode, } from './contexts/CompactModeContext'
-import { createSpotlightTourState, SpotlightTourContext, } from './contexts/SpotlightTourContext'
-import { ThemeContextProvider, useTheme } from './contexts/ThemeContext'
+import { useCompactMode } from './contexts/CompactModeContext'
+import { useTheme } from './contexts/ThemeContext'
 import { TimelineContextProvider } from './contexts/TimelineContext'
 import { DEFAULT_POINT_COUNT, DEFAULT_QUALITY, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_RESOLUTION, IS_DEV, } from './defaults'
 import { colorInitModeToImplFn } from './flame/colorInitMode'
@@ -59,27 +55,21 @@ import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } fro
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { Cross, Eye, EyeOff, Menu, Plus, Share } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
-import { Root } from './lib/Root'
-import { appTour } from './tours/appTour'
-import { sidebarTour } from './tours/sidebarTour'
-import { timelineTour } from './tours/timelineTour'
 import { createAnimationExport } from './utils/animationExport'
 import { deepClone } from './utils/clone'
 import { createStoreHistory } from './utils/createStoreHistory'
-import { decodeSharePayload } from './utils/jsonQueryParam'
 import { persistentSignal } from './utils/persistentSignal'
 import { buildReadableIds } from './utils/readableIds'
 import { saveRecentFlame } from './utils/recentFlames'
 import { sum } from './utils/sum'
 import { createTimelineState, resolveKeyframeValue } from './utils/timeline'
-import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
 import { useAppDragAndDrop } from './utils/useAppDragAndDrop'
-import { dismissWelcome, hasWelcomeBeenDismissed, } from './utils/welcomeDismissed'
+import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
 import type { Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
 import type { QualityPreset } from './components/Quality/QualityPresets'
 import type { QuickPickerMode } from './components/QuickVariationPicker/QuickVariationPicker'
-import type { TourContext, TourGuide, } from './components/SpotlightTour/tourTypes'
+import type { TourContext } from './components/SpotlightTour/tourTypes'
 import type { ColorInitMode } from './flame/colorInitMode'
 import type { ColorMap, Palette } from './flame/colorMap'
 import type { DrawMode } from './flame/drawMode'
@@ -99,19 +89,6 @@ function formatPercent(x: number) {
     return `100 %`
   }
   return `${(x * 100).toFixed(1)} %`
-}
-
-function getTour(id: string): TourGuide | undefined {
-  switch (id) {
-    case 'app':
-      return appTour
-    case 'sidebar':
-      return sidebarTour
-    case 'timeline':
-      return timelineTour
-    default:
-      return undefined
-  }
 }
 
 function newDefaultTransform(): TransformFunction {
@@ -382,7 +359,11 @@ export function MainWorkspace(props: AppProps) {
     }
   })
 
-  const onDrop = useAppDragAndDrop(history, setLoadedAnimation, clearLoadedAnimation)
+  const onDrop = useAppDragAndDrop(
+    history,
+    setLoadedAnimation,
+    clearLoadedAnimation,
+  )
 
   const timeline = createTimelineState()
 
@@ -2155,4 +2136,3 @@ export function MainWorkspace(props: AppProps) {
     </ChangeHistoryContextProvider>
   )
 }
-

@@ -1,5 +1,6 @@
-import { Accessor, onCleanup } from 'solid-js'
+import { onCleanup } from 'solid-js'
 import { useTimeline } from '@/contexts/TimelineContext'
+import type { Accessor } from 'solid-js'
 
 export function useSeekScrubber(frameWidth: Accessor<number>) {
   const timeline = useTimeline()!
@@ -36,10 +37,13 @@ export function useSeekScrubber(frameWidth: Accessor<number>) {
     function onMove(ev: PointerEvent) {
       if (!seekDragging) return
       if (Math.abs(ev.clientX - seekDragStartX) < 4) return
-      
+
       // We pass ev but fake the currentTarget to be the original lane
       // because seekToPosition relies on currentTarget
-      Object.defineProperty(ev, 'currentTarget', { value: laneElement, configurable: true })
+      Object.defineProperty(ev, 'currentTarget', {
+        value: laneElement,
+        configurable: true,
+      })
       seekToPosition(ev)
     }
 
@@ -50,9 +54,13 @@ export function useSeekScrubber(frameWidth: Accessor<number>) {
       controller = null
     }
 
-    window.addEventListener('pointermove', onMove, { signal: controller.signal })
+    window.addEventListener('pointermove', onMove, {
+      signal: controller.signal,
+    })
     window.addEventListener('pointerup', onEnd, { signal: controller.signal })
-    window.addEventListener('pointercancel', onEnd, { signal: controller.signal })
+    window.addEventListener('pointercancel', onEnd, {
+      signal: controller.signal,
+    })
   }
 
   onCleanup(() => {

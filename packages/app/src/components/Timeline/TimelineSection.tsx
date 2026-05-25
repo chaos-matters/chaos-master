@@ -11,8 +11,8 @@ export interface TimelineSectionProps {
   flameDescriptor?: FlameDescriptor
 }
 
-import { TransportBar } from './TransportBar'
 import { TimelineSettings } from './TimelineSettings'
+import { TransportBar } from './TransportBar'
 
 export function TimelineSection(props: TimelineSectionProps) {
   const timeline = useTimeline()!

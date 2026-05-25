@@ -1,6 +1,7 @@
-import { createSignal, createMemo, createEffect, onCleanup, Accessor } from 'solid-js'
-import { createPinchHandler } from '@/utils/createPinchHandler'
+import { createEffect, createMemo, createSignal, onCleanup } from 'solid-js'
 import { useTimeline } from '@/contexts/TimelineContext'
+import { createPinchHandler } from '@/utils/createPinchHandler'
+import type { Accessor } from 'solid-js'
 
 export function useZoomGestures(
   containerRef: Accessor<HTMLDivElement | undefined>,
@@ -10,7 +11,7 @@ export function useZoomGestures(
   totalFrames: Accessor<number>,
   baseFrameWidth: number,
   baseTrackHeight: number,
-  trackNameWidth: number
+  trackNameWidth: number,
 ) {
   const timeline = useTimeline()!
   const [containerHeight, setContainerHeight] = createSignal(200)
@@ -21,7 +22,7 @@ export function useZoomGestures(
     const scale = Math.max(0.8, Math.min(3, h / 140))
     return baseFrameWidth * scale * zoomLevel()
   })
-  
+
   const trackHeight = createMemo(() => {
     const h = containerHeight()
     const scale = Math.max(0.8, Math.min(3, h / 140))
@@ -39,7 +40,9 @@ export function useZoomGestures(
       }
     })
     ro.observe(el)
-    onCleanup(() => ro.disconnect())
+    onCleanup(() => {
+      ro.disconnect()
+    })
   })
 
   const startPinch = createPinchHandler((initEvent) => {
@@ -90,7 +93,7 @@ export function useZoomGestures(
     const targetFrameWidth = availableWidth / totalFrames()
     const targetZoom = targetFrameWidth / (baseFrameWidth * containerScale)
     setZoomLevel(Math.max(0.1, Math.min(5, targetZoom)))
-    
+
     // Reset scroll positions
     const ts = tracksScrollRef()
     if (ts) ts.scrollLeft = 0
