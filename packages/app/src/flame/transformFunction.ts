@@ -14,6 +14,7 @@ const FlameUniformsBase = struct({
   preAffine: AffineParams,
   postAffine: AffineParams,
   color: vec2f,
+  colorSpeed: f32,
 }).$name('FlameUniformsBase')
 
 const VariantUniformsBase = struct({
@@ -82,7 +83,7 @@ export function createFlameWgsl({
         )
         .join('\n')}
       p = transformAffine(uniforms.postAffine, p);
-      let color = mix(point.color, uniforms.color, 0.4);
+      let color = mix(point.color, uniforms.color, uniforms.colorSpeed);
       return Point(p, color);
     }
   `.$uses({
@@ -111,7 +112,7 @@ export function extractFlameUniforms({
     recordEntries(transforms).map(
       ([
         tid,
-        { variations, probability, color, preAffine, postAffine, visible },
+        { variations, probability, color, preAffine, postAffine, visible, colorSpeed },
       ]) => {
         const isVisible = visible
         return [
@@ -119,6 +120,7 @@ export function extractFlameUniforms({
           {
             probability: isVisible ? probability / totalProbability : 0,
             color: vec2f(color?.x ?? 0, color?.y ?? 0),
+            colorSpeed: colorSpeed ?? 0.4,
             preAffine: preAffine
               ? {
                   a: preAffine.a ?? 1,

@@ -24,6 +24,7 @@ const COEFFICIENTS = [
 type AffineListEditorProps = {
   transforms: TransformRecord
   setTransforms: HistorySetter<TransformRecord>
+  affineMode: 'preAffine' | 'postAffine'
 }
 
 export function AffineListEditor(props: AffineListEditorProps) {
@@ -56,7 +57,7 @@ export function AffineListEditor(props: AffineListEditorProps) {
                 title="Randomize affine coefs"
                 onClick={() => {
                   props.setTransforms((draft) => {
-                    const coefs = draft[tid]!.preAffine
+                    const coefs = draft[tid]![props.affineMode]
                     for (const key of ['a', 'b', 'c', 'd', 'e', 'f'] as const) {
                       coefs[key] = randomizeAffineCoef(coefs[key], key)
                     }
@@ -69,14 +70,14 @@ export function AffineListEditor(props: AffineListEditorProps) {
                 {({ key, label }) => (
                   <ScrubInput
                     label={label}
-                    value={transform.preAffine[key]}
+                    value={transform[props.affineMode][key]}
                     step={0.001}
                     onInput={(val) => {
                       props.setTransforms((draft) => {
-                        draft[tid]!.preAffine[key] = val
+                        draft[tid]![props.affineMode][key] = val
                       })
                     }}
-                    dataParameterPath={`transform.${tid}.preAffine.${key}`}
+                    dataParameterPath={`transform.${tid}.${props.affineMode}.${key}`}
                   />
                 )}
               </For>

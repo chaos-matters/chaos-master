@@ -131,6 +131,18 @@
   }
 }
 
+.divider {
+  width: 1px;
+  height: 12px;
+  background: var(--neutral-300);
+  align-self: center;
+  margin: 0 2px;
+
+  [data-theme='dark'] & {
+    background: var(--neutral-600);
+  }
+}
+
 .tab {
   padding: 2px 8px;
   border: none;

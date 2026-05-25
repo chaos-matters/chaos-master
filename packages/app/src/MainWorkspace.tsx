@@ -23,11 +23,14 @@ import { FloatingActions } from './components/FloatingActions/FloatingActions'
 import { createShowHelp } from './components/HelpModal/HelpModal'
 import { createLoadFlame } from './components/LoadFlameModal/LoadFlameModal'
 import { createLogoFaviconGenerator } from './components/LogoFaviconGenerator/LogoFaviconGenerator'
+import { useRequestModal } from './components/Modal/ModalContext'
+import { ModalTitleBar } from './components/Modal/ModalTitleBar'
 import { PaletteSelector } from './components/PaletteSelector/PaletteSelector'
 import { ProgressBar } from './components/ProgressBar/ProgressBar'
 import { getPresetFromQuality, qualityPresets, } from './components/Quality/QualityPresets'
 import { QuickVariationPicker } from './components/QuickVariationPicker/QuickVariationPicker'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
+import { ScrubInput } from './components/Sliders/ScrubInput'
 import { Slider } from './components/Sliders/Slider'
 import { SoftwareVersion } from './components/SoftwareVersion/SoftwareVersion'
 import { SpotlightTour } from './components/SpotlightTour/SpotlightTour'
@@ -94,6 +97,7 @@ function formatPercent(x: number) {
 function newDefaultTransform(): TransformFunction {
   return {
     probability: 1,
+    colorSpeed: 0.4,
     color: { x: 0, y: 0 },
     preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
     postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
@@ -139,6 +143,50 @@ export function MainWorkspace(props: AppProps) {
   const SIDEBAR_RESIZABLE = false
   const { isCompact, toggleCompact } = useCompactMode()
   const [showSidebar, setShowSidebar] = createSignal(true)
+  const requestModal = useRequestModal()
+
+  async function requestSymmetryModal(): Promise<number | null> {
+    return requestModal<number | null>({
+      content: ({ respond }) => {
+        const [value, setValue] = createSignal(3)
+        return (
+          <>
+            <ModalTitleBar onClose={() => { respond(null) }}>
+              Rotational Symmetry
+            </ModalTitleBar>
+            <div style={{ display: 'flex', 'flex-direction': 'column', gap: 'var(--space-3)' }}>
+              <p style={{ margin: '0', 'font-size': '0.85rem', color: 'var(--neutral-500)' }}>
+                Adds N-1 rotation transforms with color speed 0.
+              </p>
+              <label style={{ display: 'flex', 'align-items': 'center', gap: 'var(--space-3)', 'font-size': '0.85rem' }}>
+                <span>Folds (N)</span>
+                <input
+                  type="number"
+                  min={2}
+                  max={36}
+                  value={value()}
+                  onInput={(e) => setValue(parseInt(e.currentTarget.value, 10) || 2)}
+                  style={{
+                    width: '60px',
+                    padding: '4px 8px',
+                    border: '1px solid var(--neutral-300)',
+                    'border-radius': '4px',
+                    background: 'var(--neutral-100)',
+                    color: 'inherit',
+                    'font-size': '0.85rem',
+                  }}
+                />
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', 'justify-content': 'flex-end' }}>
+              <Button onClick={() => { respond(null) }}>Cancel</Button>
+              <Button onClick={() => { respond(value()) }}>Add</Button>
+            </div>
+          </>
+        )
+      },
+    })
+  }
   const [sidebarHidden, setSidebarHidden] = createSignal(false)
   const [sidebarLayoutMode, setSidebarLayoutMode] = persistentSignal<
     'compact' | 'wide'
@@ -1426,6 +1474,31 @@ export function MainWorkspace(props: AppProps) {
                               dataParameterPath={`transform.${tid}.probability`}
                             />
                           </div>
+                          <div
+                            classList={{
+                              [ui.transformGridRow as string]: true,
+                            }}
+                            onClick={() => {
+                              setTargetedParameter(
+                                `transform.${tid}.colorSpeed`,
+                              )
+                            }}
+                          >
+                            <Slider
+                              class={ui.transformGridFirstRow}
+                              label="Color Speed"
+                              value={transform.colorSpeed ?? 0.4}
+                              min={0}
+                              max={1}
+                              step={0.01}
+                              onInput={(val) => {
+                                setFlameDescriptor((draft) => {
+                                  draft.transforms[tid]!.colorSpeed = val
+                                })
+                              }}
+                              dataParameterPath={`transform.${tid}.colorSpeed`}
+                            />
+                          </div>
                           <For each={recordEntries(transform.variations)}>
                             {([vid, variation]) => (
                               <>
@@ -1663,7 +1736,66 @@ export function MainWorkspace(props: AppProps) {
                     >
                       New transform
                     </button>
+                    <button
+                      class={ui.addFlameButton}
+                      onClick={async () => {
+                        const n = await requestSymmetryModal()
+                        if (n !== null && n > 1) {
+                          setFlameDescriptor((draft) => {
+                            for (let i = 1; i < n; i++) {
+                              const angle = (2 * Math.PI * i) / n
+                              const cos = Math.cos(angle)
+                              const sin = Math.sin(angle)
+                              draft.transforms[generateTransformId('sym')] = {
+                                probability: 1,
+                                colorSpeed: 0,
+                                color: { x: 0, y: 0 },
+                                visible: true,
+                                preAffine: { a: cos, b: -sin, c: 0, d: sin, e: cos, f: 0 },
+                                postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+                                variations: {
+                                  [generateVariationId()]: getVariationDefault('linear', 1),
+                                },
+                              }
+                            }
+                          })
+                        }
+                      }}
+                    >
+                      Add symmetry
+                    </button>
                   </Card>
+                  <CollapsibleCard title="Final Transform">
+                    <Card>
+                      <div style={{ display: 'grid', "grid-template-columns": '1fr 1fr', gap: '8px', padding: '16px' }}>
+                      <For each={['a', 'b', 'c', 'd', 'e', 'f'] as const}>
+                        {(key) => (
+                          <div
+                            class={ui.parameterTarget}
+                            onClick={() => {
+                              setTargetedParameter(`finalTransform.${key}`)
+                            }}
+                          >
+                            <ScrubInput
+                              label={key}
+                              value={flameDescriptor.finalTransform?.[key] ?? (key === 'a' || key === 'e' ? 1 : 0)}
+                              step={0.001}
+                              onInput={(val) => {
+                                setFlameDescriptor((draft) => {
+                                  if (!draft.finalTransform) {
+                                    draft.finalTransform = { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 }
+                                  }
+                                  draft.finalTransform[key] = val
+                                })
+                              }}
+                              dataParameterPath={`finalTransform.${key}`}
+                            />
+                          </div>
+                        )}
+                      </For>
+                      </div>
+                    </Card>
+                  </CollapsibleCard>
                   <CollapsibleCard title="Render">
                     <Card>
                       <div

@@ -19,7 +19,13 @@ export const sidebarTour: TourGuide = {
       target: '[data-tour-target="affine-tabs"]',
       title: 'Affine Coefficients',
       description:
-        'Pre and post affine transforms control position, rotation, and scale for each transform. Switch between Grid and List views for different editing styles.',
+        'Pre and post affine transforms control position, rotation, and scale for each transform. Switch between Grid and List views, and toggle Pre/Post to edit the transform applied before or after variations.',
+    },
+    {
+      target: '[data-tour-target="affine-mode"]',
+      title: 'Pre / Post Transform',
+      description:
+        'Switch between editing the Pre-Transform (applied before variations) and the Post-Transform (applied after variations). The post-transform lets you warp the output of non-linear variations independently.',
     },
     {
       target: '[data-tour-target="probability"]',
