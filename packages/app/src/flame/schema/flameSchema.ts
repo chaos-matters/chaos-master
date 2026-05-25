@@ -62,6 +62,7 @@ export const TransformFunction = v.object({
     x: v.number(),
     y: v.number(),
   }),
+  colorSpeed: v.optional(v.number(), 0.4),
   visible: v.optional(v.boolean(), true),
   variations: VariationRecord,
 })
@@ -160,6 +161,7 @@ export const FlameDescriptor = v.object({
   metadata: v.optional(FlameMetadata, metadataDefault),
   renderSettings: v.optional(RenderSettings, renderSettingsDefault),
   transforms: TransformRecord,
+  finalTransform: v.optional(AffineParamsSchema),
 })
 
 export function validateFlame(data: unknown): FlameDescriptor {

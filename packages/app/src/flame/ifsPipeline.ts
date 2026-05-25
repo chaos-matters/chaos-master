@@ -6,6 +6,7 @@ import { camera2DWorldToClip } from '@/lib/Camera2D'
 import { hash, random, randomState, setSeed } from '@/shaders/random'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { vramLog } from '@/utils/vramLog'
+import { AffineParams, transformAffine } from './affineTranform'
 import { colorInitModeToImplFn } from './colorInitMode'
 import { pointInitModeToImplFn } from './pointInitMode'
 import { createFlameWgsl, extractFlameUniforms } from './transformFunction'
@@ -88,6 +89,9 @@ export function createIFSPipeline(
       outputTextureDimension: {
         uniform: vec2i,
       },
+      finalTransform: {
+        uniform: AffineParams,
+      },
       accumulationBuffer: {
         storage: arrayOf(AtomicBucket),
         access: 'mutable',
@@ -150,6 +154,8 @@ export function createIFSPipeline(
         point = executeRandomFlame(point)
       }
 
+      point.position = transformAffine(bindGroupLayout.$.finalTransform, point.position)
+
       const clip = camera2DWorldToClip(point.position)
       const outputTextureDimensionF = vec2f(outputTextureDimension)
       const screen = mul(
@@ -199,18 +205,23 @@ export function createIFSPipeline(
   const outputTextureDimensionBuffer = root
     .createBuffer(vec2i, vec2i(...outputTextureDimension))
     .$usage('uniform')
-  vramLog('[ifsPipeline] Created flameUniforms & dimension buffers')
+  const finalTransformBuffer = root
+    .createBuffer(AffineParams, { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 })
+    .$usage('uniform')
+  vramLog('[ifsPipeline] Created flameUniforms, finalTransform & dimension buffers')
 
   onCleanup(() => {
-    vramLog('[ifsPipeline] Destroying flameUniforms & dimension buffers')
+    vramLog('[ifsPipeline] Destroying flameUniforms, finalTransform & dimension buffers')
     flameUniformsBuffer.destroy()
     outputTextureDimensionBuffer.destroy()
+    finalTransformBuffer.destroy()
   })
 
   const bindGroup = root.createBindGroup(bindGroupLayout, {
     pointRandomSeeds,
     flameUniforms: flameUniformsBuffer,
     outputTextureDimension: outputTextureDimensionBuffer,
+    finalTransform: finalTransformBuffer,
     accumulationBuffer,
   })
 
@@ -232,6 +243,16 @@ export function createIFSPipeline(
     },
     update: (flameDescriptor: FlameDescriptor) => {
       flameUniformsBuffer.write(extractFlameUniforms(flameDescriptor))
+      finalTransformBuffer.write(
+        flameDescriptor.finalTransform ?? {
+          a: 1,
+          b: 0,
+          c: 0,
+          d: 0,
+          e: 1,
+          f: 0,
+        },
+      )
     },
   }
 }

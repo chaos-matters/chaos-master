@@ -343,6 +343,7 @@ export function AffineEditor(props: {
   const [zoom, setZoom] = createZoom(0.9, [0.5, 20])
   const [position, setPosition] = createPosition(vec2f())
   const [tab, setTab] = createSignal<Tab>('grid')
+  const [affineMode, setAffineMode] = createSignal<'preAffine' | 'postAffine'>('preAffine')
   const [isVisible, setIsVisible] = createSignal(true)
 
   useIntersectionObserver(div, (visible) => setIsVisible(visible))
@@ -378,6 +379,23 @@ export function AffineEditor(props: {
         >
           Coefs
         </button>
+        <span class={ui.divider} />
+        <button
+          class={ui.tab}
+          classList={{ [ui.tabActive as string]: affineMode() === 'preAffine' }}
+          onClick={() => setAffineMode('preAffine')}
+          data-tour-target="affine-mode"
+        >
+          Pre
+        </button>
+        <button
+          class={ui.tab}
+          classList={{ [ui.tabActive as string]: affineMode() === 'postAffine' }}
+          onClick={() => setAffineMode('postAffine')}
+          data-tour-target="affine-mode"
+        >
+          Post
+        </button>
       </div>
 
       <Show when={tab() === 'grid'}>
@@ -407,11 +425,11 @@ export function AffineEditor(props: {
               <For each={recordEntries(props.transforms)}>
                 {([tid, transform]) => (
                   <AffineHandle
-                    transform={transform.preAffine}
+                    transform={transform[affineMode()]}
                     color={vec2f(transform.color.x, transform.color.y)}
                     setTransform={(affine) => {
                       props.setTransforms((draft) => {
-                        draft[tid]!.preAffine = affine
+                        draft[tid]![affineMode()] = affine
                       })
                     }}
                   />
@@ -426,6 +444,7 @@ export function AffineEditor(props: {
         <AffineListEditor
           transforms={props.transforms}
           setTransforms={props.setTransforms}
+          affineMode={affineMode()}
         />
       </Show>
     </div>
