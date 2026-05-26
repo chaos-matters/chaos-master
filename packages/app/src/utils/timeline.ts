@@ -129,6 +129,42 @@ export const TIMELINE_PARAMETERS: TimelineParameter[] = [
     type: 'string',
     group: 'Render',
   },
+  {
+    path: 'finalTransform.a',
+    label: 'Final Transform A',
+    type: 'number',
+    group: 'Final Transform',
+  },
+  {
+    path: 'finalTransform.b',
+    label: 'Final Transform B',
+    type: 'number',
+    group: 'Final Transform',
+  },
+  {
+    path: 'finalTransform.c',
+    label: 'Final Transform C',
+    type: 'number',
+    group: 'Final Transform',
+  },
+  {
+    path: 'finalTransform.d',
+    label: 'Final Transform D',
+    type: 'number',
+    group: 'Final Transform',
+  },
+  {
+    path: 'finalTransform.e',
+    label: 'Final Transform E',
+    type: 'number',
+    group: 'Final Transform',
+  },
+  {
+    path: 'finalTransform.f',
+    label: 'Final Transform F',
+    type: 'number',
+    group: 'Final Transform',
+  },
 ]
 
 /** Flat set of all variation parameter names (e.g. 'distortion', 'freqX', ...). */
@@ -1205,6 +1241,29 @@ function applyTracksToFlame(
       }
     }
   }
+
+  // Final transform
+  if (!flame.finalTransform) {
+    flame.finalTransform = { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 }
+  }
+  applyNumber('finalTransform.a', (v) => {
+    flame.finalTransform!.a = v
+  })
+  applyNumber('finalTransform.b', (v) => {
+    flame.finalTransform!.b = v
+  })
+  applyNumber('finalTransform.c', (v) => {
+    flame.finalTransform!.c = v
+  })
+  applyNumber('finalTransform.d', (v) => {
+    flame.finalTransform!.d = v
+  })
+  applyNumber('finalTransform.e', (v) => {
+    flame.finalTransform!.e = v
+  })
+  applyNumber('finalTransform.f', (v) => {
+    flame.finalTransform!.f = v
+  })
 }
 
 /**

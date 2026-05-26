@@ -33,6 +33,7 @@ interface AnimationPaths {
     paramName: string,
   ): string
   variationWeight(transformIndex: number, variationIndex: number): string
+  finalTransformParam(coef: string): string
 }
 
 function createAnimationPaths(flame: FlameDescriptor): AnimationPaths {
@@ -69,6 +70,9 @@ function createAnimationPaths(flame: FlameDescriptor): AnimationPaths {
       const vid = getVids(tIndex)[vIndex]!
       return `${tid}.${vid}`
     },
+    finalTransformParam(coef: string): string {
+      return `finalTransform.${coef}`
+    },
   }
 }
 
@@ -97,6 +101,10 @@ const p22 = createAnimationPaths(examples.example22)
 const p23 = createAnimationPaths(examples.example23)
 const p24 = createAnimationPaths(examples.example24)
 const p25 = createAnimationPaths(examples.example25)
+const p26 = createAnimationPaths(examples.example26)
+const p27 = createAnimationPaths(examples.example27)
+const p28 = createAnimationPaths(examples.example28)
+const p29 = createAnimationPaths(examples.example29)
 
 // ---------------------------------------------------------------------------
 // Example 1 — multi-transform with swirl, popcorn, pie, gaussian, sinusoidal
@@ -4862,6 +4870,403 @@ const anim25b: AnimationDef = {
 
 
 // ---------------------------------------------------------------------------
+// Example 26 — Radiant Symmetry (D4 dihedral symmetry)
+// ---------------------------------------------------------------------------
+
+const ex26 = 'example26' as const
+
+const anim26a: AnimationDef = {
+  id: 'ex26-camera-orbit',
+  name: 'Camera Orbit & Exposure',
+  description: 'Camera orbits the symmetric center with exposure pulse',
+  exampleId: ex26,
+  tracks: [
+    {
+      parameterPath: 'camera.x',
+      keyframes: [
+        { frame: 0, value: 0 },
+        { frame: 22, value: 0.15, easing: 'easeInOut' as const },
+        { frame: 45, value: 0 },
+        { frame: 67, value: -0.15, easing: 'easeInOut' as const },
+        { frame: 90, value: 0 },
+      ],
+    },
+    {
+      parameterPath: 'camera.y',
+      keyframes: [
+        { frame: 0, value: 0 },
+        { frame: 22, value: -0.15, easing: 'easeInOut' as const },
+        { frame: 45, value: 0 },
+        { frame: 67, value: 0.15, easing: 'easeInOut' as const },
+        { frame: 90, value: 0 },
+      ],
+    },
+    {
+      parameterPath: 'exposure',
+      keyframes: [
+        { frame: 0, value: 0.25 },
+        { frame: 45, value: 0.4, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.25 },
+      ],
+    },
+    {
+      parameterPath: 'camera.zoom',
+      keyframes: [
+        { frame: 0, value: 1.0 },
+        { frame: 45, value: 0.65, easing: 'easeInOut' as const },
+        { frame: 90, value: 1.0 },
+      ],
+    },
+  ],
+}
+
+const anim26b: AnimationDef = {
+  id: 'ex26-color-shift',
+  name: 'Color Shift & Vibrancy',
+  description: 'Transform colors shift through the palette with vibrancy sweep',
+  exampleId: ex26,
+  tracks: [
+    {
+      parameterPath: p26.variationWeight(0, 0),
+      keyframes: [
+        { frame: 0, value: 0.9 },
+        { frame: 30, value: 1.2, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.6, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.9 },
+      ],
+    },
+    {
+      parameterPath: p26.transformColor(0, 'x'),
+      keyframes: [
+        { frame: 0, value: 0.4 },
+        { frame: 45, value: -0.3, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.4 },
+      ],
+    },
+    {
+      parameterPath: p26.transformColor(0, 'y'),
+      keyframes: [
+        { frame: 0, value: 0.1 },
+        { frame: 45, value: 0.5, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.1 },
+      ],
+    },
+    {
+      parameterPath: 'vibrancy',
+      keyframes: [
+        { frame: 0, value: 0.6 },
+        { frame: 45, value: 0.9, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.6 },
+      ],
+    },
+    {
+      parameterPath: 'palettePhase',
+      keyframes: [
+        { frame: 0, value: 0 },
+        { frame: 90, value: 0.75, easing: 'easeInOut' as const },
+      ],
+    },
+  ],
+}
+
+
+// ---------------------------------------------------------------------------
+// Example 27 — Post-Spiral Galaxy (postAffine showcase)
+// ---------------------------------------------------------------------------
+
+const ex27 = 'example27' as const
+
+const anim27a: AnimationDef = {
+  id: 'ex27-spiral-tightness',
+  name: 'Spiral Tightness',
+  description: 'postAffine rotation coefficients sweep to change spiral tightness',
+  exampleId: ex27,
+  tracks: [
+    {
+      parameterPath: p27.transformPostAffine(0, 'b'),
+      keyframes: [
+        { frame: 0, value: -0.35 },
+        { frame: 45, value: -0.65, easing: 'easeInOut' as const },
+        { frame: 90, value: -0.35 },
+      ],
+    },
+    {
+      parameterPath: p27.transformPostAffine(0, 'd'),
+      keyframes: [
+        { frame: 0, value: 0.15 },
+        { frame: 45, value: 0.35, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.15 },
+      ],
+    },
+    {
+      parameterPath: p27.transformPostAffine(1, 'a'),
+      keyframes: [
+        { frame: 0, value: 0.95 },
+        { frame: 30, value: 1.15, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.75, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.95 },
+      ],
+    },
+    {
+      parameterPath: p27.transformPostAffine(1, 'e'),
+      keyframes: [
+        { frame: 0, value: 1.15 },
+        { frame: 30, value: 0.9, easing: 'easeInOut' as const },
+        { frame: 60, value: 1.3, easing: 'easeInOut' as const },
+        { frame: 90, value: 1.15 },
+      ],
+    },
+    {
+      parameterPath: 'exposure',
+      keyframes: [
+        { frame: 0, value: 0.3 },
+        { frame: 45, value: 0.45, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.3 },
+      ],
+    },
+  ],
+}
+
+const anim27b: AnimationDef = {
+  id: 'ex27-camera-probability',
+  name: 'Camera Pull & Probability Crossfade',
+  description: 'Camera zooms out while transform probabilities crossfade',
+  exampleId: ex27,
+  tracks: [
+    {
+      parameterPath: 'camera.zoom',
+      keyframes: [
+        { frame: 0, value: 1.0 },
+        { frame: 60, value: 0.4, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.6 },
+      ],
+    },
+    {
+      parameterPath: p27.transformProbability(0),
+      keyframes: [
+        { frame: 0, value: 0.4 },
+        { frame: 30, value: 0.6, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.2, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.4 },
+      ],
+    },
+    {
+      parameterPath: p27.transformProbability(1),
+      keyframes: [
+        { frame: 0, value: 0.35 },
+        { frame: 30, value: 0.15, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.5, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.35 },
+      ],
+    },
+    {
+      parameterPath: p27.transformProbability(2),
+      keyframes: [
+        { frame: 0, value: 0.25 },
+        { frame: 30, value: 0.25 },
+        { frame: 60, value: 0.3 },
+        { frame: 90, value: 0.25 },
+      ],
+    },
+  ],
+}
+
+
+// ---------------------------------------------------------------------------
+// Example 28 — Final Lens (finalTransform showcase)
+// ---------------------------------------------------------------------------
+
+const ex28 = 'example28' as const
+
+const anim28a: AnimationDef = {
+  id: 'ex28-lens-warp',
+  name: 'Lens Warp',
+  description: 'finalTransform coefficients sweep to create dynamic lens warping',
+  exampleId: ex28,
+  tracks: [
+    {
+      parameterPath: p28.finalTransformParam('a'),
+      keyframes: [
+        { frame: 0, value: 0.85 },
+        { frame: 30, value: 1.1, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.6, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.85 },
+      ],
+    },
+    {
+      parameterPath: p28.finalTransformParam('b'),
+      keyframes: [
+        { frame: 0, value: 0.2 },
+        { frame: 22, value: 0.5, easing: 'easeInOut' as const },
+        { frame: 45, value: -0.1, easing: 'easeInOut' as const },
+        { frame: 67, value: -0.4, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.2 },
+      ],
+    },
+    {
+      parameterPath: p28.finalTransformParam('d'),
+      keyframes: [
+        { frame: 0, value: -0.15 },
+        { frame: 45, value: 0.3, easing: 'easeInOut' as const },
+        { frame: 90, value: -0.15 },
+      ],
+    },
+    {
+      parameterPath: p28.finalTransformParam('e'),
+      keyframes: [
+        { frame: 0, value: 1.1 },
+        { frame: 45, value: 0.7, easing: 'easeInOut' as const },
+        { frame: 90, value: 1.1 },
+      ],
+    },
+  ],
+}
+
+const anim28b: AnimationDef = {
+  id: 'ex28-contrast-pan',
+  name: 'Contrast Pan & Breathing',
+  description: 'Camera pans while contrast and gamma create a breathing effect',
+  exampleId: ex28,
+  tracks: [
+    {
+      parameterPath: 'camera.x',
+      keyframes: [
+        { frame: 0, value: 0 },
+        { frame: 30, value: 0.2, easing: 'easeInOut' as const },
+        { frame: 60, value: -0.1, easing: 'easeInOut' as const },
+        { frame: 90, value: 0 },
+      ],
+    },
+    {
+      parameterPath: 'camera.y',
+      keyframes: [
+        { frame: 0, value: 0 },
+        { frame: 30, value: -0.15, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.1, easing: 'easeInOut' as const },
+        { frame: 90, value: 0 },
+      ],
+    },
+    {
+      parameterPath: 'contrast',
+      keyframes: [
+        { frame: 0, value: 1.0 },
+        { frame: 30, value: 1.5, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.7, easing: 'easeInOut' as const },
+        { frame: 90, value: 1.0 },
+      ],
+    },
+    {
+      parameterPath: 'gamma',
+      keyframes: [
+        { frame: 0, value: 2.0 },
+        { frame: 45, value: 2.8, easing: 'easeInOut' as const },
+        { frame: 90, value: 2.0 },
+      ],
+    },
+  ],
+}
+
+
+// ---------------------------------------------------------------------------
+// Example 29 — Symmetry Cascade (D3 symmetry + postAffine)
+// ---------------------------------------------------------------------------
+
+const ex29 = 'example29' as const
+
+const anim29a: AnimationDef = {
+  id: 'ex29-kaleidoscope',
+  name: 'Kaleidoscope Morph',
+  description: 'Variation weights crossfade to morph the hexagonal kaleidoscope',
+  exampleId: ex29,
+  tracks: [
+    {
+      parameterPath: p29.variationWeight(0, 0),
+      keyframes: [
+        { frame: 0, value: 0.85 },
+        { frame: 30, value: 1.2, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.5, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.85 },
+      ],
+    },
+    {
+      parameterPath: p29.variationWeight(0, 1),
+      keyframes: [
+        { frame: 0, value: 0.3 },
+        { frame: 30, value: 0.6, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.1, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.3 },
+      ],
+    },
+    {
+      parameterPath: p29.variationWeight(1, 0),
+      keyframes: [
+        { frame: 0, value: 0.75 },
+        { frame: 45, value: 0.4, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.75 },
+      ],
+    },
+    {
+      parameterPath: p29.variationWeight(1, 1),
+      keyframes: [
+        { frame: 0, value: 0.4 },
+        { frame: 45, value: 0.8, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.4 },
+      ],
+    },
+  ],
+}
+
+const anim29b: AnimationDef = {
+  id: 'ex29-post-morph',
+  name: 'Petal Reshape & Phase',
+  description: 'postAffine coefficients reshape petals while palette phase shifts',
+  exampleId: ex29,
+  tracks: [
+    {
+      parameterPath: p29.transformPostAffine(0, 'e'),
+      keyframes: [
+        { frame: 0, value: 1.2 },
+        { frame: 30, value: 1.5, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.8, easing: 'easeInOut' as const },
+        { frame: 90, value: 1.2 },
+      ],
+    },
+    {
+      parameterPath: p29.transformPostAffine(1, 'a'),
+      keyframes: [
+        { frame: 0, value: 0.7 },
+        { frame: 45, value: 1.0, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.7 },
+      ],
+    },
+    {
+      parameterPath: p29.transformPostAffine(1, 'b'),
+      keyframes: [
+        { frame: 0, value: -0.2 },
+        { frame: 45, value: 0.2, easing: 'easeInOut' as const },
+        { frame: 90, value: -0.2 },
+      ],
+    },
+    {
+      parameterPath: 'palettePhase',
+      keyframes: [
+        { frame: 0, value: 0 },
+        { frame: 90, value: 0.9, easing: 'easeInOut' as const },
+      ],
+    },
+    {
+      parameterPath: 'vibrancy',
+      keyframes: [
+        { frame: 0, value: 0.65 },
+        { frame: 45, value: 0.9, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.65 },
+      ],
+    },
+  ],
+}
+
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
@@ -4933,6 +5338,14 @@ export const animationDefs: AnimationDef[] = [
   anim24b,
   anim25a,
   anim25b,
+  anim26a,
+  anim26b,
+  anim27a,
+  anim27b,
+  anim28a,
+  anim28b,
+  anim29a,
+  anim29b,
 ]
 
 /** Group animations by their example flame */
