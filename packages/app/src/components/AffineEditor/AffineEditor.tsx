@@ -8,7 +8,7 @@ import { ScrubInput } from '@/components/Sliders/ScrubInput'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { randomizeAffineCoef } from '@/flame/randomize'
-import { ArrowRightToBox, BoxArrowRight, GridIcon, ListIcon, Sparkle } from '@/icons'
+import { ArrowRightToBox, BoxArrowRight, GridIcon, ListIcon, Sparkle, } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { useCamera } from '@/lib/CameraContext'
 import { useCanvas } from '@/lib/CanvasContext'
@@ -401,7 +401,9 @@ export function AffineEditor(props: {
         </button>
         <button
           class={ui.tab}
-          classList={{ [ui.tabActive as string]: affineMode() === 'postAffine' }}
+          classList={{
+            [ui.tabActive as string]: affineMode() === 'postAffine',
+          }}
           onClick={() => setAffineMode('postAffine')}
           data-tour-target="affine-mode"
           title="Post-transform (after variations)"
@@ -449,11 +451,15 @@ export function AffineEditor(props: {
                 <For each={recordEntries(props.transforms)}>
                   {([tid, transform]) => (
                     <AffineHandle
-                      transform={transform[affineMode() as 'preAffine' | 'postAffine']}
+                      transform={
+                        transform[affineMode() as 'preAffine' | 'postAffine']
+                      }
                       color={vec2f(transform.color.x, transform.color.y)}
                       setTransform={(affine) => {
                         props.setTransforms((draft) => {
-                          draft[tid]![affineMode() as 'preAffine' | 'postAffine'] = affine
+                          draft[tid]![
+                            affineMode() as 'preAffine' | 'postAffine'
+                          ] = affine
                         })
                       }}
                     />
@@ -481,13 +487,15 @@ export function AffineEditor(props: {
           affineMode={affineMode() as 'preAffine' | 'postAffine'}
         />
       </Show>
-      <Show when={tab() === 'list' && affineMode() === 'final' && props.finalTransform}>
+      <Show
+        when={
+          tab() === 'list' && affineMode() === 'final' && props.finalTransform
+        }
+      >
         <div class={listUi.container}>
           <div class={listUi.transformCard}>
             <div class={listUi.transformHeader}>
-              <span class={listUi.transformLabel}>
-                Final Transform
-              </span>
+              <span class={listUi.transformLabel}>Final Transform</span>
               <DiceButton
                 title="Randomize affine coefs"
                 onClick={() => {
