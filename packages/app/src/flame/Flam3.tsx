@@ -128,6 +128,7 @@ export function Flam3(props: Flam3Props) {
       gamma: 2.2,
       highlightPower: 0.5,
       outputAlpha: 0,
+      paletteMode: 0,
     })
     .$usage('uniform')
 
@@ -181,7 +182,6 @@ export function Flam3(props: Flam3Props) {
       canvasFormat,
       drawModeToImplFn[props.flameDescriptor.renderSettings.drawMode],
       props.palette?.(),
-      animatedFlame().renderSettings.paletteMode ?? 0,
     )
   })
 
@@ -476,6 +476,7 @@ export function Flam3(props: Flam3Props) {
         gamma: animatedFlame().renderSettings.gamma ?? 2.2,
         highlightPower: animatedFlame().renderSettings.highlightPower ?? 0.5,
         outputAlpha: props.outputAlpha ? 1 : 0,
+        paletteMode: animatedFlame().renderSettings.paletteMode ?? 0,
       })
       rafLoop.redraw()
       forceDrawToScreen = true

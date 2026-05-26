@@ -9,6 +9,8 @@ import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 import type { Palette } from './colorMap'
 import type { DrawModeFn } from './drawMode'
 
+const EPSILON = 0.001
+
 export const ColorGradingUniforms = struct({
   averagePointCountPerBucketInv: f32,
   exposure: f32,
@@ -23,6 +25,8 @@ export const ColorGradingUniforms = struct({
   paletteSpeed: f32,
   /** Number of palette entries */
   paletteEntryCount: i32,
+  /** Palette mode: 0 = density-shift, 1 = flam3 hue rotation */
+  paletteMode: i32,
   /** Contrast multiplier for log-density (0.1-10, default 1) */
   contrast: f32,
   /** Gamma exponent for power curve (0.2-5, default 2.2 = sRGB) */
@@ -67,7 +71,6 @@ export function createColorGradingPipeline(
   canvasFormat: GPUTextureFormat,
   drawMode: DrawModeFn,
   palette: Palette | undefined,
-  paletteMode: number = 0,
 ) {
   const textureSizeBuffer = root
     .createBuffer(vec2i, vec2i(...textureSize))
@@ -86,7 +89,6 @@ export function createColorGradingPipeline(
 
   const entryCount = Math.max(palette?.entries.length ?? 0, 1)
 
-  // Create palette buffer using tgpu (avoids texture binding origin "handle" issues)
   const paletteBuffer = root
     .createBuffer(arrayOf(PaletteEntry, entryCount))
     .$usage('storage')
@@ -124,8 +126,7 @@ export function createColorGradingPipeline(
     }
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const fragmentBodyMode0 = ({ pos, uv }: { pos: any; uv: any }) => {
+  const fragmentBody = ({ pos, uv }: { pos: any; uv: any }) => {
     'use gpu'
     const uniforms = bindGroupLayout.$.uniforms
     const textureSize = bindGroupLayout.$.textureSize
@@ -141,7 +142,10 @@ export function createColorGradingPipeline(
     const pos2i = vec2i(pos.xy)
     const texelIndex = pos2i.y * textureSize.x + pos2i.x
     const tex = accumulationBuffer[texelIndex]!
-    const count = f32(tex.count) * BUCKET_FIXED_POINT_MULTIPLIER_INV
+    const count = max(
+      f32(tex.count) * BUCKET_FIXED_POINT_MULTIPLIER_INV,
+      f32(EPSILON),
+    )
     const texColorAb = div(
       mul(
         vec2f(f32(tex.color.a), f32(tex.color.b)),
@@ -164,18 +168,39 @@ export function createColorGradingPipeline(
         f32(0.02),
         mul(uniforms.paletteSpeed, f32(0.298)),
       )
-      // Mode 0: density-shift — palettePhase shifts the density→palette mapping
-      const logDensityNorm = fract(
-        add(mul(logDensity, paletteScale), uniforms.palettePhase),
-      )
-      const idx = i32(mul(f32(uniforms.paletteEntryCount), logDensityNorm))
-      const clampedIdx = clamp(
-        idx,
-        i32(0),
-        sub(uniforms.paletteEntryCount, i32(1)),
-      )
-      const entry = paletteBuffer[clampedIdx]!
-      const paletteAb = vec2f(entry.a, entry.b)
+
+      let paletteAb: ReturnType<typeof vec2f>
+      if (uniforms.paletteMode === i32(0)) {
+        // Mode 0: density-shift — palettePhase shifts the density→palette mapping
+        const logDensityNorm = fract(
+          add(mul(logDensity, paletteScale), uniforms.palettePhase),
+        )
+        const idx = i32(mul(f32(uniforms.paletteEntryCount), logDensityNorm))
+        const clampedIdx = clamp(
+          idx,
+          i32(0),
+          sub(uniforms.paletteEntryCount, i32(1)),
+        )
+        const entry = paletteBuffer[clampedIdx]!
+        paletteAb = vec2f(entry.a, entry.b)
+      } else {
+        // Mode 1: flam3 hue rotation — rotate OkLab a/b chroma by palettePhase * 2π
+        const logDensityNorm = fract(mul(logDensity, paletteScale))
+        const idx = i32(mul(f32(uniforms.paletteEntryCount), logDensityNorm))
+        const clampedIdx = clamp(
+          idx,
+          i32(0),
+          sub(uniforms.paletteEntryCount, i32(1)),
+        )
+        const entry = paletteBuffer[clampedIdx]!
+        const hueAngle = mul(uniforms.palettePhase, f32(6.283185307))
+        const cosH = cos(hueAngle)
+        const sinH = sin(hueAngle)
+        paletteAb = vec2f(
+          sub(mul(entry.a, cosH), mul(entry.b, sinH)),
+          add(mul(entry.a, sinH), mul(entry.b, cosH)),
+        )
+      }
 
       const gamma = f32(0.5)
       const linrange = f32(1.0)
@@ -206,121 +231,15 @@ export function createColorGradingPipeline(
 
     let rgb = oklabToRgb(vec3f(drawMode(value), finalAb))
 
-    // Highlight desaturation: ramps from 0 at mid-tones to 1 at peak brightness.
-    // Works regardless of gamut clipping — affects all bright pixels.
-    const highlightMask = pow(saturate(value), f32(2))
+    const maxChan = max(rgb.r, max(rgb.g, rgb.b))
+    const excess = saturate(sub(maxChan, f32(1)))
+    const desat = sub(
+      f32(1),
+      mul(uniforms.highlightPower, div(excess, max(maxChan, f32(EPSILON)))),
+    )
     const lum = dot(rgb, vec3f(f32(0.299), f32(0.587), f32(0.114)))
-    const desaturatedRgb = mix(
-      rgb,
-      vec3f(lum),
-      mul(uniforms.highlightPower, highlightMask),
-    )
-    rgb = saturate(desaturatedRgb)
-
-    const flameAlpha = saturate(value) * (1 - edgeFade)
-    if (uniforms.outputAlpha > f32(0.5)) {
-      return vec4f(mul(rgb, flameAlpha), flameAlpha)
-    }
-    return vec4f(mix(backgroundColor.rgb, rgb, flameAlpha), f32(1))
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const fragmentBodyMode1 = ({ pos, uv }: { pos: any; uv: any }) => {
-    'use gpu'
-    const uniforms = bindGroupLayout.$.uniforms
-    const textureSize = bindGroupLayout.$.textureSize
-    const accumulationBuffer = bindGroupLayout.$.accumulationBuffer
-
-    const edgeFade =
-      uniforms.edgeFadeColor.a * smoothstep(0.75, 1, max(abs(uv.x), abs(uv.y)))
-    const backgroundColor = mix(
-      uniforms.backgroundColor,
-      uniforms.edgeFadeColor,
-      edgeFade,
-    )
-    const pos2i = vec2i(pos.xy)
-    const texelIndex = pos2i.y * textureSize.x + pos2i.x
-    const tex = accumulationBuffer[texelIndex]!
-    const count = f32(tex.count) * BUCKET_FIXED_POINT_MULTIPLIER_INV
-    const texColorAb = div(
-      mul(
-        vec2f(f32(tex.color.a), f32(tex.color.b)),
-        BUCKET_FIXED_POINT_MULTIPLIER_INV,
-      ),
-      count,
-    )
-
-    const adjustedCount = mul(
-      mul(count, uniforms.averagePointCountPerBucketInv),
-      f32(0.1),
-    )
-    const density = clamp(log(add(adjustedCount, f32(1))), f32(0), f32(1))
-
-    let finalAb = vec2f(texColorAb)
-    if (uniforms.paletteEntryCount > i32(0) && uniforms.vibrancy > f32(0)) {
-      const paletteBuffer = bindGroupLayout.$.paletteBuffer
-      const logDensity = clamp(log(add(count, f32(1))), f32(0), f32(10))
-      const paletteScale = add(
-        f32(0.02),
-        mul(uniforms.paletteSpeed, f32(0.298)),
-      )
-      // Mode 1: flam3 hue rotation — density mapping without phase,
-      // then rotate OkLab a/b chroma by palettePhase * 2π
-      const logDensityNorm = fract(mul(logDensity, paletteScale))
-      const idx = i32(mul(f32(uniforms.paletteEntryCount), logDensityNorm))
-      const clampedIdx = clamp(
-        idx,
-        i32(0),
-        sub(uniforms.paletteEntryCount, i32(1)),
-      )
-      const entry = paletteBuffer[clampedIdx]!
-      const hueAngle = mul(uniforms.palettePhase, f32(6.283185307))
-      const cosH = cos(hueAngle)
-      const sinH = sin(hueAngle)
-      const paletteAb = vec2f(
-        sub(mul(entry.a, cosH), mul(entry.b, sinH)),
-        add(mul(entry.a, sinH), mul(entry.b, cosH)),
-      )
-
-      const gamma = f32(0.5)
-      const linrange = f32(1.0)
-      const frac = div(density, linrange)
-      const funcval = pow(linrange, gamma)
-      const baseAlpha = add(
-        mul(mul(sub(f32(1), frac), density), div(funcval, linrange)),
-        mul(frac, pow(density, gamma)),
-      )
-      const paletteBlend = clamp(
-        mul(uniforms.vibrancy, saturate(baseAlpha)),
-        f32(0),
-        f32(1),
-      )
-      finalAb = mix(texColorAb, paletteAb, paletteBlend)
-    }
-
-    const logDensity = log(add(adjustedCount, f32(1)))
-    const tonemapped = mul(
-      mul(uniforms.exposure, uniforms.contrast),
-      logDensity,
-    )
-    const value = clamp(
-      pow(saturate(tonemapped), div(f32(1), uniforms.gamma)),
-      f32(0),
-      f32(2),
-    )
-
-    let rgb = oklabToRgb(vec3f(drawMode(value), finalAb))
-
-    // Highlight desaturation: ramps from 0 at mid-tones to 1 at peak brightness.
-    // Works regardless of gamut clipping — affects all bright pixels.
-    const highlightMask = pow(saturate(value), f32(2))
-    const lum = dot(rgb, vec3f(f32(0.299), f32(0.587), f32(0.114)))
-    const desaturatedRgb = mix(
-      rgb,
-      vec3f(lum),
-      mul(uniforms.highlightPower, highlightMask),
-    )
-    rgb = saturate(desaturatedRgb)
+    const desaturatedRgb = mix(vec3f(lum), rgb, saturate(desat))
+    rgb = saturate(mix(rgb, desaturatedRgb, excess))
 
     const flameAlpha = saturate(value) * (1 - edgeFade)
     if (uniforms.outputAlpha > f32(0.5)) {
@@ -332,7 +251,7 @@ export function createColorGradingPipeline(
   const fragment = tgpu.fragmentFn({
     in: VertexOutput,
     out: vec4f,
-  })(paletteMode === 0 ? fragmentBodyMode0 : fragmentBodyMode1)
+  })(fragmentBody)
 
   const renderPipeline = root
     .createRenderPipeline({

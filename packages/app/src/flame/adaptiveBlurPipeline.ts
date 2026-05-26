@@ -118,7 +118,7 @@ export function createAdaptiveBlurPipeline(
       totalWeight += weight
     }
 
-    tempBuffer[texelIndex]!.count = u32(totalCount / totalWeight)
+    tempBuffer[texelIndex]!.count = u32(max(f32(0), totalCount / totalWeight))
     tempBuffer[texelIndex]!.color.a = i32(totalColorA / totalWeight)
     tempBuffer[texelIndex]!.color.b = i32(totalColorB / totalWeight)
   })
