@@ -218,6 +218,10 @@ export function MainWorkspace(props: AppProps) {
 
   const symTransforms = createMemo(() => recordEntries(flameDescriptor.transforms).filter(([tid]) => tid.startsWith('_sym__')))
 
+  // Stable ID list for <For> -- only changes when transforms are added/removed,
+  // not when their values change, so dragging angle editors stays fluid.
+  const symTransformIds = createMemo(() => symTransforms().map(([tid]) => tid))
+
   const currentSymType = createMemo(() => {
     const syms = symTransforms() || []
     return syms.some(([, t]) => t?.preAffine?.a === -1 && t.preAffine.d === 0 && t.preAffine.b === 0 && t.preAffine.e === 1) ? 'dihedral' : 'rotational'
@@ -1755,36 +1759,11 @@ export function MainWorkspace(props: AppProps) {
                   <Show when={recordEntries(flameDescriptor.transforms).some(([tid]) => tid.startsWith('_sym__'))}>
                     <CollapsibleCard
                       title={`Symmetry (${recordEntries(flameDescriptor.transforms).filter(([tid]) => tid.startsWith('_sym__')).length})`}
-                      defaultOpen={false}
+                      defaultOpen={true}
                     >
-                      <div style={{
-                        display: 'flex',
-                        'flex-direction': 'column',
-                        gap: 'var(--space-2)',
-                        padding: 'var(--space-2)',
-                      }}>
-                        <div style={{ display: 'flex', 'align-items': 'center', 'justify-content': 'space-between' }}>
-                          <span style={{ 'font-size': '0.75rem', color: 'var(--neutral-500)', 'font-weight': '600' }}>
-                            {symTransforms().length} symmetry transform(s)
-                          </span>
-                          <button
-                            class={ui.deleteFlameButton}
-                            title="Remove all symmetry transforms"
-                            onClick={() => {
-                              setFlameDescriptor((draft) => {
-                                for (const tid of recordKeys(draft.transforms)) {
-                                  if (tid.startsWith('_sym__')) {
-                                    delete draft.transforms[tid]
-                                  }
-                                }
-                              })
-                            }}
-                          >
-                            <Cross />
-                          </button>
-                        </div>
-                        <div style={{ display: 'flex', 'align-items': 'center', gap: 'var(--space-2)' }}>
-                          <span style={{ 'font-size': '0.75rem', width: '50px' }}>Type</span>
+                      <div class={ui.symPanel}>
+                        <div class={ui.symControls}>
+                          <span class={ui.symControlsLabel}>Type</span>
                           <select
                             class={ui.select}
                             value={currentSymType()}
@@ -1795,92 +1774,111 @@ export function MainWorkspace(props: AppProps) {
                             <option value="rotational">Rotational</option>
                             <option value="dihedral">Dihedral</option>
                           </select>
-                        </div>
-                        <div style={{ display: 'flex', 'align-items': 'center', gap: 'var(--space-2)' }}>
-                          <span style={{ 'font-size': '0.75rem', width: '50px' }}>Folds</span>
-                          <div style={{ flex: 1 }}>
-                            <ScrubInput
-                              label=""
-                              value={currentSymFolds()}
-                              step={1}
-                              onInput={(val: number) => {
-                                const newN = Math.max(2, Math.round(val))
-                                if (newN !== currentSymFolds()) {
-                                   applySymmetry(newN, currentSymType())
-                                }
-                              }}
-                            />
-                          </div>
+                          <span class={ui.symControlsLabel}>Folds</span>
+                          <ScrubInput
+                            label=""
+                            value={currentSymFolds()}
+                            step={1}
+                            onInput={(val: number) => {
+                              const newN = Math.max(2, Math.round(val))
+                              if (newN !== currentSymFolds()) {
+                                 applySymmetry(newN, currentSymType())
+                              }
+                            }}
+                          />
                         </div>
 
-                        <For each={symTransforms()}>
-                          {([tid, transform]) => (
-                            <div style={{
-                              display: 'flex',
-                              'align-items': 'center',
-                              gap: 'var(--space-2)',
-                              padding: '4px 0',
-                              'border-top': '1px solid var(--neutral-200)',
-                            }}>
-                              <span style={{
-                                'font-size': '0.75rem',
-                                'font-weight': '600',
-                                'min-width': '24px',
-                              }}>
-                                {readableIds().transformLabel[tid]}
-                              </span>
-                              <div style={{ flex: '1' }}>
-                                {(() => {
-                                  const a = transform.preAffine
-                                  if (a.a === -1 && a.d === 0 && a.b === 0 && a.e === 1) {
-                                    return <span style={{ 'font-size': '0.75rem', color: 'var(--neutral-500)' }}>Reflection</span>
-                                  }
-                                  return (
-                                    <AngleEditor
-                                      value={(() => {
-                                        let angle = Math.atan2(a.d, a.a)
-                                        if (angle < 0) angle += 2 * Math.PI
-                                        return angle
-                                      })()}
-                                      setValue={(newAngle) => {
-                                        setFlameDescriptor((draft) => {
+                        <div class={ui.symGallery}>
+                          <For each={symTransformIds()}>
+                            {(tid) => {
+                              const transform = () => flameDescriptor.transforms[tid]!
+                              const preAffine = () => transform().preAffine
+                              const isReflection = () => {
+                                const a = preAffine()
+                                return a.a === -1 && a.d === 0 && a.b === 0 && a.e === 1
+                              }
+                              const angle = () => {
+                                const a = preAffine()
+                                let v = Math.atan2(a.d, a.a)
+                                if (v < 0) v += 2 * Math.PI
+                                return v
+                              }
+                              return (
+                                <div
+                                  class={ui.symItem}
+                                  classList={{ [ui.symItemHidden as string]: !transform().visible }}
+                                >
+                                  <span
+                                    class={ui.symBadge}
+                                    classList={{ [ui.symBadgeReflection as string]: isReflection() }}
+                                  >
+                                    {readableIds().transformLabel[tid]}
+                                  </span>
+                                  <div class={ui.symAngle}>
+                                    <Show
+                                      when={!isReflection()}
+                                      fallback={
+                                        <span style={{ 'font-size': '0.65rem', color: 'var(--neutral-500)', 'white-space': 'nowrap' }}>Reflection</span>
+                                      }
+                                    >
+                                      <AngleEditor
+                                        mode="inline"
+                                        value={angle()}
+                                        dataParameterPath={`transform.${tid}.preAffine.a`}
+                                        setValue={(newAngle) => {
                                           const cos = Math.cos(newAngle)
                                           const sin = Math.sin(newAngle)
-                                          const t = draft.transforms[tid]
-                                          if (t) {
-                                            t.preAffine = { a: cos, b: -sin, c: 0, d: sin, e: cos, f: 0 }
+                                          setFlameDescriptor((draft) => {
+                                            const t = draft.transforms[tid]
+                                            if (t) {
+                                              t.preAffine = { a: cos, b: -sin, c: 0, d: sin, e: cos, f: 0 }
+                                            }
+                                          })
+                                          // Keyframe all 4 rotation components together
+                                          if (
+                                            timeline &&
+                                            timeline.autoKeyframe() &&
+                                            timeline.hasAnyKeyframes(`transform.${tid}.preAffine.a`)
+                                          ) {
+                                            timeline.addKeyframeAtCurrentFrame(`transform.${tid}.preAffine.a`)
+                                            timeline.addKeyframeAtCurrentFrame(`transform.${tid}.preAffine.b`)
+                                            timeline.addKeyframeAtCurrentFrame(`transform.${tid}.preAffine.d`)
+                                            timeline.addKeyframeAtCurrentFrame(`transform.${tid}.preAffine.e`)
                                           }
+                                        }}
+                                      />
+                                    </Show>
+                                  </div>
+                                  <div class={ui.symActions}>
+                                    <button
+                                      class={ui.symActionBtn}
+                                      title={transform().visible ? 'Hide' : 'Show'}
+                                      onClick={() => {
+                                        setFlameDescriptor((draft) => {
+                                          draft.transforms[tid]!.visible =
+                                            !draft.transforms[tid]!.visible
                                         })
                                       }}
-                                    />
-                                  )
-                                })()}
-                              </div>
-                              <button
-                                class={ui.visibilityButton}
-                                title={transform.visible ? 'Hide' : 'Show'}
-                                onClick={() => {
-                                  setFlameDescriptor((draft) => {
-                                    draft.transforms[tid]!.visible =
-                                      !draft.transforms[tid]!.visible
-                                  })
-                                }}
-                              >
-                                {transform.visible ? <Eye /> : <EyeOff />}
-                              </button>
-                              <button
-                                class={ui.deleteFlameButton}
-                                onClick={() => {
-                                  setFlameDescriptor((draft) => {
-                                    delete draft.transforms[tid]
-                                  })
-                                }}
-                              >
-                                <Cross />
-                              </button>
-                            </div>
-                          )}
-                        </For>
+                                    >
+                                      {transform().visible ? <Eye /> : <EyeOff />}
+                                    </button>
+                                    <button
+                                      class={ui.symActionBtn}
+                                      title="Remove"
+                                      onClick={() => {
+                                        setFlameDescriptor((draft) => {
+                                          delete draft.transforms[tid]
+                                        })
+                                      }}
+                                    >
+                                      <Cross />
+                                    </button>
+                                  </div>
+                                </div>
+                              )
+                            }}
+                          </For>
+                        </div>
                       </div>
                     </CollapsibleCard>
                   </Show>

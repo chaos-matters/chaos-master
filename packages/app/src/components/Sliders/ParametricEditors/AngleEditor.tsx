@@ -9,15 +9,24 @@ import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
 import ui from './AngleEditor.module.css'
 import type { EditorProps } from './types'
 
-type AngleEditorProps = EditorProps<number>
+type AngleEditorProps = EditorProps<number> & {
+  /** 'full' (default): name + track + value label in a display:contents row.
+   *  'inline': self-contained compact knob with degree value inside the track. */
+  mode?: 'full' | 'inline'
+}
 
 function formatAngle(angleRadians: number) {
   const degrees = ((angleRadians * 180) / Math.PI).toFixed(1)
-  return `${degrees}°`
+  return `${degrees}\u00b0`
+}
+
+function formatAngleShort(angleRadians: number) {
+  const degrees = (angleRadians * 180) / Math.PI
+  return `${Math.round(degrees)}\u00b0`
 }
 
 function formatDegrees(degrees: number) {
-  return `${degrees.toFixed(1)}°`
+  return `${degrees.toFixed(1)}\u00b0`
 }
 
 export function AngleEditor(props: AngleEditorProps) {
@@ -25,6 +34,7 @@ export function AngleEditor(props: AngleEditorProps) {
   const timeline = useTimeline()
   const { isCompact } = useCompactMode()
   const value = createMemo(() => props.value)
+  const mode = () => props.mode ?? 'full'
 
   return (
     <Show
@@ -87,28 +97,53 @@ export function AngleEditor(props: AngleEditorProps) {
     })
 
     return (
-      <label class={ui.label}>
-        <span class={ui.name}>
-          <Show when={props.dataParameterPath && timeline}>
-            <KeyframeDiamond parameterPath={props.dataParameterPath!} />
-          </Show>
-          {props.name}
-        </span>
-        <div
-          ref={(el) => {
-            scrollIntoViewAndFocusOnChange(value, el)
-          }}
-          class={ui.track}
-          onPointerDown={startRotating}
-          tabIndex={0}
-        >
-          <div class={ui.indicator} style={{ '--angle': `${value()}rad` }}>
-            <div class={ui.line} />
-            <div class={ui.dot} />
+      <Show
+        when={mode() === 'full'}
+        fallback={
+          <div class={ui.inlineWrapper}>
+            <Show when={props.dataParameterPath && timeline}>
+              <KeyframeDiamond parameterPath={props.dataParameterPath!} />
+            </Show>
+            <div
+              ref={(el) => {
+                scrollIntoViewAndFocusOnChange(value, el)
+              }}
+              class={ui.trackInline}
+              onPointerDown={startRotating}
+              tabIndex={0}
+            >
+              <div class={ui.indicator} style={{ '--angle': `${value()}rad` }}>
+                <div class={ui.line} />
+                <div class={ui.dot} />
+              </div>
+              <span class={ui.inlineValue}>{formatAngleShort(value())}</span>
+            </div>
           </div>
-        </div>
-        <span class={ui.value}>{formatAngle(value())}</span>
-      </label>
+        }
+      >
+        <label class={ui.label}>
+          <span class={ui.name}>
+            <Show when={props.dataParameterPath && timeline}>
+              <KeyframeDiamond parameterPath={props.dataParameterPath!} />
+            </Show>
+            {props.name}
+          </span>
+          <div
+            ref={(el) => {
+              scrollIntoViewAndFocusOnChange(value, el)
+            }}
+            class={ui.track}
+            onPointerDown={startRotating}
+            tabIndex={0}
+          >
+            <div class={ui.indicator} style={{ '--angle': `${value()}rad` }}>
+              <div class={ui.line} />
+              <div class={ui.dot} />
+            </div>
+          </div>
+          <span class={ui.value}>{formatAngle(value())}</span>
+        </label>
+      </Show>
     )
   }
 }
