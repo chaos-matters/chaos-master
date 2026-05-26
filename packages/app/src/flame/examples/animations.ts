@@ -3711,6 +3711,25 @@ const anim20a: AnimationDef = {
         { frame: 90, value: 0.5 },
       ],
     },
+    {
+      parameterPath: 'camera.zoom',
+      keyframes: [
+        { frame: 0, value: 1.0 },
+        { frame: 22, value: 1.85, easing: 'easeInOut' as const },
+        { frame: 45, value: 0.55, easing: 'easeInOut' as const },
+        { frame: 67, value: 1.4, easing: 'easeInOut' as const },
+        { frame: 90, value: 1.0 },
+      ],
+    },
+    {
+      parameterPath: 'camera.y',
+      keyframes: [
+        { frame: 0, value: 0 },
+        { frame: 30, value: 0.2, easing: 'easeInOut' as const },
+        { frame: 60, value: -0.18, easing: 'easeInOut' as const },
+        { frame: 90, value: 0 },
+      ],
+    },
   ],
 }
 
@@ -4971,6 +4990,23 @@ const anim26b: AnimationDef = {
         { frame: 90, value: 0.75, easing: 'easeInOut' as const },
       ],
     },
+    {
+      parameterPath: 'camera.zoom',
+      keyframes: [
+        { frame: 0, value: 1.0 },
+        { frame: 30, value: 0.5, easing: 'easeInOut' as const },
+        { frame: 60, value: 1.6, easing: 'easeInOut' as const },
+        { frame: 90, value: 1.0 },
+      ],
+    },
+    {
+      parameterPath: 'camera.x',
+      keyframes: [
+        { frame: 0, value: 0 },
+        { frame: 45, value: 0.12, easing: 'easeInOut' as const },
+        { frame: 90, value: 0 },
+      ],
+    },
   ],
 }
 
@@ -5027,6 +5063,15 @@ const anim27a: AnimationDef = {
         { frame: 0, value: 0.3 },
         { frame: 45, value: 0.45, easing: 'easeInOut' as const },
         { frame: 90, value: 0.3 },
+      ],
+    },
+    {
+      parameterPath: 'camera.zoom',
+      keyframes: [
+        { frame: 0, value: 1.0 },
+        { frame: 30, value: 0.5, easing: 'easeInOut' as const },
+        { frame: 60, value: 1.6, easing: 'easeInOut' as const },
+        { frame: 90, value: 1.0 },
       ],
     },
   ],
@@ -5124,6 +5169,23 @@ const anim28a: AnimationDef = {
         { frame: 90, value: 1.1 },
       ],
     },
+    {
+      parameterPath: 'camera.zoom',
+      keyframes: [
+        { frame: 0, value: 1.2 },
+        { frame: 30, value: 0.55, easing: 'easeInOut' as const },
+        { frame: 60, value: 1.8, easing: 'easeInOut' as const },
+        { frame: 90, value: 1.2 },
+      ],
+    },
+    {
+      parameterPath: 'camera.x',
+      keyframes: [
+        { frame: 0, value: 0 },
+        { frame: 45, value: -0.2, easing: 'easeInOut' as const },
+        { frame: 90, value: 0 },
+      ],
+    },
   ],
 }
 
@@ -5218,6 +5280,15 @@ const anim29a: AnimationDef = {
         { frame: 90, value: 0.4 },
       ],
     },
+    {
+      parameterPath: 'camera.zoom',
+      keyframes: [
+        { frame: 0, value: 1.0 },
+        { frame: 30, value: 0.45, easing: 'easeInOut' as const },
+        { frame: 60, value: 1.7, easing: 'easeInOut' as const },
+        { frame: 90, value: 1.0 },
+      ],
+    },
   ],
 }
 
@@ -5266,6 +5337,15 @@ const anim29b: AnimationDef = {
         { frame: 0, value: 0.65 },
         { frame: 45, value: 0.9, easing: 'easeInOut' as const },
         { frame: 90, value: 0.65 },
+      ],
+    },
+    {
+      parameterPath: 'camera.zoom',
+      keyframes: [
+        { frame: 0, value: 1.0 },
+        { frame: 30, value: 1.5, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.55, easing: 'easeInOut' as const },
+        { frame: 90, value: 1.0 },
       ],
     },
   ],
