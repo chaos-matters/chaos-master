@@ -169,7 +169,7 @@ export function createColorGradingPipeline(
         mul(uniforms.paletteSpeed, f32(0.298)),
       )
 
-      var paletteAb = vec2f(0)
+      let paletteAb = vec2f(0)
       if (uniforms.paletteMode === i32(0)) {
         // Mode 0: density-shift — palettePhase shifts the density→palette mapping
         const logDensityNorm = fract(
