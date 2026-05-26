@@ -140,9 +140,12 @@ export function createStoreHistory<T extends object>([store, setStore]: [
   function startPreview(description?: string) {
     const preview_ = preview()
     if (preview_) {
-      throw new Error(
-        `Can't start preview while existing preview in progress: ${preview_.description}`,
+      // Auto-commit the stale preview (e.g. orphaned by wheel debounce or
+      // component unmount) instead of crashing.
+      console.warn(
+        `Auto-committing stale preview "${preview_.description}" before starting "${description}"`,
       )
+      commit()
     }
     setPreview({ forwardPatches: [], backwardPatches: [], description })
   }
