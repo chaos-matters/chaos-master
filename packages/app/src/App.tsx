@@ -47,7 +47,7 @@ export function Wrappers() {
 
   const [flameFromQuery] = createResource(async () => {
     const urlParams = new URLSearchParams(window.location.search)
-    const flameDef = urlParams.get('q')
+    const flameDef = urlParams.get('flame')
     if (flameDef !== null) {
       try {
         const result = await decodeSharePayload(flameDef)
@@ -70,6 +70,14 @@ export function Wrappers() {
   })
 
   const spotlightState = createSpotlightTourState(getTour)
+
+  // Auto-dismiss welcome screen when a query flame is present in the URL
+  createEffect(() => {
+    const fq = flameFromQuery()
+    if (fq?.flame) {
+      setShowWelcome(false)
+    }
+  })
 
   // Support #tour=app|sidebar|timeline hash URLs
   createEffect(() => {
