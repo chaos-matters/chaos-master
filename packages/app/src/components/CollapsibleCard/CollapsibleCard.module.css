@@ -62,9 +62,11 @@
   border-top: none;
   border-radius: 0 0 var(--space-3) var(--space-3);
   background: white;
+  color: var(--neutral-900);
   [data-theme='dark'] & {
     border-color: var(--neutral-800);
     background: var(--neutral-950);
+    color: var(--neutral-100);
   }
 }
 

@@ -257,6 +257,7 @@ export function generateRandomFlame(
       palettePhase: 0,
       paletteSpeed: 0.5,
       densityEstimationQuality: 0.8,
+      estimatorCurve: 0.5,
       paletteMode: 0,
     },
     transforms: coloredTransforms as FlameDescriptor['transforms'],

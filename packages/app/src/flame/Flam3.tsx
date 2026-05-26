@@ -187,12 +187,15 @@ export function Flam3(props: Flam3Props) {
     // Values > 1 are old-format direct qualityK for backward compatibility.
     const qualityK =
       storedQuality > 1 ? storedQuality : 0.5 + (1 - storedQuality) * 19.5
+    const estimatorCurve =
+      animatedFlame().renderSettings.estimatorCurve ?? 0.5
     const densityPipeline = createDensityEstimationPipeline(
       root,
       textureSize,
       accumulationBuffer,
       filterParamsBuffer,
       qualityK,
+      estimatorCurve,
     )
     const blurPipeline = createAdaptiveBlurPipeline(
       root,
@@ -386,6 +389,7 @@ export function Flam3(props: Flam3Props) {
       const flame = animatedFlame()
       return JSON.stringify({
         transforms: flame.transforms,
+        finalTransform: flame.finalTransform,
         colorInitMode: flame.renderSettings.colorInitMode,
         pointInitMode: flame.renderSettings.pointInitMode,
         skipIters: flame.renderSettings.skipIters,

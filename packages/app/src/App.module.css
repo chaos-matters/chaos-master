@@ -1065,3 +1065,30 @@
     transform: translateX(-50%) translateY(-8px);
   }
 }
+
+/* -- Render settings group labels -- */
+.settings-group {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 0.5fr;
+  align-items: center;
+  justify-items: stretch;
+  gap: var(--space-3);
+  padding-bottom: 8px;
+}
+
+.settings-group-label {
+  grid-column: 1 / -1;
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--neutral-400);
+  padding: 8px 0px 0px;
+  user-select: none;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500);
+  }
+}
+

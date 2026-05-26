@@ -144,7 +144,7 @@
 }
 
 .tab {
-  padding: 2px 8px;
+  padding: 4px 6px;
   border: none;
   border-radius: var(--space-1, 4px);
   background: transparent;
@@ -152,6 +152,9 @@
   font-size: 0.6rem;
   font-weight: 500;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition:
     background 0.15s,
     color 0.15s;
@@ -182,4 +185,10 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding-top: 1.8rem;
+}
+
+.tab-icon {
+  width: 12px;
+  height: 12px;
+  display: block;
 }
