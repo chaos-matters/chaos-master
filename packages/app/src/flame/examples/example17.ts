@@ -8,7 +8,7 @@ export const example17 = defineExample({
   renderSettings: {
     exposure: -1.2,
     skipIters: 20,
-    drawMode: 'paint',
+    drawMode: 'light',
     camera: {
       zoom: 1.3,
       position: [0, 0],

@@ -10,7 +10,7 @@ export const example26 = defineExample({
   renderSettings: {
     exposure: 0.25,
     skipIters: 20,
-    drawMode: 'paint',
+    drawMode: 'light',
     vibrancy: 0.6,
     contrast: 1.1,
     gamma: 2.2,
