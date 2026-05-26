@@ -1,6 +1,6 @@
 import { batch, createSignal, For, onCleanup, Show } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
-import { DEFAULT_QUALITY, IS_DEV } from '@/defaults'
+import { ANIMATION_PREVIEW_POINT_COUNT, ANIMATION_PREVIEW_QUALITY, DEFAULT_QUALITY, IS_DEV, STATIC_PREVIEW_POINT_COUNT, } from '@/defaults'
 import { examples } from '@/flame/examples'
 import { animationDefs, getAnimationFlame } from '@/flame/examples/animations'
 import { Flam3 } from '@/flame/Flam3'
@@ -29,7 +29,11 @@ const CANCEL = 'cancel'
 
 type AnimationLoad = { flame: FlameDescriptor; tracks: TimelineTrack[] }
 
-function Preview(props: { flameDescriptor: FlameDescriptor }) {
+function Preview(props: {
+  flameDescriptor: FlameDescriptor
+  quality?: number
+  pointCountPerBatch?: number
+}) {
   return (
     <Root
       adapterOptions={{
@@ -44,12 +48,14 @@ function Preview(props: { flameDescriptor: FlameDescriptor }) {
           zoom={props.flameDescriptor.renderSettings.camera.zoom}
         >
           <Flam3
-            quality={DEFAULT_QUALITY}
-            pointCountPerBatch={2e4}
+            quality={props.quality ?? DEFAULT_QUALITY}
+            pointCountPerBatch={
+              props.pointCountPerBatch ?? STATIC_PREVIEW_POINT_COUNT
+            }
             adaptiveFilterEnabled={true}
             animationEnabled={false}
             flameDescriptor={props.flameDescriptor}
-            renderInterval={1}
+            renderInterval={5}
             onExportImage={undefined}
             edgeFadeColor={vec4f(0)}
           />
@@ -149,9 +155,20 @@ function AnimatedPreview(props: { anim: AnimationDef; index: number }) {
         Hover to preview
       </div>
       <DelayedShow delayMs={props.index * 50}>
-        <Preview flameDescriptor={animatedFlame()} />
+        <Preview
+          flameDescriptor={animatedFlame()}
+          quality={ANIMATION_PREVIEW_QUALITY}
+          pointCountPerBatch={ANIMATION_PREVIEW_POINT_COUNT}
+        />
       </DelayedShow>
-      <div class={ui.itemTitle}>
+      <div
+        class={ui.itemTitle}
+        style={{
+          opacity: hovered() ? 0.15 : 1,
+          transition: 'opacity 0.25s',
+          'pointer-events': hovered() ? 'none' : 'auto',
+        }}
+      >
         <span style={{ 'font-weight': '600' }}>{props.anim.name}</span>
         <span
           style={{
