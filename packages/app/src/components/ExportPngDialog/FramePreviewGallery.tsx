@@ -1,6 +1,6 @@
-import { createSignal, For, Show } from 'solid-js'
+import { createMemo, createSignal, For, Show } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
-import { DEFAULT_POINT_COUNT, DEFAULT_PREVIEW_PIXEL_RATIO } from '@/defaults'
+import { ANIMATION_FRAME_PREVIEW_QUALITY_HIGH, ANIMATION_FRAME_PREVIEW_QUALITY_LOW, ANIMATION_FRAME_PREVIEW_QUALITY_MID, DEFAULT_POINT_COUNT, DEFAULT_PREVIEW_PIXEL_RATIO, } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
@@ -15,12 +15,42 @@ type PreviewQuality = 'low' | 'mid' | 'high'
 
 const QUALITY_CONFIG: Record<
   PreviewQuality,
-  { quality: number; delayMs: number; maxFrames: number }
+  {
+    quality: number
+    delayMs: number
+    maxFrames: number
+    canvasWidth: number
+    canvasHeight: number
+  }
 > = {
-  low: { quality: 0.5, delayMs: 350, maxFrames: 30 },
-  mid: { quality: 0.8, delayMs: 700, maxFrames: 30 },
-  high: { quality: 0.95, delayMs: 1400, maxFrames: 30 },
+  low: {
+    quality: ANIMATION_FRAME_PREVIEW_QUALITY_LOW,
+    delayMs: 600,
+    maxFrames: 30,
+    canvasWidth: 160,
+    canvasHeight: 120,
+  },
+  mid: {
+    quality: ANIMATION_FRAME_PREVIEW_QUALITY_MID,
+    delayMs: 1200,
+    maxFrames: 30,
+    canvasWidth: 224,
+    canvasHeight: 168,
+  },
+  high: {
+    quality: ANIMATION_FRAME_PREVIEW_QUALITY_HIGH,
+    delayMs: 2400,
+    maxFrames: 30,
+    canvasWidth: 320,
+    canvasHeight: 240,
+  },
 }
+
+const THUMB_SIZE_MIN = 60
+const THUMB_SIZE_MAX = 200
+const THUMB_SIZE_DEFAULT = 90
+
+const HOVER_DEBOUNCE_MS = 300
 
 type Props = {
   flameDescriptor: FlameDescriptor
@@ -45,6 +75,24 @@ export function FramePreviewGallery(props: Props) {
 
   let captureCanvasRef: HTMLCanvasElement | undefined
   let aborted = false
+
+  // Thumbnail cell size (controlled by slider, always visible)
+  const [thumbSize, setThumbSize] = createSignal(THUMB_SIZE_DEFAULT)
+
+  // Hover preview state (debounced)
+  const [hoveredIndex, setHoveredIndex] = createSignal<number | null>(null)
+  const [visibleHoverIndex, setVisibleHoverIndex] = createSignal<number | null>(
+    null,
+  )
+  const [hoverPos, setHoverPos] = createSignal({ x: 0, y: 0 })
+  let hoverTimer: ReturnType<typeof setTimeout> | undefined
+
+  // Derived: hover thumbnail src
+  const hoverSrc = createMemo(() => {
+    const idx = visibleHoverIndex()
+    if (idx === null) return undefined
+    return thumbnails()[idx]
+  })
 
   function flameForFrame(frameIdx: number): FlameDescriptor {
     const frame = props.config.startFrame + frameIdx
@@ -101,7 +149,7 @@ export function FramePreviewGallery(props: Props) {
 
       if (captureCanvasRef) {
         try {
-          const dataUrl = captureCanvasRef.toDataURL('image/jpeg', 0.7)
+          const dataUrl = captureCanvasRef.toDataURL('image/jpeg', 0.85)
           results.push(dataUrl)
           setThumbnails([...results])
         } catch {
@@ -137,12 +185,62 @@ export function FramePreviewGallery(props: Props) {
 
   const cfg = () => QUALITY_CONFIG[previewQuality()]
 
+  // Hover handlers for thumbnails (debounced, viewport-fixed)
+  function onThumbEnter(idx: number, e: MouseEvent) {
+    setHoveredIndex(idx)
+    updateHoverPos(e)
+    clearTimeout(hoverTimer)
+    hoverTimer = setTimeout(() => {
+      if (hoveredIndex() === idx) {
+        setVisibleHoverIndex(idx)
+      }
+    }, HOVER_DEBOUNCE_MS)
+  }
+
+  function onThumbMove(e: MouseEvent) {
+    updateHoverPos(e)
+  }
+
+  function onThumbLeave() {
+    clearTimeout(hoverTimer)
+    setHoveredIndex(null)
+    setVisibleHoverIndex(null)
+  }
+
+  function updateHoverPos(e: MouseEvent) {
+    // Use viewport coordinates for fixed positioning
+    const previewW = 220
+    const previewH = 165
+    let x = e.clientX + 16
+    let y = e.clientY - previewH / 2
+
+    // Clamp so it stays within the viewport
+    if (x + previewW > window.innerWidth) {
+      x = e.clientX - previewW - 16
+    }
+    if (y < 8) y = 8
+    if (y + previewH > window.innerHeight - 8) {
+      y = window.innerHeight - previewH - 8
+    }
+    setHoverPos({ x, y })
+  }
+
+  // Frame indices for placeholder cells
+  const frameIndices = createMemo(() =>
+    Array.from({ length: displayCount() }, (_, i) => i),
+  )
+
   return (
     <div class={ui.gallery}>
       <Show when={isGenerating()}>
         <div
           class={ui.hiddenRenderer}
-          style="width:96px;height:72px;opacity:0;pointer-events:none"
+          style={{
+            width: `${cfg().canvasWidth}px`,
+            height: `${cfg().canvasHeight}px`,
+            opacity: '0',
+            'pointer-events': 'none',
+          }}
         >
           <Root adapterOptions={{ powerPreference: 'high-performance' }}>
             <AutoCanvas pixelRatio={DEFAULT_PREVIEW_PIXEL_RATIO}>
@@ -161,6 +259,7 @@ export function FramePreviewGallery(props: Props) {
                         captureCanvasRef = canvas
                       }}
                       palette={props.selectedPalette}
+                      onAccumulatedPointCount={() => {}}
                     />
                   )}
                 </Show>
@@ -230,20 +329,43 @@ export function FramePreviewGallery(props: Props) {
         </div>
       </div>
 
-      <Show
-        when={thumbnails().length > 0}
-        fallback={
-          <div class={ui.emptyState}>
-            {isGenerating()
-              ? 'Preparing renderer...'
-              : 'Generate frame thumbnails to preview the animation'}
-          </div>
-        }
-      >
-        <div class={ui.grid}>
-          <For each={thumbnails()}>
+      {/* Thumbnail size slider -- always visible */}
+      <div class={ui.sizeSliderRow}>
+        <svg class={ui.sizeIcon} viewBox="0 0 16 16" fill="currentColor">
+          <rect x="5" y="5" width="6" height="6" rx="1" />
+        </svg>
+        <input
+          type="range"
+          class={ui.sizeSlider}
+          min={THUMB_SIZE_MIN}
+          max={THUMB_SIZE_MAX}
+          value={thumbSize()}
+          onInput={(e) => setThumbSize(e.currentTarget.valueAsNumber)}
+          title={`Thumbnail size: ${thumbSize()}px`}
+        />
+        <svg class={ui.sizeIcon} viewBox="0 0 16 16" fill="currentColor">
+          <rect x="3" y="3" width="10" height="10" rx="1.5" />
+        </svg>
+      </div>
+
+      {/* Grid that fills available space */}
+      <div class={ui.gridWrapper}>
+        <div
+          class={ui.grid}
+          style={{
+            'grid-template-columns': `repeat(auto-fill, minmax(${thumbSize()}px, 1fr))`,
+          }}
+        >
+          <For each={thumbnails().length > 0 ? thumbnails() : undefined}>
             {(dataUrl, idx) => (
-              <div class={ui.thumbnail}>
+              <div
+                class={ui.thumbnail}
+                onMouseEnter={(e) => {
+                  onThumbEnter(idx(), e)
+                }}
+                onMouseMove={onThumbMove}
+                onMouseLeave={onThumbLeave}
+              >
                 <img
                   src={dataUrl}
                   alt={`Frame ${props.config.startFrame + idx()}`}
@@ -254,7 +376,47 @@ export function FramePreviewGallery(props: Props) {
               </div>
             )}
           </For>
+
+          {/* Show placeholder cells when no thumbnails yet */}
+          <Show when={thumbnails().length === 0}>
+            <For each={frameIndices()}>
+              {(i) => (
+                <div class={ui.placeholderCell}>
+                  <span class={ui.frameNumber}>
+                    {props.config.startFrame + i}
+                  </span>
+                </div>
+              )}
+            </For>
+          </Show>
         </div>
+      </div>
+
+      {/* Hover preview overlay -- position:fixed escapes overflow:hidden parents */}
+      <Show when={hoverSrc()}>
+        {(src) => {
+          const pos = () => hoverPos()
+          const idx = () => visibleHoverIndex()!
+          return (
+            <div
+              class={ui.hoverOverlay}
+              style={{
+                left: `${pos().x}px`,
+                top: `${pos().y}px`,
+                width: '220px',
+                height: '165px',
+              }}
+            >
+              <img
+                src={src()}
+                alt={`Frame ${props.config.startFrame + idx()} preview`}
+              />
+              <span class={ui.hoverFrameLabel}>
+                Frame {props.config.startFrame + idx()}
+              </span>
+            </div>
+          )
+        }}
       </Show>
     </div>
   )

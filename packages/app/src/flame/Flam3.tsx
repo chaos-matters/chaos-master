@@ -457,7 +457,12 @@ export function Flam3(props: Flam3Props) {
     function resetAccumulation() {
       batchIndex = 0
       accumulatedPointCount_ = 0
-      setAccumulatedPointCountGlobal(0)
+      // Only update the global counter from the main renderer, not preview instances.
+      // Preview Flam3 instances provide onAccumulatedPointCount and must not clobber
+      // the global signal (which drives the progress bar and quality pills).
+      if (!props.onAccumulatedPointCount) {
+        setAccumulatedPointCountGlobal(0)
+      }
       clearRequested = true
       rafLoop.redraw()
     }
@@ -545,7 +550,9 @@ export function Flam3(props: Flam3Props) {
           accumulatedPointCount_ += pointCountPerBatch * iterationCount
         }
 
-        setAccumulatedPointCountGlobal(accumulatedPointCount_)
+        if (!props.onAccumulatedPointCount) {
+          setAccumulatedPointCountGlobal(accumulatedPointCount_)
+        }
         props.onAccumulatedPointCount?.(accumulatedPointCount_)
 
         if (shouldRenderFinalImage) {

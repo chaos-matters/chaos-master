@@ -87,6 +87,16 @@
   background: #111;
 }
 
+.animationPreviewPane {
+  position: relative;
+  border-radius: 0.5rem;
+  overflow: visible;
+  background: #111;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
 .previewToolbar {
   position: absolute;
   top: 0.5rem;

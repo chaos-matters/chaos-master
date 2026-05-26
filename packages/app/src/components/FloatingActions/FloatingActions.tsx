@@ -372,6 +372,7 @@ export function FloatingActions(props: Props) {
             currentPoints={props.accumulatedPointCount()}
             targetPoints={props.qualityPointCountLimit()}
             compact={true}
+            inlinePoints={true}
           />
         </div>
       </div>

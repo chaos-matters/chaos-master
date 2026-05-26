@@ -30,6 +30,8 @@ type QualityPresetsProps = {
   currentPoints?: number
   targetPoints?: number
   compact?: boolean
+  /** Render point counts inline to the right of the pills instead of below. */
+  inlinePoints?: boolean
 }
 
 export function getPresetFromQuality(
@@ -73,7 +75,10 @@ export function QualityPresets(props: QualityPresetsProps) {
   return (
     <div
       class={ui.wrapper}
-      classList={{ [ui.compactWrapper as string]: props.compact }}
+      classList={{
+        [ui.compactWrapper as string]: props.compact,
+        [ui.inlineWrapper as string]: props.inlinePoints,
+      }}
     >
       <div class={ui.pillsContainer} style={gridStyle()}>
         <For each={props.pills}>
@@ -117,9 +122,13 @@ export function QualityPresets(props: QualityPresetsProps) {
       <Show when={showPoints()}>
         <div
           class={ui.pointsRow}
-          classList={{ [ui.compactPoints as string]: props.compact }}
+          classList={{
+            [ui.compactPoints as string]: props.compact,
+            [ui.inlinePointsRow as string]: props.inlinePoints,
+          }}
         >
-          {formatPointCount(props.currentPoints!)} /{' '}
+          {formatPointCount(props.currentPoints!)}
+          <span class={ui.pointsSep}>/</span>
           {formatPointCount(props.targetPoints!)}
         </div>
       </Show>

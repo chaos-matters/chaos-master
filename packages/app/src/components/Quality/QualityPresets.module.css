@@ -9,36 +9,47 @@
   gap: 2px;
 }
 
+/* Inline variant: pills + points on one row */
+.inlineWrapper {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
 .pillsContainer {
   display: grid;
-  gap: var(--space-2);
+  gap: 3px;
   overflow: hidden;
 }
 
 .pill {
   --color: var(--neutral-600);
-  --hover-color: var(--neutral-300);
-  --selected-color: var(--neutral-600);
-  --track-color-filled: var(--neutral-400);
+  --hover-color: var(--neutral-200);
+  --selected-color: var(--neutral-100);
+  --track-color-filled: oklch(88% 0.04 220);
   --track-color-empty: var(--neutral-200);
 
   [data-theme='dark'] & {
     --color: var(--neutral-400);
-    --hover-color: var(--neutral-700);
-    --selected-color: var(--neutral-400);
-    --track-color-filled: var(--neutral-700);
-    --track-color-empty: var(--neutral-800);
+    --hover-color: oklch(26% 0.02 220);
+    --selected-color: oklch(90% 0.06 200);
+    --track-color-filled: oklch(34% 0.045 210);
+    --track-color-empty: oklch(22% 0.01 220);
   }
 }
 
 .pill {
   position: relative;
-  padding: var(--space-1) var(--space-1);
-  min-width: 3rem;
+  padding: 3px 6px;
+  min-width: 2.4rem;
   z-index: 1;
 
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   color: var(--color);
-  border-radius: 4px;
+  border-radius: 5px;
+  border: 1.5px solid transparent;
   cursor: pointer;
 
   text-align: center;
@@ -51,27 +62,48 @@
     var(--track-color-filled) var(--fill-percent),
     var(--track-color-empty) var(--fill-percent)
   );
+
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    transform 0.1s;
 }
 
 .compactPill {
   min-width: 2rem;
-  padding: 2px 4px;
-  font-size: 0.7rem;
+  padding: 2px 5px;
+  font-size: 0.6rem;
 }
 
 .selectedPill {
   color: var(--selected-color);
-  border: 2px solid var(--neutral-800);
-  padding: calc(var(--space-1) - 1px);
+  border-color: oklch(65% 0.08 220);
+
+  /* Override track colors so the gradient fill is visible on the selected pill */
+  --track-color-filled: oklch(48% 0.09 220);
+  --track-color-empty: oklch(30% 0.04 220);
 
   [data-theme='dark'] & {
-    border-color: var(--neutral-300);
+    border-color: oklch(55% 0.08 210);
+    color: oklch(88% 0.06 200);
+
+    --track-color-filled: oklch(40% 0.08 210);
+    --track-color-empty: oklch(22% 0.03 210);
   }
 }
 
 .pill:not(.selectedPill):hover {
-  background: transparent;
-  background-color: var(--hover-color);
+  background: var(--hover-color);
+  color: var(--neutral-700);
+
+  [data-theme='dark'] & {
+    color: var(--neutral-300);
+  }
+}
+
+.pill:active {
+  transform: scale(0.95);
 }
 
 .pointsRow {
@@ -80,6 +112,7 @@
   color: var(--neutral-400);
   text-align: center;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 
   [data-theme='dark'] & {
     color: var(--neutral-500);
@@ -88,4 +121,17 @@
 
 .compactPoints {
   font-size: 0.55rem;
+}
+
+/* Inline: sits to the right of the pills, no extra row */
+.inlinePointsRow {
+  font-size: 0.5rem;
+  opacity: 0.7;
+  flex-shrink: 0;
+  padding-right: 2px;
+}
+
+.pointsSep {
+  opacity: 0.4;
+  margin: 0 1px;
 }

@@ -1057,7 +1057,7 @@ export function createTimelineState() {
 
 export type TimelineState = ReturnType<typeof createTimelineState>
 
-function applyTracksToFlame(
+export function applyTracksToFlame(
   tracks: TimelineTrack[],
   flame: FlameDescriptor,
   frame: number,
@@ -1209,6 +1209,18 @@ function applyTracksToFlame(
       const [, tid] = parts
       if (tid && transforms[tid]) {
         transforms[tid].probability = value
+      }
+      continue
+    }
+    // transform.{tid}.colorSpeed
+    if (
+      parts[0] === 'transform' &&
+      parts.length === 3 &&
+      parts[2] === 'colorSpeed'
+    ) {
+      const [, tid] = parts
+      if (tid && transforms[tid]) {
+        transforms[tid].colorSpeed = value
       }
       continue
     }
