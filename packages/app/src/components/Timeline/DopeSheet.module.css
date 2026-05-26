@@ -119,8 +119,7 @@
   display: flex;
   align-items: stretch;
   overflow-x: hidden;
-  /* Allow horizontal scroll but disable vertical pinch (handled by JS) */
-  touch-action: pan-x;
+  touch-action: none;
 
   [data-theme='dark'] & {
     background: var(--neutral-850, #1a1f2e);
