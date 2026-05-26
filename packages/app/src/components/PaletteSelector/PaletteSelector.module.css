@@ -60,27 +60,49 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-2);
-  padding-inline: var(--space-3);
-  font-size: small;
+  padding: 6px 12px;
+  margin: 0 8px;
+  font-size: 0.65rem;
+  font-weight: 500;
   line-height: 1;
-  color: var(--neutral-600);
-  background-color: var(--neutral-100);
-  border: none;
-  border-radius: var(--space-1);
+  color: var(--neutral-500);
+  background: transparent;
+  border: 1px solid var(--neutral-700);
+  border-radius: 4px;
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
-  transition: all 150ms ease;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-400);
+    border-color: var(--neutral-700);
+  }
 }
 
 .importBtn:hover {
-  color: black;
-  background-color: white;
+  color: var(--neutral-800);
+  background: var(--neutral-100);
+  border-color: var(--neutral-300);
+
+  [data-theme='dark'] & {
+    color: var(--neutral-200);
+    background: var(--neutral-800);
+    border-color: var(--neutral-600);
+  }
 }
 
 .importBtn:active:not(:disabled) {
-  box-shadow: inset 0 0 0 1px #aaa;
+  color: var(--neutral-900);
+  background: var(--neutral-200);
+
+  [data-theme='dark'] & {
+    color: var(--neutral-100);
+    background: var(--neutral-700);
+  }
 }
 
 .paletteButton {
@@ -260,12 +282,4 @@
   background: rgba(0, 0, 0, 0.25);
 }
 
-[data-theme='light'] .importBtn {
-  color: var(--neutral-400);
-  background-color: var(--neutral-950);
-}
 
-[data-theme='light'] .importBtn:hover {
-  color: white;
-  background-color: var(--neutral-900);
-}

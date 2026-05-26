@@ -56,12 +56,27 @@ export function Flam3(props: Flam3Props) {
     createSignal<TimelineFlameDescriptor>(deepClone(props.flameDescriptor))
 
   const backgroundColorFinal = () => {
-    if (props.flameDescriptor.renderSettings.backgroundColor === undefined) {
-      return props.flameDescriptor.renderSettings.drawMode === 'light'
-        ? vec3f(...backgroundColorDefault)
-        : vec3f(...backgroundColorDefaultWhite)
+    const bg = props.flameDescriptor.renderSettings.backgroundColor
+    const isPaint = props.flameDescriptor.renderSettings.drawMode !== 'light'
+
+    if (bg === undefined) {
+      return isPaint
+        ? vec3f(...backgroundColorDefaultWhite)
+        : vec3f(...backgroundColorDefault)
     }
-    return vec3f(...props.flameDescriptor.renderSettings.backgroundColor)
+
+    // Auto-swap: if the user has the default-for-the-other-mode color,
+    // switch to the appropriate default for the current mode.
+    const isDefaultBlack = bg[0] === 0 && bg[1] === 0 && bg[2] === 0
+    const isDefaultWhite = bg[0] === 1 && bg[1] === 1 && bg[2] === 1
+    if (isPaint && isDefaultBlack) {
+      return vec3f(...backgroundColorDefaultWhite)
+    }
+    if (!isPaint && isDefaultWhite) {
+      return vec3f(...backgroundColorDefault)
+    }
+
+    return vec3f(...bg)
   }
 
   const bucketProbabilityInv = () => {
@@ -170,6 +185,9 @@ export function Flam3(props: Flam3Props) {
     )
   })
 
+  // Create adaptive filter pipelines only when output buffers change (e.g. resize).
+  // Quality/curve uniform updates are handled separately below to avoid
+  // recreating GPU pipelines on every slider change.
   const runAdaptiveFilter = createMemo(() => {
     const o = outputTextures()
     if (!o) {
@@ -183,8 +201,6 @@ export function Flam3(props: Flam3Props) {
     } = o
     const storedQuality =
       animatedFlame().renderSettings.densityEstimationQuality ?? 5
-    // Map 0-1 quality slider (1=best) to qualityK (0.5=best, 20=worst).
-    // Values > 1 are old-format direct qualityK for backward compatibility.
     const qualityK =
       storedQuality > 1 ? storedQuality : 0.5 + (1 - storedQuality) * 19.5
     const estimatorCurve =
@@ -209,7 +225,24 @@ export function Flam3(props: Flam3Props) {
         densityPipeline.run(pass)
         blurPipeline.run(pass)
       },
+      densityPipeline,
     }
+  })
+
+  // Update density estimation uniforms without recreating pipelines.
+  createEffect(() => {
+    const filter = runAdaptiveFilter()
+    if (!filter) return
+    const storedQuality =
+      animatedFlame().renderSettings.densityEstimationQuality ?? 5
+    // Map 0-1 quality slider (1=best) to qualityK (0.5=best, 20=worst).
+    // Values > 1 are old-format direct qualityK for backward compatibility.
+    const qualityK =
+      storedQuality > 1 ? storedQuality : 0.5 + (1 - storedQuality) * 19.5
+    const estimatorCurve =
+      animatedFlame().renderSettings.estimatorCurve ?? 0.5
+    filter.densityPipeline.setQualityK(qualityK)
+    filter.densityPipeline.setEstimatorCurve(estimatorCurve)
   })
 
   const continueRendering = (accumulatedPointCount: number) => {

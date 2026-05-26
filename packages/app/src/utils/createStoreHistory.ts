@@ -163,12 +163,14 @@ export function createStoreHistory<T extends object>([store, setStore]: [
 
   function commit() {
     const item = preview()
+    if (!item) {
+      // No preview active -- this is expected when pointerUp/pointerCancel
+      // fires without a matching startPreview (e.g., click-without-drag,
+      // browser-initiated cancel, or component unmount). Safe to ignore.
+      return
+    }
     batch(() => {
-      if (item) {
-        addToStack(item)
-      } else {
-        console.warn('No preview to commit')
-      }
+      addToStack(item)
       setPreview(undefined)
     })
   }

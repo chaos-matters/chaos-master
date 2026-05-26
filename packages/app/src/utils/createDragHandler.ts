@@ -69,6 +69,15 @@ export function createDragHandler(
     const handlers = createHandlers(initEvent)
     if (!handlers) return
 
+    // If the component was unmounted during createHandlers (e.g. reactive
+    // updates caused a <For> to rebuild and tear down the DOM), the abort
+    // signal has already fired. Since we haven't registered listeners yet,
+    // onDone would never be called — commit any active preview and bail.
+    if (signal.aborted) {
+      handlers.onDone?.()
+      return
+    }
+
     if (preventDefault) {
       initEvent.preventDefault()
       initEvent.stopImmediatePropagation()
@@ -78,7 +87,13 @@ export function createDragHandler(
       initEvent.target instanceof HTMLElement ||
       initEvent.target instanceof SVGElement
     ) {
-      initEvent.target.setPointerCapture(initEvent.pointerId)
+      try {
+        initEvent.target.setPointerCapture(initEvent.pointerId)
+      } catch {
+        // Element may have been disconnected from the DOM by reactive
+        // updates triggered during createHandlers. Pointer capture is
+        // not critical since we use document-level listeners.
+      }
     }
 
     const { onPointerMove, onDone } = handlers
