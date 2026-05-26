@@ -1,4 +1,5 @@
 import { batch } from 'solid-js'
+import { deepClone } from '@/utils/clone'
 import { useLoadFlameFromFile } from '@/utils/useLoadFlameFromFile'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineTrack } from '@/utils/timeline'
@@ -17,10 +18,10 @@ export function useAppDragAndDrop(
     const result = await loadFlameFromFile(file)
     if (!result) return
     batch(() => {
-      history.replace(structuredClone(result.flame))
+      history.replace(deepClone(result.flame))
       if (result.animation && result.animation.tracks.length > 0) {
         setLoadedAnimation({
-          flame: structuredClone(result.flame),
+          flame: deepClone(result.flame),
           tracks: result.animation.tracks.map((t) => ({
             ...t,
             keyframes: t.keyframes.map((kf) => ({ ...kf })),

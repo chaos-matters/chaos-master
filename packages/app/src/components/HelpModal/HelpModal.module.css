@@ -278,3 +278,11 @@
     height: 1.125rem;
   }
 }
+
+.consoleActive {
+  color: oklch(65% 0.16 240) !important;
+
+  [data-theme='dark'] & {
+    color: oklch(70% 0.14 240) !important;
+  }
+}

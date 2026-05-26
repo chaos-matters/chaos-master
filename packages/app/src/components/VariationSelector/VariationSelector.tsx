@@ -294,7 +294,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
   const [previewFlame, setPreviewFlame] = createStoreHistory(
     createStore<FlameDescriptor>(
       unfreeze(
-        produce(structuredClone(props.currentFlame), (draft) => {
+        produce(deepClone(props.currentFlame), (draft) => {
           draft.renderSettings.pointInitMode = previewPointInitMode()
         }),
       ),

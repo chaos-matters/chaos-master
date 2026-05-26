@@ -8,6 +8,7 @@ import { Cross } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
 import { Root } from '@/lib/Root'
+import { deepClone } from '@/utils/clone'
 import { extractFlameFromPng } from '@/utils/flameInPng'
 import { deleteRecentFlame, formatRecentDate, loadRecentFlames, } from '@/utils/recentFlames'
 import { recordEntries } from '@/utils/record'
@@ -110,7 +111,7 @@ function AnimatedPreview(props: {
 
   const displayFlame = (): FlameDescriptor => {
     if (!hovered()) return baseFlame
-    const clone = structuredClone(baseFlame)
+    const clone = deepClone(baseFlame)
     applyTracksToFlame(props.anim.tracks, clone, animFrame())
     return clone
   }
@@ -242,7 +243,7 @@ function RecentFlameItem(props: {
 
   const displayFlame = (): FlameDescriptor => {
     if (!hovered() || !hasTracks()) return props.recent.flame
-    const clone = structuredClone(props.recent.flame)
+    const clone = deepClone(props.recent.flame)
     applyTracksToFlame(props.recent.tracks!, clone, animFrame())
     return clone
   }
@@ -251,11 +252,11 @@ function RecentFlameItem(props: {
     <button
       class={ui.item}
       onClick={() => {
-        const clone = structuredClone(props.recent.flame)
+        const clone = deepClone(props.recent.flame)
         props.onSelect(
           clone,
           props.recent.tracks
-            ? structuredClone(props.recent.tracks)
+            ? deepClone(props.recent.tracks)
             : undefined,
         )
       }}
@@ -563,9 +564,9 @@ export function createLoadFlame(history: ChangeHistory<FlameDescriptor>) {
           'tracks, batching flame + tracks atomically',
         )
       batch(() => {
-        history.replace(structuredClone(result.flame))
+        history.replace(deepClone(result.flame))
         setLoadedAnimation({
-          flame: structuredClone(result.flame),
+          flame: deepClone(result.flame),
           tracks: result.tracks.map((t) => ({
             ...t,
             keyframes: t.keyframes.map((kf) => ({ ...kf })),
@@ -580,8 +581,8 @@ export function createLoadFlame(history: ChangeHistory<FlameDescriptor>) {
         '[load] plain flame selected — batching flame + empty tracks',
       )
     batch(() => {
-      history.replace(structuredClone(result))
-      setLoadedAnimation({ flame: structuredClone(result), tracks: [] })
+      history.replace(deepClone(result))
+      setLoadedAnimation({ flame: deepClone(result), tracks: [] })
     })
     return result
   }

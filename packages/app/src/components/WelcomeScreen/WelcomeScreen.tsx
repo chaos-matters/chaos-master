@@ -9,6 +9,7 @@ import { Flam3 } from '@/flame/Flam3'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
 import { Root } from '@/lib/Root'
+import { deepClone } from '@/utils/clone'
 import { formatRecentDate, loadRecentFlames } from '@/utils/recentFlames'
 import { applyTracksToFlame } from '@/utils/timeline'
 import ui from './WelcomeScreen.module.css'
@@ -79,7 +80,7 @@ function FlameThumbnail(props: {
   const displayFlame = (): FlameDescriptor => {
     if (!hovered() || !hasTracks()) return props.flame
     const frame = animFrame()
-    const clone = structuredClone(props.flame)
+    const clone = deepClone(props.flame)
     applyTracksToFlame(props.tracks!, clone, frame)
     return clone
   }
