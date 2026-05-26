@@ -129,7 +129,7 @@
 
 @media (pointer: coarse) {
   .timeline-resize-handle {
-    display: none;
+    height: 16px;
   }
 }
 
