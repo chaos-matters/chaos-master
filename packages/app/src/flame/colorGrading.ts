@@ -126,7 +126,13 @@ export function createColorGradingPipeline(
     }
   })
 
-  const fragmentBody = ({ pos, uv }: { pos: any; uv: any }) => {
+  const fragmentBody = ({
+    pos,
+    uv,
+  }: {
+    pos: ReturnType<typeof vec4f>
+    uv: ReturnType<typeof vec2f>
+  }) => {
     'use gpu'
     const uniforms = bindGroupLayout.$.uniforms
     const textureSize = bindGroupLayout.$.textureSize
