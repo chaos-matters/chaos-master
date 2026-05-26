@@ -30,6 +30,7 @@ import { ProgressBar } from './components/ProgressBar/ProgressBar'
 import { getPresetFromQuality, qualityPresets, } from './components/Quality/QualityPresets'
 import { QuickVariationPicker } from './components/QuickVariationPicker/QuickVariationPicker'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
+import { AngleEditor } from './components/Sliders/ParametricEditors/AngleEditor'
 import { ScrubInput } from './components/Sliders/ScrubInput'
 import { Slider } from './components/Sliders/Slider'
 import { SoftwareVersion } from './components/SoftwareVersion/SoftwareVersion'
@@ -144,49 +145,6 @@ export function MainWorkspace(props: AppProps) {
   const { isCompact, toggleCompact } = useCompactMode()
   const [showSidebar, setShowSidebar] = createSignal(true)
   const requestModal = useRequestModal()
-
-  async function requestSymmetryModal(): Promise<number | null> {
-    return requestModal<number | null>({
-      content: ({ respond }) => {
-        const [value, setValue] = createSignal(3)
-        return (
-          <>
-            <ModalTitleBar onClose={() => { respond(null) }}>
-              Rotational Symmetry
-            </ModalTitleBar>
-            <div style={{ display: 'flex', 'flex-direction': 'column', gap: 'var(--space-3)' }}>
-              <p style={{ margin: '0', 'font-size': '0.85rem', color: 'var(--neutral-500)' }}>
-                Adds N-1 rotation transforms with color speed 0.
-              </p>
-              <label style={{ display: 'flex', 'align-items': 'center', gap: 'var(--space-3)', 'font-size': '0.85rem' }}>
-                <span>Folds (N)</span>
-                <input
-                  type="number"
-                  min={2}
-                  max={36}
-                  value={value()}
-                  onInput={(e) => setValue(parseInt(e.currentTarget.value, 10) || 2)}
-                  style={{
-                    width: '60px',
-                    padding: '4px 8px',
-                    border: '1px solid var(--neutral-300)',
-                    'border-radius': '4px',
-                    background: 'var(--neutral-100)',
-                    color: 'inherit',
-                    'font-size': '0.85rem',
-                  }}
-                />
-              </label>
-            </div>
-            <div style={{ display: 'flex', gap: 'var(--space-2)', 'justify-content': 'flex-end' }}>
-              <Button onClick={() => { respond(null) }}>Cancel</Button>
-              <Button onClick={() => { respond(value()) }}>Add</Button>
-            </div>
-          </>
-        )
-      },
-    })
-  }
   const [sidebarHidden, setSidebarHidden] = createSignal(false)
   const [sidebarLayoutMode, setSidebarLayoutMode] = persistentSignal<
     'compact' | 'wide'
@@ -257,6 +215,65 @@ export function MainWorkspace(props: AppProps) {
       props.resetFlameFromWelcome?.()
     }
   })
+
+  const symTransforms = createMemo(() => recordEntries(flameDescriptor.transforms).filter(([tid]) => tid.startsWith('_sym__')))
+
+  const currentSymType = createMemo(() => {
+    const syms = symTransforms() || []
+    return syms.some(([, t]) => t?.preAffine?.a === -1 && t.preAffine.d === 0 && t.preAffine.b === 0 && t.preAffine.e === 1) ? 'dihedral' : 'rotational'
+  })
+
+  const currentSymFolds = createMemo(() => {
+    const isDihedral = currentSymType() === 'dihedral'
+    const syms = symTransforms() || []
+    return isDihedral ? syms.length : syms.length + 1
+  })
+
+  const applySymmetry = (n: number, type: 'rotational' | 'dihedral') => {
+    setFlameDescriptor((draft) => {
+      for (const tid of recordKeys(draft.transforms)) {
+        if (tid.startsWith('_sym__')) {
+          delete draft.transforms[tid]
+        }
+      }
+
+      const totalWeight = sum(
+        Object.values(draft.transforms).map((t) => t.probability),
+      )
+      const symWeight = Math.max(totalWeight, 1)
+
+      for (let i = 1; i < n; i++) {
+        const angle = (2 * Math.PI * i) / n
+        const cos = Math.cos(angle)
+        const sin = Math.sin(angle)
+        draft.transforms[generateTransformId('sym')] = {
+          probability: symWeight,
+          colorSpeed: 0,
+          color: { x: 0, y: 0 },
+          visible: true,
+          preAffine: { a: cos, b: -sin, c: 0, d: sin, e: cos, f: 0 },
+          postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+          variations: {
+            [generateVariationId()]: getVariationDefault('linear', 1),
+          },
+        }
+      }
+
+      if (type === 'dihedral') {
+        draft.transforms[generateTransformId('sym')] = {
+          probability: symWeight,
+          colorSpeed: 0,
+          color: { x: 0, y: 0 },
+          visible: true,
+          preAffine: { a: -1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+          postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+          variations: {
+            [generateVariationId()]: getVariationDefault('linear', 1),
+          },
+        }
+      }
+    })
+  }
 
   const totalProbability = createMemo(() =>
     sum(Object.values(flameDescriptor.transforms).map((f) => f.probability)),
@@ -617,6 +634,8 @@ export function MainWorkspace(props: AppProps) {
         return fd.renderSettings.pointInitMode
       case 'densityEstimationQuality':
         return fd.renderSettings.densityEstimationQuality ?? 0.8
+      case 'estimatorCurve':
+        return fd.renderSettings.estimatorCurve ?? 0.5
       case 'paletteMode':
         return fd.renderSettings.paletteMode ?? 0
       case 'palettePhase':
@@ -807,6 +826,9 @@ export function MainWorkspace(props: AppProps) {
           break
         case 'densityEstimationQuality':
           draft.renderSettings.densityEstimationQuality = value as number
+          break
+        case 'estimatorCurve':
+          draft.renderSettings.estimatorCurve = value as number
           break
         case 'paletteMode':
           draft.renderSettings.paletteMode = value as number
@@ -1353,6 +1375,12 @@ export function MainWorkspace(props: AppProps) {
                           setFn(draft.transforms)
                         })
                       }}
+                      finalTransform={flameDescriptor.finalTransform ?? { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 }}
+                      setFinalTransform={(affine) => {
+                        setFlameDescriptor((draft) => {
+                          draft.finalTransform = affine
+                        })
+                      }}
                     />
                   </CollapsibleCard>
                   <CollapsibleCard title="Color">
@@ -1374,7 +1402,7 @@ export function MainWorkspace(props: AppProps) {
                       onUnselect={handlePaletteUnselect}
                     />
                   </CollapsibleCard>
-                  <For each={recordEntries(flameDescriptor.transforms)}>
+                  <For each={recordEntries(flameDescriptor.transforms).filter(([tid]) => !tid.startsWith('_sym__'))}>
                     {([tid, transform]) => (
                       <CollapsibleCard
                         title={readableIds().transformLabel[tid]!}
@@ -1724,6 +1752,138 @@ export function MainWorkspace(props: AppProps) {
                       </CollapsibleCard>
                     )}
                   </For>
+                  <Show when={recordEntries(flameDescriptor.transforms).some(([tid]) => tid.startsWith('_sym__'))}>
+                    <CollapsibleCard
+                      title={`Symmetry (${recordEntries(flameDescriptor.transforms).filter(([tid]) => tid.startsWith('_sym__')).length})`}
+                      defaultOpen={false}
+                    >
+                      <div style={{
+                        display: 'flex',
+                        'flex-direction': 'column',
+                        gap: 'var(--space-2)',
+                        padding: 'var(--space-2)',
+                      }}>
+                        <div style={{ display: 'flex', 'align-items': 'center', 'justify-content': 'space-between' }}>
+                          <span style={{ 'font-size': '0.75rem', color: 'var(--neutral-500)', 'font-weight': '600' }}>
+                            {symTransforms().length} symmetry transform(s)
+                          </span>
+                          <button
+                            class={ui.deleteFlameButton}
+                            title="Remove all symmetry transforms"
+                            onClick={() => {
+                              setFlameDescriptor((draft) => {
+                                for (const tid of recordKeys(draft.transforms)) {
+                                  if (tid.startsWith('_sym__')) {
+                                    delete draft.transforms[tid]
+                                  }
+                                }
+                              })
+                            }}
+                          >
+                            <Cross />
+                          </button>
+                        </div>
+                        <div style={{ display: 'flex', 'align-items': 'center', gap: 'var(--space-2)' }}>
+                          <span style={{ 'font-size': '0.75rem', width: '50px' }}>Type</span>
+                          <select
+                            class={ui.select}
+                            value={currentSymType()}
+                            onChange={(e) => {
+                               applySymmetry(currentSymFolds(), e.currentTarget.value as 'rotational' | 'dihedral')
+                            }}
+                          >
+                            <option value="rotational">Rotational</option>
+                            <option value="dihedral">Dihedral</option>
+                          </select>
+                        </div>
+                        <div style={{ display: 'flex', 'align-items': 'center', gap: 'var(--space-2)' }}>
+                          <span style={{ 'font-size': '0.75rem', width: '50px' }}>Folds</span>
+                          <div style={{ flex: 1 }}>
+                            <ScrubInput
+                              label=""
+                              value={currentSymFolds()}
+                              step={1}
+                              onInput={(val: number) => {
+                                const newN = Math.max(2, Math.round(val))
+                                if (newN !== currentSymFolds()) {
+                                   applySymmetry(newN, currentSymType())
+                                }
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <For each={symTransforms()}>
+                          {([tid, transform]) => (
+                            <div style={{
+                              display: 'flex',
+                              'align-items': 'center',
+                              gap: 'var(--space-2)',
+                              padding: '4px 0',
+                              'border-top': '1px solid var(--neutral-200)',
+                            }}>
+                              <span style={{
+                                'font-size': '0.75rem',
+                                'font-weight': '600',
+                                'min-width': '24px',
+                              }}>
+                                {readableIds().transformLabel[tid]}
+                              </span>
+                              <div style={{ flex: '1' }}>
+                                {(() => {
+                                  const a = transform.preAffine
+                                  if (a.a === -1 && a.d === 0 && a.b === 0 && a.e === 1) {
+                                    return <span style={{ 'font-size': '0.75rem', color: 'var(--neutral-500)' }}>Reflection</span>
+                                  }
+                                  return (
+                                    <AngleEditor
+                                      value={(() => {
+                                        let angle = Math.atan2(a.d, a.a)
+                                        if (angle < 0) angle += 2 * Math.PI
+                                        return angle
+                                      })()}
+                                      setValue={(newAngle) => {
+                                        setFlameDescriptor((draft) => {
+                                          const cos = Math.cos(newAngle)
+                                          const sin = Math.sin(newAngle)
+                                          const t = draft.transforms[tid]
+                                          if (t) {
+                                            t.preAffine = { a: cos, b: -sin, c: 0, d: sin, e: cos, f: 0 }
+                                          }
+                                        })
+                                      }}
+                                    />
+                                  )
+                                })()}
+                              </div>
+                              <button
+                                class={ui.visibilityButton}
+                                title={transform.visible ? 'Hide' : 'Show'}
+                                onClick={() => {
+                                  setFlameDescriptor((draft) => {
+                                    draft.transforms[tid]!.visible =
+                                      !draft.transforms[tid]!.visible
+                                  })
+                                }}
+                              >
+                                {transform.visible ? <Eye /> : <EyeOff />}
+                              </button>
+                              <button
+                                class={ui.deleteFlameButton}
+                                onClick={() => {
+                                  setFlameDescriptor((draft) => {
+                                    delete draft.transforms[tid]
+                                  })
+                                }}
+                              >
+                                <Cross />
+                              </button>
+                            </div>
+                          )}
+                        </For>
+                      </div>
+                    </CollapsibleCard>
+                  </Show>
                   <Card class={ui.buttonCard}>
                     <button
                       class={ui.addFlameButton}
@@ -1738,66 +1898,18 @@ export function MainWorkspace(props: AppProps) {
                     </button>
                     <button
                       class={ui.addFlameButton}
-                      onClick={async () => {
-                        const n = await requestSymmetryModal()
-                        if (n !== null && n > 1) {
-                          setFlameDescriptor((draft) => {
-                            for (let i = 1; i < n; i++) {
-                              const angle = (2 * Math.PI * i) / n
-                              const cos = Math.cos(angle)
-                              const sin = Math.sin(angle)
-                              draft.transforms[generateTransformId('sym')] = {
-                                probability: 1,
-                                colorSpeed: 0,
-                                color: { x: 0, y: 0 },
-                                visible: true,
-                                preAffine: { a: cos, b: -sin, c: 0, d: sin, e: cos, f: 0 },
-                                postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-                                variations: {
-                                  [generateVariationId()]: getVariationDefault('linear', 1),
-                                },
-                              }
-                            }
-                          })
-                        }
+                      onClick={() => {
+                        applySymmetry(3, 'rotational')
                       }}
                     >
                       Add symmetry
                     </button>
                   </Card>
-                  <CollapsibleCard title="Final Transform">
-                    <Card>
-                      <div style={{ display: 'grid', "grid-template-columns": '1fr 1fr', gap: '8px', padding: '16px' }}>
-                      <For each={['a', 'b', 'c', 'd', 'e', 'f'] as const}>
-                        {(key) => (
-                          <div
-                            class={ui.parameterTarget}
-                            onClick={() => {
-                              setTargetedParameter(`finalTransform.${key}`)
-                            }}
-                          >
-                            <ScrubInput
-                              label={key}
-                              value={flameDescriptor.finalTransform?.[key] ?? (key === 'a' || key === 'e' ? 1 : 0)}
-                              step={0.001}
-                              onInput={(val) => {
-                                setFlameDescriptor((draft) => {
-                                  if (!draft.finalTransform) {
-                                    draft.finalTransform = { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 }
-                                  }
-                                  draft.finalTransform[key] = val
-                                })
-                              }}
-                              dataParameterPath={`finalTransform.${key}`}
-                            />
-                          </div>
-                        )}
-                      </For>
-                      </div>
-                    </Card>
-                  </CollapsibleCard>
                   <CollapsibleCard title="Render">
                     <Card>
+                      {/* -- Tone Mapping -- */}
+                      <div class={ui.settingsGroup}>
+                        <span class={ui.settingsGroupLabel}>Tone Mapping</span>
                       <div
                         class={ui.parameterTarget}
                         onClick={() => {
@@ -1819,6 +1931,168 @@ export function MainWorkspace(props: AppProps) {
                           dataParameterPath="skipIters"
                         />
                       </div>
+                      <div
+                        class={ui.parameterTarget}
+                        onClick={() => {
+                          setTargetedParameter('exposure')
+                        }}
+                      >
+                        <Slider
+                          label="Exposure"
+                          value={flameDescriptor.renderSettings.exposure}
+                          min={-8}
+                          max={8}
+                          step={0.001}
+                          onInput={(newExp) => {
+                            setFlameDescriptor((draft) => {
+                              draft.renderSettings.exposure = newExp
+                            })
+                          }}
+                          formatValue={(value) =>
+                            Number(value.toFixed(6)).toString()
+                          }
+                          dataParameterPath="exposure"
+                        />
+                      </div>
+                      <div
+                        class={ui.parameterTarget}
+                        onClick={() => {
+                          setTargetedParameter('gamma')
+                        }}
+                      >
+                        <Slider
+                          label="Gamma"
+                          value={flameDescriptor.renderSettings.gamma}
+                          min={0.1}
+                          max={8}
+                          step={0.01}
+                          onInput={(newVal) => {
+                            setFlameDescriptor((draft) => {
+                              draft.renderSettings.gamma = newVal
+                            })
+                          }}
+                          formatValue={(value) => value.toFixed(2)}
+                          dataParameterPath="gamma"
+                        />
+                      </div>
+                      <div
+                        class={ui.parameterTarget}
+                        onClick={() => {
+                          setTargetedParameter('contrast')
+                        }}
+                      >
+                        <Slider
+                          label="Contrast"
+                          value={flameDescriptor.renderSettings.contrast}
+                          min={0.01}
+                          max={20}
+                          step={0.01}
+                          onInput={(newVal) => {
+                            setFlameDescriptor((draft) => {
+                              draft.renderSettings.contrast = newVal
+                            })
+                          }}
+                          formatValue={(value) => value.toFixed(2)}
+                          dataParameterPath="contrast"
+                        />
+                      </div>
+                      <div
+                        class={ui.parameterTarget}
+                        onClick={() => {
+                          setTargetedParameter('vibrancy')
+                        }}
+                      >
+                        <Slider
+                          label="Vibrancy"
+                          value={flameDescriptor.renderSettings.vibrancy}
+                          min={0}
+                          max={3}
+                          step={0.05}
+                          onInput={(newVibrancy) => {
+                            setFlameDescriptor((draft) => {
+                              draft.renderSettings.vibrancy = newVibrancy
+                            })
+                          }}
+                          formatValue={(value) => value.toFixed(2)}
+                          dataParameterPath="vibrancy"
+                        />
+                      </div>
+                      <div
+                        class={ui.parameterTarget}
+                        onClick={() => {
+                          setTargetedParameter('highlightPower')
+                        }}
+                      >
+                        <Slider
+                          label="Highlight Power"
+                          value={flameDescriptor.renderSettings.highlightPower}
+                          min={0}
+                          max={2}
+                          step={0.01}
+                          onInput={(newVal) => {
+                            setFlameDescriptor((draft) => {
+                              draft.renderSettings.highlightPower = newVal
+                            })
+                          }}
+                          formatValue={(value) => value.toFixed(2)}
+                          dataParameterPath="highlightPower"
+                        />
+                      </div>
+                      <div
+                        class={ui.parameterTarget}
+                        onClick={() => {
+                          setTargetedParameter('densityEstimationQuality')
+                        }}
+                      >
+                        <Slider
+                          label="Filter Quality"
+                          value={
+                            flameDescriptor.renderSettings
+                              .densityEstimationQuality ?? 0.8
+                          }
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          onInput={(newVal) => {
+                            setFlameDescriptor((draft) => {
+                              draft.renderSettings.densityEstimationQuality =
+                                newVal
+                            })
+                          }}
+                          formatValue={(value) => value.toFixed(2)}
+                          dataParameterPath="densityEstimationQuality"
+                        />
+                      </div>
+                      <div
+                        class={ui.parameterTarget}
+                        onClick={() => {
+                          setTargetedParameter('estimatorCurve')
+                        }}
+                      >
+                        <Slider
+                          label="Estimator Curve"
+                          value={
+                            flameDescriptor.renderSettings
+                              .estimatorCurve ?? 0.5
+                          }
+                          min={0.1}
+                          max={1}
+                          step={0.05}
+                          onInput={(newVal) => {
+                            setFlameDescriptor((draft) => {
+                              draft.renderSettings.estimatorCurve =
+                                newVal
+                            })
+                          }}
+                          formatValue={(value) => value.toFixed(2)}
+                          dataParameterPath="estimatorCurve"
+                        />
+                      </div>
+                      </div>
+
+                      {/* -- Modes -- */}
+                      <div class={ui.settingsGroup}>
+                        <span class={ui.settingsGroupLabel}>Modes</span>
                       <div
                         class={ui.parameterTarget}
                         onClick={() => {
@@ -1939,110 +2213,54 @@ export function MainWorkspace(props: AppProps) {
                       <div
                         class={ui.parameterTarget}
                         onClick={() => {
-                          setTargetedParameter('exposure')
+                          setTargetedParameter('backgroundColor')
                         }}
                       >
-                        <Slider
-                          label="Exposure"
-                          value={flameDescriptor.renderSettings.exposure}
-                          min={-8}
-                          max={8}
-                          step={0.001}
-                          onInput={(newExp) => {
-                            setFlameDescriptor((draft) => {
-                              draft.renderSettings.exposure = newExp
-                            })
-                          }}
-                          formatValue={(value) =>
-                            Number(value.toFixed(6)).toString()
-                          }
-                          dataParameterPath="exposure"
-                        />
+                        <label class={ui.labeledInput}>
+                          <span>
+                            <KeyframeDiamond parameterPath="backgroundColor" />
+                            Background Color
+                          </span>
+                          <ColorPicker
+                            value={
+                              flameDescriptor.renderSettings.backgroundColor
+                                ? vec3f(
+                                    ...flameDescriptor.renderSettings
+                                      .backgroundColor,
+                                  )
+                                : undefined
+                            }
+                            setValue={(newBgColor) => {
+                              setFlameDescriptor((draft) => {
+                                draft.renderSettings.backgroundColor =
+                                  newBgColor
+                              })
+                            }}
+                          />
+                        </label>
                       </div>
-                      <div
-                        class={ui.parameterTarget}
-                        onClick={() => {
-                          setTargetedParameter('vibrancy')
-                        }}
+                      <Show
+                        when={
+                          flameDescriptor.renderSettings.backgroundColor !==
+                          undefined
+                        }
+                        fallback={<span class={ui.noSelect} />}
                       >
-                        <Slider
-                          label="Vibrancy"
-                          value={flameDescriptor.renderSettings.vibrancy}
-                          min={0}
-                          max={3}
-                          step={0.05}
-                          onInput={(newVibrancy) => {
+                        <Button
+                          onClick={() => {
                             setFlameDescriptor((draft) => {
-                              draft.renderSettings.vibrancy = newVibrancy
+                              delete draft.renderSettings.backgroundColor
                             })
                           }}
-                          formatValue={(value) => value.toFixed(2)}
-                          dataParameterPath="vibrancy"
-                        />
+                        >
+                          Auto
+                        </Button>
+                      </Show>
                       </div>
-                      <div
-                        class={ui.parameterTarget}
-                        onClick={() => {
-                          setTargetedParameter('contrast')
-                        }}
-                      >
-                        <Slider
-                          label="Contrast"
-                          value={flameDescriptor.renderSettings.contrast}
-                          min={0.01}
-                          max={20}
-                          step={0.01}
-                          onInput={(newVal) => {
-                            setFlameDescriptor((draft) => {
-                              draft.renderSettings.contrast = newVal
-                            })
-                          }}
-                          formatValue={(value) => value.toFixed(2)}
-                          dataParameterPath="contrast"
-                        />
-                      </div>
-                      <div
-                        class={ui.parameterTarget}
-                        onClick={() => {
-                          setTargetedParameter('gamma')
-                        }}
-                      >
-                        <Slider
-                          label="Gamma"
-                          value={flameDescriptor.renderSettings.gamma}
-                          min={0.1}
-                          max={8}
-                          step={0.01}
-                          onInput={(newVal) => {
-                            setFlameDescriptor((draft) => {
-                              draft.renderSettings.gamma = newVal
-                            })
-                          }}
-                          formatValue={(value) => value.toFixed(2)}
-                          dataParameterPath="gamma"
-                        />
-                      </div>
-                      <div
-                        class={ui.parameterTarget}
-                        onClick={() => {
-                          setTargetedParameter('highlightPower')
-                        }}
-                      >
-                        <Slider
-                          label="Highlight Power"
-                          value={flameDescriptor.renderSettings.highlightPower}
-                          min={0}
-                          max={2}
-                          step={0.01}
-                          onInput={(newVal) => {
-                            setFlameDescriptor((draft) => {
-                              draft.renderSettings.highlightPower = newVal
-                            })
-                          }}
-                          formatValue={(value) => value.toFixed(2)}
-                          dataParameterPath="highlightPower"
-                        />
-                      </div>
+
+                      {/* -- Palette -- */}
+                      <div class={ui.settingsGroup}>
+                        <span class={ui.settingsGroupLabel}>Palette</span>
                       <div
                         class={ui.parameterTarget}
                         onClick={() => {
@@ -2113,77 +2331,7 @@ export function MainWorkspace(props: AppProps) {
                           dataParameterPath="palettePhase"
                         />
                       </div>
-                      <div
-                        class={ui.parameterTarget}
-                        onClick={() => {
-                          setTargetedParameter('densityEstimationQuality')
-                        }}
-                      >
-                        <Slider
-                          label="Filter Quality"
-                          value={
-                            flameDescriptor.renderSettings
-                              .densityEstimationQuality ?? 0.8
-                          }
-                          min={0}
-                          max={1}
-                          step={0.01}
-                          onInput={(newVal) => {
-                            setFlameDescriptor((draft) => {
-                              draft.renderSettings.densityEstimationQuality =
-                                newVal
-                            })
-                          }}
-                          formatValue={(value) => value.toFixed(2)}
-                          dataParameterPath="densityEstimationQuality"
-                        />
                       </div>
-                      <div
-                        class={ui.parameterTarget}
-                        onClick={() => {
-                          setTargetedParameter('backgroundColor')
-                        }}
-                      >
-                        <label class={ui.labeledInput}>
-                          <span>
-                            <KeyframeDiamond parameterPath="backgroundColor" />
-                            Background Color
-                          </span>
-                          <ColorPicker
-                            value={
-                              flameDescriptor.renderSettings.backgroundColor
-                                ? vec3f(
-                                    ...flameDescriptor.renderSettings
-                                      .backgroundColor,
-                                  )
-                                : undefined
-                            }
-                            setValue={(newBgColor) => {
-                              setFlameDescriptor((draft) => {
-                                draft.renderSettings.backgroundColor =
-                                  newBgColor
-                              })
-                            }}
-                          />
-                        </label>
-                      </div>
-                      <Show
-                        when={
-                          flameDescriptor.renderSettings.backgroundColor !==
-                          undefined
-                        }
-                        fallback={<span class={ui.noSelect} />}
-                      >
-                        <Button
-                          onClick={() => {
-                            setFlameDescriptor((draft) => {
-                              delete draft.renderSettings.backgroundColor
-                            })
-                          }}
-                        >
-                          Auto
-                        </Button>
-                      </Show>
                     </Card>
                   </CollapsibleCard>
                 </Show>

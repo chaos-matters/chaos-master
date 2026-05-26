@@ -34,6 +34,7 @@ export const renderSettingsDefault: RenderSettings = {
   gamma: 2.2,
   highlightPower: 0.5,
   densityEstimationQuality: 0.8,
+  estimatorCurve: 0.5,
   paletteMode: 0,
   palettePhase: 0,
   paletteSpeed: 0.5,
@@ -116,6 +117,10 @@ const RenderSettings = v.object({
     0.5,
   ),
   densityEstimationQuality: v.optional(v.pipe(v.number(), v.minValue(0)), 0.8),
+  estimatorCurve: v.optional(
+    v.pipe(v.number(), v.minValue(0.1), v.maxValue(1)),
+    0.5,
+  ),
   paletteMode: v.optional(
     v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(1)),
     0,

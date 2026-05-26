@@ -3,8 +3,12 @@ import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { builtin, vec2f, vec3f, vec4f } from 'typegpu/data'
 import { abs, add, dot, dpdx, fract, length, max, mix, mul, saturate, sub, } from 'typegpu/std'
+import { DiceButton } from '@/components/DiceButton/DiceButton'
+import { ScrubInput } from '@/components/Sliders/ScrubInput'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useTheme } from '@/contexts/ThemeContext'
+import { randomizeAffineCoef } from '@/flame/randomize'
+import { ArrowRightToBox, BoxArrowRight, GridIcon, ListIcon, Sparkle } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { useCamera } from '@/lib/CameraContext'
 import { useCanvas } from '@/lib/CanvasContext'
@@ -19,6 +23,7 @@ import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { handleColor } from '../FlameColorEditor/FlameColorEditor'
 import ui from './AffineEditor.module.css'
 import { AffineListEditor } from './AffineListEditor'
+import listUi from './AffineListEditor.module.css'
 import type { v2f } from 'typegpu/data'
 import type { AffineParams } from '@/flame/affineTranform'
 import type { TransformRecord } from '@/flame/schema/flameSchema'
@@ -333,17 +338,20 @@ function AffineHandle(props: {
 }
 
 type Tab = 'grid' | 'list'
+type AffineMode = 'preAffine' | 'postAffine' | 'final'
 
 export function AffineEditor(props: {
   class?: string
   transforms: TransformRecord
   setTransforms: HistorySetter<TransformRecord>
+  finalTransform?: AffineParams
+  setFinalTransform?: (affine: AffineParams) => void
 }) {
   const [div, setDiv] = createSignal<HTMLDivElement>()
   const [zoom, setZoom] = createZoom(0.9, [0.5, 20])
   const [position, setPosition] = createPosition(vec2f())
   const [tab, setTab] = createSignal<Tab>('grid')
-  const [affineMode, setAffineMode] = createSignal<'preAffine' | 'postAffine'>('preAffine')
+  const [affineMode, setAffineMode] = createSignal<AffineMode>('preAffine')
   const [isVisible, setIsVisible] = createSignal(true)
 
   useIntersectionObserver(div, (visible) => setIsVisible(visible))
@@ -369,15 +377,17 @@ export function AffineEditor(props: {
           class={ui.tab}
           classList={{ [ui.tabActive as string]: tab() === 'grid' }}
           onClick={() => setTab('grid')}
+          title="Grid view"
         >
-          Grid
+          <GridIcon class={ui.tabIcon} />
         </button>
         <button
           class={ui.tab}
           classList={{ [ui.tabActive as string]: tab() === 'list' }}
           onClick={() => setTab('list')}
+          title="Coefficients list"
         >
-          Coefs
+          <ListIcon class={ui.tabIcon} />
         </button>
         <span class={ui.divider} />
         <button
@@ -385,17 +395,30 @@ export function AffineEditor(props: {
           classList={{ [ui.tabActive as string]: affineMode() === 'preAffine' }}
           onClick={() => setAffineMode('preAffine')}
           data-tour-target="affine-mode"
+          title="Pre-transform (before variations)"
         >
-          Pre
+          <ArrowRightToBox class={ui.tabIcon} />
         </button>
         <button
           class={ui.tab}
           classList={{ [ui.tabActive as string]: affineMode() === 'postAffine' }}
           onClick={() => setAffineMode('postAffine')}
           data-tour-target="affine-mode"
+          title="Post-transform (after variations)"
         >
-          Post
+          <BoxArrowRight class={ui.tabIcon} />
         </button>
+        <Show when={props.finalTransform}>
+          <span class={ui.divider} />
+          <button
+            class={ui.tab}
+            classList={{ [ui.tabActive as string]: affineMode() === 'final' }}
+            onClick={() => setAffineMode('final')}
+            title="Final transform (applied to all points)"
+          >
+            <Sparkle class={ui.tabIcon} />
+          </button>
+        </Show>
       </div>
 
       <Show when={tab() === 'grid'}>
@@ -422,30 +445,84 @@ export function AffineEditor(props: {
                   <path d="M 0 0 L 10 5 L 0 10 z" />
                 </marker>
               </defs>
-              <For each={recordEntries(props.transforms)}>
-                {([tid, transform]) => (
-                  <AffineHandle
-                    transform={transform[affineMode()]}
-                    color={vec2f(transform.color.x, transform.color.y)}
-                    setTransform={(affine) => {
-                      props.setTransforms((draft) => {
-                        draft[tid]![affineMode()] = affine
-                      })
-                    }}
-                  />
-                )}
-              </For>
+              <Show when={affineMode() !== 'final'}>
+                <For each={recordEntries(props.transforms)}>
+                  {([tid, transform]) => (
+                    <AffineHandle
+                      transform={transform[affineMode() as 'preAffine' | 'postAffine']}
+                      color={vec2f(transform.color.x, transform.color.y)}
+                      setTransform={(affine) => {
+                        props.setTransforms((draft) => {
+                          draft[tid]![affineMode() as 'preAffine' | 'postAffine'] = affine
+                        })
+                      }}
+                    />
+                  )}
+                </For>
+              </Show>
+              <Show when={affineMode() === 'final' && props.finalTransform}>
+                <AffineHandle
+                  transform={props.finalTransform!}
+                  color={vec2f(0, 0)}
+                  setTransform={(affine) => {
+                    props.setFinalTransform?.(affine)
+                  }}
+                />
+              </Show>
             </svg>
           </WheelZoomCamera2D>
         </AutoCanvas>
       </Show>
 
-      <Show when={tab() === 'list'}>
+      <Show when={tab() === 'list' && affineMode() !== 'final'}>
         <AffineListEditor
           transforms={props.transforms}
           setTransforms={props.setTransforms}
-          affineMode={affineMode()}
+          affineMode={affineMode() as 'preAffine' | 'postAffine'}
         />
+      </Show>
+      <Show when={tab() === 'list' && affineMode() === 'final' && props.finalTransform}>
+        <div class={listUi.container}>
+          <div class={listUi.transformCard}>
+            <div class={listUi.transformHeader}>
+              <span class={listUi.transformLabel}>
+                Final Transform
+              </span>
+              <DiceButton
+                title="Randomize affine coefs"
+                onClick={() => {
+                  if (props.setFinalTransform && props.finalTransform) {
+                    const next = { ...props.finalTransform }
+                    for (const key of ['a', 'b', 'c', 'd', 'e', 'f'] as const) {
+                      next[key] = randomizeAffineCoef(next[key], key)
+                    }
+                    props.setFinalTransform(next)
+                  }
+                }}
+              />
+            </div>
+            <div class={listUi.coefficients}>
+              <For each={['a', 'b', 'c', 'd', 'e', 'f'] as const}>
+                {(key) => (
+                  <ScrubInput
+                    label={key}
+                    value={props.finalTransform![key]}
+                    step={0.001}
+                    onInput={(val) => {
+                      if (props.setFinalTransform && props.finalTransform) {
+                        props.setFinalTransform({
+                          ...props.finalTransform,
+                          [key]: val,
+                        })
+                      }
+                    }}
+                    dataParameterPath={`finalTransform.${key}`}
+                  />
+                )}
+              </For>
+            </div>
+          </div>
+        </div>
       </Show>
     </div>
   )

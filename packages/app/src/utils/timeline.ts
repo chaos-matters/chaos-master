@@ -219,11 +219,20 @@ export interface FlameDescriptor {
     paletteSpeed?: number
     paletteMode?: number
     densityEstimationQuality?: number
+    estimatorCurve?: number
     contrast?: number
     gamma?: number
     highlightPower?: number
   }
   transforms: TransformRecord
+  finalTransform?: {
+    a: number
+    b: number
+    c: number
+    d: number
+    e: number
+    f: number
+  }
   metadata: {
     author: string
   }
@@ -1078,6 +1087,9 @@ function applyTracksToFlame(
   })
   applyNumber('densityEstimationQuality', (v) => {
     flame.renderSettings.densityEstimationQuality = v
+  })
+  applyNumber('estimatorCurve', (v) => {
+    flame.renderSettings.estimatorCurve = v
   })
   applyString('drawMode', (v) => {
     flame.renderSettings.drawMode = v as 'light' | 'paint'

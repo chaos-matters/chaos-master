@@ -1,6 +1,6 @@
 import { tgpu } from 'typegpu'
 import { arrayOf, builtin, f32, i32, vec2i } from 'typegpu/data'
-import { add, clamp, max, sqrt, sub } from 'typegpu/std'
+import { add, clamp, max, pow, sub } from 'typegpu/std'
 import { Bucket, BUCKET_FIXED_POINT_MULTIPLIER_INV, FilterParams, } from './types'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
 
@@ -15,6 +15,9 @@ const bindGroupLayout = tgpu.bindGroupLayout({
   qualityK: {
     uniform: f32,
   },
+  estimatorCurve: {
+    uniform: f32,
+  },
   accumulationBuffer: {
     storage: arrayOf(Bucket),
     access: 'readonly',
@@ -26,6 +29,7 @@ const bindGroupLayout = tgpu.bindGroupLayout({
 })
 
 const DEFAULT_QUALITY_K = 5
+const DEFAULT_ESTIMATOR_CURVE = 0.5
 const MIN_SIGMA = 0.5
 const MAX_SIGMA = 12
 const EPSILON = 0.001
@@ -40,18 +44,23 @@ export function createDensityEstimationPipeline(
     (typeof bindGroupLayout)['entries']['filterParamsBuffer']
   >,
   qualityK = DEFAULT_QUALITY_K,
+  estimatorCurve = DEFAULT_ESTIMATOR_CURVE,
 ) {
   const textureSizeBuffer = root
     .createBuffer(vec2i, vec2i(...textureSize))
     .$usage('uniform')
 
   const qualityKBuffer = root.createBuffer(f32, qualityK).$usage('uniform')
+  const estimatorCurveBuffer = root
+    .createBuffer(f32, estimatorCurve)
+    .$usage('uniform')
 
   const bindGroup = root.createBindGroup(bindGroupLayout, {
     accumulationBuffer,
     filterParamsBuffer,
     textureSize: textureSizeBuffer,
     qualityK: qualityKBuffer,
+    estimatorCurve: estimatorCurveBuffer,
   })
 
   const estimate = tgpu.computeFn({
@@ -67,6 +76,7 @@ export function createDensityEstimationPipeline(
     const accumulationBuffer = bindGroupLayout.$.accumulationBuffer
     const filterParamsBuffer = bindGroupLayout.$.filterParamsBuffer
     const qualityK = bindGroupLayout.$.qualityK
+    const estimatorCurve = bindGroupLayout.$.estimatorCurve
 
     let densitySum = f32(0)
     const kernelRadius = i32(1)
@@ -89,8 +99,10 @@ export function createDensityEstimationPipeline(
     }
 
     const avgDensity = densitySum / f32(sampleCount)
+    // flam3 formula: sigma = qualityK * pow(avgDensity, -estimatorCurve)
+    // When estimatorCurve = 0.5 this is equivalent to qualityK / sqrt(avgDensity)
     const sigma = clamp(
-      qualityK / sqrt(avgDensity),
+      qualityK * pow(avgDensity, -estimatorCurve),
       f32(MIN_SIGMA),
       f32(MAX_SIGMA),
     )
@@ -115,6 +127,9 @@ export function createDensityEstimationPipeline(
     },
     setQualityK: (value: number) => {
       qualityKBuffer.write(value)
+    },
+    setEstimatorCurve: (value: number) => {
+      estimatorCurveBuffer.write(value)
     },
   }
 }

@@ -11,8 +11,11 @@ export function buildReadableIds(transforms: TransformRecord): ReadableIds {
   const variationLabel: Record<string, string> = {}
 
   const sortedTids = Object.keys(transforms).sort()
-  sortedTids.forEach((tid, i) => {
-    const tLabel = `T${i + 1}`
+  let tIdx = 0
+  let sIdx = 0
+  sortedTids.forEach((tid) => {
+    const isSym = tid.startsWith('_sym__')
+    const tLabel = isSym ? `S${++sIdx}` : `T${++tIdx}`
     transformLabel[tid] = tLabel
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const variations = (transforms as Record<string, any>)[tid]?.variations
