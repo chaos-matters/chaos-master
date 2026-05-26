@@ -1,4 +1,4 @@
-import { accumulatedPointCount, qualityPointCountLimit, setAnimationExportCancel, setAnimationExportProgress, setAnimationExportRunning, setExportQuality, } from '@/flame/renderStats'
+import { accumulatedPointCount, forceAnimationExportNow, qualityPointCountLimit, setAnimationExportCancel, setAnimationExportProgress, setAnimationExportRunning, setExportQuality, setForceAnimationExportNow, } from '@/flame/renderStats'
 import { createMetadataPayload, injectMetadataIntoMp4 } from './flameInMp4'
 import { applyTimelineToFlameAtFrame } from './timeline'
 import { createVideoEncoder } from './videoEncoder'
@@ -97,6 +97,19 @@ export function createAnimationExport(
           return
         }
 
+        // "Stop & Save": finalize the video with all frames rendered so far
+        if (forceAnimationExportNow()) {
+          setForceAnimationExportNow(false)
+          if (frameIndex > 0) {
+            void finishExport()
+          } else {
+            // No frames rendered yet — treat as a cancel
+            cleanup()
+            resolve(new Blob())
+          }
+          return
+        }
+
         if (frameIndex >= totalRenders) {
           void finishExport()
           return
@@ -187,6 +200,7 @@ export function createAnimationExport(
         setAnimationExportCancel(undefined)
         setAnimationExportRunning(false)
         setAnimationExportProgress(undefined)
+        setForceAnimationExportNow(false)
         setOnExportImage(undefined)
         setExportQuality(undefined)
         restoreFlameState()
@@ -215,6 +229,7 @@ export function createAnimationExport(
         setAnimationExportCancel(undefined)
         setAnimationExportRunning(false)
         setAnimationExportProgress(undefined)
+        setForceAnimationExportNow(false)
         setOnExportImage(undefined)
         setExportQuality(undefined)
         restoreFlameState()
@@ -232,6 +247,7 @@ export function createAnimationExport(
     setAnimationExportRunning(false)
     setAnimationExportCancel(undefined)
     setAnimationExportProgress(undefined)
+    setForceAnimationExportNow(false)
   }
 
   setAnimationExportCancel(() => cancel)

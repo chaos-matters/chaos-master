@@ -281,6 +281,7 @@
   background: rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(6px);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   pointer-events: auto;
@@ -296,6 +297,10 @@
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(12px);
   cursor: default;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.6);
+  }
 }
 
 .playbackOverlayText {
@@ -304,33 +309,51 @@
   padding: 0.6rem 1.2rem;
   border-radius: 8px;
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 500;
   user-select: none;
   pointer-events: none;
-  font-weight: 500;
 }
 
-.stopExportButton {
-  appearance: none;
-  border: 1px solid #ef4444;
-  background: transparent;
-  color: #ef4444;
-  padding: 0.35rem;
-  border-radius: 6px;
-  cursor: pointer;
-  pointer-events: auto;
-  transition:
-    background 0.15s,
-    color 0.15s;
-  margin-left: 0.6rem;
+.overlayActions {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  pointer-events: auto;
+}
 
-  &:hover {
-    background: #ef4444;
-    color: white;
-  }
+.overlayStopAndSaveButton,
+.overlayCancelButton {
+  appearance: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.overlayStopAndSaveButton {
+  background: rgba(59, 130, 246, 0.3);
+  color: #93bbfd;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.overlayStopAndSaveButton:hover {
+  background: rgba(59, 130, 246, 0.5);
+  border-color: rgba(59, 130, 246, 0.6);
+}
+
+.overlayCancelButton {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.overlayCancelButton:hover {
+  background: rgba(239, 68, 68, 0.35);
+  border-color: rgba(239, 68, 68, 0.45);
 }
 
 .no-select {

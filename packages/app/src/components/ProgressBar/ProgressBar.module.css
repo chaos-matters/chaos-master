@@ -87,3 +87,49 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+
+.animFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.animActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.stopAndSaveButton,
+.cancelButton {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.stopAndSaveButton {
+  background: rgba(59, 130, 246, 0.25);
+  color: #93bbfd;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.stopAndSaveButton:hover {
+  background: rgba(59, 130, 246, 0.4);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.cancelButton {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.cancelButton:hover {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.4);
+}

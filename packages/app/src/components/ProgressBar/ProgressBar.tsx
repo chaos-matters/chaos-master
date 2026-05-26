@@ -1,6 +1,6 @@
 import { createMemo, Show } from 'solid-js'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { accumulatedPointCount, animationExportCancel, animationExportProgress, exportProgress, forceExportNow, iterationSpeedPointPerSec, setExportProgress, setForceExportNow, } from '@/flame/renderStats'
+import { accumulatedPointCount, animationExportCancel, animationExportProgress, exportProgress, forceExportNow, iterationSpeedPointPerSec, setExportProgress, setForceAnimationExportNow, setForceExportNow, } from '@/flame/renderStats'
 import ui from './ProgressBar.module.css'
 
 function formatCount(n: number): string {
@@ -83,38 +83,30 @@ export function ProgressBar() {
     return formatEta(remaining)
   })
 
-  const handleDismiss = () => {
-    const m = mode()
-    if (m === 'image') {
-      setForceExportNow(true)
-    } else if (m === 'animation') {
-      animationExportCancel()?.()
-    }
+  const handleStopAndExportImage = () => {
+    setForceExportNow(true)
+  }
+
+  const handleStopAndSaveAnimation = () => {
+    setForceAnimationExportNow(true)
+  }
+
+  const handleCancelAnimation = () => {
+    animationExportCancel()?.()
   }
 
   return (
-    <div
-      class={ui.overlay}
-      style={{ display: display() }}
-      onClick={handleDismiss}
-      title={
-        mode() === 'animation'
-          ? 'Click to cancel'
-          : 'Click to stop & export now'
-      }
-    >
+    <div class={ui.overlay} style={{ display: display() }}>
       <div class={ui.inner}>
         <Show when={mode() === 'image'}>
           <div class={ui.header}>
             <span class={ui.label}>
-              {isAnimatingImg()
-                ? 'Rendering... (click to stop & export)'
-                : 'Finalizing...'}
+              {isAnimatingImg() ? 'Rendering Image...' : 'Finalizing...'}
             </span>
             <span class={ui.stats}>
               {formatCount(current())} /{' '}
               {formatCount(imgProgress()?.target ?? 0)} pts
-              <Show when={speed()}>{(s) => ` — ${formatCount(s())}/s`}</Show>
+              <Show when={speed()}>{(s) => ` -- ${formatCount(s())}/s`}</Show>
             </span>
           </div>
           <div class={ui.track}>
@@ -124,7 +116,21 @@ export function ProgressBar() {
               style={{ width: `${imgPct()}%` }}
             />
           </div>
-          <div class={ui.eta}>{imgEta()}</div>
+          <div class={ui.animFooter}>
+            <span class={ui.eta}>{imgEta()}</span>
+            <Show when={isAnimatingImg()}>
+              <div class={ui.animActions}>
+                <button
+                  type="button"
+                  class={ui.stopAndSaveButton}
+                  onClick={handleStopAndExportImage}
+                  title="Stop rendering and export the image at current quality"
+                >
+                  Stop & Export
+                </button>
+              </div>
+            </Show>
+          </div>
         </Show>
 
         <Show when={mode() === 'animation'}>
@@ -149,7 +155,27 @@ export function ProgressBar() {
               style={{ width: `${animFramePct()}%` }}
             />
           </div>
-          <div class={ui.eta}>{animEta()}</div>
+          <div class={ui.animFooter}>
+            <span class={ui.eta}>{animEta()}</span>
+            <div class={ui.animActions}>
+              <button
+                type="button"
+                class={ui.stopAndSaveButton}
+                onClick={handleStopAndSaveAnimation}
+                title="Stop after current frame and save the video with all frames rendered so far"
+              >
+                Stop & Save
+              </button>
+              <button
+                type="button"
+                class={ui.cancelButton}
+                onClick={handleCancelAnimation}
+                title="Cancel and discard all rendered frames"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </Show>
       </div>
     </div>

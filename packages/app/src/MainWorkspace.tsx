@@ -50,7 +50,7 @@ import { example1 } from './flame/examples/example1'
 import { Flam3 } from './flame/Flam3'
 import { pointInitModeToImplFn } from './flame/pointInitMode'
 import { random01, randomizeAllColors, randomizeVariationParams, } from './flame/randomize'
-import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, exportProgress, exportQuality, qualityPointCountLimit, setCurrentQuality, setQualityPointCountLimit, } from './flame/renderStats'
+import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, exportProgress, exportQuality, qualityPointCountLimit, setCurrentQuality, setForceAnimationExportNow, setForceExportNow, setQualityPointCountLimit, } from './flame/renderStats'
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from './flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from './flame/transformFunction'
 import { isParametricVariation, isParametricVariationType, isVariationType, transformVariations, } from './flame/variations'
@@ -1313,27 +1313,51 @@ export function MainWorkspace(props: AppProps) {
                       ? 'Rendering animation...'
                       : exportProgress() !== undefined
                         ? 'Rendering image...'
-                        : '⏸ Tap to stop animation'}
+                        : 'Tap to stop animation'}
                   </span>
                   <Show when={animationExportRunning()}>
-                    <button
-                      class={ui.stopExportButton}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        const cancelFn = animationExportCancel()
-                        if (cancelFn) cancelFn()
-                      }}
-                      title="Stop rendering"
-                    >
-                      <svg
-                        viewBox="0 0 16 16"
-                        fill="currentColor"
-                        width="16"
-                        height="16"
+                    <div class={ui.overlayActions}>
+                      <button
+                        class={ui.overlayStopAndSaveButton}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setForceAnimationExportNow(true)
+                        }}
+                        title="Stop after current frame and save"
                       >
-                        <path d="M3 3h10v10H3V3z" />
-                      </svg>
-                    </button>
+                        Stop & Save
+                      </button>
+                      <button
+                        class={ui.overlayCancelButton}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const cancelFn = animationExportCancel()
+                          if (cancelFn) cancelFn()
+                        }}
+                        title="Cancel and discard"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </Show>
+                  <Show
+                    when={
+                      exportProgress() !== undefined &&
+                      !animationExportRunning()
+                    }
+                  >
+                    <div class={ui.overlayActions}>
+                      <button
+                        class={ui.overlayStopAndSaveButton}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setForceExportNow(true)
+                        }}
+                        title="Stop and export at current quality"
+                      >
+                        Stop & Export
+                      </button>
+                    </div>
                   </Show>
                 </div>
               </Show>

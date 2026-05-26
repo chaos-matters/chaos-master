@@ -164,7 +164,15 @@ export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
       eventTarget.removeEventListener('pointerdown', startPanning)
       eventTarget.removeEventListener('touchmove', startPinch)
       eventTarget.removeEventListener('wheel', onWheel)
-      clearTimeout(wheelDebounceTimer)
+      if (wheelDebounceTimer !== undefined) {
+        clearTimeout(wheelDebounceTimer)
+        wheelDebounceTimer = undefined
+        // Don't leave the preview orphaned when the effect re-runs or
+        // the component unmounts during a debounced wheel zoom.
+        if (changeHistory.isPreviewing()) {
+          changeHistory.commit()
+        }
+      }
     })
   })
 
