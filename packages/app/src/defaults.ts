@@ -58,6 +58,14 @@ export const ANIMATION_PREVIEW_POINT_COUNT = parseFloat(
   import.meta.env.VITE_ANIMATION_PREVIEW_POINT_COUNT,
 )
 
+export const THUMBNAIL_PREVIEW_QUALITY = parseFloat(
+  import.meta.env.VITE_THUMBNAIL_PREVIEW_QUALITY ?? '0.95',
+)
+
+export const THUMBNAIL_PREVIEW_QUALITY_HOVER = parseFloat(
+  import.meta.env.VITE_THUMBNAIL_PREVIEW_QUALITY_HOVER ?? '0.999',
+)
+
 // Set to 'true' in .env.local to enable per-frame GPU timing.
 // Disabled by default: resolveQuerySet(384 slots) every frame causes device loss
 // on Firefox/Linux with GFX1201 (RDNA4) due to a wgpu/RADV timestamp-query bug.

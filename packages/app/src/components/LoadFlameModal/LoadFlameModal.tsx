@@ -1,6 +1,6 @@
 import { batch, createSignal, For, onCleanup, Show } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
-import { ANIMATION_PREVIEW_POINT_COUNT, ANIMATION_PREVIEW_QUALITY, DEFAULT_QUALITY, IS_DEV, STATIC_PREVIEW_POINT_COUNT, } from '@/defaults'
+import { ANIMATION_PREVIEW_POINT_COUNT, IS_DEV, STATIC_PREVIEW_POINT_COUNT, THUMBNAIL_PREVIEW_QUALITY, THUMBNAIL_PREVIEW_QUALITY_HOVER, } from '@/defaults'
 import { examples } from '@/flame/examples'
 import { animationDefs, getAnimationFlame } from '@/flame/examples/animations'
 import { Flam3 } from '@/flame/Flam3'
@@ -11,14 +11,14 @@ import { Root } from '@/lib/Root'
 import { extractFlameFromPng } from '@/utils/flameInPng'
 import { deleteRecentFlame, formatRecentDate, loadRecentFlames, } from '@/utils/recentFlames'
 import { recordEntries } from '@/utils/record'
-import { applyTimelineToFlame } from '@/utils/timeline'
+import { applyTracksToFlame } from '@/utils/timeline'
 import { Button } from '../Button/Button'
 import { DelayedShow } from '../DelayedShow/DelayedShow'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
+import { useAlert } from '../Modal/useAlert'
 import { ConfirmDeleteRecentModal, dontAskDeleteRecent, } from './ConfirmDeleteRecentModal'
 import ui from './LoadFlameModal.module.css'
-import type { AnimationDef } from '@/flame/examples/animations'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { ChangeHistory } from '@/utils/createStoreHistory'
 import type { TimelineTrack } from '@/utils/timeline'
@@ -48,14 +48,14 @@ function Preview(props: {
           zoom={props.flameDescriptor.renderSettings.camera.zoom}
         >
           <Flam3
-            quality={props.quality ?? DEFAULT_QUALITY}
+            quality={props.quality ?? THUMBNAIL_PREVIEW_QUALITY}
             pointCountPerBatch={
               props.pointCountPerBatch ?? STATIC_PREVIEW_POINT_COUNT
             }
-            adaptiveFilterEnabled={true}
+            adaptiveFilterEnabled={false}
             animationEnabled={false}
             flameDescriptor={props.flameDescriptor}
-            renderInterval={5}
+            renderInterval={1}
             onExportImage={undefined}
             edgeFadeColor={vec4f(0)}
             onAccumulatedPointCount={() => {}}
@@ -66,122 +66,309 @@ function Preview(props: {
   )
 }
 
-const PREVIEW_FPS = 15
+const ANIM_TOTAL_FRAMES = 90
+const ANIM_FPS = 30
+const ANIM_LOOP_MS = (ANIM_TOTAL_FRAMES / ANIM_FPS) * 1000
 
-/** AnimatedPreview — renders the animation flame and plays on hover. */
-function AnimatedPreview(props: { anim: AnimationDef; index: number }) {
+/** AnimatedPreview -- renders the animation flame, plays on hover. */
+function AnimatedPreview(props: {
+  anim: (typeof animationDefs)[number]
+  index: number
+  onSelect: (flame: FlameDescriptor, tracks: TimelineTrack[]) => void
+}) {
   const baseFlame = getAnimationFlame(props.anim)
-  const [animatedFlame, setAnimatedFlame] = createSignal(
-    structuredClone(baseFlame),
-  )
   const [hovered, setHovered] = createSignal(false)
-  const [, setFrame] = createSignal(0)
+  const [animFrame, setAnimFrame] = createSignal(0)
   let rafId: number | undefined
+  let startTime = 0
 
   function startAnimating() {
-    setHovered(true)
-    const startTime = performance.now()
-    const firstLen = props.anim.tracks[0]?.keyframes.length ?? 0
-    const totalFrames =
-      firstLen > 0
-        ? Math.max(
-            ...props.anim.tracks.flatMap((t) =>
-              t.keyframes.map((kf) => kf.frame),
-            ),
-          )
-        : 100
-    const frameDuration = 1000 / PREVIEW_FPS
+    startTime = performance.now()
 
     function tick() {
       const elapsed = performance.now() - startTime
-      const f = Math.floor(elapsed / frameDuration) % (totalFrames + 1)
-      setFrame(f)
-      const clone = structuredClone(baseFlame)
-      const mockTimeline = {
-        currentFrame: () => f,
-        tracks: () => props.anim.tracks,
-      }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      applyTimelineToFlame(mockTimeline as any, clone)
-      setAnimatedFlame(clone)
+      const f =
+        Math.floor((elapsed / ANIM_LOOP_MS) * ANIM_TOTAL_FRAMES) %
+        ANIM_TOTAL_FRAMES
+      setAnimFrame(f)
       rafId = requestAnimationFrame(tick)
     }
-
     rafId = requestAnimationFrame(tick)
   }
 
   function stopAnimating() {
-    setHovered(false)
     if (rafId !== undefined) {
       cancelAnimationFrame(rafId)
       rafId = undefined
     }
-    setFrame(0)
-    setAnimatedFlame(structuredClone(baseFlame))
+    setAnimFrame(0)
   }
 
   onCleanup(() => {
+    if (rafId !== undefined) cancelAnimationFrame(rafId)
+  })
+
+  const displayFlame = (): FlameDescriptor => {
+    if (!hovered()) return baseFlame
+    const clone = structuredClone(baseFlame)
+    applyTracksToFlame(props.anim.tracks, clone, animFrame())
+    return clone
+  }
+
+  return (
+    <button
+      class={ui.item}
+      onClick={() => {
+        props.onSelect(baseFlame, [...props.anim.tracks])
+      }}
+      onMouseEnter={() => {
+        setHovered(true)
+        startAnimating()
+      }}
+      onMouseLeave={() => {
+        setHovered(false)
+        stopAnimating()
+      }}
+    >
+      <DelayedShow delayMs={props.index * 50}>
+        <Root adapterOptions={{ powerPreference: 'high-performance' }}>
+          <AutoCanvas pixelRatio={1}>
+            <Camera2D
+              position={vec2f(...displayFlame().renderSettings.camera.position)}
+              zoom={displayFlame().renderSettings.camera.zoom}
+            >
+              <Flam3
+                quality={
+                  hovered()
+                    ? THUMBNAIL_PREVIEW_QUALITY_HOVER
+                    : THUMBNAIL_PREVIEW_QUALITY
+                }
+                pointCountPerBatch={ANIMATION_PREVIEW_POINT_COUNT}
+                adaptiveFilterEnabled={false}
+                animationEnabled={false}
+                flameDescriptor={displayFlame()}
+                renderInterval={1}
+                onExportImage={undefined}
+                edgeFadeColor={vec4f(0)}
+                onAccumulatedPointCount={() => {}}
+              />
+            </Camera2D>
+          </AutoCanvas>
+        </Root>
+      </DelayedShow>
+      <div class={ui.itemTitle}>
+        <span class={ui.itemName}>{props.anim.name}</span>
+        <span class={ui.itemMeta}>
+          <span class={ui.itemDesc} title={props.anim.description}>
+            {props.anim.description}
+          </span>
+          <span
+            class={ui.animatedBadge}
+            title={`${props.anim.tracks.length} animation tracks`}
+          >
+            <svg
+              viewBox="0 0 14 14"
+              width="10"
+              height="10"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M7 2 L11 7 L7 12 L3 7 Z"
+                fill="currentColor"
+                opacity="0.3"
+              />
+              <path d="M7 2 L11 7 L7 12 L3 7 Z" />
+              <line x1="0.5" y1="5" x2="2" y2="5" opacity="0.6" />
+              <line x1="0.5" y1="7" x2="2" y2="7" opacity="0.6" />
+              <line x1="0.5" y1="9" x2="2" y2="9" opacity="0.6" />
+            </svg>
+            {props.anim.tracks.length}
+          </span>
+        </span>
+      </div>
+    </button>
+  )
+}
+
+/** RecentFlameItem -- renders a recent flame, plays animation on hover when tracks exist. */
+function RecentFlameItem(props: {
+  recent: {
+    id: string
+    name: string
+    flame: FlameDescriptor
+    savedAt: number
+    tracks?: TimelineTrack[]
+  }
+  index: number
+  onSelect: (flame: FlameDescriptor, tracks?: TimelineTrack[]) => void
+  onDelete: (e: MouseEvent, id: string) => void
+}) {
+  const hasTracks = () =>
+    !!(props.recent.tracks && props.recent.tracks.length > 0)
+  const [hovered, setHovered] = createSignal(false)
+  const [animFrame, setAnimFrame] = createSignal(0)
+  let rafId: number | undefined
+  let startTime = 0
+
+  function startAnimating() {
+    startTime = performance.now()
+
+    function tick() {
+      const elapsed = performance.now() - startTime
+      const f =
+        Math.floor((elapsed / ANIM_LOOP_MS) * ANIM_TOTAL_FRAMES) %
+        ANIM_TOTAL_FRAMES
+      setAnimFrame(f)
+      rafId = requestAnimationFrame(tick)
+    }
+    rafId = requestAnimationFrame(tick)
+  }
+
+  function stopAnimating() {
     if (rafId !== undefined) {
       cancelAnimationFrame(rafId)
       rafId = undefined
     }
+    setAnimFrame(0)
+  }
+
+  onCleanup(() => {
+    if (rafId !== undefined) cancelAnimationFrame(rafId)
   })
 
+  const displayFlame = (): FlameDescriptor => {
+    if (!hovered() || !hasTracks()) return props.recent.flame
+    const clone = structuredClone(props.recent.flame)
+    applyTracksToFlame(props.recent.tracks!, clone, animFrame())
+    return clone
+  }
+
   return (
-    <div
-      style={{ position: 'relative' }}
-      onMouseEnter={startAnimating}
-      onMouseLeave={stopAnimating}
+    <button
+      class={ui.item}
+      onClick={() => {
+        const clone = structuredClone(props.recent.flame)
+        props.onSelect(
+          clone,
+          props.recent.tracks
+            ? structuredClone(props.recent.tracks)
+            : undefined,
+        )
+      }}
+      onMouseEnter={() => {
+        setHovered(true)
+        if (hasTracks()) startAnimating()
+      }}
+      onMouseLeave={() => {
+        setHovered(false)
+        stopAnimating()
+      }}
     >
-      <div
+      <DelayedShow delayMs={props.index * 30}>
+        <Show
+          when={hasTracks()}
+          fallback={<Preview flameDescriptor={props.recent.flame} />}
+        >
+          <Root adapterOptions={{ powerPreference: 'high-performance' }}>
+            <AutoCanvas pixelRatio={1}>
+              <Camera2D
+                position={vec2f(
+                  ...displayFlame().renderSettings.camera.position,
+                )}
+                zoom={displayFlame().renderSettings.camera.zoom}
+              >
+                <Flam3
+                  quality={
+                    hovered()
+                      ? THUMBNAIL_PREVIEW_QUALITY_HOVER
+                      : THUMBNAIL_PREVIEW_QUALITY
+                  }
+                  pointCountPerBatch={ANIMATION_PREVIEW_POINT_COUNT}
+                  adaptiveFilterEnabled={false}
+                  animationEnabled={false}
+                  flameDescriptor={displayFlame()}
+                  renderInterval={1}
+                  onExportImage={undefined}
+                  edgeFadeColor={vec4f(0)}
+                  onAccumulatedPointCount={() => {}}
+                />
+              </Camera2D>
+            </AutoCanvas>
+          </Root>
+        </Show>
+      </DelayedShow>
+      <div class={ui.itemTitle}>
+        <span class={ui.itemName}>{props.recent.name}</span>
+        <span class={ui.itemMeta}>
+          {formatRecentDate(props.recent.savedAt)}
+          {hasTracks() && (
+            <span
+              class={ui.animatedBadge}
+              title={`${props.recent.tracks!.length} animation track${props.recent.tracks!.length !== 1 ? 's' : ''}`}
+            >
+              <svg
+                viewBox="0 0 14 14"
+                width="10"
+                height="10"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.4"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M7 2 L11 7 L7 12 L3 7 Z"
+                  fill="currentColor"
+                  opacity="0.3"
+                />
+                <path d="M7 2 L11 7 L7 12 L3 7 Z" />
+                <line x1="0.5" y1="5" x2="2" y2="5" opacity="0.6" />
+                <line x1="0.5" y1="7" x2="2" y2="7" opacity="0.6" />
+                <line x1="0.5" y1="9" x2="2" y2="9" opacity="0.6" />
+              </svg>
+              {props.recent.tracks!.length}
+            </span>
+          )}
+        </span>
+      </div>
+      <span
+        class={ui.deleteBtn}
+        role="button"
+        tabIndex={0}
         style={{
-          opacity: hovered() ? 0 : 1,
-          transition: 'opacity 0.2s',
           position: 'absolute',
-          inset: 0,
+          top: '0.25rem',
+          right: '0.25rem',
+          padding: 'var(--space-1)',
+          'background-color': 'rgb(from var(--neutral-950) r g b / 60%)',
+          border: 'none',
+          'border-radius': 'var(--space-1)',
+          cursor: 'pointer',
+          color: 'white',
+          'line-height': '0',
+          width: '1.5rem',
+          height: '1.5rem',
           display: 'flex',
           'align-items': 'center',
           'justify-content': 'center',
-          'z-index': 2,
-          'pointer-events': 'none',
-          'font-size': '0.65rem',
-          'font-weight': '600',
-          'text-transform': 'uppercase',
-          'letter-spacing': '0.04em',
-          background: 'rgba(0,0,0,0.45)',
-          color: '#fff',
-          'border-radius': '0.5rem',
         }}
-      >
-        Hover to preview
-      </div>
-      <DelayedShow delayMs={props.index * 50}>
-        <Preview
-          flameDescriptor={animatedFlame()}
-          quality={ANIMATION_PREVIEW_QUALITY}
-          pointCountPerBatch={ANIMATION_PREVIEW_POINT_COUNT}
-        />
-      </DelayedShow>
-      <div
-        class={ui.itemTitle}
-        style={{
-          opacity: hovered() ? 0.15 : 1,
-          transition: 'opacity 0.25s',
-          'pointer-events': hovered() ? 'none' : 'auto',
+        onClick={(e) => {
+          props.onDelete(e, props.recent.id)
         }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            props.onDelete(e as unknown as MouseEvent, props.recent.id)
+          }
+        }}
+        title="Delete"
       >
-        <span style={{ 'font-weight': '600' }}>{props.anim.name}</span>
-        <span
-          style={{
-            'margin-left': '0.5rem',
-            'font-size': '0.65rem',
-            opacity: '0.7',
-          }}
-        >
-          {props.anim.description}
-        </span>
-      </div>
-    </div>
+        <Cross />
+      </span>
+    </button>
   )
 }
 
@@ -233,6 +420,7 @@ async function pickPngFile(): Promise<File | null> {
 
 function LoadFlameModal(props: LoadFlameModalProps) {
   const [recentFlames, setRecentFlames] = createSignal(loadRecentFlames())
+  const showAlert = useAlert()
 
   async function loadFromFile() {
     const file = await pickPngFile()
@@ -250,7 +438,8 @@ function LoadFlameModal(props: LoadFlameModalProps) {
       }
     } catch (err) {
       console.warn(err)
-      alert(`No valid flame found in '${file.name}'.`)
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises
+      showAlert(`No valid flame found in '${file.name}'.`)
     }
   }
 
@@ -290,96 +479,21 @@ function LoadFlameModal(props: LoadFlameModalProps) {
         <section class={ui.gallery}>
           <For each={recentFlames()}>
             {(recent, i) => (
-              <button
-                class={ui.item}
-                onClick={() => {
-                  const clone = structuredClone(recent.flame)
-                  if (recent.tracks && recent.tracks.length > 0) {
-                    props.respond({
-                      flame: clone,
-                      tracks: structuredClone(recent.tracks),
-                    })
+              <RecentFlameItem
+                recent={recent}
+                index={i()}
+                onSelect={(flame, tracks) => {
+                  if (tracks && tracks.length > 0) {
+                    props.respond({ flame, tracks })
                   } else {
-                    props.respond(clone)
+                    props.respond(flame)
                   }
                 }}
-              >
-                <DelayedShow delayMs={i() * 30}>
-                  <Preview flameDescriptor={recent.flame} />
-                </DelayedShow>
-                <div class={ui.itemTitle}>
-                  <span class={ui.itemName}>{recent.name}</span>
-                  <span class={ui.itemMeta}>
-                    {formatRecentDate(recent.savedAt)}
-                    {recent.tracks && recent.tracks.length > 0 && (
-                      <span
-                        class={ui.animatedBadge}
-                        title={`${recent.tracks.length} animation track${recent.tracks.length !== 1 ? 's' : ''}`}
-                      >
-                        <svg
-                          viewBox="0 0 14 14"
-                          width="10"
-                          height="10"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="1.4"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        >
-                          {/* Keyframe diamond */}
-                          <path
-                            d="M7 2 L11 7 L7 12 L3 7 Z"
-                            fill="currentColor"
-                            opacity="0.3"
-                          />
-                          <path d="M7 2 L11 7 L7 12 L3 7 Z" />
-                          {/* Motion lines */}
-                          <line x1="0.5" y1="5" x2="2" y2="5" opacity="0.6" />
-                          <line x1="0.5" y1="7" x2="2" y2="7" opacity="0.6" />
-                          <line x1="0.5" y1="9" x2="2" y2="9" opacity="0.6" />
-                        </svg>
-                        {recent.tracks.length}
-                      </span>
-                    )}
-                  </span>
-                </div>
-                <span
-                  class={ui.deleteBtn}
-                  role="button"
-                  tabIndex={0}
-                  style={{
-                    position: 'absolute',
-                    top: '0.25rem',
-                    right: '0.25rem',
-                    padding: 'var(--space-1)',
-                    'background-color':
-                      'rgb(from var(--neutral-950) r g b / 60%)',
-                    border: 'none',
-                    'border-radius': 'var(--space-1)',
-                    cursor: 'pointer',
-                    color: 'white',
-                    'line-height': '0',
-                    width: '1.5rem',
-                    height: '1.5rem',
-                    display: 'flex',
-                    'align-items': 'center',
-                    'justify-content': 'center',
-                  }}
-                  onClick={(e) => {
-                    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                    handleDeleteRecent(e, recent.id)
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-                      handleDeleteRecent(e as unknown as MouseEvent, recent.id)
-                    }
-                  }}
-                  title="Delete"
-                >
-                  <Cross />
-                </span>
-              </button>
+                onDelete={(e, id) => {
+                  // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                  handleDeleteRecent(e, id)
+                }}
+              />
             )}
           </For>
         </section>
@@ -407,15 +521,13 @@ function LoadFlameModal(props: LoadFlameModalProps) {
         <section class={ui.gallery}>
           <For each={animationDefs}>
             {(anim, i) => (
-              <button
-                class={ui.item}
-                onClick={() => {
-                  const flame = getAnimationFlame(anim)
-                  props.respond({ flame, tracks: [...anim.tracks] })
+              <AnimatedPreview
+                anim={anim}
+                index={i()}
+                onSelect={(flame, tracks) => {
+                  props.respond({ flame, tracks })
                 }}
-              >
-                <AnimatedPreview anim={anim} index={i()} />
-              </button>
+              />
             )}
           </For>
         </section>

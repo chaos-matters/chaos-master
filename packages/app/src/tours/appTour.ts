@@ -27,6 +27,12 @@ export const appTour: TourGuide = {
         'Open the flame browser to pick from curated examples, recently viewed flames, or load a PNG or flame file from disk.',
     },
     {
+      target: '[data-tour-target="canvas"]',
+      title: 'Drag and Drop',
+      description:
+        'You can also drag and drop an exported PNG onto the canvas to load a flame directly, including any embedded animation data.',
+    },
+    {
       target: '[data-tour-target="save-for-later"]',
       title: 'Save for Later',
       description:
