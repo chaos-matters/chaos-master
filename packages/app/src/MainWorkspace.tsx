@@ -81,6 +81,7 @@ import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } fr
 import type { TransformVariationType } from './flame/variations'
 import type { AnimationExportConfig } from './utils/animationExport'
 import type { SharePayload } from './utils/jsonQueryParam'
+import type { TimelineTrack } from './utils/timeline'
 
 const EDGE_FADE_COLOR = {
   light: vec4f(0.96, 0.96, 0.96, 0.7),
@@ -113,6 +114,7 @@ export type ExportImageType = (canvas: HTMLCanvasElement) => void
 export type AppProps = {
   flameFromQuery?: SharePayload
   flameFromWelcome?: () => FlameDescriptor | undefined
+  welcomeTracks?: () => TimelineTrack[] | undefined
   resetFlameFromWelcome?: () => void
 }
 
@@ -211,6 +213,24 @@ export function MainWorkspace(props: AppProps) {
     const newFlame = props.flameFromWelcome?.()
     if (newFlame !== undefined) {
       history.replace(structuredClone(newFlame))
+      // Load animation tracks if the welcome selection includes them
+      const tracks = props.welcomeTracks?.()
+      if (IS_DEV) {
+        console.info('[welcome] flame selected, tracks:', {
+          hasTracks: !!tracks,
+          trackCount: tracks?.length ?? 0,
+          trackPaths: tracks?.map((t) => t.parameterPath) ?? [],
+        })
+      }
+      if (tracks && tracks.length > 0) {
+        setLoadedAnimation({
+          flame: structuredClone(newFlame),
+          tracks: tracks.map((t) => ({
+            ...t,
+            keyframes: t.keyframes.map((kf) => ({ ...kf })),
+          })),
+        })
+      }
       props.resetFlameFromWelcome?.()
     }
   })
@@ -336,7 +356,7 @@ export function MainWorkspace(props: AppProps) {
   })
 
   const finalRenderInterval = () =>
-    loadModalIsOpen() || varSelectorModalIsOpen()
+    loadModalIsOpen() || varSelectorModalIsOpen() || exportModalIsOpen()
       ? Infinity
       : onExportImage()
         ? 0
@@ -490,16 +510,17 @@ export function MainWorkspace(props: AppProps) {
       })
   }
 
-  const { showExportPngDialog, quickExport } = createExportPngDialog(
-    flameDescriptor,
-    () => timeline,
-    pixelRatio,
-    setPixelRatio,
-    setOnExportImage,
-    setFlameDescriptor,
-    () => selectedPalette(),
-    startAnimationExport,
-  )
+  const { showExportPngDialog, quickExport, exportModalIsOpen } =
+    createExportPngDialog(
+      flameDescriptor,
+      () => timeline,
+      pixelRatio,
+      setPixelRatio,
+      setOnExportImage,
+      setFlameDescriptor,
+      () => selectedPalette(),
+      startAnimationExport,
+    )
 
   const { showLogoFaviconGenerator } = createLogoFaviconGenerator(
     flameDescriptor,
@@ -731,6 +752,9 @@ export function MainWorkspace(props: AppProps) {
       if (parts.length === 3 && parts[2] === 'probability') {
         return transforms[parts[1]!]?.probability ?? null
       }
+      if (parts.length === 3 && parts[2] === 'colorSpeed') {
+        return transforms[parts[1]!]?.colorSpeed ?? 0.4
+      }
       if (
         parts.length === 4 &&
         (parts[2] === 'preAffine' || parts[2] === 'postAffine')
@@ -901,6 +925,10 @@ export function MainWorkspace(props: AppProps) {
             if (parts.length === 3 && parts[2] === 'probability') {
               if (transforms[parts[1]!]) {
                 transforms[parts[1]!].probability = value as number
+              }
+            } else if (parts.length === 3 && parts[2] === 'colorSpeed') {
+              if (transforms[parts[1]!]) {
+                transforms[parts[1]!].colorSpeed = value as number
               }
             } else if (
               parts.length === 4 &&
@@ -2450,11 +2478,7 @@ export function MainWorkspace(props: AppProps) {
             onLoadFlame={showLoadFlameModal}
             onSaveForLater={() => {
               const tracks = timeline.tracks()
-              saveRecentFlame(
-                flameDescriptor,
-                undefined,
-                tracks.length > 0 ? tracks : undefined,
-              )
+              saveRecentFlame(flameDescriptor, undefined, tracks)
               showToast(
                 tracks.length > 0
                   ? 'Flame + animation saved for later'

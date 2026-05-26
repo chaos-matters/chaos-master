@@ -9,7 +9,7 @@ import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
 import { Root } from '@/lib/Root'
 import { extractFlameFromPng } from '@/utils/flameInPng'
-import { deleteRecentFlame, loadRecentFlames } from '@/utils/recentFlames'
+import { deleteRecentFlame, formatRecentDate, loadRecentFlames, } from '@/utils/recentFlames'
 import { recordEntries } from '@/utils/record'
 import { applyTimelineToFlame } from '@/utils/timeline'
 import { Button } from '../Button/Button'
@@ -58,6 +58,7 @@ function Preview(props: {
             renderInterval={5}
             onExportImage={undefined}
             edgeFadeColor={vec4f(0)}
+            onAccumulatedPointCount={() => {}}
           />
         </Camera2D>
       </AutoCanvas>
@@ -271,14 +272,6 @@ function LoadFlameModal(props: LoadFlameModalProps) {
     setRecentFlames(loadRecentFlames())
   }
 
-  function formatDate(timestamp: number) {
-    const d = new Date(timestamp)
-    return d.toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-    })
-  }
-
   return (
     <>
       <ModalTitleBar
@@ -315,9 +308,39 @@ function LoadFlameModal(props: LoadFlameModalProps) {
                   <Preview flameDescriptor={recent.flame} />
                 </DelayedShow>
                 <div class={ui.itemTitle}>
-                  <span>{recent.name}</span>
-                  <span style={{ 'font-size': '0.7rem', opacity: '0.7' }}>
-                    {formatDate(recent.savedAt)}
+                  <span class={ui.itemName}>{recent.name}</span>
+                  <span class={ui.itemMeta}>
+                    {formatRecentDate(recent.savedAt)}
+                    {recent.tracks && recent.tracks.length > 0 && (
+                      <span
+                        class={ui.animatedBadge}
+                        title={`${recent.tracks.length} animation track${recent.tracks.length !== 1 ? 's' : ''}`}
+                      >
+                        <svg
+                          viewBox="0 0 14 14"
+                          width="10"
+                          height="10"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="1.4"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          {/* Keyframe diamond */}
+                          <path
+                            d="M7 2 L11 7 L7 12 L3 7 Z"
+                            fill="currentColor"
+                            opacity="0.3"
+                          />
+                          <path d="M7 2 L11 7 L7 12 L3 7 Z" />
+                          {/* Motion lines */}
+                          <line x1="0.5" y1="5" x2="2" y2="5" opacity="0.6" />
+                          <line x1="0.5" y1="7" x2="2" y2="7" opacity="0.6" />
+                          <line x1="0.5" y1="9" x2="2" y2="9" opacity="0.6" />
+                        </svg>
+                        {recent.tracks.length}
+                      </span>
+                    )}
                   </span>
                 </div>
                 <span

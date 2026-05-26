@@ -435,7 +435,7 @@ function RenderDialog(props: RenderDialogProps) {
 
       <Show when={props.exportTab === 'animation'}>
         <div class={ui.dialogBody}>
-          <div class={ui.previewPane}>
+          <div class={ui.animationPreviewPane}>
             <FramePreviewGallery
               flameDescriptor={props.previewDescriptor}
               tracks={props.tracks}
@@ -603,6 +603,7 @@ export function createExportPngDialog(
   ) => void,
 ) {
   const requestModal = useRequestModal()
+  const [exportModalIsOpen, setExportModalIsOpen] = createSignal(false)
 
   function quickExport() {
     const timeline = getTimeline()
@@ -631,7 +632,7 @@ export function createExportPngDialog(
           pngBytes = new Uint8Array(
             await addFlameDataToPng(encoded, pngBytes).arrayBuffer(),
           )
-          saveRecentFlame(flameDescriptor)
+          saveRecentFlame(flameDescriptor, undefined, currentTracks)
           const fileUrlExt = URL.createObjectURL(
             new Blob([pngBytes], { type: 'image/png' }),
           )
@@ -782,18 +783,18 @@ export function createExportPngDialog(
             if (!blob) return
             const imgData = await blob.arrayBuffer()
             let pngBytes = new Uint8Array(imgData)
+            const exportTracks = timeline?.tracks() ?? []
             if (doEmbedFlame) {
               const cfg = timeline?.config() ?? defaultTimelineConfig()
-              const currentTracks = timeline?.tracks() ?? []
               const doCondense = condenseHidden()
               const flame = doCondense
                 ? condenseFlameDescriptor(flameDescriptor)
                 : flameDescriptor
               const payload =
-                doEmbedAnimation && currentTracks.length > 0
+                doEmbedAnimation && exportTracks.length > 0
                   ? {
                       flame,
-                      animation: { tracks: currentTracks, config: cfg },
+                      animation: { tracks: exportTracks, config: cfg },
                     }
                   : flame
               const encoded = await compressJsonQueryParam(payload)
@@ -801,7 +802,7 @@ export function createExportPngDialog(
                 await addFlameDataToPng(encoded, pngBytes).arrayBuffer(),
               )
             }
-            saveRecentFlame(flameDescriptor)
+            saveRecentFlame(flameDescriptor, undefined, exportTracks)
             const fileUrlExt = URL.createObjectURL(
               new Blob([pngBytes], { type: 'image/png' }),
             )
@@ -833,6 +834,7 @@ export function createExportPngDialog(
       startAnimationExport(exportConfig, document.createElement('canvas'))
     }
 
+    setExportModalIsOpen(true)
     await requestModal({
       class: ui.container,
       content: ({ respond }) => (
@@ -885,7 +887,8 @@ export function createExportPngDialog(
         />
       ),
     })
+    setExportModalIsOpen(false)
   }
 
-  return { showExportPngDialog, quickExport }
+  return { showExportPngDialog, quickExport, exportModalIsOpen }
 }

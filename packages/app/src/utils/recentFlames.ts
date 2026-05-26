@@ -54,7 +54,7 @@ export function saveRecentFlame(
   const id = generateId()
   const entry: RecentFlame = {
     id,
-    name: name ?? `Flame ${new Date().toLocaleDateString()}`,
+    name: name ?? 'Flame',
     flame: deepClone(flame),
     savedAt: Date.now(),
   }
@@ -64,6 +64,37 @@ export function saveRecentFlame(
   }
   const updated = [entry, ...recent].slice(0, MAX_RECENT_FLAMES)
   safeSetItem(STORAGE_KEY, JSON.stringify(updated))
+}
+
+/**
+ * Compact date+time label for recent flames.
+ * Returns e.g. "May 26, 14:30" or "Today, 14:30" / "Yesterday, 09:15"
+ */
+export function formatRecentDate(timestamp: number): string {
+  const d = new Date(timestamp)
+  const now = new Date()
+  const hours = d.getHours().toString().padStart(2, '0')
+  const mins = d.getMinutes().toString().padStart(2, '0')
+  const time = `${hours}:${mins}`
+
+  const isToday =
+    d.getDate() === now.getDate() &&
+    d.getMonth() === now.getMonth() &&
+    d.getFullYear() === now.getFullYear()
+
+  const yesterday = new Date(now)
+  yesterday.setDate(yesterday.getDate() - 1)
+  const isYesterday =
+    d.getDate() === yesterday.getDate() &&
+    d.getMonth() === yesterday.getMonth() &&
+    d.getFullYear() === yesterday.getFullYear()
+
+  if (isToday) return `Today, ${time}`
+  if (isYesterday) return `Yesterday, ${time}`
+
+  const month = d.toLocaleDateString(undefined, { month: 'short' })
+  const day = d.getDate()
+  return `${month} ${day}, ${time}`
 }
 
 export function deleteRecentFlame(id: string): void {

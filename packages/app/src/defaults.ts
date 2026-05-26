@@ -23,6 +23,17 @@ export const DEFAULT_ULTRA_QUALITY = parseFloat(
   import.meta.env.VITE_DEFAULT_ULTRA_QUALITY,
 )
 
+// Animation frame preview quality presets (animation export gallery thumbnails)
+export const ANIMATION_FRAME_PREVIEW_QUALITY_LOW = parseFloat(
+  import.meta.env.VITE_ANIMATION_FRAME_PREVIEW_QUALITY_LOW ?? '0.95',
+)
+export const ANIMATION_FRAME_PREVIEW_QUALITY_MID = parseFloat(
+  import.meta.env.VITE_ANIMATION_FRAME_PREVIEW_QUALITY_MID ?? '0.98',
+)
+export const ANIMATION_FRAME_PREVIEW_QUALITY_HIGH = parseFloat(
+  import.meta.env.VITE_ANIMATION_FRAME_PREVIEW_QUALITY_HIGH ?? '0.99',
+)
+
 export const DEFAULT_VARIATION_SHOW_DELAY_MS = parseFloat(
   import.meta.env.VITE_DEFAULT_VARIATION_SHOW_DELAY_MS,
 )

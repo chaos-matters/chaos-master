@@ -1,4 +1,4 @@
-import { createEffect, createResource, createSignal, ErrorBoundary, onCleanup, Show, Suspense, } from 'solid-js'
+import { batch, createEffect, createResource, createSignal, ErrorBoundary, onCleanup, Show, Suspense, } from 'solid-js'
 import { AppCrashed, WebgpuNotSupported, } from './components/ErrorHandling/ErrorHandling'
 import { Modal } from './components/Modal/Modal'
 import { WelcomeScreen } from './components/WelcomeScreen/WelcomeScreen'
@@ -19,6 +19,7 @@ import { recordKeys } from './utils/record'
 import { dismissWelcome, hasWelcomeBeenDismissed, } from './utils/welcomeDismissed'
 import type { TourGuide } from './components/SpotlightTour/tourTypes'
 import type { FlameDescriptor } from './flame/schema/flameSchema'
+import type { TimelineTrack } from './utils/timeline'
 
 function getTour(id: string): TourGuide | undefined {
   switch (id) {
@@ -43,6 +44,9 @@ export function Wrappers() {
   )
   const [selectedFlame, setSelectedFlame] = createSignal<
     FlameDescriptor | undefined
+  >()
+  const [selectedWelcomeTracks, setSelectedWelcomeTracks] = createSignal<
+    TimelineTrack[] | undefined
   >()
 
   const [flameFromQuery] = createResource(async () => {
@@ -149,8 +153,10 @@ export function Wrappers() {
                       <MainWorkspace
                         flameFromQuery={flameFromQuery()}
                         flameFromWelcome={selectedFlame}
+                        welcomeTracks={selectedWelcomeTracks}
                         resetFlameFromWelcome={() => {
                           setSelectedFlame(undefined)
+                          setSelectedWelcomeTracks(undefined)
                         }}
                       />
                     </ToastProvider>
@@ -165,7 +171,12 @@ export function Wrappers() {
                           }
                         }}
                         onEnter={() => setShowWelcome(false)}
-                        onSelectFlame={(flame) => setSelectedFlame(() => flame)}
+                        onSelectFlame={(flame, tracks) => {
+                          batch(() => {
+                            setSelectedFlame(() => flame)
+                            setSelectedWelcomeTracks(() => tracks)
+                          })
+                        }}
                         onStartTour={handleStartTour}
                       />
                     </Show>

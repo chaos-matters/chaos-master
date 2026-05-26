@@ -25,6 +25,7 @@ export function KeyframeDiamond(props: KeyframeDiamondProps) {
         }}
         onClick={(e) => {
           e.stopPropagation()
+          e.preventDefault()
           if (timeline.removeMode()) {
             const frame = timeline.currentFrame()
             if (timeline.hasKeyframeAtFrame(props.parameterPath, frame)) {
