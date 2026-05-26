@@ -536,6 +536,7 @@ export function MainWorkspace(props: AppProps) {
     setAnimationEnabled,
     animationEnabled,
     openModal: (name) => {
+      if (timeline.isPlaying()) timeline.pause()
       switch (name) {
         case 'loadFlame':
           // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -2475,7 +2476,11 @@ export function MainWorkspace(props: AppProps) {
             }
             initialLeft={floatingLeft()}
             initialTop={floatingTop()}
-            onLoadFlame={showLoadFlameModal}
+            onLoadFlame={() => {
+              if (timeline.isPlaying()) timeline.pause()
+              // eslint-disable-next-line @typescript-eslint/no-floating-promises
+              showLoadFlameModal()
+            }}
             onSaveForLater={() => {
               const tracks = timeline.tracks()
               saveRecentFlame(flameDescriptor, undefined, tracks)
@@ -2485,9 +2490,17 @@ export function MainWorkspace(props: AppProps) {
                   : 'Flame saved for later',
               )
             }}
-            onRender={showExportPngDialog}
+            onRender={() => {
+              if (timeline.isPlaying()) timeline.pause()
+              // eslint-disable-next-line @typescript-eslint/no-floating-promises
+              showExportPngDialog()
+            }}
             onQuickExport={quickExport}
-            onShareLink={showShareLinkModal}
+            onShareLink={() => {
+              if (timeline.isPlaying()) timeline.pause()
+              // eslint-disable-next-line @typescript-eslint/no-floating-promises
+              showShareLinkModal()
+            }}
             onLogoFavicon={showLogoFaviconGenerator}
             onRandomizeColors={() => {
               setFlameDescriptor((draft) => {

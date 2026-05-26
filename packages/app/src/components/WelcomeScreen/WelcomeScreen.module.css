@@ -97,7 +97,10 @@
   margin-top: 0.4rem;
   cursor: pointer;
   align-self: flex-start;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
 }
 
 .showMoreBtn:hover {

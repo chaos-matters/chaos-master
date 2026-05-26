@@ -2,7 +2,7 @@ import { createSignal, For, onCleanup, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { vec2f, vec4f } from 'typegpu/data'
 import { Checkbox } from '@/components/Checkbox/Checkbox'
-import { DEFAULT_VARIATION_PREVIEW_POINT_COUNT } from '@/defaults'
+import { DEFAULT_VARIATION_PREVIEW_POINT_COUNT, THUMBNAIL_PREVIEW_QUALITY, THUMBNAIL_PREVIEW_QUALITY_HOVER, } from '@/defaults'
 import { examples } from '@/flame/examples'
 import { animationDefs, getAnimationFlame } from '@/flame/examples/animations'
 import { Flam3 } from '@/flame/Flam3'
@@ -53,7 +53,8 @@ function FlameThumbnail(props: {
 
     function tick() {
       const elapsed = globalThis.performance.now() - startTime
-      const frame = Math.floor((elapsed / LOOP_DURATION_MS) * TOTAL_FRAMES) % TOTAL_FRAMES
+      const frame =
+        Math.floor((elapsed / LOOP_DURATION_MS) * TOTAL_FRAMES) % TOTAL_FRAMES
       setAnimFrame(frame)
       rafId = requestAnimationFrame(tick)
     }
@@ -103,13 +104,15 @@ function FlameThumbnail(props: {
       <Root adapterOptions={{ powerPreference: 'high-performance' }}>
         <AutoCanvas pixelRatio={1}>
           <Camera2D
-            position={vec2f(
-              ...(displayFlame().renderSettings.camera.position),
-            )}
+            position={vec2f(...displayFlame().renderSettings.camera.position)}
             zoom={displayFlame().renderSettings.camera.zoom}
           >
             <Flam3
-              quality={hovered() ? 0.999 : 0.95}
+              quality={
+                hovered()
+                  ? THUMBNAIL_PREVIEW_QUALITY_HOVER
+                  : THUMBNAIL_PREVIEW_QUALITY
+              }
               pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT}
               adaptiveFilterEnabled={false}
               animationEnabled={false}

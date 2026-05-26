@@ -225,11 +225,6 @@ export function FramePreviewGallery(props: Props) {
     setHoverPos({ x, y })
   }
 
-  // Frame indices for placeholder cells
-  const frameIndices = createMemo(() =>
-    Array.from({ length: displayCount() }, (_, i) => i),
-  )
-
   return (
     <div class={ui.gallery}>
       <Show when={isGenerating()}>
@@ -350,46 +345,42 @@ export function FramePreviewGallery(props: Props) {
 
       {/* Grid that fills available space */}
       <div class={ui.gridWrapper}>
-        <div
-          class={ui.grid}
-          style={{
-            'grid-template-columns': `repeat(auto-fill, minmax(${thumbSize()}px, 1fr))`,
-          }}
+        <Show
+          when={thumbnails().length > 0}
+          fallback={
+            <div class={ui.emptyState}>
+              Click "Render Previews" to generate frame thumbnails
+            </div>
+          }
         >
-          <For each={thumbnails().length > 0 ? thumbnails() : undefined}>
-            {(dataUrl, idx) => (
-              <div
-                class={ui.thumbnail}
-                onMouseEnter={(e) => {
-                  onThumbEnter(idx(), e)
-                }}
-                onMouseMove={onThumbMove}
-                onMouseLeave={onThumbLeave}
-              >
-                <img
-                  src={dataUrl}
-                  alt={`Frame ${props.config.startFrame + idx()}`}
-                />
-                <span class={ui.frameNumber}>
-                  {props.config.startFrame + idx()}
-                </span>
-              </div>
-            )}
-          </For>
-
-          {/* Show placeholder cells when no thumbnails yet */}
-          <Show when={thumbnails().length === 0}>
-            <For each={frameIndices()}>
-              {(i) => (
-                <div class={ui.placeholderCell}>
+          <div
+            class={ui.grid}
+            style={{
+              'grid-template-columns': `repeat(auto-fill, ${thumbSize()}px)`,
+            }}
+          >
+            <For each={thumbnails()}>
+              {(dataUrl, idx) => (
+                <div
+                  class={ui.thumbnail}
+                  onMouseEnter={(e) => {
+                    onThumbEnter(idx(), e)
+                  }}
+                  onMouseMove={onThumbMove}
+                  onMouseLeave={onThumbLeave}
+                >
+                  <img
+                    src={dataUrl}
+                    alt={`Frame ${props.config.startFrame + idx()}`}
+                  />
                   <span class={ui.frameNumber}>
-                    {props.config.startFrame + i}
+                    {props.config.startFrame + idx()}
                   </span>
                 </div>
               )}
             </For>
-          </Show>
-        </div>
+          </div>
+        </Show>
       </div>
 
       {/* Hover preview overlay -- position:fixed escapes overflow:hidden parents */}
