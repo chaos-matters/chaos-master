@@ -4365,7 +4365,8 @@ const ex23 = 'example23' as const
 const anim23a: AnimationDef = {
   id: 'ex23-galactic-spin',
   name: 'Galactic Spin',
-  description: 'Swirl arms rotate through log-spiral shift, julia power pulse, and camera zoom through the nebula',
+  description:
+    'Swirl arms rotate through log-spiral shift, julia power pulse, and camera zoom through the nebula',
   exampleId: ex23,
   tracks: [
     {
@@ -4450,7 +4451,8 @@ const anim23a: AnimationDef = {
 const anim23b: AnimationDef = {
   id: 'ex23-probability-cosmos',
   name: 'Probability Cosmos',
-  description: 'Transform probabilities shift, creating evolving structure as the nebula reforms itself',
+  description:
+    'Transform probabilities shift, creating evolving structure as the nebula reforms itself',
   exampleId: ex23,
   tracks: [
     {
@@ -4524,7 +4526,8 @@ const ex24 = 'example24' as const
 const anim24a: AnimationDef = {
   id: 'ex24-crystal-growth',
   name: 'Crystal Growth',
-  description: 'Hex lattice cells breathe, n-gon sides morph, and rings2 pulses as the crystal lattice grows and contracts',
+  description:
+    'Hex lattice cells breathe, n-gon sides morph, and rings2 pulses as the crystal lattice grows and contracts',
   exampleId: ex24,
   tracks: [
     {
@@ -4610,7 +4613,8 @@ const anim24a: AnimationDef = {
 const anim24b: AnimationDef = {
   id: 'ex24-prismatic-shift',
   name: 'Prismatic Shift',
-  description: 'Perspective depth warps the rings into 3D as probability flows shift the crystal structure',
+  description:
+    'Perspective depth warps the rings into 3D as probability flows shift the crystal structure',
   exampleId: ex24,
   tracks: [
     {
@@ -4698,7 +4702,8 @@ const ex25 = 'example25' as const
 const anim25a: AnimationDef = {
   id: 'ex25-quantum-drift',
   name: 'Quantum Drift',
-  description: 'Tunnel width shifts, spirograph epicycles morph through parameter space, camera drifts through the quantum corridor',
+  description:
+    'Tunnel width shifts, spirograph epicycles morph through parameter space, camera drifts through the quantum corridor',
   exampleId: ex25,
   tracks: [
     {
@@ -4792,7 +4797,8 @@ const anim25a: AnimationDef = {
 const anim25b: AnimationDef = {
   id: 'ex25-iridescent-surge',
   name: 'Iridescent Surge',
-  description: 'Butterfly iridescence blooms, hyperbolic curvature warps, and probability shifts cause the tunnel to surge with color',
+  description:
+    'Butterfly iridescence blooms, hyperbolic curvature warps, and probability shifts cause the tunnel to surge with color',
   exampleId: ex25,
   tracks: [
     {
@@ -4867,7 +4873,6 @@ const anim25b: AnimationDef = {
     },
   ],
 }
-
 
 // ---------------------------------------------------------------------------
 // Example 26 — Radiant Symmetry (D4 dihedral symmetry)
@@ -4969,7 +4974,6 @@ const anim26b: AnimationDef = {
   ],
 }
 
-
 // ---------------------------------------------------------------------------
 // Example 27 — Post-Spiral Galaxy (postAffine showcase)
 // ---------------------------------------------------------------------------
@@ -4979,7 +4983,8 @@ const ex27 = 'example27' as const
 const anim27a: AnimationDef = {
   id: 'ex27-spiral-tightness',
   name: 'Spiral Tightness',
-  description: 'postAffine rotation coefficients sweep to change spiral tightness',
+  description:
+    'postAffine rotation coefficients sweep to change spiral tightness',
   exampleId: ex27,
   tracks: [
     {
@@ -5071,7 +5076,6 @@ const anim27b: AnimationDef = {
   ],
 }
 
-
 // ---------------------------------------------------------------------------
 // Example 28 — Final Lens (finalTransform showcase)
 // ---------------------------------------------------------------------------
@@ -5081,7 +5085,8 @@ const ex28 = 'example28' as const
 const anim28a: AnimationDef = {
   id: 'ex28-lens-warp',
   name: 'Lens Warp',
-  description: 'finalTransform coefficients sweep to create dynamic lens warping',
+  description:
+    'finalTransform coefficients sweep to create dynamic lens warping',
   exampleId: ex28,
   tracks: [
     {
@@ -5166,7 +5171,6 @@ const anim28b: AnimationDef = {
   ],
 }
 
-
 // ---------------------------------------------------------------------------
 // Example 29 — Symmetry Cascade (D3 symmetry + postAffine)
 // ---------------------------------------------------------------------------
@@ -5176,7 +5180,8 @@ const ex29 = 'example29' as const
 const anim29a: AnimationDef = {
   id: 'ex29-kaleidoscope',
   name: 'Kaleidoscope Morph',
-  description: 'Variation weights crossfade to morph the hexagonal kaleidoscope',
+  description:
+    'Variation weights crossfade to morph the hexagonal kaleidoscope',
   exampleId: ex29,
   tracks: [
     {
@@ -5219,7 +5224,8 @@ const anim29a: AnimationDef = {
 const anim29b: AnimationDef = {
   id: 'ex29-post-morph',
   name: 'Petal Reshape & Phase',
-  description: 'postAffine coefficients reshape petals while palette phase shifts',
+  description:
+    'postAffine coefficients reshape petals while palette phase shifts',
   exampleId: ex29,
   tracks: [
     {
@@ -5264,7 +5270,6 @@ const anim29b: AnimationDef = {
     },
   ],
 }
-
 
 // ---------------------------------------------------------------------------
 // Registry
