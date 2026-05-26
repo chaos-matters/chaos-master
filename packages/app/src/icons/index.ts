@@ -24,6 +24,7 @@ import Shuffle from './shuffle.svg'
 import SkipBack from './skip-back.svg'
 import SkipForward from './skip-forward.svg'
 import Sparkle from './sparkle.svg'
+import Terminal from './terminal.svg'
 import TriangleAlert from './triangle-alert.svg'
 import Undo from './undo.svg'
 import Zap from './zap.svg'
@@ -56,6 +57,7 @@ export {
   SkipBack,
   SkipForward,
   Sparkle,
+  Terminal,
   Undo,
   Zap,
   TriangleAlert,

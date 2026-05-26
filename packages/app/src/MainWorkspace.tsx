@@ -191,7 +191,7 @@ export function MainWorkspace(props: AppProps) {
   >({})
   const [flameDescriptor, setFlameDescriptor, history] = createStoreHistory(
     createStore(
-      structuredClone(
+      deepClone(
         props.flameFromWelcome?.() ?? props.flameFromQuery?.flame ?? example1,
       ),
     ),
@@ -212,7 +212,7 @@ export function MainWorkspace(props: AppProps) {
   createEffect(() => {
     const newFlame = props.flameFromWelcome?.()
     if (newFlame !== undefined) {
-      history.replace(structuredClone(newFlame))
+      history.replace(deepClone(newFlame))
       // Load animation tracks if the welcome selection includes them
       const tracks = props.welcomeTracks?.()
       if (IS_DEV) {
@@ -224,7 +224,7 @@ export function MainWorkspace(props: AppProps) {
       }
       if (tracks && tracks.length > 0) {
         setLoadedAnimation({
-          flame: structuredClone(newFlame),
+          flame: deepClone(newFlame),
           tracks: tracks.map((t) => ({
             ...t,
             keyframes: t.keyframes.map((kf) => ({ ...kf })),
@@ -345,7 +345,7 @@ export function MainWorkspace(props: AppProps) {
       const clone: FlameDescriptor = deepClone(flameDescriptor)
       const existingVar = clone.transforms[state.tid]?.variations[state.vid]
       if (existingVar) {
-        clone.transforms[state.tid]!.variations[state.vid] = structuredClone(
+        clone.transforms[state.tid]!.variations[state.vid] = deepClone(
           getVariationDefault(hovered, existingVar.weight),
         )
       }
@@ -619,7 +619,7 @@ export function MainWorkspace(props: AppProps) {
     queryApplied = true
 
     if (IS_DEV) console.info('[share] applying flame from shared URL')
-    history.replace(structuredClone(data.flame))
+    history.replace(deepClone(data.flame))
 
     if (data.animation && data.animation.tracks.length > 0) {
       if (IS_DEV) {
@@ -1405,7 +1405,7 @@ export function MainWorkspace(props: AppProps) {
                             draft.transforms[state.tid]?.variations[state.vid]
                           if (existingVar) {
                             draft.transforms[state.tid]!.variations[state.vid] =
-                              structuredClone(
+                              deepClone(
                                 getVariationDefault(
                                   newType,
                                   existingVar.weight,
@@ -1541,7 +1541,7 @@ export function MainWorkspace(props: AppProps) {
                             onClick={() => {
                               setFlameDescriptor((draft) => {
                                 if (recordKeys(draft.transforms).length === 1) {
-                                  draft.transforms[tid] = structuredClone(
+                                  draft.transforms[tid] = deepClone(
                                     newDefaultTransform(),
                                   )
                                 } else {
@@ -1751,7 +1751,7 @@ export function MainWorkspace(props: AppProps) {
                                         ) {
                                           draft.transforms[tid]!.variations[
                                             vid
-                                          ] = structuredClone(
+                                          ] = deepClone(
                                             getVariationDefault(
                                               variation.type,
                                               1,
@@ -1821,7 +1821,7 @@ export function MainWorkspace(props: AppProps) {
                               setFlameDescriptor((draft) => {
                                 draft.transforms[tid]!.variations[
                                   generateVariationId()
-                                ] = structuredClone(
+                                ] = deepClone(
                                   getVariationDefault('linear', 1),
                                 )
                               })
@@ -2017,7 +2017,7 @@ export function MainWorkspace(props: AppProps) {
                       onClick={() => {
                         setFlameDescriptor((draft) => {
                           draft.transforms[generateTransformId()] =
-                            structuredClone(newDefaultTransform())
+                            deepClone(newDefaultTransform())
                         })
                       }}
                     >

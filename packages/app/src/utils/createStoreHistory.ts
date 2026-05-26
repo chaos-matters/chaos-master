@@ -1,6 +1,7 @@
 import { batch, createSignal } from 'solid-js'
 import { produce, reconcile, unwrap } from 'solid-js/store'
 import { applyPatchesMutatively, enableStandardPatches, produceWithPatches, } from 'structurajs'
+import { deepClone } from './clone'
 import { compressPatches, forwardBackwardPatchPairDoesNothing, } from './compressPatches'
 import type { SetStoreFunction, Store } from 'solid-js/store'
 import type { Patch } from 'structurajs'
@@ -93,7 +94,7 @@ export function createStoreHistory<T extends object>([store, setStore]: [
     // Using produce + applyPatchesMutatively doesn't truly remove deleted keys
     // from SolidJS stores (produce's proxy converts `delete` to setting
     // undefined), which leaves zombie entries in transform records.
-    const plain = structuredClone(unwrap(store))
+    const plain = deepClone(store)
     const result = applyPatchesMutatively(plain, backwardPatches)
     setStore(reconcile((result ?? plain) as T))
     setStackIndex(i - 1)
@@ -111,7 +112,7 @@ export function createStoreHistory<T extends object>([store, setStore]: [
       return
     }
     const { forwardPatches } = item
-    const plain = structuredClone(unwrap(store))
+    const plain = deepClone(store)
     const result = applyPatchesMutatively(plain, forwardPatches)
     setStore(reconcile((result ?? plain) as T))
     setStackIndex(i)
@@ -167,7 +168,7 @@ export function createStoreHistory<T extends object>([store, setStore]: [
   function replace(value: T, description?: string) {
     batch(() => {
       const [_, forwardPatches, backwardPatches] = produceWithPatches(
-        structuredClone(unwrap(store)),
+        deepClone(store),
         () => value,
       )
       setStore(reconcile(value))

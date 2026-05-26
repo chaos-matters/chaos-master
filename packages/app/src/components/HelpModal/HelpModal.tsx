@@ -1,9 +1,11 @@
-import { createResource, For, Show, Suspense } from 'solid-js'
-import { Changelog, GitHub } from '@/icons'
+import { createResource, createSignal, For, Show, Suspense } from 'solid-js'
+import { IS_DEV } from '@/defaults'
+import { Changelog, GitHub, Terminal } from '@/icons'
 import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
 import { formatBytes } from '@/utils/formatBytes'
 import { GIT_SHA, VERSION } from '@/version'
 import { createShowChangelog } from '../AboutPanel/Changelog'
+import { ConsoleLog } from '../ConsoleLog/ConsoleLog'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './HelpModal.module.css'
@@ -100,6 +102,7 @@ type HelpModalProps = {
 function HelpModal(props: HelpModalProps) {
   const [gpuDeviceInfo] = createResource(getGPUDeviceInformation)
   const showChangelog = createShowChangelog()
+  const [showConsole, setShowConsole] = createSignal(false)
   return (
     <>
       <ModalTitleBar
@@ -122,6 +125,16 @@ function HelpModal(props: HelpModalProps) {
           >
             <Changelog />
           </button>
+          <Show when={IS_DEV}>
+            <button
+              class={ui.changelogIconButton}
+              classList={{ [ui.consoleActive!]: showConsole() }}
+              onClick={() => setShowConsole((v) => !v)}
+              title="Console Logs"
+            >
+              <Terminal />
+            </button>
+          </Show>
         </div>
         <span>
           Chaos Master v{VERSION} <sup>alpha</sup>{' '}
@@ -286,6 +299,10 @@ function HelpModal(props: HelpModalProps) {
           </Show>
         </Suspense>
       </div>
+      <Show when={IS_DEV && showConsole()}>
+        <h2 class={ui.sectionTitle}>Console Logs</h2>
+        <ConsoleLog />
+      </Show>
     </>
   )
 }

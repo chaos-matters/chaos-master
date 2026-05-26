@@ -1,3 +1,4 @@
+import { ConsoleLog } from '@/components/ConsoleLog/ConsoleLog'
 import { VERSION } from '@/version'
 import ui from './ErrorHandling.module.css'
 
@@ -50,6 +51,7 @@ export function AppCrashed() {
           </a>
         </span>
       </div>
+      <ConsoleLog />
     </div>
   )
 }
