@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-05-26
+
+### Added
+
+- **Symmetry System**: Full symmetry panel with rotational (Cn) and dihedral (Dn) symmetry groups. Compact 2-column gallery shows per-transform angle editors, visibility toggles, and remove buttons.
+- **Symmetry Angle Keyframing**: Symmetry transform angles can be keyframed in the timeline. All 4 rotation matrix components (a, b, d, e) are keyframed simultaneously for correct interpolation.
+- **AngleEditor inline mode**: New `mode="inline"` renders a self-contained circular knob with degree value overlaid inside the track, used for compact symmetry gallery items.
+- **Adaptive Density Estimation**: flam3-style density estimation filter with per-pixel adaptive Gaussian blur. Quality and estimator curve controls exposed as sidebar sliders.
+
+### Changed
+
+- **GPU Pipeline Optimization**: Density estimation uniform updates (quality/curve) now write directly to GPU uniform buffers instead of recreating the entire pipeline on every slider change.
+- **Palette buttons restyled**: "Load More" and "Import flam3 Palettes" buttons now use the app's neutral design language with proper dark/light theme support instead of the previous solid-fill style.
+- **Symmetry controls layout**: Type dropdown and Folds scrub input now display correctly on their own grid rows. Fixed ScrubInput's `grid-column: 1 / -1` override that prevented it from sitting next to its label.
+- Symmetry gallery items use right-aligned action icons (eye/remove) via a `.sym-actions` flex container with `margin-left: auto`.
+- Type dropdown font reduced to 0.65rem for visual balance.
+- AngleEditor inline track increased to 30px with 0.55rem font for better readability.
+
+### Fixed
+
+- **Paint mode background color**: Switching to paint draw mode now correctly auto-swaps the background to white when the current background is default black (and vice versa). Previously, the auto-swap only triggered when `backgroundColor` was `undefined`, but new flames always had it explicitly set to `[0,0,0]`.
+- **"No preview to commit" console warning**: Silenced the benign `console.warn` in `createStoreHistory.commit()` that fired when `pointerUp`/`pointerCancel` events occurred without a matching `startPreview` (e.g., click-without-drag, browser-initiated cancel).
+- **AngleEditor fluid dragging**: Fixed angle editors snapping to discrete values instead of continuous rotation by correcting the drag handler's angle calculation.
+
 ## [0.8.0] - 2026-05-22
 
 ### Added

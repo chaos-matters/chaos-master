@@ -203,8 +203,7 @@ export function Flam3(props: Flam3Props) {
       animatedFlame().renderSettings.densityEstimationQuality ?? 5
     const qualityK =
       storedQuality > 1 ? storedQuality : 0.5 + (1 - storedQuality) * 19.5
-    const estimatorCurve =
-      animatedFlame().renderSettings.estimatorCurve ?? 0.5
+    const estimatorCurve = animatedFlame().renderSettings.estimatorCurve ?? 0.5
     const densityPipeline = createDensityEstimationPipeline(
       root,
       textureSize,
@@ -239,8 +238,7 @@ export function Flam3(props: Flam3Props) {
     // Values > 1 are old-format direct qualityK for backward compatibility.
     const qualityK =
       storedQuality > 1 ? storedQuality : 0.5 + (1 - storedQuality) * 19.5
-    const estimatorCurve =
-      animatedFlame().renderSettings.estimatorCurve ?? 0.5
+    const estimatorCurve = animatedFlame().renderSettings.estimatorCurve ?? 0.5
     filter.densityPipeline.setQualityK(qualityK)
     filter.densityPipeline.setEstimatorCurve(estimatorCurve)
   })

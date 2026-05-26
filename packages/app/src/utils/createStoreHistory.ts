@@ -89,18 +89,13 @@ export function createStoreHistory<T extends object>([store, setStore]: [
       return
     }
     const { backwardPatches } = item
-    let swapWhole = undefined as T | undefined
-    setStore(
-      produce((draft) => {
-        const value = applyPatchesMutatively(draft, backwardPatches)
-        if (value !== draft) {
-          swapWhole = value as T
-        }
-      }),
-    )
-    if (swapWhole !== undefined) {
-      setStore(swapWhole)
-    }
+    // Apply patches to a plain object copy, then reconcile into the store.
+    // Using produce + applyPatchesMutatively doesn't truly remove deleted keys
+    // from SolidJS stores (produce's proxy converts `delete` to setting
+    // undefined), which leaves zombie entries in transform records.
+    const plain = structuredClone(unwrap(store))
+    const result = applyPatchesMutatively(plain, backwardPatches)
+    setStore(reconcile((result ?? plain) as T))
     setStackIndex(i - 1)
   }
 
@@ -116,18 +111,9 @@ export function createStoreHistory<T extends object>([store, setStore]: [
       return
     }
     const { forwardPatches } = item
-    let swapWhole = undefined as T | undefined
-    setStore(
-      produce((draft) => {
-        const value = applyPatchesMutatively(draft, forwardPatches)
-        if (value !== draft) {
-          swapWhole = value as T
-        }
-      }),
-    )
-    if (swapWhole !== undefined) {
-      setStore(swapWhole)
-    }
+    const plain = structuredClone(unwrap(store))
+    const result = applyPatchesMutatively(plain, forwardPatches)
+    setStore(reconcile((result ?? plain) as T))
     setStackIndex(i)
   }
 

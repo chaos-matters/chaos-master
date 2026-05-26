@@ -154,7 +154,10 @@ export function createIFSPipeline(
         point = executeRandomFlame(point)
       }
 
-      point.position = transformAffine(bindGroupLayout.$.finalTransform, point.position)
+      point.position = transformAffine(
+        bindGroupLayout.$.finalTransform,
+        point.position,
+      )
 
       const clip = camera2DWorldToClip(point.position)
       const outputTextureDimensionF = vec2f(outputTextureDimension)
@@ -208,10 +211,14 @@ export function createIFSPipeline(
   const finalTransformBuffer = root
     .createBuffer(AffineParams, { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 })
     .$usage('uniform')
-  vramLog('[ifsPipeline] Created flameUniforms, finalTransform & dimension buffers')
+  vramLog(
+    '[ifsPipeline] Created flameUniforms, finalTransform & dimension buffers',
+  )
 
   onCleanup(() => {
-    vramLog('[ifsPipeline] Destroying flameUniforms, finalTransform & dimension buffers')
+    vramLog(
+      '[ifsPipeline] Destroying flameUniforms, finalTransform & dimension buffers',
+    )
     flameUniformsBuffer.destroy()
     outputTextureDimensionBuffer.destroy()
     finalTransformBuffer.destroy()

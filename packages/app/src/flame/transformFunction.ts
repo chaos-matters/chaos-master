@@ -112,7 +112,15 @@ export function extractFlameUniforms({
     recordEntries(transforms).map(
       ([
         tid,
-        { variations, probability, color, preAffine, postAffine, visible, colorSpeed },
+        {
+          variations,
+          probability,
+          color,
+          preAffine,
+          postAffine,
+          visible,
+          colorSpeed,
+        },
       ]) => {
         const isVisible = visible
         return [
