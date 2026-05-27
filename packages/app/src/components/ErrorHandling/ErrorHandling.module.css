@@ -7,11 +7,10 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   font-family: 'Orbitron', 'Segoe UI', sans-serif;
   background: radial-gradient(circle at center, #001122 0%, #000 70%);
   color: #0ff;
-  overflow: hidden;
+  overflow-y: auto;
   text-align: center;
   padding: 2rem;
 }
@@ -20,6 +19,28 @@
   position: relative;
   z-index: 2;
   max-width: 720px;
+  /* Center vertically when used by WebgpuNotSupported (the only child) */
+  margin: auto;
+}
+
+/* Crash screen: sticky header + scrollable body */
+.crash-header {
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  max-width: 720px;
+  width: 100%;
+  padding-bottom: 1rem;
+  background: radial-gradient(circle at center, #001122 0%, #000 70%);
+}
+
+.crash-body {
+  flex: 1;
+  width: 100%;
+  max-width: 42rem;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .title {
@@ -105,5 +126,146 @@
     display: inline;
     width: 1.5rem;
     fill: currentColor;
+  }
+}
+
+/* -----------------------------------------------------------------------
+   Collapse indicator (shared by device metadata + console on crash screen)
+   ----------------------------------------------------------------------- */
+
+.collapse-indicator {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-top: 0.3rem solid transparent;
+  border-bottom: 0.3rem solid transparent;
+  border-left: 0.35rem solid currentColor;
+  margin-right: 0.35rem;
+  transition: transform 0.15s ease;
+  vertical-align: middle;
+}
+
+.collapse-open {
+  transform: rotate(90deg);
+}
+
+/* -----------------------------------------------------------------------
+   Device metadata section (crash screen)
+   ----------------------------------------------------------------------- */
+
+.metadata-section {
+  width: 100%;
+  margin: 0.75rem 0 0;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.72rem;
+  color: var(--neutral-300, #ccc);
+}
+
+.metadata-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.25rem 0.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 0.375rem;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.metadata-title {
+  font-weight: 600;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #0ff;
+  opacity: 0.7;
+}
+
+.metadata-copy-btn {
+  background: none;
+  border: 1px solid rgba(0, 255, 255, 0.25);
+  color: #0ff;
+  cursor: pointer;
+  font-size: 0.65rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-family: inherit;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(0, 255, 255, 0.1);
+    border-color: rgba(0, 255, 255, 0.5);
+  }
+}
+
+.metadata-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.75rem;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.metadata-label {
+  color: rgba(0, 255, 255, 0.5);
+  white-space: nowrap;
+}
+
+.metadata-value {
+  color: var(--neutral-300, #ccc);
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+/* -----------------------------------------------------------------------
+   Crash recovery action buttons
+   ----------------------------------------------------------------------- */
+
+.crash-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1.25rem;
+  padding-bottom: 2rem;
+}
+
+.reload-btn,
+.reload-clear-btn {
+  padding: 0.5rem 1.25rem;
+  font-family: 'Orbitron', 'Segoe UI', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid;
+}
+
+.reload-btn {
+  background: rgba(0, 255, 255, 0.1);
+  border-color: rgba(0, 255, 255, 0.35);
+  color: #0ff;
+
+  &:hover {
+    background: rgba(0, 255, 255, 0.2);
+    border-color: rgba(0, 255, 255, 0.6);
+    box-shadow: 0 0 12px rgba(0, 255, 255, 0.25);
+  }
+}
+
+.reload-clear-btn {
+  background: rgba(255, 100, 80, 0.08);
+  border-color: rgba(255, 100, 80, 0.3);
+  color: #ff8a70;
+
+  &:hover {
+    background: rgba(255, 100, 80, 0.15);
+    border-color: rgba(255, 100, 80, 0.55);
+    box-shadow: 0 0 12px rgba(255, 100, 80, 0.2);
   }
 }
