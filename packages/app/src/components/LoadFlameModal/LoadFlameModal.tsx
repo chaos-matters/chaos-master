@@ -26,9 +26,9 @@ import type { TimelineTrack } from '@/utils/timeline'
 
 const { performance } = globalThis
 
-const CANCEL = 'cancel'
+export const CANCEL = 'cancel'
 
-type AnimationLoad = { flame: FlameDescriptor; tracks: TimelineTrack[] }
+export type AnimationLoad = { flame: FlameDescriptor; tracks: TimelineTrack[] }
 
 function Preview(props: {
   flameDescriptor: FlameDescriptor
@@ -417,7 +417,7 @@ async function pickPngFile(): Promise<File | null> {
   })
 }
 
-function LoadFlameModal(props: LoadFlameModalProps) {
+export function LoadFlameModal(props: LoadFlameModalProps) {
   const [recentFlames, setRecentFlames] = createSignal(loadRecentFlames())
   const showAlert = useAlert()
 

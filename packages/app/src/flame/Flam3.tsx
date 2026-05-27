@@ -44,6 +44,8 @@ type Flam3Props = {
   palette?: () => Palette | undefined
   outputAlpha?: boolean
   onAccumulatedPointCount?: (count: number) => void
+  blendFlame?: FlameDescriptor
+  blendWeight?: number
 }
 
 export function Flam3(props: Flam3Props) {
@@ -248,15 +250,24 @@ export function Flam3(props: Flam3Props) {
   // flame when outputTextures() memo re-evaluation causes nested effect flushes.
   const parameterFingerprint = createMemo(() => {
     const flame = animatedFlame()
+    const bf = props.blendFlame
     return JSON.stringify({
       transforms: recordEntries(flame.transforms).map(([tid, t]) => ({
         tid,
-
         variations: recordEntries(t.variations).map(([vid, v]) => ({
           vid,
           type: v.type,
         })),
       })),
+      ...(bf && {
+        blendTransforms: recordEntries(bf.transforms).map(([tid, t]) => ({
+          tid,
+          variations: recordEntries(t.variations).map(([vid, v]) => ({
+            vid,
+            type: v.type,
+          })),
+        })),
+      }),
       colorInitMode: flame.renderSettings.colorInitMode,
       pointInitMode: flame.renderSettings.pointInitMode,
       skipIters: Math.floor(flame.renderSettings.skipIters),
@@ -392,6 +403,7 @@ export function Flam3(props: Flam3Props) {
       typedAccumulationBuffer,
       flame.renderSettings.colorInitMode,
       flame.renderSettings.pointInitMode,
+      props.blendFlame?.transforms as never,
     )
 
     let batchIndex = 0
@@ -403,11 +415,12 @@ export function Flam3(props: Flam3Props) {
     createEffect(() => {
       const flame = animatedFlame()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ifsPipeline.update(flame as any)
+      ifsPipeline.update(flame as any, props.blendFlame as any, props.blendWeight)
     })
 
     const accumulationFingerprint = createMemo(() => {
       const flame = animatedFlame()
+      const bf = props.blendFlame
       return JSON.stringify({
         transforms: flame.transforms,
         finalTransform: flame.finalTransform,
@@ -415,6 +428,8 @@ export function Flam3(props: Flam3Props) {
         pointInitMode: flame.renderSettings.pointInitMode,
         skipIters: flame.renderSettings.skipIters,
         drawMode: flame.renderSettings.drawMode,
+        ...(bf && { blendTransforms: bf.transforms }),
+        blendWeight: props.blendWeight,
       })
     })
 

@@ -21,7 +21,7 @@ import { createExportPngDialog } from './components/ExportPngDialog/ExportPngDia
 import { FlameColorEditor, handleColor, } from './components/FlameColorEditor/FlameColorEditor'
 import { FloatingActions } from './components/FloatingActions/FloatingActions'
 import { createShowHelp } from './components/HelpModal/HelpModal'
-import { createLoadFlame } from './components/LoadFlameModal/LoadFlameModal'
+import { CANCEL, createLoadFlame, LoadFlameModal, } from './components/LoadFlameModal/LoadFlameModal'
 import { createLogoFaviconGenerator } from './components/LogoFaviconGenerator/LogoFaviconGenerator'
 import { useRequestModal } from './components/Modal/ModalContext'
 import { PaletteSelector } from './components/PaletteSelector/PaletteSelector'
@@ -34,6 +34,7 @@ import { ScrubInput } from './components/Sliders/ScrubInput'
 import { Slider } from './components/Sliders/Slider'
 import { SoftwareVersion } from './components/SoftwareVersion/SoftwareVersion'
 import { SpotlightTour } from './components/SpotlightTour/SpotlightTour'
+import { BlendFlamePicker } from './components/Timeline/BlendFlamePicker'
 import { KeyframeDiamond } from './components/Timeline/KeyframeDiamond'
 import { TimelineSection } from './components/Timeline/TimelineSection'
 import { createVariationSelector } from './components/VariationSelector/VariationSelector'
@@ -70,6 +71,7 @@ import { useAppDragAndDrop } from './utils/useAppDragAndDrop'
 import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
 import type { Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
+import type { AnimationLoad } from './components/LoadFlameModal/LoadFlameModal'
 import type { QualityPreset } from './components/Quality/QualityPresets'
 import type { QuickPickerMode } from './components/QuickVariationPicker/QuickVariationPicker'
 import type { TourContext } from './components/SpotlightTour/tourTypes'
@@ -143,6 +145,8 @@ export function MainWorkspace(props: AppProps) {
   const [devCrashTest, setDevCrashTest] = createSignal(false)
   const [adaptiveFilterEnabled, setAdaptiveFilterEnabled] = createSignal(true)
   const [animationEnabled, setAnimationEnabled] = createSignal(true)
+  const [blendFlame, setBlendFlame] = createSignal<FlameDescriptor | undefined>()
+  const [blendWeight, setBlendWeight] = createSignal(0)
   const [hideDiceButtons, setHideDiceButtons] = createSignal(false)
   const { toastMessage, showToast } = useToast()
   const SIDEBAR_RESIZABLE = false
@@ -328,6 +332,21 @@ export function MainWorkspace(props: AppProps) {
     setLoadedAnimation,
     clearLoadedAnimation,
   } = createLoadFlame(history)
+
+  async function pickBlendFlame() {
+    const result = await _requestModal<
+      FlameDescriptor | AnimationLoad | typeof CANCEL
+    >({
+      content: ({ respond }) => <LoadFlameModal respond={respond} />,
+    })
+    if (result === CANCEL || !result) return
+    if (typeof result === 'object' && 'tracks' in result) {
+      setBlendFlame(deepClone(result.flame))
+    } else {
+      setBlendFlame(deepClone(result))
+    }
+  }
+
   const { showVariationSelector, varSelectorModalIsOpen } =
     createVariationSelector(history)
 
@@ -369,6 +388,21 @@ export function MainWorkspace(props: AppProps) {
       : onExportImage()
         ? 0
         : DEFAULT_RENDER_INTERVAL_MS
+
+  const resolvedBlendWeight = createMemo(() => {
+    if (
+      blendFlame() &&
+      timeline.animationEnabled() &&
+      timeline.tracks().length > 0
+    ) {
+      const val = timeline.resolveValueAtPath(
+        'blendWeight',
+        timeline.currentFrame(),
+      )
+      if (val !== null && typeof val === 'number') return val
+    }
+    return blendWeight()
+  })
 
   const handlePaletteSelect = (palette: Palette) => {
     // If no palette was selected before, save the current "natural" colors
@@ -1203,6 +1237,8 @@ export function MainWorkspace(props: AppProps) {
                       setQualityPointCountLimit(() => fn)
                     }
                     palette={() => selectedPalette()}
+                    blendFlame={blendFlame()}
+                    blendWeight={resolvedBlendWeight()}
                   />
                 </WheelZoomCamera2D>
               </AutoCanvas>
@@ -1286,6 +1322,13 @@ export function MainWorkspace(props: AppProps) {
                       class={ui.timelineResizeHandle}
                       onPointerDown={startTimelineDrag}
                       title="Resize timeline"
+                    />
+                    <BlendFlamePicker
+                      blendFlame={blendFlame()}
+                      blendWeight={resolvedBlendWeight()}
+                      onPickBlendFlame={pickBlendFlame}
+                      onClearBlendFlame={() => { setBlendFlame(undefined); }}
+                      onBlendWeightChange={setBlendWeight}
                     />
                     <TimelineSection
                       formatTrackLabel={readableIds().formatTrackPath}
