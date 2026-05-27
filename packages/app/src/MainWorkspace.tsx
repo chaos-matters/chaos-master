@@ -138,6 +138,9 @@ export function MainWorkspace(props: AppProps) {
   )
   const [pixelRatio, setPixelRatio] = createSignal(DEFAULT_RESOLUTION)
   const [onExportImage, setOnExportImage] = createSignal<ExportImageType>()
+
+  // Dev-only: crash injection trigger (renders inside ErrorBoundary)
+  const [devCrashTest, setDevCrashTest] = createSignal(false)
   const [adaptiveFilterEnabled, setAdaptiveFilterEnabled] = createSignal(true)
   const [animationEnabled, setAnimationEnabled] = createSignal(true)
   const [hideDiceButtons, setHideDiceButtons] = createSignal(false)
@@ -2589,8 +2592,14 @@ export function MainWorkspace(props: AppProps) {
               toggleCompact,
               theme,
               setTheme,
+              IS_DEV ? () => setDevCrashTest(true) : undefined,
             )}
           />
+          <Show when={devCrashTest()}>
+            {(() => {
+              throw new Error('[DEV] Injected crash from About panel')
+            })()}
+          </Show>
         </Dropzone>
       </TimelineContextProvider>
     </ChangeHistoryContextProvider>

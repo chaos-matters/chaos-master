@@ -44,6 +44,8 @@ type ConsoleLogProps = {
   collapsible?: boolean
   /** Initial open state when collapsible. Defaults to true. */
   defaultOpen?: boolean
+  /** Visual variant. Use 'crash' for the crash screen styling. */
+  variant?: 'crash'
 }
 
 export function ConsoleLog(props: ConsoleLogProps) {
@@ -79,7 +81,7 @@ export function ConsoleLog(props: ConsoleLogProps) {
   }
 
   return (
-    <div>
+    <div classList={{ [ui.crash!]: props.variant === 'crash' }}>
       <div
         class={ui.header}
         classList={{ [ui.headerCollapsible!]: !!props.collapsible }}
