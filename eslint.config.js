@@ -14,6 +14,7 @@ export default defineConfig(
       '**/dist',
       '**/node_modules',
       '**/.pnpm-store', // present in CI
+      '**/.wrangler',
     ],
   },
   importX.flatConfigs.recommended,
