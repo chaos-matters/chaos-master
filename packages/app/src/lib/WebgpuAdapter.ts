@@ -1,4 +1,4 @@
-import { IS_DEV } from '@/defaults'
+import { IS_DEV, TRACK_PERFORMANCE } from '@/defaults'
 
 let gpuDevice: GPUDevice | null = null
 let gpuAdapter: GPUAdapter | null = null
@@ -40,40 +40,64 @@ function assertIfWebgpuUnsupported() {
   }
 }
 
-function assertRequiredWebgpuFeaturesNotAvailable(
+/**
+ * Build the set of optional features to request from the device.
+ * `timestamp-query` is only requested when TRACK_PERFORMANCE is enabled
+ * and the adapter actually advertises support (e.g. iOS Safari does not).
+ */
+function negotiateOptionalFeatures(
   adapter: GPUAdapter,
-  requiredFeatures: Iterable<GPUFeatureName>,
-) {
-  for (const feature of requiredFeatures) {
-    if (!adapter.features.has(feature)) {
-      throw new Error(
-        `This sample requires the '${feature}' feature, which is not supported by this system.`,
-        { cause: 'WebGPU' },
-      )
-    }
+): GPUFeatureName[] {
+  const features: GPUFeatureName[] = []
+  if (TRACK_PERFORMANCE && adapter.features.has('timestamp-query')) {
+    features.push('timestamp-query')
   }
+  return features
 }
 
 export async function initializeWebgpuDevice(
   adapterPreferences?: GPURequestAdapterOptions,
   deviceFeatures?: GPUDeviceDescriptor,
 ) {
+  console.info('[WebGPU] Checking navigator.gpu support...')
   assertIfWebgpuUnsupported()
+  console.info('[WebGPU] navigator.gpu is present, requesting adapter...', adapterPreferences)
 
   gpuAdapter = await navigator.gpu.requestAdapter({
     ...adapterPreferences,
   })
 
   assertIfWebgpuAdapterUnavailable(gpuAdapter)
-  if (gpuAdapter.info.vendor !== '') {
-    if (IS_DEV) console.info(`Using ${gpuAdapter.info.vendor} WebGPU adapter.`)
-  }
 
-  assertRequiredWebgpuFeaturesNotAvailable(
-    gpuAdapter,
-    deviceFeatures?.requiredFeatures ?? [],
-  )
-  gpuDevice = await gpuAdapter.requestDevice(deviceFeatures)
+  // Always log adapter info for remote diagnostics
+  const { info, features } = gpuAdapter
+  console.info('[WebGPU] Adapter acquired:', {
+    vendor: info.vendor,
+    architecture: info.architecture,
+    description: info.description,
+    features: [...features].join(', '),
+  })
+
+  const optionalFeatures = negotiateOptionalFeatures(gpuAdapter)
+  console.info('[WebGPU] Requesting device...', {
+    callerRequiredFeatures: [...(deviceFeatures?.requiredFeatures ?? [])],
+    negotiatedOptionalFeatures: optionalFeatures,
+  })
+
+  gpuDevice = await gpuAdapter.requestDevice({
+    ...deviceFeatures,
+    requiredFeatures: [
+      ...(deviceFeatures?.requiredFeatures ?? []),
+      ...optionalFeatures,
+    ],
+  })
+
+  console.info('[WebGPU] Device acquired:', {
+    maxTextureDimension2D: gpuDevice.limits.maxTextureDimension2D,
+    maxBufferSize: gpuDevice.limits.maxBufferSize,
+    maxStorageBufferBindingSize: gpuDevice.limits.maxStorageBufferBindingSize,
+    features: [...gpuDevice.features].join(', '),
+  })
 
   // requestDevice will never return null, but if a valid device request can't be
   // fulfilled for some reason it may resolve to a device which has already been lost.

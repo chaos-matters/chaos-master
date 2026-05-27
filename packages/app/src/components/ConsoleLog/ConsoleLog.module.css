@@ -43,6 +43,33 @@
   color: var(--neutral-500);
 }
 
+.headerActions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.header-collapsible {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.collapse-indicator {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-top: 0.3rem solid transparent;
+  border-bottom: 0.3rem solid transparent;
+  border-left: 0.35rem solid currentColor;
+  margin-right: 0.35rem;
+  transition: transform 0.15s ease;
+  vertical-align: middle;
+}
+
+.collapse-open {
+  transform: rotate(90deg);
+}
+
 .clearBtn {
   background: none;
   border: 1px solid var(--neutral-300);

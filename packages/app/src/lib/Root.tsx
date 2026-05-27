@@ -25,9 +25,7 @@ export function Root(props: ParentProps<RootProps>) {
         // device?.destroy()
       })
 
-      const { adapter, device } = await getWebgpuComponents(adapterOptions, {
-        requiredFeatures: ['timestamp-query'],
-      })
+      const { adapter, device } = await getWebgpuComponents(adapterOptions)
 
       // TODO: see whether it makes sense to make tgpu singleton as well, check docs
       root = tgpu.initFromDevice({ device })

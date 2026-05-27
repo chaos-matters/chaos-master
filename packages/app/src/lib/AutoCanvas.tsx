@@ -21,6 +21,11 @@ type AutoCanvasProps = {
 
 export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
   const { device } = useRootContext()
+
+  // iOS Safari fix: canvas.getContext('webgpu') returns null when called before
+  // the canvas is fully mounted. Store the element via ref, then defer the signal
+  // update to a createEffect so createContext runs after the canvas is in the DOM.
+  let canvasRef: HTMLCanvasElement | undefined
   const [canvas, setCanvas] = createSignal<HTMLCanvasElement>()
 
   const scaledCanvasSize = (size: ElementSize): ElementSize => {
@@ -70,17 +75,36 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
     }
   })
 
+  // Deferred: set the canvas signal after the element is mounted in the DOM
+  createEffect(() => {
+    if (canvasRef) {
+      setCanvas(canvasRef)
+    }
+  })
+
   function createContext(canEl: HTMLCanvasElement) {
+    console.info('[WebGPU] Creating canvas context...', {
+      canvasWidth: canEl.width,
+      canvasHeight: canEl.height,
+      isConnected: canEl.isConnected,
+    })
     const canvasFormat = navigator.gpu.getPreferredCanvasFormat()
+    console.info('[WebGPU] Preferred canvas format:', canvasFormat)
     const context = canEl.getContext('webgpu')
     if (!context) {
-      throw new Error(`GPUCanvasContext failed to initialize.`)
+      console.error('[WebGPU] canvas.getContext("webgpu") returned null')
+      throw new Error(`GPUCanvasContext failed to initialize.`, {
+        cause: 'WebGPU',
+      })
     }
+    const alphaMode = props.alphaMode ?? 'opaque'
+    console.info('[WebGPU] Configuring context:', { format: canvasFormat, alphaMode })
     context.configure({
       device,
       format: canvasFormat,
-      alphaMode: props.alphaMode ?? 'opaque',
+      alphaMode,
     })
+    console.info('[WebGPU] Canvas context configured successfully')
     return { context, canvasFormat }
   }
 
@@ -88,7 +112,7 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
     <>
       <canvas
         ref={(el) => {
-          setCanvas(el)
+          canvasRef = el
           props.ref?.(el)
         }}
         class={props.class}
