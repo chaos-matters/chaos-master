@@ -293,11 +293,12 @@
   flex-direction: column;
   gap: var(--space-1);
 
-  /* Thin scrollbar for Firefox */
-  scrollbar-width: thin;
+  /* Firefox: hidden by default, thin on hover */
+  scrollbar-width: none;
   scrollbar-color: transparent transparent;
 
   &:hover {
+    scrollbar-width: thin;
     scrollbar-color: var(--neutral-300) transparent;
   }
 
@@ -305,9 +306,9 @@
     scrollbar-color: var(--neutral-700) transparent;
   }
 
-  /* Webkit (Chrome, Safari, Edge) */
+  /* Webkit (Chrome, Safari, Edge): zero width by default */
   &::-webkit-scrollbar {
-    width: 4px;
+    width: 0;
   }
 
   &::-webkit-scrollbar-track {
@@ -317,7 +318,10 @@
   &::-webkit-scrollbar-thumb {
     background: transparent;
     border-radius: 2px;
-    transition: background 0.2s;
+  }
+
+  &:hover::-webkit-scrollbar {
+    width: 4px;
   }
 
   &:hover::-webkit-scrollbar-thumb {
