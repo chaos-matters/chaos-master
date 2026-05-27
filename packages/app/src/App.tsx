@@ -178,6 +178,17 @@ export function Wrappers() {
                           })
                         }}
                         onStartTour={handleStartTour}
+                        onShowAbout={() => {
+                          setShowWelcome(false)
+                          // Trigger the floating version pill to open About
+                          requestAnimationFrame(() => {
+                            const pill =
+                              document.querySelector<HTMLButtonElement>(
+                                '[class*="about-pill"]',
+                              )
+                            pill?.click()
+                          })
+                        }}
                       />
                     </Show>
                   </Suspense>

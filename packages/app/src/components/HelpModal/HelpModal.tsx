@@ -144,7 +144,7 @@ type HelpModalProps = {
   sidebarLayoutMode: () => SidebarLayoutMode
   onSidebarLayoutModeChange: (mode: SidebarLayoutMode) => void
   isCompact: () => boolean
-  onToggleCompact: () => void
+  onSetCompact: (value: boolean) => void
   theme: () => Theme
   onThemeChange: (theme: Theme) => void
   onInjectCrash?: () => void
@@ -303,7 +303,7 @@ function HelpModal(props: HelpModalProps) {
             class={ui.pickerModeBtn}
             classList={{ [ui.pickerModeBtnActive!]: !props.isCompact() }}
             onClick={() => {
-              if (props.isCompact()) props.onToggleCompact()
+              props.onSetCompact(false)
             }}
           >
             Off
@@ -312,7 +312,7 @@ function HelpModal(props: HelpModalProps) {
             class={ui.pickerModeBtn}
             classList={{ [ui.pickerModeBtnActive!]: props.isCompact() }}
             onClick={() => {
-              if (!props.isCompact()) props.onToggleCompact()
+              props.onSetCompact(true)
             }}
           >
             On
@@ -479,7 +479,7 @@ export function createShowHelp(
   sidebarLayoutMode: () => SidebarLayoutMode,
   onSidebarLayoutModeChange: (mode: SidebarLayoutMode) => void,
   isCompact: () => boolean,
-  onToggleCompact: () => void,
+  setCompact: (value: boolean) => void,
   theme: () => Theme,
   onThemeChange: (theme: Theme) => void,
   onInjectCrash?: () => void,
@@ -497,7 +497,7 @@ export function createShowHelp(
           sidebarLayoutMode={sidebarLayoutMode}
           onSidebarLayoutModeChange={onSidebarLayoutModeChange}
           isCompact={isCompact}
-          onToggleCompact={onToggleCompact}
+          onSetCompact={setCompact}
           theme={theme}
           onThemeChange={onThemeChange}
           onInjectCrash={onInjectCrash}

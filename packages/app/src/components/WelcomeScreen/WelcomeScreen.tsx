@@ -12,6 +12,7 @@ import { Root } from '@/lib/Root'
 import { deepClone } from '@/utils/clone'
 import { formatRecentDate, loadRecentFlames } from '@/utils/recentFlames'
 import { applyTracksToFlame } from '@/utils/timeline'
+import { VERSION } from '@/version'
 import ui from './WelcomeScreen.module.css'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineTrack } from '@/utils/timeline'
@@ -22,6 +23,7 @@ type WelcomeScreenProps = {
   onEnter: () => void
   onSelectFlame?: (flame: FlameDescriptor, tracks?: TimelineTrack[]) => void
   onStartTour?: (tourId: string) => void
+  onShowAbout?: () => void
 }
 
 type GalleryItem = {
@@ -368,6 +370,26 @@ export function WelcomeScreen(props: WelcomeScreenProps) {
               <span class={`${ui.techPill} ${ui.techPillCyan}`}>WebGPU</span>
               <span class={`${ui.techPill} ${ui.techPillBlue}`}>TypeGPU</span>
               <span class={`${ui.techPill} ${ui.techPillGreen}`}>SolidJS</span>
+              <Show when={props.onShowAbout}>
+                <button
+                  class={`${ui.techPill} ${ui.aboutPill}`}
+                  onClick={() => props.onShowAbout?.()}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="16" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12.01" y2="8" />
+                  </svg>
+                  v{VERSION}
+                </button>
+              </Show>
             </div>
           </div>
         </div>

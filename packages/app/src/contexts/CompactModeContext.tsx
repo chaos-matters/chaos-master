@@ -3,6 +3,7 @@ import type { Accessor, ParentProps } from 'solid-js'
 
 interface CompactModeContextType {
   isCompact: Accessor<boolean>
+  setCompact: (value: boolean) => void
   toggleCompact: () => void
 }
 
@@ -17,6 +18,7 @@ export function CompactModeProvider(props: ParentProps) {
     <CompactModeContext.Provider
       value={{
         isCompact,
+        setCompact: (value: boolean) => setIsCompact(value),
         toggleCompact: () => setIsCompact((v) => !v),
       }}
     >
@@ -28,7 +30,11 @@ export function CompactModeProvider(props: ParentProps) {
 export function useCompactMode() {
   const context = useContext(CompactModeContext)
   if (!context) {
-    return { isCompact: () => false, toggleCompact: () => {} }
+    return {
+      isCompact: () => false,
+      setCompact: () => {},
+      toggleCompact: () => {},
+    }
   }
   return context
 }

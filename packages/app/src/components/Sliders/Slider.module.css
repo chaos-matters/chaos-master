@@ -62,8 +62,9 @@
   position: relative;
   width: 100%;
 
-  /* make the grab area a bit bigger than slider itself */
-  min-height: 20px;
+  /* fixed height prevents misalignment when grid row grows (e.g. animation mode) */
+  height: 20px;
+  align-self: center;
 
   &::before {
     display: block;
