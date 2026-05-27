@@ -203,7 +203,13 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
             {filtered().length} / {variationTypes.length}
           </div>
         </Show>
-        <div class={ui.pillList} tabIndex={-1}>
+        <div
+          class={ui.pillList}
+          tabIndex={-1}
+          onContextMenu={(e) => {
+            e.preventDefault()
+          }}
+        >
           <Show
             when={filtered().length > 0}
             fallback={
@@ -211,22 +217,59 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
             }
           >
             <For each={filtered()}>
-              {(type) => (
-                <button
-                  class={ui.pill}
-                  classList={{ [ui.pillActive!]: type === props.currentType }}
-                  title={getNormalizedVariationName(type)}
-                  onMouseEnter={() => props.onHoverType?.(type)}
-                  onMouseLeave={() => props.onHoverClear?.()}
-                  onClick={() => {
+              {(type) => {
+                let longPressTimer: ReturnType<typeof setTimeout> | undefined
+                let didLongPress = false
+
+                function onTouchStart(_e: TouchEvent) {
+                  didLongPress = false
+                  longPressTimer = setTimeout(() => {
+                    didLongPress = true
+                    props.onHoverType?.(type)
+                  }, 300)
+                }
+
+                function onTouchEnd(e: TouchEvent) {
+                  clearTimeout(longPressTimer)
+                  if (didLongPress) {
+                    // Was a long press (preview) -- just clear preview, don't select
+                    e.preventDefault()
                     props.onHoverClear?.()
-                    props.onSelect(type)
-                    props.onClose()
-                  }}
-                >
-                  {getNormalizedVariationName(type)}
-                </button>
-              )}
+                  }
+                  // Short tap falls through to onClick
+                }
+
+                function onTouchCancel() {
+                  clearTimeout(longPressTimer)
+                  if (didLongPress) {
+                    props.onHoverClear?.()
+                  }
+                }
+
+                return (
+                  <button
+                    class={ui.pill}
+                    classList={{ [ui.pillActive!]: type === props.currentType }}
+                    title={getNormalizedVariationName(type)}
+                    onMouseEnter={() => props.onHoverType?.(type)}
+                    onMouseLeave={() => props.onHoverClear?.()}
+                    onTouchStart={onTouchStart}
+                    onTouchEnd={onTouchEnd}
+                    onTouchCancel={onTouchCancel}
+                    onClick={() => {
+                      if (didLongPress) {
+                        didLongPress = false
+                        return
+                      }
+                      props.onHoverClear?.()
+                      props.onSelect(type)
+                      props.onClose()
+                    }}
+                  >
+                    {getNormalizedVariationName(type)}
+                  </button>
+                )
+              }}
             </For>
           </Show>
         </div>

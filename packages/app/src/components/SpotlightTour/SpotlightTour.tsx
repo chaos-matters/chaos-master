@@ -27,6 +27,7 @@ export function SpotlightTour(props: SpotlightTourProps) {
   const [cardPosition, setCardPosition] = createSignal<
     'top' | 'bottom' | 'left' | 'right'
   >('bottom')
+  let cardRef: HTMLDivElement | undefined
 
   const stepIndex = () => tour.currentStepIndex()
   const step = () => tour.currentStep()
@@ -61,6 +62,11 @@ export function SpotlightTour(props: SpotlightTourProps) {
       return
     }
 
+    // Force browser to flush pending layout so getBoundingClientRect
+    // returns accurate geometry (needed when flex/grid containers haven't
+    // been interacted with yet, e.g. timeline before first resize).
+    void (target as HTMLElement).offsetHeight
+
     const targetRect = target.getBoundingClientRect()
     const vw = window.innerWidth
     const vh = window.innerHeight
@@ -89,10 +95,9 @@ export function SpotlightTour(props: SpotlightTourProps) {
       height: holeH,
     })
 
-    // Measure card for positioning
-    // Estimate card dimensions (actual card will be measured after DOM render)
-    const cardW = 340
-    const cardH = 200
+    // Use actual card dimensions if available, otherwise estimate
+    const cardW = cardRef?.offsetWidth ?? 340
+    const cardH = cardRef?.offsetHeight ?? 200
 
     // Calculate available space around target
     const spaceTop = targetRect.top
@@ -200,13 +205,7 @@ export function SpotlightTour(props: SpotlightTourProps) {
     }
   }
 
-  // Reposition on step change, resize, and scroll
-  createEffect(() => {
-    void stepIndex()
-    void step()
-    measureAndPosition()
-  })
-
+  // Reposition on resize and scroll, and handle Escape to close
   createEffect(() => {
     if (!tour.isActive()) return
 
@@ -230,7 +229,7 @@ export function SpotlightTour(props: SpotlightTourProps) {
     })
   })
 
-  // Call beforeShow/afterHide hooks on step transitions
+  // Call beforeShow/afterHide hooks on step transitions and reposition spotlight
   let prevStep: { step: ReturnType<typeof step>; index: number } | null = null
   createEffect(() => {
     const current = step()
@@ -241,8 +240,23 @@ export function SpotlightTour(props: SpotlightTourProps) {
       prevStep.step?.afterHide?.(props.tourContext)
     }
 
-    if (active && current && currentIdx !== (prevStep?.index ?? -1)) {
-      current.beforeShow?.(props.tourContext)
+    if (active && current) {
+      if (currentIdx !== (prevStep?.index ?? -1)) {
+        current.beforeShow?.(props.tourContext)
+      }
+      // After beforeShow toggles panels, SolidJS renders new DOM elements
+      // but the browser may need two frames to finalize layout (mount + layout).
+      // Double-rAF ensures position measurement is accurate.
+      // A third pass at 100ms catches the initial Show render where the card
+      // ref might not be available during the first two frames.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          measureAndPosition()
+          setTimeout(() => {
+            measureAndPosition()
+          }, 80)
+        })
+      })
     }
 
     prevStep = active ? { step: current, index: currentIdx } : null
@@ -354,6 +368,7 @@ export function SpotlightTour(props: SpotlightTourProps) {
 
           {/* Spotlight card */}
           <div
+            ref={cardRef}
             class={ui.card}
             style={cardStyle()}
             role="dialog"
