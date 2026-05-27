@@ -1,0 +1,981 @@
+
+console-store.ts:57 [ColorGrading Debug] Frame 240 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.39e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0014) -> logDens=0.0014 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1389) -> logDens=0.1301 -> paletteIdxNorm=0.0220
+console-store.ts:57     count=1000000 (adj=13.8905) -> logDens=2.7007 -> paletteIdxNorm=0.4564
+console-store.ts:57 [ColorGrading Debug] Frame 250 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.32e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0013) -> logDens=0.0013 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1324) -> logDens=0.1244 -> paletteIdxNorm=0.0210
+console-store.ts:57     count=1000000 (adj=13.2422) -> logDens=2.6562 -> paletteIdxNorm=0.4489
+console-store.ts:57 [ColorGrading Debug] Frame 260 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.27e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0013) -> logDens=0.0013 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1267) -> logDens=0.1193 -> paletteIdxNorm=0.0202
+console-store.ts:57     count=1000000 (adj=12.6687) -> logDens=2.6151 -> paletteIdxNorm=0.4420
+console-store.ts:57 [ColorGrading Debug] Frame 270 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.22e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0012) -> logDens=0.0012 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1217) -> logDens=0.1148 -> paletteIdxNorm=0.0194
+console-store.ts:57     count=1000000 (adj=12.1653) -> logDens=2.5776 -> paletteIdxNorm=0.4356
+console-store.ts:57 [ColorGrading Debug] Frame 280 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.17e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0012) -> logDens=0.0012 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1168) -> logDens=0.1105 -> paletteIdxNorm=0.0187
+console-store.ts:57     count=1000000 (adj=11.6843) -> logDens=2.5404 -> paletteIdxNorm=0.4293
+console-store.ts:57 [ColorGrading Debug] Frame 290 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.12e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0011) -> logDens=0.0011 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1125) -> logDens=0.1066 -> paletteIdxNorm=0.0180
+console-store.ts:57     count=1000000 (adj=11.2459) -> logDens=2.5052 -> paletteIdxNorm=0.4234
+console-store.ts:57 [ColorGrading Debug] Frame 300 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.08e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0011) -> logDens=0.0011 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1084) -> logDens=0.1030 -> paletteIdxNorm=0.0174
+console-store.ts:57     count=1000000 (adj=10.8446) -> logDens=2.4719 -> paletteIdxNorm=0.4177
+console-store.ts:57 [ColorGrading Debug] Frame 310 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.05e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0010) -> logDens=0.0010 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1047) -> logDens=0.0996 -> paletteIdxNorm=0.0168
+console-store.ts:57     count=1000000 (adj=10.4736) -> logDens=2.4401 -> paletteIdxNorm=0.4124
+console-store.ts:57 [ColorGrading Debug] Frame 320 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.01e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0010) -> logDens=0.0010 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1014) -> logDens=0.0965 -> paletteIdxNorm=0.0163
+console-store.ts:57     count=1000000 (adj=10.1356) -> logDens=2.4101 -> paletteIdxNorm=0.4073
+console-store.ts:57 [ColorGrading Debug] Frame 330 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 9.80e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0010) -> logDens=0.0010 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.0980) -> logDens=0.0935 -> paletteIdxNorm=0.0158
+console-store.ts:57     count=1000000 (adj=9.7961) -> logDens=2.3792 -> paletteIdxNorm=0.4021
+console-store.ts:57 [ColorGrading Debug] Frame 340 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 9.47e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0009) -> logDens=0.0009 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.0947) -> logDens=0.0904 -> paletteIdxNorm=0.0153
+console-store.ts:57     count=1000000 (adj=9.4661) -> logDens=2.3481 -> paletteIdxNorm=0.3968
+console-store.ts:57 [ColorGrading Debug] Frame 350 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 9.19e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0009) -> logDens=0.0009 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.0919) -> logDens=0.0879 -> paletteIdxNorm=0.0149
+console-store.ts:57     count=1000000 (adj=9.1901) -> logDens=2.3214 -> paletteIdxNorm=0.3923
+console-store.ts:57 [ColorGrading Debug] Frame 360 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 8.90e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0009) -> logDens=0.0009 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.0890) -> logDens=0.0852 -> paletteIdxNorm=0.0144
+console-store.ts:57     count=1000000 (adj=8.8962) -> logDens=2.2922 -> paletteIdxNorm=0.3874
+console-store.ts:57 [ColorGrading Debug] Frame 10 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 9.48e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0095) -> logDens=0.0094 -> paletteIdxNorm=0.0016
+console-store.ts:57     count=10000 (adj=0.9477) -> logDens=0.6667 -> paletteIdxNorm=0.1127
+console-store.ts:57     count=1000000 (adj=94.7707) -> logDens=4.5620 -> paletteIdxNorm=0.7710
+console-store.ts:57 [ColorGrading Debug] Frame 20 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 4.82e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0048) -> logDens=0.0048 -> paletteIdxNorm=0.0008
+console-store.ts:57     count=10000 (adj=0.4815) -> logDens=0.3931 -> paletteIdxNorm=0.0664
+console-store.ts:57     count=1000000 (adj=48.1527) -> logDens=3.8949 -> paletteIdxNorm=0.6582
+console-store.ts:57 [ColorGrading Debug] Frame 30 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 3.04e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0030) -> logDens=0.0030 -> paletteIdxNorm=0.0005
+console-store.ts:57     count=10000 (adj=0.3042) -> logDens=0.2656 -> paletteIdxNorm=0.0449
+console-store.ts:57     count=1000000 (adj=30.4187) -> logDens=3.4474 -> paletteIdxNorm=0.5826
+console-store.ts:57 [ColorGrading Debug] Frame 40 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 2.27e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0023) -> logDens=0.0023 -> paletteIdxNorm=0.0004
+console-store.ts:57     count=10000 (adj=0.2272) -> logDens=0.2047 -> paletteIdxNorm=0.0346
+console-store.ts:57     count=1000000 (adj=22.7196) -> logDens=3.1663 -> paletteIdxNorm=0.5351
+console-store.ts:57 [ColorGrading Debug] Frame 50 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.80e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0018) -> logDens=0.0018 -> paletteIdxNorm=0.0003
+console-store.ts:57     count=10000 (adj=0.1798) -> logDens=0.1653 -> paletteIdxNorm=0.0279
+console-store.ts:57     count=1000000 (adj=17.9799) -> logDens=2.9434 -> paletteIdxNorm=0.4974
+console-store.ts:57 [ColorGrading Debug] Frame 60 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.48e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0015) -> logDens=0.0015 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1480) -> logDens=0.1380 -> paletteIdxNorm=0.0233
+console-store.ts:57     count=1000000 (adj=14.8024) -> logDens=2.7602 -> paletteIdxNorm=0.4665
+console-store.ts:57 [ColorGrading Debug] Frame 70 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.24e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0012) -> logDens=0.0012 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1242) -> logDens=0.1170 -> paletteIdxNorm=0.0198
+console-store.ts:57     count=1000000 (adj=12.4152) -> logDens=2.5964 -> paletteIdxNorm=0.4388
+console-store.ts:57 [ColorGrading Debug] Frame 80 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.07e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0011) -> logDens=0.0011 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1072) -> logDens=0.1019 -> paletteIdxNorm=0.0172
+console-store.ts:57     count=1000000 (adj=10.7247) -> logDens=2.4617 -> paletteIdxNorm=0.4160
+console-store.ts:57 [ColorGrading Debug] Frame 90 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 9.58e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0010) -> logDens=0.0010 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.0958) -> logDens=0.0915 -> paletteIdxNorm=0.0155
+console-store.ts:57     count=1000000 (adj=9.5763) -> logDens=2.3586 -> paletteIdxNorm=0.3986
+console-store.ts:57 [ColorGrading Debug] Frame 100 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 8.60e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0009) -> logDens=0.0009 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0860) -> logDens=0.0825 -> paletteIdxNorm=0.0139
+console-store.ts:57     count=1000000 (adj=8.5968) -> logDens=2.2614 -> paletteIdxNorm=0.3822
+console-store.ts:57 [ColorGrading Debug] Frame 110 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 7.76e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0008) -> logDens=0.0008 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0776) -> logDens=0.0748 -> paletteIdxNorm=0.0126
+console-store.ts:57     count=1000000 (adj=7.7635) -> logDens=2.1706 -> paletteIdxNorm=0.3668
+console-store.ts:57 [ColorGrading Debug] Frame 120 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 7.10e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0007) -> logDens=0.0007 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0710) -> logDens=0.0686 -> paletteIdxNorm=0.0116
+console-store.ts:57     count=1000000 (adj=7.0965) -> logDens=2.0914 -> paletteIdxNorm=0.3535
+console-store.ts:57 [ColorGrading Debug] Frame 130 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 6.54e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0007) -> logDens=0.0007 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0654) -> logDens=0.0633 -> paletteIdxNorm=0.0107
+console-store.ts:57     count=1000000 (adj=6.5350) -> logDens=2.0196 -> paletteIdxNorm=0.3413
+console-store.ts:57 [ColorGrading Debug] Frame 140 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 6.03e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0006) -> logDens=0.0006 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0603) -> logDens=0.0585 -> paletteIdxNorm=0.0099
+console-store.ts:57     count=1000000 (adj=6.0267) -> logDens=1.9497 -> paletteIdxNorm=0.3295
+console-store.ts:57 [ColorGrading Debug] Frame 150 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 5.59e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0006) -> logDens=0.0006 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0559) -> logDens=0.0543 -> paletteIdxNorm=0.0092
+console-store.ts:57     count=1000000 (adj=5.5852) -> logDens=1.8848 -> paletteIdxNorm=0.3185
+console-store.ts:57 [ColorGrading Debug] Frame 160 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 5.23e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0523) -> logDens=0.0510 -> paletteIdxNorm=0.0086
+console-store.ts:57     count=1000000 (adj=5.2292) -> logDens=1.8292 -> paletteIdxNorm=0.3091
+console-store.ts:57 [ColorGrading Debug] Frame 10 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.27e-3
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0127) -> logDens=0.0126 -> paletteIdxNorm=0.0021
+console-store.ts:57     count=10000 (adj=1.2653) -> logDens=0.8177 -> paletteIdxNorm=0.1382
+console-store.ts:57     count=1000000 (adj=126.5290) -> logDens=4.8483 -> paletteIdxNorm=0.8194
+console-store.ts:57 [ColorGrading Debug] Frame 20 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 7.62e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0076) -> logDens=0.0076 -> paletteIdxNorm=0.0013
+console-store.ts:57     count=10000 (adj=0.7624) -> logDens=0.5667 -> paletteIdxNorm=0.0958
+console-store.ts:57     count=1000000 (adj=76.2418) -> logDens=4.3469 -> paletteIdxNorm=0.7346
+console-store.ts:57 [ColorGrading Debug] Frame 30 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 5.08e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0051) -> logDens=0.0051 -> paletteIdxNorm=0.0009
+console-store.ts:57     count=10000 (adj=0.5083) -> logDens=0.4110 -> paletteIdxNorm=0.0695
+console-store.ts:57     count=1000000 (adj=50.8279) -> logDens=3.9479 -> paletteIdxNorm=0.6672
+console-store.ts:57 [ColorGrading Debug] Frame 40 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 3.93e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0039) -> logDens=0.0039 -> paletteIdxNorm=0.0007
+console-store.ts:57     count=10000 (adj=0.3925) -> logDens=0.3311 -> paletteIdxNorm=0.0560
+console-store.ts:57     count=1000000 (adj=39.2532) -> logDens=3.6952 -> paletteIdxNorm=0.6245
+console-store.ts:57 [ColorGrading Debug] Frame 50 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 3.07e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0031) -> logDens=0.0031 -> paletteIdxNorm=0.0005
+console-store.ts:57     count=10000 (adj=0.3073) -> logDens=0.2680 -> paletteIdxNorm=0.0453
+console-store.ts:57     count=1000000 (adj=30.7331) -> logDens=3.4574 -> paletteIdxNorm=0.5843
+console-store.ts:57 [ColorGrading Debug] Frame 60 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 2.46e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0025) -> logDens=0.0025 -> paletteIdxNorm=0.0004
+console-store.ts:57     count=10000 (adj=0.2462) -> logDens=0.2201 -> paletteIdxNorm=0.0372
+console-store.ts:57     count=1000000 (adj=24.6247) -> logDens=3.2436 -> paletteIdxNorm=0.5482
+console-store.ts:57 [ColorGrading Debug] Frame 70 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 2.01e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0020) -> logDens=0.0020 -> paletteIdxNorm=0.0003
+console-store.ts:57     count=10000 (adj=0.2014) -> logDens=0.1835 -> paletteIdxNorm=0.0310
+console-store.ts:57     count=1000000 (adj=20.1418) -> logDens=3.0513 -> paletteIdxNorm=0.5157
+console-store.ts:57 [ColorGrading Debug] Frame 80 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.68e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0017) -> logDens=0.0017 -> paletteIdxNorm=0.0003
+console-store.ts:57     count=10000 (adj=0.1680) -> logDens=0.1553 -> paletteIdxNorm=0.0262
+console-store.ts:57     count=1000000 (adj=16.7990) -> logDens=2.8791 -> paletteIdxNorm=0.4866
+console-store.ts:57 [ColorGrading Debug] Frame 90 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.42e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0014) -> logDens=0.0014 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1420) -> logDens=0.1328 -> paletteIdxNorm=0.0224
+console-store.ts:57     count=1000000 (adj=14.2015) -> logDens=2.7214 -> paletteIdxNorm=0.4599
+console-store.ts:57 [ColorGrading Debug] Frame 100 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.21e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0012) -> logDens=0.0012 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1210) -> logDens=0.1142 -> paletteIdxNorm=0.0193
+console-store.ts:57     count=1000000 (adj=12.0994) -> logDens=2.5726 -> paletteIdxNorm=0.4348
+console-store.ts:57 [ColorGrading Debug] Frame 110 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.05e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0010) -> logDens=0.0010 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1050) -> logDens=0.0998 -> paletteIdxNorm=0.0169
+console-store.ts:57     count=1000000 (adj=10.4976) -> logDens=2.4421 -> paletteIdxNorm=0.4127
+console-store.ts:57 [ColorGrading Debug] Frame 120 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 9.34e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0009) -> logDens=0.0009 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.0934) -> logDens=0.0893 -> paletteIdxNorm=0.0151
+console-store.ts:57     count=1000000 (adj=9.3431) -> logDens=2.3363 -> paletteIdxNorm=0.3948
+console-store.ts:57 [ColorGrading Debug] Frame 130 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 8.47e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0008) -> logDens=0.0008 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0847) -> logDens=0.0813 -> paletteIdxNorm=0.0137
+console-store.ts:57     count=1000000 (adj=8.4683) -> logDens=2.2479 -> paletteIdxNorm=0.3799
+console-store.ts:57 [ColorGrading Debug] Frame 140 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 7.65e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0008) -> logDens=0.0008 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0765) -> logDens=0.0737 -> paletteIdxNorm=0.0125
+console-store.ts:57     count=1000000 (adj=7.6536) -> logDens=2.1580 -> paletteIdxNorm=0.3647
+console-store.ts:57 [ColorGrading Debug] Frame 150 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 6.96e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0007) -> logDens=0.0007 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0696) -> logDens=0.0673 -> paletteIdxNorm=0.0114
+console-store.ts:57     count=1000000 (adj=6.9635) -> logDens=2.0749 -> paletteIdxNorm=0.3507
+console-store.ts:57 [ColorGrading Debug] Frame 160 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 6.39e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0006) -> logDens=0.0006 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0639) -> logDens=0.0619 -> paletteIdxNorm=0.0105
+console-store.ts:57     count=1000000 (adj=6.3876) -> logDens=1.9998 -> paletteIdxNorm=0.3380
+console-store.ts:57 [ColorGrading Debug] Frame 170 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 5.88e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0006) -> logDens=0.0006 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0588) -> logDens=0.0571 -> paletteIdxNorm=0.0097
+console-store.ts:57     count=1000000 (adj=5.8793) -> logDens=1.9285 -> paletteIdxNorm=0.3259
+console-store.ts:57 [ColorGrading Debug] Frame 180 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 5.50e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0550) -> logDens=0.0535 -> paletteIdxNorm=0.0090
+console-store.ts:57     count=1000000 (adj=5.4987) -> logDens=1.8716 -> paletteIdxNorm=0.3163
+console-store.ts:57 [ColorGrading Debug] Frame 190 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 5.16e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0516) -> logDens=0.0503 -> paletteIdxNorm=0.0085
+console-store.ts:57     count=1000000 (adj=5.1588) -> logDens=1.8179 -> paletteIdxNorm=0.3072
+console-store.ts:57 [ColorGrading Debug] Frame 10 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.79e-3
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0179) -> logDens=0.0177 -> paletteIdxNorm=0.0030
+console-store.ts:57     count=10000 (adj=1.7885) -> logDens=1.0255 -> paletteIdxNorm=0.1733
+console-store.ts:57     count=1000000 (adj=178.8530) -> logDens=5.1921 -> paletteIdxNorm=0.8775
+console-store.ts:57 [ColorGrading Debug] Frame 20 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.04e-3
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0104) -> logDens=0.0103 -> paletteIdxNorm=0.0017
+console-store.ts:57     count=10000 (adj=1.0388) -> logDens=0.7123 -> paletteIdxNorm=0.1204
+console-store.ts:57     count=1000000 (adj=103.8753) -> logDens=4.6528 -> paletteIdxNorm=0.7863
+console-store.ts:57 [ColorGrading Debug] Frame 30 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 5.95e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0059) -> logDens=0.0059 -> paletteIdxNorm=0.0010
+console-store.ts:57     count=10000 (adj=0.5947) -> logDens=0.4667 -> paletteIdxNorm=0.0789
+console-store.ts:57     count=1000000 (adj=59.4686) -> logDens=4.1021 -> paletteIdxNorm=0.6933
+console-store.ts:57 [ColorGrading Debug] Frame 40 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 4.29e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0043) -> logDens=0.0043 -> paletteIdxNorm=0.0007
+console-store.ts:57     count=10000 (adj=0.4294) -> logDens=0.3572 -> paletteIdxNorm=0.0604
+console-store.ts:57     count=1000000 (adj=42.9376) -> logDens=3.7828 -> paletteIdxNorm=0.6393
+console-store.ts:57 [ColorGrading Debug] Frame 50 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 3.44e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0034) -> logDens=0.0034 -> paletteIdxNorm=0.0006
+console-store.ts:57     count=10000 (adj=0.3437) -> logDens=0.2955 -> paletteIdxNorm=0.0499
+console-store.ts:57     count=1000000 (adj=34.3749) -> logDens=3.5660 -> paletteIdxNorm=0.6027
+console-store.ts:57 [ColorGrading Debug] Frame 60 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 2.80e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0028) -> logDens=0.0028 -> paletteIdxNorm=0.0005
+console-store.ts:57     count=10000 (adj=0.2795) -> logDens=0.2465 -> paletteIdxNorm=0.0417
+console-store.ts:57     count=1000000 (adj=27.9524) -> logDens=3.3657 -> paletteIdxNorm=0.5688
+console-store.ts:57 [ColorGrading Debug] Frame 70 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 2.28e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0023) -> logDens=0.0023 -> paletteIdxNorm=0.0004
+console-store.ts:57     count=10000 (adj=0.2276) -> logDens=0.2051 -> paletteIdxNorm=0.0347
+console-store.ts:57     count=1000000 (adj=22.7631) -> logDens=3.1681 -> paletteIdxNorm=0.5354
+console-store.ts:57 [ColorGrading Debug] Frame 80 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.92e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0019) -> logDens=0.0019 -> paletteIdxNorm=0.0003
+console-store.ts:57     count=10000 (adj=0.1921) -> logDens=0.1758 -> paletteIdxNorm=0.0297
+console-store.ts:57     count=1000000 (adj=19.2144) -> logDens=3.0064 -> paletteIdxNorm=0.5081
+console-store.ts:57 [ColorGrading Debug] Frame 10 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.18e-3
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0118) -> logDens=0.0117 -> paletteIdxNorm=0.0020
+console-store.ts:57     count=10000 (adj=1.1776) -> logDens=0.7782 -> paletteIdxNorm=0.1315
+console-store.ts:57     count=1000000 (adj=117.7597) -> logDens=4.7771 -> paletteIdxNorm=0.8073
+console-store.ts:57 [ColorGrading Debug] Frame 20 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 6.43e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0064) -> logDens=0.0064 -> paletteIdxNorm=0.0011
+console-store.ts:57     count=10000 (adj=0.6429) -> logDens=0.4965 -> paletteIdxNorm=0.0839
+console-store.ts:57     count=1000000 (adj=64.2904) -> logDens=4.1788 -> paletteIdxNorm=0.7062
+console-store.ts:57 [ColorGrading Debug] Frame 30 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 3.58e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0036) -> logDens=0.0036 -> paletteIdxNorm=0.0006
+console-store.ts:57     count=10000 (adj=0.3582) -> logDens=0.3062 -> paletteIdxNorm=0.0517
+console-store.ts:57     count=1000000 (adj=35.8245) -> logDens=3.6062 -> paletteIdxNorm=0.6094
+console-store.ts:57 [ColorGrading Debug] Frame 40 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 2.49e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0025) -> logDens=0.0025 -> paletteIdxNorm=0.0004
+console-store.ts:57     count=10000 (adj=0.2486) -> logDens=0.2220 -> paletteIdxNorm=0.0375
+console-store.ts:57     count=1000000 (adj=24.8563) -> logDens=3.2526 -> paletteIdxNorm=0.5497
+console-store.ts:57 [ColorGrading Debug] Frame 50 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.87e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0019) -> logDens=0.0019 -> paletteIdxNorm=0.0003
+console-store.ts:57     count=10000 (adj=0.1872) -> logDens=0.1716 -> paletteIdxNorm=0.0290
+console-store.ts:57     count=1000000 (adj=18.7155) -> logDens=2.9814 -> paletteIdxNorm=0.5039
+console-store.ts:57 [ColorGrading Debug] Frame 60 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.53e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0015) -> logDens=0.0015 -> paletteIdxNorm=0.0003
+console-store.ts:57     count=10000 (adj=0.1534) -> logDens=0.1427 -> paletteIdxNorm=0.0241
+console-store.ts:57     count=1000000 (adj=15.3368) -> logDens=2.7934 -> paletteIdxNorm=0.4721
+console-store.ts:57 [ColorGrading Debug] Frame 70 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.32e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0013) -> logDens=0.0013 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1316) -> logDens=0.1237 -> paletteIdxNorm=0.0209
+console-store.ts:57     count=1000000 (adj=13.1641) -> logDens=2.6507 -> paletteIdxNorm=0.4480
+console-store.ts:57 [ColorGrading Debug] Frame 80 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 1.12e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0011) -> logDens=0.0011 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1117) -> logDens=0.1059 -> paletteIdxNorm=0.0179
+console-store.ts:57     count=1000000 (adj=11.1678) -> logDens=2.4988 -> paletteIdxNorm=0.4223
+console-store.ts:57 [ColorGrading Debug] Frame 90 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 9.72e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0010) -> logDens=0.0010 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.0972) -> logDens=0.0927 -> paletteIdxNorm=0.0157
+console-store.ts:57     count=1000000 (adj=9.7171) -> logDens=2.3718 -> paletteIdxNorm=0.4008
+console-store.ts:57 [ColorGrading Debug] Frame 100 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 8.65e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0009) -> logDens=0.0009 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0865) -> logDens=0.0829 -> paletteIdxNorm=0.0140
+console-store.ts:57     count=1000000 (adj=8.6468) -> logDens=2.2666 -> paletteIdxNorm=0.3831
+console-store.ts:57 [ColorGrading Debug] Frame 110 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 7.82e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0008) -> logDens=0.0008 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0782) -> logDens=0.0753 -> paletteIdxNorm=0.0127
+console-store.ts:57     count=1000000 (adj=7.8222) -> logDens=2.1773 -> paletteIdxNorm=0.3680
+console-store.ts:57 [ColorGrading Debug] Frame 120 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 7.05e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0007) -> logDens=0.0007 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0705) -> logDens=0.0681 -> paletteIdxNorm=0.0115
+console-store.ts:57     count=1000000 (adj=7.0502) -> logDens=2.0857 -> paletteIdxNorm=0.3525
+console-store.ts:57 [ColorGrading Debug] Frame 130 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 6.49e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0006) -> logDens=0.0006 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0649) -> logDens=0.0629 -> paletteIdxNorm=0.0106
+console-store.ts:57     count=1000000 (adj=6.4887) -> logDens=2.0134 -> paletteIdxNorm=0.3403
+console-store.ts:57 [ColorGrading Debug] Frame 140 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 5.98e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0006) -> logDens=0.0006 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0598) -> logDens=0.0581 -> paletteIdxNorm=0.0098
+console-store.ts:57     count=1000000 (adj=5.9798) -> logDens=1.9430 -> paletteIdxNorm=0.3284
+console-store.ts:57 [ColorGrading Debug] Frame 150 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 5.58e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0006) -> logDens=0.0006 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0558) -> logDens=0.0543 -> paletteIdxNorm=0.0092
+console-store.ts:57     count=1000000 (adj=5.5787) -> logDens=1.8838 -> paletteIdxNorm=0.3184
+console-store.ts:57 [ColorGrading Debug] Frame 160 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.50 | AvgInv: 5.18e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0518) -> logDens=0.0505 -> paletteIdxNorm=0.0085
+console-store.ts:57     count=1000000 (adj=5.1825) -> logDens=1.8217 -> paletteIdxNorm=0.3079
+console-store.ts:57 [ColorGrading Debug] Frame 170 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.45 | AvgInv: 4.99e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0499) -> logDens=0.0487 -> paletteIdxNorm=0.0082
+console-store.ts:57     count=1000000 (adj=4.9921) -> logDens=1.7904 -> paletteIdxNorm=0.3026
+console-store.ts:57 [ColorGrading Debug] Frame 180 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 2.05 | AvgInv: 4.99e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0499) -> logDens=0.0487 -> paletteIdxNorm=0.0082
+console-store.ts:57     count=1000000 (adj=4.9921) -> logDens=1.7904 -> paletteIdxNorm=0.3026
+console-store.ts:57 [ColorGrading Debug] Frame 190 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 2.00 | AvgInv: 4.99e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0499) -> logDens=0.0487 -> paletteIdxNorm=0.0082
+console-store.ts:57     count=1000000 (adj=4.9921) -> logDens=1.7904 -> paletteIdxNorm=0.3026
+console-store.ts:57 [ColorGrading Debug] Frame 200 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.20 | AvgInv: 4.99e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0499) -> logDens=0.0487 -> paletteIdxNorm=0.0082
+console-store.ts:57     count=1000000 (adj=4.9921) -> logDens=1.7904 -> paletteIdxNorm=0.3026
+console-store.ts:57 [ColorGrading Debug] Frame 10 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 5.73e-3
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0573) -> logDens=0.0557 -> paletteIdxNorm=0.0094
+console-store.ts:57     count=10000 (adj=5.7271) -> logDens=1.9062 -> paletteIdxNorm=0.3221
+console-store.ts:57     count=1000000 (adj=572.7148) -> logDens=6.3521 -> paletteIdxNorm=0.0735
+console-store.ts:57 [ColorGrading Debug] Frame 20 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 3.02e-3
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0302) -> logDens=0.0297 -> paletteIdxNorm=0.0050
+console-store.ts:57     count=10000 (adj=3.0155) -> logDens=1.3902 -> paletteIdxNorm=0.2349
+console-store.ts:57     count=1000000 (adj=301.5519) -> logDens=5.7123 -> paletteIdxNorm=0.9654
+console-store.ts:57 [ColorGrading Debug] Frame 30 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 1.83e-3
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0183) -> logDens=0.0182 -> paletteIdxNorm=0.0031
+console-store.ts:57     count=10000 (adj=1.8333) -> logDens=1.0414 -> paletteIdxNorm=0.1760
+console-store.ts:57     count=1000000 (adj=183.3256) -> logDens=5.2167 -> paletteIdxNorm=0.8816
+console-store.ts:57 [ColorGrading Debug] Frame 40 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 1.36e-3
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0136) -> logDens=0.0135 -> paletteIdxNorm=0.0023
+console-store.ts:57     count=10000 (adj=1.3606) -> logDens=0.8589 -> paletteIdxNorm=0.1452
+console-store.ts:57     count=1000000 (adj=136.0593) -> logDens=4.9204 -> paletteIdxNorm=0.8315
+console-store.ts:57 [ColorGrading Debug] Frame 50 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 1.06e-3
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0106) -> logDens=0.0105 -> paletteIdxNorm=0.0018
+console-store.ts:57     count=10000 (adj=1.0600) -> logDens=0.7227 -> paletteIdxNorm=0.1221
+console-store.ts:57     count=1000000 (adj=105.9974) -> logDens=4.6728 -> paletteIdxNorm=0.7897
+console-store.ts:57 [ColorGrading Debug] Frame 60 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 8.19e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0082) -> logDens=0.0082 -> paletteIdxNorm=0.0014
+console-store.ts:57     count=10000 (adj=0.8191) -> logDens=0.5983 -> paletteIdxNorm=0.1011
+console-store.ts:57     count=1000000 (adj=81.9071) -> logDens=4.4177 -> paletteIdxNorm=0.7466
+console-store.ts:57 [ColorGrading Debug] Frame 70 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 6.56e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0066) -> logDens=0.0065 -> paletteIdxNorm=0.0011
+console-store.ts:57     count=10000 (adj=0.6555) -> logDens=0.5041 -> paletteIdxNorm=0.0852
+console-store.ts:57     count=1000000 (adj=65.5548) -> logDens=4.1980 -> paletteIdxNorm=0.7095
+console-store.ts:57 [ColorGrading Debug] Frame 80 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 5.41e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0054) -> logDens=0.0054 -> paletteIdxNorm=0.0009
+console-store.ts:57     count=10000 (adj=0.5412) -> logDens=0.4326 -> paletteIdxNorm=0.0731
+console-store.ts:57     count=1000000 (adj=54.1247) -> logDens=4.0096 -> paletteIdxNorm=0.6776
+console-store.ts:57 [ColorGrading Debug] Frame 90 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 4.51e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0045) -> logDens=0.0045 -> paletteIdxNorm=0.0008
+console-store.ts:57     count=10000 (adj=0.4510) -> logDens=0.3723 -> paletteIdxNorm=0.0629
+console-store.ts:57     count=1000000 (adj=45.1039) -> logDens=3.8309 -> paletteIdxNorm=0.6474
+console-store.ts:57 [ColorGrading Debug] Frame 100 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 3.83e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0038) -> logDens=0.0038 -> paletteIdxNorm=0.0006
+console-store.ts:57     count=10000 (adj=0.3832) -> logDens=0.3244 -> paletteIdxNorm=0.0548
+console-store.ts:57     count=1000000 (adj=38.3196) -> logDens=3.6717 -> paletteIdxNorm=0.6205
+console-store.ts:57 [ColorGrading Debug] Frame 110 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 3.29e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0033) -> logDens=0.0033 -> paletteIdxNorm=0.0006
+console-store.ts:57     count=10000 (adj=0.3288) -> logDens=0.2843 -> paletteIdxNorm=0.0480
+console-store.ts:57     count=1000000 (adj=32.8795) -> logDens=3.5228 -> paletteIdxNorm=0.5954
+console-store.ts:57 [ColorGrading Debug] Frame 120 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 2.94e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0029) -> logDens=0.0029 -> paletteIdxNorm=0.0005
+console-store.ts:57     count=10000 (adj=0.2945) -> logDens=0.2581 -> paletteIdxNorm=0.0436
+console-store.ts:57     count=1000000 (adj=29.4461) -> logDens=3.4160 -> paletteIdxNorm=0.5773
+console-store.ts:57 [ColorGrading Debug] Frame 130 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 2.62e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0026) -> logDens=0.0026 -> paletteIdxNorm=0.0004
+console-store.ts:57     count=10000 (adj=0.2624) -> logDens=0.2330 -> paletteIdxNorm=0.0394
+console-store.ts:57     count=1000000 (adj=26.2359) -> logDens=3.3045 -> paletteIdxNorm=0.5585
+console-store.ts:57 [ColorGrading Debug] Frame 140 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 2.38e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0024) -> logDens=0.0024 -> paletteIdxNorm=0.0004
+console-store.ts:57     count=10000 (adj=0.2384) -> logDens=0.2138 -> paletteIdxNorm=0.0361
+console-store.ts:57     count=1000000 (adj=23.8400) -> logDens=3.2125 -> paletteIdxNorm=0.5429
+console-store.ts:57 [ColorGrading Debug] Frame 150 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 2.18e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0022) -> logDens=0.0022 -> paletteIdxNorm=0.0004
+console-store.ts:57     count=10000 (adj=0.2176) -> logDens=0.1968 -> paletteIdxNorm=0.0333
+console-store.ts:57     count=1000000 (adj=21.7551) -> logDens=3.1248 -> paletteIdxNorm=0.5281
+console-store.ts:57 [ColorGrading Debug] Frame 160 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 1.99e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0020) -> logDens=0.0020 -> paletteIdxNorm=0.0003
+console-store.ts:57     count=10000 (adj=0.1993) -> logDens=0.1817 -> paletteIdxNorm=0.0307
+console-store.ts:57     count=1000000 (adj=19.9299) -> logDens=3.0412 -> paletteIdxNorm=0.5140
+console-store.ts:57 [ColorGrading Debug] Frame 170 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 1.85e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0018) -> logDens=0.0018 -> paletteIdxNorm=0.0003
+console-store.ts:57     count=10000 (adj=0.1847) -> logDens=0.1695 -> paletteIdxNorm=0.0286
+console-store.ts:57     count=1000000 (adj=18.4654) -> logDens=2.9686 -> paletteIdxNorm=0.5017
+console-store.ts:57 [ColorGrading Debug] Frame 180 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 1.72e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0017) -> logDens=0.0017 -> paletteIdxNorm=0.0003
+console-store.ts:57     count=10000 (adj=0.1720) -> logDens=0.1587 -> paletteIdxNorm=0.0268
+console-store.ts:57     count=1000000 (adj=17.2014) -> logDens=2.9015 -> paletteIdxNorm=0.4904
+console-store.ts:57 [ColorGrading Debug] Frame 190 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 1.60 | AvgInv: 1.63e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0016) -> logDens=0.0016 -> paletteIdxNorm=0.0003
+console-store.ts:57     count=10000 (adj=0.1634) -> logDens=0.1514 -> paletteIdxNorm=0.0256
+console-store.ts:57     count=1000000 (adj=16.3416) -> logDens=2.8531 -> paletteIdxNorm=0.4822
+console-store.ts:57 [ColorGrading Debug] Frame 200 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.00 | AvgInv: 1.55e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0015) -> logDens=0.0015 -> paletteIdxNorm=0.0003
+console-store.ts:57     count=10000 (adj=0.1545) -> logDens=0.1437 -> paletteIdxNorm=0.0243
+console-store.ts:57     count=1000000 (adj=15.4529) -> logDens=2.8005 -> paletteIdxNorm=0.4733
+console-store.ts:57 [ColorGrading Debug] Frame 210 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 0.00 | AvgInv: 1.47e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0015) -> logDens=0.0015 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1474) -> logDens=0.1375 -> paletteIdxNorm=0.0232
+console-store.ts:57     count=1000000 (adj=14.7407) -> logDens=2.7562 -> paletteIdxNorm=0.4658
+console-store.ts:57 [ColorGrading Debug] Frame 220 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 1.40e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0014) -> logDens=0.0014 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1405) -> logDens=0.1315 -> paletteIdxNorm=0.0222
+console-store.ts:57     count=1000000 (adj=14.0483) -> logDens=2.7113 -> paletteIdxNorm=0.4582
+console-store.ts:57 [ColorGrading Debug] Frame 230 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 1.36e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0014) -> logDens=0.0014 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1363) -> logDens=0.1278 -> paletteIdxNorm=0.0216
+console-store.ts:57     count=1000000 (adj=13.6310) -> logDens=2.6831 -> paletteIdxNorm=0.4535
+console-store.ts:57 [ColorGrading Debug] Frame 240 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 1.31e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0013) -> logDens=0.0013 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1312) -> logDens=0.1233 -> paletteIdxNorm=0.0208
+console-store.ts:57     count=1000000 (adj=13.1203) -> logDens=2.6476 -> paletteIdxNorm=0.4474
+console-store.ts:57 [ColorGrading Debug] Frame 250 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 1.26e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0013) -> logDens=0.0013 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1256) -> logDens=0.1183 -> paletteIdxNorm=0.0200
+console-store.ts:57     count=1000000 (adj=12.5604) -> logDens=2.6072 -> paletteIdxNorm=0.4406
+console-store.ts:57 [ColorGrading Debug] Frame 260 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 1.20e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0012) -> logDens=0.0012 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1196) -> logDens=0.1130 -> paletteIdxNorm=0.0191
+console-store.ts:57     count=1000000 (adj=11.9625) -> logDens=2.5621 -> paletteIdxNorm=0.4330
+console-store.ts:57 [ColorGrading Debug] Frame 270 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 1.14e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0011) -> logDens=0.0011 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1143) -> logDens=0.1083 -> paletteIdxNorm=0.0183
+console-store.ts:57     count=1000000 (adj=11.4330) -> logDens=2.5204 -> paletteIdxNorm=0.4259
+console-store.ts:57 [ColorGrading Debug] Frame 280 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 1.09e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0011) -> logDens=0.0011 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1091) -> logDens=0.1036 -> paletteIdxNorm=0.0175
+console-store.ts:57     count=1000000 (adj=10.9145) -> logDens=2.4778 -> paletteIdxNorm=0.4187
+console-store.ts:57 [ColorGrading Debug] Frame 290 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 1.04e-4
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0010) -> logDens=0.0010 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.1041) -> logDens=0.0990 -> paletteIdxNorm=0.0167
+console-store.ts:57     count=1000000 (adj=10.4057) -> logDens=2.4341 -> paletteIdxNorm=0.4114
+console-store.ts:57 [ColorGrading Debug] Frame 300 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 9.98e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0010) -> logDens=0.0010 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.0998) -> logDens=0.0951 -> paletteIdxNorm=0.0161
+console-store.ts:57     count=1000000 (adj=9.9784) -> logDens=2.3959 -> paletteIdxNorm=0.4049
+console-store.ts:57 [ColorGrading Debug] Frame 310 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 9.55e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0010) -> logDens=0.0010 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.0955) -> logDens=0.0912 -> paletteIdxNorm=0.0154
+console-store.ts:57     count=1000000 (adj=9.5539) -> logDens=2.3565 -> paletteIdxNorm=0.3982
+console-store.ts:57 [ColorGrading Debug] Frame 320 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 9.17e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0009) -> logDens=0.0009 -> paletteIdxNorm=0.0002
+console-store.ts:57     count=10000 (adj=0.0917) -> logDens=0.0877 -> paletteIdxNorm=0.0148
+console-store.ts:57     count=1000000 (adj=9.1697) -> logDens=2.3194 -> paletteIdxNorm=0.3920
+console-store.ts:57 [ColorGrading Debug] Frame 330 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 8.83e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0009) -> logDens=0.0009 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0883) -> logDens=0.0846 -> paletteIdxNorm=0.0143
+console-store.ts:57     count=1000000 (adj=8.8321) -> logDens=2.2856 -> paletteIdxNorm=0.3863
+console-store.ts:57 [ColorGrading Debug] Frame 340 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 8.50e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0008) -> logDens=0.0008 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0850) -> logDens=0.0815 -> paletteIdxNorm=0.0138
+console-store.ts:57     count=1000000 (adj=8.4959) -> logDens=2.2509 -> paletteIdxNorm=0.3804
+console-store.ts:57 [ColorGrading Debug] Frame 350 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 8.24e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0008) -> logDens=0.0008 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0824) -> logDens=0.0791 -> paletteIdxNorm=0.0134
+console-store.ts:57     count=1000000 (adj=8.2364) -> logDens=2.2231 -> paletteIdxNorm=0.3757
+console-store.ts:57 [ColorGrading Debug] Frame 360 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 7.98e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0008) -> logDens=0.0008 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0798) -> logDens=0.0768 -> paletteIdxNorm=0.0130
+console-store.ts:57     count=1000000 (adj=7.9810) -> logDens=2.1951 -> paletteIdxNorm=0.3710
+console-store.ts:57 [ColorGrading Debug] Frame 370 | Mode: 0 | Speed: 0.50 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 7.71e-5
+console-store.ts:57  -> paletteScale = 0.1690
+console-store.ts:57     count=100 (adj=0.0008) -> logDens=0.0008 -> paletteIdxNorm=0.0001
+console-store.ts:57     count=10000 (adj=0.0771) -> logDens=0.0743 -> paletteIdxNorm=0.0126
+console-store.ts:57     count=1000000 (adj=7.7135) -> logDens=2.1649 -> paletteIdxNorm=0.3659
+console-store.ts:57 [ColorGrading Debug] Frame 380 | Mode: 0 | Speed: 6.70 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 7.45e-5
+console-store.ts:57  -> paletteScale = 2.0166
+console-store.ts:57     count=100 (adj=0.0007) -> logDens=0.0007 -> paletteIdxNorm=0.0015
+console-store.ts:57     count=10000 (adj=0.0745) -> logDens=0.0719 -> paletteIdxNorm=0.1450
+console-store.ts:57     count=1000000 (adj=7.4544) -> logDens=2.1347 -> paletteIdxNorm=0.3048
+console-store.ts:57 [ColorGrading Debug] Frame 390 | Mode: 0 | Speed: 18.70 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 7.28e-5
+console-store.ts:57  -> paletteScale = 5.5926
+console-store.ts:57     count=100 (adj=0.0007) -> logDens=0.0007 -> paletteIdxNorm=0.0041
+console-store.ts:57     count=10000 (adj=0.0728) -> logDens=0.0703 -> paletteIdxNorm=0.3929
+console-store.ts:57     count=1000000 (adj=7.2788) -> logDens=2.1137 -> paletteIdxNorm=0.8211
+console-store.ts:57 [ColorGrading Debug] Frame 400 | Mode: 0 | Speed: 22.00 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 7.25e-5
+console-store.ts:57  -> paletteScale = 6.5760
+console-store.ts:57     count=100 (adj=0.0007) -> logDens=0.0007 -> paletteIdxNorm=0.0048
+console-store.ts:57     count=10000 (adj=0.0725) -> logDens=0.0700 -> paletteIdxNorm=0.4604
+console-store.ts:57     count=1000000 (adj=7.2517) -> logDens=2.1104 -> paletteIdxNorm=0.8781
+console-store.ts:57 [ColorGrading Debug] Frame 410 | Mode: 0 | Speed: 22.00 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 7.15e-5
+console-store.ts:57  -> paletteScale = 6.5760
+console-store.ts:57     count=100 (adj=0.0007) -> logDens=0.0007 -> paletteIdxNorm=0.0047
+console-store.ts:57     count=10000 (adj=0.0715) -> logDens=0.0690 -> paletteIdxNorm=0.4538
+console-store.ts:57     count=1000000 (adj=7.1451) -> logDens=2.0974 -> paletteIdxNorm=0.7926
+console-store.ts:57 [ColorGrading Debug] Frame 420 | Mode: 0 | Speed: 11.00 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 7.11e-5
+console-store.ts:57  -> paletteScale = 3.2980
+console-store.ts:57     count=100 (adj=0.0007) -> logDens=0.0007 -> paletteIdxNorm=0.0023
+console-store.ts:57     count=10000 (adj=0.0711) -> logDens=0.0687 -> paletteIdxNorm=0.2264
+console-store.ts:57     count=1000000 (adj=7.1073) -> logDens=2.0928 -> paletteIdxNorm=0.9019
+console-store.ts:57 [ColorGrading Debug] Frame 430 | Mode: 0 | Speed: 10.80 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 7.03e-5
+console-store.ts:57  -> paletteScale = 3.2384
+console-store.ts:57     count=100 (adj=0.0007) -> logDens=0.0007 -> paletteIdxNorm=0.0023
+console-store.ts:57     count=10000 (adj=0.0703) -> logDens=0.0680 -> paletteIdxNorm=0.2201
+console-store.ts:57     count=1000000 (adj=7.0315) -> logDens=2.0834 -> paletteIdxNorm=0.7468
+console-store.ts:57 [ColorGrading Debug] Frame 440 | Mode: 0 | Speed: 10.80 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 6.94e-5
+console-store.ts:57  -> paletteScale = 3.2384
+console-store.ts:57     count=100 (adj=0.0007) -> logDens=0.0007 -> paletteIdxNorm=0.0022
+console-store.ts:57     count=10000 (adj=0.0694) -> logDens=0.0671 -> paletteIdxNorm=0.2173
+console-store.ts:57     count=1000000 (adj=6.9404) -> logDens=2.0720 -> paletteIdxNorm=0.7098
+console-store.ts:57 [ColorGrading Debug] Frame 450 | Mode: 0 | Speed: 10.80 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 6.86e-5
+console-store.ts:57  -> paletteScale = 3.2384
+console-store.ts:57     count=100 (adj=0.0007) -> logDens=0.0007 -> paletteIdxNorm=0.0022
+console-store.ts:57     count=10000 (adj=0.0686) -> logDens=0.0663 -> paletteIdxNorm=0.2148
+console-store.ts:57     count=1000000 (adj=6.8573) -> logDens=2.0614 -> paletteIdxNorm=0.6758
+console-store.ts:57 [ColorGrading Debug] Frame 460 | Mode: 0 | Speed: 11.30 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 6.76e-5
+console-store.ts:57  -> paletteScale = 3.3874
+console-store.ts:57     count=100 (adj=0.0007) -> logDens=0.0007 -> paletteIdxNorm=0.0023
+console-store.ts:57     count=10000 (adj=0.0676) -> logDens=0.0655 -> paletteIdxNorm=0.2217
+console-store.ts:57     count=1000000 (adj=6.7650) -> logDens=2.0496 -> paletteIdxNorm=0.9429
+console-store.ts:57 [ColorGrading Debug] Frame 470 | Mode: 0 | Speed: 11.30 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 6.68e-5
+console-store.ts:57  -> paletteScale = 3.3874
+console-store.ts:57     count=100 (adj=0.0007) -> logDens=0.0007 -> paletteIdxNorm=0.0023
+console-store.ts:57     count=10000 (adj=0.0668) -> logDens=0.0647 -> paletteIdxNorm=0.2190
+console-store.ts:57     count=1000000 (adj=6.6787) -> logDens=2.0385 -> paletteIdxNorm=0.9051
+console-store.ts:57 [ColorGrading Debug] Frame 480 | Mode: 0 | Speed: 11.30 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 6.59e-5
+console-store.ts:57  -> paletteScale = 3.3874
+console-store.ts:57     count=100 (adj=0.0007) -> logDens=0.0007 -> paletteIdxNorm=0.0022
+console-store.ts:57     count=10000 (adj=0.0659) -> logDens=0.0638 -> paletteIdxNorm=0.2161
+console-store.ts:57     count=1000000 (adj=6.5870) -> logDens=2.0264 -> paletteIdxNorm=0.8644
+console-store.ts:57 [ColorGrading Debug] Frame 490 | Mode: 0 | Speed: 11.30 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 6.48e-5
+console-store.ts:57  -> paletteScale = 3.3874
+console-store.ts:57     count=100 (adj=0.0006) -> logDens=0.0006 -> paletteIdxNorm=0.0022
+console-store.ts:57     count=10000 (adj=0.0648) -> logDens=0.0628 -> paletteIdxNorm=0.2128
+console-store.ts:57     count=1000000 (adj=6.4830) -> logDens=2.0126 -> paletteIdxNorm=0.8176
+console-store.ts:57 [ColorGrading Debug] Frame 500 | Mode: 0 | Speed: 11.30 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 6.36e-5
+console-store.ts:57  -> paletteScale = 3.3874
+console-store.ts:57     count=100 (adj=0.0006) -> logDens=0.0006 -> paletteIdxNorm=0.0022
+console-store.ts:57     count=10000 (adj=0.0636) -> logDens=0.0616 -> paletteIdxNorm=0.2088
+console-store.ts:57     count=1000000 (adj=6.3569) -> logDens=1.9956 -> paletteIdxNorm=0.7600
+console-store.ts:57 [ColorGrading Debug] Frame 510 | Mode: 0 | Speed: 11.30 | Phase: 0.00 | Vibrancy: 3.00 | AvgInv: 6.23e-5
+console-store.ts:57  -> paletteScale = 3.3874
+console-store.ts:57     count=100 (adj=0.0006) -> logDens=0.0006 -> paletteIdxNorm=0.0021
+console-store.ts:57     count=10000 (adj=0.0623) -> logDens=0.0604 -> paletteIdxNorm=0.2047
+console-store.ts:57     count=1000000 (adj=6.2299) -> logDens=1.9782 -> paletteIdxNorm=0.7010
+console-store.ts:57 [ColorGrading Debug] Frame 520 | Mode: 0 | Speed: 11.30 | Phase: 0.25 | Vibrancy: 3.00 | AvgInv: 6.10e-5
+console-store.ts:57  -> paletteScale = 3.3874
+console-store.ts:57     count=100 (adj=0.0006) -> logDens=0.0006 -> paletteIdxNorm=0.2521
+console-store.ts:57     count=10000 (adj=0.0610) -> logDens=0.0592 -> paletteIdxNorm=0.4506
+console-store.ts:57     count=1000000 (adj=6.1013) -> logDens=1.9603 -> paletteIdxNorm=0.8902
+console-store.ts:57 [ColorGrading Debug] Frame 530 | Mode: 0 | Speed: 11.30 | Phase: 0.30 | Vibrancy: 3.00 | AvgInv: 5.94e-5
+console-store.ts:57  -> paletteScale = 3.3874
+console-store.ts:57     count=100 (adj=0.0006) -> logDens=0.0006 -> paletteIdxNorm=0.3020
+console-store.ts:57     count=10000 (adj=0.0594) -> logDens=0.0577 -> paletteIdxNorm=0.4954
+console-store.ts:57     count=1000000 (adj=5.9380) -> logDens=1.9370 -> paletteIdxNorm=0.8614
+console-store.ts:57 [ColorGrading Debug] Frame 540 | Mode: 0 | Speed: 11.30 | Phase: 0.40 | Vibrancy: 3.00 | AvgInv: 5.80e-5
+console-store.ts:57  -> paletteScale = 3.3874
+console-store.ts:57     count=100 (adj=0.0006) -> logDens=0.0006 -> paletteIdxNorm=0.4020
+console-store.ts:57     count=10000 (adj=0.0580) -> logDens=0.0563 -> paletteIdxNorm=0.5909
+console-store.ts:57     count=1000000 (adj=5.7963) -> logDens=1.9164 -> paletteIdxNorm=0.8916
+console-store.ts:57 [ColorGrading Debug] Frame 550 | Mode: 0 | Speed: 11.30 | Phase: 0.55 | Vibrancy: 3.00 | AvgInv: 5.65e-5
+console-store.ts:57  -> paletteScale = 3.3874
+console-store.ts:57     count=100 (adj=0.0006) -> logDens=0.0006 -> paletteIdxNorm=0.5519
+console-store.ts:57     count=10000 (adj=0.0565) -> logDens=0.0550 -> paletteIdxNorm=0.7362
+console-store.ts:57     count=1000000 (adj=5.6514) -> logDens=1.8948 -> paletteIdxNorm=0.9685
+console-store.ts:57 [ColorGrading Debug] Frame 560 | Mode: 0 | Speed: 11.30 | Phase: 0.60 | Vibrancy: 3.00 | AvgInv: 5.53e-5
+console-store.ts:57  -> paletteScale = 3.3874
+console-store.ts:57     count=100 (adj=0.0006) -> logDens=0.0006 -> paletteIdxNorm=0.6019
+console-store.ts:57     count=10000 (adj=0.0553) -> logDens=0.0539 -> paletteIdxNorm=0.7825
+console-store.ts:57     count=1000000 (adj=5.5341) -> logDens=1.8770 -> paletteIdxNorm=0.9583
+console-store.ts:57 [ColorGrading Debug] Frame 570 | Mode: 0 | Speed: 11.30 | Phase: 0.65 | Vibrancy: 3.00 | AvgInv: 5.43e-5
+console-store.ts:57  -> paletteScale = 3.3874
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.6518
+console-store.ts:57     count=10000 (adj=0.0543) -> logDens=0.0529 -> paletteIdxNorm=0.8292
+console-store.ts:57     count=1000000 (adj=5.4324) -> logDens=1.8613 -> paletteIdxNorm=0.9551
+console-store.ts:57 [ColorGrading Debug] Frame 580 | Mode: 0 | Speed: 11.30 | Phase: 0.75 | Vibrancy: 3.00 | AvgInv: 5.31e-5
+console-store.ts:57  -> paletteScale = 3.3874
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.7518
+console-store.ts:57     count=10000 (adj=0.0531) -> logDens=0.0517 -> paletteIdxNorm=0.9253
+console-store.ts:57     count=1000000 (adj=5.3109) -> logDens=1.8423 -> paletteIdxNorm=0.9905
+console-store.ts:57 [ColorGrading Debug] Frame 590 | Mode: 0 | Speed: 11.30 | Phase: 0.80 | Vibrancy: 3.00 | AvgInv: 5.20e-5
+console-store.ts:57  -> paletteScale = 3.3874
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.8018
+console-store.ts:57     count=10000 (adj=0.0520) -> logDens=0.0506 -> paletteIdxNorm=0.9716
+console-store.ts:57     count=1000000 (adj=5.1951) -> logDens=1.8238 -> paletteIdxNorm=0.9778
+console-store.ts:57 [ColorGrading Debug] Frame 600 | Mode: 0 | Speed: 11.30 | Phase: 0.80 | Vibrancy: 3.00 | AvgInv: 5.09e-5
+console-store.ts:57  -> paletteScale = 3.3874
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.8017
+console-store.ts:57     count=10000 (adj=0.0509) -> logDens=0.0496 -> paletteIdxNorm=0.9681
+console-store.ts:57     count=1000000 (adj=5.0889) -> logDens=1.8065 -> paletteIdxNorm=0.9192
+console-store.ts:57 [ColorGrading Debug] Frame 610 | Mode: 0 | Speed: 11.30 | Phase: 0.70 | Vibrancy: 3.00 | AvgInv: 4.99e-5
+console-store.ts:57  -> paletteScale = 3.3874
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.7017
+console-store.ts:57     count=10000 (adj=0.0499) -> logDens=0.0487 -> paletteIdxNorm=0.8651
+console-store.ts:57     count=1000000 (adj=4.9946) -> logDens=1.7909 -> paletteIdxNorm=0.7664
+console-store.ts:57 [ColorGrading Debug] Frame 620 | Mode: 0 | Speed: 11.30 | Phase: 0.20 | Vibrancy: 3.00 | AvgInv: 4.99e-5
+console-store.ts:57  -> paletteScale = 3.3874
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.2017
+console-store.ts:57     count=10000 (adj=0.0499) -> logDens=0.0487 -> paletteIdxNorm=0.3651
+console-store.ts:57     count=1000000 (adj=4.9946) -> logDens=1.7909 -> paletteIdxNorm=0.2664
+console-store.ts:57 [ColorGrading Debug] Frame 630 | Mode: 0 | Speed: 5.50 | Phase: 0.25 | Vibrancy: 3.00 | AvgInv: 4.99e-5
+console-store.ts:57  -> paletteScale = 1.6590
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.2508
+console-store.ts:57     count=10000 (adj=0.0499) -> logDens=0.0487 -> paletteIdxNorm=0.3309
+console-store.ts:57     count=1000000 (adj=4.9946) -> logDens=1.7909 -> paletteIdxNorm=0.2210
+console-store.ts:57 [ColorGrading Debug] Frame 640 | Mode: 0 | Speed: 4.50 | Phase: 0.25 | Vibrancy: 3.00 | AvgInv: 4.99e-5
+console-store.ts:57  -> paletteScale = 1.3610
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.2507
+console-store.ts:57     count=10000 (adj=0.0499) -> logDens=0.0487 -> paletteIdxNorm=0.3163
+console-store.ts:57     count=1000000 (adj=4.9946) -> logDens=1.7909 -> paletteIdxNorm=0.6874
+console-store.ts:57 [ColorGrading Debug] Frame 650 | Mode: 0 | Speed: 23.10 | Phase: 0.25 | Vibrancy: 1.70 | AvgInv: 4.99e-5
+console-store.ts:57  -> paletteScale = 6.9038
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.2534
+console-store.ts:57     count=10000 (adj=0.0499) -> logDens=0.0487 -> paletteIdxNorm=0.5865
+console-store.ts:57     count=1000000 (adj=4.9946) -> logDens=1.7909 -> paletteIdxNorm=0.6137
+console-store.ts:57 [ColorGrading Debug] Frame 660 | Mode: 0 | Speed: 23.10 | Phase: 0.25 | Vibrancy: 0.10 | AvgInv: 4.99e-5
+console-store.ts:57  -> paletteScale = 6.9038
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.2534
+console-store.ts:57     count=10000 (adj=0.0499) -> logDens=0.0487 -> paletteIdxNorm=0.5865
+console-store.ts:57     count=1000000 (adj=4.9946) -> logDens=1.7909 -> paletteIdxNorm=0.6137
+console-store.ts:57 [ColorGrading Debug] Frame 670 | Mode: 0 | Speed: 23.10 | Phase: 0.25 | Vibrancy: 0.55 | AvgInv: 4.99e-5
+console-store.ts:57  -> paletteScale = 6.9038
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.2534
+console-store.ts:57     count=10000 (adj=0.0499) -> logDens=0.0487 -> paletteIdxNorm=0.5865
+console-store.ts:57     count=1000000 (adj=4.9946) -> logDens=1.7909 -> paletteIdxNorm=0.6137
+console-store.ts:57 [ColorGrading Debug] Frame 680 | Mode: 0 | Speed: 23.10 | Phase: 0.25 | Vibrancy: 1.05 | AvgInv: 4.99e-5
+console-store.ts:57  -> paletteScale = 6.9038
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.2534
+console-store.ts:57     count=10000 (adj=0.0499) -> logDens=0.0487 -> paletteIdxNorm=0.5865
+console-store.ts:57     count=1000000 (adj=4.9946) -> logDens=1.7909 -> paletteIdxNorm=0.6137
+console-store.ts:57 [ColorGrading Debug] Frame 690 | Mode: 0 | Speed: 23.10 | Phase: 0.25 | Vibrancy: 1.55 | AvgInv: 4.99e-5
+console-store.ts:57  -> paletteScale = 6.9038
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.2534
+console-store.ts:57     count=10000 (adj=0.0499) -> logDens=0.0487 -> paletteIdxNorm=0.5865
+console-store.ts:57     count=1000000 (adj=4.9946) -> logDens=1.7909 -> paletteIdxNorm=0.6137
+console-store.ts:57 [ColorGrading Debug] Frame 700 | Mode: 0 | Speed: 10.30 | Phase: 0.25 | Vibrancy: 1.80 | AvgInv: 4.99e-5
+console-store.ts:57  -> paletteScale = 3.0894
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.2515
+console-store.ts:57     count=10000 (adj=0.0499) -> logDens=0.0487 -> paletteIdxNorm=0.4006
+console-store.ts:57     count=1000000 (adj=4.9946) -> logDens=1.7909 -> paletteIdxNorm=0.7827
+console-store.ts:57 [ColorGrading Debug] Frame 710 | Mode: 0 | Speed: 6.10 | Phase: 0.25 | Vibrancy: 1.80 | AvgInv: 4.99e-5
+console-store.ts:57  -> paletteScale = 1.8378
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.2509
+console-store.ts:57     count=10000 (adj=0.0499) -> logDens=0.0487 -> paletteIdxNorm=0.3396
+console-store.ts:57     count=1000000 (adj=4.9946) -> logDens=1.7909 -> paletteIdxNorm=0.5412
+console-store.ts:57 [ColorGrading Debug] Frame 720 | Mode: 0 | Speed: 11.90 | Phase: 0.25 | Vibrancy: 1.80 | AvgInv: 4.99e-5
+console-store.ts:57  -> paletteScale = 3.5662
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.2518
+console-store.ts:57     count=10000 (adj=0.0499) -> logDens=0.0487 -> paletteIdxNorm=0.4238
+console-store.ts:57     count=1000000 (adj=4.9946) -> logDens=1.7909 -> paletteIdxNorm=0.6366
+console-store.ts:57 [ColorGrading Debug] Frame 730 | Mode: 0 | Speed: 19.50 | Phase: 0.25 | Vibrancy: 1.80 | AvgInv: 4.99e-5
+console-store.ts:57  -> paletteScale = 5.8310
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.2529
+console-store.ts:57     count=10000 (adj=0.0499) -> logDens=0.0487 -> paletteIdxNorm=0.5342
+console-store.ts:57     count=1000000 (adj=4.9946) -> logDens=1.7909 -> paletteIdxNorm=0.6925
+console-store.ts:57 [ColorGrading Debug] Frame 740 | Mode: 0 | Speed: 24.10 | Phase: 0.25 | Vibrancy: 1.80 | AvgInv: 4.99e-5
+console-store.ts:57  -> paletteScale = 7.2018
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.2536
+console-store.ts:57     count=10000 (adj=0.0499) -> logDens=0.0487 -> paletteIdxNorm=0.6010
+console-store.ts:57     count=1000000 (adj=4.9946) -> logDens=1.7909 -> paletteIdxNorm=0.1474
+console-store.ts:57 [ColorGrading Debug] Frame 750 | Mode: 0 | Speed: 25.50 | Phase: 0.25 | Vibrancy: 1.80 | AvgInv: 4.99e-5
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.2538
+console-store.ts:57     count=10000 (adj=0.0499) -> logDens=0.0487 -> paletteIdxNorm=0.6213
+console-store.ts:57     count=1000000 (adj=4.9946) -> logDens=1.7909 -> paletteIdxNorm=0.8946
+console-store.ts:57 [ColorGrading Debug] Frame 760 | Mode: 0 | Speed: 25.50 | Phase: 0.25 | Vibrancy: 1.80 | AvgInv: 4.99e-5
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.2538
+console-store.ts:57     count=10000 (adj=0.0499) -> logDens=0.0487 -> paletteIdxNorm=0.6213
+console-store.ts:57     count=1000000 (adj=4.9946) -> logDens=1.7909 -> paletteIdxNorm=0.8946
+console-store.ts:57 [ColorGrading Debug] Frame 10 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 1.74e-2
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.1738) -> logDens=0.1603 -> paletteIdxNorm=0.8211
+console-store.ts:57     count=10000 (adj=17.3834) -> logDens=2.9114 -> paletteIdxNorm=0.7823
+console-store.ts:57     count=1000000 (adj=1738.3388) -> logDens=7.4613 -> paletteIdxNorm=0.4473
+console-store.ts:57 [ColorGrading Debug] Frame 20 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 9.40e-3
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.0940) -> logDens=0.0899 -> paletteIdxNorm=0.2848
+console-store.ts:57     count=10000 (adj=9.4041) -> logDens=2.3422 -> paletteIdxNorm=0.4452
+console-store.ts:57     count=1000000 (adj=940.4128) -> logDens=6.8474 -> paletteIdxNorm=0.7702
+console-store.ts:57 [ColorGrading Debug] Frame 10 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 5.44e-2
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.5440) -> logDens=0.4344 -> paletteIdxNorm=0.9096
+console-store.ts:57     count=10000 (adj=54.4023) -> logDens=4.0146 -> paletteIdxNorm=0.1874
+console-store.ts:57     count=1000000 (adj=5440.2303) -> logDens=8.6018 -> paletteIdxNorm=0.1368
+console-store.ts:57 [ColorGrading Debug] Frame 20 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 2.61e-2
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.2611) -> logDens=0.2319 -> paletteIdxNorm=0.3672
+console-store.ts:57     count=10000 (adj=26.1051) -> logDens=3.2997 -> paletteIdxNorm=0.7406
+console-store.ts:57     count=1000000 (adj=2610.5134) -> logDens=7.8677 -> paletteIdxNorm=0.5439
+console-store.ts:57 [ColorGrading Debug] Frame 30 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 1.55e-2
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.1549) -> logDens=0.1440 -> paletteIdxNorm=0.6974
+console-store.ts:57     count=10000 (adj=15.4928) -> logDens=2.8029 -> paletteIdxNorm=0.9555
+console-store.ts:57     count=1000000 (adj=1549.2830) -> logDens=7.3462 -> paletteIdxNorm=0.5706
+console-store.ts:57 [ColorGrading Debug] Frame 40 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 1.05e-2
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.1051) -> logDens=0.0999 -> paletteIdxNorm=0.3615
+console-store.ts:57     count=10000 (adj=10.5114) -> logDens=2.4433 -> paletteIdxNorm=0.2158
+console-store.ts:57     count=1000000 (adj=1051.1359) -> logDens=6.9586 -> paletteIdxNorm=0.6174
+console-store.ts:57 [ColorGrading Debug] Frame 50 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 7.83e-3
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.0783) -> logDens=0.0754 -> paletteIdxNorm=0.1745
+console-store.ts:57     count=10000 (adj=7.8315) -> logDens=2.1783 -> paletteIdxNorm=0.1967
+console-store.ts:57     count=1000000 (adj=783.1540) -> logDens=6.6646 -> paletteIdxNorm=0.3776
+console-store.ts:57 [ColorGrading Debug] Frame 60 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 6.12e-3
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.0612) -> logDens=0.0594 -> paletteIdxNorm=0.0524
+console-store.ts:57     count=10000 (adj=6.1173) -> logDens=1.9625 -> paletteIdxNorm=0.5525
+console-store.ts:57     count=1000000 (adj=611.7341) -> logDens=6.4179 -> paletteIdxNorm=0.4982
+console-store.ts:57 [ColorGrading Debug] Frame 70 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 4.85e-3
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.0485) -> logDens=0.0474 -> paletteIdxNorm=0.9612
+console-store.ts:57     count=10000 (adj=4.8547) -> logDens=1.7672 -> paletteIdxNorm=0.0646
+console-store.ts:57     count=1000000 (adj=485.4701) -> logDens=6.1872 -> paletteIdxNorm=0.7401
+console-store.ts:57 [ColorGrading Debug] Frame 80 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 4.01e-3
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.0401) -> logDens=0.0393 -> paletteIdxNorm=0.8998
+console-store.ts:57     count=10000 (adj=4.0128) -> logDens=1.6120 -> paletteIdxNorm=0.8818
+console-store.ts:57     count=1000000 (adj=401.2782) -> logDens=5.9971 -> paletteIdxNorm=0.2922
+console-store.ts:57 [ColorGrading Debug] Frame 10 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 3.39e-3
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.0339) -> logDens=0.0333 -> paletteIdxNorm=0.8539
+console-store.ts:57     count=10000 (adj=3.3888) -> logDens=1.4790 -> paletteIdxNorm=0.8689
+console-store.ts:57     count=1000000 (adj=338.8773) -> logDens=5.8286 -> paletteIdxNorm=0.0080
+console-store.ts:57 [ColorGrading Debug] Frame 20 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 1.79e-3
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.0179) -> logDens=0.0177 -> paletteIdxNorm=0.7352
+console-store.ts:57     count=10000 (adj=1.7898) -> logDens=1.0260 -> paletteIdxNorm=0.4169
+console-store.ts:57     count=1000000 (adj=178.9798) -> logDens=5.1928 -> paletteIdxNorm=0.1643
+console-store.ts:57 [ColorGrading Debug] Frame 10 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 9.87e-4
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.0099) -> logDens=0.0098 -> paletteIdxNorm=0.6749
+console-store.ts:57     count=10000 (adj=0.9873) -> logDens=0.6868 -> paletteIdxNorm=0.8327
+console-store.ts:57     count=1000000 (adj=98.7335) -> logDens=4.6025 -> paletteIdxNorm=0.6665
+console-store.ts:57 [ColorGrading Debug] Frame 20 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 4.89e-4
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.0049) -> logDens=0.0049 -> paletteIdxNorm=0.6372
+console-store.ts:57     count=10000 (adj=0.4890) -> logDens=0.3981 -> paletteIdxNorm=0.6330
+console-store.ts:57     count=1000000 (adj=48.8966) -> logDens=3.9100 -> paletteIdxNorm=0.3899
+console-store.ts:57 [ColorGrading Debug] Frame 10 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 1.02e-3
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.0102) -> logDens=0.0102 -> paletteIdxNorm=0.6775
+console-store.ts:57     count=10000 (adj=1.0227) -> logDens=0.7045 -> paletteIdxNorm=0.9672
+console-store.ts:57     count=1000000 (adj=102.2738) -> logDens=4.6374 -> paletteIdxNorm=0.9322
+console-store.ts:57 [ColorGrading Debug] Frame 20 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 5.20e-4
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.0052) -> logDens=0.0052 -> paletteIdxNorm=0.6395
+console-store.ts:57     count=10000 (adj=0.5197) -> logDens=0.4185 -> paletteIdxNorm=0.7884
+console-store.ts:57     count=1000000 (adj=51.9650) -> logDens=3.9696 -> paletteIdxNorm=0.8446
+console-store.ts:57 [ColorGrading Debug] Frame 30 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 3.21e-4
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.0032) -> logDens=0.0032 -> paletteIdxNorm=0.6244
+console-store.ts:57     count=10000 (adj=0.3213) -> logDens=0.2786 -> paletteIdxNorm=0.7227
+console-store.ts:57     count=1000000 (adj=32.1286) -> logDens=3.5004 -> paletteIdxNorm=0.2695
+console-store.ts:57 [ColorGrading Debug] Frame 40 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 2.32e-4
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.0023) -> logDens=0.0023 -> paletteIdxNorm=0.6177
+console-store.ts:57     count=10000 (adj=0.2321) -> logDens=0.2087 -> paletteIdxNorm=0.1903
+console-store.ts:57     count=1000000 (adj=23.2104) -> logDens=3.1868 -> paletteIdxNorm=0.8801
+console-store.ts:57 [ColorGrading Debug] Frame 50 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 1.81e-4
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.0018) -> logDens=0.0018 -> paletteIdxNorm=0.6138
+console-store.ts:57     count=10000 (adj=0.1813) -> logDens=0.1666 -> paletteIdxNorm=0.8694
+console-store.ts:57     count=1000000 (adj=18.1290) -> logDens=2.9512 -> paletteIdxNorm=0.0853
+console-store.ts:57 [ColorGrading Debug] Frame 60 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 1.51e-4
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.0015) -> logDens=0.0015 -> paletteIdxNorm=0.6115
+console-store.ts:57     count=10000 (adj=0.1508) -> logDens=0.1405 -> paletteIdxNorm=0.6703
+console-store.ts:57     count=1000000 (adj=15.0827) -> logDens=2.7777 -> paletteIdxNorm=0.7636
+console-store.ts:57 [ColorGrading Debug] Frame 70 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 1.31e-4
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.0013) -> logDens=0.0013 -> paletteIdxNorm=0.6100
+console-store.ts:57     count=10000 (adj=0.1308) -> logDens=0.1230 -> paletteIdxNorm=0.5368
+console-store.ts:57     count=1000000 (adj=13.0840) -> logDens=2.6450 -> paletteIdxNorm=0.7525
+console-store.ts:57 [ColorGrading Debug] Frame 80 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 1.12e-4
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.0011) -> logDens=0.0011 -> paletteIdxNorm=0.6086
+console-store.ts:57     count=10000 (adj=0.1124) -> logDens=0.1066 -> paletteIdxNorm=0.4119
+console-store.ts:57     count=1000000 (adj=11.2443) -> logDens=2.5051 -> paletteIdxNorm=0.6861
+console-store.ts:57 [ColorGrading Debug] Frame 90 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 9.90e-5
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.0010) -> logDens=0.0010 -> paletteIdxNorm=0.6075
+console-store.ts:57     count=10000 (adj=0.0990) -> logDens=0.0944 -> paletteIdxNorm=0.3192
+console-store.ts:57     count=1000000 (adj=9.9000) -> logDens=2.3888 -> paletteIdxNorm=0.8000
+console-store.ts:57 [ColorGrading Debug] Frame 100 | Mode: 0 | Speed: 25.50 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 8.85e-5
+console-store.ts:57  -> paletteScale = 7.6190
+console-store.ts:57     count=100 (adj=0.0009) -> logDens=0.0009 -> paletteIdxNorm=0.6067
+console-store.ts:57     count=10000 (adj=0.0885) -> logDens=0.0848 -> paletteIdxNorm=0.2460
+console-store.ts:57     count=1000000 (adj=8.8489) -> logDens=2.2874 -> paletteIdxNorm=0.0274
+console-store.ts:57 [ColorGrading Debug] Frame 110 | Mode: 0 | Speed: 4.60 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 8.45e-5
+console-store.ts:57  -> paletteScale = 1.3908
+console-store.ts:57     count=100 (adj=0.0008) -> logDens=0.0008 -> paletteIdxNorm=0.6012
+console-store.ts:57     count=10000 (adj=0.0845) -> logDens=0.0811 -> paletteIdxNorm=0.7128
+console-store.ts:57     count=1000000 (adj=8.4471) -> logDens=2.2457 -> paletteIdxNorm=0.7233
+console-store.ts:57 [ColorGrading Debug] Frame 120 | Mode: 0 | Speed: 3.60 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 8.21e-5
+console-store.ts:57  -> paletteScale = 1.0928
+console-store.ts:57     count=100 (adj=0.0008) -> logDens=0.0008 -> paletteIdxNorm=0.6009
+console-store.ts:57     count=10000 (adj=0.0821) -> logDens=0.0789 -> paletteIdxNorm=0.6862
+console-store.ts:57     count=1000000 (adj=8.2068) -> logDens=2.2199 -> paletteIdxNorm=0.0259
+console-store.ts:57 [ColorGrading Debug] Frame 130 | Mode: 0 | Speed: 2.80 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 7.87e-5
+console-store.ts:57  -> paletteScale = 0.8544
+console-store.ts:57     count=100 (adj=0.0008) -> logDens=0.0008 -> paletteIdxNorm=0.6007
+console-store.ts:57     count=10000 (adj=0.0787) -> logDens=0.0757 -> paletteIdxNorm=0.6647
+console-store.ts:57     count=1000000 (adj=7.8672) -> logDens=2.1824 -> paletteIdxNorm=0.4646
+console-store.ts:57 [ColorGrading Debug] Frame 140 | Mode: 0 | Speed: 0.80 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 7.59e-5
+console-store.ts:57  -> paletteScale = 0.2584
+console-store.ts:57     count=100 (adj=0.0008) -> logDens=0.0008 -> paletteIdxNorm=0.6002
+console-store.ts:57     count=10000 (adj=0.0759) -> logDens=0.0731 -> paletteIdxNorm=0.6189
+console-store.ts:57     count=1000000 (adj=7.5859) -> logDens=2.1501 -> paletteIdxNorm=0.1556
+console-store.ts:57 [ColorGrading Debug] Frame 150 | Mode: 0 | Speed: 0.80 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 7.31e-5
+console-store.ts:57  -> paletteScale = 0.2584
+console-store.ts:57     count=100 (adj=0.0007) -> logDens=0.0007 -> paletteIdxNorm=0.6002
+console-store.ts:57     count=10000 (adj=0.0731) -> logDens=0.0705 -> paletteIdxNorm=0.6182
+console-store.ts:57     count=1000000 (adj=7.3094) -> logDens=2.1174 -> paletteIdxNorm=0.1471
+console-store.ts:57 [ColorGrading Debug] Frame 160 | Mode: 0 | Speed: 0.80 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 7.00e-5
+console-store.ts:57  -> paletteScale = 0.2584
+console-store.ts:57     count=100 (adj=0.0007) -> logDens=0.0007 -> paletteIdxNorm=0.6002
+console-store.ts:57     count=10000 (adj=0.0700) -> logDens=0.0677 -> paletteIdxNorm=0.6175
+console-store.ts:57     count=1000000 (adj=7.0043) -> logDens=2.0800 -> paletteIdxNorm=0.1375
+console-store.ts:57 [ColorGrading Debug] Frame 170 | Mode: 0 | Speed: 0.80 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 6.68e-5
+console-store.ts:57  -> paletteScale = 0.2584
+console-store.ts:57     count=100 (adj=0.0007) -> logDens=0.0007 -> paletteIdxNorm=0.6002
+console-store.ts:57     count=10000 (adj=0.0668) -> logDens=0.0647 -> paletteIdxNorm=0.6167
+console-store.ts:57     count=1000000 (adj=6.6799) -> logDens=2.0386 -> paletteIdxNorm=0.1268
+console-store.ts:57 [ColorGrading Debug] Frame 180 | Mode: 0 | Speed: 0.80 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 6.36e-5
+console-store.ts:57  -> paletteScale = 0.2584
+console-store.ts:57     count=100 (adj=0.0006) -> logDens=0.0006 -> paletteIdxNorm=0.6002
+console-store.ts:57     count=10000 (adj=0.0636) -> logDens=0.0616 -> paletteIdxNorm=0.6159
+console-store.ts:57     count=1000000 (adj=6.3573) -> logDens=1.9957 -> paletteIdxNorm=0.1157
+console-store.ts:57 [ColorGrading Debug] Frame 190 | Mode: 0 | Speed: 0.80 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 5.99e-5
+console-store.ts:57  -> paletteScale = 0.2584
+console-store.ts:57     count=100 (adj=0.0006) -> logDens=0.0006 -> paletteIdxNorm=0.6002
+console-store.ts:57     count=10000 (adj=0.0599) -> logDens=0.0581 -> paletteIdxNorm=0.6150
+console-store.ts:57     count=1000000 (adj=5.9866) -> logDens=1.9440 -> paletteIdxNorm=0.1023
+console-store.ts:57 [ColorGrading Debug] Frame 200 | Mode: 0 | Speed: 0.80 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 5.65e-5
+console-store.ts:57  -> paletteScale = 0.2584
+console-store.ts:57     count=100 (adj=0.0006) -> logDens=0.0006 -> paletteIdxNorm=0.6001
+console-store.ts:57     count=10000 (adj=0.0565) -> logDens=0.0550 -> paletteIdxNorm=0.6142
+console-store.ts:57     count=1000000 (adj=5.6494) -> logDens=1.8945 -> paletteIdxNorm=0.0895
+console-store.ts:57 [ColorGrading Debug] Frame 210 | Mode: 0 | Speed: 0.80 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 5.32e-5
+console-store.ts:57  -> paletteScale = 0.2584
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.6001
+console-store.ts:57     count=10000 (adj=0.0532) -> logDens=0.0519 -> paletteIdxNorm=0.6134
+console-store.ts:57     count=1000000 (adj=5.3226) -> logDens=1.8441 -> paletteIdxNorm=0.0765
+console-store.ts:57 [ColorGrading Debug] Frame 220 | Mode: 0 | Speed: 0.80 | Phase: 0.60 | Vibrancy: 1.80 | AvgInv: 4.98e-5
+console-store.ts:57  -> paletteScale = 0.2584
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.6001
+console-store.ts:57     count=10000 (adj=0.0498) -> logDens=0.0486 -> paletteIdxNorm=0.6126
+console-store.ts:57     count=1000000 (adj=4.9798) -> logDens=1.7884 -> paletteIdxNorm=0.0621
+console-store.ts:57 [ColorGrading Debug] Frame 230 | Mode: 0 | Speed: 0.80 | Phase: 0.30 | Vibrancy: 1.80 | AvgInv: 4.98e-5
+console-store.ts:57  -> paletteScale = 0.2584
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.3001
+console-store.ts:57     count=10000 (adj=0.0498) -> logDens=0.0486 -> paletteIdxNorm=0.3126
+console-store.ts:57     count=1000000 (adj=4.9798) -> logDens=1.7884 -> paletteIdxNorm=0.7621
+console-store.ts:57 [ColorGrading Debug] Frame 240 | Mode: 0 | Speed: 0.80 | Phase: 0.75 | Vibrancy: 1.80 | AvgInv: 4.98e-5
+console-store.ts:57  -> paletteScale = 0.2584
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.7501
+console-store.ts:57     count=10000 (adj=0.0498) -> logDens=0.0486 -> paletteIdxNorm=0.7626
+console-store.ts:57     count=1000000 (adj=4.9798) -> logDens=1.7884 -> paletteIdxNorm=0.2121
+console-store.ts:57 [ColorGrading Debug] Frame 250 | Mode: 0 | Speed: 6.50 | Phase: 0.15 | Vibrancy: 1.80 | AvgInv: 4.98e-5
+console-store.ts:57  -> paletteScale = 1.9570
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.1510
+console-store.ts:57     count=10000 (adj=0.0498) -> logDens=0.0486 -> paletteIdxNorm=0.2451
+console-store.ts:57     count=1000000 (adj=4.9798) -> logDens=1.7884 -> paletteIdxNorm=0.6499
+console-store.ts:57 [ColorGrading Debug] Frame 260 | Mode: 0 | Speed: 11.90 | Phase: 0.15 | Vibrancy: 1.80 | AvgInv: 4.98e-5
+console-store.ts:57  -> paletteScale = 3.5662
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.1518
+console-store.ts:57     count=10000 (adj=0.0498) -> logDens=0.0486 -> paletteIdxNorm=0.3233
+console-store.ts:57     count=1000000 (adj=4.9798) -> logDens=1.7884 -> paletteIdxNorm=0.5277
+console-store.ts:57 [ColorGrading Debug] Frame 270 | Mode: 0 | Speed: 15.30 | Phase: 0.15 | Vibrancy: 1.80 | AvgInv: 4.98e-5
+console-store.ts:57  -> paletteScale = 4.5794
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.1523
+console-store.ts:57     count=10000 (adj=0.0498) -> logDens=0.0486 -> paletteIdxNorm=0.3725
+console-store.ts:57     count=1000000 (adj=4.9798) -> logDens=1.7884 -> paletteIdxNorm=0.3397
+console-store.ts:57 [ColorGrading Debug] Frame 280 | Mode: 0 | Speed: 26.20 | Phase: 0.15 | Vibrancy: 1.80 | AvgInv: 4.98e-5
+console-store.ts:57  -> paletteScale = 7.8276
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.1539
+console-store.ts:57     count=10000 (adj=0.0498) -> logDens=0.0486 -> paletteIdxNorm=0.5304
+console-store.ts:57     count=1000000 (adj=4.9798) -> logDens=1.7884 -> paletteIdxNorm=0.1487
+console-store.ts:57 [ColorGrading Debug] Frame 290 | Mode: 0 | Speed: 17.70 | Phase: 0.15 | Vibrancy: 1.80 | AvgInv: 4.98e-5
+console-store.ts:57  -> paletteScale = 5.2946
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.1526
+console-store.ts:57     count=10000 (adj=0.0498) -> logDens=0.0486 -> paletteIdxNorm=0.4073
+console-store.ts:57     count=1000000 (adj=4.9798) -> logDens=1.7884 -> paletteIdxNorm=0.6188
+console-store.ts:57 [ColorGrading Debug] Frame 300 | Mode: 0 | Speed: 10.40 | Phase: 0.15 | Vibrancy: 1.80 | AvgInv: 4.98e-5
+console-store.ts:57  -> paletteScale = 3.1192
+console-store.ts:57     count=100 (adj=0.0005) -> logDens=0.0005 -> paletteIdxNorm=0.1516
+console-store.ts:57     count=10000 (adj=0.0498) -> logDens=0.0486 -> paletteIdxNorm=0.3016
+console-store.ts:57     count=1000000 (adj=4.9798) -> logDens=1.7884 -> paletteIdxNorm=0.7283

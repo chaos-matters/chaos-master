@@ -169,42 +169,91 @@ export function createColorGradingPipeline(
     let finalAb = vec2f(texColorAb)
     if (uniforms.paletteEntryCount > i32(0) && uniforms.vibrancy > f32(0)) {
       const paletteBuffer = bindGroupLayout.$.paletteBuffer
-      const logDensity = clamp(log(add(count, f32(1))), f32(0), f32(10))
+      const logDensity = clamp(log(add(adjustedCount, f32(1))), f32(0), f32(10))
       const paletteScale = add(
         f32(0.02),
         mul(uniforms.paletteSpeed, f32(0.298)),
       )
 
       let paletteAb = vec2f(0)
+      let densityInput = f32(0)
       if (uniforms.paletteMode === i32(0)) {
-        // Mode 0: density-shift — palettePhase shifts the density→palette mapping
-        const logDensityNorm = fract(
-          add(mul(logDensity, paletteScale), uniforms.palettePhase),
-        )
-        const idx = i32(mul(f32(uniforms.paletteEntryCount), logDensityNorm))
-        const clampedIdx = clamp(
-          idx,
-          i32(0),
-          sub(uniforms.paletteEntryCount, i32(1)),
-        )
-        const entry = paletteBuffer[clampedIdx]!
-        paletteAb = vec2f(entry.a, entry.b)
+        densityInput = add(mul(logDensity, paletteScale), uniforms.palettePhase)
       } else {
-        // Mode 1: flam3 hue rotation — rotate OkLab a/b chroma by palettePhase * 2π
-        const logDensityNorm = fract(mul(logDensity, paletteScale))
-        const idx = i32(mul(f32(uniforms.paletteEntryCount), logDensityNorm))
-        const clampedIdx = clamp(
-          idx,
-          i32(0),
-          sub(uniforms.paletteEntryCount, i32(1)),
-        )
-        const entry = paletteBuffer[clampedIdx]!
+        densityInput = mul(logDensity, paletteScale)
+      }
+      const logDensityNorm = fract(densityInput)
+
+      let lowerA = paletteBuffer[0]!.a
+      let lowerB = paletteBuffer[0]!.b
+      let lowerPos = paletteBuffer[0]!.position
+
+      const upperIdx = sub(uniforms.paletteEntryCount, i32(1))
+      let upperA = paletteBuffer[upperIdx]!.a
+      let upperB = paletteBuffer[upperIdx]!.b
+      let upperPos = paletteBuffer[upperIdx]!.position
+
+      let matched = false
+      for (let i = i32(0); i < upperIdx; i = add(i, i32(1))) {
+        const entry1 = paletteBuffer[i]!
+        const entry2 = paletteBuffer[add(i, i32(1))]!
+        if (
+          logDensityNorm >= entry1.position &&
+          logDensityNorm <= entry2.position
+        ) {
+          lowerA = entry1.a
+          lowerB = entry1.b
+          lowerPos = entry1.position
+          upperA = entry2.a
+          upperB = entry2.b
+          upperPos = entry2.position
+          matched = true
+        }
+      }
+
+      let range = f32(1)
+      let localT = f32(0)
+
+      if (matched) {
+        range = sub(upperPos, lowerPos)
+        if (range > f32(0)) {
+          localT = div(sub(logDensityNorm, lowerPos), range)
+        }
+      } else {
+        const lastEntry = paletteBuffer[upperIdx]!
+        const firstEntry = paletteBuffer[0]!
+
+        lowerA = lastEntry.a
+        lowerB = lastEntry.b
+        lowerPos = lastEntry.position
+
+        upperA = firstEntry.a
+        upperB = firstEntry.b
+        upperPos = add(firstEntry.position, f32(1))
+
+        let adjustedNorm = logDensityNorm
+        if (adjustedNorm < firstEntry.position) {
+          adjustedNorm = add(adjustedNorm, f32(1))
+        }
+
+        range = sub(upperPos, lowerPos)
+        if (range > f32(0)) {
+          localT = div(sub(adjustedNorm, lowerPos), range)
+        }
+      }
+
+      const interpA = add(lowerA, mul(sub(upperA, lowerA), localT))
+      const interpB = add(lowerB, mul(sub(upperB, lowerB), localT))
+
+      if (uniforms.paletteMode === i32(0)) {
+        paletteAb = vec2f(interpA, interpB)
+      } else {
         const hueAngle = mul(uniforms.palettePhase, f32(6.283185307))
         const cosH = cos(hueAngle)
         const sinH = sin(hueAngle)
         paletteAb = vec2f(
-          sub(mul(entry.a, cosH), mul(entry.b, sinH)),
-          add(mul(entry.a, sinH), mul(entry.b, cosH)),
+          sub(mul(interpA, cosH), mul(interpB, sinH)),
+          add(mul(interpA, sinH), mul(interpB, cosH)),
         )
       }
 
@@ -216,13 +265,13 @@ export function createColorGradingPipeline(
         mul(mul(sub(f32(1), frac), density), div(funcval, linrange)),
         mul(frac, pow(density, gamma)),
       )
-      const paletteBlend = clamp(
-        mul(uniforms.vibrancy, saturate(baseAlpha)),
-        f32(0),
-        f32(1),
-      )
+      // We cap the topographcal palette blend at 65% so it never completely overwrites the structural flame colors
+      const paletteBlend = mul(saturate(baseAlpha), f32(0.65))
       finalAb = mix(texColorAb, paletteAb, paletteBlend)
     }
+
+    // Apply vibrancy as a true Saturation multiplier on the OkLab chroma
+    finalAb = mul(finalAb, max(uniforms.vibrancy, f32(0)))
 
     const logDensity = log(add(adjustedCount, f32(1)))
     const tonemapped = mul(
