@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.6] - 2026-05-27
+
+### Changed
+
+- **About panel**: Compact mode toggle changed from a stateful toggle to explicit On/Off setter, preventing race conditions.
+- **About panel shortcuts layout**: Keyboard shortcut grid on small screens now uses a more compact grid layout instead of stacked columns, with smaller key caps.
+- **Welcome screen branding**: Title uses gradient text, tech pills have distinct accent colors (cyan/blue/green), and a new version info button links to the About panel.
+
+### Fixed
+
+- **Duplicate `view-transition-name` error**: Fixed browser error "Unexpected duplicate view-transition-name: modal" that occurred when opening the Changelog from the About panel. Both stacked dialogs shared the same CSS transition name.
+- **Escape key closing wrong modal**: Pressing Escape while the Changelog was open on top of the About panel would close the About panel instead. Fixed by wiring the native dialog cancel event to dismiss the topmost modal, and removing the conflicting global keyboard shortcut handler.
+
 ## [0.8.5] - 2026-05-27
 
 ### Changed

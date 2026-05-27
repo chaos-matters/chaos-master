@@ -3,7 +3,6 @@ import { IS_DEV } from '@/defaults'
 import { Changelog, GitHub, Terminal, TriangleAlert } from '@/icons'
 import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
 import { formatBytes } from '@/utils/formatBytes'
-import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
 import { GIT_SHA, VERSION } from '@/version'
 import { createShowChangelog } from '../AboutPanel/Changelog'
 import { ConsoleLog } from '../ConsoleLog/ConsoleLog'
@@ -164,13 +163,6 @@ function HelpModal(props: HelpModalProps) {
       setTimeout(() => setCopied(false), 1500)
     })
   }
-
-  useKeyboardShortcuts({
-    Escape: () => {
-      props.respond()
-      return true
-    },
-  })
 
   return (
     <>

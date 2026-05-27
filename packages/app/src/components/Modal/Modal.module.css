@@ -34,7 +34,6 @@
   background-color: var(--bg-color);
   color: var(--text-color);
   margin: auto;
-  view-transition-name: modal;
   opacity: 0;
   animation: fade-in 400ms forwards;
   outline: none;
