@@ -45,9 +45,7 @@ function assertIfWebgpuUnsupported() {
  * `timestamp-query` is only requested when TRACK_PERFORMANCE is enabled
  * and the adapter actually advertises support (e.g. iOS Safari does not).
  */
-function negotiateOptionalFeatures(
-  adapter: GPUAdapter,
-): GPUFeatureName[] {
+function negotiateOptionalFeatures(adapter: GPUAdapter): GPUFeatureName[] {
   const features: GPUFeatureName[] = []
   if (TRACK_PERFORMANCE && adapter.features.has('timestamp-query')) {
     features.push('timestamp-query')
@@ -59,9 +57,7 @@ export async function initializeWebgpuDevice(
   adapterPreferences?: GPURequestAdapterOptions,
   deviceFeatures?: GPUDeviceDescriptor,
 ) {
-  console.info('[WebGPU] Checking navigator.gpu support...')
   assertIfWebgpuUnsupported()
-  console.info('[WebGPU] navigator.gpu is present, requesting adapter...', adapterPreferences)
 
   gpuAdapter = await navigator.gpu.requestAdapter({
     ...adapterPreferences,
@@ -79,10 +75,6 @@ export async function initializeWebgpuDevice(
   })
 
   const optionalFeatures = negotiateOptionalFeatures(gpuAdapter)
-  console.info('[WebGPU] Requesting device...', {
-    callerRequiredFeatures: [...(deviceFeatures?.requiredFeatures ?? [])],
-    negotiatedOptionalFeatures: optionalFeatures,
-  })
 
   gpuDevice = await gpuAdapter.requestDevice({
     ...deviceFeatures,
@@ -90,13 +82,6 @@ export async function initializeWebgpuDevice(
       ...(deviceFeatures?.requiredFeatures ?? []),
       ...optionalFeatures,
     ],
-  })
-
-  console.info('[WebGPU] Device acquired:', {
-    maxTextureDimension2D: gpuDevice.limits.maxTextureDimension2D,
-    maxBufferSize: gpuDevice.limits.maxBufferSize,
-    maxStorageBufferBindingSize: gpuDevice.limits.maxStorageBufferBindingSize,
-    features: [...gpuDevice.features].join(', '),
   })
 
   // requestDevice will never return null, but if a valid device request can't be

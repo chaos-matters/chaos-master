@@ -1,5 +1,5 @@
 import { createEffect, createSignal, For, Show } from 'solid-js'
-import { clearConsoleLogs,consoleLogs } from '@/stores/console-store'
+import { clearConsoleLogs, consoleLogs } from '@/stores/console-store'
 import ui from './ConsoleLog.module.css'
 import type { LogType } from '@/stores/console-store'
 
@@ -13,13 +13,10 @@ const typeClass: Record<LogType, string> = {
 
 function formatTime(ts: number) {
   const d = new Date(ts)
-  return (
-    `${d.getHours().toString().padStart(2, '0') 
-    }:${ 
-    d.getMinutes().toString().padStart(2, '0') 
-    }:${ 
-    d.getSeconds().toString().padStart(2, '0')}`
-  )
+  return `${d.getHours().toString().padStart(2, '0')}:${d
+    .getMinutes()
+    .toString()
+    .padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`
 }
 
 /* eslint-disable @typescript-eslint/no-base-to-string */
@@ -68,7 +65,8 @@ export function ConsoleLog(props: ConsoleLogProps) {
           `[${formatTime(entry.timestamp)}] ${entry.type.toUpperCase().padEnd(5)} ${formatArgs(entry.args)}`,
       )
       .join('\n')
-    navigator.clipboard.writeText(text).then(() => {
+    // eslint-disable-next-line no-restricted-globals
+    void navigator.clipboard.writeText(text).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     })
@@ -89,31 +87,37 @@ export function ConsoleLog(props: ConsoleLogProps) {
       >
         <span class={ui.headerTitle}>
           {props.collapsible && (
-            <span class={ui.collapseIndicator} classList={{ [ui.collapseOpen!]: open() }} />
+            <span
+              class={ui.collapseIndicator}
+              classList={{ [ui.collapseOpen!]: open() }}
+            />
           )}
           Console ({consoleLogs().length})
         </span>
         <div class={ui.headerActions}>
           <button
             class={ui.clearBtn}
-            onClick={(e) => { e.stopPropagation(); copyLogs() }}
+            onClick={(e) => {
+              e.stopPropagation()
+              copyLogs()
+            }}
             disabled={consoleLogs().length === 0}
           >
             {copied() ? 'Copied!' : 'Copy'}
           </button>
           <button
             class={ui.clearBtn}
-            onClick={(e) => { e.stopPropagation(); clearConsoleLogs() }}
+            onClick={(e) => {
+              e.stopPropagation()
+              clearConsoleLogs()
+            }}
           >
             Clear
           </button>
         </div>
       </div>
       <Show when={open()}>
-        <div
-          ref={containerRef}
-          class={ui.consoleLog}
-        >
+        <div ref={containerRef} class={ui.consoleLog}>
           <Show
             when={consoleLogs().length > 0}
             fallback={<div class={ui.empty}>No console output yet.</div>}
@@ -137,4 +141,3 @@ export function ConsoleLog(props: ConsoleLogProps) {
     </div>
   )
 }
-

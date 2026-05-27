@@ -11,24 +11,62 @@
 }
 
 .debug-info {
-  position: fixed;
   color: var(--color);
   padding-inline: var(--space-2);
   padding-block: var(--space-1);
   line-height: 1;
-  right: 0;
-  top: 0;
   font-size: small;
   border-bottom-left-radius: var(--space-2);
   background-color: var(--bg-color);
-  cursor: pointer;
-  z-index: 10000;
   text-align: end;
-
-  &:hover {
-    color: var(--color-hover);
-  }
 
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* Container that wraps both the toggle tab and the panel */
+.wrapper {
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 10000;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+}
+
+/* Collapse / expand toggle tab -- sits at the left edge, vertically centered */
+.toggle-tab {
+  appearance: none;
+  border: none;
+  background: rgba(0, 0, 0, 0.75);
+  color: var(--neutral-400);
+  cursor: pointer;
+  padding: 8px 4px;
+  border-radius: 6px 0 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  transition:
+    color 0.15s,
+    background 0.15s;
+
+  & svg {
+    transition: transform 0.2s ease;
+  }
+
+  &:hover {
+    color: var(--neutral-200);
+    background: rgba(0, 0, 0, 0.9);
+  }
+
+  [data-theme='dark'] & {
+    background: rgba(0, 0, 0, 0.85);
+    color: var(--neutral-500);
+
+    &:hover {
+      color: var(--neutral-300);
+    }
+  }
 }

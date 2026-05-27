@@ -8,7 +8,7 @@ export function SoftwareVersion(props: { showHelp: () => void }) {
     <div>
       <DebugPanel />
       <button class={ui.version} onClick={props.showHelp}>
-        Chaos Master v{VERSION} <sup>alpha</sup> <QuestionMark />
+        CM v{VERSION} <QuestionMark />
       </button>
     </div>
   )

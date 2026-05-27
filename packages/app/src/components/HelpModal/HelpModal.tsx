@@ -3,11 +3,11 @@ import { IS_DEV } from '@/defaults'
 import { Changelog, GitHub, Terminal } from '@/icons'
 import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
 import { formatBytes } from '@/utils/formatBytes'
+import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
 import { GIT_SHA, VERSION } from '@/version'
 import { createShowChangelog } from '../AboutPanel/Changelog'
 import { ConsoleLog } from '../ConsoleLog/ConsoleLog'
 import { useRequestModal } from '../Modal/ModalContext'
-import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './HelpModal.module.css'
 import type { QuickPickerMode } from '../QuickVariationPicker/QuickVariationPicker'
 
@@ -50,15 +50,15 @@ const shortcuts: ShortcutDescriptor[] = [
   },
 ]
 
-const { navigator } = globalThis
+const { navigator: nav } = globalThis
 
 function isMac() {
   // eslint-disable-next-line @typescript-eslint/no-deprecated
-  return navigator.platform.indexOf('Mac') !== -1
+  return nav.platform.indexOf('Mac') !== -1
 }
 
-const ctrlKey = isMac() ? '⌘ ' : 'Ctrl + '
-const shiftKey = isMac() ? '⇧ ' : 'Shift + '
+const ctrlKey = isMac() ? '\u2318 ' : 'Ctrl + '
+const shiftKey = isMac() ? '\u21E7 ' : 'Shift + '
 
 function KeyCombination(props: { keyCombination: KeyCombination }) {
   return (
@@ -75,7 +75,6 @@ async function getGPUDeviceInformation() {
     powerPreference: 'high-performance',
   })
   const { info, limits } = adapter
-  // This property exists only when WebGPU Developer Features flag is set
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const memoryHeaps: { size: number }[] | undefined = (info as any).memoryHeaps
   const heaps = memoryHeaps?.map((m) => m.size)
@@ -87,6 +86,54 @@ async function getGPUDeviceInformation() {
     maxBufferSize: limits.maxBufferSize,
     heaps,
   }
+}
+
+/**
+ * Gathers GPU + browser/device metadata as copyable text.
+ */
+function gatherFullDeviceInfo(
+  gpuInfo?: Awaited<ReturnType<typeof getGPUDeviceInformation>>,
+): string {
+  const lines: string[] = []
+  const { navigator: n, screen } = globalThis
+
+  lines.push(`App Version : ${VERSION}${GIT_SHA ? ` (${GIT_SHA})` : ''}`)
+  lines.push(`User Agent  : ${n.userAgent}`)
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
+  lines.push(`Platform    : ${n.platform}`)
+  lines.push(`Language    : ${n.language}`)
+  // eslint-disable-next-line no-restricted-globals
+  lines.push(
+    `Screen      : ${screen.width}x${screen.height} @ ${devicePixelRatio}x`,
+  )
+  lines.push(`Viewport    : ${window.innerWidth}x${window.innerHeight}`)
+  lines.push(`WebGPU      : ${'gpu' in n ? 'Supported' : 'Not supported'}`)
+
+  if (n.hardwareConcurrency) {
+    lines.push(`CPU Cores   : ${n.hardwareConcurrency}`)
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const deviceMemory = (n as any).deviceMemory as number | undefined
+  if (deviceMemory !== undefined) {
+    lines.push(`Device RAM  : ~${deviceMemory} GB`)
+  }
+
+  if (gpuInfo) {
+    lines.push('')
+    lines.push('--- GPU ---')
+    if (gpuInfo.description) lines.push(`Device      : ${gpuInfo.description}`)
+    lines.push(`Vendor      : ${gpuInfo.vendor}`)
+    if (gpuInfo.architecture)
+      lines.push(`Architecture: ${gpuInfo.architecture}`)
+    lines.push(`Max Buffer  : ${formatBytes(gpuInfo.maxBufferSize)}`)
+    if (gpuInfo.heaps) {
+      lines.push(
+        `VRAM        : ${gpuInfo.heaps.map((s) => formatBytes(s)).join(' + ')}`,
+      )
+    }
+  }
+
+  return lines.join('\n')
 }
 
 type HelpModalProps = {
@@ -103,44 +150,77 @@ function HelpModal(props: HelpModalProps) {
   const [gpuDeviceInfo] = createResource(getGPUDeviceInformation)
   const showChangelog = createShowChangelog()
   const [showConsole, setShowConsole] = createSignal(false)
+  const [copied, setCopied] = createSignal(false)
+
+  function copyDeviceInfo() {
+    const text = gatherFullDeviceInfo(gpuDeviceInfo())
+    // eslint-disable-next-line no-restricted-globals
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+
+  useKeyboardShortcuts({
+    Escape: () => {
+      props.respond()
+      return true
+    },
+  })
+
   return (
     <>
-      <ModalTitleBar
-        onClose={() => {
-          props.respond()
-        }}
-      >
-        <div class={ui.titleBarActions}>
-          <a
-            class={ui.githubLink}
-            href="https://github.com/chaos-matters/chaos-master"
-            target="_blank"
-          >
-            <GitHub />
-          </a>
-          <button
-            class={ui.changelogIconButton}
-            onClick={showChangelog}
-            title="View Changelog"
-          >
-            <Changelog />
-          </button>
-          <Show when={IS_DEV}>
-            <button
-              class={ui.changelogIconButton}
-              classList={{ [ui.consoleActive!]: showConsole() }}
-              onClick={() => setShowConsole((v) => !v)}
-              title="Console Logs"
+      {/* Compact hero: title left, icons + badges center, close top-right */}
+      <div class={ui.heroSection}>
+        <h1 class={ui.heroTitle}>Chaos Master</h1>
+        <div class={ui.heroRight}>
+          <div class={ui.iconRow}>
+            <a
+              class={ui.iconLink}
+              href="https://github.com/chaos-matters/chaos-master"
+              target="_blank"
+              title="GitHub"
             >
-              <Terminal />
+              <GitHub />
+            </a>
+            <button
+              class={ui.iconBtn}
+              onClick={showChangelog}
+              title="View Changelog"
+            >
+              <Changelog />
             </button>
-          </Show>
+            <Show when={IS_DEV}>
+              <button
+                class={ui.iconBtn}
+                classList={{ [ui.consoleActive!]: showConsole() }}
+                onClick={() => setShowConsole((v) => !v)}
+                title="Console Logs"
+              >
+                <Terminal />
+              </button>
+            </Show>
+          </div>
+          <div class={ui.badgeRow}>
+            <span class={ui.versionBadge}>v{VERSION}</span>
+            {GIT_SHA ? <span class={ui.shaBadge}>{GIT_SHA}</span> : null}
+          </div>
         </div>
-        <span>
-          Chaos Master v{VERSION} <sup>alpha</sup>{' '}
-          {GIT_SHA ? <span class={ui.gitSha}>{GIT_SHA}</span> : null}{' '}
-        </span>
-      </ModalTitleBar>
+        <button
+          class={ui.closeBtn}
+          onClick={() => {
+            props.respond()
+          }}
+          title="Close"
+        >
+          <svg viewBox="0 0 24 24" width="14" height="14">
+            <path
+              fill="currentColor"
+              d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12 5.7 16.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z"
+            />
+          </svg>
+        </button>
+      </div>
 
       <h2 class={ui.sectionTitle}>General Settings</h2>
       <div class={ui.pickerModeRow}>
@@ -272,30 +352,76 @@ function HelpModal(props: HelpModalProps) {
         </button>
       </div>
 
-      <h2 class={ui.sectionTitle}>GPU Information</h2>
-      <div class={ui.gpuInformation}>
-        <Suspense fallback={<>Loading...</>}>
+      <div class={ui.gpuHeader}>
+        <h2 class={ui.sectionTitle}>GPU / Device Info</h2>
+        <button class={ui.copyDeviceBtn} onClick={copyDeviceInfo}>
+          {copied() ? 'Copied!' : 'Copy Info'}
+        </button>
+      </div>
+      <div class={ui.gpuSection}>
+        <Suspense fallback={<span class={ui.gpuLoading}>Querying GPU...</span>}>
           <Show when={gpuDeviceInfo()} keyed>
-            {(deviceInfo) => (
-              <>
-                {deviceInfo.description !== '' ? (
-                  <p>Name: {deviceInfo.description}</p>
-                ) : undefined}
-                <p>Vendor: {deviceInfo.vendor}</p>
-                {deviceInfo.architecture !== '' ? (
-                  <p>Architecture: {deviceInfo.architecture}</p>
-                ) : undefined}
-                <p>Max Buffer Size: {formatBytes(deviceInfo.maxBufferSize)}</p>
-                {deviceInfo.heaps ? (
-                  <p>
-                    Total VRAM:{' '}
-                    {deviceInfo.heaps
-                      .map((size) => formatBytes(size))
-                      .join(' + ')}
-                  </p>
-                ) : undefined}
-              </>
-            )}
+            {(deviceInfo) => {
+              const rows: {
+                label: string
+                value: string
+                color: 'green' | 'blue'
+              }[] = []
+              if (deviceInfo.description !== '') {
+                rows.push({
+                  label: 'Device',
+                  value: deviceInfo.description,
+                  color: 'green',
+                })
+              }
+              rows.push({
+                label: 'Vendor',
+                value: deviceInfo.vendor,
+                color: 'blue',
+              })
+              if (deviceInfo.architecture !== '') {
+                rows.push({
+                  label: 'Architecture',
+                  value: deviceInfo.architecture,
+                  color: 'blue',
+                })
+              }
+              rows.push({
+                label: 'Max Buffer',
+                value: formatBytes(deviceInfo.maxBufferSize),
+                color: 'green',
+              })
+              if (deviceInfo.heaps) {
+                rows.push({
+                  label: 'VRAM',
+                  value: deviceInfo.heaps
+                    .map((size) => formatBytes(size))
+                    .join(' + '),
+                  color: 'green',
+                })
+              }
+              return (
+                <div class={ui.gpuGrid}>
+                  <For each={rows}>
+                    {(row) => (
+                      <>
+                        <span class={ui.gpuLabel}>{row.label}</span>
+                        <span class={ui.gpuValue}>
+                          <span
+                            class={ui.gpuPill}
+                            classList={{
+                              [ui.gpuPillBlue!]: row.color === 'blue',
+                            }}
+                          >
+                            {row.value}
+                          </span>
+                        </span>
+                      </>
+                    )}
+                  </For>
+                </div>
+              )
+            }}
           </Show>
         </Suspense>
       </div>

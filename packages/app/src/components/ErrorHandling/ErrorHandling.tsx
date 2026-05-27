@@ -58,7 +58,10 @@ function gatherDeviceMetadata(): MetadataEntry[] {
   const { navigator, screen } = globalThis
 
   // App
-  entries.push({ label: 'App Version', value: `${VERSION}${GIT_SHA ? ` (${GIT_SHA})` : ''}` })
+  entries.push({
+    label: 'App Version',
+    value: `${VERSION}${GIT_SHA ? ` (${GIT_SHA})` : ''}`,
+  })
 
   // Browser / OS
   entries.push({ label: 'User Agent', value: navigator.userAgent })
@@ -69,6 +72,7 @@ function gatherDeviceMetadata(): MetadataEntry[] {
   // Screen
   entries.push({
     label: 'Screen',
+    // eslint-disable-next-line no-restricted-globals
     value: `${screen.width}x${screen.height} @ ${devicePixelRatio}x`,
   })
   entries.push({
@@ -83,9 +87,13 @@ function gatherDeviceMetadata(): MetadataEntry[] {
   })
 
   // Memory (Chrome-only)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, no-restricted-globals
   const mem = (performance as any).memory as
-    | { jsHeapSizeLimit: number; usedJSHeapSize: number; totalJSHeapSize: number }
+    | {
+        jsHeapSizeLimit: number
+        usedJSHeapSize: number
+        totalJSHeapSize: number
+      }
     | undefined
   if (mem) {
     const mb = (n: number) => `${(n / 1024 / 1024).toFixed(0)} MB`
@@ -102,7 +110,10 @@ function gatherDeviceMetadata(): MetadataEntry[] {
 
   // Hardware concurrency
   if (navigator.hardwareConcurrency) {
-    entries.push({ label: 'CPU Cores', value: String(navigator.hardwareConcurrency) })
+    entries.push({
+      label: 'CPU Cores',
+      value: String(navigator.hardwareConcurrency),
+    })
   }
 
   return entries
@@ -123,7 +134,8 @@ function DeviceMetadata() {
   function copyMetadata(e: MouseEvent) {
     e.stopPropagation()
     const text = formatMetadataText(entries)
-    navigator.clipboard.writeText(text).then(() => {
+    // eslint-disable-next-line no-restricted-globals
+    void navigator.clipboard.writeText(text).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     })
@@ -131,10 +143,7 @@ function DeviceMetadata() {
 
   return (
     <div class={ui.metadataSection}>
-      <div
-        class={ui.metadataHeader}
-        onClick={() => setOpen((v) => !v)}
-      >
+      <div class={ui.metadataHeader} onClick={() => setOpen((v) => !v)}>
         <span class={ui.metadataTitle}>
           <span
             class={ui.collapseIndicator}
@@ -169,7 +178,6 @@ function reloadPage() {
 }
 
 function reloadAndClearStorage() {
-  // eslint-disable-next-line no-restricted-globals
   const confirmed = confirm(
     'This will clear all local data including recent flames, settings, and preferences.\n\nAre you sure?',
   )
@@ -182,7 +190,7 @@ function reloadAndClearStorage() {
     }
     // Also attempt to clear IndexedDB databases
     if (window.indexedDB?.databases) {
-      window.indexedDB.databases().then((dbs) => {
+      void window.indexedDB.databases().then((dbs) => {
         for (const db of dbs) {
           if (db.name) window.indexedDB.deleteDatabase(db.name)
         }

@@ -29,6 +29,20 @@
   }
 }
 
+.collapsed {
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+
+  [data-theme='dark'] & {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  }
+
+  & .handle {
+    border-right: none;
+    padding: 6px;
+  }
+}
+
 .handle {
   display: flex;
   align-items: center;
@@ -244,4 +258,12 @@
 .disabled {
   pointer-events: none;
   opacity: 0.5;
+}
+
+/* Mobile: constrain width so widget doesn't overflow the viewport */
+@media (max-width: 768px) {
+  .widget {
+    max-width: calc(100vw - 16px);
+    overflow-x: auto;
+  }
 }
