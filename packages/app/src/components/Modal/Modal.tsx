@@ -117,6 +117,7 @@ export function Modal(props: ParentProps<ModalProps>) {
                 classList={{ [class_ ?? '']: true }}
                 onCancel={(ev) => {
                   ev.preventDefault()
+                  respond(undefined)
                 }}
               >
                 <Content respond={respond} />
