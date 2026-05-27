@@ -1,44 +1,31 @@
 import { createSignal, Show } from 'solid-js'
 import { ConsoleLog } from '@/components/ConsoleLog/ConsoleLog'
+import { GitHub } from '@/icons'
 import { GIT_SHA, VERSION } from '@/version'
 import ui from './ErrorHandling.module.css'
 
 export function WebgpuNotSupported() {
   return (
     <div class={ui.fallback}>
-      <div class={ui.crashHeader}>
-        <h1 class={ui.title}>CHAOS MASTER</h1>
+      <h1 class={ui.webgpuTitle}>CHAOS MASTER</h1>
 
-        <p class={ui.text}>
-          Your browser or device currently does not support{' '}
-          <strong>WebGPU</strong>.
-        </p>
+      <p class={ui.webgpuText}>
+        Your browser or device currently does not support{' '}
+        <strong>WebGPU</strong>.
+      </p>
 
-        <a
-          href="https://github.com/gpuweb/gpuweb/wiki/Implementation-Status"
-          target="_blank"
-          rel="noopener noreferrer"
-          class={ui.btn}
-        >
-          Check WebGPU Browser Support
-        </a>
+      <a
+        href="https://github.com/gpuweb/gpuweb/wiki/Implementation-Status"
+        target="_blank"
+        rel="noopener noreferrer"
+        class={ui.webgpuBtn}
+      >
+        Check WebGPU Browser Support
+      </a>
 
-        <div class={ui.hint}>
-          Try the latest Chrome, Firefox, or Safari (on supported hardware) for
-          the full experience.
-        </div>
-      </div>
-      <div class={ui.crashBody}>
-        <DeviceMetadata />
-        <ConsoleLog collapsible defaultOpen />
-        <div class={ui.crashActions}>
-          <button class={ui.reloadBtn} onClick={reloadPage}>
-            Reload Page
-          </button>
-          <button class={ui.reloadClearBtn} onClick={reloadAndClearStorage}>
-            Reload + Clear Data
-          </button>
-        </div>
+      <div class={ui.webgpuHint}>
+        Try the latest Chrome, Firefox, or Safari (on supported hardware) for
+        the full experience.
       </div>
     </div>
   )
@@ -202,34 +189,38 @@ function reloadAndClearStorage() {
 
 export function AppCrashed() {
   return (
-    <div class={ui.fallback}>
-      <div class={ui.crashHeader}>
-        <h1 class={ui.title}>CHAOS MASTER</h1>
-        <p class={ui.text}>
-          Chaos Master v{VERSION} <sup>alpha</sup> crashed, see logs for more
-          details.
-        </p>
-        <span>
-          Check current issues or open a bug report at{' '}
-          <a
-            class={ui.githubLink}
-            href="https://github.com/chaos-matters/chaos-master/issues"
-            target="_blank"
-          >
-            GitHub.
-          </a>
-        </span>
-      </div>
-      <div class={ui.crashBody}>
-        <DeviceMetadata />
-        <ConsoleLog collapsible defaultOpen />
-        <div class={ui.crashActions}>
-          <button class={ui.reloadBtn} onClick={reloadPage}>
-            Reload Page
-          </button>
-          <button class={ui.reloadClearBtn} onClick={reloadAndClearStorage}>
-            Reload + Clear Data
-          </button>
+    <div class={ui.crashOverlay}>
+      <div class={ui.crashCard}>
+        <div class={ui.crashHero}>
+          <h1 class={ui.crashTitle}>CHAOS MASTER</h1>
+          <div class={ui.crashBadgeRow}>
+            <span class={ui.crashVersionBadge}>v{VERSION}</span>
+            {GIT_SHA ? <span class={ui.crashShaBadge}>{GIT_SHA}</span> : null}
+          </div>
+          <p class={ui.crashSubtitle}>
+            Something went wrong. See the logs below for details.
+          </p>
+        </div>
+        <div class={ui.crashBody}>
+          <DeviceMetadata />
+          <ConsoleLog collapsible defaultOpen variant="crash" />
+          <div class={ui.crashActions}>
+            <a
+              class={ui.crashGithubBtn}
+              href="https://github.com/chaos-matters/chaos-master/issues/new?template=bug_report.md"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <GitHub />
+              Report Bug
+            </a>
+            <button class={ui.reloadBtn} onClick={reloadPage}>
+              Reload Page
+            </button>
+            <button class={ui.reloadClearBtn} onClick={reloadAndClearStorage}>
+              Reload + Clear Data
+            </button>
+          </div>
         </div>
       </div>
     </div>

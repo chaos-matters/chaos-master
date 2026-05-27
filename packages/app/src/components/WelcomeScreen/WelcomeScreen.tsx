@@ -365,9 +365,9 @@ export function WelcomeScreen(props: WelcomeScreenProps) {
             </div>
 
             <div class={ui.techPills}>
-              <span class={ui.techPill}>WebGPU</span>
-              <span class={ui.techPill}>TypeGPU</span>
-              <span class={ui.techPill}>SolidJS</span>
+              <span class={`${ui.techPill} ${ui.techPillCyan}`}>WebGPU</span>
+              <span class={`${ui.techPill} ${ui.techPillBlue}`}>TypeGPU</span>
+              <span class={`${ui.techPill} ${ui.techPillGreen}`}>SolidJS</span>
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 import { createResource, createSignal, For, Show, Suspense } from 'solid-js'
 import { IS_DEV } from '@/defaults'
-import { Changelog, GitHub, Terminal } from '@/icons'
+import { Changelog, GitHub, Terminal, TriangleAlert } from '@/icons'
 import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
 import { formatBytes } from '@/utils/formatBytes'
 import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
@@ -147,6 +147,7 @@ type HelpModalProps = {
   onToggleCompact: () => void
   theme: () => Theme
   onThemeChange: (theme: Theme) => void
+  onInjectCrash?: () => void
 }
 
 function HelpModal(props: HelpModalProps) {
@@ -201,6 +202,18 @@ function HelpModal(props: HelpModalProps) {
                 title="Console Logs"
               >
                 <Terminal />
+              </button>
+            </Show>
+            <Show when={IS_DEV && props.onInjectCrash}>
+              <button
+                class={ui.iconBtn}
+                onClick={() => {
+                  props.respond()
+                  props.onInjectCrash?.()
+                }}
+                title="Inject Crash (dev only)"
+              >
+                <TriangleAlert />
               </button>
             </Show>
           </div>
@@ -469,6 +482,7 @@ export function createShowHelp(
   onToggleCompact: () => void,
   theme: () => Theme,
   onThemeChange: (theme: Theme) => void,
+  onInjectCrash?: () => void,
 ) {
   const requestModal = useRequestModal()
 
@@ -486,6 +500,7 @@ export function createShowHelp(
           onToggleCompact={onToggleCompact}
           theme={theme}
           onThemeChange={onThemeChange}
+          onInjectCrash={onInjectCrash}
         />
       ),
     })

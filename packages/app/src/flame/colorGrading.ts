@@ -265,7 +265,7 @@ export function createColorGradingPipeline(
         mul(mul(sub(f32(1), frac), density), div(funcval, linrange)),
         mul(frac, pow(density, gamma)),
       )
-      // We cap the topographcal palette blend at 65% so it never completely overwrites the structural flame colors
+      // We cap the topographical palette blend at 65% so it never completely overwrites the structural flame colors
       const paletteBlend = mul(saturate(baseAlpha), f32(0.65))
       finalAb = mix(texColorAb, paletteAb, paletteBlend)
     }

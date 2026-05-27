@@ -149,13 +149,57 @@
   font-size: 0.75rem;
 }
 
-/* Crash screen variant */
+/* Crash screen variant — match Device Info styling */
 .crash {
-  margin: 1rem auto 0;
-  max-width: 42rem;
+  margin: 0.5rem 0 0;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.crash .header {
+  padding: 0.35rem 0.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 0.375rem;
+  background: transparent;
+  position: static;
+}
+
+.crash .headerTitle {
+  color: rgba(0, 200, 255, 0.55);
+  font-size: 0.7rem;
+}
+
+.crash .clearBtn {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.5);
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.8);
+  }
 }
 
 .crash .console-log {
   margin: 0;
-  max-height: 18rem;
+  max-height: 16rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 0.5rem;
+  color: rgba(255, 255, 255, 0.6);
+  padding: 0.5rem;
+}
+
+.crash .timestamp {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.crash .entry {
+  border-bottom-color: rgba(255, 255, 255, 0.03);
+}
+
+.crash .empty {
+  color: rgba(255, 255, 255, 0.3);
 }
