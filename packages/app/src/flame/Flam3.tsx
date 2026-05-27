@@ -65,17 +65,7 @@ export function Flam3(props: Flam3Props) {
         : vec3f(...backgroundColorDefault)
     }
 
-    // Auto-swap: if the user has the default-for-the-other-mode color,
-    // switch to the appropriate default for the current mode.
-    const isDefaultBlack = bg[0] === 0 && bg[1] === 0 && bg[2] === 0
-    const isDefaultWhite = bg[0] === 1 && bg[1] === 1 && bg[2] === 1
-    if (isPaint && isDefaultBlack) {
-      return vec3f(...backgroundColorDefaultWhite)
-    }
-    if (!isPaint && isDefaultWhite) {
-      return vec3f(...backgroundColorDefault)
-    }
-
+    // User explicitly chose a color -- respect it, no auto-swap.
     return vec3f(...bg)
   }
 

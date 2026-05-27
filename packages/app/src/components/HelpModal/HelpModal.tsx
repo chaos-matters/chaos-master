@@ -10,6 +10,7 @@ import { ConsoleLog } from '../ConsoleLog/ConsoleLog'
 import { useRequestModal } from '../Modal/ModalContext'
 import ui from './HelpModal.module.css'
 import type { QuickPickerMode } from '../QuickVariationPicker/QuickVariationPicker'
+import type { Theme } from '@/contexts/ThemeContext'
 
 export type SidebarLayoutMode = 'compact' | 'wide'
 
@@ -42,7 +43,7 @@ const shortcuts: ShortcutDescriptor[] = [
   },
   {
     keyCombinations: [{ key: 'D' }],
-    description: 'Toggle draw mode',
+    description: 'Toggle UI theme (dark / light)',
   },
   {
     keyCombinations: [{ key: 'M', ctrl: true }],
@@ -144,6 +145,8 @@ type HelpModalProps = {
   onSidebarLayoutModeChange: (mode: SidebarLayoutMode) => void
   isCompact: () => boolean
   onToggleCompact: () => void
+  theme: () => Theme
+  onThemeChange: (theme: Theme) => void
 }
 
 function HelpModal(props: HelpModalProps) {
@@ -304,6 +307,30 @@ function HelpModal(props: HelpModalProps) {
         </div>
       </div>
 
+      <div class={ui.pickerModeRow}>
+        <span class={ui.pickerModeLabel}>UI Theme</span>
+        <div class={ui.pickerModeBtns}>
+          <button
+            class={ui.pickerModeBtn}
+            classList={{ [ui.pickerModeBtnActive!]: props.theme() === 'dark' }}
+            onClick={() => {
+              props.onThemeChange('dark')
+            }}
+          >
+            Dark
+          </button>
+          <button
+            class={ui.pickerModeBtn}
+            classList={{ [ui.pickerModeBtnActive!]: props.theme() === 'light' }}
+            onClick={() => {
+              props.onThemeChange('light')
+            }}
+          >
+            Light
+          </button>
+        </div>
+      </div>
+
       <h2 class={ui.sectionTitle}>Keyboard Shortcuts</h2>
       <div class={ui.shortcutsGrid}>
         <For each={shortcuts}>
@@ -440,6 +467,8 @@ export function createShowHelp(
   onSidebarLayoutModeChange: (mode: SidebarLayoutMode) => void,
   isCompact: () => boolean,
   onToggleCompact: () => void,
+  theme: () => Theme,
+  onThemeChange: (theme: Theme) => void,
 ) {
   const requestModal = useRequestModal()
 
@@ -455,6 +484,8 @@ export function createShowHelp(
           onSidebarLayoutModeChange={onSidebarLayoutModeChange}
           isCompact={isCompact}
           onToggleCompact={onToggleCompact}
+          theme={theme}
+          onThemeChange={onThemeChange}
         />
       ),
     })

@@ -450,12 +450,6 @@ export function MainWorkspace(props: AppProps) {
   }
 
   createEffect(() => {
-    setTheme(
-      flameDescriptor.renderSettings.drawMode === 'light' ? 'dark' : 'light',
-    )
-  })
-
-  createEffect(() => {
     const progress = animationExportProgress()
     if (animationExportRunning() && progress) {
       if (!timeline.isPlaying()) {
@@ -1091,16 +1085,13 @@ export function MainWorkspace(props: AppProps) {
     },
     KeyD: () => {
       if (animationExportRunning()) return false
-      const togglePaintMode = () => {
-        setFlameDescriptor((draft) => {
-          draft.renderSettings.drawMode =
-            draft.renderSettings.drawMode === 'light' ? 'paint' : 'light'
-        })
+      const toggleTheme = () => {
+        setTheme(theme() === 'dark' ? 'light' : 'dark')
       }
       if ('startViewTransition' in document) {
-        document.startViewTransition(togglePaintMode)
+        document.startViewTransition(toggleTheme)
       } else {
-        togglePaintMode()
+        toggleTheme()
       }
       return true
     },
@@ -2596,6 +2587,8 @@ export function MainWorkspace(props: AppProps) {
               setSidebarLayoutMode,
               isCompact,
               toggleCompact,
+              theme,
+              setTheme,
             )}
           />
         </Dropzone>

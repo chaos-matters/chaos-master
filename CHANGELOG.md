@@ -12,10 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Vibrancy Logic**: Decoupled Vibrancy from the Topographical Density map. Vibrancy now acts as a true saturation multiplier for the flame's structural colors, while the topographical palette overlay is kept gracefully bounded.
 - **Palette Settings UI**: Palette rendering options (Speed, Phase, Mode) are now visually dimmed and disabled in the sidebar when no palette is selected.
 - **Palette Speed Scale**: Adjusted the Palette Speed slider to max out at 10 to encourage smoother gradient mapping (removing the hard schema bound to allow custom scrubbing for power users).
+- **UI Theme**: Decoupled UI dark/light theme from the draw mode. Switching draw mode (light/paint) no longer changes the UI appearance. A new "UI Theme" toggle is available in the About panel (General Settings), and the `D` keyboard shortcut now toggles the UI theme. Theme preference is persisted to localStorage.
 
 ### Fixed
 
 - **Cyclic Palette Wrapping**: Fixed sharp color banding at gradient boundaries by implementing perfect cyclic interpolation wrap-around for palette sampling in the shader.
+- **Background Color**: The user's explicit background color choice is now always respected. Previously, setting white in light draw mode would auto-swap to black.
 
 ## [0.8.4] - 2026-05-27
 
