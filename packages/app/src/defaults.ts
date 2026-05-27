@@ -90,3 +90,4 @@ export const CAMERA_UNDO_DEBOUNCE_MS =
 
 export const DEBUG_MODE = import.meta.env.VITE_DEBUG_MODE === 'true'
 export const IS_DEV = import.meta.env.DEV
+export const BASE_URL = import.meta.env.BASE_URL

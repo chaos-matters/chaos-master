@@ -102,9 +102,9 @@ function gatherFullDeviceInfo(
   // eslint-disable-next-line @typescript-eslint/no-deprecated
   lines.push(`Platform    : ${n.platform}`)
   lines.push(`Language    : ${n.language}`)
-  // eslint-disable-next-line no-restricted-globals
+
   lines.push(
-    `Screen      : ${screen.width}x${screen.height} @ ${devicePixelRatio}x`,
+    `Screen      : ${screen.width}x${screen.height} @ ${window.devicePixelRatio}x`,
   )
   lines.push(`Viewport    : ${window.innerWidth}x${window.innerHeight}`)
   lines.push(`WebGPU      : ${'gpu' in n ? 'Supported' : 'Not supported'}`)

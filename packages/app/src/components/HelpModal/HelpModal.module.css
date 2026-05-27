@@ -1,5 +1,7 @@
 .help-modal {
   width: 34rem;
+  max-width: 90vw;
+  overflow-y: auto;
 }
 
 /* ---- Compact Hero Section ---- */
@@ -123,9 +125,6 @@
   & > svg {
     width: 1rem;
     height: 1rem;
-    fill: currentColor;
-    stroke: currentColor;
-    stroke-width: 0;
   }
 
   &:hover {
@@ -192,15 +191,15 @@
   font-size: 0.62rem;
   padding: 0.15em 0.45em;
   border-radius: 999px;
-  background: var(--neutral-100);
-  color: var(--neutral-500);
-  border: 1px solid var(--neutral-200);
+  background: oklch(94% 0.03 150);
+  color: oklch(38% 0.08 150);
+  border: 1px solid oklch(88% 0.04 150);
   user-select: all;
 
   [data-theme='dark'] & {
-    background: var(--neutral-800);
-    color: var(--neutral-400);
-    border-color: var(--neutral-700);
+    background: oklch(24% 0.04 150);
+    color: oklch(72% 0.1 150);
+    border-color: oklch(30% 0.05 150);
   }
 }
 
@@ -243,6 +242,7 @@
   overflow: hidden;
   margin: 0.15rem var(--space-3);
   border: 1px solid var(--neutral-200);
+  flex-shrink: 0;
 
   [data-theme='dark'] & {
     border-color: var(--neutral-800);
@@ -304,6 +304,34 @@
     box-shadow:
       0 1px 0 rgba(0, 0, 0, 0.5),
       inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+}
+
+@media (max-width: 500px) {
+  .shortcuts-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .shortcut-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.15rem;
+
+    & > * {
+      padding: 0.25rem 0.6rem;
+    }
+  }
+
+  .shortcut-description {
+    padding-bottom: 0;
+  }
+
+  .key-combinations {
+    padding-top: 0;
+    padding-bottom: 0.35rem;
   }
 }
 

@@ -1,6 +1,6 @@
 .container {
   width: 48rem;
-  max-height: 80vh;
+  max-width: 95vw;
 }
 
 .tabBar {
@@ -73,9 +73,28 @@
   grid-template-columns: 1fr 340px;
   gap: 1rem;
   padding: 1rem;
-  flex: 1;
-  min-height: 0;
   overflow-y: auto;
+  /* Explicit max-height avoids relying on flex height resolution,
+     which iOS Safari doesn't support inside <dialog>.
+     ~6rem accounts for title bar + tab bar + footer + padding. */
+  max-height: calc(80vh - 6rem);
+}
+
+@media (max-width: 700px) {
+  .dialogBody {
+    grid-template-columns: 1fr;
+  }
+
+  .previewPane {
+    aspect-ratio: auto;
+    height: 200px;
+    max-height: 200px;
+  }
+
+  .animationPreviewPane {
+    min-height: 120px;
+    max-height: 200px;
+  }
 }
 
 .previewPane {
@@ -85,6 +104,8 @@
   border-radius: 0.5rem;
   overflow: hidden;
   background: #111;
+  isolation: isolate;
+  touch-action: none;
 }
 
 .animationPreviewPane {
