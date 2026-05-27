@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.3] - 2026-05-27
+
+### Changed
+
+- **Render dialog responsive layout**: Image and animation export tabs now stack vertically on small screens with a compact preview pane and scrollable controls.
+- **Keyboard shortcuts mobile layout**: Shortcuts in the About panel stack vertically on narrow screens for better readability.
+- **Commit SHA badge**: Styled as a green pill in the About panel.
+
+### Fixed
+
+- **Modal height on iOS/mobile**: Changelog and render dialogs no longer collapse to near-zero height on mobile Safari. Replaced flex-based height resolution with explicit viewport-capped max-heights.
+- **Modal close button styling**: Synchronized close button design across all modals (Changelog, Render, etc.) with polished icon button style.
+- **Keyboard shortcuts collapsing**: Fixed shortcuts grid disappearing on small screens due to flex shrink behavior with `overflow: hidden`.
+- **GitHub icon color on iOS**: Fixed icon rendering black instead of inheriting theme color by adding explicit `fill="currentColor"` to the SVG.
+- **Changelog fetch path**: Uses `BASE_URL` abstraction instead of hardcoded root path, fixing 404s on non-root deployments.
+- **View controls occlusion**: Added padding to avoid overlap with the version tag; horizontal scrolling enabled for touch devices.
+- **Unused Button import**: Cleaned up dead import in ModalTitleBar.
+
 ## [0.8.2] - 2026-05-27
 
 ### Added
