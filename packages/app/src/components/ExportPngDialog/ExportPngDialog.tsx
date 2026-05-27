@@ -727,12 +727,36 @@ export function createExportPngDialog(
       const doEmbedFlame = embedFlame()
       const doEmbedAnimation = embedAnimation()
 
+      // Snapshot original render settings so we can restore them after export.
+      // The dialog preview is independent of the main flame; users expect the
+      // export settings to apply only to the exported image, not to persist in
+      // the workspace.
+      const originalSettings = {
+        exposure: flameDescriptor.renderSettings.exposure,
+        vibrancy: flameDescriptor.renderSettings.vibrancy,
+        contrast: flameDescriptor.renderSettings.contrast,
+        gamma: flameDescriptor.renderSettings.gamma,
+        drawMode: flameDescriptor.renderSettings.drawMode,
+        backgroundColor: flameDescriptor.renderSettings.backgroundColor,
+        camera: {
+          zoom: flameDescriptor.renderSettings.camera.zoom,
+          position: [
+            flameDescriptor.renderSettings.camera.position[0],
+            flameDescriptor.renderSettings.camera.position[1],
+          ] as [number, number],
+        },
+      }
+
       // Apply dialog render settings to main flame descriptor
       setFlameDescriptor((draft) => {
         draft.renderSettings.exposure =
           previewDescriptor.renderSettings.exposure
         draft.renderSettings.vibrancy =
           previewDescriptor.renderSettings.vibrancy
+        draft.renderSettings.contrast =
+          previewDescriptor.renderSettings.contrast
+        draft.renderSettings.gamma =
+          previewDescriptor.renderSettings.gamma
         draft.renderSettings.drawMode =
           previewDescriptor.renderSettings.drawMode
         draft.renderSettings.backgroundColor =
@@ -777,6 +801,23 @@ export function createExportPngDialog(
         setPixelRatio(currentRatio)
         setExportQuality(undefined)
         setExportProgress(undefined)
+
+        // Restore original render settings so the workspace is not permanently
+        // modified by the export dialog adjustments.
+        setFlameDescriptor((draft) => {
+          draft.renderSettings.exposure = originalSettings.exposure
+          draft.renderSettings.vibrancy = originalSettings.vibrancy
+          draft.renderSettings.contrast = originalSettings.contrast
+          draft.renderSettings.gamma = originalSettings.gamma
+          draft.renderSettings.drawMode = originalSettings.drawMode
+          draft.renderSettings.backgroundColor =
+            originalSettings.backgroundColor
+          draft.renderSettings.camera.zoom = originalSettings.camera.zoom
+          draft.renderSettings.camera.position = [
+            originalSettings.camera.position[0],
+            originalSettings.camera.position[1],
+          ]
+        })
 
         canvas.toBlob(
           async (blob) => {
