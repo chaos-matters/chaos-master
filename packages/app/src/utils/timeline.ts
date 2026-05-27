@@ -165,6 +165,12 @@ export const TIMELINE_PARAMETERS: TimelineParameter[] = [
     type: 'number',
     group: 'Final Transform',
   },
+  {
+    path: 'blendWeight',
+    label: 'Blend Weight',
+    type: 'number',
+    group: 'Blend',
+  },
 ]
 
 /** Flat set of all variation parameter names (e.g. 'distortion', 'freqX', ...). */
