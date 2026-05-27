@@ -126,10 +126,7 @@ const RenderSettings = v.object({
     0,
   ),
   palettePhase: v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(1)), 0),
-  paletteSpeed: v.optional(
-    v.pipe(v.number(), v.minValue(0), v.maxValue(30)),
-    0.5,
-  ),
+  paletteSpeed: v.optional(v.pipe(v.number(), v.minValue(0)), 0.5),
   backgroundColor: v.optional(
     v.tuple([ColorValueSchema, ColorValueSchema, ColorValueSchema]),
   ),

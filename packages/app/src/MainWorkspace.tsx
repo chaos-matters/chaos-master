@@ -2418,77 +2418,98 @@ export function MainWorkspace(props: AppProps) {
                       </div>
 
                       {/* -- Palette -- */}
-                      <div class={ui.settingsGroup}>
-                        <span class={ui.settingsGroupLabel}>Palette</span>
+                      <div
+                        style={{ 'grid-column': '1 / -1' }}
+                        title={
+                          selectedPaletteId() === ''
+                            ? 'Select a palette in the gallery to enable these options'
+                            : undefined
+                        }
+                      >
                         <div
-                          class={ui.parameterTarget}
-                          onClick={() => {
-                            setTargetedParameter('paletteSpeed')
+                          class={ui.settingsGroup}
+                          style={{
+                            opacity: selectedPaletteId() !== '' ? 1 : 0.4,
+                            'pointer-events':
+                              selectedPaletteId() !== '' ? 'auto' : 'none',
                           }}
                         >
-                          <Slider
-                            label="Palette Speed"
-                            value={flameDescriptor.renderSettings.paletteSpeed}
-                            min={0}
-                            max={30}
-                            step={0.1}
-                            onInput={(newVal) => {
-                              setFlameDescriptor((draft) => {
-                                draft.renderSettings.paletteSpeed = newVal
-                              })
+                          <span class={ui.settingsGroupLabel}>Palette</span>
+                          <div
+                            class={ui.parameterTarget}
+                            onClick={() => {
+                              setTargetedParameter('paletteSpeed')
                             }}
-                            formatValue={(value) => value.toFixed(1)}
-                            dataParameterPath="paletteSpeed"
-                          />
-                        </div>
-                        <div
-                          class={ui.parameterTarget}
-                          onClick={() => {
-                            setTargetedParameter('paletteMode')
-                          }}
-                        >
-                          <label class={ui.labeledInput}>
-                            <span>Palette Mode</span>
-                            <select
-                              class={ui.select}
+                          >
+                            <Slider
+                              label="Palette Speed"
                               value={
-                                flameDescriptor.renderSettings.paletteMode ?? 0
+                                flameDescriptor.renderSettings.paletteSpeed
                               }
-                              onChange={(ev) => {
-                                const mode = parseInt(
-                                  ev.currentTarget.value,
-                                ) as 0 | 1
+                              min={0}
+                              max={10}
+                              step={0.1}
+                              onInput={(newVal) => {
                                 setFlameDescriptor((draft) => {
-                                  draft.renderSettings.paletteMode = mode
+                                  draft.renderSettings.paletteSpeed = newVal
                                 })
                               }}
-                            >
-                              <option value={0}>Density Shift</option>
-                              <option value={1}>Hue Rotation (flam3)</option>
-                            </select>
-                            <span></span>
-                          </label>
-                        </div>
-                        <div
-                          class={ui.parameterTarget}
-                          onClick={() => {
-                            setTargetedParameter('palettePhase')
-                          }}
-                        >
-                          <Slider
-                            label="Palette Phase"
-                            value={flameDescriptor.renderSettings.palettePhase}
-                            min={0}
-                            max={1}
-                            step={0.05}
-                            onInput={(newVal) => {
-                              setFlameDescriptor((draft) => {
-                                draft.renderSettings.palettePhase = newVal
-                              })
+                              formatValue={(value) => value.toFixed(1)}
+                              dataParameterPath="paletteSpeed"
+                            />
+                          </div>
+                          <div
+                            class={ui.parameterTarget}
+                            onClick={() => {
+                              setTargetedParameter('paletteMode')
                             }}
-                            formatValue={(value) => value.toFixed(2)}
-                            dataParameterPath="palettePhase"
-                          />
+                          >
+                            <label class={ui.labeledInput}>
+                              <span>Palette Mode</span>
+                              <select
+                                class={ui.select}
+                                value={
+                                  flameDescriptor.renderSettings.paletteMode ??
+                                  0
+                                }
+                                onChange={(ev) => {
+                                  const mode = parseInt(
+                                    ev.currentTarget.value,
+                                  ) as 0 | 1
+                                  setFlameDescriptor((draft) => {
+                                    draft.renderSettings.paletteMode = mode
+                                  })
+                                }}
+                              >
+                                <option value={0}>Density Shift</option>
+                                <option value={1}>Hue Rotation (flam3)</option>
+                              </select>
+                              <span></span>
+                            </label>
+                          </div>
+                          <div
+                            class={ui.parameterTarget}
+                            onClick={() => {
+                              setTargetedParameter('palettePhase')
+                            }}
+                          >
+                            <Slider
+                              label="Palette Phase"
+                              value={
+                                flameDescriptor.renderSettings.palettePhase
+                              }
+                              min={0}
+                              max={1}
+                              step={0.05}
+                              onInput={(newVal) => {
+                                setFlameDescriptor((draft) => {
+                                  draft.renderSettings.palettePhase = newVal
+                                })
+                              }}
+                              formatValue={(value) => value.toFixed(2)}
+                              dataParameterPath="palettePhase"
+                            />
+                          </div>
                         </div>
                       </div>
                     </Card>

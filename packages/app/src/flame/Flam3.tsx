@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, onCleanup, untrack, } from 'sol
 import { arrayOf, vec2u, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { useTimeline } from '@/contexts/TimelineContext'
-import { DEBUG_MODE } from '@/defaults'
+import { DEBUG_MODE, DEBUG_VRAM } from '@/defaults'
 import { accumulatedPointCount, animationExportRunning, setAccumulatedPointCountGlobal, setRenderTimings, } from '@/flame/renderStats'
 import { deepClone } from '@/utils/clone'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
@@ -594,6 +594,57 @@ export function Flam3(props: Flam3Props) {
 
         timestampQuery.write(encoder, iterationCount)
         device.queue.submit([encoder.finish()])
+
+        if (
+          (DEBUG_MODE || DEBUG_VRAM) &&
+          batchIndex > 0 &&
+          batchIndex % 10 === 0
+        ) {
+          const rs = animatedFlame().renderSettings
+          const paletteSpeed = rs.paletteSpeed ?? 0.5
+          const palettePhase = rs.palettePhase ?? 0
+          const paletteMode = rs.paletteMode ?? 0
+          const vibrancy = rs.vibrancy
+          const skipItersFactor = 1 + rs.skipIters * 0.05
+          const avgInv =
+            (bucketProbabilityInv() / accumulatedPointCount_) * skipItersFactor
+
+          console.info(
+            `[ColorGrading Debug] Frame ${batchIndex} | Mode: ${paletteMode} | Speed: ${paletteSpeed.toFixed(2)} | Phase: ${palettePhase.toFixed(2)} | Vibrancy: ${vibrancy.toFixed(2)} | AvgInv: ${avgInv.toExponential(2)}`,
+          )
+
+          const paletteScale = 0.02 + paletteSpeed * 0.298
+          console.info(` -> paletteScale = ${paletteScale.toFixed(4)}`)
+
+          const mockCounts = [100, 10000, 1000000] // raw counts for low, med, high density
+          for (const count of mockCounts) {
+            const adjustedCount = count * avgInv * 0.1
+            const logDensity = Math.min(
+              Math.max(Math.log(adjustedCount + 1), 0),
+              10,
+            )
+
+            if (paletteMode === 0) {
+              const logDensityNorm =
+                (logDensity * paletteScale + palettePhase) % 1.0
+              const normPositive =
+                logDensityNorm < 0 ? logDensityNorm + 1.0 : logDensityNorm
+              console.info(
+                `    count=${count} (adj=${adjustedCount.toFixed(4)}) -> logDens=${logDensity.toFixed(4)} -> paletteIdxNorm=${normPositive.toFixed(4)}`,
+              )
+            } else {
+              const logDensityNorm = (logDensity * paletteScale) % 1.0
+              const normPositive =
+                logDensityNorm < 0 ? logDensityNorm + 1.0 : logDensityNorm
+              const hueAngle = palettePhase * Math.PI * 2
+              const cosH = Math.cos(hueAngle)
+              const sinH = Math.sin(hueAngle)
+              console.info(
+                `    count=${count} (adj=${adjustedCount.toFixed(4)}) -> logDens=${logDensity.toFixed(4)} -> baseIdxNorm=${normPositive.toFixed(4)}, rotAng=${hueAngle.toFixed(2)} (cos=${cosH.toFixed(2)}, sin=${sinH.toFixed(2)})`,
+              )
+            }
+          }
+        }
 
         if (currentExportCb) {
           currentExportCb(canvas)
