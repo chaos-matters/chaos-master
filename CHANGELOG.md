@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.4] - 2026-05-27
+
+### Changed
+
+- **Variation pill touch preview**: Touch-and-hold on variation pills (list mode) now triggers a live preview on the canvas, matching the gallery mode behavior. Context menu suppressed during long press.
+
+### Fixed
+
+- **Guided tour spotlight**: Consolidated step-change effects to prevent racing between immediate and delayed position measurement. Card positioning now uses actual DOM dimensions instead of hardcoded estimates, preventing the tooltip from overlapping the target on smaller screens.
+- **Tour `beforeShow` hooks**: All sidebar and timeline tour steps now ensure their required panel is open before spotlighting, fixing missing targets when panels were toggled between steps.
+
 ## [0.8.3] - 2026-05-27
 
 ### Changed
