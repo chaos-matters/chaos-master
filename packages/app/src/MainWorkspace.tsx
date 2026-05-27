@@ -146,7 +146,7 @@ export function MainWorkspace(props: AppProps) {
   const [hideDiceButtons, setHideDiceButtons] = createSignal(false)
   const { toastMessage, showToast } = useToast()
   const SIDEBAR_RESIZABLE = false
-  const { isCompact, toggleCompact } = useCompactMode()
+  const { isCompact, setCompact } = useCompactMode()
   const [showSidebar, setShowSidebar] = createSignal(true)
   const _requestModal = useRequestModal()
   const [sidebarHidden, setSidebarHidden] = createSignal(
@@ -176,10 +176,10 @@ export function MainWorkspace(props: AppProps) {
   createEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)')
     setIsMobile(mq.matches)
-    if (mq.matches && !isCompact()) toggleCompact()
+    if (mq.matches) setCompact(true)
     const handler = (e: MediaQueryListEvent) => {
       setIsMobile(e.matches)
-      if (e.matches && !isCompact()) toggleCompact()
+      if (e.matches) setCompact(true)
       // Auto-hide sidebar when switching to mobile layout
       if (e.matches) setSidebarHidden(true)
     }
@@ -2589,7 +2589,7 @@ export function MainWorkspace(props: AppProps) {
               sidebarLayoutMode,
               setSidebarLayoutMode,
               isCompact,
-              toggleCompact,
+              setCompact,
               theme,
               setTheme,
               IS_DEV ? () => setDevCrashTest(true) : undefined,

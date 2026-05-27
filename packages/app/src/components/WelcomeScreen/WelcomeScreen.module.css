@@ -380,6 +380,33 @@
   color: rgba(70, 210, 140, 0.6);
 }
 
+.aboutPill {
+  cursor: pointer;
+  font-family: inherit;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.4);
+  transition: all 0.2s ease;
+  line-height: 1;
+
+  & > svg {
+    width: 0.85rem;
+    height: 0.85rem;
+    opacity: 0.6;
+    vertical-align: middle;
+  }
+
+  &:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.7);
+  }
+}
+
 /* Responsive */
 @media (max-width: 50rem) {
   .card {
