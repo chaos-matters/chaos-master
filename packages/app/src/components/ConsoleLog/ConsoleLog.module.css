@@ -1,6 +1,8 @@
 .console-log {
   max-height: 24rem;
   overflow-y: auto;
+  overflow-x: auto;
+  min-width: 0;
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   font-size: 0.72rem;
   line-height: 1.5;
@@ -119,11 +121,21 @@
   padding-top: 0.15rem;
 }
 
-.typeLog { color: var(--neutral-400); }
-.typeError { color: #ff6b6b; }
-.typeWarn { color: #feca57; }
-.typeInfo { color: #48dbfb; }
-.typeDebug { color: #a29bfe; }
+.typeLog {
+  color: var(--neutral-400);
+}
+.typeError {
+  color: #ff6b6b;
+}
+.typeWarn {
+  color: #feca57;
+}
+.typeInfo {
+  color: #48dbfb;
+}
+.typeDebug {
+  color: #a29bfe;
+}
 
 .args {
   word-break: break-all;

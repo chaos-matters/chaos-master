@@ -146,7 +146,9 @@ export function MainWorkspace(props: AppProps) {
   const { isCompact, toggleCompact } = useCompactMode()
   const [showSidebar, setShowSidebar] = createSignal(true)
   const _requestModal = useRequestModal()
-  const [sidebarHidden, setSidebarHidden] = createSignal(false)
+  const [sidebarHidden, setSidebarHidden] = createSignal(
+    window.innerWidth < 769,
+  )
   const [sidebarLayoutMode, setSidebarLayoutMode] = persistentSignal<
     'compact' | 'wide'
   >('sidebar-layout-mode', 'wide')
@@ -175,13 +177,16 @@ export function MainWorkspace(props: AppProps) {
     const handler = (e: MediaQueryListEvent) => {
       setIsMobile(e.matches)
       if (e.matches && !isCompact()) toggleCompact()
+      // Auto-hide sidebar when switching to mobile layout
+      if (e.matches) setSidebarHidden(true)
     }
     mq.addEventListener('change', handler)
     return () => {
       mq.removeEventListener('change', handler)
     }
   })
-  const [showTimeline, setShowTimeline] = createSignal(true)
+  // Hide timeline by default on mobile -- users can toggle it back on
+  const [showTimeline, setShowTimeline] = createSignal(window.innerWidth >= 769)
   const [selectedPaletteId, setSelectedPaletteId] = createSignal<string>('')
   const [selectedPalette, setSelectedPalette] = createSignal<
     Palette | undefined
@@ -1165,7 +1170,23 @@ export function MainWorkspace(props: AppProps) {
               class={ui.canvasContainer}
               data-tour-target="canvas"
               classList={{ [ui.fullscreen as string]: !showSidebar() }}
+              onClick={() => {
+                // Tap canvas to close sidebar on mobile
+                if (isMobile() && !sidebarHidden()) setSidebarHidden(true)
+              }}
             >
+              <Show when={isMobile()}>
+                <button
+                  class={ui.sidebarToggle}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setSidebarHidden((p) => !p)
+                  }}
+                  aria-label="Toggle sidebar"
+                >
+                  <Menu />
+                </button>
+              </Show>
               <AutoCanvas class={ui.canvas} pixelRatio={pixelRatio()}>
                 <WheelZoomCamera2D
                   zoom={[effectiveZoom, setFlameZoom]}
@@ -1230,15 +1251,6 @@ export function MainWorkspace(props: AppProps) {
                     setPixelRatio={setPixelRatio}
                     controlsDisabled={timeline.isPlaying()}
                   />
-                  <Show when={isMobile()}>
-                    <button
-                      class={ui.sidebarToggle}
-                      onClick={() => setSidebarHidden((p) => !p)}
-                      aria-label="Toggle sidebar"
-                    >
-                      <Menu />
-                    </button>
-                  </Show>
                 </div>
                 <Show when={showTimeline()}>
                   <div
@@ -1388,6 +1400,22 @@ export function MainWorkspace(props: AppProps) {
                       </button>
                     </div>
                   </Show>
+                </div>
+              </Show>
+              <Show when={isMobile()}>
+                <div class={ui.sidebarCloseRow}>
+                  <button
+                    class={ui.sidebarCloseBtn}
+                    onClick={() => setSidebarHidden(true)}
+                    aria-label="Collapse sidebar"
+                  >
+                    <svg viewBox="0 0 24 24" width="18" height="18">
+                      <path
+                        fill="currentColor"
+                        d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"
+                      />
+                    </svg>
+                  </button>
                 </div>
               </Show>
               <div class={ui.sidebarScroll} ref={sidebarScrollRef}>
@@ -1821,9 +1849,7 @@ export function MainWorkspace(props: AppProps) {
                               setFlameDescriptor((draft) => {
                                 draft.transforms[tid]!.variations[
                                   generateVariationId()
-                                ] = deepClone(
-                                  getVariationDefault('linear', 1),
-                                )
+                                ] = deepClone(getVariationDefault('linear', 1))
                               })
                             }}
                           >
@@ -2016,8 +2042,9 @@ export function MainWorkspace(props: AppProps) {
                       class={ui.addFlameButton}
                       onClick={() => {
                         setFlameDescriptor((draft) => {
-                          draft.transforms[generateTransformId()] =
-                            deepClone(newDefaultTransform())
+                          draft.transforms[generateTransformId()] = deepClone(
+                            newDefaultTransform(),
+                          )
                         })
                       }}
                     >

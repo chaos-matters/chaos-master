@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2026-05-27
+
+### Added
+
+- **Mobile floating actions widget**: Double-tap the drag handle to collapse the widget into a compact dot in the top-right corner. Tap the dot to restore. Fully draggable in all directions on touch devices.
+- **Copy Device Info**: New button in the About panel copies full GPU and browser metadata (user agent, screen, WebGPU device, VRAM, CPU cores) to clipboard for easy bug reporting.
+- **MobileContext**: Shared reactive mobile/touch detection context (`useMobile`) for consistent responsive behavior across components.
+- **Guided Tours section**: App Tour, Sidebar Tour, and Timeline Tour buttons added to the About panel.
+
+### Changed
+
+- **About panel redesigned**: Compact hero layout with title, icons, and version badges on a single row. Section titles now use small uppercase with accent bars (matching sidebar style). Keyboard shortcuts rendered as realistic keycaps with gradient and shadow. Tour buttons feature accent-bar hover effect.
+- **About panel width**: Increased from 30rem to 34rem for a more spacious layout on desktop; still responsive on mobile.
+- **GPU info pills**: Two-color pill system -- green for hardware specs (Device, Max Buffer, VRAM), blue for identification (Vendor, Architecture).
+- **Branding**: Renamed version display from "Chaos Master" to "CM", removed alpha tag for a cleaner look.
+- **Debug panel**: Converted close button to a chevron toggle tab on the panel edge. Starts collapsed by default on small screens. Flex wrapper layout prevents occlusion with timeline controls.
+- **Console log viewer**: Constrained width with horizontal scrolling to prevent long log lines from blowing out the About panel.
+- **Changelog icon**: Fixed stroke-based SVG rendering (was invisible due to `fill: currentColor` on a stroke-only icon).
+- Removed verbose WebGPU/canvas `console.info` debug logs from `WebgpuAdapter.ts` and `AutoCanvas.tsx` that were added during iOS debugging.
+
+### Fixed
+
+- **iOS WebGPU crash**: Fixed canvas context initialization by ensuring the canvas element is attached to the DOM before calling `getContext('webgpu')`, resolving crashes on iOS Safari/WebKit.
+- **iOS touch support**: Added touch event handling for dope sheet resize bar and timeline scrubbing.
+- **iOS `structuredClone` compatibility**: Replaced `structuredClone` usage with manual cloning for environments where it is unavailable.
+- **SolidJS fragment error**: Refactored GPU info grid to use `For` with a data array instead of nested fragments inside elements, which is not valid in SolidJS.
+- **Lint errors**: Fixed 7 lint violations (`no-restricted-globals` for `navigator`/`performance`, `no-floating-promises`) across `ConsoleLog.tsx` and `ErrorHandling.tsx`.
+
 ## [0.8.1] - 2026-05-26
 
 ### Added

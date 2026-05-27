@@ -255,9 +255,7 @@ function RecentFlameItem(props: {
         const clone = deepClone(props.recent.flame)
         props.onSelect(
           clone,
-          props.recent.tracks
-            ? deepClone(props.recent.tracks)
-            : undefined,
+          props.recent.tracks ? deepClone(props.recent.tracks) : undefined,
         )
       }}
       onMouseEnter={() => {

@@ -21,6 +21,11 @@
   /* allow pointer events to act correctly on touch devices */
   touch-action: none;
 
+  /* Prevent iOS text selection / magnifier popup on canvas long-press */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+
   &:not(.fullscreen) {
     /* allow canvas fade to go under the sidebar a bit */
     margin-left: -0.4rem;
@@ -83,7 +88,9 @@
   position: relative;
   z-index: 10;
   pointer-events: auto;
-  touch-action: none;
+  /* Must override parent .bottom-bar's touch-action:auto, otherwise the
+     browser intercepts the touch for scrolling before pointer events fire. */
+  touch-action: none !important;
   /* The border that visually connects view-controls to timeline */
   border-top: 1px solid var(--neutral-200);
   transition: border-top-color 0.15s;
@@ -135,6 +142,19 @@
 
 .canvas {
   image-rendering: pixelated;
+  /* Prevent iOS text selection / magnifier popup */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Global: prevent text selection popups on all canvas elements on touch devices */
+@media (pointer: coarse) {
+  :global(canvas) {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
 }
 .labeled-input {
   display: contents;
@@ -1214,9 +1234,17 @@
       'viewport-controls';
   }
 
+  /* On mobile, the canvas container should not have the sidebar gap */
+  .canvas-container:not(.fullscreen) {
+    margin-left: 0;
+  }
+
   .sidebar {
     position: fixed;
-    inset: 0;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
     z-index: 100;
     width: 100%;
     max-width: 100%;
@@ -1228,12 +1256,23 @@
     background: var(--neutral-900);
   }
 
+  /* Landscape on small screens: sidebar should not cover full width */
+  @media (orientation: landscape) {
+    .sidebar {
+      right: auto;
+      width: min(320px, 60vw);
+      border-right: 1px solid var(--neutral-800);
+      box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+    }
+  }
+
   .sidebarResizeHandle {
     display: none;
   }
 
   .sidebarHidden {
     transform: translateX(-100%);
+    pointer-events: none;
   }
 
   .bottom-bar {
@@ -1247,41 +1286,90 @@
 }
 
 .sidebarToggle {
+  /* Top-left hamburger button, overlaid on canvas */
+  position: absolute;
+  top: env(safe-area-inset-top, 8px);
+  left: 8px;
+  z-index: 10;
   width: 44px;
   height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: none;
-  border-radius: var(--space-2);
-  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   cursor: pointer;
-  color: var(--neutral-600);
+  color: rgba(255, 255, 255, 0.85);
   flex-shrink: 0;
+  pointer-events: auto;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 
   & svg {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
   }
 
   &:hover {
-    color: black;
-    background: var(--neutral-200);
+    background: rgba(0, 0, 0, 0.5);
+    border-color: rgba(255, 255, 255, 0.25);
   }
 
-  [data-theme='dark'] & {
-    color: var(--neutral-400);
-
-    &:hover {
-      color: white;
-      background: var(--neutral-800);
-    }
+  &:active {
+    background: rgba(0, 0, 0, 0.6);
   }
 }
 
 @media (min-width: 769px) {
   .sidebarToggle {
     display: none;
+  }
+}
+
+/* Close button inside the mobile sidebar */
+.sidebar-close-row {
+  display: flex;
+  justify-content: flex-start;
+  padding: 0.35rem 0.5rem 0;
+  flex-shrink: 0;
+}
+
+.sidebar-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  appearance: none;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--neutral-700);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--neutral-400);
+  padding: 0;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+
+  & svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--neutral-200);
+    border-color: var(--neutral-500);
+  }
+
+  &:active {
+    background: rgba(255, 255, 255, 0.18);
+    transform: scale(0.92);
   }
 }
 

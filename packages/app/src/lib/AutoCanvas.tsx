@@ -83,13 +83,7 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
   })
 
   function createContext(canEl: HTMLCanvasElement) {
-    console.info('[WebGPU] Creating canvas context...', {
-      canvasWidth: canEl.width,
-      canvasHeight: canEl.height,
-      isConnected: canEl.isConnected,
-    })
     const canvasFormat = navigator.gpu.getPreferredCanvasFormat()
-    console.info('[WebGPU] Preferred canvas format:', canvasFormat)
     const context = canEl.getContext('webgpu')
     if (!context) {
       console.error('[WebGPU] canvas.getContext("webgpu") returned null')
@@ -98,13 +92,11 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
       })
     }
     const alphaMode = props.alphaMode ?? 'opaque'
-    console.info('[WebGPU] Configuring context:', { format: canvasFormat, alphaMode })
     context.configure({
       device,
       format: canvasFormat,
       alphaMode,
     })
-    console.info('[WebGPU] Canvas context configured successfully')
     return { context, canvasFormat }
   }
 
