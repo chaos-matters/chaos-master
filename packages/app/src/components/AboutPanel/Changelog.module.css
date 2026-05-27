@@ -1,16 +1,6 @@
 .changelogModal {
   max-width: 570px;
   width: 82vw;
-  max-height: 63vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.changelogContainer {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
 }
 
 /* ---- Scroll area ---- */
@@ -18,7 +8,10 @@
 .content {
   padding: 0.875rem 1.25rem 1.25rem;
   overflow-y: auto;
-  flex: 1;
+  /* Explicit max-height avoids relying on flex height resolution,
+     which iOS Safari doesn't support inside <dialog> with max-height only.
+     ~4rem accounts for title bar + dialog padding + gap. */
+  max-height: calc(63vh - 4rem);
   scrollbar-width: thin;
   scrollbar-color: var(--neutral-700, #444) transparent;
 }

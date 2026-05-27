@@ -31,7 +31,6 @@
   gap: var(--space-4);
   border-radius: var(--space-4);
   border: 2px solid var(--border-color);
-  white-space: break-spaces;
   background-color: var(--bg-color);
   color: var(--text-color);
   margin: auto;
@@ -39,6 +38,9 @@
   opacity: 0;
   animation: fade-in 400ms forwards;
   outline: none;
+  /* Safari: dialog needs explicit max dimensions to prevent flex collapse */
+  max-height: min(85vh, 100%);
+  max-width: min(90vw, 100%);
 }
 
 ::backdrop {

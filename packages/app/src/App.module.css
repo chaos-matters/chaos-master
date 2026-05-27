@@ -53,10 +53,18 @@
 .view-controls-wrapper {
   display: flex;
   padding: var(--space-2);
+  padding-right: 6rem; /* Space for the CM version tag */
   gap: var(--space-2);
   background: var(--neutral-100);
   border-top: 1px solid var(--neutral-200);
   pointer-events: auto;
+
+  overflow-x: auto;
+  min-width: 0;
+  scrollbar-width: none; /* Firefox */
+  &::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+  }
 
   [data-theme='dark'] & {
     background: var(--neutral-950);
