@@ -29,6 +29,7 @@ import { ProgressBar } from './components/ProgressBar/ProgressBar'
 import { getPresetFromQuality, qualityPresets, } from './components/Quality/QualityPresets'
 import { QuickVariationPicker } from './components/QuickVariationPicker/QuickVariationPicker'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
+import { createDiscordShareModal } from './components/DiscordShareModal/DiscordShareModal'
 import { AngleEditor } from './components/Sliders/ParametricEditors/AngleEditor'
 import { ScrubInput } from './components/Sliders/ScrubInput'
 import { Slider } from './components/Sliders/Slider'
@@ -61,6 +62,9 @@ import { Cross, Eye, EyeOff, Menu, Plus, Share } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
 import { createAnimationExport } from './utils/animationExport'
 import { deepClone } from './utils/clone'
+import { sendFlameToDiscord } from './utils/discordWebhook'
+import { addFlameDataToPng } from './utils/flameInPng'
+import { compressJsonQueryParam } from './utils/jsonQueryParam'
 import { createStoreHistory } from './utils/createStoreHistory'
 import { persistentSignal } from './utils/persistentSignal'
 import { buildReadableIds } from './utils/readableIds'
@@ -509,6 +513,8 @@ export function MainWorkspace(props: AppProps) {
     () => timeline.config(),
   )
 
+  const { showDiscordShareModal } = createDiscordShareModal()
+
   function startAnimationExport(
     config: AnimationExportConfig,
     _placeholderCanvas: HTMLCanvasElement,
@@ -557,6 +563,50 @@ export function MainWorkspace(props: AppProps) {
       () => selectedPalette(),
       startAnimationExport,
     )
+
+  async function shareToDiscord() {
+    // Step 1: Capture the current flame at native device resolution
+    const rawBlob = await new Promise<Blob | null>((resolve) => {
+      const currentRatio = pixelRatio()
+      const exportRatio = window.devicePixelRatio || 2
+      setPixelRatio(exportRatio)
+      setOnExportImage(() => (canvas: HTMLCanvasElement) => {
+        setOnExportImage(undefined)
+        setPixelRatio(currentRatio)
+        canvas.toBlob((b) => resolve(b), 'image/png', 1)
+      })
+    })
+
+    if (!rawBlob) {
+      showToast('Failed to capture flame image')
+      return
+    }
+
+    // Step 2: Embed flame data into the PNG so it can be loaded back
+    const tracks = timeline.tracks()
+    const config = timeline.config()
+    const hasAnimation = tracks.some((track) => track.keyframes.length > 0)
+    const payload = hasAnimation
+      ? { flame: flameDescriptor, animation: { tracks, config } }
+      : flameDescriptor
+    const encoded = await compressJsonQueryParam(payload)
+    let pngBytes = new Uint8Array(await rawBlob.arrayBuffer())
+    pngBytes = new Uint8Array(
+      await addFlameDataToPng(encoded, pngBytes).arrayBuffer(),
+    )
+    const blob = new Blob([pngBytes], { type: 'image/png' })
+
+    // Step 3: Show the modal with a live preview of the captured image
+    const previewUrl = URL.createObjectURL(blob)
+    const meta = await showDiscordShareModal(previewUrl)
+    URL.revokeObjectURL(previewUrl)
+    if (!meta || !meta.author?.trim()) return
+
+    // Step 4: Send to Discord
+    showToast('Sending to Discord...')
+    const ok = await sendFlameToDiscord(blob, meta)
+    showToast(ok ? 'Shared to Discord' : 'Discord share failed')
+  }
 
   const { showLogoFaviconGenerator } = createLogoFaviconGenerator(
     flameDescriptor,
@@ -2586,6 +2636,7 @@ export function MainWorkspace(props: AppProps) {
               // eslint-disable-next-line @typescript-eslint/no-floating-promises
               showShareLinkModal()
             }}
+            onShareDiscord={shareToDiscord}
             onLogoFavicon={showLogoFaviconGenerator}
             onRandomizeColors={() => {
               setFlameDescriptor((draft) => {

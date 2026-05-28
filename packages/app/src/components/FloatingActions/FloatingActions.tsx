@@ -1,5 +1,5 @@
 import { createEffect, createSignal, Show } from 'solid-js'
-import { Bookmark, CameraIcon, Eye, FolderOpen, Pause, PlayPause, Share, Shuffle, Zap, } from '@/icons'
+import { Bookmark, CameraIcon, Discord, Eye, FolderOpen, Pause, PlayPause, Share, Shuffle, Zap, } from '@/icons'
 import { defaultPills, QualityPresets } from '../Quality/QualityPresets'
 import ui from './FloatingActions.module.css'
 
@@ -11,6 +11,7 @@ type Props = {
   onRender: () => void
   onQuickExport: () => void
   onShareLink: () => void
+  onShareDiscord: () => void
   onLogoFavicon: () => void
   onRandomizeColors: () => void
   hideDiceButtons: () => boolean
@@ -215,6 +216,14 @@ export function FloatingActions(props: Props) {
               data-tour-target="share-link"
             >
               <Share />
+            </button>
+            <button
+              class={ui.button}
+              onClick={props.onShareDiscord}
+              title="Share to Discord"
+              data-tour-target="share-discord"
+            >
+              <Discord />
             </button>
             <button
               class={ui.button}

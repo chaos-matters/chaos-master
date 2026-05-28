@@ -5,6 +5,7 @@ import CameraIcon from './camera.svg'
 import Changelog from './changelog.svg'
 import ChevronDown from './chevron-down.svg'
 import Cross from './cross.svg'
+import Discord from './discord.svg'
 import Eye from './eye.svg'
 import EyeOff from './eye-off.svg'
 import FolderOpen from './folder-open.svg'
@@ -38,6 +39,7 @@ export {
   Changelog,
   ChevronDown,
   Cross,
+  Discord,
   Eye,
   EyeOff,
   FolderOpen,
