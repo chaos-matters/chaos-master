@@ -3,6 +3,7 @@ import { Portal } from 'solid-js/web'
 import { vec2f, vec4f } from 'typegpu/data'
 import { Checkbox } from '@/components/Checkbox/Checkbox'
 import { DEFAULT_VARIATION_PREVIEW_POINT_COUNT, THUMBNAIL_PREVIEW_QUALITY, THUMBNAIL_PREVIEW_QUALITY_HOVER, } from '@/defaults'
+import { Heart } from '@/icons'
 import { examples } from '@/flame/examples'
 import { animationDefs, getAnimationFlame } from '@/flame/examples/animations'
 import { Flam3 } from '@/flame/Flam3'
@@ -370,6 +371,15 @@ export function WelcomeScreen(props: WelcomeScreenProps) {
               <span class={`${ui.techPill} ${ui.techPillCyan}`}>WebGPU</span>
               <span class={`${ui.techPill} ${ui.techPillBlue}`}>TypeGPU</span>
               <span class={`${ui.techPill} ${ui.techPillGreen}`}>SolidJS</span>
+              <a
+                class={`${ui.techPill} ${ui.supportPill}`}
+                href="https://ko-fi.com/chaosmatters"
+                target="_blank"
+                title="Support Chaos Master"
+              >
+                <Heart />
+                Support
+              </a>
               <Show when={props.onShowAbout}>
                 <button
                   class={`${ui.techPill} ${ui.aboutPill}`}

@@ -380,6 +380,32 @@
   color: rgba(70, 210, 140, 0.6);
 }
 
+.supportPill {
+  cursor: pointer;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid rgba(255, 140, 180, 0.25);
+  background: rgba(255, 100, 150, 0.08);
+  color: rgba(255, 150, 180, 0.55);
+  transition: all 0.2s ease;
+  line-height: 1;
+  text-decoration: none;
+
+  & > svg {
+    width: 0.85rem;
+    height: 0.85rem;
+    vertical-align: middle;
+  }
+
+  &:hover {
+    border-color: rgba(255, 140, 180, 0.4);
+    background: rgba(255, 100, 150, 0.15);
+    color: rgba(255, 170, 195, 0.8);
+  }
+}
+
 .aboutPill {
   cursor: pointer;
   font-family: inherit;
@@ -556,6 +582,18 @@
   border-color: rgba(0, 0, 0, 0.08);
   background: rgba(0, 0, 0, 0.03);
   color: rgba(0, 0, 0, 0.35);
+}
+
+[data-theme='light'] .supportPill {
+  border-color: rgba(220, 60, 100, 0.2);
+  background: rgba(220, 50, 80, 0.06);
+  color: rgba(180, 40, 70, 0.7);
+  text-decoration: none;
+}
+[data-theme='light'] .supportPill:hover {
+  border-color: rgba(220, 60, 100, 0.35);
+  background: rgba(220, 50, 80, 0.12);
+  color: rgba(160, 30, 50, 0.85);
 }
 
 [data-theme='light'] .techPillCyan {
