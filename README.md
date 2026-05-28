@@ -1,4 +1,6 @@
 [![Chaos-Master CI](https://github.com/chaos-matters/chaos-master/actions/workflows/node.js.yml/badge.svg)](https://github.com/chaos-matters/chaos-master/actions/workflows/node.js.yml)
+[![Ko-fi](https://img.shields.io/badge/Support-Ko--fi-ff5e5b?style=flat&logo=ko-fi&logoColor=white)](https://ko-fi.com/chaosmatters)
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub-ea4aaa?style=flat&logo=github&logoColor=white)](https://github.com/sponsors/chaos-matters)
 
 # Chaos Master
 

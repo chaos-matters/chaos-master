@@ -1,6 +1,6 @@
 import { createResource, createSignal, For, Show, Suspense } from 'solid-js'
 import { IS_DEV } from '@/defaults'
-import { Changelog, GitHub, Terminal, TriangleAlert } from '@/icons'
+import { Changelog, Discord, GitHub, Heart, Terminal, TriangleAlert } from '@/icons'
 import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
 import { formatBytes } from '@/utils/formatBytes'
 import { GIT_SHA, VERSION } from '@/version'
@@ -173,11 +173,27 @@ function HelpModal(props: HelpModalProps) {
           <div class={ui.iconRow}>
             <a
               class={ui.iconLink}
-              href="https://github.com/chaos-matters/chaos-master"
+              href="https://ko-fi.com/chaosmatters"
               target="_blank"
-              title="GitHub"
+              title="Support on Ko-fi"
+            >
+              <Heart />
+            </a>
+            <a
+              class={ui.iconLink}
+              href="https://github.com/sponsors/chaos-matters"
+              target="_blank"
+              title="Sponsor on GitHub"
             >
               <GitHub />
+            </a>
+            <a
+              class={ui.iconLink}
+              href={atob('aHR0cHM6Ly9kaXNjb3JkLmdnL1FrUk1aVnFmNHU=')}
+              target="_blank"
+              title="Join Discord"
+            >
+              <Discord />
             </a>
             <button
               class={ui.iconBtn}
