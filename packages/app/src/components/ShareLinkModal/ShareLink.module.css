@@ -28,15 +28,23 @@
 .textarea {
   width: 100%;
   resize: vertical;
+  min-height: 2.2rem;
   font-family: var(--font-mono, monospace);
-  font-size: 0.75rem;
-  padding: var(--space-1) var(--space-2);
+  font-size: 0.85rem;
+  padding: 0.5rem 0.8rem;
   border: 1px solid var(--border-color, #444);
-  border-radius: 4px;
+  border-radius: 8px;
   background: var(--bg-input, #1a1a1a);
   color: var(--text-color, #eee);
   line-height: 1.4;
   word-break: break-all;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.textarea:hover {
+  border-color: var(--color-accent, #4caf50);
+  background: #252525;
 }
 
 .copiedMsg {

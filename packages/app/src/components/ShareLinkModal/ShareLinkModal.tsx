@@ -34,7 +34,28 @@ function ShareLinkModal(props: ShareLinkModalProps) {
           ? { tracks: props.tracks, config: props.config }
           : undefined,
       )
-      const newUrl = `${window.location.origin}/?flame=${encoded}`
+
+      let newUrl = `${window.location.origin}/?flame=${encoded}`
+
+      try {
+        const res = await fetch('/api/shorten', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ payload: encoded }),
+        })
+
+        if (res.ok) {
+          const json = await res.json()
+          if (json.id) {
+            newUrl = `${window.location.origin}/?s=${json.id}`
+          }
+        }
+      } catch (err) {
+        console.error('Failed to shorten URL:', err)
+      }
+
       setUrl(newUrl)
       await navigator.clipboard.writeText(newUrl)
       setCopied(true)
@@ -66,9 +87,13 @@ function ShareLinkModal(props: ShareLinkModalProps) {
           class={ui.textarea}
           value={url()}
           readOnly
-          rows={4}
-          onFocus={(e) => {
+          title="Click to copy"
+          rows={url().length > 100 ? 4 : 1}
+          onClick={async (e) => {
             e.currentTarget.select()
+            await navigator.clipboard.writeText(url())
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2000)
           }}
         />
         <Show when={copied()}>

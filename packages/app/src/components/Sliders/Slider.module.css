@@ -72,8 +72,9 @@
     border-radius: var(--round);
     content: '';
     height: 4px;
-    left: 0;
-    right: 0;
+    /* Inset by half thumb width (14px/2) so fill track aligns with thumb center */
+    left: 7px;
+    right: 7px;
     top: calc(50% - 2px);
     z-index: 0;
     background: linear-gradient(
@@ -158,4 +159,40 @@
       oklab(from var(--color) calc(l * 0.75) a b)
     );
   }
+}
+
+.label.compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+}
+
+.label.compact .slider-wrapper {
+  width: 76px;
+  min-width: 36px;
+  height: 16px;
+}
+
+.label.compact .value {
+  font-size: 0.6rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  min-width: 2.4em;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.label.compact .slider {
+  height: 16px;
+  padding: 0;
+  width: 100%;
+}
+
+.label.compact .slider::-webkit-slider-thumb {
+  margin-top: 1px;
+}
+
+.label.compact .labelRow {
+  padding-right: 0;
 }

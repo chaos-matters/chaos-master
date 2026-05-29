@@ -126,6 +126,7 @@ const ICO_SIZES = [16, 32, 48, 256]
 
 interface LogoDialogProps {
   flame: FlameDescriptor
+  isGenerating: boolean
   onGenerate: () => void
   onLoadIntoMainView: () => void
   onDownloadPng: () => void
@@ -351,6 +352,10 @@ function LogoDialog(props: LogoDialogProps) {
             type="button"
             class={ui.generateButton}
             onClick={props.onGenerate}
+            disabled={props.isGenerating}
+            classList={{
+              [ui.generateButtonDisabled as string]: props.isGenerating,
+            }}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -368,7 +373,7 @@ function LogoDialog(props: LogoDialogProps) {
               <line x1="15" y1="15" x2="21" y2="21" />
               <line x1="4" y1="4" x2="9" y2="9" />
             </svg>
-            Generate Random
+            {props.isGenerating ? 'Generating...' : 'Generate Random'}
           </button>
 
           {/* Render settings */}
@@ -1002,20 +1007,10 @@ export function createLogoFaviconGenerator(
     )
     const [selectedEntryTimestamp, setSelectedEntryTimestamp] =
       createSignal<number>(0)
+    const [isGenerating, setIsGenerating] = createSignal(false)
 
     const [flame, setFlame] = createStore<FlameDescriptor>(
-      JSON.parse(
-        JSON.stringify(
-          generateRandomFlame({
-            strength: strength(),
-            minTransforms: minTransforms(),
-            maxTransforms: maxTransforms(),
-            minVariations: minVariations(),
-            maxVariations: maxVariations(),
-            allowedVariations: [...variationTypes],
-          }),
-        ),
-      ),
+      deepClone(_flameDescriptor),
     )
 
     const renderSettings = () => flame.renderSettings
@@ -1032,62 +1027,68 @@ export function createLogoFaviconGenerator(
     }
 
     async function handleGenerate() {
-      setSelectedEntryTimestamp(0)
-      // Save current flame to history before generating new one
-      const prevThumb = await captureThumbnail(HISTORY_THUMBNAIL_SIZE)
-      if (prevThumb !== null) {
-        const entry: HistoryEntry = {
-          flame: deepClone(flame),
-          thumbnail: prevThumb,
-          timestamp: Date.now(),
+      if (isGenerating()) return
+      setIsGenerating(true)
+      try {
+        setSelectedEntryTimestamp(0)
+        // Save current flame to history before generating new one
+        const prevThumb = await captureThumbnail(HISTORY_THUMBNAIL_SIZE)
+        if (prevThumb !== null) {
+          const entry: HistoryEntry = {
+            flame: deepClone(flame),
+            thumbnail: prevThumb,
+            timestamp: Date.now(),
+          }
+          void addHistoryEntry(entry, MAX_HISTORY).then(setHistoryEntries)
         }
-        void addHistoryEntry(entry, MAX_HISTORY).then(setHistoryEntries)
-      }
 
-      const config: GenerateRandomFlameConfig = {
-        strength: strength(),
-        minTransforms: minTransforms(),
-        maxTransforms: maxTransforms(),
-        minVariations: minVariations(),
-        maxVariations: maxVariations(),
-        allowedVariations: [...selectedVariations()],
+        const config: GenerateRandomFlameConfig = {
+          strength: strength(),
+          minTransforms: minTransforms(),
+          maxTransforms: maxTransforms(),
+          minVariations: minVariations(),
+          maxVariations: maxVariations(),
+          allowedVariations: [...selectedVariations()],
+        }
+        const prevRs = { ...flame.renderSettings }
+        const newFlame = generateRandomFlame(config)
+        const rs = newFlame.renderSettings
+        if (randomizeSkipIters()) {
+          rs.skipIters = RENDER_SETTING_RANGES.skipIters()
+        } else {
+          rs.skipIters = prevRs.skipIters
+        }
+        if (randomizeExposure()) {
+          rs.exposure = RENDER_SETTING_RANGES.exposure()
+        } else {
+          rs.exposure = prevRs.exposure
+        }
+        if (randomizeContrast()) {
+          rs.contrast = RENDER_SETTING_RANGES.contrast()
+        } else {
+          rs.contrast = prevRs.contrast
+        }
+        if (randomizeGamma()) {
+          rs.gamma = RENDER_SETTING_RANGES.gamma()
+        } else {
+          rs.gamma = prevRs.gamma
+        }
+        if (randomizeHighlightPower()) {
+          rs.highlightPower = RENDER_SETTING_RANGES.highlightPower()
+        } else {
+          rs.highlightPower = prevRs.highlightPower
+        }
+        if (randomizeVibrancy()) {
+          rs.vibrancy = RENDER_SETTING_RANGES.vibrancy()
+        } else {
+          rs.vibrancy = prevRs.vibrancy
+        }
+        setFlame(reconcile(deepClone(newFlame)))
+        setCameraZoom(1)
+        setCameraPosition(vec2f(0, 0))
+      } finally {
+        setIsGenerating(false)
       }
-      const prevRs = { ...flame.renderSettings }
-      const newFlame = generateRandomFlame(config)
-      const rs = newFlame.renderSettings
-      if (randomizeSkipIters()) {
-        rs.skipIters = RENDER_SETTING_RANGES.skipIters()
-      } else {
-        rs.skipIters = prevRs.skipIters
-      }
-      if (randomizeExposure()) {
-        rs.exposure = RENDER_SETTING_RANGES.exposure()
-      } else {
-        rs.exposure = prevRs.exposure
-      }
-      if (randomizeContrast()) {
-        rs.contrast = RENDER_SETTING_RANGES.contrast()
-      } else {
-        rs.contrast = prevRs.contrast
-      }
-      if (randomizeGamma()) {
-        rs.gamma = RENDER_SETTING_RANGES.gamma()
-      } else {
-        rs.gamma = prevRs.gamma
-      }
-      if (randomizeHighlightPower()) {
-        rs.highlightPower = RENDER_SETTING_RANGES.highlightPower()
-      } else {
-        rs.highlightPower = prevRs.highlightPower
-      }
-      if (randomizeVibrancy()) {
-        rs.vibrancy = RENDER_SETTING_RANGES.vibrancy()
-      } else {
-        rs.vibrancy = prevRs.vibrancy
-      }
-      setFlame(reconcile(deepClone(newFlame)))
-      setCameraZoom(1)
-      setCameraPosition(vec2f(0, 0))
     }
 
     function handleDownloadPng() {
@@ -1157,6 +1158,7 @@ export function createLogoFaviconGenerator(
       content: ({ respond }) => (
         <LogoDialog
           flame={flame}
+          isGenerating={isGenerating()}
           onGenerate={handleGenerate}
           onLoadIntoMainView={() => {
             history.replace(deepClone(flame))

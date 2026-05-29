@@ -1,0 +1,1 @@
+export { useShortcutManager } from './useShortcutManager'

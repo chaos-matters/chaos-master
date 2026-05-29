@@ -21,9 +21,7 @@ class LogoHistoryDB extends Dexie {
 
 const db = new LogoHistoryDB()
 
-export async function loadHistoryEntries(
-  maxCount: number,
-): Promise<HistoryEntry[]> {
+export function loadHistoryEntries(maxCount: number): Promise<HistoryEntry[]> {
   return db.entries.orderBy('timestamp').reverse().limit(maxCount).toArray()
 }
 

@@ -6,11 +6,14 @@ import { CompactModeProvider } from './contexts/CompactModeContext'
 import { KeyframeTargetProvider } from './contexts/KeyframeTargetContext'
 import { createSpotlightTourState, SpotlightTourContext, } from './contexts/SpotlightTourContext'
 import { ThemeContextProvider } from './contexts/ThemeContext'
-import { ToastProvider } from './contexts/ToastContext'
+import { ToastProvider, useToast } from './contexts/ToastContext'
 import { IS_DEV } from './defaults'
 import { Root } from './lib/Root'
 import { MainWorkspace } from './MainWorkspace'
 import { appTour } from './tours/appTour'
+import { example1CreationTour } from './tours/example1CreationTour'
+import { example2CreationTour } from './tours/example2CreationTour'
+import { flameCreationTour } from './tours/flameCreationTour'
 import { sidebarTour } from './tours/sidebarTour'
 import { timelineTour } from './tours/timelineTour'
 import { decodeSharePayload } from './utils/jsonQueryParam'
@@ -25,16 +28,32 @@ function getTour(id: string): TourGuide | undefined {
   switch (id) {
     case 'app':
       return appTour
+    case 'flame-creation':
+      return flameCreationTour
     case 'sidebar':
       return sidebarTour
     case 'timeline':
       return timelineTour
+    case 'example1-creation':
+      return example1CreationTour
+    case 'example2-creation':
+      return example2CreationTour
     default:
       return undefined
   }
 }
 
 export type ExportImageType = (canvas: HTMLCanvasElement) => void
+
+function QueryErrorToast(props: { error: string | null }) {
+  const { showToast } = useToast()
+  createEffect(() => {
+    if (props.error) {
+      showToast(props.error)
+    }
+  })
+  return null
+}
 
 export function Wrappers() {
   const [showWelcome, setShowWelcome] = createSignal(!hasWelcomeBeenDismissed())
@@ -48,10 +67,31 @@ export function Wrappers() {
   const [selectedWelcomeTracks, setSelectedWelcomeTracks] = createSignal<
     TimelineTrack[] | undefined
   >()
+  const [queryError, setQueryError] = createSignal<string | null>(null)
 
   const [flameFromQuery] = createResource(async () => {
     const urlParams = new URLSearchParams(window.location.search)
-    const flameDef = urlParams.get('flame')
+    const shortId = urlParams.get('s')
+    let flameDef = urlParams.get('flame')
+
+    if (shortId) {
+      try {
+        const res = await fetch(`/api/shorten/${shortId}`)
+        if (res.ok) {
+          const json = await res.json()
+          if (json.payload) {
+            flameDef = json.payload
+          }
+        } else {
+          setQueryError('The shared link could not be found or has expired.')
+          console.error('Failed to fetch short URL payload', await res.text())
+        }
+      } catch (err) {
+        setQueryError('Failed to fetch the shared link. Network error.')
+        console.error('Error fetching short URL:', err)
+      }
+    }
+
     if (flameDef !== null) {
       try {
         const result = await decodeSharePayload(flameDef)
@@ -67,6 +107,7 @@ export function Wrappers() {
         }
         return result
       } catch (err) {
+        setQueryError('Failed to decode the shared fractal.')
         console.error('Failed to decode share payload:', err)
       }
     }
@@ -150,6 +191,7 @@ export function Wrappers() {
                 >
                   <Suspense>
                     <ToastProvider>
+                      <QueryErrorToast error={queryError()} />
                       <MainWorkspace
                         flameFromQuery={flameFromQuery()}
                         flameFromWelcome={selectedFlame}

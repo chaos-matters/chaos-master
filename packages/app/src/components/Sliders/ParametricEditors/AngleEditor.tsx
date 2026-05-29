@@ -3,6 +3,7 @@ import { ScrubInput } from '@/components/Sliders/ScrubInput'
 import { KeyframeDiamond } from '@/components/Timeline/KeyframeDiamond'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useCompactMode } from '@/contexts/CompactModeContext'
+import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useTimeline } from '@/contexts/TimelineContext'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
@@ -32,6 +33,8 @@ function formatDegrees(degrees: number) {
 export function AngleEditor(props: AngleEditorProps) {
   const history = useChangeHistory()
   const timeline = useTimeline()
+  const { selectedKeyframePath } = useKeyframeTarget()
+  const highlightedPath = () => selectedKeyframePath()
   const { isCompact } = useCompactMode()
   const value = createMemo(() => props.value)
   const mode = () => props.mode ?? 'full'
@@ -121,7 +124,15 @@ export function AngleEditor(props: AngleEditorProps) {
           </div>
         }
       >
-        <label class={ui.label}>
+        <label
+          class={ui.label}
+          data-parameter-path={props.dataParameterPath}
+          classList={{
+            [ui.targeted as string]:
+              props.dataParameterPath !== undefined &&
+              highlightedPath() === props.dataParameterPath,
+          }}
+        >
           <span class={ui.name}>
             <Show when={props.dataParameterPath && timeline}>
               <KeyframeDiamond parameterPath={props.dataParameterPath!} />
@@ -133,6 +144,12 @@ export function AngleEditor(props: AngleEditorProps) {
               scrollIntoViewAndFocusOnChange(value, el)
             }}
             class={ui.track}
+            data-tour-target={
+              props.dataParameterPath
+                ? `angle-${props.dataParameterPath.split('.').pop()}`
+                : undefined
+            }
+            data-parameter-path={props.dataParameterPath}
             onPointerDown={startRotating}
             tabIndex={0}
           >

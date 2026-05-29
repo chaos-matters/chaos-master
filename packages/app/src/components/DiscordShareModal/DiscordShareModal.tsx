@@ -2,8 +2,8 @@ import { createSignal, Show } from 'solid-js'
 import { Discord } from '@/icons'
 import { persistentSignal } from '@/utils/persistentSignal'
 import { Button } from '../Button/Button'
-import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import { useRequestModal } from '../Modal/ModalContext'
+import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './DiscordShare.module.css'
 
 const CANCEL = Symbol('cancel')
@@ -18,21 +18,8 @@ type DiscordShareModalProps = {
   respond: (value: DiscordShareMeta | typeof CANCEL) => void
 }
 
-function getInitials(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .map((w) => w[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-}
-
 function DiscordShareModal(props: DiscordShareModalProps) {
-  const [storedAuthor, setStoredAuthor] = persistentSignal(
-    'discord/author',
-    '',
-  )
+  const [storedAuthor, setStoredAuthor] = persistentSignal('discord/author', '')
   const [author, setAuthor] = createSignal(storedAuthor())
   const [title, setTitle] = createSignal('')
   const [attempted, setAttempted] = createSignal(false)
@@ -147,12 +134,12 @@ export function createDiscordShareModal() {
     if (
       !result ||
       typeof result === 'symbol' ||
-      typeof (result as DiscordShareMeta).author !== 'string' ||
-      (result as DiscordShareMeta).author.trim() === ''
+      typeof result.author !== 'string' ||
+      result.author.trim() === ''
     ) {
       return undefined
     }
-    return result as DiscordShareMeta
+    return result
   }
 
   return { showDiscordShareModal }

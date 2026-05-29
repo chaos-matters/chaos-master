@@ -22,6 +22,14 @@
   "assets": {
     "directory": "dist",
   },
+  "main": "src/worker/index.ts",
+  "kv_namespaces": [
+    {
+      "binding": "KV_SHORTENER",
+      "id": "7cf9ab98f6274a179d63cccbf3c93911",
+      "preview_id": "91bef067328b4904ad4cfbcbbcf980f2",
+    },
+  ],
   "env": {
     "prod": {
       "name": "chaos-master",

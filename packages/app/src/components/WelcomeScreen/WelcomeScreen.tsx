@@ -3,10 +3,10 @@ import { Portal } from 'solid-js/web'
 import { vec2f, vec4f } from 'typegpu/data'
 import { Checkbox } from '@/components/Checkbox/Checkbox'
 import { DEFAULT_VARIATION_PREVIEW_POINT_COUNT, THUMBNAIL_PREVIEW_QUALITY, THUMBNAIL_PREVIEW_QUALITY_HOVER, } from '@/defaults'
-import { Heart } from '@/icons'
 import { examples } from '@/flame/examples'
 import { animationDefs, getAnimationFlame } from '@/flame/examples/animations'
 import { Flam3 } from '@/flame/Flam3'
+import { Heart } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
 import { Root } from '@/lib/Root'
@@ -320,6 +320,31 @@ export function WelcomeScreen(props: WelcomeScreenProps) {
               <div class={ui.tourSection}>
                 <span class={ui.tourSectionTitle}>Guided Tours</span>
                 <div class={ui.tourButtons}>
+                  <button
+                    class={ui.tourBtn}
+                    onClick={() => props.onStartTour?.('example1-creation')}
+                  >
+                    <span class={ui.tourBtnTitle}>Example 1 Creation</span>
+                    <span class={ui.tourBtnSubtitle}>
+                      Recreate the first example
+                    </span>
+                  </button>
+                  <button
+                    class={ui.tourBtn}
+                    onClick={() => props.onStartTour?.('example2-creation')}
+                  >
+                    <span class={ui.tourBtnTitle}>Example 2 Creation</span>
+                    <span class={ui.tourBtnSubtitle}>Spirals & Color</span>
+                  </button>
+                  <button
+                    class={ui.tourBtn}
+                    onClick={() => props.onStartTour?.('flame-creation')}
+                  >
+                    <span class={ui.tourBtnTitle}>Flame Creation</span>
+                    <span class={ui.tourBtnSubtitle}>
+                      Build a fractal from scratch
+                    </span>
+                  </button>
                   <button
                     class={ui.tourBtn}
                     onClick={() => props.onStartTour?.('app')}
