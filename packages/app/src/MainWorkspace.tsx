@@ -205,14 +205,6 @@ export function MainWorkspace(props: AppProps) {
   const [showTimeline, setShowTimeline] = createSignal(window.innerWidth >= 769)
   const [selectedPaletteId, setSelectedPaletteId] = createSignal<string>('')
 
-  // Auto-hide timeline when animation mode is turned off, and vice versa
-  createEffect(() => {
-    if (!animationEnabled() && showTimeline()) {
-      setShowTimeline(false)
-    } else if (!showTimeline() && animationEnabled()) {
-      setAnimationEnabled(false)
-    }
-  })
   const [selectedPalette, setSelectedPalette] = createSignal<
     Palette | undefined
   >(undefined)
@@ -592,14 +584,10 @@ export function MainWorkspace(props: AppProps) {
     )
 
   async function shareToDiscord() {
-    // Step 1: Capture the current flame at native device resolution
+    // Step 1: Capture the current flame at its current resolution to prevent flickering/resizing
     const rawBlob = await new Promise<Blob | null>((resolve) => {
-      const currentRatio = pixelRatio()
-      const exportRatio = window.devicePixelRatio || 2
-      setPixelRatio(exportRatio)
       setOnExportImage(() => (canvas: HTMLCanvasElement) => {
         setOnExportImage(undefined)
-        setPixelRatio(currentRatio)
         canvas.toBlob(
           (b) => {
             resolve(b)
@@ -772,6 +760,7 @@ export function MainWorkspace(props: AppProps) {
       timeline.setIsPlaying(false)
       timeline.setAnimationEnabled(false)
       setAnimationEnabled(false)
+      setShowTimeline(false)
     } else {
       if (IS_DEV) {
         console.info(
@@ -784,6 +773,7 @@ export function MainWorkspace(props: AppProps) {
       timeline.loadTracks(anim.tracks)
       timeline.setAnimationEnabled(true)
       setAnimationEnabled(true)
+      setShowTimeline(true)
       timeline.setConfig({ ...timeline.config(), loop: true })
       timeline.goToFrame(0)
       timeline.play()

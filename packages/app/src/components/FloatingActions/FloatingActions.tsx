@@ -273,7 +273,7 @@ export function FloatingActions(props: Props) {
 
           {/* Row 2: Display toggles */}
           <div class={ui.toggleRow}>
-            {/* Unified Animation Toggle */}
+            {/* Animation Toggle / Play / Pause */}
             <button
               class={ui.toggle}
               classList={{
@@ -285,19 +285,21 @@ export function FloatingActions(props: Props) {
                   if (!props.showTimeline()) {
                     props.setShowTimeline(true)
                   }
-                  if (props.isPlaying()) {
-                    props.togglePlay() // Ensure we start paused!
-                  }
-                } else {
+                } else if (props.isPlaying()) {
                   props.togglePlay()
+                } else {
+                  props.setAnimationEnabled(false)
+                  if (props.showTimeline()) {
+                    props.setShowTimeline(false)
+                  }
                 }
               }}
               title={
                 !props.animationEnabled()
-                  ? 'Enable Animation'
+                  ? 'Enable Animation Mode'
                   : props.isPlaying()
                     ? 'Pause'
-                    : 'Play'
+                    : 'Disable Animation Mode'
               }
               data-tour-target="animation-toggle"
             >
@@ -328,9 +330,11 @@ export function FloatingActions(props: Props) {
                 if ('startViewTransition' in document) {
                   document.startViewTransition(() => {
                     props.setShowTimeline(checked)
+                    if (!checked) props.setAnimationEnabled(false)
                   })
                 } else {
                   props.setShowTimeline(checked)
+                  if (!checked) props.setAnimationEnabled(false)
                 }
               }}
               title="Show Timeline"
