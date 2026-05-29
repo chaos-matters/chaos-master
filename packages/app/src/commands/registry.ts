@@ -1,3 +1,4 @@
+import { IS_DEV } from '../defaults'
 import type { CommandContext, FlameCommand } from './types'
 
 const commandRegistry = new Map<string, FlameCommand>()
@@ -21,9 +22,9 @@ export function executeCommand(
 ): void {
   const cmd = commandRegistry.get(id)
   if (!cmd) {
-    console.warn(`Command "${id}" not found in registry`)
+    if (IS_DEV) console.warn(`Command "${id}" not found in registry`)
     return
   }
-  console.info('[cmd:execute]', id, 'args:', ...args)
+  if (IS_DEV) console.info('[cmd:execute]', id, 'args:', ...args)
   cmd.execute(ctx, ...args)
 }
