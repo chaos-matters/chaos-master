@@ -185,6 +185,11 @@
   }
 }
 
+.generateButtonDisabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 .btnIcon {
   width: 16px;
   height: 16px;

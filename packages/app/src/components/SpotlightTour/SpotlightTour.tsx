@@ -32,9 +32,20 @@ export function SpotlightTour(props: SpotlightTourProps) {
   const stepIndex = () => tour.currentStepIndex()
   const step = () => tour.currentStep()
 
-  function findTarget(selector: string): Element | null {
+  function findTarget(selector: string, last?: boolean): Element | null {
     try {
       const elements = document.querySelectorAll(selector)
+      if (last) {
+        // Walk in reverse to find the last visible match
+        for (let i = elements.length - 1; i >= 0; i--) {
+          const el = elements[i]!
+          const rect = el.getBoundingClientRect()
+          if (rect.width > 0 && rect.height > 0) {
+            return el
+          }
+        }
+        return null
+      }
       for (let i = 0; i < elements.length; i++) {
         const el = elements[i]!
         const rect = el.getBoundingClientRect()
@@ -56,7 +67,7 @@ export function SpotlightTour(props: SpotlightTourProps) {
       return
     }
 
-    const target = findTarget(s.target)
+    const target = findTarget(s.target, s.targetLast)
     if (!target) {
       setHoleRect({ x: 0, y: 0, width: 0, height: 0 })
       return
@@ -80,6 +91,11 @@ export function SpotlightTour(props: SpotlightTourProps) {
 
     if (isOffScreen) {
       target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      // Retry after scroll animation completes so the spotlight
+      // actually lands on the now-visible element.
+      setTimeout(() => {
+        measureAndPosition()
+      }, 350)
       return
     }
 
@@ -231,10 +247,46 @@ export function SpotlightTour(props: SpotlightTourProps) {
 
   // Call beforeShow/afterHide hooks on step transitions and reposition spotlight
   let prevStep: { step: ReturnType<typeof step>; index: number } | null = null
+  /** Timer ID for a pending onAnimate callback -- cleared on step change. */
+  let pendingAnimateTimeout: ReturnType<typeof setTimeout> | null = null
+  /** The step whose onAnimate is pending -- used to fire it on early advance. */
+  let pendingAnimateStep: ReturnType<typeof step> | null = null
+  /** Flame descriptor snapshots captured before each step's beforeShow.
+   *  Key = step index, value = deep-cloned flame descriptor. */
+  const stepSnapshots = new Map<number, unknown>()
+  /** Tracks whether the last navigation was backward (Back button). */
+  let navigatingBack = false
+
+  /** Generation counter incremented on each step transition. The nested
+   *  rAF/setTimeout chain checks this before firing onAnimate -- if the
+   *  generation has changed, the closure is stale and should be skipped. */
+  let stepGeneration = 0
+
   createEffect(() => {
     const current = step()
     const currentIdx = stepIndex()
     const active = tour.isActive()
+
+    // Bump generation so any pending async chains from the prior step
+    // see a stale generation and bail out.
+    const gen = ++stepGeneration
+
+    // If the previous step's onAnimate hasn't fired yet (user clicked Next
+    // during the grace period), fire it now so its target values are applied.
+    if (pendingAnimateTimeout !== null) {
+      clearTimeout(pendingAnimateTimeout)
+      pendingAnimateTimeout = null
+      // Only fire pending animate when going forward (not when undoing)
+      if (!navigatingBack && pendingAnimateStep?.onAnimate) {
+        pendingAnimateStep.onAnimate(props.tourContext)
+      }
+      pendingAnimateStep = null
+    }
+
+    // Finish any running animations from the previous step, snapping their
+    // values to the target. This keeps state consistent when the user clicks
+    // Next rapidly through several steps.
+    props.tourContext.finishAllAnimations()
 
     if (prevStep && (currentIdx !== prevStep.index || !active)) {
       prevStep.step?.afterHide?.(props.tourContext)
@@ -242,6 +294,37 @@ export function SpotlightTour(props: SpotlightTourProps) {
 
     if (active && current) {
       if (currentIdx !== (prevStep?.index ?? -1)) {
+        if (navigatingBack) {
+          // Restore the snapshot that was taken *before* the step we're
+          // returning to, so the flame reverts to exactly what it was.
+          const snapshot = stepSnapshots.get(currentIdx)
+          if (snapshot) {
+            props.tourContext.restoreFlame(snapshot)
+          }
+          navigatingBack = false
+        } else {
+          const diff = currentIdx - (prevStep?.index ?? -1)
+          if (diff > 1) {
+            const prevIdx = prevStep?.index ?? -1
+            const activeTourObj = tour.activeTour()
+            if (activeTourObj) {
+              for (let i = prevIdx + 1; i < currentIdx; i++) {
+                const skippedStep = activeTourObj.steps[i]
+                if (skippedStep) {
+                  stepSnapshots.set(i, props.tourContext.snapshotFlame())
+                  skippedStep.beforeShow?.(props.tourContext)
+                  if (skippedStep.onAnimate) {
+                    skippedStep.onAnimate(props.tourContext)
+                    props.tourContext.finishAllAnimations()
+                  }
+                  skippedStep.afterHide?.(props.tourContext)
+                }
+              }
+            }
+          }
+          // Going forward: save a snapshot before this step modifies anything.
+          stepSnapshots.set(currentIdx, props.tourContext.snapshotFlame())
+        }
         current.beforeShow?.(props.tourContext)
       }
       // After beforeShow toggles panels, SolidJS renders new DOM elements
@@ -250,13 +333,37 @@ export function SpotlightTour(props: SpotlightTourProps) {
       // A third pass at 100ms catches the initial Show render where the card
       // ref might not be available during the first two frames.
       requestAnimationFrame(() => {
+        if (gen !== stepGeneration) return // stale -- step changed
         requestAnimationFrame(() => {
+          if (gen !== stepGeneration) return // stale -- step changed
           measureAndPosition()
           setTimeout(() => {
+            if (gen !== stepGeneration) return // stale -- step changed
             measureAndPosition()
+            // Once the spotlight has settled, schedule the animation callback.
+            // The delay gives the user time to see what is highlighted before
+            // values start changing.
+            if (current.onAnimate) {
+              const delay = current.animationDelay ?? 0
+              pendingAnimateStep = current
+              pendingAnimateTimeout = setTimeout(() => {
+                if (gen !== stepGeneration) return // stale -- step changed
+                pendingAnimateTimeout = null
+                pendingAnimateStep = null
+                // Finish any leftover animations before starting new ones.
+                props.tourContext.finishAllAnimations()
+                current.onAnimate!(props.tourContext)
+              }, delay)
+            }
           }, 80)
         })
       })
+    }
+
+    // Clear snapshots when tour ends
+    if (!active) {
+      stepSnapshots.clear()
+      navigatingBack = false
     }
 
     prevStep = active ? { step: current, index: currentIdx } : null
@@ -292,66 +399,74 @@ export function SpotlightTour(props: SpotlightTourProps) {
           </svg>
 
           {/* Blurred backdrop with a hole punched out (4 divs to bypass Chrome mask bug) */}
-          <div style={{ 'pointer-events': 'none', 'z-index': 1 }}>
-            {/* Top */}
-            <div
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: `${holeRect().y}px`,
-                background: 'rgba(0, 0, 0, 0.4)',
-                'backdrop-filter': 'blur(2px)',
-                '-webkit-backdrop-filter': 'blur(2px)',
-                transition: 'height 300ms ease',
-              }}
-            />
-            {/* Bottom */}
-            <div
-              style={{
-                position: 'fixed',
-                top: `${holeRect().y + holeRect().height}px`,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background: 'rgba(0, 0, 0, 0.4)',
-                'backdrop-filter': 'blur(2px)',
-                '-webkit-backdrop-filter': 'blur(2px)',
-                transition: 'top 300ms ease',
-              }}
-            />
-            {/* Left */}
-            <div
-              style={{
-                position: 'fixed',
-                top: `${holeRect().y}px`,
-                left: 0,
-                width: `${holeRect().x}px`,
-                height: `${holeRect().height}px`,
-                background: 'rgba(0, 0, 0, 0.4)',
-                'backdrop-filter': 'blur(2px)',
-                '-webkit-backdrop-filter': 'blur(2px)',
-                transition:
-                  'top 300ms ease, width 300ms ease, height 300ms ease',
-              }}
-            />
-            {/* Right */}
-            <div
-              style={{
-                position: 'fixed',
-                top: `${holeRect().y}px`,
-                left: `${holeRect().x + holeRect().width}px`,
-                right: 0,
-                height: `${holeRect().height}px`,
-                background: 'rgba(0, 0, 0, 0.4)',
-                'backdrop-filter': 'blur(2px)',
-                '-webkit-backdrop-filter': 'blur(2px)',
-                transition:
-                  'top 300ms ease, left 300ms ease, height 300ms ease',
-              }}
-            />
-          </div>
+          {(() => {
+            const blur = tour.activeTour()?.noBlur ? undefined : 'blur(2px)'
+            const bg = tour.activeTour()?.noBlur
+              ? 'rgba(0, 0, 0, 0.25)'
+              : 'rgba(0, 0, 0, 0.4)'
+            return (
+              <div style={{ 'pointer-events': 'none', 'z-index': 1 }}>
+                {/* Top */}
+                <div
+                  style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: `${holeRect().y}px`,
+                    background: bg,
+                    'backdrop-filter': blur,
+                    '-webkit-backdrop-filter': blur,
+                    transition: 'height 300ms ease',
+                  }}
+                />
+                {/* Bottom */}
+                <div
+                  style={{
+                    position: 'fixed',
+                    top: `${holeRect().y + holeRect().height}px`,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: bg,
+                    'backdrop-filter': blur,
+                    '-webkit-backdrop-filter': blur,
+                    transition: 'top 300ms ease',
+                  }}
+                />
+                {/* Left */}
+                <div
+                  style={{
+                    position: 'fixed',
+                    top: `${holeRect().y}px`,
+                    left: 0,
+                    width: `${holeRect().x}px`,
+                    height: `${holeRect().height}px`,
+                    background: bg,
+                    'backdrop-filter': blur,
+                    '-webkit-backdrop-filter': blur,
+                    transition:
+                      'top 300ms ease, width 300ms ease, height 300ms ease',
+                  }}
+                />
+                {/* Right */}
+                <div
+                  style={{
+                    position: 'fixed',
+                    top: `${holeRect().y}px`,
+                    left: `${holeRect().x + holeRect().width}px`,
+                    right: 0,
+                    height: `${holeRect().height}px`,
+                    background: bg,
+                    'backdrop-filter': blur,
+                    '-webkit-backdrop-filter': blur,
+                    transition:
+                      'top 300ms ease, left 300ms ease, height 300ms ease',
+                  }}
+                />
+              </div>
+            )
+          })()}
 
           {/* Glow ring around the highlighted element */}
           <svg class={ui.backdropSvg} width="100%" height="100%">
@@ -405,10 +520,19 @@ export function SpotlightTour(props: SpotlightTourProps) {
                 <div class={ui.dots}>
                   <For each={Array.from({ length: tour.totalSteps() })}>
                     {(_, i) => (
-                      <div
+                      <button
                         class={ui.dot}
                         classList={{
                           [ui.dotActive as string]: i() === stepIndex(),
+                          [ui.dotClickable as string]: true,
+                        }}
+                        onClick={() => {
+                          const target = i()
+                          if (target === stepIndex()) return
+                          if (target < stepIndex()) {
+                            navigatingBack = true
+                          }
+                          tour.goToStep(target)
                         }}
                       />
                     )}
@@ -429,6 +553,7 @@ export function SpotlightTour(props: SpotlightTourProps) {
                   <button
                     class={ui.prevBtn}
                     onClick={() => {
+                      navigatingBack = true
                       tour.goPrev()
                     }}
                   >

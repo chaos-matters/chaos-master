@@ -177,14 +177,16 @@ export function createIFSPipeline(
         },
         workgroupSize: [IFS_GROUP_SIZE, 1, 1],
       })(({ numWorkgroups, workgroupId, localInvocationIndex }) => {
-        const outputTextureDimension = blendBindGroupLayout.$.outputTextureDimension
+        const outputTextureDimension =
+          blendBindGroupLayout.$.outputTextureDimension
         const pointRandomSeeds = blendBindGroupLayout.$.pointRandomSeeds
         const accumulationBuffer = blendBindGroupLayout.$.accumulationBuffer
         const workgroupIndex =
           workgroupId.x +
           workgroupId.y * numWorkgroups.x +
           workgroupId.z * numWorkgroups.x * numWorkgroups.y
-        const pointIndex = workgroupIndex * IFS_GROUP_SIZE + localInvocationIndex
+        const pointIndex =
+          workgroupIndex * IFS_GROUP_SIZE + localInvocationIndex
         if (pointIndex >= arrayLength(pointRandomSeeds)) return
         const pointSeed = pointRandomSeeds[pointIndex]!
         const seed = add(pointSeed, hash(pointIndex))
@@ -205,14 +207,17 @@ export function createIFSPipeline(
           outputTextureDimensionF,
           add(mul(clip, vec2f(0.5, -0.5)), 0.5),
         )
-        blendBindGroupLayout.$.pointRandomSeeds[pointIndex] = vec2u(randomState.$)
+        blendBindGroupLayout.$.pointRandomSeeds[pointIndex] = vec2u(
+          randomState.$,
+        )
         const jittered = add(screen, pointInitMode(pointIndex))
         if (
           jittered.x < 0 ||
           jittered.y < 0 ||
           jittered.x > outputTextureDimensionF.x ||
           jittered.y > outputTextureDimensionF.y
-        ) return
+        )
+          return
         const screenI = vec2i(jittered)
         const pixelIndex = screenI.y * outputTextureDimension.x + screenI.x
         const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
@@ -227,7 +232,11 @@ export function createIFSPipeline(
         )
       })
 
-      cached = { FlameUniforms: BlendUniforms, bindGroupLayout: blendBindGroupLayout, ifsCompute }
+      cached = {
+        FlameUniforms: BlendUniforms,
+        bindGroupLayout: blendBindGroupLayout,
+        ifsCompute,
+      }
     } else {
       // ---- Existing non-blending code path ----
       const flames = Object.fromEntries(
@@ -238,15 +247,18 @@ export function createIFSPipeline(
       )
 
       const flamesObj = Object.fromEntries(
-        recordKeys(transforms).map((tid) => [`flame${tid}`, flames[tid]!.fnImpl]),
+        recordKeys(transforms).map((tid) => [
+          `flame${tid}`,
+          flames[tid]!.fnImpl,
+        ]),
       )
+      const keys = recordKeys(transforms)
       const FlameUniforms = struct(
-        Object.fromEntries(
-          recordKeys(transforms).map((tid) => [
-            `flame${tid}`,
-            flames[tid]!.Uniforms,
-          ]),
-        ),
+        keys.length > 0
+          ? Object.fromEntries(
+              keys.map((tid) => [`flame${tid}`, flames[tid]!.Uniforms]),
+            )
+          : { _dummy: f32 },
       )
 
       const bindGroupLayout = tgpu.bindGroupLayout({
@@ -307,7 +319,8 @@ export function createIFSPipeline(
           workgroupId.x +
           workgroupId.y * numWorkgroups.x +
           workgroupId.z * numWorkgroups.x * numWorkgroups.y
-        const pointIndex = workgroupIndex * IFS_GROUP_SIZE + localInvocationIndex
+        const pointIndex =
+          workgroupIndex * IFS_GROUP_SIZE + localInvocationIndex
         if (pointIndex >= arrayLength(pointRandomSeeds)) return
         const pointSeed = pointRandomSeeds[pointIndex]!
         const seed = add(pointSeed, hash(pointIndex))
@@ -335,7 +348,8 @@ export function createIFSPipeline(
           jittered.y < 0 ||
           jittered.x > outputTextureDimensionF.x ||
           jittered.y > outputTextureDimensionF.y
-        ) return
+        )
+          return
         const screenI = vec2i(jittered)
         const pixelIndex = screenI.y * outputTextureDimension.x + screenI.x
         const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
@@ -401,7 +415,11 @@ export function createIFSPipeline(
           1,
         )
     },
-    update: (flameDescriptor: FlameDescriptor, blendFlameDescriptor?: FlameDescriptor, blendWeight?: number) => {
+    update: (
+      flameDescriptor: FlameDescriptor,
+      blendFlameDescriptor?: FlameDescriptor,
+      blendWeight?: number,
+    ) => {
       if (isBlending && blendFlameDescriptor) {
         const a = extractFlameUniforms(flameDescriptor)
         const b = extractFlameUniforms(blendFlameDescriptor)
@@ -415,7 +433,12 @@ export function createIFSPipeline(
           blendWeight: blendWeight ?? 0,
         })
       } else {
-        flameUniformsBuffer.write(extractFlameUniforms(flameDescriptor))
+        const uniforms = extractFlameUniforms(flameDescriptor)
+        if (Object.keys(uniforms).length === 0) {
+          flameUniformsBuffer.write({ _dummy: 0 })
+        } else {
+          flameUniformsBuffer.write(uniforms)
+        }
       }
       finalTransformBuffer.write(
         flameDescriptor.finalTransform ?? {

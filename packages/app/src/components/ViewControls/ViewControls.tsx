@@ -2,13 +2,15 @@ import { For, Show } from 'solid-js'
 import { vec2f } from 'typegpu/data'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
-import { Minus, Plus, Redo, Undo } from '@/icons'
+import { Cross, Minus, Plus, Redo, Undo } from '@/icons'
 import { Button } from '../Button/Button'
 import { ButtonGroup } from '../Button/ButtonGroup'
+import { Slider } from '../Sliders/Slider'
 import { KeyframeDiamond } from '../Timeline/KeyframeDiamond'
 import ui from './ViewControls.module.css'
 import type { Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
+import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 type ViewControlProps = {
   pixelRatio: number
@@ -18,6 +20,11 @@ type ViewControlProps = {
   setPosition: Setter<v2f>
   setZoom: Setter<number>
   controlsDisabled?: boolean
+  blendFlame?: FlameDescriptor
+  blendWeight: number
+  onPickBlendFlame: () => void
+  onClearBlendFlame: () => void
+  onBlendWeightChange: (weight: number) => void
 }
 
 export function ViewControls(props: ViewControlProps) {
@@ -26,7 +33,7 @@ export function ViewControls(props: ViewControlProps) {
   const disabled = () => props.controlsDisabled ?? false
   return (
     <div class={ui.viewControls}>
-      <ButtonGroup>
+      <ButtonGroup data-tour-target="pixelRatio-buttons">
         <For each={[1, 2, 4]}>
           {(divider) => {
             const pixelRatio_ = 1 / divider
@@ -48,7 +55,7 @@ export function ViewControls(props: ViewControlProps) {
           }}
         </For>
       </ButtonGroup>
-      <ButtonGroup>
+      <ButtonGroup data-tour-target="zoom-controls">
         <div
           class={ui.viewControlWrapper}
           onClick={() => {
@@ -100,7 +107,7 @@ export function ViewControls(props: ViewControlProps) {
           </Button>
         </div>
       </ButtonGroup>
-      <ButtonGroup>
+      <ButtonGroup data-tour-target="camera-coordinates">
         <div
           class={ui.cameraCoord}
           onClick={() => {
@@ -122,7 +129,7 @@ export function ViewControls(props: ViewControlProps) {
           <KeyframeDiamond parameterPath="camera.y" />
         </div>
       </ButtonGroup>
-      <ButtonGroup>
+      <ButtonGroup data-tour-target="undoRedo-controls">
         <Button
           disabled={!history.hasUndo()}
           onClick={() => {
@@ -140,6 +147,43 @@ export function ViewControls(props: ViewControlProps) {
           <Redo />
         </Button>
       </ButtonGroup>
+      <Show when={props.blendFlame}>
+        <div class={ui.blendControls}>
+          <Button
+            active
+            onClick={props.onPickBlendFlame}
+            title="Change blend flame"
+          >
+            Blend
+          </Button>
+          <div class={ui.blendWeightWrap}>
+            <Slider
+              variant="compact"
+              value={props.blendWeight}
+              min={0}
+              max={1}
+              step={0.01}
+              onInput={props.onBlendWeightChange}
+              formatValue={(v) => `${(v * 100).toFixed(0)}%`}
+              dataParameterPath="blendWeight"
+              trackFill
+              data-tour-target="blendWeight-slider"
+            />
+          </div>
+          <button
+            class={ui.blendClearBtn}
+            onClick={props.onClearBlendFlame}
+            title="Remove blend flame"
+          >
+            <Cross />
+          </button>
+        </div>
+      </Show>
+      <Show when={!props.blendFlame}>
+        <Button onClick={props.onPickBlendFlame} title="Pick blend flame">
+          Blend...
+        </Button>
+      </Show>
     </div>
   )
 }

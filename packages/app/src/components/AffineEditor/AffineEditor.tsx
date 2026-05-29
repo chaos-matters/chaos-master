@@ -367,6 +367,7 @@ export function AffineEditor(props: {
         scrollIntoViewAndFocusOnChange(scrollTrigger, el)
       }}
       class={ui.editorCard}
+      data-tour-target="affine-editor"
       classList={{
         [props.class ?? '']: true,
         [ui.listMode as string]: tab() === 'list',

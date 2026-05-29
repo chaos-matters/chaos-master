@@ -1,5 +1,4 @@
 import { createEffect, createMemo, createSignal, onCleanup } from 'solid-js'
-import { useTimeline } from '@/contexts/TimelineContext'
 import { createPinchHandler } from '@/utils/createPinchHandler'
 import type { Accessor } from 'solid-js'
 
@@ -13,7 +12,6 @@ export function useZoomGestures(
   baseTrackHeight: number,
   trackNameWidth: number,
 ) {
-  const timeline = useTimeline()!
   const [containerHeight, setContainerHeight] = createSignal(200)
   const [zoomLevel, setZoomLevel] = createSignal(1)
 
@@ -101,17 +99,21 @@ export function useZoomGestures(
     if (sl) sl.scrollLeft = 0
   }
 
-  // Auto-fit only on initial track appearance
-  let prevTrackPaths: Set<string> | undefined
+  // Auto-fit on first valid resize of the ruler
+  let hasAutoFit = false
   createEffect(() => {
-    const tracks = timeline.tracks()
-    const paths = new Set(tracks.map((t) => t.parameterPath))
-    if (!prevTrackPaths) {
-      prevTrackPaths = paths
-      if (paths.size > 0) autoFitZoom()
-      return
-    }
-    prevTrackPaths = paths
+    const ruler = seekRulerRef()
+    if (!ruler) return
+    const ro = new ResizeObserver(([entry]) => {
+      if (entry && entry.contentRect.width > 0 && !hasAutoFit) {
+        hasAutoFit = true
+        autoFitZoom()
+      }
+    })
+    ro.observe(ruler)
+    onCleanup(() => {
+      ro.disconnect()
+    })
   })
 
   return { zoomLevel, setZoomLevel, frameWidth, trackHeight, autoFitZoom }

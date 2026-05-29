@@ -1,5 +1,5 @@
 import { createEffect, createSignal, Show } from 'solid-js'
-import { Bookmark, CameraIcon, Discord, Eye, FolderOpen, Pause, PlayPause, Share, Shuffle, Zap, } from '@/icons'
+import { Bookmark, CameraIcon, Discord, Eye, FolderOpen, Pause, Share, Shuffle, Zap, } from '@/icons'
 import { defaultPills, QualityPresets } from '../Quality/QualityPresets'
 import ui from './FloatingActions.module.css'
 
@@ -205,6 +205,7 @@ export function FloatingActions(props: Props) {
               class={ui.button}
               onClick={props.onQuickExport}
               title="Quick Export"
+              data-tour-target="quick-export"
             >
               <Zap />
             </button>
@@ -229,6 +230,7 @@ export function FloatingActions(props: Props) {
               class={ui.button}
               onClick={props.onLogoFavicon}
               title="Logo/Favicon"
+              data-tour-target="logo-favicon"
             >
               <Shuffle />
             </button>
@@ -237,6 +239,7 @@ export function FloatingActions(props: Props) {
                 class={ui.button}
                 onClick={props.onRandomizeColors}
                 title="Randomize Colors"
+                data-tour-target="randomize-colors"
               >
                 <svg viewBox="0 0 16 16" width="15" height="15" fill="none">
                   <circle
@@ -270,18 +273,50 @@ export function FloatingActions(props: Props) {
 
           {/* Row 2: Display toggles */}
           <div class={ui.toggleRow}>
-            {/* Enable Animation */}
+            {/* Unified Animation Toggle */}
             <button
               class={ui.toggle}
               classList={{
                 [ui.toggleActive as string]: props.animationEnabled(),
               }}
               onClick={() => {
-                props.setAnimationEnabled(!props.animationEnabled())
+                if (!props.animationEnabled()) {
+                  props.setAnimationEnabled(true)
+                  if (!props.showTimeline()) {
+                    props.setShowTimeline(true)
+                  }
+                  if (props.isPlaying()) {
+                    props.togglePlay() // Ensure we start paused!
+                  }
+                } else {
+                  props.togglePlay()
+                }
               }}
-              title="Enable Animation"
+              title={
+                !props.animationEnabled()
+                  ? 'Enable Animation'
+                  : props.isPlaying()
+                    ? 'Pause'
+                    : 'Play'
+              }
+              data-tour-target="animation-toggle"
             >
-              <PlayPause />
+              <Show
+                when={props.animationEnabled() && props.isPlaying()}
+                fallback={
+                  <svg
+                    viewBox="0 0 16 16"
+                    width="13"
+                    height="13"
+                    fill="currentColor"
+                    stroke="none"
+                  >
+                    <path d="M5 3l8 5-8 5V3z" />
+                  </svg>
+                }
+              >
+                <Pause />
+              </Show>
             </button>
 
             {/* Show Timeline */}
@@ -299,6 +334,7 @@ export function FloatingActions(props: Props) {
                 }
               }}
               title="Show Timeline"
+              data-tour-target="show-timeline"
             >
               {/* Timeline / rows icon */}
               <svg
@@ -326,6 +362,7 @@ export function FloatingActions(props: Props) {
                 props.setAdaptiveFilterEnabled(!props.adaptiveFilterEnabled())
               }}
               title="Adaptive Filter"
+              data-tour-target="adaptive-filter"
             >
               <Eye />
             </button>
@@ -396,42 +433,13 @@ export function FloatingActions(props: Props) {
                 />
               </svg>
             </button>
-
-            <div class={ui.toggleSeparator} />
-
-            {/* Play / Pause (only when animation is enabled) */}
-            <Show when={props.animationEnabled()}>
-              <button
-                class={ui.toggle}
-                classList={{ [ui.toggleActive as string]: props.isPlaying() }}
-                onClick={props.togglePlay}
-                title={props.isPlaying() ? 'Pause' : 'Play'}
-              >
-                <Show
-                  when={props.isPlaying()}
-                  fallback={
-                    <svg
-                      viewBox="0 0 16 16"
-                      width="13"
-                      height="13"
-                      fill="currentColor"
-                      stroke="none"
-                    >
-                      <path d="M5 3l8 5-8 5V3z" />
-                    </svg>
-                  }
-                >
-                  <Pause />
-                </Show>
-              </button>
-            </Show>
           </div>
 
           {/* Divider */}
           <div class={ui.divider} />
 
           {/* Row 3: Quality Presets */}
-          <div class={ui.qualityRow}>
+          <div class={ui.qualityRow} data-tour-target="quality-presets">
             <QualityPresets
               pills={defaultPills}
               selectedKey={props.qualityPreset()}

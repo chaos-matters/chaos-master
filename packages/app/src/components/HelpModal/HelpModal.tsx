@@ -1,6 +1,6 @@
 import { createResource, createSignal, For, Show, Suspense } from 'solid-js'
 import { IS_DEV } from '@/defaults'
-import { Changelog, Discord, GitHub, Heart, Terminal, TriangleAlert } from '@/icons'
+import { Changelog, Discord, GitHub, Heart, Terminal, TriangleAlert, } from '@/icons'
 import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
 import { formatBytes } from '@/utils/formatBytes'
 import { GIT_SHA, VERSION } from '@/version'
@@ -371,6 +371,33 @@ function HelpModal(props: HelpModalProps) {
       </div>
       <h2 class={ui.sectionTitle}>Guided Tours</h2>
       <div class={ui.tourButtons}>
+        <button
+          class={ui.tourBtn}
+          onClick={() => {
+            window.location.hash = '#tour=example1-creation'
+            props.respond()
+          }}
+        >
+          Example 1 Creation
+        </button>
+        <button
+          class={ui.tourBtn}
+          onClick={() => {
+            window.location.hash = '#tour=example2-creation'
+            props.respond()
+          }}
+        >
+          Example 2 Creation
+        </button>
+        <button
+          class={ui.tourBtn}
+          onClick={() => {
+            window.location.hash = '#tour=flame-creation'
+            props.respond()
+          }}
+        >
+          Flame Creation
+        </button>
         <button
           class={ui.tourBtn}
           onClick={() => {

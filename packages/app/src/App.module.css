@@ -293,12 +293,14 @@
   flex-direction: column;
   gap: var(--space-1);
 
-  /* Firefox: hidden by default, thin on hover */
-  scrollbar-width: none;
+  /* Always reserve gutter space so content width never shifts on hover */
+  scrollbar-gutter: stable;
+
+  /* Thin scrollbar that's transparent until hovered */
+  scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 
   &:hover {
-    scrollbar-width: thin;
     scrollbar-color: var(--neutral-300) transparent;
   }
 
@@ -306,9 +308,9 @@
     scrollbar-color: var(--neutral-700) transparent;
   }
 
-  /* Webkit (Chrome, Safari, Edge): zero width by default */
+  /* Webkit (Chrome, Safari, Edge): always reserve 4px gutter */
   &::-webkit-scrollbar {
-    width: 0;
+    width: 4px;
   }
 
   &::-webkit-scrollbar-track {
@@ -318,10 +320,7 @@
   &::-webkit-scrollbar-thumb {
     background: transparent;
     border-radius: 2px;
-  }
-
-  &:hover::-webkit-scrollbar {
-    width: 4px;
+    transition: background 0.15s;
   }
 
   &:hover::-webkit-scrollbar-thumb {
@@ -651,6 +650,12 @@
 
   & > svg {
     display: none;
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    pointer-events: none;
   }
 }
 

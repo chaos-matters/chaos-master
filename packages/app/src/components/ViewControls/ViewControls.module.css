@@ -60,3 +60,35 @@
     color: var(--neutral-300);
   }
 }
+
+.blendControls {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 0.5rem;
+  border-radius: 0.25rem;
+  flex-shrink: 0;
+}
+
+.blendWeightWrap {
+  display: flex;
+  align-items: center;
+}
+
+.blendClearBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--neutral-500);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  line-height: 0;
+}
+
+.blendClearBtn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+}

@@ -755,8 +755,7 @@ export function createExportPngDialog(
           previewDescriptor.renderSettings.vibrancy
         draft.renderSettings.contrast =
           previewDescriptor.renderSettings.contrast
-        draft.renderSettings.gamma =
-          previewDescriptor.renderSettings.gamma
+        draft.renderSettings.gamma = previewDescriptor.renderSettings.gamma
         draft.renderSettings.drawMode =
           previewDescriptor.renderSettings.drawMode
         draft.renderSettings.backgroundColor =

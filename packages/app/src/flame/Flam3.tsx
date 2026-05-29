@@ -414,8 +414,12 @@ export function Flam3(props: Flam3Props) {
     // Update IFS pipeline uniforms when animatedFlame changes.
     createEffect(() => {
       const flame = animatedFlame()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ifsPipeline.update(flame as any, props.blendFlame as any, props.blendWeight)
+
+      ifsPipeline.update(
+        flame as FlameDescriptor,
+        props.blendFlame,
+        props.blendWeight,
+      )
     })
 
     const accumulationFingerprint = createMemo(() => {

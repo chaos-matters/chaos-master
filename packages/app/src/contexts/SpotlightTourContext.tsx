@@ -7,6 +7,7 @@ export interface SpotlightTourContextValue {
   endTour: () => void
   goNext: () => void
   goPrev: () => void
+  goToStep: (index: number) => void
   isActive: Accessor<boolean>
   activeTourId: Accessor<string | null>
   activeTour: Accessor<TourGuide | null>
@@ -87,11 +88,20 @@ export function createSpotlightTourState(
     }
   }
 
+  function goToStep(index: number) {
+    const tour = activeTour()
+    if (!tour) return
+    if (index >= 0 && index < tour.steps.length) {
+      setCurrentStepIndex(index)
+    }
+  }
+
   return {
     startTour,
     endTour,
     goNext,
     goPrev,
+    goToStep,
     isActive,
     activeTourId,
     activeTour,

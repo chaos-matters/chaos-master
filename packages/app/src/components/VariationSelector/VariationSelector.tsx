@@ -283,6 +283,29 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
   const [selectedItemId, setSelectedItemId] = createSignal<string>()
   const [hoveredItemId, setHoveredItemId] = createSignal<string>()
   const [touchlessPreview, setTouchlessPreview] = createSignal<boolean>(true)
+
+  let hoverClearTimer: ReturnType<typeof setTimeout> | undefined
+  const PREVIEW_CLEAR_DELAY = 120
+
+  function handleMouseEnter(id: string) {
+    clearTimeout(hoverClearTimer)
+    setHoveredItemId(id)
+  }
+
+  function handleMouseLeave() {
+    hoverClearTimer = setTimeout(() => {
+      setHoveredItemId(undefined)
+    }, PREVIEW_CLEAR_DELAY)
+  }
+
+  function handleContainerLeave() {
+    clearTimeout(hoverClearTimer)
+    setHoveredItemId(undefined)
+  }
+
+  onCleanup(() => {
+    clearTimeout(hoverClearTimer)
+  })
   const getPreviewSelectionId = () => {
     return (
       (touchlessPreview() ? hoveredItemId() : undefined) ??
@@ -511,7 +534,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
               </button>
             </Show>
           </div>
-          <section class={ui.gallery}>
+          <section class={ui.gallery} onMouseLeave={handleContainerLeave}>
             <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
               <For each={filteredVariationEntries()}>
                 {([id, variationExample]) => {
@@ -528,10 +551,10 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                           toggleSelectedItem(id)
                         }}
                         onMouseEnter={() => {
-                          setHoveredItemId(id)
+                          handleMouseEnter(id)
                         }}
                         onMouseLeave={() => {
-                          setHoveredItemId(undefined)
+                          handleMouseLeave()
                         }}
                       >
                         <VariationPreview

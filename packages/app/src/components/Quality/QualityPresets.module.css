@@ -129,6 +129,10 @@
   opacity: 0.7;
   flex-shrink: 0;
   padding-right: 2px;
+  /* Reserve enough width for "100.0B / 100.0B" so the widget
+     doesn't jump when numbers change magnitude (M -> B). */
+  min-width: 14ch;
+  text-align: right;
 }
 
 .pointsSep {
