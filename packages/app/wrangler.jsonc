@@ -23,13 +23,7 @@
     "directory": "dist",
   },
   "main": "src/worker/index.ts",
-  "kv_namespaces": [
-    {
-      "binding": "KV_SHORTENER",
-      "id": "7cf9ab98f6274a179d63cccbf3c93911",
-      "preview_id": "91bef067328b4904ad4cfbcbbcf980f2",
-    },
-  ],
+
   "env": {
     "prod": {
       "name": "chaos-master",
@@ -42,6 +36,12 @@
       "build": {
         "command": "pnpm run build",
       },
+      "kv_namespaces": [
+        {
+          "binding": "KV_SHORTENER",
+          "id": "7cf9ab98f6274a179d63cccbf3c93911",
+        },
+      ],
     },
     "dev": {
       "name": "chaos-master-dev",
@@ -54,12 +54,26 @@
       "build": {
         "command": "pnpm run build:dev",
       },
+      "kv_namespaces": [
+        {
+          "binding": "KV_SHORTENER",
+          "id": "7cf9ab98f6274a179d63cccbf3c93911",
+          "preview_id": "91bef067328b4904ad4cfbcbbcf980f2",
+        },
+      ],
     },
     "preview": {
       "name": "chaos-master-preview",
       "vars": {
         "ENVIRONMENT": "preview",
       },
+      "kv_namespaces": [
+        {
+          "binding": "KV_SHORTENER",
+          "id": "7cf9ab98f6274a179d63cccbf3c93911",
+          "preview_id": "91bef067328b4904ad4cfbcbbcf980f2",
+        },
+      ],
     },
   },
 }
