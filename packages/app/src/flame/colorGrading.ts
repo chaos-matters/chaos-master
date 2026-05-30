@@ -164,12 +164,16 @@ export function createColorGradingPipeline(
       mul(count, uniforms.averagePointCountPerBucketInv),
       f32(0.1),
     )
-    const density = clamp(log(add(adjustedCount, f32(1))), f32(0), f32(1))
+    const adjustedCountWithExposure = mul(adjustedCount, uniforms.exposure)
+    const logDensityBase = log(add(adjustedCountWithExposure, f32(1)))
+    const tonemapped = mul(uniforms.contrast, logDensityBase)
+
+    const density = clamp(tonemapped, f32(0), f32(1))
 
     let finalAb = vec2f(texColorAb)
     if (uniforms.paletteEntryCount > i32(0) && uniforms.vibrancy > f32(0)) {
       const paletteBuffer = bindGroupLayout.$.paletteBuffer
-      const logDensity = clamp(log(add(adjustedCount, f32(1))), f32(0), f32(10))
+      const logDensityClamp = clamp(tonemapped, f32(0), f32(10))
       const paletteScale = add(
         f32(0.02),
         mul(uniforms.paletteSpeed, f32(0.298)),
@@ -178,9 +182,12 @@ export function createColorGradingPipeline(
       let paletteAb = vec2f(0)
       let densityInput = f32(0)
       if (uniforms.paletteMode === i32(0)) {
-        densityInput = add(mul(logDensity, paletteScale), uniforms.palettePhase)
+        densityInput = add(
+          mul(logDensityClamp, paletteScale),
+          uniforms.palettePhase,
+        )
       } else {
-        densityInput = mul(logDensity, paletteScale)
+        densityInput = mul(logDensityClamp, paletteScale)
       }
       const logDensityNorm = fract(densityInput)
 
@@ -258,12 +265,9 @@ export function createColorGradingPipeline(
       }
 
       const gamma = f32(0.5)
-      const linrange = f32(1.0)
-      const frac = div(density, linrange)
-      const funcval = pow(linrange, gamma)
       const baseAlpha = add(
-        mul(mul(sub(f32(1), frac), density), div(funcval, linrange)),
-        mul(frac, pow(density, gamma)),
+        mul(sub(f32(1), density), density),
+        mul(density, pow(density, gamma)),
       )
       // We cap the topographical palette blend at 65% so it never completely overwrites the structural flame colors
       const paletteBlend = mul(saturate(baseAlpha), f32(0.65))
@@ -273,16 +277,7 @@ export function createColorGradingPipeline(
     // Apply vibrancy as a true Saturation multiplier on the OkLab chroma
     finalAb = mul(finalAb, max(uniforms.vibrancy, f32(0)))
 
-    const logDensity = log(add(adjustedCount, f32(1)))
-    const tonemapped = mul(
-      mul(uniforms.exposure, uniforms.contrast),
-      logDensity,
-    )
-    const value = clamp(
-      pow(saturate(tonemapped), div(f32(1), uniforms.gamma)),
-      f32(0),
-      f32(2),
-    )
+    const value = pow(max(tonemapped, f32(0)), div(f32(1), uniforms.gamma))
 
     let rgb = oklabToRgb(vec3f(drawMode(value), finalAb))
 

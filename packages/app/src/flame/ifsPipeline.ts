@@ -212,10 +212,12 @@ export function createIFSPipeline(
         )
         const jittered = add(screen, pointInitMode(pointIndex))
         if (
-          jittered.x < 0 ||
-          jittered.y < 0 ||
-          jittered.x > outputTextureDimensionF.x ||
-          jittered.y > outputTextureDimensionF.y
+          !(
+            jittered.x >= 0 &&
+            jittered.y >= 0 &&
+            jittered.x < outputTextureDimensionF.x &&
+            jittered.y < outputTextureDimensionF.y
+          )
         )
           return
         const screenI = vec2i(jittered)
@@ -344,10 +346,12 @@ export function createIFSPipeline(
         bindGroupLayout.$.pointRandomSeeds[pointIndex] = vec2u(randomState.$)
         const jittered = add(screen, pointInitMode(pointIndex))
         if (
-          jittered.x < 0 ||
-          jittered.y < 0 ||
-          jittered.x > outputTextureDimensionF.x ||
-          jittered.y > outputTextureDimensionF.y
+          !(
+            jittered.x >= 0 &&
+            jittered.y >= 0 &&
+            jittered.x < outputTextureDimensionF.x &&
+            jittered.y < outputTextureDimensionF.y
+          )
         )
           return
         const screenI = vec2i(jittered)
