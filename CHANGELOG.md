@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.8] - 2026-05-30
+
+### Changed
+
+- **HDR Highlight Power**: Uncapped luminance clamping to allow true HDR highlights to bloom. `highlightPower` now elegantly rolls-off bright cores into white rather than producing harsh clipping bands.
+- **Exposure and Contrast**: Decoupled exposure and contrast math. Exposure now acts as a pre-log multiplier simulating linear light gathering, while contrast scales the post-log density curve. Note: This breaks backwards compatibility with previously saved exposure/contrast states as they are no longer mathematical duplicates.
+- **Palette Colors**: Palette gradient mapping now dynamically shifts in response to Exposure and Contrast adjustments.
+
+### Fixed
+
+- **Top-left Rendering Artifact**: Fixed a visual defect where NaN particle coordinates from math explosions would incorrectly accumulate at pixel (0,0).
+
 ## [0.8.7] - 2026-05-29
 
 ### Added
