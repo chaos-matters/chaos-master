@@ -15,7 +15,12 @@ function letBrowserHandleActiveInput(
   ev: KeyboardEvent,
 ): boolean {
   if (!el) return false
-  if (el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
+  if (
+    el.tagName === 'TEXTAREA' ||
+    el.tagName === 'SELECT' ||
+    el.getAttribute('contenteditable') === 'true' ||
+    el.closest('[contenteditable="true"]')
+  ) {
     return true
   }
   if (el.tagName !== 'INPUT') return false

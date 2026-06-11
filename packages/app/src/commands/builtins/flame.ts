@@ -4,7 +4,6 @@ import { getVariationDefault } from '@/flame/variations/utils'
 import { deepClone } from '@/utils/clone'
 import { registerCommand } from '../registry'
 import type { TransformId, VariationId } from '@/flame/schema/flameSchema'
-import type { TransformVariationType } from '@/flame/variations'
 
 function getTransformKey(
   transforms: Record<string, unknown>,
@@ -33,9 +32,7 @@ registerCommand({
   description: 'Add a new transform with an optional variation type',
   shortcut: 'Shift+T',
   execute(ctx, variationType?: unknown) {
-    const type = (
-      typeof variationType === 'string' ? variationType : 'linear'
-    ) as TransformVariationType
+    const type = typeof variationType === 'string' ? variationType : 'linearVar'
     ctx.setFlameDescriptor((draft) => {
       draft.transforms[generateTransformId()] = {
         probability: 1,
@@ -105,9 +102,7 @@ registerCommand({
   description: 'Add a variation type to a specific transform',
   execute(ctx, transformIndex?: unknown, variationType?: unknown) {
     const tidx = typeof transformIndex === 'number' ? transformIndex : 0
-    const type = (
-      typeof variationType === 'string' ? variationType : 'linear'
-    ) as TransformVariationType
+    const type = typeof variationType === 'string' ? variationType : 'linearVar'
     ctx.setFlameDescriptor((draft) => {
       const key = getTransformKey(draft.transforms, tidx)
       if (key) {

@@ -154,6 +154,7 @@
   align-content: flex-start;
   scrollbar-width: thin;
   scrollbar-color: var(--neutral-300) transparent;
+  -webkit-touch-callout: none;
 
   [data-theme='dark'] & {
     scrollbar-color: var(--neutral-700) transparent;
@@ -287,6 +288,8 @@
     box-shadow 0.13s,
     transform 0.1s;
   touch-action: manipulation;
+  -webkit-touch-callout: none;
+  user-select: none;
 
   &:hover {
     border-color: oklch(60% 0.08 240);
@@ -373,5 +376,114 @@
 
   [data-theme='dark'] & {
     color: var(--neutral-600);
+  }
+}
+
+/* ---- Category filter row ---- */
+
+.categoryFilterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0.25rem 0.5rem;
+  flex-shrink: 0;
+}
+
+.categoryPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.45rem;
+  border-radius: 12px;
+  border: 1px solid var(--neutral-250);
+  background: var(--neutral-100);
+  color: var(--neutral-600);
+  font-size: 0.62rem;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 0.13s,
+    color 0.13s,
+    border-color 0.13s;
+  white-space: nowrap;
+  user-select: none;
+
+  &:hover {
+    background: var(--neutral-200);
+    color: var(--neutral-800);
+  }
+
+  [data-theme='dark'] & {
+    background: var(--neutral-850);
+    border-color: var(--neutral-700);
+    color: var(--neutral-400);
+
+    &:hover {
+      background: var(--neutral-750);
+      color: var(--neutral-200);
+    }
+  }
+}
+
+.categoryPillActive {
+  background: oklch(40% 0.06 240);
+  color: oklch(96% 0.01 240);
+  border-color: transparent;
+
+  &:hover {
+    background: oklch(36% 0.06 240);
+    color: oklch(96% 0.01 240);
+  }
+
+  [data-theme='dark'] & {
+    background: oklch(55% 0.08 240);
+    color: oklch(10% 0.01 240);
+
+    &:hover {
+      background: oklch(60% 0.08 240);
+      color: oklch(10% 0.01 240);
+    }
+  }
+}
+
+/* ---- Section headers (list mode) ---- */
+
+.sectionHeader {
+  width: 100%;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--neutral-400);
+  padding: 0.4rem 0.15rem 0.15rem;
+  margin-top: 0.2rem;
+
+  &:first-child {
+    margin-top: 0;
+  }
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500);
+  }
+}
+
+/* ---- Section headers (gallery mode) ---- */
+
+.gallerySectionHeader {
+  grid-column: 1 / -1;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--neutral-400);
+  padding: 0.4rem 0.15rem 0.15rem;
+  margin-top: 0.2rem;
+
+  &:first-child {
+    margin-top: 0;
+  }
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500);
   }
 }

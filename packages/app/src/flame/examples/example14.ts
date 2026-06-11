@@ -6,7 +6,7 @@ import { defineExample, tid, vid } from './util'
  */
 export const example14 = defineExample({
   renderSettings: {
-    exposure: -1.22,
+    exposure: 0.28,
     skipIters: 20,
     drawMode: 'light',
     camera: {
@@ -37,7 +37,7 @@ export const example14 = defineExample({
           },
         },
         [vid('f3a4b5c6_d7e8_9012_3456_789012abcdef')]: {
-          type: 'sinusoidal',
+          type: 'sinusoidalVar',
           weight: 0.3,
         },
       },
@@ -55,7 +55,7 @@ export const example14 = defineExample({
           params: { ampx: 0.5, ampy: 0.6, freqx: 1.2, freqy: 1.0 },
         },
         [vid('c6d7e8f9_a0b1_2345_6789_012345abcdef')]: {
-          type: 'spherical',
+          type: 'sphericalVar',
           weight: 0.4,
         },
       },
@@ -73,7 +73,7 @@ export const example14 = defineExample({
           params: { cellsize: 0.1, power: 1.0, rotate: 0, scale: 0.75 },
         },
         [vid('f9a0b1c2_d3e4_5678_9012_345678abcdef')]: {
-          type: 'spiral',
+          type: 'spiralVar',
           weight: 0.2,
         },
       },

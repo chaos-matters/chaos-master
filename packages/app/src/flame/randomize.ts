@@ -36,7 +36,10 @@ export function randomizeVariationParams(
   strength = 0.5,
 ): Record<string, number> | undefined {
   if (!isParametricVariationType(variationType)) return undefined
-  const def = transformVariations[variationType]
+  const def = transformVariations[variationType] as Extract<
+    (typeof transformVariations)[TransformVariationType],
+    { paramDefaults: unknown }
+  >
   const defaults = def.paramDefaults as Record<string, number>
   const result: Record<string, number> = {}
   // strength maps sigma from 5% to 100% of param magnitude

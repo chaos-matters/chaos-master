@@ -1,30 +1,42 @@
-import { recordKeys } from '@/utils/record'
 import * as v from '@/valibot'
 import { parametricVariations } from './parametric'
 import * as simpleVariations from './simple'
 
-export const transformVariations = {
-  ...simpleVariations,
-  ...parametricVariations,
-}
+const rawVariations = [
+  ...Object.values(simpleVariations),
+  ...Object.values(parametricVariations),
+]
+
+const CustomVariationFallbackSchema = v.object({
+  type: v.string(),
+  weight: v.number(),
+  visible: v.optional(v.boolean(), true),
+})
+
+export const TransformVariationDescriptor = v.variant('type', [
+  ...rawVariations.map((variation) => variation.DescriptorSchema),
+  CustomVariationFallbackSchema,
+])
 
 export type TransformVariationDescriptor = v.InferOutput<
   typeof TransformVariationDescriptor
 >
-export const TransformVariationDescriptor = v.variant(
-  'type',
-  Object.values(transformVariations).map(
-    (variation) => variation.DescriptorSchema,
-  ),
-)
 
-export type TransformVariationType = keyof typeof transformVariations
-export const variationTypes = recordKeys(transformVariations)
+export type TransformVariationType =
+  | TransformVariationDescriptor['type']
+  | (string & {})
 
-type ParametricVariationType = (typeof parametricVariationTypes)[number]
+export const transformVariations = Object.fromEntries(
+  rawVariations.map((v) => [v.DescriptorSchema.entries.type.literal, v]),
+) as unknown as Record<TransformVariationType, (typeof rawVariations)[number]>
+
+export const variationTypes = [
+  ...rawVariations.map((v) => v.DescriptorSchema.entries.type.literal),
+] as string[]
 const parametricVariationTypes = Object.values(parametricVariations).map(
   (o) => o.DescriptorSchema.entries.type.literal,
 )
+type ParametricVariationType = (typeof parametricVariationTypes)[number]
 
 export type ParametricVariationDescriptor = Extract<
   TransformVariationDescriptor,
@@ -44,7 +56,8 @@ export function isParametricVariation(
 }
 
 export function isVariationType(
-  maybeType: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  maybeType: any,
 ): maybeType is TransformVariationType {
-  return (variationTypes as string[]).includes(maybeType)
+  return typeof maybeType === 'string' && variationTypes.includes(maybeType)
 }

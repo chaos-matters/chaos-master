@@ -69,8 +69,7 @@ export function Modal(props: ParentProps<ModalProps>) {
     const { resolve, promise } = Promise.withResolvers<T>()
     const instance: ModalInstance<unknown> = {
       config,
-      // @ts-expect-error this can't be modeled in ts
-      resolve,
+      resolve: resolve as (value: unknown) => void,
     }
     setModalInstances((prev) => [...prev, instance])
     return promise

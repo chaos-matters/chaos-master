@@ -1,4 +1,4 @@
-import { validateFlame } from '@/flame/schema/flameSchema'
+import { tryValidateFlame } from '@/flame/schema/flameSchema'
 import { deepClone } from '@/utils/clone'
 import { safeGetItem, safeRemoveItem, safeSetItem } from '@/utils/storage'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -36,10 +36,10 @@ export function loadRecentFlames(): RecentFlame[] {
     if (raw === null) return []
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
-    return parsed.filter(isValidRecentFlame).map((item) => ({
-      ...item,
-      flame: validateFlame(item.flame),
-    }))
+    return parsed.filter(isValidRecentFlame).flatMap((item) => {
+      const flame = tryValidateFlame(item.flame)
+      return flame ? [{ ...item, flame }] : []
+    })
   } catch {
     return []
   }

@@ -1,6 +1,6 @@
 .root {
   isolation: isolate;
-  contain: strict;
+  contain: layout style paint;
 }
 
 .modal {

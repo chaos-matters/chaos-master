@@ -1,12 +1,16 @@
 import { createEffect, createSignal, For, onCleanup, onMount, Show, } from 'solid-js'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
-import { variationTypes } from '@/flame/variations'
+import { transformVariations, variationTypes } from '@/flame/variations'
+import { CATEGORIES, CATEGORY_LABELS, sortByCategory, } from '@/flame/variations/categories'
 import { getNormalizedVariationName } from '@/flame/variations/utils'
 import { DelayedShow } from '../DelayedShow/DelayedShow'
 import { VariationPreview, variationPreviewFlames, } from '../VariationSelector/VariationSelector'
 import ui from './QuickVariationPicker.module.css'
+import type { PointInitMode } from '@/flame/pointInitMode'
 import type { TransformVariationType } from '@/flame/variations'
+import type { VariationCategory } from '@/flame/variations/categories'
+import type { HardwareTier } from '@/utils/hardwareTier'
 
 /* ---- Icons ---- */
 
@@ -37,6 +41,19 @@ function GridIcon() {
       <rect x="9" y="2" width="5" height="5" rx="1" />
       <rect x="2" y="9" width="5" height="5" rx="1" />
       <rect x="9" y="9" width="5" height="5" rx="1" />
+    </svg>
+  )
+}
+
+function ExpandIcon() {
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.6"
+    >
+      <path d="M3 10v3h3M13 6V3h-3M10 3h3v3M6 13H3v-3" />
     </svg>
   )
 }
@@ -103,6 +120,9 @@ export type QuickVariationPickerProps = {
   onHoverClear?: () => void
   mode: QuickPickerMode
   onModeChange: (mode: QuickPickerMode) => void
+  onOpenFullSelector?: () => void
+  hardwareTier?: HardwareTier | null
+  pointInitMode?: PointInitMode
 }
 
 const PREVIEW_CLEAR_DELAY = 120
@@ -132,6 +152,39 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
   }
 
   const filtered = () => filterVariations(variationTypes, query())
+
+  const [categoryFilter, setCategoryFilter] =
+    createSignal<VariationCategory | null>(null)
+
+  const grouped = () => {
+    const items = filtered()
+    const selectedCategory = categoryFilter()
+    const groups = new Map<VariationCategory, TransformVariationType[]>()
+
+    for (const type of items) {
+      const cat = transformVariations[type]!.category
+      if (selectedCategory && cat !== selectedCategory) continue
+      if (!groups.has(cat)) groups.set(cat, [])
+      groups.get(cat)!.push(type)
+    }
+
+    return [...groups.entries()]
+      .sort(([a], [b]) => sortByCategory(a, b))
+      .map(([cat, types]) => ({
+        category: cat,
+        label: CATEGORY_LABELS[cat],
+        types,
+      }))
+  }
+
+  const activeCategories = () => {
+    const cats = new Set<VariationCategory>()
+    for (const type of filtered()) {
+      cats.add(transformVariations[type]!.category)
+    }
+    // Sort by CATEGORIES order
+    return CATEGORIES.filter((c) => cats.has(c))
+  }
 
   onMount(() => {
     // auto-focus the search in list mode; small delay so the slide animation
@@ -199,6 +252,17 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
         >
           <GridIcon />
         </button>
+        <Show when={props.onOpenFullSelector}>
+          <button
+            class={ui.headerBtn}
+            title="Open full browser (with previews and params)"
+            onClick={() => {
+              props.onOpenFullSelector?.()
+            }}
+          >
+            <ExpandIcon />
+          </button>
+        </Show>
         <button
           class={ui.headerBtn}
           title="Close (Esc)"
@@ -222,6 +286,34 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
             spellcheck={false}
           />
         </div>
+        <Show when={activeCategories().length > 1}>
+          <div class={ui.categoryFilterRow}>
+            <button
+              class={ui.categoryPill}
+              classList={{
+                [ui.categoryPillActive!]: categoryFilter() === null,
+              }}
+              onClick={() => setCategoryFilter(null)}
+            >
+              All
+            </button>
+            <For each={activeCategories()}>
+              {(cat) => (
+                <button
+                  class={ui.categoryPill}
+                  classList={{
+                    [ui.categoryPillActive!]: categoryFilter() === cat,
+                  }}
+                  onClick={() =>
+                    setCategoryFilter(categoryFilter() === cat ? null : cat)
+                  }
+                >
+                  {CATEGORY_LABELS[cat]}
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
         <Show when={query() && filtered().length > 0}>
           <div class={ui.searchCount}>
             {filtered().length} / {variationTypes.length}
@@ -240,65 +332,76 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
               <div class={ui.noResults}>No variations match "{query()}"</div>
             }
           >
-            <For each={filtered()}>
-              {(type) => {
-                let longPressTimer: ReturnType<typeof setTimeout> | undefined
-                let didLongPress = false
+            <For each={grouped()}>
+              {({ label, types }) => (
+                <>
+                  <div class={ui.sectionHeader}>{label}</div>
+                  <For each={types}>
+                    {(type) => {
+                      let longPressTimer:
+                        | ReturnType<typeof setTimeout>
+                        | undefined
+                      let didLongPress = false
 
-                function onTouchStart(_e: TouchEvent) {
-                  didLongPress = false
-                  longPressTimer = setTimeout(() => {
-                    didLongPress = true
-                    props.onHoverType?.(type)
-                  }, 300)
-                }
-
-                function onTouchEnd(e: TouchEvent) {
-                  clearTimeout(longPressTimer)
-                  if (didLongPress) {
-                    // Was a long press (preview) -- just clear preview, don't select
-                    e.preventDefault()
-                    props.onHoverClear?.()
-                  }
-                  // Short tap falls through to onClick
-                }
-
-                function onTouchCancel() {
-                  clearTimeout(longPressTimer)
-                  if (didLongPress) {
-                    props.onHoverClear?.()
-                  }
-                }
-
-                return (
-                  <button
-                    class={ui.pill}
-                    classList={{ [ui.pillActive!]: type === props.currentType }}
-                    title={getNormalizedVariationName(type)}
-                    onMouseEnter={() => {
-                      handleMouseEnter(type)
-                    }}
-                    onMouseLeave={() => {
-                      handleMouseLeave()
-                    }}
-                    onTouchStart={onTouchStart}
-                    onTouchEnd={onTouchEnd}
-                    onTouchCancel={onTouchCancel}
-                    onClick={() => {
-                      if (didLongPress) {
+                      function onTouchStart(_e: TouchEvent) {
                         didLongPress = false
-                        return
+                        longPressTimer = setTimeout(() => {
+                          didLongPress = true
+                          props.onHoverType?.(type)
+                        }, 300)
                       }
-                      clearTimeout(clearTimer)
-                      props.onHoverClear?.()
-                      props.onSelect(type)
-                      props.onClose()
+
+                      function onTouchEnd(e: TouchEvent) {
+                        clearTimeout(longPressTimer)
+                        if (didLongPress) {
+                          // Was a long press (preview) -- just clear preview, don't select
+                          e.preventDefault()
+                          props.onHoverClear?.()
+                        }
+                        // Short tap falls through to onClick
+                      }
+
+                      function onTouchCancel() {
+                        clearTimeout(longPressTimer)
+                        if (didLongPress) {
+                          props.onHoverClear?.()
+                        }
+                      }
+
+                      return (
+                        <button
+                          class={ui.pill}
+                          classList={{
+                            [ui.pillActive!]: type === props.currentType,
+                          }}
+                          title={getNormalizedVariationName(type)}
+                          onMouseEnter={() => {
+                            handleMouseEnter(type)
+                          }}
+                          onMouseLeave={() => {
+                            handleMouseLeave()
+                          }}
+                          onTouchStart={onTouchStart}
+                          onTouchEnd={onTouchEnd}
+                          onTouchCancel={onTouchCancel}
+                          onClick={() => {
+                            if (didLongPress) {
+                              didLongPress = false
+                              return
+                            }
+                            clearTimeout(clearTimer)
+                            props.onHoverClear?.()
+                            props.onSelect(type)
+                            props.onClose()
+                          }}
+                        >
+                          {getNormalizedVariationName(type)}
+                        </button>
+                      )
                     }}
-                  >
-                    {getNormalizedVariationName(type)}
-                  </button>
-                )
-              }}
+                  </For>
+                </>
+              )}
             </For>
           </Show>
         </div>
@@ -306,56 +409,133 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
 
       {/* Mode B: compact GPU gallery */}
       <Show when={props.mode === 'gallery'}>
+        <Show when={activeCategories().length > 1}>
+          <div class={ui.categoryFilterRow}>
+            <button
+              class={ui.categoryPill}
+              classList={{
+                [ui.categoryPillActive!]: categoryFilter() === null,
+              }}
+              onClick={() => setCategoryFilter(null)}
+            >
+              All
+            </button>
+            <For each={activeCategories()}>
+              {(cat) => (
+                <button
+                  class={ui.categoryPill}
+                  classList={{
+                    [ui.categoryPillActive!]: categoryFilter() === cat,
+                  }}
+                  onClick={() =>
+                    setCategoryFilter(categoryFilter() === cat ? null : cat)
+                  }
+                >
+                  {CATEGORY_LABELS[cat]}
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
         <div class={ui.galleryList}>
           {(() => {
             const previewFlames = variationPreviewFlames(
-              'pointInitGaussianDisk',
+              props.pointInitMode ?? 'pointInitGaussianDisk',
             )
+            let globalIndex = 0
             return (
               <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
-                <For each={variationTypes}>
-                  {(type, i) => {
-                    const flame = () => previewFlames[type]
-                    return (
-                      <button
-                        class={ui.galleryItem}
-                        classList={{
-                          [ui.galleryItemActive!]: type === props.currentType,
-                        }}
-                        title={getNormalizedVariationName(type)}
-                        onMouseEnter={() => {
-                          handleMouseEnter(type)
-                        }}
-                        onMouseLeave={() => {
-                          handleMouseLeave()
-                        }}
-                        onClick={() => {
-                          clearTimeout(clearTimer)
-                          props.onHoverClear?.()
-                          props.onSelect(type)
-                          props.onClose()
-                        }}
-                      >
-                        <Show when={flame()} keyed>
-                          {(f) => (
-                            <DelayedShow delayMs={i() * 30}>
-                              <div class={ui.galleryCanvas}>
-                                <VariationPreview
-                                  version={1}
-                                  isSelected={type === props.currentType}
-                                  name={type}
-                                  flame={f}
-                                />
+                <For each={grouped()}>
+                  {({ label, types }) => (
+                    <>
+                      <div class={ui.gallerySectionHeader}>{label}</div>
+                      <For each={types}>
+                        {(type) => {
+                          const flame = () => previewFlames[type]
+                          const i = globalIndex++
+                          let longPressTimer:
+                            | ReturnType<typeof setTimeout>
+                            | undefined
+                          let didLongPress = false
+
+                          function onTouchStart(_e: TouchEvent) {
+                            didLongPress = false
+                            longPressTimer = setTimeout(() => {
+                              didLongPress = true
+                              handleMouseEnter(type)
+                            }, 300)
+                          }
+
+                          function onTouchEnd(e: TouchEvent) {
+                            clearTimeout(longPressTimer)
+                            if (didLongPress) {
+                              e.preventDefault()
+                              props.onHoverClear?.()
+                            }
+                          }
+
+                          function onTouchCancel() {
+                            clearTimeout(longPressTimer)
+                            if (didLongPress) {
+                              props.onHoverClear?.()
+                            }
+                          }
+
+                          return (
+                            <button
+                              class={ui.galleryItem}
+                              classList={{
+                                [ui.galleryItemActive!]:
+                                  type === props.currentType,
+                              }}
+                              title={getNormalizedVariationName(type)}
+                              onMouseEnter={() => {
+                                handleMouseEnter(type)
+                              }}
+                              onMouseLeave={() => {
+                                handleMouseLeave()
+                              }}
+                              onTouchStart={onTouchStart}
+                              onTouchEnd={onTouchEnd}
+                              onTouchCancel={onTouchCancel}
+                              onContextMenu={(e) => {
+                                e.preventDefault()
+                              }}
+                              onClick={() => {
+                                if (didLongPress) {
+                                  didLongPress = false
+                                  return
+                                }
+                                clearTimeout(clearTimer)
+                                props.onHoverClear?.()
+                                props.onSelect(type)
+                                props.onClose()
+                              }}
+                            >
+                              <Show when={flame()} keyed>
+                                {(f) => (
+                                  <DelayedShow delayMs={i * 30}>
+                                    <div class={ui.galleryCanvas}>
+                                      <VariationPreview
+                                        version={1}
+                                        isSelected={type === props.currentType}
+                                        name={type}
+                                        flame={f}
+                                        hardwareTier={props.hardwareTier}
+                                      />
+                                    </div>
+                                  </DelayedShow>
+                                )}
+                              </Show>
+                              <div class={ui.galleryItemName}>
+                                {getNormalizedVariationName(type)}
                               </div>
-                            </DelayedShow>
-                          )}
-                        </Show>
-                        <div class={ui.galleryItemName}>
-                          {getNormalizedVariationName(type)}
-                        </div>
-                      </button>
-                    )
-                  }}
+                            </button>
+                          )
+                        }}
+                      </For>
+                    </>
+                  )}
                 </For>
               </ComputeGate>
             )

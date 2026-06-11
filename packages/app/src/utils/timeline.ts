@@ -1142,7 +1142,8 @@ export function applyTracksToFlame(
       | 'colorInitPosition'
   })
   applyString('pointInitMode', (v) => {
-    flame.renderSettings.pointInitMode = v as PointInitMode
+    flame.renderSettings.pointInitMode =
+      v as typeof flame.renderSettings.pointInitMode
   })
 
   // Color arrays

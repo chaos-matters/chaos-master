@@ -1,5 +1,6 @@
-import { createResource, onCleanup, Show } from 'solid-js'
+import { createEffect, createResource, Match, onCleanup, Switch, } from 'solid-js'
 import { tgpu } from 'typegpu'
+import { WebgpuNotSupported } from '@/components/ErrorHandling/ErrorHandling'
 import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
 import { vramLog } from '@/utils/vramLog'
 import { RootContextProvider } from './RootContext'
@@ -34,13 +35,25 @@ export function Root(props: ParentProps<RootProps>) {
     },
   )
 
+  createEffect(() => {
+    const err = webgpu.error
+    if (err) {
+      console.error('[Root] WebGPU initialization failed:', err)
+    }
+  })
+
   return (
-    <Show when={webgpu()} keyed>
-      {(webgpu) => (
-        <RootContextProvider value={webgpu}>
-          {props.children}
-        </RootContextProvider>
-      )}
-    </Show>
+    <Switch>
+      <Match when={webgpu.error}>
+        <WebgpuNotSupported />
+      </Match>
+      <Match when={webgpu()}>
+        {(wg) => (
+          <RootContextProvider value={wg()}>
+            {props.children}
+          </RootContextProvider>
+        )}
+      </Match>
+    </Switch>
   )
 }

@@ -18,8 +18,13 @@ const letBrowserHandleCodes = new Set([
 
 function letBrowserHandleActiveInput(el: Element | null, ev: KeyboardEvent) {
   if (!el) return false
-  // Always let the browser handle key events in text areas and selects
-  if (el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') {
+  // Always let the browser handle key events in text areas, selects, and contenteditable elements
+  if (
+    el.tagName === 'TEXTAREA' ||
+    el.tagName === 'SELECT' ||
+    el.getAttribute('contenteditable') === 'true' ||
+    el.closest('[contenteditable="true"]')
+  ) {
     return true
   }
   if (el.tagName !== 'INPUT') return false

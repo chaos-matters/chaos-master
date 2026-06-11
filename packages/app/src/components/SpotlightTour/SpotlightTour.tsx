@@ -219,6 +219,7 @@ export function SpotlightTour(props: SpotlightTourProps) {
       case 'right':
         return ui.arrowRight!
     }
+    return ''
   }
 
   // Reposition on resize and scroll, and handle Escape to close

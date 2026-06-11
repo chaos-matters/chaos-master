@@ -161,6 +161,9 @@ export function KeyframeInspector(props: KeyframeInspectorProps) {
                     onDblClick={() => {
                       startInspectorEdit(kf().value as number)
                     }}
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                    }}
                     title="Drag to adjust, double-click to edit"
                   >
                     {formatKeyframeValue(kf().value)}

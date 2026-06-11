@@ -5,11 +5,17 @@ export function createAnimationFrame(
   fn: (frameId: number) => void,
   minDeltaTime: number | Accessor<number> = 0,
   hold?: () => Promise<void>,
+  /** While true, the rAF loop is torn down (another driver owns the ticks). */
+  paused?: Accessor<boolean>,
 ) {
   let lastTime = 0
 
   createEffect(() => {
+    if (paused?.()) {
+      return
+    }
     let frameId: number
+    let disposed = false
     const framesPending = new Set<number>()
 
     function getDeltaTime(): number {
@@ -17,6 +23,7 @@ export function createAnimationFrame(
     }
 
     function run(time: number) {
+      if (disposed) return
       const framesNotPending = framesPending.size <= 2
       const passedEnoughTime = time - lastTime >= getDeltaTime()
       if (framesNotPending && (lastTime === 0 || passedEnoughTime)) {
@@ -29,12 +36,15 @@ export function createAnimationFrame(
             .catch(console.error)
         }
       }
-      frameId = requestAnimationFrame(run)
+      if (!disposed) {
+        frameId = requestAnimationFrame(run)
+      }
     }
 
     frameId = requestAnimationFrame(run)
 
     onCleanup(() => {
+      disposed = true
       cancelAnimationFrame(frameId)
     })
   })

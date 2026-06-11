@@ -1,3 +1,4 @@
+import { benchmark } from './benchmark'
 import { example1 } from './example1'
 import { example2 } from './example2'
 import { example3 } from './example3'
@@ -34,6 +35,7 @@ import { linear1 } from './linear1'
 import type { FlameDescriptor } from '../schema/flameSchema'
 
 export const examples = {
+  benchmark,
   initExample,
   example1,
   example2,

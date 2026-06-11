@@ -60,7 +60,7 @@ export const flameCreationTour: TourGuide = {
       beforeShow: (ctx) => {
         ctx.setSidebarOpen(true)
         ctx.executeCommand('flame.clearTransforms')
-        ctx.executeCommand('flame.addTransform', 'linear')
+        ctx.executeCommand('flame.addTransform', 'linearVar')
         ctx.executeCommand('flame.setSkipIters', 1)
         ctx.executeCommand('flame.setExposure', 0.25)
         ctx.executeCommand('flame.setVibrancy', 0.5)
@@ -129,7 +129,7 @@ export const flameCreationTour: TourGuide = {
       description:
         'The Horseshoe variation bends points into distinctive U-shaped curls. Combined with the linear backbone, this creates the classic fractal flame silhouette — sweeping arcs and dramatic curves.',
       beforeShow: (ctx) => {
-        ctx.executeCommand('flame.addTransform', 'horseshoe')
+        ctx.executeCommand('flame.addTransform', 'horseshoeVar')
         ctx.executeCommand('flame.setProbability', 0, 0.55)
         ctx.executeCommand('flame.setProbability', 1, 0.45)
         ctx.executeCommand('flame.setColorSpeed', 0, 0.4)
@@ -183,7 +183,7 @@ export const flameCreationTour: TourGuide = {
       description:
         'Swirl twists points around the origin, creating spiraling arms. At lower probability (20%), it adds delicate spiraling accents woven through the horseshoe structure — like wisps of smoke curling around the main shape.',
       beforeShow: (ctx) => {
-        ctx.executeCommand('flame.addTransform', 'swirl')
+        ctx.executeCommand('flame.addTransform', 'swirlVar')
         ctx.executeCommand('flame.setProbability', 0, 0.5)
         ctx.executeCommand('flame.setProbability', 1, 0.35)
         ctx.executeCommand('flame.setProbability', 2, 0.15)

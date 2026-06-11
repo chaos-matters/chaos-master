@@ -210,6 +210,8 @@
 /* ── Track row ── */
 .trackRow {
   display: flex;
+  width: max-content;
+  min-width: 100%;
   border-bottom: 1px solid var(--neutral-100, #f3f4f6);
   align-items: stretch;
   transition: background 0.1s;
@@ -258,8 +260,7 @@
 
 .lane {
   position: relative;
-  flex: 1;
-  min-width: 100%;
+  flex: none;
   cursor: pointer;
 }
 
@@ -301,23 +302,23 @@
   top: 50%;
   transform: translate(-50%, -50%);
   cursor: pointer;
-  width: 14px;
-  height: 14px;
+  width: var(--dot-size, 14px);
+  height: var(--dot-size, 14px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 2;
-  /* Expand touch target to 36px while keeping visual size at 14px */
+  /* Expand touch target — at least 22px, scales with dot size */
   &::after {
     content: '';
     position: absolute;
-    inset: -11px;
+    inset: max(-11px, calc(var(--dot-size, 14px) * -0.6));
   }
 }
 
 .keyframeDot svg {
-  width: 9px;
-  height: 9px;
+  width: calc(var(--dot-size, 14px) * 0.64);
+  height: calc(var(--dot-size, 14px) * 0.64);
 }
 
 .keyframeDot svg path {
@@ -408,6 +409,8 @@
   border-radius: 3px;
   cursor: ew-resize;
   user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
   transition: background 0.1s;
 
   [data-theme='dark'] & {

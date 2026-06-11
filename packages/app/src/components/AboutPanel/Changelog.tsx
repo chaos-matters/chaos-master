@@ -1,5 +1,5 @@
 import { createResource, For, Show } from 'solid-js'
-import { BASE_URL } from '@/defaults'
+import changelogText from '../../../CHANGELOG.md?raw'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './Changelog.module.css'
@@ -15,8 +15,7 @@ type ChangelogEntry = {
 }
 
 async function fetchChangelog(): Promise<ChangelogEntry[]> {
-  const response = await fetch(`${BASE_URL}CHANGELOG.md`)
-  const text = await response.text()
+  const text = changelogText
 
   const entries: ChangelogEntry[] = []
   const lines = text.split('\n')
@@ -57,7 +56,7 @@ async function fetchChangelog(): Promise<ChangelogEntry[]> {
     }
   }
 
-  return entries
+  return Promise.resolve(entries)
 }
 
 /**

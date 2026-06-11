@@ -22,6 +22,7 @@ import { recordKeys } from './utils/record'
 import { dismissWelcome, hasWelcomeBeenDismissed, } from './utils/welcomeDismissed'
 import type { TourGuide } from './components/SpotlightTour/tourTypes'
 import type { FlameDescriptor } from './flame/schema/flameSchema'
+import type { HardwareTier } from './utils/hardwareTier'
 import type { TimelineTrack } from './utils/timeline'
 
 function getTour(id: string): TourGuide | undefined {
@@ -43,7 +44,16 @@ function getTour(id: string): TourGuide | undefined {
   }
 }
 
-export type ExportImageType = (canvas: HTMLCanvasElement) => void
+export type ExportImageInfo = {
+  /** True when the canvas holds a final color-graded image at the requested
+   *  quality limit, i.e. it is safe to capture the canvas for an export. */
+  finalImageReady: boolean
+}
+
+export type ExportImageType = (
+  canvas: HTMLCanvasElement,
+  info?: ExportImageInfo,
+) => void
 
 function QueryErrorToast(props: { error: string | null }) {
   const { showToast } = useToast()
@@ -60,6 +70,10 @@ export function Wrappers() {
   const [dontShowAgain, setDontShowAgain] = persistentSignal(
     'dontShowWelcome',
     false,
+  )
+  const [hardwareTier, setHardwareTier] = persistentSignal<HardwareTier | null>(
+    'hardwareTier',
+    null,
   )
   const [selectedFlame, setSelectedFlame] = createSignal<
     FlameDescriptor | undefined
@@ -182,27 +196,28 @@ export function Wrappers() {
       <SpotlightTourContext.Provider value={spotlightState}>
         <ThemeContextProvider>
           <KeyframeTargetProvider>
-            <Modal>
-              <ErrorBoundary fallback={errorHandler}>
-                <Root
-                  adapterOptions={{
-                    powerPreference: 'high-performance',
-                  }}
-                >
-                  <Suspense>
-                    <ToastProvider>
+            <ToastProvider>
+              <Modal>
+                <ErrorBoundary fallback={errorHandler}>
+                  <Root
+                    adapterOptions={{
+                      powerPreference: 'high-performance',
+                    }}
+                  >
+                    <Suspense>
                       <QueryErrorToast error={queryError()} />
                       <MainWorkspace
                         flameFromQuery={flameFromQuery()}
                         flameFromWelcome={selectedFlame}
                         welcomeTracks={selectedWelcomeTracks}
+                        hardwareTier={hardwareTier()}
+                        onHardwareTierChange={setHardwareTier}
                         resetFlameFromWelcome={() => {
                           setSelectedFlame(undefined)
                           setSelectedWelcomeTracks(undefined)
                         }}
                       />
-                    </ToastProvider>
-                    {/* WelcomeScreen overlay on top */}
+                    </Suspense>
                     <Show when={showWelcome()}>
                       <WelcomeScreen
                         showDontShowAgain={dontShowAgain()}
@@ -231,12 +246,14 @@ export function Wrappers() {
                             pill?.click()
                           })
                         }}
+                        hardwareTier={hardwareTier()}
+                        onHardwareTierChange={setHardwareTier}
                       />
                     </Show>
-                  </Suspense>
-                </Root>
-              </ErrorBoundary>
-            </Modal>
+                  </Root>
+                </ErrorBoundary>
+              </Modal>
+            </ToastProvider>
           </KeyframeTargetProvider>
         </ThemeContextProvider>
       </SpotlightTourContext.Provider>

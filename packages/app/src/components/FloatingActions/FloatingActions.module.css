@@ -50,6 +50,7 @@
   width: 18px;
   flex-shrink: 0;
   cursor: grab;
+  touch-action: none;
   color: var(--neutral-400);
   border-right: 1px solid var(--neutral-200);
   transition:

@@ -31,11 +31,11 @@ export const example27 = defineExample({
       colorSpeed: 0.3,
       variations: {
         [vid('b2c3d4e5_f6a7_027b_8901_bcdef1234567')]: {
-          type: 'swirl',
+          type: 'swirlVar',
           weight: 0.8,
         },
         [vid('c3d4e5f6_a7b8_027c_9012_cdef12345678')]: {
-          type: 'sinusoidal',
+          type: 'sinusoidalVar',
           weight: 0.2,
         },
       },
@@ -50,11 +50,11 @@ export const example27 = defineExample({
       colorSpeed: 0.35,
       variations: {
         [vid('e5f6a7b8_c9d0_027e_1234_ef1234567890')]: {
-          type: 'hyperbolic',
+          type: 'hyperbolicVar',
           weight: 0.7,
         },
         [vid('f6a7b8c9_d0e1_027f_2345_01234567890a')]: {
-          type: 'sinusoidal',
+          type: 'sinusoidalVar',
           weight: 0.3,
         },
       },
@@ -69,11 +69,11 @@ export const example27 = defineExample({
       colorSpeed: 0.25,
       variations: {
         [vid('b8c9d0e1_f2a3_027h_4567_234567890abc')]: {
-          type: 'spherical',
+          type: 'sphericalVar',
           weight: 0.6,
         },
         [vid('c9d0e1f2_a3b4_027i_5678_34567890abcd')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 0.4,
         },
       },

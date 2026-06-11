@@ -53,7 +53,7 @@ export const example1CreationTour: TourGuide = {
       description:
         'A new transform appears with the default Linear variation and colorSpeed set to 0.4. Linear is the stable backbone that maps points without distortion.',
       beforeShow: (ctx) => {
-        ctx.executeCommand('flame.addTransform', 'linear')
+        ctx.executeCommand('flame.addTransform', 'linearVar')
         ctx.executeCommand('flame.setColorSpeed', 0, 0.4)
         ctx.scrollToTarget('[data-tour-target="probability"]')
       },
@@ -108,7 +108,7 @@ export const example1CreationTour: TourGuide = {
       description:
         'A second transform starts as plain Linear. We will mix in Swirl and Popcorn to create spiraling arms with organic texture.',
       beforeShow: (ctx) => {
-        ctx.executeCommand('flame.addTransform', 'linear')
+        ctx.executeCommand('flame.addTransform', 'linearVar')
         ctx.executeCommand('flame.setColorSpeed', 1, 0.4)
         ctx.scrollToTarget('[data-tour-target="probability"]')
       },
@@ -136,7 +136,7 @@ export const example1CreationTour: TourGuide = {
       description:
         'Swirl twists points around the origin. At weight 0.5 it dominates the mix, creating the spiraling structure that defines Example 1.',
       beforeShow: (ctx) => {
-        ctx.executeCommand('flame.addVariation', 1, 'swirl')
+        ctx.executeCommand('flame.addVariation', 1, 'swirlVar')
         ctx.executeCommand('flame.setVariationWeight', 1, 1, 0.5)
         ctx.scrollToTarget('[data-tour-target="variation-type"]')
       },
@@ -148,7 +148,7 @@ export const example1CreationTour: TourGuide = {
       description:
         'Popcorn adds fine-grained sinusoidal distortion. A small weight of 0.1 gives subtle organic texture without overpowering the swirl.',
       beforeShow: (ctx) => {
-        ctx.executeCommand('flame.addVariation', 1, 'popcorn')
+        ctx.executeCommand('flame.addVariation', 1, 'popcornVar')
         ctx.executeCommand('flame.setVariationWeight', 1, 2, 0.1)
         ctx.scrollToTarget('[data-tour-target="variation-type"]')
       },
@@ -205,7 +205,7 @@ export const example1CreationTour: TourGuide = {
       description:
         'The Pie variation splits the plane into angular slices, like a pizza. Combined with the swirl, this creates the characteristic star shape.',
       beforeShow: (ctx) => {
-        ctx.executeCommand('flame.addTransform', 'pie')
+        ctx.executeCommand('flame.addTransform', 'pieVar')
         ctx.executeCommand('flame.setColorSpeed', 2, 0.4)
         ctx.scrollToTarget('[data-tour-target="probability"]')
       },
@@ -269,7 +269,7 @@ export const example1CreationTour: TourGuide = {
       description:
         'A tiny Gaussian blur at 5% softens the hard edges of the pie slices, making transitions between arms look more natural.',
       beforeShow: (ctx) => {
-        ctx.executeCommand('flame.addVariation', 2, 'gaussian')
+        ctx.executeCommand('flame.addVariation', 2, 'gaussianVar')
         ctx.executeCommand('flame.setVariationWeight', 2, 1, 0.05)
         ctx.scrollToTarget('[data-tour-target="variation-type"]')
       },
@@ -338,7 +338,7 @@ export const example1CreationTour: TourGuide = {
       description:
         'Sinusoidal bends the structure into soft sine waves, adding an organic ripple to the entire flame.',
       beforeShow: (ctx) => {
-        ctx.executeCommand('flame.addTransform', 'sinusoidal')
+        ctx.executeCommand('flame.addTransform', 'sinusoidalVar')
         ctx.executeCommand('flame.setColorSpeed', 3, 0.4)
         ctx.scrollToTarget('[data-tour-target="probability"]')
       },

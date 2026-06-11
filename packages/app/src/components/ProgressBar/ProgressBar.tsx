@@ -135,19 +135,31 @@ export function ProgressBar() {
 
         <Show when={mode() === 'animation'}>
           <div class={ui.header}>
-            <span class={ui.label}>Rendering Animation...</span>
+            <span class={ui.label}>
+              {animProgress()?.status === 'encoding'
+                ? 'Encoding Video...'
+                : 'Rendering Animation...'}
+            </span>
             <span class={ui.stats}>
-              frame {animProgress()!.totalFramesComplete + 1} /{' '}
-              {animProgress()!.totalFrames}
+              {animProgress()?.status === 'encoding' ? (
+                'Finalizing file...'
+              ) : (
+                <>
+                  frame {animProgress()!.totalFramesComplete + 1} /{' '}
+                  {animProgress()!.totalFrames}
+                </>
+              )}
             </span>
           </div>
-          <div class={ui.secondaryStats}>
-            <span>
-              Current frame: {formatCount(animProgress()!.currentPointCount)} /{' '}
-              {formatCount(animProgress()!.targetPointsPerFrame)} pts
-            </span>
-            <span>{animPointPct().toFixed(0)}% quality</span>
-          </div>
+          <Show when={animProgress()?.status !== 'encoding'}>
+            <div class={ui.secondaryStats}>
+              <span>
+                Current frame: {formatCount(animProgress()!.currentPointCount)}{' '}
+                / {formatCount(animProgress()!.targetPointsPerFrame)} pts
+              </span>
+              <span>{animPointPct().toFixed(0)}% quality</span>
+            </div>
+          </Show>
           <div class={ui.track}>
             <div
               class={ui.fill}
@@ -156,25 +168,31 @@ export function ProgressBar() {
             />
           </div>
           <div class={ui.animFooter}>
-            <span class={ui.eta}>{animEta()}</span>
-            <div class={ui.animActions}>
-              <button
-                type="button"
-                class={ui.stopAndSaveButton}
-                onClick={handleStopAndSaveAnimation}
-                title="Stop after current frame and save the video with all frames rendered so far"
-              >
-                Stop & Save
-              </button>
-              <button
-                type="button"
-                class={ui.cancelButton}
-                onClick={handleCancelAnimation}
-                title="Cancel and discard all rendered frames"
-              >
-                Cancel
-              </button>
-            </div>
+            <span class={ui.eta}>
+              {animProgress()?.status === 'encoding'
+                ? 'Saving MP4...'
+                : animEta()}
+            </span>
+            <Show when={animProgress()?.status !== 'encoding'}>
+              <div class={ui.animActions}>
+                <button
+                  type="button"
+                  class={ui.stopAndSaveButton}
+                  onClick={handleStopAndSaveAnimation}
+                  title="Stop after current frame and save the video with all frames rendered so far"
+                >
+                  Stop & Save
+                </button>
+                <button
+                  type="button"
+                  class={ui.cancelButton}
+                  onClick={handleCancelAnimation}
+                  title="Cancel and discard all rendered frames"
+                >
+                  Cancel
+                </button>
+              </div>
+            </Show>
           </div>
         </Show>
       </div>

@@ -78,6 +78,18 @@ export default defineConfig(
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/restrict-template-expressions': 'off',
+      // Types that resolve to `any` (due to noImplicitAny: false) make unions
+      // like `SomeType | null` appear as `any | null`, triggering this rule.
+      '@typescript-eslint/no-redundant-type-constituents': 'off',
+      // noImplicitAny is false in the app tsconfig because TypeGPU's tgpu.fn()
+      // and SolidJS reactive wrappers break contextual typing for ~1900+
+      // callback parameters.  Every other no-unsafe-* rule is already off;
+      // allow `any` in arithmetic too so restrict-plus-operands stays useful
+      // for catching actual string+number mismatches without false positives.
+      '@typescript-eslint/restrict-plus-operands': [
+        'error',
+        { allowAny: true },
+      ],
 
       'padding-line-between-statements': [
         'error',

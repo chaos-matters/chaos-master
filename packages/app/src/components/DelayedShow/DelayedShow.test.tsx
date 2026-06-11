@@ -17,7 +17,7 @@ describe('DelayedShow Logic', () => {
     it('should use setTimeout with correct delay', () => {
       const callback = vi.fn()
 
-      setTimeout(callback, 100)
+      setTimeout(() => callback(), 100)
 
       vi.advanceTimersByTime(99)
       expect(callback).not.toHaveBeenCalled()
@@ -30,7 +30,7 @@ describe('DelayedShow Logic', () => {
       const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout')
       const callback = vi.fn()
 
-      const timeoutId = setTimeout(callback, 100)
+      const timeoutId = setTimeout(() => callback(), 100)
       clearTimeout(timeoutId)
 
       expect(clearTimeoutSpy).toHaveBeenCalledWith(timeoutId)
@@ -44,9 +44,9 @@ describe('DelayedShow Logic', () => {
       const cb2 = vi.fn()
       const cb3 = vi.fn()
 
-      setTimeout(cb1, 50)
-      setTimeout(cb2, 100)
-      setTimeout(cb3, 500)
+      setTimeout(() => cb1(), 50)
+      setTimeout(() => cb2(), 100)
+      setTimeout(() => cb3(), 500)
 
       vi.advanceTimersByTime(50)
       expect(cb1).toHaveBeenCalled()
@@ -137,11 +137,11 @@ describe('DelayedShow Logic', () => {
       const cb2 = vi.fn()
 
       // Simulate effect re-running when delayMs changes
-      setTimeout(cb1, delayMs())
+      setTimeout(() => cb1(), delayMs())
       expect(delayMs()).toBe(100)
 
       setDelayMs(200)
-      setTimeout(cb2, delayMs())
+      setTimeout(() => cb2(), delayMs())
       expect(delayMs()).toBe(200)
     })
   })

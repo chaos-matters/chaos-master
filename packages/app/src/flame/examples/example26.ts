@@ -30,11 +30,11 @@ export const example26 = defineExample({
       colorSpeed: 0.4,
       variations: {
         [vid('b2c3d4e5_f6a7_026b_8901_bcdef1234567')]: {
-          type: 'swirl',
+          type: 'swirlVar',
           weight: 0.9,
         },
         [vid('c3d4e5f6_a7b8_026c_9012_cdef12345678')]: {
-          type: 'sinusoidal',
+          type: 'sinusoidalVar',
           weight: 0.35,
         },
       },
@@ -50,7 +50,7 @@ export const example26 = defineExample({
       colorSpeed: 0,
       variations: {
         [vid('d4e5f6a7_b8c9_026d_0123_def123456789')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 1,
         },
       },
@@ -65,7 +65,7 @@ export const example26 = defineExample({
       colorSpeed: 0,
       variations: {
         [vid('e5f6a7b8_c9d0_026e_1234_ef1234567890')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 1,
         },
       },
@@ -80,7 +80,7 @@ export const example26 = defineExample({
       colorSpeed: 0,
       variations: {
         [vid('f6a7b8c9_d0e1_026f_2345_01234567890a')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 1,
         },
       },
@@ -95,7 +95,7 @@ export const example26 = defineExample({
       colorSpeed: 0,
       variations: {
         [vid('a7b8c9d0_e1f2_026g_3456_1234567890ab')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 1,
         },
       },

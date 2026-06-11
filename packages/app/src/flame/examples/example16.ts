@@ -7,7 +7,7 @@ import { defineExample, tid, vid } from './util'
  */
 export const example16 = defineExample({
   renderSettings: {
-    exposure: -1.25,
+    exposure: 0.25,
     skipIters: 20,
     drawMode: 'light',
     camera: {
@@ -24,7 +24,7 @@ export const example16 = defineExample({
       color: { x: 0.2, y: 0.1 },
       variations: {
         [vid('b2c3d4e5_f6a7_0123_8901_bcdef1234567')]: {
-          type: 'blob',
+          type: 'blobVar',
           weight: 1,
           params: { high: 2, low: 1, waves: 1 },
         },
@@ -48,11 +48,11 @@ export const example16 = defineExample({
           params: { power: 2, sides: 3, corners: 4, circle: 4 },
         },
         [vid('f6a7b8c9_d0e1_0123_2345_01234567890a')]: {
-          type: 'spherical',
+          type: 'sphericalVar',
           weight: 0.35,
         },
         [vid('a7b8c9d0_e1f2_0123_3456_1234567890ab')]: {
-          type: 'horseshoe',
+          type: 'horseshoeVar',
           weight: 0.15,
         },
       },
@@ -65,12 +65,12 @@ export const example16 = defineExample({
       color: { x: 0, y: -0.3 },
       variations: {
         [vid('c9d0e1f2_a3b4_0123_5678_34567890abcd')]: {
-          type: 'juliaScope',
+          type: 'juliaScopeVar',
           weight: 1,
           params: { power: 3.5, dist: 2.8 },
         },
         [vid('d0e1f2a3_b4c5_0123_6789_4567890abcde')]: {
-          type: 'eyefish',
+          type: 'eyefishVar',
           weight: 0.25,
         },
       },

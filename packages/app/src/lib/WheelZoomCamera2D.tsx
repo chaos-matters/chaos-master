@@ -167,11 +167,11 @@ export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
       if (wheelDebounceTimer !== undefined) {
         clearTimeout(wheelDebounceTimer)
         wheelDebounceTimer = undefined
-        // Don't leave the preview orphaned when the effect re-runs or
-        // the component unmounts during a debounced wheel zoom.
-        if (changeHistory.isPreviewing()) {
-          changeHistory.commit()
-        }
+      }
+      // Don't leave a preview orphaned when the effect re-runs or the
+      // component unmounts during an active drag, pinch, or wheel zoom.
+      if (changeHistory.isPreviewing()) {
+        changeHistory.commit()
       }
     })
   })

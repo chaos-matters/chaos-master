@@ -6,6 +6,7 @@ import { VariationInfo } from '../simple/types'
 import type { TgpuFn } from 'typegpu'
 import type { BaseData, Infer, v2f, Vec2f, WgslStruct } from 'typegpu/data'
 import type { BooleanSchema, OptionalSchema } from 'valibot'
+import type { VariationCategory } from '../simple/types'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
 type ParametricVariationDescriptor<
@@ -28,6 +29,7 @@ type ParametricVariation<
   K extends string,
   T extends Record<string, BaseData>,
 > = {
+  category: VariationCategory
   DescriptorSchema: ParametricVariationDescriptor<K, T>
   paramStruct: WgslStruct<T>
   paramDefaults: Infer<WgslStruct<T>>
@@ -47,13 +49,25 @@ export function parametricVariationDescriptor<
 >(
   variationType: K,
   paramStruct: WgslStruct<T>,
+  paramDefaults?: Infer<WgslStruct<T>>,
 ): ParametricVariationDescriptor<K, T> {
   const ParamSchema = structToSchema(paramStruct)
+  // We use type assertion here to bypass strict return type while still emitting the correct type signature
   return v.object({
     type: v.literal(variationType),
     weight: v.number(),
     visible: v.optional(v.boolean(), true),
-    params: ParamSchema,
+    params: (paramDefaults
+      ? v.optional(
+          ParamSchema,
+          () =>
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            paramDefaults as any,
+        )
+      : ParamSchema) as unknown as v.ObjectSchema<
+      Record<keyof T, v.NumberSchema<undefined>>,
+      undefined
+    >,
   })
 }
 
@@ -66,12 +80,20 @@ export function parametricVariation<
   paramDefaults: Infer<WgslStruct<T>>,
   editor: EditorFor<Infer<WgslStruct<T>>>,
   impl: (pos: v2f, varInfo: VariationInfo, params: Infer<WgslStruct<T>>) => v2f,
+  category: VariationCategory = 'general',
 ): ParametricVariation<K, T> {
   return {
-    DescriptorSchema: parametricVariationDescriptor(variationKey, paramStruct),
+    category,
+    DescriptorSchema: parametricVariationDescriptor(
+      variationKey,
+      paramStruct,
+      paramDefaults,
+    ),
     paramStruct,
     paramDefaults,
     editor,
-    fn: tgpu.fn([vec2f, VariationInfo, paramStruct], vec2f)(impl),
+    fn: tgpu
+      .fn([vec2f, VariationInfo, paramStruct], vec2f)(impl)
+      .$name(variationKey),
   }
 }

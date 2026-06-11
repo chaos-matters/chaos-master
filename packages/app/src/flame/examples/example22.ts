@@ -8,7 +8,7 @@ import { defineExample, tid, vid } from './util'
  */
 export const example22 = defineExample({
   renderSettings: {
-    exposure: -1.18,
+    exposure: 0.32,
     skipIters: 18,
     drawMode: 'light',
     camera: {
@@ -29,11 +29,11 @@ export const example22 = defineExample({
           weight: 1,
         },
         [vid('c3d4e5f6_a7b8_9012_cdef_43210987654')]: {
-          type: 'diamond',
+          type: 'diamondVar',
           weight: 0.4,
         },
         [vid('d4e5f6a7_b8c9_0123_defa_32109876543')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 0.2,
         },
       },
@@ -46,11 +46,11 @@ export const example22 = defineExample({
       color: { x: 0.1, y: 0.35 },
       variations: {
         [vid('f6a7b8c9_d0e1_2345_fabc_10987654321')]: {
-          type: 'heart',
+          type: 'heartVar',
           weight: 1,
         },
         [vid('a7b8c9d0_e1f2_3456_abcd_09876543210')]: {
-          type: 'fan',
+          type: 'fanVar',
           weight: 0.35,
         },
         [vid('b8c9d0e1_f2a3_4567_bcde_98765432109')]: {
@@ -72,7 +72,7 @@ export const example22 = defineExample({
           params: { sides: 5, star: 0.3, circle: 0.1 },
         },
         [vid('e1f2a3b4_c5d6_7890_efab_65432109876')]: {
-          type: 'sinusoidal',
+          type: 'sinusoidalVar',
           weight: 0.3,
         },
       },
@@ -90,7 +90,7 @@ export const example22 = defineExample({
           params: { powX: 1.5, powY: 0.7 },
         },
         [vid('b4c5d6e7_f8a9_0123_bcde_32109876543')]: {
-          type: 'gaussian',
+          type: 'gaussianVar',
           weight: 0.5,
         },
       },

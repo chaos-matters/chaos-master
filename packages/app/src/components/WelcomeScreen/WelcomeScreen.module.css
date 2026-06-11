@@ -78,6 +78,17 @@
   text-align: center;
 }
 
+.galleryLoading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 8rem;
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.4);
+  gap: 0.75rem;
+}
+
 .galleryGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -356,7 +367,8 @@
 .techPill {
   display: inline-flex;
   align-items: center;
-  padding: 0.2rem 0.55rem;
+  justify-content: center;
+  padding: 0.25rem 0.55rem 0.15rem;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
@@ -365,6 +377,7 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  line-height: normal;
 }
 
 .techPillCyan {
@@ -395,7 +408,7 @@
   background: rgba(255, 100, 150, 0.08);
   color: rgba(255, 150, 180, 0.55);
   transition: all 0.2s ease;
-  line-height: 1;
+  line-height: normal;
   text-decoration: none;
 
   & > svg {
@@ -422,7 +435,7 @@
   background: rgba(255, 255, 255, 0.05);
   color: rgba(255, 255, 255, 0.4);
   transition: all 0.2s ease;
-  line-height: 1;
+  line-height: normal;
 
   & > svg {
     width: 0.85rem;
@@ -436,6 +449,106 @@
     background: rgba(255, 255, 255, 0.1);
     color: rgba(255, 255, 255, 0.7);
   }
+}
+
+.hardwareTierSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hardwareTierLabel {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.hardwareTierPills {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+}
+
+.hardwareTierPill {
+  appearance: none;
+  font-family: inherit;
+  padding: 0.2rem 0.65rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.65rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hardwareTierPill:hover {
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.hardwareTierPill:active {
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.hardwareTierPill:focus-visible {
+  outline: 2px solid rgba(124, 58, 237, 0.5);
+  outline-offset: 1px;
+}
+
+.hardwareTierPillActive {
+  border-color: rgba(124, 58, 237, 0.4);
+  background: rgba(124, 58, 237, 0.15);
+  color: rgba(180, 140, 255, 0.85);
+}
+
+/* Light mode hardware tier */
+[data-theme='light'] .hardwareTierLabel {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+[data-theme='light'] .hardwareTierPills {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='light'] .hardwareTierPill {
+  color: rgba(0, 0, 0, 0.35);
+}
+
+[data-theme='light'] .hardwareTierPill:hover {
+  color: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme='light'] .hardwareTierPill:active {
+  color: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme='light'] .hardwareTierPill:focus-visible {
+  outline: 2px solid rgba(124, 58, 237, 0.5);
+  outline-offset: 1px;
+}
+
+[data-theme='light'] .hardwareTierPillActive {
+  border-color: rgba(124, 58, 237, 0.4);
+  background: rgba(124, 58, 237, 0.12);
+  color: rgba(109, 40, 217, 0.85);
 }
 
 /* Responsive */
@@ -493,6 +606,10 @@
 
 [data-theme='light'] .galleryEmpty {
   color: rgba(0, 0, 0, 0.35);
+}
+
+[data-theme='light'] .galleryLoading {
+  color: rgba(0, 0, 0, 0.45);
 }
 
 [data-theme='light'] .showMoreBtn {

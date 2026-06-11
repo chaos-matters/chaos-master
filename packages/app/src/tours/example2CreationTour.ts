@@ -59,7 +59,7 @@ export const example2CreationTour: TourGuide = {
       description:
         'JuliaN creates n-fold rotational symmetry -- think of a kaleidoscope. We start with power=3 and dist=1 for a classic three-armed spiral.',
       beforeShow: (ctx) => {
-        ctx.executeCommand('flame.addTransform', 'juliaN')
+        ctx.executeCommand('flame.addTransform', 'juliaNVar')
         ctx.executeCommand('flame.setColorSpeed', 0, 0.5)
         ctx.executeCommand('flame.setVariationParams', 0, 0, 'power', 3)
         ctx.executeCommand('flame.setVariationParams', 0, 0, 'dist', 1)
@@ -244,7 +244,7 @@ export const example2CreationTour: TourGuide = {
       description:
         'Adding a small Linear component (weight 0.3) to T2 softens the curl distortion. It mixes the twisted coordinates with the original position, preventing the detail from collapsing into singularities.',
       beforeShow: (ctx) => {
-        ctx.executeCommand('flame.addVariation', 1, 'linear')
+        ctx.executeCommand('flame.addVariation', 1, 'linearVar')
         ctx.executeCommand('flame.setVariationWeight', 1, 1, 0.3)
         ctx.scrollToTarget('[data-tour-target="variation-weight"]')
       },

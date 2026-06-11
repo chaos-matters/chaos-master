@@ -2,14 +2,14 @@ import { produce, unfreeze } from 'structurajs'
 import { defineExample } from '../examples/util'
 import { generateTransformId, generateVariationId } from '../transformFunction'
 import { isParametricVariationType, transformVariations } from '.'
-import type { FlameDescriptor, TransformId, VariationId, } from '../schema/flameSchema'
-import type { ParametricVariationDescriptor, TransformVariationDescriptor, TransformVariationType, } from '.'
+import type { FlameDescriptor } from '../schema/flameSchema'
+import type { TransformVariationDescriptor, TransformVariationType } from '.'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
 export function getNormalizedVariationName(
   type: TransformVariationType,
 ): string {
-  return type.replaceAll(/var/gi, '')
+  return type.replace(/Var$/, '')
 }
 
 export function getVariationDefault(
@@ -17,50 +17,63 @@ export function getVariationDefault(
   weight: number,
 ): TransformVariationDescriptor {
   if (!isParametricVariationType(type)) {
-    return { type, weight, visible: true } as TransformVariationDescriptor
+    return { type, weight, visible: true }
   }
+  const variation = transformVariations[type] as Extract<
+    (typeof transformVariations)[TransformVariationType],
+    { paramDefaults: unknown }
+  >
   return {
     type,
-    params: { ...transformVariations[type].paramDefaults },
+    params: { ...variation.paramDefaults },
     weight,
     visible: true,
-  } as TransformVariationDescriptor
+  }
 }
 
-export function getParamsEditor<T extends ParametricVariationDescriptor>(
+export function getParamsEditor<T extends { type: string; params?: unknown }>(
   variation: T,
 ): { component: EditorFor<T['params']>; value: T['params'] } {
+  const v = transformVariations[variation.type] as Extract<
+    (typeof transformVariations)[TransformVariationType],
+    { editor: unknown }
+  >
   return {
-    component: transformVariations[variation.type].editor as EditorFor<
-      T['params']
-    >,
+    component: v.editor as unknown as EditorFor<T['params']>,
     get value() {
-      return variation.params
+      return variation.params as T['params']
     },
   }
 }
 
-type FlameIds = {
-  tid: TransformId
-  vid: VariationId
-}
-const transformPreviewIds = Object.keys(transformVariations).reduce(
-  (acc, type) => {
-    acc[type as TransformVariationType] = {
-      // helps with debugging, the transform ID is marked with variation type for preview
-      // so the flame is easily identifiable, consider moving this to Flame name, which can
-      // prefix all shader transforms/flames
+const transformPreviewIds = Object.keys(transformVariations).reduce<
+  Record<string, { tid: string; vid: string }>
+>((acc, type) => {
+  acc[type] = {
+    // helps with debugging, the transform ID is marked with variation type for preview
+    // so the flame is easily identifiable, consider moving this to Flame name, which can
+    // prefix all shader transforms/flames
+    tid: generateTransformId(type),
+    vid: generateVariationId(),
+  }
+  return acc
+}, {})
+export function getTransformPreviewTid(type: TransformVariationType) {
+  if (!transformPreviewIds[type]) {
+    transformPreviewIds[type] = {
       tid: generateTransformId(type),
       vid: generateVariationId(),
     }
-    return acc
-  },
-  {} as Record<TransformVariationType, FlameIds>,
-)
-export function getTransformPreviewTid(type: TransformVariationType) {
+  }
   return transformPreviewIds[type].tid
 }
 export function getTransformPreviewVid(type: TransformVariationType) {
+  if (!transformPreviewIds[type]) {
+    transformPreviewIds[type] = {
+      tid: generateTransformId(type),
+      vid: generateVariationId(),
+    }
+  }
   return transformPreviewIds[type].vid
 }
 
@@ -96,9 +109,9 @@ export function getDefaultFlameByVarType(
 
 const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
   {
-    horseshoe: unfreeze(
-      produce(getDefaultFlameByVarType('horseshoe'), (draft) => {
-        draft.transforms[getTransformPreviewTid('horseshoe')]!.preAffine = {
+    horseshoeVar: unfreeze(
+      produce(getDefaultFlameByVarType('horseshoeVar'), (draft) => {
+        draft.transforms[getTransformPreviewTid('horseshoeVar')]!.preAffine = {
           c: 0.4489954195606869,
           f: -0.4301584776979597,
           a: -0.6331653685349898,
@@ -107,7 +120,7 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
           e: -0.4865003428489606,
         }
       }),
-    ) as FlameDescriptor,
+    ),
     crossVar: unfreeze(
       produce(getDefaultFlameByVarType('crossVar'), (draft) => {
         draft.transforms[getTransformPreviewTid('crossVar')]!.preAffine = {
@@ -120,14 +133,14 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
         }
       }),
     ),
-    cylinder: unfreeze(
-      produce(getDefaultFlameByVarType('cylinder'), (draft) => {
+    cylinderVar: unfreeze(
+      produce(getDefaultFlameByVarType('cylinderVar'), (draft) => {
         draft.renderSettings.exposure = 0.666
         draft.renderSettings.camera = {
           zoom: 0.3493516243061941,
           position: [0.20715316352406743, -0.16595190682220834],
         }
-        draft.transforms[getTransformPreviewTid('cylinder')]!.preAffine = {
+        draft.transforms[getTransformPreviewTid('cylinderVar')]!.preAffine = {
           c: -0.013468013468013407,
           f: 0,
           a: 2.6554162592699293,
@@ -137,9 +150,9 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
         }
       }),
     ),
-    diamond: unfreeze(
-      produce(getDefaultFlameByVarType('diamond'), (draft) => {
-        draft.transforms[getTransformPreviewTid('diamond')]!.preAffine = {
+    diamondVar: unfreeze(
+      produce(getDefaultFlameByVarType('diamondVar'), (draft) => {
+        draft.transforms[getTransformPreviewTid('diamondVar')]!.preAffine = {
           c: 0,
           f: 0,
           a: 0.5752348183753919,
@@ -149,9 +162,9 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
         }
       }),
     ),
-    fan: unfreeze(
-      produce(getDefaultFlameByVarType('fan'), (draft) => {
-        draft.transforms[getTransformPreviewTid('fan')]!.preAffine = {
+    fanVar: unfreeze(
+      produce(getDefaultFlameByVarType('fanVar'), (draft) => {
+        draft.transforms[getTransformPreviewTid('fanVar')]!.preAffine = {
           c: 0.3030303030303029,
           f: 0.35151515151515156,
           a: 0.6931111689557807,
@@ -161,9 +174,9 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
         }
       }),
     ),
-    waves: unfreeze(
-      produce(getDefaultFlameByVarType('waves'), (draft) => {
-        draft.transforms[getTransformPreviewTid('waves')]!.preAffine = {
+    wavesVar: unfreeze(
+      produce(getDefaultFlameByVarType('wavesVar'), (draft) => {
+        draft.transforms[getTransformPreviewTid('wavesVar')]!.preAffine = {
           c: -0.3636010248255146,
           f: -0.22892481667991876,
           a: 1.2052888138611,
@@ -198,9 +211,9 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
         }
       }),
     ),
-    popcorn: unfreeze(
-      produce(getDefaultFlameByVarType('popcorn'), (draft) => {
-        draft.transforms[getTransformPreviewTid('popcorn')]!.preAffine = {
+    popcornVar: unfreeze(
+      produce(getDefaultFlameByVarType('popcornVar'), (draft) => {
+        draft.transforms[getTransformPreviewTid('popcornVar')]!.preAffine = {
           a: 1,
           b: 0,
           c: -0.28224055579678675,
@@ -210,9 +223,9 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
         }
       }),
     ),
-    rings: unfreeze(
-      produce(getDefaultFlameByVarType('rings'), (draft) => {
-        draft.transforms[getTransformPreviewTid('rings')]!.preAffine = {
+    ringsVar: unfreeze(
+      produce(getDefaultFlameByVarType('ringsVar'), (draft) => {
+        draft.transforms[getTransformPreviewTid('ringsVar')]!.preAffine = {
           c: 0.24772547468354453,
           f: 0.00009889240506325003,
           a: 1.0043677286151427,
@@ -238,10 +251,10 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
         }
       }),
     ),
-    rings2: unfreeze(
-      produce(getDefaultFlameByVarType('rings2'), (draft) => {
+    rings2Var: unfreeze(
+      produce(getDefaultFlameByVarType('rings2Var'), (draft) => {
         draft.renderSettings.exposure = 0.552
-        draft.transforms[getTransformPreviewTid('rings2')]!.preAffine = {
+        draft.transforms[getTransformPreviewTid('rings2Var')]!.preAffine = {
           c: 0.05976331360946743,
           f: -0.1600838264299801,
           a: 1.6440360757046795,
@@ -249,10 +262,10 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
           d: 1.7823436569258906,
           e: -0.5000425830694895,
         }
-        draft.transforms[getTransformPreviewTid('rings2')]!.variations[
-          getTransformPreviewVid('rings2')
+        draft.transforms[getTransformPreviewTid('rings2Var')]!.variations[
+          getTransformPreviewVid('rings2Var')
         ] = {
-          type: 'rings2',
+          type: 'rings2Var',
           weight: 1.0,
           visible: true,
           params: {
@@ -263,8 +276,8 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
     ),
     secantVar: unfreeze(
       produce(getDefaultFlameByVarType('secantVar'), (draft) => {
-        draft.renderSettings.exposure = 0.945
-        draft.renderSettings.camera.zoom = 0.4232988892907777
+        draft.renderSettings.exposure = 2.0
+        draft.renderSettings.camera.zoom = 1.0
         draft.renderSettings.camera.position = [
           0.22031681118067803, 0.18394228752956718,
         ]
@@ -278,9 +291,9 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
         }
       }),
     ),
-    circus: unfreeze(
-      produce(getDefaultFlameByVarType('circus'), (draft) => {
-        draft.transforms[getTransformPreviewTid('circus')]!.preAffine = {
+    circusVar: unfreeze(
+      produce(getDefaultFlameByVarType('circusVar'), (draft) => {
+        draft.transforms[getTransformPreviewTid('circusVar')]!.preAffine = {
           a: 1.5067596708863726,
           b: -0.11207495085714227,
           c: 0.003943048417568207,
@@ -361,14 +374,296 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
             weight: 1.0,
             visible: true,
             params: {
-              angle: 149,
-              len: 1.54,
-              width: 231,
+              scale_x: 1.0,
+              scale_y: 1.0,
+              speed_x: 0.0,
+              speed_y: 0.0,
               seed: 46472,
-              enableDirectColor: 1,
             },
           },
-          [generateVariationId()]: { type: 'linear', weight: 1, visible: true },
+          [generateVariationId()]: {
+            type: 'linearVar',
+            weight: 1,
+            visible: true,
+          },
+        }
+      }),
+    ),
+    acosechVar: unfreeze(
+      produce(getDefaultFlameByVarType('acosechVar'), (draft) => {
+        const tid = getTransformPreviewTid('acosechVar')
+        const vid = getTransformPreviewVid('acosechVar')
+        draft.renderSettings.exposure = 0.8
+        draft.transforms[tid]!.variations[vid] = {
+          type: 'acosechVar',
+          weight: 0.09,
+          visible: true,
+        }
+      }),
+    ),
+    acoshVar: unfreeze(
+      produce(getDefaultFlameByVarType('acoshVar'), (draft) => {
+        const tid = getTransformPreviewTid('acoshVar')
+        const vid = getTransformPreviewVid('acoshVar')
+        draft.renderSettings.exposure = 0.8
+        draft.transforms[tid]!.variations[vid] = {
+          type: 'acoshVar',
+          weight: 0.09,
+          visible: true,
+        }
+      }),
+    ),
+    acothVar: unfreeze(
+      produce(getDefaultFlameByVarType('acothVar'), (draft) => {
+        const tid = getTransformPreviewTid('acothVar')
+        const vid = getTransformPreviewVid('acothVar')
+        draft.renderSettings.exposure = 0.8
+        draft.transforms[tid]!.variations[vid] = {
+          type: 'acothVar',
+          weight: 0.09,
+          visible: true,
+        }
+      }),
+    ),
+    arcsinhVar: unfreeze(
+      produce(getDefaultFlameByVarType('arcsinhVar'), (draft) => {
+        const tid = getTransformPreviewTid('arcsinhVar')
+        const vid = getTransformPreviewVid('arcsinhVar')
+        draft.renderSettings.exposure = 0.8
+        draft.transforms[tid]!.variations[vid] = {
+          type: 'arcsinhVar',
+          weight: 0.12,
+          visible: true,
+        }
+      }),
+    ),
+    fociVar: unfreeze(
+      produce(getDefaultFlameByVarType('fociVar'), (draft) => {
+        const tid = getTransformPreviewTid('fociVar')
+        const vid = getTransformPreviewVid('fociVar')
+        draft.transforms[tid]!.variations[vid] = {
+          type: 'fociVar',
+          weight: 0.23,
+          visible: true,
+        }
+      }),
+    ),
+    cornersVar: unfreeze(
+      produce(getDefaultFlameByVarType('cornersVar'), (draft) => {
+        draft.renderSettings.camera.zoom = 0.4
+        draft.renderSettings.exposure = 0.5
+        draft.transforms[getTransformPreviewTid('cornersVar')]!.variations[
+          getTransformPreviewVid('cornersVar')
+        ] = {
+          type: 'cornersVar',
+          weight: 1.0,
+          visible: true,
+          params: {
+            x: 1.0,
+            y: 1.0,
+            mult_x: 1.0,
+            mult_y: 1.0,
+            x_power: 0.75,
+            y_power: 0.75,
+            xy_power_add: 0.0,
+            log_mode: 0.0,
+            log_base: 2.71828,
+          },
+        }
+      }),
+    ),
+    checksVar: unfreeze(
+      produce(getDefaultFlameByVarType('checksVar'), (draft) => {
+        draft.renderSettings.exposure = 0.7
+        draft.transforms[getTransformPreviewTid('checksVar')]!.preAffine = {
+          c: 0.0,
+          f: 0.0,
+          a: 0.5,
+          b: 0.5,
+          d: -0.5,
+          e: 0.5,
+        }
+        draft.transforms[getTransformPreviewTid('checksVar')]!.variations[
+          getTransformPreviewVid('checksVar')
+        ] = {
+          type: 'checksVar',
+          weight: 0.17,
+          visible: true,
+          params: { x: 3.0, y: 3.0, size: 1.0, rnd: 0.5 },
+        }
+      }),
+    ),
+    plusRecipVar: unfreeze(
+      produce(getDefaultFlameByVarType('plusRecipVar'), (draft) => {
+        draft.renderSettings.exposure = 0.5
+        draft.renderSettings.camera.zoom = 0.5
+        draft.transforms[getTransformPreviewTid('plusRecipVar')]!.variations[
+          getTransformPreviewVid('plusRecipVar')
+        ] = {
+          type: 'plusRecipVar',
+          weight: 0.25,
+          visible: true,
+          params: { ar: 1.0, ai: 0.5 },
+        }
+      }),
+    ),
+    arctanhVar: unfreeze(
+      produce(getDefaultFlameByVarType('arctanhVar'), (draft) => {
+        draft.transforms[getTransformPreviewTid('arctanhVar')]!.variations[
+          getTransformPreviewVid('arctanhVar')
+        ] = {
+          type: 'arctanhVar',
+          weight: 0.04,
+          visible: true,
+        }
+      }),
+    ),
+    logTile2Var: unfreeze(
+      produce(getDefaultFlameByVarType('logTile2Var'), (draft) => {
+        draft.transforms[getTransformPreviewTid('logTile2Var')]!.variations[
+          getTransformPreviewVid('logTile2Var')
+        ] = {
+          type: 'logTile2Var',
+          weight: 0.2,
+          visible: true,
+          params: { spreadx: 2.0, spready: 2.0 },
+        }
+      }),
+    ),
+    pulseVar: unfreeze(
+      produce(getDefaultFlameByVarType('pulseVar'), (draft) => {
+        draft.transforms[getTransformPreviewTid('pulseVar')]!.variations[
+          getTransformPreviewVid('pulseVar')
+        ] = {
+          type: 'pulseVar',
+          weight: 0.06,
+          visible: true,
+          params: { freqx: 2.0, freqy: 2.0, scalex: 1.0, scaley: 1.0 },
+        }
+      }),
+    ),
+    svenssonVar: unfreeze(
+      produce(getDefaultFlameByVarType('svenssonVar'), (draft) => {
+        draft.renderSettings.camera.zoom = 0.7
+        draft.transforms[getTransformPreviewTid('svenssonVar')]!.variations[
+          getTransformPreviewVid('svenssonVar')
+        ] = {
+          type: 'svenssonVar',
+          weight: 0.5,
+          visible: true,
+          params: { a: 1.4, b: 1.56, c: 1.4, d: -6.56 },
+        }
+      }),
+    ),
+    taurusVar: unfreeze(
+      produce(getDefaultFlameByVarType('taurusVar'), (draft) => {
+        draft.renderSettings.exposure = 0.36
+        draft.renderSettings.contrast = 8.76
+        draft.renderSettings.camera.zoom = 0.143
+        draft.renderSettings.camera.position = [-0.177, 0.195]
+
+        const tid = getTransformPreviewTid('taurusVar')
+        const vid = getTransformPreviewVid('taurusVar')
+        draft.transforms[tid]!.variations[vid] = {
+          type: 'taurusVar',
+          weight: 1.0,
+          visible: true,
+          params: { r: 1.9, n: 5, inv: -0.65, sor: -0.7 },
+        }
+      }),
+    ),
+    murl2Var: unfreeze(
+      produce(getDefaultFlameByVarType('murl2Var'), (draft) => {
+        draft.renderSettings.exposure = 0.6
+        draft.renderSettings.camera.zoom = 0.5
+        draft.transforms[getTransformPreviewTid('murl2Var')]!.variations[
+          getTransformPreviewVid('murl2Var')
+        ] = {
+          type: 'murl2Var',
+          weight: 1.0,
+          visible: true,
+          params: { c: 0.1, power: 3.0 },
+        }
+      }),
+    ),
+    juliaOutsideVar: unfreeze(
+      produce(getDefaultFlameByVarType('juliaOutsideVar'), (draft) => {
+        draft.renderSettings.exposure = 0.8
+        draft.renderSettings.camera.zoom = 0.4
+      }),
+    ),
+    funnelVar: unfreeze(
+      produce(getDefaultFlameByVarType('funnelVar'), (draft) => {
+        draft.renderSettings.exposure = 1.0
+        draft.transforms[getTransformPreviewTid('funnelVar')]!.variations[
+          getTransformPreviewVid('funnelVar')
+        ] = {
+          type: 'funnelVar',
+          weight: 0.05,
+          visible: true,
+          params: { effect: 8.0 },
+        }
+      }),
+    ),
+    splipticBSVar: unfreeze(
+      produce(getDefaultFlameByVarType('splipticBSVar'), (draft) => {
+        draft.renderSettings.exposure = 0.8
+        draft.renderSettings.camera.zoom = 0.5
+        draft.transforms[getTransformPreviewTid('splipticBSVar')]!.variations[
+          getTransformPreviewVid('splipticBSVar')
+        ] = {
+          type: 'splipticBSVar',
+          weight: 0.5,
+          visible: true,
+          params: { x: 0.05, y: 0.05 },
+        }
+      }),
+    ),
+    rays1Var: unfreeze(
+      produce(getDefaultFlameByVarType('rays1Var'), (draft) => {
+        draft.renderSettings.exposure = 1.5
+        draft.renderSettings.camera.zoom = 0.196
+        draft.renderSettings.camera.position = [-0.373, 0.149]
+        draft.transforms[getTransformPreviewTid('rays1Var')]!.variations[
+          getTransformPreviewVid('rays1Var')
+        ] = {
+          type: 'rays1Var',
+          weight: 0.5,
+          visible: true,
+        }
+      }),
+    ),
+    sTwinVar: unfreeze(
+      produce(getDefaultFlameByVarType('sTwinVar'), (draft) => {
+        draft.renderSettings.exposure = 2.2
+        draft.renderSettings.camera.zoom = 0.4
+      }),
+    ),
+    blockYVar: unfreeze(
+      produce(getDefaultFlameByVarType('blockYVar'), (draft) => {
+        draft.renderSettings.exposure = 2.2
+        draft.renderSettings.camera.zoom = 0.4
+      }),
+    ),
+    coneVar: unfreeze(
+      produce(getDefaultFlameByVarType('coneVar'), (draft) => {
+        const tid = getTransformPreviewTid('coneVar')
+        const vid = getTransformPreviewVid('coneVar')
+        draft.transforms[tid]!.variations[vid] = {
+          type: 'coneVar',
+          weight: 1.0,
+          visible: true,
+          params: {
+            radius1: 0.5,
+            radius2: 1.0,
+            size1: 0.5,
+            size2: 1.1,
+            ywave: 2.16,
+            xwave: 1.0,
+            height: 1.0,
+            warp: 1.0,
+            weight: 2.0,
+          },
         }
       }),
     ),

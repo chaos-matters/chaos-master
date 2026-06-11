@@ -150,9 +150,9 @@ const anim1a: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.25 },
-        { frame: 45, value: -1.05, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.25 },
+        { frame: 0, value: 0.25 },
+        { frame: 45, value: 0.45, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.25 },
       ],
     },
   ],
@@ -251,9 +251,9 @@ const anim1c: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.25 },
-        { frame: 45, value: -1.0, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.25 },
+        { frame: 0, value: 0.25 },
+        { frame: 45, value: 0.5, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.25 },
       ],
     },
   ],
@@ -309,9 +309,9 @@ const anim2a: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.25 },
-        { frame: 45, value: -1.15, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.25 },
+        { frame: 0, value: 0.25 },
+        { frame: 45, value: 0.35, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.25 },
       ],
     },
   ],
@@ -394,9 +394,9 @@ const anim2c: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.25 },
-        { frame: 45, value: -1.1, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.25 },
+        { frame: 0, value: 0.25 },
+        { frame: 45, value: 0.4, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.25 },
       ],
     },
   ],
@@ -435,9 +435,9 @@ const anim3a: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.25 },
-        { frame: 45, value: -1.05, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.25 },
+        { frame: 0, value: 0.25 },
+        { frame: 45, value: 0.45, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.25 },
       ],
     },
     {
@@ -536,9 +536,9 @@ const anim4a: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.25 },
-        { frame: 45, value: -1.0, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.25 },
+        { frame: 0, value: 0.25 },
+        { frame: 45, value: 0.5, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.25 },
       ],
     },
   ],
@@ -628,9 +628,9 @@ const anim5a: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.25 },
-        { frame: 45, value: -1.0, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.25 },
+        { frame: 0, value: 0.25 },
+        { frame: 45, value: 0.5, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.25 },
       ],
     },
     {
@@ -730,9 +730,9 @@ const anim5c: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.25 },
-        { frame: 45, value: -1.1, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.25 },
+        { frame: 0, value: 0.25 },
+        { frame: 45, value: 0.4, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.25 },
       ],
     },
   ],
@@ -779,9 +779,9 @@ const anim6a: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.25 },
-        { frame: 45, value: -1.0, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.25 },
+        { frame: 0, value: 0.25 },
+        { frame: 45, value: 0.5, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.25 },
       ],
     },
   ],
@@ -808,10 +808,10 @@ const anim6b: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.25 },
-        { frame: 30, value: -0.95, easing: 'easeInOut' as const },
-        { frame: 60, value: -1.35, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.25 },
+        { frame: 0, value: 0.25 },
+        { frame: 30, value: 0.55, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.15, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.25 },
       ],
     },
     {
@@ -1035,9 +1035,9 @@ const anim2d: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.25 },
-        { frame: 45, value: -0.95, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.25 },
+        { frame: 0, value: 0.25 },
+        { frame: 45, value: 0.55, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.25 },
       ],
     },
   ],
@@ -1094,11 +1094,11 @@ const anim1e: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.25 },
-        { frame: 22, value: -0.9, easing: 'easeOut' as const },
-        { frame: 45, value: -1.4, easing: 'easeIn' as const },
-        { frame: 68, value: -0.95, easing: 'easeOut' as const },
-        { frame: 90, value: -1.25 },
+        { frame: 0, value: 0.25 },
+        { frame: 22, value: 0.6, easing: 'easeOut' as const },
+        { frame: 45, value: 0.1, easing: 'easeIn' as const },
+        { frame: 68, value: 0.55, easing: 'easeOut' as const },
+        { frame: 90, value: 0.25 },
       ],
     },
     {
@@ -1228,10 +1228,10 @@ const anim5d: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.25 },
-        { frame: 30, value: -0.9, easing: 'easeInOut' as const },
-        { frame: 60, value: -1.4, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.25 },
+        { frame: 0, value: 0.25 },
+        { frame: 30, value: 0.6, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.1, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.25 },
       ],
     },
   ],
@@ -1313,9 +1313,9 @@ const anim3c: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.25 },
-        { frame: 45, value: -1.0, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.25 },
+        { frame: 0, value: 0.25 },
+        { frame: 45, value: 0.5, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.25 },
       ],
     },
   ],
@@ -1373,9 +1373,9 @@ const anim8a: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.2 },
-        { frame: 45, value: -1.0, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.2 },
+        { frame: 0, value: 0.3 },
+        { frame: 45, value: 0.5, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.3 },
       ],
     },
   ],
@@ -1546,10 +1546,10 @@ const anim9b: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.25 },
-        { frame: 30, value: -1.0, easing: 'easeOut' as const },
-        { frame: 60, value: -1.4, easing: 'easeIn' as const },
-        { frame: 90, value: -1.25 },
+        { frame: 0, value: 0.25 },
+        { frame: 30, value: 0.5, easing: 'easeOut' as const },
+        { frame: 60, value: 0.1, easing: 'easeIn' as const },
+        { frame: 90, value: 0.25 },
       ],
     },
     {
@@ -1639,9 +1639,9 @@ const anim10a: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.2 },
-        { frame: 45, value: -0.95, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.2 },
+        { frame: 0, value: 0.3 },
+        { frame: 45, value: 0.55, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.3 },
       ],
     },
   ],
@@ -1769,9 +1769,9 @@ const anim11a: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.3 },
-        { frame: 45, value: -1.1, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.3 },
+        { frame: 0, value: 0.2 },
+        { frame: 45, value: 0.4, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.2 },
       ],
     },
   ],
@@ -1787,13 +1787,13 @@ const anim11b: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.3 },
-        { frame: 15, value: -0.95, easing: 'easeOut' as const },
-        { frame: 30, value: -1.45, easing: 'easeIn' as const },
-        { frame: 45, value: -1.0, easing: 'easeOut' as const },
-        { frame: 60, value: -1.42, easing: 'easeIn' as const },
-        { frame: 75, value: -1.05, easing: 'easeOut' as const },
-        { frame: 90, value: -1.3 },
+        { frame: 0, value: 0.2 },
+        { frame: 15, value: 0.55, easing: 'easeOut' as const },
+        { frame: 30, value: 0.05, easing: 'easeIn' as const },
+        { frame: 45, value: 0.5, easing: 'easeOut' as const },
+        { frame: 60, value: 0.08, easing: 'easeIn' as const },
+        { frame: 75, value: 0.45, easing: 'easeOut' as const },
+        { frame: 90, value: 0.2 },
       ],
     },
     {
@@ -1975,10 +1975,10 @@ const anim12b: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.22 },
-        { frame: 30, value: -0.95, easing: 'easeInOut' as const },
-        { frame: 60, value: -1.4, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.22 },
+        { frame: 0, value: 0.28 },
+        { frame: 30, value: 0.55, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.1, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.28 },
       ],
     },
   ],
@@ -2066,9 +2066,9 @@ const anim13a: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.18 },
-        { frame: 45, value: -0.95, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.18 },
+        { frame: 0, value: 0.32 },
+        { frame: 45, value: 0.55, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.32 },
       ],
     },
   ],
@@ -2221,10 +2221,10 @@ const anim13c: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.18 },
-        { frame: 30, value: -1.35, easing: 'easeInOut' as const },
-        { frame: 60, value: -0.95, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.18 },
+        { frame: 0, value: 0.32 },
+        { frame: 30, value: 0.15, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.55, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.32 },
       ],
     },
   ],
@@ -2379,10 +2379,10 @@ const anim14b: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.22 },
-        { frame: 30, value: -1.0, easing: 'easeInOut' as const },
-        { frame: 60, value: -1.4, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.22 },
+        { frame: 0, value: 0.28 },
+        { frame: 30, value: 0.5, easing: 'easeInOut' as const },
+        { frame: 60, value: 0.1, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.28 },
       ],
     },
   ],
@@ -2530,9 +2530,9 @@ const anim15a: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.2 },
-        { frame: 45, value: -1.0, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.2 },
+        { frame: 0, value: 0.3 },
+        { frame: 45, value: 0.5, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.3 },
       ],
     },
   ],
@@ -2774,9 +2774,9 @@ const anim16a: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.25 },
-        { frame: 45, value: -1.05, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.25 },
+        { frame: 0, value: 0.25 },
+        { frame: 45, value: 0.45, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.25 },
       ],
     },
   ],
@@ -2921,9 +2921,9 @@ const anim16c: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.25 },
-        { frame: 45, value: -1.0, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.25 },
+        { frame: 0, value: 0.25 },
+        { frame: 45, value: 0.5, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.25 },
       ],
     },
   ],
@@ -3007,9 +3007,9 @@ const anim17a: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.2 },
-        { frame: 45, value: -0.95, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.2 },
+        { frame: 0, value: 0.3 },
+        { frame: 45, value: 0.55, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.3 },
       ],
     },
   ],
@@ -3184,9 +3184,9 @@ const anim17c: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.2 },
-        { frame: 45, value: -1.0, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.2 },
+        { frame: 0, value: 0.3 },
+        { frame: 45, value: 0.5, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.3 },
       ],
     },
   ],
@@ -3264,10 +3264,10 @@ const anim18a: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.22 },
-        { frame: 40, value: -0.95, easing: 'easeInOut' as const },
-        { frame: 80, value: -1.38, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.22 },
+        { frame: 0, value: 0.28 },
+        { frame: 40, value: 0.55, easing: 'easeInOut' as const },
+        { frame: 80, value: 0.12, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.28 },
       ],
     },
   ],
@@ -3618,10 +3618,10 @@ const anim19c: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.35 },
-        { frame: 40, value: -1.05, easing: 'easeIn' as const },
-        { frame: 70, value: -1.4, easing: 'easeOut' as const },
-        { frame: 90, value: -1.25 },
+        { frame: 0, value: 0.15 },
+        { frame: 40, value: 0.45, easing: 'easeIn' as const },
+        { frame: 70, value: 0.1, easing: 'easeOut' as const },
+        { frame: 90, value: 0.25 },
       ],
     },
     {
@@ -3693,11 +3693,11 @@ const anim20a: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.28 },
-        { frame: 25, value: -1.0, easing: 'easeInOut' as const },
-        { frame: 50, value: -1.42, easing: 'easeInOut' as const },
-        { frame: 75, value: -1.05, easing: 'easeInOut' as const },
-        { frame: 90, value: -1.28 },
+        { frame: 0, value: 0.22 },
+        { frame: 25, value: 0.5, easing: 'easeInOut' as const },
+        { frame: 50, value: 0.08, easing: 'easeInOut' as const },
+        { frame: 75, value: 0.45, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.22 },
       ],
     },
     {
@@ -3868,10 +3868,10 @@ const anim20c: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.42 },
-        { frame: 45, value: -1.1, easing: 'easeIn' as const },
-        { frame: 75, value: -1.35 },
-        { frame: 90, value: -1.28 },
+        { frame: 0, value: 0.08 },
+        { frame: 45, value: 0.4, easing: 'easeIn' as const },
+        { frame: 75, value: 0.15 },
+        { frame: 90, value: 0.22 },
       ],
     },
   ],
@@ -4201,11 +4201,11 @@ const anim22a: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.3 },
-        { frame: 25, value: -1.0, easing: 'easeIn' as const },
-        { frame: 50, value: -1.42, easing: 'easeOut' as const },
-        { frame: 75, value: -0.95, easing: 'easeIn' as const },
-        { frame: 90, value: -1.18 },
+        { frame: 0, value: 0.2 },
+        { frame: 25, value: 0.5, easing: 'easeIn' as const },
+        { frame: 50, value: 0.08, easing: 'easeOut' as const },
+        { frame: 75, value: 0.55, easing: 'easeIn' as const },
+        { frame: 90, value: 0.32 },
       ],
     },
   ],
@@ -4350,12 +4350,12 @@ const anim22c: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: -1.18 },
-        { frame: 20, value: -0.9, easing: 'easeIn' as const },
-        { frame: 45, value: -1.45, easing: 'easeOut' as const },
-        { frame: 65, value: -0.8, easing: 'easeIn' as const },
-        { frame: 85, value: -1.25 },
-        { frame: 90, value: -1.18 },
+        { frame: 0, value: 0.32 },
+        { frame: 20, value: 0.6, easing: 'easeIn' as const },
+        { frame: 45, value: 0.05, easing: 'easeOut' as const },
+        { frame: 65, value: 0.7, easing: 'easeIn' as const },
+        { frame: 85, value: 0.25 },
+        { frame: 90, value: 0.32 },
       ],
     },
     {

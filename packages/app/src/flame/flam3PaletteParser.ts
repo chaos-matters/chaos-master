@@ -13,7 +13,7 @@
  */
 
 import { paletteEntry } from './colorMap'
-import type { Palette } from './colorMap'
+import type { Palette, PaletteEntry } from './colorMap'
 
 /** PREFILTER_WHITE: normalization constant matching flam3/rect.c */
 export const PREFILTER_WHITE = 255
@@ -218,7 +218,7 @@ export function flam3PaletteToPalette(flam3Palette: Flam3PaletteData): Palette {
 
   // Sample colors at regular intervals to build gradient stops
   const numStops = 8
-  const entries = []
+  const entries: PaletteEntry[] = []
 
   for (let i = 0; i < numStops; i++) {
     const position = i / (numStops - 1)

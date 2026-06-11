@@ -25,7 +25,7 @@ export const example2 = defineExample({
       color: { x: 0.20738714813221648, y: 0.10064295041753546 },
       variations: {
         [vid('5c4a50b4_9b04_4105_aacb_7d455ac00dc2')]: {
-          type: 'juliaScope',
+          type: 'juliaScopeVar',
           params: { power: 3, dist: 3.65 },
           weight: 1,
         },
@@ -45,7 +45,7 @@ export const example2 = defineExample({
       postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
       variations: {
         [vid('6f0d8526_b8a7_4b0a_a06f_f829ded35840')]: {
-          type: 'juliaScope',
+          type: 'juliaScopeVar',
           params: { power: 5, dist: 2.35 },
           weight: 0.847,
         },

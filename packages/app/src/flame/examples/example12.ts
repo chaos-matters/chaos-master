@@ -7,7 +7,7 @@ import { defineExample, tid, vid } from './util'
  */
 export const example12 = defineExample({
   renderSettings: {
-    exposure: -1.22,
+    exposure: 0.28,
     skipIters: 20,
     drawMode: 'light',
     camera: {
@@ -24,15 +24,15 @@ export const example12 = defineExample({
       color: { x: 0.2, y: 0.35 },
       variations: {
         [vid('b7c8d9e0_f1a2_3456_8901_bcdef0567890')]: {
-          type: 'polar',
+          type: 'polarVar',
           weight: 1,
         },
         [vid('c7d8e9f0_a1b2_3456_9012_cdef05678901')]: {
-          type: 'cosine',
+          type: 'cosineVar',
           weight: 0.7,
         },
         [vid('d7e8f9a0_b1c2_3456_0123_def056789012')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 0.3,
         },
       },
@@ -45,16 +45,16 @@ export const example12 = defineExample({
       color: { x: -0.15, y: 0 },
       variations: {
         [vid('f7a8b9c0_d1e2_3456_2345_056789012345')]: {
-          type: 'fan2',
+          type: 'fan2Var',
           weight: 0.9,
           params: { x: 0.5, y: 0.7 },
         },
         [vid('a8b9c0d1_e2f3_4567_8901_bcdef0123456')]: {
-          type: 'spherical',
+          type: 'sphericalVar',
           weight: 0.4,
         },
         [vid('b8c9d0e1_f2a3_4567_9012_cdef01234567')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 0.3,
         },
       },
@@ -67,12 +67,12 @@ export const example12 = defineExample({
       color: { x: 0, y: -0.3 },
       variations: {
         [vid('d8e9f0a1_b2c3_4567_1234_ef0123456789')]: {
-          type: 'juliaScope',
+          type: 'juliaScopeVar',
           weight: 1,
           params: { power: 4, dist: 2 },
         },
         [vid('e8f9a0b1_c2d3_4567_2345_01234567890a')]: {
-          type: 'eyefish',
+          type: 'eyefishVar',
           weight: 0.2,
         },
       },

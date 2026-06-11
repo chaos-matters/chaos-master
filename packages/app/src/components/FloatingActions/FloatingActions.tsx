@@ -68,7 +68,8 @@ export function FloatingActions(props: Props) {
     let axisLocked: 'x' | 'y' | 'free' | null = null
 
     setDragging(true)
-    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    const handle = e.currentTarget as HTMLElement
+    handle.setPointerCapture(e.pointerId)
 
     function onMove(ev: PointerEvent) {
       const dx = ev.clientX - startX
@@ -76,8 +77,6 @@ export function FloatingActions(props: Props) {
 
       if (axisLocked === null) {
         if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
-          // On mobile: free movement in any direction
-          // On desktop: axis-locked
           axisLocked = mobile
             ? 'free'
             : Math.abs(dx) >= Math.abs(dy)
@@ -103,14 +102,25 @@ export function FloatingActions(props: Props) {
       }
     }
 
-    function onUp() {
+    function cleanup() {
       setDragging(false)
+      handle.releasePointerCapture(e.pointerId)
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onCancel)
+    }
+
+    function onUp() {
+      cleanup()
+    }
+
+    function onCancel() {
+      cleanup()
     }
 
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onCancel)
   }
 
   const [collapsed, setCollapsed] = createSignal(false)

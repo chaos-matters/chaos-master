@@ -26,7 +26,7 @@ export const example7 = defineExample({
       color: { x: -0.305588355119493, y: 0.04668761144581765 },
       variations: {
         [vid('f80c6b85_beed_4f6b_84e8_3d5815bbba82')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 1,
         },
       },
@@ -45,7 +45,7 @@ export const example7 = defineExample({
       postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
       variations: {
         [vid('1570e063_f0cb_48b5_91c1_256bf1bb5523')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 1,
         },
       },
@@ -64,7 +64,7 @@ export const example7 = defineExample({
       postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
       variations: {
         [vid('0db54b7c_b4f3_4b84_ba4f_a645406da878')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 1,
         },
       },

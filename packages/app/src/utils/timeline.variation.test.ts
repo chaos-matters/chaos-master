@@ -70,7 +70,7 @@ describe('resolveVariationParameter', () => {
         transform1: {
           variations: {
             variation1: {
-              type: 'linear',
+              type: 'linearVar',
               weight: 1,
             },
           },
@@ -146,8 +146,8 @@ describe('resolveVariationParameter', () => {
         },
       ],
     }
-    // @ts-expect-error - Setting window property for test
-    window.currentTimeline = mockTimeline
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).currentTimeline = mockTimeline
 
     const result = resolveVariationParameter(
       {
@@ -183,8 +183,8 @@ describe('resolveVariationParameter', () => {
         },
       ],
     }
-    // @ts-expect-error - Setting window property for test
-    window.currentTimeline = mockTimeline
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).currentTimeline = mockTimeline
 
     const result = resolveVariationParameter(
       {
@@ -227,8 +227,8 @@ describe('resolveVariationParameter', () => {
         },
       ],
     }
-    // @ts-expect-error - Setting window property for test
-    window.currentTimeline = mockTimeline
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).currentTimeline = mockTimeline
 
     const resultX = resolveVariationParameter(
       {

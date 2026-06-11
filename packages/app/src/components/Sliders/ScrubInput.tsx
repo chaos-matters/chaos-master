@@ -99,6 +99,9 @@ export function ScrubInput(props: ScrubInputProps) {
       data-max={props.max}
       onDblClick={startEdit}
       onPointerDown={startScrub}
+      onContextMenu={(e) => {
+        e.preventDefault()
+      }}
     >
       <Show when={props.dataParameterPath && timeline}>
         <KeyframeDiamond parameterPath={props.dataParameterPath!} />

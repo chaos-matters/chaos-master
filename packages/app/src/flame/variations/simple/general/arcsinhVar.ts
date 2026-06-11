@@ -1,0 +1,38 @@
+import { vec2f } from 'typegpu/data'
+import { atan2, log, sqrt } from 'typegpu/std'
+import { PI } from '@/flame/constants'
+import { simpleVariation } from '../types'
+
+export const arcsinhVar = simpleVariation(
+  'arcsinhVar',
+  (pos, varInfo) => {
+    'use gpu'
+
+    const z2_re = pos.x * pos.x - pos.y * pos.y
+    const z2_im = 2.0 * pos.x * pos.y
+
+    const add_re = z2_re + 1.0
+    const add_im = z2_im
+
+    const r_add = sqrt(add_re * add_re + add_im * add_im)
+    const sqrt_re = sqrt((r_add + add_re) * 0.5)
+    let sqrt_im = sqrt((r_add - add_re) * 0.5)
+    if (add_im < 0.0) sqrt_im = -sqrt_im
+
+    const term_re = pos.x + sqrt_re
+    const term_im = pos.y + sqrt_im
+
+    const r_term = sqrt(term_re * term_re + term_im * term_im)
+    const phi_term = atan2(term_im, term_re)
+
+    let res_re = log(r_term)
+    let res_im = phi_term
+
+    const scale = varInfo.weight * 2.0 * PI.$
+    res_re *= scale
+    res_im *= scale
+
+    return vec2f(res_re, res_im)
+  },
+  'general',
+)

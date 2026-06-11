@@ -28,7 +28,7 @@ export async function compressJsonQueryParam(obj: unknown) {
   await writer.close()
 
   const compressReader = compress.readable.getReader()
-  const chunks = []
+  const chunks: Uint8Array[] = []
   try {
     while (true) {
       const { done, value } = await compressReader.read()
@@ -64,7 +64,7 @@ export async function decompressJsonQuery(
   await writer.close()
 
   const decoderReader = decoder.readable.getReader()
-  const chunks = []
+  const chunks: string[] = []
   try {
     while (true) {
       const { done, value } = await decoderReader.read()

@@ -8,6 +8,8 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   padding: 4px 0;
   font-size: 12px;
+  -webkit-touch-callout: none;
+  user-select: none;
 
   [data-theme='dark'] & {
     background: var(--neutral-800, #1f2937);

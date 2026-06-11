@@ -7,7 +7,7 @@ import { defineExample, tid, vid } from './util'
  */
 export const example21 = defineExample({
   renderSettings: {
-    exposure: -1.22,
+    exposure: 0.28,
     skipIters: 20,
     drawMode: 'light',
     camera: {
@@ -53,7 +53,7 @@ export const example21 = defineExample({
           params: { angle: Math.PI * 0.5 },
         },
         [vid('a7b8c9d0_e1f2_3456_abcd_76543210987')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 0.2,
         },
       },
@@ -71,11 +71,11 @@ export const example21 = defineExample({
           params: { a: 0.8, b: 1.5, c: -0.5, d: 2.0 },
         },
         [vid('d0e1f2a3_b4c5_6789_defa_43210987654')]: {
-          type: 'diamond',
+          type: 'diamondVar',
           weight: 0.5,
         },
         [vid('e1f2a3b4_c5d6_7890_efab_32109876543')]: {
-          type: 'rings2',
+          type: 'rings2Var',
           weight: 0.3,
           params: { val: 5 },
         },
@@ -89,16 +89,16 @@ export const example21 = defineExample({
       color: { x: 0, y: -0.35 },
       variations: {
         [vid('a3b4c5d6_e7f8_9012_abcd_10987654321')]: {
-          type: 'juliaN',
+          type: 'juliaNVar',
           weight: 1,
           params: { power: 5, dist: 3.5 },
         },
         [vid('b4c5d6e7_f8a9_0123_bcde_09876543210')]: {
-          type: 'fan',
+          type: 'fanVar',
           weight: 0.3,
         },
         [vid('c5d6e7f8_a9b0_1234_cdef_98765432109')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 0.15,
         },
       },

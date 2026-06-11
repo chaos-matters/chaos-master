@@ -1,0 +1,57 @@
+import { f32, struct, vec2f } from 'typegpu/data'
+import { abs, atan2, cos, length, pow, select, sin, trunc } from 'typegpu/std'
+import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
+import { editorProps } from '@/components/Sliders/ParametricEditors/types'
+import { PI } from '@/flame/constants'
+import { random } from '@/shaders/random'
+import { parametricVariation } from '../types'
+import type { Infer } from 'typegpu/data'
+import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
+
+type JuliaScopeParams = Infer<typeof JuliaScopeParams>
+const JuliaScopeParams = struct({
+  power: f32,
+  dist: f32,
+})
+
+const JuliaScopeParamsDefaults: JuliaScopeParams = {
+  power: 1,
+  dist: 5,
+}
+
+const JuliaScopeParamsEditor: EditorFor<JuliaScopeParams> = (props) => (
+  <>
+    <RangeEditor
+      {...editorProps(props, 'power', 'Power', props.dataParameterPath)}
+      min={1}
+      max={20}
+      step={1}
+    />
+    <RangeEditor
+      {...editorProps(props, 'dist', 'Dist', props.dataParameterPath)}
+      min={1}
+      max={props.value.power + 1}
+      step={0.01}
+    />
+  </>
+)
+
+export const juliaScope = parametricVariation(
+  'juliaScopeVar',
+  JuliaScopeParams,
+  JuliaScopeParamsDefaults,
+  JuliaScopeParamsEditor,
+  (pos, varInfo, P) => {
+    'use gpu'
+    const p1 = P.power
+    const p2 = P.dist
+    const p3 = trunc(abs(p1) * random())
+    const r = length(pos)
+    const phi = atan2(pos.y, pos.x)
+    const lambda = f32(select(f32(-1.0), f32(1.0), random() > 0.5))
+    const t = (lambda * phi + 2.0 * PI.$ * p3) / p1
+    const factor = pow(r, p2 / p1)
+    return vec2f(cos(t), sin(t)).mul(factor).mul(varInfo.weight)
+  },
+  'general',
+)

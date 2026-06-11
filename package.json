@@ -10,7 +10,8 @@
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "typecheck": "tsc --noEmit --project packages/app/tsconfig.json",
-    "check": "pnpm typecheck && pnpm lint:fix && pnpm fmt:fix",
+    "validate-wgsl": "npx tsx scripts/validate-wgsl-props.ts",
+    "check": "pnpm typecheck && pnpm lint:fix && pnpm fmt:fix && pnpm validate-wgsl",
     "test": "pnpm --filter chaos-master exec vitest run",
     "test:ui": "pnpm --filter chaos-master exec vitest --ui",
     "test:watch": "pnpm --filter chaos-master exec vitest",
@@ -20,6 +21,9 @@
     "deploy:prod": "pnpm --filter chaos-master deploy:prod"
   },
   "devDependencies": {
+    "@codemirror/autocomplete": "^6.20.3",
+    "@codemirror/lint": "^6.9.7",
+    "@codemirror/search": "^6.7.0",
     "@eslint/js": "^9.39.4",
     "@playwright/test": "^1.59.1",
     "@types/wicg-file-system-access": "^2023.10.7",
@@ -31,6 +35,7 @@
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import-x": "^4.16.1",
     "eslint-plugin-simple-import-sort": "^12.1.1",
+    "happy-dom": "^20.10.1",
     "jsdom": "^28.1.0",
     "playwright": "^1.59.1",
     "prettier": "^3.8.1",
@@ -58,7 +63,8 @@
     "overrides": {
       "less": "link:./.pnpm-noop",
       "sass": "link:./.pnpm-noop",
-      "stylus": "link:./.pnpm-noop"
+      "stylus": "link:./.pnpm-noop",
+      "tinyest": "0.3.1"
     }
   }
 }

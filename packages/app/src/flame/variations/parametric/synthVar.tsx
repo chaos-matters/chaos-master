@@ -366,7 +366,7 @@ function bezier_quad_map(xin: number, min: number) {
 
     t = x // Special case when m === 2
     if ((m - 2.0) * (m - 2.0) > 1e-10) {
-      t = (-1.0 * iM + sqrt(iM * iM + (1.0 - 2.0 * iM) * x)) / (1 - 2 * iM)
+      t = (-1.0 * iM + sqrt(iM * iM + (1.0 - 2.0 * iM) * x)) / (1.0 - 2.0 * iM)
     }
     return a * (x + (m - 1.0) * t * t)
   }
@@ -380,7 +380,7 @@ function bezier_quad_map(xin: number, min: number) {
     // (L is x value (>1) where we re-join y = x line, and is maximum( iM, 2 * m )
 
     t = sqrt((x - 1.0) / (L - 1.0))
-    return a * (x + (m - 1.0) * t * t + 2 * (1.0 - m) * t + (m - 1.0))
+    return a * (x + (m - 1.0) * t * t + 2.0 * (1.0 - m) * t + (m - 1.0))
   }
 
   // Curve #4
@@ -470,9 +470,9 @@ function synth_sub_calc(
   let y = f32(yin)
   let z = f32(zin)
 
-  if (t === WAVE_SIN) x = sin(y * 2 * PI.$)
-  else if (t === WAVE_COS) x = cos(y * 2 * PI.$)
-  else if (t === WAVE_SQUARE) x = f32(select(-1.0, 1.0, y > 0.5))
+  if (t === WAVE_SIN) x = sin(y * 2.0 * PI.$)
+  else if (t === WAVE_COS) x = cos(y * 2.0 * PI.$)
+  else if (t === WAVE_SQUARE) x = f32(select(f32(-1.0), f32(1.0), y > 0.5))
   else if (t === WAVE_SAW) x = 1.0 - 2.0 * y
   else if (t === WAVE_TRIANGLE)
     x = f32(select(2.0 * y - 1.0, 3.0 - 4.0 * y, y > 0.5))
@@ -505,7 +505,7 @@ function process_layer(
   if (amp === 0.0) return currentFactor
   let x = f32(0.0)
   let z = f32(phs + theta * frq)
-  let y = f32(z / (2 * PI.$))
+  let y = f32(z / (2.0 * PI.$))
   y -= floor(y)
 
   if (skew !== 0.0) {
@@ -603,7 +603,7 @@ export const synthVar = parametricVariation(
   SynthVarParams,
   SynthVarParamsDefaults,
   SynthVarParamsEditor,
-  (pos, _varInfo, P) => {
+  (pos, varInfo, P) => {
     'use gpu'
     const mode = floor(P.mode)
     let Vx = f32(pos.x)
@@ -806,7 +806,7 @@ export const synthVar = parametricVariation(
       const mu = P.power * P.power + EPS.$
       // Java: radius += -2.0 * mu * (int) ((radius + mu) / (2.0 * mu)) + radius * (1.0 - mu);
       // (int) is floor.
-      const term = floor((radius + mu) / (2.0 * mu))
+      const term = f32(floor((radius + mu) / (2.0 * mu)))
       radius = radius + -2.0 * mu * term + radius * (1.0 - mu)
       const pair = synthsincos(theta, P)
       s = pair.x
@@ -844,6 +844,6 @@ export const synthVar = parametricVariation(
       newX = radius * s
       newY = radius * c
     }
-    return vec2f(newX, newY)
+    return vec2f(newX, newY).mul(varInfo.weight)
   },
 )

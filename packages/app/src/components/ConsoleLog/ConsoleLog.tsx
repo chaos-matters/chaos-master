@@ -19,7 +19,6 @@ function formatTime(ts: number) {
     .padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`
 }
 
-/* eslint-disable @typescript-eslint/no-base-to-string */
 function formatArgs(args: unknown[]) {
   return args
     .map((a) => {
@@ -30,14 +29,13 @@ function formatArgs(args: unknown[]) {
         try {
           return JSON.stringify(a, null, 2)
         } catch {
-          return String(a)
+          return Object.prototype.toString.call(a)
         }
       }
       return String(a)
     })
     .join(' ')
 }
-/* eslint-enable @typescript-eslint/no-base-to-string */
 
 type ConsoleLogProps = {
   /** When true the section can be collapsed by tapping the header. */

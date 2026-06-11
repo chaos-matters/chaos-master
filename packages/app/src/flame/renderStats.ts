@@ -1,4 +1,5 @@
 import { createSignal } from 'solid-js'
+import { ALLOW_CAMERA_DURING_EXPORT } from '@/defaults'
 import { convertMilliToSeconds } from '@/utils/convertSeconds'
 import type { Accessor } from 'solid-js'
 
@@ -85,6 +86,7 @@ export type AnimationExportProgress = {
   totalFramesComplete: number
   currentTimelineFrame: number
   startedAt: number
+  status?: 'rendering' | 'encoding'
 }
 
 export const [animationExportProgress, setAnimationExportProgress] =
@@ -103,3 +105,10 @@ export const [forceExportNow, setForceExportNow] = createSignal(false)
  *  finishes and finalizes the video with all frames rendered so far. */
 export const [forceAnimationExportNow, setForceAnimationExportNow] =
   createSignal(false)
+
+/** Opt-in (toggle in the animation render dialog, applied at export start):
+ *  keep camera pan/scroll/zoom interactive during an animation export. Camera
+ *  input resets the in-progress frame and bakes the user's camera into the
+ *  exported video — a creative live-control mode, off by default. */
+export const [cameraDuringExportEnabled, setCameraDuringExportEnabled] =
+  createSignal(ALLOW_CAMERA_DURING_EXPORT)

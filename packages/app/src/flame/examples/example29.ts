@@ -32,11 +32,11 @@ export const example29 = defineExample({
       colorSpeed: 0.35,
       variations: {
         [vid('b2c3d4e5_f6a7_029b_8901_bcdef1234567')]: {
-          type: 'swirl',
+          type: 'swirlVar',
           weight: 0.85,
         },
         [vid('c3d4e5f6_a7b8_029c_9012_cdef12345678')]: {
-          type: 'sinusoidal',
+          type: 'sinusoidalVar',
           weight: 0.3,
         },
       },
@@ -51,11 +51,11 @@ export const example29 = defineExample({
       colorSpeed: 0.3,
       variations: {
         [vid('e5f6a7b8_c9d0_029e_1234_ef1234567890')]: {
-          type: 'hyperbolic',
+          type: 'hyperbolicVar',
           weight: 0.75,
         },
         [vid('f6a7b8c9_d0e1_029f_2345_01234567890a')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 0.4,
         },
       },
@@ -69,7 +69,7 @@ export const example29 = defineExample({
       colorSpeed: 0.2,
       variations: {
         [vid('b8c9d0e1_f2a3_029h_4567_234567890abc')]: {
-          type: 'spherical',
+          type: 'sphericalVar',
           weight: 1,
         },
       },
@@ -85,7 +85,7 @@ export const example29 = defineExample({
       colorSpeed: 0,
       variations: {
         [vid('c9d0e1f2_a3b4_029i_5678_34567890abcd')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 1,
         },
       },
@@ -100,7 +100,7 @@ export const example29 = defineExample({
       colorSpeed: 0,
       variations: {
         [vid('d0e1f2a3_b4c5_029j_6789_4567890abcde')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 1,
         },
       },
@@ -115,7 +115,7 @@ export const example29 = defineExample({
       colorSpeed: 0,
       variations: {
         [vid('e1f2a3b4_c5d6_029k_7890_567890abcdef')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 1,
         },
       },
@@ -130,7 +130,7 @@ export const example29 = defineExample({
       colorSpeed: 0,
       variations: {
         [vid('f2a3b4c5_d6e7_029l_890a_678901abcdef')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 1,
         },
       },
@@ -145,7 +145,7 @@ export const example29 = defineExample({
       colorSpeed: 0,
       variations: {
         [vid('a3b4c5d6_e7f8_029m_90ab_789012abcdef')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 1,
         },
       },
