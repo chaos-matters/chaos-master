@@ -277,7 +277,6 @@ export function createColorGradingPipeline(
     // Apply vibrancy as a true Saturation multiplier on the OkLab chroma
     finalAb = mul(finalAb, max(uniforms.vibrancy, f32(0)))
 
-
     // Remove saturate() before pow to allow highlights to exceed 1.0,
     // which enables the highlightPower roll-off to actually work.
     const value = clamp(
