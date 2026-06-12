@@ -5,6 +5,13 @@ import { defineExample, tid, vid } from './util'
  * gaussian starfield bursts, and juliaScope fractal tendrils.
  */
 export const example10 = defineExample({
+  version: '1.0',
+  metadata: {
+    author: 'unknown',
+    name: 'Solar Prominence',
+    description:
+      'explosive solar-flare patterns with spirograph arcs, gaussian starfield bursts, and juliaScope fractal tendrils.',
+  },
   renderSettings: {
     exposure: 0.3,
     skipIters: 20,

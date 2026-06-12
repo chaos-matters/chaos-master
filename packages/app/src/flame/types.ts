@@ -13,6 +13,8 @@ export const BUCKET_FIXED_POINT_MULTIPLIER_INV =
 export const Bucket = struct({
   /** Fixed point multiplier 1000 */
   count: u32,
+  /** Fixed point multiplier 1000 */
+  z: i32,
   /** Fixed point OkLab a and b multiplier 1000 */
   color: struct({
     a: i32,
@@ -23,6 +25,7 @@ export const Bucket = struct({
 /** Same as Bucket but atomicAdd works on its fields */
 export const AtomicBucket = struct({
   count: atomic(u32),
+  z: atomic(i32),
   color: struct({
     a: atomic(i32),
     b: atomic(i32),

@@ -201,7 +201,19 @@
   font-size: 0.52rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  line-height: 1;
+  line-height: 1.3;
+}
+
+.dimBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 4px;
+  border-radius: 5px;
+  background: oklch(35% 0.1 230 / 70%);
+  color: oklch(85% 0.12 230);
+  font-size: 0.52rem;
+  font-weight: 700;
+  line-height: 1.3;
 }
 
 /* Content Section */

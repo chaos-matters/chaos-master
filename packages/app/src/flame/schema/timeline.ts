@@ -37,6 +37,7 @@ export const TimelineConfig = v.object({
   startFrame: v.pipe(v.number(), v.minValue(0)),
   endFrame: v.pipe(v.number(), v.minValue(1)),
   loop: v.boolean(),
+  autoFps: v.optional(v.boolean(), false),
 })
 export type TimelineConfig = v.InferOutput<typeof TimelineConfig>
 
@@ -52,5 +53,6 @@ export function defaultTimelineConfig(): TimelineConfig {
     startFrame: 0,
     endFrame: 90,
     loop: true,
+    autoFps: false,
   }
 }

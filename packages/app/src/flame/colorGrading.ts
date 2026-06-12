@@ -2,7 +2,7 @@ import { oklabToRgb } from '@typegpu/color'
 import { onCleanup } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { arrayOf, builtin, f32, i32, struct, vec2f, vec2i, vec3f, vec4f, } from 'typegpu/data'
-import { abs, add, clamp, cos, div, dot, fract, log, max, mix, mul, pow, saturate, sin, smoothstep, sub, } from 'typegpu/std'
+import { abs, add, clamp, cos, div, dot, exp, fract, log, max, min, mix, mul, normalize, pow, saturate, select, sin, smoothstep, sub, } from 'typegpu/std'
 import { vramLog } from '@/utils/vramLog'
 import { Bucket, BUCKET_FIXED_POINT_MULTIPLIER_INV } from './types'
 import type { LayoutEntryToInput, TgpuRoot } from 'typegpu'
@@ -35,6 +35,12 @@ export const ColorGradingUniforms = struct({
   highlightPower: f32,
   /** When > 0.5, output raw rgba with transparent background instead of blending */
   outputAlpha: f32,
+  /** Power of depth-based brightness modulation */
+  depthColorPower: f32,
+  /** Direction of the 3D lighting (x, y, z, w unused) */
+  lightDirection: vec4f,
+  /** Strength of directional lighting */
+  lightPower: f32,
 })
 
 /** Palette entry: R=a, G=b, B=unused, A=position */
@@ -286,6 +292,114 @@ export function createColorGradingPipeline(
     )
 
     let rgb = oklabToRgb(vec3f(drawMode(value), finalAb))
+
+    // Modulate brightness based on average Z depth
+    let modL = drawMode(value)
+    if (uniforms.depthColorPower > f32(0)) {
+      const avgZ = mul(
+        div(f32(tex.z), max(f32(tex.count), f32(EPSILON))),
+        f32(10.0),
+      )
+      const zFactor = clamp(avgZ, f32(-2), f32(2))
+
+      // Exponential falloff: always positive, deeper = dimmer (atmospheric perspective)
+      // Scaled by 0.1 to provide a smooth, gradual effect over the 0-5 slider range
+      modL =
+        modL * exp(mul(f32(-1.0), zFactor * uniforms.depthColorPower * 0.1))
+
+      // Depth-based color shift: warm (positive a) for near, cool (negative a) for far
+      const shift = zFactor * uniforms.depthColorPower * f32(0.04)
+      finalAb = vec2f(
+        sub(finalAb.x, shift),
+        add(finalAb.y, mul(shift, f32(0.5))),
+      )
+    }
+
+    // Apply directional lighting (Lambertian)
+    if (uniforms.lightPower > f32(0)) {
+      const leftIdx = add(max(sub(pos2i.x, 1), 0), mul(pos2i.y, textureSize.x))
+      const rightIdx = add(
+        min(add(pos2i.x, 1), sub(textureSize.x, 1)),
+        mul(pos2i.y, textureSize.x),
+      )
+      const upIdx = add(pos2i.x, mul(max(sub(pos2i.y, 1), 0), textureSize.x))
+      const downIdx = add(
+        pos2i.x,
+        mul(min(add(pos2i.y, 1), sub(textureSize.y, 1)), textureSize.x),
+      )
+
+      const centerZ = mul(
+        div(f32(tex.z), max(f32(tex.count), f32(EPSILON))),
+        f32(10.0),
+      )
+
+      const leftCount = accumulationBuffer[leftIdx]!.count
+      const leftZVal = mul(
+        div(
+          f32(accumulationBuffer[leftIdx]!.z),
+          max(f32(leftCount), f32(EPSILON)),
+        ),
+        f32(10.0),
+      )
+      const leftZ = select(centerZ, leftZVal, leftCount > 0)
+
+      const rightCount = accumulationBuffer[rightIdx]!.count
+      const rightZVal = mul(
+        div(
+          f32(accumulationBuffer[rightIdx]!.z),
+          max(f32(rightCount), f32(EPSILON)),
+        ),
+        f32(10.0),
+      )
+      const rightZ = select(centerZ, rightZVal, rightCount > 0)
+
+      const upCount = accumulationBuffer[upIdx]!.count
+      const upZVal = mul(
+        div(f32(accumulationBuffer[upIdx]!.z), max(f32(upCount), f32(EPSILON))),
+        f32(10.0),
+      )
+      const upZ = select(centerZ, upZVal, upCount > 0)
+
+      const downCount = accumulationBuffer[downIdx]!.count
+      const downZVal = mul(
+        div(
+          f32(accumulationBuffer[downIdx]!.z),
+          max(f32(downCount), f32(EPSILON)),
+        ),
+        f32(10.0),
+      )
+      const downZ = select(centerZ, downZVal, downCount > 0)
+
+      const dz_dx = mul(sub(rightZ, leftZ), f32(0.5))
+      const dz_dy = mul(sub(downZ, upZ), f32(0.5))
+
+      // Z scale factor to balance screen pixels with depth range
+      // Z scale factor to balance screen pixels with depth range.
+      // Lowered from 150 to 100 to smooth out normal calculations on high-frequency fractal depth transitions.
+      const zScale = f32(100.0)
+      const normal = normalize(
+        vec3f(
+          mul(sub(f32(0), dz_dx), zScale),
+          mul(sub(f32(0), dz_dy), zScale),
+          f32(1.0),
+        ),
+      )
+      const lightDir = normalize(uniforms.lightDirection.xyz)
+      const diffuse = max(dot(normal, sub(vec3f(0.0), lightDir)), f32(0.0))
+
+      // Ambient lighting controls the base light level in shadows.
+      // We interpolate between unshaded (1.0) and shaded using saturate(lightPower)
+      // to avoid negative extrapolation when lightPower > 1.0, which causes harsh black lines.
+      const ambient = f32(0.15)
+      const shaded = add(
+        ambient,
+        mul(diffuse, mul(uniforms.lightPower, f32(1.15))),
+      )
+      const lightFactor = mix(f32(1.0), shaded, saturate(uniforms.lightPower))
+      modL = modL * max(lightFactor, f32(0.15))
+    }
+
+    rgb = oklabToRgb(vec3f(saturate(modL), finalAb))
 
     const maxChan = max(rgb.r, max(rgb.g, rgb.b))
     const excess = saturate(sub(maxChan, f32(1)))

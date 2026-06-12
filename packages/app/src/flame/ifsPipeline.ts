@@ -8,14 +8,14 @@ import { recordEntries, recordKeys } from '@/utils/record'
 import { vramLog } from '@/utils/vramLog'
 import { AffineParams, transformAffine } from './affineTranform'
 import { colorInitModeToImplFn } from './colorInitMode'
-import { pointInitModeToImplFn } from './pointInitMode'
+import { isPointInitMode2D, pointInitModeToImplFn } from './pointInitMode'
 import { createFlameWgsl, extractFlameUniforms } from './transformFunction'
 import { AtomicBucket, BUCKET_FIXED_POINT_MULTIPLIER, Point } from './types'
 import { getCacheVersion } from './variations/custom'
 import type { StorageFlag, TgpuBuffer, TgpuRoot } from 'typegpu'
 import type { Vec2u, WgslArray } from 'typegpu/data'
 import type { ColorInitMode } from './colorInitMode'
-import type { PointInitMode } from './pointInitMode'
+import type { PointInitMode, PointInitMode2D } from './pointInitMode'
 import type { FlameDescriptor, TransformRecord } from './schema/flameSchema'
 import type { Bucket } from './types'
 import type { CameraContext } from '@/lib/CameraContext'
@@ -44,23 +44,33 @@ export function createIFSPipeline(
   pointInitType: PointInitMode = 'pointInitUnitDisk',
   blendTransforms?: TransformRecord,
 ) {
-  let globId = 'IFS-PIP-'
+  // Flames switched to 2D (or loaded 3D presets previewed without a 3D
+  // camera) can carry a 3D init mode — fall back instead of resolving an
+  // undefined shader external.
+  const pointInit: PointInitMode2D = isPointInitMode2D(pointInitType)
+    ? pointInitType
+    : 'pointInitUnitDisk'
   const isBlending = blendTransforms !== undefined
+  let globId = `IFS-PIP-${recordKeys(transforms).join('')}`
+  if (isBlending) globId += recordKeys(blendTransforms).join('')
+  // Cache key contains only what is baked into the generated WGSL: transform
+  // ids (struct member names), variation ids/types, loop count and init modes.
+  // Uniform values flow through buffers and must not fragment the cache.
   const sig = JSON.stringify({
     insideShaderCount,
     customVariationsVersion: getCacheVersion(),
     colorInitType,
-    pointInitType,
-    transforms: recordEntries(transforms).map(([_, tr]) => ({
-      ...tr,
+    pointInit,
+    transforms: recordEntries(transforms).map(([tid, tr]) => ({
+      tid,
       variations: recordEntries(tr.variations).map(([vid, v]) => ({
         vid,
         type: v.type,
       })),
     })),
     ...(isBlending && {
-      blendTransforms: recordEntries(blendTransforms).map(([_, tr]) => ({
-        ...tr,
+      blendTransforms: recordEntries(blendTransforms).map(([tid, tr]) => ({
+        tid,
         variations: recordEntries(tr.variations).map(([vid, v]) => ({
           vid,
           type: v.type,
@@ -77,16 +87,10 @@ export function createIFSPipeline(
       const tidsB = recordKeys(blendTransforms)
 
       const flamesA = Object.fromEntries(
-        tidsA.map((tid) => {
-          globId += tid
-          return [tid, createFlameWgsl(transforms[tid]!)]
-        }),
+        tidsA.map((tid) => [tid, createFlameWgsl(transforms[tid]!)]),
       )
       const flamesB = Object.fromEntries(
-        tidsB.map((tid) => {
-          globId += tid
-          return [tid, createFlameWgsl(blendTransforms[tid]!)]
-        }),
+        tidsB.map((tid) => [tid, createFlameWgsl(blendTransforms[tid]!)]),
       )
 
       const flamesObjA = Object.fromEntries(
@@ -169,7 +173,7 @@ export function createIFSPipeline(
       })
 
       const colorInitMode = colorInitModeToImplFn[colorInitType]
-      const pointInitMode = pointInitModeToImplFn[pointInitType]
+      const pointInitMode = pointInitModeToImplFn[pointInit]
 
       const ifsCompute = tgpu.computeFn({
         in: {
@@ -246,10 +250,10 @@ export function createIFSPipeline(
     } else {
       // ---- Existing non-blending code path ----
       const flames = Object.fromEntries(
-        recordEntries(transforms).map(([tid, tr]) => {
-          globId += tid
-          return [tid, createFlameWgsl(tr)]
-        }),
+        recordEntries(transforms).map(([tid, tr]) => [
+          tid,
+          createFlameWgsl(tr),
+        ]),
       )
 
       const flamesObj = Object.fromEntries(
@@ -289,7 +293,7 @@ export function createIFSPipeline(
       })
 
       const colorInitMode = colorInitModeToImplFn[colorInitType]
-      const pointInitMode = pointInitModeToImplFn[pointInitType]
+      const pointInitMode = pointInitModeToImplFn[pointInit]
 
       const executeRandomFlame = tgpu.fn([Point], Point) /* wgsl */ `
         (point: Point) -> Point {

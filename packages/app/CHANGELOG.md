@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-06-12
+
+### Added
+
+- **3D Fractal Flame Rendering**: Implemented a WebGPU-based 3D rendering pipeline for IFS fractal flames.
+- **3D Example Gallery**: Added new architectural 3D examples (Examples 32-44) and 6 3D animated preset loops.
+- **Smooth 3D Controls**: Added instant key-loop panning (W/A/S/D and arrows) for smooth 3D camera navigation.
+- **Performance Cap**: Integrated dynamic rendering caps (capping active frames to 8 iterations) during viewport orbiting, panning, and timeline playback to keep interactions responsive.
+
+### Changed
+
+- **Directional Lighting Shadow Model**: Refactored `lightFactor` calculations in the shader to use saturated interpolation, preventing negative scaling and harsh black creases when `lightPower > 1.0`.
+- **Smoother Shading Normals**: Lowered normal estimation `zScale` from 150.0 to 100.0 to reduce noise artifacts.
+
+### Fixed
+
+- **WebGPU Memory Leaks**: Solved a critical VRAM leak and crash by untracking animated timeline frames during blur pipeline checks and implementing cleanups for WebGPU pipeline buffers.
+- **Adaptive Blur Depth**: Restored Z-depth copying in the adaptive blur pipeline so that depth coloring and directional lighting apply correctly to blurred frames.
+- **Blend Gallery Exclusion**: Excluded 3D flames from the 2D blending view.
+
 ## [0.8.9] - 2026-06-11
 
 ### Added
@@ -19,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Variation Refactor**: Refactored variation categories to better organize and manage flame parametric variations.
 - **Animation Exposure**: Scaled up default exposure levels by +1.5 across all timeline animation examples for a brighter default experience.
-- Removed verbose timeline rendering logs to reduce console clutter.
+- Silenced verbose timeline rendering logs to reduce console clutter.
 - **Export Progress UI**: The progress bar now displays an explicit "Encoding Video..." status and prevents cancellation during the critical muxing finalization phase.
 - **Hardware Tier Benchmark**: Fixed a bug where Chromium would aggressively throttle the benchmark's `requestAnimationFrame` to 1 FPS because the off-screen canvas was `opacity: 0` and 1x1 pixels. The container is now `10x10` pixels with `opacity: 0.01` to ensure high-end GPUs can run at maximum frame rates.
 - **Dynamic Iteration Scaler**: Changed the timing fallback clamp from `0.1ms` to `0.001ms`. High-refresh-rate monitors without native WebGPU timestamp support will no longer artificially bottleneck the compute workload. Fixed a severe mathematical dead-zone in the scaler where `Math.floor()` would permanently trap the iterations at `1` if the browser's fixed overhead was greater than the target budget (by switching to `Math.round()`).
@@ -33,17 +53,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **VRAM Lifecycle Race Condition**: Fixed a bug where `Flam3.tsx` unmounting would trigger buffer destruction while a GPU command was still in flight, causing VRAM accumulation/leaks and console errors.
 - **Blend Flame Clear Button**: Fixed the CSS for the 'clear blend flame' (x) button to be properly visible in the UI.
 
-## [0.8.8] - 2026-05-30
+## [0.8.8] - 2026-06-10
 
 ### Changed
 
 - **HDR Highlight Power**: Uncapped luminance clamping to allow true HDR highlights to bloom. `highlightPower` now elegantly rolls-off bright cores into white rather than producing harsh clipping bands.
 - **Exposure and Contrast**: Decoupled exposure and contrast math. Exposure now acts as a pre-log multiplier simulating linear light gathering, while contrast scales the post-log density curve. Note: This breaks backwards compatibility with previously saved exposure/contrast states as they are no longer mathematical duplicates.
 - **Palette Colors**: Palette gradient mapping now dynamically shifts in response to Exposure and Contrast adjustments.
+- Silenced verbose timeline rendering logs to reduce console clutter.
+- **Color Grading Math**: Decoupled exposure and contrast. Exposure now correctly acts as a linear multiplier on bucket density before the logarithmic scale, while Contrast applies a power curve to the log-density.
+- **Hardware Tier Benchmark**: Fixed a bug where Chromium would aggressively throttle the benchmark's `requestAnimationFrame` to 1 FPS because the off-screen canvas was `opacity: 0` and 1x1 pixels. The container is now `10x10` pixels with `opacity: 0.01` to ensure high-end GPUs can run at maximum frame rates.
+- **Dynamic Iteration Scaler**: Changed the timing fallback clamp from `0.1ms` to `0.001ms`. High-refresh-rate monitors without native WebGPU timestamp support will no longer artificially bottleneck the compute workload. Fixed a severe mathematical dead-zone in the scaler where `Math.floor()` would permanently trap the iterations at `1` if the browser's fixed overhead was greater than the target budget (by switching to `Math.round()`).
+- **Benchmark Stability**: The benchmark frame budget is now bounded to 50ms (~20 FPS) instead of aggressively freezing the browser. This gracefully achieves 100% GPU saturation without triggering Timeout Detection and Recovery (TDR) crashes on weak tablet GPUs.
 
 ### Fixed
 
-- **Top-left Rendering Artifact**: Fixed a visual defect where NaN particle coordinates from math explosions would incorrectly accumulate at pixel (0,0).
+- **WebGPU Memory Limits**: Animation export at 4x upscale no longer crashes due to `Out of Memory` errors. The WebGPU adapter now explicitly requests the hardware's maximum supported buffer sizes (e.g., 2GB) rather than defaulting to the baseline 256MB.
+- **Encoder Fail-Fast**: Fixed a bug where asynchronous video encoder failures (such as Firefox refusing massive 8K resolutions) were swallowed silently, causing the app to needlessly process all frames before crashing at the end. The pipeline now halts immediately on encoder failure.
+- **Highlight Roll-off**: Fixed a bug where `highlightPower` did nothing because the tone-mapped value was prematurely saturated before gamma correction. Highlights can now naturally exceed `1.0` and be gracefully desaturated.
+- **VRAM Lifecycle Race Condition**: Fixed a bug where `Flam3.tsx` unmounting would trigger buffer destruction while a GPU command was still in flight, causing VRAM accumulation/leaks and console errors.
+- **Blend Flame Clear Button**: Fixed the CSS for the 'clear blend flame' (x) button to be properly visible in the UI.
 
 ## [0.8.7] - 2026-05-29
 

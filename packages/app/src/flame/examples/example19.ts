@@ -7,6 +7,13 @@ import { defineExample, tid, vid } from './util'
  * the structure into crystalline fractal forms.
  */
 export const example19 = defineExample({
+  version: '1.0',
+  metadata: {
+    author: 'unknown',
+    name: 'Crystal Lattice',
+    description:
+      'ngonVar polygons tessellate across a hexagonal grid, pulled into 3D perspective depth planes. Rings2 concentric circles overlay geometric mandalas while linear power distortion stretches the structure into crystalline fractal forms.',
+  },
   renderSettings: {
     exposure: 0.26,
     skipIters: 20,

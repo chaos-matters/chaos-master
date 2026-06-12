@@ -21,7 +21,7 @@ const TRACK_NAME_WIDTH = 130
 
 import { DopeSheetGrid } from './DopeSheetGrid'
 import { KeyframeInspector } from './KeyframeInspector'
-import type { FlameDescriptor, TransformId, VariationId, } from '@/flame/schema/flameSchema'
+import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 export interface DopeSheetProps {
   formatTrackLabel?: (path: string) => string
@@ -122,7 +122,7 @@ export function DopeSheet(props: DopeSheetProps) {
         const parts = t.parameterPath.split('.')
         if (flame) {
           if (parts[0] === 'transform' && parts.length >= 2) {
-            const tid = parts[1] as TransformId
+            const tid = parts[1]!
             // Handle global transform.color.x vs transform.<tid>.probability
             if (tid !== 'color' && !flame.transforms[tid]) {
               isOrphaned = true
@@ -131,19 +131,21 @@ export function DopeSheet(props: DopeSheetProps) {
             parts.length >= 2 &&
             parts[0] !== 'transform' &&
             parts[0] !== 'camera' &&
+            parts[0] !== 'camera3D' &&
             parts[0] !== 'skipIters' &&
             parts[0] !== 'exposure' &&
             parts[0] !== 'vibrancy' &&
             parts[0] !== 'contrast' &&
             parts[0] !== 'gamma' &&
             parts[0] !== 'highlightPower' &&
+            parts[0] !== 'depthColorPower' &&
             parts[0] !== 'palettePhase' &&
             parts[0] !== 'paletteSpeed' &&
             parts[0] !== 'densityEstimationQuality'
           ) {
             // It's likely <tid>.<vid> or <tid>.<vid>.<param>
-            const tid = parts[0] as TransformId
-            const vid = parts[1] as VariationId
+            const tid = parts[0]!
+            const vid = parts[1]!
             if (
               !flame.transforms[tid] ||
               !flame.transforms[tid].variations[vid]

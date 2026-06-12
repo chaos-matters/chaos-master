@@ -1,16 +1,18 @@
-import { createEffect, createMemo, createSignal, onCleanup, untrack, } from 'solid-js'
+import { createEffect, createMemo, createSignal, onCleanup, untrack, useContext, } from 'solid-js'
 import { arrayOf, vec2u, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
+import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useTimeline } from '@/contexts/TimelineContext'
 import { DEBUG_MODE } from '@/defaults'
-import { accumulatedPointCount, animationExportRunning, exportQuality, setAccumulatedPointCountGlobal, setRenderTimings, } from '@/flame/renderStats'
+import { accumulatedPointCount, animationExportProgress, animationExportRunning, exportQuality, setAccumulatedPointCountGlobal, setRenderTimings, } from '@/flame/renderStats'
 import { deepClone } from '@/utils/clone'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
 import { formatPointCount } from '@/utils/formatPointCount'
 import { logTime } from '@/utils/logTime'
 import { recordEntries } from '@/utils/record'
 import { applyTimelineToFlame } from '@/utils/timeline'
-import { useCamera } from '../lib/CameraContext'
+import { Camera3DContext } from '../lib/Camera3DContext'
+import { CameraContext } from '../lib/CameraContext'
 import { useCanvas } from '../lib/CanvasContext'
 import { useRootContext } from '../lib/RootContext'
 import { createAnimationFrame } from '../utils/createAnimationFrame'
@@ -19,6 +21,7 @@ import { ColorGradingUniforms, createColorGradingPipeline, } from './colorGradin
 import { createDensityEstimationPipeline } from './densityEstimationPipeline'
 import { drawModeToImplFn } from './drawMode'
 import { createIFSPipeline } from './ifsPipeline'
+import { createIFSPipeline3D } from './ifsPipeline3D'
 import { backgroundColorDefault, backgroundColorDefaultWhite, } from './schema/flameSchema'
 import { Bucket, BUCKET_FIXED_POINT_MULTIPLIER, FilterParams } from './types'
 import type { v4f } from 'typegpu/data'
@@ -95,10 +98,14 @@ type Flam3Props = {
 }
 
 export function Flam3(props: Flam3Props) {
-  const camera = useCamera()
+  const camera = useContext(CameraContext)
+  const camera3D = useContext(Camera3DContext)
   const { root, device } = useRootContext()
   const { context, canvasSize, canvas, canvasFormat } = useCanvas()
   const timeline = useTimeline()
+  const changeHistory = useChangeHistory()
+  const isInteractive = () =>
+    changeHistory.isPreviewing() || (timeline?.isPlaying() ?? false)
 
   const [animatedFlame, setAnimatedFlame] =
     createSignal<TimelineFlameDescriptor>(deepClone(props.flameDescriptor))
@@ -118,13 +125,34 @@ export function Flam3(props: Flam3Props) {
   }
 
   // Memo, not a plain function: renderTick reads this from the rAF callback,
-  // which has no reactive owner. Solid wraps conditional JSX props in lazily-created memos,
-  // so a first camera.zoom() read from rAF would create those computations owner-less.
+  // which has no reactive owner. Solid wraps conditional JSX props (e.g.
+  // Default3DPreviewCamera's ternaries) in lazily-created memos, so a first
+  // camera3D.fov()/position() read from rAF would create those computations
+  // owner-less — "computations created outside createRoot" + never disposed.
   // Creating the memo here makes all camera reads happen under this owner.
   const bucketProbabilityInv = createMemo(() => {
     const size = canvasSize()
     const height = size.height
-    const unitSquareArea = (height ** 2 * camera.zoom() ** 2) / 4
+    const dimensions = animatedFlame().renderSettings.dimensions ?? 2
+    if (dimensions === 3 && camera3D) {
+      // 3D equivalent of the 2D zoom-based area calculation.
+      // In 2D: A = height² × zoom² / 4  (unit square in pixels).
+      // In 3D: a unit world-space square at the target distance maps to
+      //   scale = height / (2 × radius × tan(fov/2))  pixels per world unit
+      //   A = scale²
+      // Zooming in (smaller radius) → bigger scale → more points needed.
+      const pos = camera3D.position()
+      const tgt = camera3D.target()
+      const dx = pos[0]! - tgt[0]!
+      const dy = pos[1]! - tgt[1]!
+      const dz = pos[2]! - tgt[2]!
+      const radius = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1
+      const fovRad = (camera3D.fov() * Math.PI) / 180
+      const tanHalfFov = Math.tan(fovRad / 2) || 1
+      const scale = height / (2 * radius * tanHalfFov)
+      return scale * scale
+    }
+    const unitSquareArea = (height ** 2 * camera!.zoom() ** 2) / 4
     return unitSquareArea
   })
 
@@ -167,12 +195,79 @@ export function Flam3(props: Flam3Props) {
       paletteSpeed: 0.5,
       paletteEntryCount: 0,
       contrast: 1,
-      gamma: 2.2,
+      gamma: props.flameDescriptor.renderSettings.gamma ?? 2.2,
+      depthColorPower:
+        props.flameDescriptor.renderSettings.depthColorPower ?? 0.0,
+      lightDirection: vec4f(
+        ...(props.flameDescriptor.renderSettings.lightDirection ?? [
+          -0.5, 0.5, -1.0,
+        ]),
+        0.0,
+      ),
+      lightPower: props.flameDescriptor.renderSettings.lightPower ?? 0.0,
       highlightPower: 0.5,
       outputAlpha: 0,
       paletteMode: 0,
     })
     .$usage('uniform')
+
+  const edgeFadeColorMemo = createMemo(() => props.edgeFadeColor)
+  const onExportImageMemo = createMemo(() => props.onExportImage)
+  const paletteMemo = createMemo(() => props.palette?.())
+  const outputAlphaMemo = createMemo(() => props.outputAlpha)
+
+  let currentAveragePointCountPerBucketInv = 0
+
+  function writeColorGradingUniforms() {
+    const rs = animatedFlame().renderSettings
+    const depthVal = rs.depthColorPower ?? 0.0
+    const lightVal = rs.lightPower ?? 0.0
+    if (DEBUG_MODE) {
+      console.info(
+        '[Flam3:writeUniforms] depthColorPower →',
+        depthVal,
+        'lightPower →',
+        lightVal,
+        'isPreview:',
+        !!props.onAccumulatedPointCount,
+      )
+    }
+    colorGradingUniforms.write({
+      averagePointCountPerBucketInv: currentAveragePointCountPerBucketInv,
+      exposure: 2 * Math.exp(rs.exposure),
+      edgeFadeColor: onExportImageMemo() ? vec4f(0) : edgeFadeColorMemo(),
+      backgroundColor: vec4f(backgroundColorFinal(), 1),
+      vibrancy: rs.vibrancy,
+      palettePhase: rs.palettePhase ?? 0,
+      paletteSpeed: rs.paletteSpeed ?? 0.5,
+      paletteEntryCount: paletteMemo()?.entries.length ?? 0,
+      contrast: rs.contrast ?? 1,
+      gamma: rs.gamma ?? 2.2,
+      depthColorPower: depthVal,
+      lightDirection: vec4f(
+        ...(rs.lightDirection ??
+          ([-0.5, 0.5, -1.0] as [number, number, number])),
+        0.0,
+      ),
+      lightPower: lightVal,
+      highlightPower: rs.highlightPower ?? 0.5,
+      outputAlpha: outputAlphaMemo() ? 1 : 0,
+      paletteMode: rs.paletteMode ?? 0,
+    })
+  }
+
+  onCleanup(() => {
+    // Flam3 remounts on 2D/3D switches while the root (and device) live on —
+    // without an explicit destroy these leak per remount. Deferred until
+    // pending GPU work completes, same as the accumulation buffers below.
+    void device.queue
+      .onSubmittedWorkDone()
+      .then(() => {
+        pointRandomSeeds.destroy()
+        colorGradingUniforms.destroy()
+      })
+      .catch(() => {})
+  })
 
   const outputTextures = createMemo(() => {
     const { width, height } = canvasSize()
@@ -248,11 +343,11 @@ export function Flam3(props: Flam3Props) {
       postprocessBuffer,
       filterParamsBuffer,
     } = o
-    const storedQuality =
-      animatedFlame().renderSettings.densityEstimationQuality ?? 5
+    const flame = untrack(animatedFlame)
+    const storedQuality = flame.renderSettings.densityEstimationQuality ?? 5
     const qualityK =
       storedQuality > 1 ? storedQuality : 0.5 + (1 - storedQuality) * 19.5
-    const estimatorCurve = animatedFlame().renderSettings.estimatorCurve ?? 0.5
+    const estimatorCurve = flame.renderSettings.estimatorCurve ?? 0.5
     const densityPipeline = createDensityEstimationPipeline(
       root,
       textureSize,
@@ -268,6 +363,10 @@ export function Flam3(props: Flam3Props) {
       filterParamsBuffer,
       postprocessBuffer,
     )
+    onCleanup(() => {
+      densityPipeline.destroy()
+      blurPipeline.destroy()
+    })
     return {
       run: (pass: GPUComputePassEncoder) => {
         densityPipeline.run(pass)
@@ -335,6 +434,7 @@ export function Flam3(props: Flam3Props) {
           })),
         })),
       }),
+      dimensions: flame.renderSettings.dimensions ?? 2,
       colorInitMode: flame.renderSettings.colorInitMode,
       pointInitMode: flame.renderSettings.pointInitMode,
       skipIters: Math.floor(flame.renderSettings.skipIters),
@@ -353,9 +453,11 @@ export function Flam3(props: Flam3Props) {
       palettePhase: rs.palettePhase,
       paletteSpeed: rs.paletteSpeed,
       contrast: rs.contrast,
-      gamma: rs.gamma,
-      highlightPower: rs.highlightPower,
-      skipIters: rs.skipIters,
+      gamma: rs.gamma ?? 2.2,
+      depthColorPower: rs.depthColorPower ?? 0.0,
+      lightDirection: vec4f(...(rs.lightDirection ?? [-0.5, 0.5, -1.0]), 0.0),
+      lightPower: rs.lightPower ?? 0.0,
+      highlightPower: rs.highlightPower ?? 0.5,
       drawMode: rs.drawMode,
       colorInitMode: rs.colorInitMode,
       pointInitMode: rs.pointInitMode,
@@ -372,6 +474,16 @@ export function Flam3(props: Flam3Props) {
     if (timeline && enabled && hasTracks > 0 && isActive) {
       applyTimelineToFlame(timeline, flame)
     }
+    if (DEBUG_MODE) {
+      console.info(
+        '[Flam3:animatedFlame] props.depthColorPower →',
+        rs.depthColorPower,
+        'clone.depthColorPower →',
+        flame.renderSettings.depthColorPower,
+        'isPreview:',
+        !!props.onAccumulatedPointCount,
+      )
+    }
     setAnimatedFlame(flame)
   })
 
@@ -380,7 +492,7 @@ export function Flam3(props: Flam3Props) {
    * When isPlaying is true, advances the frame at the configured FPS rate.
    */
   createEffect(() => {
-    if (!timeline || !timeline.isPlaying()) {
+    if (!timeline || !timeline.isPlaying() || timeline.config().autoFps) {
       return
     }
 
@@ -427,6 +539,8 @@ export function Flam3(props: Flam3Props) {
 
   // Main render loop — follows the main branch pattern with plain `let` variables
   // inside an outer effect, using rafLoop.redraw() for reactive triggers.
+  let ifsPipeline: ReturnType<typeof createIFSPipeline> | undefined
+  let ifsPipeline3D: ReturnType<typeof createIFSPipeline3D> | undefined
   createEffect(() => {
     const fingerprint = parameterFingerprint()
     const o = outputTextures()
@@ -436,20 +550,38 @@ export function Flam3(props: Flam3Props) {
 
     const { textureSize, accumulationBuffer } = o
     const flame = untrack(animatedFlame)
+    const dimensions: number = flame.renderSettings.dimensions ?? 2
     const typedAccumulationBuffer = accumulationBuffer
 
-    const ifsPipeline = createIFSPipeline(
-      root,
-      camera,
-      Math.floor(flame.renderSettings.skipIters),
-      pointRandomSeeds,
-      flame.transforms,
-      textureSize,
-      typedAccumulationBuffer,
-      flame.renderSettings.colorInitMode,
-      flame.renderSettings.pointInitMode,
-      props.blendFlame?.transforms,
-    )
+    ifsPipeline = undefined
+    ifsPipeline3D = undefined
+
+    if (dimensions === 3 && camera3D) {
+      ifsPipeline3D = createIFSPipeline3D(
+        root,
+        camera3D,
+        Math.floor(flame.renderSettings.skipIters),
+        pointRandomSeeds,
+        flame.transforms,
+        textureSize,
+        typedAccumulationBuffer,
+        flame.renderSettings.colorInitMode,
+        flame.renderSettings.pointInitMode,
+      )
+    } else {
+      ifsPipeline = createIFSPipeline(
+        root,
+        camera!,
+        Math.floor(flame.renderSettings.skipIters),
+        pointRandomSeeds,
+        flame.transforms,
+        textureSize,
+        typedAccumulationBuffer,
+        flame.renderSettings.colorInitMode,
+        flame.renderSettings.pointInitMode,
+        props.blendFlame?.transforms,
+      )
+    }
 
     let batchIndex = 0
     let accumulatedPointCount_ = 0
@@ -477,17 +609,22 @@ export function Flam3(props: Flam3Props) {
     createEffect(() => {
       const flame = animatedFlame()
 
-      ifsPipeline.update(
-        flame as FlameDescriptor,
-        props.blendFlame,
-        props.blendWeight,
-      )
+      if (ifsPipeline3D) {
+        ifsPipeline3D.update(flame as FlameDescriptor)
+      } else if (ifsPipeline) {
+        ifsPipeline.update(
+          flame as FlameDescriptor,
+          props.blendFlame,
+          props.blendWeight,
+        )
+      }
     })
 
     const accumulationFingerprint = createMemo(() => {
       const flame = animatedFlame()
       const bf = props.blendFlame
       return JSON.stringify({
+        dimensions: flame.renderSettings.dimensions ?? 2,
         transforms: flame.transforms,
         finalTransform: flame.finalTransform,
         colorInitMode: flame.renderSettings.colorInitMode,
@@ -525,8 +662,24 @@ export function Flam3(props: Flam3Props) {
     // (and transforms) are unchanged still skip the reset and reuse the
     // existing accumulation, which is correct for grading-only changes.
     createEffect(() => {
-      camera.update()
-      resetAccumulation()
+      camera?.update()
+      camera3D?.update()
+      if (!animationExportRunning()) resetAccumulation()
+    })
+
+    // Reset accumulation on export frame index change.
+    let lastExportFrame: number | undefined
+    createEffect(() => {
+      const progress = animationExportProgress()
+      if (progress && animationExportRunning()) {
+        const frameIdx = progress.currentFrame
+        if (frameIdx !== lastExportFrame) {
+          lastExportFrame = frameIdx
+          resetAccumulation()
+        }
+      } else {
+        lastExportFrame = undefined
+      }
     })
 
     function resetAccumulation() {
@@ -545,20 +698,10 @@ export function Flam3(props: Flam3Props) {
 
     // Update color grading uniforms.
     createEffect(() => {
-      colorGradingUniforms.writePartial({
-        exposure: 2 * Math.exp(animatedFlame().renderSettings.exposure),
-        edgeFadeColor: props.onExportImage ? vec4f(0) : props.edgeFadeColor,
-        backgroundColor: vec4f(backgroundColorFinal(), 1),
-        vibrancy: animatedFlame().renderSettings.vibrancy,
-        palettePhase: animatedFlame().renderSettings.palettePhase,
-        paletteSpeed: animatedFlame().renderSettings.paletteSpeed,
-        paletteEntryCount: props.palette?.()?.entries.length ?? 0,
-        contrast: animatedFlame().renderSettings.contrast ?? 1,
-        gamma: animatedFlame().renderSettings.gamma ?? 2.2,
-        highlightPower: animatedFlame().renderSettings.highlightPower ?? 0.5,
-        outputAlpha: props.outputAlpha ? 1 : 0,
-        paletteMode: animatedFlame().renderSettings.paletteMode ?? 0,
-      })
+      // Track depth/light reactive deps to trigger redraw on slider changes
+      void animatedFlame().renderSettings.depthColorPower
+      void animatedFlame().renderSettings.lightPower
+      writeColorGradingUniforms()
       requestRedraw()
       forceDrawToScreen = true
     })
@@ -609,8 +752,10 @@ export function Flam3(props: Flam3Props) {
             timings,
             forceDrawToScreen || periodicPresentDue,
           )
+          const maxIterations = isInteractive() ? 8 : 1000
           iterationCount = Math.min(
             estimated,
+            maxIterations,
             Math.max(4, Math.ceil(lastInteractiveIterationCount * 1.5)),
           )
           lastInteractiveIterationCount = iterationCount
@@ -628,9 +773,16 @@ export function Flam3(props: Flam3Props) {
       const isExportReady =
         currentExportCb !== undefined && !continueRendering(accumulatedAfter)
 
+      const isQualityReached = !continueRendering(accumulatedAfter)
+      const isAutoFpsReady =
+        timeline &&
+        timeline.isPlaying() &&
+        timeline.config().autoFps &&
+        isQualityReached
+
       const shouldRenderFinalImage =
         forceDrawToScreen ||
-        (isExportReady
+        (isExportReady || isAutoFpsReady
           ? accumulatedAfter !== lastExportRenderedPointCount
           : periodicPresentDue)
 
@@ -673,7 +825,8 @@ export function Flam3(props: Flam3Props) {
 
         const pass = encoder.beginComputePass(passDesc)
         for (let i = 0; i < iterationCount; i++) {
-          ifsPipeline.run(pass, pointCountPerBatch)
+          const pipeline = ifsPipeline3D ?? ifsPipeline!
+          pipeline.run(pass, pointCountPerBatch)
         }
         pass.end()
 
@@ -695,16 +848,15 @@ export function Flam3(props: Flam3Props) {
       props.onAccumulatedPointCount?.(accumulatedPointCount_)
 
       if (shouldRenderFinalImage) {
-        if (isExportReady) {
+        if (isExportReady || isAutoFpsReady) {
           lastExportRenderedPointCount = accumulatedPointCount_
         }
         lastPresentMs = performance.now()
         const skipItersFactor =
           1 + animatedFlame().renderSettings.skipIters * 0.05
-        colorGradingUniforms.writePartial({
-          averagePointCountPerBucketInv:
-            (bucketProbabilityInv() / accumulatedPointCount_) * skipItersFactor,
-        })
+        currentAveragePointCountPerBucketInv =
+          (bucketProbabilityInv() / accumulatedPointCount_) * skipItersFactor
+        writeColorGradingUniforms()
         if (props.adaptiveFilterEnabled) {
           const passDesc: GPUComputePassDescriptor =
             timestampWrites.adaptiveFilterMs
@@ -752,6 +904,13 @@ export function Flam3(props: Flam3Props) {
 
       batchIndex += 1
       forceDrawToScreen = false
+
+      if (timeline && timeline.isPlaying() && timeline.config().autoFps) {
+        if (isQualityReached) {
+          timeline.advanceFrame()
+        }
+      }
+
       return {
         iterations: iterationCount,
         presented: shouldRenderFinalImage,

@@ -6,6 +6,7 @@ import { Flam3 } from '@/flame/Flam3'
 import { Cross } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
+import { Default3DPreviewCamera } from '@/lib/Camera3D'
 import { Root } from '@/lib/Root'
 import { deepClone } from '@/utils/clone'
 import { formatRecentDate, loadRecentFlames } from '@/utils/recentFlames'
@@ -28,24 +29,40 @@ function Preview(props: { flameDescriptor: FlameDescriptor }) {
   return (
     <Root adapterOptions={{ powerPreference: 'high-performance' }}>
       <AutoCanvas pixelRatio={1}>
-        <Camera2D
-          position={vec2f(
-            ...props.flameDescriptor.renderSettings.camera.position,
-          )}
-          zoom={props.flameDescriptor.renderSettings.camera.zoom}
-        >
-          <Flam3
-            quality={THUMBNAIL_PREVIEW_QUALITY}
-            pointCountPerBatch={STATIC_PREVIEW_POINT_COUNT}
-            adaptiveFilterEnabled={false}
-            animationEnabled={false}
-            flameDescriptor={props.flameDescriptor}
-            renderInterval={1}
-            onExportImage={undefined}
-            edgeFadeColor={vec4f(0)}
-            onAccumulatedPointCount={() => {}}
-          />
-        </Camera2D>
+        {(() => {
+          const flameView = () => (
+            <Flam3
+              quality={THUMBNAIL_PREVIEW_QUALITY}
+              pointCountPerBatch={STATIC_PREVIEW_POINT_COUNT}
+              adaptiveFilterEnabled={false}
+              animationEnabled={false}
+              flameDescriptor={props.flameDescriptor}
+              renderInterval={1}
+              onExportImage={undefined}
+              edgeFadeColor={vec4f(0)}
+              onAccumulatedPointCount={() => {}}
+            />
+          )
+          return (
+            <Show
+              when={
+                (props.flameDescriptor.renderSettings.dimensions ?? 2) === 3
+              }
+              fallback={
+                <Camera2D
+                  position={vec2f(
+                    ...props.flameDescriptor.renderSettings.camera.position,
+                  )}
+                  zoom={props.flameDescriptor.renderSettings.camera.zoom}
+                >
+                  {flameView()}
+                </Camera2D>
+              }
+            >
+              <Default3DPreviewCamera>{flameView()}</Default3DPreviewCamera>
+            </Show>
+          )
+        })()}
       </AutoCanvas>
     </Root>
   )
@@ -57,14 +74,19 @@ export function BlendFlameGallery(props: BlendFlameGalleryProps) {
   const [visibleExamplesCount, setVisibleExamplesCount] =
     createSignal(INITIAL_VISIBLE)
 
-  const allRecent = () => loadRecentFlames()
+  const allRecent = () =>
+    loadRecentFlames().filter(
+      (recent) => (recent.flame.renderSettings.dimensions ?? 2) !== 3,
+    )
 
   const allExamples = () =>
-    recordEntries(examples).map(([id, flame]) => ({
-      id,
-      name: id === 'initExample' ? 'Init' : id,
-      flame,
-    }))
+    recordEntries(examples)
+      .filter(([, flame]) => (flame.renderSettings.dimensions ?? 2) !== 3)
+      .map(([id, flame]) => ({
+        id,
+        name: id === 'initExample' ? 'Init' : id,
+        flame,
+      }))
 
   const showAllRecent = () => visibleRecentCount() >= allRecent().length
   const showAllExamples = () => visibleExamplesCount() >= allExamples().length

@@ -6,6 +6,13 @@ import { defineExample, tid, vid } from './util'
  * juliaScope fractal depth.
  */
 export const example16 = defineExample({
+  version: '1.0',
+  metadata: {
+    author: 'unknown',
+    name: 'Phantom Lattice',
+    description:
+      'Organic blobs drift across a hexagonal lattice while n-gon shapes crystallize into geometric mandalas, all warped by juliaScope fractal depth.',
+  },
   renderSettings: {
     exposure: 0.25,
     skipIters: 20,

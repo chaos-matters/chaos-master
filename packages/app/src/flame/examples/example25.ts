@@ -7,6 +7,13 @@ import { defineExample, tid, vid } from './util'
  * Rendered in paint mode for luminous bloom.
  */
 export const example25 = defineExample({
+  version: '1.0',
+  metadata: {
+    author: 'unknown',
+    name: 'Quantum Tunnel',
+    description:
+      'Light streams through a tubular energy corridor formed by tunnelVar, while spirographVar traces orbital epicycles along the tunnel walls. Butterfly wings and hyperbolic curvature add iridescent glow. Rendered in paint mode for luminous bloom.',
+  },
   renderSettings: {
     exposure: 0.28,
     skipIters: 20,

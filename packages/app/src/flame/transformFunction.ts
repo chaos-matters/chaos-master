@@ -4,8 +4,10 @@ import { recordEntries } from '@/utils/record'
 import { sum } from '@/utils/sum'
 import { AffineParams, transformAffine } from './affineTranform'
 import { Point } from './types'
-import { isParametricVariationType, isVariationType, transformVariations, } from './variations'
+import { isParametricVariationType, transformVariations } from './variations'
 import { VariationInfo } from './variations/simple/types'
+import { isVariationType3D } from './variations3D'
+import type { BaseData as _BaseData, WgslStruct } from 'typegpu/data'
 import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from './schema/flameSchema'
 import type { TransformVariationType } from './variations'
 
@@ -23,10 +25,9 @@ const VariantUniformsBase = struct({
 
 function variationUniforms(variationType: TransformVariationType) {
   if (isParametricVariationType(variationType)) {
-    const v = transformVariations[variationType] as Extract<
-      (typeof transformVariations)[TransformVariationType],
-      { paramStruct: unknown }
-    >
+    const v = transformVariations[variationType] as {
+      paramStruct: WgslStruct
+    }
     return struct({
       ...VariantUniformsBase.propTypes,
       params: v.paramStruct,
@@ -58,12 +59,16 @@ export function generateVariationId(): VariationId {
 export function createFlameWgsl({
   variations,
 }: Pick<TransformFunction, 'variations'>) {
+  // Membership in the 2D registry, not isVariationType: that helper also
+  // accepts 3D type names, which have no 2D implementation to resolve.
   const validVariations = Object.fromEntries(
     Object.entries(variations).filter(([, v]) => {
-      if (isVariationType(v.type)) return true
-      console.warn(
-        `[createFlameWgsl] skipping unknown variation type "${v.type}"`,
-      )
+      if (v.type in transformVariations) return true
+      if (!isVariationType3D(v.type)) {
+        console.warn(
+          `[createFlameWgsl] skipping unsupported variation type "${v.type}"`,
+        )
+      }
       return false
     }),
   ) as Record<VariationId, { type: TransformVariationType }>
@@ -95,10 +100,12 @@ export function createFlameWgsl({
     ...Object.fromEntries(
       Object.values(validVariations).map((v) => [
         v.type,
-        (transformVariations as Record<string, { fn: unknown }>)[v.type]!.fn,
+        transformVariations[v.type]!.fn,
       ]),
     ),
-    VariationInfo,
+    // Only referenced by variation invocations — listing it with zero valid
+    // variations triggers an "external wasn't used" warning at resolution.
+    ...(Object.keys(validVariations).length > 0 ? { VariationInfo } : {}),
   })
   return {
     Uniforms,
@@ -159,7 +166,9 @@ export function extractFlameUniforms({
                   const vtype = (v as Record<string, unknown>).type as
                     | string
                     | undefined
-                  return vtype !== undefined && isVariationType(vtype)
+                  // Must mirror the createFlameWgsl filter — the uniform
+                  // buffer layout has to match the generated struct.
+                  return vtype !== undefined && vtype in transformVariations
                 })
                 .map(([vid, variation]) => {
                   const {
@@ -179,11 +188,10 @@ export function extractFlameUniforms({
                   const variationType = type
                   const isParametric = isParametricVariationType(variationType)
                   if (isParametric) {
-                    const v = transformVariations[variationType] as Extract<
-                      (typeof transformVariations)[TransformVariationType],
-                      { paramDefaults: unknown }
-                    >
-                    const defaults = v.paramDefaults as Record<string, number>
+                    const v = transformVariations[variationType] as {
+                      paramDefaults: Record<string, number>
+                    }
+                    const defaults = v.paramDefaults
                     const safe: Record<string, number> = { ...defaults }
                     if (rest.params) {
                       for (const key of Object.keys(defaults)) {

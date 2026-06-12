@@ -6,6 +6,13 @@ import { defineExample, tid, vid } from './util'
  * create galactic dust lanes with rich color separation.
  */
 export const example23 = defineExample({
+  version: '1.0',
+  metadata: {
+    author: 'unknown',
+    name: 'Cosmic Swirl',
+    description:
+      'Spiral nebula arms emerge from fan2 radial segments warped by swirl3Var logarithmic spirals. Julian fractal depth and curl distortion create galactic dust lanes with rich color separation.',
+  },
   renderSettings: {
     exposure: 0.22,
     skipIters: 20,

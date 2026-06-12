@@ -7,6 +7,13 @@ import { defineExample, tid, vid } from './util'
  * Rendered in paint mode for luminous glow.
  */
 export const example26 = defineExample({
+  version: '1.0',
+  metadata: {
+    author: 'unknown',
+    name: 'Radiant Symmetry',
+    description:
+      'D4 dihedral symmetry creates a kaleidoscopic mandala from a single swirl+sinusoidal base transform. The symmetry panel detects the _sym__ prefixed transforms automatically. Rendered in paint mode for luminous glow.',
+  },
   renderSettings: {
     exposure: 0.25,
     skipIters: 20,

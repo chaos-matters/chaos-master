@@ -110,9 +110,16 @@ function ShareLinkModal(props: ShareLinkModalProps) {
         </Button>
         <Button
           onClick={async () => {
-            await navigator.clipboard.writeText(
-              JSON.stringify(props.flameDescriptor),
-            )
+            const payload =
+              includeAnimation() && props.tracks.length > 0
+                ? {
+                    flame: props.flameDescriptor,
+                    animation: { tracks: props.tracks, config: props.config },
+                  }
+                : props.flameDescriptor
+            await navigator.clipboard.writeText(JSON.stringify(payload))
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2000)
           }}
         >
           Copy JSON

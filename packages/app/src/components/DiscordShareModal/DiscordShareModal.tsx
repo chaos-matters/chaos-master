@@ -16,12 +16,17 @@ export type DiscordShareMeta = {
 type DiscordShareModalProps = {
   previewUrl: string
   respond: (value: DiscordShareMeta | symbol) => void
+  initialMetadata?: { name?: string; author?: string }
 }
 
 function DiscordShareModal(props: DiscordShareModalProps) {
   const [storedAuthor, setStoredAuthor] = persistentSignal('discord/author', '')
-  const [author, setAuthor] = createSignal(storedAuthor())
-  const [title, setTitle] = createSignal('')
+  const [author, setAuthor] = createSignal(
+    props.initialMetadata?.author && props.initialMetadata.author !== 'unknown'
+      ? props.initialMetadata.author
+      : storedAuthor() || '',
+  )
+  const [title, setTitle] = createSignal(props.initialMetadata?.name ?? '')
   const [attempted, setAttempted] = createSignal(false)
 
   const authorTrimmed = () => author().trim()
@@ -122,11 +127,16 @@ export function createDiscordShareModal() {
 
   async function showDiscordShareModal(
     previewUrl: string,
+    initialMetadata?: { name?: string; author?: string },
   ): Promise<DiscordShareMeta | undefined> {
     const result = await requestModal<DiscordShareMeta | symbol>({
       class: ui.container,
       content: ({ respond }) => (
-        <DiscordShareModal previewUrl={previewUrl} respond={respond} />
+        <DiscordShareModal
+          previewUrl={previewUrl}
+          respond={respond}
+          initialMetadata={initialMetadata}
+        />
       ),
     })
     // Guard against every dismiss path: symbol, undefined (native dialog cancel),

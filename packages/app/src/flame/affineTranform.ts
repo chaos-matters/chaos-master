@@ -9,6 +9,12 @@ export const AffineParamsSchema = v.object({
   d: v.number(),
   e: v.number(),
   f: v.number(),
+  g: v.optional(v.number()),
+  h: v.optional(v.number()),
+  i: v.optional(v.number()),
+  j: v.optional(v.number()),
+  k: v.optional(v.number()),
+  l: v.optional(v.number()),
 })
 
 export type AffineParams = v.InferOutput<typeof AffineParamsSchema>

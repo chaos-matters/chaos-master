@@ -5,6 +5,13 @@ import { defineExample, tid, vid } from './util'
  * PDJ creates ghostly parametric distortions, curl adds spiral vortices.
  */
 export const example13 = defineExample({
+  version: '1.0',
+  metadata: {
+    author: 'unknown',
+    name: 'Nebula Ghost',
+    description:
+      'Clifford attractor weaves ethereal nebula clouds, PDJ creates ghostly parametric distortions, curl adds spiral vortices.',
+  },
   renderSettings: {
     exposure: 0.32,
     skipIters: 20,

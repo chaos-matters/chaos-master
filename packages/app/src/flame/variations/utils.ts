@@ -1,64 +1,69 @@
 import { produce, unfreeze } from 'structurajs'
-import { defineExample } from '../examples/util'
 import { generateTransformId, generateVariationId } from '../transformFunction'
-import { isParametricVariationType, transformVariations } from '.'
+import { isParametricVariationType3D, isVariationType3D, transformVariations3D, } from '../variations3D'
+import { allTransformVariations, isParametricVariationType, transformVariations, } from '.'
 import type { FlameDescriptor } from '../schema/flameSchema'
+import type { TransformVariationType3D } from '../variations3D'
 import type { TransformVariationDescriptor, TransformVariationType } from '.'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
+export type AnyVariationType = TransformVariationType | TransformVariationType3D
+
 export function getNormalizedVariationName(
-  type: TransformVariationType,
+  type: TransformVariationType | TransformVariationType3D,
 ): string {
-  return type.replace(/Var$/, '')
+  return type.replace(/Var$/, '').replace(/3D$/, '')
 }
 
 export function getVariationDefault(
-  type: TransformVariationType,
+  type: TransformVariationType | TransformVariationType3D,
   weight: number,
 ): TransformVariationDescriptor {
-  if (!isParametricVariationType(type)) {
-    return { type, weight, visible: true }
+  const isParametric =
+    isParametricVariationType(type) ||
+    (isVariationType3D(type) && isParametricVariationType3D(type))
+
+  if (!isParametric) {
+    return {
+      type,
+      weight,
+      visible: true,
+    }
   }
-  const variation = transformVariations[type] as Extract<
-    (typeof transformVariations)[TransformVariationType],
-    { paramDefaults: unknown }
-  >
+  const variation = allTransformVariations[type] as {
+    paramDefaults: Record<string, number>
+  }
   return {
     type,
     params: { ...variation.paramDefaults },
     weight,
     visible: true,
-  }
+  } as unknown as TransformVariationDescriptor
 }
 
 export function getParamsEditor<T extends { type: string; params?: unknown }>(
   variation: T,
 ): { component: EditorFor<T['params']>; value: T['params'] } {
-  const v = transformVariations[variation.type] as Extract<
-    (typeof transformVariations)[TransformVariationType],
-    { editor: unknown }
-  >
+  const v = allTransformVariations[variation.type]
   return {
-    component: v.editor as unknown as EditorFor<T['params']>,
+    component: v.editor,
     get value() {
       return variation.params as T['params']
     },
   }
 }
 
-const transformPreviewIds = Object.keys(transformVariations).reduce<
-  Record<string, { tid: string; vid: string }>
->((acc, type) => {
+const transformPreviewIds = [
+  ...Object.keys(transformVariations),
+  ...Object.keys(transformVariations3D),
+].reduce<Record<string, { tid: string; vid: string }>>((acc, type) => {
   acc[type] = {
-    // helps with debugging, the transform ID is marked with variation type for preview
-    // so the flame is easily identifiable, consider moving this to Flame name, which can
-    // prefix all shader transforms/flames
     tid: generateTransformId(type),
     vid: generateVariationId(),
   }
   return acc
 }, {})
-export function getTransformPreviewTid(type: TransformVariationType) {
+export function getTransformPreviewTid(type: AnyVariationType) {
   if (!transformPreviewIds[type]) {
     transformPreviewIds[type] = {
       tid: generateTransformId(type),
@@ -67,7 +72,7 @@ export function getTransformPreviewTid(type: TransformVariationType) {
   }
   return transformPreviewIds[type].tid
 }
-export function getTransformPreviewVid(type: TransformVariationType) {
+export function getTransformPreviewVid(type: AnyVariationType) {
   if (!transformPreviewIds[type]) {
     transformPreviewIds[type] = {
       tid: generateTransformId(type),
@@ -80,7 +85,7 @@ export function getTransformPreviewVid(type: TransformVariationType) {
 export function getDefaultFlameByVarType(
   type: TransformVariationType,
 ): FlameDescriptor {
-  return defineExample({
+  return {
     renderSettings: {
       exposure: 0.3,
       skipIters: 1,
@@ -89,6 +94,7 @@ export function getDefaultFlameByVarType(
       camera: {
         zoom: 1,
         position: [0, 0],
+        rotation: 0,
       },
       colorInitMode: 'colorInitPosition',
       pointInitMode: 'pointInitGaussianDisk',
@@ -104,7 +110,7 @@ export function getDefaultFlameByVarType(
         },
       },
     },
-  })
+  } as unknown as FlameDescriptor
 }
 
 const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
@@ -139,6 +145,7 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
         draft.renderSettings.camera = {
           zoom: 0.3493516243061941,
           position: [0.20715316352406743, -0.16595190682220834],
+          rotation: 0,
         }
         draft.transforms[getTransformPreviewTid('cylinderVar')]!.preAffine = {
           c: -0.013468013468013407,
@@ -672,4 +679,63 @@ export function getVariationPreviewFlame(
   type: TransformVariationType,
 ): FlameDescriptor {
   return previewFlames[type] ?? getDefaultFlameByVarType(type)
+}
+
+// ─── 3D Preview Flames ───────────────────────────────────────────────
+
+const IDENTITY_AFFINE_3D = {
+  a: 1,
+  b: 0,
+  c: 0,
+  d: 0,
+  e: 0,
+  f: 1,
+  g: 0,
+  h: 0,
+  i: 0,
+  j: 0,
+  k: 1,
+  l: 0,
+}
+
+export function getDefaultFlameByVarType3D(
+  type: TransformVariationType3D,
+): FlameDescriptor {
+  return {
+    renderSettings: {
+      exposure: 0.3,
+      skipIters: 1,
+      drawMode: 'light',
+      backgroundColor: [0, 0, 0],
+      camera: {
+        zoom: 1,
+        position: [0, 0],
+        rotation: 0,
+      },
+      colorInitMode: 'colorInitPosition',
+      pointInitMode: 'pointInitUnitBall',
+      dimensions: 3,
+    },
+    transforms: {
+      [getTransformPreviewTid(type)]: {
+        probability: 1,
+        preAffine: IDENTITY_AFFINE_3D,
+        postAffine: IDENTITY_AFFINE_3D,
+        color: { x: 0, y: 0 },
+        variations: {
+          [getTransformPreviewVid(type)]: getVariationDefault(type, 1.0),
+        },
+      },
+    },
+  } as unknown as FlameDescriptor
+}
+
+const previewFlames3D: Partial<
+  Record<TransformVariationType3D, FlameDescriptor>
+> = {}
+
+export function getVariationPreviewFlame3D(
+  type: TransformVariationType3D,
+): FlameDescriptor {
+  return previewFlames3D[type] ?? getDefaultFlameByVarType3D(type)
 }

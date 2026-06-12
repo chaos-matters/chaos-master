@@ -78,6 +78,18 @@ export const TIMELINE_PARAMETERS: TimelineParameter[] = [
     type: 'number',
     group: 'Render',
   },
+  {
+    path: 'depthColorPower',
+    label: 'Depth Coloring',
+    type: 'number',
+    group: 'Render',
+  },
+  {
+    path: 'lightPower',
+    label: 'Light Power',
+    type: 'number',
+    group: 'Render',
+  },
   { path: 'drawMode', label: 'Draw Mode', type: 'string', group: 'Render' },
   {
     path: 'palettePhase',
@@ -116,6 +128,30 @@ export const TIMELINE_PARAMETERS: TimelineParameter[] = [
     label: 'Camera Rotation',
     type: 'number',
     group: 'Camera',
+  },
+  {
+    path: 'camera3D.theta',
+    label: 'Camera3D Theta',
+    type: 'number',
+    group: 'Camera3D',
+  },
+  {
+    path: 'camera3D.phi',
+    label: 'Camera3D Phi',
+    type: 'number',
+    group: 'Camera3D',
+  },
+  {
+    path: 'camera3D.radius',
+    label: 'Camera3D Radius',
+    type: 'number',
+    group: 'Camera3D',
+  },
+  {
+    path: 'camera3D.fov',
+    label: 'Camera3D FOV',
+    type: 'number',
+    group: 'Camera3D',
   },
   {
     path: 'colorInitMode',
@@ -264,7 +300,18 @@ export interface FlameDescriptor {
     estimatorCurve?: number
     contrast?: number
     gamma?: number
-    highlightPower?: number
+    highlightPower: number
+    depthColorPower: number
+    lightPower: number
+    lightDirection?: [number, number, number]
+    camera3D?: {
+      theta: number
+      phi: number
+      radius: number
+      target: [number, number, number]
+      fov: number
+    }
+    dimensions?: number
   }
   transforms: TransformRecord
   finalTransform?: {
@@ -304,10 +351,18 @@ export type TimelineConfig = {
   startFrame: number
   endFrame: number
   loop: boolean
+  autoFps?: boolean
 }
 
 export function defaultConfig(): TimelineConfig {
-  return { fps: 30, timeScale: 1, startFrame: 0, endFrame: 90, loop: true }
+  return {
+    fps: 30,
+    timeScale: 1,
+    startFrame: 0,
+    endFrame: 90,
+    loop: true,
+    autoFps: false,
+  }
 }
 
 /**
@@ -1102,6 +1157,22 @@ export function applyTracksToFlame(
     })
   }
 
+  // Camera3D
+  if (flame.renderSettings.camera3D) {
+    applyNumber('camera3D.theta', (v) => {
+      flame.renderSettings.camera3D!.theta = v
+    })
+    applyNumber('camera3D.phi', (v) => {
+      flame.renderSettings.camera3D!.phi = v
+    })
+    applyNumber('camera3D.radius', (v) => {
+      flame.renderSettings.camera3D!.radius = v
+    })
+    applyNumber('camera3D.fov', (v) => {
+      flame.renderSettings.camera3D!.fov = v
+    })
+  }
+
   // Flame parameters
   applyNumber('exposure', (v) => {
     flame.renderSettings.exposure = v
@@ -1120,6 +1191,12 @@ export function applyTracksToFlame(
   })
   applyNumber('highlightPower', (v) => {
     flame.renderSettings.highlightPower = v
+  })
+  applyNumber('depthColorPower', (v) => {
+    flame.renderSettings.depthColorPower = v
+  })
+  applyNumber('lightPower', (v) => {
+    flame.renderSettings.lightPower = v
   })
   applyNumber('palettePhase', (v) => {
     flame.renderSettings.palettePhase = v

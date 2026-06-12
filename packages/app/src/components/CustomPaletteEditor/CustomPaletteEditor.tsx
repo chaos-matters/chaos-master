@@ -83,7 +83,8 @@ export function CustomPaletteEditor(props: CustomPaletteEditorProps) {
   })
 
   function handleGradientClick(e: MouseEvent) {
-    if ((e.target as HTMLElement).classList.contains(ui.stopHandle!)) return
+    if ((e.target as HTMLElement).classList.contains(ui.stopHandle || ''))
+      return
     if (!gradientBarRef) return
 
     const rect = gradientBarRef.getBoundingClientRect()

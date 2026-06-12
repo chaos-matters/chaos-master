@@ -6,6 +6,13 @@ import { defineExample, tid, vid } from './util'
  * kaleidoscopic geometry, and juliaScope+eyefish adds depth.
  */
 export const example12 = defineExample({
+  version: '1.0',
+  metadata: {
+    author: 'unknown',
+    name: 'Prism Cascade',
+    description:
+      'light-splitting cascade of geometric color. Polar+cosine creates prismatic arcs, fan2+spherical adds kaleidoscopic geometry, and juliaScope+eyefish adds depth.',
+  },
   renderSettings: {
     exposure: 0.28,
     skipIters: 20,

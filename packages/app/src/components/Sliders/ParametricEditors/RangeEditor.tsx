@@ -8,6 +8,7 @@ type RangeEditorProps = EditorProps<number> & {
   min?: number
   max?: number
   step?: number
+  logarithmic?: boolean
 }
 
 export function RangeEditor(props: RangeEditorProps) {

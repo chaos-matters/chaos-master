@@ -23,7 +23,7 @@ export type CameraContext = {
   position: Accessor<v2f>
   setPosition: (pos: v2f | ((prev: v2f) => v2f)) => v2f
 }
-const CameraContext = createContext<CameraContext>()
+export const CameraContext = createContext<CameraContext>()
 
 export const CameraContextProvider = CameraContext.Provider
 

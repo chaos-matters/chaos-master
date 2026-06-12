@@ -7,6 +7,13 @@ import { defineExample, tid, vid } from './util'
  * into the void.
  */
 export const example22 = defineExample({
+  version: '1.0',
+  metadata: {
+    author: 'unknown',
+    name: 'Phoenix Ascension',
+    description:
+      'A legendary firebird rises through fractal flames. Butterfly wings shimmer with diamond facets, hearts pulse with flame, tangent wisps curl like smoke, and linearT power-distorts rising sparks into the void.',
+  },
   renderSettings: {
     exposure: 0.32,
     skipIters: 18,

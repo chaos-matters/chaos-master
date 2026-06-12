@@ -140,6 +140,65 @@
   }
 }
 
+/* ── Category tabs filter bar ── */
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--neutral-150, #e8e8e8);
+
+  [data-theme='dark'] & {
+    border-bottom-color: var(--neutral-800, #1f2937);
+  }
+}
+
+.filterTab {
+  padding: 1px 6px;
+  font-size: 0.55rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--neutral-500);
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  transition: all 0.12s ease;
+  user-select: none;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500);
+  }
+
+  &:hover {
+    color: var(--neutral-700);
+    [data-theme='dark'] & {
+      color: var(--neutral-300);
+    }
+  }
+}
+
+.activeTab {
+  border-color: var(--accent-color, #6366f1);
+  color: var(--accent-color, #6366f1);
+  background: rgba(99, 102, 241, 0.08);
+
+  [data-theme='dark'] & {
+    color: var(--accent-color, #818cf8);
+    border-color: var(--accent-color, #818cf8);
+    background: rgba(129, 140, 248, 0.1);
+  }
+
+  &:hover {
+    color: var(--accent-color, #6366f1);
+    [data-theme='dark'] & {
+      color: var(--accent-color, #818cf8);
+    }
+  }
+}
+
 /* ── Mobile ── */
 @media (max-width: 768px) {
   .wrapper {
@@ -156,5 +215,10 @@
   .pill {
     padding: 1px 5px;
     font-size: 0.55rem;
+  }
+
+  .filterTab {
+    padding: 1px 4px;
+    font-size: 0.5rem;
   }
 }

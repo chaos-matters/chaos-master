@@ -6,6 +6,13 @@ import { defineExample, tid, vid } from './util'
  * and juliaN injects fractal complexity.
  */
 export const example9 = defineExample({
+  version: '1.0',
+  metadata: {
+    author: 'unknown',
+    name: 'Crystal Genesis',
+    description:
+      'geometric lattice blooming into fractal structures. Grid creates the crystalline base, fan2 adds angular fan patterns, and juliaN injects fractal complexity.',
+  },
   renderSettings: {
     exposure: 0.25,
     skipIters: 20,

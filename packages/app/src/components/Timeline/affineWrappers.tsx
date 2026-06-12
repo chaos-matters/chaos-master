@@ -42,7 +42,7 @@ export function WrappedAffineRow(props: WrappedAffineRowProps) {
                 {p.label}:{' '}
                 {props.transform.preAffine[
                   p.path as keyof typeof props.transform.preAffine
-                ].toFixed(3)}
+                ]!.toFixed(3)}
               </span>
             </WithKeyframeTarget>
           ))}
@@ -58,7 +58,7 @@ export function WrappedAffineRow(props: WrappedAffineRowProps) {
                 {p.label}:{' '}
                 {props.transform.postAffine[
                   p.path as keyof typeof props.transform.postAffine
-                ].toFixed(3)}
+                ]!.toFixed(3)}
               </span>
             </WithKeyframeTarget>
           ))}

@@ -24,6 +24,8 @@ type Props = {
   setShowTimeline: (v: boolean) => void
   adaptiveFilterEnabled: () => boolean
   setAdaptiveFilterEnabled: (v: boolean) => void
+  dimensions: () => number
+  setDimensions: (v: number) => void
   isPlaying: () => boolean
   togglePlay: () => void
   // Quality presets
@@ -239,7 +241,12 @@ export function FloatingActions(props: Props) {
             <button
               class={ui.button}
               onClick={props.onLogoFavicon}
-              title="Logo/Favicon"
+              disabled={props.dimensions() === 3}
+              title={
+                props.dimensions() === 3
+                  ? 'Logo/Favicon (available only in 2D)'
+                  : 'Logo/Favicon'
+              }
               data-tour-target="logo-favicon"
             >
               <Shuffle />
@@ -379,6 +386,35 @@ export function FloatingActions(props: Props) {
               data-tour-target="adaptive-filter"
             >
               <Eye />
+            </button>
+
+            {/* 2D/3D Toggle */}
+            <button
+              class={ui.toggle}
+              classList={{
+                [ui.toggleActive as string]: props.dimensions() === 3,
+              }}
+              onClick={() => {
+                props.setDimensions(props.dimensions() === 3 ? 2 : 3)
+              }}
+              title={props.dimensions() === 3 ? 'Switch to 2D' : 'Switch to 3D'}
+            >
+              <svg
+                viewBox="0 0 16 16"
+                width="13"
+                height="13"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.3"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M8 1l-6.5 3.5v7L8 15l6.5-3.5v-7L8 1z" />
+                <path d="M8 1v14" />
+                <path d="M1.5 4.5l6.5 3.5 6.5-3.5" />
+                <path d="M1.5 11.5l3.5-2" />
+                <path d="M11 9.5l3.5 2" />
+              </svg>
             </button>
 
             <div class={ui.toggleSeparator} />

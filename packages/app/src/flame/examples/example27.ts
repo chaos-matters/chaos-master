@@ -7,6 +7,13 @@ import { defineExample, tid, vid } from './util'
  * Rendered in paint mode for nebulous glow.
  */
 export const example27 = defineExample({
+  version: '1.0',
+  metadata: {
+    author: 'unknown',
+    name: 'Post-Spiral Galaxy',
+    description:
+      'Dramatic postAffine transforms that warp variation output into spiral galaxy morphology. Each transform applies a different postAffine rotation+shear, creating layered spiral arms. Rendered in paint mode for nebulous glow.',
+  },
   renderSettings: {
     exposure: 0.3,
     skipIters: 20,

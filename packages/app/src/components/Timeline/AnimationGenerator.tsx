@@ -1,7 +1,6 @@
-import { createSignal, Show } from 'solid-js'
+import { createSignal, For, Show } from 'solid-js'
 import ui from './AnimationGenerator.module.css'
 import { buildPresets, randomizeColorsParams, randomizeParams } from './presets'
-import type { PresetDef } from './presets'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineState } from '@/utils/timeline'
 
@@ -85,23 +84,54 @@ type AnimationGeneratorProps = {
 }
 
 export function AnimationGenerator(props: AnimationGeneratorProps) {
-  const presets: PresetDef[] = buildPresets()
+  const [filter, setFilter] = createSignal<
+    'All' | 'Camera' | 'Render' | 'Color' | 'Affine'
+  >('All')
+
+  const presets = () =>
+    buildPresets(props.flameDescriptor.renderSettings.dimensions === 3)
+
+  const visiblePresets = () => {
+    const activeFilter = filter()
+    const allPresets = presets()
+    if (activeFilter === 'All') {
+      return allPresets
+    }
+    return allPresets.filter((p) => p.category === activeFilter)
+  }
+
+  const categories = ['All', 'Camera', 'Render', 'Color', 'Affine'] as const
 
   return (
     <Show when={props.expanded}>
       <div class={ui.wrapper}>
+        <div class={ui.filterBar}>
+          <For each={categories}>
+            {(cat) => (
+              <button
+                class={ui.filterTab}
+                classList={{ [ui.activeTab as string]: filter() === cat }}
+                onClick={() => setFilter(cat)}
+              >
+                {cat}
+              </button>
+            )}
+          </For>
+        </div>
         <div class={ui.presetsPanel}>
-          {presets.map((preset) => (
-            <button
-              class={ui.pill}
-              onClick={() => {
-                preset.apply(props.flameDescriptor, props.timeline)
-              }}
-              title={preset.label}
-            >
-              {preset.label}
-            </button>
-          ))}
+          <For each={visiblePresets()}>
+            {(preset) => (
+              <button
+                class={ui.pill}
+                onClick={() => {
+                  preset.apply(props.flameDescriptor, props.timeline)
+                }}
+                title={preset.label}
+              >
+                {preset.label}
+              </button>
+            )}
+          </For>
         </div>
       </div>
     </Show>

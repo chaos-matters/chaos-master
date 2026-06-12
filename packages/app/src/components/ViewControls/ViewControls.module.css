@@ -92,3 +92,32 @@
   color: #fff;
   background: rgba(255, 255, 255, 0.15);
 }
+
+.camera3DControl {
+  display: flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-2);
+  background-color: var(--neutral-100);
+  color: var(--neutral-600);
+  font-size: 0.7rem;
+
+  [data-theme='dark'] & {
+    background-color: var(--neutral-950);
+    color: var(--neutral-400);
+  }
+
+  /* Override default grid-column: 1 / -1 on ScrubInput label */
+  & label {
+    grid-column: auto;
+  }
+
+  &:first-child {
+    border-top-left-radius: var(--space-1);
+    border-bottom-left-radius: var(--space-1);
+  }
+
+  &:last-child {
+    border-top-right-radius: var(--space-1);
+    border-bottom-right-radius: var(--space-1);
+  }
+}

@@ -5,6 +5,13 @@ import { defineExample, tid, vid } from './util'
  * trade atttractor dualities create flux-pinned energy patterns.
  */
 export const example17 = defineExample({
+  version: '1.0',
+  metadata: {
+    author: 'unknown',
+    name: 'Temporal Flux',
+    description:
+      'Complex power orbits trace Lissajous time curves while trade atttractor dualities create flux-pinned energy patterns.',
+  },
   renderSettings: {
     exposure: 0.3,
     skipIters: 20,

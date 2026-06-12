@@ -1,11 +1,26 @@
 import * as v from '@/valibot'
+import { transformVariations3D, variationTypes3D } from '../variations3D'
 import { parametricVariations } from './parametric'
 import * as simpleVariations from './simple'
+import type { TransformVariationType3D } from '../variations3D'
 
 const rawVariations = [
   ...Object.values(simpleVariations),
   ...Object.values(parametricVariations),
 ]
+
+export type TransformVariationType =
+  | (typeof rawVariations)[number]['DescriptorSchema']['entries']['type']['literal']
+  | (string & {})
+
+export const transformVariations = Object.fromEntries(
+  rawVariations.map((v) => [v.DescriptorSchema.entries.type.literal, v]),
+) as unknown as Record<TransformVariationType, (typeof rawVariations)[number]>
+
+export const allTransformVariations = {
+  ...transformVariations,
+  ...transformVariations3D,
+}
 
 const CustomVariationFallbackSchema = v.object({
   type: v.string(),
@@ -14,7 +29,9 @@ const CustomVariationFallbackSchema = v.object({
 })
 
 export const TransformVariationDescriptor = v.variant('type', [
-  ...rawVariations.map((variation) => variation.DescriptorSchema),
+  ...Object.values(allTransformVariations).map(
+    (variation) => variation.DescriptorSchema,
+  ),
   CustomVariationFallbackSchema,
 ])
 
@@ -22,17 +39,12 @@ export type TransformVariationDescriptor = v.InferOutput<
   typeof TransformVariationDescriptor
 >
 
-export type TransformVariationType =
-  | TransformVariationDescriptor['type']
-  | (string & {})
-
-export const transformVariations = Object.fromEntries(
-  rawVariations.map((v) => [v.DescriptorSchema.entries.type.literal, v]),
-) as unknown as Record<TransformVariationType, (typeof rawVariations)[number]>
-
 export const variationTypes = [
   ...rawVariations.map((v) => v.DescriptorSchema.entries.type.literal),
 ] as string[]
+
+const allVariationTypes = [...variationTypes, ...variationTypes3D]
+
 const parametricVariationTypes = Object.values(parametricVariations).map(
   (o) => o.DescriptorSchema.entries.type.literal,
 )
@@ -44,7 +56,7 @@ export type ParametricVariationDescriptor = Extract<
 >
 
 export function isParametricVariationType(
-  variationType: TransformVariationType,
+  variationType: TransformVariationType | TransformVariationType3D,
 ): variationType is ParametricVariationType {
   return (parametricVariationTypes as string[]).includes(variationType)
 }
@@ -56,8 +68,7 @@ export function isParametricVariation(
 }
 
 export function isVariationType(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  maybeType: any,
-): maybeType is TransformVariationType {
-  return typeof maybeType === 'string' && variationTypes.includes(maybeType)
+  maybeType: string,
+): maybeType is TransformVariationType | TransformVariationType3D {
+  return typeof maybeType === 'string' && allVariationTypes.includes(maybeType)
 }

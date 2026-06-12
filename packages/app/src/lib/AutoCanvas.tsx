@@ -108,6 +108,11 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
           props.ref?.(el)
         }}
         class={props.class}
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'block',
+        }}
       />
       <Show when={canvas()} keyed>
         {(canvas) => (

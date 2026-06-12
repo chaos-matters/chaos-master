@@ -5,7 +5,7 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineTrack } from '@/utils/timeline'
 
 const STORAGE_KEY = 'chaos-master-recent-flames'
-const MAX_RECENT_FLAMES = 10
+export const MAX_RECENT_FLAMES = 150
 
 export type RecentFlame = {
   id: string
@@ -49,12 +49,16 @@ export function saveRecentFlame(
   flame: FlameDescriptor,
   name?: string,
   tracks?: TimelineTrack[],
-): void {
+  forceOverwriteOldest: boolean = true,
+): boolean {
   const recent = loadRecentFlames()
+  if (recent.length >= MAX_RECENT_FLAMES && !forceOverwriteOldest) {
+    return false
+  }
   const id = generateId()
   const entry: RecentFlame = {
     id,
-    name: name ?? 'Flame',
+    name: name || flame.metadata?.name || 'Flame',
     flame: deepClone(flame),
     savedAt: Date.now(),
   }
@@ -64,6 +68,13 @@ export function saveRecentFlame(
   }
   const updated = [entry, ...recent].slice(0, MAX_RECENT_FLAMES)
   safeSetItem(STORAGE_KEY, JSON.stringify(updated))
+  return true
+}
+
+export function getOldestRecentFlame(): RecentFlame | undefined {
+  const recent = loadRecentFlames()
+  if (recent.length === 0) return undefined
+  return recent[recent.length - 1]
 }
 
 /**

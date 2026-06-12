@@ -85,6 +85,14 @@ function cross2d(a: v2f, b: v2f) {
   return a.x * b.y - a.y * b.x
 }
 
+function project3D(x: number, y: number, z: number): v2f {
+  const zAngle = (135 * Math.PI) / 180
+  const zScale = 0.5
+  const px = x + z * Math.cos(zAngle) * zScale
+  const py = y + z * Math.sin(zAngle) * zScale
+  return vec2f(px, py)
+}
+
 function Grid(props: { isVisible: () => boolean }) {
   const { theme } = useTheme()
   const camera = useCamera()
@@ -171,6 +179,7 @@ function AffineHandle(props: {
   transform: AffineParams
   color: v2f
   setTransform: (pos: AffineParams) => void
+  is3D?: boolean
 }) {
   const { theme } = useTheme()
   const {
@@ -284,67 +293,382 @@ function AffineHandle(props: {
   const scaleY = startScalingRotating(0, 1)
   const scaleNegX = startScalingRotating(-1, 0)
   const scaleNegY = startScalingRotating(0, -1)
+
+  // 3D projection & drag helpers
+  const getPointProj = (wx: number, wy: number, wz: number) => {
+    try {
+      const w2d = project3D(wx, wy, wz)
+      const clip = worldToClip(w2d)
+      const px = 50 * (clip.x + 1)
+      const py = 50 * (1 - clip.y)
+      return { x: px, y: py }
+    } catch {
+      return { x: 50, y: 50 }
+    }
+  }
+
+  const projC = () => {
+    const d = props.transform.d ?? 0
+    const h = props.transform.h ?? 0
+    const l = props.transform.l ?? 0
+    return getPointProj(d, h, l)
+  }
+
+  const projLocalX = () => {
+    const d = props.transform.d ?? 0
+    const h = props.transform.h ?? 0
+    const l = props.transform.l ?? 0
+    const a = props.transform.a ?? 1
+    const e = props.transform.e ?? 0
+    const i = props.transform.i ?? 0
+    return getPointProj(d + a, h + e, l + i)
+  }
+  const projLocalY = () => {
+    const d = props.transform.d ?? 0
+    const h = props.transform.h ?? 0
+    const l = props.transform.l ?? 0
+    const b = props.transform.b ?? 0
+    const f = props.transform.f ?? 1
+    const j = props.transform.j ?? 0
+    return getPointProj(d + b, h + f, l + j)
+  }
+  const projLocalZ = () => {
+    const d = props.transform.d ?? 0
+    const h = props.transform.h ?? 0
+    const l = props.transform.l ?? 0
+    const c = props.transform.c ?? 0
+    const g = props.transform.g ?? 0
+    const k = props.transform.k ?? 1
+    return getPointProj(d + c, h + g, l + k)
+  }
+
+  const projNegLocalX = () => {
+    const d = props.transform.d ?? 0
+    const h = props.transform.h ?? 0
+    const l = props.transform.l ?? 0
+    const a = props.transform.a ?? 1
+    const e = props.transform.e ?? 0
+    const i = props.transform.i ?? 0
+    return getPointProj(d - a, h - e, l - i)
+  }
+  const projNegLocalY = () => {
+    const d = props.transform.d ?? 0
+    const h = props.transform.h ?? 0
+    const l = props.transform.l ?? 0
+    const b = props.transform.b ?? 0
+    const f = props.transform.f ?? 1
+    const j = props.transform.j ?? 0
+    return getPointProj(d - b, h - f, l - j)
+  }
+  const projNegLocalZ = () => {
+    const d = props.transform.d ?? 0
+    const h = props.transform.h ?? 0
+    const l = props.transform.l ?? 0
+    const c = props.transform.c ?? 0
+    const g = props.transform.g ?? 0
+    const k = props.transform.k ?? 1
+    return getPointProj(d - c, h - g, l - k)
+  }
+
+  const startDragging3D = createDragHandler((initEvent) => {
+    changeHistory.startPreview('Affine 3D Translation')
+    const initialTransform = { ...props.transform }
+    const grabPosition = clipToWorld(eventToClip(initEvent, canvas))
+    return {
+      onPointerMove(ev) {
+        const evPosition = clipToWorld(eventToClip(ev, canvas))
+        const diff = sub(evPosition, grabPosition)
+        props.setTransform({
+          ...initialTransform,
+          d: (initialTransform.d ?? 0) + diff.x,
+          h: (initialTransform.h ?? 0) + diff.y,
+        })
+      },
+      onDone() {
+        changeHistory.commit()
+      },
+    }
+  })
+
+  const startScalingRotating3D = (axis: 'X' | 'Y' | 'Z', factor: number) =>
+    createDragHandler((initEvent) => {
+      changeHistory.startPreview(`Rotate/Scale Local ${axis}`)
+      const initialTransform = { ...props.transform }
+      const grabPosition = clipToWorld(eventToClip(initEvent, canvas))
+      const center = project3D(
+        initialTransform.d ?? 0,
+        initialTransform.h ?? 0,
+        initialTransform.l ?? 0,
+      )
+
+      function onPointerMove(ev: PointerEvent) {
+        const evPosition = clipToWorld(eventToClip(ev, canvas))
+        const grabDiff = sub(grabPosition, center)
+        const evDiff = sub(evPosition, center)
+        const ratio = length(evDiff) / (length(grabDiff) || 0.001)
+        const grabNorm = vec2Normalize(grabDiff)
+        const evNorm = vec2Normalize(evDiff)
+        const cos = ev.ctrlKey || ev.metaKey ? 1 : dot(evNorm, grabNorm)
+        const sin = ev.ctrlKey || ev.metaKey ? 0 : cross2d(evNorm, grabNorm)
+
+        if (axis === 'X') {
+          const a = initialTransform.a ?? 1
+          const e = initialTransform.e ?? 0
+          const i = initialTransform.i ?? 0
+          props.setTransform({
+            ...initialTransform,
+            a: (a * cos - e * sin) * ratio * factor,
+            e: (a * sin + e * cos) * ratio * factor,
+            i: i * ratio * factor,
+          })
+        } else if (axis === 'Y') {
+          const b = initialTransform.b ?? 0
+          const f = initialTransform.f ?? 1
+          const j = initialTransform.j ?? 0
+          props.setTransform({
+            ...initialTransform,
+            b: (b * cos - f * sin) * ratio * factor,
+            f: (b * sin + f * cos) * ratio * factor,
+            j: j * ratio * factor,
+          })
+        } else if (axis === 'Z') {
+          const c = initialTransform.c ?? 0
+          const g = initialTransform.g ?? 0
+          const k = initialTransform.k ?? 1
+          props.setTransform({
+            ...initialTransform,
+            c: (c * cos - g * sin) * ratio * factor,
+            g: (c * sin + g * cos) * ratio * factor,
+            k: k * ratio * factor,
+          })
+        }
+      }
+
+      onPointerMove(initEvent)
+
+      return {
+        onPointerMove,
+        onDone() {
+          changeHistory.commit()
+        },
+      }
+    })
+
   return (
-    <>
-      <svg viewBox={`-${aspect()} -1 ${2 * aspect()} 2`}>
+    <Show
+      when={props.is3D}
+      fallback={
+        <>
+          <svg viewBox={`-${aspect()} -1 ${2 * aspect()} 2`}>
+            <g
+              class={ui.handleBox}
+              transform={`scale(1, -1) matrix(${clipTransform()})`}
+            >
+              <path d={corners} />
+              <path
+                class={ui.handleBoxGrabArea}
+                d={corners}
+                on:pointerdown={scaleBoth}
+              />
+              <path d="M 0,0 V 1" marker-end="url(#arrow)" />
+              <path
+                class={ui.handleBoxGrabArea}
+                d="M 0,0 V 1"
+                on:pointerdown={scaleY}
+              />
+              <path d="M 0,0 L 1,0" marker-end="url(#arrow)" />
+              <path
+                class={ui.handleBoxGrabArea}
+                d="M 0,0 L 1,0"
+                on:pointerdown={scaleX}
+              />
+              <path class={ui.dashed} d="M 0,0 V -1 M 0,0 L -1,0" />
+              <path
+                class={ui.handleBoxGrabArea}
+                d="M 0,0 V -1"
+                on:pointerdown={scaleNegY}
+              />
+              <path
+                class={ui.handleBoxGrabArea}
+                d="M 0,0 L -1,0"
+                on:pointerdown={scaleNegX}
+              />
+            </g>
+          </svg>
+          <g
+            class={ui.handle}
+            on:pointerdown={startDragging}
+            onContextMenu={(e) => {
+              e.preventDefault()
+            }}
+            style={{
+              '--color': handleColor(theme(), props.color),
+              '--handle-visual-r': `${0.3 * handleScale()}rem`,
+              '--handle-visual-hover-r': `${0.4 * handleScale()}rem`,
+              '--handle-grab-r': `${0.6 * handleScale()}rem`,
+            }}
+          >
+            <circle class={ui.handleCircle} cx={p(x())} cy={p(y())} />
+            <circle class={ui.handleCircleGrabArea} cx={p(x())} cy={p(y())} />
+          </g>
+        </>
+      }
+    >
+      <g>
+        {/* Negative local guides (dashed lines) */}
+        <line
+          x1={`${projC().x}%`}
+          y1={`${projC().y}%`}
+          x2={`${projNegLocalX().x}%`}
+          y2={`${projNegLocalX().y}%`}
+          stroke="#ff4d4d"
+          stroke-width="1.5"
+          stroke-dasharray="3 3"
+          opacity="0.5"
+        />
+        <line
+          x1={`${projC().x}%`}
+          y1={`${projC().y}%`}
+          x2={`${projNegLocalY().x}%`}
+          y2={`${projNegLocalY().y}%`}
+          stroke="#2ecc71"
+          stroke-width="1.5"
+          stroke-dasharray="3 3"
+          opacity="0.5"
+        />
+        <line
+          x1={`${projC().x}%`}
+          y1={`${projC().y}%`}
+          x2={`${projNegLocalZ().x}%`}
+          y2={`${projNegLocalZ().y}%`}
+          stroke="#3498db"
+          stroke-width="1.5"
+          stroke-dasharray="3 3"
+          opacity="0.5"
+        />
+
+        {/* Local axis lines */}
+        <line
+          x1={`${projC().x}%`}
+          y1={`${projC().y}%`}
+          x2={`${projLocalX().x}%`}
+          y2={`${projLocalX().y}%`}
+          stroke="#ff4d4d"
+          stroke-width="1.5"
+        />
+        <line
+          x1={`${projC().x}%`}
+          y1={`${projC().y}%`}
+          x2={`${projLocalY().x}%`}
+          y2={`${projLocalY().y}%`}
+          stroke="#2ecc71"
+          stroke-width="1.5"
+        />
+        <line
+          x1={`${projC().x}%`}
+          y1={`${projC().y}%`}
+          x2={`${projLocalZ().x}%`}
+          y2={`${projLocalZ().y}%`}
+          stroke="#3498db"
+          stroke-width="1.5"
+        />
+
+        {/* Local X scale/rotate end-handles */}
+        <circle
+          cx={`${projLocalX().x}%`}
+          cy={`${projLocalX().y}%`}
+          r={`${0.2 * handleScale()}rem`}
+          fill="#ff4d4d"
+          stroke="white"
+          stroke-width="1.5"
+          style={{ cursor: 'nesw-resize' }}
+          on:pointerdown={startScalingRotating3D('X', 1)}
+        />
+        <circle
+          cx={`${projNegLocalX().x}%`}
+          cy={`${projNegLocalX().y}%`}
+          r={`${0.15 * handleScale()}rem`}
+          fill="#ff4d4d"
+          stroke="white"
+          stroke-width="1"
+          opacity="0.8"
+          style={{ cursor: 'nesw-resize' }}
+          on:pointerdown={startScalingRotating3D('X', -1)}
+        />
+
+        {/* Local Y scale/rotate end-handles */}
+        <circle
+          cx={`${projLocalY().x}%`}
+          cy={`${projLocalY().y}%`}
+          r={`${0.2 * handleScale()}rem`}
+          fill="#2ecc71"
+          stroke="white"
+          stroke-width="1.5"
+          style={{ cursor: 'nesw-resize' }}
+          on:pointerdown={startScalingRotating3D('Y', 1)}
+        />
+        <circle
+          cx={`${projNegLocalY().x}%`}
+          cy={`${projNegLocalY().y}%`}
+          r={`${0.15 * handleScale()}rem`}
+          fill="#2ecc71"
+          stroke="white"
+          stroke-width="1"
+          opacity="0.8"
+          style={{ cursor: 'nesw-resize' }}
+          on:pointerdown={startScalingRotating3D('Y', -1)}
+        />
+
+        {/* Local Z scale/rotate end-handles */}
+        <circle
+          cx={`${projLocalZ().x}%`}
+          cy={`${projLocalZ().y}%`}
+          r={`${0.2 * handleScale()}rem`}
+          fill="#3498db"
+          stroke="white"
+          stroke-width="1.5"
+          style={{ cursor: 'nesw-resize' }}
+          on:pointerdown={startScalingRotating3D('Z', 1)}
+        />
+        <circle
+          cx={`${projNegLocalZ().x}%`}
+          cy={`${projNegLocalZ().y}%`}
+          r={`${0.15 * handleScale()}rem`}
+          fill="#3498db"
+          stroke="white"
+          stroke-width="1"
+          opacity="0.8"
+          style={{ cursor: 'nesw-resize' }}
+          on:pointerdown={startScalingRotating3D('Z', -1)}
+        />
+
+        {/* Center free-translation handle */}
         <g
-          class={ui.handleBox}
-          transform={`scale(1, -1) matrix(${clipTransform()})`}
+          class={ui.handle}
+          on:pointerdown={startDragging3D}
+          onContextMenu={(e) => {
+            e.preventDefault()
+          }}
+          style={{
+            '--color': handleColor(theme(), props.color),
+            '--handle-visual-r': `${0.35 * handleScale()}rem`,
+            '--handle-visual-hover-r': `${0.45 * handleScale()}rem`,
+            '--handle-grab-r': `${0.65 * handleScale()}rem`,
+          }}
         >
-          <path d={corners} />
-          <path
-            class={ui.handleBoxGrabArea}
-            d={corners}
-            // TODO: temporarily using on:pointerdown and not onPointerDown
-            // because otherwise WheelZoomCamera2D steals the event
-            // due to solidjs event delegation.
-            on:pointerdown={scaleBoth}
+          <circle
+            class={ui.handleCircle}
+            cx={`${projC().x}%`}
+            cy={`${projC().y}%`}
           />
-          <path d="M 0,0 V 1" marker-end="url(#arrow)" />
-          <path
-            class={ui.handleBoxGrabArea}
-            d="M 0,0 V 1"
-            on:pointerdown={scaleY}
-          />
-          <path d="M 0,0 L 1,0" marker-end="url(#arrow)" />
-          <path
-            class={ui.handleBoxGrabArea}
-            d="M 0,0 L 1,0"
-            on:pointerdown={scaleX}
-          />
-          <path class={ui.dashed} d="M 0,0 V -1 M 0,0 L -1,0" />
-          <path
-            class={ui.handleBoxGrabArea}
-            d="M 0,0 V -1"
-            on:pointerdown={scaleNegY}
-          />
-          <path
-            class={ui.handleBoxGrabArea}
-            d="M 0,0 L -1,0"
-            on:pointerdown={scaleNegX}
+          <circle
+            class={ui.handleCircleGrabArea}
+            cx={`${projC().x}%`}
+            cy={`${projC().y}%`}
           />
         </g>
-      </svg>
-      <g
-        class={ui.handle}
-        // TODO: temporarily using on:pointerdown and not onPointerDown
-        // because otherwise WheelZoomCamera2D steals the event
-        // due to solidjs event delegation.
-        on:pointerdown={startDragging}
-        onContextMenu={(e) => {
-          e.preventDefault()
-        }}
-        style={{
-          '--color': handleColor(theme(), props.color),
-          '--handle-visual-r': `${0.3 * handleScale()}rem`,
-          '--handle-visual-hover-r': `${0.4 * handleScale()}rem`,
-          '--handle-grab-r': `${0.6 * handleScale()}rem`,
-        }}
-      >
-        <circle class={ui.handleCircle} cx={p(x())} cy={p(y())} />
-        <circle class={ui.handleCircleGrabArea} cx={p(x())} cy={p(y())} />
       </g>
-    </>
+    </Show>
   )
 }
 
@@ -357,6 +681,7 @@ export function AffineEditor(props: {
   setTransforms: HistorySetter<TransformRecord>
   finalTransform?: AffineParams
   setFinalTransform?: (affine: AffineParams) => void
+  is3D?: boolean
 }) {
   const [div, setDiv] = createSignal<HTMLDivElement>()
   const [zoom, setZoom] = createZoom(0.9, [0.5, 20])
@@ -479,6 +804,7 @@ export function AffineEditor(props: {
                           ] = affine
                         })
                       }}
+                      is3D={props.is3D}
                     />
                   )}
                 </For>
@@ -490,6 +816,7 @@ export function AffineEditor(props: {
                   setTransform={(affine) => {
                     props.setFinalTransform?.(affine)
                   }}
+                  is3D={props.is3D}
                 />
               </Show>
             </svg>
@@ -502,6 +829,7 @@ export function AffineEditor(props: {
           transforms={props.transforms}
           setTransforms={props.setTransforms}
           affineMode={affineMode() as 'preAffine' | 'postAffine'}
+          is3D={props.is3D}
         />
       </Show>
       <Show
@@ -518,8 +846,27 @@ export function AffineEditor(props: {
                 onClick={() => {
                   if (props.setFinalTransform && props.finalTransform) {
                     const next = { ...props.finalTransform }
-                    for (const key of ['a', 'b', 'c', 'd', 'e', 'f'] as const) {
-                      next[key] = randomizeAffineCoef(next[key], key)
+                    const coefs = props.is3D
+                      ? ([
+                          'a',
+                          'b',
+                          'c',
+                          'd',
+                          'e',
+                          'f',
+                          'g',
+                          'h',
+                          'i',
+                          'j',
+                          'k',
+                          'l',
+                        ] as const)
+                      : (['a', 'b', 'c', 'd', 'e', 'f'] as const)
+                    for (const key of coefs) {
+                      next[key] = randomizeAffineCoef(
+                        next[key] ?? (['a', 'e', 'i'].includes(key) ? 1 : 0),
+                        key,
+                      )
                     }
                     props.setFinalTransform(next)
                   }
@@ -527,11 +874,33 @@ export function AffineEditor(props: {
               />
             </div>
             <div class={listUi.coefficients}>
-              <For each={['a', 'b', 'c', 'd', 'e', 'f'] as const}>
+              <For
+                each={
+                  props.is3D
+                    ? ([
+                        'a',
+                        'b',
+                        'c',
+                        'd',
+                        'e',
+                        'f',
+                        'g',
+                        'h',
+                        'i',
+                        'j',
+                        'k',
+                        'l',
+                      ] as const)
+                    : (['a', 'b', 'c', 'd', 'e', 'f'] as const)
+                }
+              >
                 {(key) => (
                   <ScrubInput
                     label={key}
-                    value={props.finalTransform![key]}
+                    value={
+                      props.finalTransform![key] ??
+                      (['a', 'e', 'i'].includes(key) ? 1 : 0)
+                    }
                     step={0.001}
                     onInput={(val) => {
                       if (props.setFinalTransform && props.finalTransform) {
