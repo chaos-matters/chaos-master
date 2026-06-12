@@ -41,6 +41,7 @@ export function createObjectEditor<T extends Record<string, unknown>>(editors: {
     <>
       <For each={Object.keys(editors)}>
         {(key) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const Editor = editors[key] as EditorFor<any>
           return <Editor {...editorProps(props, key as keyof T, key)} />
         }}

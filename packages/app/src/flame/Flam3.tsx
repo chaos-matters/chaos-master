@@ -245,7 +245,8 @@ export function Flam3(props: Flam3Props) {
       gamma: rs.gamma ?? 2.2,
       depthColorPower: depthVal,
       lightDirection: vec4f(
-        ...(rs.lightDirection ?? ([-0.5, 0.5, -1.0] as [number, number, number])),
+        ...(rs.lightDirection ??
+          ([-0.5, 0.5, -1.0] as [number, number, number])),
         0.0,
       ),
       lightPower: lightVal,

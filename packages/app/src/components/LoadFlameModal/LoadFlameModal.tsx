@@ -92,9 +92,9 @@ function Preview(props: {
                 fallback={
                   <Camera2D
                     position={vec2f(
-                      ...props.flameDescriptor.renderSettings.camera!.position,
+                      ...props.flameDescriptor.renderSettings.camera.position,
                     )}
-                    zoom={props.flameDescriptor.renderSettings.camera!.zoom}
+                    zoom={props.flameDescriptor.renderSettings.camera.zoom}
                   >
                     {flameView()}
                   </Camera2D>
@@ -141,8 +141,8 @@ function FlamePreviewInner(props: {
       when={(props.flame.renderSettings.dimensions ?? 2) === 3}
       fallback={
         <Camera2D
-          position={vec2f(...props.flame.renderSettings.camera!.position)}
-          zoom={props.flame.renderSettings.camera!.zoom}
+          position={vec2f(...props.flame.renderSettings.camera.position)}
+          zoom={props.flame.renderSettings.camera.zoom}
         >
           {flameView()}
         </Camera2D>

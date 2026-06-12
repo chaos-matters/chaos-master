@@ -152,11 +152,15 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
 
   const handleSelectAllVariations = () => {
     const list = is3D() ? variationTypes3D : variationTypes
-    setSelectedVariations(new Set<TransformVariationType | TransformVariationType3D>([...list]))
+    setSelectedVariations(
+      new Set<TransformVariationType | TransformVariationType3D>([...list]),
+    )
   }
 
   const handleDeselectAllVariations = () => {
-    setSelectedVariations(new Set<TransformVariationType | TransformVariationType3D>())
+    setSelectedVariations(
+      new Set<TransformVariationType | TransformVariationType3D>(),
+    )
   }
 
   // Animation Preset Signals

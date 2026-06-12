@@ -17,7 +17,11 @@ export const backgroundColorDefault: [number, number, number] = [0, 0, 0]
 export const backgroundColorDefaultWhite: [number, number, number] = [1, 1, 1]
 export const MIN_CAMERA_ZOOM_VALUE: number = 0.01
 export const MAX_CAMERA_ZOOM_VALUE: number = 500
-const cameraDefault: { zoom: number; position: [number, number]; rotation: number } = {
+const cameraDefault: {
+  zoom: number
+  position: [number, number]
+  rotation: number
+} = {
   zoom: 1,
   position: [0, 0],
   rotation: 0,
