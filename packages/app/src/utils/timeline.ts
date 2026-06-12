@@ -303,6 +303,7 @@ export interface FlameDescriptor {
     highlightPower: number
     depthColorPower: number
     lightPower: number
+    lightDirection?: [number, number, number]
     camera3D?: {
       theta: number
       phi: number

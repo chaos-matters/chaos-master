@@ -639,10 +639,11 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                   selectedItem.renderSettings.depthColorPower
                 draft.renderSettings.lightPower =
                   selectedItem.renderSettings.lightPower
-                draft.renderSettings.lightDirection = selectedItem
-                  .renderSettings.lightDirection
-                  ? [...selectedItem.renderSettings.lightDirection]
-                  : undefined
+                if (selectedItem.renderSettings.lightDirection) {
+                  draft.renderSettings.lightDirection = [
+                    ...selectedItem.renderSettings.lightDirection,
+                  ] as [number, number, number]
+                }
 
                 draft.renderSettings.camera.zoom =
                   selectedItem.renderSettings.camera.zoom
@@ -991,7 +992,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                 class={ui.select}
                 value={previewPointInitMode()}
                 onChange={(ev) => {
-                  const mode = ev.currentTarget.value
+                  const mode = ev.currentTarget.value as PointInitMode
                   setPreviewPointInitMode(mode)
                   setVariationExamples((draft) => {
                     for (const id in draft) {

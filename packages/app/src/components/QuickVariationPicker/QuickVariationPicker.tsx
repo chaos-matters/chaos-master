@@ -97,11 +97,11 @@ function fuzzyScore(needle: string, haystack: string): number {
   return ni === n.length ? Math.max(1, score) : -1
 }
 
-function filterVariations<T extends readonly string[]>(
-  all: T,
+function filterVariations<T extends string>(
+  all: readonly T[],
   query: string,
-): T {
-  if (!query.trim()) return all
+): T[] {
+  if (!query.trim()) return [...all]
   return all
     .map((t) => ({
       t,

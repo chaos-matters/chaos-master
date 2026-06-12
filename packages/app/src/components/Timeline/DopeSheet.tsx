@@ -122,7 +122,7 @@ export function DopeSheet(props: DopeSheetProps) {
         const parts = t.parameterPath.split('.')
         if (flame) {
           if (parts[0] === 'transform' && parts.length >= 2) {
-            const tid = parts[1]
+            const tid = parts[1]!
             // Handle global transform.color.x vs transform.<tid>.probability
             if (tid !== 'color' && !flame.transforms[tid]) {
               isOrphaned = true
@@ -144,8 +144,8 @@ export function DopeSheet(props: DopeSheetProps) {
             parts[0] !== 'densityEstimationQuality'
           ) {
             // It's likely <tid>.<vid> or <tid>.<vid>.<param>
-            const tid = parts[0]
-            const vid = parts[1]
+            const tid = parts[0]!
+            const vid = parts[1]!
             if (
               !flame.transforms[tid] ||
               !flame.transforms[tid].variations[vid]

@@ -1762,7 +1762,7 @@ export function MainWorkspace(props: AppProps) {
             | 'colorInitPosition'
           break
         case 'pointInitMode':
-          draft.renderSettings.pointInitMode = value
+          draft.renderSettings.pointInitMode = value as PointInitMode
           break
         case 'densityEstimationQuality':
           draft.renderSettings.densityEstimationQuality = value as number

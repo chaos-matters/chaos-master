@@ -17,9 +17,10 @@ export const backgroundColorDefault: [number, number, number] = [0, 0, 0]
 export const backgroundColorDefaultWhite: [number, number, number] = [1, 1, 1]
 export const MIN_CAMERA_ZOOM_VALUE: number = 0.01
 export const MAX_CAMERA_ZOOM_VALUE: number = 500
-const cameraDefault: { zoom: number; position: [number, number] } = {
+const cameraDefault: { zoom: number; position: [number, number]; rotation: number } = {
   zoom: 1,
   position: [0, 0],
+  rotation: 0,
 }
 export const camera3DDefault: {
   theta: number
@@ -103,6 +104,7 @@ const CameraObjSchema = v.object({
     v.tuple([v.number(), v.number()]),
     cameraDefault.position,
   ),
+  rotation: v.optional(v.number(), cameraDefault.rotation),
 })
 
 export type Camera3DObj = v.InferOutput<typeof Camera3DObjSchema>

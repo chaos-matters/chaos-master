@@ -41,8 +41,8 @@ export function createObjectEditor<T extends Record<string, unknown>>(editors: {
     <>
       <For each={Object.keys(editors)}>
         {(key) => {
-          const Editor = editors[key] as EditorFor<T[keyof T]>
-          return <Editor {...editorProps(props, key, key)} />
+          const Editor = editors[key] as EditorFor<any>
+          return <Editor {...editorProps(props, key as keyof T, key)} />
         }}
       </For>
     </>

@@ -85,34 +85,73 @@ function Preview(props: {
             }}
           >
             <AutoCanvas pixelRatio={1}>
-              {() => {
-                const dims =
-                  props.flameDescriptor.renderSettings.dimensions ?? 2
-                if (dims === 3) {
-                  return (
-                    <Default3DPreviewCamera
-                      camera3D={props.flameDescriptor.renderSettings.camera3D}
-                    >
-                      {flameView()}
-                    </Default3DPreviewCamera>
-                  )
+              <Show
+                when={
+                  (props.flameDescriptor.renderSettings.dimensions ?? 2) === 3
                 }
-                return (
+                fallback={
                   <Camera2D
                     position={vec2f(
-                      ...props.flameDescriptor.renderSettings.camera.position,
+                      ...props.flameDescriptor.renderSettings.camera!.position,
                     )}
-                    zoom={props.flameDescriptor.renderSettings.camera.zoom}
+                    zoom={props.flameDescriptor.renderSettings.camera!.zoom}
                   >
                     {flameView()}
                   </Camera2D>
-                )
-              }}
+                }
+              >
+                <Default3DPreviewCamera
+                  camera3D={props.flameDescriptor.renderSettings.camera3D}
+                >
+                  {flameView()}
+                </Default3DPreviewCamera>
+              </Show>
             </AutoCanvas>
           </Root>
         </Show>
       </ErrorBoundary>
     </div>
+  )
+}
+
+function FlamePreviewInner(props: {
+  flame: FlameDescriptor
+  hovered: boolean
+}) {
+  const flameView = () => (
+    <Flam3
+      quality={
+        props.hovered
+          ? THUMBNAIL_PREVIEW_QUALITY_HOVER
+          : THUMBNAIL_PREVIEW_QUALITY
+      }
+      pointCountPerBatch={ANIMATION_PREVIEW_POINT_COUNT}
+      adaptiveFilterEnabled={false}
+      animationEnabled={false}
+      flameDescriptor={props.flame}
+      renderInterval={1}
+      onExportImage={undefined}
+      edgeFadeColor={vec4f(0)}
+      onAccumulatedPointCount={() => {}}
+    />
+  )
+
+  return (
+    <Show
+      when={(props.flame.renderSettings.dimensions ?? 2) === 3}
+      fallback={
+        <Camera2D
+          position={vec2f(...props.flame.renderSettings.camera!.position)}
+          zoom={props.flame.renderSettings.camera!.zoom}
+        >
+          {flameView()}
+        </Camera2D>
+      }
+    >
+      <Default3DPreviewCamera camera3D={props.flame.renderSettings.camera3D}>
+        {flameView()}
+      </Default3DPreviewCamera>
+    </Show>
   )
 }
 
@@ -196,44 +235,7 @@ function AnimatedPreview(props: {
             fallback={() => <div class={ui.previewError}>Failed</div>}
           >
             <AutoCanvas pixelRatio={1}>
-              {() => {
-                const flame = displayFlame()
-                const dims = flame.renderSettings.dimensions ?? 2
-                const flameView = () => (
-                  <Flam3
-                    quality={
-                      hovered()
-                        ? THUMBNAIL_PREVIEW_QUALITY_HOVER
-                        : THUMBNAIL_PREVIEW_QUALITY
-                    }
-                    pointCountPerBatch={ANIMATION_PREVIEW_POINT_COUNT}
-                    adaptiveFilterEnabled={false}
-                    animationEnabled={false}
-                    flameDescriptor={flame}
-                    renderInterval={1}
-                    onExportImage={undefined}
-                    edgeFadeColor={vec4f(0)}
-                    onAccumulatedPointCount={() => {}}
-                  />
-                )
-                if (dims === 3) {
-                  return (
-                    <Default3DPreviewCamera
-                      camera3D={flame.renderSettings.camera3D}
-                    >
-                      {flameView()}
-                    </Default3DPreviewCamera>
-                  )
-                }
-                return (
-                  <Camera2D
-                    position={vec2f(...flame.renderSettings.camera.position)}
-                    zoom={flame.renderSettings.camera.zoom}
-                  >
-                    {flameView()}
-                  </Camera2D>
-                )
-              }}
+              <FlamePreviewInner flame={displayFlame()} hovered={hovered()} />
             </AutoCanvas>
           </ErrorBoundary>
         </Root>
@@ -287,7 +289,7 @@ function RecentFlameItem(props: {
   }
   index: number
   onSelect: (flame: FlameDescriptor, tracks?: TimelineTrack[]) => void
-  onDelete: (e: MouseEvent, id: string) => void
+  onDelete: (e: MouseEvent | KeyboardEvent, id: string) => void
 }) {
   const hasTracks = () =>
     !!(props.recent.tracks && props.recent.tracks.length > 0)
@@ -334,7 +336,7 @@ function RecentFlameItem(props: {
   const displayFlame = (): FlameDescriptor => {
     if (!hovered() || !hasTracks()) return props.recent.flame
     const clone = deepClone(props.recent.flame)
-    applyTracksToFlame(props.recent.tracks, clone, animFrame())
+    applyTracksToFlame(props.recent.tracks!, clone, animFrame())
     return clone
   }
 
@@ -365,44 +367,7 @@ function RecentFlameItem(props: {
         >
           <Root adapterOptions={{ powerPreference: 'high-performance' }}>
             <AutoCanvas pixelRatio={1}>
-              {() => {
-                const flame = displayFlame()
-                const dims = flame.renderSettings.dimensions ?? 2
-                const flameView = () => (
-                  <Flam3
-                    quality={
-                      hovered()
-                        ? THUMBNAIL_PREVIEW_QUALITY_HOVER
-                        : THUMBNAIL_PREVIEW_QUALITY
-                    }
-                    pointCountPerBatch={ANIMATION_PREVIEW_POINT_COUNT}
-                    adaptiveFilterEnabled={false}
-                    animationEnabled={false}
-                    flameDescriptor={flame}
-                    renderInterval={1}
-                    onExportImage={undefined}
-                    edgeFadeColor={vec4f(0)}
-                    onAccumulatedPointCount={() => {}}
-                  />
-                )
-                if (dims === 3) {
-                  return (
-                    <Default3DPreviewCamera
-                      camera3D={flame.renderSettings.camera3D}
-                    >
-                      {flameView()}
-                    </Default3DPreviewCamera>
-                  )
-                }
-                return (
-                  <Camera2D
-                    position={vec2f(...flame.renderSettings.camera.position)}
-                    zoom={flame.renderSettings.camera.zoom}
-                  >
-                    {flameView()}
-                  </Camera2D>
-                )
-              }}
+              <FlamePreviewInner flame={displayFlame()} hovered={hovered()} />
             </AutoCanvas>
           </Root>
         </Show>
@@ -472,7 +437,7 @@ function RecentFlameItem(props: {
         }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
-            props.onDelete(e as unknown, props.recent.id)
+            props.onDelete(e, props.recent.id)
           }
         }}
         title="Delete"
@@ -716,7 +681,7 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
 
   const requestModal = useRequestModal()
 
-  async function handleDeleteRecent(e: MouseEvent, id: string) {
+  async function handleDeleteRecent(e: MouseEvent | KeyboardEvent, id: string) {
     e.stopPropagation()
 
     if (!dontAskDeleteRecent()) {

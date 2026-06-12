@@ -67,7 +67,7 @@ export function PaletteSelector(props: PaletteSelectorProps) {
           ...displayedOfficialPalettes(),
           ...customPalettes(),
         ]
-        props.onSelect(all[0])
+        props.onSelect(all[0]!)
       }
     }
   }

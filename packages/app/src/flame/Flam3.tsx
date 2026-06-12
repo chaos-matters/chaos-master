@@ -238,13 +238,16 @@ export function Flam3(props: Flam3Props) {
       edgeFadeColor: onExportImageMemo() ? vec4f(0) : edgeFadeColorMemo(),
       backgroundColor: vec4f(backgroundColorFinal(), 1),
       vibrancy: rs.vibrancy,
-      palettePhase: rs.palettePhase,
-      paletteSpeed: rs.paletteSpeed,
+      palettePhase: rs.palettePhase ?? 0,
+      paletteSpeed: rs.paletteSpeed ?? 0.5,
       paletteEntryCount: paletteMemo()?.entries.length ?? 0,
       contrast: rs.contrast ?? 1,
       gamma: rs.gamma ?? 2.2,
       depthColorPower: depthVal,
-      lightDirection: vec4f(...(rs.lightDirection ?? [-0.5, 0.5, -1.0]), 0.0),
+      lightDirection: vec4f(
+        ...(rs.lightDirection ?? ([-0.5, 0.5, -1.0] as [number, number, number])),
+        0.0,
+      ),
       lightPower: lightVal,
       highlightPower: rs.highlightPower ?? 0.5,
       outputAlpha: outputAlphaMemo() ? 1 : 0,
@@ -567,7 +570,7 @@ export function Flam3(props: Flam3Props) {
     } else {
       ifsPipeline = createIFSPipeline(
         root,
-        camera,
+        camera!,
         Math.floor(flame.renderSettings.skipIters),
         pointRandomSeeds,
         flame.transforms,

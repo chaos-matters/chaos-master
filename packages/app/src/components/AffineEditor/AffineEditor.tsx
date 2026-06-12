@@ -811,7 +811,7 @@ export function AffineEditor(props: {
               </Show>
               <Show when={affineMode() === 'final' && props.finalTransform}>
                 <AffineHandle
-                  transform={props.finalTransform}
+                  transform={props.finalTransform!}
                   color={vec2f(0, 0)}
                   setTransform={(affine) => {
                     props.setFinalTransform?.(affine)

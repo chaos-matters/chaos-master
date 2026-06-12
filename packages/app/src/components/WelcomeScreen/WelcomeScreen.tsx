@@ -106,7 +106,7 @@ function FlameThumbnail(props: {
     if (!hovered() || !hasTracks()) return props.flame
     const frame = animFrame()
     const clone = deepClone(props.flame)
-    applyTracksToFlame(props.tracks, clone, frame)
+    applyTracksToFlame(props.tracks!, clone, frame)
     return clone
   }
 

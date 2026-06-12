@@ -127,7 +127,7 @@ export function createColorGradingPipeline(
   })(({ vertexIndex }) => {
     const pos = [vec2f(-1, -1), vec2f(3, -1), vec2f(-1, 3)]
     return {
-      pos: vec4f(pos[vertexIndex], 0.0, 1.0),
+      pos: vec4f(pos[vertexIndex]!, 0.0, 1.0),
       uv: pos[vertexIndex]!,
     }
   })
