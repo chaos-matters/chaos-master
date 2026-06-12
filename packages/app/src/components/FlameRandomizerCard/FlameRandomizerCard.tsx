@@ -235,8 +235,10 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
     'randomizer/mutate-colors',
     true,
   )
-  const [recordHistory, setRecordHistory] = persistentSignal(
-    'randomizer/record-history',
+  const [recordHistoryOnGenerate, setRecordHistoryOnGenerate] =
+    persistentSignal('randomizer/record-history-generate', true)
+  const [recordHistoryOnMutate, setRecordHistoryOnMutate] = persistentSignal(
+    'randomizer/record-history-mutate',
     true,
   )
 
@@ -272,7 +274,7 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
         vibrancy: randomizeVibrancy(),
         vibrancyRange: vibrancyRange(),
       },
-      recordHistory(),
+      recordHistoryOnGenerate(),
     )
   }
 
@@ -310,7 +312,7 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
         mutateVariations: mutateVariations(),
         mutateColors: mutateColors(),
       },
-      recordHistory(),
+      recordHistoryOnMutate(),
     )
   }
 
@@ -371,6 +373,17 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
               onInput={handleVariationsInput}
             />
           </div>
+
+          <label
+            class={ui.checkboxField}
+            style={{ 'margin-top': '4px', 'margin-bottom': '4px' }}
+          >
+            <Checkbox
+              checked={recordHistoryOnGenerate()}
+              onChange={setRecordHistoryOnGenerate}
+            />
+            <span>Save Previous to History</span>
+          </label>
 
           {/* Collapsible Render Settings */}
           <div class={ui.paletteWrapper}>
@@ -680,8 +693,8 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
                 </label>
                 <label class={ui.checkboxField}>
                   <Checkbox
-                    checked={recordHistory()}
-                    onChange={setRecordHistory}
+                    checked={recordHistoryOnMutate()}
+                    onChange={setRecordHistoryOnMutate}
                   />
                   <span>Save Previous to History</span>
                 </label>

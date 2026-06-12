@@ -303,7 +303,7 @@ export function generateRandomFlame(
 
   return {
     version: '1.0',
-    metadata: { author: 'logo-generator' },
+    metadata: { name: '', description: '', author: 'unknown' },
     renderSettings: {
       exposure: 0.3,
       skipIters: 15,
