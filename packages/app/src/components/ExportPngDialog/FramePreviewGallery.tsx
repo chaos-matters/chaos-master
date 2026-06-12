@@ -4,6 +4,7 @@ import { ANIMATION_FRAME_PREVIEW_QUALITY_HIGH, ANIMATION_FRAME_PREVIEW_QUALITY_L
 import { Flam3 } from '@/flame/Flam3'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
+import { Default3DPreviewCamera } from '@/lib/Camera3D'
 import { Root } from '@/lib/Root'
 import { applyTimelineToFlameAtFrame } from '@/utils/timeline'
 import ui from './FramePreviewGallery.module.css'
@@ -241,26 +242,44 @@ export function FramePreviewGallery(props: Props) {
         >
           <Root adapterOptions={{ powerPreference: 'high-performance' }}>
             <AutoCanvas pixelRatio={DEFAULT_PREVIEW_PIXEL_RATIO}>
-              <Camera2D position={cameraPos()} zoom={cameraZoom()}>
-                <Show when={frameDescriptor()} keyed>
-                  {(desc) => (
-                    <Flam3
-                      quality={cfg().quality}
-                      pointCountPerBatch={DEFAULT_POINT_COUNT}
-                      adaptiveFilterEnabled={false}
-                      animationEnabled={false}
-                      flameDescriptor={desc}
-                      renderInterval={0}
-                      edgeFadeColor={vec4f(0)}
-                      onExportImage={(canvas) => {
-                        captureCanvasRef = canvas
-                      }}
-                      palette={props.selectedPalette}
-                      onAccumulatedPointCount={() => {}}
-                    />
-                  )}
-                </Show>
-              </Camera2D>
+              {(() => {
+                const flameView = () => (
+                  <Show when={frameDescriptor()} keyed>
+                    {(desc) => (
+                      <Flam3
+                        quality={cfg().quality}
+                        pointCountPerBatch={DEFAULT_POINT_COUNT}
+                        adaptiveFilterEnabled={false}
+                        animationEnabled={false}
+                        flameDescriptor={desc}
+                        renderInterval={0}
+                        edgeFadeColor={vec4f(0)}
+                        onExportImage={(canvas) => {
+                          captureCanvasRef = canvas
+                        }}
+                        palette={props.selectedPalette}
+                        onAccumulatedPointCount={() => {}}
+                      />
+                    )}
+                  </Show>
+                )
+                return (
+                  <Show
+                    when={
+                      (frameDescriptor()?.renderSettings.dimensions ?? 2) === 3
+                    }
+                    fallback={
+                      <Camera2D position={cameraPos()} zoom={cameraZoom()}>
+                        {flameView()}
+                      </Camera2D>
+                    }
+                  >
+                    <Default3DPreviewCamera>
+                      {flameView()}
+                    </Default3DPreviewCamera>
+                  </Show>
+                )
+              })()}
             </AutoCanvas>
           </Root>
         </div>

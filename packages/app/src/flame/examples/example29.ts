@@ -8,6 +8,13 @@ import { defineExample, tid, vid } from './util'
  * Rendered in paint mode for rich color blending.
  */
 export const example29 = defineExample({
+  version: '1.0',
+  metadata: {
+    author: 'unknown',
+    name: 'Symmetry Cascade',
+    description:
+      'D3 (120°) rotational symmetry applied over two base transforms, each with its own distinctive postAffine shaping. The symmetry multiplies this into a hexagonal kaleidoscope. Animate postAffine coefficients to watch the cascade reshape itself. Rendered in paint mode for rich color blending.',
+  },
   renderSettings: {
     exposure: 0.22,
     skipIters: 20,

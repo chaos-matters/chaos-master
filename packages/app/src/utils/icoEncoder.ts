@@ -58,7 +58,7 @@ export function encodeIco(frames: IcoFrame[]): Blob {
     pos += 2
     view.setUint32(pos, png.byteLength, true) // size
     pos += 4
-    view.setUint32(pos, offsets[i]!, true) // offset
+    view.setUint32(pos, offsets[i], true) // offset
     pos += 4
   }
 

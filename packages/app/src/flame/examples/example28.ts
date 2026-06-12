@@ -8,6 +8,13 @@ import { defineExample, tid, vid } from './util'
  * Rendered in light mode for crisp contrast.
  */
 export const example28 = defineExample({
+  version: '1.0',
+  metadata: {
+    author: 'unknown',
+    name: 'Final Lens',
+    description:
+      'Two simple transforms produce a heart-shaped pattern, and the descriptor-level finalTransform applies a global stretch+shear that bends the entire rendered result like a lens. Animate finalTransform coefficients to create dynamic warping effects. Rendered in light mode for crisp contrast.',
+  },
   renderSettings: {
     exposure: 0.35,
     skipIters: 20,

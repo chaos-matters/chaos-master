@@ -12,7 +12,15 @@ export interface AnimationDef {
 
 /** Resolve the flame descriptor for an animation */
 export function getAnimationFlame(anim: AnimationDef): FlameDescriptor {
-  return examples[anim.exampleId]
+  const base = examples[anim.exampleId]
+  return {
+    ...base,
+    metadata: {
+      ...base.metadata,
+      name: anim.name,
+      description: anim.description,
+    },
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -105,6 +113,9 @@ const p26 = createAnimationPaths(examples.example26)
 const p27 = createAnimationPaths(examples.example27)
 const p28 = createAnimationPaths(examples.example28)
 const p29 = createAnimationPaths(examples.example29)
+const p33 = createAnimationPaths(examples.example33)
+const p34 = createAnimationPaths(examples.example34)
+const p36 = createAnimationPaths(examples.example36)
 
 // ---------------------------------------------------------------------------
 // Example 1 — multi-transform with swirl, popcorn, pie, gaussian, sinusoidal
@@ -5352,6 +5363,251 @@ const anim29b: AnimationDef = {
 }
 
 // ---------------------------------------------------------------------------
+// Example 33 — 3D Shells (Orbit and Morph)
+// ---------------------------------------------------------------------------
+
+const ex33 = 'example33' as const
+
+const anim33a: AnimationDef = {
+  id: 'ex33-orbit-rotation',
+  name: '3D Shells Orbit',
+  description:
+    'Slow 360-degree rotation showing the organic shell patterns from all angles.',
+  exampleId: ex33,
+  tracks: [
+    {
+      parameterPath: 'camera3D.theta',
+      keyframes: [
+        { frame: 0, value: 12.104001159667982, easing: 'linear' as const },
+        { frame: 90, value: 18.387186466847567, easing: 'linear' as const },
+      ],
+    },
+  ],
+}
+
+const anim33b: AnimationDef = {
+  id: 'ex33-shells-morph',
+  name: '3D Shells Morph',
+  description:
+    'Morphing weights of bubble3D and swirl3D variations with exposure breathing.',
+  exampleId: ex33,
+  tracks: [
+    {
+      parameterPath: p33.variationWeight(0, 0), // bubble3D in 3d_shells_a
+      keyframes: [
+        { frame: 0, value: 1.0 },
+        { frame: 45, value: 0.2, easing: 'easeInOut' as const },
+        { frame: 90, value: 1.0 },
+      ],
+    },
+    {
+      parameterPath: p33.variationWeight(1, 0), // spherical3D in 3d_shells_b
+      keyframes: [
+        { frame: 0, value: 0.6 },
+        { frame: 45, value: 0.1, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.6 },
+      ],
+    },
+    {
+      parameterPath: p33.variationWeight(1, 1), // swirl3D in 3d_shells_b
+      keyframes: [
+        { frame: 0, value: 0.4 },
+        { frame: 45, value: 0.9, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.4 },
+      ],
+    },
+    {
+      parameterPath: 'exposure',
+      keyframes: [
+        { frame: 0, value: -4.583 },
+        { frame: 45, value: -3.0, easing: 'easeInOut' as const },
+        { frame: 90, value: -4.583 },
+      ],
+    },
+  ],
+}
+
+// ---------------------------------------------------------------------------
+// Example 34 — Enchanted Rose (Orbit and Morph)
+// ---------------------------------------------------------------------------
+
+const ex34 = 'example34' as const
+
+const anim34a: AnimationDef = {
+  id: 'ex34-circulating-orbit',
+  name: 'Enchanted Rose Orbit',
+  description:
+    'Orbits around the rose in a full loop from above while performing a smooth sine-wave vertical oscillation.',
+  exampleId: ex34,
+  tracks: [
+    {
+      parameterPath: 'camera3D.theta',
+      keyframes: [
+        { frame: 0, value: 0, easing: 'linear' as const },
+        { frame: 180, value: Math.PI * 2, easing: 'linear' as const },
+      ],
+    },
+    {
+      parameterPath: 'camera3D.phi',
+      keyframes: [
+        { frame: 0, value: Math.PI / 4, easing: 'easeInOut' as const },
+        {
+          frame: 45,
+          value: Math.PI / 4 - Math.PI / 12,
+          easing: 'easeInOut' as const,
+        },
+        { frame: 90, value: Math.PI / 4, easing: 'easeInOut' as const },
+        {
+          frame: 135,
+          value: Math.PI / 4 + Math.PI / 12,
+          easing: 'easeInOut' as const,
+        },
+        { frame: 180, value: Math.PI / 4, easing: 'easeInOut' as const },
+      ],
+    },
+    {
+      parameterPath: 'vibrancy',
+      keyframes: [
+        { frame: 0, value: 1.8 },
+        { frame: 90, value: 2.8, easing: 'easeInOut' as const },
+        { frame: 180, value: 1.8 },
+      ],
+    },
+  ],
+}
+
+const anim34b: AnimationDef = {
+  id: 'ex34-variation-morph',
+  name: 'Enchanted Rose Morph',
+  description:
+    'Morphing weights and affine structures on Enchanted Rose variations',
+  exampleId: ex34,
+  tracks: [
+    {
+      parameterPath: p34.variationWeight(1, 0), // spherical3D
+      keyframes: [
+        { frame: 0, value: 0.6 },
+        { frame: 45, value: 0.1, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.6 },
+      ],
+    },
+    {
+      parameterPath: p34.variationWeight(1, 1), // swirl3D
+      keyframes: [
+        { frame: 0, value: 0.4 },
+        { frame: 45, value: 0.9, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.4 },
+      ],
+    },
+    {
+      parameterPath: p34.transformPreAffine(2, 'a'), // julia3D preAffine.a
+      keyframes: [
+        { frame: 0, value: 0.4 },
+        { frame: 45, value: 0.8, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.4 },
+      ],
+    },
+    {
+      parameterPath: p34.transformPreAffine(2, 'k'), // julia3D preAffine.k
+      keyframes: [
+        { frame: 0, value: 0.4 },
+        { frame: 45, value: 0.8, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.4 },
+      ],
+    },
+    {
+      parameterPath: 'gamma',
+      keyframes: [
+        { frame: 0, value: 5.71 },
+        { frame: 45, value: 2.5, easing: 'easeInOut' as const },
+        { frame: 90, value: 5.71 },
+      ],
+    },
+  ],
+}
+
+// ---------------------------------------------------------------------------
+// Example 36 — Crystal Geode (Orbit and Shimmer)
+// ---------------------------------------------------------------------------
+
+const ex36 = 'example36' as const
+
+const anim36a: AnimationDef = {
+  id: 'ex36-geode-orbit',
+  name: 'Crystal Geode Orbit',
+  description:
+    'Smooth camera orbit showcasing the faceted crystalline interior.',
+  exampleId: ex36,
+  tracks: [
+    {
+      parameterPath: 'camera3D.theta',
+      keyframes: [
+        { frame: 0, value: 1.2, easing: 'linear' as const },
+        { frame: 90, value: 1.2 + Math.PI * 2, easing: 'linear' as const },
+      ],
+    },
+    {
+      parameterPath: 'camera3D.phi',
+      keyframes: [
+        { frame: 0, value: 1.5, easing: 'easeInOut' as const },
+        { frame: 45, value: 1.2, easing: 'easeInOut' as const },
+        { frame: 90, value: 1.5, easing: 'easeInOut' as const },
+      ],
+    },
+    {
+      parameterPath: 'camera3D.radius',
+      keyframes: [
+        { frame: 0, value: 2.2 },
+        { frame: 45, value: 3.0, easing: 'easeInOut' as const },
+        { frame: 90, value: 2.2, easing: 'easeInOut' as const },
+      ],
+    },
+  ],
+}
+
+const anim36b: AnimationDef = {
+  id: 'ex36-geode-shimmer',
+  name: 'Crystal Geode Shimmer',
+  description:
+    'Shimmering light power oscillation and diamond3D weight morphing.',
+  exampleId: ex36,
+  tracks: [
+    {
+      parameterPath: p36.variationWeight(0, 0), // diamond3D in 3d_geode_a
+      keyframes: [
+        { frame: 0, value: 0.9 },
+        { frame: 45, value: 0.1, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.9 },
+      ],
+    },
+    {
+      parameterPath: p36.variationWeight(2, 1), // diamond3D in 3d_geode_c
+      keyframes: [
+        { frame: 0, value: 0.4 },
+        { frame: 45, value: 1.0, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.4 },
+      ],
+    },
+    {
+      parameterPath: 'lightPower',
+      keyframes: [
+        { frame: 0, value: 0.1 },
+        { frame: 45, value: 1.2, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.1 },
+      ],
+    },
+    {
+      parameterPath: 'exposure',
+      keyframes: [
+        { frame: 0, value: -1.5 },
+        { frame: 45, value: -2.5, easing: 'easeInOut' as const },
+        { frame: 90, value: -1.5 },
+      ],
+    },
+  ],
+}
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
@@ -5431,6 +5687,12 @@ export const animationDefs: AnimationDef[] = [
   anim28b,
   anim29a,
   anim29b,
+  anim33a,
+  anim33b,
+  anim34a,
+  anim34b,
+  anim36a,
+  anim36b,
 ]
 
 /** Group animations by their example flame */

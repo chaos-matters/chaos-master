@@ -1,16 +1,20 @@
 import { createEffect, createSignal, For, onCleanup, onMount, Show, } from 'solid-js'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
-import { transformVariations, variationTypes } from '@/flame/variations'
+import { categoryOf, variationTypesFor } from '@/flame/variationRegistry'
 import { CATEGORIES, CATEGORY_LABELS, sortByCategory, } from '@/flame/variations/categories'
 import { getNormalizedVariationName } from '@/flame/variations/utils'
 import { DelayedShow } from '../DelayedShow/DelayedShow'
 import { VariationPreview, variationPreviewFlames, } from '../VariationSelector/VariationSelector'
 import ui from './QuickVariationPicker.module.css'
 import type { PointInitMode } from '@/flame/pointInitMode'
+import type { Dims } from '@/flame/variationRegistry'
 import type { TransformVariationType } from '@/flame/variations'
 import type { VariationCategory } from '@/flame/variations/categories'
+import type { TransformVariationType3D } from '@/flame/variations3D'
 import type { HardwareTier } from '@/utils/hardwareTier'
+
+type AnyVariationType = TransformVariationType | TransformVariationType3D
 
 /* ---- Icons ---- */
 
@@ -93,10 +97,10 @@ function fuzzyScore(needle: string, haystack: string): number {
   return ni === n.length ? Math.max(1, score) : -1
 }
 
-function filterVariations(
-  all: typeof variationTypes,
+function filterVariations<T extends readonly string[]>(
+  all: T,
   query: string,
-): typeof variationTypes {
+): T {
   if (!query.trim()) return all
   return all
     .map((t) => ({
@@ -113,10 +117,11 @@ function filterVariations(
 export type QuickPickerMode = 'list' | 'gallery'
 
 export type QuickVariationPickerProps = {
-  currentType: TransformVariationType
-  onSelect: (type: TransformVariationType) => void
+  currentType: AnyVariationType
+  dims: Dims
+  onSelect: (type: AnyVariationType) => void
   onClose: () => void
-  onHoverType?: (type: TransformVariationType) => void
+  onHoverType?: (type: AnyVariationType) => void
   onHoverClear?: () => void
   mode: QuickPickerMode
   onModeChange: (mode: QuickPickerMode) => void
@@ -134,7 +139,7 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
   let inputRef: HTMLInputElement | undefined
   let clearTimer: ReturnType<typeof setTimeout> | undefined
 
-  function handleMouseEnter(type: TransformVariationType) {
+  function handleMouseEnter(type: AnyVariationType) {
     clearTimeout(clearTimer)
     props.onHoverType?.(type)
   }
@@ -151,7 +156,13 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
     props.onHoverClear?.()
   }
 
-  const filtered = () => filterVariations(variationTypes, query())
+  const currentVariationTypes = () => variationTypesFor(props.dims)
+
+  const filtered = () =>
+    filterVariations(
+      currentVariationTypes() as readonly TransformVariationType[],
+      query(),
+    )
 
   const [categoryFilter, setCategoryFilter] =
     createSignal<VariationCategory | null>(null)
@@ -162,7 +173,8 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
     const groups = new Map<VariationCategory, TransformVariationType[]>()
 
     for (const type of items) {
-      const cat = transformVariations[type]!.category
+      const cat = categoryOf(props.dims, type)
+      if (!cat) continue
       if (selectedCategory && cat !== selectedCategory) continue
       if (!groups.has(cat)) groups.set(cat, [])
       groups.get(cat)!.push(type)
@@ -180,11 +192,14 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
   const activeCategories = () => {
     const cats = new Set<VariationCategory>()
     for (const type of filtered()) {
-      cats.add(transformVariations[type]!.category)
+      const cat = categoryOf(props.dims, type)
+      if (cat) cats.add(cat)
     }
     // Sort by CATEGORIES order
     return CATEGORIES.filter((c) => cats.has(c))
   }
+
+
 
   onMount(() => {
     // auto-focus the search in list mode; small delay so the slide animation
@@ -316,7 +331,7 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
         </Show>
         <Show when={query() && filtered().length > 0}>
           <div class={ui.searchCount}>
-            {filtered().length} / {variationTypes.length}
+            {filtered().length} / {currentVariationTypes().length}
           </div>
         </Show>
         <div
@@ -441,6 +456,7 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
           {(() => {
             const previewFlames = variationPreviewFlames(
               props.pointInitMode ?? 'pointInitGaussianDisk',
+              props.dims,
             )
             let globalIndex = 0
             return (

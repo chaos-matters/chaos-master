@@ -46,7 +46,7 @@ export function buildReadableIds(transforms: TransformRecord): ReadableIds {
       return path
     }
     // Camera paths
-    if (path.startsWith('camera.')) return path
+    if (path.startsWith('camera.') || path.startsWith('camera3D.')) return path
 
     const parts = path.split('.')
     // transform.{tid}.{prop}

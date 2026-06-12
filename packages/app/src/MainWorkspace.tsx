@@ -1,5 +1,5 @@
 import '@/commands/builtins'
-import { createEffect, createMemo, createSignal, For, onMount, Show, } from 'solid-js'
+import { createEffect, createMemo, createSignal, ErrorBoundary, For, onMount, Show, Suspense, } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { vec2f, vec3f, vec4f } from 'typegpu/data'
@@ -8,6 +8,7 @@ import { executeCommand } from '@/commands/registry'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useToast } from '@/contexts/ToastContext'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
+import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
 import { useShortcutManager } from '@/shortcuts'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { recordEntries, recordKeys } from '@/utils/record'
@@ -32,6 +33,7 @@ import { createShowHelp } from './components/HelpModal/HelpModal'
 import { createLoadFlame } from './components/LoadFlameModal/LoadFlameModal'
 import { createLogoFaviconGenerator } from './components/LogoFaviconGenerator/LogoFaviconGenerator'
 import { useRequestModal } from './components/Modal/ModalContext'
+import { OrientationGizmo } from './components/OrientationGizmo/OrientationGizmo'
 import { PaletteSelector } from './components/PaletteSelector/PaletteSelector'
 import { ProgressBar } from './components/ProgressBar/ProgressBar'
 import { getPresetFromQuality, qualityPresets, } from './components/Quality/QualityPresets'
@@ -55,12 +57,16 @@ import { colorInitModeToImplFn } from './flame/colorInitMode'
 import { applyColorMapToFlame } from './flame/colorMap'
 import { drawModeToImplFn } from './flame/drawMode'
 import { example1 } from './flame/examples/example1'
+import { example34 } from './flame/examples/example34'
+import { initExample } from './flame/examples/initExample'
 import { Flam3 } from './flame/Flam3'
 import { pointInitModeToImplFn } from './flame/pointInitMode'
+import { pointInitMode3DToImplFn } from './flame/pointInitMode3D'
 import { random01, randomizeAllColors, randomizeVariationParams, } from './flame/randomize'
 import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, cameraDuringExportEnabled, exportProgress, exportQuality, qualityPointCountLimit, setCurrentQuality, setForceAnimationExportNow, setForceExportNow, setQualityPointCountLimit, } from './flame/renderStats'
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from './flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from './flame/transformFunction'
+import { defaultLinearType } from './flame/variationRegistry'
 import { isParametricVariation, isParametricVariationType, isVariationType, transformVariations, } from './flame/variations'
 import { deleteCustomVariation, duplicateCustomVariation, getCustomVariations, loadCustomVariations, } from './flame/variations/custom'
 import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } from './flame/variations/utils'
@@ -83,14 +89,17 @@ import { useAppDragAndDrop } from './utils/useAppDragAndDrop'
 import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
 import type { Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
+import type { Vec3 } from 'wgpu-matrix'
 import type { QualityPreset } from './components/Quality/QualityPresets'
 import type { QuickPickerMode } from './components/QuickVariationPicker/QuickVariationPicker'
 import type { TourContext } from './components/SpotlightTour/tourTypes'
 import type { ColorMap, Palette } from './flame/colorMap'
 import type { PointInitMode } from './flame/pointInitMode'
 import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from './flame/schema/flameSchema'
+import type { Dims } from './flame/variationRegistry'
 import type { TransformVariationType } from './flame/variations'
 import type { CustomVariationDef } from './flame/variations/custom/types'
+import type { TransformVariationType3D } from './flame/variations3D'
 import type { AnimationExportConfig } from './utils/animationExport'
 import type { HardwareTier } from './utils/hardwareTier'
 import type { SharePayload } from './utils/jsonQueryParam'
@@ -109,16 +118,36 @@ function formatPercent(x: number) {
   return `${(x * 100).toFixed(1)} %`
 }
 
-function newDefaultTransform(): TransformFunction {
+function newDefaultTransform(dims: Dims = 2): TransformFunction {
+  const is3D = dims === 3
+  const identity = is3D
+    ? {
+        a: 1,
+        b: 0,
+        c: 0,
+        d: 0,
+        e: 0,
+        f: 1,
+        g: 0,
+        h: 0,
+        i: 0,
+        j: 0,
+        k: 1,
+        l: 0,
+      }
+    : { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 }
   return {
     probability: 1,
     colorSpeed: 0.4,
     color: { x: 0, y: 0 },
-    preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-    postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+    preAffine: identity,
+    postAffine: identity,
     visible: true,
     variations: {
-      [generateVariationId()]: getVariationDefault('linearVar', 1.0),
+      [generateVariationId()]: getVariationDefault(
+        defaultLinearType(dims),
+        1.0,
+      ),
     },
   }
 }
@@ -156,7 +185,9 @@ export function extractFlameVariationTypes(
 }
 
 function addTransformWithVariation(draft: FlameDescriptor, type: string) {
-  const t = deepClone(newDefaultTransform())
+  const t = deepClone(
+    newDefaultTransform((draft.renderSettings.dimensions ?? 2) as Dims),
+  )
   t.variations = {
     [generateVariationId()]: {
       type,
@@ -360,7 +391,12 @@ export function MainWorkspace(props: AppProps) {
           preAffine: { a: cos, b: -sin, c: 0, d: sin, e: cos, f: 0 },
           postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
           variations: {
-            [generateVariationId()]: getVariationDefault('linearVar', 1),
+            [generateVariationId()]: getVariationDefault(
+              defaultLinearType(
+                (flameDescriptor.renderSettings.dimensions ?? 2) as Dims,
+              ),
+              1,
+            ),
           },
         }
       }
@@ -374,7 +410,12 @@ export function MainWorkspace(props: AppProps) {
           preAffine: { a: -1, b: 0, c: 0, d: 0, e: 1, f: 0 },
           postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
           variations: {
-            [generateVariationId()]: getVariationDefault('linearVar', 1),
+            [generateVariationId()]: getVariationDefault(
+              defaultLinearType(
+                (flameDescriptor.renderSettings.dimensions ?? 2) as Dims,
+              ),
+              1,
+            ),
           },
         }
       }
@@ -390,7 +431,10 @@ export function MainWorkspace(props: AppProps) {
     loadedAnimation,
     setLoadedAnimation,
     clearLoadedAnimation,
-  } = createLoadFlame(history)
+  } = createLoadFlame(
+    history,
+    () => flameDescriptor.renderSettings.dimensions ?? 2,
+  )
 
   const [showBlendGallery, setShowBlendGallery] = createSignal(false)
 
@@ -437,11 +481,12 @@ export function MainWorkspace(props: AppProps) {
   type QuickPickState = {
     tid: TransformId
     vid: VariationId
-    type: TransformVariationType
+    type: TransformVariationType | TransformVariationType3D
   } | null
   const [quickPickState, setQuickPickState] = createSignal<QuickPickState>(null)
-  const [hoveredVariationType, setHoveredVariationType] =
-    createSignal<TransformVariationType | null>(null)
+  const [hoveredVariationType, setHoveredVariationType] = createSignal<
+    TransformVariationType | TransformVariationType3D | null
+  >(null)
   const [hoveredCustomVarDef, setHoveredCustomVarDef] =
     createSignal<CustomVariationDef | null>(null)
 
@@ -598,6 +643,120 @@ export function MainWorkspace(props: AppProps) {
     return flameDescriptor.renderSettings.camera.position
   }
 
+  const setFlameTheta: Setter<number> = (value) => {
+    setFlameDescriptor((draft) => {
+      draft.renderSettings.camera3D.theta =
+        typeof value === 'function'
+          ? value(draft.renderSettings.camera3D.theta)
+          : value
+    })
+    return flameDescriptor.renderSettings.camera3D.theta
+  }
+  const setFlamePhi: Setter<number> = (value) => {
+    setFlameDescriptor((draft) => {
+      draft.renderSettings.camera3D.phi =
+        typeof value === 'function'
+          ? value(draft.renderSettings.camera3D.phi)
+          : value
+    })
+    return flameDescriptor.renderSettings.camera3D.phi
+  }
+  const setFlameRadius: Setter<number> = (value) => {
+    setFlameDescriptor((draft) => {
+      draft.renderSettings.camera3D.radius =
+        typeof value === 'function'
+          ? value(draft.renderSettings.camera3D.radius)
+          : value
+    })
+    return flameDescriptor.renderSettings.camera3D.radius
+  }
+  const setFlameTarget3D = (value: Vec3 | ((prev: Vec3) => Vec3)) => {
+    setFlameDescriptor((draft) => {
+      const newTarget =
+        typeof value === 'function'
+          ? value(new Float32Array(draft.renderSettings.camera3D.target))
+          : value
+      draft.renderSettings.camera3D.target = [
+        newTarget[0] ?? 0,
+        newTarget[1] ?? 0,
+        newTarget[2] ?? 0,
+      ]
+    })
+    return new Float32Array(flameDescriptor.renderSettings.camera3D.target)
+  }
+  const setFlameFov: Setter<number> = (value) => {
+    setFlameDescriptor((draft) => {
+      draft.renderSettings.camera3D.fov =
+        typeof value === 'function'
+          ? value(draft.renderSettings.camera3D.fov)
+          : value
+    })
+    return flameDescriptor.renderSettings.camera3D.fov
+  }
+
+  const effectiveTheta = () => {
+    if (
+      timeline.animationEnabled() &&
+      (timeline.isPlaying() || timeline.isScrubbing())
+    ) {
+      const val = timeline.resolveValueAtPath(
+        'camera3D.theta',
+        timeline.currentFrame(),
+      )
+      if (val !== null && typeof val === 'number') return val
+    }
+    return flameDescriptor.renderSettings.camera3D.theta
+  }
+  const effectivePhi = () => {
+    if (
+      timeline.animationEnabled() &&
+      (timeline.isPlaying() || timeline.isScrubbing())
+    ) {
+      const val = timeline.resolveValueAtPath(
+        'camera3D.phi',
+        timeline.currentFrame(),
+      )
+      if (val !== null && typeof val === 'number') return val
+    }
+    return flameDescriptor.renderSettings.camera3D.phi
+  }
+  const effectiveRadius = () => {
+    if (
+      timeline.animationEnabled() &&
+      (timeline.isPlaying() || timeline.isScrubbing())
+    ) {
+      const val = timeline.resolveValueAtPath(
+        'camera3D.radius',
+        timeline.currentFrame(),
+      )
+      if (val !== null && typeof val === 'number') return val
+    }
+    return flameDescriptor.renderSettings.camera3D.radius
+  }
+  const effectiveTarget3D = () => {
+    // Array properties are not easily animatable yet, so just use descriptor
+    return new Float32Array(flameDescriptor.renderSettings.camera3D.target)
+  }
+  const effectiveFov = () => {
+    if (
+      timeline.animationEnabled() &&
+      (timeline.isPlaying() || timeline.isScrubbing())
+    ) {
+      const val = timeline.resolveValueAtPath(
+        'camera3D.fov',
+        timeline.currentFrame(),
+      )
+      if (val !== null && typeof val === 'number') return val
+    }
+    return flameDescriptor.renderSettings.camera3D.fov
+  }
+
+  // Per-mode flame memory: the dimension toggle stashes the active flame and
+  // restores the one last used in the target mode, so 2D work is never lost
+  // by exploring 3D (and vice versa). First entry into 3D loads a starter.
+  let stashedFlame2D: FlameDescriptor | undefined
+  let stashedFlame3D: FlameDescriptor | undefined
+
   createEffect(() => {
     const progress = animationExportProgress()
     if (animationExportRunning() && progress) {
@@ -744,7 +903,10 @@ export function MainWorkspace(props: AppProps) {
 
     // Step 3: Show the modal with a live preview of the captured image
     const previewUrl = URL.createObjectURL(blob)
-    const meta = await showDiscordShareModal(previewUrl)
+    const meta = await showDiscordShareModal(
+      previewUrl,
+      flameDescriptor.metadata,
+    )
     URL.revokeObjectURL(previewUrl)
     if (!meta || !meta.author?.trim()) return
 
@@ -981,7 +1143,10 @@ export function MainWorkspace(props: AppProps) {
       case 'edgeFadeColor':
         return fd.renderSettings.edgeFadeColor ?? [0, 0, 0, 0]
       case 'camera.x':
-        if (animationEnabled()) {
+        if (
+          animationEnabled() &&
+          (timeline.isPlaying() || timeline.isScrubbing())
+        ) {
           if (
             timeline.hasKeyframeAtFrame('camera.x', timeline.currentFrame())
           ) {
@@ -999,7 +1164,10 @@ export function MainWorkspace(props: AppProps) {
         }
         return fd.renderSettings.camera?.position[0] ?? 0
       case 'camera.y':
-        if (animationEnabled()) {
+        if (
+          animationEnabled() &&
+          (timeline.isPlaying() || timeline.isScrubbing())
+        ) {
           if (
             timeline.hasKeyframeAtFrame('camera.y', timeline.currentFrame())
           ) {
@@ -1017,7 +1185,10 @@ export function MainWorkspace(props: AppProps) {
         }
         return fd.renderSettings.camera?.position[1] ?? 0
       case 'camera.zoom':
-        if (animationEnabled()) {
+        if (
+          animationEnabled() &&
+          (timeline.isPlaying() || timeline.isScrubbing())
+        ) {
           if (
             timeline.hasKeyframeAtFrame('camera.zoom', timeline.currentFrame())
           ) {
@@ -1039,6 +1210,96 @@ export function MainWorkspace(props: AppProps) {
           ((fd.renderSettings.camera as Record<string, unknown> | undefined)
             ?.rotation as number | undefined) ?? 0
         )
+      case 'camera3D.theta':
+        if (
+          animationEnabled() &&
+          (timeline.isPlaying() || timeline.isScrubbing())
+        ) {
+          if (
+            timeline.hasKeyframeAtFrame(
+              'camera3D.theta',
+              timeline.currentFrame(),
+            )
+          ) {
+            const track = timeline
+              .tracks()
+              .find((t) => t.parameterPath === 'camera3D.theta')
+            if (track) {
+              const val = resolveKeyframeValue(
+                track.keyframes,
+                timeline.currentFrame(),
+              )
+              if (val !== null && typeof val === 'number') return val
+            }
+          }
+        }
+        return fd.renderSettings.camera3D?.theta ?? 0
+      case 'camera3D.phi':
+        if (
+          animationEnabled() &&
+          (timeline.isPlaying() || timeline.isScrubbing())
+        ) {
+          if (
+            timeline.hasKeyframeAtFrame('camera3D.phi', timeline.currentFrame())
+          ) {
+            const track = timeline
+              .tracks()
+              .find((t) => t.parameterPath === 'camera3D.phi')
+            if (track) {
+              const val = resolveKeyframeValue(
+                track.keyframes,
+                timeline.currentFrame(),
+              )
+              if (val !== null && typeof val === 'number') return val
+            }
+          }
+        }
+        return fd.renderSettings.camera3D?.phi ?? Math.PI / 2
+      case 'camera3D.radius':
+        if (
+          animationEnabled() &&
+          (timeline.isPlaying() || timeline.isScrubbing())
+        ) {
+          if (
+            timeline.hasKeyframeAtFrame(
+              'camera3D.radius',
+              timeline.currentFrame(),
+            )
+          ) {
+            const track = timeline
+              .tracks()
+              .find((t) => t.parameterPath === 'camera3D.radius')
+            if (track) {
+              const val = resolveKeyframeValue(
+                track.keyframes,
+                timeline.currentFrame(),
+              )
+              if (val !== null && typeof val === 'number') return val
+            }
+          }
+        }
+        return fd.renderSettings.camera3D?.radius ?? 5
+      case 'camera3D.fov':
+        if (
+          animationEnabled() &&
+          (timeline.isPlaying() || timeline.isScrubbing())
+        ) {
+          if (
+            timeline.hasKeyframeAtFrame('camera3D.fov', timeline.currentFrame())
+          ) {
+            const track = timeline
+              .tracks()
+              .find((t) => t.parameterPath === 'camera3D.fov')
+            if (track) {
+              const val = resolveKeyframeValue(
+                track.keyframes,
+                timeline.currentFrame(),
+              )
+              if (val !== null && typeof val === 'number') return val
+            }
+          }
+        }
+        return fd.renderSettings.camera3D?.fov ?? 60
       case 'blendWeight':
         return blendWeight()
       default:
@@ -1163,7 +1424,7 @@ export function MainWorkspace(props: AppProps) {
             | 'colorInitPosition'
           break
         case 'pointInitMode':
-          draft.renderSettings.pointInitMode = value as PointInitMode
+          draft.renderSettings.pointInitMode = value
           break
         case 'densityEstimationQuality':
           draft.renderSettings.densityEstimationQuality = value as number
@@ -1218,6 +1479,26 @@ export function MainWorkspace(props: AppProps) {
           ;(draft.renderSettings.camera as
             | Record<string, unknown>
             | undefined)!.rotation = value
+          break
+        case 'camera3D.theta':
+          if (draft.renderSettings.camera3D) {
+            draft.renderSettings.camera3D.theta = value as number
+          }
+          break
+        case 'camera3D.phi':
+          if (draft.renderSettings.camera3D) {
+            draft.renderSettings.camera3D.phi = value as number
+          }
+          break
+        case 'camera3D.radius':
+          if (draft.renderSettings.camera3D) {
+            draft.renderSettings.camera3D.radius = value as number
+          }
+          break
+        case 'camera3D.fov':
+          if (draft.renderSettings.camera3D) {
+            draft.renderSettings.camera3D.fov = value as number
+          }
           break
         default: {
           const parts = path.split('.')
@@ -1292,7 +1573,10 @@ export function MainWorkspace(props: AppProps) {
   // Effective camera values: read from timeline whenever animation is enabled
   // so the camera follows keyframes during playback, seeking, and when stopped.
   const effectiveZoom = createMemo(() => {
-    if (animationEnabled() && timeline.isPlaying()) {
+    if (
+      animationEnabled() &&
+      (timeline.isPlaying() || timeline.isScrubbing())
+    ) {
       const track = timeline
         .tracks()
         .find((t) => t.parameterPath === 'camera.zoom')
@@ -1308,7 +1592,10 @@ export function MainWorkspace(props: AppProps) {
   })
 
   const effectivePosition = createMemo(() => {
-    if (animationEnabled() && timeline.isPlaying()) {
+    if (
+      animationEnabled() &&
+      (timeline.isPlaying() || timeline.isScrubbing())
+    ) {
       const xTrack = timeline
         .tracks()
         .find((t) => t.parameterPath === 'camera.x')
@@ -1479,6 +1766,7 @@ export function MainWorkspace(props: AppProps) {
     modal: {
       open: (name: string) => {
         if (name === 'exportPng') void showExportPngDialog()
+        if (name === 'exportAnimation') void showExportPngDialog('animation')
       },
     },
   }
@@ -1547,39 +1835,120 @@ export function MainWorkspace(props: AppProps) {
                 </button>
               </Show>
               <AutoCanvas class={ui.canvas} pixelRatio={pixelRatio()}>
-                <WheelZoomCamera2D
-                  zoom={[effectiveZoom, setFlameZoom]}
-                  position={[effectivePosition, setFlamePosition]}
-                  interactive={() =>
-                    // Camera input during an export resets the in-progress
-                    // frame and bakes the user's camera into the exported
-                    // video — locked unless the user opted in via the
-                    // "camera control during render" toggle.
-                    !timeline.isPlaying() &&
-                    (!animationExportRunning() || cameraDuringExportEnabled())
-                  }
-                >
-                  <Flam3
-                    quality={exportQuality() ?? qualityPresets[qualityPreset()]}
-                    pointCountPerBatch={DEFAULT_POINT_COUNT}
-                    isExportRenderer
-                    adaptiveFilterEnabled={adaptiveFilterEnabled()}
-                    animationEnabled={animationEnabled()}
-                    flameDescriptor={effectiveFlame()}
-                    renderInterval={finalRenderInterval()}
-                    onExportImage={onExportImage()}
-                    edgeFadeColor={
-                      showSidebar() ? EDGE_FADE_COLOR[theme()] : vec4f(0)
-                    }
-                    setCurrentQuality={(fn) => setCurrentQuality(() => fn)}
-                    setQualityPointCountLimit={(fn) =>
-                      setQualityPointCountLimit(() => fn)
-                    }
-                    palette={() => selectedPalette()}
-                    blendFlame={blendFlame()}
-                    blendWeight={resolvedBlendWeight()}
-                  />
-                </WheelZoomCamera2D>
+                <Suspense>
+                  <ErrorBoundary
+                    fallback={(err) => (
+                      <div
+                        style={{
+                          color: 'red',
+                          display: 'flex',
+                          'align-items': 'center',
+                          'justify-content': 'center',
+                          height: '100%',
+                          'text-align': 'center',
+                          padding: '20px',
+                          'flex-direction': 'column',
+                          gap: '1rem',
+                        }}
+                      >
+                        <p>
+                          Failed to render flame. The flame or animation data
+                          might be invalid or incompatible.
+                        </p>
+                        <p>
+                          <code>{String(err)}</code>
+                        </p>
+                        <Button
+                          onClick={() => {
+                            window.location.reload()
+                          }}
+                        >
+                          Reload Page
+                        </Button>
+                      </div>
+                    )}
+                  >
+                    <Show
+                      when={effectiveFlame().renderSettings.dimensions === 3}
+                      fallback={
+                        <WheelZoomCamera2D
+                          zoom={[effectiveZoom, setFlameZoom]}
+                          position={[effectivePosition, setFlamePosition]}
+                          interactive={() =>
+                            !timeline.isPlaying() &&
+                            (!animationExportRunning() ||
+                              cameraDuringExportEnabled())
+                          }
+                        >
+                          <Flam3
+                            quality={
+                              exportQuality() ?? qualityPresets[qualityPreset()]
+                            }
+                            pointCountPerBatch={DEFAULT_POINT_COUNT}
+                            isExportRenderer
+                            adaptiveFilterEnabled={adaptiveFilterEnabled()}
+                            animationEnabled={animationEnabled()}
+                            flameDescriptor={effectiveFlame()}
+                            renderInterval={finalRenderInterval()}
+                            onExportImage={onExportImage()}
+                            edgeFadeColor={
+                              showSidebar()
+                                ? EDGE_FADE_COLOR[theme()]
+                                : vec4f(0)
+                            }
+                            setCurrentQuality={(fn) =>
+                              setCurrentQuality(() => fn)
+                            }
+                            setQualityPointCountLimit={(fn) =>
+                              setQualityPointCountLimit(() => fn)
+                            }
+                            palette={() => selectedPalette()}
+                            blendFlame={blendFlame()}
+                            blendWeight={resolvedBlendWeight()}
+                          />
+                        </WheelZoomCamera2D>
+                      }
+                    >
+                      <WheelZoomCamera3D
+                        theta={[effectiveTheta, setFlameTheta]}
+                        phi={[effectivePhi, setFlamePhi]}
+                        radius={[effectiveRadius, setFlameRadius]}
+                        target={[effectiveTarget3D, setFlameTarget3D]}
+                        fov={[effectiveFov, setFlameFov]}
+                        interactive={() =>
+                          !timeline.isPlaying() &&
+                          (!animationExportRunning() ||
+                            cameraDuringExportEnabled())
+                        }
+                      >
+                        <Flam3
+                          quality={
+                            exportQuality() ?? qualityPresets[qualityPreset()]
+                          }
+                          pointCountPerBatch={DEFAULT_POINT_COUNT}
+                          isExportRenderer
+                          adaptiveFilterEnabled={adaptiveFilterEnabled()}
+                          animationEnabled={animationEnabled()}
+                          flameDescriptor={effectiveFlame()}
+                          renderInterval={finalRenderInterval()}
+                          onExportImage={onExportImage()}
+                          edgeFadeColor={
+                            showSidebar() ? EDGE_FADE_COLOR[theme()] : vec4f(0)
+                          }
+                          setCurrentQuality={(fn) =>
+                            setCurrentQuality(() => fn)
+                          }
+                          setQualityPointCountLimit={(fn) =>
+                            setQualityPointCountLimit(() => fn)
+                          }
+                          palette={() => selectedPalette()}
+                          blendFlame={blendFlame()}
+                          blendWeight={resolvedBlendWeight()}
+                        />
+                      </WheelZoomCamera3D>
+                    </Show>
+                  </ErrorBoundary>
+                </Suspense>
               </AutoCanvas>
               <Show when={hoveredVariationType()} keyed>
                 {(hv) => (
@@ -1605,6 +1974,12 @@ export function MainWorkspace(props: AppProps) {
               </Show>
               <ProgressBar />
               <div class={ui.bottomBar}>
+                <Show when={effectiveFlame().renderSettings.dimensions === 3}>
+                  <OrientationGizmo
+                    theta={[effectiveTheta, setFlameTheta]}
+                    phi={[effectivePhi, setFlamePhi]}
+                  />
+                </Show>
                 <div
                   class={ui.viewControlsWrapper}
                   data-tour-target="view-controls"
@@ -1638,6 +2013,15 @@ export function MainWorkspace(props: AppProps) {
                       setBlendFlame(undefined)
                     }}
                     onBlendWeightChange={setBlendWeight}
+                    is3D={effectiveFlame().renderSettings.dimensions === 3}
+                    theta={effectiveTheta()}
+                    phi={effectivePhi()}
+                    radius={effectiveRadius()}
+                    fov={effectiveFov()}
+                    setTheta={setFlameTheta}
+                    setPhi={setFlamePhi}
+                    setRadius={setFlameRadius}
+                    setFov={setFlameFov}
                   />
                 </div>
                 <Show when={showTimeline()}>
@@ -1817,6 +2201,10 @@ export function MainWorkspace(props: AppProps) {
                                 state.vid
                               ]?.type ?? state.type
                             }
+                            dims={
+                              (flameDescriptor.renderSettings.dimensions ??
+                                2) as Dims
+                            }
                             hardwareTier={props.hardwareTier}
                             pointInitMode={
                               flameDescriptor.renderSettings.pointInitMode
@@ -1874,6 +2262,13 @@ export function MainWorkspace(props: AppProps) {
                                   deepClone(flameDescriptor),
                                   state.tid,
                                   state.vid,
+                                  {
+                                    setFlameTheta,
+                                    setFlamePhi,
+                                    setFlameRadius,
+                                    setFlameTarget3D,
+                                    setFlameFov,
+                                  },
                                 )
                                   .then((newValue) => {
                                     if (
@@ -1926,6 +2321,10 @@ export function MainWorkspace(props: AppProps) {
                                 draft.finalTransform = affine
                               })
                             }}
+                            is3D={
+                              (flameDescriptor.renderSettings.dimensions ??
+                                2) === 3
+                            }
                           />
                         </CollapsibleCard>
                         <CollapsibleCard title="Color">
@@ -2218,6 +2617,13 @@ export function MainWorkspace(props: AppProps) {
                                               deepClone(flameDescriptor),
                                               tid,
                                               vid,
+                                              {
+                                                setFlameTheta,
+                                                setFlamePhi,
+                                                setFlameRadius,
+                                                setFlameTarget3D,
+                                                setFlameFov,
+                                              },
                                             )
                                               .then((newValue) => {
                                                 if (
@@ -2416,7 +2822,10 @@ export function MainWorkspace(props: AppProps) {
                                                         number
                                                       >
                                                     }
-                                                  ).params = value
+                                                  ).params = value as Record<
+                                                    string,
+                                                    number
+                                                  >
                                                 })
                                               }}
                                             />
@@ -2434,7 +2843,13 @@ export function MainWorkspace(props: AppProps) {
                                       draft.transforms[tid]!.variations[
                                         generateVariationId()
                                       ] = deepClone(
-                                        getVariationDefault('linearVar', 1),
+                                        getVariationDefault(
+                                          defaultLinearType(
+                                            (flameDescriptor.renderSettings
+                                              .dimensions ?? 2) as Dims,
+                                          ),
+                                          1,
+                                        ),
                                       )
                                     })
                                   }}
@@ -2810,6 +3225,64 @@ export function MainWorkspace(props: AppProps) {
                                   data-tour-target="highlightPower-slider"
                                 />
                               </div>
+                              <Show
+                                when={
+                                  (flameDescriptor.renderSettings.dimensions ??
+                                    2) === 3
+                                }
+                              >
+                                <div
+                                  class={ui.parameterTarget}
+                                  onClick={() => {
+                                    setTargetedParameter('depthColorPower')
+                                  }}
+                                >
+                                  <Slider
+                                    label="Depth Coloring"
+                                    value={
+                                      flameDescriptor.renderSettings
+                                        .depthColorPower ?? 0.0
+                                    }
+                                    min={0}
+                                    max={5}
+                                    step={0.05}
+                                    onInput={(newVal) => {
+                                      setFlameDescriptor((draft) => {
+                                        draft.renderSettings.depthColorPower =
+                                          newVal
+                                      })
+                                    }}
+                                    formatValue={(value) => value.toFixed(2)}
+                                    dataParameterPath="depthColorPower"
+                                    data-tour-target="depthColorPower-slider"
+                                  />
+                                </div>
+                                <div
+                                  class={ui.parameterTarget}
+                                  onClick={() => {
+                                    setTargetedParameter('lightPower')
+                                  }}
+                                >
+                                  <Slider
+                                    label="Light Power"
+                                    value={
+                                      flameDescriptor.renderSettings
+                                        .lightPower ?? 0.0
+                                    }
+                                    min={0}
+                                    max={1.5}
+                                    step={0.01}
+                                    onInput={(newVal) => {
+                                      setFlameDescriptor((draft) => {
+                                        draft.renderSettings.lightPower = newVal
+                                      })
+                                    }}
+                                    formatValue={(value) => value.toFixed(2)}
+                                    dataParameterPath="lightPower"
+                                    data-tour-target="lightPower-slider"
+                                  />
+                                </div>
+                              </Show>
                               <div
                                 class={ui.parameterTarget}
                                 onClick={() => {
@@ -3000,7 +3473,12 @@ export function MainWorkspace(props: AppProps) {
                                     }}
                                   >
                                     <For
-                                      each={recordKeys(pointInitModeToImplFn)}
+                                      each={recordKeys(
+                                        (flameDescriptor.renderSettings
+                                          .dimensions ?? 2) === 3
+                                          ? pointInitMode3DToImplFn
+                                          : pointInitModeToImplFn,
+                                      )}
                                     >
                                       {(pointInitMode) => (
                                         <option value={pointInitMode}>
@@ -3178,6 +3656,89 @@ export function MainWorkspace(props: AppProps) {
                             </div>
                           </Card>
                         </CollapsibleCard>
+                        <CollapsibleCard title="Metadata" defaultOpen={false}>
+                          <Card>
+                            <div
+                              style={{
+                                display: 'flex',
+                                'flex-direction': 'column',
+                                gap: '0.5rem',
+                                width: '100%',
+                                'grid-column': '1 / -1',
+                              }}
+                            >
+                              <div>
+                                <label class={ui.metadataLabel}>Name</label>
+                                <input
+                                  class={ui.metadataInput}
+                                  type="text"
+                                  placeholder="Flame Name"
+                                  value={flameDescriptor.metadata?.name ?? ''}
+                                  onInput={(e) => {
+                                    setFlameDescriptor((draft) => {
+                                      if (!draft.metadata) {
+                                        draft.metadata = {
+                                          name: '',
+                                          description: '',
+                                          author: '',
+                                        }
+                                      }
+                                      draft.metadata.name =
+                                        e.currentTarget.value
+                                    })
+                                  }}
+                                />
+                              </div>
+                              <div>
+                                <label class={ui.metadataLabel}>
+                                  Description
+                                </label>
+                                <textarea
+                                  class={ui.metadataTextarea}
+                                  placeholder="Description"
+                                  value={
+                                    flameDescriptor.metadata?.description ?? ''
+                                  }
+                                  onInput={(e) => {
+                                    setFlameDescriptor((draft) => {
+                                      if (!draft.metadata) {
+                                        draft.metadata = {
+                                          name: '',
+                                          description: '',
+                                          author: '',
+                                        }
+                                      }
+                                      draft.metadata.description =
+                                        e.currentTarget.value
+                                    })
+                                  }}
+                                />
+                              </div>
+                              <div>
+                                <label class={ui.metadataLabel}>Author</label>
+                                <input
+                                  class={ui.metadataInput}
+                                  type="text"
+                                  placeholder="Author"
+                                  value={flameDescriptor.metadata?.author ?? ''}
+                                  onInput={(e) => {
+                                    setFlameDescriptor((draft) => {
+                                      if (!draft.metadata) {
+                                        draft.metadata = {
+                                          name: '',
+                                          description: '',
+                                          author: '',
+                                        }
+                                      }
+                                      draft.metadata.author =
+                                        e.currentTarget.value
+                                    })
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </Card>
+                        </CollapsibleCard>
                       </Show>
                     </>
                   }
@@ -3269,6 +3830,21 @@ export function MainWorkspace(props: AppProps) {
             }}
             accumulatedPointCount={accumulatedPointCount}
             qualityPointCountLimit={qualityPointCountLimit()}
+            dimensions={() => flameDescriptor.renderSettings.dimensions ?? 2}
+            setDimensions={(v) => {
+              const current = flameDescriptor.renderSettings.dimensions ?? 2
+              if (v === current) return
+              if (current === 3) {
+                stashedFlame3D = deepClone(flameDescriptor)
+              } else {
+                stashedFlame2D = deepClone(flameDescriptor)
+              }
+              const restored =
+                v === 3
+                  ? (stashedFlame3D ?? example34)
+                  : (stashedFlame2D ?? initExample)
+              history.replace(deepClone(restored))
+            }}
           />
           <SpotlightTour tourContext={tourContext} />
           <BenchmarkButton onClick={createShowBenchmark()} />

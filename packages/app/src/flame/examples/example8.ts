@@ -6,6 +6,13 @@ import { defineExample, tid, vid } from './util'
  * and a juliaScope fractal bloom.
  */
 export const example8 = defineExample({
+  version: '1.0',
+  metadata: {
+    author: 'unknown',
+    name: 'Tidal Spiral',
+    description:
+      'ocean-like fluid swirls with fractal depth. Three transforms: swirl3Var spiral core, horseshoe+spherical distortion, and a juliaScope fractal bloom.',
+  },
   renderSettings: {
     exposure: 0.3,
     skipIters: 20,

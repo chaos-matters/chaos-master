@@ -4,6 +4,7 @@ import { isParametricVariationType, transformVariations, variationTypes, } from 
 import { getVariationDefault } from './variations/utils'
 import type { FlameDescriptor } from './schema/flameSchema'
 import type { TransformVariationType } from './variations'
+import type { TransformVariationType3D } from './variations3D'
 
 export function random01(): number {
   return Math.random()
@@ -32,15 +33,14 @@ export function randomPerturbation(
  * strength=0 → mild perturbation, strength=1 → wild randomization.
  */
 export function randomizeVariationParams(
-  variationType: TransformVariationType,
+  variationType: TransformVariationType | TransformVariationType3D,
   strength = 0.5,
 ): Record<string, number> | undefined {
   if (!isParametricVariationType(variationType)) return undefined
-  const def = transformVariations[variationType] as Extract<
-    (typeof transformVariations)[TransformVariationType],
-    { paramDefaults: unknown }
-  >
-  const defaults = def.paramDefaults as Record<string, number>
+  const def = transformVariations[variationType as TransformVariationType] as {
+    paramDefaults: Record<string, number>
+  }
+  const defaults = def.paramDefaults
   const result: Record<string, number> = {}
   // strength maps sigma from 5% to 100% of param magnitude
   const sigmaScale = 0.05 + strength * 0.95
@@ -262,6 +262,17 @@ export function generateRandomFlame(
       densityEstimationQuality: 0.8,
       estimatorCurve: 0.5,
       paletteMode: 0,
+      dimensions: 2,
+      depthColorPower: 0.0,
+      lightDirection: [-0.5, 0.5, -1.0],
+      lightPower: 0.0,
+      camera3D: {
+        theta: 0,
+        phi: Math.PI / 2,
+        radius: 5,
+        target: [0, 0, 0],
+        fov: 60,
+      },
     },
     transforms: coloredTransforms as FlameDescriptor['transforms'],
   }

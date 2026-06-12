@@ -6,6 +6,7 @@ import { random } from '@/shaders/random'
 import { recordKeys } from '@/utils/record'
 import * as v from '@/valibot'
 import { PI } from './constants'
+import { pointInitMode3DToImplFn } from './pointInitMode3D'
 
 const pointInitModeFn = tgpu.fn([u32], vec2f)
 
@@ -193,5 +194,19 @@ export const pointInitModeToImplFn = {
   pointInitModeGaussianCircle: pointInitModeGaussian,
 }
 
+const allPointInitModes = {
+  ...pointInitModeToImplFn,
+  ...pointInitMode3DToImplFn,
+}
+
 export type PointInitMode = v.InferOutput<typeof PointInitMode>
-export const PointInitMode = v.picklist(recordKeys(pointInitModeToImplFn))
+export const PointInitMode = v.picklist(recordKeys(allPointInitModes))
+
+export type PointInitMode2D = Extract<
+  keyof typeof pointInitModeToImplFn,
+  string
+>
+
+export function isPointInitMode2D(mode: string): mode is PointInitMode2D {
+  return mode in pointInitModeToImplFn
+}

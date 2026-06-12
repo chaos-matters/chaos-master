@@ -15,15 +15,25 @@ WGSL does **not** support implicit conversion between concrete numeric types (e.
   - In TypeGPU, import `f32` or `i32` from `'typegpu/data'` and use it like a function: `f32(myVariable)`.
 - **Zeros:** Always use `0.0` instead of `0`. E.g., `vec2f(0.0)` instead of `vec2f(0)`.
 
-## 2. No Ternary Operators
-WGSL does **not** have a `? :` ternary operator. 
-Inside `'use gpu'` blocks, you must use the `select` function from `'typegpu/std'`.
+## 2. No Ternary Operators (for runtime values)
+WGSL does **not** have a `? :` ternary operator. While TypeGPU attempts to resolve ternaries, it only supports them for comptime-known checks.
+If you use a ternary operator for runtime values, you will get the error:
+`Ternary operator is only supported for comptime-known checks ... For runtime checks, please use 'std.select' or if/else statements.`
 
+Inside `'use gpu'` blocks, you have two options for runtime branching:
+
+**Option 1: Standard `if / else` (Preferred for readability and complex logic)**
+TypeGPU correctly parses standard TypeScript `if` and `else` blocks into WGSL branching.
 ```typescript
-// Incorrect:
-const result = condition ? trueValue : falseValue;
+let result = falseValue
+if (condition) {
+  result = trueValue
+}
+```
 
-// Correct:
+**Option 2: `select` function**
+Use the `select` function from `'typegpu/std'`.
+```typescript
 import { select } from 'typegpu/std';
 // Note the order: select(false_value, true_value, condition)
 const result = select(falseValue, trueValue, condition);

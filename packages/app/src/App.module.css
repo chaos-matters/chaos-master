@@ -1593,3 +1593,44 @@
     }
   }
 }
+
+.metadata-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  padding: 0.375rem 0.5rem;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.75rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 150ms ease;
+
+  [data-theme='light'] & {
+    background: rgba(0, 0, 0, 0.05);
+    border-color: rgba(0, 0, 0, 0.1);
+    color: rgba(0, 0, 0, 0.8);
+  }
+
+  &:focus {
+    border-color: rgba(255, 255, 255, 0.25);
+    [data-theme='light'] & {
+      border-color: rgba(0, 0, 0, 0.3);
+    }
+  }
+}
+
+.metadata-textarea {
+  composes: metadata-input;
+  min-height: 3.5rem;
+  resize: vertical;
+}
+
+.metadata-label {
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--neutral-500);
+  margin-bottom: 0.2rem;
+  display: block;
+  user-select: none;
+}

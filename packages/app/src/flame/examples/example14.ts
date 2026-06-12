@@ -5,6 +5,13 @@ import { defineExample, tid, vid } from './util'
  * with hexagonal cell distortions and spiral flow.
  */
 export const example14 = defineExample({
+  version: '1.0',
+  metadata: {
+    author: 'unknown',
+    name: 'Ripple Veil',
+    description:
+      'Dynamic interference ripples cascade across a frequency grid with hexagonal cell distortions and spiral flow.',
+  },
   renderSettings: {
     exposure: 0.28,
     skipIters: 20,

@@ -3,6 +3,9 @@ import { prettyPrintValibotErrors } from '@/utils/prettyPrintValibotErrors'
 import { recordEntries } from '@/utils/record'
 import * as v from '@/valibot'
 import { AffineParamsSchema } from '../affineTranform'
+import { AffineParams3DSchema } from '../affineTransform3D'
+
+export { AffineParams3DSchema }
 import { ColorInitMode } from '../colorInitMode'
 import { DrawMode } from '../drawMode'
 import { PointInitMode } from '../pointInitMode'
@@ -18,21 +21,39 @@ const cameraDefault: { zoom: number; position: [number, number] } = {
   zoom: 1,
   position: [0, 0],
 }
+export const camera3DDefault: {
+  theta: number
+  phi: number
+  radius: number
+  target: [number, number, number]
+  fov: number
+} = {
+  theta: 0,
+  phi: Math.PI / 2,
+  radius: 5,
+  target: [0, 0, 0] as [number, number, number],
+  fov: 60,
+}
 const _edgeFadeColorDefault: [number, number, number, number] = [0, 0, 0, 0.8]
 const MAX_SKIP_ITERS_VALUE = 30
 const MIN_EXPOSURE_VALUE = -8
 const MAX_EXPOSURE_VALUE = 8
 export const renderSettingsDefault: RenderSettings = {
+  dimensions: 2,
   exposure: 0.25,
   skipIters: 20,
   drawMode: 'light',
   backgroundColor: backgroundColorDefault,
   camera: cameraDefault,
+  camera3D: camera3DDefault,
   colorInitMode: 'colorInitZero',
   pointInitMode: 'pointInitUnitDisk',
   vibrancy: 0.5,
   contrast: 1,
   gamma: 2.2,
+  depthColorPower: 0.0,
+  lightDirection: [-0.5, 0.5, -1.0],
+  lightPower: 0.0,
   highlightPower: 0.5,
   densityEstimationQuality: 0.8,
   estimatorCurve: 0.5,
@@ -46,6 +67,8 @@ const MAX_LENGTH_VERSION_STRING = 10
 const metadataDefault = {
   version: latestSchemaVersion,
   author: 'unknown',
+  name: '',
+  description: '',
 }
 
 export type TransformId = v.InferOutput<typeof TransformId>
@@ -82,6 +105,18 @@ const CameraObjSchema = v.object({
   ),
 })
 
+export type Camera3DObj = v.InferOutput<typeof Camera3DObjSchema>
+export const Camera3DObjSchema = v.object({
+  theta: v.optional(v.number(), camera3DDefault.theta),
+  phi: v.optional(v.number(), camera3DDefault.phi),
+  radius: v.optional(v.number(), camera3DDefault.radius),
+  target: v.optional(
+    v.tuple([v.number(), v.number(), v.number()]),
+    camera3DDefault.target,
+  ),
+  fov: v.optional(v.number(), camera3DDefault.fov),
+})
+
 const ColorValueSchema = v.pipe(v.number(), v.minValue(0), v.maxValue(1))
 
 const MIN_VIBRANCY_VALUE = 0
@@ -100,6 +135,10 @@ const RenderSettings = v.object({
     v.minValue(0),
     v.maxValue(MAX_SKIP_ITERS_VALUE),
   ),
+  dimensions: v.optional(
+    v.pipe(v.number(), v.integer(), v.minValue(2), v.maxValue(3)),
+    2,
+  ),
   drawMode: v.optional(DrawMode, 'light'),
   colorInitMode: v.optional(ColorInitMode, 'colorInitZero'),
   pointInitMode: v.optional(PointInitMode, 'pointInitUnitDisk'),
@@ -113,6 +152,14 @@ const RenderSettings = v.object({
   ),
   contrast: v.optional(v.pipe(v.number(), v.minValue(0.01), v.maxValue(20)), 1),
   gamma: v.optional(v.pipe(v.number(), v.minValue(0.1), v.maxValue(8)), 2.2),
+  depthColorPower: v.optional(
+    v.pipe(v.number(), v.minValue(0), v.maxValue(5)),
+    0.0,
+  ),
+  lightDirection: v.optional(v.tuple([v.number(), v.number(), v.number()]), [
+    -0.5, 0.5, -1.0,
+  ] as [number, number, number]),
+  lightPower: v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(5)), 0.0),
   highlightPower: v.optional(
     v.pipe(v.number(), v.minValue(0), v.maxValue(2)),
     0.5,
@@ -132,6 +179,7 @@ const RenderSettings = v.object({
     v.tuple([ColorValueSchema, ColorValueSchema, ColorValueSchema]),
   ),
   camera: v.optional(CameraObjSchema, cameraDefault),
+  camera3D: v.optional(Camera3DObjSchema, camera3DDefault),
   edgeFadeColor: v.optional(
     v.tuple([
       ColorValueSchema,
@@ -147,6 +195,8 @@ const FlameMetadata = v.object({
     v.pipe(v.string(), v.maxLength(MAX_LENGTH_AUTHOR_STRING)),
     metadataDefault.author,
   ),
+  name: v.optional(v.string(), ''),
+  description: v.optional(v.string(), ''),
 })
 
 const FlameDescriptorVersion = v.pipe(

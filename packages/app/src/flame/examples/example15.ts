@@ -6,6 +6,13 @@ import { defineExample, tid, vid } from './util'
  * popcorn2 clustered bursts create a cyberpunk-mystical hybrid.
  */
 export const example15 = defineExample({
+  version: '1.0',
+  metadata: {
+    author: 'unknown',
+    name: 'Pixel Storm',
+    description:
+      'Digital glitch fractals collide with sacred-geometry star polygons. pixelFlow directional bleed, scry2 multi-sided stars, and popcorn2 clustered bursts create a cyberpunk-mystical hybrid.',
+  },
   renderSettings: {
     exposure: 0.3,
     skipIters: 20,

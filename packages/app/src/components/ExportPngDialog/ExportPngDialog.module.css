@@ -264,3 +264,15 @@
   border-top: 1px solid var(--color-border, #333);
   flex-shrink: 0;
 }
+
+.textarea {
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.35rem;
+  border: 1px solid var(--color-border, #333);
+  background: var(--color-bg-input, #1a1a1a);
+  color: var(--color-text, #eee);
+  font-size: 0.85rem;
+  width: 100%;
+  min-height: 3.5rem;
+  resize: vertical;
+}

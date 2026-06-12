@@ -1,19 +1,22 @@
-import { createEffect, createResource, createSignal, For, onCleanup, Show, } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, For, onCleanup, Show, } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { vec2f, vec4f } from 'typegpu/data'
 import { Checkbox } from '@/components/Checkbox/Checkbox'
-import { DEFAULT_VARIATION_PREVIEW_POINT_COUNT, THUMBNAIL_PREVIEW_QUALITY, THUMBNAIL_PREVIEW_QUALITY_HOVER, } from '@/defaults'
+import { ComputeGate, useComputeGate } from '@/contexts/ComputeGateContext'
+import { COMPUTE_GATE_CAPACITY, DEFAULT_VARIATION_PREVIEW_POINT_COUNT, THUMBNAIL_PREVIEW_QUALITY, THUMBNAIL_PREVIEW_QUALITY_HOVER, } from '@/defaults'
 import { examples } from '@/flame/examples'
 import { animationDefs, getAnimationFlame } from '@/flame/examples/animations'
 import { Flam3 } from '@/flame/Flam3'
 import { Heart } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
+import { Default3DPreviewCamera } from '@/lib/Camera3D'
 import { Root } from '@/lib/Root'
 import { deepClone } from '@/utils/clone'
 import { detectHardwareTier, hardwareTiers } from '@/utils/hardwareTier'
 import { formatRecentDate, loadRecentFlames } from '@/utils/recentFlames'
 import { applyTracksToFlame } from '@/utils/timeline'
+import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { VERSION } from '@/version'
 import ui from './WelcomeScreen.module.css'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -47,6 +50,21 @@ function FlameThumbnail(props: {
   savedAt?: number
   onClickWithTracks?: (flame: FlameDescriptor, tracks?: TimelineTrack[]) => void
 }) {
+  const [container, setContainer] = createSignal<HTMLElement>()
+  const intersection = useIntersectionObserver(container)
+  const isVisible = createMemo(() => intersection()?.isIntersecting ?? false)
+
+  const allowed = useComputeGate(() => ({
+    isVisible: isVisible(),
+    renderStatus: 'done', // Since we don't track Flam3 internal quality here yet, just request it while visible
+    isSelected: hovered(),
+  }))
+
+  const [everAllowed, setEverAllowed] = createSignal(false)
+  createEffect(() => {
+    if (allowed()) setEverAllowed(true)
+  })
+
   const [hovered, setHovered] = createSignal(false)
   const [animFrame, setAnimFrame] = createSignal(0)
   let rafId: number | undefined
@@ -88,12 +106,13 @@ function FlameThumbnail(props: {
     if (!hovered() || !hasTracks()) return props.flame
     const frame = animFrame()
     const clone = deepClone(props.flame)
-    applyTracksToFlame(props.tracks!, clone, frame)
+    applyTracksToFlame(props.tracks, clone, frame)
     return clone
   }
 
   return (
     <button
+      ref={setContainer}
       class={ui.thumbnail}
       onClick={() => {
         props.onClickWithTracks?.(props.flame, props.tracks)
@@ -109,33 +128,60 @@ function FlameThumbnail(props: {
       }}
       title={props.name}
     >
-      <Root adapterOptions={{ powerPreference: 'high-performance' }}>
-        <AutoCanvas pixelRatio={1}>
-          <Camera2D
-            position={vec2f(...displayFlame().renderSettings.camera.position)}
-            zoom={displayFlame().renderSettings.camera.zoom}
-          >
-            <Flam3
-              quality={
-                hovered()
-                  ? THUMBNAIL_PREVIEW_QUALITY_HOVER
-                  : THUMBNAIL_PREVIEW_QUALITY
-              }
-              pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT}
-              adaptiveFilterEnabled={false}
-              animationEnabled={false}
-              flameDescriptor={displayFlame()}
-              renderInterval={1}
-              onExportImage={undefined}
-              edgeFadeColor={vec4f(0)}
-              onAccumulatedPointCount={() => {}}
-            />
-          </Camera2D>
-        </AutoCanvas>
-      </Root>
+      <Show when={everAllowed() || isVisible()}>
+        <Root adapterOptions={{ powerPreference: 'high-performance' }}>
+          <AutoCanvas pixelRatio={1}>
+            {(() => {
+              const flameView = () => (
+                <Flam3
+                  quality={
+                    hovered()
+                      ? THUMBNAIL_PREVIEW_QUALITY_HOVER
+                      : THUMBNAIL_PREVIEW_QUALITY
+                  }
+                  pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT}
+                  adaptiveFilterEnabled={false}
+                  animationEnabled={false}
+                  flameDescriptor={displayFlame()}
+                  renderInterval={1}
+                  onExportImage={undefined}
+                  edgeFadeColor={vec4f(0)}
+                  onAccumulatedPointCount={() => {}}
+                />
+              )
+              return (
+                <Show
+                  when={(displayFlame().renderSettings.dimensions ?? 2) === 3}
+                  fallback={
+                    <Camera2D
+                      position={vec2f(
+                        ...displayFlame().renderSettings.camera.position,
+                      )}
+                      zoom={displayFlame().renderSettings.camera.zoom}
+                    >
+                      {flameView()}
+                    </Camera2D>
+                  }
+                >
+                  <Default3DPreviewCamera
+                    camera3D={displayFlame().renderSettings.camera3D}
+                  >
+                    {flameView()}
+                  </Default3DPreviewCamera>
+                </Show>
+              )
+            })()}
+          </AutoCanvas>
+        </Root>
+      </Show>
       <div class={ui.thumbnailBar}>
         <span class={ui.thumbnailName}>{props.name}</span>
         <span class={ui.thumbnailMeta}>
+          {(props.flame.renderSettings.dimensions ?? 2) === 3 && (
+            <span class={ui.dimBadge} title="3D flame">
+              3D
+            </span>
+          )}
           {props.savedAt && formatRecentDate(props.savedAt)}
           {hasTracks() && (
             <span
@@ -249,232 +295,243 @@ export function WelcomeScreen(props: WelcomeScreenProps) {
           if (e.target === e.currentTarget) props.onEnter()
         }}
       >
-        <div class={ui.card}>
-          <div class={ui.gallerySection}>
-            <Show
-              when={!detectedTier.loading}
-              fallback={
-                <div class={ui.galleryLoading}>
-                  <span>Detecting hardware capabilities...</span>
-                </div>
-              }
-            >
-              <div class={ui.galleryHeader}>
-                <span class={ui.galleryTitle}>Recent</span>
-              </div>
+        <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
+          <div class={ui.card}>
+            <div class={ui.gallerySection}>
               <Show
-                when={recentItems.length > 0}
+                when={!detectedTier.loading}
                 fallback={
-                  <div class={ui.galleryEmpty}>
-                    <span>No recent flames yet</span>
+                  <div class={ui.galleryLoading}>
+                    <span>Detecting hardware capabilities...</span>
                   </div>
                 }
               >
+                <div class={ui.galleryHeader}>
+                  <span class={ui.galleryTitle}>Recent</span>
+                </div>
+                <Show
+                  when={recentItems.length > 0}
+                  fallback={
+                    <div class={ui.galleryEmpty}>
+                      <span>No recent flames yet</span>
+                    </div>
+                  }
+                >
+                  <div class={ui.galleryGrid}>
+                    <For each={recentItems}>
+                      {(item) => (
+                        <FlameThumbnail
+                          flame={item.flame}
+                          name={item.name}
+                          tracks={item.tracks}
+                          savedAt={item.savedAt}
+                          onClickWithTracks={handleSelect}
+                        />
+                      )}
+                    </For>
+                  </div>
+                </Show>
+
+                <div
+                  class={ui.galleryHeader}
+                  style={{ 'margin-top': '1.25rem' }}
+                >
+                  <span class={ui.galleryTitle}>Animated Examples</span>
+                </div>
                 <div class={ui.galleryGrid}>
-                  <For each={recentItems}>
+                  <For each={visibleAnimated()}>
                     {(item) => (
                       <FlameThumbnail
                         flame={item.flame}
                         name={item.name}
                         tracks={item.tracks}
-                        savedAt={item.savedAt}
                         onClickWithTracks={handleSelect}
                       />
                     )}
                   </For>
                 </div>
-              </Show>
+                <Show when={animExamples.length > INITIAL_VISIBLE}>
+                  <button
+                    class={ui.showMoreBtn}
+                    onClick={() => setShowAllAnimated((v) => !v)}
+                  >
+                    {showAllAnimated()
+                      ? 'Show less'
+                      : `Show more (${animExamples.length - INITIAL_VISIBLE} more)`}
+                  </button>
+                </Show>
 
-              <div class={ui.galleryHeader} style={{ 'margin-top': '1.25rem' }}>
-                <span class={ui.galleryTitle}>Animated Examples</span>
-              </div>
-              <div class={ui.galleryGrid}>
-                <For each={visibleAnimated()}>
-                  {(item) => (
-                    <FlameThumbnail
-                      flame={item.flame}
-                      name={item.name}
-                      tracks={item.tracks}
-                      onClickWithTracks={handleSelect}
-                    />
-                  )}
-                </For>
-              </div>
-              <Show when={animExamples.length > INITIAL_VISIBLE}>
-                <button
-                  class={ui.showMoreBtn}
-                  onClick={() => setShowAllAnimated((v) => !v)}
+                <div
+                  class={ui.galleryHeader}
+                  style={{ 'margin-top': '1.25rem' }}
                 >
-                  {showAllAnimated()
-                    ? 'Show less'
-                    : `Show more (${animExamples.length - INITIAL_VISIBLE} more)`}
-                </button>
+                  <span class={ui.galleryTitle}>Examples</span>
+                </div>
+                <div class={ui.galleryGrid}>
+                  <For each={visibleStatic()}>
+                    {(item) => (
+                      <FlameThumbnail
+                        flame={item.flame}
+                        name={item.name}
+                        onClick={handleSelect}
+                      />
+                    )}
+                  </For>
+                </div>
+                <Show when={staticExamples.length > INITIAL_VISIBLE}>
+                  <button
+                    class={ui.showMoreBtn}
+                    onClick={() => setShowAllStatic((v) => !v)}
+                  >
+                    {showAllStatic()
+                      ? 'Show less'
+                      : `Show more (${staticExamples.length - INITIAL_VISIBLE} more)`}
+                  </button>
+                </Show>
               </Show>
-
-              <div class={ui.galleryHeader} style={{ 'margin-top': '1.25rem' }}>
-                <span class={ui.galleryTitle}>Examples</span>
-              </div>
-              <div class={ui.galleryGrid}>
-                <For each={visibleStatic()}>
-                  {(item) => (
-                    <FlameThumbnail
-                      flame={item.flame}
-                      name={item.name}
-                      onClick={handleSelect}
-                    />
-                  )}
-                </For>
-              </div>
-              <Show when={staticExamples.length > INITIAL_VISIBLE}>
-                <button
-                  class={ui.showMoreBtn}
-                  onClick={() => setShowAllStatic((v) => !v)}
-                >
-                  {showAllStatic()
-                    ? 'Show less'
-                    : `Show more (${staticExamples.length - INITIAL_VISIBLE} more)`}
-                </button>
-              </Show>
-            </Show>
-          </div>
-
-          <div class={ui.content}>
-            <div class={ui.branding}>
-              <h1 class={ui.title}>Chaos Master</h1>
-              <p class={ui.subtitle}>
-                Create and animate fractal flames using the chaos game algorithm
-              </p>
             </div>
 
-            <Show when={props.onStartTour}>
-              <div class={ui.tourSection}>
-                <span class={ui.tourSectionTitle}>Guided Tours</span>
-                <div class={ui.tourButtons}>
-                  <button
-                    class={ui.tourBtn}
-                    onClick={() => props.onStartTour?.('example1-creation')}
-                  >
-                    <span class={ui.tourBtnTitle}>Example 1 Creation</span>
-                    <span class={ui.tourBtnSubtitle}>
-                      Recreate the first example
-                    </span>
-                  </button>
-                  <button
-                    class={ui.tourBtn}
-                    onClick={() => props.onStartTour?.('example2-creation')}
-                  >
-                    <span class={ui.tourBtnTitle}>Example 2 Creation</span>
-                    <span class={ui.tourBtnSubtitle}>Spirals & Color</span>
-                  </button>
-                  <button
-                    class={ui.tourBtn}
-                    onClick={() => props.onStartTour?.('flame-creation')}
-                  >
-                    <span class={ui.tourBtnTitle}>Flame Creation</span>
-                    <span class={ui.tourBtnSubtitle}>
-                      Build a fractal from scratch
-                    </span>
-                  </button>
-                  <button
-                    class={ui.tourBtn}
-                    onClick={() => props.onStartTour?.('app')}
-                  >
-                    <span class={ui.tourBtnTitle}>App Tour</span>
-                    <span class={ui.tourBtnSubtitle}>
-                      Canvas, controls &amp; sharing
-                    </span>
-                  </button>
-                  <button
-                    class={ui.tourBtn}
-                    onClick={() => props.onStartTour?.('sidebar')}
-                  >
-                    <span class={ui.tourBtnTitle}>Sidebar Tour</span>
-                    <span class={ui.tourBtnSubtitle}>
-                      Parameters, variations &amp; editing
-                    </span>
-                  </button>
-                  <button
-                    class={ui.tourBtn}
-                    onClick={() => props.onStartTour?.('timeline')}
-                  >
-                    <span class={ui.tourBtnTitle}>Timeline Tour</span>
-                    <span class={ui.tourBtnSubtitle}>
-                      Animation &amp; keyframes
-                    </span>
-                  </button>
+            <div class={ui.content}>
+              <div class={ui.branding}>
+                <h1 class={ui.title}>Chaos Master</h1>
+                <p class={ui.subtitle}>
+                  Create and animate fractal flames using the chaos game
+                  algorithm
+                </p>
+              </div>
+
+              <Show when={props.onStartTour}>
+                <div class={ui.tourSection}>
+                  <span class={ui.tourSectionTitle}>Guided Tours</span>
+                  <div class={ui.tourButtons}>
+                    <button
+                      class={ui.tourBtn}
+                      onClick={() => props.onStartTour?.('example1-creation')}
+                    >
+                      <span class={ui.tourBtnTitle}>Example 1 Creation</span>
+                      <span class={ui.tourBtnSubtitle}>
+                        Recreate the first example
+                      </span>
+                    </button>
+                    <button
+                      class={ui.tourBtn}
+                      onClick={() => props.onStartTour?.('example2-creation')}
+                    >
+                      <span class={ui.tourBtnTitle}>Example 2 Creation</span>
+                      <span class={ui.tourBtnSubtitle}>Spirals & Color</span>
+                    </button>
+                    <button
+                      class={ui.tourBtn}
+                      onClick={() => props.onStartTour?.('flame-creation')}
+                    >
+                      <span class={ui.tourBtnTitle}>Flame Creation</span>
+                      <span class={ui.tourBtnSubtitle}>
+                        Build a fractal from scratch
+                      </span>
+                    </button>
+                    <button
+                      class={ui.tourBtn}
+                      onClick={() => props.onStartTour?.('app')}
+                    >
+                      <span class={ui.tourBtnTitle}>App Tour</span>
+                      <span class={ui.tourBtnSubtitle}>
+                        Canvas, controls &amp; sharing
+                      </span>
+                    </button>
+                    <button
+                      class={ui.tourBtn}
+                      onClick={() => props.onStartTour?.('sidebar')}
+                    >
+                      <span class={ui.tourBtnTitle}>Sidebar Tour</span>
+                      <span class={ui.tourBtnSubtitle}>
+                        Parameters, variations &amp; editing
+                      </span>
+                    </button>
+                    <button
+                      class={ui.tourBtn}
+                      onClick={() => props.onStartTour?.('timeline')}
+                    >
+                      <span class={ui.tourBtnTitle}>Timeline Tour</span>
+                      <span class={ui.tourBtnSubtitle}>
+                        Animation &amp; keyframes
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </Show>
+
+              <div class={ui.actions}>
+                <button class={ui.startBtn} onClick={props.onEnter}>
+                  Start
+                </button>
+
+                <label class={ui.dontShow}>
+                  <Checkbox
+                    checked={props.showDontShowAgain ?? false}
+                    onChange={(checked, ev) => {
+                      props.onDontShowAgainChange?.(checked, ev)
+                    }}
+                  />
+                  <span>Don't show on startup</span>
+                </label>
+              </div>
+
+              <div class={ui.hardwareTierSection}>
+                <span class={ui.hardwareTierLabel}>Hardware Tier</span>
+                <div class={ui.hardwareTierPills}>
+                  {hardwareTiers.map((tier) => (
+                    <button
+                      class={ui.hardwareTierPill}
+                      classList={{
+                        [ui.hardwareTierPillActive!]: tier === effectiveTier(),
+                      }}
+                      onClick={() => props.onHardwareTierChange?.(tier)}
+                    >
+                      {tier}
+                    </button>
+                  ))}
                 </div>
               </div>
-            </Show>
 
-            <div class={ui.actions}>
-              <button class={ui.startBtn} onClick={props.onEnter}>
-                Start
-              </button>
-
-              <label class={ui.dontShow}>
-                <Checkbox
-                  checked={props.showDontShowAgain ?? false}
-                  onChange={(checked, ev) => {
-                    props.onDontShowAgainChange?.(checked, ev)
-                  }}
-                />
-                <span>Don't show on startup</span>
-              </label>
-            </div>
-
-            <div class={ui.hardwareTierSection}>
-              <span class={ui.hardwareTierLabel}>Hardware Tier</span>
-              <div class={ui.hardwareTierPills}>
-                {hardwareTiers.map((tier) => (
+              <div class={ui.techPills}>
+                <span class={`${ui.techPill} ${ui.techPillCyan}`}>WebGPU</span>
+                <span class={`${ui.techPill} ${ui.techPillBlue}`}>TypeGPU</span>
+                <span class={`${ui.techPill} ${ui.techPillGreen}`}>
+                  SolidJS
+                </span>
+                <a
+                  class={`${ui.techPill} ${ui.supportPill}`}
+                  href="https://ko-fi.com/chaosmatters"
+                  target="_blank"
+                  title="Support Chaos Master"
+                >
+                  <Heart />
+                  Support
+                </a>
+                <Show when={props.onShowAbout}>
                   <button
-                    class={ui.hardwareTierPill}
-                    classList={{
-                      [ui.hardwareTierPillActive!]: tier === effectiveTier(),
-                    }}
-                    onClick={() => props.onHardwareTierChange?.(tier)}
+                    class={`${ui.techPill} ${ui.aboutPill}`}
+                    onClick={() => props.onShowAbout?.()}
                   >
-                    {tier}
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="16" x2="12" y2="12" />
+                      <line x1="12" y1="8" x2="12.01" y2="8" />
+                    </svg>
+                    v{VERSION}
                   </button>
-                ))}
+                </Show>
               </div>
             </div>
-
-            <div class={ui.techPills}>
-              <span class={`${ui.techPill} ${ui.techPillCyan}`}>WebGPU</span>
-              <span class={`${ui.techPill} ${ui.techPillBlue}`}>TypeGPU</span>
-              <span class={`${ui.techPill} ${ui.techPillGreen}`}>SolidJS</span>
-              <a
-                class={`${ui.techPill} ${ui.supportPill}`}
-                href="https://ko-fi.com/chaosmatters"
-                target="_blank"
-                title="Support Chaos Master"
-              >
-                <Heart />
-                Support
-              </a>
-              <Show when={props.onShowAbout}>
-                <button
-                  class={`${ui.techPill} ${ui.aboutPill}`}
-                  onClick={() => props.onShowAbout?.()}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="16" x2="12" y2="12" />
-                    <line x1="12" y1="8" x2="12.01" y2="8" />
-                  </svg>
-                  v{VERSION}
-                </button>
-              </Show>
-            </div>
           </div>
-        </div>
+        </ComputeGate>
       </div>
     </Portal>
   )

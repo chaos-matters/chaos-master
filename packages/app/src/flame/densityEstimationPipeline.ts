@@ -131,5 +131,10 @@ export function createDensityEstimationPipeline(
     setEstimatorCurve: (value: number) => {
       estimatorCurveBuffer.write(value)
     },
+    destroy: () => {
+      textureSizeBuffer.destroy()
+      qualityKBuffer.destroy()
+      estimatorCurveBuffer.destroy()
+    },
   }
 }

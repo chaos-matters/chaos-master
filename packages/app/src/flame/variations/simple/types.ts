@@ -5,6 +5,7 @@ import { AffineParams } from '../../affineTranform'
 import type { TgpuFn } from 'typegpu'
 import type { Infer, v2f, Vec2f } from 'typegpu/data'
 import type { BooleanSchema, OptionalSchema } from 'valibot'
+import type { VariationCategory } from '../categories'
 
 export type VariationInfo = Infer<typeof VariationInfo>
 export const VariationInfo = struct({

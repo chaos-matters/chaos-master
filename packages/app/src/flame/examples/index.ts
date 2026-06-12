@@ -28,6 +28,21 @@ import { example26 } from './example26'
 import { example27 } from './example27'
 import { example28 } from './example28'
 import { example29 } from './example29'
+import { example30 } from './example30'
+import { example31 } from './example31'
+import { example32 } from './example32'
+import { example33 } from './example33'
+import { example34 } from './example34'
+import { example35 } from './example35'
+import { example36 } from './example36'
+import { example37 } from './example37'
+import { example38 } from './example38'
+import { example39 } from './example39'
+import { example40 } from './example40'
+import { example41 } from './example41'
+import { example42 } from './example42'
+import { example43 } from './example43'
+import { example44 } from './example44'
 import { initExample } from './initExample'
 import { invCircleEx1, invCircleEx2 } from './invCircle'
 import { invCircle2Ex1 } from './invCircle2'
@@ -66,6 +81,21 @@ export const examples = {
   example27,
   example28,
   example29,
+  example30,
+  example31,
+  example32,
+  example33,
+  example34,
+  example35,
+  example36,
+  example37,
+  example38,
+  example39,
+  example40,
+  example41,
+  example42,
+  example43,
+  example44,
   linear1,
   invCircleEx1,
   invCircleEx2,

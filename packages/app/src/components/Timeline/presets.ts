@@ -105,6 +105,12 @@ export function randomizeColorsParams(
 
 export type PresetDef = {
   label: string
+  category: 'Camera' | 'Render' | 'Color' | 'Affine'
+  apply: (flame: FlameDescriptor, timeline: TimelineState) => void
+}
+
+type RawPresetDef = {
+  label: string
   apply: (flame: FlameDescriptor, timeline: TimelineState) => void
 }
 
@@ -226,16 +232,99 @@ const EASE_IN_OUT: EasingCurve = 'easeInOut'
 const EASE_OUT: EasingCurve = 'easeOut'
 const LINEAR: EasingCurve = 'linear'
 
-export function buildPresets(): PresetDef[] {
+export function buildPresets(is3D: boolean): PresetDef[] {
+  const mapPresets = (
+    list: RawPresetDef[],
+    category: PresetDef['category'],
+  ): PresetDef[] => list.map((p) => ({ ...p, category }))
+
   return [
-    ...cameraPresets(),
-    ...renderPresets(),
-    ...colorPresets(),
-    ...affinePresets(),
+    ...mapPresets(is3D ? camera3DPresets() : cameraPresets(), 'Camera'),
+    ...mapPresets(renderPresets(), 'Render'),
+    ...mapPresets(colorPresets(), 'Color'),
+    ...mapPresets(affinePresets(), 'Affine'),
   ]
 }
 
-function cameraPresets(): PresetDef[] {
+function camera3DPresets(): RawPresetDef[] {
+  return [
+    {
+      label: '3D Orbit',
+      apply(flame, timeline) {
+        const cam = flame.renderSettings.camera3D
+        if (!cam) return
+        const { start, end } = frameRange(timeline)
+        timeline.addKeyframe('camera3D.theta', start, cam.theta, LINEAR)
+        timeline.addKeyframe(
+          'camera3D.theta',
+          end,
+          cam.theta + Math.PI * 2,
+          LINEAR,
+        )
+      },
+    },
+    {
+      label: '3D Orbit & Sine',
+      apply(flame, timeline) {
+        const cam = flame.renderSettings.camera3D
+        if (!cam) return
+        const { start, end } = frameRange(timeline)
+        const duration = end - start
+
+        timeline.addKeyframe('camera3D.theta', start, cam.theta, LINEAR)
+        timeline.addKeyframe(
+          'camera3D.theta',
+          end,
+          cam.theta + Math.PI * 2,
+          LINEAR,
+        )
+
+        const basePhi = cam.phi > Math.PI / 3 ? Math.PI / 4 : cam.phi
+        const cycles = 1
+        const amp = Math.PI / 12
+        for (let i = 0; i <= cycles * 4; i++) {
+          const progress = i / (cycles * 4)
+          const frame = Math.round(start + progress * duration)
+          const angle = progress * Math.PI * 2 * cycles
+          const val = basePhi + Math.sin(angle) * amp
+          timeline.addKeyframe('camera3D.phi', frame, val, EASE_IN_OUT)
+        }
+      },
+    },
+    {
+      label: '3D Zoom In',
+      apply(flame, timeline) {
+        const cam = flame.renderSettings.camera3D
+        if (!cam) return
+        const { start, end } = frameRange(timeline)
+        timeline.addKeyframe('camera3D.radius', start, cam.radius, EASE_IN_OUT)
+        timeline.addKeyframe(
+          'camera3D.radius',
+          end,
+          cam.radius * 0.4,
+          EASE_IN_OUT,
+        )
+      },
+    },
+    {
+      label: '3D Zoom Out',
+      apply(flame, timeline) {
+        const cam = flame.renderSettings.camera3D
+        if (!cam) return
+        const { start, end } = frameRange(timeline)
+        timeline.addKeyframe('camera3D.radius', start, cam.radius, EASE_IN_OUT)
+        timeline.addKeyframe(
+          'camera3D.radius',
+          end,
+          cam.radius * 2.5,
+          EASE_IN_OUT,
+        )
+      },
+    },
+  ]
+}
+
+function cameraPresets(): RawPresetDef[] {
   return [
     {
       label: 'Zoom In',
@@ -412,7 +501,7 @@ function cameraPresets(): PresetDef[] {
   ]
 }
 
-function renderPresets(): PresetDef[] {
+function renderPresets(): RawPresetDef[] {
   return [
     {
       label: 'Skip 1→15',
@@ -510,7 +599,7 @@ function renderPresets(): PresetDef[] {
   ]
 }
 
-function colorPresets(): PresetDef[] {
+function colorPresets(): RawPresetDef[] {
   return [
     {
       label: 'Colors Shift',
@@ -628,7 +717,7 @@ function colorPresets(): PresetDef[] {
   ]
 }
 
-function affinePresets(): PresetDef[] {
+function affinePresets(): RawPresetDef[] {
   return [
     {
       label: 'Scale Up',

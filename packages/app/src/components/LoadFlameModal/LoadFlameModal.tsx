@@ -1,25 +1,30 @@
-import { batch, createSignal, For, onCleanup, Show } from 'solid-js'
+import { batch, createMemo, createSignal, ErrorBoundary, For, onCleanup, Show, } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
-import { ANIMATION_PREVIEW_POINT_COUNT, IS_DEV, STATIC_PREVIEW_POINT_COUNT, THUMBNAIL_PREVIEW_QUALITY, THUMBNAIL_PREVIEW_QUALITY_HOVER, } from '@/defaults'
+import { ComputeGate, useComputeGate } from '@/contexts/ComputeGateContext'
+import { ANIMATION_PREVIEW_POINT_COUNT, COMPUTE_GATE_CAPACITY, IS_DEV, STATIC_PREVIEW_POINT_COUNT, THUMBNAIL_PREVIEW_QUALITY, THUMBNAIL_PREVIEW_QUALITY_HOVER, } from '@/defaults'
 import { examples } from '@/flame/examples'
 import { animationDefs, getAnimationFlame } from '@/flame/examples/animations'
 import { Flam3 } from '@/flame/Flam3'
+import { camera3DDefault } from '@/flame/schema/flameSchema'
 import { Cross } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
+import { Default3DPreviewCamera } from '@/lib/Camera3D'
 import { Root } from '@/lib/Root'
 import { deepClone } from '@/utils/clone'
 import { extractFlameFromPng } from '@/utils/flameInPng'
+import { persistentSignal } from '@/utils/persistentSignal'
 import { deleteRecentFlame, formatRecentDate, loadRecentFlames, } from '@/utils/recentFlames'
 import { recordEntries } from '@/utils/record'
 import { applyTracksToFlame } from '@/utils/timeline'
-import { Button } from '../Button/Button'
+import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { DelayedShow } from '../DelayedShow/DelayedShow'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import { useAlert } from '../Modal/useAlert'
 import { ConfirmDeleteRecentModal, dontAskDeleteRecent, } from './ConfirmDeleteRecentModal'
 import ui from './LoadFlameModal.module.css'
+import type { JSX } from 'solid-js'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { ChangeHistory } from '@/utils/createStoreHistory'
 import type { TimelineTrack } from '@/utils/timeline'
@@ -35,35 +40,79 @@ function Preview(props: {
   quality?: number
   pointCountPerBatch?: number
 }) {
+  const [container, setContainer] = createSignal<HTMLElement>()
+  const intersection = useIntersectionObserver(container)
+  const isVisible = createMemo(() => intersection()?.isIntersecting ?? false)
+  const allowed = useComputeGate(() => ({
+    isVisible: isVisible(),
+    renderStatus: 'done',
+    isSelected: false,
+  }))
+
+  const flameView = () => (
+    <Flam3
+      quality={props.quality ?? THUMBNAIL_PREVIEW_QUALITY}
+      pointCountPerBatch={
+        props.pointCountPerBatch ?? STATIC_PREVIEW_POINT_COUNT
+      }
+      adaptiveFilterEnabled={false}
+      animationEnabled={false}
+      flameDescriptor={props.flameDescriptor}
+      renderInterval={1}
+      onExportImage={undefined}
+      edgeFadeColor={vec4f(0)}
+      onAccumulatedPointCount={() => {}}
+    />
+  )
   return (
-    <Root
-      adapterOptions={{
-        powerPreference: 'high-performance',
+    <div
+      ref={setContainer}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
       }}
     >
-      <AutoCanvas pixelRatio={1}>
-        <Camera2D
-          position={vec2f(
-            ...props.flameDescriptor.renderSettings.camera.position,
-          )}
-          zoom={props.flameDescriptor.renderSettings.camera.zoom}
-        >
-          <Flam3
-            quality={props.quality ?? THUMBNAIL_PREVIEW_QUALITY}
-            pointCountPerBatch={
-              props.pointCountPerBatch ?? STATIC_PREVIEW_POINT_COUNT
-            }
-            adaptiveFilterEnabled={false}
-            animationEnabled={false}
-            flameDescriptor={props.flameDescriptor}
-            renderInterval={1}
-            onExportImage={undefined}
-            edgeFadeColor={vec4f(0)}
-            onAccumulatedPointCount={() => {}}
-          />
-        </Camera2D>
-      </AutoCanvas>
-    </Root>
+      <ErrorBoundary
+        fallback={() => <div class={ui.previewError}>Failed to render</div>}
+      >
+        <Show when={allowed() || isVisible()}>
+          <Root
+            adapterOptions={{
+              powerPreference: 'high-performance',
+            }}
+          >
+            <AutoCanvas pixelRatio={1}>
+              {() => {
+                const dims =
+                  props.flameDescriptor.renderSettings.dimensions ?? 2
+                if (dims === 3) {
+                  return (
+                    <Default3DPreviewCamera
+                      camera3D={props.flameDescriptor.renderSettings.camera3D}
+                    >
+                      {flameView()}
+                    </Default3DPreviewCamera>
+                  )
+                }
+                return (
+                  <Camera2D
+                    position={vec2f(
+                      ...props.flameDescriptor.renderSettings.camera.position,
+                    )}
+                    zoom={props.flameDescriptor.renderSettings.camera.zoom}
+                  >
+                    {flameView()}
+                  </Camera2D>
+                )
+              }}
+            </AutoCanvas>
+          </Root>
+        </Show>
+      </ErrorBoundary>
+    </div>
   )
 }
 
@@ -82,6 +131,15 @@ function AnimatedPreview(props: {
   const [animFrame, setAnimFrame] = createSignal(0)
   let rafId: number | undefined
   let startTime = 0
+
+  const [container, setContainer] = createSignal<HTMLElement>()
+  const intersection = useIntersectionObserver(container)
+  const isVisible = createMemo(() => intersection()?.isIntersecting ?? false)
+  const allowed = useComputeGate(() => ({
+    isVisible: isVisible(),
+    renderStatus: 'done',
+    isSelected: hovered(),
+  }))
 
   function startAnimating() {
     startTime = performance.now()
@@ -130,33 +188,56 @@ function AnimatedPreview(props: {
         setHovered(false)
         stopAnimating()
       }}
+      ref={setContainer}
     >
-      <DelayedShow delayMs={props.index * 50}>
+      <Show when={allowed() || isVisible()}>
         <Root adapterOptions={{ powerPreference: 'high-performance' }}>
-          <AutoCanvas pixelRatio={1}>
-            <Camera2D
-              position={vec2f(...displayFlame().renderSettings.camera.position)}
-              zoom={displayFlame().renderSettings.camera.zoom}
-            >
-              <Flam3
-                quality={
-                  hovered()
-                    ? THUMBNAIL_PREVIEW_QUALITY_HOVER
-                    : THUMBNAIL_PREVIEW_QUALITY
+          <ErrorBoundary
+            fallback={() => <div class={ui.previewError}>Failed</div>}
+          >
+            <AutoCanvas pixelRatio={1}>
+              {() => {
+                const flame = displayFlame()
+                const dims = flame.renderSettings.dimensions ?? 2
+                const flameView = () => (
+                  <Flam3
+                    quality={
+                      hovered()
+                        ? THUMBNAIL_PREVIEW_QUALITY_HOVER
+                        : THUMBNAIL_PREVIEW_QUALITY
+                    }
+                    pointCountPerBatch={ANIMATION_PREVIEW_POINT_COUNT}
+                    adaptiveFilterEnabled={false}
+                    animationEnabled={false}
+                    flameDescriptor={flame}
+                    renderInterval={1}
+                    onExportImage={undefined}
+                    edgeFadeColor={vec4f(0)}
+                    onAccumulatedPointCount={() => {}}
+                  />
+                )
+                if (dims === 3) {
+                  return (
+                    <Default3DPreviewCamera
+                      camera3D={flame.renderSettings.camera3D}
+                    >
+                      {flameView()}
+                    </Default3DPreviewCamera>
+                  )
                 }
-                pointCountPerBatch={ANIMATION_PREVIEW_POINT_COUNT}
-                adaptiveFilterEnabled={false}
-                animationEnabled={false}
-                flameDescriptor={displayFlame()}
-                renderInterval={1}
-                onExportImage={undefined}
-                edgeFadeColor={vec4f(0)}
-                onAccumulatedPointCount={() => {}}
-              />
-            </Camera2D>
-          </AutoCanvas>
+                return (
+                  <Camera2D
+                    position={vec2f(...flame.renderSettings.camera.position)}
+                    zoom={flame.renderSettings.camera.zoom}
+                  >
+                    {flameView()}
+                  </Camera2D>
+                )
+              }}
+            </AutoCanvas>
+          </ErrorBoundary>
         </Root>
-      </DelayedShow>
+      </Show>
       <div class={ui.itemTitle}>
         <span class={ui.itemName}>{props.anim.name}</span>
         <span class={ui.itemMeta}>
@@ -215,6 +296,15 @@ function RecentFlameItem(props: {
   let rafId: number | undefined
   let startTime = 0
 
+  const [container, setContainer] = createSignal<HTMLElement>()
+  const intersection = useIntersectionObserver(container)
+  const isVisible = createMemo(() => intersection()?.isIntersecting ?? false)
+  const allowed = useComputeGate(() => ({
+    isVisible: isVisible(),
+    renderStatus: 'done',
+    isSelected: hovered(),
+  }))
+
   function startAnimating() {
     startTime = performance.now()
 
@@ -244,7 +334,7 @@ function RecentFlameItem(props: {
   const displayFlame = (): FlameDescriptor => {
     if (!hovered() || !hasTracks()) return props.recent.flame
     const clone = deepClone(props.recent.flame)
-    applyTracksToFlame(props.recent.tracks!, clone, animFrame())
+    applyTracksToFlame(props.recent.tracks, clone, animFrame())
     return clone
   }
 
@@ -266,43 +356,65 @@ function RecentFlameItem(props: {
         setHovered(false)
         stopAnimating()
       }}
+      ref={setContainer}
     >
-      <DelayedShow delayMs={props.index * 30}>
+      <Show when={allowed() || isVisible()}>
         <Show
           when={hasTracks()}
           fallback={<Preview flameDescriptor={props.recent.flame} />}
         >
           <Root adapterOptions={{ powerPreference: 'high-performance' }}>
             <AutoCanvas pixelRatio={1}>
-              <Camera2D
-                position={vec2f(
-                  ...displayFlame().renderSettings.camera.position,
-                )}
-                zoom={displayFlame().renderSettings.camera.zoom}
-              >
-                <Flam3
-                  quality={
-                    hovered()
-                      ? THUMBNAIL_PREVIEW_QUALITY_HOVER
-                      : THUMBNAIL_PREVIEW_QUALITY
-                  }
-                  pointCountPerBatch={ANIMATION_PREVIEW_POINT_COUNT}
-                  adaptiveFilterEnabled={false}
-                  animationEnabled={false}
-                  flameDescriptor={displayFlame()}
-                  renderInterval={1}
-                  onExportImage={undefined}
-                  edgeFadeColor={vec4f(0)}
-                  onAccumulatedPointCount={() => {}}
-                />
-              </Camera2D>
+              {() => {
+                const flame = displayFlame()
+                const dims = flame.renderSettings.dimensions ?? 2
+                const flameView = () => (
+                  <Flam3
+                    quality={
+                      hovered()
+                        ? THUMBNAIL_PREVIEW_QUALITY_HOVER
+                        : THUMBNAIL_PREVIEW_QUALITY
+                    }
+                    pointCountPerBatch={ANIMATION_PREVIEW_POINT_COUNT}
+                    adaptiveFilterEnabled={false}
+                    animationEnabled={false}
+                    flameDescriptor={flame}
+                    renderInterval={1}
+                    onExportImage={undefined}
+                    edgeFadeColor={vec4f(0)}
+                    onAccumulatedPointCount={() => {}}
+                  />
+                )
+                if (dims === 3) {
+                  return (
+                    <Default3DPreviewCamera
+                      camera3D={flame.renderSettings.camera3D}
+                    >
+                      {flameView()}
+                    </Default3DPreviewCamera>
+                  )
+                }
+                return (
+                  <Camera2D
+                    position={vec2f(...flame.renderSettings.camera.position)}
+                    zoom={flame.renderSettings.camera.zoom}
+                  >
+                    {flameView()}
+                  </Camera2D>
+                )
+              }}
             </AutoCanvas>
           </Root>
         </Show>
-      </DelayedShow>
+      </Show>
       <div class={ui.itemTitle}>
         <span class={ui.itemName}>{props.recent.name}</span>
         <span class={ui.itemMeta}>
+          {(props.recent.flame.renderSettings.dimensions ?? 2) === 3 && (
+            <span class={ui.dimBadge} title="3D flame">
+              3D
+            </span>
+          )}
           {formatRecentDate(props.recent.savedAt)}
           {hasTracks() && (
             <span
@@ -360,7 +472,7 @@ function RecentFlameItem(props: {
         }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
-            props.onDelete(e as unknown as MouseEvent, props.recent.id)
+            props.onDelete(e as unknown, props.recent.id)
           }
         }}
         title="Delete"
@@ -373,6 +485,110 @@ function RecentFlameItem(props: {
 
 type LoadFlameModalProps = {
   respond: (payload: FlameDescriptor | AnimationLoad | typeof CANCEL) => void
+  /** Workspace dimension when the modal opened — that dimension's examples
+   *  are listed first. */
+  currentDimensions?: number
+}
+
+type DimensionFilter = 'all' | '2d' | '3d'
+
+function flameDimension(flame: FlameDescriptor): '2d' | '3d' {
+  return (flame.renderSettings.dimensions ?? 2) === 3 ? '3d' : '2d'
+}
+
+function Icon2D() {
+  return (
+    <svg
+      viewBox="0 0 14 14"
+      width="11"
+      height="11"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.3"
+      stroke-linejoin="round"
+    >
+      <rect x="2" y="2" width="10" height="10" rx="1" />
+    </svg>
+  )
+}
+
+function Icon3D() {
+  return (
+    <svg
+      viewBox="0 0 14 14"
+      width="11"
+      height="11"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.2"
+      stroke-linejoin="round"
+    >
+      <path d="M7 1.2 L12.4 4.1 L12.4 9.9 L7 12.8 L1.6 9.9 L1.6 4.1 Z" />
+      <path d="M1.6 4.1 L7 7 L12.4 4.1" />
+      <path d="M7 7 L7 12.8" />
+    </svg>
+  )
+}
+
+/** Gallery group with a collapsible header. Collapsed groups unmount their
+ *  WebGPU previews, so collapsing also frees GPU work. */
+function CollapsibleSection(props: {
+  title: string
+  count: number
+  collapsed: boolean
+  onToggle: () => void
+  /** Flex order inside the sections wrapper — lets the current workspace
+   *  dimension's group sort first without remounting DOM. */
+  order: number
+  children: JSX.Element
+}) {
+  return (
+    <div style={{ order: String(props.order) }}>
+      <h2 class={ui.sectionHeader} onClick={props.onToggle}>
+        <span class={ui.chevron}>{props.collapsed ? '▶' : '▼'}</span>
+        <span>{props.title}</span>
+        <span class={ui.sectionCount}>{props.count}</span>
+      </h2>
+      <Show when={!props.collapsed}>
+        <section class={ui.gallery}>{props.children}</section>
+      </Show>
+    </div>
+  )
+}
+
+function ExampleItem(props: {
+  exampleId: string
+  example: FlameDescriptor
+  index: number
+  onSelect: (flame: FlameDescriptor) => void
+}) {
+  return (
+    <button
+      class={ui.item}
+      onClick={() => {
+        props.onSelect(props.example)
+      }}
+    >
+      <DelayedShow delayMs={props.index * 50}>
+        <Preview flameDescriptor={props.example} />
+      </DelayedShow>
+      <div class={ui.itemTitle}>
+        <span class={ui.itemName}>
+          {props.example.metadata?.name || props.exampleId}
+        </span>
+        <Show when={props.example.metadata?.description}>
+          <span class={ui.itemMeta}>
+            <span
+              class={ui.itemDesc}
+              title={props.example.metadata?.description}
+            >
+              {props.example.metadata?.description}
+            </span>
+          </span>
+        </Show>
+      </div>
+    </button>
+  )
 }
 
 async function pickPngFile(): Promise<File | null> {
@@ -420,10 +636,38 @@ async function pickPngFile(): Promise<File | null> {
 export function LoadFlameModal(props: LoadFlameModalProps) {
   const [recentFlames, setRecentFlames] = createSignal(loadRecentFlames())
   const showAlert = useAlert()
+  const [isDragging, setIsDragging] = createSignal(false)
 
-  async function loadFromFile() {
-    const file = await pickPngFile()
-    if (!file) return
+  const [dimFilter, setDimFilter] = persistentSignal<DimensionFilter>(
+    'load-flame-dimension-filter',
+    'all',
+  )
+  const [collapsedSections, setCollapsedSections] = persistentSignal<
+    Record<string, boolean>
+  >('load-flame-collapsed-sections', {})
+  const toggleSection = (key: string) => {
+    setCollapsedSections((c) => ({ ...c, [key]: !c[key] }))
+  }
+
+  const show2D = () => dimFilter() !== '3d'
+  const show3D = () => dimFilter() !== '2d'
+  const filteredRecents = () =>
+    recentFlames().filter(
+      (r) => dimFilter() === 'all' || flameDimension(r.flame) === dimFilter(),
+    )
+
+  const allExamples = recordEntries(examples)
+  const examples2D = allExamples.filter(([, e]) => flameDimension(e) === '2d')
+  const examples3D = allExamples.filter(([, e]) => flameDimension(e) === '3d')
+  const animations2D = animationDefs.filter(
+    (a) => flameDimension(getAnimationFlame(a)) === '2d',
+  )
+  const animations3D = animationDefs.filter(
+    (a) => flameDimension(getAnimationFlame(a)) === '3d',
+  )
+  const is3DWorkspace = (props.currentDimensions ?? 2) === 3
+
+  async function processPngFile(file: File) {
     const arrBuf = new Uint8Array(await file.arrayBuffer())
     try {
       const result = await extractFlameFromPng(arrBuf)
@@ -440,6 +684,34 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
 
       void showAlert(`No valid flame found in '${file.name}'.`)
     }
+  }
+
+  async function loadFromFile() {
+    const file = await pickPngFile()
+    if (!file) return
+    await processPngFile(file)
+  }
+
+  function handleDragOver(e: DragEvent) {
+    e.preventDefault()
+  }
+
+  function handleDragEnter(e: DragEvent) {
+    e.preventDefault()
+    setIsDragging(true)
+  }
+
+  function handleDragLeave(e: DragEvent) {
+    e.preventDefault()
+    setIsDragging(false)
+  }
+
+  async function handleDrop(e: DragEvent) {
+    e.preventDefault()
+    setIsDragging(false)
+    const file = e.dataTransfer?.files?.[0]
+    if (!file) return
+    await processPngFile(file)
   }
 
   const requestModal = useRequestModal()
@@ -467,74 +739,214 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
           props.respond(CANCEL)
         }}
       >
-        Load Flame
-        <span class={ui.undoMessage}>You can undo this operation.</span>
+        Discover Fractal Flames
       </ModalTitleBar>
-      <section>
-        From disk <Button onClick={loadFromFile}>Choose File</Button>
-      </section>
-      <Show when={recentFlames().length > 0}>
-        <h2>Recent Flames</h2>
-        <section class={ui.gallery}>
-          <For each={recentFlames()}>
-            {(recent, i) => (
-              <RecentFlameItem
-                recent={recent}
-                index={i()}
-                onSelect={(flame, tracks) => {
-                  if (tracks && tracks.length > 0) {
-                    props.respond({ flame, tracks })
-                  } else {
-                    props.respond(flame)
-                  }
+      <p class={ui.modalSubtitle}>
+        Select a preset to begin, load a recent creation, or import a saved PNG
+        config.
+      </p>
+      <div
+        class={ui.uploadZone}
+        classList={{ [ui.uploadZoneDragging as string]: isDragging() }}
+        onClick={loadFromFile}
+        onDragOver={handleDragOver}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <svg
+          class={ui.uploadIcon}
+          viewBox="0 0 24 24"
+          width="24"
+          height="24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
+        </svg>
+        <div class={ui.uploadTitle}>
+          {isDragging() ? 'Drop PNG Here!' : 'Import from PNG File'}
+        </div>
+        <div class={ui.uploadSubtitle}>
+          {isDragging()
+            ? 'Release to load the flame configuration.'
+            : 'Click to choose a file, or drag and drop an exported PNG flame directly into the app or here to load it.'}
+        </div>
+      </div>
+      <div class={ui.filterRow} role="group" aria-label="Filter by dimension">
+        <button
+          class={ui.filterPill}
+          classList={{
+            [ui.filterPillActive as string]: dimFilter() === 'all',
+          }}
+          onClick={() => setDimFilter('all')}
+        >
+          All
+        </button>
+        <button
+          class={ui.filterPill}
+          classList={{
+            [ui.filterPillActive as string]: dimFilter() === '2d',
+          }}
+          onClick={() => setDimFilter('2d')}
+        >
+          <Icon2D />
+          2D
+        </button>
+        <button
+          class={ui.filterPill}
+          classList={{
+            [ui.filterPillActive as string]: dimFilter() === '3d',
+          }}
+          onClick={() => setDimFilter('3d')}
+        >
+          <Icon3D />
+          3D
+        </button>
+      </div>
+      <div class={ui.galleryScroll}>
+        <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
+          <div class={ui.sections}>
+            <Show when={filteredRecents().length > 0}>
+              <CollapsibleSection
+                title="Recent Flames"
+                count={filteredRecents().length}
+                order={0}
+                collapsed={!!collapsedSections().recent}
+                onToggle={() => {
+                  toggleSection('recent')
                 }}
-                onDelete={async (e, id) => {
-                  await handleDeleteRecent(e, id)
+              >
+                <For each={filteredRecents()}>
+                  {(recent, i) => (
+                    <RecentFlameItem
+                      recent={recent}
+                      index={i()}
+                      onSelect={(flame, tracks) => {
+                        if (tracks && tracks.length > 0) {
+                          props.respond({ flame, tracks })
+                        } else {
+                          props.respond(flame)
+                        }
+                      }}
+                      onDelete={async (e, id) => {
+                        await handleDeleteRecent(e, id)
+                      }}
+                    />
+                  )}
+                </For>
+              </CollapsibleSection>
+            </Show>
+            <Show when={show2D() && examples2D.length > 0}>
+              <CollapsibleSection
+                title="2D Examples"
+                count={examples2D.length}
+                order={is3DWorkspace ? 2 : 1}
+                collapsed={!!collapsedSections().examples2d}
+                onToggle={() => {
+                  toggleSection('examples2d')
                 }}
-              />
-            )}
-          </For>
-        </section>
-      </Show>
-      <h2>Example Gallery</h2>
-      <section class={ui.gallery}>
-        <For each={recordEntries(examples)}>
-          {([exampleId, example], i) => (
-            <button
-              class={ui.item}
-              onClick={() => {
-                props.respond(example)
-              }}
-            >
-              <DelayedShow delayMs={i() * 50}>
-                <Preview flameDescriptor={example} />
-              </DelayedShow>
-              <div class={ui.itemTitle}>{exampleId}</div>
-            </button>
-          )}
-        </For>
-      </section>
-      <Show when={animationDefs.length > 0}>
-        <h2>Animation Examples</h2>
-        <section class={ui.gallery}>
-          <For each={animationDefs}>
-            {(anim, i) => (
-              <AnimatedPreview
-                anim={anim}
-                index={i()}
-                onSelect={(flame, tracks) => {
-                  props.respond({ flame, tracks })
+              >
+                <For each={examples2D}>
+                  {([exampleId, example], i) => (
+                    <ExampleItem
+                      exampleId={exampleId}
+                      example={example}
+                      index={i()}
+                      onSelect={(flame) => {
+                        props.respond(flame)
+                      }}
+                    />
+                  )}
+                </For>
+              </CollapsibleSection>
+            </Show>
+            <Show when={show3D() && examples3D.length > 0}>
+              <CollapsibleSection
+                title="3D Examples"
+                count={examples3D.length}
+                order={is3DWorkspace ? 1 : 3}
+                collapsed={!!collapsedSections().examples3d}
+                onToggle={() => {
+                  toggleSection('examples3d')
                 }}
-              />
-            )}
-          </For>
-        </section>
-      </Show>
+              >
+                <For each={examples3D}>
+                  {([exampleId, example], i) => (
+                    <ExampleItem
+                      exampleId={exampleId}
+                      example={example}
+                      index={i()}
+                      onSelect={(flame) => {
+                        props.respond(flame)
+                      }}
+                    />
+                  )}
+                </For>
+              </CollapsibleSection>
+            </Show>
+            <Show when={show2D() && animations2D.length > 0}>
+              <CollapsibleSection
+                title="2D Animation Examples"
+                count={animations2D.length}
+                order={is3DWorkspace ? 4 : 2}
+                collapsed={!!collapsedSections().animations2d}
+                onToggle={() => {
+                  toggleSection('animations2d')
+                }}
+              >
+                <For each={animations2D}>
+                  {(anim, i) => (
+                    <AnimatedPreview
+                      anim={anim}
+                      index={i()}
+                      onSelect={(flame, tracks) => {
+                        props.respond({ flame, tracks })
+                      }}
+                    />
+                  )}
+                </For>
+              </CollapsibleSection>
+            </Show>
+            <Show when={show3D() && animations3D.length > 0}>
+              <CollapsibleSection
+                title="3D Animation Examples"
+                count={animations3D.length}
+                order={is3DWorkspace ? 2 : 4}
+                collapsed={!!collapsedSections().animations3d}
+                onToggle={() => {
+                  toggleSection('animations3d')
+                }}
+              >
+                <For each={animations3D}>
+                  {(anim, i) => (
+                    <AnimatedPreview
+                      anim={anim}
+                      index={i()}
+                      onSelect={(flame, tracks) => {
+                        props.respond({ flame, tracks })
+                      }}
+                    />
+                  )}
+                </For>
+              </CollapsibleSection>
+            </Show>
+          </div>
+        </ComputeGate>
+      </div>
     </>
   )
 }
 
-export function createLoadFlame(history: ChangeHistory<FlameDescriptor>) {
+export function createLoadFlame(
+  history: ChangeHistory<FlameDescriptor>,
+  currentDimensions?: () => number,
+) {
   const requestModal = useRequestModal()
   const [loadModalIsOpen, setLoadModalIsOpen] = createSignal(false)
   const [loadedAnimation, setLoadedAnimation] = createSignal<
@@ -546,7 +958,13 @@ export function createLoadFlame(history: ChangeHistory<FlameDescriptor>) {
     const result = await requestModal<
       FlameDescriptor | AnimationLoad | typeof CANCEL
     >({
-      content: ({ respond }) => <LoadFlameModal respond={respond} />,
+      class: ui.loadFlameModal,
+      content: ({ respond }) => (
+        <LoadFlameModal
+          respond={respond}
+          currentDimensions={currentDimensions?.()}
+        />
+      ),
     })
     setLoadModalIsOpen(false)
     if (result === CANCEL) {
@@ -555,15 +973,15 @@ export function createLoadFlame(history: ChangeHistory<FlameDescriptor>) {
     // Animation load: flame + keyframe tracks
     if (typeof result === 'object' && 'tracks' in result) {
       if (IS_DEV)
-        console.info(
-          '[load] animation selected —',
-          result.tracks.length,
-          'tracks, batching flame + tracks atomically',
-        )
+        console.info('[load] animation selected —', result.tracks.length)
       batch(() => {
-        history.replace(deepClone(result.flame))
+        const flame = deepClone(result.flame)
+        if (!flame.renderSettings.camera3D) {
+          flame.renderSettings.camera3D = deepClone(camera3DDefault)
+        }
+        history.replace(flame)
         setLoadedAnimation({
-          flame: deepClone(result.flame),
+          flame,
           tracks: result.tracks.map((t) => ({
             ...t,
             keyframes: t.keyframes.map((kf) => ({ ...kf })),
@@ -578,8 +996,12 @@ export function createLoadFlame(history: ChangeHistory<FlameDescriptor>) {
         '[load] plain flame selected — batching flame + empty tracks',
       )
     batch(() => {
-      history.replace(deepClone(result))
-      setLoadedAnimation({ flame: deepClone(result), tracks: [] })
+      const flame = deepClone(result)
+      if (!flame.renderSettings.camera3D) {
+        flame.renderSettings.camera3D = deepClone(camera3DDefault)
+      }
+      history.replace(flame)
+      setLoadedAnimation({ flame, tracks: [] })
     })
     return result
   }

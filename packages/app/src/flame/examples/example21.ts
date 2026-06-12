@@ -6,6 +6,13 @@ import { defineExample, tid, vid } from './util'
  * and a juliaN fractal outer edge. Sacred geometry meets cyberpunk.
  */
 export const example21 = defineExample({
+  version: '1.0',
+  metadata: {
+    author: 'unknown',
+    name: 'Cyber Mandala',
+    description:
+      'Intricate geometric mandala radiating from a central n-gon polygon through star-burst halos, parametric distortion rings, and a juliaN fractal outer edge. Sacred geometry meets cyberpunk.',
+  },
   renderSettings: {
     exposure: 0.28,
     skipIters: 20,

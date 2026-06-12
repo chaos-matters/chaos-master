@@ -11,6 +11,7 @@ import { condenseFlameDescriptor, MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, 
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
+import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
 import { deepClone } from '@/utils/clone'
 import { addFlameDataToPng } from '@/utils/flameInPng'
 import { compressJsonQueryParam } from '@/utils/jsonQueryParam'
@@ -27,6 +28,7 @@ import ui from './ExportPngDialog.module.css'
 import { FramePreviewGallery } from './FramePreviewGallery'
 import type { Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
+import type { Vec3 } from 'wgpu-matrix'
 import type { ExportImageType } from '@/App'
 import type { Palette } from '@/flame/colorMap'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -106,6 +108,84 @@ function RenderDialog(props: RenderDialogProps) {
       props.previewDescriptor.renderSettings.camera.position[0],
       props.previewDescriptor.renderSettings.camera.position[1],
     )
+
+  const is3D = () =>
+    (props.previewDescriptor.renderSettings.dimensions ?? 2) === 3
+
+  const updateCamera3D = (
+    updater: (
+      cam: NonNullable<FlameDescriptor['renderSettings']['camera3D']>,
+    ) => void,
+  ) => {
+    const current = deepClone(
+      props.previewDescriptor.renderSettings.camera3D ?? {
+        theta: 0,
+        phi: Math.PI / 2,
+        radius: 5,
+        target: [0, 0, 0],
+        fov: 60,
+      },
+    )
+    updater(current)
+    props.setPreviewDescriptor('renderSettings', 'camera3D', current)
+  }
+
+  const setFlameTheta: Setter<number> = (v) => {
+    const next =
+      typeof v === 'function'
+        ? v(props.previewDescriptor.renderSettings.camera3D?.theta ?? 0)
+        : v
+    updateCamera3D((c) => {
+      c.theta = next
+    })
+    return next
+  }
+  const setFlamePhi: Setter<number> = (v) => {
+    const next =
+      typeof v === 'function'
+        ? v(props.previewDescriptor.renderSettings.camera3D?.phi ?? Math.PI / 2)
+        : v
+    updateCamera3D((c) => {
+      c.phi = next
+    })
+    return next
+  }
+  const setFlameRadius: Setter<number> = (v) => {
+    const next =
+      typeof v === 'function'
+        ? v(props.previewDescriptor.renderSettings.camera3D?.radius ?? 5)
+        : v
+    updateCamera3D((c) => {
+      c.radius = next
+    })
+    return next
+  }
+  const setFlameTarget3D = (v: Vec3 | ((prev: Vec3) => Vec3)) => {
+    const next =
+      typeof v === 'function'
+        ? v(
+            new Float32Array(
+              props.previewDescriptor.renderSettings.camera3D?.target ?? [
+                0, 0, 0,
+              ],
+            ),
+          )
+        : v
+    updateCamera3D((c) => {
+      c.target = [next[0] ?? 0, next[1] ?? 0, next[2] ?? 0]
+    })
+    return new Float32Array(next)
+  }
+  const setFlameFov: Setter<number> = (v) => {
+    const next =
+      typeof v === 'function'
+        ? v(props.previewDescriptor.renderSettings.camera3D?.fov ?? 60)
+        : v
+    updateCamera3D((c) => {
+      c.fov = next
+    })
+    return next
+  }
 
   const setFlameZoom: Setter<number> = (value) => {
     if (typeof value === 'function') {
@@ -212,39 +292,106 @@ function RenderDialog(props: RenderDialogProps) {
             </div>
             <Root adapterOptions={{ powerPreference: 'high-performance' }}>
               <AutoCanvas pixelRatio={DEFAULT_PREVIEW_PIXEL_RATIO}>
-                <WheelZoomCamera2D
-                  zoom={[
-                    () => props.previewDescriptor.renderSettings.camera.zoom,
-                    setFlameZoom,
-                  ]}
-                  position={[cameraPos, setFlamePosition]}
+                <Show
+                  when={is3D()}
+                  fallback={
+                    <WheelZoomCamera2D
+                      zoom={[
+                        () =>
+                          props.previewDescriptor.renderSettings.camera.zoom,
+                        setFlameZoom,
+                      ]}
+                      position={[cameraPos, setFlamePosition]}
+                    >
+                      <Show
+                        when={
+                          renderMode() === 'auto'
+                            ? true
+                            : renderKey() > 0
+                              ? renderKey()
+                              : false
+                        }
+                        keyed
+                      >
+                        <Flam3
+                          quality={props.quality}
+                          pointCountPerBatch={DEFAULT_POINT_COUNT}
+                          adaptiveFilterEnabled={false}
+                          animationEnabled={false}
+                          flameDescriptor={props.previewDescriptor}
+                          renderInterval={renderMode() === 'auto' ? 1 : 0}
+                          edgeFadeColor={vec4f(0)}
+                          palette={props.selectedPalette}
+                          onAccumulatedPointCount={setPreviewPoints}
+                          setQualityPointCountLimit={(fn) =>
+                            setPreviewLimitFn(() => fn)
+                          }
+                        />
+                      </Show>
+                    </WheelZoomCamera2D>
+                  }
                 >
-                  <Show
-                    when={
-                      renderMode() === 'auto'
-                        ? true
-                        : renderKey() > 0
-                          ? renderKey()
-                          : false
-                    }
-                    keyed
+                  <WheelZoomCamera3D
+                    theta={[
+                      () =>
+                        props.previewDescriptor.renderSettings.camera3D
+                          ?.theta ?? 0,
+                      setFlameTheta,
+                    ]}
+                    phi={[
+                      () =>
+                        props.previewDescriptor.renderSettings.camera3D?.phi ??
+                        Math.PI / 2,
+                      setFlamePhi,
+                    ]}
+                    radius={[
+                      () =>
+                        props.previewDescriptor.renderSettings.camera3D
+                          ?.radius ?? 5,
+                      setFlameRadius,
+                    ]}
+                    target={[
+                      () =>
+                        new Float32Array(
+                          props.previewDescriptor.renderSettings.camera3D
+                            ?.target ?? [0, 0, 0],
+                        ),
+                      setFlameTarget3D,
+                    ]}
+                    fov={[
+                      () =>
+                        props.previewDescriptor.renderSettings.camera3D?.fov ??
+                        60,
+                      setFlameFov,
+                    ]}
                   >
-                    <Flam3
-                      quality={props.quality}
-                      pointCountPerBatch={DEFAULT_POINT_COUNT}
-                      adaptiveFilterEnabled={false}
-                      animationEnabled={false}
-                      flameDescriptor={props.previewDescriptor}
-                      renderInterval={renderMode() === 'auto' ? 1 : 0}
-                      edgeFadeColor={vec4f(0)}
-                      palette={props.selectedPalette}
-                      onAccumulatedPointCount={setPreviewPoints}
-                      setQualityPointCountLimit={(fn) =>
-                        setPreviewLimitFn(() => fn)
+                    <Show
+                      when={
+                        renderMode() === 'auto'
+                          ? true
+                          : renderKey() > 0
+                            ? renderKey()
+                            : false
                       }
-                    />
-                  </Show>
-                </WheelZoomCamera2D>
+                      keyed
+                    >
+                      <Flam3
+                        quality={props.quality}
+                        pointCountPerBatch={DEFAULT_POINT_COUNT}
+                        adaptiveFilterEnabled={false}
+                        animationEnabled={false}
+                        flameDescriptor={props.previewDescriptor}
+                        renderInterval={renderMode() === 'auto' ? 1 : 0}
+                        edgeFadeColor={vec4f(0)}
+                        palette={props.selectedPalette}
+                        onAccumulatedPointCount={setPreviewPoints}
+                        setQualityPointCountLimit={(fn) =>
+                          setPreviewLimitFn(() => fn)
+                        }
+                      />
+                    </Show>
+                  </WheelZoomCamera3D>
+                </Show>
               </AutoCanvas>
             </Root>
           </div>
@@ -343,6 +490,46 @@ function RenderDialog(props: RenderDialogProps) {
               />
             </div>
 
+            <Show when={is3D()}>
+              <div class={ui.sliderField}>
+                <Slider
+                  label="Depth Coloring"
+                  value={
+                    props.previewDescriptor.renderSettings.depthColorPower ??
+                    0.0
+                  }
+                  min={0}
+                  max={5}
+                  step={0.05}
+                  onInput={(v) => {
+                    props.setPreviewDescriptor(
+                      'renderSettings',
+                      'depthColorPower',
+                      v,
+                    )
+                  }}
+                />
+              </div>
+              <div class={ui.sliderField}>
+                <Slider
+                  label="Light Power"
+                  value={
+                    props.previewDescriptor.renderSettings.lightPower ?? 0.0
+                  }
+                  min={0}
+                  max={1.5}
+                  step={0.01}
+                  onInput={(v) => {
+                    props.setPreviewDescriptor(
+                      'renderSettings',
+                      'lightPower',
+                      v,
+                    )
+                  }}
+                />
+              </div>
+            </Show>
+
             <label class={ui.field}>
               <span>Draw Mode</span>
               <select
@@ -397,6 +584,53 @@ function RenderDialog(props: RenderDialogProps) {
                   </Button>
                 )}
               </div>
+            </label>
+
+            <label class={ui.field}>
+              <span>Name</span>
+              <input
+                type="text"
+                class={ui.numberInput}
+                value={props.previewDescriptor.metadata?.name ?? ''}
+                onInput={(e) => {
+                  props.setPreviewDescriptor(
+                    'metadata',
+                    'name',
+                    e.currentTarget.value,
+                  )
+                }}
+              />
+            </label>
+
+            <label class={ui.field}>
+              <span>Description</span>
+              <textarea
+                class={ui.textarea}
+                value={props.previewDescriptor.metadata?.description ?? ''}
+                onInput={(e) => {
+                  props.setPreviewDescriptor(
+                    'metadata',
+                    'description',
+                    e.currentTarget.value,
+                  )
+                }}
+              />
+            </label>
+
+            <label class={ui.field}>
+              <span>Author</span>
+              <input
+                type="text"
+                class={ui.numberInput}
+                value={props.previewDescriptor.metadata?.author ?? ''}
+                onInput={(e) => {
+                  props.setPreviewDescriptor(
+                    'metadata',
+                    'author',
+                    e.currentTarget.value,
+                  )
+                }}
+              />
             </label>
 
             <label class={ui.checkboxField}>
@@ -560,6 +794,53 @@ function RenderDialog(props: RenderDialogProps) {
               </select>
             </label>
 
+            <label class={ui.field}>
+              <span>Name</span>
+              <input
+                type="text"
+                class={ui.numberInput}
+                value={props.previewDescriptor.metadata?.name ?? ''}
+                onInput={(e) => {
+                  props.setPreviewDescriptor(
+                    'metadata',
+                    'name',
+                    e.currentTarget.value,
+                  )
+                }}
+              />
+            </label>
+
+            <label class={ui.field}>
+              <span>Description</span>
+              <textarea
+                class={ui.textarea}
+                value={props.previewDescriptor.metadata?.description ?? ''}
+                onInput={(e) => {
+                  props.setPreviewDescriptor(
+                    'metadata',
+                    'description',
+                    e.currentTarget.value,
+                  )
+                }}
+              />
+            </label>
+
+            <label class={ui.field}>
+              <span>Author</span>
+              <input
+                type="text"
+                class={ui.numberInput}
+                value={props.previewDescriptor.metadata?.author ?? ''}
+                onInput={(e) => {
+                  props.setPreviewDescriptor(
+                    'metadata',
+                    'author',
+                    e.currentTarget.value,
+                  )
+                }}
+              />
+            </label>
+
             <label class={ui.checkboxField}>
               <Checkbox
                 checked={props.embedMetadata}
@@ -662,7 +943,7 @@ export function createExportPngDialog(
     })
   }
 
-  async function showExportPngDialog() {
+  async function showExportPngDialog(initialTab?: 'image' | 'animation') {
     const timeline = getTimeline()
     const tracks = timeline?.tracks() ?? []
     const config = timeline?.config() ?? defaultTimelineConfig()
@@ -691,6 +972,10 @@ export function createExportPngDialog(
       'export/tab',
       'image',
     )
+
+    if (initialTab) {
+      setExportTab(initialTab)
+    }
 
     // Force back to image tab if no keyframes exist
     if (!hasAnimation && exportTab() === 'animation') {
@@ -734,6 +1019,16 @@ export function createExportPngDialog(
     )
 
     const initialFlame = deepClone(flameDescriptor)
+    if (!initialFlame.metadata) {
+      initialFlame.metadata = { name: '', description: '', author: 'unknown' }
+    } else {
+      if (initialFlame.metadata.name === undefined)
+        initialFlame.metadata.name = ''
+      if (initialFlame.metadata.description === undefined)
+        initialFlame.metadata.description = ''
+      if (initialFlame.metadata.author === undefined)
+        initialFlame.metadata.author = 'unknown'
+    }
     if (timeline && hasAnimation) {
       applyTimelineToFlameAtFrame(timeline, initialFlame, currentFrame)
     }
@@ -766,8 +1061,16 @@ export function createExportPngDialog(
         },
       }
 
-      // Apply dialog render settings to main flame descriptor
+      // Apply dialog render settings and metadata to main flame descriptor
       setFlameDescriptor((draft) => {
+        if (!draft.metadata) {
+          draft.metadata = { name: '', description: '', author: 'unknown' }
+        }
+        draft.metadata.name = previewDescriptor.metadata?.name ?? ''
+        draft.metadata.description =
+          previewDescriptor.metadata?.description ?? ''
+        draft.metadata.author = previewDescriptor.metadata?.author ?? 'unknown'
+
         draft.renderSettings.exposure =
           previewDescriptor.renderSettings.exposure
         draft.renderSettings.vibrancy =
@@ -884,6 +1187,16 @@ export function createExportPngDialog(
 
     function handleRenderAnimation() {
       if (!startAnimationExport) return
+      // Sync metadata back to workspace flame descriptor
+      setFlameDescriptor((draft) => {
+        if (!draft.metadata) {
+          draft.metadata = { name: '', description: '', author: 'unknown' }
+        }
+        draft.metadata.name = previewDescriptor.metadata?.name ?? ''
+        draft.metadata.description =
+          previewDescriptor.metadata?.description ?? ''
+        draft.metadata.author = previewDescriptor.metadata?.author ?? 'unknown'
+      })
       // Apply the opt-in before the export locks canvas interaction.
       setCameraDuringExportEnabled(cameraDuringExport())
       const exportConfig: AnimationExportConfig = {

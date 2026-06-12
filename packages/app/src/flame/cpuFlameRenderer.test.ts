@@ -20,7 +20,18 @@ describe('CPU Flame Renderer', () => {
       drawMode: 'light',
       colorInitMode: 'colorInitZero',
       pointInitMode: 'pointInitUnitDisk',
+      dimensions: 2,
       camera: { zoom: 1, position: [0, 0] },
+      camera3D: {
+        theta: 0,
+        phi: Math.PI / 2,
+        radius: 5,
+        target: [0, 0, 0],
+        fov: 60,
+      },
+      depthColorPower: 0,
+      lightDirection: [-0.5, 0.5, -1.0],
+      lightPower: 0,
     },
     transforms: {
       ['0']: {
@@ -128,7 +139,18 @@ describe('CPU Flame Renderer', () => {
           drawMode: 'light',
           colorInitMode: 'colorInitZero',
           pointInitMode: 'pointInitUnitDisk',
+          dimensions: 2,
           camera: { zoom: 1, position: [0, 0] },
+          camera3D: {
+            theta: 0,
+            phi: Math.PI / 2,
+            radius: 5,
+            target: [0, 0, 0],
+            fov: 60,
+          },
+          depthColorPower: 0,
+          lightDirection: [-0.5, 0.5, -1.0],
+          lightPower: 0,
         },
         transforms: {},
       }

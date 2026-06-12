@@ -56,7 +56,7 @@ export function persistentSignal<T, S>(
     stored !== null && options
       ? options.deserialize(stored)
       : stored !== null
-        ? (stored as unknown as T)
+        ? stored
         : defaultValue
 
   const [get, set] = createSignal<T>(initial)

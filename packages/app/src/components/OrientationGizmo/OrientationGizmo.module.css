@@ -1,0 +1,69 @@
+.gizmoContainer {
+  position: absolute;
+  bottom: 100%;
+  right: 1rem;
+  z-index: 1;
+  pointer-events: auto;
+}
+
+.gizmo {
+  width: 80px;
+  height: 80px;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.gizmo:active {
+  cursor: grabbing;
+}
+
+.axisLine {
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0.8;
+}
+
+.axisEndpoint {
+  cursor: pointer;
+  transition:
+    r 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.axisEndpoint:hover {
+  r: 9;
+  opacity: 1;
+}
+
+.axisLabel {
+  font-size: 9px;
+  font-weight: 700;
+  font-family: 'Inter', 'Roboto', sans-serif;
+  pointer-events: none;
+  user-select: none;
+  text-anchor: middle;
+  dominant-baseline: central;
+  fill: white;
+}
+
+.negativeEndpoint {
+  cursor: pointer;
+  transition:
+    r 0.15s ease,
+    opacity 0.15s ease;
+  opacity: 0.5;
+}
+
+.negativeEndpoint:hover {
+  r: 6;
+  opacity: 0.8;
+}
+
+.backgroundDisc {
+  fill: rgba(0, 0, 0, 0.35);
+
+  [data-theme='dark'] & {
+    fill: rgba(0, 0, 0, 0.5);
+  }
+}

@@ -100,6 +100,7 @@ export function createAdaptiveBlurPipeline(
     const clampedRadius = clamp(radius, i32(1), i32(MAX_SIGMA * 3))
 
     let totalCount = f32(0)
+    let totalZ = f32(0)
     let totalColorA = f32(0)
     let totalColorB = f32(0)
     let totalWeight = f32(0)
@@ -113,12 +114,14 @@ export function createAdaptiveBlurPipeline(
       const weight = exp(sub(f32(0), (dist * dist) / (f32(2) * sigma * sigma)))
 
       totalCount += f32(sample.count) * weight
+      totalZ += f32(sample.z) * weight
       totalColorA += f32(sample.color.a) * weight
       totalColorB += f32(sample.color.b) * weight
       totalWeight += weight
     }
 
     tempBuffer[texelIndex]!.count = u32(max(f32(0), totalCount / totalWeight))
+    tempBuffer[texelIndex]!.z = i32(totalZ / totalWeight)
     tempBuffer[texelIndex]!.color.a = i32(totalColorA / totalWeight)
     tempBuffer[texelIndex]!.color.b = i32(totalColorB / totalWeight)
   })
@@ -155,6 +158,7 @@ export function createAdaptiveBlurPipeline(
     const clampedRadius = clamp(radius, i32(1), i32(MAX_SIGMA * 3))
 
     let totalCount = f32(0)
+    let totalZ = f32(0)
     let totalColorA = f32(0)
     let totalColorB = f32(0)
     let totalWeight = f32(0)
@@ -168,6 +172,7 @@ export function createAdaptiveBlurPipeline(
       const weight = exp(sub(f32(0), (dist * dist) / (f32(2) * sigma * sigma)))
 
       totalCount += f32(sample.count) * weight
+      totalZ += f32(sample.z) * weight
       totalColorA += f32(sample.color.a) * weight
       totalColorB += f32(sample.color.b) * weight
       totalWeight += weight
@@ -176,6 +181,7 @@ export function createAdaptiveBlurPipeline(
     postprocessBuffer[texelIndex]!.count = u32(
       max(f32(0), totalCount / totalWeight),
     )
+    postprocessBuffer[texelIndex]!.z = i32(totalZ / totalWeight)
     postprocessBuffer[texelIndex]!.color.a = i32(totalColorA / totalWeight)
     postprocessBuffer[texelIndex]!.color.b = i32(totalColorB / totalWeight)
   })
@@ -203,6 +209,7 @@ export function createAdaptiveBlurPipeline(
     },
     destroy: () => {
       tempBuffer.destroy()
+      textureSizeBuffer.destroy()
     },
   }
 }

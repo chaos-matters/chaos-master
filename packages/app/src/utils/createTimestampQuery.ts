@@ -32,10 +32,11 @@ export function createTimestampQuery<T extends string>(
         if (item !== undefined) {
           const durationMs = globalThis.performance.now() - item.time
           // Assign total time divided by iterations to the first timestamp (ifsMs)
-          timings[timestampNames[0] as T] = Math.max(
-            durationMs / Math.max(item.div, 1),
-            0.001,
-          )
+          // Without GPU timestamps, we measure CPU-to-GPU wall latency which includes constant
+          // browser/scheduling overhead. Enforce a minimum floor on the calculated per-iteration
+          // time to prevent the estimator from escalating iteration count to 1000 under scheduling latency.
+          const calculatedIfsMs = durationMs / Math.max(item.div, 1)
+          timings[timestampNames[0] as T] = Math.max(calculatedIfsMs, 0.25)
         }
       },
       average: () => timings,

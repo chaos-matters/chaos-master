@@ -70,6 +70,21 @@ export function TimelineSettings() {
           }}
         />
       </label>
+      <label class={ui.settingItem}>
+        <span class={ui.settingLabel}>Auto FPS</span>
+        <input
+          type="checkbox"
+          class={ui.settingCheckbox}
+          checked={config().autoFps ?? false}
+          onChange={() => {
+            timeline.setConfig({
+              ...config(),
+              autoFps: !(config().autoFps ?? false),
+            })
+          }}
+          title="Auto FPS: Wait for each frame to render to target quality before advancing"
+        />
+      </label>
       <label
         class={ui.settingItem}
         onPointerDown={createSettingScrubber(

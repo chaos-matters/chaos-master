@@ -54,7 +54,7 @@ export function saveRecentFlame(
   const id = generateId()
   const entry: RecentFlame = {
     id,
-    name: name ?? 'Flame',
+    name: name || flame.metadata?.name || 'Flame',
     flame: deepClone(flame),
     savedAt: Date.now(),
   }

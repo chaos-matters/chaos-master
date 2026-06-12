@@ -4,8 +4,8 @@
  */
 
 import { tgpu } from 'typegpu'
-import { u32, vec2f, vec2u } from 'typegpu/data'
-import { bitcastU32toF32, cos, mul, sin, sqrt } from 'typegpu/std'
+import { u32, vec2f, vec2u, vec3f } from 'typegpu/data'
+import { acos, bitcastU32toF32, cos, mul, pow, sin, sqrt } from 'typegpu/std'
 import { PI } from '@/flame/constants'
 import type { v2u } from 'typegpu/data'
 
@@ -120,4 +120,26 @@ export const randomGaussianCircle = tgpu.fn(
     2
   const theta = random() * 2 * PI.$
   return vec2f(cos(theta), sin(theta)).mul(r)
+})
+
+export const randomUnitSphere = tgpu.fn(
+  [],
+  vec3f,
+)(() => {
+  const theta = random() * 2 * PI.$
+  const phi = acos(2 * random() - 1)
+  return mul(
+    sqrt(1),
+    vec3f(sin(phi) * cos(theta), sin(phi) * sin(theta), cos(phi)),
+  )
+})
+
+export const randomUnitBall = tgpu.fn(
+  [],
+  vec3f,
+)(() => {
+  const theta = random() * 2 * PI.$
+  const phi = acos(2 * random() - 1)
+  const r = pow(random(), 1.0 / 3.0)
+  return mul(r, vec3f(sin(phi) * cos(theta), sin(phi) * sin(theta), cos(phi)))
 })

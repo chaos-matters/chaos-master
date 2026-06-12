@@ -12,26 +12,35 @@ import ui from './AffineListEditor.module.css'
 import type { TransformRecord } from '@/flame/schema/flameSchema'
 import type { HistorySetter } from '@/utils/createStoreHistory'
 
-const COEFFICIENTS = [
-  { key: 'a', label: 'a' },
-  { key: 'b', label: 'b' },
-  { key: 'c', label: 'c' },
-  { key: 'd', label: 'd' },
-  { key: 'e', label: 'e' },
-  { key: 'f', label: 'f' },
-] as const
-
-type AffineListEditorProps = {
+export type AffineListEditorProps = {
   transforms: TransformRecord
   setTransforms: HistorySetter<TransformRecord>
   affineMode: 'preAffine' | 'postAffine'
+  is3D?: boolean
 }
+
+const COEFS_2D = ['a', 'b', 'c', 'd', 'e', 'f'] as const
+const COEFS_3D = [
+  'a',
+  'b',
+  'c',
+  'd',
+  'e',
+  'f',
+  'g',
+  'h',
+  'i',
+  'j',
+  'k',
+  'l',
+] as const
 
 export function AffineListEditor(props: AffineListEditorProps) {
   const { theme } = useTheme()
   const timeline = useTimeline()
 
   const readableIds = createMemo(() => buildReadableIds(props.transforms))
+  const activeCoefs = createMemo(() => (props.is3D ? COEFS_3D : COEFS_2D))
 
   return (
     <div class={ui.container}>
@@ -58,19 +67,25 @@ export function AffineListEditor(props: AffineListEditorProps) {
                 onClick={() => {
                   props.setTransforms((draft) => {
                     const coefs = draft[tid]![props.affineMode]
-                    for (const key of ['a', 'b', 'c', 'd', 'e', 'f'] as const) {
-                      coefs[key] = randomizeAffineCoef(coefs[key], key)
+                    for (const key of activeCoefs()) {
+                      coefs[key] = randomizeAffineCoef(
+                        coefs[key] ?? (['a', 'e', 'i'].includes(key) ? 1 : 0),
+                        key,
+                      )
                     }
                   })
                 }}
               />
             </div>
             <div class={ui.coefficients}>
-              <For each={COEFFICIENTS}>
-                {({ key, label }) => (
+              <For each={activeCoefs()}>
+                {(key) => (
                   <ScrubInput
-                    label={label}
-                    value={transform[props.affineMode][key]}
+                    label={key}
+                    value={
+                      transform[props.affineMode][key] ??
+                      (['a', 'e', 'i'].includes(key) ? 1 : 0)
+                    }
                     step={0.001}
                     onInput={(val) => {
                       props.setTransforms((draft) => {

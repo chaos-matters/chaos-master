@@ -12,15 +12,20 @@ import { KeyframeTargetProvider } from '@/contexts/KeyframeTargetContext'
 import { COMPUTE_GATE_CAPACITY, DEFAULT_VARIATION_PREVIEW_POINT_COUNT, DEFAULT_VARIATION_PREVIEW_QUALITY, DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS, DEFAULT_VARIATION_SHOW_DELAY_MS, } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
 import { pointInitModeToImplFn } from '@/flame/pointInitMode'
+import { pointInitMode3DToImplFn } from '@/flame/pointInitMode3D'
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from '@/flame/schema/flameSchema'
-import { isParametricVariation, transformVariations, variationTypes, } from '@/flame/variations'
+import { categoryOf } from '@/flame/variationRegistry'
+import { isParametricVariation, variationTypes } from '@/flame/variations'
 import { CATEGORIES, CATEGORY_LABELS, sortByCategory, } from '@/flame/variations/categories'
-import { getNormalizedVariationName, getParamsEditor, getTransformPreviewTid, getTransformPreviewVid, getVariationPreviewFlame, } from '@/flame/variations/utils'
+import { getNormalizedVariationName, getParamsEditor, getTransformPreviewTid, getTransformPreviewVid, getVariationPreviewFlame, getVariationPreviewFlame3D, } from '@/flame/variations/utils'
+import { variationTypes3D } from '@/flame/variations3D'
 import { HoverEyePreview, HoverPreview } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
+import { Default3DPreviewCamera } from '@/lib/Camera3D'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
+import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
 import { deepClone } from '@/utils/clone'
 import { createStoreHistory } from '@/utils/createStoreHistory'
 import { hardwareTierToQuality } from '@/utils/hardwareTier'
@@ -38,6 +43,7 @@ import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './VariationSelector.module.css'
 import type { Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
+import type { Vec3 } from 'wgpu-matrix'
 import type { ExportImageType } from '@/App'
 import type { RenderStatus } from '@/contexts/ComputeGateContext'
 import type { PointInitMode } from '@/flame/pointInitMode'
@@ -54,35 +60,80 @@ export function PreviewFinalFlame(props: {
   flame: FlameDescriptor
   setFlamePosition: Setter<v2f>
   setFlameZoom: Setter<number>
+  setFlameTheta?: Setter<number>
+  setFlamePhi?: Setter<number>
+  setFlameRadius?: Setter<number>
+  setFlameTarget3D?: Setter<Vec3>
+  setFlameFov?: Setter<number>
   hardwareTier?: HardwareTier | null
 }) {
+  const is3D = () => (props.flame.renderSettings.dimensions ?? 2) === 3
   const targetQuality = () =>
-    props.hardwareTier
-      ? hardwareTierToQuality[props.hardwareTier]
-      : DEFAULT_VARIATION_PREVIEW_QUALITY
+    props.hardwareTier ? hardwareTierToQuality[props.hardwareTier] : 0.99
 
   return (
     <AutoCanvas class={ui.canvas} pixelRatio={1}>
-      <WheelZoomCamera2D
-        zoom={[
-          () => props.flame.renderSettings.camera.zoom,
-          props.setFlameZoom,
-        ]}
-        position={[
-          () => vec2f(...props.flame.renderSettings.camera.position),
-          props.setFlamePosition,
-        ]}
+      <Show
+        when={is3D()}
+        fallback={
+          <WheelZoomCamera2D
+            zoom={[
+              () => props.flame.renderSettings.camera.zoom,
+              props.setFlameZoom,
+            ]}
+            position={[
+              () => vec2f(...props.flame.renderSettings.camera.position),
+              props.setFlamePosition,
+            ]}
+          >
+            <Flam3
+              animationEnabled={false}
+              quality={targetQuality()}
+              pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT}
+              adaptiveFilterEnabled={true}
+              flameDescriptor={props.flame}
+              renderInterval={DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS}
+              edgeFadeColor={vec4f(0)}
+            />
+          </WheelZoomCamera2D>
+        }
       >
-        <Flam3
-          animationEnabled={false}
-          quality={targetQuality()}
-          pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT}
-          adaptiveFilterEnabled={true}
-          flameDescriptor={props.flame}
-          renderInterval={DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS}
-          edgeFadeColor={vec4f(0)}
-        />
-      </WheelZoomCamera2D>
+        <WheelZoomCamera3D
+          theta={[
+            () => props.flame.renderSettings.camera3D?.theta ?? 0,
+            props.setFlameTheta ?? (() => 0),
+          ]}
+          phi={[
+            () => props.flame.renderSettings.camera3D?.phi ?? Math.PI / 2,
+            props.setFlamePhi ?? (() => 0),
+          ]}
+          radius={[
+            () => props.flame.renderSettings.camera3D?.radius ?? 5,
+            props.setFlameRadius ?? (() => 0),
+          ]}
+          target={[
+            () =>
+              new Float32Array(
+                props.flame.renderSettings.camera3D?.target ?? [0, 0, 0],
+              ),
+            props.setFlameTarget3D ?? (() => new Float32Array([0, 0, 0])),
+          ]}
+          fov={[
+            () => props.flame.renderSettings.camera3D?.fov ?? 60,
+            props.setFlameFov ?? (() => 0),
+          ]}
+        >
+          <Flam3
+            animationEnabled={false}
+            quality={targetQuality()}
+            pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT}
+            adaptiveFilterEnabled={true}
+            flameDescriptor={props.flame}
+            renderInterval={DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS}
+            edgeFadeColor={vec4f(0)}
+          />
+        </WheelZoomCamera3D>
+      </Show>
     </AutoCanvas>
   )
 }
@@ -94,6 +145,9 @@ export function VariationPreview(props: {
   name: string
   hardwareTier?: HardwareTier | null
 }) {
+  const is3D = () => (props.flame.renderSettings.dimensions ?? 2) === 3
+  const targetQuality = () =>
+    props.hardwareTier ? hardwareTierToQuality[props.hardwareTier] : 0.99
   const [container, setContainer] = createSignal<HTMLElement>()
   const [quality, setQuality] = createSignal<() => number>()
   const intersection = useIntersectionObserver(container)
@@ -213,22 +267,41 @@ export function VariationPreview(props: {
           pixelRatio={1}
           fixedResolution={{ width: 256, height: 144 }}
         >
-          <Camera2D
-            position={vec2f(...props.flame.renderSettings.camera.position)}
-            zoom={props.flame.renderSettings.camera.zoom}
+          <Show
+            when={is3D()}
+            fallback={
+              <Camera2D
+                position={vec2f(...props.flame.renderSettings.camera.position)}
+                zoom={props.flame.renderSettings.camera.zoom}
+              >
+                <Flam3
+                  animationEnabled={false}
+                  quality={targetQuality()}
+                  pointCountPerBatch={5e4}
+                  adaptiveFilterEnabled={false}
+                  flameDescriptor={props.flame}
+                  renderInterval={allowed() ? 1 : Infinity}
+                  onExportImage={exportImage()}
+                  edgeFadeColor={vec4f(0)}
+                  setCurrentQuality={(fn) => setQuality(() => fn)}
+                />
+              </Camera2D>
+            }
           >
-            <Flam3
-              animationEnabled={false}
-              quality={previewQuality()}
-              pointCountPerBatch={5e4}
-              adaptiveFilterEnabled={false}
-              flameDescriptor={props.flame}
-              renderInterval={previewRenderInterval()}
-              onExportImage={exportImage()}
-              edgeFadeColor={vec4f(0)}
-              setCurrentQuality={(fn) => setQuality(() => fn)}
-            />
-          </Camera2D>
+            <Default3DPreviewCamera>
+              <Flam3
+                animationEnabled={false}
+                quality={targetQuality()}
+                pointCountPerBatch={5e4}
+                adaptiveFilterEnabled={true}
+                flameDescriptor={props.flame}
+                renderInterval={allowed() ? 1 : Infinity}
+                onExportImage={exportImage()}
+                edgeFadeColor={vec4f(0)}
+                setCurrentQuality={(fn) => setQuality(() => fn)}
+              />
+            </Default3DPreviewCamera>
+          </Show>
         </AutoCanvas>
       </Show>
     </div>
@@ -247,10 +320,31 @@ type VariationSelectorModalProps = {
   variationId: VariationId
   respond: (value: RespondType) => void
   hardwareTier?: HardwareTier | null
+  setFlameTheta?: Setter<number>
+  setFlamePhi?: Setter<number>
+  setFlameRadius?: Setter<number>
+  setFlameTarget3D?: Setter<Vec3>
+  setFlameFov?: Setter<number>
 }
 export const variationPreviewFlames: (
   p: PointInitMode,
-) => Record<string, FlameDescriptor> = (pointInitMode: PointInitMode) => {
+  dims?: 2 | 3,
+) => Record<string, FlameDescriptor> = (
+  pointInitMode: PointInitMode,
+  dims: 2 | 3 = 2,
+) => {
+  if (dims === 3) {
+    return Object.fromEntries(
+      variationTypes3D.map((name) => [
+        name,
+        unfreeze(
+          produce(getVariationPreviewFlame3D(name), (draft) => {
+            draft.renderSettings.pointInitMode = pointInitMode
+          }),
+        ),
+      ]),
+    )
+  }
   return Object.fromEntries(
     variationTypes.map((name) => [
       name,
@@ -279,10 +373,12 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
     }
   }
 
+  const dims = () =>
+    (props.currentFlame.renderSettings.dimensions ?? 2) as 2 | 3
   let searchInputRef: HTMLInputElement | undefined
   const [variationExamples, setVariationExamples] = createStoreHistory(
     createStore<Record<string, FlameDescriptor>>(
-      variationPreviewFlames(previewPointInitMode()),
+      variationPreviewFlames(previewPointInitMode(), dims()),
     ),
   )
 
@@ -310,7 +406,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
     for (const [id, flame] of items) {
       const variation = getVarFromPreviewFlame(flame)
       if (!variation) continue
-      const cat = transformVariations[variation.type]?.category
+      const cat = categoryOf(dims(), variation.type)
       if (!cat || (selectedCategory && cat !== selectedCategory)) continue
       if (!groups.has(cat)) groups.set(cat, [])
       groups.get(cat)!.push([id, flame])
@@ -330,7 +426,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
     for (const [, flame] of filteredVariationEntries()) {
       const variation = getVarFromPreviewFlame(flame)
       if (!variation) continue
-      const cat = transformVariations[variation.type]?.category
+      const cat = categoryOf(dims(), variation.type)
       if (cat) cats.add(cat)
     }
     return CATEGORIES.filter((c) => cats.has(c))
@@ -418,6 +514,93 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
     return previewFlame.renderSettings.camera.position
   }
 
+  const setFlameTheta: Setter<number> = (value) => {
+    if (typeof value === 'function') {
+      setPreviewFlame((draft) => {
+        if (!draft.renderSettings.camera3D) return
+        draft.renderSettings.camera3D.theta = value(
+          draft.renderSettings.camera3D.theta,
+        )
+      })
+    } else {
+      setPreviewFlame((draft) => {
+        if (!draft.renderSettings.camera3D) return
+        draft.renderSettings.camera3D.theta = value
+      })
+    }
+    return previewFlame.renderSettings.camera3D?.theta ?? 0
+  }
+
+  const setFlamePhi: Setter<number> = (value) => {
+    if (typeof value === 'function') {
+      setPreviewFlame((draft) => {
+        if (!draft.renderSettings.camera3D) return
+        draft.renderSettings.camera3D.phi = value(
+          draft.renderSettings.camera3D.phi,
+        )
+      })
+    } else {
+      setPreviewFlame((draft) => {
+        if (!draft.renderSettings.camera3D) return
+        draft.renderSettings.camera3D.phi = value
+      })
+    }
+    return previewFlame.renderSettings.camera3D?.phi ?? 0
+  }
+
+  const setFlameRadius: Setter<number> = (value) => {
+    if (typeof value === 'function') {
+      setPreviewFlame((draft) => {
+        if (!draft.renderSettings.camera3D) return
+        draft.renderSettings.camera3D.radius = value(
+          draft.renderSettings.camera3D.radius,
+        )
+      })
+    } else {
+      setPreviewFlame((draft) => {
+        if (!draft.renderSettings.camera3D) return
+        draft.renderSettings.camera3D.radius = value
+      })
+    }
+    return previewFlame.renderSettings.camera3D?.radius ?? 5
+  }
+
+  const setFlameTarget3D: Setter<Vec3> = (value) => {
+    if (typeof value === 'function') {
+      setPreviewFlame((draft) => {
+        if (!draft.renderSettings.camera3D) return
+        draft.renderSettings.camera3D.target = value(
+          new Float32Array(draft.renderSettings.camera3D.target),
+        ) as [number, number, number]
+      })
+    } else {
+      setPreviewFlame((draft) => {
+        if (!draft.renderSettings.camera3D) return
+        draft.renderSettings.camera3D.target = value
+      })
+    }
+    return new Float32Array(
+      previewFlame.renderSettings.camera3D?.target ?? [0, 0, 0],
+    )
+  }
+
+  const setFlameFov: Setter<number> = (value) => {
+    if (typeof value === 'function') {
+      setPreviewFlame((draft) => {
+        if (!draft.renderSettings.camera3D) return
+        draft.renderSettings.camera3D.fov = value(
+          draft.renderSettings.camera3D.fov,
+        )
+      })
+    } else {
+      setPreviewFlame((draft) => {
+        if (!draft.renderSettings.camera3D) return
+        draft.renderSettings.camera3D.fov = value
+      })
+    }
+    return previewFlame.renderSettings.camera3D?.fov ?? 60
+  }
+
   const getVarFromPreviewFlame = (flame: FlameDescriptor) => {
     return getTransformFromPreviewFlame(flame)[1]
   }
@@ -454,10 +637,30 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                 previewTr.variations[props.variationId] = variation
                 draft.renderSettings.exposure =
                   selectedItem.renderSettings.exposure
+                draft.renderSettings.gamma = selectedItem.renderSettings.gamma
+                draft.renderSettings.vibrancy =
+                  selectedItem.renderSettings.vibrancy
+                draft.renderSettings.contrast =
+                  selectedItem.renderSettings.contrast
+                draft.renderSettings.depthColorPower =
+                  selectedItem.renderSettings.depthColorPower
+                draft.renderSettings.lightPower =
+                  selectedItem.renderSettings.lightPower
+                draft.renderSettings.lightDirection = selectedItem
+                  .renderSettings.lightDirection
+                  ? [...selectedItem.renderSettings.lightDirection]
+                  : undefined
+
                 draft.renderSettings.camera.zoom =
                   selectedItem.renderSettings.camera.zoom
                 draft.renderSettings.camera.position =
                   selectedItem.renderSettings.camera.position
+
+                if (selectedItem.renderSettings.camera3D) {
+                  draft.renderSettings.camera3D = deepClone(
+                    selectedItem.renderSettings.camera3D,
+                  )
+                }
               }
             })
           })
@@ -734,7 +937,10 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                                           variationDraft as {
                                             params: Record<string, number>
                                           }
-                                        ).params = value
+                                        ).params = value as Record<
+                                          string,
+                                          number
+                                        >
                                       },
                                     )
                                   }}
@@ -750,7 +956,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
               )
             }}
           </For>
-          <Show when={selectedItemId()}>
+          <Show when={selectedItemId() && dims() !== 3}>
             <h2
               class={ui.collapsibleHeader}
               onClick={() => setAffineCollapsed((v) => !v)}
@@ -770,6 +976,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                     setFn(draft.transforms)
                   })
                 }}
+                is3D={(previewFlame.renderSettings.dimensions ?? 2) === 3}
               />
             </Show>
           </Show>
@@ -780,6 +987,11 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
               flame={previewFlame}
               setFlamePosition={setFlamePosition}
               setFlameZoom={setFlameZoom}
+              setFlameTheta={setFlameTheta}
+              setFlamePhi={setFlamePhi}
+              setFlameRadius={setFlameRadius}
+              setFlameTarget3D={setFlameTarget3D}
+              setFlameFov={setFlameFov}
               hardwareTier={props.hardwareTier}
             />
           </div>
@@ -789,7 +1001,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                 class={ui.select}
                 value={previewPointInitMode()}
                 onChange={(ev) => {
-                  const mode = ev.currentTarget.value as PointInitMode
+                  const mode = ev.currentTarget.value
                   setPreviewPointInitMode(mode)
                   setVariationExamples((draft) => {
                     for (const id in draft) {
@@ -805,7 +1017,13 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                   })
                 }}
               >
-                <For each={recordKeys(pointInitModeToImplFn)}>
+                <For
+                  each={
+                    dims() === 3
+                      ? recordKeys(pointInitMode3DToImplFn)
+                      : recordKeys(pointInitModeToImplFn)
+                  }
+                >
                   {(pointInitMode) => (
                     <option value={pointInitMode}>{pointInitMode}</option>
                   )}
@@ -867,6 +1085,13 @@ export function createVariationSelector(
     currentFlame: FlameDescriptor,
     tid: TransformId,
     vid: VariationId,
+    props: {
+      setFlameTheta?: Setter<number>
+      setFlamePhi?: Setter<number>
+      setFlameRadius?: Setter<number>
+      setFlameTarget3D?: Setter<Vec3>
+      setFlameFov?: Setter<number>
+    } = {},
   ) {
     setVarSelectorModalIsOpen(true)
     const result = await requestModal<RespondType>({
@@ -883,6 +1108,11 @@ export function createVariationSelector(
                   variationId={vid}
                   respond={respond}
                   hardwareTier={hardwareTier}
+                  setFlameTheta={props.setFlameTheta}
+                  setFlamePhi={props.setFlamePhi}
+                  setFlameRadius={props.setFlameRadius}
+                  setFlameTarget3D={props.setFlameTarget3D}
+                  setFlameFov={props.setFlameFov}
                 />
               </KeyframeTargetProvider>
             </ChangeHistoryContextProvider>

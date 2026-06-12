@@ -5,6 +5,13 @@ import { defineExample, tid, vid } from './util'
  * geometry, juliaN fractal threads, and bent distortions.
  */
 export const example11 = defineExample({
+  version: '1.0',
+  metadata: {
+    author: 'unknown',
+    name: 'Void Weave',
+    description:
+      'dark, delicate web-like patterns with diamond+spiral geometry, juliaN fractal threads, and bent distortions.',
+  },
   renderSettings: {
     exposure: 0.2,
     skipIters: 20,
