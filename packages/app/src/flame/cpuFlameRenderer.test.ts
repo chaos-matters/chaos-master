@@ -1,37 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { CPUFlameRenderer, testCPURenderer } from './cpuFlameRenderer'
-import type { FlameDescriptor } from './schema/flameSchema'
+import { validateFlame } from './schema/flameSchema'
 
 describe('CPU Flame Renderer', () => {
-  const sampleFlame: FlameDescriptor = {
-    metadata: { author: 'test', name: 'test', description: '' },
+  const sampleFlame = validateFlame({
+    metadata: { author: 'test' },
     renderSettings: {
       exposure: 1,
       skipIters: 10,
-      vibrancy: 0.5,
-      contrast: 1,
-      gamma: 2.2,
-      highlightPower: 0.5,
-      palettePhase: 0,
-      paletteSpeed: 0,
-      paletteMode: 0,
-      densityEstimationQuality: 5,
-      estimatorCurve: 0.5,
-      drawMode: 'light',
-      colorInitMode: 'colorInitZero',
-      pointInitMode: 'pointInitUnitDisk',
-      dimensions: 2,
-      camera: { zoom: 1, position: [0, 0], rotation: 0 },
-      camera3D: {
-        theta: 0,
-        phi: Math.PI / 2,
-        radius: 5,
-        target: [0, 0, 0],
-        fov: 60,
-      },
-      depthColorPower: 0,
-      lightDirection: [-0.5, 0.5, -1.0],
-      lightPower: 0,
     },
     transforms: {
       ['0']: {
@@ -41,8 +17,8 @@ describe('CPU Flame Renderer', () => {
         color: { x: 0, y: 0 },
         variations: {},
       },
-    } as FlameDescriptor['transforms'],
-  }
+    },
+  })
 
   describe('CPUFlameRenderer', () => {
     it('should initialize with flame descriptor', () => {
@@ -122,38 +98,14 @@ describe('CPU Flame Renderer', () => {
     })
 
     it('should handle flame with empty transforms', () => {
-      const emptyFlame: FlameDescriptor = {
-        metadata: { author: 'test', name: 'test', description: '' },
+      const emptyFlame = validateFlame({
+        metadata: { author: 'test' },
         renderSettings: {
           exposure: 1,
           skipIters: 0,
-          vibrancy: 0.5,
-          contrast: 1,
-          gamma: 2.2,
-          highlightPower: 0.5,
-          palettePhase: 0,
-          paletteSpeed: 0.5,
-          paletteMode: 0,
-          densityEstimationQuality: 5,
-          estimatorCurve: 0.5,
-          drawMode: 'light',
-          colorInitMode: 'colorInitZero',
-          pointInitMode: 'pointInitUnitDisk',
-          dimensions: 2,
-          camera: { zoom: 1, position: [0, 0], rotation: 0 },
-          camera3D: {
-            theta: 0,
-            phi: Math.PI / 2,
-            radius: 5,
-            target: [0, 0, 0],
-            fov: 60,
-          },
-          depthColorPower: 0,
-          lightDirection: [-0.5, 0.5, -1.0],
-          lightPower: 0,
         },
         transforms: {},
-      }
+      })
 
       const result = testCPURenderer(emptyFlame, {
         width: 10,

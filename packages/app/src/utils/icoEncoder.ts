@@ -58,14 +58,14 @@ export function encodeIco(frames: IcoFrame[]): Blob {
     pos += 2
     view.setUint32(pos, png.byteLength, true) // size
     pos += 4
-    view.setUint32(pos, offsets[i], true) // offset
+    view.setUint32(pos, offsets[i]!, true) // offset
     pos += 4
   }
 
   // Write PNG data at each offset
   const bytes = new Uint8Array(buf)
   for (let i = 0; i < count; i++) {
-    bytes.set(frames[i]!.png, offsets[i])
+    bytes.set(frames[i]!.png, offsets[i]!)
   }
 
   return new Blob([bytes], { type: 'image/x-icon' })
