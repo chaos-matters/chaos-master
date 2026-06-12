@@ -65,7 +65,7 @@ export function encodeIco(frames: IcoFrame[]): Blob {
   // Write PNG data at each offset
   const bytes = new Uint8Array(buf)
   for (let i = 0; i < count; i++) {
-    bytes.set(frames[i]!.png, offsets[i]!)
+    bytes.set(frames[i]!.png, offsets[i])
   }
 
   return new Blob([bytes], { type: 'image/x-icon' })
