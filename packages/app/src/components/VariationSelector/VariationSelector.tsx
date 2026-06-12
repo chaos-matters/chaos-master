@@ -152,11 +152,6 @@ export function VariationPreview(props: {
   const [quality, setQuality] = createSignal<() => number>()
   const intersection = useIntersectionObserver(container)
   const isVisible = createMemo(() => intersection()?.isIntersecting)
-  const previewQuality = createMemo(() =>
-    props.hardwareTier
-      ? hardwareTierToQuality[props.hardwareTier]
-      : DEFAULT_VARIATION_PREVIEW_QUALITY,
-  )
   const renderStatus = createMemo<RenderStatus | undefined>(() => {
     const quality_ = quality()?.()
     if (quality_ === undefined) {
@@ -180,8 +175,6 @@ export function VariationPreview(props: {
       isSelected: props.isSelected,
     }
   })
-  const previewRenderInterval = createMemo(() => (allowed() ? 1 : Infinity))
-
   const [exportImage, setExportImage] = createSignal<ExportImageType>()
   const [image, setImage] = createSignal<string | undefined>()
 
@@ -937,10 +930,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                                           variationDraft as {
                                             params: Record<string, number>
                                           }
-                                        ).params = value as Record<
-                                          string,
-                                          number
-                                        >
+                                        ).params = value
                                       },
                                     )
                                   }}

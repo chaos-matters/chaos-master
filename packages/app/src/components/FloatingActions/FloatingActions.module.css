@@ -154,19 +154,26 @@
     overflow: visible;
   }
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: var(--neutral-100);
     color: var(--neutral-800);
   }
 
-  &:active {
+  &:active:not(:disabled) {
     transform: scale(0.92);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+    background: transparent !important;
+    transform: none !important;
   }
 
   [data-theme='dark'] & {
     color: var(--neutral-400);
 
-    &:hover {
+    &:hover:not(:disabled) {
       background: rgba(255, 255, 255, 0.08);
       color: white;
     }

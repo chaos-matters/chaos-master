@@ -241,7 +241,8 @@ export function FloatingActions(props: Props) {
             <button
               class={ui.button}
               onClick={props.onLogoFavicon}
-              title="Logo/Favicon"
+              disabled={props.dimensions() === 3}
+              title={props.dimensions() === 3 ? 'Logo/Favicon (available only in 2D)' : 'Logo/Favicon'}
               data-tour-target="logo-favicon"
             >
               <Shuffle />

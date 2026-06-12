@@ -42,7 +42,7 @@ export function categoryOf(
     const entry = transformVariations3D[type as TransformVariationType3D]
     return entry?.category
   }
-  const entry = transformVariations[type as TransformVariationType]
+  const entry = transformVariations[type]
   return entry?.category
 }
 

@@ -6,7 +6,6 @@ import { deepClone } from '@/utils/clone'
 import { registerCommand } from '../registry'
 import type { TransformId, VariationId } from '@/flame/schema/flameSchema'
 import type { Dims } from '@/flame/variationRegistry'
-import type { TransformVariationType } from '@/flame/variations'
 
 function getTransformKey(
   transforms: Record<string, unknown>,
@@ -40,7 +39,7 @@ registerCommand({
       typeof variationType === 'string'
         ? variationType
         : defaultLinearType(dims)
-    ) as TransformVariationType
+    )
     ctx.setFlameDescriptor((draft) => {
       draft.transforms[generateTransformId()] = {
         probability: 1,
@@ -115,7 +114,7 @@ registerCommand({
       typeof variationType === 'string'
         ? variationType
         : defaultLinearType(dims)
-    ) as TransformVariationType
+    )
     ctx.setFlameDescriptor((draft) => {
       const key = getTransformKey(draft.transforms, tidx)
       if (key) {

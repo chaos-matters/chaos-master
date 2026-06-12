@@ -68,6 +68,6 @@ export function isParametricVariation(
 export function isVariationType(
   maybeType: string,
 ): maybeType is TransformVariationType | TransformVariationType3D {
-  return typeof maybeType === 'string' && (allVariationTypes as string[]).includes(maybeType)
+  return typeof maybeType === 'string' && (allVariationTypes).includes(maybeType)
 }
 

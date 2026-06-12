@@ -2346,110 +2346,112 @@ export function MainWorkspace(props: AppProps) {
                             onUnselect={handlePaletteUnselect}
                           />
                         </CollapsibleCard>
-                        <CollapsibleCard
-                          title="Custom Variations"
-                          defaultOpen={false}
-                        >
-                          <For
-                            each={customVariationsList()}
-                            fallback={
-                              <div class={ui.customVarEmpty}>
-                                No custom variations yet
-                              </div>
-                            }
+                        <Show when={flameDescriptor.renderSettings.dimensions !== 3}>
+                          <CollapsibleCard
+                            title="Custom Variations"
+                            defaultOpen={false}
                           >
-                            {(def) => (
-                              <div
-                                class={ui.customVarItem}
-                                onContextMenu={(e) => {
-                                  e.preventDefault()
-                                }}
-                                onMouseEnter={() => setHoveredCustomVarDef(def)}
-                                onMouseLeave={() =>
-                                  setHoveredCustomVarDef(null)
-                                }
-                                onClick={() => {
-                                  void showCustomVariationEditor(def).then(
-                                    (addedDef) => {
-                                      if (addedDef) {
-                                        setFlameDescriptor((draft) => {
-                                          addTransformWithVariation(
-                                            draft,
-                                            addedDef.id,
-                                          )
-                                        })
-                                      }
-                                      setCustomVarsVersion((v) => v + 1)
-                                    },
-                                  )
-                                }}
-                              >
-                                <span class={ui.customVarItemName}>
-                                  {def.name}
-                                </span>
-                                <div class={ui.customVarItemActions}>
-                                  <button
-                                    class={ui.customVarItemBtn}
-                                    classList={{
-                                      [ui.customVarItemBtnPrimary as string]: true,
-                                    }}
-                                    title="Add to flame"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setHoveredCustomVarDef(null)
-                                      setFlameDescriptor((draft) => {
-                                        addTransformWithVariation(draft, def.id)
-                                      })
-                                    }}
-                                  >
-                                    <BoxArrowRight />
-                                  </button>
-                                  <button
-                                    class={ui.customVarItemBtn}
-                                    title="Duplicate"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      duplicateCustomVariation(def.id)
-                                      setCustomVarsVersion((v) => v + 1)
-                                    }}
-                                  >
-                                    ⧉
-                                  </button>
-                                  <button
-                                    class={ui.customVarItemBtn}
-                                    classList={{
-                                      [ui.customVarItemBtnDanger as string]: true,
-                                    }}
-                                    title="Delete"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      deleteCustomVariation(def.id)
-                                      setCustomVarsVersion((v) => v + 1)
-                                    }}
-                                  >
-                                    ×
-                                  </button>
+                            <For
+                              each={customVariationsList()}
+                              fallback={
+                                <div class={ui.customVarEmpty}>
+                                  No custom variations yet
                                 </div>
-                              </div>
-                            )}
-                          </For>
-                          <button
-                            class={ui.customVarsButton}
-                            onClick={async () => {
-                              const addedDef = await showCustomVariationEditor()
-                              if (addedDef) {
-                                setFlameDescriptor((draft) => {
-                                  addTransformWithVariation(draft, addedDef.id)
-                                })
                               }
-                              setCustomVarsVersion((v) => v + 1)
-                            }}
-                            title="Create a new custom variation"
-                          >
-                            <Plus />
-                            <span>Create Variation</span>
-                          </button>
-                        </CollapsibleCard>
+                            >
+                              {(def) => (
+                                <div
+                                  class={ui.customVarItem}
+                                  onContextMenu={(e) => {
+                                    e.preventDefault()
+                                  }}
+                                  onMouseEnter={() => setHoveredCustomVarDef(def)}
+                                  onMouseLeave={() =>
+                                    setHoveredCustomVarDef(null)
+                                  }
+                                  onClick={() => {
+                                    void showCustomVariationEditor(def).then(
+                                      (addedDef) => {
+                                        if (addedDef) {
+                                          setFlameDescriptor((draft) => {
+                                            addTransformWithVariation(
+                                              draft,
+                                              addedDef.id,
+                                            )
+                                          })
+                                        }
+                                        setCustomVarsVersion((v) => v + 1)
+                                      },
+                                    )
+                                  }}
+                                >
+                                  <span class={ui.customVarItemName}>
+                                    {def.name}
+                                  </span>
+                                  <div class={ui.customVarItemActions}>
+                                    <button
+                                      class={ui.customVarItemBtn}
+                                      classList={{
+                                        [ui.customVarItemBtnPrimary as string]: true,
+                                      }}
+                                      title="Add to flame"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setHoveredCustomVarDef(null)
+                                        setFlameDescriptor((draft) => {
+                                          addTransformWithVariation(draft, def.id)
+                                        })
+                                      }}
+                                    >
+                                      <BoxArrowRight />
+                                    </button>
+                                    <button
+                                      class={ui.customVarItemBtn}
+                                      title="Duplicate"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        duplicateCustomVariation(def.id)
+                                        setCustomVarsVersion((v) => v + 1)
+                                      }}
+                                    >
+                                      ⧉
+                                    </button>
+                                    <button
+                                      class={ui.customVarItemBtn}
+                                      classList={{
+                                        [ui.customVarItemBtnDanger as string]: true,
+                                      }}
+                                      title="Delete"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        deleteCustomVariation(def.id)
+                                        setCustomVarsVersion((v) => v + 1)
+                                      }}
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </For>
+                            <button
+                              class={ui.customVarsButton}
+                              onClick={async () => {
+                                const addedDef = await showCustomVariationEditor()
+                                if (addedDef) {
+                                  setFlameDescriptor((draft) => {
+                                    addTransformWithVariation(draft, addedDef.id)
+                                  })
+                                }
+                                setCustomVarsVersion((v) => v + 1)
+                              }}
+                              title="Create a new custom variation"
+                            >
+                              <Plus />
+                              <span>Create Variation</span>
+                            </button>
+                          </CollapsibleCard>
+                        </Show>
                         <For
                           each={recordEntries(
                             flameDescriptor.transforms,
@@ -2822,10 +2824,7 @@ export function MainWorkspace(props: AppProps) {
                                                         number
                                                       >
                                                     }
-                                                  ).params = value as Record<
-                                                    string,
-                                                    number
-                                                  >
+                                                  ).params = value
                                                 })
                                               }}
                                             />

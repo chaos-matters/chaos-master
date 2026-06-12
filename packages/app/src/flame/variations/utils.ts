@@ -28,7 +28,7 @@ export function getVariationDefault(
       type,
       weight,
       visible: true,
-    } as unknown as TransformVariationDescriptor
+    }
   }
   const variation = allTransformVariations[type] as {
     paramDefaults: Record<string, number>
@@ -46,7 +46,7 @@ export function getParamsEditor<T extends { type: string; params?: unknown }>(
 ): { component: EditorFor<T['params']>; value: T['params'] } {
   const v = allTransformVariations[variation.type]
   return {
-    component: v.editor as unknown as EditorFor<T['params']>,
+    component: v.editor,
     get value() {
       return variation.params as T['params']
     },
