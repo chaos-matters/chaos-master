@@ -1,3 +1,4 @@
+import { MAX_RECENT_FLAMES } from '../../utils/recentFlames'
 import { Button } from '../Button/Button'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
 
@@ -29,9 +30,9 @@ export function ConfirmOverwriteRecentModal(
         }}
       >
         <p style={{ margin: 0, 'font-size': '0.95rem', 'line-height': '1.4' }}>
-          You have reached the limit of 10 saved flames. Would you like to
-          overwrite the oldest saved flame (<strong>{props.oldestName}</strong>
-          )?
+          You have reached the limit of {MAX_RECENT_FLAMES} saved flames. Would
+          you like to overwrite the oldest saved flame (
+          <strong>{props.oldestName}</strong>)?
         </p>
         <div
           style={{

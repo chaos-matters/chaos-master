@@ -5,7 +5,7 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineTrack } from '@/utils/timeline'
 
 const STORAGE_KEY = 'chaos-master-recent-flames'
-const MAX_RECENT_FLAMES = 10
+export const MAX_RECENT_FLAMES = 150
 
 export type RecentFlame = {
   id: string
