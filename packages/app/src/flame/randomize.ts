@@ -506,7 +506,10 @@ export function mutateFlame(
           if (isParametric) {
             const randomizedParams = randomizeVariationParams(vtype, strength)
             if (randomizedParams) {
-              variations[vid] = { ...(base as VariationInstance), params: randomizedParams }
+              variations[vid] = {
+                ...(base as VariationInstance),
+                params: randomizedParams,
+              }
               continue
             }
           }

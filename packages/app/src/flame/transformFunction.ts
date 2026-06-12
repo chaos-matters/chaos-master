@@ -188,7 +188,9 @@ export function extractFlameUniforms({
                   const variationType = type
                   const isParametric = isParametricVariationType(variationType)
                   if (isParametric) {
-                    const v = transformVariations[variationType] as { paramDefaults: Record<string, number> }
+                    const v = transformVariations[variationType] as {
+                      paramDefaults: Record<string, number>
+                    }
                     const defaults = v.paramDefaults
                     const safe: Record<string, number> = { ...defaults }
                     if (rest.params) {
