@@ -21,15 +21,17 @@ class RandomizerHistoryDB extends Dexie {
 
 const db = new RandomizerHistoryDB()
 
+export const MAX_RANDOMIZER_HISTORY_LIMIT = 150
+
 export function loadRandomizerHistoryEntries(
-  maxCount: number,
+  maxCount: number = MAX_RANDOMIZER_HISTORY_LIMIT,
 ): Promise<RandomizerHistoryEntry[]> {
   return db.entries.orderBy('timestamp').reverse().limit(maxCount).toArray()
 }
 
 export async function addRandomizerHistoryEntry(
   entry: RandomizerHistoryEntry,
-  maxCount: number,
+  maxCount: number = MAX_RANDOMIZER_HISTORY_LIMIT,
 ): Promise<RandomizerHistoryEntry[]> {
   await db.entries.add(entry)
   const all = await db.entries.orderBy('timestamp').reverse().toArray()

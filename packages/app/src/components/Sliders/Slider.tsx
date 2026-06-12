@@ -17,6 +17,7 @@ type SliderProps = {
   max?: number
   step?: number
   trackFill?: boolean
+  showValue?: boolean
   variant?: 'default' | 'compact'
   onInput: (value: number) => void
   formatValue?: (value: number) => string
@@ -138,7 +139,9 @@ export function Slider(props: SliderProps) {
             }}
           />
         </div>
-        <span class={ui.value}>{formatValue()}</span>
+        <Show when={props.showValue !== false}>
+          <span class={ui.value}>{formatValue()}</span>
+        </Show>
       </label>
     )
   }

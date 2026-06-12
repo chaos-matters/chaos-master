@@ -160,11 +160,26 @@
 }
 
 .primaryButton {
-  background: oklch(55% 0.18 250);
+  background-color: oklch(60% 0.12 250);
   color: white;
+  --hover-bg-color: oklch(52% 0.12 250);
+  --hover-color: white;
 
   &:hover {
-    background: oklch(50% 0.18 250);
+    background-color: var(--hover-bg-color);
+    color: var(--hover-color);
+  }
+
+  [data-theme='dark'] & {
+    background-color: oklch(45% 0.1 250);
+    color: var(--neutral-100);
+    --hover-bg-color: oklch(38% 0.1 250);
+    --hover-color: white;
+
+    &:hover {
+      background-color: var(--hover-bg-color);
+      color: var(--hover-color);
+    }
   }
 }
 
@@ -276,6 +291,9 @@
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .historyThumbBtn {
@@ -382,6 +400,16 @@
   }
 }
 
+.valuePreview {
+  font-weight: 600;
+  color: var(--neutral-800);
+  margin-left: 2px;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-200);
+  }
+}
+
 .randomizeToggle {
   appearance: none;
   border: none;
@@ -436,4 +464,117 @@
   align-items: center;
   gap: 8px;
   width: 100%;
+}
+
+.subSliderRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+  padding: 4px 6px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.02);
+
+  [data-theme='light'] & {
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(0, 0, 0, 0.02);
+  }
+}
+
+.subSliderLabel {
+  font-size: 0.65rem;
+  color: var(--neutral-400);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500);
+  }
+}
+
+.buttonGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.mutationContainer,
+.animContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  background: transparent;
+}
+
+.pillsRow {
+  display: flex;
+  flex-direction: row;
+  border: 1px solid var(--neutral-300);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--neutral-100);
+  width: 100%;
+
+  [data-theme='dark'] & {
+    border-color: var(--neutral-700);
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
+.pillButton {
+  flex: 1;
+  text-align: center;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  color: var(--neutral-600);
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+
+  &:not(:last-child) {
+    border-right: 1px solid var(--neutral-300);
+
+    [data-theme='dark'] & {
+      border-right-color: var(--neutral-700);
+    }
+  }
+
+  &:hover {
+    background: var(--neutral-200);
+    color: var(--neutral-800);
+
+    [data-theme='dark'] & {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--neutral-200);
+    }
+  }
+
+  [data-theme='dark'] & {
+    color: var(--neutral-400);
+  }
+}
+
+.pillButtonActive {
+  background: var(--neutral-300) !important;
+  color: black !important;
+  font-weight: 600;
+
+  [data-theme='dark'] & {
+    background: rgba(255, 255, 255, 0.15) !important;
+    color: white !important;
+  }
+}
+
+.wideRangeSlider {
+  padding-left: 16px !important;
+  padding-right: 16px !important;
 }

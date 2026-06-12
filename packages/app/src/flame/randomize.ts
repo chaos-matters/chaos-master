@@ -1,3 +1,4 @@
+import { deepClone } from '@/utils/clone'
 import { recordEntries } from '@/utils/record'
 import { generateTransformId, generateVariationId } from './transformFunction'
 import { isParametricVariationType, transformVariations, variationTypes, } from './variations'
@@ -334,4 +335,217 @@ export function generateRandomFlame(
     },
     transforms: coloredTransforms as FlameDescriptor['transforms'],
   }
+}
+
+export interface MutateFlameOptions {
+  mutateAffine: boolean
+  mutateVariations: 'modify' | 'all' | 'none'
+  mutateColors: boolean
+}
+
+export function mutateFlame(
+  flame: FlameDescriptor,
+  config: GenerateRandomFlameConfig,
+  options: MutateFlameOptions,
+): FlameDescriptor {
+  const { strength, minVariations, maxVariations, allowedVariations } = config
+  const dims = config.dimensions ?? 2
+
+  const mutated = deepClone(flame)
+  const transforms = mutated.transforms
+
+  const pool =
+    allowedVariations.length > 0
+      ? allowedVariations
+      : dims === 3
+        ? [...variationTypes3D]
+        : [...variationTypes]
+
+  for (const tid of Object.keys(transforms)) {
+    const t = transforms[tid]!
+
+    // 1. Mutate Affine
+    if (options.mutateAffine) {
+      if (t.preAffine) {
+        for (const key of Object.keys(t.preAffine)) {
+          const val = t.preAffine[key as keyof typeof t.preAffine] as number
+          t.preAffine[key as keyof typeof t.preAffine] = randomizeAffineCoef(
+            val,
+            key,
+            strength,
+            dims === 3,
+          )
+        }
+      }
+      if (t.postAffine) {
+        for (const key of Object.keys(t.postAffine)) {
+          const val = t.postAffine[key as keyof typeof t.postAffine] as number
+          t.postAffine[key as keyof typeof t.postAffine] = randomizeAffineCoef(
+            val,
+            key,
+            strength,
+            dims === 3,
+          )
+        }
+      }
+    }
+
+    // 2. Mutate Colors
+    if (options.mutateColors && t.color) {
+      t.color = {
+        x: randomPerturbation(t.color.x, 0.15 * strength, [-0.4, 0.4]),
+        y: randomPerturbation(t.color.y, 0.15 * strength, [-0.4, 0.4]),
+      }
+    }
+
+    // 3. Mutate Variations
+    if (options.mutateVariations === 'modify') {
+      if (t.variations) {
+        for (const vid of Object.keys(t.variations)) {
+          const v = t.variations[vid]!
+          const vtype = v.type as
+            | TransformVariationType
+            | TransformVariationType3D
+          const is3D = isVariationType3D(vtype)
+          const isParametric = is3D
+            ? isParametricVariationType3D(vtype)
+            : isParametricVariationType(vtype)
+          if (isParametric) {
+            const defaults = (
+              is3D ? transformVariations3D[vtype] : transformVariations[vtype]
+            ) as { paramDefaults: Record<string, number> }
+            const params = v.params ? { ...v.params } : {}
+            const sigmaScale = 0.05 + strength * 0.95
+            for (const key of Object.keys(defaults.paramDefaults)) {
+              const d = params[key] ?? defaults.paramDefaults[key]!
+              params[key] = randomPerturbation(
+                d,
+                Math.abs(d) * 0.5 * sigmaScale,
+              )
+            }
+            v.params = params
+          }
+          v.weight = randomPerturbation(v.weight, 0.2 * strength, [0.05, 1.0])
+        }
+      }
+    } else if (options.mutateVariations === 'all') {
+      type VariationInstance = {
+        type: string
+        weight: number
+        params?: Record<string, number>
+      }
+      const varEntries = t.variations ? Object.entries(t.variations) : []
+      const currentVars = varEntries.map(([vid, v]) => ({
+        vid,
+        v: v as VariationInstance,
+      }))
+
+      for (const item of currentVars) {
+        const v = item.v
+        const vtype = v.type
+        const is3D = isVariationType3D(vtype)
+        const isParametric = is3D
+          ? isParametricVariationType3D(vtype)
+          : isParametricVariationType(vtype)
+        if (isParametric) {
+          const defaults = (
+            is3D ? transformVariations3D[vtype] : transformVariations[vtype]
+          ) as { paramDefaults: Record<string, number> }
+          const params = v.params ? { ...v.params } : {}
+          const sigmaScale = 0.05 + strength * 0.95
+          for (const key of Object.keys(defaults.paramDefaults)) {
+            const d = params[key] ?? defaults.paramDefaults[key]!
+            params[key] = randomPerturbation(d, Math.abs(d) * 0.5 * sigmaScale)
+          }
+          v.params = params
+        }
+        v.weight = randomPerturbation(v.weight, 0.2 * strength, [0.05, 1.0])
+      }
+
+      let targetVarCount = Math.floor(
+        randomRange(minVariations, maxVariations + 1),
+      )
+      targetVarCount = Math.min(targetVarCount, pool.length)
+
+      const variations: Record<string, VariationInstance> = {}
+
+      if (currentVars.length > targetVarCount) {
+        const sorted = [...currentVars].sort((a, b) => b.v.weight - a.v.weight)
+        for (let i = 0; i < targetVarCount; i++) {
+          const item = sorted[i]!
+          variations[item.vid] = item.v
+        }
+      } else {
+        for (const item of currentVars) {
+          variations[item.vid] = item.v
+        }
+
+        const usedTypes = new Set(currentVars.map((item) => item.v.type))
+        let attempts = 0
+        while (
+          Object.keys(variations).length < targetVarCount &&
+          attempts < 20
+        ) {
+          attempts++
+          const available = pool.filter((vt) => !usedTypes.has(vt))
+          if (available.length === 0) break
+          const vtype = pickRandomVariationType(available)
+          usedTypes.add(vtype)
+
+          const vid = generateVariationId()
+          const weight = randomRange(0.3, 1)
+          const base = getVariationDefault(vtype, weight) as Record<
+            string,
+            unknown
+          >
+
+          const is3D = isVariationType3D(vtype)
+          const isParametric = is3D
+            ? isParametricVariationType3D(vtype)
+            : isParametricVariationType(vtype)
+          if (isParametric) {
+            const randomizedParams = randomizeVariationParams(vtype, strength)
+            if (randomizedParams) {
+              variations[vid] = { ...base, params: randomizedParams }
+              continue
+            }
+          }
+          variations[vid] = base
+        }
+      }
+
+      const nextVarEntries = Object.entries(variations)
+      const totalWeight = nextVarEntries.reduce(
+        (sum, [, v]) => sum + v.weight,
+        0,
+      )
+      if (totalWeight > 0) {
+        for (const vid of Object.keys(variations)) {
+          variations[vid].weight = variations[vid].weight / totalWeight
+        }
+      }
+      t.variations = variations
+    }
+
+    if (options.mutateVariations !== 'none' && t.variations) {
+      type VariationInstance = {
+        type: string
+        weight: number
+        params?: Record<string, number>
+      }
+      const nextVarEntries = Object.entries(t.variations)
+      const totalWeight = nextVarEntries.reduce(
+        (sum, [, v]) => sum + (v as VariationInstance).weight,
+        0,
+      )
+      if (totalWeight > 0) {
+        for (const vid of Object.keys(t.variations)) {
+          const v = t.variations[vid] as VariationInstance
+          v.weight = v.weight / totalWeight
+        }
+      }
+    }
+  }
+
+  return mutated
 }

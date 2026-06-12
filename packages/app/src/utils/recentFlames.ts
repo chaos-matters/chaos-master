@@ -49,8 +49,12 @@ export function saveRecentFlame(
   flame: FlameDescriptor,
   name?: string,
   tracks?: TimelineTrack[],
-): void {
+  forceOverwriteOldest: boolean = true,
+): boolean {
   const recent = loadRecentFlames()
+  if (recent.length >= MAX_RECENT_FLAMES && !forceOverwriteOldest) {
+    return false
+  }
   const id = generateId()
   const entry: RecentFlame = {
     id,
@@ -64,6 +68,13 @@ export function saveRecentFlame(
   }
   const updated = [entry, ...recent].slice(0, MAX_RECENT_FLAMES)
   safeSetItem(STORAGE_KEY, JSON.stringify(updated))
+  return true
+}
+
+export function getOldestRecentFlame(): RecentFlame | undefined {
+  const recent = loadRecentFlames()
+  if (recent.length === 0) return undefined
+  return recent[recent.length - 1]
 }
 
 /**

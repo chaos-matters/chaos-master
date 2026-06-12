@@ -3,6 +3,7 @@ import { Button } from '@/components/Button/Button'
 import { Checkbox } from '@/components/Checkbox/Checkbox'
 import { CollapsibleCard } from '@/components/CollapsibleCard/CollapsibleCard'
 import { VariationPalette } from '@/components/LogoFaviconGenerator/VariationPalette'
+import { RangeSlider } from '@/components/Sliders/RangeSlider'
 import { Slider } from '@/components/Sliders/Slider'
 import { variationTypes } from '@/flame/variations'
 import { variationTypes3D } from '@/flame/variations3D'
@@ -22,12 +23,42 @@ export interface FlameRandomizerCardProps {
     config: GenerateRandomFlameConfig,
     randomizeSettings: {
       skipIters: boolean
+      skipItersRange?: [number, number]
       exposure: boolean
+      exposureRange?: [number, number]
       contrast: boolean
+      contrastRange?: [number, number]
       gamma: boolean
+      gammaRange?: [number, number]
       highlightPower: boolean
+      highlightPowerRange?: [number, number]
       vibrancy: boolean
+      vibrancyRange?: [number, number]
     },
+    recordHistory: boolean,
+  ) => void
+  onMutateFlame: (
+    config: GenerateRandomFlameConfig,
+    randomizeSettings: {
+      skipIters: boolean
+      skipItersRange?: [number, number]
+      exposure: boolean
+      exposureRange?: [number, number]
+      contrast: boolean
+      contrastRange?: [number, number]
+      gamma: boolean
+      gammaRange?: [number, number]
+      highlightPower: boolean
+      highlightPowerRange?: [number, number]
+      vibrancy: boolean
+      vibrancyRange?: [number, number]
+    },
+    mutationSettings: {
+      mutateAffine: boolean
+      mutateVariations: 'modify' | 'all' | 'none'
+      mutateColors: boolean
+    },
+    recordHistory: boolean,
   ) => void
   onLoadHistory: (entry: RandomizerHistoryEntry) => void
   onClearHistory: () => void
@@ -35,12 +66,6 @@ export interface FlameRandomizerCardProps {
   onUpdateRenderSettings: (
     settings: Partial<FlameDescriptor['renderSettings']>,
   ) => void
-}
-
-function numberOptions(min: number, max: number) {
-  const opts: number[] = []
-  for (let i = min; i <= max; i++) opts.push(i)
-  return opts
 }
 
 function RandomizeToggleButton(props: {
@@ -78,8 +103,6 @@ function RandomizeToggleButton(props: {
 
 export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
   const is3D = () => props.flame.renderSettings.dimensions === 3
-  const transformOptions = () => numberOptions(1, 10)
-  const variationOptions = () => numberOptions(1, 5)
 
   // Local settings signals
   const [strength, setStrength] = createSignal(0.5)
@@ -87,6 +110,20 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
   const [maxTransforms, setMaxTransforms] = createSignal(4)
   const [minVariations, setMinVariations] = createSignal(1)
   const [maxVariations, setMaxVariations] = createSignal(2)
+
+  const transformsValue = () =>
+    [minTransforms(), maxTransforms()] as [number, number]
+  const handleTransformsInput = (val: [number, number]) => {
+    setMinTransforms(val[0])
+    setMaxTransforms(val[1])
+  }
+
+  const variationsValue = () =>
+    [minVariations(), maxVariations()] as [number, number]
+  const handleVariationsInput = (val: [number, number]) => {
+    setMinVariations(val[0])
+    setMaxVariations(val[1])
+  }
 
   // Track selected variations
   const [selectedVariations, setSelectedVariations] = createSignal<
@@ -138,25 +175,72 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
     'randomizer/randomize-skipIters',
     true,
   )
+  const [skipItersRange, setSkipItersRange] = persistentSignal<
+    [number, number]
+  >('randomizer/range-skipIters', [5, 30])
+
   const [randomizeExposure, setRandomizeExposure] = persistentSignal(
     'randomizer/randomize-exposure',
     true,
   )
+  const [exposureRange, setExposureRange] = persistentSignal<[number, number]>(
+    'randomizer/range-exposure',
+    [-2, 2],
+  )
+
   const [randomizeContrast, setRandomizeContrast] = persistentSignal(
     'randomizer/randomize-contrast',
     true,
   )
+  const [contrastRange, setContrastRange] = persistentSignal<[number, number]>(
+    'randomizer/range-contrast',
+    [0.5, 4.0],
+  )
+
   const [randomizeGamma, setRandomizeGamma] = persistentSignal(
     'randomizer/randomize-gamma',
     true,
   )
+  const [gammaRange, setGammaRange] = persistentSignal<[number, number]>(
+    'randomizer/range-gamma',
+    [1.0, 3.5],
+  )
+
   const [randomizeHighlightPower, setRandomizeHighlightPower] =
     persistentSignal('randomizer/randomize-highlightPower', true)
+  const [highlightPowerRange, setHighlightPowerRange] = persistentSignal<
+    [number, number]
+  >('randomizer/range-highlightPower', [0.1, 0.9])
+
   const [randomizeVibrancy, setRandomizeVibrancy] = persistentSignal(
     'randomizer/randomize-vibrancy',
     true,
   )
+  const [vibrancyRange, setVibrancyRange] = persistentSignal<[number, number]>(
+    'randomizer/range-vibrancy',
+    [0.2, 0.8],
+  )
 
+  // Mutation Settings
+  const [mutationSettingsExpanded, setMutationSettingsExpanded] =
+    createSignal(false)
+  const [mutateAffine, setMutateAffine] = persistentSignal(
+    'randomizer/mutate-affine',
+    true,
+  )
+  const [mutateVariations, setMutateVariations] = persistentSignal<
+    'modify' | 'all' | 'none'
+  >('randomizer/mutate-variations', 'all')
+  const [mutateColors, setMutateColors] = persistentSignal(
+    'randomizer/mutate-colors',
+    true,
+  )
+  const [recordHistory, setRecordHistory] = persistentSignal(
+    'randomizer/record-history',
+    true,
+  )
+
+  const [animationExpanded, setAnimationExpanded] = createSignal(false)
   const [historyExpanded, setHistoryExpanded] = createSignal(true)
 
   const handleGenerate = () => {
@@ -172,14 +256,62 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
       )[],
       dimensions: props.flame.renderSettings.dimensions,
     }
-    props.onGenerateFlame(config, {
-      skipIters: randomizeSkipIters(),
-      exposure: randomizeExposure(),
-      contrast: randomizeContrast(),
-      gamma: randomizeGamma(),
-      highlightPower: randomizeHighlightPower(),
-      vibrancy: randomizeVibrancy(),
-    })
+    props.onGenerateFlame(
+      config,
+      {
+        skipIters: randomizeSkipIters(),
+        skipItersRange: skipItersRange(),
+        exposure: randomizeExposure(),
+        exposureRange: exposureRange(),
+        contrast: randomizeContrast(),
+        contrastRange: contrastRange(),
+        gamma: randomizeGamma(),
+        gammaRange: gammaRange(),
+        highlightPower: randomizeHighlightPower(),
+        highlightPowerRange: highlightPowerRange(),
+        vibrancy: randomizeVibrancy(),
+        vibrancyRange: vibrancyRange(),
+      },
+      recordHistory(),
+    )
+  }
+
+  const handleMutate = () => {
+    const config: GenerateRandomFlameConfig = {
+      strength: strength(),
+      minTransforms: minTransforms(),
+      maxTransforms: maxTransforms(),
+      minVariations: minVariations(),
+      maxVariations: maxVariations(),
+      allowedVariations: [...selectedVariations()] as (
+        | TransformVariationType
+        | TransformVariationType3D
+      )[],
+      dimensions: props.flame.renderSettings.dimensions,
+    }
+    props.onMutateFlame(
+      config,
+      {
+        skipIters: randomizeSkipIters(),
+        skipItersRange: skipItersRange(),
+        exposure: randomizeExposure(),
+        exposureRange: exposureRange(),
+        contrast: randomizeContrast(),
+        contrastRange: contrastRange(),
+        gamma: randomizeGamma(),
+        gammaRange: gammaRange(),
+        highlightPower: randomizeHighlightPower(),
+        highlightPowerRange: highlightPowerRange(),
+        vibrancy: randomizeVibrancy(),
+        vibrancyRange: vibrancyRange(),
+      },
+      {
+        mutateAffine: mutateAffine(),
+        mutateVariations: mutateVariations(),
+        mutateColors: mutateColors(),
+      },
+      recordHistory(),
+    )
   }
 
   const handleRandomizeAnimation = () => {
@@ -216,74 +348,28 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
             </div>
           </div>
 
-          <div class={ui.fieldRow}>
-            <label class={ui.field}>
-              <span class={ui.fieldLabel}>Transf. Min</span>
-              <select
-                class={ui.select}
-                value={minTransforms()}
-                onChange={(e) => {
-                  const v = Number(e.currentTarget.value)
-                  setMinTransforms(v)
-                  if (v > maxTransforms()) setMaxTransforms(v)
-                }}
-              >
-                <For each={transformOptions()}>
-                  {(n) => <option value={n}>{n}</option>}
-                </For>
-              </select>
-            </label>
-            <label class={ui.field}>
-              <span class={ui.fieldLabel}>Max</span>
-              <select
-                class={ui.select}
-                value={maxTransforms()}
-                onChange={(e) => {
-                  const v = Number(e.currentTarget.value)
-                  setMaxTransforms(v)
-                  if (v < minTransforms()) setMinTransforms(v)
-                }}
-              >
-                <For each={transformOptions()}>
-                  {(n) => <option value={n}>{n}</option>}
-                </For>
-              </select>
-            </label>
+          <div class={ui.renderField}>
+            <RangeSlider
+              class={ui.wideRangeSlider}
+              label="Transforms"
+              value={transformsValue()}
+              min={1}
+              max={10}
+              step={1}
+              onInput={handleTransformsInput}
+            />
           </div>
 
-          <div class={ui.fieldRow}>
-            <label class={ui.field}>
-              <span class={ui.fieldLabel}>Var. Min</span>
-              <select
-                class={ui.select}
-                value={minVariations()}
-                onChange={(e) => {
-                  const v = Number(e.currentTarget.value)
-                  setMinVariations(v)
-                  if (v > maxVariations()) setMaxVariations(v)
-                }}
-              >
-                <For each={variationOptions()}>
-                  {(n) => <option value={n}>{n}</option>}
-                </For>
-              </select>
-            </label>
-            <label class={ui.field}>
-              <span class={ui.fieldLabel}>Max</span>
-              <select
-                class={ui.select}
-                value={maxVariations()}
-                onChange={(e) => {
-                  const v = Number(e.currentTarget.value)
-                  setMaxVariations(v)
-                  if (v < minVariations()) setMinVariations(v)
-                }}
-              >
-                <For each={variationOptions()}>
-                  {(n) => <option value={n}>{n}</option>}
-                </For>
-              </select>
-            </label>
+          <div class={ui.renderField}>
+            <RangeSlider
+              class={ui.wideRangeSlider}
+              label="Variations per Transf."
+              value={variationsValue()}
+              min={1}
+              max={10}
+              step={1}
+              onInput={handleVariationsInput}
+            />
           </div>
 
           {/* Collapsible Render Settings */}
@@ -311,9 +397,14 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
             </button>
             <Show when={renderSettingsExpanded()}>
               <div class={ui.renderGrid}>
-                <label class={ui.renderField}>
+                <div class={ui.renderField}>
                   <div class={ui.renderLabelRow}>
-                    <span class={ui.renderLabel}>Skip Iters</span>
+                    <span class={ui.renderLabel}>
+                      Skip Iters:{' '}
+                      <span class={ui.valuePreview}>
+                        {props.flame.renderSettings.skipIters}
+                      </span>
+                    </span>
                     <RandomizeToggleButton
                       enabled={randomizeSkipIters()}
                       onChange={setRandomizeSkipIters}
@@ -324,14 +415,30 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
                     min={0}
                     max={30}
                     step={1}
+                    showValue={false}
                     onInput={(v) => {
                       props.onUpdateRenderSettings({ skipIters: v })
                     }}
                   />
-                </label>
-                <label class={ui.renderField}>
+                  <Show when={randomizeSkipIters()}>
+                    <RangeSlider
+                      label="Range"
+                      value={skipItersRange()}
+                      min={0}
+                      max={30}
+                      step={1}
+                      onInput={setSkipItersRange}
+                    />
+                  </Show>
+                </div>
+                <div class={ui.renderField}>
                   <div class={ui.renderLabelRow}>
-                    <span class={ui.renderLabel}>Exposure</span>
+                    <span class={ui.renderLabel}>
+                      Exposure:{' '}
+                      <span class={ui.valuePreview}>
+                        {props.flame.renderSettings.exposure.toFixed(2)}
+                      </span>
+                    </span>
                     <RandomizeToggleButton
                       enabled={randomizeExposure()}
                       onChange={setRandomizeExposure}
@@ -342,14 +449,30 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
                     min={-4}
                     max={4}
                     step={0.01}
+                    showValue={false}
                     onInput={(v) => {
                       props.onUpdateRenderSettings({ exposure: v })
                     }}
                   />
-                </label>
-                <label class={ui.renderField}>
+                  <Show when={randomizeExposure()}>
+                    <RangeSlider
+                      label="Range"
+                      value={exposureRange()}
+                      min={-4}
+                      max={4}
+                      step={0.01}
+                      onInput={setExposureRange}
+                    />
+                  </Show>
+                </div>
+                <div class={ui.renderField}>
                   <div class={ui.renderLabelRow}>
-                    <span class={ui.renderLabel}>Contrast</span>
+                    <span class={ui.renderLabel}>
+                      Contrast:{' '}
+                      <span class={ui.valuePreview}>
+                        {props.flame.renderSettings.contrast.toFixed(2)}
+                      </span>
+                    </span>
                     <RandomizeToggleButton
                       enabled={randomizeContrast()}
                       onChange={setRandomizeContrast}
@@ -360,14 +483,30 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
                     min={0.1}
                     max={10}
                     step={0.01}
+                    showValue={false}
                     onInput={(v) => {
                       props.onUpdateRenderSettings({ contrast: v })
                     }}
                   />
-                </label>
-                <label class={ui.renderField}>
+                  <Show when={randomizeContrast()}>
+                    <RangeSlider
+                      label="Range"
+                      value={contrastRange()}
+                      min={0.1}
+                      max={10}
+                      step={0.01}
+                      onInput={setContrastRange}
+                    />
+                  </Show>
+                </div>
+                <div class={ui.renderField}>
                   <div class={ui.renderLabelRow}>
-                    <span class={ui.renderLabel}>Gamma</span>
+                    <span class={ui.renderLabel}>
+                      Gamma:{' '}
+                      <span class={ui.valuePreview}>
+                        {props.flame.renderSettings.gamma.toFixed(2)}
+                      </span>
+                    </span>
                     <RandomizeToggleButton
                       enabled={randomizeGamma()}
                       onChange={setRandomizeGamma}
@@ -378,14 +517,30 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
                     min={0.2}
                     max={5}
                     step={0.01}
+                    showValue={false}
                     onInput={(v) => {
                       props.onUpdateRenderSettings({ gamma: v })
                     }}
                   />
-                </label>
-                <label class={ui.renderField}>
+                  <Show when={randomizeGamma()}>
+                    <RangeSlider
+                      label="Range"
+                      value={gammaRange()}
+                      min={0.2}
+                      max={5}
+                      step={0.01}
+                      onInput={setGammaRange}
+                    />
+                  </Show>
+                </div>
+                <div class={ui.renderField}>
                   <div class={ui.renderLabelRow}>
-                    <span class={ui.renderLabel}>Highlight</span>
+                    <span class={ui.renderLabel}>
+                      Highlight:{' '}
+                      <span class={ui.valuePreview}>
+                        {props.flame.renderSettings.highlightPower.toFixed(2)}
+                      </span>
+                    </span>
                     <RandomizeToggleButton
                       enabled={randomizeHighlightPower()}
                       onChange={setRandomizeHighlightPower}
@@ -396,14 +551,30 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
                     min={0}
                     max={1}
                     step={0.01}
+                    showValue={false}
                     onInput={(v) => {
                       props.onUpdateRenderSettings({ highlightPower: v })
                     }}
                   />
-                </label>
-                <label class={ui.renderField}>
+                  <Show when={randomizeHighlightPower()}>
+                    <RangeSlider
+                      label="Range"
+                      value={highlightPowerRange()}
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      onInput={setHighlightPowerRange}
+                    />
+                  </Show>
+                </div>
+                <div class={ui.renderField}>
                   <div class={ui.renderLabelRow}>
-                    <span class={ui.renderLabel}>Vibrancy</span>
+                    <span class={ui.renderLabel}>
+                      Vibrancy:{' '}
+                      <span class={ui.valuePreview}>
+                        {props.flame.renderSettings.vibrancy.toFixed(2)}
+                      </span>
+                    </span>
                     <RandomizeToggleButton
                       enabled={randomizeVibrancy()}
                       onChange={setRandomizeVibrancy}
@@ -414,11 +585,22 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
                     min={0}
                     max={1}
                     step={0.01}
+                    showValue={false}
                     onInput={(v) => {
                       props.onUpdateRenderSettings({ vibrancy: v })
                     }}
                   />
-                </label>
+                  <Show when={randomizeVibrancy()}>
+                    <RangeSlider
+                      label="Range"
+                      value={vibrancyRange()}
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      onInput={setVibrancyRange}
+                    />
+                  </Show>
+                </div>
               </div>
             </Show>
           </div>
@@ -457,74 +639,198 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
             </Show>
           </div>
 
-          <Button class={ui.primaryButton} onClick={handleGenerate}>
-            <svg
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-              fill="none"
-              class={ui.btnIcon}
+          {/* Collapsible Mutation Settings */}
+          <div class={ui.paletteWrapper}>
+            <button
+              type="button"
+              class={ui.paletteHeader}
+              onClick={() =>
+                setMutationSettingsExpanded(!mutationSettingsExpanded())
+              }
             >
-              <polyline points="16 3 21 3 21 8" />
-              <line x1="4" y1="20" x2="21" y2="3" />
-              <polyline points="21 16 21 21 16 21" />
-              <line x1="15" y1="15" x2="21" y2="21" />
-              <line x1="4" y1="4" x2="9" y2="9" />
-            </svg>
-            Generate Random Flame
-          </Button>
-        </div>
-
-        {/* Divider */}
-        <div class={ui.divider} />
-
-        {/* Animation Presets Section */}
-        <div class={ui.animSection}>
-          <span class={ui.sectionTitle}>Animation Randomizer</span>
-          <div class={ui.presetsGrid}>
-            <label class={ui.checkboxField}>
-              <Checkbox checked={animPan()} onChange={setAnimPan} />
-              <span>Camera Pan</span>
-            </label>
-            <label class={ui.checkboxField}>
-              <Checkbox checked={animZoom()} onChange={setAnimZoom} />
-              <span>Camera Zoom</span>
-            </label>
-            <label class={ui.checkboxField}>
-              <Checkbox checked={animRot()} onChange={setAnimRot} />
-              <span>Camera Spin</span>
-            </label>
-            <label class={ui.checkboxField}>
-              <Checkbox checked={animColor()} onChange={setAnimColor} />
-              <span>Color Cycle</span>
-            </label>
-            <label class={ui.checkboxField}>
-              <Checkbox checked={animVib()} onChange={setAnimVib} />
-              <span>Vibrancy Pulse</span>
-            </label>
-            <Show when={is3D()}>
-              <label class={ui.checkboxField}>
-                <Checkbox checked={animOrbit()} onChange={setAnimOrbit} />
-                <span>3D Orbit</span>
-              </label>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                class={ui.chevron}
+                classList={{
+                  [ui.chevronExpanded as string]: mutationSettingsExpanded(),
+                }}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+              <span>Mutation Settings</span>
+            </button>
+            <Show when={mutationSettingsExpanded()}>
+              <div class={ui.mutationContainer}>
+                <label class={ui.checkboxField}>
+                  <Checkbox
+                    checked={mutateAffine()}
+                    onChange={setMutateAffine}
+                  />
+                  <span>Mutate Affine Coefs</span>
+                </label>
+                <label class={ui.checkboxField}>
+                  <Checkbox
+                    checked={mutateColors()}
+                    onChange={setMutateColors}
+                  />
+                  <span>Mutate Colors</span>
+                </label>
+                <label class={ui.checkboxField}>
+                  <Checkbox
+                    checked={recordHistory()}
+                    onChange={setRecordHistory}
+                  />
+                  <span>Save Previous to History</span>
+                </label>
+                <div class={ui.field}>
+                  <span class={ui.fieldLabel}>Mutate Variations</span>
+                  <div class={ui.pillsRow}>
+                    <button
+                      type="button"
+                      class={ui.pillButton}
+                      classList={{
+                        [ui.pillButtonActive as string]:
+                          mutateVariations() === 'all',
+                      }}
+                      onClick={() => setMutateVariations('all')}
+                    >
+                      All
+                    </button>
+                    <button
+                      type="button"
+                      class={ui.pillButton}
+                      classList={{
+                        [ui.pillButtonActive as string]:
+                          mutateVariations() === 'modify',
+                      }}
+                      onClick={() => setMutateVariations('modify')}
+                    >
+                      Params
+                    </button>
+                    <button
+                      type="button"
+                      class={ui.pillButton}
+                      classList={{
+                        [ui.pillButtonActive as string]:
+                          mutateVariations() === 'none',
+                      }}
+                      onClick={() => setMutateVariations('none')}
+                    >
+                      None
+                    </button>
+                  </div>
+                </div>
+              </div>
             </Show>
-            <label class={ui.checkboxField}>
-              <Checkbox checked={animFT()} onChange={setAnimFT} />
-              <span>Final Transf. Spin</span>
-            </label>
           </div>
-          <Button class={ui.secondaryButton} onClick={handleRandomizeAnimation}>
-            <svg
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-              fill="none"
-              class={ui.btnIcon}
+
+          {/* Collapsible Animation Settings */}
+          <div class={ui.paletteWrapper}>
+            <button
+              type="button"
+              class={ui.paletteHeader}
+              onClick={() => setAnimationExpanded(!animationExpanded())}
             >
-              <polygon points="5 3 19 12 5 21 5 3" />
-            </svg>
-            Randomize Animation
-          </Button>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                class={ui.chevron}
+                classList={{
+                  [ui.chevronExpanded as string]: animationExpanded(),
+                }}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+              <span>Animation Settings</span>
+            </button>
+            <Show when={animationExpanded()}>
+              <div class={ui.animContainer}>
+                <div class={ui.presetsGrid}>
+                  <label class={ui.checkboxField}>
+                    <Checkbox checked={animPan()} onChange={setAnimPan} />
+                    <span>Camera Pan</span>
+                  </label>
+                  <label class={ui.checkboxField}>
+                    <Checkbox checked={animZoom()} onChange={setAnimZoom} />
+                    <span>Camera Zoom</span>
+                  </label>
+                  <label class={ui.checkboxField}>
+                    <Checkbox checked={animRot()} onChange={setAnimRot} />
+                    <span>Camera Spin</span>
+                  </label>
+                  <label class={ui.checkboxField}>
+                    <Checkbox checked={animColor()} onChange={setAnimColor} />
+                    <span>Color Cycle</span>
+                  </label>
+                  <label class={ui.checkboxField}>
+                    <Checkbox checked={animVib()} onChange={setAnimVib} />
+                    <span>Vibrancy Pulse</span>
+                  </label>
+                  <Show when={is3D()}>
+                    <label class={ui.checkboxField}>
+                      <Checkbox checked={animOrbit()} onChange={setAnimOrbit} />
+                      <span>3D Orbit</span>
+                    </label>
+                  </Show>
+                  <label class={ui.checkboxField}>
+                    <Checkbox checked={animFT()} onChange={setAnimFT} />
+                    <span>Final Transf. Spin</span>
+                  </label>
+                </div>
+              </div>
+            </Show>
+          </div>
+
+          <div class={ui.buttonGroup}>
+            <Button class={ui.primaryButton} onClick={handleGenerate}>
+              <svg
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+                fill="none"
+                class={ui.btnIcon}
+              >
+                <polyline points="16 3 21 3 21 8" />
+                <line x1="4" y1="20" x2="21" y2="3" />
+                <polyline points="21 16 21 21 16 21" />
+                <line x1="15" y1="15" x2="21" y2="21" />
+                <line x1="4" y1="4" x2="9" y2="9" />
+              </svg>
+              Generate Random Flame
+            </Button>
+            <Button class={ui.secondaryButton} onClick={handleMutate}>
+              <svg
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+                fill="none"
+                class={ui.btnIcon}
+              >
+                <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+              </svg>
+              Mutate Active Flame
+            </Button>
+            <Button
+              class={ui.secondaryButton}
+              onClick={handleRandomizeAnimation}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+                fill="none"
+                class={ui.btnIcon}
+              >
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+              Randomize Animation
+            </Button>
+          </div>
         </div>
 
         {/* Recent History Gallery */}

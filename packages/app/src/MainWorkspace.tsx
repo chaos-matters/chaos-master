@@ -31,6 +31,7 @@ import { FlameColorEditor, handleColor, } from './components/FlameColorEditor/Fl
 import { FlameRandomizerCard } from './components/FlameRandomizerCard/FlameRandomizerCard'
 import { FloatingActions } from './components/FloatingActions/FloatingActions'
 import { createShowHelp } from './components/HelpModal/HelpModal'
+import { ConfirmOverwriteRecentModal } from './components/LoadFlameModal/ConfirmOverwriteRecentModal'
 import { createLoadFlame } from './components/LoadFlameModal/LoadFlameModal'
 import { createLogoFaviconGenerator } from './components/LogoFaviconGenerator/LogoFaviconGenerator'
 import { useRequestModal } from './components/Modal/ModalContext'
@@ -63,7 +64,7 @@ import { initExample } from './flame/examples/initExample'
 import { Flam3 } from './flame/Flam3'
 import { pointInitModeToImplFn } from './flame/pointInitMode'
 import { pointInitMode3DToImplFn } from './flame/pointInitMode3D'
-import { generateRandomFlame, random01, randomizeAllColors, randomizeVariationParams, randomRange, } from './flame/randomize'
+import { generateRandomFlame, mutateFlame, random01, randomizeAllColors, randomizeVariationParams, randomRange, } from './flame/randomize'
 import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, cameraDuringExportEnabled, exportProgress, exportQuality, qualityPointCountLimit, setCurrentQuality, setForceAnimationExportNow, setForceExportNow, setQualityPointCountLimit, } from './flame/renderStats'
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from './flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from './flame/transformFunction'
@@ -82,9 +83,9 @@ import { addFlameDataToPng } from './utils/flameInPng'
 import { hardwareTierToPreset } from './utils/hardwareTier'
 import { compressJsonQueryParam } from './utils/jsonQueryParam'
 import { persistentSignal } from './utils/persistentSignal'
-import { addRandomizerHistoryEntry, clearRandomizerHistory, loadRandomizerHistoryEntries, } from './utils/randomizerHistoryDB'
+import { addRandomizerHistoryEntry, clearRandomizerHistory, loadRandomizerHistoryEntries, MAX_RANDOMIZER_HISTORY_LIMIT, } from './utils/randomizerHistoryDB'
 import { buildReadableIds } from './utils/readableIds'
-import { saveRecentFlame } from './utils/recentFlames'
+import { getOldestRecentFlame, saveRecentFlame } from './utils/recentFlames'
 import { sum } from './utils/sum'
 import { createTimelineState, resolveKeyframeValue } from './utils/timeline'
 import { useAppDragAndDrop } from './utils/useAppDragAndDrop'
@@ -97,7 +98,7 @@ import type { QuickPickerMode } from './components/QuickVariationPicker/QuickVar
 import type { TourContext } from './components/SpotlightTour/tourTypes'
 import type { ColorMap, Palette } from './flame/colorMap'
 import type { PointInitMode } from './flame/pointInitMode'
-import type { GenerateRandomFlameConfig } from './flame/randomize'
+import type { GenerateRandomFlameConfig, MutateFlameOptions, } from './flame/randomize'
 import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from './flame/schema/flameSchema'
 import type { Dims } from './flame/variationRegistry'
 import type { TransformVariationType } from './flame/variations'
@@ -205,10 +206,11 @@ function addTransformWithVariation(draft: FlameDescriptor, type: string) {
 export function MainWorkspace(props: AppProps) {
   const { theme, setTheme } = useTheme()
   const { targetedParameter, setTargetedParameter } = useKeyframeTarget()
+  let isRandomizingAnimation = false
 
   createEffect(() => {
     const path = targetedParameter()
-    if (path) {
+    if (path && !isRandomizingAnimation) {
       // Find the element with the matching data-parameter-path
       const el = document.querySelector(`[data-parameter-path="${path}"]`)
       if (el) {
@@ -604,7 +606,9 @@ export function MainWorkspace(props: AppProps) {
   onMount(() => {
     loadCustomVariations()
     setCustomVarsVersion((v) => v + 1)
-    void loadRandomizerHistoryEntries(50).then(setRandomizerHistory)
+    void loadRandomizerHistoryEntries(MAX_RANDOMIZER_HISTORY_LIMIT).then(
+      setRandomizerHistory,
+    )
     if (IS_DEV) {
       console.info('[share:app] onMount', {
         hasQueryFlame: !!props.flameFromQuery?.flame,
@@ -972,22 +976,34 @@ export function MainWorkspace(props: AppProps) {
     config: GenerateRandomFlameConfig,
     randomizeSettings: {
       skipIters: boolean
+      skipItersRange?: [number, number]
       exposure: boolean
+      exposureRange?: [number, number]
       contrast: boolean
+      contrastRange?: [number, number]
       gamma: boolean
+      gammaRange?: [number, number]
       highlightPower: boolean
+      highlightPowerRange?: [number, number]
       vibrancy: boolean
+      vibrancyRange?: [number, number]
     },
+    recordHistory: boolean,
   ) => {
-    const thumb = await captureMainThumbnail(128)
-    if (thumb) {
-      const entry: RandomizerHistoryEntry = {
-        flame: deepClone(flameDescriptor),
-        thumbnail: thumb,
-        timestamp: Date.now(),
+    if (recordHistory) {
+      const thumb = await captureMainThumbnail(128)
+      if (thumb) {
+        const entry: RandomizerHistoryEntry = {
+          flame: deepClone(flameDescriptor),
+          thumbnail: thumb,
+          timestamp: Date.now(),
+        }
+        const updated = await addRandomizerHistoryEntry(
+          entry,
+          MAX_RANDOMIZER_HISTORY_LIMIT,
+        )
+        setRandomizerHistory(updated)
       }
-      const updated = await addRandomizerHistoryEntry(entry, 50)
-      setRandomizerHistory(updated)
     }
 
     setSelectedHistoryTimestamp(0)
@@ -998,36 +1014,123 @@ export function MainWorkspace(props: AppProps) {
 
     // Skip Iters
     if (randomizeSettings.skipIters) {
-      rs.skipIters = Math.floor(randomRange(5, 31))
+      const r = randomizeSettings.skipItersRange ?? [5, 30]
+      rs.skipIters = Math.floor(randomRange(r[0], r[1] + 1))
     }
 
     // Exposure
     if (randomizeSettings.exposure) {
-      rs.exposure = randomRange(-4, 4)
+      const r = randomizeSettings.exposureRange ?? [-2, 2]
+      rs.exposure = randomRange(r[0], r[1])
     }
 
     // Contrast
     if (randomizeSettings.contrast) {
-      rs.contrast = randomRange(0.1, 10)
+      const r = randomizeSettings.contrastRange ?? [0.5, 4.0]
+      rs.contrast = randomRange(r[0], r[1])
     }
 
     // Gamma
     if (randomizeSettings.gamma) {
-      rs.gamma = randomRange(0.2, 5)
+      const r = randomizeSettings.gammaRange ?? [1.0, 3.5]
+      rs.gamma = randomRange(r[0], r[1])
     }
 
     // Highlight Power
     if (randomizeSettings.highlightPower) {
-      rs.highlightPower = randomRange(0, 1)
+      const r = randomizeSettings.highlightPowerRange ?? [0.1, 0.9]
+      rs.highlightPower = randomRange(r[0], r[1])
     }
 
     // Vibrancy
     if (randomizeSettings.vibrancy) {
-      rs.vibrancy = randomRange(0, 1)
+      const r = randomizeSettings.vibrancyRange ?? [0.2, 0.8]
+      rs.vibrancy = randomRange(r[0], r[1])
     }
 
     newFlame.renderSettings = rs
     history.replace(newFlame, 'Randomize Flame')
+  }
+
+  const handleMutateFlame = async (
+    config: GenerateRandomFlameConfig,
+    randomizeSettings: {
+      skipIters: boolean
+      skipItersRange?: [number, number]
+      exposure: boolean
+      exposureRange?: [number, number]
+      contrast: boolean
+      contrastRange?: [number, number]
+      gamma: boolean
+      gammaRange?: [number, number]
+      highlightPower: boolean
+      highlightPowerRange?: [number, number]
+      vibrancy: boolean
+      vibrancyRange?: [number, number]
+    },
+    mutationSettings: MutateFlameOptions,
+    recordHistory: boolean,
+  ) => {
+    if (recordHistory) {
+      const thumb = await captureMainThumbnail(128)
+      if (thumb) {
+        const entry: RandomizerHistoryEntry = {
+          flame: deepClone(flameDescriptor),
+          thumbnail: thumb,
+          timestamp: Date.now(),
+        }
+        const updated = await addRandomizerHistoryEntry(
+          entry,
+          MAX_RANDOMIZER_HISTORY_LIMIT,
+        )
+        setRandomizerHistory(updated)
+      }
+    }
+
+    setSelectedHistoryTimestamp(0)
+
+    const mutatedFlame = mutateFlame(flameDescriptor, config, mutationSettings)
+    const prevRs = flameDescriptor.renderSettings
+    const rs = deepClone(prevRs)
+
+    // Skip Iters
+    if (randomizeSettings.skipIters) {
+      const r = randomizeSettings.skipItersRange ?? [5, 30]
+      rs.skipIters = Math.floor(randomRange(r[0], r[1] + 1))
+    }
+
+    // Exposure
+    if (randomizeSettings.exposure) {
+      const r = randomizeSettings.exposureRange ?? [-2, 2]
+      rs.exposure = randomRange(r[0], r[1])
+    }
+
+    // Contrast
+    if (randomizeSettings.contrast) {
+      const r = randomizeSettings.contrastRange ?? [0.5, 4.0]
+      rs.contrast = randomRange(r[0], r[1])
+    }
+
+    // Gamma
+    if (randomizeSettings.gamma) {
+      const r = randomizeSettings.gammaRange ?? [1.0, 3.5]
+      rs.gamma = randomRange(r[0], r[1])
+    }
+
+    // Highlight Power
+    if (randomizeSettings.highlightPower) {
+      const r = randomizeSettings.highlightPowerRange ?? [0.1, 0.9]
+      rs.highlightPower = randomRange(r[0], r[1])
+    }
+
+    // Vibrancy
+    if (randomizeSettings.vibrancy) {
+      const r = randomizeSettings.vibrancyRange ?? [0.2, 0.8]
+      rs.vibrancy = randomRange(r[0], r[1])
+    }
+
+    mutatedFlame.renderSettings = rs
+    history.replace(mutatedFlame, 'Mutate Flame')
   }
 
   const handleUpdateRenderSettings = (
@@ -1049,99 +1152,112 @@ export function MainWorkspace(props: AppProps) {
   const handleRandomizeAnimation = (presetIds: string[]) => {
     if (presetIds.length === 0) return
 
-    timeline.clearAllTracks()
+    isRandomizingAnimation = true
+    try {
+      timeline.clearAllTracks()
 
-    const start = timeline.config().startFrame
-    const end = timeline.config().endFrame
-    const mid = Math.floor((start + end) / 2)
+      const start = timeline.config().startFrame
+      const end = timeline.config().endFrame
+      const mid = Math.floor((start + end) / 2)
 
-    const addLoopingTrack = (
-      paramPath: string,
-      startVal: number,
-      minPerturb: number,
-      maxPerturb: number,
-      easing: EasingCurve = 'easeInOut',
-    ) => {
-      const perturb =
-        randomRange(minPerturb, maxPerturb) * (Math.random() > 0.5 ? 1 : -1)
-      const midVal = startVal + perturb
-      timeline.addKeyframe(paramPath, start, startVal, easing)
-      timeline.addKeyframe(paramPath, mid, midVal, easing)
-      timeline.addKeyframe(paramPath, end, startVal, easing)
-    }
-
-    const addContinuousTrack = (
-      paramPath: string,
-      startVal: number,
-      delta: number,
-    ) => {
-      timeline.addKeyframe(paramPath, start, startVal, 'linear')
-      timeline.addKeyframe(paramPath, end, startVal + delta, 'linear')
-    }
-
-    for (const preset of presetIds) {
-      if (preset === 'pan') {
-        const camX = flameDescriptor.renderSettings.camera?.position?.[0] ?? 0
-        const camY = flameDescriptor.renderSettings.camera?.position?.[1] ?? 0
-        addLoopingTrack('camera.x', camX, 0.1, 0.4)
-        addLoopingTrack('camera.y', camY, 0.1, 0.4)
-      } else if (preset === 'zoom') {
-        const zoom = flameDescriptor.renderSettings.camera?.zoom ?? 1
-        addLoopingTrack('camera.zoom', zoom, zoom * 0.15, zoom * 0.4)
-      } else if (preset === 'rot') {
-        const rot = flameDescriptor.renderSettings.camera?.rotation ?? 0
-        const dir = Math.random() > 0.5 ? 1 : -1
-        addContinuousTrack('camera.rotation', rot, dir * 2 * Math.PI)
-      } else if (preset === 'color') {
-        const phase = flameDescriptor.renderSettings.palettePhase ?? 0
-        const dir = Math.random() > 0.5 ? 1 : -1
-        addContinuousTrack('palettePhase', phase, dir * randomRange(1, 3))
-      } else if (preset === 'vibrancy') {
-        const vib = flameDescriptor.renderSettings.vibrancy ?? 0.5
-        const minPert = vib > 0.5 ? -0.3 : 0.1
-        const maxPert = vib > 0.5 ? -0.1 : 0.3
-        addLoopingTrack('vibrancy', vib, minPert, maxPert)
-      } else if (preset === 'orbit') {
-        const theta = flameDescriptor.renderSettings.camera3D?.theta ?? 0
-        const phi = flameDescriptor.renderSettings.camera3D?.phi ?? Math.PI / 2
-        const radius = flameDescriptor.renderSettings.camera3D?.radius ?? 5
-
-        addContinuousTrack('camera3D.theta', theta, 2 * Math.PI)
-        addLoopingTrack('camera3D.phi', phi, 0.1, 0.3)
-        addLoopingTrack('camera3D.radius', radius, radius * 0.1, radius * 0.25)
-      } else if (preset === 'finalTransform') {
-        const q1 = Math.floor(start + (end - start) * 0.25)
-        const q3 = Math.floor(start + (end - start) * 0.75)
-        const dir = Math.random() > 0.5 ? 1 : -1
-
-        timeline.addKeyframe('finalTransform.a', start, 1, 'linear')
-        timeline.addKeyframe('finalTransform.a', q1, 0, 'linear')
-        timeline.addKeyframe('finalTransform.a', mid, -1, 'linear')
-        timeline.addKeyframe('finalTransform.a', q3, 0, 'linear')
-        timeline.addKeyframe('finalTransform.a', end, 1, 'linear')
-
-        timeline.addKeyframe('finalTransform.b', start, 0, 'linear')
-        timeline.addKeyframe('finalTransform.b', q1, -dir, 'linear')
-        timeline.addKeyframe('finalTransform.b', mid, 0, 'linear')
-        timeline.addKeyframe('finalTransform.b', q3, dir, 'linear')
-        timeline.addKeyframe('finalTransform.b', end, 0, 'linear')
-
-        timeline.addKeyframe('finalTransform.c', start, 0, 'linear')
-        timeline.addKeyframe('finalTransform.c', q1, dir, 'linear')
-        timeline.addKeyframe('finalTransform.c', mid, 0, 'linear')
-        timeline.addKeyframe('finalTransform.c', q3, -dir, 'linear')
-        timeline.addKeyframe('finalTransform.c', end, 0, 'linear')
-
-        timeline.addKeyframe('finalTransform.d', start, 1, 'linear')
-        timeline.addKeyframe('finalTransform.d', q1, 0, 'linear')
-        timeline.addKeyframe('finalTransform.d', mid, -1, 'linear')
-        timeline.addKeyframe('finalTransform.d', q3, 0, 'linear')
-        timeline.addKeyframe('finalTransform.d', end, 1, 'linear')
+      const addLoopingTrack = (
+        paramPath: string,
+        startVal: number,
+        minPerturb: number,
+        maxPerturb: number,
+        easing: EasingCurve = 'easeInOut',
+      ) => {
+        const perturb =
+          randomRange(minPerturb, maxPerturb) * (Math.random() > 0.5 ? 1 : -1)
+        const midVal = startVal + perturb
+        timeline.addKeyframe(paramPath, start, startVal, easing)
+        timeline.addKeyframe(paramPath, mid, midVal, easing)
+        timeline.addKeyframe(paramPath, end, startVal, easing)
       }
-    }
 
-    timeline.setAnimationEnabled(true)
-    setShowTimeline(true)
+      const addContinuousTrack = (
+        paramPath: string,
+        startVal: number,
+        delta: number,
+      ) => {
+        timeline.addKeyframe(paramPath, start, startVal, 'linear')
+        timeline.addKeyframe(paramPath, end, startVal + delta, 'linear')
+      }
+
+      for (const preset of presetIds) {
+        if (preset === 'pan') {
+          const camX = flameDescriptor.renderSettings.camera?.position?.[0] ?? 0
+          const camY = flameDescriptor.renderSettings.camera?.position?.[1] ?? 0
+          addLoopingTrack('camera.x', camX, 0.1, 0.4)
+          addLoopingTrack('camera.y', camY, 0.1, 0.4)
+        } else if (preset === 'zoom') {
+          const zoom = flameDescriptor.renderSettings.camera?.zoom ?? 1
+          addLoopingTrack('camera.zoom', zoom, zoom * 0.15, zoom * 0.4)
+        } else if (preset === 'rot') {
+          const rot = flameDescriptor.renderSettings.camera?.rotation ?? 0
+          const dir = Math.random() > 0.5 ? 1 : -1
+          addContinuousTrack('camera.rotation', rot, dir * 2 * Math.PI)
+        } else if (preset === 'color') {
+          const phase = flameDescriptor.renderSettings.palettePhase ?? 0
+          const dir = Math.random() > 0.5 ? 1 : -1
+          addContinuousTrack('palettePhase', phase, dir * randomRange(1, 3))
+        } else if (preset === 'vibrancy') {
+          const vib = flameDescriptor.renderSettings.vibrancy ?? 0.5
+          const minPert = vib > 0.5 ? -0.3 : 0.1
+          const maxPert = vib > 0.5 ? -0.1 : 0.3
+          addLoopingTrack('vibrancy', vib, minPert, maxPert)
+        } else if (preset === 'orbit') {
+          const theta = flameDescriptor.renderSettings.camera3D?.theta ?? 0
+          const phi =
+            flameDescriptor.renderSettings.camera3D?.phi ?? Math.PI / 2
+          const radius = flameDescriptor.renderSettings.camera3D?.radius ?? 5
+
+          addContinuousTrack('camera3D.theta', theta, 2 * Math.PI)
+          addLoopingTrack('camera3D.phi', phi, 0.1, 0.3)
+          addLoopingTrack(
+            'camera3D.radius',
+            radius,
+            radius * 0.1,
+            radius * 0.25,
+          )
+        } else if (preset === 'finalTransform') {
+          const q1 = Math.floor(start + (end - start) * 0.25)
+          const q3 = Math.floor(start + (end - start) * 0.75)
+          const dir = Math.random() > 0.5 ? 1 : -1
+
+          timeline.addKeyframe('finalTransform.a', start, 1, 'linear')
+          timeline.addKeyframe('finalTransform.a', q1, 0, 'linear')
+          timeline.addKeyframe('finalTransform.a', mid, -1, 'linear')
+          timeline.addKeyframe('finalTransform.a', q3, 0, 'linear')
+          timeline.addKeyframe('finalTransform.a', end, 1, 'linear')
+
+          timeline.addKeyframe('finalTransform.b', start, 0, 'linear')
+          timeline.addKeyframe('finalTransform.b', q1, -dir, 'linear')
+          timeline.addKeyframe('finalTransform.b', mid, 0, 'linear')
+          timeline.addKeyframe('finalTransform.b', q3, dir, 'linear')
+          timeline.addKeyframe('finalTransform.b', end, 0, 'linear')
+
+          timeline.addKeyframe('finalTransform.c', start, 0, 'linear')
+          timeline.addKeyframe('finalTransform.c', q1, dir, 'linear')
+          timeline.addKeyframe('finalTransform.c', mid, 0, 'linear')
+          timeline.addKeyframe('finalTransform.c', q3, -dir, 'linear')
+          timeline.addKeyframe('finalTransform.c', end, 0, 'linear')
+
+          timeline.addKeyframe('finalTransform.d', start, 1, 'linear')
+          timeline.addKeyframe('finalTransform.d', q1, 0, 'linear')
+          timeline.addKeyframe('finalTransform.d', mid, -1, 'linear')
+          timeline.addKeyframe('finalTransform.d', q3, 0, 'linear')
+          timeline.addKeyframe('finalTransform.d', end, 1, 'linear')
+        }
+      }
+
+      timeline.setAnimationEnabled(true)
+      setShowTimeline(true)
+    } finally {
+      setTimeout(() => {
+        isRandomizingAnimation = false
+      }, 200)
+    }
   }
 
   const runTourCommand: { fn?: (id: string, ...args: unknown[]) => void } = {}
@@ -2690,6 +2806,7 @@ export function MainWorkspace(props: AppProps) {
                           historyEntries={randomizerHistory()}
                           selectedTimestamp={selectedHistoryTimestamp()}
                           onGenerateFlame={handleGenerateFlame}
+                          onMutateFlame={handleMutateFlame}
                           onLoadHistory={handleLoadHistory}
                           onClearHistory={handleClearHistory}
                           onRandomizeAnimation={handleRandomizeAnimation}
@@ -4014,14 +4131,40 @@ export function MainWorkspace(props: AppProps) {
 
               void showLoadFlameModal()
             }}
-            onSaveForLater={() => {
+            onSaveForLater={async () => {
               const tracks = timeline.tracks()
-              saveRecentFlame(flameDescriptor, undefined, tracks)
-              showToast(
-                tracks.length > 0
-                  ? 'Flame + animation saved for later'
-                  : 'Flame saved for later',
+              const success = saveRecentFlame(
+                flameDescriptor,
+                undefined,
+                tracks,
+                false,
               )
+              if (!success) {
+                const oldest = getOldestRecentFlame()
+                const oldestName = oldest?.name || 'Flame'
+                const confirmed = await _requestModal<boolean>({
+                  content: ({ respond }) => (
+                    <ConfirmOverwriteRecentModal
+                      oldestName={oldestName}
+                      respond={respond}
+                    />
+                  ),
+                })
+                if (confirmed) {
+                  saveRecentFlame(flameDescriptor, undefined, tracks, true)
+                  showToast(
+                    tracks.length > 0
+                      ? 'Flame + animation saved (replaced oldest)'
+                      : 'Flame saved (replaced oldest)',
+                  )
+                }
+              } else {
+                showToast(
+                  tracks.length > 0
+                    ? 'Flame + animation saved for later'
+                    : 'Flame saved for later',
+                )
+              }
             }}
             onRender={() => {
               if (timeline.isPlaying()) timeline.pause()
