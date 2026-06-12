@@ -309,7 +309,7 @@ export function generateRandomFlame(
       skipIters: 15,
       drawMode: 'light',
       backgroundColor: [0, 0, 0],
-      camera: { zoom: 1, position: [0, 0] },
+      camera: { zoom: 1, position: [0, 0], rotation: 0 },
       colorInitMode: 'colorInitPosition',
       pointInitMode: 'pointInitUnitDisk',
       vibrancy: 0.5,
@@ -506,11 +506,11 @@ export function mutateFlame(
           if (isParametric) {
             const randomizedParams = randomizeVariationParams(vtype, strength)
             if (randomizedParams) {
-              variations[vid] = { ...base, params: randomizedParams }
+              variations[vid] = { ...(base as VariationInstance), params: randomizedParams }
               continue
             }
           }
-          variations[vid] = base
+          variations[vid] = base as VariationInstance
         }
       }
 
@@ -521,7 +521,7 @@ export function mutateFlame(
       )
       if (totalWeight > 0) {
         for (const vid of Object.keys(variations)) {
-          variations[vid].weight = variations[vid].weight / totalWeight
+          variations[vid]!.weight = variations[vid]!.weight / totalWeight
         }
       }
       t.variations = variations

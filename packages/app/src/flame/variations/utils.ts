@@ -94,6 +94,7 @@ export function getDefaultFlameByVarType(
       camera: {
         zoom: 1,
         position: [0, 0],
+        rotation: 0,
       },
       colorInitMode: 'colorInitPosition',
       pointInitMode: 'pointInitGaussianDisk',
@@ -144,6 +145,7 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
         draft.renderSettings.camera = {
           zoom: 0.3493516243061941,
           position: [0.20715316352406743, -0.16595190682220834],
+          rotation: 0,
         }
         draft.transforms[getTransformPreviewTid('cylinderVar')]!.preAffine = {
           c: -0.013468013468013407,
@@ -708,6 +710,7 @@ export function getDefaultFlameByVarType3D(
       camera: {
         zoom: 1,
         position: [0, 0],
+        rotation: 0,
       },
       colorInitMode: 'colorInitPosition',
       pointInitMode: 'pointInitUnitBall',

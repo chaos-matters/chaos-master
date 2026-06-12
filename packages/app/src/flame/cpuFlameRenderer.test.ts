@@ -4,7 +4,7 @@ import type { FlameDescriptor } from './schema/flameSchema'
 
 describe('CPU Flame Renderer', () => {
   const sampleFlame: FlameDescriptor = {
-    metadata: { author: 'test' },
+    metadata: { author: 'test', name: 'test', description: '' },
     renderSettings: {
       exposure: 1,
       skipIters: 10,
@@ -21,7 +21,7 @@ describe('CPU Flame Renderer', () => {
       colorInitMode: 'colorInitZero',
       pointInitMode: 'pointInitUnitDisk',
       dimensions: 2,
-      camera: { zoom: 1, position: [0, 0] },
+      camera: { zoom: 1, position: [0, 0], rotation: 0 },
       camera3D: {
         theta: 0,
         phi: Math.PI / 2,
@@ -123,7 +123,7 @@ describe('CPU Flame Renderer', () => {
 
     it('should handle flame with empty transforms', () => {
       const emptyFlame: FlameDescriptor = {
-        metadata: { author: 'test' },
+        metadata: { author: 'test', name: 'test', description: '' },
         renderSettings: {
           exposure: 1,
           skipIters: 0,
@@ -140,7 +140,7 @@ describe('CPU Flame Renderer', () => {
           colorInitMode: 'colorInitZero',
           pointInitMode: 'pointInitUnitDisk',
           dimensions: 2,
-          camera: { zoom: 1, position: [0, 0] },
+          camera: { zoom: 1, position: [0, 0], rotation: 0 },
           camera3D: {
             theta: 0,
             phi: Math.PI / 2,

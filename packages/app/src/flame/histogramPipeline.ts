@@ -65,7 +65,7 @@ export function createHistogramPipeline(
     const adjustedCount = count * uniforms.averagePointCountPerBucketInv
     const binCount = arrayLength(bindGroupLayout.$.histogram)
     const bin = clamp(u32(adjustedCount * 2000), 0, binCount)
-    atomicAdd(bindGroupLayout.$.histogram[bin], 1)
+    atomicAdd(bindGroupLayout.$.histogram[bin]!, 1)
   })
 
   const pipeline = root.createComputePipeline({ compute }).with(bindGroup)

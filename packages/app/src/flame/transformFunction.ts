@@ -100,7 +100,7 @@ export function createFlameWgsl({
     ...Object.fromEntries(
       Object.values(validVariations).map((v) => [
         v.type,
-        transformVariations[v.type].fn,
+        transformVariations[v.type]!.fn,
       ]),
     ),
     // Only referenced by variation invocations — listing it with zero valid
@@ -188,8 +188,8 @@ export function extractFlameUniforms({
                   const variationType = type
                   const isParametric = isParametricVariationType(variationType)
                   if (isParametric) {
-                    const v = transformVariations[variationType]
-                    const defaults = v.paramDefaults as Record<string, number>
+                    const v = transformVariations[variationType] as { paramDefaults: Record<string, number> }
+                    const defaults = v.paramDefaults
                     const safe: Record<string, number> = { ...defaults }
                     if (rest.params) {
                       for (const key of Object.keys(defaults)) {

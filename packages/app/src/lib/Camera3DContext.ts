@@ -10,7 +10,7 @@ export type Camera3DContext = {
   bindGroup: TgpuBindGroup
   BindGroupLayout: TgpuBindGroupLayout
   wgsl: {
-    worldToClip: TgpuFn<(pos: Vec3f) => Vec2f>
+    worldToClip: TgpuFn<(pos: Vec3f) => Vec3f>
   }
   js: {
     worldToClip: (pos: Vec3) => Vec3

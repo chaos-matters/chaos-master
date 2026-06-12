@@ -34,10 +34,10 @@ jobs:
       run: pnpm lint
 
     - name: 🔍 Type check
-      run: pnpm --filter chaos-master exec tsc --noEmit
+      run: pnpm typecheck
 
     - name: 🧪 Run tests
-      run: pnpm --filter chaos-master run test
+      run: pnpm test
       
     - name: 🛠️ Build project
       run: pnpm --filter chaos-master run build
