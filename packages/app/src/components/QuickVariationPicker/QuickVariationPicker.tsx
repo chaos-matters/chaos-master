@@ -199,8 +199,6 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
     return CATEGORIES.filter((c) => cats.has(c))
   }
 
-
-
   onMount(() => {
     // auto-focus the search in list mode; small delay so the slide animation
     // doesn't conflict with focus ring paint

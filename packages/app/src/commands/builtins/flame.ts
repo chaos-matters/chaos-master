@@ -35,11 +35,10 @@ registerCommand({
   shortcut: 'Shift+T',
   execute(ctx, variationType?: unknown) {
     const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
-    const type = (
+    const type =
       typeof variationType === 'string'
         ? variationType
         : defaultLinearType(dims)
-    )
     ctx.setFlameDescriptor((draft) => {
       draft.transforms[generateTransformId()] = {
         probability: 1,
@@ -110,11 +109,10 @@ registerCommand({
   execute(ctx, transformIndex?: unknown, variationType?: unknown) {
     const tidx = typeof transformIndex === 'number' ? transformIndex : 0
     const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
-    const type = (
+    const type =
       typeof variationType === 'string'
         ? variationType
         : defaultLinearType(dims)
-    )
     ctx.setFlameDescriptor((draft) => {
       const key = getTransformKey(draft.transforms, tidx)
       if (key) {

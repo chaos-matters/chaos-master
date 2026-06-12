@@ -28,6 +28,7 @@ import { createDiscordShareModal } from './components/DiscordShareModal/DiscordS
 import { Dropzone } from './components/Dropzone/Dropzone'
 import { createExportPngDialog } from './components/ExportPngDialog/ExportPngDialog'
 import { FlameColorEditor, handleColor, } from './components/FlameColorEditor/FlameColorEditor'
+import { FlameRandomizerCard } from './components/FlameRandomizerCard/FlameRandomizerCard'
 import { FloatingActions } from './components/FloatingActions/FloatingActions'
 import { createShowHelp } from './components/HelpModal/HelpModal'
 import { createLoadFlame } from './components/LoadFlameModal/LoadFlameModal'
@@ -62,7 +63,7 @@ import { initExample } from './flame/examples/initExample'
 import { Flam3 } from './flame/Flam3'
 import { pointInitModeToImplFn } from './flame/pointInitMode'
 import { pointInitMode3DToImplFn } from './flame/pointInitMode3D'
-import { random01, randomizeAllColors, randomizeVariationParams, } from './flame/randomize'
+import { generateRandomFlame, random01, randomizeAllColors, randomizeVariationParams, randomRange, } from './flame/randomize'
 import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, cameraDuringExportEnabled, exportProgress, exportQuality, qualityPointCountLimit, setCurrentQuality, setForceAnimationExportNow, setForceExportNow, setQualityPointCountLimit, } from './flame/renderStats'
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from './flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from './flame/transformFunction'
@@ -81,6 +82,7 @@ import { addFlameDataToPng } from './utils/flameInPng'
 import { hardwareTierToPreset } from './utils/hardwareTier'
 import { compressJsonQueryParam } from './utils/jsonQueryParam'
 import { persistentSignal } from './utils/persistentSignal'
+import { addRandomizerHistoryEntry, clearRandomizerHistory, loadRandomizerHistoryEntries, } from './utils/randomizerHistoryDB'
 import { buildReadableIds } from './utils/readableIds'
 import { saveRecentFlame } from './utils/recentFlames'
 import { sum } from './utils/sum'
@@ -95,6 +97,7 @@ import type { QuickPickerMode } from './components/QuickVariationPicker/QuickVar
 import type { TourContext } from './components/SpotlightTour/tourTypes'
 import type { ColorMap, Palette } from './flame/colorMap'
 import type { PointInitMode } from './flame/pointInitMode'
+import type { GenerateRandomFlameConfig } from './flame/randomize'
 import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from './flame/schema/flameSchema'
 import type { Dims } from './flame/variationRegistry'
 import type { TransformVariationType } from './flame/variations'
@@ -103,6 +106,7 @@ import type { TransformVariationType3D } from './flame/variations3D'
 import type { AnimationExportConfig } from './utils/animationExport'
 import type { HardwareTier } from './utils/hardwareTier'
 import type { SharePayload } from './utils/jsonQueryParam'
+import type { RandomizerHistoryEntry } from './utils/randomizerHistoryDB'
 import type { EasingCurve, TimelineTrack } from './utils/timeline'
 import type { CommandContext } from '@/commands/types'
 
@@ -600,6 +604,7 @@ export function MainWorkspace(props: AppProps) {
   onMount(() => {
     loadCustomVariations()
     setCustomVarsVersion((v) => v + 1)
+    void loadRandomizerHistoryEntries(50).then(setRandomizerHistory)
     if (IS_DEV) {
       console.info('[share:app] onMount', {
         hasQueryFlame: !!props.flameFromQuery?.flame,
@@ -921,6 +926,223 @@ export function MainWorkspace(props: AppProps) {
     () => selectedPalette(),
     history,
   )
+
+  const [randomizerHistory, setRandomizerHistory] = createSignal<
+    RandomizerHistoryEntry[]
+  >([])
+
+  const [selectedHistoryTimestamp, setSelectedHistoryTimestamp] =
+    createSignal<number>(0)
+
+  const handleClearHistory = async () => {
+    await clearRandomizerHistory()
+    setRandomizerHistory([])
+  }
+
+  function captureMainThumbnail(size: number): Promise<string | null> {
+    const canvas = document.querySelector<HTMLCanvasElement>(`.${ui.canvas}`)
+    if (canvas === null) return Promise.resolve(null)
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => {
+        if (blob === null) {
+          resolve(null)
+          return
+        }
+        const url = URL.createObjectURL(blob)
+        const img = new Image()
+        img.onload = () => {
+          const offscreen = document.createElement('canvas')
+          offscreen.width = size
+          offscreen.height = size
+          const ctx = offscreen.getContext('2d')!
+          ctx.drawImage(img, 0, 0, size, size)
+          URL.revokeObjectURL(url)
+          resolve(offscreen.toDataURL('image/png'))
+        }
+        img.onerror = () => {
+          URL.revokeObjectURL(url)
+          resolve(null)
+        }
+        img.src = url
+      }, 'image/png')
+    })
+  }
+
+  const handleGenerateFlame = async (
+    config: GenerateRandomFlameConfig,
+    randomizeSettings: {
+      skipIters: boolean
+      exposure: boolean
+      contrast: boolean
+      gamma: boolean
+      highlightPower: boolean
+      vibrancy: boolean
+    },
+  ) => {
+    const thumb = await captureMainThumbnail(128)
+    if (thumb) {
+      const entry: RandomizerHistoryEntry = {
+        flame: deepClone(flameDescriptor),
+        thumbnail: thumb,
+        timestamp: Date.now(),
+      }
+      const updated = await addRandomizerHistoryEntry(entry, 50)
+      setRandomizerHistory(updated)
+    }
+
+    setSelectedHistoryTimestamp(0)
+
+    const newFlame = generateRandomFlame(config)
+    const prevRs = flameDescriptor.renderSettings
+    const rs = deepClone(prevRs)
+
+    // Skip Iters
+    if (randomizeSettings.skipIters) {
+      rs.skipIters = Math.floor(randomRange(5, 31))
+    }
+
+    // Exposure
+    if (randomizeSettings.exposure) {
+      rs.exposure = randomRange(-4, 4)
+    }
+
+    // Contrast
+    if (randomizeSettings.contrast) {
+      rs.contrast = randomRange(0.1, 10)
+    }
+
+    // Gamma
+    if (randomizeSettings.gamma) {
+      rs.gamma = randomRange(0.2, 5)
+    }
+
+    // Highlight Power
+    if (randomizeSettings.highlightPower) {
+      rs.highlightPower = randomRange(0, 1)
+    }
+
+    // Vibrancy
+    if (randomizeSettings.vibrancy) {
+      rs.vibrancy = randomRange(0, 1)
+    }
+
+    newFlame.renderSettings = rs
+    history.replace(newFlame, 'Randomize Flame')
+  }
+
+  const handleUpdateRenderSettings = (
+    settings: Partial<FlameDescriptor['renderSettings']>,
+  ) => {
+    setFlameDescriptor((draft) => {
+      draft.renderSettings = {
+        ...draft.renderSettings,
+        ...settings,
+      }
+    })
+  }
+
+  const handleLoadHistory = (entry: RandomizerHistoryEntry) => {
+    setSelectedHistoryTimestamp(entry.timestamp)
+    history.replace(deepClone(entry.flame), 'Load History Flame')
+  }
+
+  const handleRandomizeAnimation = (presetIds: string[]) => {
+    if (presetIds.length === 0) return
+
+    timeline.clearAllTracks()
+
+    const start = timeline.config().startFrame
+    const end = timeline.config().endFrame
+    const mid = Math.floor((start + end) / 2)
+
+    const addLoopingTrack = (
+      paramPath: string,
+      startVal: number,
+      minPerturb: number,
+      maxPerturb: number,
+      easing: EasingCurve = 'easeInOut',
+    ) => {
+      const perturb =
+        randomRange(minPerturb, maxPerturb) * (Math.random() > 0.5 ? 1 : -1)
+      const midVal = startVal + perturb
+      timeline.addKeyframe(paramPath, start, startVal, easing)
+      timeline.addKeyframe(paramPath, mid, midVal, easing)
+      timeline.addKeyframe(paramPath, end, startVal, easing)
+    }
+
+    const addContinuousTrack = (
+      paramPath: string,
+      startVal: number,
+      delta: number,
+    ) => {
+      timeline.addKeyframe(paramPath, start, startVal, 'linear')
+      timeline.addKeyframe(paramPath, end, startVal + delta, 'linear')
+    }
+
+    for (const preset of presetIds) {
+      if (preset === 'pan') {
+        const camX = flameDescriptor.renderSettings.camera?.position?.[0] ?? 0
+        const camY = flameDescriptor.renderSettings.camera?.position?.[1] ?? 0
+        addLoopingTrack('camera.x', camX, 0.1, 0.4)
+        addLoopingTrack('camera.y', camY, 0.1, 0.4)
+      } else if (preset === 'zoom') {
+        const zoom = flameDescriptor.renderSettings.camera?.zoom ?? 1
+        addLoopingTrack('camera.zoom', zoom, zoom * 0.15, zoom * 0.4)
+      } else if (preset === 'rot') {
+        const rot = flameDescriptor.renderSettings.camera?.rotation ?? 0
+        const dir = Math.random() > 0.5 ? 1 : -1
+        addContinuousTrack('camera.rotation', rot, dir * 2 * Math.PI)
+      } else if (preset === 'color') {
+        const phase = flameDescriptor.renderSettings.palettePhase ?? 0
+        const dir = Math.random() > 0.5 ? 1 : -1
+        addContinuousTrack('palettePhase', phase, dir * randomRange(1, 3))
+      } else if (preset === 'vibrancy') {
+        const vib = flameDescriptor.renderSettings.vibrancy ?? 0.5
+        const minPert = vib > 0.5 ? -0.3 : 0.1
+        const maxPert = vib > 0.5 ? -0.1 : 0.3
+        addLoopingTrack('vibrancy', vib, minPert, maxPert)
+      } else if (preset === 'orbit') {
+        const theta = flameDescriptor.renderSettings.camera3D?.theta ?? 0
+        const phi = flameDescriptor.renderSettings.camera3D?.phi ?? Math.PI / 2
+        const radius = flameDescriptor.renderSettings.camera3D?.radius ?? 5
+
+        addContinuousTrack('camera3D.theta', theta, 2 * Math.PI)
+        addLoopingTrack('camera3D.phi', phi, 0.1, 0.3)
+        addLoopingTrack('camera3D.radius', radius, radius * 0.1, radius * 0.25)
+      } else if (preset === 'finalTransform') {
+        const q1 = Math.floor(start + (end - start) * 0.25)
+        const q3 = Math.floor(start + (end - start) * 0.75)
+        const dir = Math.random() > 0.5 ? 1 : -1
+
+        timeline.addKeyframe('finalTransform.a', start, 1, 'linear')
+        timeline.addKeyframe('finalTransform.a', q1, 0, 'linear')
+        timeline.addKeyframe('finalTransform.a', mid, -1, 'linear')
+        timeline.addKeyframe('finalTransform.a', q3, 0, 'linear')
+        timeline.addKeyframe('finalTransform.a', end, 1, 'linear')
+
+        timeline.addKeyframe('finalTransform.b', start, 0, 'linear')
+        timeline.addKeyframe('finalTransform.b', q1, -dir, 'linear')
+        timeline.addKeyframe('finalTransform.b', mid, 0, 'linear')
+        timeline.addKeyframe('finalTransform.b', q3, dir, 'linear')
+        timeline.addKeyframe('finalTransform.b', end, 0, 'linear')
+
+        timeline.addKeyframe('finalTransform.c', start, 0, 'linear')
+        timeline.addKeyframe('finalTransform.c', q1, dir, 'linear')
+        timeline.addKeyframe('finalTransform.c', mid, 0, 'linear')
+        timeline.addKeyframe('finalTransform.c', q3, -dir, 'linear')
+        timeline.addKeyframe('finalTransform.c', end, 0, 'linear')
+
+        timeline.addKeyframe('finalTransform.d', start, 1, 'linear')
+        timeline.addKeyframe('finalTransform.d', q1, 0, 'linear')
+        timeline.addKeyframe('finalTransform.d', mid, -1, 'linear')
+        timeline.addKeyframe('finalTransform.d', q3, 0, 'linear')
+        timeline.addKeyframe('finalTransform.d', end, 1, 'linear')
+      }
+    }
+
+    timeline.setAnimationEnabled(true)
+    setShowTimeline(true)
+  }
 
   const runTourCommand: { fn?: (id: string, ...args: unknown[]) => void } = {}
 
@@ -2346,7 +2568,9 @@ export function MainWorkspace(props: AppProps) {
                             onUnselect={handlePaletteUnselect}
                           />
                         </CollapsibleCard>
-                        <Show when={flameDescriptor.renderSettings.dimensions !== 3}>
+                        <Show
+                          when={flameDescriptor.renderSettings.dimensions !== 3}
+                        >
                           <CollapsibleCard
                             title="Custom Variations"
                             defaultOpen={false}
@@ -2365,7 +2589,9 @@ export function MainWorkspace(props: AppProps) {
                                   onContextMenu={(e) => {
                                     e.preventDefault()
                                   }}
-                                  onMouseEnter={() => setHoveredCustomVarDef(def)}
+                                  onMouseEnter={() =>
+                                    setHoveredCustomVarDef(def)
+                                  }
                                   onMouseLeave={() =>
                                     setHoveredCustomVarDef(null)
                                   }
@@ -2399,7 +2625,10 @@ export function MainWorkspace(props: AppProps) {
                                         e.stopPropagation()
                                         setHoveredCustomVarDef(null)
                                         setFlameDescriptor((draft) => {
-                                          addTransformWithVariation(draft, def.id)
+                                          addTransformWithVariation(
+                                            draft,
+                                            def.id,
+                                          )
                                         })
                                       }}
                                     >
@@ -2437,10 +2666,14 @@ export function MainWorkspace(props: AppProps) {
                             <button
                               class={ui.customVarsButton}
                               onClick={async () => {
-                                const addedDef = await showCustomVariationEditor()
+                                const addedDef =
+                                  await showCustomVariationEditor()
                                 if (addedDef) {
                                   setFlameDescriptor((draft) => {
-                                    addTransformWithVariation(draft, addedDef.id)
+                                    addTransformWithVariation(
+                                      draft,
+                                      addedDef.id,
+                                    )
                                   })
                                 }
                                 setCustomVarsVersion((v) => v + 1)
@@ -2452,6 +2685,16 @@ export function MainWorkspace(props: AppProps) {
                             </button>
                           </CollapsibleCard>
                         </Show>
+                        <FlameRandomizerCard
+                          flame={flameDescriptor}
+                          historyEntries={randomizerHistory()}
+                          selectedTimestamp={selectedHistoryTimestamp()}
+                          onGenerateFlame={handleGenerateFlame}
+                          onLoadHistory={handleLoadHistory}
+                          onClearHistory={handleClearHistory}
+                          onRandomizeAnimation={handleRandomizeAnimation}
+                          onUpdateRenderSettings={handleUpdateRenderSettings}
+                        />
                         <For
                           each={recordEntries(
                             flameDescriptor.transforms,

@@ -2,6 +2,7 @@ import { recordEntries } from '@/utils/record'
 import { generateTransformId, generateVariationId } from './transformFunction'
 import { isParametricVariationType, transformVariations, variationTypes, } from './variations'
 import { getVariationDefault } from './variations/utils'
+import { isParametricVariationType3D, isVariationType3D, transformVariations3D, variationTypes3D, } from './variations3D'
 import type { FlameDescriptor } from './schema/flameSchema'
 import type { TransformVariationType } from './variations'
 import type { TransformVariationType3D } from './variations3D'
@@ -36,8 +37,17 @@ export function randomizeVariationParams(
   variationType: TransformVariationType | TransformVariationType3D,
   strength = 0.5,
 ): Record<string, number> | undefined {
-  if (!isParametricVariationType(variationType)) return undefined
-  const def = transformVariations[variationType as TransformVariationType] as {
+  const is3D = isVariationType3D(variationType)
+  const isParametric = is3D
+    ? isParametricVariationType3D(variationType)
+    : isParametricVariationType(variationType)
+  if (!isParametric) return undefined
+
+  const def = (
+    is3D
+      ? transformVariations3D[variationType]
+      : transformVariations[variationType]
+  ) as {
     paramDefaults: Record<string, number>
   }
   const defaults = def.paramDefaults
@@ -134,9 +144,12 @@ export function randomizeAffineCoef(
   current: number,
   coefKey: string,
   strength = 0.5,
+  is3D = false,
 ): number {
-  const range: [number, number] =
-    coefKey === 'e' || coefKey === 'f' ? [-3, 3] : [-2, 2]
+  const isTranslation = is3D
+    ? coefKey === 'd' || coefKey === 'h' || coefKey === 'l'
+    : coefKey === 'c' || coefKey === 'f'
+  const range: [number, number] = isTranslation ? [-3, 3] : [-2, 2]
   // sigma goes from 0.03 (strength=0) to 0.9 (strength=1)
   const sigma = 0.03 + strength * 0.87
   return randomPerturbation(current, sigma, range)
@@ -148,11 +161,12 @@ export interface GenerateRandomFlameConfig {
   maxTransforms: number
   minVariations: number
   maxVariations: number
-  allowedVariations: TransformVariationType[]
+  allowedVariations: (TransformVariationType | TransformVariationType3D)[]
+  dimensions?: number
 }
 
 /**
- * Generate a completely random flame descriptor based on configuration.
+ * Point initializer ranges / defaults for 3D/2D.
  */
 export function generateRandomFlame(
   config: GenerateRandomFlameConfig,
@@ -166,8 +180,14 @@ export function generateRandomFlame(
     allowedVariations,
   } = config
 
+  const dims = config.dimensions ?? 2
+
   const pool =
-    allowedVariations.length > 0 ? allowedVariations : [...variationTypes]
+    allowedVariations.length > 0
+      ? allowedVariations
+      : dims === 3
+        ? [...variationTypes3D]
+        : [...variationTypes]
 
   const transformCount = Math.floor(
     randomRange(minTransforms, maxTransforms + 1),
@@ -179,7 +199,9 @@ export function generateRandomFlame(
     const tid = generateTransformId(`logo_${t}`)
 
     const varCount = Math.floor(randomRange(minVariations, maxVariations + 1))
-    const usedTypes = new Set<TransformVariationType>()
+    const usedTypes = new Set<
+      TransformVariationType | TransformVariationType3D
+    >()
     const variations: Record<string, unknown> = {}
 
     for (let v = 0; v < varCount; v++) {
@@ -192,7 +214,11 @@ export function generateRandomFlame(
       const weight = randomRange(0.3, 1)
       const base = getVariationDefault(vtype, weight) as Record<string, unknown>
       // Randomize params for parametric variations
-      if (isParametricVariationType(vtype)) {
+      const is3D = isVariationType3D(vtype)
+      const isParametric = is3D
+        ? isParametricVariationType3D(vtype)
+        : isParametricVariationType(vtype)
+      if (isParametric) {
         const randomizedParams = randomizeVariationParams(vtype, strength)
         if (randomizedParams) {
           variations[vid] = { ...base, params: randomizedParams }
@@ -218,22 +244,54 @@ export function generateRandomFlame(
 
     transforms[tid] = {
       probability: 1 / transformCount,
-      preAffine: {
-        a: randomizeAffineCoef(1, 'a', strength),
-        b: randomizeAffineCoef(0, 'b', strength),
-        c: randomizeAffineCoef(0, 'c', strength),
-        d: randomizeAffineCoef(0, 'd', strength),
-        e: randomizeAffineCoef(1, 'e', strength),
-        f: randomizeAffineCoef(0, 'f', strength),
-      },
-      postAffine: {
-        a: randomizeAffineCoef(1, 'a', strength),
-        b: randomizeAffineCoef(0, 'b', strength),
-        c: randomizeAffineCoef(0, 'c', strength),
-        d: randomizeAffineCoef(0, 'd', strength),
-        e: randomizeAffineCoef(1, 'e', strength),
-        f: randomizeAffineCoef(0, 'f', strength),
-      },
+      preAffine:
+        dims === 3
+          ? {
+              a: randomizeAffineCoef(1, 'a', strength, true),
+              b: randomizeAffineCoef(0, 'b', strength, true),
+              c: randomizeAffineCoef(0, 'c', strength, true),
+              d: randomizeAffineCoef(0, 'd', strength, true),
+              e: randomizeAffineCoef(0, 'e', strength, true),
+              f: randomizeAffineCoef(1, 'f', strength, true),
+              g: randomizeAffineCoef(0, 'g', strength, true),
+              h: randomizeAffineCoef(0, 'h', strength, true),
+              i: randomizeAffineCoef(0, 'i', strength, true),
+              j: randomizeAffineCoef(0, 'j', strength, true),
+              k: randomizeAffineCoef(1, 'k', strength, true),
+              l: randomizeAffineCoef(0, 'l', strength, true),
+            }
+          : {
+              a: randomizeAffineCoef(1, 'a', strength, false),
+              b: randomizeAffineCoef(0, 'b', strength, false),
+              c: randomizeAffineCoef(0, 'c', strength, false),
+              d: randomizeAffineCoef(0, 'd', strength, false),
+              e: randomizeAffineCoef(1, 'e', strength, false),
+              f: randomizeAffineCoef(0, 'f', strength, false),
+            },
+      postAffine:
+        dims === 3
+          ? {
+              a: randomizeAffineCoef(1, 'a', strength, true),
+              b: randomizeAffineCoef(0, 'b', strength, true),
+              c: randomizeAffineCoef(0, 'c', strength, true),
+              d: randomizeAffineCoef(0, 'd', strength, true),
+              e: randomizeAffineCoef(0, 'e', strength, true),
+              f: randomizeAffineCoef(1, 'f', strength, true),
+              g: randomizeAffineCoef(0, 'g', strength, true),
+              h: randomizeAffineCoef(0, 'h', strength, true),
+              i: randomizeAffineCoef(0, 'i', strength, true),
+              j: randomizeAffineCoef(0, 'j', strength, true),
+              k: randomizeAffineCoef(1, 'k', strength, true),
+              l: randomizeAffineCoef(0, 'l', strength, true),
+            }
+          : {
+              a: randomizeAffineCoef(1, 'a', strength, false),
+              b: randomizeAffineCoef(0, 'b', strength, false),
+              c: randomizeAffineCoef(0, 'c', strength, false),
+              d: randomizeAffineCoef(0, 'd', strength, false),
+              e: randomizeAffineCoef(1, 'e', strength, false),
+              f: randomizeAffineCoef(0, 'f', strength, false),
+            },
       color: { x: randomRange(-0.4, 0.4), y: randomRange(-0.4, 0.4) },
       variations,
       visible: true,
@@ -247,7 +305,7 @@ export function generateRandomFlame(
     metadata: { author: 'logo-generator' },
     renderSettings: {
       exposure: 0.3,
-      skipIters: 1,
+      skipIters: 15,
       drawMode: 'light',
       backgroundColor: [0, 0, 0],
       camera: { zoom: 1, position: [0, 0] },
@@ -262,7 +320,7 @@ export function generateRandomFlame(
       densityEstimationQuality: 0.8,
       estimatorCurve: 0.5,
       paletteMode: 0,
-      dimensions: 2,
+      dimensions: dims,
       depthColorPower: 0.0,
       lightDirection: [-0.5, 0.5, -1.0],
       lightPower: 0.0,

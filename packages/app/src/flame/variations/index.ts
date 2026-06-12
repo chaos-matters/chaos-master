@@ -29,7 +29,9 @@ const CustomVariationFallbackSchema = v.object({
 })
 
 export const TransformVariationDescriptor = v.variant('type', [
-  ...Object.values(allTransformVariations).map((variation) => variation.DescriptorSchema),
+  ...Object.values(allTransformVariations).map(
+    (variation) => variation.DescriptorSchema,
+  ),
   CustomVariationFallbackSchema,
 ])
 
@@ -68,6 +70,5 @@ export function isParametricVariation(
 export function isVariationType(
   maybeType: string,
 ): maybeType is TransformVariationType | TransformVariationType3D {
-  return typeof maybeType === 'string' && (allVariationTypes).includes(maybeType)
+  return typeof maybeType === 'string' && allVariationTypes.includes(maybeType)
 }
-
