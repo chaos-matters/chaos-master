@@ -36,7 +36,7 @@ type QualityPresetsProps = {
 
 export function getPresetFromQuality(
   q: number,
-  fallback: QualityPreset = 'high',
+  fallback: QualityPreset = 'mid',
 ): QualityPreset {
   const entries = Object.entries(qualityPresets) as [QualityPreset, number][]
   return entries.find(([, v]) => v === q)?.[0] ?? fallback
@@ -127,9 +127,9 @@ export function QualityPresets(props: QualityPresetsProps) {
             [ui.inlinePointsRow as string]: props.inlinePoints,
           }}
         >
-          {formatPointCount(props.currentPoints!)}
+          {formatPointCount(props.currentPoints ?? 0)}
           <span class={ui.pointsSep}>/</span>
-          {formatPointCount(props.targetPoints!)}
+          {formatPointCount(props.targetPoints ?? 0)}
         </div>
       </Show>
     </div>

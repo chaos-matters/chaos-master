@@ -7,7 +7,7 @@ import { defineExample, tid, vid } from './util'
  */
 export const example9 = defineExample({
   renderSettings: {
-    exposure: -1.25,
+    exposure: 0.25,
     skipIters: 20,
     drawMode: 'light',
     camera: {
@@ -24,7 +24,7 @@ export const example9 = defineExample({
       color: { x: 0.1, y: 0.25 },
       variations: {
         [vid('f2a3b4c5_d6e7_8901_3456_7890abcdef23')]: {
-          type: 'grid',
+          type: 'gridVar',
           weight: 1,
           params: {
             divisions: 8,
@@ -33,7 +33,7 @@ export const example9 = defineExample({
           },
         },
         [vid('a2b3c4d5_e6f7_8901_4567_890abcdef234')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 0.5,
         },
       },
@@ -46,16 +46,16 @@ export const example9 = defineExample({
       color: { x: -0.15, y: 0.05 },
       variations: {
         [vid('c2d3e4f5_a6b7_8901_6789_0abcdef23456')]: {
-          type: 'fan2',
+          type: 'fan2Var',
           weight: 0.8,
           params: { x: 0.7, y: 0.5 },
         },
         [vid('d2e3f4a5_b6c7_8901_7890_abcdef234567')]: {
-          type: 'popcorn',
+          type: 'popcornVar',
           weight: 0.2,
         },
         [vid('e2f3a4b5_c6d7_8901_8901_bcdef2345678')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 0.3,
         },
       },
@@ -68,12 +68,12 @@ export const example9 = defineExample({
       color: { x: 0, y: -0.35 },
       variations: {
         [vid('a3b4c5d6_e7f8_9012_3456_7890abcdef01')]: {
-          type: 'juliaN',
+          type: 'juliaNVar',
           weight: 1,
           params: { power: 4, dist: 3 },
         },
         [vid('b3c4d5e6_f7a8_9012_4567_890abcdef012')]: {
-          type: 'eyefish',
+          type: 'eyefishVar',
           weight: 0.15,
         },
       },

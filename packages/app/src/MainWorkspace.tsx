@@ -13,11 +13,14 @@ import { createDragHandler } from '@/utils/createDragHandler'
 import { recordEntries, recordKeys } from '@/utils/record'
 import ui from './App.module.css'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
+import { BenchmarkButton } from './components/BenchmarkButton/BenchmarkButton'
+import { createShowBenchmark } from './components/BenchmarkModal/BenchmarkModal'
 import { BlendFlameGallery } from './components/BlendFlameGallery/BlendFlameGallery'
 import { Button } from './components/Button/Button'
 import { CollapsibleCard } from './components/CollapsibleCard/CollapsibleCard'
 import { ColorPicker } from './components/ColorPicker/ColorPicker'
 import { Card } from './components/ControlCard/ControlCard'
+import { createShowCustomVariationEditor } from './components/CustomVariationEditor/CustomVariationEditor'
 import { DebugOverlay } from './components/DebugOverlay'
 import { DiceButton } from './components/DiceButton/DiceButton'
 import { createDiscordShareModal } from './components/DiscordShareModal/DiscordShareModal'
@@ -55,19 +58,21 @@ import { example1 } from './flame/examples/example1'
 import { Flam3 } from './flame/Flam3'
 import { pointInitModeToImplFn } from './flame/pointInitMode'
 import { random01, randomizeAllColors, randomizeVariationParams, } from './flame/randomize'
-import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, exportProgress, exportQuality, qualityPointCountLimit, setCurrentQuality, setForceAnimationExportNow, setForceExportNow, setQualityPointCountLimit, } from './flame/renderStats'
+import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, cameraDuringExportEnabled, exportProgress, exportQuality, qualityPointCountLimit, setCurrentQuality, setForceAnimationExportNow, setForceExportNow, setQualityPointCountLimit, } from './flame/renderStats'
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from './flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from './flame/transformFunction'
 import { isParametricVariation, isParametricVariationType, isVariationType, transformVariations, } from './flame/variations'
+import { deleteCustomVariation, duplicateCustomVariation, getCustomVariations, loadCustomVariations, } from './flame/variations/custom'
 import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } from './flame/variations/utils'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { Cross, Eye, EyeOff, Menu, Plus, Share } from './icons'
+import { BoxArrowRight, Cross, Eye, EyeOff, Menu, Plus, Share, Terminal, } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
 import { createAnimationExport } from './utils/animationExport'
 import { deepClone } from './utils/clone'
 import { createStoreHistory } from './utils/createStoreHistory'
 import { sendFlameToDiscord } from './utils/discordWebhook'
 import { addFlameDataToPng } from './utils/flameInPng'
+import { hardwareTierToPreset } from './utils/hardwareTier'
 import { compressJsonQueryParam } from './utils/jsonQueryParam'
 import { persistentSignal } from './utils/persistentSignal'
 import { buildReadableIds } from './utils/readableIds'
@@ -81,13 +86,13 @@ import type { v2f } from 'typegpu/data'
 import type { QualityPreset } from './components/Quality/QualityPresets'
 import type { QuickPickerMode } from './components/QuickVariationPicker/QuickVariationPicker'
 import type { TourContext } from './components/SpotlightTour/tourTypes'
-import type { ColorInitMode } from './flame/colorInitMode'
 import type { ColorMap, Palette } from './flame/colorMap'
-import type { DrawMode } from './flame/drawMode'
 import type { PointInitMode } from './flame/pointInitMode'
 import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from './flame/schema/flameSchema'
 import type { TransformVariationType } from './flame/variations'
+import type { CustomVariationDef } from './flame/variations/custom/types'
 import type { AnimationExportConfig } from './utils/animationExport'
+import type { HardwareTier } from './utils/hardwareTier'
 import type { SharePayload } from './utils/jsonQueryParam'
 import type { EasingCurve, TimelineTrack } from './utils/timeline'
 import type { CommandContext } from '@/commands/types'
@@ -113,18 +118,53 @@ function newDefaultTransform(): TransformFunction {
     postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
     visible: true,
     variations: {
-      [generateVariationId()]: getVariationDefault('linear', 1.0),
+      [generateVariationId()]: getVariationDefault('linearVar', 1.0),
     },
   }
 }
 
-export type ExportImageType = (canvas: HTMLCanvasElement) => void
+export type ExportImageInfo = {
+  /** True when the canvas holds a final color-graded image at the requested
+   *  quality limit, i.e. it is safe to capture the canvas for an export. */
+  finalImageReady: boolean
+}
+
+export type ExportImageType = (
+  canvas: HTMLCanvasElement,
+  info?: ExportImageInfo,
+) => void
 
 export type AppProps = {
   flameFromQuery?: SharePayload
   flameFromWelcome?: () => FlameDescriptor | undefined
   welcomeTracks?: () => TimelineTrack[] | undefined
   resetFlameFromWelcome?: () => void
+  hardwareTier?: HardwareTier | null
+  onHardwareTierChange?: (tier: HardwareTier) => void
+}
+
+export function extractFlameVariationTypes(
+  descriptor: FlameDescriptor,
+): TransformVariationType[] {
+  const result: TransformVariationType[] = []
+  for (const transform of Object.values(descriptor.transforms)) {
+    for (const variation of Object.values(transform.variations)) {
+      result.push(variation.type)
+    }
+  }
+  return result
+}
+
+function addTransformWithVariation(draft: FlameDescriptor, type: string) {
+  const t = deepClone(newDefaultTransform())
+  t.variations = {
+    [generateVariationId()]: {
+      type,
+      weight: 1,
+      visible: true,
+    },
+  }
+  draft.transforms[generateTransformId()] = t
 }
 
 export function MainWorkspace(props: AppProps) {
@@ -143,8 +183,17 @@ export function MainWorkspace(props: AppProps) {
   })
 
   const [qualityPreset, setQualityPreset] = createSignal<QualityPreset>(
-    getPresetFromQuality(DEFAULT_QUALITY),
+    props.hardwareTier
+      ? hardwareTierToPreset(props.hardwareTier)
+      : getPresetFromQuality(DEFAULT_QUALITY),
   )
+
+  createEffect(() => {
+    if (props.hardwareTier) {
+      setQualityPreset(hardwareTierToPreset(props.hardwareTier))
+    }
+  })
+
   const [pixelRatio, setPixelRatio] = createSignal(DEFAULT_RESOLUTION)
   const [onExportImage, setOnExportImage] = createSignal<ExportImageType>()
 
@@ -311,7 +360,7 @@ export function MainWorkspace(props: AppProps) {
           preAffine: { a: cos, b: -sin, c: 0, d: sin, e: cos, f: 0 },
           postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
           variations: {
-            [generateVariationId()]: getVariationDefault('linear', 1),
+            [generateVariationId()]: getVariationDefault('linearVar', 1),
           },
         }
       }
@@ -325,7 +374,7 @@ export function MainWorkspace(props: AppProps) {
           preAffine: { a: -1, b: 0, c: 0, d: 0, e: 1, f: 0 },
           postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
           variations: {
-            [generateVariationId()]: getVariationDefault('linear', 1),
+            [generateVariationId()]: getVariationDefault('linearVar', 1),
           },
         }
       }
@@ -371,7 +420,16 @@ export function MainWorkspace(props: AppProps) {
   )
 
   const { showVariationSelector, varSelectorModalIsOpen } =
-    createVariationSelector(history)
+    createVariationSelector(history, props.hardwareTier)
+
+  const { showCustomVariationEditor, customVariationEditorIsOpen } =
+    createShowCustomVariationEditor()
+
+  const isAnyModalOpen = () =>
+    loadModalIsOpen() ||
+    varSelectorModalIsOpen() ||
+    exportModalIsOpen() ||
+    customVariationEditorIsOpen()
 
   // Quick variation picker state
   const [quickPickerMode, setQuickPickerMode] =
@@ -384,13 +442,42 @@ export function MainWorkspace(props: AppProps) {
   const [quickPickState, setQuickPickState] = createSignal<QuickPickState>(null)
   const [hoveredVariationType, setHoveredVariationType] =
     createSignal<TransformVariationType | null>(null)
+  const [hoveredCustomVarDef, setHoveredCustomVarDef] =
+    createSignal<CustomVariationDef | null>(null)
+
+  // Trigger for refreshing the custom variations list (incremented on delete/duplicate/modal close)
+  const [customVarsVersion, setCustomVarsVersion] = createSignal(0)
+  const customVariationsList = createMemo(() => {
+    void customVarsVersion()
+    return getCustomVariations()
+  })
 
   // Compute a temporary flame with the hovered variation swapped in.
   // Falls back to the real flameDescriptor when nothing is hovered.
   const effectiveFlame = createMemo<FlameDescriptor>(() => {
+    // Custom variation hover — add a new transform on top
+    const hoveredCV = hoveredCustomVarDef()
+    if (hoveredCV) {
+      try {
+        const clone: FlameDescriptor = deepClone(flameDescriptor)
+        const transform = newDefaultTransform()
+        transform.variations = {
+          [generateVariationId()]: {
+            type: hoveredCV.id,
+            weight: 1,
+            visible: true,
+          },
+        }
+        clone.transforms[generateTransformId()] = transform
+        return clone
+      } catch {
+        return flameDescriptor
+      }
+    }
+
     const hovered = hoveredVariationType()
     const state = quickPickState()
-    if (!hovered || !state) return flameDescriptor as unknown as FlameDescriptor
+    if (!hovered || !state) return flameDescriptor
     try {
       const clone: FlameDescriptor = deepClone(flameDescriptor)
       const existingVar = clone.transforms[state.tid]?.variations[state.vid]
@@ -401,12 +488,12 @@ export function MainWorkspace(props: AppProps) {
       }
       return clone
     } catch {
-      return flameDescriptor as unknown as FlameDescriptor
+      return flameDescriptor
     }
   })
 
   const finalRenderInterval = () =>
-    loadModalIsOpen() || varSelectorModalIsOpen() || exportModalIsOpen()
+    isAnyModalOpen()
       ? Infinity
       : onExportImage()
         ? 0
@@ -466,6 +553,8 @@ export function MainWorkspace(props: AppProps) {
   }
 
   onMount(() => {
+    loadCustomVariations()
+    setCustomVarsVersion((v) => v + 1)
     if (IS_DEV) {
       console.info('[share:app] onMount', {
         hasQueryFlame: !!props.flameFromQuery?.flame,
@@ -534,7 +623,28 @@ export function MainWorkspace(props: AppProps) {
 
   const { showDiscordShareModal } = createDiscordShareModal()
 
-  function startAnimationExport(
+  /** Waits until the canvas backing-store size stops changing (the resize is
+   *  reactive and may be debounced) so export dimensions read a settled size. */
+  async function waitForStableCanvasSize(
+    canvas: HTMLCanvasElement,
+    timeoutMs = 2000,
+  ) {
+    const startMs = Date.now()
+    let lastWidth = -1
+    let lastHeight = -1
+    while (Date.now() - startMs < timeoutMs) {
+      await new Promise<void>((resolve) =>
+        setTimeout(() => {
+          resolve()
+        }, 60),
+      )
+      if (canvas.width === lastWidth && canvas.height === lastHeight) return
+      lastWidth = canvas.width
+      lastHeight = canvas.height
+    }
+  }
+
+  async function startAnimationExport(
     config: AnimationExportConfig,
     _placeholderCanvas: HTMLCanvasElement,
   ) {
@@ -544,8 +654,20 @@ export function MainWorkspace(props: AppProps) {
       return
     }
 
+    // True high-resolution export: scale the canvas backing store for the
+    // duration of the export so every frame is rendered at the target
+    // resolution, instead of bitmap-upscaling the 1x canvas (which only
+    // interpolated pixels and produced soft output).
+    const baseRatio = pixelRatio()
+    const scaledExport = config.resolution !== 1
+    if (scaledExport) {
+      setPixelRatio(baseRatio * config.resolution)
+      await waitForStableCanvasSize(canvas)
+    }
+
+    // resolution: 1 — the canvas itself already renders at export resolution.
     const { promise } = createAnimationExport(
-      config,
+      { ...config, resolution: 1 },
       canvas,
       timeline,
       flameDescriptor,
@@ -564,10 +686,13 @@ export function MainWorkspace(props: AppProps) {
         URL.revokeObjectURL(url)
         showToast('Animation exported')
       })
-      // eslint-disable-next-line @typescript-eslint/use-unknown-in-catch-callback-variable
-      .catch((err) => {
+
+      .catch((err: unknown) => {
         console.error('Animation export failed:', err)
         showToast('Animation export failed')
+      })
+      .finally(() => {
+        if (scaledExport) setPixelRatio(baseRatio)
       })
   }
 
@@ -651,16 +776,13 @@ export function MainWorkspace(props: AppProps) {
       if (timeline.isPlaying()) timeline.pause()
       switch (name) {
         case 'loadFlame':
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          showLoadFlameModal()
+          void showLoadFlameModal()
           break
         case 'exportPng':
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          showExportPngDialog()
+          void showExportPngDialog()
           break
         case 'shareLink':
-          // eslint-disable-next-line @typescript-eslint/no-floating-promises
-          showShareLinkModal()
+          void showShareLinkModal()
           break
       }
     },
@@ -729,7 +851,7 @@ export function MainWorkspace(props: AppProps) {
       // produceWithPatches (structurajs draft proxy), and reconcile expects
       // a SolidJS store proxy -- mixing the two causes "node.$ is not a
       // function".
-      history.replace(snapshot as typeof flameDescriptor, 'tour:restore')
+      history.replace(snapshot as FlameDescriptor, 'tour:restore')
     },
   }
 
@@ -971,14 +1093,12 @@ export function MainWorkspace(props: AppProps) {
         if (variation.params) {
           const val = variation.params[paramName]
           if (val !== undefined) return val
-        } else if (
-          isParametricVariationType(variation.type as TransformVariationType)
-        ) {
+        } else if (isParametricVariationType(variation.type)) {
           // Params not initialized yet — fall back to defaults
-          const vType = variation.type as TransformVariationType
-          const vDef = transformVariations[vType] as {
-            paramDefaults: Record<string, number>
-          }
+          const vType = variation.type
+          const vDef = (transformVariations as Record<string, unknown>)[
+            vType
+          ] as { paramDefaults: Record<string, number> } | undefined
           if (vDef && paramName in vDef.paramDefaults) {
             const d = vDef.paramDefaults[paramName]
             if (d !== undefined) return d
@@ -1097,7 +1217,7 @@ export function MainWorkspace(props: AppProps) {
         case 'camera.rotation':
           ;(draft.renderSettings.camera as
             | Record<string, unknown>
-            | undefined)!.rotation = value as number
+            | undefined)!.rotation = value
           break
         default: {
           const parts = path.split('.')
@@ -1364,7 +1484,8 @@ export function MainWorkspace(props: AppProps) {
   }
   useShortcutManager(cmdContext)
 
-  runTourCommand.fn = (id, ...args) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  runTourCommand.fn = (id, ...args: any[]) => {
     executeCommand(id, cmdContext, ...args)
   }
 
@@ -1429,11 +1550,19 @@ export function MainWorkspace(props: AppProps) {
                 <WheelZoomCamera2D
                   zoom={[effectiveZoom, setFlameZoom]}
                   position={[effectivePosition, setFlamePosition]}
-                  interactive={() => !timeline.isPlaying()}
+                  interactive={() =>
+                    // Camera input during an export resets the in-progress
+                    // frame and bakes the user's camera into the exported
+                    // video — locked unless the user opted in via the
+                    // "camera control during render" toggle.
+                    !timeline.isPlaying() &&
+                    (!animationExportRunning() || cameraDuringExportEnabled())
+                  }
                 >
                   <Flam3
                     quality={exportQuality() ?? qualityPresets[qualityPreset()]}
                     pointCountPerBatch={DEFAULT_POINT_COUNT}
+                    isExportRenderer
                     adaptiveFilterEnabled={adaptiveFilterEnabled()}
                     animationEnabled={animationEnabled()}
                     flameDescriptor={effectiveFlame()}
@@ -1456,6 +1585,13 @@ export function MainWorkspace(props: AppProps) {
                 {(hv) => (
                   <div class={ui.hoverPreviewBadge}>
                     Previewing: {getNormalizedVariationName(hv)}
+                  </div>
+                )}
+              </Show>
+              <Show when={hoveredCustomVarDef()} keyed>
+                {(cv) => (
+                  <div class={ui.hoverPreviewBadge}>
+                    Previewing custom: {cv.name}
                   </div>
                 )}
               </Show>
@@ -1554,12 +1690,10 @@ export function MainWorkspace(props: AppProps) {
               </div>
             </div>
           </>
-          <Show when={IS_DEV}>
-            <DebugOverlay
-              animationEnabled={animationEnabled()}
-              flameDescriptor={flameDescriptor}
-            />
-          </Show>
+          <DebugOverlay
+            animationEnabled={animationEnabled()}
+            flameDescriptor={flameDescriptor}
+          />
 
           <Show when={showSidebar()}>
             <div
@@ -1683,6 +1817,10 @@ export function MainWorkspace(props: AppProps) {
                                 state.vid
                               ]?.type ?? state.type
                             }
+                            hardwareTier={props.hardwareTier}
+                            pointInitMode={
+                              flameDescriptor.renderSettings.pointInitMode
+                            }
                             onSelect={(newType) => {
                               setFlameDescriptor((draft) => {
                                 const existingVar =
@@ -1719,6 +1857,47 @@ export function MainWorkspace(props: AppProps) {
                             onHoverClear={() => setHoveredVariationType(null)}
                             mode={quickPickerMode()}
                             onModeChange={setQuickPickerMode}
+                            onOpenFullSelector={() => {
+                              console.info(
+                                '[QuickVariationPicker] onOpenFullSelector — opening full VariationSelector',
+                                { tid: state.tid, vid: state.vid },
+                              )
+                              const currentVar =
+                                flameDescriptor.transforms[state.tid]
+                                  ?.variations[state.vid]
+                              if (!currentVar) return
+                              // Close quick picker first so modal stacking works
+                              setQuickPickState(null)
+                              queueMicrotask(() => {
+                                showVariationSelector(
+                                  deepClone(currentVar),
+                                  deepClone(flameDescriptor),
+                                  state.tid,
+                                  state.vid,
+                                )
+                                  .then((newValue) => {
+                                    if (
+                                      newValue === undefined ||
+                                      !isVariationType(newValue.variation.type)
+                                    ) {
+                                      return
+                                    }
+                                    setFlameDescriptor((draft) => {
+                                      draft.transforms[state.tid]!.preAffine =
+                                        newValue.transform.preAffine
+                                      draft.transforms[state.tid]!.variations[
+                                        state.vid
+                                      ] = newValue.variation
+                                    })
+                                  })
+                                  .catch((err: unknown) => {
+                                    console.warn(
+                                      'Cannot load this variation, reason: ',
+                                      err,
+                                    )
+                                  })
+                              })
+                            }}
                           />
                         )}
                       </Show>
@@ -1767,6 +1946,110 @@ export function MainWorkspace(props: AppProps) {
                             onSelect={handlePaletteSelect}
                             onUnselect={handlePaletteUnselect}
                           />
+                        </CollapsibleCard>
+                        <CollapsibleCard
+                          title="Custom Variations"
+                          defaultOpen={false}
+                        >
+                          <For
+                            each={customVariationsList()}
+                            fallback={
+                              <div class={ui.customVarEmpty}>
+                                No custom variations yet
+                              </div>
+                            }
+                          >
+                            {(def) => (
+                              <div
+                                class={ui.customVarItem}
+                                onContextMenu={(e) => {
+                                  e.preventDefault()
+                                }}
+                                onMouseEnter={() => setHoveredCustomVarDef(def)}
+                                onMouseLeave={() =>
+                                  setHoveredCustomVarDef(null)
+                                }
+                                onClick={() => {
+                                  void showCustomVariationEditor(def).then(
+                                    (addedDef) => {
+                                      if (addedDef) {
+                                        setFlameDescriptor((draft) => {
+                                          addTransformWithVariation(
+                                            draft,
+                                            addedDef.id,
+                                          )
+                                        })
+                                      }
+                                      setCustomVarsVersion((v) => v + 1)
+                                    },
+                                  )
+                                }}
+                              >
+                                <span class={ui.customVarItemName}>
+                                  {def.name}
+                                </span>
+                                <div class={ui.customVarItemActions}>
+                                  <button
+                                    class={ui.customVarItemBtn}
+                                    classList={{
+                                      [ui.customVarItemBtnPrimary as string]: true,
+                                    }}
+                                    title="Add to flame"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setHoveredCustomVarDef(null)
+                                      setFlameDescriptor((draft) => {
+                                        addTransformWithVariation(draft, def.id)
+                                      })
+                                    }}
+                                  >
+                                    <BoxArrowRight />
+                                  </button>
+                                  <button
+                                    class={ui.customVarItemBtn}
+                                    title="Duplicate"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      duplicateCustomVariation(def.id)
+                                      setCustomVarsVersion((v) => v + 1)
+                                    }}
+                                  >
+                                    ⧉
+                                  </button>
+                                  <button
+                                    class={ui.customVarItemBtn}
+                                    classList={{
+                                      [ui.customVarItemBtnDanger as string]: true,
+                                    }}
+                                    title="Delete"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      deleteCustomVariation(def.id)
+                                      setCustomVarsVersion((v) => v + 1)
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </For>
+                          <button
+                            class={ui.customVarsButton}
+                            onClick={async () => {
+                              const addedDef = await showCustomVariationEditor()
+                              if (addedDef) {
+                                setFlameDescriptor((draft) => {
+                                  addTransformWithVariation(draft, addedDef.id)
+                                })
+                              }
+                              setCustomVarsVersion((v) => v + 1)
+                            }}
+                            title="Create a new custom variation"
+                          >
+                            <Plus />
+                            <span>Create Variation</span>
+                          </button>
                         </CollapsibleCard>
                         <For
                           each={recordEntries(
@@ -1918,6 +2201,10 @@ export function MainWorkspace(props: AppProps) {
                                             variation.type,
                                           )}
                                           onClick={() => {
+                                            // Auto-open sidebar on mobile so the picker is visible
+                                            if (isMobile() && sidebarHidden()) {
+                                              setSidebarHidden(false)
+                                            }
                                             setQuickPickState({
                                               tid,
                                               vid,
@@ -2122,7 +2409,14 @@ export function MainWorkspace(props: AppProps) {
                                                       `Unreachable code`,
                                                     )
                                                   }
-                                                  variationDraft.params = value
+                                                  ;(
+                                                    variationDraft as {
+                                                      params: Record<
+                                                        string,
+                                                        number
+                                                      >
+                                                    }
+                                                  ).params = value
                                                 })
                                               }}
                                             />
@@ -2140,7 +2434,7 @@ export function MainWorkspace(props: AppProps) {
                                       draft.transforms[tid]!.variations[
                                         generateVariationId()
                                       ] = deepClone(
-                                        getVariationDefault('linear', 1),
+                                        getVariationDefault('linearVar', 1),
                                       )
                                     })
                                   }}
@@ -2595,11 +2889,11 @@ export function MainWorkspace(props: AppProps) {
                                       flameDescriptor.renderSettings.drawMode
                                     }
                                     onChange={(ev) => {
-                                      const mode = ev.currentTarget
-                                        .value as DrawMode
+                                      const mode = ev.currentTarget.value
                                       const update = () => {
                                         setFlameDescriptor((draft) => {
-                                          draft.renderSettings.drawMode = mode
+                                          draft.renderSettings.drawMode =
+                                            mode as 'light' | 'paint'
                                         })
                                       }
                                       if ('startViewTransition' in document) {
@@ -2641,12 +2935,13 @@ export function MainWorkspace(props: AppProps) {
                                         .colorInitMode
                                     }
                                     onChange={(ev) => {
-                                      const mode = ev.currentTarget
-                                        .value as ColorInitMode
+                                      const mode = ev.currentTarget.value
                                       const update = () => {
                                         setFlameDescriptor((draft) => {
                                           draft.renderSettings.colorInitMode =
-                                            mode
+                                            mode as
+                                              | 'colorInitZero'
+                                              | 'colorInitPosition'
                                         })
                                       }
                                       if ('startViewTransition' in document) {
@@ -2690,12 +2985,11 @@ export function MainWorkspace(props: AppProps) {
                                         .pointInitMode
                                     }
                                     onChange={(ev) => {
-                                      const mode = ev.currentTarget
-                                        .value as PointInitMode
+                                      const mode = ev.currentTarget.value
                                       const update = () => {
                                         setFlameDescriptor((draft) => {
                                           draft.renderSettings.pointInitMode =
-                                            mode
+                                            mode as PointInitMode
                                         })
                                       }
                                       if ('startViewTransition' in document) {
@@ -2914,8 +3208,8 @@ export function MainWorkspace(props: AppProps) {
             initialTop={floatingTop()}
             onLoadFlame={() => {
               if (timeline.isPlaying()) timeline.pause()
-              // eslint-disable-next-line @typescript-eslint/no-floating-promises
-              showLoadFlameModal()
+
+              void showLoadFlameModal()
             }}
             onSaveForLater={() => {
               const tracks = timeline.tracks()
@@ -2928,14 +3222,14 @@ export function MainWorkspace(props: AppProps) {
             }}
             onRender={() => {
               if (timeline.isPlaying()) timeline.pause()
-              // eslint-disable-next-line @typescript-eslint/no-floating-promises
-              showExportPngDialog()
+
+              void showExportPngDialog()
             }}
             onQuickExport={quickExport}
             onShareLink={() => {
               if (timeline.isPlaying()) timeline.pause()
-              // eslint-disable-next-line @typescript-eslint/no-floating-promises
-              showShareLinkModal()
+
+              void showShareLinkModal()
             }}
             onShareDiscord={shareToDiscord}
             onLogoFavicon={showLogoFaviconGenerator}
@@ -2977,6 +3271,7 @@ export function MainWorkspace(props: AppProps) {
             qualityPointCountLimit={qualityPointCountLimit()}
           />
           <SpotlightTour tourContext={tourContext} />
+          <BenchmarkButton onClick={createShowBenchmark()} />
           <SoftwareVersion
             showHelp={createShowHelp(
               quickPickerMode,
@@ -2988,6 +3283,8 @@ export function MainWorkspace(props: AppProps) {
               theme,
               setTheme,
               IS_DEV ? () => setDevCrashTest(true) : undefined,
+              () => props.hardwareTier ?? null,
+              props.onHardwareTierChange,
             )}
           />
           <Show when={devCrashTest()}>

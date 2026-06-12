@@ -25,7 +25,7 @@ export const linear1 = defineExample({
       color: { x: -0.24059401492657634, y: -0.1892117532217128 },
       variations: {
         [vid('79b89e92_15a5_478f_ae85_dcd22856f9ea')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 0.95,
         },
       },
@@ -44,7 +44,7 @@ export const linear1 = defineExample({
       color: { x: -0.031047370799169666, y: 0.0937664949455789 },
       variations: {
         [vid('c07f1b17_9072_461e_9dc8_c5ceaaabf71d')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 0.566,
         },
       },
@@ -63,7 +63,7 @@ export const linear1 = defineExample({
       color: { x: -0.031047370799169666, y: 0.0937664949455789 },
       variations: {
         [vid('b2c15c46_4975_4fc6_9571_52189459f503')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 0.566,
         },
       },
@@ -82,7 +82,7 @@ export const linear1 = defineExample({
       color: { x: 0.007662306620185175, y: 0.12602455946170793 },
       variations: {
         [vid('30af6845_b157_4a01_98de_3f1ee9f93c44')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 0.566,
         },
       },

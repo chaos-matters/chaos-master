@@ -1,4 +1,4 @@
-import { createSignal, For, onCleanup, Show } from 'solid-js'
+import { createEffect, createResource, createSignal, For, onCleanup, Show, } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { vec2f, vec4f } from 'typegpu/data'
 import { Checkbox } from '@/components/Checkbox/Checkbox'
@@ -11,11 +11,13 @@ import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
 import { Root } from '@/lib/Root'
 import { deepClone } from '@/utils/clone'
+import { detectHardwareTier, hardwareTiers } from '@/utils/hardwareTier'
 import { formatRecentDate, loadRecentFlames } from '@/utils/recentFlames'
 import { applyTracksToFlame } from '@/utils/timeline'
 import { VERSION } from '@/version'
 import ui from './WelcomeScreen.module.css'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { HardwareTier } from '@/utils/hardwareTier'
 import type { TimelineTrack } from '@/utils/timeline'
 
 type WelcomeScreenProps = {
@@ -25,6 +27,8 @@ type WelcomeScreenProps = {
   onSelectFlame?: (flame: FlameDescriptor, tracks?: TimelineTrack[]) => void
   onStartTour?: (tourId: string) => void
   onShowAbout?: () => void
+  hardwareTier?: HardwareTier | null
+  onHardwareTierChange?: (tier: HardwareTier) => void
 }
 
 type GalleryItem = {
@@ -210,6 +214,23 @@ export function WelcomeScreen(props: WelcomeScreenProps) {
   const [showAllAnimated, setShowAllAnimated] = createSignal(false)
   const [showAllStatic, setShowAllStatic] = createSignal(false)
 
+  const [detectedTier] = createResource(
+    () => props.hardwareTier ?? '__detect__',
+    async (key) => {
+      if (key !== '__detect__') return key as HardwareTier
+      return await detectHardwareTier()
+    },
+  )
+
+  createEffect(() => {
+    const detected = detectedTier()
+    if (detected && !props.hardwareTier) {
+      props.onHardwareTierChange?.(detected)
+    }
+  })
+
+  const effectiveTier = () => props.hardwareTier ?? detectedTier()
+
   const visibleAnimated = () =>
     showAllAnimated() ? animExamples : animExamples.slice(0, INITIAL_VISIBLE)
   const visibleStatic = () =>
@@ -230,81 +251,90 @@ export function WelcomeScreen(props: WelcomeScreenProps) {
       >
         <div class={ui.card}>
           <div class={ui.gallerySection}>
-            <div class={ui.galleryHeader}>
-              <span class={ui.galleryTitle}>Recent</span>
-            </div>
             <Show
-              when={recentItems.length > 0}
+              when={!detectedTier.loading}
               fallback={
-                <div class={ui.galleryEmpty}>
-                  <span>No recent flames yet</span>
+                <div class={ui.galleryLoading}>
+                  <span>Detecting hardware capabilities...</span>
                 </div>
               }
             >
+              <div class={ui.galleryHeader}>
+                <span class={ui.galleryTitle}>Recent</span>
+              </div>
+              <Show
+                when={recentItems.length > 0}
+                fallback={
+                  <div class={ui.galleryEmpty}>
+                    <span>No recent flames yet</span>
+                  </div>
+                }
+              >
+                <div class={ui.galleryGrid}>
+                  <For each={recentItems}>
+                    {(item) => (
+                      <FlameThumbnail
+                        flame={item.flame}
+                        name={item.name}
+                        tracks={item.tracks}
+                        savedAt={item.savedAt}
+                        onClickWithTracks={handleSelect}
+                      />
+                    )}
+                  </For>
+                </div>
+              </Show>
+
+              <div class={ui.galleryHeader} style={{ 'margin-top': '1.25rem' }}>
+                <span class={ui.galleryTitle}>Animated Examples</span>
+              </div>
               <div class={ui.galleryGrid}>
-                <For each={recentItems}>
+                <For each={visibleAnimated()}>
                   {(item) => (
                     <FlameThumbnail
                       flame={item.flame}
                       name={item.name}
                       tracks={item.tracks}
-                      savedAt={item.savedAt}
                       onClickWithTracks={handleSelect}
                     />
                   )}
                 </For>
               </div>
-            </Show>
+              <Show when={animExamples.length > INITIAL_VISIBLE}>
+                <button
+                  class={ui.showMoreBtn}
+                  onClick={() => setShowAllAnimated((v) => !v)}
+                >
+                  {showAllAnimated()
+                    ? 'Show less'
+                    : `Show more (${animExamples.length - INITIAL_VISIBLE} more)`}
+                </button>
+              </Show>
 
-            <div class={ui.galleryHeader} style={{ 'margin-top': '1.25rem' }}>
-              <span class={ui.galleryTitle}>Animated Examples</span>
-            </div>
-            <div class={ui.galleryGrid}>
-              <For each={visibleAnimated()}>
-                {(item) => (
-                  <FlameThumbnail
-                    flame={item.flame}
-                    name={item.name}
-                    tracks={item.tracks}
-                    onClickWithTracks={handleSelect}
-                  />
-                )}
-              </For>
-            </div>
-            <Show when={animExamples.length > INITIAL_VISIBLE}>
-              <button
-                class={ui.showMoreBtn}
-                onClick={() => setShowAllAnimated((v) => !v)}
-              >
-                {showAllAnimated()
-                  ? 'Show less'
-                  : `Show more (${animExamples.length - INITIAL_VISIBLE} more)`}
-              </button>
-            </Show>
-
-            <div class={ui.galleryHeader} style={{ 'margin-top': '1.25rem' }}>
-              <span class={ui.galleryTitle}>Examples</span>
-            </div>
-            <div class={ui.galleryGrid}>
-              <For each={visibleStatic()}>
-                {(item) => (
-                  <FlameThumbnail
-                    flame={item.flame}
-                    name={item.name}
-                    onClick={handleSelect}
-                  />
-                )}
-              </For>
-            </div>
-            <Show when={staticExamples.length > INITIAL_VISIBLE}>
-              <button
-                class={ui.showMoreBtn}
-                onClick={() => setShowAllStatic((v) => !v)}
-              >
-                {showAllStatic()
-                  ? 'Show less'
-                  : `Show more (${staticExamples.length - INITIAL_VISIBLE} more)`}
-              </button>
+              <div class={ui.galleryHeader} style={{ 'margin-top': '1.25rem' }}>
+                <span class={ui.galleryTitle}>Examples</span>
+              </div>
+              <div class={ui.galleryGrid}>
+                <For each={visibleStatic()}>
+                  {(item) => (
+                    <FlameThumbnail
+                      flame={item.flame}
+                      name={item.name}
+                      onClick={handleSelect}
+                    />
+                  )}
+                </For>
+              </div>
+              <Show when={staticExamples.length > INITIAL_VISIBLE}>
+                <button
+                  class={ui.showMoreBtn}
+                  onClick={() => setShowAllStatic((v) => !v)}
+                >
+                  {showAllStatic()
+                    ? 'Show less'
+                    : `Show more (${staticExamples.length - INITIAL_VISIBLE} more)`}
+                </button>
+              </Show>
             </Show>
           </div>
 
@@ -390,6 +420,23 @@ export function WelcomeScreen(props: WelcomeScreenProps) {
                 />
                 <span>Don't show on startup</span>
               </label>
+            </div>
+
+            <div class={ui.hardwareTierSection}>
+              <span class={ui.hardwareTierLabel}>Hardware Tier</span>
+              <div class={ui.hardwareTierPills}>
+                {hardwareTiers.map((tier) => (
+                  <button
+                    class={ui.hardwareTierPill}
+                    classList={{
+                      [ui.hardwareTierPillActive!]: tier === effectiveTier(),
+                    }}
+                    onClick={() => props.onHardwareTierChange?.(tier)}
+                  >
+                    {tier}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div class={ui.techPills}>

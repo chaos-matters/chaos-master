@@ -67,10 +67,11 @@ export function DopeSheetTrack(props: DopeSheetTrackProps) {
       }
     }
 
-    function handleUp(ev: PointerEvent) {
+    function finishDrag(ev: PointerEvent) {
       target.releasePointerCapture(e.pointerId)
       window.removeEventListener('pointermove', handleMove)
       window.removeEventListener('pointerup', handleUp)
+      window.removeEventListener('pointercancel', handleCancel)
 
       const lane = target.closest(`.${ui.lane}`)
       if (!lane) {
@@ -90,8 +91,17 @@ export function DopeSheetTrack(props: DopeSheetTrackProps) {
       didDrag = false
     }
 
+    function handleUp(ev: PointerEvent) {
+      finishDrag(ev)
+    }
+
+    function handleCancel(ev: PointerEvent) {
+      finishDrag(ev)
+    }
+
     window.addEventListener('pointermove', handleMove)
     window.addEventListener('pointerup', handleUp)
+    window.addEventListener('pointercancel', handleCancel)
   }
 
   function handleLaneClick(e: MouseEvent) {
@@ -156,6 +166,8 @@ export function DopeSheetTrack(props: DopeSheetTrackProps) {
         <For each={keyframes()}>
           {(kf) => {
             const left = () => (kf.frame - props.startFrame) * props.frameWidth
+            const diamondSize = () =>
+              Math.max(14, Math.round(props.trackHeight * 0.7))
             return (
               <div
                 class={ui.keyframeDot}
@@ -167,7 +179,10 @@ export function DopeSheetTrack(props: DopeSheetTrackProps) {
                   [ui.atCurrentFrame as string]:
                     kf.frame === props.currentFrame,
                 }}
-                style={{ left: `${left()}px` }}
+                style={{
+                  left: `${left()}px`,
+                  '--dot-size': `${diamondSize()}px`,
+                }}
                 title={`Frame ${kf.frame}: ${String(kf.value)}`}
                 onPointerDown={(e) => {
                   handleDragStart(e, kf.frame)

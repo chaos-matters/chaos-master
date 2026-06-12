@@ -1,446 +1,112 @@
-import { f32, vec2f } from 'typegpu/data'
-import { abs, atan2, cos, cosh, dot, exp, length, log, pow, select, sin, sinh, sqrt, tan, } from 'typegpu/std'
-import { random, randomUnitDisk } from '@/shaders/random'
-import { EPS, PI } from '../../constants'
-import { simpleVariation } from './types'
-
-export const waves = simpleVariation('waves', (pos, varInfo) => {
-  'use gpu'
-  const T = varInfo.affineCoefs
-  const xSinArg = pos.y / (T.c * T.c)
-  const ySinArg = pos.x / (T.f * T.f)
-  const delta = vec2f(T.b * sin(xSinArg), T.e * sin(ySinArg))
-  return pos.add(delta)
-})
-
-export const popcorn = simpleVariation('popcorn', (pos, varInfo) => {
-  'use gpu'
-  const T = varInfo.affineCoefs
-  const delta = vec2f(T.c * sin(tan(3 * pos.y)), T.f * sin(tan(3 * pos.x)))
-  return pos.add(delta)
-})
-
-export const rings = simpleVariation('rings', (pos, varInfo) => {
-  'use gpu'
-  const T = varInfo.affineCoefs
-  const c2 = T.c * T.c
-  const r = length(pos)
-  const theta = atan2(pos.y, pos.x)
-  const factor = ((r + c2) % (2 * c2)) - c2 + r * (1 - c2)
-  return vec2f(cos(theta), sin(theta)).mul(factor)
-})
-
-export const fan = simpleVariation('fan', (pos, varInfo) => {
-  'use gpu'
-  const T = varInfo.affineCoefs
-  const t = PI.$ * T.c * T.c
-  const r = length(pos)
-  const theta = atan2(pos.y, pos.x)
-
-  const thalf = t / 2
-  const trueAngle = theta - thalf
-  const falseAngle = theta + thalf
-  const modCond = (theta + T.f) % t
-  const angle = select(falseAngle, trueAngle, modCond > thalf)
-  return vec2f(cos(angle), sin(angle)).mul(r)
-})
-
-export const linear = simpleVariation('linear', (pos, _varInfo) => {
-  'use gpu'
-  return vec2f(pos)
-})
-
-export const randomDisk = simpleVariation('randomDisk', (_pos, _varInfo) => {
-  'use gpu'
-  return randomUnitDisk()
-})
-
-export const gaussian = simpleVariation('gaussian', (_pos, _varInfo) => {
-  'use gpu'
-  const r = random() + random() + random() + random() - 2
-  const theta = random() * 2 * PI.$
-  return vec2f(cos(theta), sin(theta)).mul(r)
-})
-
-export const sinusoidal = simpleVariation('sinusoidal', (pos, _varInfo) => {
-  'use gpu'
-  return vec2f(sin(pos.x), sin(pos.y))
-})
-
-export const spherical = simpleVariation('spherical', (pos, _varInfo) => {
-  'use gpu'
-  const r2 = dot(pos, pos)
-  return pos.div(r2)
-})
-
-export const swirl = simpleVariation('swirl', (pos, _varInfo) => {
-  'use gpu'
-  const r2 = dot(pos, pos)
-  const s2 = sin(r2)
-  const c2 = cos(r2)
-  return vec2f(pos.x * s2 - pos.y * c2, pos.x * c2 + pos.y * s2)
-})
-
-export const horseshoe = simpleVariation('horseshoe', (pos, _varInfo) => {
-  'use gpu'
-  const r = length(pos)
-  return vec2f((pos.x - pos.y) * (pos.x + pos.y), 2 * pos.x * pos.y).div(r)
-})
-
-export const polar = simpleVariation('polar', (pos, _varInfo) => {
-  'use gpu'
-  const r = length(pos)
-  const theta = atan2(pos.y, pos.x)
-  return vec2f(theta / PI.$, r - 1)
-})
-
-export const handkerchief = simpleVariation('handkerchief', (pos, _varInfo) => {
-  'use gpu'
-  const r = length(pos)
-  const theta = atan2(pos.y, pos.x)
-  return vec2f(sin(theta + r), cos(theta - r)).mul(r)
-})
-
-export const heart = simpleVariation('heart', (pos, _varInfo) => {
-  'use gpu'
-  const r = length(pos)
-  const theta = atan2(pos.y, pos.x)
-  return vec2f(sin(theta * r), -cos(theta * r)).mul(r)
-})
-
-export const disc = simpleVariation('disc', (pos, _varInfo) => {
-  'use gpu'
-  const r = length(pos)
-  const theta = atan2(pos.y, pos.x)
-  const thOverPi = theta / PI.$
-  return vec2f(sin(PI.$ * r), cos(PI.$ * r)).mul(thOverPi)
-})
-
-export const spiral = simpleVariation('spiral', (pos, _varInfo) => {
-  'use gpu'
-  const r = length(pos)
-  const theta = atan2(pos.y, pos.x)
-  return vec2f(cos(theta) + sin(r), sin(theta) - cos(r)).div(r)
-})
-
-export const hyperbolic = simpleVariation('hyperbolic', (pos, _varInfo) => {
-  'use gpu'
-  const r = length(pos)
-  const theta = atan2(pos.y, pos.x)
-  return vec2f(sin(theta) / r, r * cos(theta))
-})
-
-export const diamond = simpleVariation('diamond', (pos, _varInfo) => {
-  'use gpu'
-  const r = length(pos)
-  const theta = atan2(pos.y, pos.x)
-  return vec2f(sin(theta) * cos(r), cos(theta) * sin(r))
-})
-
-export const exVar = simpleVariation('exVar', (pos, _varInfo) => {
-  'use gpu'
-  const r = length(pos)
-  const theta = atan2(pos.y, pos.x)
-  const p0 = sin(theta + r)
-  const p1 = cos(theta - r)
-  const p03 = p0 * p0 * p0
-  const p13 = p1 * p1 * p1
-  return vec2f(p03 + p13, p03 - p13).mul(r)
-})
-
-export const julia = simpleVariation('julia', (pos, _varInfo) => {
-  'use gpu'
-  const sqrtr = sqrt(length(pos))
-  const theta = atan2(pos.y, pos.x)
-  const omega = f32(select(0, PI.$, random() > 0.5))
-  const angle = theta / 2.0 + omega
-  return vec2f(cos(angle), sin(angle)).mul(sqrtr)
-})
-
-export const bent = simpleVariation('bent', (pos, _varInfo) => {
-  'use gpu'
-  const fx = select(pos.x, 2.0 * pos.x, pos.x < 0)
-  const fy = select(pos.y, pos.y / 2.0, pos.y < 0)
-  return vec2f(fx, fy)
-})
-
-export const fisheye = simpleVariation('fisheye', (pos, _varInfo) => {
-  'use gpu'
-  const r = length(pos)
-  const factor = 2 / (r + 1)
-  return pos.yx.mul(factor)
-})
-
-export const eyefish = simpleVariation('eyefish', (pos, _varInfo) => {
-  'use gpu'
-  const r = length(pos)
-  const factor = 2 / (r + 1)
-  return pos.mul(factor)
-})
-
-export const exponential = simpleVariation('exponential', (pos, _varInfo) => {
-  'use gpu'
-  const factor = exp(pos.x - 1)
-  const piY = PI.$ * pos.y
-  return vec2f(cos(piY), sin(piY)).mul(factor)
-})
-
-export const power = simpleVariation('power', (pos, _varInfo) => {
-  'use gpu'
-  const r = length(pos)
-  const theta = atan2(pos.y, pos.x)
-  const sinTheta = sin(theta)
-  const factor = pow(r, sinTheta)
-  return vec2f(cos(theta), sinTheta).mul(factor)
-})
-
-export const cosine = simpleVariation('cosine', (pos, _varInfo) => {
-  'use gpu'
-  const piX = PI.$ * pos.x
-  return vec2f(cos(piX) * cosh(pos.y), -sin(piX) * sinh(pos.y))
-})
-
-export const bubble = simpleVariation('bubble', (pos, _varInfo) => {
-  'use gpu'
-  const r = length(pos)
-  const r2 = r * r
-  const factor = 4 / (r2 + 4)
-  return vec2f(pos.x, pos.y).mul(factor)
-})
-
-export const cylinder = simpleVariation('cylinder', (pos, _varInfo) => {
-  'use gpu'
-  return vec2f(sin(pos.x), pos.y)
-})
-
-export const noise = simpleVariation('noise', (pos, _varInfo) => {
-  'use gpu'
-  const rand = random()
-  const angle = 2 * PI.$ * random()
-  return vec2f(pos.x * cos(angle), pos.y * sin(angle)).mul(rand)
-})
-
-export const blurVar = simpleVariation('blurVar', (_pos, _varInfo) => {
-  'use gpu'
-  const rand = random()
-  const angle = 2 * PI.$ * random()
-  return vec2f(cos(angle), sin(angle)).mul(rand)
-})
-
-export const archVar = simpleVariation('archVar', (_pos, varInfo) => {
-  'use gpu'
-  const weight = varInfo.weight
-  const angle = random() * PI.$ * weight
-  return vec2f(sin(angle), (sin(angle) * sin(angle)) / cos(angle))
-})
-
-export const tangentVar = simpleVariation('tangentVar', (pos, _varInfo) => {
-  'use gpu'
-  return vec2f(sin(pos.x) / cos(pos.y), tan(pos.y))
-})
-
-export const squareVar = simpleVariation('squareVar', (_pos, _varInfo) => {
-  'use gpu'
-  const randX = random()
-  const randY = random()
-  return vec2f(randX - 0.5, randY - 0.5)
-})
-
-export const raysVar = simpleVariation('raysVar', (pos, varInfo) => {
-  'use gpu'
-  const weight = varInfo.weight
-  const rand = random()
-  const r = length(pos)
-  const angle = rand * PI.$ * weight
-  const fact = (weight * tan(angle)) / (r * r)
-  return vec2f(cos(pos.x), sin(pos.y)).mul(fact)
-})
-
-export const bladeVar = simpleVariation('bladeVar', (pos, varInfo) => {
-  'use gpu'
-  const weight = varInfo.weight
-  const rand = random()
-  const r = length(pos)
-  const angle = rand * r * weight
-  return vec2f(cos(angle) + sin(angle), cos(angle) - sin(angle)).mul(pos.x)
-})
-
-export const secantVar = simpleVariation('secantVar', (pos, varInfo) => {
-  'use gpu'
-  const weight = varInfo.weight
-  const r = length(pos)
-  const angle = weight * r
-  return vec2f(pos.x, 1 / (weight * cos(angle)))
-})
-
-export const twintrianVar = simpleVariation('twintrianVar', (pos, varInfo) => {
-  'use gpu'
-  const weight = varInfo.weight
-  const r = length(pos)
-  const angle = random() * r * weight
-  const sinAngle = sin(angle)
-  const t = log(sinAngle * sinAngle) / log(10) + cos(angle)
-  return vec2f(t, t - PI.$ * sinAngle).mul(pos.x)
-})
-
-export const crossVar = simpleVariation('crossVar', (pos, _varInfo) => {
-  'use gpu'
-  const squareDiff = pos.x * pos.x - pos.y * pos.y
-  const fact = sqrt(1 / (squareDiff * squareDiff))
-  return vec2f(pos.x, pos.y).mul(fact)
-})
-
-export const idiscVar = simpleVariation('idiscVar', (pos, _varInfo) => {
-  'use gpu'
-  const M_1_PI_F = 0.31830988618379
-  const a = PI.$ / (length(pos) + 1.0)
-  const theta = atan2(pos.y, pos.x)
-  const r = theta * M_1_PI_F
-  const s = sin(a)
-  const c = cos(a)
-
-  return vec2f(r * c, r * s)
-})
-
-export const butterflyVar = simpleVariation('butterflyVar', (pos, _varInfo) => {
-  'use gpu'
-  const y2 = pos.y * 2
-  const wx = 4 / sqrt(3 * PI.$)
-  const denominator = dot(vec2f(pos.x, y2), vec2f(pos.x, y2))
-  const r = wx * sqrt(abs(pos.y * pos.x) / (denominator + 1e-10))
-
-  return vec2f(r * pos.x, r * y2)
-})
-
-export const unpolarVar = simpleVariation('unpolarVar', (pos, _varInfo) => {
-  'use gpu'
-  // TODO: consider moving weight calculation inside variations, as they differ in some cases,
-  // not all need weight calculation
-  // const vvar_2 = (varInfo.weight * 0.5) / PI.$
-  const vvar_2 = 0.5 / PI.$
-
-  const r = exp(pos.y)
-  const s = sin(pos.x)
-  const c = cos(pos.x)
-
-  const newX = vvar_2 * r * s
-  const newY = vvar_2 * r * c
-
-  return vec2f(newX, newY)
-})
-
-export const squarizeVar = simpleVariation('squarizeVar', (pos, _varInfo) => {
-  'use gpu'
-  const s = length(pos)
-  let a = atan2(pos.y, pos.x)
-  if (a < 0.0) {
-    a += 2.0 * PI.$
-  }
-  const p = 4.0 * s * a * (1.0 / PI.$)
-
-  let newX = f32(0.0)
-  let newY = f32(0.0)
-
-  if (p <= 1.0 * s) {
-    newX = s
-    newY = p
-  } else if (p <= 3.0 * s) {
-    newX = 2.0 * s - p
-    newY = s
-  } else if (p <= 5.0 * s) {
-    newX = -s
-    newY = 4.0 * s - p
-  } else if (p <= 7.0 * s) {
-    newX = -(6.0 * s - p)
-    newY = -s
-  } else {
-    newX = s
-    newY = -(8.0 * s - p)
-  }
-
-  return vec2f(newX, newY)
-})
-
-export const sinusoidalVar = simpleVariation(
-  'sinusoidalVar',
-  (pos, _varInfo) => {
-    'use gpu'
-    return vec2f(sin(pos.x), sin(pos.y))
-  },
-)
-
-export const scryVar = simpleVariation('scryVar', (pos, varInfo) => {
-  'use gpu'
-  const t = dot(pos, pos)
-  // Java: d = (sqrt(t) * (t + 1.0 / pAmount));
-  // Note: We protect against division by zero if weight is 0
-  const weight = select(varInfo.weight, EPS.$, varInfo.weight === 0.0)
-  const d = sqrt(t) * (t + 1.0 / weight)
-
-  if (d === 0.0) {
-    // Java returns without modifying pVarTP (effectively adding 0)
-    return vec2f(0.0, 0.0)
-  }
-
-  const r = 1.0 / d
-  const newX = pos.x * r
-  const newY = pos.y * r
-
-  return vec2f(newX, newY)
-})
-
-export const tanhVar = simpleVariation('tanhVar', (pos, _varInfo) => {
-  'use gpu'
-  const tanhsin = sin(2.0 * pos.y)
-  const tanhcos = cos(2.0 * pos.y)
-  const tanhsinh = sinh(2.0 * pos.x)
-  const tanhcosh = cosh(2.0 * pos.x)
-
-  const d = tanhcos + tanhcosh
-
-  if (d === 0.0) {
-    return vec2f(0.0, 0.0)
-  }
-
-  const tanhden = 1.0 / d
-  const newX = tanhden * tanhsinh
-  const newY = tanhden * tanhsin
-
-  return vec2f(newX, newY)
-})
-
-export const twoFaceVar = simpleVariation('twoFaceVar', (pos, _varInfo) => {
-  'use gpu'
-  // TODO: refactor when weight calculation becomes per variation
-  let factor = f32(1.0) // This represents 'r' normalized by weight
-  if (pos.x > 0.0) {
-    const denom = pos.x * pos.x + pos.y * pos.y
-    factor /= denom
-  }
-
-  const newX = factor * pos.x
-  const newY = factor * pos.y
-
-  return vec2f(newX, newY)
-})
-
-export const pyramidVar = simpleVariation('pyramidVar', (pos, _varInfo) => {
-  'use gpu'
-  const x = pos.x * pos.x * pos.x
-  const y = pos.y * pos.y * pos.y
-
-  // r = pAmount / (|x| + |y| + |z|)
-  // The framework handles the multiplication by weight (pAmount) *after* we return.
-  // However, here 'r' is inversely proportional to the coordinate magnitude.
-  // Java: r = pAmount / (...)
-  // pVarTP += x * r => x * pAmount / (...)
-  // We should return x / (...) so that when multiplied by weight, it matches.
-
-  const div = abs(x) + abs(y) + 0.000000001
-  const r = 1.0 / div
-
-  const newX = x * r
-  const newY = y * r
-
-  return vec2f(newX, newY)
-})
+export * from './general'
+export * from './blur'
+export * from './post'
+export * from './pre'
+export * from './general/acosechVar'
+export * from './general/acoshVar'
+export * from './general/acothVar'
+export * from './general/apocarpetVar'
+
+export * from './general/archVar'
+export * from './general/arcsech2Var'
+export * from './general/arcsinhVar'
+export * from './general/arctanhVar'
+export * from './general/bilinearVar'
+export * from './general/boardersVar'
+export * from './general/chrysanthemumVar'
+export * from './general/collatzVar'
+export * from './general/cothqVar'
+export * from './general/cothVar'
+export * from './general/cosVar'
+export * from './general/cosqVar'
+export * from './general/coshqVar'
+export * from './general/coshVar'
+export * from './general/cotqVar'
+export * from './general/cotVar'
+export * from './general/cschVar'
+export * from './general/cschqVar'
+export * from './general/cscqVar'
+export * from './general/cscVar'
+export * from './general/easeVar'
+export * from './general/ediscVar'
+export * from './general/ennepersVar'
+export * from './general/laceVar'
+export * from './general/petalVar'
+export * from './general/secqVar'
+export * from './general/secVar'
+export * from './general/glynniaVar'
+export * from './general/gridoutVar'
+export * from './general/hadamardVar'
+export * from './general/holesqVar'
+export * from './general/invpolarVar'
+export * from './general/invsquircularVar'
+export * from './general/invtreeVar'
+export * from './general/panorama1Var'
+export * from './general/panorama2Var'
+export * from './general/riftVar'
+export * from './general/rippledVar'
+export * from './general/rondspherVar'
+export * from './general/roundSpherVar'
+export * from './general/cylinder2Var'
+export * from './general/logVar'
+export * from './general/loonie3Var'
+export * from './general/minkVar'
+export * from './general/polar2Var'
+export * from './general/secant2Var'
+export * from './general/sechqVar'
+export * from './general/sechVar'
+export * from './general/sinqVar'
+export * from './general/sinVar'
+export * from './general/sinhqVar'
+export * from './general/sinhVar'
+export * from './general/spiralwingVar'
+export * from './general/tanhqVar'
+export * from './general/tanCosVar'
+export * from './general/tanVar'
+export * from './general/threePointIFSVar'
+export * from './general/tornadoVar'
+export * from './general/wdiscVar'
+export * from './general/cylinderApoVar'
+export * from './general/dustpointVar'
+export * from './general/rays1Var'
+export * from './general/rays2Var'
+export * from './general/rays3Var'
+export * from './blur/circleBlurVar'
+export * from './post/postHeatHazeVar'
+export * from './post/postFlattenVar'
+export * from './pre/preFlattenVar'
+export * from './pre/preGaussianSimpleVar'
+export * from './post/postRotateVar'
+export * from './pre/preRotateVar'
+export * from './pre/preSpinZ'
+
+// ── Separate-file variations (general) ──
+// These were previously exported via a backward-compat alias block.
+// Now exported cleanly via barrel re-exports.
+export * from './general/bentVar'
+export * from './general/bubbleVar'
+export * from './general/cosineVar'
+export * from './general/cylinderVar'
+export * from './general/diamondVar'
+export * from './general/discVar'
+export * from './general/exponentialVar'
+export * from './general/eyefishVar'
+export * from './general/fanVar'
+export * from './general/fisheyeVar'
+export * from './general/flipCircleVar'
+export * from './general/flipYVar'
+export * from './general/handkerchiefVar'
+export * from './general/heartVar'
+export * from './general/horseshoeVar'
+export * from './general/hyperbolicVar'
+export * from './general/juliaVar'
+export * from './general/linearVar'
+export * from './general/noiseVar'
+export * from './general/polarVar'
+export * from './general/popcornVar'
+export * from './general/powerVar'
+export * from './general/ringsVar'
+export * from './general/sphericalVar'
+export * from './general/spiralVar'
+export * from './general/swirlVar'
+export * from './general/wavesVar'

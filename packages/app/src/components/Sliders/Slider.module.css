@@ -103,6 +103,8 @@
 
   /* make the grab area a bit bigger than slider itself */
   height: 20px;
+  touch-action: none;
+  -webkit-touch-callout: none;
 
   /* when scrolling into view on change, how much to over-scroll */
   scroll-margin-block: 8rem;

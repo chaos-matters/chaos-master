@@ -35,14 +35,18 @@
 .svg {
   width: 100%;
   height: 100%;
+  -webkit-touch-callout: none;
+  user-select: none;
 }
 
 .handle {
   cursor: grab;
   filter: drop-shadow(0 1px 2px black);
+  -webkit-touch-callout: none;
+  user-select: none;
 
   &:hover:not(:active) .handle-circle {
-    r: 0.4rem;
+    r: var(--handle-visual-hover-r, 0.4rem);
   }
 
   &:active {
@@ -51,7 +55,7 @@
 }
 
 .handle-circle {
-  r: 0.3rem;
+  r: var(--handle-visual-r, 0.3rem);
   fill: var(--color);
   stroke: white;
   stroke-width: 1px;
@@ -59,10 +63,20 @@
 }
 
 .handle-circle-grab-area {
-  r: 0.6rem;
+  r: var(--handle-grab-r, 0.6rem);
   fill: transparent;
   /* otherwise transparent fill is not hoverable */
   pointer-events: all;
+}
+
+@media (pointer: coarse) {
+  .handle-circle {
+    r: var(--handle-visual-r, 0.55rem);
+  }
+
+  .handle-circle-grab-area {
+    r: var(--handle-grab-r, 1.1rem);
+  }
 }
 
 .handle-box {

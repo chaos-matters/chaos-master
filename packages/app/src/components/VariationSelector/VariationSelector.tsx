@@ -9,11 +9,12 @@ import { CompactModeProvider } from '@/contexts/CompactModeContext'
 import { ComputeGate, useComputeGate } from '@/contexts/ComputeGateContext'
 import { KeyframeTargetProvider } from '@/contexts/KeyframeTargetContext'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { COMPUTE_GATE_CAPACITY, DEFAULT_VARIATION_PREVIEW_POINT_COUNT, DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS, DEFAULT_VARIATION_SHOW_DELAY_MS, } from '@/defaults'
+import { COMPUTE_GATE_CAPACITY, DEFAULT_VARIATION_PREVIEW_POINT_COUNT, DEFAULT_VARIATION_PREVIEW_QUALITY, DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS, DEFAULT_VARIATION_SHOW_DELAY_MS, } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
 import { pointInitModeToImplFn } from '@/flame/pointInitMode'
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from '@/flame/schema/flameSchema'
-import { isParametricVariation, variationTypes } from '@/flame/variations'
+import { isParametricVariation, transformVariations, variationTypes, } from '@/flame/variations'
+import { CATEGORIES, CATEGORY_LABELS, sortByCategory, } from '@/flame/variations/categories'
 import { getNormalizedVariationName, getParamsEditor, getTransformPreviewTid, getTransformPreviewVid, getVariationPreviewFlame, } from '@/flame/variations/utils'
 import { HoverEyePreview, HoverPreview } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
@@ -22,6 +23,7 @@ import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { deepClone } from '@/utils/clone'
 import { createStoreHistory } from '@/utils/createStoreHistory'
+import { hardwareTierToQuality } from '@/utils/hardwareTier'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
@@ -41,8 +43,10 @@ import type { RenderStatus } from '@/contexts/ComputeGateContext'
 import type { PointInitMode } from '@/flame/pointInitMode'
 import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from '@/flame/schema/flameSchema'
 import type { TransformVariationDescriptor } from '@/flame/variations'
+import type { VariationCategory } from '@/flame/variations/categories'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { ChangeHistory, HistorySetter } from '@/utils/createStoreHistory'
+import type { HardwareTier } from '@/utils/hardwareTier'
 
 const CANCEL = 'cancel'
 
@@ -50,7 +54,13 @@ export function PreviewFinalFlame(props: {
   flame: FlameDescriptor
   setFlamePosition: Setter<v2f>
   setFlameZoom: Setter<number>
+  hardwareTier?: HardwareTier | null
 }) {
+  const targetQuality = () =>
+    props.hardwareTier
+      ? hardwareTierToQuality[props.hardwareTier]
+      : DEFAULT_VARIATION_PREVIEW_QUALITY
+
   return (
     <AutoCanvas class={ui.canvas} pixelRatio={1}>
       <WheelZoomCamera2D
@@ -65,7 +75,7 @@ export function PreviewFinalFlame(props: {
       >
         <Flam3
           animationEnabled={false}
-          quality={0.99}
+          quality={targetQuality()}
           pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT}
           adaptiveFilterEnabled={true}
           flameDescriptor={props.flame}
@@ -82,11 +92,17 @@ export function VariationPreview(props: {
   isSelected: boolean
   flame: FlameDescriptor
   name: string
+  hardwareTier?: HardwareTier | null
 }) {
   const [container, setContainer] = createSignal<HTMLElement>()
   const [quality, setQuality] = createSignal<() => number>()
   const intersection = useIntersectionObserver(container)
   const isVisible = createMemo(() => intersection()?.isIntersecting)
+  const previewQuality = createMemo(() =>
+    props.hardwareTier
+      ? hardwareTierToQuality[props.hardwareTier]
+      : DEFAULT_VARIATION_PREVIEW_QUALITY,
+  )
   const renderStatus = createMemo<RenderStatus | undefined>(() => {
     const quality_ = quality()?.()
     if (quality_ === undefined) {
@@ -110,6 +126,8 @@ export function VariationPreview(props: {
       isSelected: props.isSelected,
     }
   })
+  const previewRenderInterval = createMemo(() => (allowed() ? 1 : Infinity))
+
   const [exportImage, setExportImage] = createSignal<ExportImageType>()
   const [image, setImage] = createSignal<string | undefined>()
 
@@ -201,11 +219,11 @@ export function VariationPreview(props: {
           >
             <Flam3
               animationEnabled={false}
-              quality={0.99}
+              quality={previewQuality()}
               pointCountPerBatch={5e4}
               adaptiveFilterEnabled={false}
               flameDescriptor={props.flame}
-              renderInterval={allowed() ? 1 : Infinity}
+              renderInterval={previewRenderInterval()}
               onExportImage={exportImage()}
               edgeFadeColor={vec4f(0)}
               setCurrentQuality={(fn) => setQuality(() => fn)}
@@ -228,6 +246,7 @@ type VariationSelectorModalProps = {
   transformId: TransformId
   variationId: VariationId
   respond: (value: RespondType) => void
+  hardwareTier?: HardwareTier | null
 }
 export const variationPreviewFlames: (
   p: PointInitMode,
@@ -280,9 +299,48 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
     })
   }
 
+  const [categoryFilter, setCategoryFilter] =
+    createSignal<VariationCategory | null>(null)
+
+  const groupedEntries = () => {
+    const items = filteredVariationEntries()
+    const selectedCategory = categoryFilter()
+    const groups = new Map<VariationCategory, [string, FlameDescriptor][]>()
+
+    for (const [id, flame] of items) {
+      const variation = getVarFromPreviewFlame(flame)
+      if (!variation) continue
+      const cat = transformVariations[variation.type]?.category
+      if (!cat || (selectedCategory && cat !== selectedCategory)) continue
+      if (!groups.has(cat)) groups.set(cat, [])
+      groups.get(cat)!.push([id, flame])
+    }
+
+    return [...groups.entries()]
+      .sort(([a], [b]) => sortByCategory(a, b))
+      .map(([cat, entries]) => ({
+        category: cat,
+        label: CATEGORY_LABELS[cat],
+        entries,
+      }))
+  }
+
+  const activeCategories = () => {
+    const cats = new Set<VariationCategory>()
+    for (const [, flame] of filteredVariationEntries()) {
+      const variation = getVarFromPreviewFlame(flame)
+      if (!variation) continue
+      const cat = transformVariations[variation.type]?.category
+      if (cat) cats.add(cat)
+    }
+    return CATEGORIES.filter((c) => cats.has(c))
+  }
+
   const [selectedItemId, setSelectedItemId] = createSignal<string>()
   const [hoveredItemId, setHoveredItemId] = createSignal<string>()
   const [touchlessPreview, setTouchlessPreview] = createSignal<boolean>(true)
+  const [paramsCollapsed, setParamsCollapsed] = createSignal(false)
+  const [affineCollapsed, setAffineCollapsed] = createSignal(false)
 
   let hoverClearTimer: ReturnType<typeof setTimeout> | undefined
   const PREVIEW_CLEAR_DELAY = 120
@@ -500,77 +558,118 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
         <span class={ui.undoMessage}>You can undo this operation.</span>
       </ModalTitleBar>
       <section class={ui.variationPreview}>
-        <div class={ui.variationSelectorSidebar}>
-          <div class={ui.searchBar}>
-            <input
-              ref={searchInputRef}
-              class={ui.searchInput}
-              type="text"
-              placeholder="Search variations..."
-              value={searchQuery()}
-              onInput={(e) => setSearchQuery(e.currentTarget.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  setSearchQuery('')
+        <div class={ui.searchBar}>
+          <input
+            ref={searchInputRef}
+            class={ui.searchInput}
+            type="text"
+            placeholder="Search variations..."
+            value={searchQuery()}
+            onInput={(e) => setSearchQuery(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setSearchQuery('')
+                e.stopPropagation()
+              } else if (e.key === 'Enter') {
+                if (applySelection()) {
+                  e.preventDefault()
                   e.stopPropagation()
-                } else if (e.key === 'Enter') {
-                  if (applySelection()) {
-                    e.preventDefault()
-                    e.stopPropagation()
-                  }
                 }
+              }
+            }}
+          />
+          <Show when={searchQuery()}>
+            <button
+              class={ui.searchClear}
+              onClick={() => {
+                setSearchQuery('')
+                searchInputRef?.focus()
               }}
-            />
-            <Show when={searchQuery()}>
+              title="Clear search"
+            >
+              &times;
+            </button>
+          </Show>
+        </div>
+        <div class={ui.dummyHeader} />
+        <div class={ui.variationSelectorSidebar}>
+          <Show when={activeCategories().length > 1}>
+            <div class={ui.categoryFilterRow}>
               <button
-                class={ui.searchClear}
-                onClick={() => {
-                  setSearchQuery('')
-                  searchInputRef?.focus()
+                class={ui.categoryPill}
+                classList={{
+                  [ui.categoryPillActive as string]: categoryFilter() === null,
                 }}
-                title="Clear search"
+                onClick={() => setCategoryFilter(null)}
               >
-                &times;
+                All
               </button>
-            </Show>
-          </div>
+              <For each={activeCategories()}>
+                {(cat) => (
+                  <button
+                    class={ui.categoryPill}
+                    classList={{
+                      [ui.categoryPillActive as string]:
+                        categoryFilter() === cat,
+                    }}
+                    onClick={() =>
+                      setCategoryFilter(categoryFilter() === cat ? null : cat)
+                    }
+                  >
+                    {CATEGORY_LABELS[cat]}
+                  </button>
+                )}
+              </For>
+            </div>
+          </Show>
           <section class={ui.gallery} onMouseLeave={handleContainerLeave}>
             <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
-              <For each={filteredVariationEntries()}>
-                {([id, variationExample]) => {
-                  const variation = getVarFromPreviewFlame(variationExample)
-                  const isSelected = () => selectedItemId() === id
-                  return (
-                    variation && (
-                      <button
-                        class={ui.item}
-                        classList={{
-                          [ui.selected as string]: isSelected(),
-                        }}
-                        onClick={() => {
-                          toggleSelectedItem(id)
-                        }}
-                        onMouseEnter={() => {
-                          handleMouseEnter(id)
-                        }}
-                        onMouseLeave={() => {
-                          handleMouseLeave()
-                        }}
-                      >
-                        <VariationPreview
-                          version={version()}
-                          isSelected={isSelected()}
-                          flame={variationExample}
-                          name={variation.type}
-                        />
-
-                        <div class={ui.itemTitle}>
-                          {getNormalizedVariationName(variation.type)}
-                        </div>
-                      </button>
-                    )
-                  )
-                }}
+              <For each={groupedEntries()}>
+                {({ label, entries }) => (
+                  <>
+                    <div class={ui.sectionHeader}>{label}</div>
+                    <For each={entries}>
+                      {([id, variationExample]) => {
+                        const variation =
+                          getVarFromPreviewFlame(variationExample)
+                        const isSelected = () => selectedItemId() === id
+                        return (
+                          variation && (
+                            <button
+                              class={ui.item}
+                              classList={{
+                                [ui.selected as string]: isSelected(),
+                              }}
+                              onClick={() => {
+                                toggleSelectedItem(id)
+                              }}
+                              onMouseEnter={() => {
+                                handleMouseEnter(id)
+                              }}
+                              onMouseLeave={() => {
+                                handleMouseLeave()
+                              }}
+                              onContextMenu={(e) => {
+                                e.preventDefault()
+                              }}
+                            >
+                              <VariationPreview
+                                version={version()}
+                                isSelected={isSelected()}
+                                flame={variationExample}
+                                name={variation.type}
+                                hardwareTier={props.hardwareTier}
+                              />
+                              <div class={ui.itemTitle}>
+                                {getNormalizedVariationName(variation.type)}
+                              </div>
+                            </button>
+                          )
+                        )
+                      }}
+                    </For>
+                  </>
+                )}
               </For>
             </ComputeGate>
           </section>
@@ -596,34 +695,52 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                       >
                         {(variation) => (
                           <>
-                            <h2>Variation Parameters</h2>
-                            <div class={ui.itemParams}>
-                              <Dynamic
-                                {...getParamsEditor(variation)}
-                                dataParameterPath={`${getTransformPreviewTid(variation.type)}.${getTransformPreviewVid(variation.type)}`}
-                                setValue={(value) => {
-                                  setVariationExamples(
-                                    (
-                                      draft: Record<string, FlameDescriptor>,
-                                    ) => {
-                                      const variationDraft =
-                                        draft[id]?.transforms[
-                                          getTransformPreviewTid(variation.type)
-                                        ]?.variations[
-                                          getTransformPreviewVid(variation.type)
-                                        ]
-                                      if (
-                                        variationDraft === undefined ||
-                                        !isParametricVariation(variationDraft)
-                                      ) {
-                                        throw new Error(`Unreachable code`)
-                                      }
-                                      variationDraft.params = value
-                                    },
-                                  )
-                                }}
-                              />
-                            </div>
+                            <h2
+                              class={ui.collapsibleHeader}
+                              onClick={() => setParamsCollapsed((v) => !v)}
+                            >
+                              <span class={ui.chevron}>
+                                {paramsCollapsed() ? '▶' : '▼'}
+                              </span>
+                              Variation Parameters
+                            </h2>
+                            <Show when={!paramsCollapsed()}>
+                              <div class={ui.itemParams}>
+                                <Dynamic
+                                  {...getParamsEditor(variation)}
+                                  dataParameterPath={`${getTransformPreviewTid(variation.type)}.${getTransformPreviewVid(variation.type)}`}
+                                  setValue={(value) => {
+                                    setVariationExamples(
+                                      (
+                                        draft: Record<string, FlameDescriptor>,
+                                      ) => {
+                                        const variationDraft =
+                                          draft[id]?.transforms[
+                                            getTransformPreviewTid(
+                                              variation.type,
+                                            )
+                                          ]?.variations[
+                                            getTransformPreviewVid(
+                                              variation.type,
+                                            )
+                                          ]
+                                        if (
+                                          variationDraft === undefined ||
+                                          !isParametricVariation(variationDraft)
+                                        ) {
+                                          throw new Error(`Unreachable code`)
+                                        }
+                                        ;(
+                                          variationDraft as {
+                                            params: Record<string, number>
+                                          }
+                                        ).params = value
+                                      },
+                                    )
+                                  }}
+                                />
+                              </div>
+                            </Show>
                           </>
                         )}
                       </Show>
@@ -634,18 +751,27 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
             }}
           </For>
           <Show when={selectedItemId()}>
-            <AffineEditor
-              class={ui.affineEditor}
-              transforms={{
-                [props.transformId]:
-                  previewFlame.transforms[props.transformId]!,
-              }}
-              setTransforms={(setFn) => {
-                setPreviewFlame((draft) => {
-                  setFn(draft.transforms)
-                })
-              }}
-            />
+            <h2
+              class={ui.collapsibleHeader}
+              onClick={() => setAffineCollapsed((v) => !v)}
+            >
+              <span class={ui.chevron}>{affineCollapsed() ? '▶' : '▼'}</span>
+              Affine Editor
+            </h2>
+            <Show when={!affineCollapsed()}>
+              <AffineEditor
+                class={ui.affineEditor}
+                transforms={{
+                  [props.transformId]:
+                    previewFlame.transforms[props.transformId]!,
+                }}
+                setTransforms={(setFn) => {
+                  setPreviewFlame((draft) => {
+                    setFn(draft.transforms)
+                  })
+                }}
+              />
+            </Show>
           </Show>
         </div>
         <div class={ui.flamePreview}>
@@ -654,6 +780,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
               flame={previewFlame}
               setFlamePosition={setFlamePosition}
               setFlameZoom={setFlameZoom}
+              hardwareTier={props.hardwareTier}
             />
           </div>
           <div class={ui.flamePreviewControls}>
@@ -713,7 +840,10 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
               >
                 Apply
                 <Show when={selectedItemId() !== undefined}>
-                  <span> {selectedItemId()} variation</span>
+                  <span>
+                    {' '}
+                    {getNormalizedVariationName(selectedItemId()!)} variation
+                  </span>
                 </Show>
               </Button>
             </ButtonGroup>
@@ -726,6 +856,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
 
 export function createVariationSelector(
   history: ChangeHistory<FlameDescriptor>,
+  hardwareTier?: HardwareTier | null,
 ) {
   const requestModal = useRequestModal()
   const [varSelectorModalIsOpen, setVarSelectorModalIsOpen] =
@@ -751,6 +882,7 @@ export function createVariationSelector(
                   transformId={tid}
                   variationId={vid}
                   respond={respond}
+                  hardwareTier={hardwareTier}
                 />
               </KeyframeTargetProvider>
             </ChangeHistoryContextProvider>

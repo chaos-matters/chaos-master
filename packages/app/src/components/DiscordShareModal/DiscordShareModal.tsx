@@ -15,7 +15,7 @@ export type DiscordShareMeta = {
 
 type DiscordShareModalProps = {
   previewUrl: string
-  respond: (value: DiscordShareMeta | typeof CANCEL) => void
+  respond: (value: DiscordShareMeta | symbol) => void
 }
 
 function DiscordShareModal(props: DiscordShareModalProps) {
@@ -123,7 +123,7 @@ export function createDiscordShareModal() {
   async function showDiscordShareModal(
     previewUrl: string,
   ): Promise<DiscordShareMeta | undefined> {
-    const result = await requestModal<DiscordShareMeta | typeof CANCEL>({
+    const result = await requestModal<DiscordShareMeta | symbol>({
       class: ui.container,
       content: ({ respond }) => (
         <DiscordShareModal previewUrl={previewUrl} respond={respond} />

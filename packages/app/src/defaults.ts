@@ -38,6 +38,10 @@ export const DEFAULT_VARIATION_SHOW_DELAY_MS = parseFloat(
   import.meta.env.VITE_DEFAULT_VARIATION_SHOW_DELAY_MS,
 )
 
+export const DEFAULT_VARIATION_PREVIEW_QUALITY = parseFloat(
+  import.meta.env.VITE_DEFAULT_VARIATION_PREVIEW_QUALITY ?? '0.95',
+)
+
 export const DEFAULT_VARIATION_PREVIEW_POINT_COUNT = parseFloat(
   import.meta.env.VITE_DEFAULT_VARIATION_PREVIEW_POINT_COUNT,
 )
@@ -80,6 +84,14 @@ export const CANVAS_RESIZE_DEBOUNCE_MS = Number.parseInt(
 // Enable comprehensive WebGPU buffer lifecycle logging.
 // Set VITE_DEBUG_VRAM=true in .env.local to trace memory leaks.
 export const DEBUG_VRAM = import.meta.env.VITE_DEBUG_VRAM === 'true'
+
+// Default for the "camera control during render" opt-in in the animation
+// render dialog. When enabled, pan/scroll/zoom stay active during an
+// animation export: camera input re-renders the in-progress frame under the
+// user's camera and bakes it into the video — a creative live-control tool,
+// off by default so exports are deterministic.
+export const ALLOW_CAMERA_DURING_EXPORT =
+  import.meta.env.VITE_ALLOW_CAMERA_DURING_EXPORT === 'true'
 
 export const COMPUTE_GATE_CAPACITY = parseFloat(
   import.meta.env.VITE_COMPUTE_GATE_CAPACITY ?? '2',

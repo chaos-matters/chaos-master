@@ -76,7 +76,7 @@ function boxChildrenEnd(
   return childOffset
 }
 
-export async function createMetadataPayload(
+export function createMetadataPayload(
   flame: FlameDescriptor,
   tracks: TimelineTrack[],
   config: TimelineConfig,
@@ -178,14 +178,14 @@ export function injectMetadataIntoMp4(
 }
 
 /** Extract flame+animation metadata from an MP4 buffer. */
-export async function extractMetadataFromMp4(mp4Buffer: ArrayBuffer): Promise<{
+export function extractMetadataFromMp4(mp4Buffer: ArrayBuffer): Promise<{
   flame: FlameDescriptor
   animation?: SharePayload['animation']
 } | null> {
   const moov = findBox(mp4Buffer, 'moov')
   if (!moov) {
     console.warn('[flameInMp4] moov box not found')
-    return null
+    return Promise.resolve(null)
   }
 
   // Parse moov children to find udta → flm3
@@ -240,5 +240,5 @@ export async function extractMetadataFromMp4(mp4Buffer: ArrayBuffer): Promise<{
     childOffset += childSize
   }
 
-  return null
+  return Promise.resolve(null)
 }

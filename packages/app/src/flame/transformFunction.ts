@@ -23,9 +23,13 @@ const VariantUniformsBase = struct({
 
 function variationUniforms(variationType: TransformVariationType) {
   if (isParametricVariationType(variationType)) {
+    const v = transformVariations[variationType] as Extract<
+      (typeof transformVariations)[TransformVariationType],
+      { paramStruct: unknown }
+    >
     return struct({
       ...VariantUniformsBase.propTypes,
-      params: transformVariations[variationType].paramStruct,
+      params: v.paramStruct,
     }).$name(`VariationUniforms_${variationType}`)
   }
   return VariantUniformsBase
@@ -75,11 +79,11 @@ export function createFlameWgsl({
   const fnImpl = tgpu.fn([Point, Uniforms], Point) /* wgsl */ `
     (point: Point, uniforms: Uniforms) -> Point {
       let pre = transformAffine(uniforms.preAffine, point.position);
-      var p = vec2f(0);
+      var p = vec2f(0.0);
       ${recordEntries(validVariations)
         .map(
           ([vid, { type }]) => /* wgsl */ `
-            p += uniforms.variation${vid}.weight * ${variationInvocation(type, vid)};`,
+            p += ${variationInvocation(type, vid)};`,
         )
         .join('\n')}
       p = transformAffine(uniforms.postAffine, p);
@@ -91,7 +95,7 @@ export function createFlameWgsl({
     ...Object.fromEntries(
       Object.values(validVariations).map((v) => [
         v.type,
-        transformVariations[v.type].fn,
+        (transformVariations as Record<string, { fn: unknown }>)[v.type]!.fn,
       ]),
     ),
     VariationInfo,
@@ -172,11 +176,14 @@ export function extractFlameUniforms({
                   const typed: Record<string, unknown> = {
                     weight: isVarVisible ? (rest.weight ?? 1) : 0,
                   }
-                  const variationType = type as TransformVariationType
+                  const variationType = type
                   const isParametric = isParametricVariationType(variationType)
                   if (isParametric) {
-                    const defaults = transformVariations[variationType]
-                      .paramDefaults as Record<string, number>
+                    const v = transformVariations[variationType] as Extract<
+                      (typeof transformVariations)[TransformVariationType],
+                      { paramDefaults: unknown }
+                    >
+                    const defaults = v.paramDefaults as Record<string, number>
                     const safe: Record<string, number> = { ...defaults }
                     if (rest.params) {
                       for (const key of Object.keys(defaults)) {

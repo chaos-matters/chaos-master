@@ -7,17 +7,12 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 export default defineConfig({
-  plugins: [solidPlugin()],
+  plugins: [solidPlugin({ hot: false })],
   test: {
     globals: true,
-    environment: 'jsdom',
+    environment: 'happy-dom',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     setupFiles: ['./src/vitest.setup.ts'],
-    environmentOptions: {
-      jsdom: {
-        resources: 'usable',
-      },
-    },
     css: {
       modules: {
         classNameStrategy: 'non-scoped',

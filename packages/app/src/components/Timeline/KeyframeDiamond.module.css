@@ -1,5 +1,6 @@
 .diamond {
   display: inline-flex;
+  position: relative;
   align-items: center;
   justify-content: center;
   width: 12px;
@@ -7,6 +8,14 @@
   flex-shrink: 0;
   cursor: pointer;
   margin-right: 2px;
+  -webkit-touch-callout: none;
+  user-select: none;
+  /* Expand touch target to at least 44px */
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -14px;
+  }
 }
 
 .diamond svg {

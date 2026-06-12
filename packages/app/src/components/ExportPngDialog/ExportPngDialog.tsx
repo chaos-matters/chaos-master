@@ -4,9 +4,9 @@ import { vec2f, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { ScrubInput } from '@/components/Sliders/ScrubInput'
 import { Slider } from '@/components/Sliders/Slider'
-import { DEFAULT_POINT_COUNT, DEFAULT_PREVIEW_PIXEL_RATIO } from '@/defaults'
+import { ALLOW_CAMERA_DURING_EXPORT, DEFAULT_POINT_COUNT, DEFAULT_PREVIEW_PIXEL_RATIO, } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
-import { accumulatedPointCount, forceExportNow, qualityPointCountLimit, setExportProgress, setExportQuality, setForceExportNow, } from '@/flame/renderStats'
+import { accumulatedPointCount, forceExportNow, qualityPointCountLimit, setCameraDuringExportEnabled, setExportProgress, setExportQuality, setForceExportNow, } from '@/flame/renderStats'
 import { condenseFlameDescriptor, MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from '@/flame/schema/flameSchema'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
@@ -88,6 +88,8 @@ type RenderDialogProps = {
   onCodecChange: (v: VideoEncoderConfig['codec']) => void
   embedMetadata: boolean
   onEmbedMetadataChange: (v: boolean) => void
+  cameraDuringExport: boolean
+  onCameraDuringExportChange: (v: boolean) => void
   onRenderAnimation: () => void
 }
 
@@ -567,6 +569,19 @@ function RenderDialog(props: RenderDialogProps) {
               />
               <span>Embed metadata</span>
             </label>
+
+            <label
+              class={ui.checkboxField}
+              title="Keep camera pan/scroll/zoom active while rendering — your live camera moves get baked into the video. Leave off for a deterministic export."
+            >
+              <Checkbox
+                checked={props.cameraDuringExport}
+                onChange={(checked) => {
+                  props.onCameraDuringExportChange(checked)
+                }}
+              />
+              <span>Camera control during render (experimental)</span>
+            </label>
           </div>
         </div>
       </Show>
@@ -713,6 +728,10 @@ export function createExportPngDialog(
       'export/embed-metadata',
       true,
     )
+    const [cameraDuringExport, setCameraDuringExport] = persistentSignal(
+      'export/camera-during-export',
+      ALLOW_CAMERA_DURING_EXPORT,
+    )
 
     const initialFlame = deepClone(flameDescriptor)
     if (timeline && hasAnimation) {
@@ -779,7 +798,8 @@ export function createExportPngDialog(
       setPixelRatio(res)
 
       // Export callback waits for quality to be reached
-      setOnExportImage(() => (canvas: HTMLCanvasElement) => {
+      type ExportInfo = { finalImageReady: boolean }
+      setOnExportImage(() => (canvas: HTMLCanvasElement, info?: ExportInfo) => {
         const limitFn = qualityPointCountLimit()
         const limit = limitFn()
         const current = accumulatedPointCount()
@@ -791,8 +811,13 @@ export function createExportPngDialog(
           pointsPerSec: prev?.pointsPerSec ?? 0,
         }))
 
-        // Not yet reached quality — keep rendering unless force-stopped
-        if (current < limit && !forceExportNow()) return
+        // Not yet reached quality (or the final color-graded image is not on
+        // the canvas yet) — keep rendering unless force-stopped
+        if (
+          (current < limit || info?.finalImageReady !== true) &&
+          !forceExportNow()
+        )
+          return
 
         // Quality reached or force-exported
         setForceExportNow(false)
@@ -859,6 +884,8 @@ export function createExportPngDialog(
 
     function handleRenderAnimation() {
       if (!startAnimationExport) return
+      // Apply the opt-in before the export locks canvas interaction.
+      setCameraDuringExportEnabled(cameraDuringExport())
       const exportConfig: AnimationExportConfig = {
         quality: animationQuality(),
         resolution: resolution(),
@@ -920,6 +947,8 @@ export function createExportPngDialog(
           onCodecChange={setCodec}
           embedMetadata={embedMetadata()}
           onEmbedMetadataChange={setEmbedMetadata}
+          cameraDuringExport={cameraDuringExport()}
+          onCameraDuringExportChange={setCameraDuringExport}
           onRenderAnimation={() => {
             handleRenderAnimation()
             respond()

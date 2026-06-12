@@ -37,12 +37,13 @@ export function DebugOverlay(props: DebugOverlayProps) {
   })
 
   function handleDragStart(e: PointerEvent) {
-    const startY = e.clientY
-    const startTop = panelTop()
+    const startY: number = e.clientY
+    const startTop: number = panelTop()
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
 
     function onMove(ev: PointerEvent) {
-      const dy = ev.clientY - startY
+      const clientY: number = ev.clientY
+      const dy: number = clientY - startY
       setPanelTop(
         Math.max(60, Math.min(window.innerHeight - 60, startTop + dy)),
       )

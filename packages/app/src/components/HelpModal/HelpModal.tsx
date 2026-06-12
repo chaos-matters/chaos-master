@@ -1,8 +1,9 @@
 import { createResource, createSignal, For, Show, Suspense } from 'solid-js'
-import { IS_DEV } from '@/defaults'
+import { useToast } from '@/contexts/ToastContext'
 import { Changelog, Discord, GitHub, Heart, Terminal, TriangleAlert, } from '@/icons'
 import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
 import { formatBytes } from '@/utils/formatBytes'
+import { detectHardwareTier, hardwareTiers } from '@/utils/hardwareTier'
 import { GIT_SHA, VERSION } from '@/version'
 import { createShowChangelog } from '../AboutPanel/Changelog'
 import { ConsoleLog } from '../ConsoleLog/ConsoleLog'
@@ -10,6 +11,7 @@ import { useRequestModal } from '../Modal/ModalContext'
 import ui from './HelpModal.module.css'
 import type { QuickPickerMode } from '../QuickVariationPicker/QuickVariationPicker'
 import type { Theme } from '@/contexts/ThemeContext'
+import type { HardwareTier } from '@/utils/hardwareTier'
 
 export type SidebarLayoutMode = 'compact' | 'wide'
 
@@ -53,8 +55,8 @@ const shortcuts: ShortcutDescriptor[] = [
 const { navigator: nav } = globalThis
 
 function isMac() {
-  // eslint-disable-next-line @typescript-eslint/no-deprecated
-  return nav.platform.indexOf('Mac') !== -1
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (nav as any).platform.indexOf('Mac') !== -1
 }
 
 const ctrlKey = isMac() ? '\u2318 ' : 'Ctrl + '
@@ -99,8 +101,8 @@ function gatherFullDeviceInfo(
 
   lines.push(`App Version : ${VERSION}${GIT_SHA ? ` (${GIT_SHA})` : ''}`)
   lines.push(`User Agent  : ${n.userAgent}`)
-  // eslint-disable-next-line @typescript-eslint/no-deprecated
-  lines.push(`Platform    : ${n.platform}`)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  lines.push(`Platform    : ${(n as any).platform}`)
   lines.push(`Language    : ${n.language}`)
 
   lines.push(
@@ -147,13 +149,32 @@ type HelpModalProps = {
   theme: () => Theme
   onThemeChange: (theme: Theme) => void
   onInjectCrash?: () => void
+  hardwareTier: () => HardwareTier | null
+  onHardwareTierChange?: (tier: HardwareTier) => void
 }
 
 function HelpModal(props: HelpModalProps) {
   const [gpuDeviceInfo] = createResource(getGPUDeviceInformation)
   const showChangelog = createShowChangelog()
-  const [showConsole, setShowConsole] = createSignal(false)
+  const [showConsole, setShowConsole] = createSignal(true)
   const [copied, setCopied] = createSignal(false)
+  const { showToast } = useToast()
+  const [detectingTier, setDetectingTier] = createSignal(false)
+
+  async function detectTierAgain() {
+    if (!props.onHardwareTierChange) return
+    setDetectingTier(true)
+    try {
+      const tier = await detectHardwareTier()
+      props.onHardwareTierChange(tier)
+      showToast(`Hardware detected as: ${tier}`)
+    } catch (err) {
+      console.error(err)
+      showToast('Failed to detect hardware tier')
+    } finally {
+      setDetectingTier(false)
+    }
+  }
 
   function copyDeviceInfo() {
     const text = gatherFullDeviceInfo(gpuDeviceInfo())
@@ -202,17 +223,15 @@ function HelpModal(props: HelpModalProps) {
             >
               <Changelog />
             </button>
-            <Show when={IS_DEV}>
-              <button
-                class={ui.iconBtn}
-                classList={{ [ui.consoleActive!]: showConsole() }}
-                onClick={() => setShowConsole((v) => !v)}
-                title="Console Logs"
-              >
-                <Terminal />
-              </button>
-            </Show>
-            <Show when={IS_DEV && props.onInjectCrash}>
+            <button
+              class={ui.iconBtn}
+              classList={{ [ui.consoleActive!]: showConsole() }}
+              onClick={() => setShowConsole((v) => !v)}
+              title="Console Logs"
+            >
+              <Terminal />
+            </button>
+            <Show when={props.onInjectCrash}>
               <button
                 class={ui.iconBtn}
                 onClick={() => {
@@ -348,6 +367,33 @@ function HelpModal(props: HelpModalProps) {
             }}
           >
             Light
+          </button>
+        </div>
+      </div>
+
+      <div class={ui.pickerModeRow}>
+        <span class={ui.pickerModeLabel}>Hardware Tier</span>
+        <div class={ui.pickerModeBtns}>
+          <For each={hardwareTiers}>
+            {(tier) => (
+              <button
+                class={ui.pickerModeBtn}
+                classList={{
+                  [ui.pickerModeBtnActive!]: props.hardwareTier() === tier,
+                }}
+                onClick={() => props.onHardwareTierChange?.(tier)}
+                style={{ 'text-transform': 'capitalize' }}
+              >
+                {tier}
+              </button>
+            )}
+          </For>
+          <button
+            class={ui.pickerModeBtn}
+            onClick={detectTierAgain}
+            disabled={detectingTier()}
+          >
+            {detectingTier() ? 'Detecting...' : 'Detect Again'}
           </button>
         </div>
       </div>
@@ -500,7 +546,7 @@ function HelpModal(props: HelpModalProps) {
           </Show>
         </Suspense>
       </div>
-      <Show when={IS_DEV && showConsole()}>
+      <Show when={showConsole()}>
         <h2 class={ui.sectionTitle}>Console Logs</h2>
         <ConsoleLog />
       </Show>
@@ -518,6 +564,8 @@ export function createShowHelp(
   theme: () => Theme,
   onThemeChange: (theme: Theme) => void,
   onInjectCrash?: () => void,
+  hardwareTier?: () => HardwareTier | null,
+  onHardwareTierChange?: (tier: HardwareTier) => void,
 ) {
   const requestModal = useRequestModal()
 
@@ -536,6 +584,8 @@ export function createShowHelp(
           theme={theme}
           onThemeChange={onThemeChange}
           onInjectCrash={onInjectCrash}
+          hardwareTier={hardwareTier ?? (() => null)}
+          onHardwareTierChange={onHardwareTierChange}
         />
       ),
     })

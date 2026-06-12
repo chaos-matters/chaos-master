@@ -164,9 +164,9 @@ export function createColorGradingPipeline(
       mul(count, uniforms.averagePointCountPerBucketInv),
       f32(0.1),
     )
-    const adjustedCountWithExposure = mul(adjustedCount, uniforms.exposure)
-    const logDensityBase = log(add(adjustedCountWithExposure, f32(1)))
-    const tonemapped = mul(uniforms.contrast, logDensityBase)
+    const exposedCount = mul(adjustedCount, max(uniforms.exposure, f32(0)))
+    const logDensity = log(add(exposedCount, f32(1)))
+    const tonemapped = mul(logDensity, max(uniforms.contrast, f32(0)))
 
     const density = clamp(tonemapped, f32(0), f32(1))
 
@@ -277,7 +277,13 @@ export function createColorGradingPipeline(
     // Apply vibrancy as a true Saturation multiplier on the OkLab chroma
     finalAb = mul(finalAb, max(uniforms.vibrancy, f32(0)))
 
-    const value = pow(max(tonemapped, f32(0)), div(f32(1), uniforms.gamma))
+    // Remove saturate() before pow to allow highlights to exceed 1.0,
+    // which enables the highlightPower roll-off to actually work.
+    const value = clamp(
+      pow(max(tonemapped, f32(0)), div(f32(1), uniforms.gamma)),
+      f32(0),
+      f32(2),
+    )
 
     let rgb = oklabToRgb(vec3f(drawMode(value), finalAb))
 

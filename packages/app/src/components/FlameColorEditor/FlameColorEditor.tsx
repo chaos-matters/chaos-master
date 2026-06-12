@@ -139,12 +139,14 @@ function FlameColorHandle(props: {
   const { canvas } = useCanvas()
   const {
     js: { worldToClip, clipToWorld },
+    zoom,
   } = useCamera()
   const changeHistory = useChangeHistory()
   const clip = createMemo(() => {
     const result = worldToClip(props.color)
     return result
   })
+  const handleScale = () => Math.max(1, Math.sqrt(zoom()))
   const startDragging = createDragHandler((initEvent) => {
     changeHistory.startPreview('Flame color')
 
@@ -169,7 +171,15 @@ function FlameColorHandle(props: {
       // because otherwise WheelZoomCamera2D steals the event
       // due to solidjs event delegation.
       on:pointerdown={startDragging}
-      style={{ '--color': handleColor(theme(), props.color) }}
+      onContextMenu={(e) => {
+        e.preventDefault()
+      }}
+      style={{
+        '--color': handleColor(theme(), props.color),
+        '--handle-visual-r': `${0.3 * handleScale()}rem`,
+        '--handle-visual-hover-r': `${0.4 * handleScale()}rem`,
+        '--handle-grab-r': `${0.6 * handleScale()}rem`,
+      }}
     >
       <circle
         class={ui.handleCircle}
@@ -215,7 +225,12 @@ export function FlameColorEditor(props: {
           position={[position, setPosition]}
         >
           <Gradient isVisible={isVisible} />
-          <svg class={ui.svg}>
+          <svg
+            class={ui.svg}
+            onContextMenu={(e) => {
+              e.preventDefault()
+            }}
+          >
             <For each={recordEntries(props.transforms)}>
               {([tid, transform]) => (
                 <FlameColorHandle

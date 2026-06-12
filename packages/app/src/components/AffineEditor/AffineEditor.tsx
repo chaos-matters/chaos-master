@@ -175,9 +175,12 @@ function AffineHandle(props: {
   const { theme } = useTheme()
   const {
     js: { worldToClip, clipToWorld },
+    zoom,
   } = useCamera()
   const { canvas, canvasSize } = useCanvas()
   const changeHistory = useChangeHistory()
+
+  const handleScale = () => Math.max(1, Math.sqrt(zoom()))
 
   const aspect = createMemo(() => canvasSize().width / canvasSize().height)
   const position = createMemo(() => vec2f(props.transform.c, props.transform.f))
@@ -328,7 +331,15 @@ function AffineHandle(props: {
         // because otherwise WheelZoomCamera2D steals the event
         // due to solidjs event delegation.
         on:pointerdown={startDragging}
-        style={{ '--color': handleColor(theme(), props.color) }}
+        onContextMenu={(e) => {
+          e.preventDefault()
+        }}
+        style={{
+          '--color': handleColor(theme(), props.color),
+          '--handle-visual-r': `${0.3 * handleScale()}rem`,
+          '--handle-visual-hover-r': `${0.4 * handleScale()}rem`,
+          '--handle-grab-r': `${0.6 * handleScale()}rem`,
+        }}
       >
         <circle class={ui.handleCircle} cx={p(x())} cy={p(y())} />
         <circle class={ui.handleCircleGrabArea} cx={p(x())} cy={p(y())} />
@@ -432,7 +443,12 @@ export function AffineEditor(props: {
             position={[position, setPosition]}
           >
             <Grid isVisible={isVisible} />
-            <svg class={ui.svg}>
+            <svg
+              class={ui.svg}
+              onContextMenu={(e) => {
+                e.preventDefault()
+              }}
+            >
               <defs>
                 <marker
                   id="arrow"

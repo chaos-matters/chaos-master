@@ -21,7 +21,7 @@ export const initExample = defineExample({
       color: { x: 0, y: 0 },
       variations: {
         [vid('bc571c35_0b03_4865_a765_d00cd71031a6')]: {
-          type: 'linear',
+          type: 'linearVar',
           weight: 1,
         },
       },

@@ -175,7 +175,7 @@ export function ViewControls(props: ViewControlProps) {
             onClick={props.onClearBlendFlame}
             title="Remove blend flame"
           >
-            <Cross />
+            <Cross width="1rem" />
           </button>
         </div>
       </Show>

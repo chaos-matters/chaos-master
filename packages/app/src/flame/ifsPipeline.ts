@@ -11,6 +11,7 @@ import { colorInitModeToImplFn } from './colorInitMode'
 import { pointInitModeToImplFn } from './pointInitMode'
 import { createFlameWgsl, extractFlameUniforms } from './transformFunction'
 import { AtomicBucket, BUCKET_FIXED_POINT_MULTIPLIER, Point } from './types'
+import { getCacheVersion } from './variations/custom'
 import type { StorageFlag, TgpuBuffer, TgpuRoot } from 'typegpu'
 import type { Vec2u, WgslArray } from 'typegpu/data'
 import type { ColorInitMode } from './colorInitMode'
@@ -47,6 +48,7 @@ export function createIFSPipeline(
   const isBlending = blendTransforms !== undefined
   const sig = JSON.stringify({
     insideShaderCount,
+    customVariationsVersion: getCacheVersion(),
     colorInitType,
     pointInitType,
     transforms: recordEntries(transforms).map(([_, tr]) => ({
@@ -212,12 +214,14 @@ export function createIFSPipeline(
         )
         const jittered = add(screen, pointInitMode(pointIndex))
         if (
-          !(
-            jittered.x >= 0 &&
-            jittered.y >= 0 &&
-            jittered.x < outputTextureDimensionF.x &&
-            jittered.y < outputTextureDimensionF.y
-          )
+          jittered.x < 0 ||
+          jittered.y < 0 ||
+          jittered.x > outputTextureDimensionF.x ||
+          jittered.y > outputTextureDimensionF.y ||
+          // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+          jittered.x != jittered.x ||
+          // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+          jittered.y != jittered.y
         )
           return
         const screenI = vec2i(jittered)
@@ -346,12 +350,14 @@ export function createIFSPipeline(
         bindGroupLayout.$.pointRandomSeeds[pointIndex] = vec2u(randomState.$)
         const jittered = add(screen, pointInitMode(pointIndex))
         if (
-          !(
-            jittered.x >= 0 &&
-            jittered.y >= 0 &&
-            jittered.x < outputTextureDimensionF.x &&
-            jittered.y < outputTextureDimensionF.y
-          )
+          jittered.x < 0 ||
+          jittered.y < 0 ||
+          jittered.x > outputTextureDimensionF.x ||
+          jittered.y > outputTextureDimensionF.y ||
+          // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+          jittered.x != jittered.x ||
+          // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+          jittered.y != jittered.y
         )
           return
         const screenI = vec2i(jittered)
