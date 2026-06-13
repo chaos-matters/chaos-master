@@ -157,6 +157,173 @@ export function randomizeAffineCoef(
   return randomPerturbation(current, sigma, range)
 }
 
+/**
+ * "Smart" affine mutation. Rather than perturbing each matrix coefficient
+ * independently (`randomizeAffineCoef`, which easily collapses the map into a
+ * degenerate, unrecognisable transform), this composes the existing affine
+ * with a random similarity transform built from well-defined operations —
+ * rotation, (an)isotropic scale, the occasional flip and a translation. Each
+ * operation fires with its own probability and a magnitude scaled by
+ * `strength`, so low strength nudges and high strength reshapes. The delta is
+ * applied on the output side, keeping the linear part and translation
+ * consistent. Mutates `af` in place.
+ */
+export function smartMutateAffine2D(
+  af: Record<string, number>,
+  strength: number,
+): void {
+  const a = af.a ?? 1
+  const b = af.b ?? 0
+  const c = af.c ?? 0
+  const d = af.d ?? 0
+  const e = af.e ?? 1
+  const f = af.f ?? 0
+
+  const angle = random01() < 0.85 ? randomRange(-1, 1) * strength * Math.PI : 0
+
+  // Multiplicative scale, symmetric about 1 (exp of a symmetric range).
+  let sx = 1
+  let sy = 1
+  if (random01() < 0.85) {
+    const k = strength * 0.7
+    const uniform = Math.exp(randomRange(-k, k))
+    sx = uniform
+    sy = uniform
+    if (random01() < 0.5) {
+      // Anisotropic squash/stretch.
+      sx *= Math.exp(randomRange(-k, k) * 0.5)
+      sy *= Math.exp(randomRange(-k, k) * 0.5)
+    }
+  }
+  if (random01() < 0.12 * strength) sx = -sx // occasional flip
+
+  const cos = Math.cos(angle)
+  const sin = Math.sin(angle)
+  // M = R(angle) · diag(sx, sy)
+  const m00 = cos * sx
+  const m01 = -sin * sy
+  const m10 = sin * sx
+  const m11 = cos * sy
+
+  let dx = 0
+  let dy = 0
+  if (random01() < 0.85) {
+    const tr = strength * 1.5
+    dx = randomRange(-tr, tr)
+    dy = randomRange(-tr, tr)
+  }
+
+  // L_new = M · L (linear part), t_new = M · t + delta (translation = c, f).
+  af.a = m00 * a + m01 * d
+  af.b = m00 * b + m01 * e
+  af.c = m00 * c + m01 * f + dx
+  af.d = m10 * a + m11 * d
+  af.e = m10 * b + m11 * e
+  af.f = m10 * c + m11 * f + dy
+}
+
+/**
+ * 3D counterpart of {@link smartMutateAffine2D}. The 3×4 affine is laid out as
+ * rows `(a b c | d)`, `(e f g | h)`, `(i j k | l)` — a 3×3 linear part plus the
+ * translation column `(d, h, l)`. Composes with a random axis-angle rotation,
+ * scale and translation on the output side. Mutates `af` in place.
+ */
+export function smartMutateAffine3D(
+  af: Record<string, number>,
+  strength: number,
+): void {
+  // Linear rows L and translation t.
+  const a = af.a ?? 1
+  const b = af.b ?? 0
+  const cc = af.c ?? 0
+  const e = af.e ?? 0
+  const ff = af.f ?? 1
+  const g = af.g ?? 0
+  const ii = af.i ?? 0
+  const j = af.j ?? 0
+  const k = af.k ?? 1
+  const tx = af.d ?? 0
+  const ty = af.h ?? 0
+  const tz = af.l ?? 0
+
+  // Random rotation axis (uniform-ish) and angle.
+  const angle = random01() < 0.85 ? randomRange(-1, 1) * strength * Math.PI : 0
+  let ux = randomRange(-1, 1)
+  let uy = randomRange(-1, 1)
+  let uz = randomRange(-1, 1)
+  const ulen = Math.sqrt(ux * ux + uy * uy + uz * uz) || 1
+  ux /= ulen
+  uy /= ulen
+  uz /= ulen
+  const cos = Math.cos(angle)
+  const sin = Math.sin(angle)
+  const ic = 1 - cos
+  // Rodrigues rotation matrix R.
+  const r00 = cos + ux * ux * ic
+  const r01 = ux * uy * ic - uz * sin
+  const r02 = ux * uz * ic + uy * sin
+  const r10 = uy * ux * ic + uz * sin
+  const r11 = cos + uy * uy * ic
+  const r12 = uy * uz * ic - ux * sin
+  const r20 = uz * ux * ic - uy * sin
+  const r21 = uz * uy * ic + ux * sin
+  const r22 = cos + uz * uz * ic
+
+  // Scale (uniform + optional anisotropy + occasional flip).
+  let sx = 1
+  let sy = 1
+  let sz = 1
+  if (random01() < 0.85) {
+    const kk = strength * 0.7
+    const uniform = Math.exp(randomRange(-kk, kk))
+    sx = uniform
+    sy = uniform
+    sz = uniform
+    if (random01() < 0.5) {
+      sx *= Math.exp(randomRange(-kk, kk) * 0.5)
+      sy *= Math.exp(randomRange(-kk, kk) * 0.5)
+      sz *= Math.exp(randomRange(-kk, kk) * 0.5)
+    }
+  }
+  if (random01() < 0.12 * strength) sx = -sx
+
+  // M = R · diag(sx, sy, sz) → scale columns of R.
+  const m00 = r00 * sx
+  const m01 = r01 * sy
+  const m02 = r02 * sz
+  const m10 = r10 * sx
+  const m11 = r11 * sy
+  const m12 = r12 * sz
+  const m20 = r20 * sx
+  const m21 = r21 * sy
+  const m22 = r22 * sz
+
+  let dx = 0
+  let dy = 0
+  let dz = 0
+  if (random01() < 0.85) {
+    const tr = strength * 1.5
+    dx = randomRange(-tr, tr)
+    dy = randomRange(-tr, tr)
+    dz = randomRange(-tr, tr)
+  }
+
+  // L_new = M · L
+  af.a = m00 * a + m01 * e + m02 * ii
+  af.b = m00 * b + m01 * ff + m02 * j
+  af.c = m00 * cc + m01 * g + m02 * k
+  af.e = m10 * a + m11 * e + m12 * ii
+  af.f = m10 * b + m11 * ff + m12 * j
+  af.g = m10 * cc + m11 * g + m12 * k
+  af.i = m20 * a + m21 * e + m22 * ii
+  af.j = m20 * b + m21 * ff + m22 * j
+  af.k = m20 * cc + m21 * g + m22 * k
+  // t_new = M · t + delta
+  af.d = m00 * tx + m01 * ty + m02 * tz + dx
+  af.h = m10 * tx + m11 * ty + m12 * tz + dy
+  af.l = m20 * tx + m21 * ty + m22 * tz + dz
+}
+
 export interface GenerateRandomFlameConfig {
   strength: number
   minTransforms: number
@@ -340,6 +507,13 @@ export function generateRandomFlame(
 
 export interface MutateFlameOptions {
   mutateAffine: boolean
+  /**
+   * How affine coefficients are mutated when `mutateAffine` is on. `'smart'`
+   * composes the affine with random rotate/scale/translate operations (see
+   * {@link smartMutateAffine2D}); `'full'` perturbs every coefficient
+   * independently (`randomizeAffineCoef`).
+   */
+  affineMode: 'smart' | 'full'
   mutateVariations: 'modify' | 'all' | 'none'
   mutateColors: boolean
 }
@@ -367,28 +541,26 @@ export function mutateFlame(
 
     // 1. Mutate Affine
     if (options.mutateAffine) {
-      if (t.preAffine) {
-        for (const key of Object.keys(t.preAffine)) {
-          const val = t.preAffine[key as keyof typeof t.preAffine] as number
-          t.preAffine[key as keyof typeof t.preAffine] = randomizeAffineCoef(
-            val,
-            key,
-            strength,
-            dims === 3,
-          )
+      const mutateOne = (affine: Record<string, number>) => {
+        if (options.affineMode === 'smart') {
+          if (dims === 3) {
+            smartMutateAffine3D(affine, strength)
+          } else {
+            smartMutateAffine2D(affine, strength)
+          }
+        } else {
+          for (const key of Object.keys(affine)) {
+            affine[key] = randomizeAffineCoef(
+              affine[key] ?? 0,
+              key,
+              strength,
+              dims === 3,
+            )
+          }
         }
       }
-      if (t.postAffine) {
-        for (const key of Object.keys(t.postAffine)) {
-          const val = t.postAffine[key as keyof typeof t.postAffine] as number
-          t.postAffine[key as keyof typeof t.postAffine] = randomizeAffineCoef(
-            val,
-            key,
-            strength,
-            dims === 3,
-          )
-        }
-      }
+      if (t.preAffine) mutateOne(t.preAffine as Record<string, number>)
+      if (t.postAffine) mutateOne(t.postAffine as Record<string, number>)
     }
 
     // 2. Mutate Colors

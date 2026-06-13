@@ -35,6 +35,9 @@ type ViewControlProps = {
   setPhi?: Setter<number>
   setRadius?: Setter<number>
   setFov?: Setter<number>
+  flyMode?: boolean
+  flySpeed?: number
+  setFlySpeed?: Setter<number>
 }
 
 export function ViewControls(props: ViewControlProps) {
@@ -187,6 +190,21 @@ export function ViewControls(props: ViewControlProps) {
               dataParameterPath="camera3D.fov"
             />
           </div>
+          <Show when={props.flyMode}>
+            <div
+              class={ui.camera3DControl}
+              title="Fly movement speed (scroll while flying to change)"
+            >
+              <ScrubInput
+                label="Speed"
+                value={props.flySpeed ?? 1}
+                min={0.05}
+                max={20}
+                step={0.05}
+                onInput={(v) => props.setFlySpeed?.(v)}
+              />
+            </div>
+          </Show>
         </ButtonGroup>
       </Show>
       <ButtonGroup data-tour-target="undoRedo-controls">

@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.4] - 2026-06-13
+
+### Added
+
+- **Fly mode for 3D flames**: a first-person navigation toggle (action widget, second row, 3D only) that lets you move _through_ the fractal. `W`/`S` fly along the view direction, `A`/`D` strafe, `Q`/`E` descend/ascend, and left-drag looks around (turning in place instead of orbiting). Movement speed is adjustable live by scrolling while flying, and a **Speed** scrub appears in the View Controls next to the camera options.
+- **Smart affine mutation mode**: the Flame Randomizer's _Mutate_ now offers **Smart** vs **Full** affine handling. Smart composes the existing affine with random, well-defined rotate / scale / flip / translate operations (2D and 3D), so mutations stay recognisable instead of collapsing the map; Full keeps the previous per-coefficient randomization. The mode is remembered between sessions.
+- **Copy full (permanent) share link**: the Share dialog now explains that short `?s=` links expire after 60 days and adds a **Copy full link** action for the self-contained `?flame=` link, which carries all the data inline and never expires.
+- **Storage usage & data management (About panel)**: a new _Storage & Data_ section shows how much space each group uses (settings, recent flames, generated history, logo/favicon history) with item counts and a total. A **Danger Zone** offers two separate, confirm-gated actions — clear all settings, or delete all stored flames — each listing exactly how many items and how much space will be recovered.
+- **Backup / export all flames as a ZIP**: from the same panel, export a ZIP of your flames as JSON descriptors plus PNGs with the flame embedded (from the stored history thumbnails). Recent, generated and logo/favicon groups are individually selectable, and a `manifest.json` records the export. (Built on `fflate`; fresh high-resolution batch renders are a planned follow-up — any flame can already be loaded and re-exported at full quality.)
+
+### Fixed
+
+- **Right/middle-click drag-to-pan in the 3D view did nothing**: the 3D camera routed middle- and right-button drags to its pan handler, but the shared drag helper (`createDragHandler`) silently ignored every button except the left one, so mouse panning never started — only WASD/arrow-key panning worked. The drag helper now takes an optional `button` set, and the 3D camera registers pan on the middle (1) and right (2) buttons while orbit keeps the left button. Right-click still suppresses the context menu over the canvas.
+
+### Changed
+
+- **Theme toggle moved from `D` to `Ctrl/Cmd+D`**: plain `D` is part of the 3D camera's WASD pan controls, so it double-fired (panning the camera _and_ flipping the theme). The dark/light toggle now lives on `Ctrl/Cmd+D`, and the 3D camera ignores movement keys pressed with a modifier. The About panel's shortcut list reflects the new binding and gains a dedicated **3D Camera** section documenting orbit (left-drag), pan (right/middle-drag, WASD/arrows) and scroll-to-zoom.
+
 ## [0.9.3] - 2026-06-13
 
 ### Added

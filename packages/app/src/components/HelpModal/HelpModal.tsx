@@ -7,6 +7,7 @@ import { detectHardwareTier, hardwareTiers } from '@/utils/hardwareTier'
 import { GIT_SHA, VERSION } from '@/version'
 import { createShowChangelog } from '../AboutPanel/Changelog'
 import { ConsoleLog } from '../ConsoleLog/ConsoleLog'
+import { DataManagement } from '../DataManagement/DataManagement'
 import { useRequestModal } from '../Modal/ModalContext'
 import ui from './HelpModal.module.css'
 import type { QuickPickerMode } from '../QuickVariationPicker/QuickVariationPicker'
@@ -43,12 +44,31 @@ const shortcuts: ShortcutDescriptor[] = [
     description: 'Redo last change',
   },
   {
-    keyCombinations: [{ key: 'D' }],
+    keyCombinations: [{ key: 'D', ctrl: true }],
     description: 'Toggle UI theme (dark / light)',
   },
   {
     keyCombinations: [{ key: 'M', ctrl: true }],
     description: 'Toggle debug panel',
+  },
+]
+
+const cameraControls: ShortcutDescriptor[] = [
+  {
+    keyCombinations: [{ key: 'Left-drag' }],
+    description: 'Orbit the 3D camera',
+  },
+  {
+    keyCombinations: [{ key: 'Right-drag' }, { key: 'Middle-drag' }],
+    description: 'Pan the 3D camera',
+  },
+  {
+    keyCombinations: [{ key: 'W A S D' }, { key: 'Arrows' }],
+    description: 'Pan the 3D camera',
+  },
+  {
+    keyCombinations: [{ key: 'Scroll' }],
+    description: 'Zoom in / out',
   },
 ]
 
@@ -415,6 +435,25 @@ function HelpModal(props: HelpModalProps) {
           )}
         </For>
       </div>
+
+      <h2 class={ui.sectionTitle}>3D Camera</h2>
+      <div class={ui.shortcutsGrid}>
+        <For each={cameraControls}>
+          {({ description, keyCombinations }) => (
+            <div class={ui.shortcutRow}>
+              <span class={ui.shortcutDescription}>{description}</span>
+              <div class={ui.keyCombinations}>
+                <For each={keyCombinations}>
+                  {(keyCombination) => (
+                    <KeyCombination keyCombination={keyCombination} />
+                  )}
+                </For>
+              </div>
+            </div>
+          )}
+        </For>
+      </div>
+
       <h2 class={ui.sectionTitle}>Guided Tours</h2>
       <div class={ui.tourButtons}>
         <button
@@ -546,6 +585,10 @@ function HelpModal(props: HelpModalProps) {
           </Show>
         </Suspense>
       </div>
+
+      <h2 class={ui.sectionTitle}>Storage &amp; Data</h2>
+      <DataManagement />
+
       <Show when={showConsole()}>
         <h2 class={ui.sectionTitle}>Console Logs</h2>
         <ConsoleLog />

@@ -1,0 +1,191 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 1rem);
+}
+
+/* --- Storage usage --- */
+.usageCard {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-color, #3a3a3a);
+  border-radius: 8px;
+  padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
+}
+
+.loading {
+  font-size: 0.85rem;
+  color: var(--text-muted, #999);
+  padding: var(--space-2, 0.5rem) 0;
+}
+
+.usageRow {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+  padding: 0.35rem 0;
+  font-size: 0.85rem;
+}
+
+.usageRow + .usageRow {
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+}
+
+.usageLabel {
+  color: var(--text-color, #eee);
+}
+
+.usageMeta {
+  color: var(--text-muted, #999);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.usageBytes {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-color, #eee);
+  min-width: 4.5rem;
+  text-align: right;
+}
+
+.usageTotal {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border-color, #3a3a3a);
+  font-weight: 600;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Backup section --- */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+}
+
+.sectionHeading {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.sectionHint {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--text-muted, #999);
+}
+
+.groupChecks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3, 0.75rem);
+}
+
+.groupCheck {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 0.5rem);
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* --- Danger zone --- */
+.dangerZone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+  border: 1px solid var(--color-danger, #ef4444);
+  border-radius: 8px;
+  padding: var(--space-3, 0.75rem);
+  background: color-mix(in srgb, var(--color-danger, #ef4444) 6%, transparent);
+}
+
+.dangerHeading {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-danger, #ef4444);
+}
+
+.dangerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3, 0.75rem);
+}
+
+.dangerText {
+  display: flex;
+  flex-direction: column;
+}
+
+.dangerTitle {
+  font-size: 0.85rem;
+}
+
+.dangerSub {
+  font-size: 0.76rem;
+  color: var(--text-muted, #999);
+}
+
+.dangerBtn {
+  background-color: var(--color-danger, #ef4444) !important;
+  color: #fff !important;
+  white-space: nowrap;
+}
+
+/* --- Confirm modal --- */
+.confirmBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 0.75rem);
+  padding: var(--space-3, 0.75rem);
+  max-width: 28rem;
+}
+
+.confirmIntro {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.confirmList {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-color, #3a3a3a);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.confirmRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3, 0.75rem);
+  padding: 0.4rem 0.6rem;
+  font-size: 0.82rem;
+}
+
+.confirmRow + .confirmRow {
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+}
+
+.confirmRowMeta {
+  color: var(--text-muted, #999);
+  font-variant-numeric: tabular-nums;
+}
+
+.confirmTotal {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-muted, #999);
+}
+
+.confirmActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2, 0.5rem);
+}

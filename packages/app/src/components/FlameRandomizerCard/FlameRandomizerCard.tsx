@@ -55,6 +55,7 @@ export interface FlameRandomizerCardProps {
     },
     mutationSettings: {
       mutateAffine: boolean
+      affineMode: 'smart' | 'full'
       mutateVariations: 'modify' | 'all' | 'none'
       mutateColors: boolean
     },
@@ -232,6 +233,10 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
     'randomizer/mutate-affine',
     true,
   )
+  const [affineMode, setAffineMode] = persistentSignal<'smart' | 'full'>(
+    'randomizer/affine-mode',
+    'smart',
+  )
   const [mutateVariations, setMutateVariations] = persistentSignal<
     'modify' | 'all' | 'none'
   >('randomizer/mutate-variations', 'all')
@@ -313,6 +318,7 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
       },
       {
         mutateAffine: mutateAffine(),
+        affineMode: affineMode(),
         mutateVariations: mutateVariations(),
         mutateColors: mutateColors(),
       },
@@ -688,6 +694,37 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
                   />
                   <span>Mutate Affine Coefs</span>
                 </label>
+                <Show when={mutateAffine()}>
+                  <div class={ui.field}>
+                    <span class={ui.fieldLabel}>Affine Mode</span>
+                    <div class={ui.pillsRow}>
+                      <button
+                        type="button"
+                        class={ui.pillButton}
+                        classList={{
+                          [ui.pillButtonActive as string]:
+                            affineMode() === 'smart',
+                        }}
+                        title="Random rotate / scale / move on the existing affine"
+                        onClick={() => setAffineMode('smart')}
+                      >
+                        Smart
+                      </button>
+                      <button
+                        type="button"
+                        class={ui.pillButton}
+                        classList={{
+                          [ui.pillButtonActive as string]:
+                            affineMode() === 'full',
+                        }}
+                        title="Randomize every coefficient independently"
+                        onClick={() => setAffineMode('full')}
+                      >
+                        Full
+                      </button>
+                    </div>
+                  </div>
+                </Show>
                 <label class={ui.checkboxField}>
                   <Checkbox
                     checked={mutateColors()}
