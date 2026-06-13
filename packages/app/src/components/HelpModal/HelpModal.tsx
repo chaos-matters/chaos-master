@@ -70,6 +70,11 @@ const cameraControls: ShortcutDescriptor[] = [
     keyCombinations: [{ key: 'Scroll' }],
     description: 'Zoom in / out',
   },
+  {
+    keyCombinations: [{ key: 'W A S D' }, { key: 'Q / E' }],
+    description:
+      'Fly mode: move / up · down (click canvas to look, Esc to exit)',
+  },
 ]
 
 const { navigator: nav } = globalThis

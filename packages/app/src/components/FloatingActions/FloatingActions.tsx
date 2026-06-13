@@ -432,7 +432,7 @@ export function FloatingActions(props: Props) {
                 title={
                   props.flyMode()
                     ? 'Exit fly mode'
-                    : 'Fly mode (WASD/arrows to move, drag to look, Q/E up/down, scroll for speed)'
+                    : 'Fly mode — click to look around (Esc to release), WASD/arrows to move, Q/E up/down, scroll for speed'
                 }
               >
                 {/* Paper-plane icon */}

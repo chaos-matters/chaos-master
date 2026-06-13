@@ -4350,7 +4350,14 @@ export function MainWorkspace(props: AppProps) {
               history.replace(deepClone(restored))
             }}
             flyMode={flyMode}
-            setFlyMode={setFlyMode}
+            setFlyMode={(v) => {
+              setFlyMode(v)
+              if (v) {
+                showToast(
+                  'Fly mode: click to look around · WASD/arrows to move · Q/E up/down · Esc to release',
+                )
+              }
+            }}
           />
           <SpotlightTour tourContext={tourContext} />
           <BenchmarkButton
