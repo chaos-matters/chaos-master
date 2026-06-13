@@ -12,7 +12,9 @@
     "test": "vitest",
     "analyze-bundle": "VITE_ANALYZE_BUNDLE=true vite build",
     "deploy:dev": "pnpm exec wrangler deploy --env dev",
-    "deploy:prod": "pnpm exec wrangler deploy --env prod"
+    "deploy:prod": "pnpm exec wrangler deploy --env prod",
+    "r2:create:dev": "pnpm exec wrangler r2 bucket create chaos-master-og-images-dev",
+    "r2:create:prod": "pnpm exec wrangler r2 bucket create chaos-master-og-images"
   },
   "license": "AGPL-3.0-only",
   "dependencies": {

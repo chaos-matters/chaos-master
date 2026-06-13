@@ -31,13 +31,17 @@ Long-form `/?flame=…` links (created outside the share flow) get a generic tex
 
 ## One-time setup (before deploy)
 
-Create the R2 buckets (free tier — 10 GB, egress free):
+Create the R2 buckets (free tier — 10 GB, egress free). Requires `wrangler login`
+first. From `packages/app`:
 
 ```bash
-cd packages/app
-pnpm exec wrangler r2 bucket create chaos-master-og-images       # prod
-pnpm exec wrangler r2 bucket create chaos-master-og-images-dev   # dev/preview
+pnpm run r2:create:dev     # chaos-master-og-images-dev   (dev + preview envs)
+pnpm run r2:create:prod    # chaos-master-og-images       (prod env)
 ```
+
+You only need `r2:create:dev` to test on the dev environment. Bucket names /
+bindings are wired in `wrangler.jsonc` (`OG_IMAGES`); R2 is local-simulated under
+`wrangler dev`, so no bucket is needed for local testing.
 
 **Optional — auto-expire images** to bound storage (recommended; matches the plan).
 R2 lifecycle rules are set in the Cloudflare dashboard → R2 → bucket → Settings →
