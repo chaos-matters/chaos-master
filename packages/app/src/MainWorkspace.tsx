@@ -175,6 +175,9 @@ export type AppProps = {
   resetFlameFromWelcome?: () => void
   hardwareTier?: HardwareTier | null
   onHardwareTierChange?: (tier: HardwareTier) => void
+  /** When true (driven by the `?benchmark` query param), open the benchmark
+   *  dialog on mount so the user lands one click from running it. */
+  autoOpenBenchmark?: boolean
 }
 
 export function extractFlameVariationTypes(
@@ -603,12 +606,18 @@ export function MainWorkspace(props: AppProps) {
     setPrePaletteColors({})
   }
 
+  // Shared by the toolbar Benchmark button and the `?benchmark` auto-open.
+  const showBenchmark = createShowBenchmark()
+
   onMount(() => {
     loadCustomVariations()
     setCustomVarsVersion((v) => v + 1)
     void loadRandomizerHistoryEntries(MAX_RANDOMIZER_HISTORY_LIMIT).then(
       setRandomizerHistory,
     )
+    if (props.autoOpenBenchmark) {
+      void showBenchmark()
+    }
     if (IS_DEV) {
       console.info('[share:app] onMount', {
         hasQueryFlame: !!props.flameFromQuery?.flame,
@@ -4236,7 +4245,7 @@ export function MainWorkspace(props: AppProps) {
             }}
           />
           <SpotlightTour tourContext={tourContext} />
-          <BenchmarkButton onClick={createShowBenchmark()} />
+          <BenchmarkButton onClick={showBenchmark} />
           <SoftwareVersion
             showHelp={createShowHelp(
               quickPickerMode,
