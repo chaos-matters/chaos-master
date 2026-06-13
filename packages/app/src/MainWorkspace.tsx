@@ -826,11 +826,25 @@ export function MainWorkspace(props: AppProps) {
       offscreen.height = h
       const ctx = offscreen.getContext('2d')!
       ctx.drawImage(img, 0, 0, w, h)
-      return await new Promise<Blob | null>((resolve) => {
+      const downscaled = await new Promise<Blob | null>((resolve) => {
         offscreen.toBlob((b) => {
           resolve(b)
         }, 'image/png')
       })
+      if (!downscaled) return null
+
+      // Embed the flame descriptor into the PNG (deflate-compressed zTXt chunk,
+      // a few KB) so anyone who opens the shared link or downloads the preview
+      // image can load it straight back into the app — same as Discord sharing.
+      const tracks = timeline.tracks()
+      const config = timeline.config()
+      const hasAnimation = tracks.some((track) => track.keyframes.length > 0)
+      const payload = hasAnimation
+        ? { flame: flameDescriptor, animation: { tracks, config } }
+        : flameDescriptor
+      const encoded = await compressJsonQueryParam(payload)
+      const pngBytes = new Uint8Array(await downscaled.arrayBuffer())
+      return addFlameDataToPng(encoded, pngBytes)
     } catch {
       return null
     } finally {
