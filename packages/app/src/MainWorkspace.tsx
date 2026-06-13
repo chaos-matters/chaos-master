@@ -65,7 +65,7 @@ import { Flam3 } from './flame/Flam3'
 import { pointInitModeToImplFn } from './flame/pointInitMode'
 import { pointInitMode3DToImplFn } from './flame/pointInitMode3D'
 import { generateRandomFlame, mutateFlame, random01, randomizeAllColors, randomizeVariationParams, randomRange, } from './flame/randomize'
-import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, cameraDuringExportEnabled, exportProgress, exportQuality, qualityPointCountLimit, setCurrentQuality, setForceAnimationExportNow, setForceExportNow, setQualityPointCountLimit, } from './flame/renderStats'
+import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, cameraDuringExportEnabled, exportProgress, exportQuality, qualityPointCountLimit, setCurrentQuality, setExportQuality, setForceAnimationExportNow, setForceExportNow, setQualityPointCountLimit, } from './flame/renderStats'
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from './flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from './flame/transformFunction'
 import { defaultLinearType } from './flame/variationRegistry'
@@ -795,27 +795,46 @@ export function MainWorkspace(props: AppProps) {
   const timeline = createTimelineState()
 
   /**
-   * Capture the current flame canvas as a downscaled PNG for OG link previews.
-   * Reuses the export-image hook (same path as Discord sharing) to grab a clean
-   * frame, then scales it down (aspect preserved) to keep stored images small.
+   * Capture the current flame as a downscaled PNG for OG link previews.
+   *
+   * Drives the same async export loop as the PNG export — via `setExportQuality`
+   * at the *current* quality, so the on-screen canvas is unchanged. Unlike the
+   * rAF loop, that loop renders even a fully settled flame and keeps running in
+   * background tabs, so the capture reliably produces a frame (the earlier
+   * hook-only path could time out and silently drop the preview). Captures the
+   * clean, quality-graded image, then scales it down (aspect preserved).
    */
   async function captureOgImageBlob(maxDim = 1000): Promise<Blob | null> {
     const rawBlob = await new Promise<Blob | null>((resolve) => {
+      let settled = false
+      const finish = (b: Blob | null) => {
+        if (settled) return
+        settled = true
+        setOnExportImage(undefined)
+        setExportQuality(undefined)
+        resolve(b)
+      }
+      // Best-effort with a generous safety net — never hang the share flow.
       const timer = setTimeout(() => {
-        setOnExportImage(undefined)
-        resolve(null)
-      }, 5000)
-      setOnExportImage(() => (canvas: HTMLCanvasElement) => {
-        setOnExportImage(undefined)
-        clearTimeout(timer)
-        canvas.toBlob(
-          (b) => {
-            resolve(b)
+        finish(null)
+      }, 20000)
+      setOnExportImage(
+        () =>
+          (canvas: HTMLCanvasElement, info?: { finalImageReady: boolean }) => {
+            // Wait for the export driver's clean, quality-graded frame.
+            if (info?.finalImageReady !== true) return
+            clearTimeout(timer)
+            canvas.toBlob(
+              (b) => {
+                finish(b)
+              },
+              'image/png',
+              1,
+            )
           },
-          'image/png',
-          1,
-        )
-      })
+      )
+      // Same render path as PNG export; current quality keeps the canvas as-is.
+      setExportQuality(qualityPresets[qualityPreset()])
     })
     if (!rawBlob) return null
 
