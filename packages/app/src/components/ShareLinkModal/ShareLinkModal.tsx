@@ -34,6 +34,20 @@ async function blobToBase64(blob: Blob): Promise<string> {
   })
 }
 
+/**
+ * Content-addressed key for the OG image — must match the Worker's `ogKey`
+ * (SHA-256 of the encoded payload, first 32 hex chars) so `?flame=` and `?s=`
+ * links resolve the same stored image.
+ */
+async function ogKey(encoded: string): Promise<string> {
+  const data = new TextEncoder().encode(encoded)
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', data)
+  return [...new Uint8Array(digest)]
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, 32)
+}
+
 function deriveOgMeta(flame: FlameDescriptor): {
   title: string
   description: string
@@ -65,13 +79,13 @@ function ShareLinkModal(props: ShareLinkModalProps) {
    * crawlers show a rich preview. Runs in the background — the link is already
    * usable; the image just needs to land before the first crawler scrape.
    */
-  async function uploadOgPreview(id: string) {
+  async function uploadOgPreview(encoded: string) {
     try {
       const blob = await props.captureOgImage?.()
       if (!blob) return
       const image = await blobToBase64(blob)
       const { title, description } = deriveOgMeta(props.flameDescriptor)
-      await fetch(`/api/og/${id}`, {
+      await fetch(`/api/og/${await ogKey(encoded)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image, title, description }),
@@ -106,12 +120,15 @@ function ShareLinkModal(props: ShareLinkModalProps) {
           const json = await res.json()
           if (json.id) {
             newUrl = `${window.location.origin}/?s=${json.id}`
-            void uploadOgPreview(json.id)
           }
         }
       } catch (err) {
         console.error('Failed to shorten URL:', err)
       }
+
+      // Upload the preview keyed by content hash, regardless of whether the
+      // shortener succeeded — so the ?flame= fallback link gets the same card.
+      void uploadOgPreview(encoded)
 
       setUrl(newUrl)
       await navigator.clipboard.writeText(newUrl)

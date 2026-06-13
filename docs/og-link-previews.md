@@ -7,18 +7,25 @@ Worker stores it in R2 and injects `og:*` / `twitter:*` meta tags. **$0 / free t
 
 ## How it works
 
-1. **Share** — `ShareLinkModal` creates a short link (`POST /api/shorten` → `?s=<id>`),
-   then in the background captures the current flame canvas, downscales it (≤1000 px,
-   aspect preserved), and `POST /api/og/<id>` with the PNG + title/description.
-2. **Store** — the Worker puts the PNG in the **`OG_IMAGES` R2 bucket** under `<id>` and
-   the title/description in KV under `og:<id>`.
-3. **Serve** — `GET /og/<id>` streams the PNG from R2 (cached 24 h).
-4. **Inject** — when a crawler fetches `/?s=<id>`, the Worker reads `og:<id>`, fetches the
-   built `index.html` from assets, and injects `og:*` / `twitter:*` tags (absolute URLs)
-   plus a richer `<title>`. Human visitors still get the normal SPA.
+1. **Share** — `ShareLinkModal` builds `?flame=<encoded>`, upgrades to `?s=<id>` if
+   `POST /api/shorten` succeeds, then (background) captures the current flame canvas,
+   downscales it (≤1000 px), **embeds the flame descriptor** into the PNG (deflate zTXt
+   chunk, same as Discord share), and `POST /api/og/<key>` with the PNG + title/description.
+   `<key>` is `ogKey(encoded)` = SHA-256 of the encoded payload (first 32 hex) —
+   **content-addressed**, so it's independent of the short id.
+2. **Store** — the Worker puts the PNG in the **`OG_IMAGES` R2 bucket** under `<key>` and
+   the title/description in KV under `og:<key>`.
+3. **Serve** — `GET /og/<key>` streams the PNG from R2 (cached 24 h). Because the flame is
+   embedded, downloading this image lets the user load the flame back into the app.
+4. **Inject** — for `/?s=<id>` the Worker resolves the payload from KV then hashes it to
+   `<key>`; for `/?flame=<encoded>` it hashes the inline payload directly. Either way it
+   reads `og:<key>`, fetches the built `index.html` via `env.ASSETS`, and injects
+   `og:*` / `twitter:*` tags (absolute URLs) + a richer `<title>`. Human visitors still
+   get the normal SPA.
 
-Long-form `/?flame=…` links (created outside the share flow) get a generic text card
-(no stored image).
+Because the image is content-addressed, **`?flame=` and `?s=` produce the same preview** —
+so a link shared without (or after a failed) shortener still gets the full image card. A
+`?flame=` link built outside the app (no uploaded image) falls back to a text card.
 
 ## Files
 

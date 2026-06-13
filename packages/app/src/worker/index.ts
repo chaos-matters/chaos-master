@@ -55,6 +55,44 @@ function base64ToBytes(b64: string): Uint8Array {
   return bytes
 }
 
+/**
+ * Content-addressed key for a share payload: a hash of the encoded payload.
+ * The OG image + meta are keyed by this (not by the short id), so `?flame=…`
+ * and `?s=<id>` resolve to the same image — even when the shortener wasn't used
+ * or failed. The client computes the identical key when uploading.
+ */
+async function ogKey(encoded: string): Promise<string> {
+  const data = new TextEncoder().encode(encoded)
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', data)
+  return [...new Uint8Array(digest)]
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, 32)
+}
+
+/** Look up the stored OG title/description/image for a content key. */
+async function resolveOgCard(
+  env: Env,
+  origin: string,
+  key: string,
+): Promise<{ title: string; description: string; imageUrl?: string }> {
+  let title = DEFAULT_TITLE
+  let description = DEFAULT_DESCRIPTION
+  let imageUrl: string | undefined
+  try {
+    const raw = await env.KV_SHORTENER.get(`og:${key}`)
+    if (raw) {
+      const meta = JSON.parse(raw) as OgMeta
+      if (meta.t) title = meta.t
+      if (meta.d) description = meta.d
+      if (meta.img) imageUrl = `${origin}/og/${key}`
+    }
+  } catch (err) {
+    console.error('Error reading OG meta:', err)
+  }
+  return { title, description, imageUrl }
+}
+
 // ---------------------------------------------------------------------------
 // Open Graph / Twitter meta-tag injection
 // ---------------------------------------------------------------------------
@@ -157,12 +195,13 @@ export default {
       }
     }
 
-    // ── Attach an OG preview image + meta to an existing short link ─────────
-    // The client renders the flame on its GPU, downscales it, and uploads it
-    // here in the background after the short link is created.
+    // ── Attach an OG preview image + meta, keyed by content hash ───────────
+    // The client renders the flame on its GPU, downscales it, embeds the flame
+    // descriptor in the PNG, and uploads it here (background) under
+    // ogKey(payload) — so both ?s= and ?flame= links can resolve it.
     if (pathname.startsWith('/api/og/') && request.method === 'POST') {
-      const shortId = pathname.split('/').pop()
-      if (!shortId) return json({ error: 'Missing ID' }, 400)
+      const key = pathname.split('/').pop()
+      if (!key) return json({ error: 'Missing key' }, 400)
       try {
         const body = (await request.json()) as {
           image?: string
@@ -173,7 +212,7 @@ export default {
           return json({ error: 'Missing image' }, 400)
         }
         const bytes = base64ToBytes(body.image)
-        await env.OG_IMAGES.put(shortId, bytes, {
+        await env.OG_IMAGES.put(key, bytes, {
           httpMetadata: { contentType: 'image/png' },
         })
         const meta: OgMeta = {
@@ -181,7 +220,7 @@ export default {
           d: body.description?.slice(0, 300),
           img: 1,
         }
-        await env.KV_SHORTENER.put(`og:${shortId}`, JSON.stringify(meta), {
+        await env.KV_SHORTENER.put(`og:${key}`, JSON.stringify(meta), {
           expirationTtl: SHORTEN_TTL,
         })
         return json({ ok: true })
@@ -218,38 +257,37 @@ export default {
       const shortId = url.searchParams.get('s')
       const flame = url.searchParams.get('flame')
 
+      // Short link: resolve the payload from KV, then hash it to the content key
+      // so it finds the same image a ?flame= link would.
       if (shortId) {
-        let title = DEFAULT_TITLE
-        let description = DEFAULT_DESCRIPTION
-        let imageUrl: string | undefined
-        try {
-          const raw = await env.KV_SHORTENER.get(`og:${shortId}`)
-          if (raw) {
-            const meta = JSON.parse(raw) as OgMeta
-            if (meta.t) title = meta.t
-            if (meta.d) description = meta.d
-            if (meta.img) imageUrl = `${url.origin}/og/${shortId}`
-          }
-        } catch (err) {
-          console.error('Error reading OG meta:', err)
-        }
-        const metaHtml = buildMetaTags({
-          title,
-          description,
-          pageUrl: `${url.origin}/?s=${shortId}`,
-          imageUrl,
-        })
-        return injectMeta(env, url.origin, title, metaHtml)
-      }
-
-      if (flame) {
-        // Long-form (un-shortened) link — no stored image; serve a text card.
-        const metaHtml = buildMetaTags({
+        let card = {
           title: DEFAULT_TITLE,
           description: DEFAULT_DESCRIPTION,
+        } as { title: string; description: string; imageUrl?: string }
+        try {
+          const payload = await env.KV_SHORTENER.get(shortId)
+          if (payload) {
+            card = await resolveOgCard(env, url.origin, await ogKey(payload))
+          }
+        } catch (err) {
+          console.error('Error resolving short link OG:', err)
+        }
+        const metaHtml = buildMetaTags({
+          ...card,
+          pageUrl: `${url.origin}/?s=${shortId}`,
+        })
+        return injectMeta(env, url.origin, card.title, metaHtml)
+      }
+
+      // Long-form link: hash the inline payload directly. Same OG card as ?s=,
+      // including the image when the client uploaded one (text card otherwise).
+      if (flame) {
+        const card = await resolveOgCard(env, url.origin, await ogKey(flame))
+        const metaHtml = buildMetaTags({
+          ...card,
           pageUrl: url.toString(),
         })
-        return injectMeta(env, url.origin, DEFAULT_TITLE, metaHtml)
+        return injectMeta(env, url.origin, card.title, metaHtml)
       }
     }
 
