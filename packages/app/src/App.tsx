@@ -16,6 +16,7 @@ import { example2CreationTour } from './tours/example2CreationTour'
 import { flameCreationTour } from './tours/flameCreationTour'
 import { sidebarTour } from './tours/sidebarTour'
 import { timelineTour } from './tours/timelineTour'
+import { isBenchmarkAuto, isBenchmarkRequested } from './utils/benchmarkRequest'
 import { decodeSharePayload } from './utils/jsonQueryParam'
 import { persistentSignal } from './utils/persistentSignal'
 import { recordKeys } from './utils/record'
@@ -66,7 +67,14 @@ function QueryErrorToast(props: { error: string | null }) {
 }
 
 export function Wrappers() {
-  const [showWelcome, setShowWelcome] = createSignal(!hasWelcomeBeenDismissed())
+  // `?benchmark` (or `?benchmark=1`) is the "request benchmark" entry point:
+  // skip the welcome screen and open the benchmark dialog straight away.
+  // `?benchmark=auto` additionally starts the run on load.
+  const benchmarkRequested = isBenchmarkRequested(window.location.search)
+  const benchmarkAuto = isBenchmarkAuto(window.location.search)
+  const [showWelcome, setShowWelcome] = createSignal(
+    !hasWelcomeBeenDismissed() && !benchmarkRequested,
+  )
   const [dontShowAgain, setDontShowAgain] = persistentSignal(
     'dontShowWelcome',
     false,
@@ -210,6 +218,8 @@ export function Wrappers() {
                         flameFromQuery={flameFromQuery()}
                         flameFromWelcome={selectedFlame}
                         welcomeTracks={selectedWelcomeTracks}
+                        autoOpenBenchmark={benchmarkRequested}
+                        autoStartBenchmark={benchmarkAuto}
                         hardwareTier={hardwareTier()}
                         onHardwareTierChange={setHardwareTier}
                         resetFlameFromWelcome={() => {

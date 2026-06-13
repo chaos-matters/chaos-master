@@ -1,4 +1,4 @@
-import { createMemo, createResource, createSignal, Show, Suspense, } from 'solid-js'
+import { createMemo, createResource, createSignal, onMount, Show, Suspense, } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
 import { DEFAULT_POINT_COUNT } from '@/defaults'
 import { examples } from '@/flame/examples'
@@ -186,7 +186,7 @@ function drawAchievementBadge(
   ctx.fillText(label, x + 8, y + 15)
 }
 
-function BenchmarkModal(props: { respond: () => void }) {
+function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
   const [gpuDeviceInfo] = createResource(getGPUDeviceInformation)
   const [state, setState] = createSignal<BenchmarkState>('idle')
   const [totalPoints, setTotalPoints] = createSignal(0)
@@ -207,6 +207,15 @@ function BenchmarkModal(props: { respond: () => void }) {
     running = true
     setState('running')
   }
+
+  // `?benchmark=auto` starts the run as soon as the dialog mounts. The elapsed
+  // timer only begins on the first accumulated points (see handleAccumulatedPoints),
+  // so starting before the GPU is warm doesn't skew the measurement.
+  onMount(() => {
+    if (props.autoStart) {
+      handleStart()
+    }
+  })
 
   function handleCancel() {
     running = false
@@ -676,10 +685,12 @@ function BenchmarkModal(props: { respond: () => void }) {
 export function createShowBenchmark() {
   const requestModal = useRequestModal()
 
-  async function showBenchmark() {
+  async function showBenchmark(options?: { autoStart?: boolean }) {
     await requestModal({
       class: ui.benchmarkModal,
-      content: ({ respond }) => <BenchmarkModal respond={respond} />,
+      content: ({ respond }) => (
+        <BenchmarkModal respond={respond} autoStart={options?.autoStart} />
+      ),
     })
   }
 
