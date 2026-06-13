@@ -714,6 +714,11 @@ export function MainWorkspace(props: AppProps) {
     return flameDescriptor.renderSettings.camera3D.fov
   }
 
+  // First-person "fly" navigation for 3D flames. Session-only (you don't want
+  // to reopen the app mid-flight); the movement speed is remembered.
+  const [flyMode, setFlyMode] = createSignal(false)
+  const flySpeed = persistentSignal('camera3D/fly-speed', 1)
+
   const effectiveTheta = () => {
     if (
       timeline.animationEnabled() &&
@@ -2110,7 +2115,10 @@ export function MainWorkspace(props: AppProps) {
         }
       }
     },
-    KeyD: () => {
+    KeyD: (ev) => {
+      // Plain "D" pans the 3D camera right (WASD), so the theme toggle lives
+      // on Ctrl/Cmd+D to avoid the conflict.
+      if (!(ev.ctrlKey || ev.metaKey)) return false
       if (animationExportRunning()) return false
       const toggleTheme = () => {
         setTheme(theme() === 'dark' ? 'light' : 'dark')
@@ -2353,6 +2361,8 @@ export function MainWorkspace(props: AppProps) {
                         radius={[effectiveRadius, setFlameRadius]}
                         target={[effectiveTarget3D, setFlameTarget3D]}
                         fov={[effectiveFov, setFlameFov]}
+                        flyMode={flyMode}
+                        flySpeed={flySpeed}
                         interactive={() =>
                           !timeline.isPlaying() &&
                           (!animationExportRunning() ||
@@ -2460,6 +2470,9 @@ export function MainWorkspace(props: AppProps) {
                     setPhi={setFlamePhi}
                     setRadius={setFlameRadius}
                     setFov={setFlameFov}
+                    flyMode={flyMode()}
+                    flySpeed={flySpeed[0]()}
+                    setFlySpeed={flySpeed[1]}
                   />
                 </div>
                 <Show when={showTimeline()}>
@@ -4328,12 +4341,16 @@ export function MainWorkspace(props: AppProps) {
               } else {
                 stashedFlame2D = deepClone(flameDescriptor)
               }
+              // Fly mode only makes sense in 3D.
+              if (v !== 3) setFlyMode(false)
               const restored =
                 v === 3
                   ? (stashedFlame3D ?? example34)
                   : (stashedFlame2D ?? initExample)
               history.replace(deepClone(restored))
             }}
+            flyMode={flyMode}
+            setFlyMode={setFlyMode}
           />
           <SpotlightTour tourContext={tourContext} />
           <BenchmarkButton

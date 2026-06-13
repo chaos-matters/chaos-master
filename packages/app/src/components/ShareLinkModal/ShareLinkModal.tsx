@@ -10,6 +10,13 @@ import type { TimelineConfig, TimelineTrack } from '@/utils/timeline'
 
 const { navigator } = globalThis
 
+/**
+ * Keep in sync with the Worker's `SHORTEN_TTL` (currently 60 days). Short `?s=`
+ * links are stored in KV and evicted after this window; the full `?flame=` link
+ * carries the data inline and never expires.
+ */
+const SHORT_LINK_TTL_DAYS = 60
+
 type ShareLinkModalProps = {
   flameDescriptor: FlameDescriptor
   tracks: TimelineTrack[]
@@ -71,8 +78,23 @@ function ShareLinkModal(props: ShareLinkModalProps) {
   const [includeAnimation, setIncludeAnimation] = createSignal(
     props.hasAnimation,
   )
-  const [url, setUrl] = createSignal('')
+  // The full, self-contained `?flame=` link (carries all data, never expires)
+  // and the optional shortened `?s=` link (nicer to share, but expires).
+  const [longUrl, setLongUrl] = createSignal('')
+  const [shortUrl, setShortUrl] = createSignal('')
   const [copied, setCopied] = createSignal(false)
+
+  // Prefer the short link for display/auto-copy; fall back to the full link
+  // when the shortener is unavailable.
+  const primaryUrl = () => shortUrl() || longUrl()
+  const hasShortLink = () => shortUrl() !== ''
+
+  async function copyToClipboard(text: string) {
+    if (!text) return
+    await navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
   /**
    * Render the current flame to a PNG and attach it to the short link so social
@@ -105,7 +127,10 @@ function ShareLinkModal(props: ShareLinkModalProps) {
           : undefined,
       )
 
-      let newUrl = `${window.location.origin}/?flame=${encoded}`
+      // Surface the full link immediately so there's always something to copy,
+      // even while the shortener request is in flight or if it fails.
+      setLongUrl(`${window.location.origin}/?flame=${encoded}`)
+      setShortUrl('')
 
       try {
         const res = await fetch('/api/shorten', {
@@ -119,7 +144,7 @@ function ShareLinkModal(props: ShareLinkModalProps) {
         if (res.ok) {
           const json = await res.json()
           if (json.id) {
-            newUrl = `${window.location.origin}/?s=${json.id}`
+            setShortUrl(`${window.location.origin}/?s=${json.id}`)
           }
         }
       } catch (err) {
@@ -130,10 +155,7 @@ function ShareLinkModal(props: ShareLinkModalProps) {
       // shortener succeeded — so the ?flame= fallback link gets the same card.
       void uploadOgPreview(encoded)
 
-      setUrl(newUrl)
-      await navigator.clipboard.writeText(newUrl)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      await copyToClipboard(primaryUrl())
     })()
   })
 
@@ -159,17 +181,30 @@ function ShareLinkModal(props: ShareLinkModalProps) {
         </label>
         <textarea
           class={ui.textarea}
-          value={url()}
+          value={primaryUrl()}
           readOnly
           title="Click to copy"
-          rows={url().length > 100 ? 4 : 1}
-          onClick={async (e) => {
+          rows={primaryUrl().length > 100 ? 4 : 1}
+          onClick={(e) => {
             e.currentTarget.select()
-            await navigator.clipboard.writeText(url())
-            setCopied(true)
-            setTimeout(() => setCopied(false), 2000)
+            void copyToClipboard(primaryUrl())
           }}
         />
+        <p class={ui.note}>
+          <Show
+            when={hasShortLink()}
+            fallback={
+              <>
+                This full link carries the flame data inline, so it never
+                expires.
+              </>
+            }
+          >
+            Short link copied. It expires after {SHORT_LINK_TTL_DAYS} days — for
+            a permanent link use <strong>Copy full link</strong> (it carries the
+            flame data inline).
+          </Show>
+        </p>
         <Show when={copied()}>
           <div class={ui.copiedMsg}>Copied to clipboard!</div>
         </Show>
@@ -182,6 +217,11 @@ function ShareLinkModal(props: ShareLinkModalProps) {
         >
           Close
         </Button>
+        <Show when={hasShortLink()}>
+          <Button onClick={() => void copyToClipboard(longUrl())}>
+            Copy full link
+          </Button>
+        </Show>
         <Button
           onClick={async () => {
             const payload =
@@ -191,9 +231,7 @@ function ShareLinkModal(props: ShareLinkModalProps) {
                     animation: { tracks: props.tracks, config: props.config },
                   }
                 : props.flameDescriptor
-            await navigator.clipboard.writeText(JSON.stringify(payload))
-            setCopied(true)
-            setTimeout(() => setCopied(false), 2000)
+            await copyToClipboard(JSON.stringify(payload))
           }}
         >
           Copy JSON

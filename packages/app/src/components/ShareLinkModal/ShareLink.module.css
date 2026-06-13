@@ -47,6 +47,18 @@
   background: #252525;
 }
 
+.note {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-muted, #999);
+}
+
+.note strong {
+  color: var(--text-color, #eee);
+  font-weight: 600;
+}
+
 .copiedMsg {
   font-size: 0.8rem;
   color: var(--color-accent, #4caf50);

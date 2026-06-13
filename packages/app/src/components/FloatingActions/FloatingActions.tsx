@@ -26,6 +26,8 @@ type Props = {
   setAdaptiveFilterEnabled: (v: boolean) => void
   dimensions: () => number
   setDimensions: (v: number) => void
+  flyMode: () => boolean
+  setFlyMode: (v: boolean) => void
   isPlaying: () => boolean
   togglePlay: () => void
   // Quality presets
@@ -416,6 +418,39 @@ export function FloatingActions(props: Props) {
                 <path d="M11 9.5l3.5 2" />
               </svg>
             </button>
+
+            {/* Fly Mode (3D only) */}
+            <Show when={props.dimensions() === 3}>
+              <button
+                class={ui.toggle}
+                classList={{
+                  [ui.toggleActive as string]: props.flyMode(),
+                }}
+                onClick={() => {
+                  props.setFlyMode(!props.flyMode())
+                }}
+                title={
+                  props.flyMode()
+                    ? 'Exit fly mode'
+                    : 'Fly mode (WASD/arrows to move, drag to look, Q/E up/down, scroll for speed)'
+                }
+              >
+                {/* Paper-plane icon */}
+                <svg
+                  viewBox="0 0 16 16"
+                  width="13"
+                  height="13"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.3"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M15 1.5L7.5 9" />
+                  <path d="M15 1.5l-4.7 13-2.8-5.5L2 6.2 15 1.5z" />
+                </svg>
+              </button>
+            </Show>
 
             <div class={ui.toggleSeparator} />
 
