@@ -20,6 +20,18 @@ const FLY_SPEED_RANGE: [number, number] = [0.05, 20]
 // the radius is clamped to this range first so panning is never absurdly fast
 // when far out or painfully slow when zoomed in close.
 const PAN_RADIUS_RANGE: [number, number] = [1, 12]
+// Movement keys (always camera-controlled in 3D) and fly-only keys.
+const MOVE_KEYS = new Set([
+  'w',
+  's',
+  'a',
+  'd',
+  'arrowup',
+  'arrowdown',
+  'arrowleft',
+  'arrowright',
+])
+const FLY_KEYS = new Set(['q', 'e'])
 
 type WheelZoomCamera3DProps = {
   theta: Signal<number>
@@ -171,33 +183,40 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
 
   // Fly-mode look: turn the view about a fixed eye. We keep the spherical
   // angles but, after rotating them, move the target so the camera position
-  // stays put — turning the head instead of orbiting the subject.
+  // stays put — turning the head instead of orbiting the subject. `dx`/`dy` are
+  // pointer movement deltas in pixels.
+  function applyLook(dx: number, dy: number) {
+    const eye = position()
+    const r = props.radius[0]()
+    const nextTheta = props.theta[0]() - dx * FLY_LOOK_SENSITIVITY
+    const nextPhi = Math.max(
+      0.01,
+      Math.min(Math.PI - 0.01, props.phi[0]() - dy * FLY_LOOK_SENSITIVITY),
+    )
+    // offset = eye - target = r · dir(theta, phi)
+    const ox = r * Math.sin(nextPhi) * Math.sin(nextTheta)
+    const oy = r * Math.cos(nextPhi)
+    const oz = r * Math.sin(nextPhi) * Math.cos(nextTheta)
+    batch(() => {
+      props.theta[1](nextTheta)
+      props.phi[1](nextPhi)
+      props.target[1](
+        () => new Float32Array([eye[0]! - ox, eye[1]! - oy, eye[2]! - oz]),
+      )
+    })
+  }
+
+  // Drag-to-look fallback (used when pointer lock isn't engaged/available).
   const startFlyLook = createDragHandler((initEvent) => {
     if (!changeHistory.isPreviewing()) {
       changeHistory.startPreview('Camera look')
     }
     return {
       onPointerMove(event) {
-        const dx = event.clientX - initEvent.clientX
-        const dy = event.clientY - initEvent.clientY
-        const eye = position()
-        const r = props.radius[0]()
-        const nextTheta = props.theta[0]() - dx * FLY_LOOK_SENSITIVITY
-        const nextPhi = Math.max(
-          0.01,
-          Math.min(Math.PI - 0.01, props.phi[0]() - dy * FLY_LOOK_SENSITIVITY),
+        applyLook(
+          event.clientX - initEvent.clientX,
+          event.clientY - initEvent.clientY,
         )
-        // offset = eye - target = r · dir(theta, phi)
-        const ox = r * Math.sin(nextPhi) * Math.sin(nextTheta)
-        const oy = r * Math.cos(nextPhi)
-        const oz = r * Math.sin(nextPhi) * Math.cos(nextTheta)
-        batch(() => {
-          props.theta[1](nextTheta)
-          props.phi[1](nextPhi)
-          props.target[1](
-            () => new Float32Array([eye[0]! - ox, eye[1]! - oy, eye[2]! - oz]),
-          )
-        })
         initEvent = event
       },
       onDone() {
@@ -207,6 +226,47 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
       },
     }
   })
+
+  // --- Pointer lock (first-person mouselook) ---------------------------------
+  // While locked the cursor is captured and raw mouse movement drives the look,
+  // so you fly wherever you point — the standard web FPS interaction.
+  function isPointerLocked(): boolean {
+    return document.pointerLockElement === el()
+  }
+
+  function onMouseMove(ev: MouseEvent) {
+    if (!isPointerLocked()) return
+    if (!changeHistory.isPreviewing()) {
+      changeHistory.startPreview('Camera look')
+    }
+    applyLook(ev.movementX, ev.movementY)
+  }
+
+  function onPointerLockChange() {
+    if (!isPointerLocked() && changeHistory.isPreviewing()) {
+      // Released (Esc / focus loss) — settle the look into history.
+      changeHistory.commit()
+    }
+  }
+
+  function requestFlyLook(ev: PointerEvent) {
+    const target = el()
+    const lock = (target as Element & { requestPointerLock?: () => unknown })
+      .requestPointerLock
+    if (typeof lock !== 'function') {
+      startFlyLook(ev) // pointer lock unsupported — fall back to drag
+      return
+    }
+    try {
+      const result = lock.call(target) as Promise<void> | undefined
+      // Some browsers reject if the gesture is stale — fall back to drag.
+      void result?.catch?.(() => {
+        startFlyLook(ev)
+      })
+    } catch {
+      startFlyLook(ev)
+    }
+  }
 
   function onWheel(ev: WheelEvent) {
     ev.preventDefault()
@@ -255,13 +315,24 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
   })
 
   function onPointerDown(ev: PointerEvent) {
-    // Middle-click or right-click → pan (both orbit and fly modes)
+    if (props.flyMode?.()) {
+      // While the pointer is locked, mouselook is driven by mousemove — ignore
+      // the click itself.
+      if (isPointerLocked()) return
+      if (ev.button === 1 || ev.button === 2) {
+        ev.preventDefault()
+        startPanning(ev)
+        return
+      }
+      // Left-click captures the mouse for first-person look (drag fallback).
+      ev.preventDefault()
+      requestFlyLook(ev)
+      return
+    }
+    // Orbit mode: middle/right pan, left orbit.
     if (ev.button === 1 || ev.button === 2) {
       ev.preventDefault()
       startPanning(ev)
-    } else if (props.flyMode?.()) {
-      // Left-drag looks around (first-person) instead of orbiting.
-      startFlyLook(ev)
     } else {
       startOrbit(ev)
     }
@@ -390,25 +461,14 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
       return
     }
 
-    const moveKeys = [
-      'w',
-      's',
-      'a',
-      'd',
-      'arrowup',
-      'arrowdown',
-      'arrowleft',
-      'arrowright',
-    ]
     // Q/E (ascend/descend) only steer the camera while flying.
-    if (props.flyMode?.() && (key === 'q' || key === 'e')) {
+    const flying = props.flyMode?.() === true
+    if (MOVE_KEYS.has(key) || (flying && FLY_KEYS.has(key))) {
       ev.preventDefault()
-      activeKeys.add(key)
-      startKeyLoop()
-      return
-    }
-    if (moveKeys.includes(key)) {
-      ev.preventDefault()
+      // While flying we fully claim the key over page-level handlers and
+      // extensions (e.g. Vimium's single-key `d`) so movement is reliable. In
+      // orbit mode we only preventDefault, leaving the event for menus/pickers.
+      if (flying) ev.stopImmediatePropagation()
       activeKeys.add(key)
       startKeyLoop()
     }
@@ -416,6 +476,13 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
 
   function onKeyUp(ev: KeyboardEvent) {
     const key = ev.key.toLowerCase()
+    if (
+      props.flyMode?.() === true &&
+      (MOVE_KEYS.has(key) || FLY_KEYS.has(key))
+    ) {
+      // Mirror the keydown claim so the release isn't swallowed either.
+      ev.stopImmediatePropagation()
+    }
     if (activeKeys.has(key)) {
       activeKeys.delete(key)
     }
@@ -436,17 +503,24 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
     eventTarget.addEventListener('contextmenu', onContextMenu)
     eventTarget.addEventListener('touchmove', startPinch, { passive: false })
     eventTarget.addEventListener('wheel', onWheel, { passive: false })
-    window.addEventListener('keydown', onKeyDown)
-    window.addEventListener('keyup', onKeyUp)
+    // Capture phase + stopImmediatePropagation lets the camera win movement
+    // keys over page-level extension handlers (Vimium etc.).
+    window.addEventListener('keydown', onKeyDown, true)
+    window.addEventListener('keyup', onKeyUp, true)
     window.addEventListener('blur', onBlur)
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('pointerlockchange', onPointerLockChange)
     onCleanup(() => {
       eventTarget.removeEventListener('pointerdown', onPointerDown)
       eventTarget.removeEventListener('contextmenu', onContextMenu)
       eventTarget.removeEventListener('touchmove', startPinch)
       eventTarget.removeEventListener('wheel', onWheel)
-      window.removeEventListener('keydown', onKeyDown)
-      window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('keydown', onKeyDown, true)
+      window.removeEventListener('keyup', onKeyUp, true)
       window.removeEventListener('blur', onBlur)
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('pointerlockchange', onPointerLockChange)
+      if (isPointerLocked()) document.exitPointerLock()
       if (keyLoopId !== null) {
         cancelAnimationFrame(keyLoopId)
         keyLoopId = null
@@ -456,6 +530,13 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
         changeHistory.commit()
       }
     })
+  })
+
+  // Leaving fly mode releases the captured mouse.
+  createEffect(() => {
+    if (props.flyMode?.() === false && isPointerLocked()) {
+      document.exitPointerLock()
+    }
   })
 
   return (
