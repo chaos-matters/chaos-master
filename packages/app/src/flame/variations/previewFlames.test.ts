@@ -95,4 +95,22 @@ describe('curated 3D preview overrides', () => {
     expect(flame.renderSettings.exposure).toBe(1.892)
     expect(flame.renderSettings.camera3D?.radius).toBeCloseTo(9.726998)
   })
+
+  it('applies the tuned fan3D override (params + grading)', () => {
+    const flame = getVariationPreviewFlame3D('fan3D')
+    expect(flame.renderSettings.vibrancy).toBe(0.95)
+    expect(flame.renderSettings.contrast).toBe(4.1)
+    const variation = Object.values(
+      Object.values(flame.transforms)[0]!.variations,
+    )[0] as { type: string; params: Record<string, number> }
+    expect(variation.type).toBe('fan3D')
+    expect(variation.params.spreadTheta).toBe(2.8)
+  })
+
+  it('applies the tuned sinusoidal3D override (scaled input)', () => {
+    const flame = getVariationPreviewFlame3D('sinusoidal3D')
+    expect(
+      (Object.values(flame.transforms)[0]!.preAffine as { a: number }).a,
+    ).toBe(2.6)
+  })
 })

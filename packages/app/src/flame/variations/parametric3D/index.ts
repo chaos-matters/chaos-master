@@ -1,4 +1,4 @@
-import { f32, i32, struct, vec3f } from 'typegpu/data'
+import { f32, struct, vec3f } from 'typegpu/data'
 import { acos, atan2, cos, floor, length, select, sin, sqrt, tan, } from 'typegpu/std'
 import { createObjectEditor, sliderEditor, sliderLogEditor, } from '@/components/Sliders/ParametricEditors/sliderEditor'
 import { random } from '@/shaders/random'
@@ -107,10 +107,12 @@ export const fan3D = parametricVariation3D(
     const t = theta + params.spreadTheta / 2
     const p = phi + params.spreadPhi / 2
 
-    // integer truncation in wgsl
-    // using floor since wgsl modulo can behave differently for negative
-    const ft = t - params.spreadTheta * f32(i32(t / params.spreadTheta))
-    const fp = p - params.spreadPhi * f32(i32(p / params.spreadPhi))
+    // Wrap into [0, spread) with floor, not i32() truncation: theta is in
+    // (-pi, pi], so t goes negative for azimuths below -spreadTheta/2, where
+    // truncation toward zero would fold the wedge the wrong way and leave a
+    // seam on the -x side.
+    const ft = t - params.spreadTheta * floor(t / params.spreadTheta)
+    const fp = p - params.spreadPhi * floor(p / params.spreadPhi)
 
     const newTheta = theta - ft + params.spreadTheta / 2
     const newPhi = phi - fp + params.spreadPhi / 2

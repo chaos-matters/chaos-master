@@ -11,13 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **More 3D variations**: Added 11 new 3D variations — 7 parametric (`rectangles3D`, `splits3D`, `modulus3D`, `separation3D`, `blob3D`, `bent2_3D`, `zScale3D`) and 4 simple (`hemisphere3D`, `scry3D`, `square3D`, `blur3D`) — ported from their 2D counterparts and extended along the z axis.
 - **3D starting flame preset**: Added `initExample3D`, a clean single-`linear3D` identity flame, to the example/preset list as a blank-slate 3D starting point.
-- **Curated 3D variation previews**: Added tuned `previewFlames3D` overrides (pre-affine, params, exposure and camera) for `pdj3D` and `rectangles3D` so their gallery thumbnails present the variation shape naturally instead of the flat identity default — the 3D analog of the existing 2D `previewFlames` overrides.
+- **Curated 3D variation previews**: Added tuned `previewFlames3D` overrides (pre-affine, params, exposure and camera) for `pdj3D`, `rectangles3D`, `fan3D` and `sinusoidal3D` so their gallery thumbnails present the variation shape naturally instead of the flat identity default — the 3D analog of the existing 2D `previewFlames` overrides.
 
 ### Fixed
 
 - **Variation previews rendered as blank gray blobs**: Preview flames built for the variation selector and quick-picker gallery skipped schema validation after the 3D expansion, leaving render defaults unset. A missing transform `visible` forced the IFS probability to 0 (no shape) and a missing `vibrancy` multiplied chroma by 0 (no color). Previews now show correct, colored variation shapes in both 2D and 3D.
 - **Dark halo around 3D variation previews**: the 3D preview thumbnails ran the adaptive density-estimation blur that the 2D thumbnails skip, which smeared the projected cloud's sparse edge into a vignette. The 3D thumbnails now render without it, matching the 2D path.
 - **3D parametric variations showed no parameters**: the variation selector and the main-workspace sidebar gated the parameter editor on a 2D-only check (`isParametricVariation`), so 3D parametric variations (e.g. `pdj3D`) exposed no sliders. Both now use a combined 2D/3D parametric check (`isAnyParametricVariationType`).
+- **`fan3D` azimuthal seam**: the wedge wrap used `i32()` truncation toward zero instead of `floor`, so azimuths below `-spreadTheta/2` folded the wrong way and left a seam on the −x side. Now uses `floor` for a correct modulo across the full angular range.
 
 ### Changed
 

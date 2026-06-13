@@ -803,6 +803,74 @@ const previewFlames3D: Partial<
       }
     }),
   ),
+  fan3D: unfreeze(
+    produce(getDefaultFlameByVarType3D('fan3D'), (draft) => {
+      const tid = getTransformPreviewTid('fan3D')
+      const vid = getTransformPreviewVid('fan3D')
+      draft.renderSettings.exposure = 0.25
+      draft.renderSettings.vibrancy = 0.95
+      draft.renderSettings.contrast = 4.1
+      draft.renderSettings.camera3D = {
+        theta: 0.1975585937499996,
+        phi: 2.7067728892948852,
+        radius: 2.5632133404321378,
+        target: [0, 0, 0],
+        fov: 60,
+      }
+      draft.transforms[tid]!.preAffine = {
+        a: 1.3145890408937746,
+        b: 0,
+        c: 0,
+        d: -0.3573642671108246,
+        e: -0.2598492721051762,
+        f: 1,
+        g: 0,
+        h: -0.1605902910232544,
+        i: 0,
+        j: 0,
+        k: 1,
+        l: 0,
+      }
+      draft.transforms[tid]!.variations[vid] = {
+        type: 'fan3D',
+        weight: 1,
+        visible: true,
+        params: { spreadTheta: 2.8, spreadPhi: 0.79 },
+      }
+    }),
+  ),
+  // Sinusoidal folds the input through sin() per-axis; on the bare unit ball
+  // the domain barely spans one period, so it reads as a near-identity blob.
+  // Scaling the input up so it wraps across several periods reveals the
+  // characteristic cushion/lattice, lifted by an angled camera.
+  sinusoidal3D: unfreeze(
+    produce(getDefaultFlameByVarType3D('sinusoidal3D'), (draft) => {
+      const tid = getTransformPreviewTid('sinusoidal3D')
+      draft.renderSettings.exposure = 0.6
+      draft.renderSettings.contrast = 2.2
+      draft.renderSettings.camera3D = {
+        theta: 0.62,
+        phi: 1.12,
+        radius: 3.4,
+        target: [0, 0, 0],
+        fov: 60,
+      }
+      draft.transforms[tid]!.preAffine = {
+        a: 2.6,
+        b: 0,
+        c: 0,
+        d: 0,
+        e: 0,
+        f: 2.6,
+        g: 0,
+        h: 0,
+        i: 0,
+        j: 0,
+        k: 2.6,
+        l: 0,
+      }
+    }),
+  ),
 }
 
 export function getVariationPreviewFlame3D(
