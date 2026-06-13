@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.3] - 2026-06-13
+
+### Added
+
+- **Rich link-sharing previews (Open Graph)**: shared flame links now produce a social preview card on Discord, Slack, X, Facebook and LinkedIn that shows the actual rendered flame. When you create a share link the app renders the flame, downscales it, embeds the flame descriptor into the PNG, and stores it on Cloudflare R2 (content-addressed by the payload hash); the Worker serves the image and injects `og:` / `twitter:` meta tags for both `?s=` short links and `?flame=` long links. Downloading the preview image lets you load the flame straight back into the app. Runs entirely on the Cloudflare free tier.
+
 ## [0.9.2] - 2026-06-13
 
 ### Added
