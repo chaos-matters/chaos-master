@@ -16,6 +16,10 @@ export type BackupGroups = {
   logo: boolean
 }
 
+/** Which artifacts to write per flame. `png` only applies where an image
+ *  exists (history thumbnails); recent flames are JSON-only regardless. */
+export type BackupFormat = 'json' | 'png' | 'both'
+
 export type BackupResult = {
   bytes: Uint8Array
   fileCount: number
@@ -74,11 +78,15 @@ async function embedFlameInThumbnail(
  */
 export async function buildFlameBackupZip(
   groups: BackupGroups,
+  format: BackupFormat = 'both',
 ): Promise<BackupResult> {
+  const includeJson = format === 'json' || format === 'both'
+  const includePng = format === 'png' || format === 'both'
   const files: Zippable = {}
   const counts = { recents: 0, generated: 0, logo: 0 }
 
-  if (groups.recents) {
+  if (groups.recents && includeJson) {
+    // Recent flames have no stored image — JSON only.
     const recents = loadRecentFlames()
     counts.recents = recents.length
     recents.forEach((r, i) => {
@@ -102,9 +110,13 @@ export async function buildFlameBackupZip(
     for (let i = 0; i < gen.length; i++) {
       const e = gen[i]!
       const stem = fileStem(e.flame.metadata?.name ?? 'generated', i)
-      files[`generated/${stem}.json`] = [jsonBytes(e.flame), { level: 6 }]
-      const png = await embedFlameInThumbnail(e.flame, e.thumbnail)
-      if (png !== null) files[`generated/${stem}.png`] = [png, { level: 0 }]
+      if (includeJson) {
+        files[`generated/${stem}.json`] = [jsonBytes(e.flame), { level: 6 }]
+      }
+      if (includePng) {
+        const png = await embedFlameInThumbnail(e.flame, e.thumbnail)
+        if (png !== null) files[`generated/${stem}.png`] = [png, { level: 0 }]
+      }
     }
   }
 
@@ -114,9 +126,13 @@ export async function buildFlameBackupZip(
     for (let i = 0; i < logo.length; i++) {
       const e = logo[i]!
       const stem = fileStem(e.flame.metadata?.name ?? 'logo', i)
-      files[`logo/${stem}.json`] = [jsonBytes(e.flame), { level: 6 }]
-      const png = await embedFlameInThumbnail(e.flame, e.thumbnail)
-      if (png !== null) files[`logo/${stem}.png`] = [png, { level: 0 }]
+      if (includeJson) {
+        files[`logo/${stem}.json`] = [jsonBytes(e.flame), { level: 6 }]
+      }
+      if (includePng) {
+        const png = await embedFlameInThumbnail(e.flame, e.thumbnail)
+        if (png !== null) files[`logo/${stem}.png`] = [png, { level: 0 }]
+      }
     }
   }
 
@@ -125,6 +141,7 @@ export async function buildFlameBackupZip(
       app: 'Chaos Master',
       version: VERSION,
       exportedAt: new Date().toISOString(),
+      format,
       counts,
     }),
     { level: 6 },

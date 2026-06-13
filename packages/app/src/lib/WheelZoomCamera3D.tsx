@@ -16,6 +16,10 @@ const FLY_LOOK_SENSITIVITY = 0.005
 // Multiplier applied to fly speed per wheel notch.
 const FLY_SPEED_WHEEL_STEP = 1.0015
 const FLY_SPEED_RANGE: [number, number] = [0.05, 20]
+// Pan speed scales with the orbit radius (so it feels right at any zoom), but
+// the radius is clamped to this range first so panning is never absurdly fast
+// when far out or painfully slow when zoomed in close.
+const PAN_RADIUS_RANGE: [number, number] = [1, 12]
 
 type WheelZoomCamera3DProps = {
   theta: Signal<number>
@@ -70,6 +74,12 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
     const z = tgt[2]! + r * Math.sin(p) * Math.cos(t)
     return new Float32Array([x, y, z])
   })
+
+  /** Orbit radius clamped to a sane range for scaling pan speed. */
+  function panRadius(): number {
+    const [min, max] = PAN_RADIUS_RANGE
+    return Math.max(min, Math.min(max, props.radius[0]()))
+  }
 
   const startOrbit = createDragHandler((initEvent) => {
     if (!changeHistory.isPreviewing()) {
@@ -138,7 +148,7 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
           const cu0 = camUp[0]!
           const cu1 = camUp[1]!
           const cu2 = camUp[2]!
-          const panSpeed = props.radius[0]() * 0.001
+          const panSpeed = panRadius() * 0.001
           props.target[1]((tgt) => {
             const rx = rg0 * -dx * panSpeed + cu0 * dy * panSpeed
             const ry = rg1 * -dx * panSpeed + cu1 * dy * panSpeed
@@ -343,7 +353,7 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
       return
     }
 
-    const speed = radius * KEY_PAN_SPEED * deltaTime
+    const speed = panRadius() * KEY_PAN_SPEED * deltaTime
     let dx = 0
     let dy = 0
 
@@ -370,11 +380,16 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
     const tag = (ev.target as HTMLElement)?.tagName
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
 
-    // Modifier combos (e.g. Ctrl+D theme toggle) are app shortcuts, not
-    // camera movement — leave them for the global shortcut handler.
-    if (ev.ctrlKey || ev.metaKey || ev.altKey) return
-
     const key = ev.key.toLowerCase()
+    // Modifier combos (e.g. Ctrl+D theme toggle) are app shortcuts, not camera
+    // movement. Also drop any in-progress movement for this key: if it was held
+    // and a modifier joins (or the key repeats modified), the matching keyup can
+    // be swallowed by the shortcut/focus change and leave the key stuck.
+    if (ev.ctrlKey || ev.metaKey || ev.altKey) {
+      activeKeys.delete(key)
+      return
+    }
+
     const moveKeys = [
       'w',
       's',
@@ -406,6 +421,12 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
     }
   }
 
+  // If the window loses focus (alt-tab, devtools, a view transition) we won't
+  // receive the keyup — drop all held keys so the camera doesn't drift forever.
+  function onBlur() {
+    activeKeys.clear()
+  }
+
   createEffect(() => {
     const eventTarget = el()
     if (props.interactive?.() === false) {
@@ -417,6 +438,7 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
     eventTarget.addEventListener('wheel', onWheel, { passive: false })
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', onBlur)
     onCleanup(() => {
       eventTarget.removeEventListener('pointerdown', onPointerDown)
       eventTarget.removeEventListener('contextmenu', onContextMenu)
@@ -424,6 +446,7 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
       eventTarget.removeEventListener('wheel', onWheel)
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', onBlur)
       if (keyLoopId !== null) {
         cancelAnimationFrame(keyLoopId)
         keyLoopId = null

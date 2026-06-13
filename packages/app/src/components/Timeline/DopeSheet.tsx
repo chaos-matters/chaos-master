@@ -1,12 +1,23 @@
 import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useTimeline } from '@/contexts/TimelineContext'
+import { TIMELINE_PARAMETERS } from '@/utils/timeline'
 import ui from './DopeSheet.module.css'
 import { useScrollSync } from './hooks/useScrollSync'
 import { useSeekScrubber } from './hooks/useSeekScrubber'
 import { useZoomGestures } from './hooks/useZoomGestures'
 import { KeyframeContextMenu } from './KeyframeContextMenu'
 import { TrackContextMenu } from './TrackContextMenu'
+
+/**
+ * Roots of every built-in animatable parameter path (e.g. `camera`, `camera3D`,
+ * `finalTransform`, `vibrancy`, `blendWeight`). Derived from the authoritative
+ * parameter list so it can't drift — anything else with a `<tid>.<vid>` shape is
+ * treated as a transform/variation target and validated against the flame.
+ */
+const STATIC_PARAM_ROOTS = new Set(
+  TIMELINE_PARAMETERS.map((p) => p.path.split('.')[0]!),
+)
 
 function pathLabel(path: string): string {
   return path
@@ -127,22 +138,11 @@ export function DopeSheet(props: DopeSheetProps) {
             if (tid !== 'color' && !flame.transforms[tid]) {
               isOrphaned = true
             }
-          } else if (
-            parts.length >= 2 &&
-            parts[0] !== 'transform' &&
-            parts[0] !== 'camera' &&
-            parts[0] !== 'camera3D' &&
-            parts[0] !== 'skipIters' &&
-            parts[0] !== 'exposure' &&
-            parts[0] !== 'vibrancy' &&
-            parts[0] !== 'contrast' &&
-            parts[0] !== 'gamma' &&
-            parts[0] !== 'highlightPower' &&
-            parts[0] !== 'depthColorPower' &&
-            parts[0] !== 'palettePhase' &&
-            parts[0] !== 'paletteSpeed' &&
-            parts[0] !== 'densityEstimationQuality'
-          ) {
+          } else if (STATIC_PARAM_ROOTS.has(parts[0]!)) {
+            // A known built-in parameter (camera, finalTransform, render
+            // settings, blendWeight, …) — always valid.
+            isOrphaned = false
+          } else if (parts.length >= 2) {
             // It's likely <tid>.<vid> or <tid>.<vid>.<param>
             const tid = parts[0]!
             const vid = parts[1]!

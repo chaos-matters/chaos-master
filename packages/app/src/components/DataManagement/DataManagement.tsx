@@ -8,8 +8,14 @@ import { Checkbox } from '../Checkbox/Checkbox'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './DataManagement.module.css'
-import type { BackupGroups } from '@/utils/flameBackup'
+import type { BackupFormat, BackupGroups } from '@/utils/flameBackup'
 import type { StorageBucket, StorageUsage } from '@/utils/storageUsage'
+
+const FORMAT_OPTIONS: { value: BackupFormat; label: string }[] = [
+  { value: 'both', label: 'JSON + PNG' },
+  { value: 'json', label: 'JSON only' },
+  { value: 'png', label: 'PNG only' },
+]
 
 type ConfirmLine = { label: string; count: number; bytes: number }
 
@@ -93,6 +99,7 @@ export function DataManagement() {
   const [backupRecents, setBackupRecents] = createSignal(true)
   const [backupGenerated, setBackupGenerated] = createSignal(true)
   const [backupLogo, setBackupLogo] = createSignal(true)
+  const [backupFormat, setBackupFormat] = createSignal<BackupFormat>('both')
   const [exporting, setExporting] = createSignal(false)
 
   const anyGroupSelected = () =>
@@ -107,7 +114,7 @@ export function DataManagement() {
         generated: backupGenerated(),
         logo: backupLogo(),
       }
-      const result = await buildFlameBackupZip(groups)
+      const result = await buildFlameBackupZip(groups, backupFormat())
       const total =
         result.counts.recents + result.counts.generated + result.counts.logo
       if (total === 0) {
@@ -179,7 +186,8 @@ export function DataManagement() {
   return (
     <div class={ui.root}>
       {/* Storage usage breakdown */}
-      <div class={ui.usageCard}>
+      <section class={ui.card}>
+        <div class={ui.cardLabel}>Usage</div>
         <Show
           when={usage()}
           fallback={<div class={ui.loading}>Calculating storage…</div>}
@@ -200,43 +208,72 @@ export function DataManagement() {
             </>
           )}
         </Show>
-      </div>
+      </section>
 
       {/* Backup / export */}
-      <div class={ui.section}>
-        <h3 class={ui.sectionHeading}>Backup &amp; Export</h3>
-        <p class={ui.sectionHint}>
-          Download a ZIP of your flames as JSON descriptors plus PNGs with the
-          flame embedded (history thumbnails). Choose what to include:
+      <section class={ui.card}>
+        <div class={ui.cardLabel}>Backup &amp; Export</div>
+        <p class={ui.cardHint}>
+          Bundle your flames into a ZIP — JSON descriptors and/or PNGs with the
+          flame embedded (from history thumbnails).
         </p>
-        <div class={ui.groupChecks}>
-          <label class={ui.groupCheck}>
-            <Checkbox checked={backupRecents()} onChange={setBackupRecents} />
-            <span>Recent flames</span>
-          </label>
-          <label class={ui.groupCheck}>
-            <Checkbox
-              checked={backupGenerated()}
-              onChange={setBackupGenerated}
-            />
-            <span>Generated history</span>
-          </label>
-          <label class={ui.groupCheck}>
-            <Checkbox checked={backupLogo()} onChange={setBackupLogo} />
-            <span>Logo/Favicon history</span>
-          </label>
+        <div class={ui.fieldRow}>
+          <span class={ui.fieldName}>Include</span>
+          <div class={ui.groupChecks}>
+            <label class={ui.groupCheck}>
+              <Checkbox checked={backupRecents()} onChange={setBackupRecents} />
+              <span>Recent</span>
+            </label>
+            <label class={ui.groupCheck}>
+              <Checkbox
+                checked={backupGenerated()}
+                onChange={setBackupGenerated}
+              />
+              <span>Generated</span>
+            </label>
+            <label class={ui.groupCheck}>
+              <Checkbox checked={backupLogo()} onChange={setBackupLogo} />
+              <span>Logo</span>
+            </label>
+          </div>
+        </div>
+        <div class={ui.fieldRow}>
+          <span class={ui.fieldName}>Format</span>
+          <div class={ui.pills}>
+            <For each={FORMAT_OPTIONS}>
+              {(opt) => (
+                <button
+                  type="button"
+                  class={ui.pill}
+                  classList={{
+                    [ui.pillActive as string]: backupFormat() === opt.value,
+                  }}
+                  onClick={() => setBackupFormat(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              )}
+            </For>
+          </div>
         </div>
         <Button
+          class={ui.exportBtn}
           onClick={handleExport}
           disabled={exporting() || !anyGroupSelected()}
         >
-          {exporting() ? 'Exporting…' : 'Export Backup (.zip)'}
+          {exporting() ? 'Exporting…' : 'Export Backup'}
+          <span class={ui.zipBadge}>ZIP</span>
         </Button>
-      </div>
+      </section>
 
       {/* Danger zone */}
-      <div class={ui.dangerZone}>
-        <h3 class={ui.dangerHeading}>Danger Zone</h3>
+      <section class={ui.card} classList={{ [ui.dangerCard as string]: true }}>
+        <div
+          class={ui.cardLabel}
+          classList={{ [ui.dangerLabel as string]: true }}
+        >
+          Danger Zone
+        </div>
         <div class={ui.dangerRow}>
           <div class={ui.dangerText}>
             <span class={ui.dangerTitle}>Clear all settings</span>
@@ -259,7 +296,7 @@ export function DataManagement() {
             Delete flames
           </Button>
         </div>
-      </div>
+      </section>
     </div>
   )
 }
