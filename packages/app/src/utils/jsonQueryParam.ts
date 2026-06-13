@@ -7,6 +7,15 @@ import type { TimelineConfig, TimelineTrack } from '@/utils/timeline'
 
 const format: CompressionFormat = 'deflate'
 
+// Verbose share encode/decode/decompress tracing — dev builds only. Vite
+// statically replaces `import.meta.env.DEV` with `false` in production and
+// strips this to a no-op, so none of these log in prod builds.
+const shareLog: (...args: unknown[]) => void = import.meta.env.DEV
+  ? (...args) => {
+      console.info(...args)
+    }
+  : () => {}
+
 export function concatBuffers(buffers: Uint8Array[]): Uint8Array<ArrayBuffer> {
   const totalLength = sum(buffers.map((b) => b.length))
   const result = new Uint8Array(totalLength)
@@ -135,7 +144,7 @@ export async function encodeSharePayload(
         flame.transforms as Record<string, { color?: { x: number; y: number } }>
       )[transformKeys[0]]?.color
     : undefined
-  console.info('[share:encode] encoding payload', {
+  shareLog('[share:encode] encoding payload', {
     transformCount: transformKeys.length,
     firstTransformColor: firstColor,
     renderSettings: flame.renderSettings
@@ -153,9 +162,9 @@ export async function encodeSharePayload(
 export async function decodeSharePayload(
   param: string,
 ): Promise<{ flame: FlameDescriptor; animation?: SharePayload['animation'] }> {
-  console.info('[share:decode] starting decode, param length:', param.length)
+  shareLog('[share:decode] starting decode, param length:', param.length)
   const rawBytes = decodeBase64(param)
-  console.info(
+  shareLog(
     '[share:decode] base64 decoded, byte length:',
     rawBytes.length,
     'first 4 hex:',
@@ -165,7 +174,7 @@ export async function decodeSharePayload(
   )
   const decompressedBytes = await decompressJsonQueryRaw(rawBytes)
   const rawText = new TextDecoder().decode(decompressedBytes)
-  console.info(
+  shareLog(
     '[share:decode] decompressed text length:',
     rawText.length,
     'first 100 chars:',
@@ -175,7 +184,7 @@ export async function decodeSharePayload(
   // Log raw structure before validation
   const hasTransforms = 'transforms' in raw
   const hasFlame = raw && typeof raw === 'object' && 'flame' in raw
-  console.info('[share:decode] raw structure:', {
+  shareLog('[share:decode] raw structure:', {
     hasTransforms,
     hasFlame,
     hasAnimation: hasFlame && 'animation' in raw,
@@ -198,7 +207,7 @@ export async function decodeSharePayload(
   // Backward compat: old format is bare FlameDescriptor (has `transforms`)
   if (hasTransforms) {
     const validated = validateFlame(raw)
-    console.info(
+    shareLog(
       '[share:decode] old format, validated flame transforms:',
       recordKeys(validated.transforms).length,
     )
@@ -208,7 +217,7 @@ export async function decodeSharePayload(
   if (hasFlame) {
     const validated = validateFlame(raw.flame)
     const firstColor = Object.values(validated.transforms ?? {})[0]?.color
-    console.info('[share:decode] new format, validated:', {
+    shareLog('[share:decode] new format, validated:', {
       transformCount: recordKeys(validated.transforms).length,
       firstTransformColor: firstColor,
       hasAnimation: !!raw.animation,
@@ -227,12 +236,12 @@ export async function decodeSharePayload(
 async function decompressJsonQueryRaw(
   compressedBytes: Uint8Array<ArrayBuffer>,
 ): Promise<Uint8Array> {
-  console.info(
+  shareLog(
     '[share:decompress] starting, byte length:',
     compressedBytes.length,
   )
   const decompress = new DecompressionStream(format)
-  console.info(
+  shareLog(
     '[share:decompress] DecompressionStream created, format:',
     format,
   )
@@ -241,7 +250,7 @@ async function decompressJsonQueryRaw(
   const pipePromise = decompress.readable.pipeTo(
     new WritableStream<Uint8Array>({
       write(chunk) {
-        console.info('[share:decompress] got chunk, size:', chunk.length)
+        shareLog('[share:decompress] got chunk, size:', chunk.length)
         chunks.push(chunk)
       },
     }),
@@ -249,9 +258,9 @@ async function decompressJsonQueryRaw(
 
   const writer = decompress.writable.getWriter()
   await writer.write(compressedBytes)
-  console.info('[share:decompress] wrote', compressedBytes.length, 'bytes')
+  shareLog('[share:decompress] wrote', compressedBytes.length, 'bytes')
   await writer.close()
-  console.info('[share:decompress] writer closed')
+  shareLog('[share:decompress] writer closed')
 
   await Promise.race([
     pipePromise,
@@ -261,7 +270,7 @@ async function decompressJsonQueryRaw(
       }, 5000),
     ),
   ])
-  console.info(
+  shareLog(
     '[share:decompress] decompression success, chunks:',
     chunks.length,
     'total bytes:',
