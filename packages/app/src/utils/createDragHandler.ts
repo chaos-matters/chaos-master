@@ -17,6 +17,12 @@ function manhattanDistance(p1: Point, p2: Point) {
 type Options = {
   deadZoneRadius?: number
   preventDefault?: boolean
+  /**
+   * Which pointer button(s) start the drag. Defaults to the left button (0).
+   * Touch and pen contacts also report button 0, so the default covers them.
+   * Pass e.g. `[1, 2]` to drive a handler from the middle/right mouse buttons.
+   */
+  button?: number | readonly number[]
 }
 
 /**
@@ -46,8 +52,9 @@ type Options = {
  */
 export function createDragHandler(
   createHandlers: CreateClickAndDragHandler,
-  { deadZoneRadius = 0, preventDefault = true }: Options = {},
+  { deadZoneRadius = 0, preventDefault = true, button = 0 }: Options = {},
 ) {
+  const allowedButtons = typeof button === 'number' ? [button] : button
   const unmountController = new AbortController()
   const unmountSignal = unmountController.signal
 
@@ -62,8 +69,8 @@ export function createDragHandler(
     const cleanupSignal = cleanupController.signal
     const signal = AbortSignal.any([unmountSignal, cleanupSignal])
 
-    // ignore non-left mouse button clicks
-    if (initEvent.button !== 0) {
+    // ignore button presses this handler isn't configured to react to
+    if (!allowedButtons.includes(initEvent.button)) {
       return
     }
     const handlers = createHandlers(initEvent)
