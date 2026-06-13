@@ -8,6 +8,9 @@ export interface Env {
 }
 
 const SHORTEN_TTL = 60 * 24 * 60 * 60 // 60 days in seconds
+// Upper bound on an OG upload (JSON body). Legit previews are ~1–1.5 MB; this
+// caps abuse so R2 storage — and cost — stays bounded.
+const MAX_OG_UPLOAD = 4 * 1024 * 1024 // ~4 MB
 const SITE_NAME = 'Chaos Master'
 const DEFAULT_TITLE = 'Fractal Flame — Chaos Master'
 const DEFAULT_DESCRIPTION =
@@ -202,6 +205,9 @@ export default {
     if (pathname.startsWith('/api/og/') && request.method === 'POST') {
       const key = pathname.split('/').pop()
       if (!key) return json({ error: 'Missing key' }, 400)
+      if (Number(request.headers.get('content-length') ?? 0) > MAX_OG_UPLOAD) {
+        return json({ error: 'Image too large' }, 413)
+      }
       try {
         const body = (await request.json()) as {
           image?: string
@@ -210,6 +216,9 @@ export default {
         }
         if (!body.image || typeof body.image !== 'string') {
           return json({ error: 'Missing image' }, 400)
+        }
+        if (body.image.length > MAX_OG_UPLOAD) {
+          return json({ error: 'Image too large' }, 413)
         }
         const bytes = base64ToBytes(body.image)
         await env.OG_IMAGES.put(key, bytes, {
