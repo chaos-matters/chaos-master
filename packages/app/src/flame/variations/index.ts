@@ -1,5 +1,5 @@
 import * as v from '@/valibot'
-import { transformVariations3D, variationTypes3D } from '../variations3D'
+import { isParametricVariationType3D, transformVariations3D, variationTypes3D, } from '../variations3D'
 import { parametricVariations } from './parametric'
 import * as simpleVariations from './simple'
 import type { TransformVariationType3D } from '../variations3D'
@@ -65,6 +65,21 @@ export function isParametricVariation(
   v: TransformVariationDescriptor,
 ): v is ParametricVariationDescriptor {
   return isParametricVariationType(v.type)
+}
+
+/**
+ * Parametric in either the 2D or 3D registry. Both expose `params` plus a
+ * slider editor, but `isParametricVariationType` only knows the 2D registry —
+ * UI that surfaces parameter editors (e.g. the variation selector) must use
+ * this combined check so 3D parametric variations show their params too.
+ */
+export function isAnyParametricVariationType(
+  variationType: TransformVariationType | TransformVariationType3D,
+): boolean {
+  return (
+    isParametricVariationType(variationType) ||
+    isParametricVariationType3D(variationType)
+  )
 }
 
 export function isVariationType(

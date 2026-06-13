@@ -69,7 +69,7 @@ import { accumulatedPointCount, animationExportCancel, animationExportProgress, 
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from './flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from './flame/transformFunction'
 import { defaultLinearType } from './flame/variationRegistry'
-import { isParametricVariation, isParametricVariationType, isVariationType, transformVariations, } from './flame/variations'
+import { allTransformVariations, isAnyParametricVariationType, isVariationType, } from './flame/variations'
 import { deleteCustomVariation, duplicateCustomVariation, getCustomVariations, loadCustomVariations, } from './flame/variations/custom'
 import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } from './flame/variations/utils'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1692,10 +1692,10 @@ export function MainWorkspace(props: AppProps) {
         if (variation.params) {
           const val = variation.params[paramName]
           if (val !== undefined) return val
-        } else if (isParametricVariationType(variation.type)) {
+        } else if (isAnyParametricVariationType(variation.type)) {
           // Params not initialized yet — fall back to defaults
           const vType = variation.type
-          const vDef = (transformVariations as Record<string, unknown>)[
+          const vDef = (allTransformVariations as Record<string, unknown>)[
             vType
           ] as { paramDefaults: Record<string, number> } | undefined
           if (vDef && paramName in vDef.paramDefaults) {
@@ -3140,8 +3140,9 @@ export function MainWorkspace(props: AppProps) {
                                       </div>
                                       <Show
                                         when={
-                                          isParametricVariation(variation) &&
-                                          variation
+                                          isAnyParametricVariationType(
+                                            variation.type,
+                                          ) && variation
                                         }
                                         keyed
                                       >
@@ -3169,8 +3170,8 @@ export function MainWorkspace(props: AppProps) {
                                                   if (
                                                     variationDraft ===
                                                       undefined ||
-                                                    !isParametricVariation(
-                                                      variationDraft,
+                                                    !isAnyParametricVariationType(
+                                                      variationDraft.type,
                                                     )
                                                   ) {
                                                     throw new Error(
@@ -3184,7 +3185,10 @@ export function MainWorkspace(props: AppProps) {
                                                         number
                                                       >
                                                     }
-                                                  ).params = value
+                                                  ).params = value as Record<
+                                                    string,
+                                                    number
+                                                  >
                                                 })
                                               }}
                                             />
