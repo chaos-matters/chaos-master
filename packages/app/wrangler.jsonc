@@ -54,6 +54,14 @@
           "bucket_name": "chaos-master-og-images",
         },
       ],
+      // Per-IP cap on share/OG write endpoints to bound abuse + cost.
+      "ratelimits": [
+        {
+          "name": "API_RL",
+          "namespace_id": "1001",
+          "simple": { "limit": 30, "period": 60 },
+        },
+      ],
     },
     "dev": {
       "name": "chaos-master-dev",
@@ -79,6 +87,13 @@
           "bucket_name": "chaos-master-og-images-dev",
         },
       ],
+      "ratelimits": [
+        {
+          "name": "API_RL",
+          "namespace_id": "1002",
+          "simple": { "limit": 30, "period": 60 },
+        },
+      ],
     },
     "preview": {
       "name": "chaos-master-preview",
@@ -96,6 +111,13 @@
         {
           "binding": "OG_IMAGES",
           "bucket_name": "chaos-master-og-images-dev",
+        },
+      ],
+      "ratelimits": [
+        {
+          "name": "API_RL",
+          "namespace_id": "1003",
+          "simple": { "limit": 30, "period": 60 },
         },
       ],
     },

@@ -4,6 +4,8 @@ export interface Env {
   // R2 bucket holding the per-share OG preview PNGs (keyed by short id).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   OG_IMAGES: any
+  // Per-IP rate limiter for the share/OG write endpoints.
+  API_RL: { limit: (options: { key: string }) => Promise<{ success: boolean }> }
   ASSETS: { fetch: typeof fetch }
 }
 
@@ -165,6 +167,21 @@ export default {
   async fetch(request: Request, env: Env, _ctx: unknown): Promise<Response> {
     const url = new URL(request.url)
     const { pathname } = url
+
+    // ── Rate-limit the write endpoints per IP ──────────────────────────────
+    // Bounds spam/abuse (and R2/KV cost). Fail-open: a limiter hiccup or a
+    // missing binding never breaks sharing.
+    if (request.method === 'POST' && pathname.startsWith('/api/')) {
+      try {
+        const ip = request.headers.get('cf-connecting-ip') ?? 'anon'
+        const { success } = await env.API_RL.limit({ key: ip })
+        if (!success) {
+          return json({ error: 'Too many requests, please slow down' }, 429)
+        }
+      } catch (err) {
+        console.error('Rate limit check failed (allowing):', err)
+      }
+    }
 
     // ── Create a short link ────────────────────────────────────────────────
     if (pathname === '/api/shorten' && request.method === 'POST') {
