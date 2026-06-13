@@ -1,5 +1,6 @@
 import { deepClone } from '@/utils/clone'
 import { recordEntries } from '@/utils/record'
+import { validateFlame } from './schema/flameSchema'
 import { generateTransformId, generateVariationId } from './transformFunction'
 import { isParametricVariationType, transformVariations, variationTypes, } from './variations'
 import { getVariationDefault } from './variations/utils'
@@ -301,7 +302,7 @@ export function generateRandomFlame(
 
   const coloredTransforms = randomizeAllColors(transforms, strength)
 
-  return {
+  return validateFlame({
     version: '1.0',
     metadata: { name: '', description: '', author: 'unknown' },
     renderSettings: {
@@ -333,8 +334,8 @@ export function generateRandomFlame(
         fov: 60,
       },
     },
-    transforms: coloredTransforms as FlameDescriptor['transforms'],
-  }
+    transforms: coloredTransforms,
+  })
 }
 
 export interface MutateFlameOptions {

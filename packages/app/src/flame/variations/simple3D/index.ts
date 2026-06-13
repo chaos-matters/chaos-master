@@ -233,3 +233,37 @@ export const cylindrical3D = simpleVariation3D(
     return vec3f(sin(pos.x) * r, cos(pos.x) * r, pos.z)
   },
 )
+
+export const hemisphere3D = simpleVariation3D(
+  'hemisphere3D',
+  (pos, _varInfo) => {
+    'use gpu'
+    return pos.mul(1 / sqrt(dot(pos, pos) + 1))
+  },
+)
+
+export const scry3D = simpleVariation3D('scry3D', (pos, _varInfo) => {
+  'use gpu'
+  const r2 = dot(pos, pos)
+  const r = sqrt(r2)
+  const t = 1 / (r * (r2 + 1 / (r + EPS.$)) + EPS.$)
+  return pos.mul(t)
+})
+
+export const square3D = simpleVariation3D(
+  'square3D',
+  (_pos, _varInfo) => {
+    'use gpu'
+    return vec3f(random() - 0.5, random() - 0.5, random() - 0.5)
+  },
+  'blur',
+)
+
+export const blur3D = simpleVariation3D(
+  'blur3D',
+  (_pos, _varInfo) => {
+    'use gpu'
+    return randomUnitSphere().mul(pow(random(), 1.0 / 3.0))
+  },
+  'blur',
+)

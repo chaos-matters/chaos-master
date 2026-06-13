@@ -44,6 +44,7 @@ import { example42 } from './example42'
 import { example43 } from './example43'
 import { example44 } from './example44'
 import { initExample } from './initExample'
+import { initExample3D } from './initExample3D'
 import { invCircleEx1, invCircleEx2 } from './invCircle'
 import { invCircle2Ex1 } from './invCircle2'
 import { linear1 } from './linear1'
@@ -52,6 +53,7 @@ import type { FlameDescriptor } from '../schema/flameSchema'
 export const examples = {
   benchmark,
   initExample,
+  initExample3D,
   example1,
   example2,
   example3,

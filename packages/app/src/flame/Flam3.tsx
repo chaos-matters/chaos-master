@@ -237,7 +237,7 @@ export function Flam3(props: Flam3Props) {
       exposure: 2 * Math.exp(rs.exposure),
       edgeFadeColor: onExportImageMemo() ? vec4f(0) : edgeFadeColorMemo(),
       backgroundColor: vec4f(backgroundColorFinal(), 1),
-      vibrancy: rs.vibrancy,
+      vibrancy: rs.vibrancy ?? 0.5,
       palettePhase: rs.palettePhase ?? 0,
       paletteSpeed: rs.paletteSpeed ?? 0.5,
       paletteEntryCount: paletteMemo()?.entries.length ?? 0,

@@ -15,7 +15,7 @@ import { pointInitModeToImplFn } from '@/flame/pointInitMode'
 import { pointInitMode3DToImplFn } from '@/flame/pointInitMode3D'
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from '@/flame/schema/flameSchema'
 import { categoryOf } from '@/flame/variationRegistry'
-import { isParametricVariation, variationTypes } from '@/flame/variations'
+import { isAnyParametricVariationType, variationTypes, } from '@/flame/variations'
 import { CATEGORIES, CATEGORY_LABELS, sortByCategory, } from '@/flame/variations/categories'
 import { getNormalizedVariationName, getParamsEditor, getTransformPreviewTid, getTransformPreviewVid, getVariationPreviewFlame, getVariationPreviewFlame3D, } from '@/flame/variations/utils'
 import { variationTypes3D } from '@/flame/variations3D'
@@ -281,12 +281,17 @@ export function VariationPreview(props: {
               </Camera2D>
             }
           >
-            <Default3DPreviewCamera>
+            <Default3DPreviewCamera
+              camera3D={props.flame.renderSettings.camera3D}
+            >
               <Flam3
                 animationEnabled={false}
                 quality={targetQuality()}
                 pointCountPerBatch={5e4}
-                adaptiveFilterEnabled={true}
+                // Match the 2D thumbnails: the adaptive density-estimation blur
+                // widens its kernel in sparse regions, smearing the soft edge of
+                // the projected 3D cloud into a dark halo around the bright core.
+                adaptiveFilterEnabled={false}
                 flameDescriptor={props.flame}
                 renderInterval={allowed() ? 1 : Infinity}
                 onExportImage={exportImage()}
@@ -887,7 +892,10 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                   <>
                     <Show when={selectedItemId() === id}>
                       <Show
-                        when={isParametricVariation(variation) && variation}
+                        when={
+                          isAnyParametricVariationType(variation.type) &&
+                          variation
+                        }
                         keyed
                       >
                         {(variation) => (
@@ -923,7 +931,9 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                                           ]
                                         if (
                                           variationDraft === undefined ||
-                                          !isParametricVariation(variationDraft)
+                                          !isAnyParametricVariationType(
+                                            variationDraft.type,
+                                          )
                                         ) {
                                           throw new Error(`Unreachable code`)
                                         }
@@ -931,7 +941,10 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                                           variationDraft as {
                                             params: Record<string, number>
                                           }
-                                        ).params = value
+                                        ).params = value as Record<
+                                          string,
+                                          number
+                                        >
                                       },
                                     )
                                   }}

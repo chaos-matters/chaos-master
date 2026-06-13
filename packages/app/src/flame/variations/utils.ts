@@ -1,4 +1,5 @@
 import { produce, unfreeze } from 'structurajs'
+import { defineExample, defineExample3D } from '../examples/util'
 import { generateTransformId, generateVariationId } from '../transformFunction'
 import { isParametricVariationType3D, isVariationType3D, transformVariations3D, } from '../variations3D'
 import { allTransformVariations, isParametricVariationType, transformVariations, } from '.'
@@ -12,7 +13,7 @@ export type AnyVariationType = TransformVariationType | TransformVariationType3D
 export function getNormalizedVariationName(
   type: TransformVariationType | TransformVariationType3D,
 ): string {
-  return type.replace(/Var$/, '').replace(/3D$/, '')
+  return type.replace(/Var$/, '').replace(/3D$/, '').replace(/_+$/, '')
 }
 
 export function getVariationDefault(
@@ -85,7 +86,10 @@ export function getTransformPreviewVid(type: AnyVariationType) {
 export function getDefaultFlameByVarType(
   type: TransformVariationType,
 ): FlameDescriptor {
-  return {
+  // Route through the schema so every default (visible, vibrancy, contrast,
+  // gamma, colorSpeed, …) is filled — a raw cast leaves them undefined, which
+  // zeroes the transform probability (no shape) and the chroma (no color).
+  return defineExample({
     renderSettings: {
       exposure: 0.3,
       skipIters: 1,
@@ -110,7 +114,7 @@ export function getDefaultFlameByVarType(
         },
       },
     },
-  } as unknown as FlameDescriptor
+  })
 }
 
 const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
@@ -701,9 +705,14 @@ const IDENTITY_AFFINE_3D = {
 export function getDefaultFlameByVarType3D(
   type: TransformVariationType3D,
 ): FlameDescriptor {
-  return {
+  // Validate against the 3D schema (12-param affines + dimensions:3) so the
+  // same set of render defaults is filled as for 2D previews.
+  return defineExample3D({
     renderSettings: {
-      exposure: 0.3,
+      // 3D point clouds project sparser than their 2D counterparts, so the
+      // previews need a brighter exposure than the 2D default to read clearly
+      // at thumbnail size.
+      exposure: 1.0,
       skipIters: 1,
       drawMode: 'light',
       backgroundColor: [0, 0, 0],
@@ -715,6 +724,15 @@ export function getDefaultFlameByVarType3D(
       colorInitMode: 'colorInitPosition',
       pointInitMode: 'pointInitUnitBall',
       dimensions: 3,
+      // Pull the preview camera closer than the radius-5 default so each 3D
+      // variation fills its gallery cell instead of sitting small and distant.
+      camera3D: {
+        theta: 0,
+        phi: Math.PI / 2,
+        radius: 3.0,
+        target: [0, 0, 0],
+        fov: 60,
+      },
     },
     transforms: {
       [getTransformPreviewTid(type)]: {
@@ -727,12 +745,65 @@ export function getDefaultFlameByVarType3D(
         },
       },
     },
-  } as unknown as FlameDescriptor
+  })
 }
 
+// Curated 3D preview overrides — the 3D analog of `previewFlames`. The
+// generic identity-affine default reads flat for variations whose character
+// only emerges under a skewed input and an angled camera; these tune the
+// pre-affine, params, exposure and camera to present the shape naturally.
 const previewFlames3D: Partial<
   Record<TransformVariationType3D, FlameDescriptor>
-> = {}
+> = {
+  pdj3D: unfreeze(
+    produce(getDefaultFlameByVarType3D('pdj3D'), (draft) => {
+      const tid = getTransformPreviewTid('pdj3D')
+      const vid = getTransformPreviewVid('pdj3D')
+      draft.renderSettings.exposure = 0.832
+      draft.renderSettings.camera3D = {
+        theta: 0.9237890624999997,
+        phi: 1.1629012473397915,
+        radius: 3.0783846480421624,
+        target: [-0.474032998085022, 0, 0.3669804632663727],
+        fov: 60,
+      }
+      draft.transforms[tid]!.preAffine = {
+        a: 1,
+        b: -0.02293873687527012,
+        c: 0,
+        d: 1.040137566626072,
+        e: 0,
+        f: -1.3852514408469307,
+        g: 0,
+        h: 0.11959376931190491,
+        i: 0,
+        j: 0,
+        k: 1,
+        l: 0,
+      }
+      draft.transforms[tid]!.variations[vid] = {
+        type: 'pdj3D',
+        weight: 1,
+        visible: true,
+        params: { a: -0.42, b: 0.28, c: 0.69, d: -2.32, e: 0.94, f: -2.1 },
+      }
+    }),
+  ),
+  rectangles3D: unfreeze(
+    produce(getDefaultFlameByVarType3D('rectangles3D'), (draft) => {
+      // Identity affine and default params already frame the lattice well —
+      // just brighten it and pull the camera back so the full grid is visible.
+      draft.renderSettings.exposure = 1.892
+      draft.renderSettings.camera3D = {
+        theta: 0,
+        phi: 1.5707963267948966,
+        radius: 9.726998192586759,
+        target: [0, 0, 0],
+        fov: 60,
+      }
+    }),
+  ),
+}
 
 export function getVariationPreviewFlame3D(
   type: TransformVariationType3D,

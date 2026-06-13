@@ -1,5 +1,5 @@
 import { f32, i32, struct, vec3f } from 'typegpu/data'
-import { acos, atan2, cos, length, sin, tan } from 'typegpu/std'
+import { acos, atan2, cos, floor, length, select, sin, sqrt, tan, } from 'typegpu/std'
 import { createObjectEditor, sliderEditor, sliderLogEditor, } from '@/components/Sliders/ParametricEditors/sliderEditor'
 import { random } from '@/shaders/random'
 import { PI } from '../../constants'
@@ -172,4 +172,176 @@ export const blurLinear3D = parametricVariation3D(
     )
   },
   'blur',
+)
+
+// ── Simple ports of 2D parametric variations, extended per-axis with z ──
+// Note: 3D variation impls must NOT multiply by weight — createFlameWgsl3D
+// applies the variation weight externally (`weight * fn(...)`).
+
+export const rectangles3D = parametricVariation3D(
+  'rectangles3D',
+  struct({ x: f32, y: f32, z: f32 }),
+  { x: 2, y: 3, z: 2 },
+  createObjectEditor({
+    x: sliderEditor({ min: 0.1, max: 20, step: 0.1 }),
+    y: sliderEditor({ min: 0.1, max: 20, step: 0.1 }),
+    z: sliderEditor({ min: 0.1, max: 20, step: 0.1 }),
+  }),
+  (pos, _varInfo, P) => {
+    'use gpu'
+    return vec3f(
+      (2 * floor(pos.x / P.x) + 1) * P.x - pos.x,
+      (2 * floor(pos.y / P.y) + 1) * P.y - pos.y,
+      (2 * floor(pos.z / P.z) + 1) * P.z - pos.z,
+    )
+  },
+)
+
+export const splits3D = parametricVariation3D(
+  'splits3D',
+  struct({ x: f32, y: f32, z: f32 }),
+  { x: 0.4, y: 0.6, z: 0.5 },
+  createObjectEditor({
+    x: sliderEditor({ min: -2, max: 2, step: 0.01 }),
+    y: sliderEditor({ min: -2, max: 2, step: 0.01 }),
+    z: sliderEditor({ min: -2, max: 2, step: 0.01 }),
+  }),
+  (pos, _varInfo, P) => {
+    'use gpu'
+    return vec3f(
+      pos.x + select(-P.x, P.x, pos.x >= 0),
+      pos.y + select(-P.y, P.y, pos.y >= 0),
+      pos.z + select(-P.z, P.z, pos.z >= 0),
+    )
+  },
+)
+
+export const modulus3D = parametricVariation3D(
+  'modulus3D',
+  struct({ x: f32, y: f32, z: f32 }),
+  { x: 0.5, y: 0.5, z: 0.5 },
+  createObjectEditor({
+    x: sliderEditor({ min: 0.01, max: 3, step: 0.01 }),
+    y: sliderEditor({ min: 0.01, max: 3, step: 0.01 }),
+    z: sliderEditor({ min: 0.01, max: 3, step: 0.01 }),
+  }),
+  (pos, _varInfo, P) => {
+    'use gpu'
+    const xr = 2 * P.x
+    const yr = 2 * P.y
+    const zr = 2 * P.z
+    let nx = pos.x
+    if (pos.x > xr) {
+      nx = -P.x + ((pos.x + P.x) % xr)
+    } else if (pos.x < -xr) {
+      nx = P.x - ((P.x - pos.x) % xr)
+    }
+    let ny = pos.y
+    if (pos.y > yr) {
+      ny = -P.y + ((pos.y + P.y) % yr)
+    } else if (pos.y < -yr) {
+      ny = P.y - ((P.y - pos.y) % yr)
+    }
+    let nz = pos.z
+    if (pos.z > zr) {
+      nz = -P.z + ((pos.z + P.z) % zr)
+    } else if (pos.z < -zr) {
+      nz = P.z - ((P.z - pos.z) % zr)
+    }
+    return vec3f(nx, ny, nz)
+  },
+)
+
+export const separation3D = parametricVariation3D(
+  'separation3D',
+  struct({
+    x: f32,
+    xInside: f32,
+    y: f32,
+    yInside: f32,
+    z: f32,
+    zInside: f32,
+  }),
+  { x: 0.5, xInside: 0.05, y: 0.25, yInside: 0.025, z: 0.25, zInside: 0.025 },
+  createObjectEditor({
+    x: sliderEditor({ min: 0, max: 2, step: 0.01 }),
+    xInside: sliderEditor({ min: 0, max: 1, step: 0.001 }),
+    y: sliderEditor({ min: 0, max: 2, step: 0.01 }),
+    yInside: sliderEditor({ min: 0, max: 1, step: 0.001 }),
+    z: sliderEditor({ min: 0, max: 2, step: 0.01 }),
+    zInside: sliderEditor({ min: 0, max: 1, step: 0.001 }),
+  }),
+  (pos, _varInfo, P) => {
+    'use gpu'
+    const sx2 = P.x * P.x
+    const sy2 = P.y * P.y
+    const sz2 = P.z * P.z
+    return vec3f(
+      select(
+        -(sqrt(pos.x * pos.x + sx2) + pos.x * P.xInside),
+        sqrt(pos.x * pos.x + sx2) - pos.x * P.xInside,
+        pos.x > 0,
+      ),
+      select(
+        -(sqrt(pos.y * pos.y + sy2) + pos.y * P.yInside),
+        sqrt(pos.y * pos.y + sy2) - pos.y * P.yInside,
+        pos.y > 0,
+      ),
+      select(
+        -(sqrt(pos.z * pos.z + sz2) + pos.z * P.zInside),
+        sqrt(pos.z * pos.z + sz2) - pos.z * P.zInside,
+        pos.z > 0,
+      ),
+    )
+  },
+)
+
+export const blob3D = parametricVariation3D(
+  'blob3D',
+  struct({ high: f32, low: f32, waves: f32 }),
+  { high: 2, low: 1, waves: 3 },
+  createObjectEditor({
+    high: sliderEditor({ min: 0, max: 20, step: 0.1 }),
+    low: sliderEditor({ min: 0, max: 20, step: 0.1 }),
+    waves: sliderEditor({ min: -20, max: 20, step: 1 }),
+  }),
+  (pos, _varInfo, P) => {
+    'use gpu'
+    const theta = atan2(pos.y, pos.x)
+    const sinFactor = (P.high - P.low) / 2
+    const blobFact = P.low + sinFactor * (sin(P.waves * theta) + 1)
+    return pos.mul(blobFact)
+  },
+)
+
+export const bent2_3D = parametricVariation3D(
+  'bent2_3D',
+  struct({ x: f32, y: f32, z: f32 }),
+  { x: 1, y: 1, z: 1 },
+  createObjectEditor({
+    x: sliderEditor({ min: -2, max: 2, step: 0.01 }),
+    y: sliderEditor({ min: -2, max: 2, step: 0.01 }),
+    z: sliderEditor({ min: -2, max: 2, step: 0.01 }),
+  }),
+  (pos, _varInfo, P) => {
+    'use gpu'
+    return vec3f(
+      select(pos.x, pos.x * P.x, pos.x < 0),
+      select(pos.y, pos.y * P.y, pos.y < 0),
+      select(pos.z, pos.z * P.z, pos.z < 0),
+    )
+  },
+)
+
+export const zScale3D = parametricVariation3D(
+  'zScale3D',
+  struct({ scale: f32 }),
+  { scale: 1 },
+  createObjectEditor({
+    scale: sliderEditor({ min: -3, max: 3, step: 0.01 }),
+  }),
+  (pos, _varInfo, P) => {
+    'use gpu'
+    return vec3f(pos.x, pos.y, pos.z * P.scale)
+  },
 )

@@ -83,19 +83,10 @@ export const VariationId = v.pipe(v.string(), v.brand('VariationId'))
 
 const VariationRecord = v.record(VariationId, TransformVariationDescriptor)
 
-export type TransformFunction = v.InferOutput<typeof TransformFunction>
-export const TransformFunction = v.object({
-  probability: v.number(),
-  preAffine: AffineParamsSchema,
-  postAffine: AffineParamsSchema,
-  color: v.object({
-    x: v.number(),
-    y: v.number(),
-  }),
-  colorSpeed: v.optional(v.number(), 0.4),
-  visible: v.optional(v.boolean(), true),
-  variations: VariationRecord,
-})
+// `TransformFunction`, `TransformRecord`, `FlameDescriptor` and the new
+// `FlameDescriptor3D` are built from a shared factory further down — once
+// `RenderSettings`/`FlameMetadata` are in scope — so the 2D and 3D descriptors
+// differ only by their affine schema.
 
 const ZoomValueSchema = v.pipe(
   v.number(),
@@ -211,24 +202,55 @@ const FlameDescriptorVersion = v.pipe(
   v.maxLength(MAX_LENGTH_VERSION_STRING),
 )
 
+// ── Descriptor schema factory ────────────────────────────────────────
+// Parameterized by the affine schema so 2D and 3D flames share one
+// definition. 3D affines carry 12 params (a–l); validating a 3D flame
+// against the 2D schema would silently strip g–l (valibot drops unknown
+// keys), which is why preview/3D flames previously bypassed validation.
+function makeFlameDescriptorSchema<
+  TAffine extends typeof AffineParamsSchema | typeof AffineParams3DSchema,
+>(affine: TAffine) {
+  const TransformFunction = v.object({
+    probability: v.number(),
+    preAffine: affine,
+    postAffine: affine,
+    color: v.object({ x: v.number(), y: v.number() }),
+    colorSpeed: v.optional(v.number(), 0.4),
+    visible: v.optional(v.boolean(), true),
+    variations: VariationRecord,
+  })
+  const TransformRecord = v.record(TransformId, TransformFunction)
+  const FlameDescriptor = v.object({
+    version: v.optional(FlameDescriptorVersion),
+    metadata: v.optional(FlameMetadata, metadataDefault),
+    renderSettings: v.optional(RenderSettings, renderSettingsDefault),
+    transforms: TransformRecord,
+    finalTransform: v.optional(affine),
+  })
+  return { TransformFunction, TransformRecord, FlameDescriptor }
+}
+
+const schema2D = makeFlameDescriptorSchema(AffineParamsSchema)
+const schema3D = makeFlameDescriptorSchema(AffineParams3DSchema)
+
+export const TransformFunction = schema2D.TransformFunction
+export type TransformFunction = v.InferOutput<typeof TransformFunction>
+const TransformRecord = schema2D.TransformRecord
 export type TransformRecord = v.InferOutput<typeof TransformRecord>
-const TransformRecord = v.record(TransformId, TransformFunction)
 
+export const FlameDescriptor = schema2D.FlameDescriptor
 export type FlameDescriptor = v.InferOutput<typeof FlameDescriptor>
-export const FlameDescriptor = v.object({
-  version: v.optional(FlameDescriptorVersion),
-  metadata: v.optional(FlameMetadata, metadataDefault),
-  renderSettings: v.optional(RenderSettings, renderSettingsDefault),
-  transforms: TransformRecord,
-  finalTransform: v.optional(AffineParamsSchema),
-})
 
-export function validateFlame(data: unknown): FlameDescriptor {
-  migrateFlameVariationTypes(data)
-  const result = v.safeParse(FlameDescriptor, data)
+export const FlameDescriptor3D = schema3D.FlameDescriptor
+export type FlameDescriptor3D = v.InferOutput<typeof FlameDescriptor3D>
+
+function parseFlame<TSchema extends Parameters<typeof v.safeParse>[0]>(
+  schema: TSchema,
+  data: unknown,
+) {
+  const result = v.safeParse(schema, data)
   if (!result.success) {
-    const flatErrors = v.flatten<typeof FlameDescriptor>(result.issues)
-    prettyPrintValibotErrors(flatErrors)
+    prettyPrintValibotErrors(v.flatten(result.issues))
     throw new Error(
       'This flame cannot be shown, please check console for more info.',
     )
@@ -236,8 +258,29 @@ export function validateFlame(data: unknown): FlameDescriptor {
   return result.output
 }
 
+/**
+ * Validate a flame, dispatching to the 3D schema when the descriptor declares
+ * `dimensions: 3` so 3D affines (a–l) survive parsing instead of being stripped
+ * to a 2D affine. Returns the shared `FlameDescriptor` type the app threads
+ * through both the 2D and 3D pipelines.
+ */
+export function validateFlame(data: unknown): FlameDescriptor {
+  migrateFlameVariationTypes(data)
+  const dimensions = (data as { renderSettings?: { dimensions?: number } })
+    ?.renderSettings?.dimensions
+  if (dimensions === 3) {
+    return parseFlame(schema3D.FlameDescriptor, data)
+  }
+  return parseFlame(schema2D.FlameDescriptor, data)
+}
+
+export function validateFlame3D(data: unknown): FlameDescriptor3D {
+  migrateFlameVariationTypes(data)
+  return parseFlame(schema3D.FlameDescriptor, data)
+}
+
 export function tryValidateFlame(data: unknown): FlameDescriptor | undefined {
-  const result = v.safeParse(FlameDescriptor, data)
+  const result = v.safeParse(schema2D.FlameDescriptor, data)
   if (!result.success) return undefined
   return result.output
 }
