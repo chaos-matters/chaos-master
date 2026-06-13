@@ -18,9 +18,15 @@
       "head_sampling_rate": 1,
     },
   },
-  // Modern Cloudflare Assets configuration
+  // Modern Cloudflare Assets configuration.
+  // `binding` exposes env.ASSETS so the Worker can fetch the built index.html
+  // (needed to inject OG/Twitter meta tags for shared links). `run_worker_first`
+  // makes the Worker handle navigations + APIs while the hashed /assets/* files
+  // stay static-first (served directly, no Worker invocation).
   "assets": {
     "directory": "dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/*", "!/assets/*"],
   },
   "main": "src/worker/index.ts",
 
@@ -42,6 +48,12 @@
           "id": "7cf9ab98f6274a179d63cccbf3c93911",
         },
       ],
+      "r2_buckets": [
+        {
+          "binding": "OG_IMAGES",
+          "bucket_name": "chaos-master-og-images",
+        },
+      ],
     },
     "dev": {
       "name": "chaos-master-dev",
@@ -61,6 +73,12 @@
           "preview_id": "91bef067328b4904ad4cfbcbbcf980f2",
         },
       ],
+      "r2_buckets": [
+        {
+          "binding": "OG_IMAGES",
+          "bucket_name": "chaos-master-og-images-dev",
+        },
+      ],
     },
     "preview": {
       "name": "chaos-master-preview",
@@ -72,6 +90,12 @@
           "binding": "KV_SHORTENER",
           "id": "7cf9ab98f6274a179d63cccbf3c93911",
           "preview_id": "91bef067328b4904ad4cfbcbbcf980f2",
+        },
+      ],
+      "r2_buckets": [
+        {
+          "binding": "OG_IMAGES",
+          "bucket_name": "chaos-master-og-images-dev",
         },
       ],
     },
