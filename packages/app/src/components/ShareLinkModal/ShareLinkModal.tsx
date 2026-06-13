@@ -15,7 +15,42 @@ type ShareLinkModalProps = {
   tracks: TimelineTrack[]
   config: TimelineConfig
   hasAnimation: boolean
+  captureOgImage?: () => Promise<Blob | null>
   respond: () => void
+}
+
+async function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result as string
+      // strip the `data:image/png;base64,` prefix
+      resolve(result.slice(result.indexOf(',') + 1))
+    }
+    reader.onerror = () => {
+      reject(new Error('Failed to read blob'))
+    }
+    reader.readAsDataURL(blob)
+  })
+}
+
+function deriveOgMeta(flame: FlameDescriptor): {
+  title: string
+  description: string
+} {
+  const meta = flame.metadata
+  const name = meta?.name?.trim()
+  const author = meta?.author
+  const title = name
+    ? name
+    : author && author !== 'unknown'
+      ? `Flame by ${author}`
+      : 'Fractal Flame — Chaos Master'
+  const transformCount = Object.keys(flame.transforms ?? {}).length
+  const description = meta?.description?.trim()
+    ? meta.description.trim()
+    : `${transformCount} transform${transformCount === 1 ? '' : 's'} • Created with Chaos Master`
+  return { title, description }
 }
 
 function ShareLinkModal(props: ShareLinkModalProps) {
@@ -24,6 +59,27 @@ function ShareLinkModal(props: ShareLinkModalProps) {
   )
   const [url, setUrl] = createSignal('')
   const [copied, setCopied] = createSignal(false)
+
+  /**
+   * Render the current flame to a PNG and attach it to the short link so social
+   * crawlers show a rich preview. Runs in the background — the link is already
+   * usable; the image just needs to land before the first crawler scrape.
+   */
+  async function uploadOgPreview(id: string) {
+    try {
+      const blob = await props.captureOgImage?.()
+      if (!blob) return
+      const image = await blobToBase64(blob)
+      const { title, description } = deriveOgMeta(props.flameDescriptor)
+      await fetch(`/api/og/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image, title, description }),
+      })
+    } catch (err) {
+      console.error('Failed to upload OG preview image:', err)
+    }
+  }
 
   createEffect(() => {
     const include = includeAnimation()
@@ -50,6 +106,7 @@ function ShareLinkModal(props: ShareLinkModalProps) {
           const json = await res.json()
           if (json.id) {
             newUrl = `${window.location.origin}/?s=${json.id}`
+            void uploadOgPreview(json.id)
           }
         }
       } catch (err) {
@@ -133,6 +190,7 @@ export function createShareLinkModal(
   flameDescriptor: FlameDescriptor,
   getTracks: () => TimelineTrack[],
   getConfig: () => TimelineConfig,
+  captureOgImage?: () => Promise<Blob | null>,
 ) {
   const requestModal = useRequestModal()
 
@@ -149,6 +207,7 @@ export function createShareLinkModal(
           tracks={tracks}
           config={config}
           hasAnimation={hasAnimation}
+          captureOgImage={captureOgImage}
           respond={respond}
         />
       ),

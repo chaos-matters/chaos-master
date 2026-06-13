@@ -783,10 +783,66 @@ export function MainWorkspace(props: AppProps) {
 
   const timeline = createTimelineState()
 
+  /**
+   * Capture the current flame canvas as a downscaled PNG for OG link previews.
+   * Reuses the export-image hook (same path as Discord sharing) to grab a clean
+   * frame, then scales it down (aspect preserved) to keep stored images small.
+   */
+  async function captureOgImageBlob(maxDim = 1000): Promise<Blob | null> {
+    const rawBlob = await new Promise<Blob | null>((resolve) => {
+      const timer = setTimeout(() => {
+        setOnExportImage(undefined)
+        resolve(null)
+      }, 5000)
+      setOnExportImage(() => (canvas: HTMLCanvasElement) => {
+        setOnExportImage(undefined)
+        clearTimeout(timer)
+        canvas.toBlob(
+          (b) => {
+            resolve(b)
+          },
+          'image/png',
+          1,
+        )
+      })
+    })
+    if (!rawBlob) return null
+
+    const url = URL.createObjectURL(rawBlob)
+    try {
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const im = new Image()
+        im.onload = () => {
+          resolve(im)
+        }
+        im.onerror = reject
+        im.src = url
+      })
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+      const w = Math.max(1, Math.round(img.width * scale))
+      const h = Math.max(1, Math.round(img.height * scale))
+      const offscreen = document.createElement('canvas')
+      offscreen.width = w
+      offscreen.height = h
+      const ctx = offscreen.getContext('2d')!
+      ctx.drawImage(img, 0, 0, w, h)
+      return await new Promise<Blob | null>((resolve) => {
+        offscreen.toBlob((b) => {
+          resolve(b)
+        }, 'image/png')
+      })
+    } catch {
+      return null
+    } finally {
+      URL.revokeObjectURL(url)
+    }
+  }
+
   const { showShareLinkModal } = createShareLinkModal(
     flameDescriptor,
     () => timeline.tracks(),
     () => timeline.config(),
+    captureOgImageBlob,
   )
 
   const { showDiscordShareModal } = createDiscordShareModal()

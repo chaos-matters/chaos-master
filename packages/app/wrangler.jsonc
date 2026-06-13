@@ -42,6 +42,12 @@
           "id": "7cf9ab98f6274a179d63cccbf3c93911",
         },
       ],
+      "r2_buckets": [
+        {
+          "binding": "OG_IMAGES",
+          "bucket_name": "chaos-master-og-images",
+        },
+      ],
     },
     "dev": {
       "name": "chaos-master-dev",
@@ -61,6 +67,12 @@
           "preview_id": "91bef067328b4904ad4cfbcbbcf980f2",
         },
       ],
+      "r2_buckets": [
+        {
+          "binding": "OG_IMAGES",
+          "bucket_name": "chaos-master-og-images-dev",
+        },
+      ],
     },
     "preview": {
       "name": "chaos-master-preview",
@@ -72,6 +84,12 @@
           "binding": "KV_SHORTENER",
           "id": "7cf9ab98f6274a179d63cccbf3c93911",
           "preview_id": "91bef067328b4904ad4cfbcbbcf980f2",
+        },
+      ],
+      "r2_buckets": [
+        {
+          "binding": "OG_IMAGES",
+          "bucket_name": "chaos-master-og-images-dev",
         },
       ],
     },
