@@ -178,6 +178,8 @@ export type AppProps = {
   /** When true (driven by the `?benchmark` query param), open the benchmark
    *  dialog on mount so the user lands one click from running it. */
   autoOpenBenchmark?: boolean
+  /** When true (`?benchmark=auto`), also start the run automatically. */
+  autoStartBenchmark?: boolean
 }
 
 export function extractFlameVariationTypes(
@@ -616,7 +618,7 @@ export function MainWorkspace(props: AppProps) {
       setRandomizerHistory,
     )
     if (props.autoOpenBenchmark) {
-      void showBenchmark()
+      void showBenchmark({ autoStart: props.autoStartBenchmark })
     }
     if (IS_DEV) {
       console.info('[share:app] onMount', {
@@ -4245,7 +4247,11 @@ export function MainWorkspace(props: AppProps) {
             }}
           />
           <SpotlightTour tourContext={tourContext} />
-          <BenchmarkButton onClick={showBenchmark} />
+          <BenchmarkButton
+            onClick={() => {
+              void showBenchmark()
+            }}
+          />
           <SoftwareVersion
             showHelp={createShowHelp(
               quickPickerMode,
