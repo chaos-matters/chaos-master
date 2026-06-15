@@ -23,7 +23,7 @@ export function ColorEditor(props: {
   const [view, setView] = createSignal<ColorView>('grid')
 
   return (
-    <div>
+    <div class={ui.root}>
       <div class={ui.tabs}>
         <button
           class={ui.tab}
@@ -45,10 +45,12 @@ export function ColorEditor(props: {
       <Show
         when={view() === 'grid'}
         fallback={
-          <ColorListEditor
-            transforms={props.transforms}
-            setTransforms={props.setTransforms}
-          />
+          <div class={ui.listWrap}>
+            <ColorListEditor
+              transforms={props.transforms}
+              setTransforms={props.setTransforms}
+            />
+          </div>
         }
       >
         <FlameColorEditor
