@@ -401,6 +401,68 @@
   border: 1px solid oklch(80% 0.08 320 / 0.3);
 }
 
+.badge-legend {
+  background: linear-gradient(
+    135deg,
+    oklch(80% 0.13 200),
+    oklch(60% 0.2 275),
+    oklch(55% 0.24 310)
+  );
+  color: white;
+  box-shadow:
+    0 0 12px oklch(62% 0.2 280 / 0.45),
+    0 0 24px oklch(60% 0.18 200 / 0.25);
+  border: 1px solid oklch(80% 0.1 250 / 0.35);
+}
+
+.badge-mythic {
+  background: linear-gradient(
+    135deg,
+    oklch(62% 0.26 10),
+    oklch(67% 0.23 40),
+    oklch(80% 0.17 85)
+  );
+  color: white;
+  box-shadow:
+    0 0 14px oklch(62% 0.26 15 / 0.5),
+    0 0 28px oklch(70% 0.2 60 / 0.3);
+  border: 1px solid oklch(82% 0.12 40 / 0.35);
+}
+
+.badge-cosmic {
+  background: linear-gradient(
+    135deg,
+    oklch(82% 0.18 180),
+    oklch(70% 0.2 230),
+    oklch(62% 0.24 300),
+    oklch(68% 0.24 350),
+    oklch(85% 0.17 95)
+  );
+  background-size: 220% 220%;
+  animation: badge-cosmic-shimmer 4s ease-in-out infinite;
+  color: white;
+  box-shadow:
+    0 0 16px oklch(65% 0.22 290 / 0.55),
+    0 0 34px oklch(72% 0.2 200 / 0.35);
+  border: 1px solid oklch(88% 0.1 300 / 0.4);
+}
+
+@keyframes badge-cosmic-shimmer {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .badge-cosmic {
+    animation: none;
+  }
+}
+
 .badge-elite {
   background: linear-gradient(135deg, oklch(72% 0.16 80), oklch(68% 0.14 65));
   color: oklch(30% 0.04 45);

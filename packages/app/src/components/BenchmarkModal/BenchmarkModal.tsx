@@ -40,6 +40,9 @@ const BENCHMARK_FLAMES = [
 type BenchmarkFlameId = (typeof BENCHMARK_FLAMES)[number]['id']
 
 function getAchievementBadge(bps: number): { label: string; cssClass: string } {
+  if (bps >= 100) return { label: '100B+', cssClass: 'badgeCosmic' }
+  if (bps >= 50) return { label: '50B+', cssClass: 'badgeMythic' }
+  if (bps >= 10) return { label: '10B+', cssClass: 'badgeLegend' }
   if (bps >= 5) return { label: '5B+', cssClass: 'badgeUltra' }
   if (bps >= 3) return { label: '3B+', cssClass: 'badgeElite' }
   if (bps >= 1) return { label: '1B+', cssClass: 'badgePro' }
@@ -167,6 +170,35 @@ function drawAchievementBadge(
 
   let grad: CanvasGradient
   switch (cssClass) {
+    case 'badgeCosmic':
+      grad = ctx.createLinearGradient(x, y, x + pw, y + ph)
+      grad.addColorStop(0, '#00f5d4')
+      grad.addColorStop(0.25, '#00bbf9')
+      grad.addColorStop(0.5, '#9b5de5')
+      grad.addColorStop(0.75, '#f15bb5')
+      grad.addColorStop(1, '#fee440')
+      ctx.fillStyle = grad
+      ctx.shadowColor = 'rgba(155,93,229,0.6)'
+      ctx.shadowBlur = 14
+      break
+    case 'badgeMythic':
+      grad = ctx.createLinearGradient(x, y, x + pw, y + ph)
+      grad.addColorStop(0, '#ff006e')
+      grad.addColorStop(0.5, '#fb5607')
+      grad.addColorStop(1, '#ffbe0b')
+      ctx.fillStyle = grad
+      ctx.shadowColor = 'rgba(255,0,110,0.5)'
+      ctx.shadowBlur = 12
+      break
+    case 'badgeLegend':
+      grad = ctx.createLinearGradient(x, y, x + pw, y + ph)
+      grad.addColorStop(0, '#48cae4')
+      grad.addColorStop(0.5, '#5e60ce')
+      grad.addColorStop(1, '#7400b8')
+      ctx.fillStyle = grad
+      ctx.shadowColor = 'rgba(94,96,206,0.45)'
+      ctx.shadowBlur = 10
+      break
     case 'badgeUltra':
       grad = ctx.createLinearGradient(x, y, x + pw, y + ph)
       grad.addColorStop(0, '#c47fff')
