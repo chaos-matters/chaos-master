@@ -1,6 +1,6 @@
 import { onCleanup } from 'solid-js'
 import { tgpu } from 'typegpu'
-import { arrayOf, builtin, f32, i32, struct, u32, vec2f, vec2i, vec2u, } from 'typegpu/data'
+import { arrayOf, builtin, f32, i32, struct, u32, vec2f, vec2i, vec2u, vec4f, } from 'typegpu/data'
 import { add, arrayLength, atomicAdd, atomicLoad, div, mul, sub, } from 'typegpu/std'
 import { camera2DWorldToClip } from '@/lib/Camera2D'
 import { hash, random, randomState, setSeed } from '@/shaders/random'
@@ -18,7 +18,7 @@ import {
 } from './types'
 import { getCacheVersion } from './variations/custom'
 import type { StorageFlag, TgpuBuffer, TgpuRoot } from 'typegpu'
-import type { Vec2u, WgslArray } from 'typegpu/data'
+import type { Vec2f, Vec2u, Vec4f, WgslArray } from 'typegpu/data'
 import type { ColorInitMode } from './colorInitMode'
 import type { PointInitMode, PointInitMode2D } from './pointInitMode'
 import type { FlameDescriptor, TransformRecord } from './schema/flameSchema'
@@ -60,6 +60,11 @@ export function createIFSPipeline(
   camera: CameraContext,
   insideShaderCount: number,
   pointRandomSeeds: TgpuBuffer<WgslArray<Vec2u>> & StorageFlag,
+  // Persisted chain state across dispatches (position xyz in a vec4f, color in a
+  // vec2f). Lets the warmup/fuse be paid once per settle rather than every
+  // dispatch — see the `resetPoints` uniform below.
+  pointPositions: TgpuBuffer<WgslArray<Vec4f>> & StorageFlag,
+  pointColors: TgpuBuffer<WgslArray<Vec2f>> & StorageFlag,
   transforms: TransformRecord,
   outputTextureDimension: readonly [number, number],
   accumulationBuffer: TgpuBuffer<WgslArray<typeof Bucket>> & StorageFlag,
@@ -162,6 +167,17 @@ export function createIFSPipeline(
         stochasticFilterRadius: {
           uniform: f32,
         },
+        pointPositions: {
+          storage: arrayOf(vec4f),
+          access: 'mutable',
+        },
+        pointColors: {
+          storage: arrayOf(vec2f),
+          access: 'mutable',
+        },
+        resetPoints: {
+          uniform: u32,
+        },
       })
 
       const executeRandomFlame = tgpu.fn([Point], Point) /* wgsl */ `
@@ -231,10 +247,17 @@ export function createIFSPipeline(
         const seed = add(pointSeed, hash(pointIndex))
         setSeed(seed)
         let point = Point()
-        point.position = pointInitMode(pointIndex)
-        point.color = colorInitMode(point.position)
-        for (let i = 0; i < insideShaderCount; i += 1) {
-          point = executeRandomFlame(point)
+        // Cold start (after a settle/reset): seed the chain and pay the warmup
+        // fuse. Otherwise continue the persisted chain from the last dispatch.
+        if (blendBindGroupLayout.$.resetPoints > 0) {
+          point.position = pointInitMode(pointIndex)
+          point.color = colorInitMode(point.position)
+          for (let i = 0; i < insideShaderCount; i += 1) {
+            point = executeRandomFlame(point)
+          }
+        } else {
+          point.position = blendBindGroupLayout.$.pointPositions[pointIndex]!.xy
+          point.color = blendBindGroupLayout.$.pointColors[pointIndex]!
         }
         const outputTextureDimensionF = vec2f(outputTextureDimension)
         const filterRadius = blendBindGroupLayout.$.stochasticFilterRadius
@@ -331,6 +354,13 @@ export function createIFSPipeline(
             }
           }
         }
+        // Persist the chain so the next dispatch continues it without re-warmup.
+        blendBindGroupLayout.$.pointPositions[pointIndex] = vec4f(
+          point.position,
+          0,
+          0,
+        )
+        blendBindGroupLayout.$.pointColors[pointIndex] = point.color
         blendBindGroupLayout.$.pointRandomSeeds[pointIndex] = vec2u(
           randomState.$,
         )
@@ -387,6 +417,17 @@ export function createIFSPipeline(
         stochasticFilterRadius: {
           uniform: f32,
         },
+        pointPositions: {
+          storage: arrayOf(vec4f),
+          access: 'mutable',
+        },
+        pointColors: {
+          storage: arrayOf(vec2f),
+          access: 'mutable',
+        },
+        resetPoints: {
+          uniform: u32,
+        },
       })
 
       const colorInitMode = colorInitModeToImplFn[colorInitType]
@@ -433,10 +474,17 @@ export function createIFSPipeline(
         const seed = add(pointSeed, hash(pointIndex))
         setSeed(seed)
         let point = Point()
-        point.position = pointInitMode(pointIndex)
-        point.color = colorInitMode(point.position)
-        for (let i = 0; i < insideShaderCount; i += 1) {
-          point = executeRandomFlame(point)
+        // Cold start (after a settle/reset): seed the chain and pay the warmup
+        // fuse. Otherwise continue the persisted chain from the last dispatch.
+        if (bindGroupLayout.$.resetPoints > 0) {
+          point.position = pointInitMode(pointIndex)
+          point.color = colorInitMode(point.position)
+          for (let i = 0; i < insideShaderCount; i += 1) {
+            point = executeRandomFlame(point)
+          }
+        } else {
+          point.position = bindGroupLayout.$.pointPositions[pointIndex]!.xy
+          point.color = bindGroupLayout.$.pointColors[pointIndex]!
         }
         const outputTextureDimensionF = vec2f(outputTextureDimension)
         const filterRadius = bindGroupLayout.$.stochasticFilterRadius
@@ -533,6 +581,9 @@ export function createIFSPipeline(
             }
           }
         }
+        // Persist the chain so the next dispatch continues it without re-warmup.
+        bindGroupLayout.$.pointPositions[pointIndex] = vec4f(point.position, 0, 0)
+        bindGroupLayout.$.pointColors[pointIndex] = point.color
         bindGroupLayout.$.pointRandomSeeds[pointIndex] = vec2u(randomState.$)
       })
 
@@ -553,6 +604,8 @@ export function createIFSPipeline(
   const stochasticFilterRadiusBuffer = root
     .createBuffer(f32, 0)
     .$usage('uniform')
+  // Defaults to 1 so a freshly created pipeline warms up on its first dispatch.
+  const resetPointsBuffer = root.createBuffer(u32, 1).$usage('uniform')
   vramLog(
     '[ifsPipeline] Created flameUniforms, finalTransform, dimension & stochasticFilterRadius buffers',
   )
@@ -565,6 +618,7 @@ export function createIFSPipeline(
     outputTextureDimensionBuffer.destroy()
     finalTransformBuffer.destroy()
     stochasticFilterRadiusBuffer.destroy()
+    resetPointsBuffer.destroy()
   })
 
   const bindGroup = root.createBindGroup(bindGroupLayout, {
@@ -574,6 +628,9 @@ export function createIFSPipeline(
     finalTransform: finalTransformBuffer,
     accumulationBuffer,
     stochasticFilterRadius: stochasticFilterRadiusBuffer,
+    pointPositions,
+    pointColors,
+    resetPoints: resetPointsBuffer,
   })
 
   const ifsPipeline = root
@@ -630,6 +687,11 @@ export function createIFSPipeline(
     },
     setStochasticFilterRadius: (radius: number) => {
       stochasticFilterRadiusBuffer.write(radius)
+    },
+    // 1 = re-initialize chains and pay the warmup this dispatch; 0 = continue the
+    // persisted chains. Set to 1 for the first tick after an accumulation reset.
+    setResetPoints: (reset: number) => {
+      resetPointsBuffer.write(reset)
     },
   }
 }

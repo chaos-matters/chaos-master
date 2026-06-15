@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, onCleanup, untrack, useContext, } from 'solid-js'
-import { arrayOf, vec2u, vec3f, vec4f } from 'typegpu/data'
+import { arrayOf, vec2f, vec2u, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useTimeline } from '@/contexts/TimelineContext'
@@ -183,6 +183,15 @@ export function Flam3(props: Flam3Props) {
 
   const pointRandomSeeds = root
     .createBuffer(arrayOf(vec2u, props.pointCountPerBatch))
+    .$usage('storage')
+  // Persisted per-chain state across dispatches (position xyz packed in a vec4f,
+  // color in a vec2f). Created once and shared like the RNG seeds; the IFS
+  // pipeline re-initializes them on the first tick after a settle (resetPoints).
+  const pointPositions = root
+    .createBuffer(arrayOf(vec4f, props.pointCountPerBatch))
+    .$usage('storage')
+  const pointColors = root
+    .createBuffer(arrayOf(vec2f, props.pointCountPerBatch))
     .$usage('storage')
 
   const colorGradingUniforms = root
@@ -571,6 +580,8 @@ export function Flam3(props: Flam3Props) {
         camera3D,
         Math.floor(flame.renderSettings.skipIters),
         pointRandomSeeds,
+        pointPositions,
+        pointColors,
         flame.transforms,
         textureSize,
         typedAccumulationBuffer,
@@ -584,6 +595,8 @@ export function Flam3(props: Flam3Props) {
         camera!,
         Math.floor(flame.renderSettings.skipIters),
         pointRandomSeeds,
+        pointPositions,
+        pointColors,
         flame.transforms,
         textureSize,
         typedAccumulationBuffer,
@@ -599,6 +612,10 @@ export function Flam3(props: Flam3Props) {
     let lastExportRenderedPointCount = -1
     let forceDrawToScreen = false
     let clearRequested = true
+    // When true, the next IFS tick re-initializes the persisted chains and pays
+    // the warmup fuse (set on every accumulation reset). Otherwise chains
+    // continue across dispatches, so warmup is paid once per settle.
+    let resetPointStatePending = true
     // Interactive estimator state: last iteration count, used to cap growth.
     let lastInteractiveIterationCount = 1
     // Export driver state: chunk size adapted from measured chunk wall time,
@@ -722,6 +739,9 @@ export function Flam3(props: Flam3Props) {
         setAccumulatedPointCountGlobal(0)
       }
       clearRequested = true
+      // The accumulated chains are no longer valid for the new state — re-warm
+      // them on the next tick rather than continuing stale chains.
+      resetPointStatePending = true
       requestRedraw()
     }
 
@@ -857,9 +877,16 @@ export function Flam3(props: Flam3Props) {
           : {}
 
         const pass = encoder.beginComputePass(passDesc)
-        for (let i = 0; i < iterationCount; i++) {
+        if (iterationCount > 0) {
           const pipeline = ifsPipeline3D ?? ifsPipeline!
-          pipeline.run(pass, pointCountPerBatch)
+          // Pay the warmup only on the first tick after a settle; subsequent
+          // ticks continue the persisted chains. Ordered before the dispatch in
+          // this submission (queue.writeBuffer then queue.submit).
+          pipeline.setResetPoints(resetPointStatePending ? 1 : 0)
+          resetPointStatePending = false
+          for (let i = 0; i < iterationCount; i++) {
+            pipeline.run(pass, pointCountPerBatch)
+          }
         }
         pass.end()
 
