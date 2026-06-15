@@ -57,6 +57,18 @@
   }
 }
 
+/* `.label` is display:contents (no box), so dim its children instead. */
+.label.disabled .labelRow,
+.label.disabled .slider-wrapper,
+.label.disabled .value {
+  opacity: 0.4;
+}
+
+.label.disabled .slider {
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
 .slider-wrapper {
   display: flex;
   position: relative;

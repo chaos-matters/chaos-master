@@ -79,6 +79,7 @@ type Flam3Props = {
   pointCountPerBatch: number
   renderInterval: number
   adaptiveFilterEnabled: boolean
+  stochasticFilterEnabled?: boolean
   animationEnabled: boolean
   flameDescriptor: FlameDescriptor
   edgeFadeColor: v4f
@@ -320,7 +321,13 @@ export function Flam3(props: Flam3Props) {
       root,
       colorGradingUniforms,
       textureSize,
-      props.adaptiveFilterEnabled
+      // The adaptive-filter passes (density estimation + blur) write
+      // postprocessBuffer, but they are skipped while the stochastic (MN)
+      // filter is active. Reading postprocessBuffer in that state would show a
+      // frozen, never-updated image, so fall back to the live accumulation
+      // buffer whenever MN is on. Reading props.stochasticFilterEnabled here
+      // also makes this memo rebuild when the MN toggle flips.
+      props.adaptiveFilterEnabled && !props.stochasticFilterEnabled
         ? typedPostprocessBuffer
         : typedAccumulationBuffer,
       canvasFormat,
@@ -530,7 +537,9 @@ export function Flam3(props: Flam3Props) {
 
     const paintTimeMs =
       Number(shouldRenderFinalImage) *
-      (colorGradingMs + Number(props.adaptiveFilterEnabled) * adaptiveFilterMs)
+      (colorGradingMs +
+        Number(props.adaptiveFilterEnabled && !props.stochasticFilterEnabled) *
+          adaptiveFilterMs)
 
     // Use Math.round instead of floor to prevent the dead-zone where budget/ifsMs < 2
     // would permanently trap the scaler at 1 iteration.
@@ -618,6 +627,24 @@ export function Flam3(props: Flam3Props) {
           props.blendWeight,
         )
       }
+    })
+
+    // Update stochastic filter radius when quality or filter toggle changes.
+    // Drives whichever IFS pipeline is active (2D or 3D) — both expose the same
+    // setStochasticFilterRadius API.
+    createEffect(() => {
+      const pipeline = ifsPipeline3D ?? ifsPipeline
+      if (!pipeline) return
+      if (!props.stochasticFilterEnabled) {
+        pipeline.setStochasticFilterRadius(0)
+        return
+      }
+      const storedQuality =
+        animatedFlame().renderSettings.densityEstimationQuality ?? 5
+      const qualityK =
+        storedQuality > 1 ? storedQuality : 0.5 + (1 - storedQuality) * 19.5
+      const radius = Math.max(0.5, qualityK / 2)
+      pipeline.setStochasticFilterRadius(radius)
     })
 
     const accumulationFingerprint = createMemo(() => {
@@ -810,9 +837,10 @@ export function Flam3(props: Flam3Props) {
       if (timings) {
         setRenderTimings({
           ...timings,
-          adaptiveFilterMs: props.adaptiveFilterEnabled
-            ? timings.adaptiveFilterMs
-            : 0,
+          adaptiveFilterMs:
+            props.adaptiveFilterEnabled && !props.stochasticFilterEnabled
+              ? timings.adaptiveFilterMs
+              : 0,
         })
       }
 
@@ -857,7 +885,7 @@ export function Flam3(props: Flam3Props) {
         currentAveragePointCountPerBucketInv =
           (bucketProbabilityInv() / accumulatedPointCount_) * skipItersFactor
         writeColorGradingUniforms()
-        if (props.adaptiveFilterEnabled) {
+        if (props.adaptiveFilterEnabled && !props.stochasticFilterEnabled) {
           const passDesc: GPUComputePassDescriptor =
             timestampWrites.adaptiveFilterMs
               ? { timestampWrites: timestampWrites.adaptiveFilterMs }

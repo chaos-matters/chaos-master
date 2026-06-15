@@ -1,7 +1,7 @@
 import { onCleanup } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { arrayOf, builtin, f32, i32, struct, u32, vec2f, vec2i, vec2u, } from 'typegpu/data'
-import { add, arrayLength, atomicAdd, mul } from 'typegpu/std'
+import { add, arrayLength, atomicAdd, div, mul, sub } from 'typegpu/std'
 import { camera2DWorldToClip } from '@/lib/Camera2D'
 import { hash, random, randomState, setSeed } from '@/shaders/random'
 import { recordEntries, recordKeys } from '@/utils/record'
@@ -22,6 +22,24 @@ import type { CameraContext } from '@/lib/CameraContext'
 
 const { ceil } = Math
 const IFS_GROUP_SIZE = 64
+
+// Mitchell-Netravali cubic filter (B=1/3, C=1/3).
+// Support [-2, 2], integrates to 1. Used for stochastic accumulation.
+// Defined at module scope and referenced directly in the computeFn body — the
+// same proven pattern as the 3D pipeline's copy. (Not shared cross-module: a
+// WGSL-string tgpu.fn imported into another file's computeFn body is not
+// reliably traced by unplugin-typegpu.)
+const mitchellNetravali = tgpu.fn([f32], f32) /* wgsl */ `
+  (x: f32) -> f32 {
+    let ax = abs(x);
+    if (ax < 1.0) {
+      return (7.0 * ax * ax * ax - 12.0 * ax * ax + 16.0 / 3.0) / 6.0;
+    } else if (ax < 2.0) {
+      return (-7.0 / 3.0 * ax * ax * ax + 12.0 * ax * ax - 20.0 * ax + 32.0 / 3.0) / 6.0;
+    }
+    return 0.0;
+  }
+`
 
 const pipelineCache = new Map<
   string,
@@ -129,6 +147,9 @@ export function createIFSPipeline(
           storage: arrayOf(AtomicBucket),
           access: 'mutable',
         },
+        stochasticFilterRadius: {
+          uniform: f32,
+        },
       })
 
       const executeRandomFlame = tgpu.fn([Point], Point) /* wgsl */ `
@@ -216,30 +237,70 @@ export function createIFSPipeline(
         blendBindGroupLayout.$.pointRandomSeeds[pointIndex] = vec2u(
           randomState.$,
         )
-        const jittered = add(screen, pointInitMode(pointIndex))
-        if (
-          jittered.x < 0 ||
-          jittered.y < 0 ||
-          jittered.x > outputTextureDimensionF.x ||
-          jittered.y > outputTextureDimensionF.y ||
-          // eslint-disable-next-line eqeqeq -- NaN check in WGSL
-          jittered.x != jittered.x ||
-          // eslint-disable-next-line eqeqeq -- NaN check in WGSL
-          jittered.y != jittered.y
-        )
-          return
-        const screenI = vec2i(jittered)
-        const pixelIndex = screenI.y * outputTextureDimension.x + screenI.x
-        const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
-        atomicAdd(accumulationBuffer[pixelIndex]!.count, u32(1 * fixed_m))
-        atomicAdd(
-          accumulationBuffer[pixelIndex]!.color.a,
-          i32(point.color.x * f32(fixed_m)),
-        )
-        atomicAdd(
-          accumulationBuffer[pixelIndex]!.color.b,
-          i32(point.color.y * f32(fixed_m)),
-        )
+        const filterRadius =
+          blendBindGroupLayout.$.stochasticFilterRadius
+        if (filterRadius > 0) {
+          const offsetX = mul(sub(random(), 0.5), mul(filterRadius, 4))
+          const offsetY = mul(sub(random(), 0.5), mul(filterRadius, 4))
+          const wx = mitchellNetravali(div(offsetX, filterRadius))
+          const wy = mitchellNetravali(div(offsetY, filterRadius))
+          // Importance-sampling estimator: offset ~ uniform on [-2R, 2R]²
+          // (pdf = 1/(16R²)); the normalized 2D MN kernel is MN(dx/R)·MN(dy/R)/R².
+          // weight = kernel / pdf = 16·MN·MN, giving an expected contribution of
+          // 1 per point — energy-preserving and independent of the radius, so it
+          // matches the non-MN path (count += 1) and the tonemap normalization.
+          const accumWeight = mul(mul(wx, wy), 16)
+          const finalScreen = add(screen, vec2f(offsetX, offsetY))
+          if (
+            finalScreen.x < 0 ||
+            finalScreen.y < 0 ||
+            finalScreen.x > outputTextureDimensionF.x ||
+            finalScreen.y > outputTextureDimensionF.y ||
+            // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+            finalScreen.x != finalScreen.x ||
+            // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+            finalScreen.y != finalScreen.y
+          )
+            return
+          const screenI = vec2i(finalScreen)
+          const pixelIndex = screenI.y * outputTextureDimension.x + screenI.x
+          const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
+          const fixedWeight = u32(mul(accumWeight, f32(fixed_m)))
+          atomicAdd(accumulationBuffer[pixelIndex]!.count, fixedWeight)
+          atomicAdd(
+            accumulationBuffer[pixelIndex]!.color.a,
+            i32(mul(point.color.x, f32(fixedWeight))),
+          )
+          atomicAdd(
+            accumulationBuffer[pixelIndex]!.color.b,
+            i32(mul(point.color.y, f32(fixedWeight))),
+          )
+        } else {
+          const jittered = add(screen, pointInitMode(pointIndex))
+          if (
+            jittered.x < 0 ||
+            jittered.y < 0 ||
+            jittered.x > outputTextureDimensionF.x ||
+            jittered.y > outputTextureDimensionF.y ||
+            // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+            jittered.x != jittered.x ||
+            // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+            jittered.y != jittered.y
+          )
+            return
+          const screenI = vec2i(jittered)
+          const pixelIndex = screenI.y * outputTextureDimension.x + screenI.x
+          const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
+          atomicAdd(accumulationBuffer[pixelIndex]!.count, u32(1 * fixed_m))
+          atomicAdd(
+            accumulationBuffer[pixelIndex]!.color.a,
+            i32(point.color.x * f32(fixed_m)),
+          )
+          atomicAdd(
+            accumulationBuffer[pixelIndex]!.color.b,
+            i32(point.color.y * f32(fixed_m)),
+          )
+        }
       })
 
       cached = {
@@ -289,6 +350,9 @@ export function createIFSPipeline(
         accumulationBuffer: {
           storage: arrayOf(AtomicBucket),
           access: 'mutable',
+        },
+        stochasticFilterRadius: {
+          uniform: f32,
         },
       })
 
@@ -352,30 +416,69 @@ export function createIFSPipeline(
           add(mul(clip, vec2f(0.5, -0.5)), 0.5),
         )
         bindGroupLayout.$.pointRandomSeeds[pointIndex] = vec2u(randomState.$)
-        const jittered = add(screen, pointInitMode(pointIndex))
-        if (
-          jittered.x < 0 ||
-          jittered.y < 0 ||
-          jittered.x > outputTextureDimensionF.x ||
-          jittered.y > outputTextureDimensionF.y ||
-          // eslint-disable-next-line eqeqeq -- NaN check in WGSL
-          jittered.x != jittered.x ||
-          // eslint-disable-next-line eqeqeq -- NaN check in WGSL
-          jittered.y != jittered.y
-        )
-          return
-        const screenI = vec2i(jittered)
-        const pixelIndex = screenI.y * outputTextureDimension.x + screenI.x
-        const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
-        atomicAdd(accumulationBuffer[pixelIndex]!.count, u32(1 * fixed_m))
-        atomicAdd(
-          accumulationBuffer[pixelIndex]!.color.a,
-          i32(point.color.x * f32(fixed_m)),
-        )
-        atomicAdd(
-          accumulationBuffer[pixelIndex]!.color.b,
-          i32(point.color.y * f32(fixed_m)),
-        )
+        const filterRadius = bindGroupLayout.$.stochasticFilterRadius
+        if (filterRadius > 0) {
+          const offsetX = mul(sub(random(), 0.5), mul(filterRadius, 4))
+          const offsetY = mul(sub(random(), 0.5), mul(filterRadius, 4))
+          const wx = mitchellNetravali(div(offsetX, filterRadius))
+          const wy = mitchellNetravali(div(offsetY, filterRadius))
+          // Importance-sampling estimator: offset ~ uniform on [-2R, 2R]²
+          // (pdf = 1/(16R²)); the normalized 2D MN kernel is MN(dx/R)·MN(dy/R)/R².
+          // weight = kernel / pdf = 16·MN·MN, giving an expected contribution of
+          // 1 per point — energy-preserving and independent of the radius, so it
+          // matches the non-MN path (count += 1) and the tonemap normalization.
+          const accumWeight = mul(mul(wx, wy), 16)
+          const finalScreen = add(screen, vec2f(offsetX, offsetY))
+          if (
+            finalScreen.x < 0 ||
+            finalScreen.y < 0 ||
+            finalScreen.x > outputTextureDimensionF.x ||
+            finalScreen.y > outputTextureDimensionF.y ||
+            // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+            finalScreen.x != finalScreen.x ||
+            // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+            finalScreen.y != finalScreen.y
+          )
+            return
+          const screenI = vec2i(finalScreen)
+          const pixelIndex = screenI.y * outputTextureDimension.x + screenI.x
+          const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
+          const fixedWeight = u32(mul(accumWeight, f32(fixed_m)))
+          atomicAdd(accumulationBuffer[pixelIndex]!.count, fixedWeight)
+          atomicAdd(
+            accumulationBuffer[pixelIndex]!.color.a,
+            i32(mul(point.color.x, f32(fixedWeight))),
+          )
+          atomicAdd(
+            accumulationBuffer[pixelIndex]!.color.b,
+            i32(mul(point.color.y, f32(fixedWeight))),
+          )
+        } else {
+          const jittered = add(screen, pointInitMode(pointIndex))
+          if (
+            jittered.x < 0 ||
+            jittered.y < 0 ||
+            jittered.x > outputTextureDimensionF.x ||
+            jittered.y > outputTextureDimensionF.y ||
+            // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+            jittered.x != jittered.x ||
+            // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+            jittered.y != jittered.y
+          )
+            return
+          const screenI = vec2i(jittered)
+          const pixelIndex = screenI.y * outputTextureDimension.x + screenI.x
+          const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
+          atomicAdd(accumulationBuffer[pixelIndex]!.count, u32(1 * fixed_m))
+          atomicAdd(
+            accumulationBuffer[pixelIndex]!.color.a,
+            i32(point.color.x * f32(fixed_m)),
+          )
+          atomicAdd(
+            accumulationBuffer[pixelIndex]!.color.b,
+            i32(point.color.y * f32(fixed_m)),
+          )
+        }
       })
 
       cached = { FlameUniforms, bindGroupLayout, ifsCompute }
@@ -392,17 +495,21 @@ export function createIFSPipeline(
   const finalTransformBuffer = root
     .createBuffer(AffineParams, { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 })
     .$usage('uniform')
+  const stochasticFilterRadiusBuffer = root
+    .createBuffer(f32, 0)
+    .$usage('uniform')
   vramLog(
-    '[ifsPipeline] Created flameUniforms, finalTransform & dimension buffers',
+    '[ifsPipeline] Created flameUniforms, finalTransform, dimension & stochasticFilterRadius buffers',
   )
 
   onCleanup(() => {
     vramLog(
-      '[ifsPipeline] Destroying flameUniforms, finalTransform & dimension buffers',
+      '[ifsPipeline] Destroying flameUniforms, finalTransform, dimension & stochasticFilterRadius buffers',
     )
     flameUniformsBuffer.destroy()
     outputTextureDimensionBuffer.destroy()
     finalTransformBuffer.destroy()
+    stochasticFilterRadiusBuffer.destroy()
   })
 
   const bindGroup = root.createBindGroup(bindGroupLayout, {
@@ -411,6 +518,7 @@ export function createIFSPipeline(
     outputTextureDimension: outputTextureDimensionBuffer,
     finalTransform: finalTransformBuffer,
     accumulationBuffer,
+    stochasticFilterRadius: stochasticFilterRadiusBuffer,
   })
 
   const ifsPipeline = root
@@ -464,6 +572,9 @@ export function createIFSPipeline(
           f: 0,
         },
       )
+    },
+    setStochasticFilterRadius: (radius: number) => {
+      stochasticFilterRadiusBuffer.write(radius)
     },
   }
 }

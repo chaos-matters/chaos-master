@@ -24,6 +24,10 @@ type SliderProps = {
   /** Parameter path for Blender-style keyframe targeting */
   dataParameterPath?: string
   'data-tour-target'?: string
+  /** Dims the control and blocks input — used when a setting has no effect. */
+  disabled?: boolean
+  /** Tooltip explaining why the control is disabled. */
+  disabledReason?: string
 }
 
 export function Slider(props: SliderProps) {
@@ -63,6 +67,8 @@ export function Slider(props: SliderProps) {
           formatValue={props.formatValue}
           dataParameterPath={props.dataParameterPath}
           data-tour-target={props['data-tour-target']}
+          disabled={props.disabled}
+          disabledReason={props.disabledReason}
         />
       }
     >
@@ -77,10 +83,12 @@ export function Slider(props: SliderProps) {
         classList={{
           [props.class ?? '']: true,
           [ui.compact as string]: props.variant === 'compact',
+          [ui.disabled as string]: props.disabled === true,
           [ui.targeted as string]:
             props.dataParameterPath !== undefined &&
             highlightedPath() === props.dataParameterPath,
         }}
+        title={props.disabled ? props.disabledReason : undefined}
         onContextMenu={(e) => {
           e.preventDefault()
         }}
@@ -110,6 +118,7 @@ export function Slider(props: SliderProps) {
             max={max()}
             step={step()}
             value={value()}
+            disabled={props.disabled}
             data-parameter-path={props.dataParameterPath}
             onPointerDown={() => {
               history.startPreview(`Edit ${props.label ?? 'slider'}`)

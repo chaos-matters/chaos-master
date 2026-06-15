@@ -242,6 +242,8 @@ export function MainWorkspace(props: AppProps) {
   // Dev-only: crash injection trigger (renders inside ErrorBoundary)
   const [devCrashTest, setDevCrashTest] = createSignal(false)
   const [adaptiveFilterEnabled, setAdaptiveFilterEnabled] = createSignal(true)
+  const [stochasticFilterEnabled, setStochasticFilterEnabled] =
+    createSignal(false)
   const [animationEnabled, setAnimationEnabled] = createSignal(true)
   const [blendFlame, setBlendFlame] = createSignal<
     FlameDescriptor | undefined
@@ -2333,6 +2335,7 @@ export function MainWorkspace(props: AppProps) {
                             pointCountPerBatch={DEFAULT_POINT_COUNT}
                             isExportRenderer
                             adaptiveFilterEnabled={adaptiveFilterEnabled()}
+                            stochasticFilterEnabled={stochasticFilterEnabled()}
                             animationEnabled={animationEnabled()}
                             flameDescriptor={effectiveFlame()}
                             renderInterval={finalRenderInterval()}
@@ -3811,6 +3814,8 @@ export function MainWorkspace(props: AppProps) {
                                   formatValue={(value) => value.toFixed(2)}
                                   dataParameterPath="estimatorCurve"
                                   data-tour-target="estimatorCurve-slider"
+                                  disabled={stochasticFilterEnabled()}
+                                  disabledReason="The estimator curve only affects the density-estimation pass, which is bypassed while the Mitchell-Netravali (MN) filter is active. Turn off MN to use it."
                                 />
                               </div>
                             </div>
@@ -4312,6 +4317,8 @@ export function MainWorkspace(props: AppProps) {
             setShowTimeline={setShowTimeline}
             adaptiveFilterEnabled={adaptiveFilterEnabled}
             setAdaptiveFilterEnabled={setAdaptiveFilterEnabled}
+            stochasticFilterEnabled={stochasticFilterEnabled}
+            setStochasticFilterEnabled={setStochasticFilterEnabled}
             isPlaying={() => timeline.isPlaying()}
             togglePlay={() => {
               if (!animationEnabled()) {

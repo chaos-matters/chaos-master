@@ -24,6 +24,8 @@ type Props = {
   setShowTimeline: (v: boolean) => void
   adaptiveFilterEnabled: () => boolean
   setAdaptiveFilterEnabled: (v: boolean) => void
+  stochasticFilterEnabled: () => boolean
+  setStochasticFilterEnabled: (v: boolean) => void
   dimensions: () => number
   setDimensions: (v: number) => void
   flyMode: () => boolean
@@ -388,6 +390,22 @@ export function FloatingActions(props: Props) {
               data-tour-target="adaptive-filter"
             >
               <Eye />
+            </button>
+
+            {/* Mitchell-Netravali Stochastic Filter (2D + 3D) */}
+            <button
+              class={ui.toggle}
+              classList={{
+                [ui.toggleActive as string]: props.stochasticFilterEnabled(),
+              }}
+              onClick={() => {
+                props.setStochasticFilterEnabled(
+                  !props.stochasticFilterEnabled(),
+                )
+              }}
+              title="Mitchell-Netravali Stochastic Filter"
+            >
+              MN
             </button>
 
             {/* 2D/3D Toggle */}

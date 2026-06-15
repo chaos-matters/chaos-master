@@ -23,6 +23,11 @@
   background: color-mix(in srgb, var(--accent-color, #3b82f6) 6%, transparent);
 }
 
+.label.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .labelName {
   font-weight: 500;
   min-width: 12px;
