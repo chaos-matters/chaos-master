@@ -1314,6 +1314,14 @@ export function MainWorkspace(props: AppProps) {
           const phase = flameDescriptor.renderSettings.palettePhase ?? 0
           const dir = Math.random() > 0.5 ? 1 : -1
           addContinuousTrack('palettePhase', phase, dir * randomRange(1, 3))
+        } else if (preset === 'transformColor') {
+          // Drift each transform's OkLab (a, b) color coordinate in a loop —
+          // animates the per-transform colors (the color scrub inputs), distinct
+          // from palette cycling above.
+          for (const [tid, t] of Object.entries(flameDescriptor.transforms)) {
+            addLoopingTrack(`transform.${tid}.color.x`, t.color.x, 0.1, 0.3)
+            addLoopingTrack(`transform.${tid}.color.y`, t.color.y, 0.1, 0.3)
+          }
         } else if (preset === 'vibrancy') {
           const vib = flameDescriptor.renderSettings.vibrancy ?? 0.5
           const minPert = vib > 0.5 ? -0.3 : 0.1
