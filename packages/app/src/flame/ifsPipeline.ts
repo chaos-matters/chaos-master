@@ -10,12 +10,7 @@ import { AffineParams, transformAffine } from './affineTranform'
 import { colorInitModeToImplFn } from './colorInitMode'
 import { isPointInitMode2D, pointInitModeToImplFn } from './pointInitMode'
 import { createFlameWgsl, extractFlameUniforms } from './transformFunction'
-import {
-  AtomicBucket,
-  BUCKET_FIXED_POINT_MULTIPLIER,
-  BUCKET_SATURATION_COUNT,
-  Point,
-} from './types'
+import { AtomicBucket, BUCKET_FIXED_POINT_MULTIPLIER, BUCKET_SATURATION_COUNT, Point, } from './types'
 import { getCacheVersion } from './variations/custom'
 import type { StorageFlag, TgpuBuffer, TgpuRoot } from 'typegpu'
 import type { Vec2f, Vec2u, Vec4f, WgslArray } from 'typegpu/data'
@@ -582,7 +577,11 @@ export function createIFSPipeline(
           }
         }
         // Persist the chain so the next dispatch continues it without re-warmup.
-        bindGroupLayout.$.pointPositions[pointIndex] = vec4f(point.position, 0, 0)
+        bindGroupLayout.$.pointPositions[pointIndex] = vec4f(
+          point.position,
+          0,
+          0,
+        )
         bindGroupLayout.$.pointColors[pointIndex] = vec2f(point.color)
         bindGroupLayout.$.pointRandomSeeds[pointIndex] = vec2u(randomState.$)
       })

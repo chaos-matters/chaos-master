@@ -11,11 +11,7 @@ import { AffineParams3D, transformAffine3D } from './affineTransform3D'
 import { colorInitModeToImplFn } from './colorInitMode'
 import { isPointInitMode3D, pointInitMode3DToImplFn } from './pointInitMode3D'
 import { createFlameWgsl3D, extractFlameUniforms3D, isAffine3D, } from './transformFunction3D'
-import {
-  AtomicBucket,
-  BUCKET_FIXED_POINT_MULTIPLIER,
-  BUCKET_SATURATION_COUNT,
-} from './types'
+import { AtomicBucket, BUCKET_FIXED_POINT_MULTIPLIER, BUCKET_SATURATION_COUNT, } from './types'
 import { Point3D } from './types3D'
 import type { StorageFlag, TgpuBuffer, TgpuRoot } from 'typegpu'
 import type { Vec2f, Vec2u, Vec4f, WgslArray } from 'typegpu/data'
