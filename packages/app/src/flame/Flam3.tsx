@@ -893,20 +893,6 @@ export function Flam3(props: Flam3Props) {
         accumulatedPointCount_ = accumulatedAfter
       }
 
-      if (!props.onAccumulatedPointCount) {
-        // Ready ticks always write so the capture gate sees a fresh count.
-        const nowMs = performance.now()
-        if (
-          !exportMode ||
-          isExportReady ||
-          nowMs - lastCountSignalMs >= EXPORT_COUNT_SIGNAL_INTERVAL_MS
-        ) {
-          lastCountSignalMs = nowMs
-          setAccumulatedPointCountGlobal(accumulatedPointCount_)
-        }
-      }
-      props.onAccumulatedPointCount?.(accumulatedPointCount_)
-
       if (shouldRenderFinalImage) {
         if (isExportReady || isAutoFpsReady) {
           lastExportRenderedPointCount = accumulatedPointCount_
@@ -948,6 +934,25 @@ export function Flam3(props: Flam3Props) {
 
       timestampQuery.write(encoder, Math.max(iterationCount, 1))
       device.queue.submit([encoder.finish()])
+
+      // Signal the accumulated count only AFTER the submit. Consumers
+      // (e.g. the benchmark / hardware-tier detector) may synchronously tear
+      // this renderer down from the callback — doing it before submit would
+      // destroy the pipeline's buffers while the just-encoded command buffer
+      // still references them ("used in submit while destroyed").
+      if (!props.onAccumulatedPointCount) {
+        // Ready ticks always write so the capture gate sees a fresh count.
+        const nowMs = performance.now()
+        if (
+          !exportMode ||
+          isExportReady ||
+          nowMs - lastCountSignalMs >= EXPORT_COUNT_SIGNAL_INTERVAL_MS
+        ) {
+          lastCountSignalMs = nowMs
+          setAccumulatedPointCountGlobal(accumulatedPointCount_)
+        }
+      }
+      props.onAccumulatedPointCount?.(accumulatedPointCount_)
 
       if (currentExportCb) {
         currentExportCb(canvas, {
