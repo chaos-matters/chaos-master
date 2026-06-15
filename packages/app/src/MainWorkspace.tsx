@@ -27,8 +27,8 @@ import { DiceButton } from './components/DiceButton/DiceButton'
 import { createDiscordShareModal } from './components/DiscordShareModal/DiscordShareModal'
 import { Dropzone } from './components/Dropzone/Dropzone'
 import { createExportPngDialog } from './components/ExportPngDialog/ExportPngDialog'
-import { ColorListEditor } from './components/FlameColorEditor/ColorListEditor'
-import { FlameColorEditor, handleColor, } from './components/FlameColorEditor/FlameColorEditor'
+import { ColorEditor } from './components/FlameColorEditor/ColorEditor'
+import { handleColor } from './components/FlameColorEditor/FlameColorEditor'
 import { FlameRandomizerCard } from './components/FlameRandomizerCard/FlameRandomizerCard'
 import { FloatingActions } from './components/FloatingActions/FloatingActions'
 import { createShowHelp } from './components/HelpModal/HelpModal'
@@ -2791,7 +2791,7 @@ export function MainWorkspace(props: AppProps) {
                         </CollapsibleCard>
                         <CollapsibleCard title="Color">
                           <div>
-                            <FlameColorEditor
+                            <ColorEditor
                               transforms={flameDescriptor.transforms}
                               setTransforms={(setFn) => {
                                 setFlameDescriptor((draft) => {
@@ -2800,14 +2800,6 @@ export function MainWorkspace(props: AppProps) {
                               }}
                               selectedTransformId={selectedTransformId}
                               setSelectedTransformId={setSelectedTransformId}
-                            />
-                            <ColorListEditor
-                              transforms={flameDescriptor.transforms}
-                              setTransforms={(setFn) => {
-                                setFlameDescriptor((draft) => {
-                                  setFn(draft.transforms)
-                                })
-                              }}
                             />
                           </div>
                         </CollapsibleCard>
