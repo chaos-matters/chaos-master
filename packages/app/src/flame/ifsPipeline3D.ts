@@ -61,6 +61,9 @@ export function createIFSPipeline3D(
   accumulationBuffer: TgpuBuffer<WgslArray<typeof Bucket>> & StorageFlag,
   colorInitType: ColorInitMode = 'colorInitZero',
   pointInitType: PointInitMode = 'pointInitUnitSphere',
+  // Number of points each chain plots after the warmup/fuse (see ifsPipeline).
+  // Baked as a compile-time loop bound so the shader compiler can unroll it.
+  plotsPerChain: number = 1,
 ) {
   // Flames switched to 3D (or animated point-init keyframes) can still carry a
   // 2D init mode — fall back instead of resolving an undefined shader external.
@@ -73,6 +76,7 @@ export function createIFSPipeline3D(
   // Uniform values flow through buffers and must not fragment the cache.
   const sig = JSON.stringify({
     insideShaderCount,
+    plotsPerChain,
     colorInitType,
     pointInit,
     transforms: recordEntries(transforms).map(([tid, tr]) => ({
@@ -185,84 +189,92 @@ export function createIFSPipeline3D(
       for (let i = 0; i < insideShaderCount; i += 1) {
         point = executeRandomFlame(point)
       }
-      point.position = transformAffine3D(
-        bindGroupLayout.$.finalTransform,
-        point.position,
-      )
-      const clip = camera3DWorldToClip(point.position)
       const outputTextureDimensionF = vec2f(outputTextureDimension)
-      const screen = mul(
-        outputTextureDimensionF,
-        add(mul(clip.xy, vec2f(0.5, -0.5)), 0.5),
-      )
-      bindGroupLayout.$.pointRandomSeeds[pointIndex] = vec2u(randomState.$)
       const filterRadius = bindGroupLayout.$.stochasticFilterRadius
-      if (filterRadius > 0) {
-        // Screen-space Mitchell-Netravali splat (mirrors the 2D path). The
-        // kernel ignores depth, so it reconstructs in screen space only — the z
-        // value is splatted at the offset pixel weighted by the same factor so
-        // the per-pixel depth average (z / count) stays correct.
-        const offsetX = mul(sub(random(), 0.5), mul(filterRadius, 4))
-        const offsetY = mul(sub(random(), 0.5), mul(filterRadius, 4))
-        const wx = mitchellNetravali(div(offsetX, filterRadius))
-        const wy = mitchellNetravali(div(offsetY, filterRadius))
-        const accumWeight = mul(mul(wx, wy), 16)
-        const finalScreen = add(screen, vec2f(offsetX, offsetY))
-        if (
-          finalScreen.x < 0 ||
-          finalScreen.y < 0 ||
-          finalScreen.x > outputTextureDimensionF.x ||
-          finalScreen.y > outputTextureDimensionF.y ||
-          // eslint-disable-next-line eqeqeq -- NaN check in WGSL
-          finalScreen.x != finalScreen.x ||
-          // eslint-disable-next-line eqeqeq -- NaN check in WGSL
-          finalScreen.y != finalScreen.y
+      // Plot one point per chain step after the warmup above, amortizing the
+      // warmup cost across plotsPerChain plotted points.
+      for (let plot = 0; plot < plotsPerChain; plot += 1) {
+        point = executeRandomFlame(point)
+        const plotPos = transformAffine3D(
+          bindGroupLayout.$.finalTransform,
+          point.position,
         )
-          return
-        const screenI = vec2i(finalScreen)
-        const pixelIndex = screenI.y * outputTextureDimension.x + screenI.x
-        const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
-        const fixedWeight = u32(mul(accumWeight, f32(fixed_m)))
-        atomicAdd(accumulationBuffer[pixelIndex]!.count, fixedWeight)
-        atomicAdd(
-          accumulationBuffer[pixelIndex]!.z,
-          i32(mul(clip.z, f32(fixedWeight))),
+        const clip = camera3DWorldToClip(plotPos)
+        const screen = mul(
+          outputTextureDimensionF,
+          add(mul(clip.xy, vec2f(0.5, -0.5)), 0.5),
         )
-        atomicAdd(
-          accumulationBuffer[pixelIndex]!.color.a,
-          i32(mul(point.color.x, f32(fixedWeight))),
-        )
-        atomicAdd(
-          accumulationBuffer[pixelIndex]!.color.b,
-          i32(mul(point.color.y, f32(fixedWeight))),
-        )
-      } else {
-        const jittered = add(screen, pointInitMode(pointIndex).xy)
-        if (
-          jittered.x < 0 ||
-          jittered.y < 0 ||
-          jittered.x > outputTextureDimensionF.x ||
-          jittered.y > outputTextureDimensionF.y ||
-          // eslint-disable-next-line eqeqeq -- NaN check in WGSL
-          jittered.x != jittered.x ||
-          // eslint-disable-next-line eqeqeq -- NaN check in WGSL
-          jittered.y != jittered.y
-        )
-          return
-        const screenI = vec2i(jittered)
-        const pixelIndex = screenI.y * outputTextureDimension.x + screenI.x
-        const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
-        atomicAdd(accumulationBuffer[pixelIndex]!.count, u32(1 * fixed_m))
-        atomicAdd(accumulationBuffer[pixelIndex]!.z, i32(clip.z * f32(fixed_m)))
-        atomicAdd(
-          accumulationBuffer[pixelIndex]!.color.a,
-          i32(point.color.x * f32(fixed_m)),
-        )
-        atomicAdd(
-          accumulationBuffer[pixelIndex]!.color.b,
-          i32(point.color.y * f32(fixed_m)),
-        )
+        if (filterRadius > 0) {
+          // Screen-space Mitchell-Netravali splat (mirrors the 2D path). The
+          // kernel ignores depth, so it reconstructs in screen space only — the
+          // z value is splatted at the offset pixel weighted by the same factor
+          // so the per-pixel depth average (z / count) stays correct.
+          const offsetX = mul(sub(random(), 0.5), mul(filterRadius, 4))
+          const offsetY = mul(sub(random(), 0.5), mul(filterRadius, 4))
+          const wx = mitchellNetravali(div(offsetX, filterRadius))
+          const wy = mitchellNetravali(div(offsetY, filterRadius))
+          const accumWeight = mul(mul(wx, wy), 16)
+          const finalScreen = add(screen, vec2f(offsetX, offsetY))
+          const oob =
+            finalScreen.x < 0 ||
+            finalScreen.y < 0 ||
+            finalScreen.x > outputTextureDimensionF.x ||
+            finalScreen.y > outputTextureDimensionF.y ||
+            // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+            finalScreen.x != finalScreen.x ||
+            // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+            finalScreen.y != finalScreen.y
+          if (!oob) {
+            const screenI = vec2i(finalScreen)
+            const pixelIndex = screenI.y * outputTextureDimension.x + screenI.x
+            const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
+            const fixedWeight = u32(mul(accumWeight, f32(fixed_m)))
+            atomicAdd(accumulationBuffer[pixelIndex]!.count, fixedWeight)
+            atomicAdd(
+              accumulationBuffer[pixelIndex]!.z,
+              i32(mul(clip.z, f32(fixedWeight))),
+            )
+            atomicAdd(
+              accumulationBuffer[pixelIndex]!.color.a,
+              i32(mul(point.color.x, f32(fixedWeight))),
+            )
+            atomicAdd(
+              accumulationBuffer[pixelIndex]!.color.b,
+              i32(mul(point.color.y, f32(fixedWeight))),
+            )
+          }
+        } else {
+          const jittered = add(screen, pointInitMode(pointIndex).xy)
+          const oob =
+            jittered.x < 0 ||
+            jittered.y < 0 ||
+            jittered.x > outputTextureDimensionF.x ||
+            jittered.y > outputTextureDimensionF.y ||
+            // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+            jittered.x != jittered.x ||
+            // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+            jittered.y != jittered.y
+          if (!oob) {
+            const screenI = vec2i(jittered)
+            const pixelIndex = screenI.y * outputTextureDimension.x + screenI.x
+            const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
+            atomicAdd(accumulationBuffer[pixelIndex]!.count, u32(1 * fixed_m))
+            atomicAdd(
+              accumulationBuffer[pixelIndex]!.z,
+              i32(clip.z * f32(fixed_m)),
+            )
+            atomicAdd(
+              accumulationBuffer[pixelIndex]!.color.a,
+              i32(point.color.x * f32(fixed_m)),
+            )
+            atomicAdd(
+              accumulationBuffer[pixelIndex]!.color.b,
+              i32(point.color.y * f32(fixed_m)),
+            )
+          }
+        }
       }
+      bindGroupLayout.$.pointRandomSeeds[pointIndex] = vec2u(randomState.$)
     })
 
     cached = { FlameUniforms, bindGroupLayout, ifsCompute }

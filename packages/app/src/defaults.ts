@@ -1,6 +1,13 @@
 export const DEFAULT_POINT_COUNT = parseFloat(
   import.meta.env.VITE_DEFAULT_POINT_COUNT,
 )
+// Points each chaos-game chain plots after its warmup/fuse. Higher amortizes
+// the warmup cost across more plotted points (throughput), at the cost of more
+// per-dispatch work. Baked into the IFS shader as a compile-time loop bound.
+export const PLOTS_PER_CHAIN = Math.max(
+  1,
+  Math.floor(Number(import.meta.env.VITE_PLOTS_PER_CHAIN ?? 16)),
+)
 export const DEFAULT_RESOLUTION = parseFloat(
   import.meta.env.VITE_DEFAULT_RESOLUTION,
 )

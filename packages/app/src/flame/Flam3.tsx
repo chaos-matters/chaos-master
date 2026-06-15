@@ -3,7 +3,7 @@ import { arrayOf, vec2u, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useTimeline } from '@/contexts/TimelineContext'
-import { DEBUG_MODE } from '@/defaults'
+import { DEBUG_MODE, PLOTS_PER_CHAIN } from '@/defaults'
 import { accumulatedPointCount, animationExportProgress, animationExportRunning, exportQuality, setAccumulatedPointCountGlobal, setRenderTimings, } from '@/flame/renderStats'
 import { deepClone } from '@/utils/clone'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
@@ -576,6 +576,7 @@ export function Flam3(props: Flam3Props) {
         typedAccumulationBuffer,
         flame.renderSettings.colorInitMode,
         flame.renderSettings.pointInitMode,
+        PLOTS_PER_CHAIN,
       )
     } else {
       ifsPipeline = createIFSPipeline(
@@ -589,6 +590,7 @@ export function Flam3(props: Flam3Props) {
         flame.renderSettings.colorInitMode,
         flame.renderSettings.pointInitMode,
         props.blendFlame?.transforms,
+        PLOTS_PER_CHAIN,
       )
     }
 
@@ -791,8 +793,11 @@ export function Flam3(props: Flam3Props) {
         }
       }
 
+      // Each dispatched chain (thread) plots PLOTS_PER_CHAIN points after its
+      // warmup, so plotted points = threads × PLOTS_PER_CHAIN × dispatches.
       const accumulatedAfter =
-        accumulatedPointCount_ + pointCountPerBatch * iterationCount
+        accumulatedPointCount_ +
+        pointCountPerBatch * PLOTS_PER_CHAIN * iterationCount
 
       // Export readiness is decided with the post-accumulation count so the
       // final color-graded render and the capture happen in the same
@@ -1038,7 +1043,8 @@ export function Flam3(props: Flam3Props) {
           }
 
           const tickMs = performance.now() - startMs
-          windowPoints += tick.iterations * props.pointCountPerBatch
+          windowPoints +=
+            tick.iterations * props.pointCountPerBatch * PLOTS_PER_CHAIN
           windowTickMs += tickMs
           windowTicks += 1
 
