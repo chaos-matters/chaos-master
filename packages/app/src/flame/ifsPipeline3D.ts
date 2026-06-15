@@ -213,7 +213,7 @@ export function createIFSPipeline3D(
         }
       } else {
         point.position = bindGroupLayout.$.pointPositions[pointIndex]!.xyz
-        point.color = bindGroupLayout.$.pointColors[pointIndex]!
+        point.color = vec2f(bindGroupLayout.$.pointColors[pointIndex]!)
       }
       const outputTextureDimensionF = vec2f(outputTextureDimension)
       const filterRadius = bindGroupLayout.$.stochasticFilterRadius
@@ -314,7 +314,7 @@ export function createIFSPipeline3D(
       }
       // Persist the chain so the next dispatch continues it without re-warmup.
       bindGroupLayout.$.pointPositions[pointIndex] = vec4f(point.position, 0)
-      bindGroupLayout.$.pointColors[pointIndex] = point.color
+      bindGroupLayout.$.pointColors[pointIndex] = vec2f(point.color)
       bindGroupLayout.$.pointRandomSeeds[pointIndex] = vec2u(randomState.$)
     })
 
