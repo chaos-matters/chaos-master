@@ -1,7 +1,6 @@
 import { createSignal, Show } from 'solid-js'
-// Reuse the affine editor's tab styling so the two editors look/behave the same.
-import tabUi from '@/components/AffineEditor/AffineEditor.module.css'
 import { GridIcon, ListIcon } from '@/icons'
+import ui from './ColorEditor.module.css'
 import { ColorListEditor } from './ColorListEditor'
 import { FlameColorEditor } from './FlameColorEditor'
 import type { TransformRecord } from '@/flame/schema/flameSchema'
@@ -25,22 +24,22 @@ export function ColorEditor(props: {
 
   return (
     <div>
-      <div class={tabUi.tabs}>
+      <div class={ui.tabs}>
         <button
-          class={tabUi.tab}
-          classList={{ [tabUi.tabActive as string]: view() === 'grid' }}
+          class={ui.tab}
+          classList={{ [ui.tabActive as string]: view() === 'grid' }}
           onClick={() => setView('grid')}
           title="Color wheel"
         >
-          <GridIcon class={tabUi.tabIcon} />
+          <GridIcon class={ui.tabIcon} />
         </button>
         <button
-          class={tabUi.tab}
-          classList={{ [tabUi.tabActive as string]: view() === 'list' }}
+          class={ui.tab}
+          classList={{ [ui.tabActive as string]: view() === 'list' }}
           onClick={() => setView('list')}
           title="Color values (scrub + keyframe)"
         >
-          <ListIcon class={tabUi.tabIcon} />
+          <ListIcon class={ui.tabIcon} />
         </button>
       </div>
       <Show
