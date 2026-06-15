@@ -146,8 +146,19 @@ function FlameColorHandle(props: {
   } = useCamera()
   const changeHistory = useChangeHistory()
   const clip = createMemo(() => {
-    const result = worldToClip(props.color)
-    return result
+    // worldToClip can throw or return NaN before the camera/canvas is
+    // initialized — which happens for a frame or two when toggling between the
+    // wheel and scrub-list views (the editor remounts). Falling back to the
+    // center keeps the <circle> cx/cy valid instead of rendering "NaN%".
+    try {
+      const result = worldToClip(props.color)
+      if (Number.isFinite(result.x) && Number.isFinite(result.y)) {
+        return result
+      }
+    } catch {
+      // camera not ready yet
+    }
+    return vec2f(0, 0)
   })
   // The editor's default zoom is 4 (see createZoom in FlameColorEditor). Scale
   // the handles gently relative to that: smaller on desktop initially, and
