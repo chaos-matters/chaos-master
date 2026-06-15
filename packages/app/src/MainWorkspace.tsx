@@ -2956,11 +2956,6 @@ export function MainWorkspace(props: AppProps) {
                                     />
                                   </g>
                                 </svg>
-                                <Show when={animationEnabled()}>
-                                  <span class={ui.readableId}>
-                                    {readableIds().transformLabel[tid]}
-                                  </span>
-                                </Show>
                                 <Show when={!hideDiceButtons()}>
                                   <DiceButton
                                     onClick={() => {

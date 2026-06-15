@@ -146,7 +146,11 @@ function FlameColorHandle(props: {
     const result = worldToClip(props.color)
     return result
   })
-  const handleScale = () => Math.max(1, Math.sqrt(zoom()))
+  // The editor's default zoom is 4 (see createZoom in FlameColorEditor). Scale
+  // the handles gently relative to that: smaller on desktop initially, and
+  // growing much less aggressively than the old sqrt(zoom) as the user zooms in
+  // (so they don't balloon). The invisible grab area stays generous for touch.
+  const handleScale = () => Math.max(0.7, (zoom() / 4) ** 0.4)
   const startDragging = createDragHandler((initEvent) => {
     changeHistory.startPreview('Flame color')
 
@@ -176,9 +180,9 @@ function FlameColorHandle(props: {
       }}
       style={{
         '--color': handleColor(theme(), props.color),
-        '--handle-visual-r': `${0.3 * handleScale()}rem`,
-        '--handle-visual-hover-r': `${0.4 * handleScale()}rem`,
-        '--handle-grab-r': `${0.6 * handleScale()}rem`,
+        '--handle-visual-r': `${0.42 * handleScale()}rem`,
+        '--handle-visual-hover-r': `${0.54 * handleScale()}rem`,
+        '--handle-grab-r': `${1.2 * handleScale()}rem`,
       }}
     >
       <circle
