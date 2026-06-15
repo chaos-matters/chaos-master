@@ -561,7 +561,12 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
         <div class={ui.previewCanvas}>
           <Root adapterOptions={{ powerPreference: 'high-performance' }}>
             <AutoCanvas
-              fixedResolution={{ width: 256, height: 256 }}
+              // 1024² keeps the average bucket well under the per-bucket
+              // saturation cap over the 10s unbounded run, so the benchmark
+              // measures real throughput instead of inflating once hot buckets
+              // stop taking atomic adds (only the extreme hot tail clamps). Also
+              // closer to a real render resolution than 256².
+              fixedResolution={{ width: 1024, height: 1024 }}
               alphaMode="opaque"
             >
               <WheelZoomCamera2D
