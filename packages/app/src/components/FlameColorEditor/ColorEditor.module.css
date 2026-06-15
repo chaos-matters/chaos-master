@@ -51,7 +51,8 @@
   display: block;
 }
 
-/* List view has no wheel, so pad it down past the floating toggle. */
+/* List view has no wheel, so pad it down past the floating toggle with a real
+   gap (matches the affine list clearance). */
 .list-wrap {
-  padding-top: 1.9rem;
+  padding-top: 2.5rem;
 }

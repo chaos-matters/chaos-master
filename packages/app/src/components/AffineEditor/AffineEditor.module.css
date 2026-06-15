@@ -211,7 +211,9 @@
 .list-mode {
   overflow-y: auto;
   overflow-x: hidden;
-  padding-top: 1.8rem;
+  /* Clear the floating toolbar (top: 6px, ~28px tall) with a real gap so the
+     first transform card isn't crammed against it. */
+  padding-top: 2.5rem;
 }
 
 .tab-icon {
