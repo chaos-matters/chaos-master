@@ -500,6 +500,23 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
     }, 'image/png')
   }
 
+  // Clipboard image writes are unreliable on Safari/iOS and some apps won't let
+  // you paste from the clipboard — a direct download always works.
+  function downloadBenchmarkImage() {
+    const canvas = renderBenchmarkCard()
+    canvas.toBlob((blob) => {
+      if (!blob) return
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `chaos-master-benchmark-${finalBps().toFixed(2)}Bps.png`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    }, 'image/png')
+  }
+
   const finalMps = createMemo(() => finalBps() * 1000)
   const achievementBadge = createMemo(() => getAchievementBadge(finalBps()))
 
@@ -743,7 +760,7 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
                 <path d="M4 2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h1v-1H4V3h7v2h1V3a1 1 0 0 0-1-1H4zm3 4a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H7zm0 1h7v7H7V7z" />
               )}
             </svg>
-            {copied() ? 'Copied!' : 'Copy Benchmark Log'}
+            {copied() ? 'Copied!' : 'Copy Log'}
           </button>
           <button
             class={ui.copyBtn}
@@ -760,7 +777,18 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
                 </>
               )}
             </svg>
-            {imageCopied() ? 'Copied!' : 'Copy as Image'}
+            {imageCopied() ? 'Copied!' : 'Copy Image'}
+          </button>
+          <button
+            class={ui.copyBtn}
+            onClick={downloadBenchmarkImage}
+            title="Download the benchmark image as a PNG"
+          >
+            <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14">
+              <path d="M8 1a.75.75 0 0 1 .75.75v6.69l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V1.75A.75.75 0 0 1 8 1z" />
+              <path d="M2.5 10.5a.75.75 0 0 1 .75.75V13h9.5v-1.75a.75.75 0 0 1 1.5 0v2.5a.75.75 0 0 1-.75.75h-11a.75.75 0 0 1-.75-.75v-2.5a.75.75 0 0 1 .75-.75z" />
+            </svg>
+            Download
           </button>
         </div>
         <div class={ui.caveatSection}>
