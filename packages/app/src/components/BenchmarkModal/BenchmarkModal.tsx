@@ -1,4 +1,4 @@
-import { createMemo, createResource, createSignal, onMount, Show, Suspense, } from 'solid-js'
+import { createMemo, createResource, createSignal, For, onMount, Show, Suspense, } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
 import { DEFAULT_POINT_COUNT } from '@/defaults'
 import { examples } from '@/flame/examples'
@@ -13,6 +13,31 @@ import { useRequestModal } from '../Modal/ModalContext'
 import ui from './BenchmarkModal.module.css'
 
 const BENCHMARK_SECONDS = 10
+
+// Selectable benchmark workloads of increasing per-point cost, so users can
+// measure different regimes (light vs transform/variation-heavy flames).
+const BENCHMARK_FLAMES = [
+  {
+    id: 'small',
+    label: 'Small',
+    meta: '2 transforms',
+    flame: examples.example2,
+  },
+  {
+    id: 'medium',
+    label: 'Medium',
+    meta: '4 transforms',
+    flame: examples.example1,
+  },
+  {
+    id: 'large',
+    label: 'Large',
+    meta: '6 tf · 14 var',
+    flame: examples.benchmark,
+  },
+] as const
+
+type BenchmarkFlameId = (typeof BENCHMARK_FLAMES)[number]['id']
 
 function getAchievementBadge(bps: number): { label: string; cssClass: string } {
   if (bps >= 5) return { label: '5B+', cssClass: 'badgeUltra' }
@@ -195,10 +220,21 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
   const [finalBps, setFinalBps] = createSignal(0)
   const [copied, setCopied] = createSignal(false)
   const [imageCopied, setImageCopied] = createSignal(false)
+  // Default to the standardized "large" benchmark flame (preserves prior
+  // behavior and leaderboard comparability).
+  const [selectedFlameId, setSelectedFlameId] =
+    createSignal<BenchmarkFlameId>('large')
+  const selectedFlame = () =>
+    BENCHMARK_FLAMES.find((f) => f.id === selectedFlameId()) ??
+    BENCHMARK_FLAMES[2]
   let startTime = 0
   let running = false
 
   function handleStart() {
+    // Frame the chosen flame with its own camera before the canvas mounts.
+    const cam = selectedFlame().flame.renderSettings.camera
+    cameraPosition[1](vec2f(cam.position[0], cam.position[1]))
+    cameraZoom[1](cam.zoom)
     setTotalPoints(0)
     setLiveBps(0)
     setProgress(0)
@@ -466,6 +502,24 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
             Second (BPS). The result can be shared on Discord for leaderboard
             challenges.
           </p>
+          <div class={ui.flamePills} role="group" aria-label="Benchmark flame">
+            <For each={BENCHMARK_FLAMES}>
+              {(f) => (
+                <button
+                  type="button"
+                  class={ui.flamePill}
+                  classList={{
+                    [ui.flamePillActive as string]: selectedFlameId() === f.id,
+                  }}
+                  aria-pressed={selectedFlameId() === f.id}
+                  onClick={() => setSelectedFlameId(f.id)}
+                >
+                  {f.label}
+                  <span class={ui.flamePillMeta}>{f.meta}</span>
+                </button>
+              )}
+            </For>
+          </div>
           <button class={ui.runBtn} onClick={handleStart}>
             <svg
               viewBox="0 0 24 24"
@@ -520,7 +574,7 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
                   pointCountPerBatch={DEFAULT_POINT_COUNT}
                   adaptiveFilterEnabled={false}
                   animationEnabled={false}
-                  flameDescriptor={examples.benchmark}
+                  flameDescriptor={selectedFlame().flame}
                   renderInterval={0}
                   disableQualityLimit={true}
                   edgeFadeColor={vec4f(0)}
