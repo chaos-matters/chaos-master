@@ -19,6 +19,7 @@ enabling (MN filter) or corrective (overflow clamp, benchmark canvas).
 | `0b3b221` | Benchmark small/medium/large flame selector | Tooling — measure different workloads |
 | `f5e7e2c` | Per-bucket saturation clamp | Fixes hot-spot atomic overflow defect |
 | `2303800` | Benchmark canvas 256² → 1024² | Stops saturation from inflating reported M/s |
+| `5c4b7e2` | **Persist chain state across dispatches** | Warmup paid once per settle, not every dispatch |
 
 ## The dominant win: plot every iteration (`d8a6719`)
 
@@ -96,14 +97,32 @@ throughput. Benchmark M/s is therefore **not comparable to prior 256² runs**.
   GPU** by the maintainer (the agent environment has no GPU). The overflow defect
   is gone and throughput rose 5→17 B/s.
 
-## Next
+## State persistence (`5c4b7e2`)
 
-- **State persistence** (in progress): persist each chain's point state across
-  dispatches (IFSRenderer's `state[gid]`) so warmup is paid once per "settle"
-  rather than every dispatch. Asymptotically removes the remaining warmup cost.
-- **Cheap interim lever:** raising `VITE_PLOTS_PER_CHAIN` (e.g. 32–64) captures
-  much of the same warmup amortization with zero added complexity, at the cost of
-  more atomic contention / per-dispatch latency.
+Following IFSRenderer's `state[gid]` design: each chain's position (packed xyz in
+a `vec4f`) and color (`vec2f`) persist in buffers across dispatches, so the
+warmup/fuse is paid **once per settle** instead of every dispatch. Previously
+every dispatch re-initialized its point and ran the full ~20-iter warmup even on
+frame 50 of a static accumulation — with `PLOTS_PER_CHAIN=16` that was ~20 of 36
+per-dispatch iterations spent on warmup.
+
+- Shared `pointPositions`/`pointColors` buffers (created in `Flam3` like
+  `pointRandomSeeds`), passed to all three pipelines.
+- A per-pipeline `resetPoints` uniform: `1` = cold start (init + warmup), `0` =
+  continue the persisted chain. `Flam3` sets it to `1` on the first IFS tick
+  after an accumulation reset (aligned with `clearRequested`) and `0` thereafter,
+  so a static render warms up once then runs warmup-free.
+- Camera/param changes re-warm (correct — chains are invalid for the new state);
+  animation playback re-warms each frame (expected).
+
+Verified by static checks + build + unit suite; **awaiting GPU verification**
+(chain continuity, correct re-warm on changes, no artifacts).
+
+## Cheap interim lever
+
+Raising `VITE_PLOTS_PER_CHAIN` (e.g. 32–64) captures much of the warmup
+amortization with zero added complexity, at the cost of more atomic contention /
+per-dispatch latency. Complementary to state persistence.
 
 ### Why we did *not* remove the per-point RNG seed round-trip
 
