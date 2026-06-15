@@ -69,6 +69,19 @@
   pointer-events: all;
 }
 
+/* Selection: dim non-selected handles and emphasize the selected one. Dimmed
+   handles stay interactive so clicking one selects it. */
+.handle.dimmed {
+  opacity: 0.3;
+  transition: opacity 150ms;
+}
+
+.handle.selected .handle-circle {
+  r: var(--handle-visual-hover-r, 0.4rem);
+  stroke-width: 2.5px;
+  filter: drop-shadow(0 0 4px var(--color));
+}
+
 @media (pointer: coarse) {
   .handle-circle {
     r: var(--handle-visual-r, 0.55rem);

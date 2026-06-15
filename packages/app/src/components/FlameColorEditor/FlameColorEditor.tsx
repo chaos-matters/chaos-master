@@ -134,6 +134,9 @@ function Gradient(props: { isVisible: () => boolean }) {
 function FlameColorHandle(props: {
   color: v2f
   setColor: (color: v2f) => void
+  selected?: boolean
+  dimmed?: boolean
+  onSelect?: () => void
 }) {
   const { theme } = useTheme()
   const { canvas } = useCanvas()
@@ -171,10 +174,17 @@ function FlameColorHandle(props: {
   return (
     <g
       class={ui.handle}
+      classList={{
+        [ui.selected as string]: props.selected,
+        [ui.dimmed as string]: props.dimmed,
+      }}
       // TODO: temporarily using on:pointerdown and not onPointerDown
       // because otherwise WheelZoomCamera2D steals the event
       // due to solidjs event delegation.
-      on:pointerdown={startDragging}
+      on:pointerdown={(e) => {
+        props.onSelect?.()
+        startDragging(e)
+      }}
       onContextMenu={(e) => {
         e.preventDefault()
       }}
@@ -202,6 +212,8 @@ function FlameColorHandle(props: {
 export function FlameColorEditor(props: {
   transforms: TransformRecord
   setTransforms: HistorySetter<TransformRecord>
+  selectedTransformId?: () => string | null
+  setSelectedTransformId?: (tid: string | null) => void
 }) {
   const [div, setDiv] = createSignal<HTMLDivElement>()
   const [zoom, setZoom] = createZoom(4, [2, 20])
@@ -244,6 +256,12 @@ export function FlameColorEditor(props: {
                       draft[tid]!.color = { x: color.x, y: color.y }
                     })
                   }}
+                  selected={props.selectedTransformId?.() === tid}
+                  dimmed={
+                    !!props.selectedTransformId?.() &&
+                    props.selectedTransformId?.() !== tid
+                  }
+                  onSelect={() => props.setSelectedTransformId?.(tid)}
                 />
               )}
             </For>

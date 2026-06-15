@@ -2,6 +2,14 @@
   /* CollapsibleCard is the visual container — header + content form one unit */
 }
 
+/* Selected transform: accent outline so it's clear which transform the affine
+   grid / color picker are acting on. */
+.card.selected {
+  outline: 2px solid var(--accent-color, #3b82f6);
+  outline-offset: 1px;
+  border-radius: var(--space-3);
+}
+
 .collapsed .header {
   /* Full border-radius on all corners when collapsed */
   border-radius: var(--space-3);

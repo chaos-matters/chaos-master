@@ -180,6 +180,9 @@ function AffineHandle(props: {
   color: v2f
   setTransform: (pos: AffineParams) => void
   is3D?: boolean
+  selected?: boolean
+  dimmed?: boolean
+  onSelect?: () => void
 }) {
   const { theme } = useTheme()
   const {
@@ -497,7 +500,14 @@ function AffineHandle(props: {
           </svg>
           <g
             class={ui.handle}
-            on:pointerdown={startDragging}
+            classList={{
+              [ui.selected as string]: props.selected,
+              [ui.dimmed as string]: props.dimmed,
+            }}
+            on:pointerdown={(e) => {
+              props.onSelect?.()
+              startDragging(e)
+            }}
             onContextMenu={(e) => {
               e.preventDefault()
             }}
@@ -645,7 +655,14 @@ function AffineHandle(props: {
         {/* Center free-translation handle */}
         <g
           class={ui.handle}
-          on:pointerdown={startDragging3D}
+          classList={{
+            [ui.selected as string]: props.selected,
+            [ui.dimmed as string]: props.dimmed,
+          }}
+          on:pointerdown={(e) => {
+            props.onSelect?.()
+            startDragging3D(e)
+          }}
           onContextMenu={(e) => {
             e.preventDefault()
           }}
@@ -682,6 +699,8 @@ export function AffineEditor(props: {
   finalTransform?: AffineParams
   setFinalTransform?: (affine: AffineParams) => void
   is3D?: boolean
+  selectedTransformId?: () => string | null
+  setSelectedTransformId?: (tid: string | null) => void
 }) {
   const [div, setDiv] = createSignal<HTMLDivElement>()
   const [zoom, setZoom] = createZoom(0.9, [0.5, 20])
@@ -805,6 +824,12 @@ export function AffineEditor(props: {
                         })
                       }}
                       is3D={props.is3D}
+                      selected={props.selectedTransformId?.() === tid}
+                      dimmed={
+                        !!props.selectedTransformId?.() &&
+                        props.selectedTransformId?.() !== tid
+                      }
+                      onSelect={() => props.setSelectedTransformId?.(tid)}
                     />
                   )}
                 </For>

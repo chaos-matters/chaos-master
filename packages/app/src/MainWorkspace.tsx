@@ -245,6 +245,11 @@ export function MainWorkspace(props: AppProps) {
   const [adaptiveFilterEnabled, setAdaptiveFilterEnabled] = createSignal(true)
   const [stochasticFilterEnabled, setStochasticFilterEnabled] =
     createSignal(false)
+  // Which transform is "selected" — shared across the affine grid, the color
+  // picker and the sidebar transform cards so it's clear which one edits target.
+  const [selectedTransformId, setSelectedTransformId] = createSignal<
+    string | null
+  >(null)
   const [animationEnabled, setAnimationEnabled] = createSignal(true)
   const [blendFlame, setBlendFlame] = createSignal<
     FlameDescriptor | undefined
@@ -2780,6 +2785,8 @@ export function MainWorkspace(props: AppProps) {
                               (flameDescriptor.renderSettings.dimensions ??
                                 2) === 3
                             }
+                            selectedTransformId={selectedTransformId}
+                            setSelectedTransformId={setSelectedTransformId}
                           />
                         </CollapsibleCard>
                         <CollapsibleCard title="Color">
@@ -2791,6 +2798,8 @@ export function MainWorkspace(props: AppProps) {
                                   setFn(draft.transforms)
                                 })
                               }}
+                              selectedTransformId={selectedTransformId}
+                              setSelectedTransformId={setSelectedTransformId}
                             />
                             <ColorListEditor
                               transforms={flameDescriptor.transforms}
@@ -2945,9 +2954,14 @@ export function MainWorkspace(props: AppProps) {
                           {([tid, transform]) => (
                             <CollapsibleCard
                               title={readableIds().transformLabel[tid]!}
+                              selected={selectedTransformId() === tid}
                             >
                               <div class={ui.transformGrid}>
-                                <svg class={ui.variationButtonSvgColor}>
+                                <svg
+                                  class={ui.variationButtonSvgColor}
+                                  style={{ cursor: 'pointer' }}
+                                  onClick={() => setSelectedTransformId(tid)}
+                                >
                                   <g
                                     class={ui.variationButtonColor}
                                     style={{

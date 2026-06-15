@@ -4,7 +4,12 @@ import ui from './CollapsibleCard.module.css'
 import type { ParentProps } from 'solid-js'
 
 export function CollapsibleCard(
-  props: ParentProps<{ title: string; defaultOpen?: boolean; class?: string }>,
+  props: ParentProps<{
+    title: string
+    defaultOpen?: boolean
+    class?: string
+    selected?: boolean
+  }>,
 ) {
   const [isOpen, setIsOpen] = createSignal(props.defaultOpen ?? true)
   return (
@@ -13,6 +18,7 @@ export function CollapsibleCard(
       classList={{
         [props.class ?? '']: true,
         [ui.collapsed!]: !isOpen(),
+        [ui.selected!]: props.selected === true,
       }}
     >
       <button class={ui.header} onClick={() => setIsOpen((p) => !p)}>
