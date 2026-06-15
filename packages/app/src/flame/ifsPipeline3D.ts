@@ -1,7 +1,7 @@
 import { onCleanup } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { arrayOf, builtin, f32, i32, struct, u32, vec2f, vec2i, vec2u, } from 'typegpu/data'
-import { add, arrayLength, atomicAdd, div, mul, sub } from 'typegpu/std'
+import { add, arrayLength, atomicAdd, atomicLoad, div, mul, sub, } from 'typegpu/std'
 import { DEBUG_MODE } from '@/defaults'
 import { camera3DWorldToClip } from '@/lib/Camera3D'
 import { hash, random, randomState, setSeed } from '@/shaders/random'
@@ -11,7 +11,11 @@ import { AffineParams3D, transformAffine3D } from './affineTransform3D'
 import { colorInitModeToImplFn } from './colorInitMode'
 import { isPointInitMode3D, pointInitMode3DToImplFn } from './pointInitMode3D'
 import { createFlameWgsl3D, extractFlameUniforms3D, isAffine3D, } from './transformFunction3D'
-import { AtomicBucket, BUCKET_FIXED_POINT_MULTIPLIER } from './types'
+import {
+  AtomicBucket,
+  BUCKET_FIXED_POINT_MULTIPLIER,
+  BUCKET_SATURATION_COUNT,
+} from './types'
 import { Point3D } from './types3D'
 import type { StorageFlag, TgpuBuffer, TgpuRoot } from 'typegpu'
 import type { Vec2u, WgslArray } from 'typegpu/data'
@@ -229,19 +233,25 @@ export function createIFSPipeline3D(
             const pixelIndex = screenI.y * outputTextureDimension.x + screenI.x
             const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
             const fixedWeight = u32(mul(accumWeight, f32(fixed_m)))
-            atomicAdd(accumulationBuffer[pixelIndex]!.count, fixedWeight)
-            atomicAdd(
-              accumulationBuffer[pixelIndex]!.z,
-              i32(mul(clip.z, f32(fixedWeight))),
-            )
-            atomicAdd(
-              accumulationBuffer[pixelIndex]!.color.a,
-              i32(mul(point.color.x, f32(fixedWeight))),
-            )
-            atomicAdd(
-              accumulationBuffer[pixelIndex]!.color.b,
-              i32(mul(point.color.y, f32(fixedWeight))),
-            )
+            // Stop once the bucket saturates so the atomics can't wrap.
+            if (
+              atomicLoad(accumulationBuffer[pixelIndex]!.count) <
+              BUCKET_SATURATION_COUNT
+            ) {
+              atomicAdd(accumulationBuffer[pixelIndex]!.count, fixedWeight)
+              atomicAdd(
+                accumulationBuffer[pixelIndex]!.z,
+                i32(mul(clip.z, f32(fixedWeight))),
+              )
+              atomicAdd(
+                accumulationBuffer[pixelIndex]!.color.a,
+                i32(mul(point.color.x, f32(fixedWeight))),
+              )
+              atomicAdd(
+                accumulationBuffer[pixelIndex]!.color.b,
+                i32(mul(point.color.y, f32(fixedWeight))),
+              )
+            }
           }
         } else {
           const jittered = add(screen, pointInitMode(pointIndex).xy)
@@ -258,19 +268,25 @@ export function createIFSPipeline3D(
             const screenI = vec2i(jittered)
             const pixelIndex = screenI.y * outputTextureDimension.x + screenI.x
             const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
-            atomicAdd(accumulationBuffer[pixelIndex]!.count, u32(1 * fixed_m))
-            atomicAdd(
-              accumulationBuffer[pixelIndex]!.z,
-              i32(clip.z * f32(fixed_m)),
-            )
-            atomicAdd(
-              accumulationBuffer[pixelIndex]!.color.a,
-              i32(point.color.x * f32(fixed_m)),
-            )
-            atomicAdd(
-              accumulationBuffer[pixelIndex]!.color.b,
-              i32(point.color.y * f32(fixed_m)),
-            )
+            // Stop once the bucket saturates so the atomics can't wrap.
+            if (
+              atomicLoad(accumulationBuffer[pixelIndex]!.count) <
+              BUCKET_SATURATION_COUNT
+            ) {
+              atomicAdd(accumulationBuffer[pixelIndex]!.count, u32(1 * fixed_m))
+              atomicAdd(
+                accumulationBuffer[pixelIndex]!.z,
+                i32(clip.z * f32(fixed_m)),
+              )
+              atomicAdd(
+                accumulationBuffer[pixelIndex]!.color.a,
+                i32(point.color.x * f32(fixed_m)),
+              )
+              atomicAdd(
+                accumulationBuffer[pixelIndex]!.color.b,
+                i32(point.color.y * f32(fixed_m)),
+              )
+            }
           }
         }
       }
