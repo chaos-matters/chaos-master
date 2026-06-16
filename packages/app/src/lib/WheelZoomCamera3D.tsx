@@ -288,7 +288,7 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
       changeHistory.startPreview('Camera zoom')
     }
     props.radius[1]((r) =>
-      Math.max(0.01, Math.min(100, r * (1 + ev.deltaY * SCROLL_SENSITIVITY))),
+      Math.max(0.001, Math.min(100, r * (1 + ev.deltaY * SCROLL_SENSITIVITY))),
     )
     setTimeout(() => {
       changeHistory.commit()
@@ -303,7 +303,7 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
     return {
       onPinchMove(event) {
         const ratio = event.distance / prevDistance
-        props.radius[1]((r) => Math.max(0.01, Math.min(100, r / ratio)))
+        props.radius[1]((r) => Math.max(0.001, Math.min(100, r / ratio)))
         prevDistance = event.distance
       },
       onDone() {
