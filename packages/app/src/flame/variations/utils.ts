@@ -409,25 +409,28 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
     ),
     pixelFlowVar: unfreeze(
       produce(getDefaultFlameByVarType('pixelFlowVar'), (draft) => {
-        draft.renderSettings.camera.zoom = 0.595
-        draft.renderSettings.camera.position = [0.2323, 0.0853]
-        draft.renderSettings.exposure = 0.566
+        draft.renderSettings.camera.zoom = 0.6
+        draft.renderSettings.camera.position = [0, 0]
+        draft.renderSettings.exposure = 0.4
+        draft.renderSettings.pointInitMode = 'pointInitCircle'
+        // pixelFlow only contributes a flow delta, so pair it with linear (which
+        // supplies the base disk shape) — exactly how JWildFire's pixel_flow is
+        // meant to be used.
         draft.transforms[getTransformPreviewTid('pixelFlowVar')]!.variations = {
           [getTransformPreviewVid('pixelFlowVar')]: {
             type: 'pixelFlowVar',
             weight: 1.0,
             visible: true,
             params: {
-              scale_x: 1.0,
-              scale_y: 1.0,
-              speed_x: 0.0,
-              speed_y: 0.0,
+              angle: 149,
+              len: 1.54,
+              width: 231,
               seed: 46472,
             },
           },
           [generateVariationId()]: {
             type: 'linearVar',
-            weight: 1,
+            weight: 0.92,
             visible: true,
           },
         }

@@ -63,18 +63,19 @@ const PixelFlowVarParamsEditor: EditorFor<PixelFlowVarParams> = (props) => (
   </>
 )
 
-// Robert Jenkins' 32-bit integer hash, matching PixelFlowFunc.hash(): signed
-// i32 arithmetic (arithmetic right shifts, wrapping multiply) normalized by
-// 2^31-1, so the result lands in roughly [-1, 1).
+// Robert Jenkins' 32-bit integer hash (PixelFlowFunc.hash()). The scramble runs
+// in u32 — WGSL requires u32 shift amounts and the bit ops match the Java signed
+// version — then the final value is reinterpreted as signed and normalized by
+// 2^31-1 (JWildFire's `(double)a / Integer.MAX_VALUE`), so it spans ~[-1, 1).
 const pixel_flow_hash = (inVal: number): number => {
   'use gpu'
-  let a = i32(inVal)
+  let a = u32(inVal)
   a = (a ^ 61) ^ (a >> u32(16))
   a = a + (a << u32(3))
   a = a ^ (a >> u32(4))
   a = a * 0x27d4eb2d
   a = a ^ (a >> u32(15))
-  return f32(a) / 2147483647.0
+  return f32(i32(a)) / 2147483647.0
 }
 
 export const pixelFlowVar = parametricVariation(
