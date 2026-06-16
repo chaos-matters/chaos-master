@@ -391,7 +391,6 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
     const deltaTime = (now - lastTime) / 1000 // in seconds
     lastTime = now
 
-    const radius = props.radius[0]()
     const { right, up, forward } = getCameraAxes()
 
     if (props.flyMode?.()) {
@@ -399,7 +398,9 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
       // Q/E descend/ascend along world up. Moving the target translates the
       // whole camera since the eye is derived from it.
       const speed =
-        radius * KEY_PAN_SPEED * (props.flySpeed?.[0]() ?? 1) * deltaTime
+        // Clamp the radius (panRadius) so fly speed doesn't crawl to ~0 when
+        // zoomed in very close — otherwise you can't fly back out.
+        panRadius() * KEY_PAN_SPEED * (props.flySpeed?.[0]() ?? 1) * deltaTime
       let fwd = 0
       let strafe = 0
       let rise = 0
