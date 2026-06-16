@@ -3428,6 +3428,7 @@ export function MainWorkspace(props: AppProps) {
                                     })
                                   }}
                                 >
+                                  <Plus />
                                   Add variation
                                 </button>
                               </div>

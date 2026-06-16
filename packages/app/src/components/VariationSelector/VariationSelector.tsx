@@ -782,8 +782,10 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
         }}
       >
         Select Variation
-        <span class={ui.undoMessage}>You can undo this operation.</span>
       </ModalTitleBar>
+      <p class={ui.modalSubtitle}>
+        Search and preview functions, then add the selected one to the transform.
+      </p>
       <section class={ui.variationPreview}>
         <div class={ui.searchBar}>
           <input

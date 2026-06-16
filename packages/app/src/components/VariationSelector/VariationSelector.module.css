@@ -22,6 +22,17 @@
   width: calc(90vw - 2 * var(--space-4));
 }
 
+.modal-subtitle {
+  margin: -0.2rem 0 var(--space-3) 0;
+  font-size: 0.72rem;
+  color: var(--neutral-500);
+  line-height: 1.4;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-400);
+  }
+}
+
 .variation-preview {
   display: grid;
   flex: 1;
