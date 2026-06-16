@@ -312,6 +312,11 @@ export interface FlameDescriptor {
       fov: number
     }
     dimensions?: number
+    plotsPerChain?: number
+    autoExposure3D?: boolean
+    autoExposure3DStrength?: number
+    autoExposure3DRefRadius?: number
+    autoExposure3DBase?: number
   }
   transforms: TransformRecord
   finalTransform?: {
