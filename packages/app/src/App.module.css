@@ -1185,10 +1185,17 @@
 .readable-id {
   font-family: monospace;
   font-size: 10px;
-  color: var(--accent-color, #3b82f6);
+  /* Derive a readable tint from the transform accent instead of using it
+     raw: pin lightness against the card background per theme and cap chroma
+     so saturated hues (esp. dark blue) can't gamut-clip to near-invisible. */
+  color: oklch(from var(--accent-color, #3b82f6) 0.48 min(c, 0.15) h);
   font-weight: 600;
   white-space: nowrap;
   user-select: none;
+
+  [data-theme='dark'] & {
+    color: oklch(from var(--accent-color, #3b82f6) 0.8 min(c, 0.13) h);
+  }
 }
 
 .toast {
