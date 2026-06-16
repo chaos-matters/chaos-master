@@ -1,5 +1,5 @@
 import { f32, struct, vec2f } from 'typegpu/data'
-import { floor, sqrt } from 'typegpu/std'
+import { floor } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { random } from '@/shaders/random'
@@ -42,16 +42,15 @@ export const blurPixelizeVar = parametricVariation(
   (pos, varInfo, P) => {
     'use gpu'
     const inv_size = 1.0 / P.size
-    const x0 = f32(floor(pos.x * inv_size))
-    const y0 = f32(floor(pos.y * inv_size))
-    const cx = x0 * P.size + P.size * 0.5
-    const cy = y0 * P.size + P.size * 0.5
-    const dx = pos.x - cx
-    const dy = pos.y - cy
-    const dist = sqrt(dx * dx + dy * dy)
-    const v = varInfo.weight * P.size
-    const delta = dist * P.scale * random() * v
-    return vec2f(delta, delta) // Note: symmetric shift on X and Y based on code?
+    // Pixelize: snap the point to the centre of its size×size grid cell.
+    const cx = f32(floor(pos.x * inv_size)) * P.size + P.size * 0.5
+    const cy = f32(floor(pos.y * inv_size)) * P.size + P.size * 0.5
+    // Blur: jitter uniformly within the cell, widened by `scale`.
+    const jitter = P.size * P.scale
+    return vec2f(
+      cx + jitter * (0.5 - random()),
+      cy + jitter * (0.5 - random()),
+    ).mul(varInfo.weight)
   },
   'blur',
 )

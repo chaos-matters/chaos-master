@@ -835,19 +835,17 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
     ),
     blurPixelizeVar: unfreeze(
       produce(getDefaultFlameByVarType('blurPixelizeVar'), (draft) => {
-        // NOTE: blurPixelizeVar returns vec2f(delta, delta), so every point
-        // lands on the y=x diagonal (likely a variation bug). Best we can do
-        // for the thumbnail is widen that streak: bump size/scale + zoom in.
+        // Pixelizes the input into a grid of blurred cells around the origin;
+        // size sets the cell pitch, scale the in-cell blur. Frame a few cells.
         draft.renderSettings.exposure = 1.5
         draft.renderSettings.camera.zoom = 0.6
-        draft.renderSettings.camera.position = [0.4, 0.4]
         draft.transforms[getTransformPreviewTid('blurPixelizeVar')]!.variations[
           getTransformPreviewVid('blurPixelizeVar')
         ] = {
           type: 'blurPixelizeVar',
           weight: 1.0,
           visible: true,
-          params: { size: 0.7, scale: 3.0 },
+          params: { size: 0.5, scale: 1.0 },
         }
       }),
     ),
