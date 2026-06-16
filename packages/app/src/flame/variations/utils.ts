@@ -645,7 +645,9 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
     ),
     funnelVar: unfreeze(
       produce(getDefaultFlameByVarType('funnelVar'), (draft) => {
+        // The cushion spans ~[-2, 2]; zoom out so the whole funnel shape shows.
         draft.renderSettings.exposure = 1.0
+        draft.renderSettings.camera.zoom = 0.5
         draft.transforms[getTransformPreviewTid('funnelVar')]!.variations[
           getTransformPreviewVid('funnelVar')
         ] = {
@@ -686,8 +688,20 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
     ),
     sTwinVar: unfreeze(
       produce(getDefaultFlameByVarType('sTwinVar'), (draft) => {
-        draft.renderSettings.exposure = 2.2
-        draft.renderSettings.camera.zoom = 0.4
+        // At distort=0 the x-output collapses to 0 and the internal 0.05
+        // multipliers shrink everything to a sliver; the gaussian input also
+        // concentrates near the origin so the twin shape stays tiny. Crank
+        // weight + distort and zoom IN to enlarge the central structure.
+        draft.renderSettings.exposure = 1.8
+        draft.renderSettings.camera.zoom = 1.8
+        draft.transforms[getTransformPreviewTid('sTwinVar')]!.variations[
+          getTransformPreviewVid('sTwinVar')
+        ] = {
+          type: 'sTwinVar',
+          weight: 25.0,
+          visible: true,
+          params: { distort: 2.0, offset_x2: 0, offset_y2: 0, offset_xy: 0 },
+        }
       }),
     ),
     blockYVar: unfreeze(
@@ -715,6 +729,125 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
             warp: 1.0,
             weight: 2.0,
           },
+        }
+      }),
+    ),
+    cellVar: unfreeze(
+      produce(getDefaultFlameByVarType('cellVar'), (draft) => {
+        // cellVar tiles points into a grid in x∈[0,2.4], y∈[-2.4,0] (the
+        // lower-right of the origin), so recentre + zoom out to frame it.
+        draft.renderSettings.exposure = 1.2
+        draft.renderSettings.camera.zoom = 0.6
+        draft.renderSettings.camera.position = [1.2, -1.2]
+      }),
+    ),
+    cell2Var: unfreeze(
+      produce(getDefaultFlameByVarType('cell2Var'), (draft) => {
+        // Same grid layout as cellVar (default spacing maps to x∈[0,2.4],
+        // y∈[-2.4,0]).
+        draft.renderSettings.exposure = 1.2
+        draft.renderSettings.camera.zoom = 0.6
+        draft.renderSettings.camera.position = [1.2, -1.2]
+      }),
+    ),
+    circleRandVar: unfreeze(
+      produce(getDefaultFlameByVarType('circleRandVar'), (draft) => {
+        // Defaults scatter circles across x,y∈[-10,10] — far too sparse for a
+        // thumbnail. Shrink the field + circle scale to a dense patch and push
+        // exposure hard (the per-point jitter spreads the disks thin).
+        draft.renderSettings.exposure = 3.5
+        draft.renderSettings.camera.zoom = 0.5
+        draft.transforms[getTransformPreviewTid('circleRandVar')]!.variations[
+          getTransformPreviewVid('circleRandVar')
+        ] = {
+          type: 'circleRandVar',
+          weight: 1.0,
+          visible: true,
+          params: { sc: 0.5, dens: 0.85, x: 2.0, y: 2.0, seed: 0.0 },
+        }
+      }),
+    ),
+    fluxVar: unfreeze(
+      produce(getDefaultFlameByVarType('fluxVar'), (draft) => {
+        // flux maps the origin to ~(0, 2.3); the bright "eye" sits near the
+        // (1,0) pole. Zoom out and centre on that cluster.
+        draft.renderSettings.exposure = 1.0
+        draft.renderSettings.camera.zoom = 0.38
+        draft.renderSettings.camera.position = [1.5, 0]
+      }),
+    ),
+    nPolarVar: unfreeze(
+      produce(getDefaultFlameByVarType('nPolarVar'), (draft) => {
+        // n-fold blob near the origin; drop n for distinct petals and zoom in
+        // a little so the central structure reads clearly.
+        draft.renderSettings.exposure = 1.5
+        draft.renderSettings.camera.zoom = 1.4
+        draft.transforms[getTransformPreviewTid('nPolarVar')]!.variations[
+          getTransformPreviewVid('nPolarVar')
+        ] = {
+          type: 'nPolarVar',
+          weight: 1.0,
+          visible: true,
+          params: { n: 3.0, parity: 0.0 },
+        }
+      }),
+    ),
+    logVar: unfreeze(
+      produce(getDefaultFlameByVarType('logVar'), (draft) => {
+        // log maps to x∈[-3,0.3], y∈[-π,π]: a tall strip. The dense cluster
+        // sits near x≈-0.3 (r≈0.5-1); centre there and zoom out for the curve.
+        draft.renderSettings.exposure = 1.0
+        draft.renderSettings.camera.zoom = 0.3
+        draft.renderSettings.camera.position = [0.2, -0.2]
+      }),
+    ),
+    splitsVar: unfreeze(
+      produce(getDefaultFlameByVarType('splitsVar'), (draft) => {
+        // Framing tuned in-app: rotate the split via preAffine, shear the
+        // quadrants, then zoom/centre on the offset cluster.
+        draft.renderSettings.exposure = 2.067
+        draft.renderSettings.camera.zoom = 0.232
+        draft.renderSettings.camera.position = [1.035, 0.075]
+        const tid = getTransformPreviewTid('splitsVar')
+        const vid = getTransformPreviewVid('splitsVar')
+        draft.transforms[tid]!.preAffine = {
+          a: 0.87924897700036,
+          b: -0.5916507929296548,
+          c: -0.09523609280586243,
+          d: 0.5916507929296548,
+          e: 0.87924897700036,
+          f: -0.034293368458747864,
+        }
+        draft.transforms[tid]!.variations[vid] = {
+          type: 'splitsVar',
+          weight: 1.0,
+          visible: true,
+          params: {
+            x: 0.09,
+            y: 0.01,
+            lshear: -0.64,
+            rshear: -0.13,
+            ushear: 0.05,
+            dshear: -0.11,
+          },
+        }
+      }),
+    ),
+    blurPixelizeVar: unfreeze(
+      produce(getDefaultFlameByVarType('blurPixelizeVar'), (draft) => {
+        // NOTE: blurPixelizeVar returns vec2f(delta, delta), so every point
+        // lands on the y=x diagonal (likely a variation bug). Best we can do
+        // for the thumbnail is widen that streak: bump size/scale + zoom in.
+        draft.renderSettings.exposure = 1.5
+        draft.renderSettings.camera.zoom = 0.6
+        draft.renderSettings.camera.position = [0.4, 0.4]
+        draft.transforms[getTransformPreviewTid('blurPixelizeVar')]!.variations[
+          getTransformPreviewVid('blurPixelizeVar')
+        ] = {
+          type: 'blurPixelizeVar',
+          weight: 1.0,
+          visible: true,
+          params: { size: 0.7, scale: 3.0 },
         }
       }),
     ),
