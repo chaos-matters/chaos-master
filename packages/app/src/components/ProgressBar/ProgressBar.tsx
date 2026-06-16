@@ -1,6 +1,6 @@
 import { createMemo, Show } from 'solid-js'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { accumulatedPointCount, animationExportCancel, animationExportProgress, exportProgress, forceExportNow, iterationSpeedPointPerSec, setExportProgress, setForceAnimationExportNow, setForceExportNow, } from '@/flame/renderStats'
+import { accumulatedPointCount, animationExportCancel, animationExportProgress, exportProgress, forceExportNow, iterationSpeedPointPerSec, setCancelExportNow, setExportProgress, setForceAnimationExportNow, setForceExportNow, } from '@/flame/renderStats'
 import ui from './ProgressBar.module.css'
 
 function formatCount(n: number): string {
@@ -87,6 +87,10 @@ export function ProgressBar() {
     setForceExportNow(true)
   }
 
+  const handleCancelImage = () => {
+    setCancelExportNow(true)
+  }
+
   const handleStopAndSaveAnimation = () => {
     setForceAnimationExportNow(true)
   }
@@ -127,6 +131,14 @@ export function ProgressBar() {
                   title="Stop rendering and export the image at current quality"
                 >
                   Stop & Export
+                </button>
+                <button
+                  type="button"
+                  class={ui.cancelButton}
+                  onClick={handleCancelImage}
+                  title="Cancel and discard the export"
+                >
+                  Cancel
                 </button>
               </div>
             </Show>

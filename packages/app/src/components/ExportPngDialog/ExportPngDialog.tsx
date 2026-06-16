@@ -6,7 +6,7 @@ import { ScrubInput } from '@/components/Sliders/ScrubInput'
 import { Slider } from '@/components/Sliders/Slider'
 import { ALLOW_CAMERA_DURING_EXPORT, DEFAULT_POINT_COUNT, DEFAULT_PREVIEW_PIXEL_RATIO, } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
-import { accumulatedPointCount, forceExportNow, qualityPointCountLimit, setCameraDuringExportEnabled, setExportProgress, setExportQuality, setForceExportNow, } from '@/flame/renderStats'
+import { accumulatedPointCount, cancelExportNow, forceExportNow, qualityPointCountLimit, setCameraDuringExportEnabled, setCancelExportNow, setExportProgress, setExportQuality, setForceExportNow, } from '@/flame/renderStats'
 import { condenseFlameDescriptor, MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from '@/flame/schema/flameSchema'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
@@ -1110,7 +1110,39 @@ export function createExportPngDialog(
 
       // Export callback waits for quality to be reached
       type ExportInfo = { finalImageReady: boolean }
+      // Reset export signals + restore the workspace render settings the dialog
+      // temporarily overrode. Shared by the normal finish, "Stop & Export" and
+      // "Cancel" paths.
+      const restoreAfterExport = () => {
+        setForceExportNow(false)
+        setCancelExportNow(false)
+        setOnExportImage(undefined)
+        setPixelRatio(currentRatio)
+        setExportQuality(undefined)
+        setExportProgress(undefined)
+        setFlameDescriptor((draft) => {
+          draft.renderSettings.exposure = originalSettings.exposure
+          draft.renderSettings.vibrancy = originalSettings.vibrancy
+          draft.renderSettings.contrast = originalSettings.contrast
+          draft.renderSettings.gamma = originalSettings.gamma
+          draft.renderSettings.drawMode = originalSettings.drawMode
+          draft.renderSettings.backgroundColor =
+            originalSettings.backgroundColor
+          draft.renderSettings.camera.zoom = originalSettings.camera.zoom
+          draft.renderSettings.camera.position = [
+            originalSettings.camera.position[0],
+            originalSettings.camera.position[1],
+          ]
+        })
+      }
+
       setOnExportImage(() => (canvas: HTMLCanvasElement, info?: ExportInfo) => {
+        // Cancel (discard): abort without saving and restore the workspace.
+        if (cancelExportNow()) {
+          restoreAfterExport()
+          return
+        }
+
         const limitFn = qualityPointCountLimit()
         const limit = limitFn()
         const current = accumulatedPointCount()
@@ -1131,28 +1163,7 @@ export function createExportPngDialog(
           return
 
         // Quality reached or force-exported
-        setForceExportNow(false)
-        setOnExportImage(undefined)
-        setPixelRatio(currentRatio)
-        setExportQuality(undefined)
-        setExportProgress(undefined)
-
-        // Restore original render settings so the workspace is not permanently
-        // modified by the export dialog adjustments.
-        setFlameDescriptor((draft) => {
-          draft.renderSettings.exposure = originalSettings.exposure
-          draft.renderSettings.vibrancy = originalSettings.vibrancy
-          draft.renderSettings.contrast = originalSettings.contrast
-          draft.renderSettings.gamma = originalSettings.gamma
-          draft.renderSettings.drawMode = originalSettings.drawMode
-          draft.renderSettings.backgroundColor =
-            originalSettings.backgroundColor
-          draft.renderSettings.camera.zoom = originalSettings.camera.zoom
-          draft.renderSettings.camera.position = [
-            originalSettings.camera.position[0],
-            originalSettings.camera.position[1],
-          ]
-        })
+        restoreAfterExport()
 
         canvas.toBlob(
           async (blob) => {

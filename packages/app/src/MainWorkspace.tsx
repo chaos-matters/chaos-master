@@ -67,7 +67,7 @@ import { Flam3 } from './flame/Flam3'
 import { pointInitModeToImplFn } from './flame/pointInitMode'
 import { pointInitMode3DToImplFn } from './flame/pointInitMode3D'
 import { generateRandomFlame, mutateFlame, random01, randomizeAllColors, randomizeVariationParams, randomRange, } from './flame/randomize'
-import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, cameraDuringExportEnabled, exportProgress, exportQuality, qualityPointCountLimit, setCurrentQuality, setExportQuality, setForceAnimationExportNow, setForceExportNow, setQualityPointCountLimit, } from './flame/renderStats'
+import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, cameraDuringExportEnabled, exportProgress, exportQuality, qualityPointCountLimit, setCancelExportNow, setCurrentQuality, setExportQuality, setForceAnimationExportNow, setForceExportNow, setQualityPointCountLimit, } from './flame/renderStats'
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from './flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from './flame/transformFunction'
 import { defaultLinearType } from './flame/variationRegistry'
@@ -2742,6 +2742,16 @@ export function MainWorkspace(props: AppProps) {
                         title="Stop and export at current quality"
                       >
                         Stop & Export
+                      </button>
+                      <button
+                        class={ui.overlayCancelButton}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setCancelExportNow(true)
+                        }}
+                        title="Cancel and discard"
+                      >
+                        Cancel
                       </button>
                     </div>
                   </Show>
