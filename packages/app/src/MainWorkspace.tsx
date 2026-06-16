@@ -2590,16 +2590,20 @@ export function MainWorkspace(props: AppProps) {
                   <div
                     class={ui.timelineContainer}
                     style={{
+                      // Lock the timeline only during export — NOT during plain
+                      // playback. Locking the whole container while playing also
+                      // disabled the transport bar, so the pause button became
+                      // unclickable (#8). Editing is already guarded per-handler
+                      // during playback (e.g. DopeSheetTrack ignores input), so
+                      // leaving it interactive lets the user pause/scrub.
                       'pointer-events':
                         animationExportRunning() ||
-                        exportProgress() !== undefined ||
-                        timeline.isPlaying()
+                        exportProgress() !== undefined
                           ? 'none'
                           : 'auto',
                       opacity:
                         animationExportRunning() ||
-                        exportProgress() !== undefined ||
-                        timeline.isPlaying()
+                        exportProgress() !== undefined
                           ? 0.5
                           : 1,
                     }}
