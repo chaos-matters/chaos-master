@@ -377,20 +377,7 @@ export function FloatingActions(props: Props) {
               </svg>
             </button>
 
-            {/* Adaptive Filter */}
-            <button
-              class={ui.toggle}
-              classList={{
-                [ui.toggleActive as string]: props.adaptiveFilterEnabled(),
-              }}
-              onClick={() => {
-                props.setAdaptiveFilterEnabled(!props.adaptiveFilterEnabled())
-              }}
-              title="Adaptive Filter"
-              data-tour-target="adaptive-filter"
-            >
-              <Eye />
-            </button>
+            <div class={ui.toggleSeparator} />
 
             {/* Mitchell-Netravali Stochastic Filter (2D + 3D) */}
             <button
@@ -403,10 +390,40 @@ export function FloatingActions(props: Props) {
                   !props.stochasticFilterEnabled(),
                 )
               }}
-              title="Mitchell-Netravali Stochastic Filter"
+              title="Mitchell-Netravali stochastic resampling filter (sharper edges)"
             >
-              MN
+              {/* MN reconstruction kernel: a central lobe with the two small
+                  negative side-lobes that give the filter its sharpness. */}
+              <svg
+                viewBox="0 0 16 16"
+                width="13"
+                height="13"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.3"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M1.5 10 C 3.5 10 4.2 11.5 5.3 11.5 C 6.3 11.5 6.7 3.3 8 3.3 C 9.3 3.3 9.7 11.5 10.7 11.5 C 11.8 11.5 12.5 10 14.5 10" />
+              </svg>
             </button>
+
+            {/* Adaptive Filter (density-estimation blur) */}
+            <button
+              class={ui.toggle}
+              classList={{
+                [ui.toggleActive as string]: props.adaptiveFilterEnabled(),
+              }}
+              onClick={() => {
+                props.setAdaptiveFilterEnabled(!props.adaptiveFilterEnabled())
+              }}
+              title="Adaptive density-estimation blur (smooths sparse regions)"
+              data-tour-target="adaptive-filter"
+            >
+              <Eye />
+            </button>
+
+            <div class={ui.toggleSeparator} />
 
             {/* 2D/3D Toggle */}
             <button
