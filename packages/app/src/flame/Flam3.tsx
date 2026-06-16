@@ -3,7 +3,7 @@ import { arrayOf, vec2f, vec2u, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useTimeline } from '@/contexts/TimelineContext'
-import { DEBUG_MODE, PLOTS_PER_CHAIN } from '@/defaults'
+import { DEBUG_MODE, PERSIST_RESEED_INTERVAL, PLOTS_PER_CHAIN, } from '@/defaults'
 import { accumulatedPointCount, animationExportProgress, animationExportRunning, exportQuality, setAccumulatedPointCountGlobal, setRenderTimings, } from '@/flame/renderStats'
 import { deepClone } from '@/utils/clone'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
@@ -471,6 +471,9 @@ export function Flam3(props: Flam3Props) {
       colorInitMode: flame.renderSettings.colorInitMode,
       pointInitMode: flame.renderSettings.pointInitMode,
       skipIters: Math.floor(flame.renderSettings.skipIters),
+      plotsPerChain: Math.floor(
+        flame.renderSettings.plotsPerChain ?? PLOTS_PER_CHAIN,
+      ),
     })
   })
 
@@ -576,6 +579,10 @@ export function Flam3(props: Flam3Props) {
   // inside an outer effect, using rafLoop.redraw() for reactive triggers.
   let ifsPipeline: ReturnType<typeof createIFSPipeline> | undefined
   let ifsPipeline3D: ReturnType<typeof createIFSPipeline3D> | undefined
+  // Plots-per-chain the active pipeline was compiled with (renderSettings
+  // override → env default). Tracked for point accounting so it matches the
+  // baked loop bound even as the slider changes (the pipeline rebuilds on it).
+  let plotsPerChainBaked = PLOTS_PER_CHAIN
   createEffect(() => {
     const fingerprint = parameterFingerprint()
     const o = outputTextures()
@@ -587,6 +594,11 @@ export function Flam3(props: Flam3Props) {
     const flame = untrack(animatedFlame)
     const dimensions: number = flame.renderSettings.dimensions ?? 2
     const typedAccumulationBuffer = accumulationBuffer
+    const plotsPerChainValue = Math.max(
+      1,
+      Math.floor(flame.renderSettings.plotsPerChain ?? PLOTS_PER_CHAIN),
+    )
+    plotsPerChainBaked = plotsPerChainValue
 
     ifsPipeline = undefined
     ifsPipeline3D = undefined
@@ -604,7 +616,7 @@ export function Flam3(props: Flam3Props) {
         typedAccumulationBuffer,
         flame.renderSettings.colorInitMode,
         flame.renderSettings.pointInitMode,
-        PLOTS_PER_CHAIN,
+        plotsPerChainValue,
       )
     } else {
       ifsPipeline = createIFSPipeline(
@@ -620,7 +632,7 @@ export function Flam3(props: Flam3Props) {
         flame.renderSettings.colorInitMode,
         flame.renderSettings.pointInitMode,
         props.blendFlame?.transforms,
-        PLOTS_PER_CHAIN,
+        plotsPerChainValue,
       )
     }
 
@@ -633,6 +645,15 @@ export function Flam3(props: Flam3Props) {
     // the warmup fuse (set on every accumulation reset). Otherwise chains
     // continue across dispatches, so warmup is paid once per settle.
     let resetPointStatePending = true
+    // Periodically re-seed persisted chains so the sample distribution stays
+    // stationary. A continuing chain on a slow-mixing flame (few transforms /
+    // certain variation math) drifts off the invariant measure over time,
+    // which — with our total-count brightness normalization — shows as the
+    // image darkening as it accumulates. Re-seeding every N dispatches bounds
+    // that drift; the warmup is amortized over N, so throughput barely moves.
+    // Tunable via VITE_PERSIST_RESEED_INTERVAL — lower it to make skipIters /
+    // warmup read more strongly and reduce settle flicker, at a throughput cost.
+    let dispatchesSincePersistReseed = 0
     // Interactive estimator state: last iteration count, used to cap growth.
     let lastInteractiveIterationCount = 1
     // Export driver state: chunk size adapted from measured chunk wall time,
@@ -759,6 +780,7 @@ export function Flam3(props: Flam3Props) {
       // The accumulated chains are no longer valid for the new state — re-warm
       // them on the next tick rather than continuing stale chains.
       resetPointStatePending = true
+      dispatchesSincePersistReseed = 0
       requestRedraw()
     }
 
@@ -834,7 +856,7 @@ export function Flam3(props: Flam3Props) {
       // warmup, so plotted points = threads × PLOTS_PER_CHAIN × dispatches.
       const accumulatedAfter =
         accumulatedPointCount_ +
-        pointCountPerBatch * PLOTS_PER_CHAIN * iterationCount
+        pointCountPerBatch * plotsPerChainBaked * iterationCount
 
       // Export readiness is decided with the post-accumulation count so the
       // final color-graded render and the capture happen in the same
@@ -903,11 +925,28 @@ export function Flam3(props: Flam3Props) {
           // safe for a real chaos game (2+ transforms); a single-map flame would
           // collapse onto its attractor (shape contraction) if its chains
           // continued. The persistChains prop can force either way.
+          // Plots/Chain = 1 is "classic" mode: re-warm every dispatch so each
+          // plotted point sits at exactly depth skipIters and the slider fully
+          // controls convergence. Persistence would re-converge it otherwise.
           const persistChains =
-            props.persistChains ?? visibleTransformCount() >= 2
-          pipeline.setResetPoints(
-            !persistChains || resetPointStatePending ? 1 : 0,
-          )
+            props.persistChains ??
+            (visibleTransformCount() >= 2 && plotsPerChainBaked > 1)
+          // Force a periodic re-seed so a slow-mixing flame's chains can't
+          // drift far enough off the invariant measure to darken the image.
+          if (
+            persistChains &&
+            !resetPointStatePending &&
+            dispatchesSincePersistReseed >= PERSIST_RESEED_INTERVAL
+          ) {
+            resetPointStatePending = true
+          }
+          const reseeding = !persistChains || resetPointStatePending
+          pipeline.setResetPoints(reseeding ? 1 : 0)
+          if (reseeding) {
+            dispatchesSincePersistReseed = 0
+          } else {
+            dispatchesSincePersistReseed += iterationCount
+          }
           if (persistChains) resetPointStatePending = false
           for (let i = 0; i < iterationCount; i++) {
             pipeline.run(pass, pointCountPerBatch)
@@ -1101,7 +1140,7 @@ export function Flam3(props: Flam3Props) {
 
           const tickMs = performance.now() - startMs
           windowPoints +=
-            tick.iterations * props.pointCountPerBatch * PLOTS_PER_CHAIN
+            tick.iterations * props.pointCountPerBatch * plotsPerChainBaked
           windowTickMs += tickMs
           windowTicks += 1
 

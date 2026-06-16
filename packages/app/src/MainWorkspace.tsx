@@ -3022,15 +3022,22 @@ export function MainWorkspace(props: AppProps) {
                                 <Show when={!hideDiceButtons()}>
                                   <DiceButton
                                     onClick={() => {
+                                      // Randomize a uniform OkLab hue at a vivid
+                                      // chroma so every hue (green/blue/yellow/…)
+                                      // is equally likely. The old random01() in
+                                      // (x,y) only covered the +a/+b quadrant
+                                      // (red/orange) and overshot the ±0.4 gamut,
+                                      // so it nearly always landed reddish.
+                                      const hue = random01() * 2 * Math.PI
+                                      const chroma = 0.25 + random01() * 0.15
                                       setFlameDescriptor((draft) => {
-                                        // Set leaves individually (not a whole
-                                        // new color object) so the store's
-                                        // fine-grained updates reliably reach
-                                        // the card swatch / circle readers.
+                                        // Set leaves individually (not a whole new
+                                        // color object) so the store's fine-grained
+                                        // updates reach the swatch / circle readers.
                                         draft.transforms[tid]!.color.x =
-                                          random01()
+                                          chroma * Math.cos(hue)
                                         draft.transforms[tid]!.color.y =
-                                          random01()
+                                          chroma * Math.sin(hue)
                                       })
                                     }}
                                     title="Randomize transform color"
@@ -3641,6 +3648,24 @@ export function MainWorkspace(props: AppProps) {
                                   formatValue={(value) => value.toString()}
                                   dataParameterPath="skipIters"
                                   data-tour-target="skipIters-slider"
+                                />
+                              </div>
+                              <div class={ui.parameterTarget}>
+                                <Slider
+                                  label="Plots / Chain"
+                                  value={
+                                    flameDescriptor.renderSettings.plotsPerChain
+                                  }
+                                  min={1}
+                                  max={32}
+                                  step={1}
+                                  onInput={(plotsPerChain) => {
+                                    setFlameDescriptor((draft) => {
+                                      draft.renderSettings.plotsPerChain =
+                                        plotsPerChain
+                                    })
+                                  }}
+                                  formatValue={(value) => value.toString()}
                                 />
                               </div>
                               <div

@@ -8,6 +8,15 @@ export const PLOTS_PER_CHAIN = Math.max(
   1,
   Math.floor(Number(import.meta.env.VITE_PLOTS_PER_CHAIN ?? 16)),
 )
+// How many dispatches a persisted chain continues before it re-seeds + re-warms.
+// Lower = more frequent re-warm: skipIters/warmup reads more strongly and the
+// post-camera-move settle flicker shrinks (slow-mixing flames stay stationary),
+// at a throughput cost. Higher → closer to pure persistence (max throughput).
+// 1 = re-warm every dispatch (effectively no persistence).
+export const PERSIST_RESEED_INTERVAL = Math.max(
+  1,
+  Math.floor(Number(import.meta.env.VITE_PERSIST_RESEED_INTERVAL ?? 32)),
+)
 export const DEFAULT_RESOLUTION = parseFloat(
   import.meta.env.VITE_DEFAULT_RESOLUTION,
 )

@@ -132,6 +132,15 @@ const RenderSettings = v.object({
     v.minValue(0),
     v.maxValue(MAX_SKIP_ITERS_VALUE),
   ),
+  // Points each chaos-game chain plots after its warmup. 16 = throughput (the
+  // plotted points span many convergence depths, so skipIters reads as
+  // cosmetic); 1 restores the classic behavior where skipIters fully controls
+  // the plotted convergence (slower — each chain contributes one point at depth
+  // skipIters).
+  plotsPerChain: v.optional(
+    v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(64)),
+    16,
+  ),
   dimensions: v.optional(
     v.pipe(v.number(), v.integer(), v.minValue(2), v.maxValue(3)),
     2,
