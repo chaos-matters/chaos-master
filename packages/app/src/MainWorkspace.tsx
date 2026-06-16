@@ -3717,6 +3717,21 @@ export function MainWorkspace(props: AppProps) {
                                   onInput={(newExp) => {
                                     setFlameDescriptor((draft) => {
                                       draft.renderSettings.exposure = newExp
+                                      // With auto-exposure on, a manual change
+                                      // re-bases it: this value becomes the
+                                      // baseline at the current zoom, and zoom
+                                      // scales from here.
+                                      if (
+                                        draft.renderSettings.autoExposure3D &&
+                                        (draft.renderSettings.dimensions ??
+                                          2) === 3
+                                      ) {
+                                        draft.renderSettings.autoExposure3DBase =
+                                          newExp
+                                        draft.renderSettings.autoExposure3DRefRadius =
+                                          draft.renderSettings.camera3D
+                                            ?.radius ?? 5
+                                      }
                                     })
                                   }}
                                   formatValue={(value) =>
