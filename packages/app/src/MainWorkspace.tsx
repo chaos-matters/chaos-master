@@ -18,6 +18,7 @@ import { BenchmarkButton } from './components/BenchmarkButton/BenchmarkButton'
 import { createShowBenchmark } from './components/BenchmarkModal/BenchmarkModal'
 import { BlendFlameGallery } from './components/BlendFlameGallery/BlendFlameGallery'
 import { Button } from './components/Button/Button'
+import { Checkbox } from './components/Checkbox/Checkbox'
 import { CollapsibleCard } from './components/CollapsibleCard/CollapsibleCard'
 import { ColorPicker } from './components/ColorPicker/ColorPicker'
 import { Card } from './components/ControlCard/ControlCard'
@@ -1590,6 +1591,8 @@ export function MainWorkspace(props: AppProps) {
         return fd.renderSettings.exposure
       case 'skipIters':
         return fd.renderSettings.skipIters
+      case 'plotsPerChain':
+        return fd.renderSettings.plotsPerChain
       case 'vibrancy':
         return fd.renderSettings.vibrancy
       case 'contrast':
@@ -1878,6 +1881,9 @@ export function MainWorkspace(props: AppProps) {
           break
         case 'skipIters':
           draft.renderSettings.skipIters = value as number
+          break
+        case 'plotsPerChain':
+          draft.renderSettings.plotsPerChain = value as number
           break
         case 'vibrancy':
           draft.renderSettings.vibrancy = value as number
@@ -3650,9 +3656,14 @@ export function MainWorkspace(props: AppProps) {
                                   data-tour-target="skipIters-slider"
                                 />
                               </div>
-                              <div class={ui.parameterTarget}>
+                              <div
+                                class={ui.parameterTarget}
+                                onClick={() => {
+                                  setTargetedParameter('plotsPerChain')
+                                }}
+                              >
                                 <Slider
-                                  label="Plots / Chain"
+                                  label="Point Batch"
                                   value={
                                     flameDescriptor.renderSettings.plotsPerChain
                                   }
@@ -3666,6 +3677,7 @@ export function MainWorkspace(props: AppProps) {
                                     })
                                   }}
                                   formatValue={(value) => value.toString()}
+                                  dataParameterPath="plotsPerChain"
                                 />
                               </div>
                               <div
@@ -3694,6 +3706,68 @@ export function MainWorkspace(props: AppProps) {
                                   data-tour-target="exposure-slider"
                                 />
                               </div>
+                              <Show
+                                when={
+                                  flameDescriptor.renderSettings.dimensions ===
+                                  3
+                                }
+                              >
+                                <label
+                                  style={{
+                                    display: 'flex',
+                                    'align-items': 'center',
+                                    gap: '6px',
+                                    'font-size': '12px',
+                                    cursor: 'pointer',
+                                    padding: '2px 4px',
+                                  }}
+                                >
+                                  <Checkbox
+                                    checked={
+                                      flameDescriptor.renderSettings
+                                        .autoExposure3D
+                                    }
+                                    onChange={(checked) => {
+                                      setFlameDescriptor((draft) => {
+                                        draft.renderSettings.autoExposure3D =
+                                          checked
+                                        if (checked) {
+                                          draft.renderSettings.autoExposure3DRefRadius =
+                                            draft.renderSettings.camera3D
+                                              ?.radius ?? 5
+                                        }
+                                      })
+                                    }}
+                                  />
+                                  <span>Auto exposure on zoom</span>
+                                </label>
+                                <Show
+                                  when={
+                                    flameDescriptor.renderSettings
+                                      .autoExposure3D
+                                  }
+                                >
+                                  <div class={ui.parameterTarget}>
+                                    <Slider
+                                      label="Auto Strength"
+                                      value={
+                                        flameDescriptor.renderSettings
+                                          .autoExposure3DStrength
+                                      }
+                                      min={0}
+                                      max={3}
+                                      step={0.05}
+                                      onInput={(strength) => {
+                                        setFlameDescriptor((draft) => {
+                                          draft.renderSettings.autoExposure3DStrength =
+                                            strength
+                                        })
+                                      }}
+                                      formatValue={(value) => value.toFixed(2)}
+                                    />
+                                  </div>
+                                </Show>
+                              </Show>
                               <div
                                 class={ui.parameterTarget}
                                 onClick={() => {

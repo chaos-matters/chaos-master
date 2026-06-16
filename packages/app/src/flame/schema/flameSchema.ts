@@ -141,6 +141,15 @@ const RenderSettings = v.object({
     v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(64)),
     16,
   ),
+  // 3D auto-exposure: when on, dampen exposure as the camera zooms in (radius
+  // shrinks) so the flame doesn't blow out. Reference radius is captured when
+  // the toggle is enabled (neutral at that zoom); strength scales the effect.
+  autoExposure3D: v.optional(v.boolean(), false),
+  autoExposure3DStrength: v.optional(
+    v.pipe(v.number(), v.minValue(0), v.maxValue(3)),
+    1,
+  ),
+  autoExposure3DRefRadius: v.optional(v.number(), 5),
   dimensions: v.optional(
     v.pipe(v.number(), v.integer(), v.minValue(2), v.maxValue(3)),
     2,
