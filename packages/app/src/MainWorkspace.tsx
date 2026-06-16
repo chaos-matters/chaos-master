@@ -75,7 +75,7 @@ import { allTransformVariations, isAnyParametricVariationType, isVariationType, 
 import { deleteCustomVariation, duplicateCustomVariation, getCustomVariations, loadCustomVariations, } from './flame/variations/custom'
 import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } from './flame/variations/utils'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { BoxArrowRight, Cross, Eye, EyeOff, Menu, Plus, Share, Terminal, } from './icons'
+import { BoxArrowRight, Cross, Eye, EyeOff, Menu, Plus, Share, Shuffle, Terminal, } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
 import { createAnimationExport } from './utils/animationExport'
 import { deepClone } from './utils/clone'
@@ -3023,6 +3023,30 @@ export function MainWorkspace(props: AppProps) {
                               }
                               headerActions={
                                 <>
+                                  <Show when={!hideDiceButtons()}>
+                                    <span
+                                      class={ui.transformHeaderAction}
+                                      role="button"
+                                      tabindex={0}
+                                      title="Randomize transform color"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        // Uniform OkLab hue at a vivid chroma so
+                                        // every hue is equally likely (the old
+                                        // random in x/y skewed reddish).
+                                        const hue = random01() * 2 * Math.PI
+                                        const chroma = 0.25 + random01() * 0.15
+                                        setFlameDescriptor((draft) => {
+                                          draft.transforms[tid]!.color.x =
+                                            chroma * Math.cos(hue)
+                                          draft.transforms[tid]!.color.y =
+                                            chroma * Math.sin(hue)
+                                        })
+                                      }}
+                                    >
+                                      <Shuffle />
+                                    </span>
+                                  </Show>
                                   <span
                                     class={ui.transformHeaderAction}
                                     role="button"
@@ -3069,30 +3093,6 @@ export function MainWorkspace(props: AppProps) {
                               }
                             >
                               <div class={ui.transformGrid}>
-                                <Show when={!hideDiceButtons()}>
-                                  <DiceButton
-                                    onClick={() => {
-                                      // Randomize a uniform OkLab hue at a vivid
-                                      // chroma so every hue (green/blue/yellow/…)
-                                      // is equally likely. The old random01() in
-                                      // (x,y) only covered the +a/+b quadrant
-                                      // (red/orange) and overshot the ±0.4 gamut,
-                                      // so it nearly always landed reddish.
-                                      const hue = random01() * 2 * Math.PI
-                                      const chroma = 0.25 + random01() * 0.15
-                                      setFlameDescriptor((draft) => {
-                                        // Set leaves individually (not a whole new
-                                        // color object) so the store's fine-grained
-                                        // updates reach the swatch / circle readers.
-                                        draft.transforms[tid]!.color.x =
-                                          chroma * Math.cos(hue)
-                                        draft.transforms[tid]!.color.y =
-                                          chroma * Math.sin(hue)
-                                      })
-                                    }}
-                                    title="Randomize transform color"
-                                  />
-                                </Show>
                                 <div
                                   data-tour-target="probability"
                                   classList={{
