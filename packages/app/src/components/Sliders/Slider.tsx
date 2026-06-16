@@ -43,7 +43,11 @@ export function Slider(props: SliderProps) {
   const max = () => props.max ?? 1
   const step = () => props.step ?? 0.01
   const value = createMemo(() => {
-    return clamp(props.value, min(), max())
+    // Guard against undefined/NaN (e.g. a stale flame whose variation params
+    // don't match the current schema): typegpu's clamp throws on a non-number
+    // argument, which would otherwise crash the whole editor.
+    const v = props.value
+    return clamp(Number.isFinite(v) ? v : min(), min(), max())
   })
   const formatValue = () =>
     props.formatValue ? props.formatValue(value()) : value().toFixed(2)
