@@ -249,18 +249,6 @@ export function Flam3(props: Flam3Props) {
     const rs = animatedFlame().renderSettings
     const depthVal = rs.depthColorPower ?? 0.0
     const lightVal = rs.lightPower ?? 0.0
-    // 3D auto-exposure: dampen exposure as the camera zooms in (radius shrinks)
-    // so the flame doesn't blow out. Neutral at the reference radius captured
-    // when the toggle was enabled. exposure is in stops (uniform = 2*exp(x)).
-    let effExposure = rs.exposure
-    if ((rs.dimensions ?? 2) === 3 && rs.autoExposure3D) {
-      const radius = rs.camera3D?.radius ?? 0
-      const refRadius = rs.autoExposure3DRefRadius ?? radius
-      if (radius > 0 && refRadius > 0) {
-        const strength = rs.autoExposure3DStrength ?? 1
-        effExposure = rs.exposure + strength * Math.log(radius / refRadius)
-      }
-    }
     if (DEBUG_MODE) {
       console.info(
         '[Flam3:writeUniforms] depthColorPower →',
@@ -273,7 +261,7 @@ export function Flam3(props: Flam3Props) {
     }
     colorGradingUniforms.write({
       averagePointCountPerBucketInv: currentAveragePointCountPerBucketInv,
-      exposure: 2 * Math.exp(effExposure),
+      exposure: 2 * Math.exp(rs.exposure),
       edgeFadeColor: onExportImageMemo() ? vec4f(0) : edgeFadeColorMemo(),
       backgroundColor: vec4f(backgroundColorFinal(), 1),
       vibrancy: rs.vibrancy ?? 0.5,

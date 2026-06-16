@@ -1,5 +1,5 @@
 import '@/commands/builtins'
-import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, onMount, Show, Suspense, } from 'solid-js'
+import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, onMount, Show, Suspense, untrack, } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { vec2f, vec3f, vec4f } from 'typegpu/data'
@@ -714,6 +714,26 @@ export function MainWorkspace(props: AppProps) {
     })
     return flameDescriptor.renderSettings.camera3D.radius
   }
+  // 3D auto-exposure: drive the real Exposure value from the camera zoom so the
+  // slider visibly tracks it. exposure = base + strength*log(radius/refRadius),
+  // neutral at the radius where the toggle was enabled. The exposure read is
+  // untracked so manual edits between zooms aren't immediately reverted.
+  createEffect(() => {
+    const rs = flameDescriptor.renderSettings
+    if (!rs.autoExposure3D || (rs.dimensions ?? 2) !== 3) return
+    const radius = rs.camera3D?.radius ?? 0
+    const ref = rs.autoExposure3DRefRadius
+    if (radius <= 0 || ref <= 0) return
+    const target =
+      rs.autoExposure3DBase + rs.autoExposure3DStrength * Math.log(radius / ref)
+    untrack(() => {
+      if (Math.abs(target - flameDescriptor.renderSettings.exposure) > 1e-4) {
+        setFlameDescriptor((draft) => {
+          draft.renderSettings.exposure = target
+        })
+      }
+    })
+  })
   const setFlameTarget3D = (value: Vec3 | ((prev: Vec3) => Vec3)) => {
     setFlameDescriptor((draft) => {
       const newTarget =
@@ -3739,6 +3759,8 @@ export function MainWorkspace(props: AppProps) {
                                           draft.renderSettings.autoExposure3DRefRadius =
                                             draft.renderSettings.camera3D
                                               ?.radius ?? 5
+                                          draft.renderSettings.autoExposure3DBase =
+                                            draft.renderSettings.exposure
                                         }
                                       })
                                     }}

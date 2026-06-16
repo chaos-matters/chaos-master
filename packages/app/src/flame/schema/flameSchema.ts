@@ -150,6 +150,9 @@ const RenderSettings = v.object({
     1,
   ),
   autoExposure3DRefRadius: v.optional(v.number(), 5),
+  // Exposure (stops) captured when the auto toggle was enabled — the value the
+  // zoom-driven Exposure is offset from.
+  autoExposure3DBase: v.optional(v.number(), 0),
   dimensions: v.optional(
     v.pipe(v.number(), v.integer(), v.minValue(2), v.maxValue(3)),
     2,
