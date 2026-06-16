@@ -64,7 +64,9 @@
       "less": "link:./.pnpm-noop",
       "sass": "link:./.pnpm-noop",
       "stylus": "link:./.pnpm-noop",
-      "tinyest": "0.3.1"
+      "tinyest": "0.3.1",
+      "esbuild": "^0.28.1",
+      "ws": "^8.21.0"
     }
   }
 }
