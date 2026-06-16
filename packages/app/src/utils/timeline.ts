@@ -470,6 +470,19 @@ export function createTimelineState() {
   })
   const [isPlaying, setIsPlaying] = createSignal(false)
   const [isScrubbing, setIsScrubbing] = createSignal(false)
+  // Achieved playback FPS while Auto FPS is on. With Auto FPS each frame only
+  // advances once it reaches target quality, so the real rate is below the
+  // nominal `fps` and varies with scene complexity. Smoothed (EMA) so the
+  // readout is stable. undefined when not measuring.
+  const [measuredFps, setMeasuredFps] = createSignal<number | undefined>(
+    undefined,
+  )
+  let lastAdvanceTs: number | undefined
+
+  function resetFpsMeter() {
+    lastAdvanceTs = undefined
+    setMeasuredFps(undefined)
+  }
   const [autoKeyframe, setAutoKeyframe] = persistentSignal(
     'timeline-auto-keyframe',
     true,
@@ -902,11 +915,29 @@ export function createTimelineState() {
 
   function advanceFrame() {
     const cfg = config()
+    // Sample the achieved rate between auto-FPS advances (each advance fires
+    // when a frame hits target quality). Skip manual stepping (not playing).
+    if (isPlaying() && cfg.autoFps) {
+      const now = globalThis.performance.now()
+      if (lastAdvanceTs !== undefined) {
+        const dt = now - lastAdvanceTs
+        if (dt > 0) {
+          const instantaneous = 1000 / dt
+          setMeasuredFps((prev) =>
+            prev === undefined
+              ? instantaneous
+              : prev * 0.8 + instantaneous * 0.2,
+          )
+        }
+      }
+      lastAdvanceTs = now
+    }
     const next = currentFrame() + 1
     if (next > cfg.endFrame) {
       setCurrentFrame(cfg.startFrame)
       if (!cfg.loop) {
         setIsPlaying(false)
+        resetFpsMeter()
       }
     } else {
       setCurrentFrame(next)
@@ -932,15 +963,18 @@ export function createTimelineState() {
     if (!cfg.loop && currentFrame() >= cfg.endFrame) {
       setCurrentFrame(cfg.startFrame)
     }
+    resetFpsMeter()
     setIsPlaying(true)
   }
 
   function pause() {
     setIsPlaying(false)
+    resetFpsMeter()
   }
 
   function togglePlay() {
     setIsPlaying(!isPlaying())
+    resetFpsMeter()
   }
 
   function hasAnyKeyframes(parameterPath: string): boolean {
@@ -1072,6 +1106,7 @@ export function createTimelineState() {
     lastAddedKeyframe,
     isPlaying,
     setIsPlaying,
+    measuredFps,
     isScrubbing,
     setIsScrubbing,
     autoKeyframe,
