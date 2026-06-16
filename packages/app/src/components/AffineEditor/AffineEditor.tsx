@@ -252,12 +252,21 @@ function AffineHandle(props: {
       const { a, b, d, e, ...rest } = props.transform
       const grabPosition = clipToWorld(eventToClip(initEvent, canvas))
       const center = position()
+      // grabDiff is fixed for the whole drag (grab point and centre are both
+      // captured once). If the handle was grabbed at the affine centre — e.g.
+      // a collapsed/degenerate box — its length is 0; dividing by it below
+      // would make ratio (and thus the whole a/b/d/e matrix) NaN.
+      const grabDiff = sub(grabPosition, center)
+      const grabLen = length(grabDiff)
 
       function onPointerMove(ev: PointerEvent) {
+        if (grabLen < 1e-6) {
+          // Scale/rotation is undefined from a zero-radius grab — ignore.
+          return
+        }
         const evPosition = clipToWorld(eventToClip(ev, canvas))
-        const grabDiff = sub(grabPosition, center)
         const evDiff = sub(evPosition, center)
-        const ratio = length(evDiff) / length(grabDiff)
+        const ratio = length(evDiff) / grabLen
         const grabNorm = vec2Normalize(grabDiff)
         const evNorm = vec2Normalize(evDiff)
         const cos = ev.ctrlKey || ev.metaKey ? 1 : dot(evNorm, grabNorm)

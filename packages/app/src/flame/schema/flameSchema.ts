@@ -306,7 +306,17 @@ export function validateFlame3D(data: unknown): FlameDescriptor3D {
 }
 
 export function tryValidateFlame(data: unknown): FlameDescriptor | undefined {
-  const result = v.safeParse(schema2D.FlameDescriptor, data)
+  // Mirror validateFlame's soundness for recent/stored flames: migrate
+  // renamed variation types so older saves still parse, and dispatch to the 3D
+  // schema for 3D flames so their a–l affines survive instead of being dropped
+  // or stripped to 2D. Failure still returns undefined (caller drops the entry).
+  migrateFlameVariationTypes(data)
+  const dimensions = (data as { renderSettings?: { dimensions?: number } })
+    ?.renderSettings?.dimensions
+  const result =
+    dimensions === 3
+      ? v.safeParse(schema3D.FlameDescriptor, data)
+      : v.safeParse(schema2D.FlameDescriptor, data)
   if (!result.success) return undefined
   return result.output
 }
