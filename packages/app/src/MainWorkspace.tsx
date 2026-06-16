@@ -281,6 +281,7 @@ export function MainWorkspace(props: AppProps) {
   const setSidebarWidth = () => {} // Drag resize disabled
   let sidebarRef: HTMLDivElement | undefined
   let sidebarScrollRef: HTMLDivElement | undefined
+  let randomizerCardRef: HTMLDivElement | undefined
   let savedScrollTop = 0
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [sidebarEl, setSidebarEl] = createSignal<HTMLDivElement | undefined>()
@@ -1287,6 +1288,22 @@ export function MainWorkspace(props: AppProps) {
     history.replace(mutatedFlame, 'Mutate Flame')
   }
 
+  // Keep the randomizer card visually fixed across a flame swap. Changing the
+  // transform count reflows the sidebar (affine/colour list rows + transform
+  // cards), which would otherwise shove the Generate button up/down under the
+  // cursor. Measure the card before, correct scrollTop once the DOM has settled.
+  const anchorSidebarToRandomizer = (): (() => void) => {
+    if (!sidebarScrollRef || !randomizerCardRef) return () => {}
+    const before = randomizerCardRef.getBoundingClientRect().top
+    return () => {
+      requestAnimationFrame(() => {
+        if (!sidebarScrollRef || !randomizerCardRef) return
+        sidebarScrollRef.scrollTop +=
+          randomizerCardRef.getBoundingClientRect().top - before
+      })
+    }
+  }
+
   // Guard randomize/mutate so a slow run (history thumbnail capture + render)
   // can't be re-triggered until it finishes — rapid clicks would otherwise pile
   // up concurrent captures and lag the UI. Mirrors the logo/favicon generator.
@@ -1295,10 +1312,12 @@ export function MainWorkspace(props: AppProps) {
   ) => {
     if (isRandomizing()) return
     setIsRandomizing(true)
+    const releaseAnchor = anchorSidebarToRandomizer()
     try {
       await runGenerateFlame(...args)
     } finally {
       setIsRandomizing(false)
+      releaseAnchor()
     }
   }
 
@@ -1307,10 +1326,12 @@ export function MainWorkspace(props: AppProps) {
   ) => {
     if (isRandomizing()) return
     setIsRandomizing(true)
+    const releaseAnchor = anchorSidebarToRandomizer()
     try {
       await runMutateFlame(...args)
     } finally {
       setIsRandomizing(false)
+      releaseAnchor()
     }
   }
 
@@ -3020,18 +3041,20 @@ export function MainWorkspace(props: AppProps) {
                             </button>
                           </CollapsibleCard>
                         </Show>
-                        <FlameRandomizerCard
-                          flame={flameDescriptor}
-                          historyEntries={randomizerHistory()}
-                          selectedTimestamp={selectedHistoryTimestamp()}
-                          onGenerateFlame={handleGenerateFlame}
-                          onMutateFlame={handleMutateFlame}
-                          onLoadHistory={handleLoadHistory}
-                          onClearHistory={handleClearHistory}
-                          onRandomizeAnimation={handleRandomizeAnimation}
-                          onUpdateRenderSettings={handleUpdateRenderSettings}
-                          isBusy={isRandomizing()}
-                        />
+                        <div ref={randomizerCardRef}>
+                          <FlameRandomizerCard
+                            flame={flameDescriptor}
+                            historyEntries={randomizerHistory()}
+                            selectedTimestamp={selectedHistoryTimestamp()}
+                            onGenerateFlame={handleGenerateFlame}
+                            onMutateFlame={handleMutateFlame}
+                            onLoadHistory={handleLoadHistory}
+                            onClearHistory={handleClearHistory}
+                            onRandomizeAnimation={handleRandomizeAnimation}
+                            onUpdateRenderSettings={handleUpdateRenderSettings}
+                            isBusy={isRandomizing()}
+                          />
+                        </div>
                         <For
                           each={recordEntries(
                             flameDescriptor.transforms,
