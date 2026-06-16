@@ -2,6 +2,7 @@ import { createMemo, For, Show } from 'solid-js'
 import { vec2f } from 'typegpu/data'
 import { DiceButton } from '@/components/DiceButton/DiceButton'
 import { handleColor } from '@/components/FlameColorEditor/FlameColorEditor'
+import { ResetButton } from '@/components/ResetButton/ResetButton'
 import { ScrubInput } from '@/components/Sliders/ScrubInput'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useTimeline } from '@/contexts/TimelineContext'
@@ -95,6 +96,17 @@ export function AffineListEditor(props: AffineListEditorProps) {
                           coefs[key] ?? (['a', 'e', 'i'].includes(key) ? 1 : 0),
                           key,
                         )
+                      }
+                    })
+                  }}
+                />
+                <ResetButton
+                  title="Reset affine to identity (no scale/rotation/offset)"
+                  onClick={() => {
+                    props.setTransforms((draft) => {
+                      const coefs = draft[tid]![props.affineMode]
+                      for (const key of activeCoefs()) {
+                        coefs[key] = ['a', 'e', 'i'].includes(key) ? 1 : 0
                       }
                     })
                   }}

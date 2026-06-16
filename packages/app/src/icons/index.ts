@@ -21,6 +21,7 @@ import Pause from './pause.svg'
 import PlayPause from './play-pause.svg'
 import Plus from './plus.svg'
 import Redo from './redo.svg'
+import Reset from './reset.svg'
 import Share from './share.svg'
 import Shuffle from './shuffle.svg'
 import SkipBack from './skip-back.svg'
@@ -56,6 +57,7 @@ export {
   PlayPause,
   Plus,
   Redo,
+  Reset,
   Share,
   Shuffle,
   SkipBack,
