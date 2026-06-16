@@ -1,54 +1,58 @@
 import { f32, i32, struct, u32, vec2f } from 'typegpu/data'
-import { clamp, cos, floor, fract, sin } from 'typegpu/std'
+import { abs, cos, floor, sin } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
+// Faithful port of JWildFire's PixelFlow (org.jwildfire...PixelFlowFunc):
+// a block-quantized "flowing pixels" perturbation. The point is nudged a small
+// distance `len` along a fixed `angle`, scaled by a per-block magnitude and a
+// quartic fade. Two deviations from the Java original, both forced by our
+// variation framework:
+//   * It returns the flow DELTA only (added to the running sum), so to see it
+//     you pair it with `linear` — same as in JWildFire, where it accumulates
+//     into pVarTP alongside the other variations.
+//   * JWildFire's `r01 = pContext.random()` is a per-iteration random; our
+//     variations are pure functions of position with no RNG, so r01 is derived
+//     deterministically from a fine sub-block hash. The `enable_dc` direct-color
+//     option is dropped (the framework only returns a position, not a color).
 const PixelFlowVarParams = struct({
-  scale_x: f32,
-  scale_y: f32,
-  speed_x: f32,
-  speed_y: f32,
+  angle: f32,
+  len: f32,
+  width: f32,
   seed: f32,
 })
 
 type PixelFlowVarParams = Infer<typeof PixelFlowVarParams>
 
 const PixelFlowVarParamsDefaults: PixelFlowVarParams = {
-  scale_x: 1.0,
-  scale_y: 1.0,
-  speed_x: 1.0,
-  speed_y: 1.0,
-  seed: 0.0,
+  angle: 90.0,
+  len: 0.1,
+  width: 200.0,
+  seed: 42.0,
 }
 
 const PixelFlowVarParamsEditor: EditorFor<PixelFlowVarParams> = (props) => (
   <>
     <RangeEditor
-      {...editorProps(props, 'scale_x', 'Scale X', props.dataParameterPath)}
-      min={0.1}
-      max={10.0}
-      step={0.01}
-    />
-    <RangeEditor
-      {...editorProps(props, 'scale_y', 'Scale Y', props.dataParameterPath)}
-      min={0.1}
-      max={10.0}
-      step={0.01}
-    />
-    <RangeEditor
-      {...editorProps(props, 'speed_x', 'Speed X', props.dataParameterPath)}
+      {...editorProps(props, 'angle', 'Angle', props.dataParameterPath)}
       min={0.0}
-      max={5.0}
+      max={360.0}
+      step={1.0}
+    />
+    <RangeEditor
+      {...editorProps(props, 'len', 'Length', props.dataParameterPath)}
+      min={0.0}
+      max={2.0}
       step={0.01}
     />
     <RangeEditor
-      {...editorProps(props, 'speed_y', 'Speed Y', props.dataParameterPath)}
-      min={0.0}
-      max={5.0}
-      step={0.01}
+      {...editorProps(props, 'width', 'Width', props.dataParameterPath)}
+      min={1.0}
+      max={1000.0}
+      step={1.0}
     />
     <RangeEditor
       {...editorProps(props, 'seed', 'Seed', props.dataParameterPath)}
@@ -59,16 +63,18 @@ const PixelFlowVarParamsEditor: EditorFor<PixelFlowVarParams> = (props) => (
   </>
 )
 
+// Robert Jenkins' 32-bit integer hash, matching PixelFlowFunc.hash(): signed
+// i32 arithmetic (arithmetic right shifts, wrapping multiply) normalized by
+// 2^31-1, so the result lands in roughly [-1, 1).
 const pixel_flow_hash = (inVal: number): number => {
   'use gpu'
-  let a = u32(inVal)
-  a = a ^ 61 ^ (a >> u32(16))
+  let a = i32(inVal)
+  a = (a ^ 61) ^ (a >> u32(16))
   a = a + (a << u32(3))
   a = a ^ (a >> u32(4))
   a = a * 0x27d4eb2d
   a = a ^ (a >> u32(15))
-  // GPU code divides by exp2f(32.0) => 2^32
-  return f32(a) / 4294967296.0
+  return f32(a) / 2147483647.0
 }
 
 export const pixelFlowVar = parametricVariation(
@@ -78,24 +84,30 @@ export const pixelFlowVar = parametricVariation(
   PixelFlowVarParamsEditor,
   (pos, varInfo, P) => {
     'use gpu'
-    const scaled_x = pos.x * P.scale_x
-    const scaled_y = pos.y * P.scale_y
-    const fx = floor(scaled_x)
-    const fy = floor(scaled_y)
-    const rx = fract(scaled_x)
-    const ry = fract(scaled_y)
-    const n = f32(pixel_flow_hash(i32(fx + fy * 57.0 + P.seed)))
-    const angle = n * 6.283185307
+    const seedI = i32(P.seed)
+    const a_rad = P.angle * 0.0174532925
+    const sina = sin(a_rad)
+    const cosa = cos(a_rad)
 
-    const cos_a = cos(angle)
-    const sin_a = sin(angle)
-    const flow_x = rx - 0.5 + cos_a * P.speed_x
-    const flow_y = ry - 0.5 + sin_a * P.speed_y
+    let blockx = i32(floor(pos.x * P.width))
+    blockx = blockx + i32(2.0 - 4.0 * pixel_flow_hash(blockx * seedI + 1))
+    let blocky = i32(floor(pos.y * P.width))
+    blocky = blocky + i32(2.0 - 4.0 * pixel_flow_hash(blocky * seedI + 1))
 
-    return vec2f(
-      (fx + clamp(flow_x, 0.0, 1.0)) / P.scale_x,
-      (fy + clamp(flow_y, 0.0, 1.0)) / P.scale_y,
-    ).mul(varInfo.weight)
+    const fLen =
+      (pixel_flow_hash(blocky + blockx * -seedI) +
+        pixel_flow_hash(blockx + blocky * (seedI / 2))) *
+      0.5
+
+    // Deterministic stand-in for pContext.random(): hash a fine sub-block cell
+    // so the quartic fade still varies across the plane. abs() maps to [0, 1).
+    const rk =
+      i32(floor(pos.x * P.width * 821.0)) * 374761393 +
+      i32(floor(pos.y * P.width * 821.0)) * 668265263
+    const r01 = abs(pixel_flow_hash(rk))
+    const fade = fLen * r01 * r01 * r01 * r01
+
+    return vec2f(P.len * cosa * fade, P.len * sina * fade).mul(varInfo.weight)
   },
   'dc',
 )
