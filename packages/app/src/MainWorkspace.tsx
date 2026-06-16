@@ -3714,6 +3714,10 @@ export function MainWorkspace(props: AppProps) {
                               >
                                 <label
                                   style={{
+                                    // Span both grid columns so the checkbox row
+                                    // doesn't consume a value-column cell and
+                                    // shift the slider rows out of alignment.
+                                    'grid-column': '1 / -1',
                                     display: 'flex',
                                     'align-items': 'center',
                                     gap: '6px',
