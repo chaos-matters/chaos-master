@@ -819,6 +819,36 @@
   }
 }
 
+/* Visibility / delete actions in a transform card's collapsible header. */
+.transform-header-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+  color: var(--neutral-500);
+  border-radius: var(--round);
+  transition: color 0.12s;
+
+  & svg {
+    width: 0.72rem;
+    height: 0.72rem;
+  }
+
+  &:hover {
+    color: var(--neutral-800);
+  }
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500);
+
+    &:hover {
+      color: white;
+    }
+  }
+}
+
 .visibility-button {
   border: none;
   border-radius: var(--round);

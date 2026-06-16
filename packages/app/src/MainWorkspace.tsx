@@ -3021,30 +3021,54 @@ export function MainWorkspace(props: AppProps) {
                               onToggleSelect={() =>
                                 toggleSelectedTransform(tid)
                               }
-                            >
-                              <div class={ui.transformGrid}>
-                                <svg
-                                  class={ui.variationButtonSvgColor}
-                                  style={{ cursor: 'pointer' }}
-                                  onClick={() => toggleSelectedTransform(tid)}
-                                >
-                                  <g
-                                    class={ui.variationButtonColor}
-                                    style={{
-                                      '--color': handleColor(
-                                        theme(),
-                                        vec2f(
-                                          transform.color.x,
-                                          transform.color.y,
-                                        ),
-                                      ),
+                              headerActions={
+                                <>
+                                  <span
+                                    class={ui.transformHeaderAction}
+                                    role="button"
+                                    tabindex={0}
+                                    title={
+                                      transform.visible
+                                        ? 'Hide transform'
+                                        : 'Show transform'
+                                    }
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setFlameDescriptor((draft) => {
+                                        draft.transforms[tid]!.visible =
+                                          !draft.transforms[tid]!.visible
+                                      })
                                     }}
                                   >
-                                    <circle
-                                      class={ui.variationButtonColorCircle}
-                                    />
-                                  </g>
-                                </svg>
+                                    {transform.visible ? <Eye /> : <EyeOff />}
+                                  </span>
+                                  <span
+                                    class={ui.transformHeaderAction}
+                                    role="button"
+                                    tabindex={0}
+                                    title="Delete transform"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setFlameDescriptor((draft) => {
+                                        if (
+                                          recordKeys(draft.transforms)
+                                            .length === 1
+                                        ) {
+                                          draft.transforms[tid] = deepClone(
+                                            newDefaultTransform(),
+                                          )
+                                        } else {
+                                          delete draft.transforms[tid]
+                                        }
+                                      })
+                                    }}
+                                  >
+                                    <Cross />
+                                  </span>
+                                </>
+                              }
+                            >
+                              <div class={ui.transformGrid}>
                                 <Show when={!hideDiceButtons()}>
                                   <DiceButton
                                     onClick={() => {
@@ -3069,41 +3093,6 @@ export function MainWorkspace(props: AppProps) {
                                     title="Randomize transform color"
                                   />
                                 </Show>
-                                <button
-                                  class={ui.visibilityButton}
-                                  title={
-                                    transform.visible
-                                      ? 'Hide transform'
-                                      : 'Show transform'
-                                  }
-                                  onClick={() => {
-                                    setFlameDescriptor((draft) => {
-                                      draft.transforms[tid]!.visible =
-                                        !draft.transforms[tid]!.visible
-                                    })
-                                  }}
-                                >
-                                  {transform.visible ? <Eye /> : <EyeOff />}
-                                </button>
-                                <button
-                                  class={ui.deleteFlameButton}
-                                  onClick={() => {
-                                    setFlameDescriptor((draft) => {
-                                      if (
-                                        recordKeys(draft.transforms).length ===
-                                        1
-                                      ) {
-                                        draft.transforms[tid] = deepClone(
-                                          newDefaultTransform(),
-                                        )
-                                      } else {
-                                        delete draft.transforms[tid]
-                                      }
-                                    })
-                                  }}
-                                >
-                                  <Cross />
-                                </button>
                                 <div
                                   data-tour-target="probability"
                                   classList={{

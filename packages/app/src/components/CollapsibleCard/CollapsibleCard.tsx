@@ -1,7 +1,7 @@
 import { createSignal, Show } from 'solid-js'
 import { ChevronDown } from '@/icons'
 import ui from './CollapsibleCard.module.css'
-import type { ParentProps } from 'solid-js'
+import type { JSX, ParentProps } from 'solid-js'
 
 export function CollapsibleCard(
   props: ParentProps<{
@@ -15,6 +15,10 @@ export function CollapsibleCard(
     accentColor?: string
     /** When provided, renders a leading swatch that toggles selection. */
     onToggleSelect?: () => void
+    /** Right-aligned actions rendered just before the collapse chevron (e.g.
+     *  visibility / delete). Their click handlers must stopPropagation so they
+     *  don't also toggle the card. */
+    headerActions?: JSX.Element
   }>,
 ) {
   const [isOpen, setIsOpen] = createSignal(props.defaultOpen ?? true)
@@ -57,10 +61,15 @@ export function CollapsibleCard(
           </Show>
           <span class={ui.title}>{props.title}</span>
         </span>
-        <ChevronDown
-          class={ui.chevron}
-          classList={{ [ui.chevronOpen!]: isOpen() }}
-        />
+        <span class={ui.headerRight}>
+          <Show when={props.headerActions}>
+            <span class={ui.headerActions}>{props.headerActions}</span>
+          </Show>
+          <ChevronDown
+            class={ui.chevron}
+            classList={{ [ui.chevronOpen!]: isOpen() }}
+          />
+        </span>
       </button>
       {isOpen() && <div class={ui.content}>{props.children}</div>}
     </div>
