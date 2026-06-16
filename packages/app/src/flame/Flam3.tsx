@@ -260,16 +260,6 @@ export function Flam3(props: Flam3Props) {
     const rs = animatedFlame().renderSettings
     const depthVal = rs.depthColorPower ?? 0.0
     const lightVal = rs.lightPower ?? 0.0
-    if (DEBUG_MODE) {
-      console.info(
-        '[Flam3:writeUniforms] depthColorPower →',
-        depthVal,
-        'lightPower →',
-        lightVal,
-        'isPreview:',
-        !!props.onAccumulatedPointCount,
-      )
-    }
     colorGradingUniforms.write({
       averagePointCountPerBucketInv: currentAveragePointCountPerBucketInv,
       exposure: 2 * Math.exp(rs.exposure),
@@ -521,16 +511,6 @@ export function Flam3(props: Flam3Props) {
     if (timeline && enabled && hasTracks > 0 && isActive) {
       applyTimelineToFlame(timeline, flame)
     }
-    if (DEBUG_MODE) {
-      console.info(
-        '[Flam3:animatedFlame] props.depthColorPower →',
-        rs.depthColorPower,
-        'clone.depthColorPower →',
-        flame.renderSettings.depthColorPower,
-        'isPreview:',
-        !!props.onAccumulatedPointCount,
-      )
-    }
     setAnimatedFlame(flame)
   })
 
@@ -778,6 +758,11 @@ export function Flam3(props: Flam3Props) {
     })
 
     function resetAccumulation() {
+      if (DEBUG_MODE && untrack(animationExportRunning)) {
+        console.info(
+          `[Flam3 ${logTime()}] resetAccumulation (was ${accumulatedPointCount_} pts → 0, clear + re-warm pending)`,
+        )
+      }
       batchIndex = 0
       accumulatedPointCount_ = 0
       lastExportRenderedPointCount = -1
@@ -894,11 +879,15 @@ export function Flam3(props: Flam3Props) {
       if (!hadWork) {
         // Nothing to submit — still report state so export capture, progress
         // and cancellation keep flowing while the export driver idles.
-        currentExportCb?.(canvas, {
-          finalImageReady:
-            isExportReady &&
-            lastExportRenderedPointCount === accumulatedPointCount_,
-        })
+        const finalImageReady =
+          isExportReady &&
+          lastExportRenderedPointCount === accumulatedPointCount_
+        if (DEBUG_MODE && finalImageReady && untrack(animationExportRunning)) {
+          console.info(
+            `[Flam3 ${logTime()}] !hadWork emit finalImageReady=TRUE at ${accumulatedPointCount_} pts (no new IFS work this tick) — capture gate may grab a STALE frame`,
+          )
+        }
+        currentExportCb?.(canvas, { finalImageReady })
         return { iterations: 0, presented: false, hadWork: false }
       }
 
@@ -971,6 +960,11 @@ export function Flam3(props: Flam3Props) {
       if (shouldRenderFinalImage) {
         if (isExportReady || isAutoFpsReady) {
           lastExportRenderedPointCount = accumulatedPointCount_
+          if (DEBUG_MODE && isExportReady && untrack(animationExportRunning)) {
+            console.info(
+              `[Flam3 ${logTime()}] rendered FRESH export image at ${accumulatedPointCount_} pts`,
+            )
+          }
         }
         lastPresentMs = performance.now()
         const skipItersFactor =
