@@ -706,8 +706,19 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
     ),
     blockYVar: unfreeze(
       produce(getDefaultFlameByVarType('blockYVar'), (draft) => {
-        draft.renderSettings.exposure = 2.2
-        draft.renderSettings.camera.zoom = 0.4
+        // Near-origin input collapses to a dense core with a thin ray out to
+        // ~(4,4); spread it with larger x/y/mp and frame the whole ray.
+        draft.renderSettings.exposure = 1.8
+        draft.renderSettings.camera.zoom = 0.42
+        draft.renderSettings.camera.position = [2.2, 2.2]
+        draft.transforms[getTransformPreviewTid('blockYVar')]!.variations[
+          getTransformPreviewVid('blockYVar')
+        ] = {
+          type: 'blockYVar',
+          weight: 1.0,
+          visible: true,
+          params: { x: 3.0, y: 3.0, mp: 2.0 },
+        }
       }),
     ),
     coneVar: unfreeze(
@@ -847,6 +858,59 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
           visible: true,
           params: { size: 0.5, scale: 1.0 },
         }
+      }),
+    ),
+    boardersVar: unfreeze(
+      produce(getDefaultFlameByVarType('boardersVar'), (draft) => {
+        // Borders tiles the integer lattice; the gaussian input mostly fills
+        // the origin cell (~[-0.5,0.5]), so zoom in on it.
+        draft.renderSettings.exposure = 1.5
+        draft.renderSettings.camera.zoom = 1.8
+      }),
+    ),
+    cscSquaredVar: unfreeze(
+      produce(getDefaultFlameByVarType('cscSquaredVar'), (draft) => {
+        // csc=1/sin(x) blows up at x=0, flinging origin-centred points to ±∞
+        // in y. Shift the input off the singularity via preAffine, then frame
+        // the bounded shape that remains.
+        draft.renderSettings.exposure = 0.9
+        draft.renderSettings.camera.zoom = 0.5
+        draft.renderSettings.camera.position = [7.0, 0]
+        // Shrink AND shift the input so it samples only the smooth band around
+        // x=π/2, away from the x=0 / x=π csc singularities.
+        draft.transforms[getTransformPreviewTid('cscSquaredVar')]!.preAffine = {
+          a: 0.4,
+          b: 0,
+          c: 1.5,
+          d: 0,
+          e: 0.4,
+          f: 0,
+        }
+      }),
+    ),
+    vogelVar: unfreeze(
+      produce(getDefaultFlameByVarType('vogelVar'), (draft) => {
+        // Vogel sunflower: r=scale·√i spreads seeds out, but with n=500 each
+        // seed gets too few points to read. Fewer seeds (lower n) concentrate
+        // the points into brighter dots; zoom out + lift exposure for the spiral.
+        draft.renderSettings.exposure = 2.5
+        draft.renderSettings.camera.zoom = 0.3
+        draft.transforms[getTransformPreviewTid('vogelVar')]!.variations[
+          getTransformPreviewVid('vogelVar')
+        ] = {
+          type: 'vogelVar',
+          weight: 1.0,
+          visible: true,
+          params: { scale: 0.35, n: 80 },
+        }
+      }),
+    ),
+    ovoidVar: unfreeze(
+      produce(getDefaultFlameByVarType('ovoidVar'), (draft) => {
+        // 1/r² inversion: output radius is ≥ ~1.94 (everything sits outside the
+        // default view → black). Zoom out to frame the ovoid ring.
+        draft.renderSettings.exposure = 1.2
+        draft.renderSettings.camera.zoom = 0.32
       }),
     ),
   }
