@@ -1,5 +1,6 @@
 import { f32, i32, struct, u32, vec2f } from 'typegpu/data'
 import { abs, cos, floor, sin } from 'typegpu/std'
+import { AngleEditor } from '@/components/Sliders/ParametricEditors/AngleEditor'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { parametricVariation } from '../types'
@@ -28,7 +29,7 @@ const PixelFlowVarParams = struct({
 type PixelFlowVarParams = Infer<typeof PixelFlowVarParams>
 
 const PixelFlowVarParamsDefaults: PixelFlowVarParams = {
-  angle: 90.0,
+  angle: Math.PI / 2, // 90°, stored in radians for AngleEditor
   len: 0.1,
   width: 200.0,
   seed: 42.0,
@@ -36,11 +37,8 @@ const PixelFlowVarParamsDefaults: PixelFlowVarParams = {
 
 const PixelFlowVarParamsEditor: EditorFor<PixelFlowVarParams> = (props) => (
   <>
-    <RangeEditor
+    <AngleEditor
       {...editorProps(props, 'angle', 'Angle', props.dataParameterPath)}
-      min={0.0}
-      max={360.0}
-      step={1.0}
     />
     <RangeEditor
       {...editorProps(props, 'len', 'Length', props.dataParameterPath)}
@@ -86,9 +84,9 @@ export const pixelFlowVar = parametricVariation(
   (pos, varInfo, P) => {
     'use gpu'
     const seedI = i32(P.seed)
-    const a_rad = P.angle * 0.0174532925
-    const sina = sin(a_rad)
-    const cosa = cos(a_rad)
+    // angle is stored in radians (driven by AngleEditor)
+    const sina = sin(P.angle)
+    const cosa = cos(P.angle)
 
     let blockx = i32(floor(pos.x * P.width))
     blockx = blockx + i32(2.0 - 4.0 * pixel_flow_hash(blockx * seedI + 1))

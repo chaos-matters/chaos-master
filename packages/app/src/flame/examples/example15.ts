@@ -34,7 +34,7 @@ export const example15 = defineExample({
           type: 'pixelFlowVar',
           weight: 1,
           params: {
-            angle: 90.0,
+            angle: Math.PI / 2,
             len: 0.1,
             width: 200.0,
             seed: 42.0,

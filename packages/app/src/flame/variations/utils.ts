@@ -422,7 +422,7 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
             weight: 1.0,
             visible: true,
             params: {
-              angle: 149,
+              angle: (149 * Math.PI) / 180,
               len: 1.54,
               width: 231,
               seed: 46472,
