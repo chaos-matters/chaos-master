@@ -2589,21 +2589,30 @@ export function MainWorkspace(props: AppProps) {
                 <Show when={showTimeline()}>
                   <div
                     class={ui.timelineContainer}
+                    // During playback (and export) the timeline is dimmed +
+                    // locked so the canvas/animation reads cleanly. Playback
+                    // additionally tags itself so ONLY the transport bar stays
+                    // clickable (to pause) — see [data-playback-locked] in
+                    // TimelineSection.module.css. Export stays fully locked so a
+                    // stray click can't start playback mid-render (#8).
+                    data-playback-locked={
+                      timeline.isPlaying() &&
+                      !animationExportRunning() &&
+                      exportProgress() === undefined
+                        ? 'true'
+                        : undefined
+                    }
                     style={{
-                      // Lock the timeline only during export — NOT during plain
-                      // playback. Locking the whole container while playing also
-                      // disabled the transport bar, so the pause button became
-                      // unclickable (#8). Editing is already guarded per-handler
-                      // during playback (e.g. DopeSheetTrack ignores input), so
-                      // leaving it interactive lets the user pause/scrub.
                       'pointer-events':
                         animationExportRunning() ||
-                        exportProgress() !== undefined
+                        exportProgress() !== undefined ||
+                        timeline.isPlaying()
                           ? 'none'
                           : 'auto',
                       opacity:
                         animationExportRunning() ||
-                        exportProgress() !== undefined
+                        exportProgress() !== undefined ||
+                        timeline.isPlaying()
                           ? 0.5
                           : 1,
                     }}

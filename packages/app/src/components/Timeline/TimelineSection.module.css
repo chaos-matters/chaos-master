@@ -99,6 +99,13 @@
   flex-shrink: 0;
 }
 
+/* While playback locks the dimmed timeline (pointer-events: none on the
+   container), keep the transport bar clickable so the user can still pause.
+   The container sets data-playback-locked only for playback, not export. */
+[data-playback-locked='true'] .transportControls {
+  pointer-events: auto;
+}
+
 .transportBtn {
   display: flex;
   align-items: center;
