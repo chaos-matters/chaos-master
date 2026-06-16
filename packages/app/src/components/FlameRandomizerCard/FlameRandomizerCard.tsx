@@ -19,6 +19,8 @@ export interface FlameRandomizerCardProps {
   flame: FlameDescriptor
   historyEntries: RandomizerHistoryEntry[]
   selectedTimestamp: number
+  /** True while a generate/mutate run is in flight — disables the buttons. */
+  isBusy?: boolean
   onGenerateFlame: (
     config: GenerateRandomFlameConfig,
     randomizeSettings: {
@@ -850,7 +852,11 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
           </div>
 
           <div class={ui.buttonGroup}>
-            <Button class={ui.primaryButton} onClick={handleGenerate}>
+            <Button
+              class={ui.primaryButton}
+              onClick={handleGenerate}
+              disabled={props.isBusy}
+            >
               <svg
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -866,7 +872,11 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
               </svg>
               Generate Random Flame
             </Button>
-            <Button class={ui.secondaryButton} onClick={handleMutate}>
+            <Button
+              class={ui.secondaryButton}
+              onClick={handleMutate}
+              disabled={props.isBusy}
+            >
               <svg
                 viewBox="0 0 24 24"
                 stroke="currentColor"

@@ -261,6 +261,9 @@ export function MainWorkspace(props: AppProps) {
   >()
   const [blendWeight, setBlendWeight] = createSignal(0)
   const [hideDiceButtons, setHideDiceButtons] = createSignal(false)
+  // True while a randomize/mutate run is in flight, so the buttons disable and
+  // rapid clicks can't pile up concurrent runs (history thumbnail capture).
+  const [isRandomizing, setIsRandomizing] = createSignal(false)
   const { toastMessage, showToast } = useToast()
   const SIDEBAR_RESIZABLE = false
   const { isCompact, setCompact } = useCompactMode()
@@ -1123,7 +1126,7 @@ export function MainWorkspace(props: AppProps) {
     })
   }
 
-  const handleGenerateFlame = async (
+  const runGenerateFlame = async (
     config: GenerateRandomFlameConfig,
     randomizeSettings: {
       skipIters: boolean
@@ -1203,7 +1206,7 @@ export function MainWorkspace(props: AppProps) {
     history.replace(newFlame, 'Randomize Flame')
   }
 
-  const handleMutateFlame = async (
+  const runMutateFlame = async (
     config: GenerateRandomFlameConfig,
     randomizeSettings: {
       skipIters: boolean
@@ -1282,6 +1285,33 @@ export function MainWorkspace(props: AppProps) {
 
     mutatedFlame.renderSettings = rs
     history.replace(mutatedFlame, 'Mutate Flame')
+  }
+
+  // Guard randomize/mutate so a slow run (history thumbnail capture + render)
+  // can't be re-triggered until it finishes — rapid clicks would otherwise pile
+  // up concurrent captures and lag the UI. Mirrors the logo/favicon generator.
+  const handleGenerateFlame = async (
+    ...args: Parameters<typeof runGenerateFlame>
+  ) => {
+    if (isRandomizing()) return
+    setIsRandomizing(true)
+    try {
+      await runGenerateFlame(...args)
+    } finally {
+      setIsRandomizing(false)
+    }
+  }
+
+  const handleMutateFlame = async (
+    ...args: Parameters<typeof runMutateFlame>
+  ) => {
+    if (isRandomizing()) return
+    setIsRandomizing(true)
+    try {
+      await runMutateFlame(...args)
+    } finally {
+      setIsRandomizing(false)
+    }
   }
 
   const handleUpdateRenderSettings = (
@@ -3000,6 +3030,7 @@ export function MainWorkspace(props: AppProps) {
                           onClearHistory={handleClearHistory}
                           onRandomizeAnimation={handleRandomizeAnimation}
                           onUpdateRenderSettings={handleUpdateRenderSettings}
+                          isBusy={isRandomizing()}
                         />
                         <For
                           each={recordEntries(
