@@ -151,6 +151,10 @@
   align-items: center;
   gap: var(--space-2, 0.5rem);
   margin-top: 0.15rem;
+  /* The base Button has border: none, leaving this action borderless at rest.
+     Give it a resting border (currentColor-based so it adapts to both themes)
+     so it reads as actionable before hover. */
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
 }
 
 .zipBadge {

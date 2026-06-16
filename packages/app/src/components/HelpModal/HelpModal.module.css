@@ -309,6 +309,34 @@
 }
 
 @media (max-width: 500px) {
+  /* Let the hero wrap so the icon row drops below the title instead of
+     overflowing horizontally; this also frees the top-right corner so the
+     absolute close button no longer overlaps the icons. */
+  .hero-section {
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+  }
+
+  .hero-right {
+    align-items: flex-start;
+  }
+
+  .icon-row {
+    flex-wrap: wrap;
+  }
+
+  /* Segmented controls (Hardware Tier etc.) wrap their buttons rather than
+     forcing the whole modal to scroll sideways. */
+  .picker-mode-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    row-gap: 0.35rem;
+  }
+
+  .picker-mode-btns {
+    flex-wrap: wrap;
+  }
+
   .shortcuts-grid {
     font-size: 0.68rem;
     padding: 0 var(--space-2);
