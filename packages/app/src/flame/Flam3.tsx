@@ -164,7 +164,12 @@ export function Flam3(props: Flam3Props) {
       const dx = pos[0]! - tgt[0]!
       const dy = pos[1]! - tgt[1]!
       const dz = pos[2]! - tgt[2]!
-      const radius = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1
+      // Clamp the radius used for the density/quality normalization to the old
+      // zoom floor: scale = 1/radius, so below this the area (scale²) explodes,
+      // the quality cap saturates and brightness runs away (blow-out that no
+      // exposure can fix). The camera can still zoom closer; only the
+      // normalization is held in its known-good range.
+      const radius = Math.max(0.01, Math.sqrt(dx * dx + dy * dy + dz * dz) || 1)
       const fovRad = (camera3D.fov() * Math.PI) / 180
       const tanHalfFov = Math.tan(fovRad / 2) || 1
       const scale = height / (2 * radius * tanHalfFov)
