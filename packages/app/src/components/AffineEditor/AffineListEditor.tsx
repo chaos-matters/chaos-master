@@ -17,6 +17,8 @@ export type AffineListEditorProps = {
   setTransforms: HistorySetter<TransformRecord>
   affineMode: 'preAffine' | 'postAffine'
   is3D?: boolean
+  selectedTransformId?: () => string | null
+  setSelectedTransformId?: (tid: string | null) => void
 }
 
 const COEFS_2D = ['a', 'b', 'c', 'd', 'e', 'f'] as const
@@ -45,60 +47,82 @@ export function AffineListEditor(props: AffineListEditorProps) {
   return (
     <div class={ui.container}>
       <For each={recordEntries(props.transforms)}>
-        {([tid, transform]) => (
-          <div class={ui.transformCard}>
-            <div class={ui.transformHeader}>
-              <span
-                class={ui.colorBadge}
-                style={{
-                  background: handleColor(
-                    theme(),
-                    vec2f(transform.color.x, transform.color.y),
-                  ),
-                }}
-              />
-              <Show when={timeline?.animationEnabled()}>
-                <span class={ui.transformLabel}>
-                  {readableIds().transformLabel[tid]}
-                </span>
-              </Show>
-              <DiceButton
-                title="Randomize affine coefs"
-                onClick={() => {
-                  props.setTransforms((draft) => {
-                    const coefs = draft[tid]![props.affineMode]
-                    for (const key of activeCoefs()) {
-                      coefs[key] = randomizeAffineCoef(
-                        coefs[key] ?? (['a', 'e', 'i'].includes(key) ? 1 : 0),
-                        key,
-                      )
+        {([tid, transform]) => {
+          const color = () =>
+            handleColor(theme(), vec2f(transform.color.x, transform.color.y))
+          const isSelected = () => props.selectedTransformId?.() === tid
+          const isDimmed = () =>
+            !!props.selectedTransformId?.() && !isSelected()
+          const toggleSelect = () =>
+            props.setSelectedTransformId?.(isSelected() ? null : tid)
+          return (
+            <div
+              class={ui.transformCard}
+              classList={{
+                [ui.selected as string]: isSelected(),
+                [ui.dimmed as string]: isDimmed(),
+              }}
+              style={isSelected() ? { '--accent-color': color() } : undefined}
+            >
+              <div class={ui.transformHeader}>
+                <span
+                  class={ui.colorBadge}
+                  style={{ background: color() }}
+                  role="button"
+                  tabindex={0}
+                  aria-pressed={isSelected()}
+                  aria-label={`${isSelected() ? 'Deselect' : 'Select'} ${readableIds().transformLabel[tid]}`}
+                  onClick={toggleSelect}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      toggleSelect()
                     }
-                  })
-                }}
-              />
+                  }}
+                />
+                <Show when={timeline?.animationEnabled()}>
+                  <span class={ui.transformLabel}>
+                    {readableIds().transformLabel[tid]}
+                  </span>
+                </Show>
+                <DiceButton
+                  title="Randomize affine coefs"
+                  onClick={() => {
+                    props.setTransforms((draft) => {
+                      const coefs = draft[tid]![props.affineMode]
+                      for (const key of activeCoefs()) {
+                        coefs[key] = randomizeAffineCoef(
+                          coefs[key] ?? (['a', 'e', 'i'].includes(key) ? 1 : 0),
+                          key,
+                        )
+                      }
+                    })
+                  }}
+                />
+              </div>
+              <div class={ui.coefficients}>
+                <For each={activeCoefs()}>
+                  {(key) => (
+                    <ScrubInput
+                      label={key}
+                      value={
+                        transform[props.affineMode][key] ??
+                        (['a', 'e', 'i'].includes(key) ? 1 : 0)
+                      }
+                      step={0.001}
+                      onInput={(val) => {
+                        props.setTransforms((draft) => {
+                          draft[tid]![props.affineMode][key] = val
+                        })
+                      }}
+                      dataParameterPath={`transform.${tid}.${props.affineMode}.${key}`}
+                    />
+                  )}
+                </For>
+              </div>
             </div>
-            <div class={ui.coefficients}>
-              <For each={activeCoefs()}>
-                {(key) => (
-                  <ScrubInput
-                    label={key}
-                    value={
-                      transform[props.affineMode][key] ??
-                      (['a', 'e', 'i'].includes(key) ? 1 : 0)
-                    }
-                    step={0.001}
-                    onInput={(val) => {
-                      props.setTransforms((draft) => {
-                        draft[tid]![props.affineMode][key] = val
-                      })
-                    }}
-                    dataParameterPath={`transform.${tid}.${props.affineMode}.${key}`}
-                  />
-                )}
-              </For>
-            </div>
-          </div>
-        )}
+          )
+        }}
       </For>
     </div>
   )

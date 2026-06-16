@@ -96,6 +96,11 @@ type Flam3Props = {
   disableQualityLimit?: boolean
   blendFlame?: FlameDescriptor
   blendWeight?: number
+  /** Default true. When false, chains re-seed every dispatch instead of
+   *  persisting across dispatches — required for single-transform preview
+   *  flames, whose chains would otherwise collapse onto the lone map's
+   *  attractor (shape contraction) and decay color toward the transform's. */
+  persistChains?: boolean
 }
 
 export function Flam3(props: Flam3Props) {
@@ -107,6 +112,18 @@ export function Flam3(props: Flam3Props) {
   const changeHistory = useChangeHistory()
   const isInteractive = () =>
     changeHistory.isPreviewing() || (timeline?.isPlaying() ?? false)
+
+  // Persisting chains across dispatches collapses single-map dynamics onto their
+  // attractor — a 1-transform flame visibly contracts as it accumulates. So we
+  // only persist when the chaos game picks among 2+ visible transforms (a real
+  // fractal flame); otherwise chains re-seed every dispatch. The persistChains
+  // prop overrides this default.
+  const visibleTransformCount = createMemo(
+    () =>
+      Object.values(props.flameDescriptor.transforms).filter(
+        (t) => t.visible ?? true,
+      ).length,
+  )
 
   const [animatedFlame, setAnimatedFlame] =
     createSignal<TimelineFlameDescriptor>(deepClone(props.flameDescriptor))
@@ -882,8 +899,16 @@ export function Flam3(props: Flam3Props) {
           // Pay the warmup only on the first tick after a settle; subsequent
           // ticks continue the persisted chains. Ordered before the dispatch in
           // this submission (queue.writeBuffer then queue.submit).
-          pipeline.setResetPoints(resetPointStatePending ? 1 : 0)
-          resetPointStatePending = false
+          // Re-seed every dispatch unless persisting chains. Persistence is only
+          // safe for a real chaos game (2+ transforms); a single-map flame would
+          // collapse onto its attractor (shape contraction) if its chains
+          // continued. The persistChains prop can force either way.
+          const persistChains =
+            props.persistChains ?? visibleTransformCount() >= 2
+          pipeline.setResetPoints(
+            !persistChains || resetPointStatePending ? 1 : 0,
+          )
+          if (persistChains) resetPointStatePending = false
           for (let i = 0; i < iterationCount; i++) {
             pipeline.run(pass, pointCountPerBatch)
           }

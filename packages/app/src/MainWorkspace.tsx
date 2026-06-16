@@ -1,5 +1,5 @@
 import '@/commands/builtins'
-import { createEffect, createMemo, createSignal, ErrorBoundary, For, onMount, Show, Suspense, } from 'solid-js'
+import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, onMount, Show, Suspense, } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { vec2f, vec3f, vec4f } from 'typegpu/data'
@@ -250,6 +250,10 @@ export function MainWorkspace(props: AppProps) {
   const [selectedTransformId, setSelectedTransformId] = createSignal<
     string | null
   >(null)
+  // Toggle: clicking the already-selected transform clears the selection
+  // (deselect-all → nothing dimmed). Canvas handles only ever *set* (drag-safe).
+  const toggleSelectedTransform = (tid: string) =>
+    setSelectedTransformId((prev) => (prev === tid ? null : tid))
   const [animationEnabled, setAnimationEnabled] = createSignal(true)
   const [blendFlame, setBlendFlame] = createSignal<
     FlameDescriptor | undefined
@@ -635,6 +639,17 @@ export function MainWorkspace(props: AppProps) {
         selectedPaletteId: selectedPaletteId(),
       })
     }
+
+    // Esc clears the transform selection (deselect-all → nothing dimmed).
+    const handleSelectionKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedTransformId() !== null) {
+        setSelectedTransformId(null)
+      }
+    }
+    window.addEventListener('keydown', handleSelectionKeyDown)
+    onCleanup(() => {
+      window.removeEventListener('keydown', handleSelectionKeyDown)
+    })
   })
 
   const setFlameZoom: Setter<number> = (value) => {
@@ -987,6 +1002,8 @@ export function MainWorkspace(props: AppProps) {
       setFlameDescriptor,
       () => selectedPalette(),
       startAnimationExport,
+      () => blendFlame(),
+      () => resolvedBlendWeight(),
     )
 
   async function shareToDiscord() {
@@ -2775,14 +2792,26 @@ export function MainWorkspace(props: AppProps) {
                               })
                             }}
                             finalTransform={
-                              flameDescriptor.finalTransform ?? {
-                                a: 1,
-                                b: 0,
-                                c: 0,
-                                d: 0,
-                                e: 1,
-                                f: 0,
-                              }
+                              flameDescriptor.finalTransform ??
+                              ((flameDescriptor.renderSettings.dimensions ??
+                                2) === 3
+                                ? // 3D identity in the kernel's layout
+                                  // (diagonal a,f,k; translation d,h,l)
+                                  {
+                                    a: 1,
+                                    b: 0,
+                                    c: 0,
+                                    d: 0,
+                                    e: 0,
+                                    f: 1,
+                                    g: 0,
+                                    h: 0,
+                                    i: 0,
+                                    j: 0,
+                                    k: 1,
+                                    l: 0,
+                                  }
+                                : { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 })
                             }
                             setFinalTransform={(affine) => {
                               setFlameDescriptor((draft) => {
@@ -2955,12 +2984,23 @@ export function MainWorkspace(props: AppProps) {
                             <CollapsibleCard
                               title={readableIds().transformLabel[tid]!}
                               selected={selectedTransformId() === tid}
+                              dimmed={
+                                selectedTransformId() !== null &&
+                                selectedTransformId() !== tid
+                              }
+                              accentColor={handleColor(
+                                theme(),
+                                vec2f(transform.color.x, transform.color.y),
+                              )}
+                              onToggleSelect={() =>
+                                toggleSelectedTransform(tid)
+                              }
                             >
                               <div class={ui.transformGrid}>
                                 <svg
                                   class={ui.variationButtonSvgColor}
                                   style={{ cursor: 'pointer' }}
-                                  onClick={() => setSelectedTransformId(tid)}
+                                  onClick={() => toggleSelectedTransform(tid)}
                                 >
                                   <g
                                     class={ui.variationButtonColor}
@@ -2983,10 +3023,14 @@ export function MainWorkspace(props: AppProps) {
                                   <DiceButton
                                     onClick={() => {
                                       setFlameDescriptor((draft) => {
-                                        draft.transforms[tid]!.color = {
-                                          x: random01(),
-                                          y: random01(),
-                                        }
+                                        // Set leaves individually (not a whole
+                                        // new color object) so the store's
+                                        // fine-grained updates reliably reach
+                                        // the card swatch / circle readers.
+                                        draft.transforms[tid]!.color.x =
+                                          random01()
+                                        draft.transforms[tid]!.color.y =
+                                          random01()
                                       })
                                     }}
                                     title="Randomize transform color"

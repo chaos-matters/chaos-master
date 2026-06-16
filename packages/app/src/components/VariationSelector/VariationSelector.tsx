@@ -270,7 +270,8 @@ export function VariationPreview(props: {
                 <Flam3
                   animationEnabled={false}
                   quality={targetQuality()}
-                  pointCountPerBatch={5e4}
+                  pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT}
+                  persistChains={false}
                   adaptiveFilterEnabled={false}
                   flameDescriptor={props.flame}
                   renderInterval={allowed() ? 1 : Infinity}
@@ -287,7 +288,8 @@ export function VariationPreview(props: {
               <Flam3
                 animationEnabled={false}
                 quality={targetQuality()}
-                pointCountPerBatch={5e4}
+                pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT}
+                persistChains={false}
                 // Match the 2D thumbnails: the adaptive density-estimation blur
                 // widens its kernel in sparse regions, smearing the soft edge of
                 // the projected 3D cloud into a dark halo around the bright core.
@@ -324,6 +326,13 @@ type VariationSelectorModalProps = {
   setFlameTarget3D?: Setter<Vec3>
   setFlameFov?: Setter<number>
 }
+// Previews render dimmer under the new accumulation, and most variations read
+// too dark at thumbnail size; floor every preview's exposure/gamma so the shape
+// stays visible. Math.max only lifts the dim ones — variations already tuned
+// brighter keep their values. Tune the two constants.
+const PREVIEW_MIN_EXPOSURE = 1.3
+const PREVIEW_MIN_GAMMA = 5.0
+
 export const variationPreviewFlames: (
   p: PointInitMode,
   dims?: 2 | 3,
@@ -338,6 +347,14 @@ export const variationPreviewFlames: (
         unfreeze(
           produce(getVariationPreviewFlame3D(name), (draft) => {
             draft.renderSettings.pointInitMode = pointInitMode
+            draft.renderSettings.exposure = Math.max(
+              draft.renderSettings.exposure,
+              PREVIEW_MIN_EXPOSURE,
+            )
+            draft.renderSettings.gamma = Math.max(
+              draft.renderSettings.gamma,
+              PREVIEW_MIN_GAMMA,
+            )
           }),
         ),
       ]),
@@ -349,6 +366,14 @@ export const variationPreviewFlames: (
       unfreeze(
         produce(getVariationPreviewFlame(name), (draft) => {
           draft.renderSettings.pointInitMode = pointInitMode
+          draft.renderSettings.exposure = Math.max(
+            draft.renderSettings.exposure,
+            PREVIEW_MIN_EXPOSURE,
+          )
+          draft.renderSettings.gamma = Math.max(
+            draft.renderSettings.gamma,
+            PREVIEW_MIN_GAMMA,
+          )
         }),
       ),
     ]),

@@ -55,6 +55,55 @@
   user-select: none;
 }
 
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* Leading select swatch — toggles which transform the affine grid / color
+   picker target. Its color matches the transform's canvas handle. */
+.swatch {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--swatch-color, var(--neutral-400));
+  border: 2px solid transparent;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.1s ease;
+}
+
+.swatch:hover {
+  transform: scale(1.15);
+}
+
+.swatchSelected {
+  box-shadow:
+    0 0 0 2px var(--neutral-50),
+    0 0 0 4px var(--swatch-color, var(--accent-color, #3b82f6));
+  [data-theme='dark'] & {
+    box-shadow:
+      0 0 0 2px var(--neutral-900),
+      0 0 0 4px var(--swatch-color, var(--accent-color, #3b82f6));
+  }
+}
+
+/* Non-selected transform cards dim when another is selected (mirrors the
+   affine-grid / color-picker handle dimming). */
+.card.dimmed {
+  opacity: 0.45;
+  transition: opacity 0.15s ease;
+}
+
+.card.dimmed:hover {
+  opacity: 0.85;
+}
+
 .chevron {
   width: 14px;
   height: 14px;

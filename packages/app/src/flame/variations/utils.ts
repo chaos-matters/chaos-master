@@ -109,6 +109,11 @@ export function getDefaultFlameByVarType(
         preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
         postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
         color: { x: 0, y: 0 },
+        // colorInitPosition gives each chain its color from its start position.
+        // colorSpeed 0 stops the per-iteration blend toward this neutral (0,0)
+        // transform color, which otherwise decays the hue to gray across the
+        // 16-plots-per-chain loop — leaving these palette-less previews colorless.
+        colorSpeed: 0,
         variations: {
           [getTransformPreviewVid(type)]: getVariationDefault(type, 1.0),
         },
@@ -312,7 +317,11 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
           e: 1.5067596708863726,
           f: 0.011692757718265057,
         }
-        draft.renderSettings.exposure = 0.666
+        // circus expands r>1 by ~1.087×/iteration, so under the 16-plot chain
+        // most points escape and are bounds-rejected; the kept early-iteration
+        // structure is faint. Lift gamma/exposure to reveal it. (Guess — tune.)
+        draft.renderSettings.exposure = 1.3
+        draft.renderSettings.gamma = 5.0
         draft.renderSettings.camera.zoom = 0.5
       }),
     ),
@@ -461,8 +470,12 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
     ),
     cornersVar: unfreeze(
       produce(getDefaultFlameByVarType('cornersVar'), (draft) => {
-        draft.renderSettings.camera.zoom = 0.4
-        draft.renderSettings.exposure = 0.5
+        draft.renderSettings.camera.zoom = 0.2
+        // corners pushes points to ±[1,2] and re-applies, so the chain escapes
+        // over the 16 plots; lift gamma/exposure so the early-iteration corner
+        // clusters show through. (Guess — tune.)
+        draft.renderSettings.exposure = 1.3
+        draft.renderSettings.gamma = 5.0
         draft.transforms[getTransformPreviewTid('cornersVar')]!.variations[
           getTransformPreviewVid('cornersVar')
         ] = {
@@ -740,6 +753,11 @@ export function getDefaultFlameByVarType3D(
         preAffine: IDENTITY_AFFINE_3D,
         postAffine: IDENTITY_AFFINE_3D,
         color: { x: 0, y: 0 },
+        // colorInitPosition gives each chain its color from its start position.
+        // colorSpeed 0 stops the per-iteration blend toward this neutral (0,0)
+        // transform color, which otherwise decays the hue to gray across the
+        // 16-plots-per-chain loop — leaving these palette-less previews colorless.
+        colorSpeed: 0,
         variations: {
           [getTransformPreviewVid(type)]: getVariationDefault(type, 1.0),
         },

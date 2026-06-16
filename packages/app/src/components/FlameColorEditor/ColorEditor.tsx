@@ -49,6 +49,8 @@ export function ColorEditor(props: {
             <ColorListEditor
               transforms={props.transforms}
               setTransforms={props.setTransforms}
+              selectedTransformId={props.selectedTransformId}
+              setSelectedTransformId={props.setSelectedTransformId}
             />
           </div>
         }
