@@ -784,7 +784,8 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
         Select Variation
       </ModalTitleBar>
       <p class={ui.modalSubtitle}>
-        Search and preview functions, then add the selected one to the transform.
+        Search and preview functions, then add the selected one to the
+        transform.
       </p>
       <section class={ui.variationPreview}>
         <div class={ui.searchBar}>

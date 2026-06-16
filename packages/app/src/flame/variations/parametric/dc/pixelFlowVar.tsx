@@ -68,7 +68,7 @@ const PixelFlowVarParamsEditor: EditorFor<PixelFlowVarParams> = (props) => (
 const pixel_flow_hash = (inVal: number): number => {
   'use gpu'
   let a = u32(inVal)
-  a = (a ^ 61) ^ (a >> u32(16))
+  a = a ^ 61 ^ (a >> u32(16))
   a = a + (a << u32(3))
   a = a ^ (a >> u32(4))
   a = a * 0x27d4eb2d
