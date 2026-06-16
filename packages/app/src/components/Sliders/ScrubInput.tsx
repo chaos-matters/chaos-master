@@ -14,6 +14,10 @@ type ScrubInputProps = {
   formatValue?: (value: number) => string
   dataParameterPath?: string
   'data-tour-target'?: string
+  /** Dims the control and blocks scrub/edit — used when a setting has no effect. */
+  disabled?: boolean
+  /** Tooltip explaining why the control is disabled. */
+  disabledReason?: string
 }
 
 export function ScrubInput(props: ScrubInputProps) {
@@ -32,7 +36,7 @@ export function ScrubInput(props: ScrubInputProps) {
         : props.value.toFixed(3)
 
   function startScrub(e: PointerEvent) {
-    if (editing()) return
+    if (props.disabled || editing()) return
     const startX = e.clientX
     const startValue = props.value
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
@@ -64,6 +68,7 @@ export function ScrubInput(props: ScrubInputProps) {
   }
 
   function startEdit() {
+    if (props.disabled) return
     setEditValue(formatValue())
     setEditing(true)
     requestAnimationFrame(() => inputRef?.select())
@@ -88,10 +93,12 @@ export function ScrubInput(props: ScrubInputProps) {
     <label
       class={ui.label}
       classList={{
+        [ui.disabled as string]: props.disabled === true,
         [ui.targeted as string]:
           props.dataParameterPath !== undefined &&
           selectedKeyframePath() === props.dataParameterPath,
       }}
+      title={props.disabled ? props.disabledReason : undefined}
       data-tour-target={props['data-tour-target']}
       data-parameter-path={props.dataParameterPath}
       data-step={step()}

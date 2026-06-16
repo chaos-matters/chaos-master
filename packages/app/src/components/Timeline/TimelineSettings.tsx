@@ -76,11 +76,14 @@ export function TimelineSettings() {
           type="checkbox"
           class={ui.settingCheckbox}
           checked={config().autoFps ?? false}
-          onChange={() => {
+          onChange={(e) => {
             timeline.setConfig({
               ...config(),
               autoFps: !(config().autoFps ?? false),
             })
+            // Don't keep keyboard focus on the checkbox, otherwise the next
+            // Space press toggles it again instead of starting playback.
+            e.currentTarget.blur()
           }}
           title="Auto FPS: Wait for each frame to render to target quality before advancing"
         />
@@ -142,8 +145,10 @@ export function TimelineSettings() {
           type="checkbox"
           class={ui.settingCheckbox}
           checked={config().loop}
-          onChange={() => {
+          onChange={(e) => {
             timeline.setConfig({ ...config(), loop: !config().loop })
+            // Release focus so Space starts playback instead of re-toggling.
+            e.currentTarget.blur()
           }}
           data-testid="loop-toggle"
         />

@@ -134,6 +134,10 @@ function Gradient(props: { isVisible: () => boolean }) {
 function FlameColorHandle(props: {
   color: v2f
   setColor: (color: v2f) => void
+  selected?: boolean
+  dimmed?: boolean
+  hidden?: boolean
+  onSelect?: () => void
 }) {
   const { theme } = useTheme()
   const { canvas } = useCanvas()
@@ -143,10 +147,25 @@ function FlameColorHandle(props: {
   } = useCamera()
   const changeHistory = useChangeHistory()
   const clip = createMemo(() => {
-    const result = worldToClip(props.color)
-    return result
+    // worldToClip can throw or return NaN before the camera/canvas is
+    // initialized — which happens for a frame or two when toggling between the
+    // wheel and scrub-list views (the editor remounts). Falling back to the
+    // center keeps the <circle> cx/cy valid instead of rendering "NaN%".
+    try {
+      const result = worldToClip(props.color)
+      if (Number.isFinite(result.x) && Number.isFinite(result.y)) {
+        return result
+      }
+    } catch {
+      // camera not ready yet
+    }
+    return vec2f(0, 0)
   })
-  const handleScale = () => Math.max(1, Math.sqrt(zoom()))
+  // The editor's default zoom is 4 (see createZoom in FlameColorEditor). Scale
+  // the handles gently relative to that: smaller on desktop initially, and
+  // growing much less aggressively than the old sqrt(zoom) as the user zooms in
+  // (so they don't balloon). The invisible grab area stays generous for touch.
+  const handleScale = () => Math.max(0.7, (zoom() / 4) ** 0.4)
   const startDragging = createDragHandler((initEvent) => {
     changeHistory.startPreview('Flame color')
 
@@ -167,18 +186,26 @@ function FlameColorHandle(props: {
   return (
     <g
       class={ui.handle}
+      classList={{
+        [ui.selected as string]: props.selected,
+        [ui.dimmed as string]: props.dimmed,
+        [ui.hidden as string]: props.hidden,
+      }}
       // TODO: temporarily using on:pointerdown and not onPointerDown
       // because otherwise WheelZoomCamera2D steals the event
       // due to solidjs event delegation.
-      on:pointerdown={startDragging}
+      on:pointerdown={(e) => {
+        props.onSelect?.()
+        startDragging(e)
+      }}
       onContextMenu={(e) => {
         e.preventDefault()
       }}
       style={{
         '--color': handleColor(theme(), props.color),
-        '--handle-visual-r': `${0.3 * handleScale()}rem`,
-        '--handle-visual-hover-r': `${0.4 * handleScale()}rem`,
-        '--handle-grab-r': `${0.6 * handleScale()}rem`,
+        '--handle-visual-r': `${0.42 * handleScale()}rem`,
+        '--handle-visual-hover-r': `${0.54 * handleScale()}rem`,
+        '--handle-grab-r': `${1.2 * handleScale()}rem`,
       }}
     >
       <circle
@@ -198,6 +225,8 @@ function FlameColorHandle(props: {
 export function FlameColorEditor(props: {
   transforms: TransformRecord
   setTransforms: HistorySetter<TransformRecord>
+  selectedTransformId?: () => string | null
+  setSelectedTransformId?: (tid: string | null) => void
 }) {
   const [div, setDiv] = createSignal<HTMLDivElement>()
   const [zoom, setZoom] = createZoom(4, [2, 20])
@@ -240,6 +269,13 @@ export function FlameColorEditor(props: {
                       draft[tid]!.color = { x: color.x, y: color.y }
                     })
                   }}
+                  selected={props.selectedTransformId?.() === tid}
+                  dimmed={
+                    !!props.selectedTransformId?.() &&
+                    props.selectedTransformId?.() !== tid
+                  }
+                  onSelect={() => props.setSelectedTransformId?.(tid)}
+                  hidden={!(transform.visible ?? true)}
                 />
               )}
             </For>

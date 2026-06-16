@@ -20,6 +20,12 @@ const FLY_SPEED_RANGE: [number, number] = [0.05, 20]
 // the radius is clamped to this range first so panning is never absurdly fast
 // when far out or painfully slow when zoomed in close.
 const PAN_RADIUS_RANGE: [number, number] = [1, 12]
+// Orbit-zoom radius clamp. The lower bound keeps the 3D brightness/quality
+// normalization out of its blow-out regime at extreme magnification — use fly
+// mode (which translates the rig instead of shrinking the radius) to get
+// visually closer than this.
+const MIN_ORBIT_RADIUS = 0.02
+const MAX_ORBIT_RADIUS = 100
 // Movement keys (always camera-controlled in 3D) and fly-only keys.
 const MOVE_KEYS = new Set([
   'w',
@@ -288,7 +294,10 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
       changeHistory.startPreview('Camera zoom')
     }
     props.radius[1]((r) =>
-      Math.max(0.01, Math.min(100, r * (1 + ev.deltaY * SCROLL_SENSITIVITY))),
+      Math.max(
+        MIN_ORBIT_RADIUS,
+        Math.min(MAX_ORBIT_RADIUS, r * (1 + ev.deltaY * SCROLL_SENSITIVITY)),
+      ),
     )
     setTimeout(() => {
       changeHistory.commit()
@@ -303,7 +312,9 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
     return {
       onPinchMove(event) {
         const ratio = event.distance / prevDistance
-        props.radius[1]((r) => Math.max(0.01, Math.min(100, r / ratio)))
+        props.radius[1]((r) =>
+          Math.max(MIN_ORBIT_RADIUS, Math.min(MAX_ORBIT_RADIUS, r / ratio)),
+        )
         prevDistance = event.distance
       },
       onDone() {
@@ -391,7 +402,6 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
     const deltaTime = (now - lastTime) / 1000 // in seconds
     lastTime = now
 
-    const radius = props.radius[0]()
     const { right, up, forward } = getCameraAxes()
 
     if (props.flyMode?.()) {
@@ -399,7 +409,9 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
       // Q/E descend/ascend along world up. Moving the target translates the
       // whole camera since the eye is derived from it.
       const speed =
-        radius * KEY_PAN_SPEED * (props.flySpeed?.[0]() ?? 1) * deltaTime
+        // Clamp the radius (panRadius) so fly speed doesn't crawl to ~0 when
+        // zoomed in very close — otherwise you can't fly back out.
+        panRadius() * KEY_PAN_SPEED * (props.flySpeed?.[0]() ?? 1) * deltaTime
       let fwd = 0
       let strafe = 0
       let rise = 0

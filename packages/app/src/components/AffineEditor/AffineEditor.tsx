@@ -180,6 +180,10 @@ function AffineHandle(props: {
   color: v2f
   setTransform: (pos: AffineParams) => void
   is3D?: boolean
+  selected?: boolean
+  dimmed?: boolean
+  hidden?: boolean
+  onSelect?: () => void
 }) {
   const { theme } = useTheme()
   const {
@@ -370,9 +374,39 @@ function AffineHandle(props: {
     return getPointProj(d - c, h - g, l - k)
   }
 
+  // In a 3D flame the affine handles must operate on a full 3D affine in the
+  // kernel's layout (rows a,b,c,d / e,f,g,h / i,j,k,l; translation d,h,l). A 2D
+  // affine (a..f) dragged here would otherwise be misread: its 2D y-row (d,e,f)
+  // lands in the 3D y-row and the result collapses to a plane (pancake). Promote
+  // it first, mirroring ifsPipeline3D's 2D→3D mapping.
+  const ensure3DAffine = (t: AffineParams): AffineParams => {
+    const already3D =
+      t.g !== undefined ||
+      t.h !== undefined ||
+      t.i !== undefined ||
+      t.j !== undefined ||
+      t.k !== undefined ||
+      t.l !== undefined
+    if (already3D) return t
+    return {
+      a: t.a ?? 1,
+      b: t.b ?? 0,
+      c: 0,
+      d: t.c ?? 0,
+      e: t.d ?? 0,
+      f: t.e ?? 1,
+      g: 0,
+      h: t.f ?? 0,
+      i: 0,
+      j: 0,
+      k: 1,
+      l: 0,
+    }
+  }
+
   const startDragging3D = createDragHandler((initEvent) => {
     changeHistory.startPreview('Affine 3D Translation')
-    const initialTransform = { ...props.transform }
+    const initialTransform = ensure3DAffine(props.transform)
     const grabPosition = clipToWorld(eventToClip(initEvent, canvas))
     return {
       onPointerMove(ev) {
@@ -393,7 +427,7 @@ function AffineHandle(props: {
   const startScalingRotating3D = (axis: 'X' | 'Y' | 'Z', factor: number) =>
     createDragHandler((initEvent) => {
       changeHistory.startPreview(`Rotate/Scale Local ${axis}`)
-      const initialTransform = { ...props.transform }
+      const initialTransform = ensure3DAffine(props.transform)
       const grabPosition = clipToWorld(eventToClip(initEvent, canvas))
       const center = project3D(
         initialTransform.d ?? 0,
@@ -497,7 +531,15 @@ function AffineHandle(props: {
           </svg>
           <g
             class={ui.handle}
-            on:pointerdown={startDragging}
+            classList={{
+              [ui.selected as string]: props.selected,
+              [ui.dimmed as string]: props.dimmed,
+              [ui.hidden as string]: props.hidden,
+            }}
+            on:pointerdown={(e) => {
+              props.onSelect?.()
+              startDragging(e)
+            }}
             onContextMenu={(e) => {
               e.preventDefault()
             }}
@@ -645,7 +687,15 @@ function AffineHandle(props: {
         {/* Center free-translation handle */}
         <g
           class={ui.handle}
-          on:pointerdown={startDragging3D}
+          classList={{
+            [ui.selected as string]: props.selected,
+            [ui.dimmed as string]: props.dimmed,
+            [ui.hidden as string]: props.hidden,
+          }}
+          on:pointerdown={(e) => {
+            props.onSelect?.()
+            startDragging3D(e)
+          }}
           onContextMenu={(e) => {
             e.preventDefault()
           }}
@@ -682,6 +732,8 @@ export function AffineEditor(props: {
   finalTransform?: AffineParams
   setFinalTransform?: (affine: AffineParams) => void
   is3D?: boolean
+  selectedTransformId?: () => string | null
+  setSelectedTransformId?: (tid: string | null) => void
 }) {
   const [div, setDiv] = createSignal<HTMLDivElement>()
   const [zoom, setZoom] = createZoom(0.9, [0.5, 20])
@@ -805,6 +857,13 @@ export function AffineEditor(props: {
                         })
                       }}
                       is3D={props.is3D}
+                      selected={props.selectedTransformId?.() === tid}
+                      dimmed={
+                        !!props.selectedTransformId?.() &&
+                        props.selectedTransformId?.() !== tid
+                      }
+                      onSelect={() => props.setSelectedTransformId?.(tid)}
+                      hidden={!(transform.visible ?? true)}
                     />
                   )}
                 </For>
@@ -830,6 +889,8 @@ export function AffineEditor(props: {
           setTransforms={props.setTransforms}
           affineMode={affineMode() as 'preAffine' | 'postAffine'}
           is3D={props.is3D}
+          selectedTransformId={props.selectedTransformId}
+          setSelectedTransformId={props.setSelectedTransformId}
         />
       </Show>
       <Show

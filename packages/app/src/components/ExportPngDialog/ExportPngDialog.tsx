@@ -67,6 +67,8 @@ type RenderDialogProps = {
   previewDescriptor: FlameDescriptor
   setPreviewDescriptor: (...args: unknown[]) => void
   selectedPalette: () => Palette | undefined
+  blendFlame?: () => FlameDescriptor | undefined
+  blendWeight?: () => number
   onResolutionChange: (v: number) => void
   onQualityChange: (v: number) => void
   onEmbedFlameChange: (v: boolean) => void
@@ -319,6 +321,8 @@ function RenderDialog(props: RenderDialogProps) {
                           adaptiveFilterEnabled={false}
                           animationEnabled={false}
                           flameDescriptor={props.previewDescriptor}
+                          blendFlame={props.blendFlame?.()}
+                          blendWeight={props.blendWeight?.()}
                           renderInterval={renderMode() === 'auto' ? 1 : 0}
                           edgeFadeColor={vec4f(0)}
                           palette={props.selectedPalette}
@@ -381,6 +385,8 @@ function RenderDialog(props: RenderDialogProps) {
                         adaptiveFilterEnabled={false}
                         animationEnabled={false}
                         flameDescriptor={props.previewDescriptor}
+                        blendFlame={props.blendFlame?.()}
+                        blendWeight={props.blendWeight?.()}
                         renderInterval={renderMode() === 'auto' ? 1 : 0}
                         edgeFadeColor={vec4f(0)}
                         palette={props.selectedPalette}
@@ -897,6 +903,8 @@ export function createExportPngDialog(
     config: AnimationExportConfig,
     canvas: HTMLCanvasElement,
   ) => void,
+  getBlendFlame?: () => FlameDescriptor | undefined,
+  getBlendWeight?: () => number,
 ) {
   const requestModal = useRequestModal()
   const [exportModalIsOpen, setExportModalIsOpen] = createSignal(false)
@@ -1232,6 +1240,8 @@ export function createExportPngDialog(
             setPreviewDescriptor as (...args: unknown[]) => void
           }
           selectedPalette={selectedPalette}
+          blendFlame={() => getBlendFlame?.()}
+          blendWeight={() => getBlendWeight?.() ?? 0}
           onResolutionChange={setResolution}
           onQualityChange={setQuality}
           onEmbedFlameChange={setEmbedFlame}

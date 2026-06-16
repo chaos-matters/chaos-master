@@ -24,6 +24,10 @@ type SliderProps = {
   /** Parameter path for Blender-style keyframe targeting */
   dataParameterPath?: string
   'data-tour-target'?: string
+  /** Dims the control and blocks input — used when a setting has no effect. */
+  disabled?: boolean
+  /** Tooltip explaining why the control is disabled. */
+  disabledReason?: string
 }
 
 export function Slider(props: SliderProps) {
@@ -39,7 +43,11 @@ export function Slider(props: SliderProps) {
   const max = () => props.max ?? 1
   const step = () => props.step ?? 0.01
   const value = createMemo(() => {
-    return clamp(props.value, min(), max())
+    // Guard against undefined/NaN (e.g. a stale flame whose variation params
+    // don't match the current schema): typegpu's clamp throws on a non-number
+    // argument, which would otherwise crash the whole editor.
+    const v = props.value
+    return clamp(Number.isFinite(v) ? v : min(), min(), max())
   })
   const formatValue = () =>
     props.formatValue ? props.formatValue(value()) : value().toFixed(2)
@@ -63,6 +71,8 @@ export function Slider(props: SliderProps) {
           formatValue={props.formatValue}
           dataParameterPath={props.dataParameterPath}
           data-tour-target={props['data-tour-target']}
+          disabled={props.disabled}
+          disabledReason={props.disabledReason}
         />
       }
     >
@@ -77,10 +87,12 @@ export function Slider(props: SliderProps) {
         classList={{
           [props.class ?? '']: true,
           [ui.compact as string]: props.variant === 'compact',
+          [ui.disabled as string]: props.disabled === true,
           [ui.targeted as string]:
             props.dataParameterPath !== undefined &&
             highlightedPath() === props.dataParameterPath,
         }}
+        title={props.disabled ? props.disabledReason : undefined}
         onContextMenu={(e) => {
           e.preventDefault()
         }}
@@ -110,6 +122,7 @@ export function Slider(props: SliderProps) {
             max={max()}
             step={step()}
             value={value()}
+            disabled={props.disabled}
             data-parameter-path={props.dataParameterPath}
             onPointerDown={() => {
               history.startPreview(`Edit ${props.label ?? 'slider'}`)

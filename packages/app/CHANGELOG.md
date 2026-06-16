@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.5] - 2026-06-16
+
+### Performance
+
+- **Plot every iteration after warmup**: the chaos game now records every iteration once a chain has settled instead of advancing several steps between plotted points, so the warmup/fuse cost is amortized across the whole batch. Measured throughput on the reference flame rose from ~5 B/s to ~17 B/s (~3.4×). The per-chain batch size is exposed as the **Point Batch** setting and the `VITE_PLOTS_PER_CHAIN` env var.
+- **Persisted chain state across dispatches**: each chain's position and color are carried over between compute dispatches so the warmup/fuse is paid once per settle rather than on every dispatch. A periodic re-seed (`VITE_PERSIST_RESEED_INTERVAL`) restarts chains on an interval to keep the sampling stationary and avoid drift off the invariant measure.
+- **Atomic-overflow guard**: hot accumulation buckets are clamped so the brightest regions can no longer overflow their atomic counters into garbage/dark pixels.
+- **Benchmark accuracy**: the benchmark now renders at 1024² so bucket saturation no longer inflates the reported M/s.
+
+### Added
+
+- **Point Batch render setting** (timeline-animatable slider): controls how many iterations each chain plots per batch. The default (16) keeps the throughput optimization; setting it to 1 restores the classic behaviour where **Skip Iterations** alone governs how converged the plotted points are.
+- **3D auto-exposure**: a toggle and **Strength** slider next to Exposure (3D only) that damp exposure as you zoom in, so close-range 3D flames no longer blow out. It drives the real Exposure value and re-bases to whatever exposure you set manually at the current zoom.
+- **Mitchell–Netravali stochastic resampling filter** (2D and 3D), toggled from the action widget (now shown as a kernel-curve icon).
+- **Transform selection highlight**: a transform's header colour swatch selects/deselects it and dims the rest, consistently across the affine grid, the colour picker, the sidebar cards and the affine/colour scrub list views; `Esc` clears the selection.
+- **Colour editor grid/list toggle** and a timeline-animatable per-transform colour scrub view; the randomizer can now animate per-transform colours, not just the palette.
+- **Blended flame in the Export image/PNG modal preview**, so the preview matches the exported result.
+- **Benchmark UX**: small/medium/large flame selector, 10B/50B/100B achievement badges, and download-as-PNG.
+
+### Changed
+
+- **Action-widget row regrouped** with subtle faded dividers (`[animation, timeline] | [MN, adaptive blur] | [3D, fly] | randomizers`) and clearer tooltips.
+- **Randomize transform colour** now draws a uniform OkLab hue, so every hue is equally likely; it previously biased toward red/orange and often landed out of gamut.
+- **Variation previews**: brighter exposure/gamma floor, env-driven sampling for crisper thumbnails, and tuned previews for the math, corners and circus variations.
+- **3D orbit zoom floor**: the orbit radius is clamped to a named `MIN_ORBIT_RADIUS` (0.02) — use fly mode to inspect a flame more closely than that. The 3D density/quality normalization radius is floored at `MIN_DENSITY_NORM_RADIUS` so extreme zoom can no longer blow out brightness.
+
+### Fixed
+
+- **Progressive darkening** of slow-mixing (few-transform) flames as points accumulated: chains drifting off the invariant measure under persistence are now bounded by the periodic re-seed.
+- **3D final transform collapsing into a "pancake"** when its affine handle was dragged (2D-identity default plus 2D→3D coefficient promotion in the drag handlers).
+- **Variation previews** rendering with no colour, contracting / losing their shape during accumulation, or appearing dark / invisible.
+- **Quick-variation gallery losing all preview thumbnails** when a category filter was applied.
+- **Colour editor**: wheel-handle NaN guard on view toggle, grid/list toggle positioning, and floating-toolbar cleanup in the list views.
+- **Use-after-destroy** when signalling the accumulated point count after submit.
+
 ## [0.9.4] - 2026-06-13
 
 ### Added

@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, onCleanup, onMount, Show, } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, } from 'solid-js'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { categoryOf, variationTypesFor } from '@/flame/variationRegistry'
@@ -198,6 +198,24 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
     // Sort by CATEGORIES order
     return CATEGORIES.filter((c) => cats.has(c))
   }
+
+  // Stable 0..N-1 index over the CURRENT (filtered) gallery set, so the
+  // staggered-reveal delay never grows. Previously a mutable counter was
+  // incremented inside the per-item render fn, which re-runs on every
+  // category-filter toggle — so the counter accumulated across re-renders and
+  // pushed later items' DelayedShow delay into the multi-second range, leaving
+  // the previews black until it elapsed.
+  const galleryIndexOf = createMemo(() => {
+    const map = new Map<string, number>()
+    let idx = 0
+    for (const group of grouped()) {
+      for (const type of group.types) {
+        map.set(type, idx)
+        idx += 1
+      }
+    }
+    return map
+  })
 
   onMount(() => {
     // auto-focus the search in list mode; small delay so the slide animation
@@ -456,7 +474,6 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
               props.pointInitMode ?? 'pointInitGaussianDisk',
               props.dims,
             )
-            let globalIndex = 0
             return (
               <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
                 <For each={grouped()}>
@@ -466,7 +483,7 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
                       <For each={types}>
                         {(type) => {
                           const flame = () => previewFlames[type]
-                          const i = globalIndex++
+                          const i = galleryIndexOf().get(type) ?? 0
                           let longPressTimer:
                             | ReturnType<typeof setTimeout>
                             | undefined

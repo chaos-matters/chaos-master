@@ -246,22 +246,45 @@
 .separator {
   width: 1px;
   margin: 4px 2px;
-  background: var(--neutral-200);
+  /* Soft hairline that fades at the ends — matches the toggle-row dividers. */
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--neutral-200),
+    transparent
+  );
   flex-shrink: 0;
 
   [data-theme='dark'] & {
-    background: var(--neutral-700);
+    background: linear-gradient(
+      to bottom,
+      transparent,
+      var(--neutral-700),
+      transparent
+    );
   }
 }
 
 .toggleSeparator {
   width: 1px;
-  margin: 3px 2px;
-  background: var(--neutral-200);
+  margin: 4px 3px;
+  /* Soft hairline that fades at the ends — reads as a gentle group divider
+     instead of a hard full-height bar. */
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--neutral-200),
+    transparent
+  );
   flex-shrink: 0;
 
   [data-theme='dark'] & {
-    background: var(--neutral-700);
+    background: linear-gradient(
+      to bottom,
+      transparent,
+      var(--neutral-700),
+      transparent
+    );
   }
 }
 

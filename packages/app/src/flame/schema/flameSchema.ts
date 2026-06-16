@@ -47,6 +47,11 @@ export const renderSettingsDefault: RenderSettings = {
   dimensions: 2,
   exposure: 0.25,
   skipIters: 20,
+  plotsPerChain: 16,
+  autoExposure3D: false,
+  autoExposure3DStrength: 1,
+  autoExposure3DRefRadius: 5,
+  autoExposure3DBase: 0,
   drawMode: 'light',
   backgroundColor: backgroundColorDefault,
   camera: cameraDefault,
@@ -132,6 +137,27 @@ const RenderSettings = v.object({
     v.minValue(0),
     v.maxValue(MAX_SKIP_ITERS_VALUE),
   ),
+  // Points each chaos-game chain plots after its warmup. 16 = throughput (the
+  // plotted points span many convergence depths, so skipIters reads as
+  // cosmetic); 1 restores the classic behavior where skipIters fully controls
+  // the plotted convergence (slower — each chain contributes one point at depth
+  // skipIters).
+  plotsPerChain: v.optional(
+    v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(64)),
+    16,
+  ),
+  // 3D auto-exposure: when on, dampen exposure as the camera zooms in (radius
+  // shrinks) so the flame doesn't blow out. Reference radius is captured when
+  // the toggle is enabled (neutral at that zoom); strength scales the effect.
+  autoExposure3D: v.optional(v.boolean(), false),
+  autoExposure3DStrength: v.optional(
+    v.pipe(v.number(), v.minValue(0), v.maxValue(3)),
+    1,
+  ),
+  autoExposure3DRefRadius: v.optional(v.number(), 5),
+  // Exposure (stops) captured when the auto toggle was enabled — the value the
+  // zoom-driven Exposure is offset from.
+  autoExposure3DBase: v.optional(v.number(), 0),
   dimensions: v.optional(
     v.pipe(v.number(), v.integer(), v.minValue(2), v.maxValue(3)),
     2,

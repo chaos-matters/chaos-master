@@ -1,4 +1,4 @@
-import { createMemo, createResource, createSignal, onMount, Show, Suspense, } from 'solid-js'
+import { createMemo, createResource, createSignal, For, onMount, Show, Suspense, } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
 import { DEFAULT_POINT_COUNT } from '@/defaults'
 import { examples } from '@/flame/examples'
@@ -14,7 +14,35 @@ import ui from './BenchmarkModal.module.css'
 
 const BENCHMARK_SECONDS = 10
 
+// Selectable benchmark workloads of increasing per-point cost, so users can
+// measure different regimes (light vs transform/variation-heavy flames).
+const BENCHMARK_FLAMES = [
+  {
+    id: 'small',
+    label: 'Small',
+    meta: '2 transforms',
+    flame: examples.example2,
+  },
+  {
+    id: 'medium',
+    label: 'Medium',
+    meta: '4 transforms',
+    flame: examples.example1,
+  },
+  {
+    id: 'large',
+    label: 'Large',
+    meta: '6 tf · 14 var',
+    flame: examples.benchmark,
+  },
+] as const
+
+type BenchmarkFlameId = (typeof BENCHMARK_FLAMES)[number]['id']
+
 function getAchievementBadge(bps: number): { label: string; cssClass: string } {
+  if (bps >= 100) return { label: '100B+', cssClass: 'badgeCosmic' }
+  if (bps >= 50) return { label: '50B+', cssClass: 'badgeMythic' }
+  if (bps >= 10) return { label: '10B+', cssClass: 'badgeLegend' }
   if (bps >= 5) return { label: '5B+', cssClass: 'badgeUltra' }
   if (bps >= 3) return { label: '3B+', cssClass: 'badgeElite' }
   if (bps >= 1) return { label: '1B+', cssClass: 'badgePro' }
@@ -142,6 +170,35 @@ function drawAchievementBadge(
 
   let grad: CanvasGradient
   switch (cssClass) {
+    case 'badgeCosmic':
+      grad = ctx.createLinearGradient(x, y, x + pw, y + ph)
+      grad.addColorStop(0, '#00f5d4')
+      grad.addColorStop(0.25, '#00bbf9')
+      grad.addColorStop(0.5, '#9b5de5')
+      grad.addColorStop(0.75, '#f15bb5')
+      grad.addColorStop(1, '#fee440')
+      ctx.fillStyle = grad
+      ctx.shadowColor = 'rgba(155,93,229,0.6)'
+      ctx.shadowBlur = 14
+      break
+    case 'badgeMythic':
+      grad = ctx.createLinearGradient(x, y, x + pw, y + ph)
+      grad.addColorStop(0, '#ff006e')
+      grad.addColorStop(0.5, '#fb5607')
+      grad.addColorStop(1, '#ffbe0b')
+      ctx.fillStyle = grad
+      ctx.shadowColor = 'rgba(255,0,110,0.5)'
+      ctx.shadowBlur = 12
+      break
+    case 'badgeLegend':
+      grad = ctx.createLinearGradient(x, y, x + pw, y + ph)
+      grad.addColorStop(0, '#48cae4')
+      grad.addColorStop(0.5, '#5e60ce')
+      grad.addColorStop(1, '#7400b8')
+      ctx.fillStyle = grad
+      ctx.shadowColor = 'rgba(94,96,206,0.45)'
+      ctx.shadowBlur = 10
+      break
     case 'badgeUltra':
       grad = ctx.createLinearGradient(x, y, x + pw, y + ph)
       grad.addColorStop(0, '#c47fff')
@@ -195,10 +252,21 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
   const [finalBps, setFinalBps] = createSignal(0)
   const [copied, setCopied] = createSignal(false)
   const [imageCopied, setImageCopied] = createSignal(false)
+  // Default to the standardized "large" benchmark flame (preserves prior
+  // behavior and leaderboard comparability).
+  const [selectedFlameId, setSelectedFlameId] =
+    createSignal<BenchmarkFlameId>('large')
+  const selectedFlame = () =>
+    BENCHMARK_FLAMES.find((f) => f.id === selectedFlameId()) ??
+    BENCHMARK_FLAMES[2]
   let startTime = 0
   let running = false
 
   function handleStart() {
+    // Frame the chosen flame with its own camera before the canvas mounts.
+    const cam = selectedFlame().flame.renderSettings.camera
+    cameraPosition[1](vec2f(cam.position[0], cam.position[1]))
+    cameraZoom[1](cam.zoom)
     setTotalPoints(0)
     setLiveBps(0)
     setProgress(0)
@@ -432,6 +500,23 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
     }, 'image/png')
   }
 
+  // Clipboard image writes are unreliable on Safari/iOS and some apps won't let
+  // you paste from the clipboard — a direct download always works.
+  function downloadBenchmarkImage() {
+    const canvas = renderBenchmarkCard()
+    canvas.toBlob((blob) => {
+      if (!blob) return
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `chaos-master-benchmark-${finalBps().toFixed(2)}Bps.png`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    }, 'image/png')
+  }
+
   const finalMps = createMemo(() => finalBps() * 1000)
   const achievementBadge = createMemo(() => getAchievementBadge(finalBps()))
 
@@ -466,6 +551,24 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
             Second (BPS). The result can be shared on Discord for leaderboard
             challenges.
           </p>
+          <div class={ui.flamePills} role="group" aria-label="Benchmark flame">
+            <For each={BENCHMARK_FLAMES}>
+              {(f) => (
+                <button
+                  type="button"
+                  class={ui.flamePill}
+                  classList={{
+                    [ui.flamePillActive as string]: selectedFlameId() === f.id,
+                  }}
+                  aria-pressed={selectedFlameId() === f.id}
+                  onClick={() => setSelectedFlameId(f.id)}
+                >
+                  {f.label}
+                  <span class={ui.flamePillMeta}>{f.meta}</span>
+                </button>
+              )}
+            </For>
+          </div>
           <button class={ui.runBtn} onClick={handleStart}>
             <svg
               viewBox="0 0 24 24"
@@ -507,7 +610,12 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
         <div class={ui.previewCanvas}>
           <Root adapterOptions={{ powerPreference: 'high-performance' }}>
             <AutoCanvas
-              fixedResolution={{ width: 256, height: 256 }}
+              // 1024² keeps the average bucket well under the per-bucket
+              // saturation cap over the 10s unbounded run, so the benchmark
+              // measures real throughput instead of inflating once hot buckets
+              // stop taking atomic adds (only the extreme hot tail clamps). Also
+              // closer to a real render resolution than 256².
+              fixedResolution={{ width: 1024, height: 1024 }}
               alphaMode="opaque"
             >
               <WheelZoomCamera2D
@@ -520,7 +628,7 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
                   pointCountPerBatch={DEFAULT_POINT_COUNT}
                   adaptiveFilterEnabled={false}
                   animationEnabled={false}
-                  flameDescriptor={examples.benchmark}
+                  flameDescriptor={selectedFlame().flame}
                   renderInterval={0}
                   disableQualityLimit={true}
                   edgeFadeColor={vec4f(0)}
@@ -652,7 +760,7 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
                 <path d="M4 2a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h1v-1H4V3h7v2h1V3a1 1 0 0 0-1-1H4zm3 4a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1H7zm0 1h7v7H7V7z" />
               )}
             </svg>
-            {copied() ? 'Copied!' : 'Copy Benchmark Log'}
+            {copied() ? 'Copied!' : 'Copy Log'}
           </button>
           <button
             class={ui.copyBtn}
@@ -669,7 +777,18 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
                 </>
               )}
             </svg>
-            {imageCopied() ? 'Copied!' : 'Copy as Image'}
+            {imageCopied() ? 'Copied!' : 'Copy Image'}
+          </button>
+          <button
+            class={ui.copyBtn}
+            onClick={downloadBenchmarkImage}
+            title="Download the benchmark image as a PNG"
+          >
+            <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14">
+              <path d="M8 1a.75.75 0 0 1 .75.75v6.69l2.22-2.22a.75.75 0 1 1 1.06 1.06l-3.5 3.5a.75.75 0 0 1-1.06 0l-3.5-3.5a.75.75 0 0 1 1.06-1.06l2.22 2.22V1.75A.75.75 0 0 1 8 1z" />
+              <path d="M2.5 10.5a.75.75 0 0 1 .75.75V13h9.5v-1.75a.75.75 0 0 1 1.5 0v2.5a.75.75 0 0 1-.75.75h-11a.75.75 0 0 1-.75-.75v-2.5a.75.75 0 0 1 .75-.75z" />
+            </svg>
+            Download
           </button>
         </div>
         <div class={ui.caveatSection}>

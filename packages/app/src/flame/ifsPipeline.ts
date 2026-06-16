@@ -1,7 +1,7 @@
 import { onCleanup } from 'solid-js'
 import { tgpu } from 'typegpu'
-import { arrayOf, builtin, f32, i32, struct, u32, vec2f, vec2i, vec2u, } from 'typegpu/data'
-import { add, arrayLength, atomicAdd, mul } from 'typegpu/std'
+import { arrayOf, builtin, f32, i32, struct, u32, vec2f, vec2i, vec2u, vec4f, } from 'typegpu/data'
+import { add, arrayLength, atomicAdd, atomicLoad, div, mul, sub, } from 'typegpu/std'
 import { camera2DWorldToClip } from '@/lib/Camera2D'
 import { hash, random, randomState, setSeed } from '@/shaders/random'
 import { recordEntries, recordKeys } from '@/utils/record'
@@ -10,10 +10,10 @@ import { AffineParams, transformAffine } from './affineTranform'
 import { colorInitModeToImplFn } from './colorInitMode'
 import { isPointInitMode2D, pointInitModeToImplFn } from './pointInitMode'
 import { createFlameWgsl, extractFlameUniforms } from './transformFunction'
-import { AtomicBucket, BUCKET_FIXED_POINT_MULTIPLIER, Point } from './types'
+import { AtomicBucket, BUCKET_FIXED_POINT_MULTIPLIER, BUCKET_SATURATION_COUNT, Point, } from './types'
 import { getCacheVersion } from './variations/custom'
 import type { StorageFlag, TgpuBuffer, TgpuRoot } from 'typegpu'
-import type { Vec2u, WgslArray } from 'typegpu/data'
+import type { Vec2f, Vec2u, Vec4f, WgslArray } from 'typegpu/data'
 import type { ColorInitMode } from './colorInitMode'
 import type { PointInitMode, PointInitMode2D } from './pointInitMode'
 import type { FlameDescriptor, TransformRecord } from './schema/flameSchema'
@@ -22,6 +22,24 @@ import type { CameraContext } from '@/lib/CameraContext'
 
 const { ceil } = Math
 const IFS_GROUP_SIZE = 64
+
+// Mitchell-Netravali cubic filter (B=1/3, C=1/3).
+// Support [-2, 2], integrates to 1. Used for stochastic accumulation.
+// Defined at module scope and referenced directly in the computeFn body — the
+// same proven pattern as the 3D pipeline's copy. (Not shared cross-module: a
+// WGSL-string tgpu.fn imported into another file's computeFn body is not
+// reliably traced by unplugin-typegpu.)
+const mitchellNetravali = tgpu.fn([f32], f32) /* wgsl */ `
+  (x: f32) -> f32 {
+    let ax = abs(x);
+    if (ax < 1.0) {
+      return (7.0 * ax * ax * ax - 12.0 * ax * ax + 16.0 / 3.0) / 6.0;
+    } else if (ax < 2.0) {
+      return (-7.0 / 3.0 * ax * ax * ax + 12.0 * ax * ax - 20.0 * ax + 32.0 / 3.0) / 6.0;
+    }
+    return 0.0;
+  }
+`
 
 const pipelineCache = new Map<
   string,
@@ -37,12 +55,23 @@ export function createIFSPipeline(
   camera: CameraContext,
   insideShaderCount: number,
   pointRandomSeeds: TgpuBuffer<WgslArray<Vec2u>> & StorageFlag,
+  // Persisted chain state across dispatches (position xyz in a vec4f, color in a
+  // vec2f). Lets the warmup/fuse be paid once per settle rather than every
+  // dispatch — see the `resetPoints` uniform below.
+  pointPositions: TgpuBuffer<WgslArray<Vec4f>> & StorageFlag,
+  pointColors: TgpuBuffer<WgslArray<Vec2f>> & StorageFlag,
   transforms: TransformRecord,
   outputTextureDimension: readonly [number, number],
   accumulationBuffer: TgpuBuffer<WgslArray<typeof Bucket>> & StorageFlag,
   colorInitType: ColorInitMode = 'colorInitZero',
   pointInitType: PointInitMode = 'pointInitUnitDisk',
   blendTransforms?: TransformRecord,
+  // Number of points each chain plots after the warmup/fuse. The chaos game
+  // converges onto the attractor during `insideShaderCount` warmup iterations,
+  // then plots one point per iteration (compare bezo97/IFSRenderer). Plotting
+  // many points per chain amortizes the warmup cost — the key throughput lever.
+  // Baked as a compile-time loop bound so the shader compiler can unroll it.
+  plotsPerChain: number = 1,
 ) {
   // Flames switched to 2D (or loaded 3D presets previewed without a 3D
   // camera) can carry a 3D init mode — fall back instead of resolving an
@@ -58,6 +87,7 @@ export function createIFSPipeline(
   // Uniform values flow through buffers and must not fragment the cache.
   const sig = JSON.stringify({
     insideShaderCount,
+    plotsPerChain,
     customVariationsVersion: getCacheVersion(),
     colorInitType,
     pointInit,
@@ -129,6 +159,20 @@ export function createIFSPipeline(
           storage: arrayOf(AtomicBucket),
           access: 'mutable',
         },
+        stochasticFilterRadius: {
+          uniform: f32,
+        },
+        pointPositions: {
+          storage: arrayOf(vec4f),
+          access: 'mutable',
+        },
+        pointColors: {
+          storage: arrayOf(vec2f),
+          access: 'mutable',
+        },
+        resetPoints: {
+          uniform: u32,
+        },
       })
 
       const executeRandomFlame = tgpu.fn([Point], Point) /* wgsl */ `
@@ -198,47 +242,122 @@ export function createIFSPipeline(
         const seed = add(pointSeed, hash(pointIndex))
         setSeed(seed)
         let point = Point()
-        point.position = pointInitMode(pointIndex)
-        point.color = colorInitMode(point.position)
-        for (let i = 0; i < insideShaderCount; i += 1) {
-          point = executeRandomFlame(point)
+        // Cold start (after a settle/reset): seed the chain and pay the warmup
+        // fuse. Otherwise continue the persisted chain from the last dispatch.
+        if (blendBindGroupLayout.$.resetPoints > 0) {
+          point.position = pointInitMode(pointIndex)
+          point.color = colorInitMode(point.position)
+          for (let i = 0; i < insideShaderCount; i += 1) {
+            point = executeRandomFlame(point)
+          }
+        } else {
+          point.position = blendBindGroupLayout.$.pointPositions[pointIndex]!.xy
+          point.color = vec2f(blendBindGroupLayout.$.pointColors[pointIndex]!)
         }
-        point.position = transformAffine(
-          blendBindGroupLayout.$.finalTransform,
-          point.position,
-        )
-        const clip = camera2DWorldToClip(point.position)
         const outputTextureDimensionF = vec2f(outputTextureDimension)
-        const screen = mul(
-          outputTextureDimensionF,
-          add(mul(clip, vec2f(0.5, -0.5)), 0.5),
+        const filterRadius = blendBindGroupLayout.$.stochasticFilterRadius
+        // Plot one point per chain step after the warmup above, amortizing the
+        // warmup cost across plotsPerChain plotted points.
+        for (let plot = 0; plot < plotsPerChain; plot += 1) {
+          point = executeRandomFlame(point)
+          const plotPos = transformAffine(
+            blendBindGroupLayout.$.finalTransform,
+            point.position,
+          )
+          const clip = camera2DWorldToClip(plotPos)
+          const screen = mul(
+            outputTextureDimensionF,
+            add(mul(clip, vec2f(0.5, -0.5)), 0.5),
+          )
+          if (filterRadius > 0) {
+            const offsetX = mul(sub(random(), 0.5), mul(filterRadius, 4))
+            const offsetY = mul(sub(random(), 0.5), mul(filterRadius, 4))
+            const wx = mitchellNetravali(div(offsetX, filterRadius))
+            const wy = mitchellNetravali(div(offsetY, filterRadius))
+            // Importance-sampling estimator: offset ~ uniform on [-2R, 2R]²
+            // (pdf = 1/(16R²)); the normalized 2D MN kernel is MN(dx/R)·MN(dy/R)/R².
+            // weight = kernel / pdf = 16·MN·MN, giving an expected contribution of
+            // 1 per point — energy-preserving and independent of the radius, so it
+            // matches the non-MN path (count += 1) and the tonemap normalization.
+            const accumWeight = mul(mul(wx, wy), 16)
+            const finalScreen = add(screen, vec2f(offsetX, offsetY))
+            const oob =
+              finalScreen.x < 0 ||
+              finalScreen.y < 0 ||
+              finalScreen.x > outputTextureDimensionF.x ||
+              finalScreen.y > outputTextureDimensionF.y ||
+              // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+              finalScreen.x != finalScreen.x ||
+              // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+              finalScreen.y != finalScreen.y
+            if (!oob) {
+              const screenI = vec2i(finalScreen)
+              const pixelIndex =
+                screenI.y * outputTextureDimension.x + screenI.x
+              const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
+              const fixedWeight = u32(mul(accumWeight, f32(fixed_m)))
+              // Stop once the bucket saturates so the atomics can't wrap.
+              if (
+                atomicLoad(accumulationBuffer[pixelIndex]!.count) <
+                BUCKET_SATURATION_COUNT
+              ) {
+                atomicAdd(accumulationBuffer[pixelIndex]!.count, fixedWeight)
+                atomicAdd(
+                  accumulationBuffer[pixelIndex]!.color.a,
+                  i32(mul(point.color.x, f32(fixedWeight))),
+                )
+                atomicAdd(
+                  accumulationBuffer[pixelIndex]!.color.b,
+                  i32(mul(point.color.y, f32(fixedWeight))),
+                )
+              }
+            }
+          } else {
+            const jittered = add(screen, pointInitMode(pointIndex))
+            const oob =
+              jittered.x < 0 ||
+              jittered.y < 0 ||
+              jittered.x > outputTextureDimensionF.x ||
+              jittered.y > outputTextureDimensionF.y ||
+              // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+              jittered.x != jittered.x ||
+              // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+              jittered.y != jittered.y
+            if (!oob) {
+              const screenI = vec2i(jittered)
+              const pixelIndex =
+                screenI.y * outputTextureDimension.x + screenI.x
+              const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
+              // Stop once the bucket saturates so the atomics can't wrap.
+              if (
+                atomicLoad(accumulationBuffer[pixelIndex]!.count) <
+                BUCKET_SATURATION_COUNT
+              ) {
+                atomicAdd(
+                  accumulationBuffer[pixelIndex]!.count,
+                  u32(1 * fixed_m),
+                )
+                atomicAdd(
+                  accumulationBuffer[pixelIndex]!.color.a,
+                  i32(point.color.x * f32(fixed_m)),
+                )
+                atomicAdd(
+                  accumulationBuffer[pixelIndex]!.color.b,
+                  i32(point.color.y * f32(fixed_m)),
+                )
+              }
+            }
+          }
+        }
+        // Persist the chain so the next dispatch continues it without re-warmup.
+        blendBindGroupLayout.$.pointPositions[pointIndex] = vec4f(
+          point.position,
+          0,
+          0,
         )
+        blendBindGroupLayout.$.pointColors[pointIndex] = vec2f(point.color)
         blendBindGroupLayout.$.pointRandomSeeds[pointIndex] = vec2u(
           randomState.$,
-        )
-        const jittered = add(screen, pointInitMode(pointIndex))
-        if (
-          jittered.x < 0 ||
-          jittered.y < 0 ||
-          jittered.x > outputTextureDimensionF.x ||
-          jittered.y > outputTextureDimensionF.y ||
-          // eslint-disable-next-line eqeqeq -- NaN check in WGSL
-          jittered.x != jittered.x ||
-          // eslint-disable-next-line eqeqeq -- NaN check in WGSL
-          jittered.y != jittered.y
-        )
-          return
-        const screenI = vec2i(jittered)
-        const pixelIndex = screenI.y * outputTextureDimension.x + screenI.x
-        const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
-        atomicAdd(accumulationBuffer[pixelIndex]!.count, u32(1 * fixed_m))
-        atomicAdd(
-          accumulationBuffer[pixelIndex]!.color.a,
-          i32(point.color.x * f32(fixed_m)),
-        )
-        atomicAdd(
-          accumulationBuffer[pixelIndex]!.color.b,
-          i32(point.color.y * f32(fixed_m)),
         )
       })
 
@@ -290,6 +409,20 @@ export function createIFSPipeline(
           storage: arrayOf(AtomicBucket),
           access: 'mutable',
         },
+        stochasticFilterRadius: {
+          uniform: f32,
+        },
+        pointPositions: {
+          storage: arrayOf(vec4f),
+          access: 'mutable',
+        },
+        pointColors: {
+          storage: arrayOf(vec2f),
+          access: 'mutable',
+        },
+        resetPoints: {
+          uniform: u32,
+        },
       })
 
       const colorInitMode = colorInitModeToImplFn[colorInitType]
@@ -336,46 +469,121 @@ export function createIFSPipeline(
         const seed = add(pointSeed, hash(pointIndex))
         setSeed(seed)
         let point = Point()
-        point.position = pointInitMode(pointIndex)
-        point.color = colorInitMode(point.position)
-        for (let i = 0; i < insideShaderCount; i += 1) {
-          point = executeRandomFlame(point)
+        // Cold start (after a settle/reset): seed the chain and pay the warmup
+        // fuse. Otherwise continue the persisted chain from the last dispatch.
+        if (bindGroupLayout.$.resetPoints > 0) {
+          point.position = pointInitMode(pointIndex)
+          point.color = colorInitMode(point.position)
+          for (let i = 0; i < insideShaderCount; i += 1) {
+            point = executeRandomFlame(point)
+          }
+        } else {
+          point.position = bindGroupLayout.$.pointPositions[pointIndex]!.xy
+          point.color = vec2f(bindGroupLayout.$.pointColors[pointIndex]!)
         }
-        point.position = transformAffine(
-          bindGroupLayout.$.finalTransform,
-          point.position,
-        )
-        const clip = camera2DWorldToClip(point.position)
         const outputTextureDimensionF = vec2f(outputTextureDimension)
-        const screen = mul(
-          outputTextureDimensionF,
-          add(mul(clip, vec2f(0.5, -0.5)), 0.5),
+        const filterRadius = bindGroupLayout.$.stochasticFilterRadius
+        // Plot one point per chain step after the warmup above, amortizing the
+        // warmup cost across plotsPerChain plotted points.
+        for (let plot = 0; plot < plotsPerChain; plot += 1) {
+          point = executeRandomFlame(point)
+          const plotPos = transformAffine(
+            bindGroupLayout.$.finalTransform,
+            point.position,
+          )
+          const clip = camera2DWorldToClip(plotPos)
+          const screen = mul(
+            outputTextureDimensionF,
+            add(mul(clip, vec2f(0.5, -0.5)), 0.5),
+          )
+          if (filterRadius > 0) {
+            const offsetX = mul(sub(random(), 0.5), mul(filterRadius, 4))
+            const offsetY = mul(sub(random(), 0.5), mul(filterRadius, 4))
+            const wx = mitchellNetravali(div(offsetX, filterRadius))
+            const wy = mitchellNetravali(div(offsetY, filterRadius))
+            // Importance-sampling estimator: offset ~ uniform on [-2R, 2R]²
+            // (pdf = 1/(16R²)); the normalized 2D MN kernel is MN(dx/R)·MN(dy/R)/R².
+            // weight = kernel / pdf = 16·MN·MN, giving an expected contribution of
+            // 1 per point — energy-preserving and independent of the radius, so it
+            // matches the non-MN path (count += 1) and the tonemap normalization.
+            const accumWeight = mul(mul(wx, wy), 16)
+            const finalScreen = add(screen, vec2f(offsetX, offsetY))
+            const oob =
+              finalScreen.x < 0 ||
+              finalScreen.y < 0 ||
+              finalScreen.x > outputTextureDimensionF.x ||
+              finalScreen.y > outputTextureDimensionF.y ||
+              // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+              finalScreen.x != finalScreen.x ||
+              // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+              finalScreen.y != finalScreen.y
+            if (!oob) {
+              const screenI = vec2i(finalScreen)
+              const pixelIndex =
+                screenI.y * outputTextureDimension.x + screenI.x
+              const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
+              const fixedWeight = u32(mul(accumWeight, f32(fixed_m)))
+              // Stop once the bucket saturates so the atomics can't wrap.
+              if (
+                atomicLoad(accumulationBuffer[pixelIndex]!.count) <
+                BUCKET_SATURATION_COUNT
+              ) {
+                atomicAdd(accumulationBuffer[pixelIndex]!.count, fixedWeight)
+                atomicAdd(
+                  accumulationBuffer[pixelIndex]!.color.a,
+                  i32(mul(point.color.x, f32(fixedWeight))),
+                )
+                atomicAdd(
+                  accumulationBuffer[pixelIndex]!.color.b,
+                  i32(mul(point.color.y, f32(fixedWeight))),
+                )
+              }
+            }
+          } else {
+            const jittered = add(screen, pointInitMode(pointIndex))
+            const oob =
+              jittered.x < 0 ||
+              jittered.y < 0 ||
+              jittered.x > outputTextureDimensionF.x ||
+              jittered.y > outputTextureDimensionF.y ||
+              // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+              jittered.x != jittered.x ||
+              // eslint-disable-next-line eqeqeq -- NaN check in WGSL
+              jittered.y != jittered.y
+            if (!oob) {
+              const screenI = vec2i(jittered)
+              const pixelIndex =
+                screenI.y * outputTextureDimension.x + screenI.x
+              const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
+              // Stop once the bucket saturates so the atomics can't wrap.
+              if (
+                atomicLoad(accumulationBuffer[pixelIndex]!.count) <
+                BUCKET_SATURATION_COUNT
+              ) {
+                atomicAdd(
+                  accumulationBuffer[pixelIndex]!.count,
+                  u32(1 * fixed_m),
+                )
+                atomicAdd(
+                  accumulationBuffer[pixelIndex]!.color.a,
+                  i32(point.color.x * f32(fixed_m)),
+                )
+                atomicAdd(
+                  accumulationBuffer[pixelIndex]!.color.b,
+                  i32(point.color.y * f32(fixed_m)),
+                )
+              }
+            }
+          }
+        }
+        // Persist the chain so the next dispatch continues it without re-warmup.
+        bindGroupLayout.$.pointPositions[pointIndex] = vec4f(
+          point.position,
+          0,
+          0,
         )
+        bindGroupLayout.$.pointColors[pointIndex] = vec2f(point.color)
         bindGroupLayout.$.pointRandomSeeds[pointIndex] = vec2u(randomState.$)
-        const jittered = add(screen, pointInitMode(pointIndex))
-        if (
-          jittered.x < 0 ||
-          jittered.y < 0 ||
-          jittered.x > outputTextureDimensionF.x ||
-          jittered.y > outputTextureDimensionF.y ||
-          // eslint-disable-next-line eqeqeq -- NaN check in WGSL
-          jittered.x != jittered.x ||
-          // eslint-disable-next-line eqeqeq -- NaN check in WGSL
-          jittered.y != jittered.y
-        )
-          return
-        const screenI = vec2i(jittered)
-        const pixelIndex = screenI.y * outputTextureDimension.x + screenI.x
-        const fixed_m = BUCKET_FIXED_POINT_MULTIPLIER
-        atomicAdd(accumulationBuffer[pixelIndex]!.count, u32(1 * fixed_m))
-        atomicAdd(
-          accumulationBuffer[pixelIndex]!.color.a,
-          i32(point.color.x * f32(fixed_m)),
-        )
-        atomicAdd(
-          accumulationBuffer[pixelIndex]!.color.b,
-          i32(point.color.y * f32(fixed_m)),
-        )
       })
 
       cached = { FlameUniforms, bindGroupLayout, ifsCompute }
@@ -392,17 +600,24 @@ export function createIFSPipeline(
   const finalTransformBuffer = root
     .createBuffer(AffineParams, { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 })
     .$usage('uniform')
+  const stochasticFilterRadiusBuffer = root
+    .createBuffer(f32, 0)
+    .$usage('uniform')
+  // Defaults to 1 so a freshly created pipeline warms up on its first dispatch.
+  const resetPointsBuffer = root.createBuffer(u32, 1).$usage('uniform')
   vramLog(
-    '[ifsPipeline] Created flameUniforms, finalTransform & dimension buffers',
+    '[ifsPipeline] Created flameUniforms, finalTransform, dimension & stochasticFilterRadius buffers',
   )
 
   onCleanup(() => {
     vramLog(
-      '[ifsPipeline] Destroying flameUniforms, finalTransform & dimension buffers',
+      '[ifsPipeline] Destroying flameUniforms, finalTransform, dimension & stochasticFilterRadius buffers',
     )
     flameUniformsBuffer.destroy()
     outputTextureDimensionBuffer.destroy()
     finalTransformBuffer.destroy()
+    stochasticFilterRadiusBuffer.destroy()
+    resetPointsBuffer.destroy()
   })
 
   const bindGroup = root.createBindGroup(bindGroupLayout, {
@@ -411,6 +626,10 @@ export function createIFSPipeline(
     outputTextureDimension: outputTextureDimensionBuffer,
     finalTransform: finalTransformBuffer,
     accumulationBuffer,
+    stochasticFilterRadius: stochasticFilterRadiusBuffer,
+    pointPositions,
+    pointColors,
+    resetPoints: resetPointsBuffer,
   })
 
   const ifsPipeline = root
@@ -464,6 +683,14 @@ export function createIFSPipeline(
           f: 0,
         },
       )
+    },
+    setStochasticFilterRadius: (radius: number) => {
+      stochasticFilterRadiusBuffer.write(radius)
+    },
+    // 1 = re-initialize chains and pay the warmup this dispatch; 0 = continue the
+    // persisted chains. Set to 1 for the first tick after an accumulation reset.
+    setResetPoints: (reset: number) => {
+      resetPointsBuffer.write(reset)
     },
   }
 }

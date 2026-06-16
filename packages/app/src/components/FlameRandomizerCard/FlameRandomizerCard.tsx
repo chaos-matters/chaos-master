@@ -19,6 +19,8 @@ export interface FlameRandomizerCardProps {
   flame: FlameDescriptor
   historyEntries: RandomizerHistoryEntry[]
   selectedTimestamp: number
+  /** True while a generate/mutate run is in flight — disables the buttons. */
+  isBusy?: boolean
   onGenerateFlame: (
     config: GenerateRandomFlameConfig,
     randomizeSettings: {
@@ -169,6 +171,7 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
   const [animZoom, setAnimZoom] = createSignal(true)
   const [animRot, setAnimRot] = createSignal(false)
   const [animColor, setAnimColor] = createSignal(true)
+  const [animTransformColor, setAnimTransformColor] = createSignal(false)
   const [animVib, setAnimVib] = createSignal(false)
   const [animOrbit, setAnimOrbit] = createSignal(true)
   const [animFT, setAnimFT] = createSignal(false)
@@ -332,6 +335,7 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
     if (animZoom()) presetIds.push('zoom')
     if (animRot()) presetIds.push('rot')
     if (animColor()) presetIds.push('color')
+    if (animTransformColor()) presetIds.push('transformColor')
     if (animVib()) presetIds.push('vibrancy')
     if (is3D() && animOrbit()) presetIds.push('orbit')
     if (animFT()) presetIds.push('finalTransform')
@@ -822,6 +826,13 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
                     <span>Color Cycle</span>
                   </label>
                   <label class={ui.checkboxField}>
+                    <Checkbox
+                      checked={animTransformColor()}
+                      onChange={setAnimTransformColor}
+                    />
+                    <span>Transform Colors</span>
+                  </label>
+                  <label class={ui.checkboxField}>
                     <Checkbox checked={animVib()} onChange={setAnimVib} />
                     <span>Vibrancy Pulse</span>
                   </label>
@@ -841,7 +852,11 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
           </div>
 
           <div class={ui.buttonGroup}>
-            <Button class={ui.primaryButton} onClick={handleGenerate}>
+            <Button
+              class={ui.primaryButton}
+              onClick={handleGenerate}
+              disabled={props.isBusy}
+            >
               <svg
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -857,7 +872,11 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
               </svg>
               Generate Random Flame
             </Button>
-            <Button class={ui.secondaryButton} onClick={handleMutate}>
+            <Button
+              class={ui.secondaryButton}
+              onClick={handleMutate}
+              disabled={props.isBusy}
+            >
               <svg
                 viewBox="0 0 24 24"
                 stroke="currentColor"

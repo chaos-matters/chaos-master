@@ -10,6 +10,15 @@ export const BUCKET_FIXED_POINT_MULTIPLIER = 1000
 export const BUCKET_FIXED_POINT_MULTIPLIER_INV =
   1 / BUCKET_FIXED_POINT_MULTIPLIER
 
+// Per-bucket saturation cap for the accumulation atomics. Once a bucket's
+// fixed-point count reaches this, accumulation into it stops, so the u32 count
+// and the i32 color/z accumulators can never wrap around (a hot spot wrapping
+// shows up as a dark/garbage pixel). 2^29 fixed units ≈ 5.4e5 actual points in
+// a single pixel — far past visual convergence — and leaves headroom for the
+// i32 color/z sums (|color|·count, |z|·count) to stay within range even with
+// concurrent over-add. Cold buckets keep refining; only runaway hot spots clamp.
+export const BUCKET_SATURATION_COUNT = 1 << 29
+
 export const Bucket = struct({
   /** Fixed point multiplier 1000 */
   count: u32,

@@ -34,10 +34,9 @@ export const example15 = defineExample({
           type: 'pixelFlowVar',
           weight: 1,
           params: {
-            scale_x: 1.0,
-            scale_y: 1.0,
-            speed_x: 0.0,
-            speed_y: 0.0,
+            angle: Math.PI / 2,
+            len: 0.1,
+            width: 200.0,
             seed: 42.0,
           },
         },

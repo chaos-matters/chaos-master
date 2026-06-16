@@ -31,6 +31,28 @@
   border-radius: 50%;
   flex-shrink: 0;
   border: 1px solid rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.colorBadge:hover {
+  transform: scale(1.2);
+}
+
+/* Selection indication — mirrors the color wheel / affine-grid highlight so the
+   scrub list views agree with the canvas (selected emphasized, others dimmed). */
+.transformCard.selected {
+  border-color: var(--accent-color, #3b82f6);
+  box-shadow: 0 0 0 1px var(--accent-color, #3b82f6);
+}
+
+.transformCard.dimmed {
+  opacity: 0.45;
+  transition: opacity 0.15s ease;
+}
+
+.transformCard.dimmed:hover {
+  opacity: 0.85;
 }
 
 .transformLabel {

@@ -1,9 +1,9 @@
 import { createEffect, createMemo, createSignal, onCleanup, untrack, useContext, } from 'solid-js'
-import { arrayOf, vec2u, vec3f, vec4f } from 'typegpu/data'
+import { arrayOf, vec2f, vec2u, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useTimeline } from '@/contexts/TimelineContext'
-import { DEBUG_MODE } from '@/defaults'
+import { DEBUG_MODE, PERSIST_RESEED_INTERVAL, PLOTS_PER_CHAIN, } from '@/defaults'
 import { accumulatedPointCount, animationExportProgress, animationExportRunning, exportQuality, setAccumulatedPointCountGlobal, setRenderTimings, } from '@/flame/renderStats'
 import { deepClone } from '@/utils/clone'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
@@ -35,6 +35,12 @@ const { performance } = globalThis
 
 const OUTPUT_EVERY_FRAME_BATCH_INDEX = 20
 const OUTPUT_INTERVAL_BATCH_INDEX = 10
+
+// Floor for the radius used in the 3D density/quality normalization. Below this,
+// scale = 1/radius makes the projected area (scale²) explode, saturating the
+// quality cap and blowing out brightness. The camera may zoom closer; only the
+// normalization is held here.
+const MIN_DENSITY_NORM_RADIUS = 0.01
 
 // Export driver tuning. During exports the render loop is driven by a
 // self-scheduling async loop instead of requestAnimationFrame: rAF cadence is
@@ -79,6 +85,7 @@ type Flam3Props = {
   pointCountPerBatch: number
   renderInterval: number
   adaptiveFilterEnabled: boolean
+  stochasticFilterEnabled?: boolean
   animationEnabled: boolean
   flameDescriptor: FlameDescriptor
   edgeFadeColor: v4f
@@ -95,6 +102,11 @@ type Flam3Props = {
   disableQualityLimit?: boolean
   blendFlame?: FlameDescriptor
   blendWeight?: number
+  /** Default true. When false, chains re-seed every dispatch instead of
+   *  persisting across dispatches — required for single-transform preview
+   *  flames, whose chains would otherwise collapse onto the lone map's
+   *  attractor (shape contraction) and decay color toward the transform's. */
+  persistChains?: boolean
 }
 
 export function Flam3(props: Flam3Props) {
@@ -106,6 +118,18 @@ export function Flam3(props: Flam3Props) {
   const changeHistory = useChangeHistory()
   const isInteractive = () =>
     changeHistory.isPreviewing() || (timeline?.isPlaying() ?? false)
+
+  // Persisting chains across dispatches collapses single-map dynamics onto their
+  // attractor — a 1-transform flame visibly contracts as it accumulates. So we
+  // only persist when the chaos game picks among 2+ visible transforms (a real
+  // fractal flame); otherwise chains re-seed every dispatch. The persistChains
+  // prop overrides this default.
+  const visibleTransformCount = createMemo(
+    () =>
+      Object.values(props.flameDescriptor.transforms).filter(
+        (t) => t.visible ?? true,
+      ).length,
+  )
 
   const [animatedFlame, setAnimatedFlame] =
     createSignal<TimelineFlameDescriptor>(deepClone(props.flameDescriptor))
@@ -146,7 +170,12 @@ export function Flam3(props: Flam3Props) {
       const dx = pos[0]! - tgt[0]!
       const dy = pos[1]! - tgt[1]!
       const dz = pos[2]! - tgt[2]!
-      const radius = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1
+      // Hold the normalization radius out of the blow-out regime even when the
+      // camera is closer (see MIN_DENSITY_NORM_RADIUS).
+      const radius = Math.max(
+        MIN_DENSITY_NORM_RADIUS,
+        Math.sqrt(dx * dx + dy * dy + dz * dz) || 1,
+      )
       const fovRad = (camera3D.fov() * Math.PI) / 180
       const tanHalfFov = Math.tan(fovRad / 2) || 1
       const scale = height / (2 * radius * tanHalfFov)
@@ -182,6 +211,15 @@ export function Flam3(props: Flam3Props) {
 
   const pointRandomSeeds = root
     .createBuffer(arrayOf(vec2u, props.pointCountPerBatch))
+    .$usage('storage')
+  // Persisted per-chain state across dispatches (position xyz packed in a vec4f,
+  // color in a vec2f). Created once and shared like the RNG seeds; the IFS
+  // pipeline re-initializes them on the first tick after a settle (resetPoints).
+  const pointPositions = root
+    .createBuffer(arrayOf(vec4f, props.pointCountPerBatch))
+    .$usage('storage')
+  const pointColors = root
+    .createBuffer(arrayOf(vec2f, props.pointCountPerBatch))
     .$usage('storage')
 
   const colorGradingUniforms = root
@@ -222,16 +260,6 @@ export function Flam3(props: Flam3Props) {
     const rs = animatedFlame().renderSettings
     const depthVal = rs.depthColorPower ?? 0.0
     const lightVal = rs.lightPower ?? 0.0
-    if (DEBUG_MODE) {
-      console.info(
-        '[Flam3:writeUniforms] depthColorPower →',
-        depthVal,
-        'lightPower →',
-        lightVal,
-        'isPreview:',
-        !!props.onAccumulatedPointCount,
-      )
-    }
     colorGradingUniforms.write({
       averagePointCountPerBucketInv: currentAveragePointCountPerBucketInv,
       exposure: 2 * Math.exp(rs.exposure),
@@ -320,7 +348,13 @@ export function Flam3(props: Flam3Props) {
       root,
       colorGradingUniforms,
       textureSize,
-      props.adaptiveFilterEnabled
+      // The adaptive-filter passes (density estimation + blur) write
+      // postprocessBuffer, but they are skipped while the stochastic (MN)
+      // filter is active. Reading postprocessBuffer in that state would show a
+      // frozen, never-updated image, so fall back to the live accumulation
+      // buffer whenever MN is on. Reading props.stochasticFilterEnabled here
+      // also makes this memo rebuild when the MN toggle flips.
+      props.adaptiveFilterEnabled && !props.stochasticFilterEnabled
         ? typedPostprocessBuffer
         : typedAccumulationBuffer,
       canvasFormat,
@@ -438,6 +472,9 @@ export function Flam3(props: Flam3Props) {
       colorInitMode: flame.renderSettings.colorInitMode,
       pointInitMode: flame.renderSettings.pointInitMode,
       skipIters: Math.floor(flame.renderSettings.skipIters),
+      plotsPerChain: Math.floor(
+        flame.renderSettings.plotsPerChain ?? PLOTS_PER_CHAIN,
+      ),
     })
   })
 
@@ -473,16 +510,6 @@ export function Flam3(props: Flam3Props) {
     const isActive = timeline?.isPlaying() || timeline?.isScrubbing()
     if (timeline && enabled && hasTracks > 0 && isActive) {
       applyTimelineToFlame(timeline, flame)
-    }
-    if (DEBUG_MODE) {
-      console.info(
-        '[Flam3:animatedFlame] props.depthColorPower →',
-        rs.depthColorPower,
-        'clone.depthColorPower →',
-        flame.renderSettings.depthColorPower,
-        'isPreview:',
-        !!props.onAccumulatedPointCount,
-      )
     }
     setAnimatedFlame(flame)
   })
@@ -530,7 +557,9 @@ export function Flam3(props: Flam3Props) {
 
     const paintTimeMs =
       Number(shouldRenderFinalImage) *
-      (colorGradingMs + Number(props.adaptiveFilterEnabled) * adaptiveFilterMs)
+      (colorGradingMs +
+        Number(props.adaptiveFilterEnabled && !props.stochasticFilterEnabled) *
+          adaptiveFilterMs)
 
     // Use Math.round instead of floor to prevent the dead-zone where budget/ifsMs < 2
     // would permanently trap the scaler at 1 iteration.
@@ -541,6 +570,10 @@ export function Flam3(props: Flam3Props) {
   // inside an outer effect, using rafLoop.redraw() for reactive triggers.
   let ifsPipeline: ReturnType<typeof createIFSPipeline> | undefined
   let ifsPipeline3D: ReturnType<typeof createIFSPipeline3D> | undefined
+  // Plots-per-chain the active pipeline was compiled with (renderSettings
+  // override → env default). Tracked for point accounting so it matches the
+  // baked loop bound even as the slider changes (the pipeline rebuilds on it).
+  let plotsPerChainBaked = PLOTS_PER_CHAIN
   createEffect(() => {
     const fingerprint = parameterFingerprint()
     const o = outputTextures()
@@ -552,6 +585,11 @@ export function Flam3(props: Flam3Props) {
     const flame = untrack(animatedFlame)
     const dimensions: number = flame.renderSettings.dimensions ?? 2
     const typedAccumulationBuffer = accumulationBuffer
+    const plotsPerChainValue = Math.max(
+      1,
+      Math.floor(flame.renderSettings.plotsPerChain ?? PLOTS_PER_CHAIN),
+    )
+    plotsPerChainBaked = plotsPerChainValue
 
     ifsPipeline = undefined
     ifsPipeline3D = undefined
@@ -562,11 +600,14 @@ export function Flam3(props: Flam3Props) {
         camera3D,
         Math.floor(flame.renderSettings.skipIters),
         pointRandomSeeds,
+        pointPositions,
+        pointColors,
         flame.transforms,
         textureSize,
         typedAccumulationBuffer,
         flame.renderSettings.colorInitMode,
         flame.renderSettings.pointInitMode,
+        plotsPerChainValue,
       )
     } else {
       ifsPipeline = createIFSPipeline(
@@ -574,12 +615,15 @@ export function Flam3(props: Flam3Props) {
         camera!,
         Math.floor(flame.renderSettings.skipIters),
         pointRandomSeeds,
+        pointPositions,
+        pointColors,
         flame.transforms,
         textureSize,
         typedAccumulationBuffer,
         flame.renderSettings.colorInitMode,
         flame.renderSettings.pointInitMode,
         props.blendFlame?.transforms,
+        plotsPerChainValue,
       )
     }
 
@@ -588,6 +632,19 @@ export function Flam3(props: Flam3Props) {
     let lastExportRenderedPointCount = -1
     let forceDrawToScreen = false
     let clearRequested = true
+    // When true, the next IFS tick re-initializes the persisted chains and pays
+    // the warmup fuse (set on every accumulation reset). Otherwise chains
+    // continue across dispatches, so warmup is paid once per settle.
+    let resetPointStatePending = true
+    // Periodically re-seed persisted chains so the sample distribution stays
+    // stationary. A continuing chain on a slow-mixing flame (few transforms /
+    // certain variation math) drifts off the invariant measure over time,
+    // which — with our total-count brightness normalization — shows as the
+    // image darkening as it accumulates. Re-seeding every N dispatches bounds
+    // that drift; the warmup is amortized over N, so throughput barely moves.
+    // Tunable via VITE_PERSIST_RESEED_INTERVAL — lower it to make skipIters /
+    // warmup read more strongly and reduce settle flicker, at a throughput cost.
+    let dispatchesSincePersistReseed = 0
     // Interactive estimator state: last iteration count, used to cap growth.
     let lastInteractiveIterationCount = 1
     // Export driver state: chunk size adapted from measured chunk wall time,
@@ -618,6 +675,24 @@ export function Flam3(props: Flam3Props) {
           props.blendWeight,
         )
       }
+    })
+
+    // Update stochastic filter radius when quality or filter toggle changes.
+    // Drives whichever IFS pipeline is active (2D or 3D) — both expose the same
+    // setStochasticFilterRadius API.
+    createEffect(() => {
+      const pipeline = ifsPipeline3D ?? ifsPipeline
+      if (!pipeline) return
+      if (!props.stochasticFilterEnabled) {
+        pipeline.setStochasticFilterRadius(0)
+        return
+      }
+      const storedQuality =
+        animatedFlame().renderSettings.densityEstimationQuality ?? 5
+      const qualityK =
+        storedQuality > 1 ? storedQuality : 0.5 + (1 - storedQuality) * 19.5
+      const radius = Math.max(0.5, qualityK / 2)
+      pipeline.setStochasticFilterRadius(radius)
     })
 
     const accumulationFingerprint = createMemo(() => {
@@ -683,6 +758,11 @@ export function Flam3(props: Flam3Props) {
     })
 
     function resetAccumulation() {
+      if (DEBUG_MODE && untrack(animationExportRunning)) {
+        console.info(
+          `[Flam3 ${logTime()}] resetAccumulation (was ${accumulatedPointCount_} pts → 0, clear + re-warm pending)`,
+        )
+      }
       batchIndex = 0
       accumulatedPointCount_ = 0
       lastExportRenderedPointCount = -1
@@ -693,6 +773,10 @@ export function Flam3(props: Flam3Props) {
         setAccumulatedPointCountGlobal(0)
       }
       clearRequested = true
+      // The accumulated chains are no longer valid for the new state — re-warm
+      // them on the next tick rather than continuing stale chains.
+      resetPointStatePending = true
+      dispatchesSincePersistReseed = 0
       requestRedraw()
     }
 
@@ -764,8 +848,11 @@ export function Flam3(props: Flam3Props) {
         }
       }
 
+      // Each dispatched chain (thread) plots PLOTS_PER_CHAIN points after its
+      // warmup, so plotted points = threads × PLOTS_PER_CHAIN × dispatches.
       const accumulatedAfter =
-        accumulatedPointCount_ + pointCountPerBatch * iterationCount
+        accumulatedPointCount_ +
+        pointCountPerBatch * plotsPerChainBaked * iterationCount
 
       // Export readiness is decided with the post-accumulation count so the
       // final color-graded render and the capture happen in the same
@@ -792,11 +879,15 @@ export function Flam3(props: Flam3Props) {
       if (!hadWork) {
         // Nothing to submit — still report state so export capture, progress
         // and cancellation keep flowing while the export driver idles.
-        currentExportCb?.(canvas, {
-          finalImageReady:
-            isExportReady &&
-            lastExportRenderedPointCount === accumulatedPointCount_,
-        })
+        const finalImageReady =
+          isExportReady &&
+          lastExportRenderedPointCount === accumulatedPointCount_
+        if (DEBUG_MODE && finalImageReady && untrack(animationExportRunning)) {
+          console.info(
+            `[Flam3 ${logTime()}] !hadWork emit finalImageReady=TRUE at ${accumulatedPointCount_} pts (no new IFS work this tick) — capture gate may grab a STALE frame`,
+          )
+        }
+        currentExportCb?.(canvas, { finalImageReady })
         return { iterations: 0, presented: false, hadWork: false }
       }
 
@@ -810,9 +901,10 @@ export function Flam3(props: Flam3Props) {
       if (timings) {
         setRenderTimings({
           ...timings,
-          adaptiveFilterMs: props.adaptiveFilterEnabled
-            ? timings.adaptiveFilterMs
-            : 0,
+          adaptiveFilterMs:
+            props.adaptiveFilterEnabled && !props.stochasticFilterEnabled
+              ? timings.adaptiveFilterMs
+              : 0,
         })
       }
 
@@ -824,32 +916,55 @@ export function Flam3(props: Flam3Props) {
           : {}
 
         const pass = encoder.beginComputePass(passDesc)
-        for (let i = 0; i < iterationCount; i++) {
+        if (iterationCount > 0) {
           const pipeline = ifsPipeline3D ?? ifsPipeline!
-          pipeline.run(pass, pointCountPerBatch)
+          // Pay the warmup only on the first tick after a settle; subsequent
+          // ticks continue the persisted chains. Ordered before the dispatch in
+          // this submission (queue.writeBuffer then queue.submit).
+          // Re-seed every dispatch unless persisting chains. Persistence is only
+          // safe for a real chaos game (2+ transforms); a single-map flame would
+          // collapse onto its attractor (shape contraction) if its chains
+          // continued. The persistChains prop can force either way.
+          // Plots/Chain = 1 is "classic" mode: re-warm every dispatch so each
+          // plotted point sits at exactly depth skipIters and the slider fully
+          // controls convergence. Persistence would re-converge it otherwise.
+          const persistChains =
+            props.persistChains ??
+            (visibleTransformCount() >= 2 && plotsPerChainBaked > 1)
+          // Force a periodic re-seed so a slow-mixing flame's chains can't
+          // drift far enough off the invariant measure to darken the image.
+          if (
+            persistChains &&
+            !resetPointStatePending &&
+            dispatchesSincePersistReseed >= PERSIST_RESEED_INTERVAL
+          ) {
+            resetPointStatePending = true
+          }
+          const reseeding = !persistChains || resetPointStatePending
+          pipeline.setResetPoints(reseeding ? 1 : 0)
+          if (reseeding) {
+            dispatchesSincePersistReseed = 0
+          } else {
+            dispatchesSincePersistReseed += iterationCount
+          }
+          if (persistChains) resetPointStatePending = false
+          for (let i = 0; i < iterationCount; i++) {
+            pipeline.run(pass, pointCountPerBatch)
+          }
         }
         pass.end()
 
         accumulatedPointCount_ = accumulatedAfter
       }
 
-      if (!props.onAccumulatedPointCount) {
-        // Ready ticks always write so the capture gate sees a fresh count.
-        const nowMs = performance.now()
-        if (
-          !exportMode ||
-          isExportReady ||
-          nowMs - lastCountSignalMs >= EXPORT_COUNT_SIGNAL_INTERVAL_MS
-        ) {
-          lastCountSignalMs = nowMs
-          setAccumulatedPointCountGlobal(accumulatedPointCount_)
-        }
-      }
-      props.onAccumulatedPointCount?.(accumulatedPointCount_)
-
       if (shouldRenderFinalImage) {
         if (isExportReady || isAutoFpsReady) {
           lastExportRenderedPointCount = accumulatedPointCount_
+          if (DEBUG_MODE && isExportReady && untrack(animationExportRunning)) {
+            console.info(
+              `[Flam3 ${logTime()}] rendered FRESH export image at ${accumulatedPointCount_} pts`,
+            )
+          }
         }
         lastPresentMs = performance.now()
         const skipItersFactor =
@@ -857,7 +972,7 @@ export function Flam3(props: Flam3Props) {
         currentAveragePointCountPerBucketInv =
           (bucketProbabilityInv() / accumulatedPointCount_) * skipItersFactor
         writeColorGradingUniforms()
-        if (props.adaptiveFilterEnabled) {
+        if (props.adaptiveFilterEnabled && !props.stochasticFilterEnabled) {
           const passDesc: GPUComputePassDescriptor =
             timestampWrites.adaptiveFilterMs
               ? { timestampWrites: timestampWrites.adaptiveFilterMs }
@@ -888,6 +1003,25 @@ export function Flam3(props: Flam3Props) {
 
       timestampQuery.write(encoder, Math.max(iterationCount, 1))
       device.queue.submit([encoder.finish()])
+
+      // Signal the accumulated count only AFTER the submit. Consumers
+      // (e.g. the benchmark / hardware-tier detector) may synchronously tear
+      // this renderer down from the callback — doing it before submit would
+      // destroy the pipeline's buffers while the just-encoded command buffer
+      // still references them ("used in submit while destroyed").
+      if (!props.onAccumulatedPointCount) {
+        // Ready ticks always write so the capture gate sees a fresh count.
+        const nowMs = performance.now()
+        if (
+          !exportMode ||
+          isExportReady ||
+          nowMs - lastCountSignalMs >= EXPORT_COUNT_SIGNAL_INTERVAL_MS
+        ) {
+          lastCountSignalMs = nowMs
+          setAccumulatedPointCountGlobal(accumulatedPointCount_)
+        }
+      }
+      props.onAccumulatedPointCount?.(accumulatedPointCount_)
 
       if (currentExportCb) {
         currentExportCb(canvas, {
@@ -1010,7 +1144,8 @@ export function Flam3(props: Flam3Props) {
           }
 
           const tickMs = performance.now() - startMs
-          windowPoints += tick.iterations * props.pointCountPerBatch
+          windowPoints +=
+            tick.iterations * props.pointCountPerBatch * plotsPerChainBaked
           windowTickMs += tickMs
           windowTicks += 1
 

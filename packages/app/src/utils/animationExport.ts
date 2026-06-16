@@ -161,6 +161,11 @@ export function createAnimationExport(
         setExportQuality(config.quality)
 
         frameAccumStartMs = performance.now()
+        if (DEBUG_MODE) {
+          console.info(
+            `[AnimExport ${logTime()}] setup frame ${frameIndex + 1}/${totalRenders} (timeline frame ${frame})`,
+          )
+        }
         let capturing = false
 
         type ExportInfo = { finalImageReady: boolean }
@@ -189,6 +194,13 @@ export function createAnimationExport(
 
             // Quality reached for this frame — capture canvas before clearing
             // export state so Flam3 doesn't overwrite the canvas first.
+            if (DEBUG_MODE) {
+              const sinceSetup = performance.now() - frameAccumStartMs
+              const frameNo = config.frameStart + (frameIndex % totalFrames)
+              console.info(
+                `[AnimExport ${logTime()}] capture frame ${frameIndex + 1}/${totalRenders} (timeline frame ${frameNo}): ${current}/${limit} pts (${(current / Math.max(1, limit)).toFixed(2)}x), ${sinceSetup.toFixed(0)}ms after setup${sinceSetup < 8 ? ' ⚠ STALE-CAPTURE? (too fast to have re-rendered)' : ''}`,
+              )
+            }
             capturing = true
 
             const captureStartTime = performance.now()

@@ -236,15 +236,9 @@ export async function decodeSharePayload(
 async function decompressJsonQueryRaw(
   compressedBytes: Uint8Array<ArrayBuffer>,
 ): Promise<Uint8Array> {
-  shareLog(
-    '[share:decompress] starting, byte length:',
-    compressedBytes.length,
-  )
+  shareLog('[share:decompress] starting, byte length:', compressedBytes.length)
   const decompress = new DecompressionStream(format)
-  shareLog(
-    '[share:decompress] DecompressionStream created, format:',
-    format,
-  )
+  shareLog('[share:decompress] DecompressionStream created, format:', format)
 
   const chunks: Uint8Array[] = []
   const pipePromise = decompress.readable.pipeTo(

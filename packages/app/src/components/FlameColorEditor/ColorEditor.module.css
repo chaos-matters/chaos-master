@@ -1,0 +1,58 @@
+.root {
+  position: relative;
+}
+
+/* The grid/list toggle floats over the top-right of the color wheel (like the
+   affine editor's toolbar floats over its canvas). A subtle glassy backdrop —
+   rather than a solid pill — keeps the icons legible on the bright wheel without
+   looking like a black box. */
+.tabs {
+  position: absolute;
+  top: var(--space-2, 6px);
+  right: var(--space-2, 6px);
+  z-index: 3;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--space-2, 6px);
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.tab {
+  padding: 4px 6px;
+  border: none;
+  border-radius: var(--space-1, 4px);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.15s,
+    color 0.15s;
+
+  &:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.12);
+  }
+}
+
+.tab-active {
+  background: rgba(255, 255, 255, 0.22);
+  color: white;
+}
+
+.tab-icon {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
+
+/* List view has no wheel, so pad it down past the floating toggle with a real
+   gap (matches the affine list clearance). */
+.list-wrap {
+  padding-top: 2.5rem;
+}

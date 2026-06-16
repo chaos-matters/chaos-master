@@ -109,6 +109,11 @@ export function getDefaultFlameByVarType(
         preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
         postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
         color: { x: 0, y: 0 },
+        // colorInitPosition gives each chain its color from its start position.
+        // colorSpeed 0 stops the per-iteration blend toward this neutral (0,0)
+        // transform color, which otherwise decays the hue to gray across the
+        // 16-plots-per-chain loop — leaving these palette-less previews colorless.
+        colorSpeed: 0,
         variations: {
           [getTransformPreviewVid(type)]: getVariationDefault(type, 1.0),
         },
@@ -128,6 +133,30 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
           b: -0.6087500485024285,
           d: -1.0517990037014098,
           e: -0.4865003428489606,
+        }
+      }),
+    ),
+    hexesVar: unfreeze(
+      produce(getDefaultFlameByVarType('hexesVar'), (draft) => {
+        draft.renderSettings.exposure = 0.25
+        draft.renderSettings.gamma = 2.8
+        draft.renderSettings.camera = {
+          zoom: 0.6057513177738368,
+          position: [0, 0],
+          rotation: 0,
+        }
+        draft.transforms[getTransformPreviewTid('hexesVar')]!.variations[
+          getTransformPreviewVid('hexesVar')
+        ] = {
+          type: 'hexesVar',
+          weight: 1.0,
+          visible: true,
+          params: {
+            cellsize: 0.11,
+            power: 1,
+            rotate: 0,
+            scale: 0.99,
+          },
         }
       }),
     ),
@@ -312,7 +341,11 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
           e: 1.5067596708863726,
           f: 0.011692757718265057,
         }
-        draft.renderSettings.exposure = 0.666
+        // circus expands r>1 by ~1.087×/iteration, so under the 16-plot chain
+        // most points escape and are bounds-rejected; the kept early-iteration
+        // structure is faint. Lift gamma/exposure to reveal it. (Guess — tune.)
+        draft.renderSettings.exposure = 1.3
+        draft.renderSettings.gamma = 5.0
         draft.renderSettings.camera.zoom = 0.5
       }),
     ),
@@ -376,25 +409,28 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
     ),
     pixelFlowVar: unfreeze(
       produce(getDefaultFlameByVarType('pixelFlowVar'), (draft) => {
-        draft.renderSettings.camera.zoom = 0.595
-        draft.renderSettings.camera.position = [0.2323, 0.0853]
-        draft.renderSettings.exposure = 0.566
+        draft.renderSettings.camera.zoom = 0.6
+        draft.renderSettings.camera.position = [0, 0]
+        draft.renderSettings.exposure = 0.4
+        draft.renderSettings.pointInitMode = 'pointInitCircle'
+        // pixelFlow only contributes a flow delta, so pair it with linear (which
+        // supplies the base disk shape) — exactly how JWildFire's pixel_flow is
+        // meant to be used.
         draft.transforms[getTransformPreviewTid('pixelFlowVar')]!.variations = {
           [getTransformPreviewVid('pixelFlowVar')]: {
             type: 'pixelFlowVar',
             weight: 1.0,
             visible: true,
             params: {
-              scale_x: 1.0,
-              scale_y: 1.0,
-              speed_x: 0.0,
-              speed_y: 0.0,
+              angle: (149 * Math.PI) / 180,
+              len: 1.54,
+              width: 231,
               seed: 46472,
             },
           },
           [generateVariationId()]: {
             type: 'linearVar',
-            weight: 1,
+            weight: 0.92,
             visible: true,
           },
         }
@@ -461,8 +497,12 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
     ),
     cornersVar: unfreeze(
       produce(getDefaultFlameByVarType('cornersVar'), (draft) => {
-        draft.renderSettings.camera.zoom = 0.4
-        draft.renderSettings.exposure = 0.5
+        draft.renderSettings.camera.zoom = 0.2
+        // corners pushes points to ±[1,2] and re-applies, so the chain escapes
+        // over the 16 plots; lift gamma/exposure so the early-iteration corner
+        // clusters show through. (Guess — tune.)
+        draft.renderSettings.exposure = 1.3
+        draft.renderSettings.gamma = 5.0
         draft.transforms[getTransformPreviewTid('cornersVar')]!.variations[
           getTransformPreviewVid('cornersVar')
         ] = {
@@ -740,6 +780,11 @@ export function getDefaultFlameByVarType3D(
         preAffine: IDENTITY_AFFINE_3D,
         postAffine: IDENTITY_AFFINE_3D,
         color: { x: 0, y: 0 },
+        // colorInitPosition gives each chain its color from its start position.
+        // colorSpeed 0 stops the per-iteration blend toward this neutral (0,0)
+        // transform color, which otherwise decays the hue to gray across the
+        // 16-plots-per-chain loop — leaving these palette-less previews colorless.
+        colorSpeed: 0,
         variations: {
           [getTransformPreviewVid(type)]: getVariationDefault(type, 1.0),
         },

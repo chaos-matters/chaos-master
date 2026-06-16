@@ -1,5 +1,5 @@
 import '@/commands/builtins'
-import { createEffect, createMemo, createSignal, ErrorBoundary, For, onMount, Show, Suspense, } from 'solid-js'
+import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, onMount, Show, Suspense, untrack, } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { vec2f, vec3f, vec4f } from 'typegpu/data'
@@ -18,6 +18,7 @@ import { BenchmarkButton } from './components/BenchmarkButton/BenchmarkButton'
 import { createShowBenchmark } from './components/BenchmarkModal/BenchmarkModal'
 import { BlendFlameGallery } from './components/BlendFlameGallery/BlendFlameGallery'
 import { Button } from './components/Button/Button'
+import { Checkbox } from './components/Checkbox/Checkbox'
 import { CollapsibleCard } from './components/CollapsibleCard/CollapsibleCard'
 import { ColorPicker } from './components/ColorPicker/ColorPicker'
 import { Card } from './components/ControlCard/ControlCard'
@@ -27,7 +28,8 @@ import { DiceButton } from './components/DiceButton/DiceButton'
 import { createDiscordShareModal } from './components/DiscordShareModal/DiscordShareModal'
 import { Dropzone } from './components/Dropzone/Dropzone'
 import { createExportPngDialog } from './components/ExportPngDialog/ExportPngDialog'
-import { FlameColorEditor, handleColor, } from './components/FlameColorEditor/FlameColorEditor'
+import { ColorEditor } from './components/FlameColorEditor/ColorEditor'
+import { handleColor } from './components/FlameColorEditor/FlameColorEditor'
 import { FlameRandomizerCard } from './components/FlameRandomizerCard/FlameRandomizerCard'
 import { FloatingActions } from './components/FloatingActions/FloatingActions'
 import { createShowHelp } from './components/HelpModal/HelpModal'
@@ -73,7 +75,7 @@ import { allTransformVariations, isAnyParametricVariationType, isVariationType, 
 import { deleteCustomVariation, duplicateCustomVariation, getCustomVariations, loadCustomVariations, } from './flame/variations/custom'
 import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } from './flame/variations/utils'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { BoxArrowRight, Cross, Eye, EyeOff, Menu, Plus, Share, Terminal, } from './icons'
+import { BoxArrowRight, Cross, Eye, EyeOff, Menu, Plus, Share, Shuffle, Terminal, } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
 import { createAnimationExport } from './utils/animationExport'
 import { deepClone } from './utils/clone'
@@ -242,12 +244,26 @@ export function MainWorkspace(props: AppProps) {
   // Dev-only: crash injection trigger (renders inside ErrorBoundary)
   const [devCrashTest, setDevCrashTest] = createSignal(false)
   const [adaptiveFilterEnabled, setAdaptiveFilterEnabled] = createSignal(true)
+  const [stochasticFilterEnabled, setStochasticFilterEnabled] =
+    createSignal(false)
+  // Which transform is "selected" — shared across the affine grid, the color
+  // picker and the sidebar transform cards so it's clear which one edits target.
+  const [selectedTransformId, setSelectedTransformId] = createSignal<
+    string | null
+  >(null)
+  // Toggle: clicking the already-selected transform clears the selection
+  // (deselect-all → nothing dimmed). Canvas handles only ever *set* (drag-safe).
+  const toggleSelectedTransform = (tid: string) =>
+    setSelectedTransformId((prev) => (prev === tid ? null : tid))
   const [animationEnabled, setAnimationEnabled] = createSignal(true)
   const [blendFlame, setBlendFlame] = createSignal<
     FlameDescriptor | undefined
   >()
   const [blendWeight, setBlendWeight] = createSignal(0)
   const [hideDiceButtons, setHideDiceButtons] = createSignal(false)
+  // True while a randomize/mutate run is in flight, so the buttons disable and
+  // rapid clicks can't pile up concurrent runs (history thumbnail capture).
+  const [isRandomizing, setIsRandomizing] = createSignal(false)
   const { toastMessage, showToast } = useToast()
   const SIDEBAR_RESIZABLE = false
   const { isCompact, setCompact } = useCompactMode()
@@ -265,6 +281,7 @@ export function MainWorkspace(props: AppProps) {
   const setSidebarWidth = () => {} // Drag resize disabled
   let sidebarRef: HTMLDivElement | undefined
   let sidebarScrollRef: HTMLDivElement | undefined
+  let randomizerCardRef: HTMLDivElement | undefined
   let savedScrollTop = 0
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [sidebarEl, setSidebarEl] = createSignal<HTMLDivElement | undefined>()
@@ -627,6 +644,17 @@ export function MainWorkspace(props: AppProps) {
         selectedPaletteId: selectedPaletteId(),
       })
     }
+
+    // Esc clears the transform selection (deselect-all → nothing dimmed).
+    const handleSelectionKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedTransformId() !== null) {
+        setSelectedTransformId(null)
+      }
+    }
+    window.addEventListener('keydown', handleSelectionKeyDown)
+    onCleanup(() => {
+      window.removeEventListener('keydown', handleSelectionKeyDown)
+    })
   })
 
   const setFlameZoom: Setter<number> = (value) => {
@@ -690,6 +718,26 @@ export function MainWorkspace(props: AppProps) {
     })
     return flameDescriptor.renderSettings.camera3D.radius
   }
+  // 3D auto-exposure: drive the real Exposure value from the camera zoom so the
+  // slider visibly tracks it. exposure = base + strength*log(radius/refRadius),
+  // neutral at the radius where the toggle was enabled. The exposure read is
+  // untracked so manual edits between zooms aren't immediately reverted.
+  createEffect(() => {
+    const rs = flameDescriptor.renderSettings
+    if (!rs.autoExposure3D || (rs.dimensions ?? 2) !== 3) return
+    const radius = rs.camera3D?.radius ?? 0
+    const ref = rs.autoExposure3DRefRadius
+    if (radius <= 0 || ref <= 0) return
+    const target =
+      rs.autoExposure3DBase + rs.autoExposure3DStrength * Math.log(radius / ref)
+    untrack(() => {
+      if (Math.abs(target - flameDescriptor.renderSettings.exposure) > 1e-4) {
+        setFlameDescriptor((draft) => {
+          draft.renderSettings.exposure = target
+        })
+      }
+    })
+  })
   const setFlameTarget3D = (value: Vec3 | ((prev: Vec3) => Vec3)) => {
     setFlameDescriptor((draft) => {
       const newTarget =
@@ -979,6 +1027,8 @@ export function MainWorkspace(props: AppProps) {
       setFlameDescriptor,
       () => selectedPalette(),
       startAnimationExport,
+      () => blendFlame(),
+      () => resolvedBlendWeight(),
     )
 
   async function shareToDiscord() {
@@ -1077,7 +1127,7 @@ export function MainWorkspace(props: AppProps) {
     })
   }
 
-  const handleGenerateFlame = async (
+  const runGenerateFlame = async (
     config: GenerateRandomFlameConfig,
     randomizeSettings: {
       skipIters: boolean
@@ -1157,7 +1207,7 @@ export function MainWorkspace(props: AppProps) {
     history.replace(newFlame, 'Randomize Flame')
   }
 
-  const handleMutateFlame = async (
+  const runMutateFlame = async (
     config: GenerateRandomFlameConfig,
     randomizeSettings: {
       skipIters: boolean
@@ -1238,6 +1288,53 @@ export function MainWorkspace(props: AppProps) {
     history.replace(mutatedFlame, 'Mutate Flame')
   }
 
+  // Keep the randomizer card visually fixed across a flame swap. Changing the
+  // transform count reflows the sidebar (affine/colour list rows + transform
+  // cards), which would otherwise shove the Generate button up/down under the
+  // cursor. Measure the card before, correct scrollTop once the DOM has settled.
+  const anchorSidebarToRandomizer = (): (() => void) => {
+    if (!sidebarScrollRef || !randomizerCardRef) return () => {}
+    const before = randomizerCardRef.getBoundingClientRect().top
+    return () => {
+      requestAnimationFrame(() => {
+        if (!sidebarScrollRef || !randomizerCardRef) return
+        sidebarScrollRef.scrollTop +=
+          randomizerCardRef.getBoundingClientRect().top - before
+      })
+    }
+  }
+
+  // Guard randomize/mutate so a slow run (history thumbnail capture + render)
+  // can't be re-triggered until it finishes — rapid clicks would otherwise pile
+  // up concurrent captures and lag the UI. Mirrors the logo/favicon generator.
+  const handleGenerateFlame = async (
+    ...args: Parameters<typeof runGenerateFlame>
+  ) => {
+    if (isRandomizing()) return
+    setIsRandomizing(true)
+    const releaseAnchor = anchorSidebarToRandomizer()
+    try {
+      await runGenerateFlame(...args)
+    } finally {
+      setIsRandomizing(false)
+      releaseAnchor()
+    }
+  }
+
+  const handleMutateFlame = async (
+    ...args: Parameters<typeof runMutateFlame>
+  ) => {
+    if (isRandomizing()) return
+    setIsRandomizing(true)
+    const releaseAnchor = anchorSidebarToRandomizer()
+    try {
+      await runMutateFlame(...args)
+    } finally {
+      setIsRandomizing(false)
+      releaseAnchor()
+    }
+  }
+
   const handleUpdateRenderSettings = (
     settings: Partial<FlameDescriptor['renderSettings']>,
   ) => {
@@ -1306,6 +1403,14 @@ export function MainWorkspace(props: AppProps) {
           const phase = flameDescriptor.renderSettings.palettePhase ?? 0
           const dir = Math.random() > 0.5 ? 1 : -1
           addContinuousTrack('palettePhase', phase, dir * randomRange(1, 3))
+        } else if (preset === 'transformColor') {
+          // Drift each transform's OkLab (a, b) color coordinate in a loop —
+          // animates the per-transform colors (the color scrub inputs), distinct
+          // from palette cycling above.
+          for (const [tid, t] of Object.entries(flameDescriptor.transforms)) {
+            addLoopingTrack(`transform.${tid}.color.x`, t.color.x, 0.1, 0.3)
+            addLoopingTrack(`transform.${tid}.color.y`, t.color.y, 0.1, 0.3)
+          }
         } else if (preset === 'vibrancy') {
           const vib = flameDescriptor.renderSettings.vibrancy ?? 0.5
           const minPert = vib > 0.5 ? -0.3 : 0.1
@@ -1557,6 +1662,8 @@ export function MainWorkspace(props: AppProps) {
         return fd.renderSettings.exposure
       case 'skipIters':
         return fd.renderSettings.skipIters
+      case 'plotsPerChain':
+        return fd.renderSettings.plotsPerChain
       case 'vibrancy':
         return fd.renderSettings.vibrancy
       case 'contrast':
@@ -1845,6 +1952,9 @@ export function MainWorkspace(props: AppProps) {
           break
         case 'skipIters':
           draft.renderSettings.skipIters = value as number
+          break
+        case 'plotsPerChain':
+          draft.renderSettings.plotsPerChain = value as number
           break
         case 'vibrancy':
           draft.renderSettings.vibrancy = value as number
@@ -2333,6 +2443,7 @@ export function MainWorkspace(props: AppProps) {
                             pointCountPerBatch={DEFAULT_POINT_COUNT}
                             isExportRenderer
                             adaptiveFilterEnabled={adaptiveFilterEnabled()}
+                            stochasticFilterEnabled={stochasticFilterEnabled()}
                             animationEnabled={animationEnabled()}
                             flameDescriptor={effectiveFlame()}
                             renderInterval={finalRenderInterval()}
@@ -2758,14 +2869,26 @@ export function MainWorkspace(props: AppProps) {
                               })
                             }}
                             finalTransform={
-                              flameDescriptor.finalTransform ?? {
-                                a: 1,
-                                b: 0,
-                                c: 0,
-                                d: 0,
-                                e: 1,
-                                f: 0,
-                              }
+                              flameDescriptor.finalTransform ??
+                              ((flameDescriptor.renderSettings.dimensions ??
+                                2) === 3
+                                ? // 3D identity in the kernel's layout
+                                  // (diagonal a,f,k; translation d,h,l)
+                                  {
+                                    a: 1,
+                                    b: 0,
+                                    c: 0,
+                                    d: 0,
+                                    e: 0,
+                                    f: 1,
+                                    g: 0,
+                                    h: 0,
+                                    i: 0,
+                                    j: 0,
+                                    k: 1,
+                                    l: 0,
+                                  }
+                                : { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 })
                             }
                             setFinalTransform={(affine) => {
                               setFlameDescriptor((draft) => {
@@ -2776,17 +2899,21 @@ export function MainWorkspace(props: AppProps) {
                               (flameDescriptor.renderSettings.dimensions ??
                                 2) === 3
                             }
+                            selectedTransformId={selectedTransformId}
+                            setSelectedTransformId={setSelectedTransformId}
                           />
                         </CollapsibleCard>
                         <CollapsibleCard title="Color">
                           <div>
-                            <FlameColorEditor
+                            <ColorEditor
                               transforms={flameDescriptor.transforms}
                               setTransforms={(setFn) => {
                                 setFlameDescriptor((draft) => {
                                   setFn(draft.transforms)
                                 })
                               }}
+                              selectedTransformId={selectedTransformId}
+                              setSelectedTransformId={setSelectedTransformId}
                             />
                           </div>
                         </CollapsibleCard>
@@ -2914,17 +3041,20 @@ export function MainWorkspace(props: AppProps) {
                             </button>
                           </CollapsibleCard>
                         </Show>
-                        <FlameRandomizerCard
-                          flame={flameDescriptor}
-                          historyEntries={randomizerHistory()}
-                          selectedTimestamp={selectedHistoryTimestamp()}
-                          onGenerateFlame={handleGenerateFlame}
-                          onMutateFlame={handleMutateFlame}
-                          onLoadHistory={handleLoadHistory}
-                          onClearHistory={handleClearHistory}
-                          onRandomizeAnimation={handleRandomizeAnimation}
-                          onUpdateRenderSettings={handleUpdateRenderSettings}
-                        />
+                        <div ref={randomizerCardRef}>
+                          <FlameRandomizerCard
+                            flame={flameDescriptor}
+                            historyEntries={randomizerHistory()}
+                            selectedTimestamp={selectedHistoryTimestamp()}
+                            onGenerateFlame={handleGenerateFlame}
+                            onMutateFlame={handleMutateFlame}
+                            onLoadHistory={handleLoadHistory}
+                            onClearHistory={handleClearHistory}
+                            onRandomizeAnimation={handleRandomizeAnimation}
+                            onUpdateRenderSettings={handleUpdateRenderSettings}
+                            isBusy={isRandomizing()}
+                          />
+                        </div>
                         <For
                           each={recordEntries(
                             flameDescriptor.transforms,
@@ -2933,79 +3063,90 @@ export function MainWorkspace(props: AppProps) {
                           {([tid, transform]) => (
                             <CollapsibleCard
                               title={readableIds().transformLabel[tid]!}
-                            >
-                              <div class={ui.transformGrid}>
-                                <svg class={ui.variationButtonSvgColor}>
-                                  <g
-                                    class={ui.variationButtonColor}
-                                    style={{
-                                      '--color': handleColor(
-                                        theme(),
-                                        vec2f(
-                                          transform.color.x,
-                                          transform.color.y,
-                                        ),
-                                      ),
+                              selected={selectedTransformId() === tid}
+                              dimmed={
+                                selectedTransformId() !== null &&
+                                selectedTransformId() !== tid
+                              }
+                              accentColor={handleColor(
+                                theme(),
+                                vec2f(transform.color.x, transform.color.y),
+                              )}
+                              onToggleSelect={() =>
+                                toggleSelectedTransform(tid)
+                              }
+                              headerActions={
+                                <>
+                                  <Show when={!hideDiceButtons()}>
+                                    <span
+                                      class={ui.transformHeaderAction}
+                                      role="button"
+                                      tabindex={0}
+                                      title="Randomize transform color"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        // Uniform OkLab hue at a vivid chroma so
+                                        // every hue is equally likely (the old
+                                        // random in x/y skewed reddish).
+                                        const hue = random01() * 2 * Math.PI
+                                        const chroma = 0.25 + random01() * 0.15
+                                        setFlameDescriptor((draft) => {
+                                          draft.transforms[tid]!.color.x =
+                                            chroma * Math.cos(hue)
+                                          draft.transforms[tid]!.color.y =
+                                            chroma * Math.sin(hue)
+                                        })
+                                      }}
+                                    >
+                                      <Shuffle />
+                                    </span>
+                                  </Show>
+                                  <span
+                                    class={ui.transformHeaderAction}
+                                    role="button"
+                                    tabindex={0}
+                                    title={
+                                      transform.visible
+                                        ? 'Hide transform'
+                                        : 'Show transform'
+                                    }
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setFlameDescriptor((draft) => {
+                                        draft.transforms[tid]!.visible =
+                                          !draft.transforms[tid]!.visible
+                                      })
                                     }}
                                   >
-                                    <circle
-                                      class={ui.variationButtonColorCircle}
-                                    />
-                                  </g>
-                                </svg>
-                                <Show when={animationEnabled()}>
-                                  <span class={ui.readableId}>
-                                    {readableIds().transformLabel[tid]}
+                                    {transform.visible ? <Eye /> : <EyeOff />}
                                   </span>
-                                </Show>
-                                <Show when={!hideDiceButtons()}>
-                                  <DiceButton
-                                    onClick={() => {
+                                  <span
+                                    class={ui.transformHeaderAction}
+                                    role="button"
+                                    tabindex={0}
+                                    title="Delete transform"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
                                       setFlameDescriptor((draft) => {
-                                        draft.transforms[tid]!.color = {
-                                          x: random01(),
-                                          y: random01(),
+                                        if (
+                                          recordKeys(draft.transforms)
+                                            .length === 1
+                                        ) {
+                                          draft.transforms[tid] = deepClone(
+                                            newDefaultTransform(),
+                                          )
+                                        } else {
+                                          delete draft.transforms[tid]
                                         }
                                       })
                                     }}
-                                    title="Randomize transform color"
-                                  />
-                                </Show>
-                                <button
-                                  class={ui.visibilityButton}
-                                  title={
-                                    transform.visible
-                                      ? 'Hide transform'
-                                      : 'Show transform'
-                                  }
-                                  onClick={() => {
-                                    setFlameDescriptor((draft) => {
-                                      draft.transforms[tid]!.visible =
-                                        !draft.transforms[tid]!.visible
-                                    })
-                                  }}
-                                >
-                                  {transform.visible ? <Eye /> : <EyeOff />}
-                                </button>
-                                <button
-                                  class={ui.deleteFlameButton}
-                                  onClick={() => {
-                                    setFlameDescriptor((draft) => {
-                                      if (
-                                        recordKeys(draft.transforms).length ===
-                                        1
-                                      ) {
-                                        draft.transforms[tid] = deepClone(
-                                          newDefaultTransform(),
-                                        )
-                                      } else {
-                                        delete draft.transforms[tid]
-                                      }
-                                    })
-                                  }}
-                                >
-                                  <Cross />
-                                </button>
+                                  >
+                                    <Cross />
+                                  </span>
+                                </>
+                              }
+                            >
+                              <div class={ui.transformGrid}>
                                 <div
                                   data-tour-target="probability"
                                   classList={{
@@ -3330,6 +3471,7 @@ export function MainWorkspace(props: AppProps) {
                                     })
                                   }}
                                 >
+                                  <Plus />
                                   Add variation
                                 </button>
                               </div>
@@ -3581,6 +3723,30 @@ export function MainWorkspace(props: AppProps) {
                               <div
                                 class={ui.parameterTarget}
                                 onClick={() => {
+                                  setTargetedParameter('plotsPerChain')
+                                }}
+                              >
+                                <Slider
+                                  label="Point Batch"
+                                  value={
+                                    flameDescriptor.renderSettings.plotsPerChain
+                                  }
+                                  min={1}
+                                  max={32}
+                                  step={1}
+                                  onInput={(plotsPerChain) => {
+                                    setFlameDescriptor((draft) => {
+                                      draft.renderSettings.plotsPerChain =
+                                        plotsPerChain
+                                    })
+                                  }}
+                                  formatValue={(value) => value.toString()}
+                                  dataParameterPath="plotsPerChain"
+                                />
+                              </div>
+                              <div
+                                class={ui.parameterTarget}
+                                onClick={() => {
                                   setTargetedParameter('exposure')
                                 }}
                               >
@@ -3595,6 +3761,21 @@ export function MainWorkspace(props: AppProps) {
                                   onInput={(newExp) => {
                                     setFlameDescriptor((draft) => {
                                       draft.renderSettings.exposure = newExp
+                                      // With auto-exposure on, a manual change
+                                      // re-bases it: this value becomes the
+                                      // baseline at the current zoom, and zoom
+                                      // scales from here.
+                                      if (
+                                        draft.renderSettings.autoExposure3D &&
+                                        (draft.renderSettings.dimensions ??
+                                          2) === 3
+                                      ) {
+                                        draft.renderSettings.autoExposure3DBase =
+                                          newExp
+                                        draft.renderSettings.autoExposure3DRefRadius =
+                                          draft.renderSettings.camera3D
+                                            ?.radius ?? 5
+                                      }
                                     })
                                   }}
                                   formatValue={(value) =>
@@ -3604,6 +3785,74 @@ export function MainWorkspace(props: AppProps) {
                                   data-tour-target="exposure-slider"
                                 />
                               </div>
+                              <Show
+                                when={
+                                  flameDescriptor.renderSettings.dimensions ===
+                                  3
+                                }
+                              >
+                                <label
+                                  style={{
+                                    // Span both grid columns so the checkbox row
+                                    // doesn't consume a value-column cell and
+                                    // shift the slider rows out of alignment.
+                                    'grid-column': '1 / -1',
+                                    display: 'flex',
+                                    'align-items': 'center',
+                                    gap: '6px',
+                                    'font-size': '12px',
+                                    cursor: 'pointer',
+                                    padding: '2px 4px',
+                                  }}
+                                >
+                                  <Checkbox
+                                    checked={
+                                      flameDescriptor.renderSettings
+                                        .autoExposure3D
+                                    }
+                                    onChange={(checked) => {
+                                      setFlameDescriptor((draft) => {
+                                        draft.renderSettings.autoExposure3D =
+                                          checked
+                                        if (checked) {
+                                          draft.renderSettings.autoExposure3DRefRadius =
+                                            draft.renderSettings.camera3D
+                                              ?.radius ?? 5
+                                          draft.renderSettings.autoExposure3DBase =
+                                            draft.renderSettings.exposure
+                                        }
+                                      })
+                                    }}
+                                  />
+                                  <span>Auto exposure on zoom</span>
+                                </label>
+                                <Show
+                                  when={
+                                    flameDescriptor.renderSettings
+                                      .autoExposure3D
+                                  }
+                                >
+                                  <div class={ui.parameterTarget}>
+                                    <Slider
+                                      label="Auto Strength"
+                                      value={
+                                        flameDescriptor.renderSettings
+                                          .autoExposure3DStrength
+                                      }
+                                      min={0}
+                                      max={3}
+                                      step={0.05}
+                                      onInput={(strength) => {
+                                        setFlameDescriptor((draft) => {
+                                          draft.renderSettings.autoExposure3DStrength =
+                                            strength
+                                        })
+                                      }}
+                                      formatValue={(value) => value.toFixed(2)}
+                                    />
+                                  </div>
+                                </Show>
+                              </Show>
                               <div
                                 class={ui.parameterTarget}
                                 onClick={() => {
@@ -3811,6 +4060,8 @@ export function MainWorkspace(props: AppProps) {
                                   formatValue={(value) => value.toFixed(2)}
                                   dataParameterPath="estimatorCurve"
                                   data-tour-target="estimatorCurve-slider"
+                                  disabled={stochasticFilterEnabled()}
+                                  disabledReason="The estimator curve only affects the density-estimation pass, which is bypassed while the Mitchell-Netravali (MN) filter is active. Turn off MN to use it."
                                 />
                               </div>
                             </div>
@@ -4312,6 +4563,8 @@ export function MainWorkspace(props: AppProps) {
             setShowTimeline={setShowTimeline}
             adaptiveFilterEnabled={adaptiveFilterEnabled}
             setAdaptiveFilterEnabled={setAdaptiveFilterEnabled}
+            stochasticFilterEnabled={stochasticFilterEnabled}
+            setStochasticFilterEnabled={setStochasticFilterEnabled}
             isPlaying={() => timeline.isPlaying()}
             togglePlay={() => {
               if (!animationEnabled()) {

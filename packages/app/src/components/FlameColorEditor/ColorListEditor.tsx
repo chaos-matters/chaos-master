@@ -1,49 +1,36 @@
-import { createMemo, For, Show } from 'solid-js'
+import { createMemo, For } from 'solid-js'
 import { vec2f } from 'typegpu/data'
+// Reuse the affine list's styling so the two scrub views look consistent.
+import ui from '@/components/AffineEditor/AffineListEditor.module.css'
 import { DiceButton } from '@/components/DiceButton/DiceButton'
-import { handleColor } from '@/components/FlameColorEditor/FlameColorEditor'
 import { ResetButton } from '@/components/ResetButton/ResetButton'
 import { ScrubInput } from '@/components/Sliders/ScrubInput'
 import { useTheme } from '@/contexts/ThemeContext'
-import { useTimeline } from '@/contexts/TimelineContext'
-import { randomizeAffineCoef } from '@/flame/randomize'
+import { randomRange } from '@/flame/randomize'
 import { buildReadableIds } from '@/utils/readableIds'
 import { recordEntries } from '@/utils/record'
-import ui from './AffineListEditor.module.css'
+import { handleColor } from './FlameColorEditor'
 import type { TransformRecord } from '@/flame/schema/flameSchema'
 import type { HistorySetter } from '@/utils/createStoreHistory'
 
-export type AffineListEditorProps = {
-  transforms: TransformRecord
-  setTransforms: HistorySetter<TransformRecord>
-  affineMode: 'preAffine' | 'postAffine'
-  is3D?: boolean
-  selectedTransformId?: () => string | null
-  setSelectedTransformId?: (tid: string | null) => void
-}
-
-const COEFS_2D = ['a', 'b', 'c', 'd', 'e', 'f'] as const
-const COEFS_3D = [
-  'a',
-  'b',
-  'c',
-  'd',
-  'e',
-  'f',
-  'g',
-  'h',
-  'i',
-  'j',
-  'k',
-  'l',
+// The flame color is an OkLab (a, b) coordinate stored as { x, y }. Exposing
+// both axes as scrub inputs gives precise editing and — because each carries a
+// dataParameterPath — timeline keyframe diamonds + auto-keyframing, the same way
+// the affine coefficients animate. The apply/read of these paths
+// (transform.{tid}.color.{x,y}) already exists in MainWorkspace.
+const COLOR_COMPONENTS = [
+  { key: 'x', label: 'a' },
+  { key: 'y', label: 'b' },
 ] as const
 
-export function AffineListEditor(props: AffineListEditorProps) {
+export function ColorListEditor(props: {
+  transforms: TransformRecord
+  setTransforms: HistorySetter<TransformRecord>
+  selectedTransformId?: () => string | null
+  setSelectedTransformId?: (tid: string | null) => void
+}) {
   const { theme } = useTheme()
-  const timeline = useTimeline()
-
   const readableIds = createMemo(() => buildReadableIds(props.transforms))
-  const activeCoefs = createMemo(() => (props.is3D ? COEFS_3D : COEFS_2D))
 
   return (
     <div class={ui.container}>
@@ -81,53 +68,42 @@ export function AffineListEditor(props: AffineListEditorProps) {
                     }
                   }}
                 />
-                <Show when={timeline?.animationEnabled()}>
-                  <span class={ui.transformLabel}>
-                    {readableIds().transformLabel[tid]}
-                  </span>
-                </Show>
+                <span class={ui.transformLabel}>
+                  {readableIds().transformLabel[tid]}
+                </span>
                 <DiceButton
-                  title="Randomize affine coefs"
+                  title="Randomize color"
                   onClick={() => {
                     props.setTransforms((draft) => {
-                      const coefs = draft[tid]![props.affineMode]
-                      for (const key of activeCoefs()) {
-                        coefs[key] = randomizeAffineCoef(
-                          coefs[key] ?? (['a', 'e', 'i'].includes(key) ? 1 : 0),
-                          key,
-                        )
+                      draft[tid]!.color = {
+                        x: randomRange(-0.4, 0.4),
+                        y: randomRange(-0.4, 0.4),
                       }
                     })
                   }}
                 />
                 <ResetButton
-                  title="Reset affine to identity (no scale/rotation/offset)"
+                  title="Reset color to neutral (0, 0)"
                   onClick={() => {
                     props.setTransforms((draft) => {
-                      const coefs = draft[tid]![props.affineMode]
-                      for (const key of activeCoefs()) {
-                        coefs[key] = ['a', 'e', 'i'].includes(key) ? 1 : 0
-                      }
+                      draft[tid]!.color = { x: 0, y: 0 }
                     })
                   }}
                 />
               </div>
               <div class={ui.coefficients}>
-                <For each={activeCoefs()}>
-                  {(key) => (
+                <For each={COLOR_COMPONENTS}>
+                  {(comp) => (
                     <ScrubInput
-                      label={key}
-                      value={
-                        transform[props.affineMode][key] ??
-                        (['a', 'e', 'i'].includes(key) ? 1 : 0)
-                      }
+                      label={comp.label}
+                      value={transform.color[comp.key]}
                       step={0.001}
                       onInput={(val) => {
                         props.setTransforms((draft) => {
-                          draft[tid]![props.affineMode][key] = val
+                          draft[tid]!.color[comp.key] = val
                         })
                       }}
-                      dataParameterPath={`transform.${tid}.${props.affineMode}.${key}`}
+                      dataParameterPath={`transform.${tid}.color.${comp.key}`}
                     />
                   )}
                 </For>
