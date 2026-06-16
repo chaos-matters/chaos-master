@@ -2,8 +2,11 @@ import { createMemo, For } from 'solid-js'
 import { vec2f } from 'typegpu/data'
 // Reuse the affine list's styling so the two scrub views look consistent.
 import ui from '@/components/AffineEditor/AffineListEditor.module.css'
+import { DiceButton } from '@/components/DiceButton/DiceButton'
+import { ResetButton } from '@/components/ResetButton/ResetButton'
 import { ScrubInput } from '@/components/Sliders/ScrubInput'
 import { useTheme } from '@/contexts/ThemeContext'
+import { randomRange } from '@/flame/randomize'
 import { buildReadableIds } from '@/utils/readableIds'
 import { recordEntries } from '@/utils/record'
 import { handleColor } from './FlameColorEditor'
@@ -68,6 +71,25 @@ export function ColorListEditor(props: {
                 <span class={ui.transformLabel}>
                   {readableIds().transformLabel[tid]}
                 </span>
+                <DiceButton
+                  title="Randomize color"
+                  onClick={() => {
+                    props.setTransforms((draft) => {
+                      draft[tid]!.color = {
+                        x: randomRange(-0.4, 0.4),
+                        y: randomRange(-0.4, 0.4),
+                      }
+                    })
+                  }}
+                />
+                <ResetButton
+                  title="Reset color to neutral (0, 0)"
+                  onClick={() => {
+                    props.setTransforms((draft) => {
+                      draft[tid]!.color = { x: 0, y: 0 }
+                    })
+                  }}
+                />
               </div>
               <div class={ui.coefficients}>
                 <For each={COLOR_COMPONENTS}>

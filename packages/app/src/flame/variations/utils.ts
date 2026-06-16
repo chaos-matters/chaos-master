@@ -136,6 +136,30 @@ const previewFlames: Partial<Record<TransformVariationType, FlameDescriptor>> =
         }
       }),
     ),
+    hexesVar: unfreeze(
+      produce(getDefaultFlameByVarType('hexesVar'), (draft) => {
+        draft.renderSettings.exposure = 0.25
+        draft.renderSettings.gamma = 2.8
+        draft.renderSettings.camera = {
+          zoom: 0.6057513177738368,
+          position: [0, 0],
+          rotation: 0,
+        }
+        draft.transforms[getTransformPreviewTid('hexesVar')]!.variations[
+          getTransformPreviewVid('hexesVar')
+        ] = {
+          type: 'hexesVar',
+          weight: 1.0,
+          visible: true,
+          params: {
+            cellsize: 0.11,
+            power: 1,
+            rotate: 0,
+            scale: 0.99,
+          },
+        }
+      }),
+    ),
     crossVar: unfreeze(
       produce(getDefaultFlameByVarType('crossVar'), (draft) => {
         draft.transforms[getTransformPreviewTid('crossVar')]!.preAffine = {
