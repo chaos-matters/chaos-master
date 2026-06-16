@@ -76,6 +76,14 @@
   transition: opacity 150ms;
 }
 
+/* Transform is hidden (eye toggle off): strongly fade its affine handle and
+   make it non-interactive, so it's clear it isn't contributing to the flame. */
+.handle.hidden {
+  opacity: 0.18;
+  pointer-events: none;
+  transition: opacity 150ms;
+}
+
 .handle.selected .handle-circle {
   r: var(--handle-visual-hover-r, 0.4rem);
   stroke-width: 2.5px;

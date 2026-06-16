@@ -182,6 +182,7 @@ function AffineHandle(props: {
   is3D?: boolean
   selected?: boolean
   dimmed?: boolean
+  hidden?: boolean
   onSelect?: () => void
 }) {
   const { theme } = useTheme()
@@ -533,6 +534,7 @@ function AffineHandle(props: {
             classList={{
               [ui.selected as string]: props.selected,
               [ui.dimmed as string]: props.dimmed,
+              [ui.hidden as string]: props.hidden,
             }}
             on:pointerdown={(e) => {
               props.onSelect?.()
@@ -688,6 +690,7 @@ function AffineHandle(props: {
           classList={{
             [ui.selected as string]: props.selected,
             [ui.dimmed as string]: props.dimmed,
+            [ui.hidden as string]: props.hidden,
           }}
           on:pointerdown={(e) => {
             props.onSelect?.()
@@ -860,6 +863,7 @@ export function AffineEditor(props: {
                         props.selectedTransformId?.() !== tid
                       }
                       onSelect={() => props.setSelectedTransformId?.(tid)}
+                      hidden={!(transform.visible ?? true)}
                     />
                   )}
                 </For>
