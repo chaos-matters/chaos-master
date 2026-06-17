@@ -184,6 +184,7 @@ function AffineHandle(props: {
   dimmed?: boolean
   hidden?: boolean
   onSelect?: () => void
+  onDeselect?: () => void
 }) {
   const { theme } = useTheme()
   const {
@@ -548,11 +549,14 @@ function AffineHandle(props: {
                 [ui.hidden as string]: props.hidden,
               }}
               on:pointerdown={(e) => {
+                // Right-click is reserved for deselect (handled in contextmenu).
+                if (e.button === 2) return
                 props.onSelect?.()
                 startDragging(e)
               }}
               onContextMenu={(e) => {
                 e.preventDefault()
+                props.onDeselect?.()
               }}
               style={{
                 '--color': handleColor(theme(), props.color),
@@ -704,11 +708,14 @@ function AffineHandle(props: {
               [ui.hidden as string]: props.hidden,
             }}
             on:pointerdown={(e) => {
+              // Right-click is reserved for deselect (handled in contextmenu).
+              if (e.button === 2) return
               props.onSelect?.()
               startDragging3D(e)
             }}
             onContextMenu={(e) => {
               e.preventDefault()
+              props.onDeselect?.()
             }}
             style={{
               '--color': handleColor(theme(), props.color),
@@ -875,6 +882,7 @@ export function AffineEditor(props: {
                         props.selectedTransformId?.() !== tid
                       }
                       onSelect={() => props.setSelectedTransformId?.(tid)}
+                      onDeselect={() => props.setSelectedTransformId?.(null)}
                       hidden={!(transform.visible ?? true)}
                     />
                   )}

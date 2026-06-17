@@ -58,6 +58,11 @@ export function ColorListEditor(props: {
                 [ui.dimmed as string]: isDimmed(),
               }}
               style={isSelected() ? { '--accent-color': color() } : undefined}
+              onContextMenu={(e) => {
+                // Right-click / long-press deselects.
+                e.preventDefault()
+                props.setSelectedTransformId?.(null)
+              }}
             >
               <div class={ui.transformHeader}>
                 <span
