@@ -317,15 +317,17 @@ export function FloatingActions(props: Props) {
               }}
               title={
                 !props.animationEnabled()
-                  ? 'Enable Animation Mode'
+                  ? 'Enable animation mode (opens the timeline)'
                   : props.isPlaying()
-                    ? 'Pause'
-                    : 'Disable Animation Mode'
+                    ? 'Pause playback'
+                    : 'Disable animation mode (hides the timeline)'
               }
               data-tour-target="animation-toggle"
             >
+              {/* Three distinct states so the icon matches what a click does:
+                  off → ▶ enable, playing → ⏸ pause, paused → ⏻ disable. */}
               <Show
-                when={props.animationEnabled() && props.isPlaying()}
+                when={props.animationEnabled()}
                 fallback={
                   <svg
                     viewBox="0 0 16 16"
@@ -338,7 +340,27 @@ export function FloatingActions(props: Props) {
                   </svg>
                 }
               >
-                <Pause />
+                <Show
+                  when={props.isPlaying()}
+                  fallback={
+                    // Enabled + paused: a click disables animation, so show a
+                    // power symbol rather than a misleading play triangle.
+                    <svg
+                      viewBox="0 0 16 16"
+                      width="13"
+                      height="13"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.6"
+                      stroke-linecap="round"
+                    >
+                      <path d="M8 2.4V7.2" />
+                      <path d="M5.1 4.6a4.2 4.2 0 1 0 5.8 0" />
+                    </svg>
+                  }
+                >
+                  <Pause />
+                </Show>
               </Show>
             </button>
 
@@ -358,7 +380,11 @@ export function FloatingActions(props: Props) {
                   if (!checked) props.setAnimationEnabled(false)
                 }
               }}
-              title="Show Timeline"
+              title={
+                props.showTimeline()
+                  ? 'Hide timeline (also disables animation)'
+                  : 'Show timeline'
+              }
               data-tour-target="show-timeline"
             >
               {/* Timeline / rows icon */}
