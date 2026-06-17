@@ -15,9 +15,7 @@ function formatIterationSpeed(pointPerSec: number | undefined) {
 export function DebugPanel() {
   const [showDebugPanel, setShowDebugPanel] = createSignal(IS_DEV)
   const [expanded, setExpanded] = createSignal(window.innerWidth >= 769)
-  const formatValueForPanel = (ms: number) => {
-    return `${ms.toFixed(2)} ms`
-  }
+  const formatMs = (ms: number) => ms.toFixed(2)
   useKeyboardShortcuts({
     KeyM: (ev) => {
       if (ev.metaKey || ev.ctrlKey) {
@@ -53,15 +51,37 @@ export function DebugPanel() {
         <Show when={expanded()}>
           <div class={ui.debugInfo}>
             <p>
-              {bigNumberFormatter.format(accumulatedPointCount())} /{' '}
-              {bigNumberFormatter.format(qualityPointCountLimit()())} Iters
+              <span class={ui.num}>
+                {bigNumberFormatter.format(accumulatedPointCount())}
+              </span>{' '}
+              /{' '}
+              <span class={ui.num}>
+                {bigNumberFormatter.format(qualityPointCountLimit()())}
+              </span>{' '}
+              Iters
             </p>
             <p>
-              {formatIterationSpeed(iterationSpeedPointPerSec())} Iters / sec
+              <span class={ui.num}>
+                {formatIterationSpeed(iterationSpeedPointPerSec())}
+              </span>{' '}
+              Iters / sec
             </p>
-            <p>{formatValueForPanel(renderTimings().ifsMs)} IFS</p>
-            <p>{formatValueForPanel(renderTimings().adaptiveFilterMs)} Blur</p>
-            <p>{formatValueForPanel(renderTimings().colorGradingMs)} Grading</p>
+            <p>
+              <span class={ui.numMs}>{formatMs(renderTimings().ifsMs)}</span> ms
+              IFS
+            </p>
+            <p>
+              <span class={ui.numMs}>
+                {formatMs(renderTimings().adaptiveFilterMs)}
+              </span>{' '}
+              ms Blur
+            </p>
+            <p>
+              <span class={ui.numMs}>
+                {formatMs(renderTimings().colorGradingMs)}
+              </span>{' '}
+              ms Grading
+            </p>
           </div>
         </Show>
       </div>
