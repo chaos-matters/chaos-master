@@ -112,6 +112,14 @@ export function AngleEditor(props: AngleEditorProps) {
                 scrollIntoViewAndFocusOnChange(value, el)
               }}
               class={ui.trackInline}
+              // Mirror the full-mode target so tours/keyframes can find this
+              // angle in compact sidebar layout too (e.g. "angle-rotation").
+              data-tour-target={
+                props.dataParameterPath
+                  ? `angle-${props.dataParameterPath.split('.').pop()}`
+                  : undefined
+              }
+              data-parameter-path={props.dataParameterPath}
               onPointerDown={startRotating}
               tabIndex={0}
             >
