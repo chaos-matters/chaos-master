@@ -1,7 +1,8 @@
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--cell-min, 96px), 1fr));
   gap: 0.4rem;
+  grid-template-columns: repeat(auto-fill, minmax(var(--cell-min, 96px), 1fr));
+  width: 100%;
 }
 
 .scroll {

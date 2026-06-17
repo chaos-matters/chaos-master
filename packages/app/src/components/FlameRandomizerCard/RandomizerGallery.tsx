@@ -4,7 +4,6 @@ import { generateRandomFlame } from '@/flame/randomize'
 import { GalleryGrid } from './GalleryGrid'
 import ui from './RandomizerGallery.module.css'
 import { RandomizerGalleryModal } from './RandomizerGalleryModal'
-import galleryModalUi from './RandomizerGalleryModal.module.css'
 import type { GenerateRandomFlameConfig, MutateFlameOptions, } from '@/flame/randomize'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { HardwareTier } from '@/utils/hardwareTier'
@@ -41,7 +40,6 @@ export function RandomizerGallery(props: {
 
   const openModal = (initialSource?: FlameDescriptor) => {
     void requestModal({
-      class: galleryModalUi.dialog,
       content: ({ respond }) => (
         <RandomizerGalleryModal
           buildConfig={props.buildConfig}

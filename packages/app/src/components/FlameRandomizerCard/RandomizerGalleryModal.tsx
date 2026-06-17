@@ -151,38 +151,22 @@ export function RandomizerGalleryModal(props: {
       </div>
 
       <div class={ui.controls}>
-        <div class={ui.sliderRow} title={`Preview size: ${cellSize()}px`}>
-          <svg class={ui.sliderIcon} viewBox="0 0 16 16" fill="currentColor">
-            <rect x="5" y="5" width="6" height="6" rx="1" />
-          </svg>
+        <div class={ui.sliderRow}>
+          <span class={ui.sliderLabel}>Preview size</span>
           <input
             type="range"
             class={ui.slider}
-            min={120}
-            max={360}
+            min={180}
+            max={380}
             step={10}
             value={cellSize()}
             onInput={(e) => setCellSize(e.currentTarget.valueAsNumber)}
+            title="Preview size"
           />
-          <svg class={ui.sliderIcon} viewBox="0 0 16 16" fill="currentColor">
-            <rect x="2" y="2" width="12" height="12" rx="1.5" />
-          </svg>
+          <span class={ui.sliderValue}>{cellSize()}px</span>
         </div>
-        <div
-          class={ui.sliderRow}
-          title={`Brightness: ${brightness().toFixed(2)}×`}
-        >
-          <svg
-            class={ui.sliderIcon}
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-          >
-            <circle cx="12" cy="12" r="4" />
-            <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-          </svg>
+        <div class={ui.sliderRow}>
+          <span class={ui.sliderLabel}>Brightness</span>
           <input
             type="range"
             class={ui.slider}
@@ -191,6 +175,7 @@ export function RandomizerGalleryModal(props: {
             step={0.05}
             value={brightness()}
             onInput={(e) => setBrightness(e.currentTarget.valueAsNumber)}
+            title="Preview brightness"
           />
           <span class={ui.sliderValue}>{brightness().toFixed(1)}×</span>
         </div>
@@ -209,7 +194,7 @@ export function RandomizerGalleryModal(props: {
             onApply={apply}
             onMutate={mutate}
             minCellWidth={`${cellSize()}px`}
-            maxHeight="70vh"
+            maxHeight="100%"
             brightness={brightness()}
           />
         </Root>

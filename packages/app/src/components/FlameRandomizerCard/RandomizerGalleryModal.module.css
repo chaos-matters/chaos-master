@@ -1,16 +1,37 @@
-/* Applied to the modal <dialog>: a fixed, generous width so the column count
-   adapts to the preview-size slider (auto-fill) and adding more previews only
-   grows it vertically (the grid scrolls), never sideways. */
-.dialog {
-  width: min(1280px, 95vw);
-  max-width: 95vw;
-}
-
+/* Size the content wrapper (same approach as VariationSelector): the <dialog>
+   grows to fit it, capped by the base modal's max-width: min(90vw, 100%). A
+   generous fixed vw width means the column count (auto-fill) adapts to the
+   preview-size slider and adding more previews only scrolls vertically. */
 .modal {
+  /* Content width = exactly 6 columns at the minimum cell size (180px) + gaps,
+     so the grid's auto-fill can never exceed 6 columns. Capped at 70vw so it
+     shrinks on smaller screens (where fewer columns fit). The size slider then
+     trades column count for cell size within this width. */
+  --gallery-cols: 6;
+  --gallery-cell-min: 180px;
+  --gallery-gap: 0.4rem;
+  --gallery-content: calc(
+    var(--gallery-cols) * var(--gallery-cell-min) + (var(--gallery-cols) - 1) *
+      var(--gallery-gap)
+  );
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
-  width: 100%;
+  width: min(70vw, var(--gallery-content));
+  max-height: min(85vh, 100%);
+  min-height: 0;
+}
+
+@media (max-width: 1200px) {
+  .modal {
+    width: min(88vw, var(--gallery-content));
+  }
+}
+
+@media (max-width: 768px) {
+  .modal {
+    width: 100vw;
+  }
 }
 
 .toolbar {
@@ -100,32 +121,30 @@
 
 .controls {
   display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color, rgba(128, 128, 128, 0.2));
 }
 
 .sliderRow {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  flex: 1 1 220px;
-  min-width: 180px;
+  gap: 0.75rem;
+  width: 100%;
 }
 
-.sliderIcon {
-  width: 13px;
-  height: 13px;
-  flex-shrink: 0;
-  color: var(--neutral-400);
-}
-
-[data-theme='dark'] .sliderIcon {
-  color: var(--neutral-500);
+.sliderLabel {
+  flex: 0 0 5.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0.85;
 }
 
 .slider {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
   height: 4px;
   appearance: none;
   background: var(--neutral-200);
@@ -158,12 +177,14 @@
 }
 
 .sliderValue {
-  min-width: 2.5rem;
+  flex: 0 0 3.5rem;
+  text-align: right;
   font-size: 0.72rem;
   font-variant-numeric: tabular-nums;
   opacity: 0.7;
 }
 
 .body {
+  flex: 1;
   min-height: 0;
 }

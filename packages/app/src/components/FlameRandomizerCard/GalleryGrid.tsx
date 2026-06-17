@@ -1,10 +1,15 @@
-import { createSignal, For } from 'solid-js'
+import { createEffect, createSignal, For, onCleanup } from 'solid-js'
 import { VariationPreview } from '@/components/VariationSelector/VariationSelector'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import ui from './GalleryGrid.module.css'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { HardwareTier } from '@/utils/hardwareTier'
+
+// Reveal cells a few at a time rather than mounting a wall of black placeholders
+// (the actual render is still throttled by the ComputeGate below).
+const REVEAL_BATCH = 4
+const REVEAL_INTERVAL_MS = 100
 
 /**
  * Responsive grid of flame previews with a subtle top-right Apply / Mutate
@@ -32,6 +37,27 @@ export function GalleryGrid(props: {
   // touch has no hover, so tapping a cell reveals its Apply/Mutate buttons.
   const [activeIndex, setActiveIndex] = createSignal(-1)
 
+  // Progressive reveal: re-stagger whenever the candidate set or version
+  // (re-roll / count change) changes, so previews appear a few at a time.
+  const [revealCount, setRevealCount] = createSignal(REVEAL_BATCH)
+  createEffect(() => {
+    const total = props.candidates.length
+    void props.version
+    setRevealCount(Math.min(REVEAL_BATCH, total))
+    if (total <= REVEAL_BATCH) return
+    const timer = setInterval(() => {
+      setRevealCount((c) => {
+        const next = Math.min(c + REVEAL_BATCH, total)
+        if (next >= total) clearInterval(timer)
+        return next
+      })
+    }, REVEAL_INTERVAL_MS)
+    onCleanup(() => {
+      clearInterval(timer)
+    })
+  })
+  const visibleCandidates = () => props.candidates.slice(0, revealCount())
+
   return (
     <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
       <div
@@ -47,7 +73,7 @@ export function GalleryGrid(props: {
             : {}),
         }}
       >
-        <For each={props.candidates}>
+        <For each={visibleCandidates()}>
           {(candidate, i) => (
             <div
               class={ui.cell}
