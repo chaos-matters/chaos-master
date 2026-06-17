@@ -12,6 +12,7 @@ import { randomRange } from '@/flame/randomize'
 import { keyframeRandomizedParams } from '@/utils/randomizeKeyframes'
 import { buildReadableIds } from '@/utils/readableIds'
 import { recordEntries } from '@/utils/record'
+import { sortedTransformEntries } from '@/utils/transformOrder'
 import { handleColor } from './FlameColorEditor'
 import type { TransformRecord } from '@/flame/schema/flameSchema'
 import type { HistorySetter } from '@/utils/createStoreHistory'
@@ -41,7 +42,7 @@ export function ColorListEditor(props: {
       <Show when={timeline?.animationEnabled()}>
         <KeyframeOnRandomizeToggle />
       </Show>
-      <For each={recordEntries(props.transforms)}>
+      <For each={sortedTransformEntries(recordEntries(props.transforms))}>
         {([tid, transform]) => {
           const color = () =>
             handleColor(theme(), vec2f(transform.color.x, transform.color.y))

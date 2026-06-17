@@ -1,3 +1,4 @@
+import { sortedTransformEntries } from './transformOrder'
 import type { TransformRecord } from '@/flame/schema/flameSchema'
 
 interface ReadableIds {
@@ -10,7 +11,9 @@ export function buildReadableIds(transforms: TransformRecord): ReadableIds {
   const transformLabel: Record<string, string> = {}
   const variationLabel: Record<string, string> = {}
 
-  const sortedTids = Object.keys(transforms).sort()
+  const sortedTids = sortedTransformEntries(Object.entries(transforms)).map(
+    ([tid]) => tid,
+  )
   let tIdx = 0
   let sIdx = 0
   sortedTids.forEach((tid) => {

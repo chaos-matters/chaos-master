@@ -93,6 +93,7 @@ import { buildReadableIds } from './utils/readableIds'
 import { getOldestRecentFlame, saveRecentFlame } from './utils/recentFlames'
 import { sum } from './utils/sum'
 import { createTimelineState, resolveKeyframeValue } from './utils/timeline'
+import { sortedTransformEntries } from './utils/transformOrder'
 import { useAppDragAndDrop } from './utils/useAppDragAndDrop'
 import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
 import type { Setter } from 'solid-js'
@@ -384,8 +385,8 @@ export function MainWorkspace(props: AppProps) {
   })
 
   const symTransforms = createMemo(() =>
-    recordEntries(flameDescriptor.transforms).filter(([tid]) =>
-      tid.startsWith('_sym__'),
+    sortedTransformEntries(recordEntries(flameDescriptor.transforms)).filter(
+      ([tid]) => tid.startsWith('_sym__'),
     ),
   )
 
@@ -3091,8 +3092,8 @@ export function MainWorkspace(props: AppProps) {
                           />
                         </div>
                         <For
-                          each={recordEntries(
-                            flameDescriptor.transforms,
+                          each={sortedTransformEntries(
+                            recordEntries(flameDescriptor.transforms),
                           ).filter(([tid]) => !tid.startsWith('_sym__'))}
                         >
                           {([tid, transform]) => (
