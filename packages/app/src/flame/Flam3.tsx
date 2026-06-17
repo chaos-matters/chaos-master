@@ -94,6 +94,10 @@ type Flam3Props = {
    *  render loop from rAF to the async export driver. Preview instances must
    *  not set this. */
   isExportRenderer?: boolean
+  /** Forces the async export driver on directly (independent of the global
+   *  export signals). Used by the offscreen export-job renderer so it runs the
+   *  fast loop without flipping the main workspace renderer into export mode. */
+  exportDriver?: boolean
   setCurrentQuality?: (fn: () => number) => void
   setQualityPointCountLimit?: (fn: () => number) => void
   palette?: () => Palette | undefined
@@ -435,8 +439,9 @@ export function Flam3(props: Flam3Props) {
   // workspace renderer opts in via isExportRenderer.
   const exportDriverActive = createMemo(
     () =>
-      (props.isExportRenderer ?? false) &&
-      (animationExportRunning() || exportQuality() !== undefined),
+      (props.exportDriver ?? false) ||
+      ((props.isExportRenderer ?? false) &&
+        (animationExportRunning() || exportQuality() !== undefined)),
   )
 
   const timestampQuery = createTimestampQuery(device, [

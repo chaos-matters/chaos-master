@@ -27,6 +27,8 @@ import { DebugOverlay } from './components/DebugOverlay'
 import { DiceButton } from './components/DiceButton/DiceButton'
 import { createDiscordShareModal } from './components/DiscordShareModal/DiscordShareModal'
 import { Dropzone } from './components/Dropzone/Dropzone'
+import { ExportJobHost } from './components/ExportJobs/ExportJobHost'
+import { ExportJobTracker } from './components/ExportJobs/ExportJobTracker'
 import { createExportPngDialog } from './components/ExportPngDialog/ExportPngDialog'
 import { ColorEditor } from './components/FlameColorEditor/ColorEditor'
 import { handleColor } from './components/FlameColorEditor/FlameColorEditor'
@@ -67,7 +69,7 @@ import { Flam3 } from './flame/Flam3'
 import { pointInitModeToImplFn } from './flame/pointInitMode'
 import { pointInitMode3DToImplFn } from './flame/pointInitMode3D'
 import { generateRandomFlame, mutateFlame, random01, randomizeAllColors, randomizeVariationParams, randomRange, } from './flame/randomize'
-import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, cameraDuringExportEnabled, exportProgress, exportQuality, qualityPointCountLimit, setCancelExportNow, setCurrentQuality, setExportQuality, setForceAnimationExportNow, setForceExportNow, setQualityPointCountLimit, } from './flame/renderStats'
+import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, cameraDuringExportEnabled, exportQuality, qualityPointCountLimit, setCurrentQuality, setExportQuality, setForceAnimationExportNow, setQualityPointCountLimit, } from './flame/renderStats'
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from './flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from './flame/transformFunction'
 import { defaultLinearType } from './flame/variationRegistry'
@@ -81,6 +83,7 @@ import { createAnimationExport } from './utils/animationExport'
 import { deepClone } from './utils/clone'
 import { createStoreHistory } from './utils/createStoreHistory'
 import { sendFlameToDiscord } from './utils/discordWebhook'
+import { enqueueImageJob } from './utils/exportJobs'
 import { addFlameDataToPng } from './utils/flameInPng'
 import { hardwareTierToPreset } from './utils/hardwareTier'
 import { compressJsonQueryParam } from './utils/jsonQueryParam'
@@ -1029,7 +1032,6 @@ export function MainWorkspace(props: AppProps) {
       setOnExportImage,
       setFlameDescriptor,
       () => selectedPalette(),
-      setExportDimensions,
       () => {
         const canvas = document.querySelector<HTMLCanvasElement>(
           `.${ui.canvas}`,
@@ -1039,6 +1041,7 @@ export function MainWorkspace(props: AppProps) {
         }
         return window.innerWidth / window.innerHeight
       },
+      enqueueImageJob,
       startAnimationExport,
       () => blendFlame(),
       () => resolvedBlendWeight(),
@@ -2549,6 +2552,8 @@ export function MainWorkspace(props: AppProps) {
                 {(msg) => <div class={ui.toast}>{msg()}</div>}
               </Show>
               <ProgressBar />
+              <ExportJobHost />
+              <ExportJobTracker />
               <div class={ui.bottomBar}>
                 <Show when={effectiveFlame().renderSettings.dimensions === 3}>
                   <OrientationGizmo
@@ -2561,15 +2566,11 @@ export function MainWorkspace(props: AppProps) {
                   data-tour-target="view-controls"
                   style={{
                     'pointer-events':
-                      animationExportRunning() ||
-                      exportProgress() !== undefined ||
-                      timeline.isPlaying()
+                      animationExportRunning() || timeline.isPlaying()
                         ? 'none'
                         : 'auto',
                     opacity:
-                      animationExportRunning() ||
-                      exportProgress() !== undefined ||
-                      timeline.isPlaying()
+                      animationExportRunning() || timeline.isPlaying()
                         ? 0.5
                         : 1,
                   }}
@@ -2606,30 +2607,26 @@ export function MainWorkspace(props: AppProps) {
                 <Show when={showTimeline()}>
                   <div
                     class={ui.timelineContainer}
-                    // During playback (and export) the timeline is dimmed +
-                    // locked so the canvas/animation reads cleanly. Playback
-                    // additionally tags itself so ONLY the transport bar stays
-                    // clickable (to pause) — see [data-playback-locked] in
-                    // TimelineSection.module.css. Export stays fully locked so a
-                    // stray click can't start playback mid-render (#8).
+                    // During playback (and animation export) the timeline is
+                    // dimmed + locked so the canvas/animation reads cleanly.
+                    // Playback additionally tags itself so ONLY the transport bar
+                    // stays clickable (to pause) — see [data-playback-locked] in
+                    // TimelineSection.module.css. Animation export stays fully
+                    // locked so a stray click can't start playback mid-render
+                    // (#8). Image export now runs offscreen (background job) and
+                    // does NOT lock the workspace.
                     data-playback-locked={
-                      timeline.isPlaying() &&
-                      !animationExportRunning() &&
-                      exportProgress() === undefined
+                      timeline.isPlaying() && !animationExportRunning()
                         ? 'true'
                         : undefined
                     }
                     style={{
                       'pointer-events':
-                        animationExportRunning() ||
-                        exportProgress() !== undefined ||
-                        timeline.isPlaying()
+                        animationExportRunning() || timeline.isPlaying()
                           ? 'none'
                           : 'auto',
                       opacity:
-                        animationExportRunning() ||
-                        exportProgress() !== undefined ||
-                        timeline.isPlaying()
+                        animationExportRunning() || timeline.isPlaying()
                           ? 0.5
                           : 1,
                     }}
@@ -2691,19 +2688,11 @@ export function MainWorkspace(props: AppProps) {
                   onPointerDown={startSidebarDrag}
                 />
               )}
-              <Show
-                when={
-                  timeline.isPlaying() ||
-                  animationExportRunning() ||
-                  exportProgress() !== undefined
-                }
-              >
+              <Show when={timeline.isPlaying() || animationExportRunning()}>
                 <div
                   class={ui.playbackOverlay}
                   classList={{
-                    [ui.exportOverlay as string]:
-                      animationExportRunning() ||
-                      exportProgress() !== undefined,
+                    [ui.exportOverlay as string]: animationExportRunning(),
                   }}
                   onClick={() => {
                     if (timeline.isPlaying()) {
@@ -2714,9 +2703,7 @@ export function MainWorkspace(props: AppProps) {
                   <span class={ui.playbackOverlayText}>
                     {animationExportRunning()
                       ? 'Rendering animation...'
-                      : exportProgress() !== undefined
-                        ? 'Rendering image...'
-                        : 'Tap to stop animation'}
+                      : 'Tap to stop animation'}
                   </span>
                   <Show when={animationExportRunning()}>
                     <div class={ui.overlayActions}>
@@ -2736,35 +2723,6 @@ export function MainWorkspace(props: AppProps) {
                           e.stopPropagation()
                           const cancelFn = animationExportCancel()
                           if (cancelFn) cancelFn()
-                        }}
-                        title="Cancel and discard"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </Show>
-                  <Show
-                    when={
-                      exportProgress() !== undefined &&
-                      !animationExportRunning()
-                    }
-                  >
-                    <div class={ui.overlayActions}>
-                      <button
-                        class={ui.overlayStopAndSaveButton}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setForceExportNow(true)
-                        }}
-                        title="Stop and export at current quality"
-                      >
-                        Stop & Export
-                      </button>
-                      <button
-                        class={ui.overlayCancelButton}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setCancelExportNow(true)
                         }}
                         title="Cancel and discard"
                       >
@@ -4529,9 +4487,7 @@ export function MainWorkspace(props: AppProps) {
             </div>
           </Show>
           <FloatingActions
-            disabled={
-              animationExportRunning() || exportProgress() !== undefined
-            }
+            disabled={animationExportRunning()}
             initialLeft={floatingLeft()}
             initialTop={floatingTop()}
             onLoadFlame={() => {

@@ -6,8 +6,8 @@ import { ScrubInput } from '@/components/Sliders/ScrubInput'
 import { Slider } from '@/components/Sliders/Slider'
 import { ALLOW_CAMERA_DURING_EXPORT, DEFAULT_POINT_COUNT, DEFAULT_PREVIEW_PIXEL_RATIO, } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
-import { accumulatedPointCount, cancelExportNow, forceExportNow, qualityPointCountLimit, setCameraDuringExportEnabled, setCancelExportNow, setExportProgress, setExportQuality, setForceExportNow, } from '@/flame/renderStats'
-import { condenseFlameDescriptor, MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from '@/flame/schema/flameSchema'
+import { setCameraDuringExportEnabled } from '@/flame/renderStats'
+import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from '@/flame/schema/flameSchema'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
@@ -35,29 +35,13 @@ import type { ExportImageType } from '@/App'
 import type { Palette } from '@/flame/colorMap'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { AnimationExportConfig } from '@/utils/animationExport'
-import type { ExportAspectKey, ExportDimensions, } from '@/utils/exportDimensions'
+import type { ExportAspectKey } from '@/utils/exportDimensions'
+import type { ImageJobSpec } from '@/utils/exportJobs'
 import type { TimelineConfig, TimelineState, TimelineTrack, } from '@/utils/timeline'
 import type { VideoEncoderConfig } from '@/utils/videoEncoder'
 
 const QUALITY_MIN = 0.5
 const QUALITY_MAX = 0.9999
-
-/**
- * Estimate total points for final export at the given quality and exact output
- * height. pointLimit = bucketInv / (q - 1)² where bucketInv = (height² * zoom²) / 4.
- * Uses the real export pixel height (resolution + aspect resolve to it) rather
- * than the old 800 * multiplier approximation.
- */
-function estimatePointCount(
-  quality: number,
-  height: number,
-  zoom: number,
-): number {
-  const bucketInv = (height ** 2 * zoom ** 2) / 4
-  const denom = (quality - 1) ** 2
-  if (denom === 0) return Infinity
-  return Math.round(bucketInv / denom)
-}
 
 type RenderDialogProps = {
   resolution: number
@@ -892,8 +876,8 @@ export function createExportPngDialog(
   setOnExportImage: Setter<ExportImageType | undefined>,
   setFlameDescriptor: (updater: (draft: FlameDescriptor) => void) => void,
   selectedPalette: () => Palette | undefined,
-  setExportDimensions: (d: ExportDimensions | undefined) => void,
   getViewportAspect: () => number,
+  enqueueImageJob: (spec: ImageJobSpec) => void,
   startAnimationExport?: (
     config: AnimationExportConfig,
     canvas: HTMLCanvasElement,
@@ -1043,36 +1027,15 @@ export function createExportPngDialog(
     const [previewDescriptor, setPreviewDescriptor] = createStore(initialFlame)
 
     function handleExport() {
-      const qual = quality()
       const dimensions = computeExportDimensions(
         resolution(),
         aspect(),
         viewportAspect,
       )
-      const doEmbedFlame = embedFlame()
-      const doEmbedAnimation = embedAnimation()
 
-      // Snapshot original render settings so we can restore them after export.
-      // The dialog preview is independent of the main flame; users expect the
-      // export settings to apply only to the exported image, not to persist in
-      // the workspace.
-      const originalSettings = {
-        exposure: flameDescriptor.renderSettings.exposure,
-        vibrancy: flameDescriptor.renderSettings.vibrancy,
-        contrast: flameDescriptor.renderSettings.contrast,
-        gamma: flameDescriptor.renderSettings.gamma,
-        drawMode: flameDescriptor.renderSettings.drawMode,
-        backgroundColor: flameDescriptor.renderSettings.backgroundColor,
-        camera: {
-          zoom: flameDescriptor.renderSettings.camera.zoom,
-          position: [
-            flameDescriptor.renderSettings.camera.position[0],
-            flameDescriptor.renderSettings.camera.position[1],
-          ] as [number, number],
-        },
-      }
-
-      // Apply dialog render settings and metadata to main flame descriptor
+      // Persist the dialog's metadata edits back to the workspace flame (the
+      // render-setting edits stay scoped to the export — they go into the job
+      // snapshot below, not the workspace flame).
       setFlameDescriptor((draft) => {
         if (!draft.metadata) {
           draft.metadata = { name: '', description: '', author: 'unknown' }
@@ -1081,132 +1044,25 @@ export function createExportPngDialog(
         draft.metadata.description =
           previewDescriptor.metadata?.description ?? ''
         draft.metadata.author = previewDescriptor.metadata?.author ?? 'unknown'
-
-        draft.renderSettings.exposure =
-          previewDescriptor.renderSettings.exposure
-        draft.renderSettings.vibrancy =
-          previewDescriptor.renderSettings.vibrancy
-        draft.renderSettings.contrast =
-          previewDescriptor.renderSettings.contrast
-        draft.renderSettings.gamma = previewDescriptor.renderSettings.gamma
-        draft.renderSettings.drawMode =
-          previewDescriptor.renderSettings.drawMode
-        draft.renderSettings.backgroundColor =
-          previewDescriptor.renderSettings.backgroundColor
-        draft.renderSettings.camera.zoom =
-          previewDescriptor.renderSettings.camera.zoom
-        draft.renderSettings.camera.position = [
-          previewDescriptor.renderSettings.camera.position[0],
-          previewDescriptor.renderSettings.camera.position[1],
-        ]
       })
 
-      // Estimate target points and show progress
-      const targetPoints = estimatePointCount(
-        qual,
-        dimensions.height,
-        previewDescriptor.renderSettings.camera.zoom,
-      )
-      setExportProgress({ current: 0, target: targetPoints, pointsPerSec: 0 })
-      setExportQuality(qual)
-      // Render the main canvas at the exact export resolution + aspect. The
-      // backing store becomes width x height (pixelRatio is forced to 1 while
-      // exportDimensions is set), so the captured PNG matches the chosen format.
-      setExportDimensions(dimensions)
-
-      // Export callback waits for quality to be reached
-      type ExportInfo = { finalImageReady: boolean }
-      // Reset export signals + restore the workspace render settings the dialog
-      // temporarily overrode. Shared by the normal finish, "Stop & Export" and
-      // "Cancel" paths.
-      const restoreAfterExport = () => {
-        setForceExportNow(false)
-        setCancelExportNow(false)
-        setOnExportImage(undefined)
-        setExportDimensions(undefined)
-        setExportQuality(undefined)
-        setExportProgress(undefined)
-        setFlameDescriptor((draft) => {
-          draft.renderSettings.exposure = originalSettings.exposure
-          draft.renderSettings.vibrancy = originalSettings.vibrancy
-          draft.renderSettings.contrast = originalSettings.contrast
-          draft.renderSettings.gamma = originalSettings.gamma
-          draft.renderSettings.drawMode = originalSettings.drawMode
-          draft.renderSettings.backgroundColor =
-            originalSettings.backgroundColor
-          draft.renderSettings.camera.zoom = originalSettings.camera.zoom
-          draft.renderSettings.camera.position = [
-            originalSettings.camera.position[0],
-            originalSettings.camera.position[1],
-          ]
-        })
-      }
-
-      setOnExportImage(() => (canvas: HTMLCanvasElement, info?: ExportInfo) => {
-        // Cancel (discard): abort without saving and restore the workspace.
-        if (cancelExportNow()) {
-          restoreAfterExport()
-          return
-        }
-
-        const limitFn = qualityPointCountLimit()
-        const limit = limitFn()
-        const current = accumulatedPointCount()
-
-        // Update progress
-        setExportProgress((prev) => ({
-          current,
-          target: limit > 0 ? limit : (prev?.target ?? targetPoints),
-          pointsPerSec: prev?.pointsPerSec ?? 0,
-        }))
-
-        // Not yet reached quality (or the final color-graded image is not on
-        // the canvas yet) — keep rendering unless force-stopped
-        if (
-          (current < limit || info?.finalImageReady !== true) &&
-          !forceExportNow()
-        )
-          return
-
-        // Quality reached or force-exported
-        restoreAfterExport()
-
-        canvas.toBlob(
-          async (blob) => {
-            if (!blob) return
-            const imgData = await blob.arrayBuffer()
-            let pngBytes = new Uint8Array(imgData)
-            const exportTracks = timeline?.tracks() ?? []
-            if (doEmbedFlame) {
-              const cfg = timeline?.config() ?? defaultTimelineConfig()
-              const doCondense = condenseHidden()
-              const flame = doCondense
-                ? condenseFlameDescriptor(flameDescriptor)
-                : flameDescriptor
-              const payload =
-                doEmbedAnimation && exportTracks.length > 0
-                  ? {
-                      flame,
-                      animation: { tracks: exportTracks, config: cfg },
-                    }
-                  : flame
-              const encoded = await compressJsonQueryParam(payload)
-              pngBytes = new Uint8Array(
-                await addFlameDataToPng(encoded, pngBytes).arrayBuffer(),
-              )
-            }
-            saveRecentFlame(flameDescriptor, undefined, exportTracks)
-            const fileUrlExt = URL.createObjectURL(
-              new Blob([pngBytes], { type: 'image/png' }),
-            )
-            const downloadLink = window.document.createElement('a')
-            downloadLink.href = fileUrlExt
-            downloadLink.download = 'flame.png'
-            downloadLink.click()
-          },
-          'image/png',
-          1,
-        )
+      // Enqueue an offscreen background render job. The job owns a deep-cloned
+      // snapshot of the dialog's edited flame, so workspace edits after this
+      // point don't affect the in-flight render. Progress + download surface in
+      // the top-right ExportJobTracker; the workspace stays usable meanwhile.
+      enqueueImageJob({
+        name: previewDescriptor.metadata?.name?.trim() || 'flame',
+        flame: deepClone(previewDescriptor),
+        quality: quality(),
+        dimensions,
+        palette: selectedPalette(),
+        blendFlame: getBlendFlame?.(),
+        blendWeight: getBlendWeight?.() ?? 0,
+        embedFlame: embedFlame(),
+        embedAnimation: embedAnimation() && hasAnimation,
+        condenseHidden: condenseHidden(),
+        tracks: timeline?.tracks() ?? [],
+        config: timeline?.config() ?? defaultTimelineConfig(),
       })
     }
 
