@@ -903,7 +903,11 @@ export function Flam3(props: Flam3Props) {
         encoder.clearBuffer(accumulationBuffer.buffer)
       }
 
-      if (timings) {
+      // Only the main workspace renderer reports debug timings. Offscreen
+      // export jobs (and previews) share these global stats but must not write
+      // them, or the DebugPanel's "ms IFS" readout would track the offscreen
+      // render instead of the visible one.
+      if (timings && (props.isExportRenderer ?? false)) {
         setRenderTimings({
           ...timings,
           adaptiveFilterMs:

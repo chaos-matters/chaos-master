@@ -326,6 +326,13 @@ export interface FlameDescriptor {
     d: number
     e: number
     f: number
+    // 3D flames carry a 12-param (a–l) affine; optional so 2D stays a–f.
+    g?: number
+    h?: number
+    i?: number
+    j?: number
+    k?: number
+    l?: number
   }
   metadata: {
     author: string
@@ -1378,9 +1385,28 @@ export function applyTracksToFlame(
     }
   }
 
-  // Final transform
+  // Final transform. Seed a dimension-appropriate identity: a 3D flame needs a
+  // 12-param (a–l) affine — seeding a 2D one here produced 3D flames with an
+  // invalid 2D finalTransform that then failed strict schema validation on
+  // re-import.
   if (!flame.finalTransform) {
-    flame.finalTransform = { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 }
+    flame.finalTransform =
+      flame.renderSettings.dimensions === 3
+        ? {
+            a: 1,
+            b: 0,
+            c: 0,
+            d: 0,
+            e: 0,
+            f: 1,
+            g: 0,
+            h: 0,
+            i: 0,
+            j: 0,
+            k: 1,
+            l: 0,
+          }
+        : { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 }
   }
   applyNumber('finalTransform.a', (v) => {
     flame.finalTransform!.a = v
