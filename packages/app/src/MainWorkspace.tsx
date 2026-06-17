@@ -845,8 +845,13 @@ export function MainWorkspace(props: AppProps) {
   // Per-mode flame memory: the dimension toggle stashes the active flame and
   // restores the one last used in the target mode, so 2D work is never lost
   // by exploring 3D (and vice versa). First entry into 3D loads a starter.
+  // The animation tracks are stashed alongside, because keyframe paths are
+  // dimension-specific (transform ids, camera vs camera3D, affine a–f vs a–l)
+  // and carrying them across a 2D↔3D switch would orphan them.
   let stashedFlame2D: FlameDescriptor | undefined
   let stashedFlame3D: FlameDescriptor | undefined
+  let stashedTracks2D: TimelineTrack[] | undefined
+  let stashedTracks3D: TimelineTrack[] | undefined
 
   createEffect(() => {
     const progress = animationExportProgress()
@@ -4594,10 +4599,15 @@ export function MainWorkspace(props: AppProps) {
             setDimensions={(v) => {
               const current = flameDescriptor.renderSettings.dimensions ?? 2
               if (v === current) return
+              // Stash the active flame AND its animation tracks under the
+              // current dimension; restore the target dimension's own pair so
+              // 2D and 3D each keep independent animations.
               if (current === 3) {
                 stashedFlame3D = deepClone(flameDescriptor)
+                stashedTracks3D = deepClone(timeline.tracks())
               } else {
                 stashedFlame2D = deepClone(flameDescriptor)
+                stashedTracks2D = deepClone(timeline.tracks())
               }
               // Fly mode only makes sense in 3D.
               if (v !== 3) setFlyMode(false)
@@ -4605,7 +4615,11 @@ export function MainWorkspace(props: AppProps) {
                 v === 3
                   ? (stashedFlame3D ?? example34)
                   : (stashedFlame2D ?? initExample)
+              const restoredTracks = v === 3 ? stashedTracks3D : stashedTracks2D
               history.replace(deepClone(restored))
+              // Swap the timeline to the target dimension's tracks (empty on
+              // first entry — matches the starter flame).
+              timeline.loadTracks(restoredTracks ?? [])
             }}
             flyMode={flyMode}
             setFlyMode={(v) => {
