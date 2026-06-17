@@ -9,10 +9,12 @@ import { variationTypes } from '@/flame/variations'
 import { variationTypes3D } from '@/flame/variations3D'
 import { persistentSignal } from '@/utils/persistentSignal'
 import ui from './FlameRandomizerCard.module.css'
+import { RandomizerGallery } from './RandomizerGallery'
 import type { GenerateRandomFlameConfig } from '@/flame/randomize'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TransformVariationType } from '@/flame/variations'
 import type { TransformVariationType3D } from '@/flame/variations3D'
+import type { HardwareTier } from '@/utils/hardwareTier'
 import type { RandomizerHistoryEntry } from '@/utils/randomizerHistoryDB'
 
 export interface FlameRandomizerCardProps {
@@ -69,6 +71,9 @@ export interface FlameRandomizerCardProps {
   onUpdateRenderSettings: (
     settings: Partial<FlameDescriptor['renderSettings']>,
   ) => void
+  /** Apply a flame chosen from the preview gallery (replaces the active flame). */
+  onApplyCandidate: (flame: FlameDescriptor) => void
+  hardwareTier?: HardwareTier | null
 }
 
 function RandomizeToggleButton(props: {
@@ -257,19 +262,21 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
   const [animationExpanded, setAnimationExpanded] = createSignal(false)
   const [historyExpanded, setHistoryExpanded] = createSignal(true)
 
+  const buildConfig = (): GenerateRandomFlameConfig => ({
+    strength: strength(),
+    minTransforms: minTransforms(),
+    maxTransforms: maxTransforms(),
+    minVariations: minVariations(),
+    maxVariations: maxVariations(),
+    allowedVariations: [...selectedVariations()] as (
+      | TransformVariationType
+      | TransformVariationType3D
+    )[],
+    dimensions: props.flame.renderSettings.dimensions,
+  })
+
   const handleGenerate = () => {
-    const config: GenerateRandomFlameConfig = {
-      strength: strength(),
-      minTransforms: minTransforms(),
-      maxTransforms: maxTransforms(),
-      minVariations: minVariations(),
-      maxVariations: maxVariations(),
-      allowedVariations: [...selectedVariations()] as (
-        | TransformVariationType
-        | TransformVariationType3D
-      )[],
-      dimensions: props.flame.renderSettings.dimensions,
-    }
+    const config = buildConfig()
     props.onGenerateFlame(
       config,
       {
@@ -291,18 +298,7 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
   }
 
   const handleMutate = () => {
-    const config: GenerateRandomFlameConfig = {
-      strength: strength(),
-      minTransforms: minTransforms(),
-      maxTransforms: maxTransforms(),
-      minVariations: minVariations(),
-      maxVariations: maxVariations(),
-      allowedVariations: [...selectedVariations()] as (
-        | TransformVariationType
-        | TransformVariationType3D
-      )[],
-      dimensions: props.flame.renderSettings.dimensions,
-    }
+    const config = buildConfig()
     props.onMutateFlame(
       config,
       {
@@ -344,6 +340,7 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
   }
 
   const [paletteExpanded, setPaletteExpanded] = createSignal(false)
+  const [galleryExpanded, setGalleryExpanded] = createSignal(false)
 
   return (
     <CollapsibleCard title="Flame Randomizer" defaultOpen={false}>
@@ -848,6 +845,38 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
                   </label>
                 </div>
               </div>
+            </Show>
+          </div>
+
+          {/* Preview gallery: pick a flame from a page of random previews
+              instead of click-spamming Generate. Mounts (and renders the
+              off-screen previews) only while expanded. */}
+          <div class={ui.paletteWrapper}>
+            <button
+              type="button"
+              class={ui.paletteHeader}
+              onClick={() => setGalleryExpanded(!galleryExpanded())}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                class={ui.chevron}
+                classList={{
+                  [ui.chevronExpanded as string]: galleryExpanded(),
+                }}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+              <span>Gallery (pick from random previews)</span>
+            </button>
+            <Show when={galleryExpanded()}>
+              <RandomizerGallery
+                buildConfig={buildConfig}
+                hardwareTier={props.hardwareTier}
+                onApply={props.onApplyCandidate}
+              />
             </Show>
           </div>
 

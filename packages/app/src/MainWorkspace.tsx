@@ -3089,6 +3089,13 @@ export function MainWorkspace(props: AppProps) {
                             onClearHistory={handleClearHistory}
                             onRandomizeAnimation={handleRandomizeAnimation}
                             onUpdateRenderSettings={handleUpdateRenderSettings}
+                            onApplyCandidate={(flame) => {
+                              history.replace(
+                                deepClone(flame),
+                                'Apply Random Flame',
+                              )
+                            }}
+                            hardwareTier={props.hardwareTier}
                             isBusy={isRandomizing()}
                           />
                         </div>
