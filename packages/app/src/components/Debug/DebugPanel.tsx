@@ -15,9 +15,7 @@ function formatIterationSpeed(pointPerSec: number | undefined) {
 export function DebugPanel() {
   const [showDebugPanel, setShowDebugPanel] = createSignal(IS_DEV)
   const [expanded, setExpanded] = createSignal(window.innerWidth >= 769)
-  const formatValueForPanel = (ms: number) => {
-    return `${ms.toFixed(2)} ms`
-  }
+  const formatMs = (ms: number) => ms.toFixed(2)
   useKeyboardShortcuts({
     KeyM: (ev) => {
       if (ev.metaKey || ev.ctrlKey) {
@@ -59,9 +57,9 @@ export function DebugPanel() {
             <p>
               {formatIterationSpeed(iterationSpeedPointPerSec())} Iters / sec
             </p>
-            <p>{formatValueForPanel(renderTimings().ifsMs)} IFS</p>
-            <p>{formatValueForPanel(renderTimings().adaptiveFilterMs)} Blur</p>
-            <p>{formatValueForPanel(renderTimings().colorGradingMs)} Grading</p>
+            <p>{formatMs(renderTimings().ifsMs)} ms IFS</p>
+            <p>{formatMs(renderTimings().adaptiveFilterMs)} ms Blur</p>
+            <p>{formatMs(renderTimings().colorGradingMs)} ms Grading</p>
           </div>
         </Show>
       </div>

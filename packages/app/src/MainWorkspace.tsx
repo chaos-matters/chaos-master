@@ -27,6 +27,9 @@ import { DebugOverlay } from './components/DebugOverlay'
 import { DiceButton } from './components/DiceButton/DiceButton'
 import { createDiscordShareModal } from './components/DiscordShareModal/DiscordShareModal'
 import { Dropzone } from './components/Dropzone/Dropzone'
+import { ExportActions } from './components/ExportJobs/ExportActions'
+import { ExportJobHost } from './components/ExportJobs/ExportJobHost'
+import { ExportJobTracker } from './components/ExportJobs/ExportJobTracker'
 import { createExportPngDialog } from './components/ExportPngDialog/ExportPngDialog'
 import { ColorEditor } from './components/FlameColorEditor/ColorEditor'
 import { handleColor } from './components/FlameColorEditor/FlameColorEditor'
@@ -63,11 +66,12 @@ import { drawModeToImplFn } from './flame/drawMode'
 import { example1 } from './flame/examples/example1'
 import { example34 } from './flame/examples/example34'
 import { initExample } from './flame/examples/initExample'
+import { tid as toTransformId, vid as toVariationId, } from './flame/examples/util'
 import { Flam3 } from './flame/Flam3'
 import { pointInitModeToImplFn } from './flame/pointInitMode'
 import { pointInitMode3DToImplFn } from './flame/pointInitMode3D'
 import { generateRandomFlame, mutateFlame, random01, randomizeAllColors, randomizeVariationParams, randomRange, } from './flame/randomize'
-import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, cameraDuringExportEnabled, exportProgress, exportQuality, qualityPointCountLimit, setCurrentQuality, setExportQuality, setForceAnimationExportNow, setForceExportNow, setQualityPointCountLimit, } from './flame/renderStats'
+import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, cameraDuringExportEnabled, exportQuality, qualityPointCountLimit, setCurrentQuality, setExportQuality, setForceAnimationExportNow, setQualityPointCountLimit, } from './flame/renderStats'
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from './flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from './flame/transformFunction'
 import { defaultLinearType } from './flame/variationRegistry'
@@ -81,6 +85,7 @@ import { createAnimationExport } from './utils/animationExport'
 import { deepClone } from './utils/clone'
 import { createStoreHistory } from './utils/createStoreHistory'
 import { sendFlameToDiscord } from './utils/discordWebhook'
+import { enqueueAnimationJob, enqueueImageJob } from './utils/exportJobs'
 import { addFlameDataToPng } from './utils/flameInPng'
 import { hardwareTierToPreset } from './utils/hardwareTier'
 import { compressJsonQueryParam } from './utils/jsonQueryParam'
@@ -90,6 +95,7 @@ import { buildReadableIds } from './utils/readableIds'
 import { getOldestRecentFlame, saveRecentFlame } from './utils/recentFlames'
 import { sum } from './utils/sum'
 import { createTimelineState, resolveKeyframeValue } from './utils/timeline'
+import { sortedTransformEntries } from './utils/transformOrder'
 import { useAppDragAndDrop } from './utils/useAppDragAndDrop'
 import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
 import type { Setter } from 'solid-js'
@@ -107,6 +113,7 @@ import type { TransformVariationType } from './flame/variations'
 import type { CustomVariationDef } from './flame/variations/custom/types'
 import type { TransformVariationType3D } from './flame/variations3D'
 import type { AnimationExportConfig } from './utils/animationExport'
+import type { ExportDimensions } from './utils/exportDimensions'
 import type { HardwareTier } from './utils/hardwareTier'
 import type { SharePayload } from './utils/jsonQueryParam'
 import type { RandomizerHistoryEntry } from './utils/randomizerHistoryDB'
@@ -239,6 +246,20 @@ export function MainWorkspace(props: AppProps) {
   })
 
   const [pixelRatio, setPixelRatio] = createSignal(DEFAULT_RESOLUTION)
+  // When set during an export, the main canvas renders at this exact pixel size
+  // (resolution + aspect resolved) instead of the viewport-scaled pixelRatio, so
+  // the captured image/video matches the chosen export format.
+  const [exportDimensions, setExportDimensions] = createSignal<
+    ExportDimensions | undefined
+  >()
+  // Hoist this conditional out of the AutoCanvas JSX prop: a ternary in a prop
+  // compiles to a memo that Solid instantiates lazily on first read — and the
+  // first read happens inside Flam3's rAF export loop (no owner), which warns
+  // "computations created outside a createRoot". Created here it lives in this
+  // component's owner. See memory: solid-conditional-prop-memo-leak.
+  const canvasPixelRatio = createMemo(() =>
+    exportDimensions() ? 1 : pixelRatio(),
+  )
   const [onExportImage, setOnExportImage] = createSignal<ExportImageType>()
 
   // Dev-only: crash injection trigger (renders inside ErrorBoundary)
@@ -366,8 +387,8 @@ export function MainWorkspace(props: AppProps) {
   })
 
   const symTransforms = createMemo(() =>
-    recordEntries(flameDescriptor.transforms).filter(([tid]) =>
-      tid.startsWith('_sym__'),
+    sortedTransformEntries(recordEntries(flameDescriptor.transforms)).filter(
+      ([tid]) => tid.startsWith('_sym__'),
     ),
   )
 
@@ -761,6 +782,15 @@ export function MainWorkspace(props: AppProps) {
     })
     return flameDescriptor.renderSettings.camera3D.fov
   }
+  const setFlameRoll: Setter<number> = (value) => {
+    setFlameDescriptor((draft) => {
+      draft.renderSettings.camera3D.roll =
+        typeof value === 'function'
+          ? value(draft.renderSettings.camera3D.roll)
+          : value
+    })
+    return flameDescriptor.renderSettings.camera3D.roll
+  }
 
   // First-person "fly" navigation for 3D flames. Session-only (you don't want
   // to reopen the app mid-flight); the movement speed is remembered.
@@ -810,6 +840,19 @@ export function MainWorkspace(props: AppProps) {
     // Array properties are not easily animatable yet, so just use descriptor
     return new Float32Array(flameDescriptor.renderSettings.camera3D.target)
   }
+  const effectiveRoll = () => {
+    if (
+      timeline.animationEnabled() &&
+      (timeline.isPlaying() || timeline.isScrubbing())
+    ) {
+      const val = timeline.resolveValueAtPath(
+        'camera3D.roll',
+        timeline.currentFrame(),
+      )
+      if (val !== null && typeof val === 'number') return val
+    }
+    return flameDescriptor.renderSettings.camera3D.roll
+  }
   const effectiveFov = () => {
     if (
       timeline.animationEnabled() &&
@@ -827,8 +870,13 @@ export function MainWorkspace(props: AppProps) {
   // Per-mode flame memory: the dimension toggle stashes the active flame and
   // restores the one last used in the target mode, so 2D work is never lost
   // by exploring 3D (and vice versa). First entry into 3D loads a starter.
+  // The animation tracks are stashed alongside, because keyframe paths are
+  // dimension-specific (transform ids, camera vs camera3D, affine a–f vs a–l)
+  // and carrying them across a 2D↔3D switch would orphan them.
   let stashedFlame2D: FlameDescriptor | undefined
   let stashedFlame3D: FlameDescriptor | undefined
+  let stashedTracks2D: TimelineTrack[] | undefined
+  let stashedTracks3D: TimelineTrack[] | undefined
 
   createEffect(() => {
     const progress = animationExportProgress()
@@ -975,20 +1023,16 @@ export function MainWorkspace(props: AppProps) {
       return
     }
 
-    // True high-resolution export: scale the canvas backing store for the
-    // duration of the export so every frame is rendered at the target
-    // resolution, instead of bitmap-upscaling the 1x canvas (which only
-    // interpolated pixels and produced soft output).
-    const baseRatio = pixelRatio()
-    const scaledExport = config.resolution !== 1
-    if (scaledExport) {
-      setPixelRatio(baseRatio * config.resolution)
-      await waitForStableCanvasSize(canvas)
-    }
+    // True high-resolution export: render the canvas backing store at the exact
+    // export dimensions (resolution + aspect) for the duration of the export,
+    // instead of bitmap-upscaling the viewport canvas (which only interpolated
+    // pixels and produced soft output).
+    setExportDimensions({ width: config.width, height: config.height })
+    await waitForStableCanvasSize(canvas)
 
-    // resolution: 1 — the canvas itself already renders at export resolution.
+    // The canvas already renders at the export dimensions.
     const { promise } = createAnimationExport(
-      { ...config, resolution: 1 },
+      config,
       canvas,
       timeline,
       flameDescriptor,
@@ -1013,7 +1057,7 @@ export function MainWorkspace(props: AppProps) {
         showToast('Animation export failed')
       })
       .finally(() => {
-        if (scaledExport) setPixelRatio(baseRatio)
+        setExportDimensions(undefined)
       })
   }
 
@@ -1026,6 +1070,17 @@ export function MainWorkspace(props: AppProps) {
       setOnExportImage,
       setFlameDescriptor,
       () => selectedPalette(),
+      () => {
+        const canvas = document.querySelector<HTMLCanvasElement>(
+          `.${ui.canvas}`,
+        )
+        if (canvas && canvas.clientWidth > 0 && canvas.clientHeight > 0) {
+          return canvas.clientWidth / canvas.clientHeight
+        }
+        return window.innerWidth / window.innerHeight
+      },
+      enqueueImageJob,
+      enqueueAnimationJob,
       startAnimationExport,
       () => blendFlame(),
       () => resolvedBlendWeight(),
@@ -2390,7 +2445,11 @@ export function MainWorkspace(props: AppProps) {
                   <Menu />
                 </button>
               </Show>
-              <AutoCanvas class={ui.canvas} pixelRatio={pixelRatio()}>
+              <AutoCanvas
+                class={ui.canvas}
+                pixelRatio={canvasPixelRatio()}
+                fixedResolution={exportDimensions()}
+              >
                 <Suspense>
                   <ErrorBoundary
                     fallback={(err) => (
@@ -2472,6 +2531,7 @@ export function MainWorkspace(props: AppProps) {
                         radius={[effectiveRadius, setFlameRadius]}
                         target={[effectiveTarget3D, setFlameTarget3D]}
                         fov={[effectiveFov, setFlameFov]}
+                        roll={[effectiveRoll, setFlameRoll]}
                         flyMode={flyMode}
                         flySpeed={flySpeed}
                         interactive={() =>
@@ -2532,6 +2592,8 @@ export function MainWorkspace(props: AppProps) {
                 {(msg) => <div class={ui.toast}>{msg()}</div>}
               </Show>
               <ProgressBar />
+              <ExportJobHost />
+              <ExportJobTracker />
               <div class={ui.bottomBar}>
                 <Show when={effectiveFlame().renderSettings.dimensions === 3}>
                   <OrientationGizmo
@@ -2544,15 +2606,11 @@ export function MainWorkspace(props: AppProps) {
                   data-tour-target="view-controls"
                   style={{
                     'pointer-events':
-                      animationExportRunning() ||
-                      exportProgress() !== undefined ||
-                      timeline.isPlaying()
+                      animationExportRunning() || timeline.isPlaying()
                         ? 'none'
                         : 'auto',
                     opacity:
-                      animationExportRunning() ||
-                      exportProgress() !== undefined ||
-                      timeline.isPlaying()
+                      animationExportRunning() || timeline.isPlaying()
                         ? 0.5
                         : 1,
                   }}
@@ -2589,17 +2647,26 @@ export function MainWorkspace(props: AppProps) {
                 <Show when={showTimeline()}>
                   <div
                     class={ui.timelineContainer}
+                    // During playback (and animation export) the timeline is
+                    // dimmed + locked so the canvas/animation reads cleanly.
+                    // Playback additionally tags itself so ONLY the transport bar
+                    // stays clickable (to pause) — see [data-playback-locked] in
+                    // TimelineSection.module.css. Animation export stays fully
+                    // locked so a stray click can't start playback mid-render
+                    // (#8). Image export now runs offscreen (background job) and
+                    // does NOT lock the workspace.
+                    data-playback-locked={
+                      timeline.isPlaying() && !animationExportRunning()
+                        ? 'true'
+                        : undefined
+                    }
                     style={{
                       'pointer-events':
-                        animationExportRunning() ||
-                        exportProgress() !== undefined ||
-                        timeline.isPlaying()
+                        animationExportRunning() || timeline.isPlaying()
                           ? 'none'
                           : 'auto',
                       opacity:
-                        animationExportRunning() ||
-                        exportProgress() !== undefined ||
-                        timeline.isPlaying()
+                        animationExportRunning() || timeline.isPlaying()
                           ? 0.5
                           : 1,
                     }}
@@ -2661,19 +2728,11 @@ export function MainWorkspace(props: AppProps) {
                   onPointerDown={startSidebarDrag}
                 />
               )}
-              <Show
-                when={
-                  timeline.isPlaying() ||
-                  animationExportRunning() ||
-                  exportProgress() !== undefined
-                }
-              >
+              <Show when={timeline.isPlaying() || animationExportRunning()}>
                 <div
                   class={ui.playbackOverlay}
                   classList={{
-                    [ui.exportOverlay as string]:
-                      animationExportRunning() ||
-                      exportProgress() !== undefined,
+                    [ui.exportOverlay as string]: animationExportRunning(),
                   }}
                   onClick={() => {
                     if (timeline.isPlaying()) {
@@ -2684,52 +2743,27 @@ export function MainWorkspace(props: AppProps) {
                   <span class={ui.playbackOverlayText}>
                     {animationExportRunning()
                       ? 'Rendering animation...'
-                      : exportProgress() !== undefined
-                        ? 'Rendering image...'
-                        : 'Tap to stop animation'}
+                      : 'Tap to stop animation'}
                   </span>
                   <Show when={animationExportRunning()}>
-                    <div class={ui.overlayActions}>
-                      <button
-                        class={ui.overlayStopAndSaveButton}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setForceAnimationExportNow(true)
-                        }}
-                        title="Stop after current frame and save"
-                      >
-                        Stop & Save
-                      </button>
-                      <button
-                        class={ui.overlayCancelButton}
-                        onClick={(e) => {
-                          e.stopPropagation()
+                    {/* Stop the click from bubbling to the overlay's
+                        tap-to-stop-playback handler. */}
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation()
+                      }}
+                    >
+                      <ExportActions
+                        variant="overlay"
+                        stopLabel="Stop & Save"
+                        stopTitle="Stop after current frame and save"
+                        onStop={() => setForceAnimationExportNow(true)}
+                        cancelTitle="Cancel and discard"
+                        onCancel={() => {
                           const cancelFn = animationExportCancel()
                           if (cancelFn) cancelFn()
                         }}
-                        title="Cancel and discard"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </Show>
-                  <Show
-                    when={
-                      exportProgress() !== undefined &&
-                      !animationExportRunning()
-                    }
-                  >
-                    <div class={ui.overlayActions}>
-                      <button
-                        class={ui.overlayStopAndSaveButton}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setForceExportNow(true)
-                        }}
-                        title="Stop and export at current quality"
-                      >
-                        Stop & Export
-                      </button>
+                      />
                     </div>
                   </Show>
                 </div>
@@ -3041,7 +3075,10 @@ export function MainWorkspace(props: AppProps) {
                             </button>
                           </CollapsibleCard>
                         </Show>
-                        <div ref={randomizerCardRef}>
+                        <div
+                          ref={randomizerCardRef}
+                          data-tour-target="randomizer-card"
+                        >
                           <FlameRandomizerCard
                             flame={flameDescriptor}
                             historyEntries={randomizerHistory()}
@@ -3056,8 +3093,8 @@ export function MainWorkspace(props: AppProps) {
                           />
                         </div>
                         <For
-                          each={recordEntries(
-                            flameDescriptor.transforms,
+                          each={sortedTransformEntries(
+                            recordEntries(flameDescriptor.transforms),
                           ).filter(([tid]) => !tid.startsWith('_sym__'))}
                         >
                           {([tid, transform]) => (
@@ -3221,8 +3258,8 @@ export function MainWorkspace(props: AppProps) {
                                               setSidebarHidden(false)
                                             }
                                             setQuickPickState({
-                                              tid,
-                                              vid,
+                                              tid: toTransformId(tid),
+                                              vid: toVariationId(vid),
                                               type: variation.type,
                                             })
                                           }}
@@ -3231,8 +3268,8 @@ export function MainWorkspace(props: AppProps) {
                                             showVariationSelector(
                                               deepClone(variation),
                                               deepClone(flameDescriptor),
-                                              tid,
-                                              vid,
+                                              toTransformId(tid),
+                                              toVariationId(vid),
                                               {
                                                 setFlameTheta,
                                                 setFlamePhi,
@@ -3675,6 +3712,7 @@ export function MainWorkspace(props: AppProps) {
                           </button>
                           <button
                             class={ui.addFlameButton}
+                            data-tour-target="add-symmetry"
                             disabled={symTransforms().length > 0}
                             title={
                               symTransforms().length > 0
@@ -3728,6 +3766,7 @@ export function MainWorkspace(props: AppProps) {
                               >
                                 <Slider
                                   label="Point Batch"
+                                  data-tour-target="pointBatch-slider"
                                   value={
                                     flameDescriptor.renderSettings.plotsPerChain
                                   }
@@ -4383,7 +4422,11 @@ export function MainWorkspace(props: AppProps) {
                             </div>
                           </Card>
                         </CollapsibleCard>
-                        <CollapsibleCard title="Metadata" defaultOpen={false}>
+                        <CollapsibleCard
+                          title="Metadata"
+                          defaultOpen={false}
+                          data-tour-target="metadata-card"
+                        >
                           <Card>
                             <div
                               style={{
@@ -4489,9 +4532,7 @@ export function MainWorkspace(props: AppProps) {
             </div>
           </Show>
           <FloatingActions
-            disabled={
-              animationExportRunning() || exportProgress() !== undefined
-            }
+            disabled={animationExportRunning()}
             initialLeft={floatingLeft()}
             initialTop={floatingTop()}
             onLoadFlame={() => {
@@ -4589,10 +4630,15 @@ export function MainWorkspace(props: AppProps) {
             setDimensions={(v) => {
               const current = flameDescriptor.renderSettings.dimensions ?? 2
               if (v === current) return
+              // Stash the active flame AND its animation tracks under the
+              // current dimension; restore the target dimension's own pair so
+              // 2D and 3D each keep independent animations.
               if (current === 3) {
                 stashedFlame3D = deepClone(flameDescriptor)
+                stashedTracks3D = deepClone(timeline.tracks())
               } else {
                 stashedFlame2D = deepClone(flameDescriptor)
+                stashedTracks2D = deepClone(timeline.tracks())
               }
               // Fly mode only makes sense in 3D.
               if (v !== 3) setFlyMode(false)
@@ -4600,14 +4646,18 @@ export function MainWorkspace(props: AppProps) {
                 v === 3
                   ? (stashedFlame3D ?? example34)
                   : (stashedFlame2D ?? initExample)
+              const restoredTracks = v === 3 ? stashedTracks3D : stashedTracks2D
               history.replace(deepClone(restored))
+              // Swap the timeline to the target dimension's tracks (empty on
+              // first entry — matches the starter flame).
+              timeline.loadTracks(restoredTracks ?? [])
             }}
             flyMode={flyMode}
             setFlyMode={(v) => {
               setFlyMode(v)
               if (v) {
                 showToast(
-                  'Fly mode: click to look around · WASD/arrows to move · Q/E up/down · Esc to release',
+                  'Fly mode: click to look around · WASD/arrows move · Space/C up/down · Q/E roll · Esc to release',
                 )
               }
             }}

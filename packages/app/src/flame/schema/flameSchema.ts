@@ -32,12 +32,14 @@ export const camera3DDefault: {
   radius: number
   target: [number, number, number]
   fov: number
+  roll: number
 } = {
   theta: 0,
   phi: Math.PI / 2,
   radius: 5,
   target: [0, 0, 0] as [number, number, number],
   fov: 60,
+  roll: 0,
 }
 const _edgeFadeColorDefault: [number, number, number, number] = [0, 0, 0, 0.8]
 const MAX_SKIP_ITERS_VALUE = 30
@@ -117,6 +119,7 @@ export const Camera3DObjSchema = v.object({
     camera3DDefault.target,
   ),
   fov: v.optional(v.number(), camera3DDefault.fov),
+  roll: v.optional(v.number(), camera3DDefault.roll),
 })
 
 const ColorValueSchema = v.pipe(v.number(), v.minValue(0), v.maxValue(1))
@@ -306,7 +309,17 @@ export function validateFlame3D(data: unknown): FlameDescriptor3D {
 }
 
 export function tryValidateFlame(data: unknown): FlameDescriptor | undefined {
-  const result = v.safeParse(schema2D.FlameDescriptor, data)
+  // Mirror validateFlame's soundness for recent/stored flames: migrate
+  // renamed variation types so older saves still parse, and dispatch to the 3D
+  // schema for 3D flames so their a–l affines survive instead of being dropped
+  // or stripped to 2D. Failure still returns undefined (caller drops the entry).
+  migrateFlameVariationTypes(data)
+  const dimensions = (data as { renderSettings?: { dimensions?: number } })
+    ?.renderSettings?.dimensions
+  const result =
+    dimensions === 3
+      ? v.safeParse(schema3D.FlameDescriptor, data)
+      : v.safeParse(schema2D.FlameDescriptor, data)
   if (!result.success) return undefined
   return result.output
 }

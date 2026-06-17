@@ -140,6 +140,11 @@
   flex: 1;
   overflow-x: auto;
   overflow-y: hidden;
+  /* The lane's horizontal scroll is JS-synced from tracksScroll, not user-
+     scrolled. Without this, a horizontal touch-drag to scrub is interpreted as a
+     pan/scroll and the browser fires pointercancel, dropping the scrub on touch
+     devices. */
+  touch-action: none;
   /* Hide scrollbar — synced from tracksScroll via JS */
   scrollbar-width: none;
   &::-webkit-scrollbar {

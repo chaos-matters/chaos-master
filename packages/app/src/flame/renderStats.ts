@@ -101,6 +101,11 @@ export const [animationExportCancel, setAnimationExportCancel] = createSignal<
 
 export const [forceExportNow, setForceExportNow] = createSignal(false)
 
+/** When set to true, the in-progress image export aborts WITHOUT saving and the
+ *  workspace render settings are restored (the discard counterpart to
+ *  forceExportNow / "Stop & Export"). */
+export const [cancelExportNow, setCancelExportNow] = createSignal(false)
+
 /** When set to true, the animation export stops after the current frame
  *  finishes and finalizes the video with all frames rendered so far. */
 export const [forceAnimationExportNow, setForceAnimationExportNow] =

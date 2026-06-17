@@ -57,6 +57,14 @@ export function AngleEditor(props: AngleEditorProps) {
           }}
           formatValue={formatDegrees}
           dataParameterPath={props.dataParameterPath}
+          // Compact sidebar path: keep the tour/keyframe target (e.g.
+          // "angle-rotation") that the full/inline tracks also expose, so
+          // creation tours can find the angle control here too.
+          data-tour-target={
+            props.dataParameterPath
+              ? `angle-${props.dataParameterPath.split('.').pop()}`
+              : undefined
+          }
         />
       }
     >
@@ -112,6 +120,14 @@ export function AngleEditor(props: AngleEditorProps) {
                 scrollIntoViewAndFocusOnChange(value, el)
               }}
               class={ui.trackInline}
+              // Mirror the full-mode target so tours/keyframes can find this
+              // angle in compact sidebar layout too (e.g. "angle-rotation").
+              data-tour-target={
+                props.dataParameterPath
+                  ? `angle-${props.dataParameterPath.split('.').pop()}`
+                  : undefined
+              }
+              data-parameter-path={props.dataParameterPath}
               onPointerDown={startRotating}
               tabIndex={0}
             >

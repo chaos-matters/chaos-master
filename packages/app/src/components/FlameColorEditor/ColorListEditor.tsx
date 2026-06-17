@@ -1,14 +1,18 @@
-import { createMemo, For } from 'solid-js'
+import { createMemo, For, Show } from 'solid-js'
 import { vec2f } from 'typegpu/data'
 // Reuse the affine list's styling so the two scrub views look consistent.
 import ui from '@/components/AffineEditor/AffineListEditor.module.css'
 import { DiceButton } from '@/components/DiceButton/DiceButton'
 import { ResetButton } from '@/components/ResetButton/ResetButton'
 import { ScrubInput } from '@/components/Sliders/ScrubInput'
+import { KeyframeOnRandomizeToggle } from '@/components/Timeline/KeyframeOnRandomizeToggle'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useTimeline } from '@/contexts/TimelineContext'
 import { randomRange } from '@/flame/randomize'
+import { keyframeRandomizedParams } from '@/utils/randomizeKeyframes'
 import { buildReadableIds } from '@/utils/readableIds'
 import { recordEntries } from '@/utils/record'
+import { sortedTransformEntries } from '@/utils/transformOrder'
 import { handleColor } from './FlameColorEditor'
 import type { TransformRecord } from '@/flame/schema/flameSchema'
 import type { HistorySetter } from '@/utils/createStoreHistory'
@@ -30,11 +34,15 @@ export function ColorListEditor(props: {
   setSelectedTransformId?: (tid: string | null) => void
 }) {
   const { theme } = useTheme()
+  const timeline = useTimeline()
   const readableIds = createMemo(() => buildReadableIds(props.transforms))
 
   return (
     <div class={ui.container}>
-      <For each={recordEntries(props.transforms)}>
+      <Show when={timeline?.animationEnabled()}>
+        <KeyframeOnRandomizeToggle />
+      </Show>
+      <For each={sortedTransformEntries(recordEntries(props.transforms))}>
         {([tid, transform]) => {
           const color = () =>
             handleColor(theme(), vec2f(transform.color.x, transform.color.y))
@@ -51,6 +59,11 @@ export function ColorListEditor(props: {
                 [ui.dimmed as string]: isDimmed(),
               }}
               style={isSelected() ? { '--accent-color': color() } : undefined}
+              onContextMenu={(e) => {
+                // Right-click / long-press deselects.
+                e.preventDefault()
+                props.setSelectedTransformId?.(null)
+              }}
             >
               <div class={ui.transformHeader}>
                 <span
@@ -80,6 +93,10 @@ export function ColorListEditor(props: {
                         y: randomRange(-0.4, 0.4),
                       }
                     })
+                    keyframeRandomizedParams(timeline, [
+                      `transform.${tid}.color.x`,
+                      `transform.${tid}.color.y`,
+                    ])
                   }}
                 />
                 <ResetButton

@@ -1,0 +1,11 @@
+/* Off-screen host: the canvas still renders (and is captured) at its full
+   fixedResolution backing store, but is parked out of view and out of layout. */
+.host {
+  position: fixed;
+  left: -99999px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  pointer-events: none;
+}

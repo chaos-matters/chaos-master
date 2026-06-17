@@ -2,6 +2,7 @@ import { createResource, createSignal, For, Show, Suspense } from 'solid-js'
 import { useToast } from '@/contexts/ToastContext'
 import { Changelog, Discord, GitHub, Heart, Terminal, TriangleAlert, } from '@/icons'
 import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
+import { getWebglRenderer } from '@/utils/deviceInfo'
 import { formatBytes } from '@/utils/formatBytes'
 import { detectHardwareTier, hardwareTiers } from '@/utils/hardwareTier'
 import { GIT_SHA, VERSION } from '@/version'
@@ -110,6 +111,9 @@ async function getGPUDeviceInformation() {
     description: info.description,
     vendor: info.vendor,
     architecture: info.architecture,
+    // Firefox returns empty adapter.info fields — fall back to the WebGL
+    // renderer string so the GPU still shows up.
+    renderer: getWebglRenderer(),
     maxBufferSize: limits.maxBufferSize,
     heaps,
   }
@@ -141,15 +145,22 @@ function gatherFullDeviceInfo(
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const deviceMemory = (n as any).deviceMemory as number | undefined
-  if (deviceMemory !== undefined) {
-    lines.push(`Device RAM  : ~${deviceMemory} GB`)
-  }
+  lines.push(
+    `Device RAM  : ${
+      deviceMemory !== undefined
+        ? `~${deviceMemory} GB`
+        : 'Not exposed by browser'
+    }`,
+  )
 
   if (gpuInfo) {
     lines.push('')
     lines.push('--- GPU ---')
-    if (gpuInfo.description) lines.push(`Device      : ${gpuInfo.description}`)
-    lines.push(`Vendor      : ${gpuInfo.vendor}`)
+    // adapter.info.description is empty on Firefox; the WebGL renderer is the
+    // fallback so a GPU name still appears.
+    const deviceName = gpuInfo.description || gpuInfo.renderer
+    lines.push(`Device      : ${deviceName ?? 'Not exposed by browser'}`)
+    if (gpuInfo.vendor) lines.push(`Vendor      : ${gpuInfo.vendor}`)
     if (gpuInfo.architecture)
       lines.push(`Architecture: ${gpuInfo.architecture}`)
     lines.push(`Max Buffer  : ${formatBytes(gpuInfo.maxBufferSize)}`)
@@ -532,18 +543,21 @@ function HelpModal(props: HelpModalProps) {
                 value: string
                 color: 'green' | 'blue'
               }[] = []
-              if (deviceInfo.description !== '') {
+              // Firefox leaves adapter.info empty; fall back to the WebGL
+              // renderer so a GPU name still shows.
+              const deviceName = deviceInfo.description || deviceInfo.renderer
+              rows.push({
+                label: 'Device',
+                value: deviceName ?? 'Not exposed by browser',
+                color: 'green',
+              })
+              if (deviceInfo.vendor !== '') {
                 rows.push({
-                  label: 'Device',
-                  value: deviceInfo.description,
-                  color: 'green',
+                  label: 'Vendor',
+                  value: deviceInfo.vendor,
+                  color: 'blue',
                 })
               }
-              rows.push({
-                label: 'Vendor',
-                value: deviceInfo.vendor,
-                color: 'blue',
-              })
               if (deviceInfo.architecture !== '') {
                 rows.push({
                   label: 'Architecture',

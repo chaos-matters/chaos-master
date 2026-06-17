@@ -1,0 +1,73 @@
+.actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.stopButton,
+.cancelButton {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.stopButton {
+  background: rgba(59, 130, 246, 0.25);
+  color: #93bbfd;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.stopButton:hover {
+  background: rgba(59, 130, 246, 0.4);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.cancelButton {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.cancelButton:hover {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* Overlay variant: larger, punchier buttons for the in-view dark export
+   overlay (was App.module.css .overlayStopAndSaveButton/.overlayCancelButton). */
+.overlay {
+  margin-top: 0.75rem;
+  pointer-events: auto;
+}
+
+.overlay .stopButton,
+.overlay .cancelButton {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.78rem;
+  border-radius: 6px;
+}
+
+.overlay .stopButton {
+  background: rgba(59, 130, 246, 0.3);
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+.overlay .stopButton:hover {
+  background: rgba(59, 130, 246, 0.5);
+  border-color: rgba(59, 130, 246, 0.6);
+}
+
+.overlay .cancelButton {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.overlay .cancelButton:hover {
+  background: rgba(239, 68, 68, 0.35);
+  border-color: rgba(239, 68, 68, 0.45);
+}

@@ -1,3 +1,4 @@
+import { tgpu } from 'typegpu'
 import { f32, i32, struct, u32, vec2f } from 'typegpu/data'
 import { abs, cos, floor, sin } from 'typegpu/std'
 import { AngleEditor } from '@/components/Sliders/ParametricEditors/AngleEditor'
@@ -65,7 +66,13 @@ const PixelFlowVarParamsEditor: EditorFor<PixelFlowVarParams> = (props) => (
 // in u32 — WGSL requires u32 shift amounts and the bit ops match the Java signed
 // version — then the final value is reinterpreted as signed and normalized by
 // 2^31-1 (JWildFire's `(double)a / Integer.MAX_VALUE`), so it spans ~[-1, 1).
-const pixel_flow_hash = (inVal: number): number => {
+// i32 input (the callers pass integer block indices / hash seeds): typing it as
+// i32 keeps the integer bits exact and avoids an implicit i32→f32 conversion
+// (which would also lose precision for large block indices).
+const pixel_flow_hash = tgpu.fn(
+  [i32],
+  f32,
+)((inVal) => {
   'use gpu'
   let a = u32(inVal)
   a = a ^ 61 ^ (a >> u32(16))
@@ -74,7 +81,7 @@ const pixel_flow_hash = (inVal: number): number => {
   a = a * 0x27d4eb2d
   a = a ^ (a >> u32(15))
   return f32(i32(a)) / 2147483647.0
-}
+})
 
 export const pixelFlowVar = parametricVariation(
   'pixelFlowVar',

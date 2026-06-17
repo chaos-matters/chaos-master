@@ -326,6 +326,13 @@ export interface FlameDescriptor {
     d: number
     e: number
     f: number
+    // 3D flames carry a 12-param (a–l) affine; optional so 2D stays a–f.
+    g?: number
+    h?: number
+    i?: number
+    j?: number
+    k?: number
+    l?: number
   }
   metadata: {
     author: string
@@ -470,6 +477,19 @@ export function createTimelineState() {
   })
   const [isPlaying, setIsPlaying] = createSignal(false)
   const [isScrubbing, setIsScrubbing] = createSignal(false)
+  // Achieved playback FPS while Auto FPS is on. With Auto FPS each frame only
+  // advances once it reaches target quality, so the real rate is below the
+  // nominal `fps` and varies with scene complexity. Smoothed (EMA) so the
+  // readout is stable. undefined when not measuring.
+  const [measuredFps, setMeasuredFps] = createSignal<number | undefined>(
+    undefined,
+  )
+  let lastAdvanceTs: number | undefined
+
+  function resetFpsMeter() {
+    lastAdvanceTs = undefined
+    setMeasuredFps(undefined)
+  }
   const [autoKeyframe, setAutoKeyframe] = persistentSignal(
     'timeline-auto-keyframe',
     true,
@@ -902,11 +922,29 @@ export function createTimelineState() {
 
   function advanceFrame() {
     const cfg = config()
+    // Sample the achieved rate between auto-FPS advances (each advance fires
+    // when a frame hits target quality). Skip manual stepping (not playing).
+    if (isPlaying() && cfg.autoFps) {
+      const now = globalThis.performance.now()
+      if (lastAdvanceTs !== undefined) {
+        const dt = now - lastAdvanceTs
+        if (dt > 0) {
+          const instantaneous = 1000 / dt
+          setMeasuredFps((prev) =>
+            prev === undefined
+              ? instantaneous
+              : prev * 0.8 + instantaneous * 0.2,
+          )
+        }
+      }
+      lastAdvanceTs = now
+    }
     const next = currentFrame() + 1
     if (next > cfg.endFrame) {
       setCurrentFrame(cfg.startFrame)
       if (!cfg.loop) {
         setIsPlaying(false)
+        resetFpsMeter()
       }
     } else {
       setCurrentFrame(next)
@@ -932,15 +970,18 @@ export function createTimelineState() {
     if (!cfg.loop && currentFrame() >= cfg.endFrame) {
       setCurrentFrame(cfg.startFrame)
     }
+    resetFpsMeter()
     setIsPlaying(true)
   }
 
   function pause() {
     setIsPlaying(false)
+    resetFpsMeter()
   }
 
   function togglePlay() {
     setIsPlaying(!isPlaying())
+    resetFpsMeter()
   }
 
   function hasAnyKeyframes(parameterPath: string): boolean {
@@ -1072,6 +1113,7 @@ export function createTimelineState() {
     lastAddedKeyframe,
     isPlaying,
     setIsPlaying,
+    measuredFps,
     isScrubbing,
     setIsScrubbing,
     autoKeyframe,
@@ -1343,9 +1385,28 @@ export function applyTracksToFlame(
     }
   }
 
-  // Final transform
+  // Final transform. Seed a dimension-appropriate identity: a 3D flame needs a
+  // 12-param (a–l) affine — seeding a 2D one here produced 3D flames with an
+  // invalid 2D finalTransform that then failed strict schema validation on
+  // re-import.
   if (!flame.finalTransform) {
-    flame.finalTransform = { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 }
+    flame.finalTransform =
+      flame.renderSettings.dimensions === 3
+        ? {
+            a: 1,
+            b: 0,
+            c: 0,
+            d: 0,
+            e: 0,
+            f: 1,
+            g: 0,
+            h: 0,
+            i: 0,
+            j: 0,
+            k: 1,
+            l: 0,
+          }
+        : { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 }
   }
   applyNumber('finalTransform.a', (v) => {
     flame.finalTransform!.a = v

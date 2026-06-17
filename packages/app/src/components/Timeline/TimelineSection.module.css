@@ -99,6 +99,13 @@
   flex-shrink: 0;
 }
 
+/* While playback locks the dimmed timeline (pointer-events: none on the
+   container), keep the transport bar clickable so the user can still pause.
+   The container sets data-playback-locked only for playback, not export. */
+[data-playback-locked='true'] .transportControls {
+  pointer-events: auto;
+}
+
 .transportBtn {
   display: flex;
   align-items: center;
@@ -207,6 +214,57 @@
   [data-theme='dark'] & {
     color: var(--neutral-500);
   }
+}
+
+/* Live "achieved FPS" pill, shown while Auto FPS playback is running. */
+.measuredFps {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px 1px 5px;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+  user-select: none;
+  color: oklch(58% 0.15 150);
+  background: oklch(58% 0.15 150 / 0.12);
+  border: 1px solid oklch(58% 0.15 150 / 0.25);
+
+  [data-theme='dark'] & {
+    color: oklch(80% 0.15 150);
+    background: oklch(80% 0.15 150 / 0.14);
+    border-color: oklch(80% 0.15 150 / 0.3);
+  }
+}
+
+.measuredFpsDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 4px currentColor;
+  animation: measuredFpsPulse 1.4s ease-in-out infinite;
+}
+
+@keyframes measuredFpsPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.measuredFpsUnit {
+  font-size: 0.5rem;
+  font-weight: 500;
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .settingInput {

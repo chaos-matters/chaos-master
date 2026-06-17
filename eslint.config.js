@@ -15,6 +15,7 @@ export default defineConfig(
       '**/node_modules',
       '**/.pnpm-store', // present in CI
       '**/.wrangler',
+      '**/assets/local', // gitignored local scratch (snapshots, throwaway scripts)
     ],
   },
   importX.flatConfigs.recommended,

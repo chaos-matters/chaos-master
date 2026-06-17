@@ -184,6 +184,7 @@ function AffineHandle(props: {
   dimmed?: boolean
   hidden?: boolean
   onSelect?: () => void
+  onDeselect?: () => void
 }) {
   const { theme } = useTheme()
   const {
@@ -252,12 +253,21 @@ function AffineHandle(props: {
       const { a, b, d, e, ...rest } = props.transform
       const grabPosition = clipToWorld(eventToClip(initEvent, canvas))
       const center = position()
+      // grabDiff is fixed for the whole drag (grab point and centre are both
+      // captured once). If the handle was grabbed at the affine centre — e.g.
+      // a collapsed/degenerate box — its length is 0; dividing by it below
+      // would make ratio (and thus the whole a/b/d/e matrix) NaN.
+      const grabDiff = sub(grabPosition, center)
+      const grabLen = length(grabDiff)
 
       function onPointerMove(ev: PointerEvent) {
+        if (grabLen < 1e-6) {
+          // Scale/rotation is undefined from a zero-radius grab — ignore.
+          return
+        }
         const evPosition = clipToWorld(eventToClip(ev, canvas))
-        const grabDiff = sub(grabPosition, center)
         const evDiff = sub(evPosition, center)
-        const ratio = length(evDiff) / length(grabDiff)
+        const ratio = length(evDiff) / grabLen
         const grabNorm = vec2Normalize(grabDiff)
         const evNorm = vec2Normalize(evDiff)
         const cos = ev.ctrlKey || ev.metaKey ? 1 : dot(evNorm, grabNorm)
@@ -489,46 +499,207 @@ function AffineHandle(props: {
     })
 
   return (
-    <Show
-      when={props.is3D}
-      fallback={
-        <>
-          <svg viewBox={`-${aspect()} -1 ${2 * aspect()} 2`}>
+    <Show when={!props.hidden}>
+      <Show
+        when={props.is3D}
+        fallback={
+          <>
+            <svg viewBox={`-${aspect()} -1 ${2 * aspect()} 2`}>
+              <g
+                class={ui.handleBox}
+                classList={{ [ui.dimmed as string]: props.dimmed }}
+                transform={`scale(1, -1) matrix(${clipTransform()})`}
+              >
+                <path d={corners} />
+                <path
+                  class={ui.handleBoxGrabArea}
+                  d={corners}
+                  on:pointerdown={scaleBoth}
+                />
+                <path d="M 0,0 V 1" marker-end="url(#arrow)" />
+                <path
+                  class={ui.handleBoxGrabArea}
+                  d="M 0,0 V 1"
+                  on:pointerdown={scaleY}
+                />
+                <path d="M 0,0 L 1,0" marker-end="url(#arrow)" />
+                <path
+                  class={ui.handleBoxGrabArea}
+                  d="M 0,0 L 1,0"
+                  on:pointerdown={scaleX}
+                />
+                <path class={ui.dashed} d="M 0,0 V -1 M 0,0 L -1,0" />
+                <path
+                  class={ui.handleBoxGrabArea}
+                  d="M 0,0 V -1"
+                  on:pointerdown={scaleNegY}
+                />
+                <path
+                  class={ui.handleBoxGrabArea}
+                  d="M 0,0 L -1,0"
+                  on:pointerdown={scaleNegX}
+                />
+              </g>
+            </svg>
             <g
-              class={ui.handleBox}
-              transform={`scale(1, -1) matrix(${clipTransform()})`}
+              class={ui.handle}
+              classList={{
+                [ui.selected as string]: props.selected,
+                [ui.dimmed as string]: props.dimmed,
+                [ui.hidden as string]: props.hidden,
+              }}
+              on:pointerdown={(e) => {
+                // Right-click is reserved for deselect (handled in contextmenu).
+                if (e.button === 2) return
+                props.onSelect?.()
+                startDragging(e)
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                props.onDeselect?.()
+              }}
+              style={{
+                '--color': handleColor(theme(), props.color),
+                '--handle-visual-r': `${0.3 * handleScale()}rem`,
+                '--handle-visual-hover-r': `${0.4 * handleScale()}rem`,
+                '--handle-grab-r': `${0.6 * handleScale()}rem`,
+              }}
             >
-              <path d={corners} />
-              <path
-                class={ui.handleBoxGrabArea}
-                d={corners}
-                on:pointerdown={scaleBoth}
-              />
-              <path d="M 0,0 V 1" marker-end="url(#arrow)" />
-              <path
-                class={ui.handleBoxGrabArea}
-                d="M 0,0 V 1"
-                on:pointerdown={scaleY}
-              />
-              <path d="M 0,0 L 1,0" marker-end="url(#arrow)" />
-              <path
-                class={ui.handleBoxGrabArea}
-                d="M 0,0 L 1,0"
-                on:pointerdown={scaleX}
-              />
-              <path class={ui.dashed} d="M 0,0 V -1 M 0,0 L -1,0" />
-              <path
-                class={ui.handleBoxGrabArea}
-                d="M 0,0 V -1"
-                on:pointerdown={scaleNegY}
-              />
-              <path
-                class={ui.handleBoxGrabArea}
-                d="M 0,0 L -1,0"
-                on:pointerdown={scaleNegX}
-              />
+              <circle class={ui.handleCircle} cx={p(x())} cy={p(y())} />
+              <circle class={ui.handleCircleGrabArea} cx={p(x())} cy={p(y())} />
             </g>
-          </svg>
+          </>
+        }
+      >
+        <g class={ui.box3d} classList={{ [ui.dimmed as string]: props.dimmed }}>
+          {/* Negative local guides (dashed lines) */}
+          <line
+            x1={`${projC().x}%`}
+            y1={`${projC().y}%`}
+            x2={`${projNegLocalX().x}%`}
+            y2={`${projNegLocalX().y}%`}
+            stroke="#ff4d4d"
+            stroke-width="1.5"
+            stroke-dasharray="3 3"
+            opacity="0.5"
+          />
+          <line
+            x1={`${projC().x}%`}
+            y1={`${projC().y}%`}
+            x2={`${projNegLocalY().x}%`}
+            y2={`${projNegLocalY().y}%`}
+            stroke="#2ecc71"
+            stroke-width="1.5"
+            stroke-dasharray="3 3"
+            opacity="0.5"
+          />
+          <line
+            x1={`${projC().x}%`}
+            y1={`${projC().y}%`}
+            x2={`${projNegLocalZ().x}%`}
+            y2={`${projNegLocalZ().y}%`}
+            stroke="#3498db"
+            stroke-width="1.5"
+            stroke-dasharray="3 3"
+            opacity="0.5"
+          />
+
+          {/* Local axis lines */}
+          <line
+            x1={`${projC().x}%`}
+            y1={`${projC().y}%`}
+            x2={`${projLocalX().x}%`}
+            y2={`${projLocalX().y}%`}
+            stroke="#ff4d4d"
+            stroke-width="1.5"
+          />
+          <line
+            x1={`${projC().x}%`}
+            y1={`${projC().y}%`}
+            x2={`${projLocalY().x}%`}
+            y2={`${projLocalY().y}%`}
+            stroke="#2ecc71"
+            stroke-width="1.5"
+          />
+          <line
+            x1={`${projC().x}%`}
+            y1={`${projC().y}%`}
+            x2={`${projLocalZ().x}%`}
+            y2={`${projLocalZ().y}%`}
+            stroke="#3498db"
+            stroke-width="1.5"
+          />
+
+          {/* Local X scale/rotate end-handles */}
+          <circle
+            cx={`${projLocalX().x}%`}
+            cy={`${projLocalX().y}%`}
+            r={`${0.2 * handleScale()}rem`}
+            fill="#ff4d4d"
+            stroke="white"
+            stroke-width="1.5"
+            style={{ cursor: 'nesw-resize' }}
+            on:pointerdown={startScalingRotating3D('X', 1)}
+          />
+          <circle
+            cx={`${projNegLocalX().x}%`}
+            cy={`${projNegLocalX().y}%`}
+            r={`${0.15 * handleScale()}rem`}
+            fill="#ff4d4d"
+            stroke="white"
+            stroke-width="1"
+            opacity="0.8"
+            style={{ cursor: 'nesw-resize' }}
+            on:pointerdown={startScalingRotating3D('X', -1)}
+          />
+
+          {/* Local Y scale/rotate end-handles */}
+          <circle
+            cx={`${projLocalY().x}%`}
+            cy={`${projLocalY().y}%`}
+            r={`${0.2 * handleScale()}rem`}
+            fill="#2ecc71"
+            stroke="white"
+            stroke-width="1.5"
+            style={{ cursor: 'nesw-resize' }}
+            on:pointerdown={startScalingRotating3D('Y', 1)}
+          />
+          <circle
+            cx={`${projNegLocalY().x}%`}
+            cy={`${projNegLocalY().y}%`}
+            r={`${0.15 * handleScale()}rem`}
+            fill="#2ecc71"
+            stroke="white"
+            stroke-width="1"
+            opacity="0.8"
+            style={{ cursor: 'nesw-resize' }}
+            on:pointerdown={startScalingRotating3D('Y', -1)}
+          />
+
+          {/* Local Z scale/rotate end-handles */}
+          <circle
+            cx={`${projLocalZ().x}%`}
+            cy={`${projLocalZ().y}%`}
+            r={`${0.2 * handleScale()}rem`}
+            fill="#3498db"
+            stroke="white"
+            stroke-width="1.5"
+            style={{ cursor: 'nesw-resize' }}
+            on:pointerdown={startScalingRotating3D('Z', 1)}
+          />
+          <circle
+            cx={`${projNegLocalZ().x}%`}
+            cy={`${projNegLocalZ().y}%`}
+            r={`${0.15 * handleScale()}rem`}
+            fill="#3498db"
+            stroke="white"
+            stroke-width="1"
+            opacity="0.8"
+            style={{ cursor: 'nesw-resize' }}
+            on:pointerdown={startScalingRotating3D('Z', -1)}
+          />
+
+          {/* Center free-translation handle */}
           <g
             class={ui.handle}
             classList={{
@@ -537,187 +708,35 @@ function AffineHandle(props: {
               [ui.hidden as string]: props.hidden,
             }}
             on:pointerdown={(e) => {
+              // Right-click is reserved for deselect (handled in contextmenu).
+              if (e.button === 2) return
               props.onSelect?.()
-              startDragging(e)
+              startDragging3D(e)
             }}
             onContextMenu={(e) => {
               e.preventDefault()
+              props.onDeselect?.()
             }}
             style={{
               '--color': handleColor(theme(), props.color),
-              '--handle-visual-r': `${0.3 * handleScale()}rem`,
-              '--handle-visual-hover-r': `${0.4 * handleScale()}rem`,
-              '--handle-grab-r': `${0.6 * handleScale()}rem`,
+              '--handle-visual-r': `${0.35 * handleScale()}rem`,
+              '--handle-visual-hover-r': `${0.45 * handleScale()}rem`,
+              '--handle-grab-r': `${0.65 * handleScale()}rem`,
             }}
           >
-            <circle class={ui.handleCircle} cx={p(x())} cy={p(y())} />
-            <circle class={ui.handleCircleGrabArea} cx={p(x())} cy={p(y())} />
+            <circle
+              class={ui.handleCircle}
+              cx={`${projC().x}%`}
+              cy={`${projC().y}%`}
+            />
+            <circle
+              class={ui.handleCircleGrabArea}
+              cx={`${projC().x}%`}
+              cy={`${projC().y}%`}
+            />
           </g>
-        </>
-      }
-    >
-      <g>
-        {/* Negative local guides (dashed lines) */}
-        <line
-          x1={`${projC().x}%`}
-          y1={`${projC().y}%`}
-          x2={`${projNegLocalX().x}%`}
-          y2={`${projNegLocalX().y}%`}
-          stroke="#ff4d4d"
-          stroke-width="1.5"
-          stroke-dasharray="3 3"
-          opacity="0.5"
-        />
-        <line
-          x1={`${projC().x}%`}
-          y1={`${projC().y}%`}
-          x2={`${projNegLocalY().x}%`}
-          y2={`${projNegLocalY().y}%`}
-          stroke="#2ecc71"
-          stroke-width="1.5"
-          stroke-dasharray="3 3"
-          opacity="0.5"
-        />
-        <line
-          x1={`${projC().x}%`}
-          y1={`${projC().y}%`}
-          x2={`${projNegLocalZ().x}%`}
-          y2={`${projNegLocalZ().y}%`}
-          stroke="#3498db"
-          stroke-width="1.5"
-          stroke-dasharray="3 3"
-          opacity="0.5"
-        />
-
-        {/* Local axis lines */}
-        <line
-          x1={`${projC().x}%`}
-          y1={`${projC().y}%`}
-          x2={`${projLocalX().x}%`}
-          y2={`${projLocalX().y}%`}
-          stroke="#ff4d4d"
-          stroke-width="1.5"
-        />
-        <line
-          x1={`${projC().x}%`}
-          y1={`${projC().y}%`}
-          x2={`${projLocalY().x}%`}
-          y2={`${projLocalY().y}%`}
-          stroke="#2ecc71"
-          stroke-width="1.5"
-        />
-        <line
-          x1={`${projC().x}%`}
-          y1={`${projC().y}%`}
-          x2={`${projLocalZ().x}%`}
-          y2={`${projLocalZ().y}%`}
-          stroke="#3498db"
-          stroke-width="1.5"
-        />
-
-        {/* Local X scale/rotate end-handles */}
-        <circle
-          cx={`${projLocalX().x}%`}
-          cy={`${projLocalX().y}%`}
-          r={`${0.2 * handleScale()}rem`}
-          fill="#ff4d4d"
-          stroke="white"
-          stroke-width="1.5"
-          style={{ cursor: 'nesw-resize' }}
-          on:pointerdown={startScalingRotating3D('X', 1)}
-        />
-        <circle
-          cx={`${projNegLocalX().x}%`}
-          cy={`${projNegLocalX().y}%`}
-          r={`${0.15 * handleScale()}rem`}
-          fill="#ff4d4d"
-          stroke="white"
-          stroke-width="1"
-          opacity="0.8"
-          style={{ cursor: 'nesw-resize' }}
-          on:pointerdown={startScalingRotating3D('X', -1)}
-        />
-
-        {/* Local Y scale/rotate end-handles */}
-        <circle
-          cx={`${projLocalY().x}%`}
-          cy={`${projLocalY().y}%`}
-          r={`${0.2 * handleScale()}rem`}
-          fill="#2ecc71"
-          stroke="white"
-          stroke-width="1.5"
-          style={{ cursor: 'nesw-resize' }}
-          on:pointerdown={startScalingRotating3D('Y', 1)}
-        />
-        <circle
-          cx={`${projNegLocalY().x}%`}
-          cy={`${projNegLocalY().y}%`}
-          r={`${0.15 * handleScale()}rem`}
-          fill="#2ecc71"
-          stroke="white"
-          stroke-width="1"
-          opacity="0.8"
-          style={{ cursor: 'nesw-resize' }}
-          on:pointerdown={startScalingRotating3D('Y', -1)}
-        />
-
-        {/* Local Z scale/rotate end-handles */}
-        <circle
-          cx={`${projLocalZ().x}%`}
-          cy={`${projLocalZ().y}%`}
-          r={`${0.2 * handleScale()}rem`}
-          fill="#3498db"
-          stroke="white"
-          stroke-width="1.5"
-          style={{ cursor: 'nesw-resize' }}
-          on:pointerdown={startScalingRotating3D('Z', 1)}
-        />
-        <circle
-          cx={`${projNegLocalZ().x}%`}
-          cy={`${projNegLocalZ().y}%`}
-          r={`${0.15 * handleScale()}rem`}
-          fill="#3498db"
-          stroke="white"
-          stroke-width="1"
-          opacity="0.8"
-          style={{ cursor: 'nesw-resize' }}
-          on:pointerdown={startScalingRotating3D('Z', -1)}
-        />
-
-        {/* Center free-translation handle */}
-        <g
-          class={ui.handle}
-          classList={{
-            [ui.selected as string]: props.selected,
-            [ui.dimmed as string]: props.dimmed,
-            [ui.hidden as string]: props.hidden,
-          }}
-          on:pointerdown={(e) => {
-            props.onSelect?.()
-            startDragging3D(e)
-          }}
-          onContextMenu={(e) => {
-            e.preventDefault()
-          }}
-          style={{
-            '--color': handleColor(theme(), props.color),
-            '--handle-visual-r': `${0.35 * handleScale()}rem`,
-            '--handle-visual-hover-r': `${0.45 * handleScale()}rem`,
-            '--handle-grab-r': `${0.65 * handleScale()}rem`,
-          }}
-        >
-          <circle
-            class={ui.handleCircle}
-            cx={`${projC().x}%`}
-            cy={`${projC().y}%`}
-          />
-          <circle
-            class={ui.handleCircleGrabArea}
-            cx={`${projC().x}%`}
-            cy={`${projC().y}%`}
-          />
         </g>
-      </g>
+      </Show>
     </Show>
   )
 }
@@ -863,6 +882,7 @@ export function AffineEditor(props: {
                         props.selectedTransformId?.() !== tid
                       }
                       onSelect={() => props.setSelectedTransformId?.(tid)}
+                      onDeselect={() => props.setSelectedTransformId?.(null)}
                       hidden={!(transform.visible ?? true)}
                     />
                   )}

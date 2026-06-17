@@ -1,4 +1,4 @@
-import { createMemo } from 'solid-js'
+import { createMemo, Show } from 'solid-js'
 import { useTimeline } from '@/contexts/TimelineContext'
 import ui from './TimelineSection.module.css'
 
@@ -88,6 +88,22 @@ export function TimelineSettings() {
           title="Auto FPS: Wait for each frame to render to target quality before advancing"
         />
       </label>
+      <Show
+        when={
+          (config().autoFps ?? false) &&
+          timeline.isPlaying() &&
+          timeline.measuredFps() !== undefined
+        }
+      >
+        <span
+          class={ui.measuredFps}
+          title="Actual playback rate while waiting for each frame to reach the quality target"
+        >
+          <span class={ui.measuredFpsDot} />
+          {timeline.measuredFps()!.toFixed(1)}
+          <span class={ui.measuredFpsUnit}>fps</span>
+        </span>
+      </Show>
       <label
         class={ui.settingItem}
         onPointerDown={createSettingScrubber(

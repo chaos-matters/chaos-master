@@ -1,0 +1,66 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+/* Label in a fixed column with the pills beside it — compact, and the two rows
+   line up. */
+.group {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr;
+  align-items: center;
+  column-gap: 0.5rem;
+}
+
+.groupLabel {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary, #999);
+}
+
+.cards {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.card {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0.3rem 0.2rem;
+  border: 1px solid var(--color-border, #333);
+  border-radius: 0.35rem;
+  background: var(--color-bg-input, #1a1a1a);
+  color: var(--color-text-secondary, #999);
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.card:hover {
+  color: var(--color-text, #eee);
+  border-color: var(--color-text-secondary, #888);
+}
+
+.cardActive {
+  background: var(--accent-color, #3b82f6);
+  border-color: var(--accent-color, #3b82f6);
+  color: #fff;
+}
+
+.cardActive:hover {
+  background: var(--accent-color, #3b82f6);
+  color: #fff;
+  border-color: var(--accent-color, #3b82f6);
+}
+
+.dimensions {
+  align-self: flex-end;
+  font-size: 0.68rem;
+  color: var(--color-text-secondary, #999);
+  font-variant-numeric: tabular-nums;
+}

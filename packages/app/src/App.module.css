@@ -380,48 +380,6 @@
   pointer-events: none;
 }
 
-.overlayActions {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-  pointer-events: auto;
-}
-
-.overlayStopAndSaveButton,
-.overlayCancelButton {
-  appearance: none;
-  padding: 0.4rem 0.8rem;
-  border-radius: 6px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.overlayStopAndSaveButton {
-  background: rgba(59, 130, 246, 0.3);
-  color: #93bbfd;
-  border: 1px solid rgba(59, 130, 246, 0.35);
-}
-
-.overlayStopAndSaveButton:hover {
-  background: rgba(59, 130, 246, 0.5);
-  border-color: rgba(59, 130, 246, 0.6);
-}
-
-.overlayCancelButton {
-  background: rgba(239, 68, 68, 0.2);
-  color: #f87171;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-}
-
-.overlayCancelButton:hover {
-  background: rgba(239, 68, 68, 0.35);
-  border-color: rgba(239, 68, 68, 0.45);
-}
-
 .no-select {
   user-select: none;
   -webkit-user-select: none;
@@ -582,6 +540,7 @@
 .button-card.button-card {
   display: flex;
   padding: 0.25rem;
+  gap: 0.4rem;
   align-items: stretch;
   flex-direction: column;
   background: none;
@@ -604,20 +563,21 @@
   justify-content: center;
   gap: 0.35rem;
   appearance: none;
-  border: none;
-  border-radius: 6px;
+  width: 100%;
+  border: 1px dashed var(--neutral-300);
+  border-radius: 8px;
   background: transparent;
-  height: 24px;
-  padding: 0 0.5rem;
+  height: 26px;
+  padding: 0 0.75rem;
   cursor: pointer;
-  font-size: 0.65rem;
+  font-size: 0.68rem;
   font-weight: 500;
   letter-spacing: 0.02em;
-  color: var(--neutral-400);
-  width: 100%;
+  color: var(--neutral-500);
   transition:
     color 0.15s,
-    background 0.15s;
+    background 0.15s,
+    border-color 0.15s;
 
   &::before {
     content: '+';
@@ -628,19 +588,22 @@
 
   &:hover {
     color: var(--neutral-800);
-    background: var(--neutral-100);
+    background: var(--neutral-50);
+    border-color: var(--neutral-400);
   }
 
   &:active {
-    background: var(--neutral-200);
+    background: var(--neutral-100);
   }
 
   [data-theme='dark'] & {
-    color: var(--neutral-500);
+    border-color: var(--neutral-700);
+    color: var(--neutral-400);
 
     &:hover {
-      color: var(--neutral-300);
+      color: var(--neutral-200);
       background: rgba(255, 255, 255, 0.05);
+      border-color: var(--neutral-600);
     }
 
     &:active {
@@ -1185,10 +1148,17 @@
 .readable-id {
   font-family: monospace;
   font-size: 10px;
-  color: var(--accent-color, #3b82f6);
+  /* Derive a readable tint from the transform accent instead of using it
+     raw: pin lightness against the card background per theme and cap chroma
+     so saturated hues (esp. dark blue) can't gamut-clip to near-invisible. */
+  color: oklch(from var(--accent-color, #3b82f6) 0.48 min(c, 0.15) h);
   font-weight: 600;
   white-space: nowrap;
   user-select: none;
+
+  [data-theme='dark'] & {
+    color: oklch(from var(--accent-color, #3b82f6) 0.8 min(c, 0.13) h);
+  }
 }
 
 .toast {
