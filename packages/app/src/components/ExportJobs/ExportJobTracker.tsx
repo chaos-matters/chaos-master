@@ -87,11 +87,17 @@ function JobCard(props: { job: ExportJob }) {
   const framePts = createMemo(() => {
     if (job.type !== 'animation' || job.status !== 'rendering') return null
     const { currentPoints, targetPoints, phase } = job.progress
-    if (phase !== 'rendering' || targetPoints <= 0) return null
+    // Shown for the whole rendering phase (even at a frame boundary when the
+    // counts momentarily reset to 0) so the line stays put instead of flickering
+    // in and out between frames. Hidden only once during the final encode.
+    if (phase !== 'rendering') return null
     return {
       current: currentPoints,
       target: targetPoints,
-      pct: Math.min(100, (currentPoints / targetPoints) * 100),
+      pct:
+        targetPoints > 0
+          ? Math.min(100, (currentPoints / targetPoints) * 100)
+          : 0,
     }
   })
 
@@ -128,14 +134,14 @@ function JobCard(props: { job: ExportJob }) {
           <span>{stats()}</span>
           <span>{pct().toFixed(0)}%</span>
         </div>
-        <Show when={framePts()} keyed>
+        <Show when={framePts()}>
           {(fp) => (
             <div class={ui.subStats}>
               <span>
-                {formatPointCount(fp.current)} / {formatPointCount(fp.target)}{' '}
-                pts
+                {formatPointCount(fp().current)} /{' '}
+                {formatPointCount(fp().target)} pts
               </span>
-              <span>{fp.pct.toFixed(0)}% frame</span>
+              <span>{fp().pct.toFixed(0)}% frame</span>
             </div>
           )}
         </Show>
