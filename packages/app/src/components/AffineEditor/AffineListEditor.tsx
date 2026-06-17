@@ -4,9 +4,11 @@ import { DiceButton } from '@/components/DiceButton/DiceButton'
 import { handleColor } from '@/components/FlameColorEditor/FlameColorEditor'
 import { ResetButton } from '@/components/ResetButton/ResetButton'
 import { ScrubInput } from '@/components/Sliders/ScrubInput'
+import { KeyframeOnRandomizeToggle } from '@/components/Timeline/KeyframeOnRandomizeToggle'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useTimeline } from '@/contexts/TimelineContext'
 import { randomizeAffineCoef } from '@/flame/randomize'
+import { keyframeRandomizedParams } from '@/utils/randomizeKeyframes'
 import { buildReadableIds } from '@/utils/readableIds'
 import { recordEntries } from '@/utils/record'
 import ui from './AffineListEditor.module.css'
@@ -47,6 +49,9 @@ export function AffineListEditor(props: AffineListEditorProps) {
 
   return (
     <div class={ui.container}>
+      <Show when={timeline?.animationEnabled()}>
+        <KeyframeOnRandomizeToggle />
+      </Show>
       <For each={recordEntries(props.transforms)}>
         {([tid, transform]) => {
           const color = () =>
@@ -98,6 +103,12 @@ export function AffineListEditor(props: AffineListEditorProps) {
                         )
                       }
                     })
+                    keyframeRandomizedParams(
+                      timeline,
+                      activeCoefs().map(
+                        (key) => `transform.${tid}.${props.affineMode}.${key}`,
+                      ),
+                    )
                   }}
                 />
                 <ResetButton

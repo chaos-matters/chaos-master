@@ -1,12 +1,15 @@
-import { createMemo, For } from 'solid-js'
+import { createMemo, For, Show } from 'solid-js'
 import { vec2f } from 'typegpu/data'
 // Reuse the affine list's styling so the two scrub views look consistent.
 import ui from '@/components/AffineEditor/AffineListEditor.module.css'
 import { DiceButton } from '@/components/DiceButton/DiceButton'
 import { ResetButton } from '@/components/ResetButton/ResetButton'
 import { ScrubInput } from '@/components/Sliders/ScrubInput'
+import { KeyframeOnRandomizeToggle } from '@/components/Timeline/KeyframeOnRandomizeToggle'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useTimeline } from '@/contexts/TimelineContext'
 import { randomRange } from '@/flame/randomize'
+import { keyframeRandomizedParams } from '@/utils/randomizeKeyframes'
 import { buildReadableIds } from '@/utils/readableIds'
 import { recordEntries } from '@/utils/record'
 import { handleColor } from './FlameColorEditor'
@@ -30,10 +33,14 @@ export function ColorListEditor(props: {
   setSelectedTransformId?: (tid: string | null) => void
 }) {
   const { theme } = useTheme()
+  const timeline = useTimeline()
   const readableIds = createMemo(() => buildReadableIds(props.transforms))
 
   return (
     <div class={ui.container}>
+      <Show when={timeline?.animationEnabled()}>
+        <KeyframeOnRandomizeToggle />
+      </Show>
       <For each={recordEntries(props.transforms)}>
         {([tid, transform]) => {
           const color = () =>
@@ -80,6 +87,10 @@ export function ColorListEditor(props: {
                         y: randomRange(-0.4, 0.4),
                       }
                     })
+                    keyframeRandomizedParams(timeline, [
+                      `transform.${tid}.color.x`,
+                      `transform.${tid}.color.y`,
+                    ])
                   }}
                 />
                 <ResetButton
