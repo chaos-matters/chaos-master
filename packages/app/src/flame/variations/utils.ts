@@ -1006,6 +1006,7 @@ const previewFlames3D: Partial<
         radius: 3.0783846480421624,
         target: [-0.474032998085022, 0, 0.3669804632663727],
         fov: 60,
+        roll: 0,
       }
       draft.transforms[tid]!.preAffine = {
         a: 1,
@@ -1040,6 +1041,7 @@ const previewFlames3D: Partial<
         radius: 9.726998192586759,
         target: [0, 0, 0],
         fov: 60,
+        roll: 0,
       }
     }),
   ),
@@ -1056,6 +1058,7 @@ const previewFlames3D: Partial<
         radius: 2.5632133404321378,
         target: [0, 0, 0],
         fov: 60,
+        roll: 0,
       }
       draft.transforms[tid]!.preAffine = {
         a: 1.3145890408937746,
@@ -1094,6 +1097,7 @@ const previewFlames3D: Partial<
         radius: 3.4,
         target: [0, 0, 0],
         fov: 60,
+        roll: 0,
       }
       draft.transforms[tid]!.preAffine = {
         a: 2.6,

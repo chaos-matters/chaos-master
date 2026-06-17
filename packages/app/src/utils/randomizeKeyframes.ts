@@ -19,7 +19,7 @@ export const [keyframeOnRandomize, setKeyframeOnRandomize] = persistentSignal(
  *  Call AFTER applying the value change so the new values are captured. No-op
  *  when the option is off or there is no timeline. */
 export function keyframeRandomizedParams(
-  timeline: TimelineState | undefined,
+  timeline: TimelineState | null | undefined,
   paths: readonly string[],
 ) {
   if (!timeline || !keyframeOnRandomize()) return

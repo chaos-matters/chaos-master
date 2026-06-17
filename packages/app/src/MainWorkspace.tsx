@@ -66,6 +66,7 @@ import { drawModeToImplFn } from './flame/drawMode'
 import { example1 } from './flame/examples/example1'
 import { example34 } from './flame/examples/example34'
 import { initExample } from './flame/examples/initExample'
+import { tid as toTransformId, vid as toVariationId, } from './flame/examples/util'
 import { Flam3 } from './flame/Flam3'
 import { pointInitModeToImplFn } from './flame/pointInitMode'
 import { pointInitMode3DToImplFn } from './flame/pointInitMode3D'
@@ -3257,8 +3258,8 @@ export function MainWorkspace(props: AppProps) {
                                               setSidebarHidden(false)
                                             }
                                             setQuickPickState({
-                                              tid,
-                                              vid,
+                                              tid: toTransformId(tid),
+                                              vid: toVariationId(vid),
                                               type: variation.type,
                                             })
                                           }}
@@ -3267,8 +3268,8 @@ export function MainWorkspace(props: AppProps) {
                                             showVariationSelector(
                                               deepClone(variation),
                                               deepClone(flameDescriptor),
-                                              tid,
-                                              vid,
+                                              toTransformId(tid),
+                                              toVariationId(vid),
                                               {
                                                 setFlameTheta,
                                                 setFlamePhi,

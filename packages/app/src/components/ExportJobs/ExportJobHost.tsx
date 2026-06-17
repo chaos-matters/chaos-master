@@ -13,6 +13,7 @@ import { compressJsonQueryParam } from '@/utils/jsonQueryParam'
 import { saveRecentFlame } from '@/utils/recentFlames'
 import ui from './ExportJobHost.module.css'
 import { OffscreenAnimationRender } from './OffscreenAnimationRender'
+import type { Vec3 } from 'wgpu-matrix'
 import type { ExportImageType } from '@/App'
 import type { ImageJob } from '@/utils/exportJobs'
 
@@ -85,7 +86,7 @@ function OffscreenRender(props: { job: ImageJob }) {
   const theta = createSignal(c3d.theta)
   const phi = createSignal(c3d.phi)
   const radius = createSignal(c3d.radius)
-  const target = createSignal(new Float32Array(c3d.target))
+  const target = createSignal<Vec3>(new Float32Array(c3d.target))
   const fov = createSignal(c3d.fov)
   const roll = createSignal(c3d.roll ?? 0)
 
