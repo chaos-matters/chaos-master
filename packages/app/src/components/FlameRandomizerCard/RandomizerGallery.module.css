@@ -16,7 +16,13 @@
   opacity: 0.7;
 }
 
-.rerollBtn {
+.galleryActions {
+  display: inline-flex;
+  gap: 0.3rem;
+}
+
+.rerollBtn,
+.advancedBtn {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -33,41 +39,17 @@
     border-color 0.15s ease;
 }
 
-.rerollBtn:hover {
+.rerollBtn:hover,
+.advancedBtn:hover {
   background: rgba(128, 128, 128, 0.12);
+}
+
+.advancedBtn {
+  border-color: var(--accent-color, #6ea8fe);
+  color: var(--accent-color, #6ea8fe);
 }
 
 .rerollIcon {
   width: 13px;
   height: 13px;
-}
-
-.galleryGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.4rem;
-}
-
-.galleryCell {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  padding: 0;
-  border: 1px solid rgba(128, 128, 128, 0.25);
-  border-radius: 0.35rem;
-  overflow: hidden;
-  background: #000;
-  cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    transform 0.1s ease;
-}
-
-.galleryCell:hover {
-  border-color: var(--accent-color, #6ea8fe);
-  transform: scale(1.02);
-}
-
-.galleryCell:active {
-  transform: scale(0.98);
 }

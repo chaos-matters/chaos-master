@@ -10,7 +10,7 @@ import { variationTypes3D } from '@/flame/variations3D'
 import { persistentSignal } from '@/utils/persistentSignal'
 import ui from './FlameRandomizerCard.module.css'
 import { RandomizerGallery } from './RandomizerGallery'
-import type { GenerateRandomFlameConfig } from '@/flame/randomize'
+import type { GenerateRandomFlameConfig, MutateFlameOptions, } from '@/flame/randomize'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TransformVariationType } from '@/flame/variations'
 import type { TransformVariationType3D } from '@/flame/variations3D'
@@ -275,6 +275,13 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
     dimensions: props.flame.renderSettings.dimensions,
   })
 
+  const buildMutationOptions = (): MutateFlameOptions => ({
+    mutateAffine: mutateAffine(),
+    affineMode: affineMode(),
+    mutateVariations: mutateVariations(),
+    mutateColors: mutateColors(),
+  })
+
   const handleGenerate = () => {
     const config = buildConfig()
     props.onGenerateFlame(
@@ -315,12 +322,7 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
         vibrancy: randomizeVibrancy(),
         vibrancyRange: vibrancyRange(),
       },
-      {
-        mutateAffine: mutateAffine(),
-        affineMode: affineMode(),
-        mutateVariations: mutateVariations(),
-        mutateColors: mutateColors(),
-      },
+      buildMutationOptions(),
       recordHistoryOnMutate(),
     )
   }
@@ -874,6 +876,7 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
             <Show when={galleryExpanded()}>
               <RandomizerGallery
                 buildConfig={buildConfig}
+                buildMutationOptions={buildMutationOptions}
                 hardwareTier={props.hardwareTier}
                 onApply={props.onApplyCandidate}
               />
