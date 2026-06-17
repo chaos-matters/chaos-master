@@ -55,7 +55,7 @@ export const sidebarTour: TourGuide = {
       target: '[data-tour-target="auto-keyframe"]',
       title: 'Auto Keyframe Mode',
       description:
-        'When Auto is enabled, any change you make to a property that already has keyframes automatically inserts a new keyframe at the current frame.',
+        'When Auto is enabled, any change to a property that already has keyframes automatically inserts a new keyframe at the current frame. The affine and color editors also offer a "Keyframe on randomize" toggle — one 🎲 randomize then drops keyframes for every changed value at once, perfect for building a flow of colors or shapes frame by frame.',
       beforeShow: (ctx) => ctx.setTimelineOpen(true),
     },
     {

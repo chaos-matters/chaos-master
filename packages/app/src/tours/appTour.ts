@@ -42,7 +42,7 @@ export const appTour: TourGuide = {
       target: '[data-tour-target="export-png"]',
       title: 'Export PNG',
       description:
-        'Save your flame as a high-resolution PNG. Set dimensions, quality, and optionally embed flame data so others can load it.',
+        'Save your flame as a high-resolution PNG. Pick a resolution (1K / 2K / 4K) and an aspect ratio (Auto, 1:1, 16:9, 9:16, 4:3), tune quality, and optionally embed the flame data so others can load it. Exports render in the background — keep working while they finish, then grab them from the Exports panel that appears top-right.',
     },
     {
       target: '[data-tour-target="quick-export"]',
@@ -78,7 +78,7 @@ export const appTour: TourGuide = {
       target: '[data-tour-target="show-timeline"]',
       title: 'Timeline Editor',
       description:
-        'Open the timeline editor at the bottom of the screen to smoothly keyframe transforms and colors over time.',
+        'Open the timeline editor at the bottom of the screen to smoothly keyframe transforms and colors over time. You can export the result as a video — optionally rendered in the background (offscreen) so you can keep working while it encodes.',
     },
     {
       target: '[data-tour-target="adaptive-filter"]',
@@ -90,7 +90,7 @@ export const appTour: TourGuide = {
       target: '[data-tour-target="quality-presets"]',
       title: 'Quality Presets',
       description:
-        'Quickly switch rendering quality limits. Higher quality resolves more detail and reduces noise, but takes longer to compute.',
+        'Quickly switch rendering quality limits. Higher quality resolves more detail and reduces noise, but takes longer to compute. Nearby you can also switch a flame between 2D and 3D, and (in 3D) enter Fly mode — WASD/arrows to move, Space/C for up/down, Q/E to roll.',
     },
   ],
 }
