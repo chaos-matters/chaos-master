@@ -57,6 +57,14 @@ export function AngleEditor(props: AngleEditorProps) {
           }}
           formatValue={formatDegrees}
           dataParameterPath={props.dataParameterPath}
+          // Compact sidebar path: keep the tour/keyframe target (e.g.
+          // "angle-rotation") that the full/inline tracks also expose, so
+          // creation tours can find the angle control here too.
+          data-tour-target={
+            props.dataParameterPath
+              ? `angle-${props.dataParameterPath.split('.').pop()}`
+              : undefined
+          }
         />
       }
     >
