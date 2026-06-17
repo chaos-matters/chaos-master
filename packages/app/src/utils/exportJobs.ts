@@ -88,6 +88,9 @@ export type AnimationJob = JobCommon &
       frame: number
       totalFrames: number
       phase: 'rendering' | 'encoding'
+      /** Point progress within the frame currently rendering. */
+      currentPoints: number
+      targetPoints: number
     }
   }
 
@@ -128,7 +131,13 @@ export function enqueueAnimationJob(spec: AnimationJobSpec): string {
       id,
       type: 'animation',
       status: 'queued',
-      progress: { frame: 0, totalFrames, phase: 'rendering' },
+      progress: {
+        frame: 0,
+        totalFrames,
+        phase: 'rendering',
+        currentPoints: 0,
+        targetPoints: 0,
+      },
       startedAt: globalThis.performance.now(),
       forceExport: false,
     },
@@ -164,7 +173,34 @@ export function setAnimationJobProgress(
     'items',
     (j) => j.id === id,
     produce((j) => {
-      if (j.type === 'animation') j.progress = { frame, totalFrames, phase }
+      if (j.type === 'animation') {
+        // Frame/phase change resets the per-frame point progress.
+        j.progress = {
+          frame,
+          totalFrames,
+          phase,
+          currentPoints: 0,
+          targetPoints: 0,
+        }
+      }
+    }),
+  )
+}
+
+/** Per-frame point progress for the animation frame currently rendering. */
+export function setAnimationJobPoints(
+  id: string,
+  currentPoints: number,
+  targetPoints: number,
+) {
+  setStore(
+    'items',
+    (j) => j.id === id,
+    produce((j) => {
+      if (j.type === 'animation') {
+        j.progress.currentPoints = currentPoints
+        j.progress.targetPoints = targetPoints
+      }
     }),
   )
 }

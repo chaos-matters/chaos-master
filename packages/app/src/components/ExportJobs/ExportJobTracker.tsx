@@ -82,6 +82,19 @@ function JobCard(props: { job: ExportJob }) {
     return formatEta(remaining / speed)
   })
 
+  // Per-frame point progress for animation, so a long single frame still shows
+  // movement (mirrors the live render's points readout).
+  const framePts = createMemo(() => {
+    if (job.type !== 'animation' || job.status !== 'rendering') return null
+    const { currentPoints, targetPoints, phase } = job.progress
+    if (phase !== 'rendering' || targetPoints <= 0) return null
+    return {
+      current: currentPoints,
+      target: targetPoints,
+      pct: Math.min(100, (currentPoints / targetPoints) * 100),
+    }
+  })
+
   const isAnim = job.type === 'animation'
   const is3D = (job.flame.renderSettings.dimensions ?? 2) === 3
   const fileName = () =>
@@ -115,6 +128,17 @@ function JobCard(props: { job: ExportJob }) {
           <span>{stats()}</span>
           <span>{pct().toFixed(0)}%</span>
         </div>
+        <Show when={framePts()} keyed>
+          {(fp) => (
+            <div class={ui.subStats}>
+              <span>
+                {formatPointCount(fp.current)} / {formatPointCount(fp.target)}{' '}
+                pts
+              </span>
+              <span>{fp.pct.toFixed(0)}% frame</span>
+            </div>
+          )}
+        </Show>
         <div class={ui.track}>
           <div class={ui.fill} style={{ width: `${pct()}%` }} />
         </div>

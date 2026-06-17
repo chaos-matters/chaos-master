@@ -125,6 +125,14 @@
   font-variant-numeric: tabular-nums;
 }
 
+.subStats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6rem;
+  color: var(--color-text-secondary, #777);
+  font-variant-numeric: tabular-nums;
+}
+
 .track {
   width: 100%;
   height: 5px;

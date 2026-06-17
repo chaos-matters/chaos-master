@@ -7,7 +7,7 @@ import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
 import { deepClone } from '@/utils/clone'
-import { dismissJob, jobExists, setAnimationJobProgress, setJobError, setJobResult, } from '@/utils/exportJobs'
+import { dismissJob, jobExists, setAnimationJobPoints, setAnimationJobProgress, setJobError, setJobResult, } from '@/utils/exportJobs'
 import { createMetadataPayload, injectMetadataIntoMp4, } from '@/utils/flameInMp4'
 import { applyTracksToFlame } from '@/utils/timeline'
 import { createVideoEncoder } from '@/utils/videoEncoder'
@@ -77,6 +77,8 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
   let finishing = false
   let disposed = false
   let lastProgressMs = 0
+  let accumulated = 0
+  let limitAccessor: () => number = () => 0
   let encoder: Awaited<ReturnType<typeof createVideoEncoder>> | undefined
 
   onCleanup(() => {
@@ -162,10 +164,11 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
   const handleExport: ExportImageType = (canvas, info) => {
     if (disposed || capturing || finishing || !encoder) return
 
+    // Per-frame point progress, so a long single frame still shows movement.
     const now = globalThis.performance.now()
     if (now - lastProgressMs >= PROGRESS_THROTTLE_MS) {
       lastProgressMs = now
-      setAnimationJobProgress(job.id, frameIndex, totalRenders, 'rendering')
+      setAnimationJobPoints(job.id, accumulated, limitAccessor())
     }
 
     // "Stop & Save": finalize with the frames rendered so far (or cancel if none).
@@ -236,7 +239,12 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
               edgeFadeColor={vec4f(0)}
               palette={() => job.palette}
               onExportImage={handleExport}
-              onAccumulatedPointCount={() => {}}
+              onAccumulatedPointCount={(c) => {
+                accumulated = c
+              }}
+              setQualityPointCountLimit={(fn) => {
+                limitAccessor = fn
+              }}
             />
           </WheelZoomCamera3D>
         </Show>
