@@ -69,19 +69,39 @@
   pointer-events: all;
 }
 
-/* Selection: dim the non-selected handles as a visual cue and emphasize the
-   selected one. Dimmed handles stay interactive so clicking one selects it. */
-.handle.dimmed {
+/* Selection: non-selected transforms are de-emphasized by dimming their
+   box/arrows/lines strongly, while the centre dot stays fully opaque and on top
+   (it's the click target to select them). */
+.handle-box.dimmed {
+  opacity: 0.22;
+  transition: opacity 150ms;
+}
+
+.box3d.dimmed > line,
+.box3d.dimmed > circle {
   opacity: 0.3;
   transition: opacity 150ms;
 }
 
-/* Transform is hidden (eye toggle off): strongly fade its affine handle and
-   make it non-interactive, so it's clear it isn't contributing to the flame. */
+/* A non-selected (dimmed) transform's box/arrow (2D) and end-handle (3D) scale/
+   rotate grips are not grabbable — so while one transform is selected you can't
+   accidentally scale/rotate another. Its centre dot stays grabbable, so a click
+   there selects (and can move) it and then its grips become active. */
+.handle-box.dimmed .handle-box-grab-area {
+  pointer-events: none;
+  cursor: default;
+}
+
+.box3d.dimmed > circle {
+  pointer-events: none;
+  cursor: default;
+}
+
+/* Transform is hidden (eye toggle off): its handles are not rendered at all
+   (see AffineHandle). Kept for the class reference. */
 .handle.hidden {
   opacity: 0.18;
   pointer-events: none;
-  transition: opacity 150ms;
 }
 
 .handle.selected .handle-circle {
