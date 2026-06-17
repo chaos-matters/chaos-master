@@ -68,6 +68,9 @@ type JobCommon = {
   /** Set via requestJobForceExport — capture/finalize at the current state
    *  ("Stop & Export" / "Stop & Save"). */
   forceExport: boolean
+  /** True once the render is done and the file is being captured/encoded — the
+   *  tracker shows "Finalizing…" and hides the stop action so it can't re-fire. */
+  finalizing?: boolean
   result?: JobResult
   /** Set once the user has downloaded the finished result — drives the
    *  before-unload "you have undownloaded exports" guard. */
@@ -217,6 +220,10 @@ export function setJobError(id: string, error: string) {
 
 export function requestJobForceExport(id: string) {
   setStore('items', (j) => j.id === id, 'forceExport', true)
+}
+
+export function setJobFinalizing(id: string) {
+  setStore('items', (j) => j.id === id, 'finalizing', true)
 }
 
 export function jobExists(id: string): boolean {

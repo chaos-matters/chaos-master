@@ -7,7 +7,7 @@ import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
-import { exportJobs, hasPendingExportJobs, jobExists, setImageJobProgress, setJobError, setJobResult, setJobStatus, } from '@/utils/exportJobs'
+import { exportJobs, hasPendingExportJobs, jobExists, setImageJobProgress, setJobError, setJobFinalizing, setJobResult, setJobStatus, } from '@/utils/exportJobs'
 import { addFlameDataToPng } from '@/utils/flameInPng'
 import { compressJsonQueryParam } from '@/utils/jsonQueryParam'
 import { saveRecentFlame } from '@/utils/recentFlames'
@@ -140,6 +140,7 @@ function OffscreenRender(props: { job: ImageJob }) {
     // reached), or immediately on a "Stop & Export" request.
     if (!props.job.forceExport && info?.finalImageReady !== true) return
     captured = true
+    setJobFinalizing(job.id)
     void finalize(canvas).catch((err: unknown) => {
       setJobError(job.id, err instanceof Error ? err.message : String(err))
     })

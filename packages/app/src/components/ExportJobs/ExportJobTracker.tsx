@@ -101,6 +101,17 @@ function JobCard(props: { job: ExportJob }) {
     }
   })
 
+  // Capturing the still / encoding the video after the render finishes. While
+  // this runs the stop action is hidden (shown as "Finalizing…") so it can't be
+  // clicked again and there's clear feedback that work is still happening.
+  const isFinalizing = createMemo(
+    () =>
+      job.forceExport ||
+      (job.type === 'animation'
+        ? job.progress.phase === 'encoding'
+        : !!job.finalizing),
+  )
+
   const isAnim = job.type === 'animation'
   const is3D = (job.flame.renderSettings.dimensions ?? 2) === 3
   const fileName = () =>
@@ -149,22 +160,31 @@ function JobCard(props: { job: ExportJob }) {
           <div class={ui.fill} style={{ width: `${pct()}%` }} />
         </div>
         <div class={ui.footer}>
-          <span class={ui.eta}>{eta()}</span>
-          <ExportActions
-            onStop={() => {
-              requestJobForceExport(job.id)
-            }}
-            stopLabel={isAnim ? 'Stop & Save' : 'Stop & Export'}
-            stopTitle={
-              isAnim
-                ? 'Stop and save the video with the frames rendered so far'
-                : 'Stop rendering and export at the current quality'
+          <Show
+            when={isFinalizing()}
+            fallback={
+              <>
+                <span class={ui.eta}>{eta()}</span>
+                <ExportActions
+                  onStop={() => {
+                    requestJobForceExport(job.id)
+                  }}
+                  stopLabel={isAnim ? 'Stop & Save' : 'Stop & Export'}
+                  stopTitle={
+                    isAnim
+                      ? 'Stop and save the video with the frames rendered so far'
+                      : 'Stop rendering and export at the current quality'
+                  }
+                  onCancel={() => {
+                    dismissJob(job.id)
+                  }}
+                  cancelTitle="Cancel and discard this export"
+                />
+              </>
             }
-            onCancel={() => {
-              dismissJob(job.id)
-            }}
-            cancelTitle="Cancel and discard this export"
-          />
+          >
+            <span class={ui.muted}>Finalizing…</span>
+          </Show>
         </div>
       </Show>
 

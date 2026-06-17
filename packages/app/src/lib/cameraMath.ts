@@ -20,9 +20,15 @@ export function cameraBasis(
   roll: number,
 ): { forward: Vec3; right: Vec3; up: Vec3 } {
   const f = vec3.normalize(forward)
-  const upRef =
-    Math.abs(vec3.dot(f, WORLD_UP)) > 0.999 ? WORLD_UP_FALLBACK : WORLD_UP
-  const right0 = vec3.normalize(vec3.cross(f, upRef))
+  // right = forward × world-up. Only fall back to an alternate reference when
+  // that cross product is essentially zero (forward almost exactly parallel to
+  // world-up — i.e. looking straight up/down). A looser threshold would flip the
+  // up vector a few degrees off the pole and make the view "clap" mid-orbit.
+  let rightRaw = vec3.cross(f, WORLD_UP)
+  if (vec3.length(rightRaw) < 1e-4) {
+    rightRaw = vec3.cross(f, WORLD_UP_FALLBACK)
+  }
+  const right0 = vec3.normalize(rightRaw)
   const up0 = vec3.normalize(vec3.cross(right0, f))
   const c = Math.cos(roll)
   const s = Math.sin(roll)
