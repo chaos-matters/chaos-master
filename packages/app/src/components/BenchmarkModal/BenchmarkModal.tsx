@@ -7,6 +7,7 @@ import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
 import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
+import { getWebglRenderer } from '@/utils/deviceInfo'
 import { formatBytes } from '@/utils/formatBytes'
 import { GIT_SHA, VERSION } from '@/version'
 import { useRequestModal } from '../Modal/ModalContext'
@@ -62,6 +63,8 @@ async function getGPUDeviceInformation() {
     description: info.description,
     vendor: info.vendor,
     architecture: info.architecture,
+    // Fallback for browsers (Firefox) that return empty adapter.info.
+    renderer: getWebglRenderer(),
     maxBufferSize: limits.maxBufferSize,
     heaps,
   }
@@ -79,8 +82,9 @@ function gatherBenchmarkLog(
   lines.push(`Version  : ${VERSION}${GIT_SHA ? ` (${GIT_SHA})` : ''}`)
 
   if (gpuInfo) {
-    if (gpuInfo.description) lines.push(`GPU      : ${gpuInfo.description}`)
-    lines.push(`Vendor   : ${gpuInfo.vendor}`)
+    const gpuName = gpuInfo.description || gpuInfo.renderer
+    if (gpuName) lines.push(`GPU      : ${gpuName}`)
+    if (gpuInfo.vendor) lines.push(`Vendor   : ${gpuInfo.vendor}`)
     if (gpuInfo.architecture) lines.push(`Arch     : ${gpuInfo.architecture}`)
     if (gpuInfo.heaps) {
       lines.push(
@@ -388,8 +392,8 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
 
     const devices: { label: string; value: string; color: 'green' | 'blue' }[] =
       []
-    if (info?.description)
-      devices.push({ label: 'GPU', value: info.description, color: 'green' })
+    const gpuName = info?.description || info?.renderer
+    if (gpuName) devices.push({ label: 'GPU', value: gpuName, color: 'green' })
     if (info?.vendor)
       devices.push({ label: 'Vendor', value: info.vendor, color: 'blue' })
     if (info?.architecture)
@@ -694,18 +698,20 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
                 value: string
                 color: 'green' | 'blue'
               }[] = []
-              if (deviceInfo.description !== '') {
+              const deviceName = deviceInfo.description || deviceInfo.renderer
+              if (deviceName) {
                 rows.push({
                   label: 'Device',
-                  value: deviceInfo.description,
+                  value: deviceName,
                   color: 'green',
                 })
               }
-              rows.push({
-                label: 'Vendor',
-                value: deviceInfo.vendor,
-                color: 'blue',
-              })
+              if (deviceInfo.vendor !== '')
+                rows.push({
+                  label: 'Vendor',
+                  value: deviceInfo.vendor,
+                  color: 'blue',
+                })
               if (deviceInfo.architecture !== '') {
                 rows.push({
                   label: 'Architecture',
