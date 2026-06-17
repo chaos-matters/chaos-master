@@ -5,40 +5,71 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.6] - 2026-06-17
+
+### Added
+
+- **Background exports**: image and (opt-in) animation exports render in the background, so you can keep editing while they finish. A top-right Exports panel tracks each job with progress, 2D/3D and file-type badges, and frame count, plus **Stop & Save** and **Cancel**.
+- **Export resolution & aspect ratio**: pick 1K / 2K / 4K and an aspect ratio (Auto, 1:1, 16:9, 9:16, 4:3) for both image and video exports.
+- **Fly-mode roll & free flight**: in 3D fly mode, **Q/E** roll the camera and **Space/C** move up/down, for full six-degrees-of-freedom navigation.
+- **Live FPS readout** while playing the timeline in Auto FPS mode.
+- **Keyframe on randomize**: an opt-in toggle in the colour and affine editors so a single randomize keyframes every changed value at once.
+- **Deselect a transform** by right-clicking (or long-pressing on touch) its affine handle.
+- **GPU details on Firefox**: the device panels now show your GPU on Firefox.
+
+### Changed
+
+- **Stable transform order**: transforms stay put — new ones appear at the bottom, and undo restores an item to its original place.
+- **Clearer animation button**: a distinct icon and tooltip for each state (enable / pause / disable).
+- **Expanded guided tours** covering the timeline, Point Batch, symmetry, randomizer, metadata, 2D/3D and fly mode — with every step landing on the right control.
+- **Protected transforms**: editing a selected transform no longer disturbs the others, with clearer affine handle states.
+
+### Fixed
+
+- **Timeline scrubbing on tablets** no longer loses the touch and stops partway.
+- **Pause stays clickable during playback**, and the dope sheet stays readable while playing.
+- **2D and 3D keyframes stay separate** when switching a flame between 2D and 3D.
+- **3D export fixes**: 3D flames export correctly, and the orbit "clap" near the poles is gone.
+- **Export progress** no longer flickers, and **Stop & Export** can't be double-clicked while a job finalizes.
+- **About panel** layout on mobile.
+- **More variation thumbnails** render visibly (framing and brightness fixes).
+- **Safer flame loading** for older and 3D saved flames.
+
+### Security
+
+- Patched the **esbuild** and **ws** advisories.
+
 ## [0.9.5] - 2026-06-16
 
 ### Performance
 
-- **Plot every iteration after warmup**: the chaos game now records every iteration once a chain has settled instead of advancing several steps between plotted points, so the warmup/fuse cost is amortized across the whole batch. Measured throughput on the reference flame rose from ~5 B/s to ~17 B/s (~3.4×). The per-chain batch size is exposed as the **Point Batch** setting and the `VITE_PLOTS_PER_CHAIN` env var.
-- **Persisted chain state across dispatches**: each chain's position and color are carried over between compute dispatches so the warmup/fuse is paid once per settle rather than on every dispatch. A periodic re-seed (`VITE_PERSIST_RESEED_INTERVAL`) restarts chains on an interval to keep the sampling stationary and avoid drift off the invariant measure.
-- **Atomic-overflow guard**: hot accumulation buckets are clamped so the brightest regions can no longer overflow their atomic counters into garbage/dark pixels.
-- **Benchmark accuracy**: the benchmark now renders at 1024² so bucket saturation no longer inflates the reported M/s.
+- **~3.4× faster rendering**: flames now resolve much faster (about 5 → 17 billion points/sec on the reference flame) by plotting every iteration after warmup and reusing work between passes. Tune it with the new **Point Batch** setting.
+- The brightest regions no longer overflow into dark or garbage pixels.
 
 ### Added
 
-- **Point Batch render setting** (timeline-animatable slider): controls how many iterations each chain plots per batch. The default (16) keeps the throughput optimization; setting it to 1 restores the classic behaviour where **Skip Iterations** alone governs how converged the plotted points are.
-- **3D auto-exposure**: a toggle and **Strength** slider next to Exposure (3D only) that damp exposure as you zoom in, so close-range 3D flames no longer blow out. It drives the real Exposure value and re-bases to whatever exposure you set manually at the current zoom.
-- **Mitchell–Netravali stochastic resampling filter** (2D and 3D), toggled from the action widget (now shown as a kernel-curve icon).
-- **Transform selection highlight**: a transform's header colour swatch selects/deselects it and dims the rest, consistently across the affine grid, the colour picker, the sidebar cards and the affine/colour scrub list views; `Esc` clears the selection.
-- **Colour editor grid/list toggle** and a timeline-animatable per-transform colour scrub view; the randomizer can now animate per-transform colours, not just the palette.
-- **Blended flame in the Export image/PNG modal preview**, so the preview matches the exported result.
-- **Benchmark UX**: small/medium/large flame selector, 10B/50B/100B achievement badges, and download-as-PNG.
+- **Point Batch** render setting (animatable): how many points each chain plots per batch — set it to 1 for the classic behaviour.
+- **3D auto-exposure**: a toggle and **Strength** slider that keep close-range 3D flames from blowing out as you zoom in.
+- **Mitchell–Netravali filter** (2D and 3D) for sharper resampling, toggled from the action widget.
+- **Transform selection**: click a transform's colour swatch to select it and dim the rest; `Esc` clears it.
+- **Colour editor grid/list views** and animatable per-transform colours — the randomizer can animate colours too, not just the palette.
+- **Export preview shows the blended flame**, so it matches the result.
+- **Benchmark**: small/medium/large flame selector, achievement badges, and save-as-PNG.
 
 ### Changed
 
-- **Action-widget row regrouped** with subtle faded dividers (`[animation, timeline] | [MN, adaptive blur] | [3D, fly] | randomizers`) and clearer tooltips.
-- **Randomize transform colour** now draws a uniform OkLab hue, so every hue is equally likely; it previously biased toward red/orange and often landed out of gamut.
-- **Variation previews**: brighter exposure/gamma floor, env-driven sampling for crisper thumbnails, and tuned previews for the math, corners and circus variations.
-- **3D orbit zoom floor**: the orbit radius is clamped to a named `MIN_ORBIT_RADIUS` (0.02) — use fly mode to inspect a flame more closely than that. The 3D density/quality normalization radius is floored at `MIN_DENSITY_NORM_RADIUS` so extreme zoom can no longer blow out brightness.
+- **Action-widget row regrouped** with clearer tooltips.
+- **Randomize transform colour** now picks any hue evenly (it used to lean toward red/orange).
+- **Variation thumbnails** are brighter and crisper.
+- **3D zoom floor**: orbit zoom is clamped (use fly mode to go closer) so extreme zoom can't blow out brightness.
 
 ### Fixed
 
-- **Progressive darkening** of slow-mixing (few-transform) flames as points accumulated: chains drifting off the invariant measure under persistence are now bounded by the periodic re-seed.
-- **3D final transform collapsing into a "pancake"** when its affine handle was dragged (2D-identity default plus 2D→3D coefficient promotion in the drag handlers).
-- **Variation previews** rendering with no colour, contracting / losing their shape during accumulation, or appearing dark / invisible.
-- **Quick-variation gallery losing all preview thumbnails** when a category filter was applied.
-- **Colour editor**: wheel-handle NaN guard on view toggle, grid/list toggle positioning, and floating-toolbar cleanup in the list views.
-- **Use-after-destroy** when signalling the accumulated point count after submit.
+- Slow-mixing flames no longer darken as they keep rendering.
+- The 3D final transform no longer collapses into a flat "pancake" when its handle is dragged.
+- Variation thumbnails no longer render colourless, shrinking, or invisible.
+- The quick-variation gallery keeps its thumbnails when a category filter is applied.
+- Colour editor: handle NaN guard, grid/list toggle placement, and toolbar cleanup.
 
 ## [0.9.4] - 2026-06-13
 
