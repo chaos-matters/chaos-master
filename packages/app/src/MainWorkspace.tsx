@@ -27,6 +27,7 @@ import { DebugOverlay } from './components/DebugOverlay'
 import { DiceButton } from './components/DiceButton/DiceButton'
 import { createDiscordShareModal } from './components/DiscordShareModal/DiscordShareModal'
 import { Dropzone } from './components/Dropzone/Dropzone'
+import { ExportActions } from './components/ExportJobs/ExportActions'
 import { ExportJobHost } from './components/ExportJobs/ExportJobHost'
 import { ExportJobTracker } from './components/ExportJobs/ExportJobTracker'
 import { createExportPngDialog } from './components/ExportPngDialog/ExportPngDialog'
@@ -2744,28 +2745,24 @@ export function MainWorkspace(props: AppProps) {
                       : 'Tap to stop animation'}
                   </span>
                   <Show when={animationExportRunning()}>
-                    <div class={ui.overlayActions}>
-                      <button
-                        class={ui.overlayStopAndSaveButton}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setForceAnimationExportNow(true)
-                        }}
-                        title="Stop after current frame and save"
-                      >
-                        Stop & Save
-                      </button>
-                      <button
-                        class={ui.overlayCancelButton}
-                        onClick={(e) => {
-                          e.stopPropagation()
+                    {/* Stop the click from bubbling to the overlay's
+                        tap-to-stop-playback handler. */}
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation()
+                      }}
+                    >
+                      <ExportActions
+                        variant="overlay"
+                        stopLabel="Stop & Save"
+                        stopTitle="Stop after current frame and save"
+                        onStop={() => setForceAnimationExportNow(true)}
+                        cancelTitle="Cancel and discard"
+                        onCancel={() => {
                           const cancelFn = animationExportCancel()
                           if (cancelFn) cancelFn()
                         }}
-                        title="Cancel and discard"
-                      >
-                        Cancel
-                      </button>
+                      />
                     </div>
                   </Show>
                 </div>

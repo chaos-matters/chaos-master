@@ -380,48 +380,6 @@
   pointer-events: none;
 }
 
-.overlayActions {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-  pointer-events: auto;
-}
-
-.overlayStopAndSaveButton,
-.overlayCancelButton {
-  appearance: none;
-  padding: 0.4rem 0.8rem;
-  border-radius: 6px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.overlayStopAndSaveButton {
-  background: rgba(59, 130, 246, 0.3);
-  color: #93bbfd;
-  border: 1px solid rgba(59, 130, 246, 0.35);
-}
-
-.overlayStopAndSaveButton:hover {
-  background: rgba(59, 130, 246, 0.5);
-  border-color: rgba(59, 130, 246, 0.6);
-}
-
-.overlayCancelButton {
-  background: rgba(239, 68, 68, 0.2);
-  color: #f87171;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-}
-
-.overlayCancelButton:hover {
-  background: rgba(239, 68, 68, 0.35);
-  border-color: rgba(239, 68, 68, 0.45);
-}
-
 .no-select {
   user-select: none;
   -webkit-user-select: none;
