@@ -13,7 +13,14 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
  */
 
 type Dimensions = { width: number; height: number }
-type JobResult = { blobUrl: string; width: number; height: number }
+type JobResult = {
+  blobUrl: string
+  width: number
+  height: number
+  /** Animation only: number of frames actually encoded (may be < total if the
+   *  user used Stop & Save). */
+  frames?: number
+}
 
 /** Everything needed to render one image export, snapshotted at enqueue time so
  *  later edits to the workspace flame don't affect an in-flight job. */

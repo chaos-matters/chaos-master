@@ -122,6 +122,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
         blobUrl: URL.createObjectURL(blob),
         width: resizeWidth,
         height: resizeHeight,
+        frames: frameIndex,
       })
     } catch (err) {
       setJobError(job.id, err instanceof Error ? err.message : String(err))

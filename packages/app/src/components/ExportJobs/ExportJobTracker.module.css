@@ -159,13 +159,43 @@
   align-items: center;
 }
 
+.thumbWrap {
+  position: relative;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
 .thumb {
   width: 56px;
   height: 56px;
   object-fit: contain;
   border-radius: 0.3rem;
   background: #000;
-  flex-shrink: 0;
+  display: block;
+}
+
+.typeBadge,
+.dimBadge {
+  position: absolute;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.52rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+}
+
+.typeBadge {
+  bottom: 3px;
+  right: 3px;
+}
+
+.dimBadge {
+  top: 3px;
+  left: 3px;
 }
 
 .doneInfo {

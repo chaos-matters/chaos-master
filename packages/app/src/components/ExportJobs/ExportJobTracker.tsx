@@ -83,6 +83,7 @@ function JobCard(props: { job: ExportJob }) {
   })
 
   const isAnim = job.type === 'animation'
+  const is3D = (job.flame.renderSettings.dimensions ?? 2) === 3
   const fileName = () =>
     `${job.name?.trim() || 'flame'}.${isAnim ? 'mp4' : 'png'}`
 
@@ -140,18 +141,31 @@ function JobCard(props: { job: ExportJob }) {
       <Show when={job.status === 'done' && job.result} keyed>
         {(result) => (
           <div class={ui.doneRow}>
-            <Show
-              when={isAnim}
-              fallback={
-                <img class={ui.thumb} src={result.blobUrl} alt={job.name} />
-              }
-            >
-              <video class={ui.thumb} src={result.blobUrl} muted playsinline />
-            </Show>
+            <div class={ui.thumbWrap}>
+              <Show
+                when={isAnim}
+                fallback={
+                  <img class={ui.thumb} src={result.blobUrl} alt={job.name} />
+                }
+              >
+                <video
+                  class={ui.thumb}
+                  src={result.blobUrl}
+                  muted
+                  playsinline
+                />
+              </Show>
+              <span class={ui.dimBadge}>{is3D ? '3D' : '2D'}</span>
+              <span class={ui.typeBadge}>{isAnim ? 'MP4' : 'PNG'}</span>
+            </div>
             <div class={ui.doneInfo}>
               <span class={ui.muted}>
                 {result.width} &times; {result.height}
                 {isAnim ? '' : ' px'}
+                <Show when={isAnim && result.frames}>
+                  {' · '}
+                  {result.frames} frames
+                </Show>
               </span>
               <a
                 class={ui.download}
