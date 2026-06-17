@@ -100,9 +100,13 @@ export const pixelFlowVar = parametricVariation(
     let blocky = i32(floor(pos.y * P.width))
     blocky = blocky + i32(2.0 - 4.0 * pixel_flow_hash(blocky * seedI + 1))
 
+    // `seedI >> 1` keeps the halving in integer space (matching JWildFire's
+    // int `seedI / 2`). Writing `seedI / 2` makes the transpiler pick float
+    // division, which promotes blockx/blocky to f32 and then implicitly converts
+    // the result back to i32 for the hash — both warn and lose integer exactness.
     const fLen =
       (pixel_flow_hash(blocky + blockx * -seedI) +
-        pixel_flow_hash(blockx + blocky * (seedI / 2))) *
+        pixel_flow_hash(blockx + blocky * (seedI >> u32(1)))) *
       0.5
 
     // Deterministic stand-in for pContext.random(): hash a fine sub-block cell
