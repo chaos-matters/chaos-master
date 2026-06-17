@@ -19,12 +19,15 @@ export function CollapsibleCard(
      *  visibility / delete). Their click handlers must stopPropagation so they
      *  don't also toggle the card. */
     headerActions?: JSX.Element
+    /** Tour anchor on the card root (present even while collapsed). */
+    'data-tour-target'?: string
   }>,
 ) {
   const [isOpen, setIsOpen] = createSignal(props.defaultOpen ?? true)
   return (
     <div
       class={ui.card}
+      data-tour-target={props['data-tour-target']}
       style={
         props.accentColor ? { '--accent-color': props.accentColor } : undefined
       }

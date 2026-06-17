@@ -90,7 +90,17 @@ export const appTour: TourGuide = {
       target: '[data-tour-target="quality-presets"]',
       title: 'Quality Presets',
       description:
-        'Quickly switch rendering quality limits. Higher quality resolves more detail and reduces noise, but takes longer to compute. Nearby you can also switch a flame between 2D and 3D, and (in 3D) enter Fly mode — WASD/arrows to move, Space/C for up/down, Q/E to roll.',
+        'Quickly switch rendering quality limits. Higher quality resolves more detail and reduces noise, but takes longer to compute. Nearby you can also switch a flame between 2D and 3D, and (in 3D) enter Fly mode — WASD/arrows to move, Space/C for up/down, Q/E to roll. In 3D you can also enable "Auto exposure on zoom" so brightness stays consistent as you fly closer or further from the flame.',
+    },
+    {
+      target: '[data-tour-target="pointBatch-slider"]',
+      title: 'Point Batch (Performance)',
+      description:
+        'The renderer accumulates points in batched chains for speed. Point Batch sets how many points each chain plots per dispatch — raise it to resolve detail faster on a strong GPU, lower it to keep the camera responsive on slower hardware. Found in the sidebar’s Render settings.',
+      beforeShow: (ctx) => {
+        ctx.setSidebarOpen(true)
+        ctx.scrollToTarget('[data-tour-target="pointBatch-slider"]')
+      },
     },
   ],
 }

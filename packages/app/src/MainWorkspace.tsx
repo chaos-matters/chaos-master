@@ -3077,7 +3077,10 @@ export function MainWorkspace(props: AppProps) {
                             </button>
                           </CollapsibleCard>
                         </Show>
-                        <div ref={randomizerCardRef}>
+                        <div
+                          ref={randomizerCardRef}
+                          data-tour-target="randomizer-card"
+                        >
                           <FlameRandomizerCard
                             flame={flameDescriptor}
                             historyEntries={randomizerHistory()}
@@ -3711,6 +3714,7 @@ export function MainWorkspace(props: AppProps) {
                           </button>
                           <button
                             class={ui.addFlameButton}
+                            data-tour-target="add-symmetry"
                             disabled={symTransforms().length > 0}
                             title={
                               symTransforms().length > 0
@@ -3764,6 +3768,7 @@ export function MainWorkspace(props: AppProps) {
                               >
                                 <Slider
                                   label="Point Batch"
+                                  data-tour-target="pointBatch-slider"
                                   value={
                                     flameDescriptor.renderSettings.plotsPerChain
                                   }
@@ -4419,7 +4424,11 @@ export function MainWorkspace(props: AppProps) {
                             </div>
                           </Card>
                         </CollapsibleCard>
-                        <CollapsibleCard title="Metadata" defaultOpen={false}>
+                        <CollapsibleCard
+                          title="Metadata"
+                          defaultOpen={false}
+                          data-tour-target="metadata-card"
+                        >
                           <Card>
                             <div
                               style={{
