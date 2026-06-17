@@ -39,6 +39,9 @@ export type ExportJob = ImageJobSpec & {
    *  Export"). */
   forceExport: boolean
   result?: { blobUrl: string; width: number; height: number }
+  /** Set once the user has downloaded the finished result — drives the
+   *  before-unload "you have undownloaded exports" guard. */
+  downloaded?: boolean
   error?: string
 }
 
@@ -93,6 +96,21 @@ export function requestJobForceExport(id: string) {
 
 export function jobExists(id: string): boolean {
   return store.items.some((j) => j.id === id)
+}
+
+export function markJobDownloaded(id: string) {
+  setStore('items', (j) => j.id === id, 'downloaded', true)
+}
+
+/** True while there is work the user likely doesn't want to lose on reload: a
+ *  job still rendering/queued, or a finished one they haven't downloaded yet. */
+export function hasPendingExportJobs(): boolean {
+  return store.items.some(
+    (j) =>
+      j.status === 'queued' ||
+      j.status === 'rendering' ||
+      (j.status === 'done' && !j.downloaded),
+  )
 }
 
 /**

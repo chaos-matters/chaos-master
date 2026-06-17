@@ -43,8 +43,7 @@ export function ExportFormatCard(props: ExportFormatCardProps) {
                 }}
                 title={`${res.value}px on the longest edge`}
               >
-                <span class={ui.cardLabel}>{res.label}</span>
-                <span class={ui.cardSub}>{res.value}px</span>
+                {res.label}
               </button>
             )}
           </For>
@@ -66,7 +65,7 @@ export function ExportFormatCard(props: ExportFormatCardProps) {
                   props.onAspectChange(asp.key)
                 }}
               >
-                <span class={ui.cardLabel}>{asp.label}</span>
+                {asp.label}
               </button>
             )}
           </For>

@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, onCleanup, Show, } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
 import { DEFAULT_POINT_COUNT } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
@@ -7,7 +7,7 @@ import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
-import { exportJobs, jobExists, setJobError, setJobProgress, setJobResult, setJobStatus, } from '@/utils/exportJobs'
+import { exportJobs, hasPendingExportJobs, jobExists, setJobError, setJobProgress, setJobResult, setJobStatus, } from '@/utils/exportJobs'
 import { addFlameDataToPng } from '@/utils/flameInPng'
 import { compressJsonQueryParam } from '@/utils/jsonQueryParam'
 import { saveRecentFlame } from '@/utils/recentFlames'
@@ -34,6 +34,20 @@ export function ExportJobHost() {
     if (job && job.status === 'queued') {
       setJobStatus(job.id, 'rendering')
     }
+  })
+
+  // Warn before leaving if exports are still rendering or finished-but-not-yet
+  // downloaded — the results live only in memory and would be lost on reload.
+  const beforeUnload = (e: BeforeUnloadEvent) => {
+    // preventDefault() is the modern way to trigger the browser's "leave site?"
+    // prompt (the legacy event.returnValue is deprecated).
+    if (hasPendingExportJobs()) {
+      e.preventDefault()
+    }
+  }
+  window.addEventListener('beforeunload', beforeUnload)
+  onCleanup(() => {
+    window.removeEventListener('beforeunload', beforeUnload)
   })
 
   return (

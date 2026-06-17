@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
-import { dismissJob, exportJobs, requestJobForceExport, } from '@/utils/exportJobs'
+import { dismissJob, exportJobs, markJobDownloaded, requestJobForceExport, } from '@/utils/exportJobs'
 import { formatEta } from '@/utils/formatEta'
 import { formatPointCount } from '@/utils/formatPointCount'
 import { ExportActions } from './ExportActions'
@@ -126,6 +126,9 @@ function JobCard(props: { job: ExportJob }) {
                 class={ui.download}
                 href={result.blobUrl}
                 download={fileName()}
+                onClick={() => {
+                  markJobDownloaded(job.id)
+                }}
               >
                 Download
               </a>

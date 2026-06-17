@@ -249,6 +249,14 @@ export function MainWorkspace(props: AppProps) {
   const [exportDimensions, setExportDimensions] = createSignal<
     ExportDimensions | undefined
   >()
+  // Hoist this conditional out of the AutoCanvas JSX prop: a ternary in a prop
+  // compiles to a memo that Solid instantiates lazily on first read — and the
+  // first read happens inside Flam3's rAF export loop (no owner), which warns
+  // "computations created outside a createRoot". Created here it lives in this
+  // component's owner. See memory: solid-conditional-prop-memo-leak.
+  const canvasPixelRatio = createMemo(() =>
+    exportDimensions() ? 1 : pixelRatio(),
+  )
   const [onExportImage, setOnExportImage] = createSignal<ExportImageType>()
 
   // Dev-only: crash injection trigger (renders inside ErrorBoundary)
@@ -2408,7 +2416,7 @@ export function MainWorkspace(props: AppProps) {
               </Show>
               <AutoCanvas
                 class={ui.canvas}
-                pixelRatio={exportDimensions() ? 1 : pixelRatio()}
+                pixelRatio={canvasPixelRatio()}
                 fixedResolution={exportDimensions()}
               >
                 <Suspense>
