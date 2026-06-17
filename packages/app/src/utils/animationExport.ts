@@ -13,7 +13,10 @@ const { performance } = globalThis
 
 export type AnimationExportConfig = {
   quality: number
-  resolution: number
+  /** Exact output dimensions (resolution + aspect already resolved). The main
+   *  canvas is rendered at this size for the duration of the export. */
+  width: number
+  height: number
   fps: number
   frameStart: number
   frameEnd: number
@@ -24,11 +27,10 @@ export type AnimationExportConfig = {
 
 function estimatePointCount(
   quality: number,
-  resolution: number,
+  height: number,
   zoom: number,
 ): number {
-  const baseHeight = 800 * resolution
-  const bucketInv = (baseHeight ** 2 * zoom ** 2) / 4
+  const bucketInv = (height ** 2 * zoom ** 2) / 4
   const denom = (quality - 1) ** 2
   if (denom === 0) return Infinity
   return Math.round(bucketInv / denom)
@@ -59,8 +61,10 @@ export function createAnimationExport(
 
   const totalFrames = config.frameEnd - config.frameStart + 1
   const totalRenders = totalFrames * config.playCount
-  const resizeWidth = Math.round(canvas.width * config.resolution) & ~1 || 2
-  const resizeHeight = Math.round(canvas.height * config.resolution) & ~1 || 2
+  // The canvas is already sized to the export dimensions (see
+  // startAnimationExport), so encode at the canvas backing-store size.
+  const resizeWidth = Math.round(canvas.width) & ~1 || 2
+  const resizeHeight = Math.round(canvas.height) & ~1 || 2
 
   const zoom =
     baseFlame.renderSettings.camera?.zoom ??
@@ -69,7 +73,7 @@ export function createAnimationExport(
 
   const targetPointsPerFrame = estimatePointCount(
     config.quality,
-    config.resolution,
+    resizeHeight,
     zoom,
   )
 

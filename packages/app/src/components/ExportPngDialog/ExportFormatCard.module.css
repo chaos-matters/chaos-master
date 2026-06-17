@@ -1,0 +1,77 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.groupLabel {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary, #999);
+}
+
+.cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  flex: 1 1 auto;
+  min-width: 3rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--color-border, #333);
+  border-radius: 0.4rem;
+  background: var(--color-bg-input, #1a1a1a);
+  color: var(--color-text-secondary, #999);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.card:hover {
+  color: var(--color-text, #eee);
+  border-color: var(--color-text-secondary, #888);
+}
+
+.cardActive {
+  background: var(--accent-color, #3b82f6);
+  border-color: var(--accent-color, #3b82f6);
+  color: #fff;
+}
+
+.cardActive:hover {
+  background: var(--accent-color, #3b82f6);
+  color: #fff;
+  border-color: var(--accent-color, #3b82f6);
+}
+
+.cardLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.cardSub {
+  font-size: 0.6rem;
+  letter-spacing: 0.02em;
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+
+.dimensions {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary, #999);
+  font-variant-numeric: tabular-nums;
+}

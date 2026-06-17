@@ -107,6 +107,7 @@ import type { TransformVariationType } from './flame/variations'
 import type { CustomVariationDef } from './flame/variations/custom/types'
 import type { TransformVariationType3D } from './flame/variations3D'
 import type { AnimationExportConfig } from './utils/animationExport'
+import type { ExportDimensions } from './utils/exportDimensions'
 import type { HardwareTier } from './utils/hardwareTier'
 import type { SharePayload } from './utils/jsonQueryParam'
 import type { RandomizerHistoryEntry } from './utils/randomizerHistoryDB'
@@ -239,6 +240,12 @@ export function MainWorkspace(props: AppProps) {
   })
 
   const [pixelRatio, setPixelRatio] = createSignal(DEFAULT_RESOLUTION)
+  // When set during an export, the main canvas renders at this exact pixel size
+  // (resolution + aspect resolved) instead of the viewport-scaled pixelRatio, so
+  // the captured image/video matches the chosen export format.
+  const [exportDimensions, setExportDimensions] = createSignal<
+    ExportDimensions | undefined
+  >()
   const [onExportImage, setOnExportImage] = createSignal<ExportImageType>()
 
   // Dev-only: crash injection trigger (renders inside ErrorBoundary)
@@ -975,20 +982,16 @@ export function MainWorkspace(props: AppProps) {
       return
     }
 
-    // True high-resolution export: scale the canvas backing store for the
-    // duration of the export so every frame is rendered at the target
-    // resolution, instead of bitmap-upscaling the 1x canvas (which only
-    // interpolated pixels and produced soft output).
-    const baseRatio = pixelRatio()
-    const scaledExport = config.resolution !== 1
-    if (scaledExport) {
-      setPixelRatio(baseRatio * config.resolution)
-      await waitForStableCanvasSize(canvas)
-    }
+    // True high-resolution export: render the canvas backing store at the exact
+    // export dimensions (resolution + aspect) for the duration of the export,
+    // instead of bitmap-upscaling the viewport canvas (which only interpolated
+    // pixels and produced soft output).
+    setExportDimensions({ width: config.width, height: config.height })
+    await waitForStableCanvasSize(canvas)
 
-    // resolution: 1 — the canvas itself already renders at export resolution.
+    // The canvas already renders at the export dimensions.
     const { promise } = createAnimationExport(
-      { ...config, resolution: 1 },
+      config,
       canvas,
       timeline,
       flameDescriptor,
@@ -1013,7 +1016,7 @@ export function MainWorkspace(props: AppProps) {
         showToast('Animation export failed')
       })
       .finally(() => {
-        if (scaledExport) setPixelRatio(baseRatio)
+        setExportDimensions(undefined)
       })
   }
 
@@ -1026,6 +1029,16 @@ export function MainWorkspace(props: AppProps) {
       setOnExportImage,
       setFlameDescriptor,
       () => selectedPalette(),
+      setExportDimensions,
+      () => {
+        const canvas = document.querySelector<HTMLCanvasElement>(
+          `.${ui.canvas}`,
+        )
+        if (canvas && canvas.clientWidth > 0 && canvas.clientHeight > 0) {
+          return canvas.clientWidth / canvas.clientHeight
+        }
+        return window.innerWidth / window.innerHeight
+      },
       startAnimationExport,
       () => blendFlame(),
       () => resolvedBlendWeight(),
@@ -2390,7 +2403,11 @@ export function MainWorkspace(props: AppProps) {
                   <Menu />
                 </button>
               </Show>
-              <AutoCanvas class={ui.canvas} pixelRatio={pixelRatio()}>
+              <AutoCanvas
+                class={ui.canvas}
+                pixelRatio={exportDimensions() ? 1 : pixelRatio()}
+                fixedResolution={exportDimensions()}
+              >
                 <Suspense>
                   <ErrorBoundary
                     fallback={(err) => (

@@ -13,6 +13,7 @@ import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
 import { deepClone } from '@/utils/clone'
+import { computeExportDimensions, DEFAULT_EXPORT_ASPECT, DEFAULT_EXPORT_RESOLUTION, } from '@/utils/exportDimensions'
 import { addFlameDataToPng } from '@/utils/flameInPng'
 import { compressJsonQueryParam } from '@/utils/jsonQueryParam'
 import { persistentSignal } from '@/utils/persistentSignal'
@@ -24,6 +25,7 @@ import { ColorPicker } from '../ColorPicker/ColorPicker'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import { defaultPills, getNearestPresetKey, QualityPresets, qualityPresets, } from '../Quality/QualityPresets'
+import { ExportFormatCard } from './ExportFormatCard'
 import ui from './ExportPngDialog.module.css'
 import { FramePreviewGallery } from './FramePreviewGallery'
 import type { Setter } from 'solid-js'
@@ -33,6 +35,7 @@ import type { ExportImageType } from '@/App'
 import type { Palette } from '@/flame/colorMap'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { AnimationExportConfig } from '@/utils/animationExport'
+import type { ExportAspectKey, ExportDimensions, } from '@/utils/exportDimensions'
 import type { TimelineConfig, TimelineState, TimelineTrack, } from '@/utils/timeline'
 import type { VideoEncoderConfig } from '@/utils/videoEncoder'
 
@@ -40,16 +43,17 @@ const QUALITY_MIN = 0.5
 const QUALITY_MAX = 0.9999
 
 /**
- * Estimate total points for final export at the given quality and resolution.
- * pointLimit = bucketInv / (q - 1)² where bucketInv = (height² * zoom²) / 4
+ * Estimate total points for final export at the given quality and exact output
+ * height. pointLimit = bucketInv / (q - 1)² where bucketInv = (height² * zoom²) / 4.
+ * Uses the real export pixel height (resolution + aspect resolve to it) rather
+ * than the old 800 * multiplier approximation.
  */
 function estimatePointCount(
   quality: number,
-  resolution: number,
+  height: number,
   zoom: number,
 ): number {
-  const baseHeight = 800 * resolution
-  const bucketInv = (baseHeight ** 2 * zoom ** 2) / 4
+  const bucketInv = (height ** 2 * zoom ** 2) / 4
   const denom = (quality - 1) ** 2
   if (denom === 0) return Infinity
   return Math.round(bucketInv / denom)
@@ -57,6 +61,8 @@ function estimatePointCount(
 
 type RenderDialogProps = {
   resolution: number
+  aspect: ExportAspectKey
+  viewportAspect: number
   quality: number
   embedFlame: boolean
   embedAnimation: boolean
@@ -70,6 +76,7 @@ type RenderDialogProps = {
   blendFlame?: () => FlameDescriptor | undefined
   blendWeight?: () => number
   onResolutionChange: (v: number) => void
+  onAspectChange: (v: ExportAspectKey) => void
   onQualityChange: (v: number) => void
   onEmbedFlameChange: (v: boolean) => void
   onEmbedAnimationChange: (v: boolean) => void
@@ -402,20 +409,13 @@ function RenderDialog(props: RenderDialogProps) {
             </Root>
           </div>
           <div class={ui.controlsPane}>
-            <label class={ui.field}>
-              <span>Resolution</span>
-              <select
-                class={ui.select}
-                value={props.resolution}
-                onChange={(e) => {
-                  props.onResolutionChange(Number(e.currentTarget.value))
-                }}
-              >
-                <option value={1}>1x</option>
-                <option value={2}>2x</option>
-                <option value={4}>4x</option>
-              </select>
-            </label>
+            <ExportFormatCard
+              resolution={props.resolution}
+              onResolutionChange={props.onResolutionChange}
+              aspect={props.aspect}
+              onAspectChange={props.onAspectChange}
+              viewportAspect={props.viewportAspect}
+            />
 
             <fieldset class={ui.field}>
               <span>Quality</span>
@@ -686,20 +686,13 @@ function RenderDialog(props: RenderDialogProps) {
             />
           </div>
           <div class={ui.controlsPane}>
-            <label class={ui.field}>
-              <span>Resolution</span>
-              <select
-                class={ui.select}
-                value={props.resolution}
-                onChange={(e) => {
-                  props.onResolutionChange(Number(e.currentTarget.value))
-                }}
-              >
-                <option value={1}>1x</option>
-                <option value={2}>2x</option>
-                <option value={4}>4x</option>
-              </select>
-            </label>
+            <ExportFormatCard
+              resolution={props.resolution}
+              onResolutionChange={props.onResolutionChange}
+              aspect={props.aspect}
+              onAspectChange={props.onAspectChange}
+              viewportAspect={props.viewportAspect}
+            />
 
             <fieldset class={ui.field}>
               <span>Quality</span>
@@ -899,6 +892,8 @@ export function createExportPngDialog(
   setOnExportImage: Setter<ExportImageType | undefined>,
   setFlameDescriptor: (updater: (draft: FlameDescriptor) => void) => void,
   selectedPalette: () => Palette | undefined,
+  setExportDimensions: (d: ExportDimensions | undefined) => void,
+  getViewportAspect: () => number,
   startAnimationExport?: (
     config: AnimationExportConfig,
     canvas: HTMLCanvasElement,
@@ -957,11 +952,15 @@ export function createExportPngDialog(
     const config = timeline?.config() ?? defaultTimelineConfig()
     const hasAnimation = tracks.some((track) => track.keyframes.length > 0)
     const currentFrame = timeline?.currentFrame() ?? 0
-    const currentRatio = getPixelRatio()
+    const viewportAspect = getViewportAspect()
 
     const [resolution, setResolution] = persistentSignal(
-      'export/resolution',
-      currentRatio,
+      'export/resolution-px',
+      DEFAULT_EXPORT_RESOLUTION,
+    )
+    const [aspect, setAspect] = persistentSignal<ExportAspectKey>(
+      'export/aspect',
+      DEFAULT_EXPORT_ASPECT,
     )
     const [quality, setQuality] = persistentSignal('export/quality', 0.9)
     const [embedFlame, setEmbedFlame] = persistentSignal(
@@ -1044,8 +1043,12 @@ export function createExportPngDialog(
     const [previewDescriptor, setPreviewDescriptor] = createStore(initialFlame)
 
     function handleExport() {
-      const res = resolution()
       const qual = quality()
+      const dimensions = computeExportDimensions(
+        resolution(),
+        aspect(),
+        viewportAspect,
+      )
       const doEmbedFlame = embedFlame()
       const doEmbedAnimation = embedAnimation()
 
@@ -1101,12 +1104,15 @@ export function createExportPngDialog(
       // Estimate target points and show progress
       const targetPoints = estimatePointCount(
         qual,
-        res,
+        dimensions.height,
         previewDescriptor.renderSettings.camera.zoom,
       )
       setExportProgress({ current: 0, target: targetPoints, pointsPerSec: 0 })
       setExportQuality(qual)
-      setPixelRatio(res)
+      // Render the main canvas at the exact export resolution + aspect. The
+      // backing store becomes width x height (pixelRatio is forced to 1 while
+      // exportDimensions is set), so the captured PNG matches the chosen format.
+      setExportDimensions(dimensions)
 
       // Export callback waits for quality to be reached
       type ExportInfo = { finalImageReady: boolean }
@@ -1117,7 +1123,7 @@ export function createExportPngDialog(
         setForceExportNow(false)
         setCancelExportNow(false)
         setOnExportImage(undefined)
-        setPixelRatio(currentRatio)
+        setExportDimensions(undefined)
         setExportQuality(undefined)
         setExportProgress(undefined)
         setFlameDescriptor((draft) => {
@@ -1218,9 +1224,15 @@ export function createExportPngDialog(
       })
       // Apply the opt-in before the export locks canvas interaction.
       setCameraDuringExportEnabled(cameraDuringExport())
+      const dimensions = computeExportDimensions(
+        resolution(),
+        aspect(),
+        viewportAspect,
+      )
       const exportConfig: AnimationExportConfig = {
         quality: animationQuality(),
-        resolution: resolution(),
+        width: dimensions.width,
+        height: dimensions.height,
         fps: animFps(),
         frameStart: frameStart(),
         frameEnd: frameEnd(),
@@ -1239,6 +1251,8 @@ export function createExportPngDialog(
       content: ({ respond }) => (
         <RenderDialog
           resolution={resolution()}
+          aspect={aspect()}
+          viewportAspect={viewportAspect}
           quality={quality()}
           embedFlame={embedFlame()}
           embedAnimation={embedAnimation()}
@@ -1254,6 +1268,7 @@ export function createExportPngDialog(
           blendFlame={() => getBlendFlame?.()}
           blendWeight={() => getBlendWeight?.() ?? 0}
           onResolutionChange={setResolution}
+          onAspectChange={setAspect}
           onQualityChange={setQuality}
           onEmbedFlameChange={setEmbedFlame}
           onEmbedAnimationChange={setEmbedAnimation}
