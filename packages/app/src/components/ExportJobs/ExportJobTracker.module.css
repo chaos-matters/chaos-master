@@ -159,12 +159,6 @@
   align-items: center;
 }
 
-.thumbWrap {
-  position: relative;
-  flex-shrink: 0;
-  line-height: 0;
-}
-
 .thumb {
   width: 56px;
   height: 56px;
@@ -172,37 +166,35 @@
   border-radius: 0.3rem;
   background: #000;
   display: block;
-}
-
-.typeBadge,
-.dimBadge {
-  position: absolute;
-  padding: 1px 4px;
-  border-radius: 3px;
-  font-size: 0.52rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  line-height: 1.3;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.7);
-  pointer-events: none;
-}
-
-.typeBadge {
-  bottom: 3px;
-  right: 3px;
-}
-
-.dimBadge {
-  top: 3px;
-  left: 3px;
+  flex-shrink: 0;
 }
 
 .doneInfo {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.35rem;
   align-items: flex-start;
+  min-width: 0;
+}
+
+.metaLine {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  color: var(--color-text, #eee);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .download {
