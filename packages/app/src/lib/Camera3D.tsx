@@ -4,6 +4,7 @@ import { f32, mat4x4f, struct, vec2f, vec3f, vec4f } from 'typegpu/data'
 import { mul } from 'typegpu/std'
 import { mat4, vec3 } from 'wgpu-matrix'
 import { Camera3DContextProvider } from './Camera3DContext'
+import { rolledUpVector } from './cameraMath'
 import { useCanvas } from './CanvasContext'
 import { useRootContext } from './RootContext'
 import type { ParentProps } from 'solid-js'
@@ -47,6 +48,8 @@ type Camera3DProps = {
   position: Vec3
   target: Vec3
   fov: number
+  /** Camera roll around the view direction, in radians (default 0). */
+  roll?: number
 }
 
 import type { Camera3DObj } from '@/flame/schema/flameSchema'
@@ -73,8 +76,9 @@ export function Default3DPreviewCamera(
     return new Float32Array(c ? c.target : [0, 0, 0])
   }
   const fov = () => props.camera3D?.fov ?? 60
+  const roll = () => props.camera3D?.roll ?? 0
   return (
-    <Camera3D position={position()} target={target()} fov={fov()}>
+    <Camera3D position={position()} target={target()} fov={fov()} roll={roll()}>
       {props.children}
     </Camera3D>
   )
@@ -99,7 +103,7 @@ export function Camera3D(props: ParentProps<Camera3DProps>) {
     const { position, target, fov } = props
     const aspect = width / height
 
-    const up = vec3.fromValues(0, 1, 0)
+    const up = rolledUpVector(vec3.sub(target, position), props.roll ?? 0)
     const viewMatrix = mat4.lookAt(position, target, up)
     const projectionMatrix = mat4.perspective(
       fov * (Math.PI / 180),

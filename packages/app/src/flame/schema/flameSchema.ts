@@ -32,12 +32,14 @@ export const camera3DDefault: {
   radius: number
   target: [number, number, number]
   fov: number
+  roll: number
 } = {
   theta: 0,
   phi: Math.PI / 2,
   radius: 5,
   target: [0, 0, 0] as [number, number, number],
   fov: 60,
+  roll: 0,
 }
 const _edgeFadeColorDefault: [number, number, number, number] = [0, 0, 0, 0.8]
 const MAX_SKIP_ITERS_VALUE = 30
@@ -117,6 +119,7 @@ export const Camera3DObjSchema = v.object({
     camera3DDefault.target,
   ),
   fov: v.optional(v.number(), camera3DDefault.fov),
+  roll: v.optional(v.number(), camera3DDefault.roll),
 })
 
 const ColorValueSchema = v.pipe(v.number(), v.minValue(0), v.maxValue(1))

@@ -361,6 +361,12 @@ function RenderDialog(props: RenderDialogProps) {
                         60,
                       setFlameFov,
                     ]}
+                    roll={[
+                      () =>
+                        props.previewDescriptor.renderSettings.camera3D?.roll ??
+                        0,
+                      () => 0,
+                    ]}
                   >
                     <Show
                       when={

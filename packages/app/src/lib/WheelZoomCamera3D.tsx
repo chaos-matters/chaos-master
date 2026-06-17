@@ -1,7 +1,9 @@
 import { batch, createEffect, createMemo, createSignal, onCleanup, } from 'solid-js'
+import { vec3 } from 'wgpu-matrix'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { Camera3D } from '@/lib/Camera3D'
 import { useCamera3D } from '@/lib/Camera3DContext'
+import { cameraBasis } from '@/lib/cameraMath'
 import { useCanvas } from '@/lib/CanvasContext'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { createPinchHandler } from '@/utils/createPinchHandler'
@@ -13,6 +15,8 @@ const SCROLL_SENSITIVITY = 0.001
 const KEY_PAN_SPEED = 1.3 // Camera pan speed (units per second at radius = 1)
 // Fly-mode look sensitivity (radians per pixel of pointer movement).
 const FLY_LOOK_SENSITIVITY = 0.005
+// Fly-mode roll speed (radians per second while holding Q/E).
+const FLY_ROLL_SPEED = 1.6
 // Multiplier applied to fly speed per wheel notch.
 const FLY_SPEED_WHEEL_STEP = 1.0015
 const FLY_SPEED_RANGE: [number, number] = [0.05, 20]
@@ -37,7 +41,8 @@ const MOVE_KEYS = new Set([
   'arrowleft',
   'arrowright',
 ])
-const FLY_KEYS = new Set(['q', 'e'])
+// Fly-only keys: Q/E roll, Space/C move up/down (along the camera's local up).
+const FLY_KEYS = new Set(['q', 'e', ' ', 'c'])
 
 type WheelZoomCamera3DProps = {
   theta: Signal<number>
@@ -51,6 +56,8 @@ type WheelZoomCamera3DProps = {
   flyMode?: Accessor<boolean>
   /** Movement-speed multiplier for fly mode (also scrubbed via scroll). */
   flySpeed?: Signal<number>
+  /** Camera roll around the view direction (radians). Q/E adjust it in fly mode. */
+  roll?: Signal<number>
 }
 
 export function createSpherical(
@@ -59,12 +66,14 @@ export function createSpherical(
   initRadius: number,
   initTarget: Vec3,
   initFov: number,
+  initRoll = 0,
 ) {
   const [theta, setTheta] = createSignal(initTheta)
   const [phi, setPhi] = createSignal(initPhi)
   const [radius, setRadius] = createSignal(initRadius)
   const [target, setTarget] = createSignal(initTarget)
   const [fov, setFov] = createSignal(initFov)
+  const [roll, setRoll] = createSignal(initRoll)
 
   return {
     theta: [theta, setTheta] as Signal<number>,
@@ -72,6 +81,7 @@ export function createSpherical(
     radius: [radius, setRadius] as Signal<number>,
     target: [target, setTarget] as Signal<Vec3>,
     fov: [fov, setFov] as Signal<number>,
+    roll: [roll, setRoll] as Signal<number>,
   }
 }
 
@@ -353,30 +363,19 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
     ev.preventDefault()
   }
 
-  /** Compute camera right & up vectors from current spherical coords. */
+  /** Camera right/up/forward axes from current spherical coords + roll. With
+   *  roll = 0 this matches the old fixed-world-up axes; roll rotates right/up
+   *  around forward so movement (and the view's up) follow the roll. */
   function getCameraAxes() {
     const t = props.theta[0]()
     const p = props.phi[0]()
-    // Forward = target - position (normalised)
-    const fx = -Math.sin(p) * Math.sin(t)
-    const fy = -Math.cos(p)
-    const fz = -Math.sin(p) * Math.cos(t)
-    // Right = forward × worldUp, where worldUp = (0,1,0)
-    const rx = -fz
-    const rz = fx
-    const rLen = Math.sqrt(rx * rx + rz * rz) || 1
-    const nrx = rx / rLen
-    const nrz = rz / rLen
-    // CamUp = right × forward
-    const ux = 0 * fz - nrz * fy
-    const uy = nrz * fx - nrx * fz
-    const uz = nrx * fy - 0 * fx
-    const uLen = Math.sqrt(ux * ux + uy * uy + uz * uz) || 1
-    return {
-      right: [nrx, 0, nrz] as const,
-      up: [ux / uLen, uy / uLen, uz / uLen] as const,
-      forward: [fx, fy, fz] as const,
-    }
+    // Forward = target - position (look direction).
+    const forward = vec3.fromValues(
+      -Math.sin(p) * Math.sin(t),
+      -Math.cos(p),
+      -Math.sin(p) * Math.cos(t),
+    )
+    return cameraBasis(forward, props.roll?.[0]() ?? 0)
   }
 
   const activeKeys = new Set<string>()
@@ -405,9 +404,9 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
     const { right, up, forward } = getCameraAxes()
 
     if (props.flyMode?.()) {
-      // First-person flight: W/S fly along the look direction, A/D strafe,
-      // Q/E descend/ascend along world up. Moving the target translates the
-      // whole camera since the eye is derived from it.
+      // First-person flight: W/S along the look direction, A/D strafe, Space/C up
+      // and down along the camera's LOCAL up (roll-aware), Q/E roll. Moving the
+      // target translates the whole camera since the eye is derived from it.
       const speed =
         // Clamp the radius (panRadius) so fly speed doesn't crawl to ~0 when
         // zoomed in very close — otherwise you can't fly back out.
@@ -419,17 +418,26 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
       if (activeKeys.has('s') || activeKeys.has('arrowdown')) fwd -= speed
       if (activeKeys.has('d') || activeKeys.has('arrowright')) strafe += speed
       if (activeKeys.has('a') || activeKeys.has('arrowleft')) strafe -= speed
-      if (activeKeys.has('e')) rise += speed
-      if (activeKeys.has('q')) rise -= speed
+      if (activeKeys.has(' ')) rise += speed
+      if (activeKeys.has('c')) rise -= speed
 
       if (fwd !== 0 || strafe !== 0 || rise !== 0) {
         props.target[1]((tgt) => {
           return new Float32Array([
-            tgt[0]! + forward[0] * fwd + right[0] * strafe,
-            tgt[1]! + forward[1] * fwd + right[1] * strafe + rise,
-            tgt[2]! + forward[2] * fwd + right[2] * strafe,
+            tgt[0]! + forward[0]! * fwd + right[0]! * strafe + up[0]! * rise,
+            tgt[1]! + forward[1]! * fwd + right[1]! * strafe + up[1]! * rise,
+            tgt[2]! + forward[2]! * fwd + right[2]! * strafe + up[2]! * rise,
           ])
         })
+      }
+
+      // Q/E roll the camera around the view direction.
+      let rollDelta = 0
+      const rollStep = FLY_ROLL_SPEED * deltaTime
+      if (activeKeys.has('e')) rollDelta += rollStep
+      if (activeKeys.has('q')) rollDelta -= rollStep
+      if (rollDelta !== 0 && props.roll) {
+        props.roll[1]((r) => r + rollDelta)
       }
 
       keyLoopId = requestAnimationFrame(keyLoop)
@@ -448,9 +456,9 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
     if (dx !== 0 || dy !== 0) {
       props.target[1]((tgt) => {
         return new Float32Array([
-          tgt[0]! + right[0] * dx + up[0] * dy,
-          tgt[1]! + right[1] * dx + up[1] * dy,
-          tgt[2]! + right[2] * dx + up[2] * dy,
+          tgt[0]! + right[0]! * dx + up[0]! * dy,
+          tgt[1]! + right[1]! * dx + up[1]! * dy,
+          tgt[2]! + right[2]! * dx + up[2]! * dy,
         ])
       })
     }
@@ -556,6 +564,7 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
       position={position()}
       target={props.target[0]()}
       fov={props.fov[0]()}
+      roll={props.roll?.[0]() ?? 0}
     >
       {(() => {
         const { js } = useCamera3D()

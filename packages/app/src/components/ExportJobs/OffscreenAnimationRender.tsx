@@ -61,6 +61,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
       radius: 5,
       target: [0, 0, 0] as [number, number, number],
       fov: 60,
+      roll: 0,
     }
   const zoom = readonlySignal(() => cam().zoom)
   const position = readonlySignal<v2f>(() =>
@@ -71,6 +72,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
   const radius = readonlySignal(() => c3d().radius)
   const target = readonlySignal<Vec3>(() => new Float32Array(c3d().target))
   const fov = readonlySignal(() => c3d().fov)
+  const roll = readonlySignal(() => c3d().roll ?? 0)
 
   let frameIndex = 0
   let capturing = false
@@ -224,6 +226,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
             radius={radius}
             target={target}
             fov={fov}
+            roll={roll}
             interactive={() => false}
           >
             <Flam3

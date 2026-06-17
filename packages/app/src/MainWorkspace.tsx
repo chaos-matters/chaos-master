@@ -779,6 +779,15 @@ export function MainWorkspace(props: AppProps) {
     })
     return flameDescriptor.renderSettings.camera3D.fov
   }
+  const setFlameRoll: Setter<number> = (value) => {
+    setFlameDescriptor((draft) => {
+      draft.renderSettings.camera3D.roll =
+        typeof value === 'function'
+          ? value(draft.renderSettings.camera3D.roll)
+          : value
+    })
+    return flameDescriptor.renderSettings.camera3D.roll
+  }
 
   // First-person "fly" navigation for 3D flames. Session-only (you don't want
   // to reopen the app mid-flight); the movement speed is remembered.
@@ -827,6 +836,19 @@ export function MainWorkspace(props: AppProps) {
   const effectiveTarget3D = () => {
     // Array properties are not easily animatable yet, so just use descriptor
     return new Float32Array(flameDescriptor.renderSettings.camera3D.target)
+  }
+  const effectiveRoll = () => {
+    if (
+      timeline.animationEnabled() &&
+      (timeline.isPlaying() || timeline.isScrubbing())
+    ) {
+      const val = timeline.resolveValueAtPath(
+        'camera3D.roll',
+        timeline.currentFrame(),
+      )
+      if (val !== null && typeof val === 'number') return val
+    }
+    return flameDescriptor.renderSettings.camera3D.roll
   }
   const effectiveFov = () => {
     if (
@@ -2506,6 +2528,7 @@ export function MainWorkspace(props: AppProps) {
                         radius={[effectiveRadius, setFlameRadius]}
                         target={[effectiveTarget3D, setFlameTarget3D]}
                         fov={[effectiveFov, setFlameFov]}
+                        roll={[effectiveRoll, setFlameRoll]}
                         flyMode={flyMode}
                         flySpeed={flySpeed}
                         interactive={() =>
@@ -4626,7 +4649,7 @@ export function MainWorkspace(props: AppProps) {
               setFlyMode(v)
               if (v) {
                 showToast(
-                  'Fly mode: click to look around · WASD/arrows to move · Q/E up/down · Esc to release',
+                  'Fly mode: click to look around · WASD/arrows move · Space/C up/down · Q/E roll · Esc to release',
                 )
               }
             }}

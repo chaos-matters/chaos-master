@@ -80,12 +80,14 @@ function OffscreenRender(props: { job: ImageJob }) {
     radius: 5,
     target: [0, 0, 0] as [number, number, number],
     fov: 60,
+    roll: 0,
   }
   const theta = createSignal(c3d.theta)
   const phi = createSignal(c3d.phi)
   const radius = createSignal(c3d.radius)
   const target = createSignal(new Float32Array(c3d.target))
   const fov = createSignal(c3d.fov)
+  const roll = createSignal(c3d.roll ?? 0)
 
   let limitAccessor: () => number = () => 0
   let accumulated = 0
@@ -183,6 +185,7 @@ function OffscreenRender(props: { job: ImageJob }) {
             radius={radius}
             target={target}
             fov={fov}
+            roll={roll}
             interactive={() => false}
           >
             <Flam3
