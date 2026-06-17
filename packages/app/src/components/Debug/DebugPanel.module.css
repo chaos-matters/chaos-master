@@ -25,7 +25,7 @@
      right-aligns within it (no odd per-number gaps); compact notation bounds the
      numbers so the panel never needs to grow past this. */
   font-variant-numeric: tabular-nums;
-  min-width: 24ch;
+  min-width: 18ch;
 
   user-select: none;
   -webkit-user-select: none;
