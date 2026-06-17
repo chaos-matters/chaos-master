@@ -83,7 +83,7 @@ import { createAnimationExport } from './utils/animationExport'
 import { deepClone } from './utils/clone'
 import { createStoreHistory } from './utils/createStoreHistory'
 import { sendFlameToDiscord } from './utils/discordWebhook'
-import { enqueueImageJob } from './utils/exportJobs'
+import { enqueueAnimationJob, enqueueImageJob } from './utils/exportJobs'
 import { addFlameDataToPng } from './utils/flameInPng'
 import { hardwareTierToPreset } from './utils/hardwareTier'
 import { compressJsonQueryParam } from './utils/jsonQueryParam'
@@ -1050,6 +1050,7 @@ export function MainWorkspace(props: AppProps) {
         return window.innerWidth / window.innerHeight
       },
       enqueueImageJob,
+      enqueueAnimationJob,
       startAnimationExport,
       () => blendFlame(),
       () => resolvedBlendWeight(),

@@ -48,21 +48,43 @@ function JobCard(props: { job: ExportJob }) {
 
   const pct = createMemo(() => {
     if (job.status === 'done') return 100
+    if (job.type === 'animation') {
+      if (job.progress.phase === 'encoding') return 100
+      const total = job.progress.totalFrames
+      return total <= 0 ? 0 : Math.min(99.5, (job.progress.frame / total) * 100)
+    }
     const target = job.progress.target
     if (target <= 0) return 0
     return Math.min(99.5, Math.max(0, (job.progress.current / target) * 100))
   })
 
+  const stats = createMemo(() => {
+    if (job.type === 'animation') {
+      return job.progress.phase === 'encoding'
+        ? 'Encoding video…'
+        : `frame ${Math.min(job.progress.frame + 1, job.progress.totalFrames)} / ${job.progress.totalFrames}`
+    }
+    return `${formatPointCount(job.progress.current)} / ${formatPointCount(job.progress.target)} pts`
+  })
+
   const eta = createMemo(() => {
     if (job.status !== 'rendering') return ''
     const elapsed = (globalThis.performance.now() - job.startedAt) / 1000
+    if (job.type === 'animation') {
+      const done = job.progress.frame
+      if (job.progress.phase === 'encoding' || done <= 0) return ''
+      const remaining = (job.progress.totalFrames - done) * (elapsed / done)
+      return formatEta(remaining)
+    }
     const speed = elapsed > 0 ? job.progress.current / elapsed : 0
     const remaining = job.progress.target - job.progress.current
     if (speed <= 0 || remaining <= 0) return ''
     return formatEta(remaining / speed)
   })
 
-  const fileName = () => `${job.name?.trim() || 'flame'}.png`
+  const isAnim = job.type === 'animation'
+  const fileName = () =>
+    `${job.name?.trim() || 'flame'}.${isAnim ? 'mp4' : 'png'}`
 
   return (
     <div class={ui.card}>
@@ -89,10 +111,7 @@ function JobCard(props: { job: ExportJob }) {
 
       <Show when={job.status === 'rendering'}>
         <div class={ui.stats}>
-          <span>
-            {formatPointCount(job.progress.current)} /{' '}
-            {formatPointCount(job.progress.target)} pts
-          </span>
+          <span>{stats()}</span>
           <span>{pct().toFixed(0)}%</span>
         </div>
         <div class={ui.track}>
@@ -104,8 +123,12 @@ function JobCard(props: { job: ExportJob }) {
             onStop={() => {
               requestJobForceExport(job.id)
             }}
-            stopLabel="Stop & Export"
-            stopTitle="Stop rendering and export at the current quality"
+            stopLabel={isAnim ? 'Stop & Save' : 'Stop & Export'}
+            stopTitle={
+              isAnim
+                ? 'Stop and save the video with the frames rendered so far'
+                : 'Stop rendering and export at the current quality'
+            }
             onCancel={() => {
               dismissJob(job.id)
             }}
@@ -117,10 +140,18 @@ function JobCard(props: { job: ExportJob }) {
       <Show when={job.status === 'done' && job.result} keyed>
         {(result) => (
           <div class={ui.doneRow}>
-            <img class={ui.thumb} src={result.blobUrl} alt={job.name} />
+            <Show
+              when={isAnim}
+              fallback={
+                <img class={ui.thumb} src={result.blobUrl} alt={job.name} />
+              }
+            >
+              <video class={ui.thumb} src={result.blobUrl} muted playsinline />
+            </Show>
             <div class={ui.doneInfo}>
               <span class={ui.muted}>
-                {result.width} &times; {result.height} px
+                {result.width} &times; {result.height}
+                {isAnim ? '' : ' px'}
               </span>
               <a
                 class={ui.download}

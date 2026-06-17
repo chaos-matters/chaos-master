@@ -1,14 +1,19 @@
-import { createStore } from 'solid-js/store'
+import { createStore, produce } from 'solid-js/store'
 import type { TimelineConfig, TimelineTrack } from './timeline'
+import type { VideoEncoderConfig } from './videoEncoder'
 import type { Palette } from '@/flame/colorMap'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 /**
- * Background export jobs. Image exports run OFFSCREEN (see ExportJobHost) so the
- * workspace stays usable while they render; the ExportJobTracker popup shows
- * each job's progress and offers a download when it finishes. Jobs render
- * sequentially — the host always renders the first job that is queued/rendering.
+ * Background export jobs. Image (and opt-in animation) exports run OFFSCREEN (see
+ * ExportJobHost) so the workspace stays usable while they render; the
+ * ExportJobTracker popup shows each job's progress and offers a download when it
+ * finishes. Jobs render sequentially — the host always renders the first job
+ * that is queued/rendering.
  */
+
+type Dimensions = { width: number; height: number }
+type JobResult = { blobUrl: string; width: number; height: number }
 
 /** Everything needed to render one image export, snapshotted at enqueue time so
  *  later edits to the workspace flame don't affect an in-flight job. */
@@ -16,7 +21,7 @@ export type ImageJobSpec = {
   name: string
   flame: FlameDescriptor
   quality: number
-  dimensions: { width: number; height: number }
+  dimensions: Dimensions
   palette: Palette | undefined
   blendFlame: FlameDescriptor | undefined
   blendWeight: number
@@ -27,23 +32,59 @@ export type ImageJobSpec = {
   config: TimelineConfig
 }
 
+/** Everything needed to render one animation (video) export offscreen. `flame`
+ *  is the RAW flame (timeline applied per-frame by the runner). */
+export type AnimationJobSpec = {
+  name: string
+  flame: FlameDescriptor
+  quality: number
+  dimensions: Dimensions
+  fps: number
+  frameStart: number
+  frameEnd: number
+  playCount: number
+  codec: VideoEncoderConfig['codec']
+  embedMetadata: boolean
+  palette: Palette | undefined
+  blendFlame: FlameDescriptor | undefined
+  blendWeight: number
+  tracks: TimelineTrack[]
+  config: TimelineConfig
+}
+
 export type ExportJobStatus = 'queued' | 'rendering' | 'done' | 'error'
 
-export type ExportJob = ImageJobSpec & {
+type JobCommon = {
   id: string
-  type: 'image'
   status: ExportJobStatus
-  progress: { current: number; target: number }
   startedAt: number
-  /** Set via requestJobForceExport — capture at the current quality ("Stop &
-   *  Export"). */
+  /** Set via requestJobForceExport — capture/finalize at the current state
+   *  ("Stop & Export" / "Stop & Save"). */
   forceExport: boolean
-  result?: { blobUrl: string; width: number; height: number }
+  result?: JobResult
   /** Set once the user has downloaded the finished result — drives the
    *  before-unload "you have undownloaded exports" guard. */
   downloaded?: boolean
   error?: string
 }
+
+export type ImageJob = JobCommon &
+  ImageJobSpec & {
+    type: 'image'
+    progress: { current: number; target: number }
+  }
+
+export type AnimationJob = JobCommon &
+  AnimationJobSpec & {
+    type: 'animation'
+    progress: {
+      frame: number
+      totalFrames: number
+      phase: 'rendering' | 'encoding'
+    }
+  }
+
+export type ExportJob = ImageJob | AnimationJob
 
 const [store, setStore] = createStore<{ items: ExportJob[] }>({ items: [] })
 
@@ -69,18 +110,59 @@ export function enqueueImageJob(spec: ImageJobSpec): string {
   return id
 }
 
+export function enqueueAnimationJob(spec: AnimationJobSpec): string {
+  const id = `job-${nextId++}`
+  const totalFrames =
+    (spec.frameEnd - spec.frameStart + 1) * Math.max(1, spec.playCount)
+  setStore('items', (items) => [
+    ...items,
+    {
+      ...spec,
+      id,
+      type: 'animation',
+      status: 'queued',
+      progress: { frame: 0, totalFrames, phase: 'rendering' },
+      startedAt: globalThis.performance.now(),
+      forceExport: false,
+    },
+  ])
+  return id
+}
+
 export function setJobStatus(id: string, status: ExportJobStatus) {
   setStore('items', (j) => j.id === id, 'status', status)
 }
 
-export function setJobProgress(id: string, current: number, target: number) {
-  setStore('items', (j) => j.id === id, 'progress', { current, target })
+export function setImageJobProgress(
+  id: string,
+  current: number,
+  target: number,
+) {
+  setStore(
+    'items',
+    (j) => j.id === id,
+    produce((j) => {
+      if (j.type === 'image') j.progress = { current, target }
+    }),
+  )
 }
 
-export function setJobResult(
+export function setAnimationJobProgress(
   id: string,
-  result: { blobUrl: string; width: number; height: number },
+  frame: number,
+  totalFrames: number,
+  phase: 'rendering' | 'encoding',
 ) {
+  setStore(
+    'items',
+    (j) => j.id === id,
+    produce((j) => {
+      if (j.type === 'animation') j.progress = { frame, totalFrames, phase }
+    }),
+  )
+}
+
+export function setJobResult(id: string, result: JobResult) {
   setStore('items', (j) => j.id === id, 'result', result)
   setStore('items', (j) => j.id === id, 'status', 'done')
 }

@@ -51,37 +51,15 @@ export function DebugPanel() {
         <Show when={expanded()}>
           <div class={ui.debugInfo}>
             <p>
-              <span class={ui.num}>
-                {bigNumberFormatter.format(accumulatedPointCount())}
-              </span>{' '}
-              /{' '}
-              <span class={ui.num}>
-                {bigNumberFormatter.format(qualityPointCountLimit()())}
-              </span>{' '}
-              Iters
+              {bigNumberFormatter.format(accumulatedPointCount())} /{' '}
+              {bigNumberFormatter.format(qualityPointCountLimit()())} Iters
             </p>
             <p>
-              <span class={ui.num}>
-                {formatIterationSpeed(iterationSpeedPointPerSec())}
-              </span>{' '}
-              Iters / sec
+              {formatIterationSpeed(iterationSpeedPointPerSec())} Iters / sec
             </p>
-            <p>
-              <span class={ui.numMs}>{formatMs(renderTimings().ifsMs)}</span> ms
-              IFS
-            </p>
-            <p>
-              <span class={ui.numMs}>
-                {formatMs(renderTimings().adaptiveFilterMs)}
-              </span>{' '}
-              ms Blur
-            </p>
-            <p>
-              <span class={ui.numMs}>
-                {formatMs(renderTimings().colorGradingMs)}
-              </span>{' '}
-              ms Grading
-            </p>
+            <p>{formatMs(renderTimings().ifsMs)} ms IFS</p>
+            <p>{formatMs(renderTimings().adaptiveFilterMs)} ms Blur</p>
+            <p>{formatMs(renderTimings().colorGradingMs)} ms Grading</p>
           </div>
         </Show>
       </div>

@@ -36,7 +36,7 @@ import type { Palette } from '@/flame/colorMap'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { AnimationExportConfig } from '@/utils/animationExport'
 import type { ExportAspectKey } from '@/utils/exportDimensions'
-import type { ImageJobSpec } from '@/utils/exportJobs'
+import type { AnimationJobSpec, ImageJobSpec } from '@/utils/exportJobs'
 import type { TimelineConfig, TimelineState, TimelineTrack, } from '@/utils/timeline'
 import type { VideoEncoderConfig } from '@/utils/videoEncoder'
 
@@ -85,6 +85,8 @@ type RenderDialogProps = {
   onEmbedMetadataChange: (v: boolean) => void
   cameraDuringExport: boolean
   onCameraDuringExportChange: (v: boolean) => void
+  animationOffscreen: boolean
+  onAnimationOffscreenChange: (v: boolean) => void
   onRenderAnimation: () => void
 }
 
@@ -836,10 +838,26 @@ function RenderDialog(props: RenderDialogProps) {
 
             <label
               class={ui.checkboxField}
-              title="Keep camera pan/scroll/zoom active while rendering — your live camera moves get baked into the video. Leave off for a deterministic export."
+              title="Render the video offscreen as a background job so you can keep using the app. Progress + download appear in the top-right export tracker. Off = render on the main canvas (locks the workspace)."
             >
               <Checkbox
-                checked={props.cameraDuringExport}
+                checked={props.animationOffscreen}
+                onChange={(checked) => {
+                  props.onAnimationOffscreenChange(checked)
+                }}
+              />
+              <span>Render in background (offscreen)</span>
+            </label>
+
+            <label
+              class={ui.checkboxField}
+              classList={{
+                [ui.disabled as string]: props.animationOffscreen,
+              }}
+              title="Keep camera pan/scroll/zoom active while rendering — your live camera moves get baked into the video. Leave off for a deterministic export. (Main-canvas render only.)"
+            >
+              <Checkbox
+                checked={props.cameraDuringExport && !props.animationOffscreen}
                 onChange={(checked) => {
                   props.onCameraDuringExportChange(checked)
                 }}
@@ -878,6 +896,7 @@ export function createExportPngDialog(
   selectedPalette: () => Palette | undefined,
   getViewportAspect: () => number,
   enqueueImageJob: (spec: ImageJobSpec) => void,
+  enqueueAnimationJob: (spec: AnimationJobSpec) => void,
   startAnimationExport?: (
     config: AnimationExportConfig,
     canvas: HTMLCanvasElement,
@@ -1008,6 +1027,10 @@ export function createExportPngDialog(
       'export/camera-during-export',
       ALLOW_CAMERA_DURING_EXPORT,
     )
+    const [animationOffscreen, setAnimationOffscreen] = persistentSignal(
+      'export/animation-offscreen',
+      false,
+    )
 
     const initialFlame = deepClone(flameDescriptor)
     if (!initialFlame.metadata) {
@@ -1067,7 +1090,6 @@ export function createExportPngDialog(
     }
 
     function handleRenderAnimation() {
-      if (!startAnimationExport) return
       // Sync metadata back to workspace flame descriptor
       setFlameDescriptor((draft) => {
         if (!draft.metadata) {
@@ -1078,13 +1100,39 @@ export function createExportPngDialog(
           previewDescriptor.metadata?.description ?? ''
         draft.metadata.author = previewDescriptor.metadata?.author ?? 'unknown'
       })
-      // Apply the opt-in before the export locks canvas interaction.
-      setCameraDuringExportEnabled(cameraDuringExport())
       const dimensions = computeExportDimensions(
         resolution(),
         aspect(),
         viewportAspect,
       )
+
+      // Offscreen: enqueue a background job (workspace stays usable). Renders the
+      // RAW workspace flame; the job applies the timeline per frame.
+      if (animationOffscreen()) {
+        enqueueAnimationJob({
+          name: previewDescriptor.metadata?.name?.trim() || 'flame',
+          flame: deepClone(flameDescriptor),
+          quality: animationQuality(),
+          dimensions,
+          fps: animFps(),
+          frameStart: frameStart(),
+          frameEnd: frameEnd(),
+          playCount: playCount(),
+          codec: codec(),
+          embedMetadata: embedMetadata(),
+          palette: selectedPalette(),
+          blendFlame: getBlendFlame?.(),
+          blendWeight: getBlendWeight?.() ?? 0,
+          tracks: timeline?.tracks() ?? [],
+          config: timeline?.config() ?? defaultTimelineConfig(),
+        })
+        return
+      }
+
+      // Main-canvas path (default, unchanged).
+      if (!startAnimationExport) return
+      // Apply the opt-in before the export locks canvas interaction.
+      setCameraDuringExportEnabled(cameraDuringExport())
       const exportConfig: AnimationExportConfig = {
         quality: animationQuality(),
         width: dimensions.width,
@@ -1154,6 +1202,8 @@ export function createExportPngDialog(
           onEmbedMetadataChange={setEmbedMetadata}
           cameraDuringExport={cameraDuringExport()}
           onCameraDuringExportChange={setCameraDuringExport}
+          animationOffscreen={animationOffscreen()}
+          onAnimationOffscreenChange={setAnimationOffscreen}
           onRenderAnimation={() => {
             handleRenderAnimation()
             respond()

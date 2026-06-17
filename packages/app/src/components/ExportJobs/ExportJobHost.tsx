@@ -7,13 +7,14 @@ import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
-import { exportJobs, hasPendingExportJobs, jobExists, setJobError, setJobProgress, setJobResult, setJobStatus, } from '@/utils/exportJobs'
+import { exportJobs, hasPendingExportJobs, jobExists, setImageJobProgress, setJobError, setJobResult, setJobStatus, } from '@/utils/exportJobs'
 import { addFlameDataToPng } from '@/utils/flameInPng'
 import { compressJsonQueryParam } from '@/utils/jsonQueryParam'
 import { saveRecentFlame } from '@/utils/recentFlames'
 import ui from './ExportJobHost.module.css'
+import { OffscreenAnimationRender } from './OffscreenAnimationRender'
 import type { ExportImageType } from '@/App'
-import type { ExportJob } from '@/utils/exportJobs'
+import type { ImageJob } from '@/utils/exportJobs'
 
 /**
  * Renders the current image export job OFFSCREEN, at its exact dimensions, in a
@@ -53,13 +54,19 @@ export function ExportJobHost() {
   return (
     <div class={ui.host} aria-hidden="true">
       <Show when={current()} keyed>
-        {(job) => <OffscreenRender job={job} />}
+        {(job) =>
+          job.type === 'animation' ? (
+            <OffscreenAnimationRender job={job} />
+          ) : (
+            <OffscreenRender job={job} />
+          )
+        }
       </Show>
     </div>
   )
 }
 
-function OffscreenRender(props: { job: ExportJob }) {
+function OffscreenRender(props: { job: ImageJob }) {
   const { job } = props
   const is3D = (job.flame.renderSettings.dimensions ?? 2) === 3
 
@@ -125,7 +132,7 @@ function OffscreenRender(props: { job: ExportJob }) {
     const now = globalThis.performance.now()
     if (now - lastProgressMs >= 100) {
       lastProgressMs = now
-      setJobProgress(job.id, accumulated, limitAccessor())
+      setImageJobProgress(job.id, accumulated, limitAccessor())
     }
     // Capture once the final color-graded image is on the canvas (quality
     // reached), or immediately on a "Stop & Export" request.

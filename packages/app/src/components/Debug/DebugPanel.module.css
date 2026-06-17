@@ -19,31 +19,16 @@
   border-bottom-left-radius: var(--space-2);
   background-color: var(--bg-color);
   text-align: end;
-  /* Equal-width figures so individual digits don't jitter as values update. */
+  white-space: nowrap;
+  /* Equal-width figures + a fixed min-width sized for the worst line, so the
+     right-anchored panel keeps a stable width as digit counts change. Text
+     right-aligns within it (no odd per-number gaps); compact notation bounds the
+     numbers so the panel never needs to grow past this. */
   font-variant-numeric: tabular-nums;
+  min-width: 24ch;
 
   user-select: none;
   -webkit-user-select: none;
-}
-
-/* Reserve fixed slots for the changing numbers (labels are static), so the
-   right-anchored panel keeps a stable width instead of shifting left/right as
-   digit counts grow and shrink during rendering. */
-.num,
-.num-ms {
-  display: inline-block;
-  text-align: end;
-  font-variant-numeric: tabular-nums;
-}
-
-.num {
-  /* compact counts/speeds: up to "999.9M" / "1000B" */
-  min-width: 6ch;
-}
-
-.num-ms {
-  /* millisecond timings: up to "1234.56" */
-  min-width: 7ch;
 }
 
 /* Container that wraps both the toggle tab and the panel */
