@@ -19,7 +19,7 @@ import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import { defaultPills, getNearestPresetKey, QualityPresets, qualityPresets, } from '../Quality/QualityPresets'
 import ui from './LogoFaviconGenerator.module.css'
-import { VariationPalette } from './VariationPalette'
+import { VariationMultiSelect } from '@/components/VariationMultiSelect/VariationMultiSelect'
 import type { Signal } from 'solid-js'
 import type { v2f } from 'typegpu/data'
 import type { Palette } from '@/flame/colorMap'
@@ -651,7 +651,8 @@ function LogoDialog(props: LogoDialogProps) {
           {/* Variation palette */}
           <div class={ui.paletteSection}>
             <span class={ui.fieldLabel}>Variation Palette</span>
-            <VariationPalette
+            <VariationMultiSelect
+              dims={2}
               allVariations={[...variationTypes]}
               selected={props.selectedVariations}
               onToggle={props.onToggleVariation}

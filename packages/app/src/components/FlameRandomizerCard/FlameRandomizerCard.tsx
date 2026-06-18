@@ -2,9 +2,10 @@ import { createEffect, createSignal, For, Show } from 'solid-js'
 import { Button } from '@/components/Button/Button'
 import { Checkbox } from '@/components/Checkbox/Checkbox'
 import { CollapsibleCard } from '@/components/CollapsibleCard/CollapsibleCard'
-import { VariationPalette } from '@/components/LogoFaviconGenerator/VariationPalette'
+import { VariationMultiSelect } from '@/components/VariationMultiSelect/VariationMultiSelect'
 import { RangeSlider } from '@/components/Sliders/RangeSlider'
 import { Slider } from '@/components/Sliders/Slider'
+import { categoryOf } from '@/flame/variationRegistry'
 import { variationTypes } from '@/flame/variations'
 import { variationTypes3D } from '@/flame/variations3D'
 import { persistentSignal } from '@/utils/persistentSignal'
@@ -12,6 +13,7 @@ import ui from './FlameRandomizerCard.module.css'
 import { RandomizerGallery } from './RandomizerGallery'
 import type { GenerateRandomFlameConfig, MutateFlameOptions, } from '@/flame/randomize'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { Dims } from '@/flame/variationRegistry'
 import type { TransformVariationType } from '@/flame/variations'
 import type { TransformVariationType3D } from '@/flame/variations3D'
 import type { HardwareTier } from '@/utils/hardwareTier'
@@ -109,6 +111,22 @@ function RandomizeToggleButton(props: {
   )
 }
 
+/**
+ * Categories selected by default in the randomizer — General + Blur only.
+ * Everything else (pre/post/crop/cut/dc/symmetry/3d/...) starts deselected.
+ */
+function defaultSelectedVariations(
+  dims: Dims,
+): Set<TransformVariationType | TransformVariationType3D> {
+  const list = dims === 3 ? variationTypes3D : variationTypes
+  return new Set(
+    list.filter((type) => {
+      const category = categoryOf(dims, type)
+      return category === 'general' || category === 'blur'
+    }),
+  )
+}
+
 export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
   const is3D = () => props.flame.renderSettings.dimensions === 3
 
@@ -133,15 +151,14 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
     setMaxVariations(val[1])
   }
 
-  // Track selected variations
+  // Track selected variations (default: General + Blur groups only).
   const [selectedVariations, setSelectedVariations] = createSignal<
     Set<TransformVariationType | TransformVariationType3D>
-  >(new Set([...variationTypes]))
+  >(defaultSelectedVariations(is3D() ? 3 : 2))
 
-  // Keep variations selection set updated when changing between 2D and 3D
+  // Reset to the default selection when switching between 2D and 3D.
   createEffect(() => {
-    const list = is3D() ? [...variationTypes3D] : [...variationTypes]
-    setSelectedVariations(new Set(list))
+    setSelectedVariations(defaultSelectedVariations(is3D() ? 3 : 2))
   })
 
   const handleToggleVariation = (
@@ -654,7 +671,8 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
             </button>
             <Show when={paletteExpanded()}>
               <div class={ui.paletteContainer}>
-                <VariationPalette
+                <VariationMultiSelect
+                  dims={is3D() ? 3 : 2}
                   allVariations={is3D() ? variationTypes3D : variationTypes}
                   selected={selectedVariations()}
                   onToggle={handleToggleVariation}
