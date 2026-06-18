@@ -82,6 +82,9 @@
   height: 100%;
   touch-action: none;
   cursor: crosshair;
+  /* SVG viewports clip to their box by default — let the edge nodes spill out so
+     the lane's overflow-clip-margin (not the svg) decides what shows. */
+  overflow: visible;
 }
 
 .axisLine {
