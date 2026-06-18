@@ -1521,11 +1521,21 @@ export function MainWorkspace(props: AppProps) {
           const q3 = Math.floor(start + (end - start) * 0.75)
           const dir = Math.random() > 0.5 ? 1 : -1
 
+          // Rotate the final transform a full turn. The affine matrix is
+          // [[a, b], [d, e]] (c, f are translation), so rotation by θ is
+          // a = e = cos θ, b = -sin θ, d = sin θ (`dir` flips the spin).
+          // θ steps 0,90,180,270,360 → cos: 1,0,-1,0,1  sin: 0,1,0,-1,0
           timeline.addKeyframe('finalTransform.a', start, 1, 'linear')
           timeline.addKeyframe('finalTransform.a', q1, 0, 'linear')
           timeline.addKeyframe('finalTransform.a', mid, -1, 'linear')
           timeline.addKeyframe('finalTransform.a', q3, 0, 'linear')
           timeline.addKeyframe('finalTransform.a', end, 1, 'linear')
+
+          timeline.addKeyframe('finalTransform.e', start, 1, 'linear')
+          timeline.addKeyframe('finalTransform.e', q1, 0, 'linear')
+          timeline.addKeyframe('finalTransform.e', mid, -1, 'linear')
+          timeline.addKeyframe('finalTransform.e', q3, 0, 'linear')
+          timeline.addKeyframe('finalTransform.e', end, 1, 'linear')
 
           timeline.addKeyframe('finalTransform.b', start, 0, 'linear')
           timeline.addKeyframe('finalTransform.b', q1, -dir, 'linear')
@@ -1533,17 +1543,11 @@ export function MainWorkspace(props: AppProps) {
           timeline.addKeyframe('finalTransform.b', q3, dir, 'linear')
           timeline.addKeyframe('finalTransform.b', end, 0, 'linear')
 
-          timeline.addKeyframe('finalTransform.c', start, 0, 'linear')
-          timeline.addKeyframe('finalTransform.c', q1, dir, 'linear')
-          timeline.addKeyframe('finalTransform.c', mid, 0, 'linear')
-          timeline.addKeyframe('finalTransform.c', q3, -dir, 'linear')
-          timeline.addKeyframe('finalTransform.c', end, 0, 'linear')
-
-          timeline.addKeyframe('finalTransform.d', start, 1, 'linear')
-          timeline.addKeyframe('finalTransform.d', q1, 0, 'linear')
-          timeline.addKeyframe('finalTransform.d', mid, -1, 'linear')
-          timeline.addKeyframe('finalTransform.d', q3, 0, 'linear')
-          timeline.addKeyframe('finalTransform.d', end, 1, 'linear')
+          timeline.addKeyframe('finalTransform.d', start, 0, 'linear')
+          timeline.addKeyframe('finalTransform.d', q1, dir, 'linear')
+          timeline.addKeyframe('finalTransform.d', mid, 0, 'linear')
+          timeline.addKeyframe('finalTransform.d', q3, -dir, 'linear')
+          timeline.addKeyframe('finalTransform.d', end, 0, 'linear')
         }
       }
 
