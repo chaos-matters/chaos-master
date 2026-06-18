@@ -1,7 +1,6 @@
 import { createSignal, onMount } from 'solid-js'
 import { useRequestModal } from '@/components/Modal/ModalContext'
 import { generateRandomFlame } from '@/flame/randomize'
-import { FlameInspectModal } from './FlameInspectModal'
 import { GalleryGrid } from './GalleryGrid'
 import ui from './RandomizerGallery.module.css'
 import { RandomizerGalleryModal } from './RandomizerGalleryModal'
@@ -54,18 +53,6 @@ export function RandomizerGallery(props: {
     })
   }
 
-  const openInspect = (flame: FlameDescriptor) => {
-    void requestModal({
-      content: ({ respond }) => (
-        <FlameInspectModal
-          flame={flame}
-          onApply={props.onApply}
-          respond={respond}
-        />
-      ),
-    })
-  }
-
   return (
     <div class={ui.gallery}>
       <div class={ui.galleryHeader}>
@@ -111,7 +98,6 @@ export function RandomizerGallery(props: {
         onMutate={(flame) => {
           openModal(flame)
         }}
-        onInspect={openInspect}
       />
     </div>
   )

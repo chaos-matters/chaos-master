@@ -9,16 +9,20 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  flex-wrap: wrap;
+  row-gap: 0.4rem;
+  margin-bottom: 0.15rem;
 }
 
 .galleryHint {
-  font-size: 0.75rem;
-  opacity: 0.7;
+  font-size: 0.78rem;
+  font-weight: 500;
+  opacity: 0.75;
 }
 
 .galleryActions {
   display: inline-flex;
-  gap: 0.3rem;
+  gap: 0.4rem;
 }
 
 .rerollBtn,
@@ -26,7 +30,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.3rem 0.6rem;
+  padding: 0.35rem 0.7rem;
   border: 1px solid var(--border-color, rgba(128, 128, 128, 0.3));
   border-radius: 0.35rem;
   background: transparent;

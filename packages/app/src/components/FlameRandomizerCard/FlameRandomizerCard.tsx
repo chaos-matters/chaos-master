@@ -2,9 +2,9 @@ import { createEffect, createSignal, For, Show } from 'solid-js'
 import { Button } from '@/components/Button/Button'
 import { Checkbox } from '@/components/Checkbox/Checkbox'
 import { CollapsibleCard } from '@/components/CollapsibleCard/CollapsibleCard'
-import { VariationMultiSelect } from '@/components/VariationMultiSelect/VariationMultiSelect'
 import { RangeSlider } from '@/components/Sliders/RangeSlider'
 import { Slider } from '@/components/Sliders/Slider'
+import { VariationMultiSelect } from '@/components/VariationMultiSelect/VariationMultiSelect'
 import { categoryOf } from '@/flame/variationRegistry'
 import { variationTypes } from '@/flame/variations'
 import { variationTypes3D } from '@/flame/variations3D'
@@ -892,12 +892,14 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
               <span>Preview Gallery</span>
             </button>
             <Show when={galleryExpanded()}>
-              <RandomizerGallery
-                buildConfig={buildConfig}
-                buildMutationOptions={buildMutationOptions}
-                hardwareTier={props.hardwareTier}
-                onApply={props.onApplyCandidate}
-              />
+              <div class={ui.paletteContainer}>
+                <RandomizerGallery
+                  buildConfig={buildConfig}
+                  buildMutationOptions={buildMutationOptions}
+                  hardwareTier={props.hardwareTier}
+                  onApply={props.onApplyCandidate}
+                />
+              </div>
             </Show>
           </div>
 
