@@ -889,7 +889,7 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
               >
                 <polyline points="6 9 12 15 18 9" />
               </svg>
-              <span>Gallery (pick from random previews)</span>
+              <span>Preview Gallery</span>
             </button>
             <Show when={galleryExpanded()}>
               <RandomizerGallery
