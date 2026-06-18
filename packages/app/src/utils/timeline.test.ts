@@ -598,14 +598,15 @@ describe('Timeline Utilities', () => {
       expect(timeline.config().endFrame).toBe(extendedEnd)
     })
 
-    it('reserves trailing room when the last keyframe sits at endFrame', () => {
+    it('reserves trailing room equal to the forward span (uniform return)', () => {
       timeline.setConfig({ ...timeline.config(), startFrame: 0, endFrame: 40 })
       timeline.addKeyframe('exposure', 0, 0.2, 'linear')
       timeline.addKeyframe('exposure', 40, 0.9, 'linear')
 
       timeline.setSeamlessLoop(true)
-      // userEnd = 40, span = 40 → endFrame extended to 40 + 20 = 60.
-      expect(timeline.config().endFrame).toBe(60)
+      // userEnd = 40, span = 40 → endFrame extended to 40 + 40 = 80 so the
+      // return takes the same time as the forward animation.
+      expect(timeline.config().endFrame).toBe(80)
     })
 
     it('resolves a value at endFrame equal to the start value when on', () => {

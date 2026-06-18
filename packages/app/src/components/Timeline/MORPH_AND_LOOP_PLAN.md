@@ -78,10 +78,10 @@ paths), `applyTracksToFlame` (the offscreen export job, from `job.config`), and
 
 **Enabling the toggle (`setSeamlessLoop(true)`):** sets `seamlessLoop = true`
 and `loop = true`, and — only if the timeline currently ends on/before the last
-keyframe (`endFrame <= userEnd`) — extends `endFrame` to `userEnd + round(span ×
-0.5)` so a return ramp exists. Re-enabling when room already exists is a no-op
-(idempotent — no piling up). Disabling just clears the flag; the keyframes were
-never touched.
+keyframe (`endFrame <= userEnd`) — extends `endFrame` to `userEnd + span` (the
+full forward span) so the return (B→A) takes the **same time** as the forward
+animation (A→B). Re-enabling when room already exists is a no-op (idempotent — no
+piling up). Disabling just clears the flag; the keyframes were never touched.
 
 **Composition with Morph:** a morph is `blendWeight` 1 @ start → 0 @ endFrame.
 Turning Seamless on extends the timeline past that final keyframe and ramps

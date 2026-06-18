@@ -589,11 +589,13 @@ function renderPresets(): RawPresetDef[] {
       },
     },
     {
-      label: 'Phase 0→1',
+      label: 'Glow Pulse',
       apply(flame, timeline) {
-        const { start, end } = frameRange(timeline)
-        timeline.addKeyframe('palettePhase', start, 0, LINEAR)
-        timeline.addKeyframe('palettePhase', end, 1, LINEAR)
+        const { start, mid, end } = frameRange(timeline)
+        const v = flame.renderSettings.highlightPower ?? 0.5
+        timeline.addKeyframe('highlightPower', start, v, EASE_IN_OUT)
+        timeline.addKeyframe('highlightPower', mid, v + 0.6, EASE_IN_OUT)
+        timeline.addKeyframe('highlightPower', end, v, EASE_IN_OUT)
       },
     },
   ]
@@ -680,7 +682,27 @@ function colorPresets(): RawPresetDef[] {
       },
     },
     {
-      label: 'Speed Up',
+      // Palette phase sweep (renamed from the ambiguous "Phase 0→1"). Needs an
+      // active palette to be visible — sweeps the colour mapping a full cycle.
+      label: 'Palette Sweep',
+      apply(_flame, timeline) {
+        const { start, end } = frameRange(timeline)
+        timeline.addKeyframe('palettePhase', start, 0, LINEAR)
+        timeline.addKeyframe('palettePhase', end, 1, LINEAR)
+      },
+    },
+    {
+      label: 'Palette Bounce',
+      apply(flame, timeline) {
+        const { start, mid, end } = frameRange(timeline)
+        const v = flame.renderSettings.palettePhase
+        timeline.addKeyframe('palettePhase', start, v, EASE_IN_OUT)
+        timeline.addKeyframe('palettePhase', mid, (v + 0.5) % 1, EASE_IN_OUT)
+        timeline.addKeyframe('palettePhase', end, v, EASE_IN_OUT)
+      },
+    },
+    {
+      label: 'Palette Speed Up',
       apply(flame, timeline) {
         const { start, end } = frameRange(timeline)
         const v = flame.renderSettings.paletteSpeed
@@ -694,7 +716,7 @@ function colorPresets(): RawPresetDef[] {
       },
     },
     {
-      label: 'Speed Wave',
+      label: 'Palette Speed Wave',
       apply(flame, timeline) {
         const { start, mid, end } = frameRange(timeline)
         const v = flame.renderSettings.paletteSpeed
@@ -704,22 +726,13 @@ function colorPresets(): RawPresetDef[] {
         timeline.addKeyframe('paletteSpeed', end, v, EASE_IN_OUT)
       },
     },
-    {
-      label: 'Phase Cycle',
-      apply(flame, timeline) {
-        const { start, mid, end } = frameRange(timeline)
-        const v = flame.renderSettings.palettePhase
-        timeline.addKeyframe('palettePhase', start, v, EASE_IN_OUT)
-        timeline.addKeyframe('palettePhase', mid, (v + 0.5) % 1, EASE_IN_OUT)
-        timeline.addKeyframe('palettePhase', end, v, EASE_IN_OUT)
-      },
-    },
   ]
 }
 
 function affinePresets(): RawPresetDef[] {
   return [
     {
+      // Uniform scale lives on the matrix diagonal a (x) and e (y).
       label: 'Scale Up',
       apply(flame, timeline) {
         const { start, end } = frameRange(timeline)
@@ -733,9 +746,9 @@ function affinePresets(): RawPresetDef[] {
             EASE_IN_OUT,
           )
           timeline.addKeyframe(
-            `transform.${tidStr}.postAffine.d`,
+            `transform.${tidStr}.postAffine.e`,
             start,
-            aff.d,
+            aff.e,
             EASE_IN_OUT,
           )
           timeline.addKeyframe(
@@ -745,9 +758,9 @@ function affinePresets(): RawPresetDef[] {
             EASE_IN_OUT,
           )
           timeline.addKeyframe(
-            `transform.${tidStr}.postAffine.d`,
+            `transform.${tidStr}.postAffine.e`,
             end,
-            aff.d * 1.5,
+            aff.e * 1.5,
             EASE_IN_OUT,
           )
         }
@@ -767,9 +780,9 @@ function affinePresets(): RawPresetDef[] {
             EASE_IN_OUT,
           )
           timeline.addKeyframe(
-            `transform.${tidStr}.postAffine.d`,
+            `transform.${tidStr}.postAffine.e`,
             start,
-            aff.d,
+            aff.e,
             EASE_IN_OUT,
           )
           timeline.addKeyframe(
@@ -779,9 +792,9 @@ function affinePresets(): RawPresetDef[] {
             EASE_IN_OUT,
           )
           timeline.addKeyframe(
-            `transform.${tidStr}.postAffine.d`,
+            `transform.${tidStr}.postAffine.e`,
             end,
-            aff.d * 0.5,
+            aff.e * 0.5,
             EASE_IN_OUT,
           )
         }
@@ -793,8 +806,10 @@ function affinePresets(): RawPresetDef[] {
         const { start, end } = frameRange(timeline)
         for (const [tid, t] of recordEntries(flame.transforms)) {
           const tidStr = String(tid)
-          const { a, b, c, d } = t.postAffine
-          // Post-multiply by 90° rotation: [a b; c d] * [0 -1; 1 0] = [b -a; d -c]
+          // The affine matrix is [[a, b], [d, e]] (c, f are translation).
+          // Post-multiply by a 90° rotation R = [[0, -1], [1, 0]]:
+          //   [[a b] [d e]] · R = [[b -a] [e -d]]
+          const { a, b, d, e } = t.postAffine
           timeline.addKeyframe(
             `transform.${tidStr}.postAffine.a`,
             start,
@@ -808,15 +823,15 @@ function affinePresets(): RawPresetDef[] {
             EASE_IN_OUT,
           )
           timeline.addKeyframe(
-            `transform.${tidStr}.postAffine.c`,
-            start,
-            c,
-            EASE_IN_OUT,
-          )
-          timeline.addKeyframe(
             `transform.${tidStr}.postAffine.d`,
             start,
             d,
+            EASE_IN_OUT,
+          )
+          timeline.addKeyframe(
+            `transform.${tidStr}.postAffine.e`,
+            start,
+            e,
             EASE_IN_OUT,
           )
           timeline.addKeyframe(
@@ -832,15 +847,76 @@ function affinePresets(): RawPresetDef[] {
             EASE_IN_OUT,
           )
           timeline.addKeyframe(
-            `transform.${tidStr}.postAffine.c`,
+            `transform.${tidStr}.postAffine.d`,
             end,
-            d,
+            e,
             EASE_IN_OUT,
           )
           timeline.addKeyframe(
-            `transform.${tidStr}.postAffine.d`,
+            `transform.${tidStr}.postAffine.e`,
             end,
-            -c,
+            -d,
+            EASE_IN_OUT,
+          )
+        }
+      },
+    },
+    {
+      // Spin the final (post-IFS) transform a full turn — with Symmetry applied
+      // this reads as a rotating kaleidoscope. Matrix [[a b] [d e]] = rotation.
+      label: 'Kaleidoscope',
+      apply(_flame, timeline) {
+        const { start, end } = frameRange(timeline)
+        const steps = 8
+        for (let i = 0; i <= steps; i++) {
+          const frame = Math.round(start + ((end - start) * i) / steps)
+          const theta = (Math.PI * 2 * i) / steps
+          const cos = Math.cos(theta)
+          const sin = Math.sin(theta)
+          timeline.addKeyframe('finalTransform.a', frame, cos, LINEAR)
+          timeline.addKeyframe('finalTransform.b', frame, -sin, LINEAR)
+          timeline.addKeyframe('finalTransform.d', frame, sin, LINEAR)
+          timeline.addKeyframe('finalTransform.e', frame, cos, LINEAR)
+        }
+      },
+    },
+    {
+      // Breathe the whole image via a uniform final-transform scale pulse.
+      label: 'Bloom',
+      apply(_flame, timeline) {
+        const { start, mid, end } = frameRange(timeline)
+        timeline.addKeyframe('finalTransform.a', start, 1, EASE_IN_OUT)
+        timeline.addKeyframe('finalTransform.e', start, 1, EASE_IN_OUT)
+        timeline.addKeyframe('finalTransform.a', mid, 1.4, EASE_IN_OUT)
+        timeline.addKeyframe('finalTransform.e', mid, 1.4, EASE_IN_OUT)
+        timeline.addKeyframe('finalTransform.a', end, 1, EASE_IN_OUT)
+        timeline.addKeyframe('finalTransform.e', end, 1, EASE_IN_OUT)
+      },
+    },
+    {
+      // Sway the x-from-y shear (coefficient b) back and forth.
+      label: 'Shear Sway',
+      apply(flame, timeline) {
+        const { start, mid, end } = frameRange(timeline)
+        for (const [tid, t] of recordEntries(flame.transforms)) {
+          const tidStr = String(tid)
+          const b = t.postAffine.b
+          timeline.addKeyframe(
+            `transform.${tidStr}.postAffine.b`,
+            start,
+            b,
+            EASE_IN_OUT,
+          )
+          timeline.addKeyframe(
+            `transform.${tidStr}.postAffine.b`,
+            mid,
+            b + 0.4,
+            EASE_IN_OUT,
+          )
+          timeline.addKeyframe(
+            `transform.${tidStr}.postAffine.b`,
+            end,
+            b,
             EASE_IN_OUT,
           )
         }
@@ -880,7 +956,8 @@ function affinePresets(): RawPresetDef[] {
         for (const [tid, t] of recordEntries(flame.transforms)) {
           const tidStr = String(tid)
           for (const affine of ['preAffine', 'postAffine'] as const) {
-            for (const coeff of ['a', 'b', 'c', 'd'] as const) {
+            // a, b, d, e are the 2×2 matrix (c, f are translation).
+            for (const coeff of ['a', 'b', 'd', 'e'] as const) {
               const v = t[affine][coeff]
               timeline.addKeyframe(
                 `transform.${tidStr}.${affine}.${coeff}`,
@@ -900,6 +977,7 @@ function affinePresets(): RawPresetDef[] {
       },
     },
     {
+      // Drift = translate the transform. Translation is c (x) and f (y).
       label: 'Drift',
       apply(flame, timeline) {
         const { start, end } = frameRange(timeline)
@@ -907,9 +985,9 @@ function affinePresets(): RawPresetDef[] {
           const tidStr = String(tid)
           const aff = t.postAffine
           timeline.addKeyframe(
-            `transform.${tidStr}.postAffine.e`,
+            `transform.${tidStr}.postAffine.c`,
             start,
-            aff.e,
+            aff.c,
             EASE_IN_OUT,
           )
           timeline.addKeyframe(
@@ -919,9 +997,9 @@ function affinePresets(): RawPresetDef[] {
             EASE_IN_OUT,
           )
           timeline.addKeyframe(
-            `transform.${tidStr}.postAffine.e`,
+            `transform.${tidStr}.postAffine.c`,
             end,
-            aff.e + (random01() - 0.5) * 0.6,
+            aff.c + (random01() - 0.5) * 0.6,
             EASE_IN_OUT,
           )
           timeline.addKeyframe(

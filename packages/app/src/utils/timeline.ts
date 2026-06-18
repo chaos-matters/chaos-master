@@ -1199,9 +1199,10 @@ export function createTimelineState() {
     const userEnd = getUserEndFrame(tracks(), cfg.startFrame)
     // Reserve room for the return ramp only when the timeline ends on (or before)
     // the last keyframe — otherwise the existing trailing gap is used as-is.
+    // The tail equals the forward span so the return (B→A) takes the same time
+    // as the forward animation (A→B) — a uniform, non-sped-up loop.
     const span = Math.max(1, userEnd - cfg.startFrame)
-    const endFrame =
-      cfg.endFrame > userEnd ? cfg.endFrame : userEnd + Math.round(span * 0.5)
+    const endFrame = cfg.endFrame > userEnd ? cfg.endFrame : userEnd + span
     setConfig({ ...cfg, seamlessLoop: true, loop: true, endFrame })
   }
 

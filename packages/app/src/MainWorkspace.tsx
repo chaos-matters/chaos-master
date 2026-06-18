@@ -2211,56 +2211,33 @@ export function MainWorkspace(props: AppProps) {
 
   // Effective camera values: read from timeline whenever animation is enabled
   // so the camera follows keyframes during playback, seeking, and when stopped.
+  const animatingCamera = () =>
+    animationEnabled() && (timeline.isPlaying() || timeline.isScrubbing())
+
   const effectiveZoom = createMemo(() => {
-    if (
-      animationEnabled() &&
-      (timeline.isPlaying() || timeline.isScrubbing())
-    ) {
-      const track = timeline
-        .tracks()
-        .find((t) => t.parameterPath === 'camera.zoom')
-      if (track) {
-        const val = resolveKeyframeValue(
-          track.keyframes,
-          timeline.currentFrame(),
-        )
-        if (val !== null && typeof val === 'number') return val
-      }
+    if (animatingCamera()) {
+      const val = timeline.resolveValueAtPath(
+        'camera.zoom',
+        timeline.currentFrame(),
+      )
+      if (val !== null && typeof val === 'number') return val
     }
     return flameDescriptor.renderSettings.camera.zoom
   })
 
   const effectivePosition = createMemo(() => {
-    if (
-      animationEnabled() &&
-      (timeline.isPlaying() || timeline.isScrubbing())
-    ) {
-      const xTrack = timeline
-        .tracks()
-        .find((t) => t.parameterPath === 'camera.x')
-      const yTrack = timeline
-        .tracks()
-        .find((t) => t.parameterPath === 'camera.y')
-      if (xTrack && yTrack) {
-        const xVal = resolveKeyframeValue(
-          xTrack.keyframes,
-          timeline.currentFrame(),
-        )
-        const yVal = resolveKeyframeValue(
-          yTrack.keyframes,
-          timeline.currentFrame(),
-        )
-        if (
-          xVal !== null &&
-          yVal !== null &&
-          typeof xVal === 'number' &&
-          typeof yVal === 'number'
-        ) {
-          return vec2f(xVal, yVal)
-        }
-      }
+    const base = flameDescriptor.renderSettings.camera.position
+    if (animatingCamera()) {
+      const frame = timeline.currentFrame()
+      // Resolve each axis independently — presets like Pan Left only keyframe
+      // one axis, so requiring both tracks would freeze the camera.
+      const xVal = timeline.resolveValueAtPath('camera.x', frame)
+      const yVal = timeline.resolveValueAtPath('camera.y', frame)
+      const x = typeof xVal === 'number' ? xVal : base[0]
+      const y = typeof yVal === 'number' ? yVal : base[1]
+      return vec2f(x, y)
     }
-    return vec2f(...flameDescriptor.renderSettings.camera.position)
+    return vec2f(...base)
   })
 
   useKeyboardShortcuts({
