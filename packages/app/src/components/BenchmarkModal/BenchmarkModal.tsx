@@ -429,12 +429,16 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
 
     // Results (right column)
     const rx = 360
-    let ry = 64
+    // Start the workload pill so its text baseline (y + 15) lands on the same
+    // row as the left column's "DEVICE" header baseline (y = 90), keeping the two
+    // columns visually aligned.
+    let ry = 75
 
     // Which benchmark workload was run.
     const workload = selectedFlame()
     drawPill(ctx, rx, ry, `${workload.label}  ·  ${workload.meta}`, 'blue')
-    ry += 34
+    // Extra gap below the pill so "MILLIONS / SECOND" reads as its own group.
+    ry += 44
 
     ctx.fillStyle = 'rgba(255,255,255,0.35)'
     ctx.font = '10px Inter, system-ui, sans-serif'
