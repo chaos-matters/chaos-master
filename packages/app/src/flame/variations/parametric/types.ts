@@ -6,7 +6,7 @@ import { VariationInfo } from '../simple/types'
 import type { TgpuFn } from 'typegpu'
 import type { BaseData, Infer, v2f, Vec2f, WgslStruct } from 'typegpu/data'
 import type { BooleanSchema, OptionalSchema } from 'valibot'
-import type { VariationCategory } from '../simple/types'
+import type { VariationCategory } from '../categories'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 
 type ParametricVariationDescriptor<
