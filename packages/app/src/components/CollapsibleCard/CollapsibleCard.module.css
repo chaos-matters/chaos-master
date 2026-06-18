@@ -140,12 +140,14 @@
   }
 }
 
-/* Inner card blends into our content container — suppress its top and bottom border/radius */
+/* Inner card blends into our content container — suppress its top border/radius,
+   and round its bottom corners to follow the container's rounded bottom (inset by
+   the 2px border) so a square inner corner doesn't poke past the card's rounding. */
 .content > * {
   border-top: none !important;
   border-bottom: none !important;
   border-top-left-radius: 0 !important;
   border-top-right-radius: 0 !important;
-  border-bottom-left-radius: 0 !important;
-  border-bottom-right-radius: 0 !important;
+  border-bottom-left-radius: calc(var(--space-3) - 2px) !important;
+  border-bottom-right-radius: calc(var(--space-3) - 2px) !important;
 }
