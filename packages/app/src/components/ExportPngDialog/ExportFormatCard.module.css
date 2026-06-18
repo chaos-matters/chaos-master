@@ -4,6 +4,15 @@
   gap: 0.4rem;
 }
 
+/* Locked while frame previews render (changing aspect mid-render misbehaves). */
+.disabled {
+  opacity: 0.55;
+}
+
+.card:disabled {
+  cursor: not-allowed;
+}
+
 /* Label in a fixed column with the pills beside it — compact, and the two rows
    line up. */
 .group {

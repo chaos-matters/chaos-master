@@ -77,6 +77,8 @@ type Props = {
   aspect: ExportAspectKey
   /** Current viewport W/H aspect, used to resolve the "auto" aspect. */
   viewportAspect: number
+  /** Notifies the parent when preview rendering starts/stops (to lock settings). */
+  onGeneratingChange?: (generating: boolean) => void
 }
 
 export function FramePreviewGallery(props: Props) {
@@ -110,6 +112,11 @@ export function FramePreviewGallery(props: Props) {
 
   // Thumbnail cell size (controlled by slider, always visible)
   const [thumbSize, setThumbSize] = createSignal(THUMB_SIZE_DEFAULT)
+
+  // Let the parent lock the export format settings while previews render.
+  createEffect(() => {
+    props.onGeneratingChange?.(isGenerating())
+  })
 
   // Cached previews become stale when the aspect or stride changes — drop them
   // so they're re-rendered consistently (skip the very first run).
