@@ -1,0 +1,59 @@
+.gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.galleryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  row-gap: 0.4rem;
+  margin-bottom: 0.15rem;
+}
+
+.galleryHint {
+  font-size: 0.78rem;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+.galleryActions {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+
+.rerollBtn,
+.advancedBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--border-color, rgba(128, 128, 128, 0.3));
+  border-radius: 0.35rem;
+  background: transparent;
+  color: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.rerollBtn:hover,
+.advancedBtn:hover {
+  background: rgba(128, 128, 128, 0.12);
+}
+
+.advancedBtn {
+  border-color: var(--accent-color, #6ea8fe);
+  color: var(--accent-color, #6ea8fe);
+}
+
+.rerollIcon {
+  width: 13px;
+  height: 13px;
+}

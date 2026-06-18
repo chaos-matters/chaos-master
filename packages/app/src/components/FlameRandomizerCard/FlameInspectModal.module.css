@@ -1,0 +1,48 @@
+.modal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.canvasWrap {
+  align-self: center;
+  height: min(56vh, 576px);
+  aspect-ratio: 16 / 9;
+  max-width: 86vw;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #000;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* Matches the app's primary button (e.g. "Generate Random Flame"). */
+.applyBtn {
+  padding: 0.5rem 1.1rem;
+  border: none;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  background-color: oklch(60% 0.12 250);
+  transition: background-color 0.15s;
+
+  &:hover {
+    background-color: oklch(52% 0.12 250);
+  }
+
+  [data-theme='dark'] & {
+    background-color: oklch(45% 0.1 250);
+
+    &:hover {
+      background-color: oklch(52% 0.1 250);
+    }
+  }
+}

@@ -2,17 +2,21 @@ import { createEffect, createSignal, For, Show } from 'solid-js'
 import { Button } from '@/components/Button/Button'
 import { Checkbox } from '@/components/Checkbox/Checkbox'
 import { CollapsibleCard } from '@/components/CollapsibleCard/CollapsibleCard'
-import { VariationPalette } from '@/components/LogoFaviconGenerator/VariationPalette'
 import { RangeSlider } from '@/components/Sliders/RangeSlider'
 import { Slider } from '@/components/Sliders/Slider'
+import { VariationMultiSelect } from '@/components/VariationMultiSelect/VariationMultiSelect'
+import { categoryOf } from '@/flame/variationRegistry'
 import { variationTypes } from '@/flame/variations'
 import { variationTypes3D } from '@/flame/variations3D'
 import { persistentSignal } from '@/utils/persistentSignal'
 import ui from './FlameRandomizerCard.module.css'
-import type { GenerateRandomFlameConfig } from '@/flame/randomize'
+import { RandomizerGallery } from './RandomizerGallery'
+import type { GenerateRandomFlameConfig, MutateFlameOptions, } from '@/flame/randomize'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { Dims } from '@/flame/variationRegistry'
 import type { TransformVariationType } from '@/flame/variations'
 import type { TransformVariationType3D } from '@/flame/variations3D'
+import type { HardwareTier } from '@/utils/hardwareTier'
 import type { RandomizerHistoryEntry } from '@/utils/randomizerHistoryDB'
 
 export interface FlameRandomizerCardProps {
@@ -69,6 +73,9 @@ export interface FlameRandomizerCardProps {
   onUpdateRenderSettings: (
     settings: Partial<FlameDescriptor['renderSettings']>,
   ) => void
+  /** Apply a flame chosen from the preview gallery (replaces the active flame). */
+  onApplyCandidate: (flame: FlameDescriptor) => void
+  hardwareTier?: HardwareTier | null
 }
 
 function RandomizeToggleButton(props: {
@@ -104,8 +111,30 @@ function RandomizeToggleButton(props: {
   )
 }
 
+/**
+ * Categories selected by default in the randomizer — General + Blur only.
+ * Everything else (pre/post/crop/cut/dc/symmetry/3d/...) starts deselected.
+ */
+function defaultSelectedVariations(
+  dims: Dims,
+): Set<TransformVariationType | TransformVariationType3D> {
+  const list = dims === 3 ? variationTypes3D : variationTypes
+  return new Set(
+    list.filter((type) => {
+      const category = categoryOf(dims, type)
+      return category === 'general' || category === 'blur'
+    }),
+  )
+}
+
 export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
   const is3D = () => props.flame.renderSettings.dimensions === 3
+
+  // A single "active selection" across the whole card: either a Preview Gallery
+  // cell or a Recent History entry is highlighted, never both.
+  const [selectionOwner, setSelectionOwner] = createSignal<
+    'gallery' | 'history' | null
+  >(null)
 
   // Local settings signals
   const [strength, setStrength] = createSignal(0.5)
@@ -128,15 +157,14 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
     setMaxVariations(val[1])
   }
 
-  // Track selected variations
+  // Track selected variations (default: General + Blur groups only).
   const [selectedVariations, setSelectedVariations] = createSignal<
     Set<TransformVariationType | TransformVariationType3D>
-  >(new Set([...variationTypes]))
+  >(defaultSelectedVariations(is3D() ? 3 : 2))
 
-  // Keep variations selection set updated when changing between 2D and 3D
+  // Reset to the default selection when switching between 2D and 3D.
   createEffect(() => {
-    const list = is3D() ? [...variationTypes3D] : [...variationTypes]
-    setSelectedVariations(new Set(list))
+    setSelectedVariations(defaultSelectedVariations(is3D() ? 3 : 2))
   })
 
   const handleToggleVariation = (
@@ -257,19 +285,29 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
   const [animationExpanded, setAnimationExpanded] = createSignal(false)
   const [historyExpanded, setHistoryExpanded] = createSignal(true)
 
+  const buildConfig = (): GenerateRandomFlameConfig => ({
+    strength: strength(),
+    minTransforms: minTransforms(),
+    maxTransforms: maxTransforms(),
+    minVariations: minVariations(),
+    maxVariations: maxVariations(),
+    allowedVariations: [...selectedVariations()] as (
+      | TransformVariationType
+      | TransformVariationType3D
+    )[],
+    dimensions: props.flame.renderSettings.dimensions,
+  })
+
+  const buildMutationOptions = (): MutateFlameOptions => ({
+    mutateAffine: mutateAffine(),
+    affineMode: affineMode(),
+    mutateVariations: mutateVariations(),
+    mutateColors: mutateColors(),
+  })
+
   const handleGenerate = () => {
-    const config: GenerateRandomFlameConfig = {
-      strength: strength(),
-      minTransforms: minTransforms(),
-      maxTransforms: maxTransforms(),
-      minVariations: minVariations(),
-      maxVariations: maxVariations(),
-      allowedVariations: [...selectedVariations()] as (
-        | TransformVariationType
-        | TransformVariationType3D
-      )[],
-      dimensions: props.flame.renderSettings.dimensions,
-    }
+    setSelectionOwner(null)
+    const config = buildConfig()
     props.onGenerateFlame(
       config,
       {
@@ -291,18 +329,8 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
   }
 
   const handleMutate = () => {
-    const config: GenerateRandomFlameConfig = {
-      strength: strength(),
-      minTransforms: minTransforms(),
-      maxTransforms: maxTransforms(),
-      minVariations: minVariations(),
-      maxVariations: maxVariations(),
-      allowedVariations: [...selectedVariations()] as (
-        | TransformVariationType
-        | TransformVariationType3D
-      )[],
-      dimensions: props.flame.renderSettings.dimensions,
-    }
+    setSelectionOwner(null)
+    const config = buildConfig()
     props.onMutateFlame(
       config,
       {
@@ -319,12 +347,7 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
         vibrancy: randomizeVibrancy(),
         vibrancyRange: vibrancyRange(),
       },
-      {
-        mutateAffine: mutateAffine(),
-        affineMode: affineMode(),
-        mutateVariations: mutateVariations(),
-        mutateColors: mutateColors(),
-      },
+      buildMutationOptions(),
       recordHistoryOnMutate(),
     )
   }
@@ -344,6 +367,7 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
   }
 
   const [paletteExpanded, setPaletteExpanded] = createSignal(false)
+  const [galleryExpanded, setGalleryExpanded] = createSignal(false)
 
   return (
     <CollapsibleCard title="Flame Randomizer" defaultOpen={false}>
@@ -655,7 +679,8 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
             </button>
             <Show when={paletteExpanded()}>
               <div class={ui.paletteContainer}>
-                <VariationPalette
+                <VariationMultiSelect
+                  dims={is3D() ? 3 : 2}
                   allVariations={is3D() ? variationTypes3D : variationTypes}
                   selected={selectedVariations()}
                   onToggle={handleToggleVariation}
@@ -851,6 +876,45 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
             </Show>
           </div>
 
+          {/* Preview gallery: pick a flame from a page of random previews
+              instead of click-spamming Generate. Mounts (and renders the
+              off-screen previews) only while expanded. */}
+          <div class={ui.paletteWrapper}>
+            <button
+              type="button"
+              class={ui.paletteHeader}
+              onClick={() => setGalleryExpanded(!galleryExpanded())}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                class={ui.chevron}
+                classList={{
+                  [ui.chevronExpanded as string]: galleryExpanded(),
+                }}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+              <span>Preview Gallery</span>
+            </button>
+            <Show when={galleryExpanded()}>
+              <div class={ui.paletteContainer}>
+                <RandomizerGallery
+                  buildConfig={buildConfig}
+                  buildMutationOptions={buildMutationOptions}
+                  hardwareTier={props.hardwareTier}
+                  selectionActive={selectionOwner() === 'gallery'}
+                  onApply={(flame) => {
+                    setSelectionOwner('gallery')
+                    props.onApplyCandidate(flame)
+                  }}
+                />
+              </div>
+            </Show>
+          </div>
+
           <div class={ui.buttonGroup}>
             <Button
               class={ui.primaryButton}
@@ -956,9 +1020,11 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
                       class={ui.historyThumbBtn}
                       classList={{
                         [ui.historyThumbBtnSelected as string]:
+                          selectionOwner() === 'history' &&
                           props.selectedTimestamp === entry.timestamp,
                       }}
                       onClick={() => {
+                        setSelectionOwner('history')
                         props.onLoadHistory(entry)
                       }}
                       title="Load flame state"

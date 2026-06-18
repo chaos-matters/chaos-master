@@ -4,6 +4,6 @@ dist
 .env.local
 test-results
 .wrangler
-.claude/settings.local.json
+**/.claude/settings.local.json
 # Local scratch space (not part of the project)
 /assets/local/

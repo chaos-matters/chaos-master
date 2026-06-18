@@ -812,6 +812,21 @@
   }
 }
 
+.transforms-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.1rem 0.25rem 0;
+}
+
+.transforms-toolbar-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--neutral-500);
+}
+
 .visibility-button {
   border: none;
   border-radius: var(--round);

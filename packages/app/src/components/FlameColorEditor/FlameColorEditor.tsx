@@ -138,6 +138,7 @@ function FlameColorHandle(props: {
   dimmed?: boolean
   hidden?: boolean
   onSelect?: () => void
+  onDeselect?: () => void
 }) {
   const { theme } = useTheme()
   const { canvas } = useCanvas()
@@ -166,23 +167,39 @@ function FlameColorHandle(props: {
   // growing much less aggressively than the old sqrt(zoom) as the user zooms in
   // (so they don't balloon). The invisible grab area stays generous for touch.
   const handleScale = () => Math.max(0.7, (zoom() / 4) ** 0.4)
-  const startDragging = createDragHandler((initEvent) => {
-    changeHistory.startPreview('Flame color')
+  const startDragging = createDragHandler(
+    (initEvent) => {
+      const wasSelected = props.selected ?? false
+      // Select on press so the handle can be dragged immediately.
+      if (!wasSelected) props.onSelect?.()
 
-    const initialColor = props.color
-    const grabPosition = clipToWorld(eventToClip(initEvent, canvas))
-    return {
-      onPointerMove(ev) {
-        const position = clipToWorld(eventToClip(ev, canvas))
-        const diff = sub(position, grabPosition)
-        const color = add(initialColor, diff)
-        props.setColor(color)
-      },
-      onDone() {
-        changeHistory.commit()
-      },
-    }
-  })
+      const initialColor = props.color
+      const grabPosition = clipToWorld(eventToClip(initEvent, canvas))
+      let moved = false
+      return {
+        onPointerMove(ev) {
+          if (!moved) {
+            // First movement past the dead zone — begin the colour edit.
+            changeHistory.startPreview('Flame color')
+            moved = true
+          }
+          const position = clipToWorld(eventToClip(ev, canvas))
+          const diff = sub(position, grabPosition)
+          const color = add(initialColor, diff)
+          props.setColor(color)
+        },
+        onDone() {
+          if (moved) {
+            changeHistory.commit()
+          } else if (wasSelected) {
+            // A click (no drag) on an already-selected handle deselects it.
+            props.onDeselect?.()
+          }
+        },
+      }
+    },
+    { deadZoneRadius: 6 },
+  )
   return (
     <g
       class={ui.handle}
@@ -195,11 +212,12 @@ function FlameColorHandle(props: {
       // because otherwise WheelZoomCamera2D steals the event
       // due to solidjs event delegation.
       on:pointerdown={(e) => {
-        props.onSelect?.()
         startDragging(e)
       }}
+      // Right-click / long-press deselects (mirrors the list view).
       onContextMenu={(e) => {
         e.preventDefault()
+        props.onDeselect?.()
       }}
       style={{
         '--color': handleColor(theme(), props.color),
@@ -275,6 +293,7 @@ export function FlameColorEditor(props: {
                     props.selectedTransformId?.() !== tid
                   }
                   onSelect={() => props.setSelectedTransformId?.(tid)}
+                  onDeselect={() => props.setSelectedTransformId?.(null)}
                   hidden={!(transform.visible ?? true)}
                 />
               )}

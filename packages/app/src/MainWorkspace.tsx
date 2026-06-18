@@ -276,6 +276,8 @@ export function MainWorkspace(props: AppProps) {
   // (deselect-all → nothing dimmed). Canvas handles only ever *set* (drag-safe).
   const toggleSelectedTransform = (tid: string) =>
     setSelectedTransformId((prev) => (prev === tid ? null : tid))
+  // Bumped by the sidebar "Collapse all" button to fold every transform card.
+  const [transformCollapseEpoch, setTransformCollapseEpoch] = createSignal(0)
   const [animationEnabled, setAnimationEnabled] = createSignal(true)
   const [blendFlame, setBlendFlame] = createSignal<
     FlameDescriptor | undefined
@@ -3089,8 +3091,47 @@ export function MainWorkspace(props: AppProps) {
                             onClearHistory={handleClearHistory}
                             onRandomizeAnimation={handleRandomizeAnimation}
                             onUpdateRenderSettings={handleUpdateRenderSettings}
+                            onApplyCandidate={(flame) => {
+                              history.replace(
+                                deepClone(flame),
+                                'Apply Random Flame',
+                              )
+                            }}
+                            hardwareTier={props.hardwareTier}
                             isBusy={isRandomizing()}
                           />
+                        </div>
+                        <div class={ui.transformsToolbar}>
+                          <span class={ui.transformsToolbarLabel}>
+                            Transforms
+                          </span>
+                          <span
+                            class={ui.transformHeaderAction}
+                            role="button"
+                            tabindex={0}
+                            title="Collapse all transform cards"
+                            onClick={() => {
+                              setTransformCollapseEpoch((e) => e + 1)
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                setTransformCollapseEpoch((c) => c + 1)
+                              }
+                            }}
+                          >
+                            <svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                            >
+                              <polyline points="18 11 12 5 6 11" />
+                              <polyline points="18 19 12 13 6 19" />
+                            </svg>
+                          </span>
                         </div>
                         <For
                           each={sortedTransformEntries(
@@ -3100,6 +3141,7 @@ export function MainWorkspace(props: AppProps) {
                           {([tid, transform]) => (
                             <CollapsibleCard
                               title={readableIds().transformLabel[tid]!}
+                              collapseEpoch={transformCollapseEpoch()}
                               selected={selectedTransformId() === tid}
                               dimmed={
                                 selectedTransformId() !== null &&
@@ -3817,9 +3859,7 @@ export function MainWorkspace(props: AppProps) {
                                       }
                                     })
                                   }}
-                                  formatValue={(value) =>
-                                    Number(value.toFixed(6)).toString()
-                                  }
+                                  formatValue={(value) => value.toFixed(2)}
                                   dataParameterPath="exposure"
                                   data-tour-target="exposure-slider"
                                 />

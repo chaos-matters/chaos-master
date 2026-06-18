@@ -429,7 +429,12 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
 
     // Results (right column)
     const rx = 360
-    let ry = 82
+    let ry = 64
+
+    // Which benchmark workload was run.
+    const workload = selectedFlame()
+    drawPill(ctx, rx, ry, `${workload.label}  ·  ${workload.meta}`, 'blue')
+    ry += 34
 
     ctx.fillStyle = 'rgba(255,255,255,0.35)'
     ctx.font = '10px Inter, system-ui, sans-serif'
@@ -648,6 +653,10 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
 
       <Show when={state() === 'complete'}>
         <div class={ui.completeSection}>
+          <div class={ui.workloadBadge}>
+            <span>{selectedFlame().label}</span>
+            <span class={ui.workloadBadgeMeta}>{selectedFlame().meta}</span>
+          </div>
           <div class={ui.resultCard}>
             <div class={ui.resultGrid}>
               <div class={ui.resultRow}>

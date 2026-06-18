@@ -93,6 +93,9 @@ type RenderDialogProps = {
 function RenderDialog(props: RenderDialogProps) {
   const [renderMode, setRenderMode] = createSignal<'auto' | 'manual'>('auto')
   const [renderKey, setRenderKey] = createSignal(0)
+  // True while the animation frame-preview gallery is rendering — locks the
+  // resolution/aspect controls so they can't be changed mid-render.
+  const [previewsRendering, setPreviewsRendering] = createSignal(false)
   const [previewPoints, setPreviewPoints] = createSignal(0)
   const [previewLimitFn, setPreviewLimitFn] = createSignal<() => number>(
     () => 0,
@@ -675,6 +678,9 @@ function RenderDialog(props: RenderDialogProps) {
               tracks={props.tracks}
               config={props.config}
               selectedPalette={props.selectedPalette}
+              aspect={props.aspect}
+              viewportAspect={props.viewportAspect}
+              onGeneratingChange={setPreviewsRendering}
             />
           </div>
           <div class={ui.controlsPane}>
@@ -684,6 +690,7 @@ function RenderDialog(props: RenderDialogProps) {
               aspect={props.aspect}
               onAspectChange={props.onAspectChange}
               viewportAspect={props.viewportAspect}
+              disabled={previewsRendering()}
             />
 
             <fieldset class={ui.field}>

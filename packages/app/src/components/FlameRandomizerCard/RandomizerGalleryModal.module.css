@@ -1,0 +1,190 @@
+/* Size the content wrapper (same approach as VariationSelector): the <dialog>
+   grows to fit it, capped by the base modal's max-width: min(90vw, 100%). A
+   generous fixed vw width means the column count (auto-fill) adapts to the
+   preview-size slider and adding more previews only scrolls vertically. */
+.modal {
+  /* Content width = exactly 6 columns at the minimum cell size (180px) + gaps,
+     so the grid's auto-fill can never exceed 6 columns. Capped at 70vw so it
+     shrinks on smaller screens (where fewer columns fit). The size slider then
+     trades column count for cell size within this width. */
+  --gallery-cols: 6;
+  --gallery-cell-min: 180px;
+  --gallery-gap: 0.4rem;
+  --gallery-content: calc(
+    var(--gallery-cols) * var(--gallery-cell-min) + (var(--gallery-cols) - 1) *
+      var(--gallery-gap)
+  );
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: min(70vw, var(--gallery-content));
+  max-height: min(85vh, 100%);
+  min-height: 0;
+}
+
+@media (max-width: 1200px) {
+  .modal {
+    width: min(88vw, var(--gallery-content));
+  }
+}
+
+@media (max-width: 768px) {
+  .modal {
+    width: 100vw;
+  }
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.toolbarLeft,
+.toolbarRight {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.backBtn {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 0.35rem;
+  background: transparent;
+  color: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.backBtn:hover {
+  background: rgba(128, 128, 128, 0.12);
+}
+
+.crumb {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.depthTag {
+  opacity: 0.6;
+  font-weight: 400;
+}
+
+.countChips {
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+.chip {
+  min-width: 2rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 0.35rem;
+  background: transparent;
+  color: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: rgba(128, 128, 128, 0.12);
+}
+
+.chipActive {
+  background: var(--accent-color, #6ea8fe);
+  border-color: var(--accent-color, #6ea8fe);
+  color: #fff;
+}
+
+.rerollBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 0.35rem;
+  background: transparent;
+  color: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rerollBtn:hover {
+  background: rgba(128, 128, 128, 0.12);
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color, rgba(128, 128, 128, 0.2));
+}
+
+.sliderRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.sliderLabel {
+  flex: 0 0 5.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.slider {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  height: 4px;
+  appearance: none;
+  background: var(--neutral-200);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+[data-theme='dark'] .slider {
+  background: var(--neutral-700);
+}
+
+.slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: oklch(55% 0.08 210);
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: oklch(55% 0.08 210);
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+}
+
+.sliderValue {
+  flex: 0 0 3.5rem;
+  text-align: right;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+}

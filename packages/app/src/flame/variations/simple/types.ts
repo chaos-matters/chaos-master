@@ -5,24 +5,14 @@ import { AffineParams } from '../../affineTranform'
 import type { TgpuFn } from 'typegpu'
 import type { Infer, v2f, Vec2f } from 'typegpu/data'
 import type { BooleanSchema, OptionalSchema } from 'valibot'
+// Category union lives in ../categories (single source of truth, incl. 'custom').
+import type { VariationCategory } from '../categories'
 
 export type VariationInfo = Infer<typeof VariationInfo>
 export const VariationInfo = struct({
   weight: f32,
   affineCoefs: AffineParams,
 })
-
-export type VariationCategory =
-  | 'blur'
-  | 'post'
-  | 'pre'
-  | 'crop'
-  | 'symmetry'
-  | 'dc'
-  | 'glsl'
-  | 'cut'
-  | '3d'
-  | 'general'
 
 export type SimpleVariation<K extends string> = {
   category: VariationCategory

@@ -2,6 +2,7 @@ import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createStore, reconcile } from 'solid-js/store'
 import { vec2f, vec4f } from 'typegpu/data'
 import { Slider } from '@/components/Sliders/Slider'
+import { VariationMultiSelect } from '@/components/VariationMultiSelect/VariationMultiSelect'
 import { DEFAULT_POINT_COUNT } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
 import { generateRandomFlame } from '@/flame/randomize'
@@ -19,7 +20,6 @@ import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import { defaultPills, getNearestPresetKey, QualityPresets, qualityPresets, } from '../Quality/QualityPresets'
 import ui from './LogoFaviconGenerator.module.css'
-import { VariationPalette } from './VariationPalette'
 import type { Signal } from 'solid-js'
 import type { v2f } from 'typegpu/data'
 import type { Palette } from '@/flame/colorMap'
@@ -651,7 +651,8 @@ function LogoDialog(props: LogoDialogProps) {
           {/* Variation palette */}
           <div class={ui.paletteSection}>
             <span class={ui.fieldLabel}>Variation Palette</span>
-            <VariationPalette
+            <VariationMultiSelect
+              dims={2}
               allVariations={[...variationTypes]}
               selected={props.selectedVariations}
               onToggle={props.onToggleVariation}

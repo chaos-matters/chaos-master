@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
 import { ANIMATION_FRAME_PREVIEW_QUALITY_HIGH, ANIMATION_FRAME_PREVIEW_QUALITY_LOW, ANIMATION_FRAME_PREVIEW_QUALITY_MID, DEFAULT_POINT_COUNT, DEFAULT_PREVIEW_PIXEL_RATIO, } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
@@ -6,10 +6,12 @@ import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
 import { Default3DPreviewCamera } from '@/lib/Camera3D'
 import { Root } from '@/lib/Root'
+import { resolveAspectRatio } from '@/utils/exportDimensions'
 import { applyTimelineToFlameAtFrame } from '@/utils/timeline'
 import ui from './FramePreviewGallery.module.css'
 import type { Palette } from '@/flame/colorMap'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { ExportAspectKey } from '@/utils/exportDimensions'
 import type { TimelineConfig, TimelineTrack } from '@/utils/timeline'
 
 type PreviewQuality = 'low' | 'mid' | 'high'
@@ -20,30 +22,27 @@ const QUALITY_CONFIG: Record<
     quality: number
     delayMs: number
     maxFrames: number
-    canvasWidth: number
-    canvasHeight: number
+    /** Longest edge (px) of the preview render; the other edge follows aspect. */
+    maxEdge: number
   }
 > = {
   low: {
     quality: ANIMATION_FRAME_PREVIEW_QUALITY_LOW,
-    delayMs: 600,
+    delayMs: 1100,
     maxFrames: 30,
-    canvasWidth: 160,
-    canvasHeight: 120,
+    maxEdge: 240,
   },
   mid: {
     quality: ANIMATION_FRAME_PREVIEW_QUALITY_MID,
-    delayMs: 1200,
+    delayMs: 1700,
     maxFrames: 30,
-    canvasWidth: 224,
-    canvasHeight: 168,
+    maxEdge: 340,
   },
   high: {
     quality: ANIMATION_FRAME_PREVIEW_QUALITY_HIGH,
     delayMs: 2400,
     maxFrames: 30,
-    canvasWidth: 320,
-    canvasHeight: 240,
+    maxEdge: 480,
   },
 }
 
@@ -51,34 +50,86 @@ const THUMB_SIZE_MIN = 60
 const THUMB_SIZE_MAX = 200
 const THUMB_SIZE_DEFAULT = 90
 
+// Longest on-screen edge of the hover popup. Kept modest so it's a faithful,
+// correct-aspect preview of the export — not a giant near-4K overlay.
+const HOVER_MAX_EDGE = 420
+
 const HOVER_DEBOUNCE_MS = 300
+
+/** Compute width/height for a longest-edge size at the given W/H aspect ratio. */
+function dimsForAspect(
+  ratio: number,
+  longEdge: number,
+): { width: number; height: number } {
+  return ratio >= 1
+    ? { width: Math.round(longEdge), height: Math.round(longEdge / ratio) }
+    : { width: Math.round(longEdge * ratio), height: Math.round(longEdge) }
+}
+
+type Thumb = { src: string; frame: number }
 
 type Props = {
   flameDescriptor: FlameDescriptor
   tracks: TimelineTrack[]
   config: TimelineConfig
   selectedPalette: () => Palette | undefined
+  /** Export aspect chosen in the format card (so previews match the output). */
+  aspect: ExportAspectKey
+  /** Current viewport W/H aspect, used to resolve the "auto" aspect. */
+  viewportAspect: number
+  /** Notifies the parent when preview rendering starts/stops (to lock settings). */
+  onGeneratingChange?: (generating: boolean) => void
 }
 
 export function FramePreviewGallery(props: Props) {
-  const [thumbnails, setThumbnails] = createSignal<string[]>([])
+  const [thumbnails, setThumbnails] = createSignal<Thumb[]>([])
   const [isGenerating, setIsGenerating] = createSignal(false)
   const [progress, setProgress] = createSignal<{
     current: number
     total: number
   }>()
   const [previewQuality, setPreviewQuality] =
-    createSignal<PreviewQuality>('low')
+    createSignal<PreviewQuality>('mid')
+  // Render every Nth frame so long animations can be previewed across their
+  // whole range quickly (1 = every frame, the default).
+  const [previewStride, setPreviewStride] = createSignal(1)
 
   const totalFrames = props.config.endFrame - props.config.startFrame + 1
+  // How many previews the current stride yields across the whole range.
+  const totalPreviews = () => Math.ceil(totalFrames / previewStride())
   const displayCount = () =>
-    Math.min(totalFrames, QUALITY_CONFIG[previewQuality()].maxFrames)
+    Math.min(totalPreviews(), QUALITY_CONFIG[previewQuality()].maxFrames)
+
+  // Preview aspect ratio (W/H) matching the chosen export aspect.
+  const previewRatio = () =>
+    resolveAspectRatio(props.aspect, props.viewportAspect)
+  const cfg = () => QUALITY_CONFIG[previewQuality()]
+  const canvasDims = () => dimsForAspect(previewRatio(), cfg().maxEdge)
+  const hoverDims = () => dimsForAspect(previewRatio(), HOVER_MAX_EDGE)
 
   let captureCanvasRef: HTMLCanvasElement | undefined
   let aborted = false
 
   // Thumbnail cell size (controlled by slider, always visible)
   const [thumbSize, setThumbSize] = createSignal(THUMB_SIZE_DEFAULT)
+
+  // Let the parent lock the export format settings while previews render.
+  createEffect(() => {
+    props.onGeneratingChange?.(isGenerating())
+  })
+
+  // Cached previews become stale when the aspect or stride changes — drop them
+  // so they're re-rendered consistently (skip the very first run).
+  let isFirstReset = true
+  createEffect(() => {
+    void previewRatio()
+    void previewStride()
+    if (isFirstReset) {
+      isFirstReset = false
+      return
+    }
+    setThumbnails([])
+  })
 
   // Hover preview state (debounced)
   const [hoveredIndex, setHoveredIndex] = createSignal<number | null>(null)
@@ -88,8 +139,8 @@ export function FramePreviewGallery(props: Props) {
   const [hoverPos, setHoverPos] = createSignal({ x: 0, y: 0 })
   let hoverTimer: ReturnType<typeof setTimeout> | undefined
 
-  // Derived: hover thumbnail src
-  const hoverSrc = createMemo(() => {
+  // Derived: hovered thumbnail
+  const hoverThumb = createMemo(() => {
     const idx = visibleHoverIndex()
     if (idx === null) return undefined
     return thumbnails()[idx]
@@ -110,19 +161,27 @@ export function FramePreviewGallery(props: Props) {
     return clone
   }
 
-  async function generatePreviews() {
+  async function generatePreviews(append = false) {
     aborted = false
     setIsGenerating(true)
-    setThumbnails([])
 
-    const cfg = QUALITY_CONFIG[previewQuality()]
-    const results: string[] = []
+    const c = cfg()
+    const stride = previewStride()
+    const total = totalPreviews()
+    // "Render more" continues from where the last batch stopped; a fresh render
+    // starts at the first preview. Each batch covers up to maxFrames previews.
+    const startK = append ? thumbnails().length : 0
+    const endK = Math.min(startK + c.maxFrames, total)
+    const results: Thumb[] = append ? [...thumbnails()] : []
+    if (!append) setThumbnails([])
+    const batchTotal = endK - startK
 
-    for (let i = 0; i < displayCount(); i++) {
+    for (let k = startK; k < endK; k++) {
       if (aborted) break
 
-      setProgress({ current: i + 1, total: displayCount() })
-      const desc = flameForFrame(i)
+      const frameIdx = k * stride
+      setProgress({ current: k - startK + 1, total: batchTotal })
+      const desc = flameForFrame(frameIdx)
       setFrameDescriptor(() => desc)
 
       await new Promise<void>((resolve) => {
@@ -139,7 +198,7 @@ export function FramePreviewGallery(props: Props) {
           }
           // eslint-disable-next-line no-restricted-globals
           const elapsed = performance.now() - start
-          if (elapsed >= cfg.delayMs) {
+          if (elapsed >= c.delayMs) {
             resolved = true
             resolve()
             return
@@ -153,7 +212,10 @@ export function FramePreviewGallery(props: Props) {
       if (captureCanvasRef) {
         try {
           const dataUrl = captureCanvasRef.toDataURL('image/jpeg', 0.85)
-          results.push(dataUrl)
+          results.push({
+            src: dataUrl,
+            frame: props.config.startFrame + frameIdx,
+          })
           setThumbnails([...results])
         } catch {
           // Canvas may be tainted or unavailable
@@ -186,8 +248,6 @@ export function FramePreviewGallery(props: Props) {
 
   const cameraZoom = () => frameDescriptor().renderSettings.camera.zoom
 
-  const cfg = () => QUALITY_CONFIG[previewQuality()]
-
   // Hover handlers for thumbnails (debounced, viewport-fixed)
   function onThumbEnter(idx: number, e: MouseEvent) {
     setHoveredIndex(idx)
@@ -212,8 +272,7 @@ export function FramePreviewGallery(props: Props) {
 
   function updateHoverPos(e: MouseEvent) {
     // Use viewport coordinates for fixed positioning
-    const previewW = 220
-    const previewH = 165
+    const { width: previewW, height: previewH } = hoverDims()
     let x = e.clientX + 16
     let y = e.clientY - previewH / 2
 
@@ -229,13 +288,16 @@ export function FramePreviewGallery(props: Props) {
   }
 
   return (
-    <div class={ui.gallery}>
+    // No wrapping element: the controls panel and the previews grid render as
+    // direct children of the body pane (animationPreviewPane), so the controls
+    // live at the body level rather than nested inside a gallery container.
+    <>
       <Show when={isGenerating()}>
         <div
           class={ui.hiddenRenderer}
           style={{
-            width: `${cfg().canvasWidth}px`,
-            height: `${cfg().canvasHeight}px`,
+            width: `${canvasDims().width}px`,
+            height: `${canvasDims().height}px`,
             opacity: '0',
             'pointer-events': 'none',
           }}
@@ -285,26 +347,74 @@ export function FramePreviewGallery(props: Props) {
         </div>
       </Show>
 
-      <div class={ui.toolbar}>
-        <div class={ui.qualityToggle}>
-          {(['low', 'mid', 'high'] as PreviewQuality[]).map((q) => (
-            <button
-              type="button"
-              class={ui.qualityButton}
-              classList={{
-                [ui.qualityActive as string]: previewQuality() === q,
-              }}
+      {/* Settings panel — visually separated from the previews below. */}
+      <div class={ui.controls}>
+        <div class={ui.settingsRow}>
+          <div class={ui.settingGroup}>
+            <span class={ui.settingLabel}>Quality</span>
+            <div class={ui.qualityToggle}>
+              {(['low', 'mid', 'high'] as PreviewQuality[]).map((q) => (
+                <button
+                  type="button"
+                  class={ui.qualityButton}
+                  classList={{
+                    [ui.qualityActive as string]: previewQuality() === q,
+                  }}
+                  disabled={isGenerating()}
+                  onClick={() => setPreviewQuality(q)}
+                >
+                  {q.charAt(0).toUpperCase() + q.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div class={ui.settingGroup}>
+            <span class={ui.settingLabel}>Step</span>
+            <input
+              type="number"
+              class={ui.strideInput}
+              min="1"
+              max={totalFrames}
+              value={previewStride()}
               disabled={isGenerating()}
-              onClick={() => setPreviewQuality(q)}
-            >
-              {q.charAt(0).toUpperCase() + q.slice(1)}
-            </button>
-          ))}
+              title="Preview every Nth frame, spread across the timeline (faster overview of long animations)"
+              onInput={(e) => {
+                const n = Math.floor(e.currentTarget.valueAsNumber)
+                setPreviewStride(Number.isFinite(n) && n >= 1 ? n : 1)
+              }}
+            />
+          </div>
         </div>
-        <div class={ui.actions}>
+
+        <div class={ui.settingsRow}>
+          <div class={`${ui.settingGroup} ${ui.settingGroupGrow}`}>
+            <span class={ui.settingLabel}>Size</span>
+            <div class={ui.sizeSliderRow}>
+              <svg class={ui.sizeIcon} viewBox="0 0 16 16" fill="currentColor">
+                <rect x="5" y="5" width="6" height="6" rx="1" />
+              </svg>
+              <input
+                type="range"
+                class={ui.sizeSlider}
+                min={THUMB_SIZE_MIN}
+                max={THUMB_SIZE_MAX}
+                value={thumbSize()}
+                onInput={(e) => setThumbSize(e.currentTarget.valueAsNumber)}
+                title={`Thumbnail size: ${thumbSize()}px`}
+              />
+              <svg class={ui.sizeIcon} viewBox="0 0 16 16" fill="currentColor">
+                <rect x="3" y="3" width="10" height="10" rx="1.5" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div class={ui.actionsRow}>
           <Show when={isGenerating()}>
             <div class={ui.progressLabel}>
-              {progress()?.current ?? 0}/{progress()?.total ?? displayCount()}
+              Rendering {progress()?.current ?? 0}/
+              {progress()?.total ?? displayCount()}
             </div>
             <button
               type="button"
@@ -333,35 +443,30 @@ export function FramePreviewGallery(props: Props) {
                 </svg>
               </button>
             </Show>
+            <Show
+              when={
+                thumbnails().length > 0 && thumbnails().length < totalPreviews()
+              }
+            >
+              <button
+                type="button"
+                class={ui.generateButton}
+                onClick={() => generatePreviews(true)}
+                title="Render the next batch of frame previews"
+              >
+                Render more ({thumbnails().length}/{totalPreviews()})
+              </button>
+            </Show>
             <button
               type="button"
-              class={ui.generateButton}
-              onClick={generatePreviews}
+              class={ui.primaryButton}
+              onClick={() => generatePreviews(false)}
               title="Generate previews"
             >
-              Render Previews
+              {thumbnails().length > 0 ? 'Re-render' : 'Render Previews'}
             </button>
           </Show>
         </div>
-      </div>
-
-      {/* Thumbnail size slider -- always visible */}
-      <div class={ui.sizeSliderRow}>
-        <svg class={ui.sizeIcon} viewBox="0 0 16 16" fill="currentColor">
-          <rect x="5" y="5" width="6" height="6" rx="1" />
-        </svg>
-        <input
-          type="range"
-          class={ui.sizeSlider}
-          min={THUMB_SIZE_MIN}
-          max={THUMB_SIZE_MAX}
-          value={thumbSize()}
-          onInput={(e) => setThumbSize(e.currentTarget.valueAsNumber)}
-          title={`Thumbnail size: ${thumbSize()}px`}
-        />
-        <svg class={ui.sizeIcon} viewBox="0 0 16 16" fill="currentColor">
-          <rect x="3" y="3" width="10" height="10" rx="1.5" />
-        </svg>
       </div>
 
       {/* Grid that fills available space */}
@@ -381,22 +486,18 @@ export function FramePreviewGallery(props: Props) {
             }}
           >
             <For each={thumbnails()}>
-              {(dataUrl, idx) => (
+              {(thumb, idx) => (
                 <div
                   class={ui.thumbnail}
+                  style={{ 'aspect-ratio': String(previewRatio()) }}
                   onMouseEnter={(e) => {
                     onThumbEnter(idx(), e)
                   }}
                   onMouseMove={onThumbMove}
                   onMouseLeave={onThumbLeave}
                 >
-                  <img
-                    src={dataUrl}
-                    alt={`Frame ${props.config.startFrame + idx()}`}
-                  />
-                  <span class={ui.frameNumber}>
-                    {props.config.startFrame + idx()}
-                  </span>
+                  <img src={thumb.src} alt={`Frame ${thumb.frame}`} />
+                  <span class={ui.frameNumber}>{thumb.frame}</span>
                 </div>
               )}
             </For>
@@ -405,31 +506,25 @@ export function FramePreviewGallery(props: Props) {
       </div>
 
       {/* Hover preview overlay -- position:fixed escapes overflow:hidden parents */}
-      <Show when={hoverSrc()}>
-        {(src) => {
+      <Show when={hoverThumb()}>
+        {(thumb) => {
           const pos = () => hoverPos()
-          const idx = () => visibleHoverIndex()!
           return (
             <div
               class={ui.hoverOverlay}
               style={{
                 left: `${pos().x}px`,
                 top: `${pos().y}px`,
-                width: '220px',
-                height: '165px',
+                width: `${hoverDims().width}px`,
+                height: `${hoverDims().height}px`,
               }}
             >
-              <img
-                src={src()}
-                alt={`Frame ${props.config.startFrame + idx()} preview`}
-              />
-              <span class={ui.hoverFrameLabel}>
-                Frame {props.config.startFrame + idx()}
-              </span>
+              <img src={thumb().src} alt={`Frame ${thumb().frame} preview`} />
+              <span class={ui.hoverFrameLabel}>Frame {thumb().frame}</span>
             </div>
           )
         }}
       </Show>
-    </div>
+    </>
   )
 }

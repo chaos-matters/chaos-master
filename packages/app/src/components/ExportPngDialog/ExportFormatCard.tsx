@@ -10,6 +10,8 @@ type ExportFormatCardProps = {
   onAspectChange: (v: ExportAspectKey) => void
   /** Current viewport aspect (width / height), used to resolve "Auto". */
   viewportAspect: number
+  /** Locks the controls (e.g. while frame previews are rendering). */
+  disabled?: boolean
 }
 
 /**
@@ -26,7 +28,10 @@ export function ExportFormatCard(props: ExportFormatCardProps) {
   )
 
   return (
-    <div class={ui.root}>
+    <div
+      class={ui.root}
+      classList={{ [ui.disabled as string]: props.disabled }}
+    >
       <div class={ui.group}>
         <span class={ui.groupLabel}>Resolution</span>
         <div class={ui.cards}>
@@ -38,6 +43,7 @@ export function ExportFormatCard(props: ExportFormatCardProps) {
                 classList={{
                   [ui.cardActive as string]: props.resolution === res.value,
                 }}
+                disabled={props.disabled}
                 onClick={() => {
                   props.onResolutionChange(res.value)
                 }}
@@ -61,6 +67,7 @@ export function ExportFormatCard(props: ExportFormatCardProps) {
                 classList={{
                   [ui.cardActive as string]: props.aspect === asp.key,
                 }}
+                disabled={props.disabled}
                 onClick={() => {
                   props.onAspectChange(asp.key)
                 }}
