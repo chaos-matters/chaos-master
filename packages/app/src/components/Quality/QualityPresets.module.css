@@ -93,12 +93,17 @@
   }
 }
 
+/* Highlight on hover (border + slight brighten) WITHOUT flattening the fill
+   gradient — replacing the background with a flat colour made filled pills
+   look darker (a "dimming" effect) instead of highlighted. */
 .pill:not(.selectedPill):hover {
-  background: var(--hover-color);
-  color: var(--neutral-700);
+  border-color: oklch(65% 0.07 220);
+  color: var(--neutral-800);
+  filter: brightness(1.08);
 
   [data-theme='dark'] & {
-    color: var(--neutral-300);
+    border-color: oklch(55% 0.07 210);
+    color: var(--neutral-200);
   }
 }
 
