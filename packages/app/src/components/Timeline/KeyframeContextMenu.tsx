@@ -2,7 +2,7 @@ import { createEffect, createSignal, onCleanup } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { useTimeline } from '@/contexts/TimelineContext'
 import ui from './KeyframeContextMenu.module.css'
-import type { EasingCurve } from '@/utils/timeline'
+import type { EasingCurve, KeyframeInterpolation } from '@/utils/timeline'
 
 type KeyframeContextMenuProps = {
   x: number
@@ -21,9 +21,12 @@ const EASING_OPTIONS: EasingCurve[] = [
   'elastic',
 ]
 
+const INTERP_OPTIONS: KeyframeInterpolation[] = ['linear', 'spline', 'constant']
+
 export function KeyframeContextMenu(props: KeyframeContextMenuProps) {
   const timeline = useTimeline()!
   const [showEasing, setShowEasing] = createSignal(false)
+  const [showInterp, setShowInterp] = createSignal(false)
 
   function close() {
     props.onClose()
@@ -61,6 +64,16 @@ export function KeyframeContextMenu(props: KeyframeContextMenuProps) {
     if (kf && kf.value !== null && typeof kf.value !== 'boolean') {
       timeline.addKeyframe(props.parameterPath, props.frame, kf.value, easing)
     }
+    close()
+  }
+
+  const currentInterp = () => {
+    const kf = timeline.getKeyframeAtFrame(props.parameterPath, props.frame)
+    return kf?.interp ?? 'linear'
+  }
+
+  function setInterp(interp: KeyframeInterpolation) {
+    timeline.setKeyframeInterp(props.parameterPath, props.frame, interp)
     close()
   }
 
@@ -129,6 +142,30 @@ export function KeyframeContextMenu(props: KeyframeContextMenuProps) {
                 }}
                 onClick={() => {
                   setEasing(opt)
+                }}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        )}
+        <button
+          class={ui.item}
+          disabled={!hasAtFrame()}
+          onClick={() => setShowInterp(!showInterp())}
+        >
+          Interp: {currentInterp()}
+        </button>
+        {showInterp() && (
+          <div class={ui.easingSubmenu}>
+            {INTERP_OPTIONS.map((opt) => (
+              <button
+                class={ui.item}
+                classList={{
+                  [ui.activeEasing as string]: currentInterp() === opt,
+                }}
+                onClick={() => {
+                  setInterp(opt)
                 }}
               >
                 {opt}

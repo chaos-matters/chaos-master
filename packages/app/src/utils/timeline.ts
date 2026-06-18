@@ -1312,6 +1312,25 @@ export function createTimelineState() {
     )
   }
 
+  /**
+   * Move a keyframe to a new frame WITHOUT pushing undo — for use inside an
+   * interactive drag that already opened a single undo step at its start. No-op
+   * if the source is missing/non-interpolatable, or the destination already
+   * holds another keyframe (so a drag can't clobber a neighbour).
+   */
+  function relocateKeyframe(
+    parameterPath: string,
+    oldFrame: number,
+    newFrame: number,
+  ) {
+    if (oldFrame === newFrame) return
+    const kf = getKeyframeAtFrame(parameterPath, oldFrame)
+    if (!kf || kf.value === null || typeof kf.value === 'boolean') return
+    if (hasKeyframeAtFrame(parameterPath, newFrame)) return
+    removeKeyframeImpl(parameterPath, oldFrame)
+    addKeyframeImpl(parameterPath, newFrame, kf.value, kf.easing, kf.interp)
+  }
+
   function clearAllTracks() {
     if (tracks().length === 0) return
     pushUndo()
@@ -1405,6 +1424,7 @@ export function createTimelineState() {
     addKeyframeAtCurrentFrame,
     toggleKeyframeAtCurrentFrame,
     moveKeyframe,
+    relocateKeyframe,
     loadTracks,
     clearAllTracks,
     setLoopMode,

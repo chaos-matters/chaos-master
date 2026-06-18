@@ -110,7 +110,7 @@
   fill: var(--neutral-50);
   stroke: var(--accent-color, #3b82f6);
   stroke-width: 1.5;
-  cursor: ns-resize;
+  cursor: move;
   transition: r 0.1s;
 
   &:hover {

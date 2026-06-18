@@ -14,6 +14,7 @@ interface CurveEditorProps {
   /** Currently selected keyframe frame (highlighted), if any. */
   selectedFrame?: number | null
   onSelectKeyframe?: (path: string, frame: number) => void
+  onContextMenu?: (e: MouseEvent, path: string, frame: number) => void
   // Geometry shared with the dope sheet so the graph lines up with the diamonds.
   frameWidth: number
   startFrame: number
@@ -130,25 +131,39 @@ export function CurveEditor(props: CurveEditorProps) {
     const p = props.path
     if (!p) return
     const vp = viewport()
+    const startX = e.clientX
     const startY = e.clientY
     const startValue = kf.value
-    const frame = kf.frame
+    const startFrame = kf.frame
+    let currentFrame = startFrame
     ;(e.target as Element).setPointerCapture(e.pointerId)
 
-    props.onSelectKeyframe?.(p, frame)
+    props.onSelectKeyframe?.(p, startFrame)
     // Pin the axis and open a single undo/preview step for the whole drag.
     setFrozenRange({ min: vp.minValue, max: vp.maxValue })
     if (!changeHistory.isPreviewing()) changeHistory.startPreview('Curve edit')
-    timeline.addKeyframe(p, frame, startValue, kf.easing, kf.interp)
+    timeline.addKeyframe(p, startFrame, startValue, kf.easing, kf.interp)
 
     const valuePerPx =
       (vp.maxValue - vp.minValue) / Math.max(1, vp.height - 2 * vp.padY)
+    const fw = Math.max(1, props.frameWidth)
 
     function onMove(ev: PointerEvent) {
-      const dy = ev.clientY - startY
+      // Horizontal: retime the keyframe (snap to frame; never onto a neighbour).
+      const desired = Math.round(startFrame + (ev.clientX - startX) / fw)
+      const clamped = Math.max(
+        props.startFrame,
+        Math.min(props.endFrame, desired),
+      )
+      if (clamped !== currentFrame && !timeline.hasKeyframeAtFrame(p, clamped)) {
+        timeline.relocateKeyframe(p, currentFrame, clamped)
+        currentFrame = clamped
+        props.onSelectKeyframe?.(p, currentFrame)
+      }
+      // Vertical: set the value at the (possibly moved) keyframe.
       const sensitivity = ev.shiftKey ? 0.1 : 1
-      const newValue = startValue - dy * valuePerPx * sensitivity
-      timeline.setKeyframeValue(p, frame, newValue, kf.easing, kf.interp)
+      const newValue = startValue - (ev.clientY - startY) * valuePerPx * sensitivity
+      timeline.setKeyframeValue(p, currentFrame, newValue, kf.easing, kf.interp)
     }
 
     function onUp() {
@@ -257,6 +272,13 @@ export function CurveEditor(props: CurveEditorProps) {
                       r={selected() ? 5 : 4}
                       onPointerDown={(ev) => {
                         startNodeDrag(ev, kf)
+                      }}
+                      onContextMenu={(ev) => {
+                        ev.preventDefault()
+                        ev.stopPropagation()
+                        if (props.path) {
+                          props.onContextMenu?.(ev, props.path, kf.frame)
+                        }
                       }}
                     />
                   )
