@@ -303,6 +303,18 @@ export function MainWorkspace(props: AppProps) {
       return next
     })
   }
+
+  // Browser tab title: "Chaos Master — <flame name>" when the flame is named,
+  // otherwise just "Chaos Master".
+  createEffect(() => {
+    const name = flameDescriptor.metadata?.name?.trim()
+    // eslint-disable-next-line no-restricted-globals
+    document.title =
+      name && name.toLowerCase() !== 'unknown'
+        ? `Chaos Master — ${name}`
+        : 'Chaos Master'
+  })
+
   const [animationEnabled, setAnimationEnabled] = createSignal(true)
   const [blendFlame, setBlendFlame] = createSignal<
     FlameDescriptor | undefined
