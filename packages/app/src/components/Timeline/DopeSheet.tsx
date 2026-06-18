@@ -1,7 +1,9 @@
 import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useTimeline } from '@/contexts/TimelineContext'
+import { persistentSignal } from '@/utils/persistentSignal'
 import { TIMELINE_PARAMETERS } from '@/utils/timeline'
+import { CurveEditor } from './CurveEditor/CurveEditor'
 import ui from './DopeSheet.module.css'
 import { useScrollSync } from './hooks/useScrollSync'
 import { useSeekScrubber } from './hooks/useSeekScrubber'
@@ -47,6 +49,10 @@ export function DopeSheet(props: DopeSheetProps) {
     timeline.config().endFrame - timeline.config().startFrame
 
   const [seekOnSelect, setSeekOnSelect] = createSignal(false)
+  const [showCurve, setShowCurve] = persistentSignal(
+    'timeline-curve-editor',
+    false,
+  )
   let containerRef: HTMLDivElement | undefined
   let tracksScrollRef!: HTMLDivElement
   let seekRulerRef!: HTMLDivElement
@@ -220,11 +226,28 @@ export function DopeSheet(props: DopeSheetProps) {
         >
           Seek
         </button>
+        <button
+          class={ui.zoomBtn}
+          classList={{ [ui.zoomBtnActive as string]: showCurve() }}
+          onClick={() => setShowCurve((v) => !v)}
+          title="Show the value curve for the selected parameter"
+        >
+          Curve
+        </button>
         <span class={ui.zoomHint}>(Alt+wheel or pinch to zoom)</span>
         <span class={ui.frameIndicator}>Frame {currentFrame()}</span>
       </div>
 
       <KeyframeInspector selectedKeyframe={selectedKeyframe()} />
+
+      {/* ── Curve editor (selected parameter) ── */}
+      <Show when={showCurve()}>
+        <CurveEditor
+          path={selectedKeyframe()?.path ?? null}
+          selectedFrame={selectedKeyframe()?.frame ?? null}
+          onSelectKeyframe={(path, frame) => setSelectedKeyframe({ path, frame })}
+        />
+      </Show>
 
       {/* ── Seek ruler ── */}
       <div class={ui.seekRuler} ref={seekRulerRef}>

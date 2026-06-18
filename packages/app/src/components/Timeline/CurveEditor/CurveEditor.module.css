@@ -1,0 +1,81 @@
+.curveEditor {
+  width: 100%;
+  height: 150px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--neutral-200);
+  background: var(--neutral-50);
+
+  [data-theme='dark'] & {
+    border-bottom-color: var(--neutral-800);
+    background: var(--neutral-900);
+  }
+}
+
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 0.62rem;
+  color: var(--neutral-500);
+  user-select: none;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.axisLine {
+  stroke: var(--neutral-200);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+
+  [data-theme='dark'] & {
+    stroke: var(--neutral-800);
+  }
+}
+
+.axisLabel {
+  fill: var(--neutral-500);
+  font-size: 9px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  user-select: none;
+}
+
+.playhead {
+  stroke: var(--accent-color, #3b82f6);
+  stroke-width: 1;
+  opacity: 0.5;
+}
+
+.curve {
+  fill: none;
+  stroke: var(--accent-color, #3b82f6);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.node {
+  fill: var(--neutral-50);
+  stroke: var(--accent-color, #3b82f6);
+  stroke-width: 1.5;
+  cursor: ns-resize;
+  transition: r 0.1s;
+
+  &:hover {
+    fill: var(--accent-color, #3b82f6);
+  }
+
+  [data-theme='dark'] & {
+    fill: var(--neutral-900);
+  }
+}
+
+.nodeSelected {
+  fill: var(--accent-color, #3b82f6);
+}
