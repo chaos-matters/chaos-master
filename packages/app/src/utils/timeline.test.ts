@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { catmullRom } from './easing'
 import {
   createTimelineState,
   resolveKeyframeValue,
@@ -673,6 +674,99 @@ describe('Timeline Utilities', () => {
       expect(resolveLoopValue(k, 0, opts)).toBeCloseTo(
         resolveLoopValue(k, 60, opts) as number,
       )
+    })
+  })
+
+  describe('spline (Catmull-Rom) interpolation', () => {
+    it('catmullRom passes through p1 at t=0 and p2 at t=1', () => {
+      expect(catmullRom(0, 1, 2, 3, 0)).toBeCloseTo(1)
+      expect(catmullRom(0, 1, 2, 3, 1)).toBeCloseTo(2)
+    })
+
+    it('catmullRom of collinear points equals the linear midpoint', () => {
+      // p0..p3 = 0,1,2,3 → at t=0.5 the value is 1.5 (no curvature).
+      expect(catmullRom(0, 1, 2, 3, 0.5)).toBeCloseTo(1.5)
+    })
+
+    const splineKfs = [
+      { frame: 0, value: 0, interp: 'spline' as const },
+      { frame: 10, value: 10, interp: 'spline' as const },
+      { frame: 20, value: 0, interp: 'spline' as const },
+    ]
+
+    it('passes through keyframes exactly', () => {
+      expect(resolveKeyframeValue(splineKfs, 0)).toBeCloseTo(0)
+      expect(resolveKeyframeValue(splineKfs, 10)).toBeCloseTo(10)
+      expect(resolveKeyframeValue(splineKfs, 20)).toBeCloseTo(0)
+    })
+
+    it('curves away from the straight line between keyframes', () => {
+      // Over a hump (0→10→0), the spline at the segment midpoint overshoots the
+      // linear value (5).
+      const v = resolveKeyframeValue(splineKfs, 5) as number
+      expect(v).toBeGreaterThan(5)
+    })
+
+    it("'linear' interp is identical to the previous lerp behaviour", () => {
+      const lin = [
+        { frame: 0, value: 0, interp: 'linear' as const },
+        { frame: 10, value: 10, interp: 'linear' as const },
+      ]
+      expect(resolveKeyframeValue(lin, 3)).toBeCloseTo(3)
+      expect(resolveKeyframeValue(lin, 7)).toBeCloseTo(7)
+    })
+
+    it("'constant' interp holds the previous value", () => {
+      const step = [
+        { frame: 0, value: 2, interp: 'constant' as const },
+        { frame: 10, value: 8, interp: 'constant' as const },
+      ]
+      // 'constant' is read from the *next* keyframe (segment owner).
+      expect(resolveKeyframeValue(step, 5)).toBeCloseTo(2)
+      expect(resolveKeyframeValue(step, 9.9)).toBeCloseTo(2)
+      expect(resolveKeyframeValue(step, 10)).toBeCloseTo(8)
+    })
+
+    it('interpolates array (colour) values with spline', () => {
+      const arr = [
+        { frame: 0, value: [0, 0, 0] as [number, number, number], interp: 'spline' as const },
+        { frame: 10, value: [1, 1, 1] as [number, number, number], interp: 'spline' as const },
+      ]
+      const v = resolveKeyframeValue(arr, 5) as number[]
+      expect(v).toHaveLength(3)
+      expect(v[0]).toBeGreaterThan(0)
+      expect(v[0]).toBeLessThan(1)
+    })
+  })
+
+  describe('keyframe interp metadata', () => {
+    it('setKeyframeInterp sets the mode and preserves value + easing', () => {
+      timeline.addKeyframe('exposure', 10, 0.5, 'easeIn')
+      timeline.setKeyframeInterp('exposure', 10, 'spline')
+      const kf = timeline.getKeyframeAtFrame('exposure', 10)
+      expect(kf?.interp).toBe('spline')
+      expect(kf?.value).toBe(0.5)
+      expect(kf?.easing).toBe('easeIn')
+    })
+
+    it('is preserved across a value change and an easing change', () => {
+      timeline.addKeyframe('exposure', 10, 0.5)
+      timeline.setKeyframeInterp('exposure', 10, 'spline')
+      // value scrub
+      timeline.setKeyframeValue('exposure', 10, 0.8)
+      expect(timeline.getKeyframeAtFrame('exposure', 10)?.interp).toBe('spline')
+      // easing change
+      timeline.addKeyframe('exposure', 10, 0.8, 'bounce')
+      const kf = timeline.getKeyframeAtFrame('exposure', 10)
+      expect(kf?.interp).toBe('spline')
+      expect(kf?.easing).toBe('bounce')
+    })
+
+    it('is preserved when a keyframe is moved', () => {
+      timeline.addKeyframe('exposure', 10, 0.5)
+      timeline.setKeyframeInterp('exposure', 10, 'spline')
+      timeline.moveKeyframe('exposure', 10, 25)
+      expect(timeline.getKeyframeAtFrame('exposure', 25)?.interp).toBe('spline')
     })
   })
 })

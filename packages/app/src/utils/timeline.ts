@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js'
-import { applyEasing, clamp } from './easing'
+import { applyEasing, catmullRom, clamp } from './easing'
 import { persistentSignal } from './persistentSignal'
 
 interface WindowTimelineState {
@@ -340,6 +340,9 @@ export interface FlameDescriptor {
   edgeFadeColor?: [number, number, number, number]
 }
 
+/** Segment interpolation mode (orthogonal to `easing`). See schema/timeline.ts. */
+export type KeyframeInterpolation = 'linear' | 'constant' | 'spline'
+
 export type KeyframeData = {
   frame: number
   value:
@@ -350,6 +353,7 @@ export type KeyframeData = {
     | boolean
     | null
   easing?: EasingCurve
+  interp?: KeyframeInterpolation
 }
 
 export type TimelineTrack = {
@@ -563,18 +567,16 @@ export function resolveKeyframeValue(
   const lastKf = sorted[sorted.length - 1]!
   if (frame >= lastKf.frame) return lastKf.value
 
-  // Find surrounding keyframes
-  let prev = sorted[0]!
-  let next = sorted[sorted.length - 1]!
+  // Find surrounding keyframes (track the index so spline can reach neighbours).
+  let prevIdx = 0
   for (let i = 0; i < sorted.length - 1; i++) {
-    const current = sorted[i]!
-    const after = sorted[i + 1]!
-    if (current.frame <= frame && after.frame >= frame) {
-      prev = current
-      next = after
+    if (sorted[i]!.frame <= frame && sorted[i + 1]!.frame >= frame) {
+      prevIdx = i
       break
     }
   }
+  const prev = sorted[prevIdx]!
+  const next = sorted[prevIdx + 1]!
 
   const frameRange = next.frame - prev.frame
   if (frameRange === 0) return prev.value
@@ -582,25 +584,51 @@ export function resolveKeyframeValue(
   const rawT = (frame - prev.frame) / frameRange
   const t = clamp(rawT, 0, 1)
 
-  // Type guard: if values are numbers, use lerp with easing, otherwise interpolate strings
+  // The segment prev→next is owned by `next` (its easing + interp), consistent
+  // with how this resolver has always sourced easing.
+  const easedT = applyEasing(t, next.easing ?? 'linear')
+  const interp = next.interp ?? 'linear'
+
+  // Numbers: constant (hold) / spline (Catmull-Rom) / linear (lerp).
   if (typeof prev.value === 'number' && typeof next.value === 'number') {
-    // Use the easing curve from the next keyframe (or default to linear)
-    const easingCurve = next.easing ?? 'linear'
-    const easedT = applyEasing(t, easingCurve)
+    if (interp === 'constant') return prev.value
+    if (interp === 'spline') {
+      const before = sorted[prevIdx - 1]?.value
+      const after = sorted[prevIdx + 2]?.value
+      const p0 = typeof before === 'number' ? before : prev.value
+      const p3 = typeof after === 'number' ? after : next.value
+      return catmullRom(p0, prev.value, next.value, p3, easedT)
+    }
     return prev.value + (next.value - prev.value) * easedT
   }
 
-  // Interpolate array values (RGB/RGBA colors) with easing
+  // Array values (RGB/RGBA colors): same modes, component-wise.
   if (
     Array.isArray(prev.value) &&
     Array.isArray(next.value) &&
     prev.value.length === next.value.length
   ) {
-    const easingCurve = next.easing ?? 'linear'
-    const easedT = applyEasing(t, easingCurve)
-    return prev.value.map(
-      (v, i) => v + ((next.value as number[])[i]! - v) * easedT,
-    ) as [number, number, number] | [number, number, number, number]
+    if (interp === 'constant') return prev.value
+    const nextArr = next.value as number[]
+    if (interp === 'spline') {
+      const before = sorted[prevIdx - 1]?.value
+      const after = sorted[prevIdx + 2]?.value
+      const len = prev.value.length
+      const p0 =
+        Array.isArray(before) && before.length === len
+          ? (before as number[])
+          : (prev.value as number[])
+      const p3 =
+        Array.isArray(after) && after.length === len
+          ? (after as number[])
+          : nextArr
+      return prev.value.map((v, i) =>
+        catmullRom(p0[i]!, v, nextArr[i]!, p3[i]!, easedT),
+      ) as [number, number, number] | [number, number, number, number]
+    }
+    return prev.value.map((v, i) => v + (nextArr[i]! - v) * easedT) as
+      | [number, number, number]
+      | [number, number, number, number]
   }
 
   // For string interpolation (drawMode, colorInitMode, pointInitMode) or boolean
@@ -737,6 +765,7 @@ export function createTimelineState() {
       | [number, number, number]
       | [number, number, number, number],
     easing?: EasingCurve,
+    interp?: KeyframeInterpolation,
   ) {
     setTracks((prev: TimelineTrack[]) => {
       const ti = prev.findIndex(
@@ -747,20 +776,30 @@ export function createTimelineState() {
         const existingKf = track.keyframes.find(
           (kf: KeyframeData) => kf.frame === frame,
         )
+        // On update, preserve fields the caller didn't pass (e.g. a value scrub
+        // or easing change must keep the keyframe's interp mode).
         const newKeyframes = existingKf
           ? track.keyframes.map((kf) =>
               kf.frame === frame
-                ? { frame, value, easing: easing ?? kf.easing }
+                ? {
+                    frame,
+                    value,
+                    easing: easing ?? kf.easing,
+                    interp: interp ?? kf.interp,
+                  }
                 : kf,
             )
-          : [...track.keyframes, { frame, value, easing }]
+          : [...track.keyframes, { frame, value, easing, interp }]
         return [
           ...prev.slice(0, ti),
           { parameterPath, keyframes: newKeyframes },
           ...prev.slice(ti + 1),
         ]
       }
-      return [...prev, { parameterPath, keyframes: [{ frame, value, easing }] }]
+      return [
+        ...prev,
+        { parameterPath, keyframes: [{ frame, value, easing, interp }] },
+      ]
     })
     setLastAddedKeyframe({ path: parameterPath, frame })
     if (frame === currentFrame() && valueWriterFn) {
@@ -794,9 +833,10 @@ export function createTimelineState() {
       | [number, number, number]
       | [number, number, number, number],
     easing?: EasingCurve,
+    interp?: KeyframeInterpolation,
   ) {
     pushUndo()
-    addKeyframeImpl(parameterPath, frame, value, easing)
+    addKeyframeImpl(parameterPath, frame, value, easing, interp)
   }
 
   function removeKeyframe(parameterPath: string, frame: number) {
@@ -813,8 +853,23 @@ export function createTimelineState() {
       | [number, number, number]
       | [number, number, number, number],
     easing?: EasingCurve,
+    interp?: KeyframeInterpolation,
   ) {
-    addKeyframeImpl(parameterPath, frame, value, easing)
+    addKeyframeImpl(parameterPath, frame, value, easing, interp)
+  }
+
+  /**
+   * Set the interpolation mode of an existing keyframe, preserving its value and
+   * easing. No-op if the keyframe's value isn't interpolatable (null/boolean).
+   */
+  function setKeyframeInterp(
+    parameterPath: string,
+    frame: number,
+    interp: KeyframeInterpolation,
+  ) {
+    const kf = getKeyframeAtFrame(parameterPath, frame)
+    if (!kf || kf.value === null || typeof kf.value === 'boolean') return
+    addKeyframe(parameterPath, frame, kf.value, kf.easing, interp)
   }
 
   function getKeysForFrame(frame: number): Record<string, boolean> {
@@ -975,8 +1030,15 @@ export function createTimelineState() {
       originalFrame,
       keyframe.value,
       keyframe.easing,
+      keyframe.interp,
     )
-    addKeyframeImpl(parameterPath, splitFrame, keyframe.value, keyframe.easing)
+    addKeyframeImpl(
+      parameterPath,
+      splitFrame,
+      keyframe.value,
+      keyframe.easing,
+      keyframe.interp,
+    )
 
     return true
   }
@@ -1043,6 +1105,7 @@ export function createTimelineState() {
       mirroredFrame,
       keyframe.value,
       keyframe.easing,
+      keyframe.interp,
     )
     return true
   }
@@ -1240,7 +1303,13 @@ export function createTimelineState() {
 
     pushUndo()
     removeKeyframeImpl(parameterPath, oldFrame)
-    addKeyframeImpl(parameterPath, newFrame, keyframe.value, keyframe.easing)
+    addKeyframeImpl(
+      parameterPath,
+      newFrame,
+      keyframe.value,
+      keyframe.easing,
+      keyframe.interp,
+    )
   }
 
   function clearAllTracks() {
@@ -1282,6 +1351,7 @@ export function createTimelineState() {
           frame: kf.frame,
           value: kf.value,
           easing: kf.easing,
+          interp: kf.interp,
         })),
       })),
     )
@@ -1312,6 +1382,7 @@ export function createTimelineState() {
     addKeyframe,
     removeKeyframe,
     setKeyframeValue,
+    setKeyframeInterp,
     getKeysForFrame,
     hasKeyframeAtFrame,
     getKeyframeAtFrame,
