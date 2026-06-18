@@ -289,6 +289,25 @@
   padding: 0 var(--space-3) 0.75rem;
 }
 
+.workload-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: white;
+  background: linear-gradient(135deg, oklch(65% 0.22 30), oklch(58% 0.2 25));
+}
+
+.workload-badge-meta {
+  font-size: 0.62rem;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.85);
+}
+
 .result-card {
   border: 1px solid var(--neutral-200);
   border-radius: 10px;
