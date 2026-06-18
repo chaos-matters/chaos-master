@@ -70,8 +70,11 @@
   flex: 1;
   min-width: 0;
   height: 100%;
+  z-index: 1; /* paint the graph (and its overflowing edge nodes) over the gutter line */
   overflow: clip;
-  overflow-clip-margin: 6px;
+  /* Generous margin so the first/last keyframe circles (r≈5 + stroke) overflow
+     the gutter/end edges fully instead of being clipped to a half-moon. */
+  overflow-clip-margin: 12px;
 }
 
 .svg {
@@ -79,7 +82,6 @@
   height: 100%;
   touch-action: none;
   cursor: crosshair;
-  will-change: transform;
 }
 
 .axisLine {
