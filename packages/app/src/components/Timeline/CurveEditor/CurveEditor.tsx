@@ -1,11 +1,4 @@
-import {
-  createMemo,
-  createSignal,
-  For,
-  onCleanup,
-  onMount,
-  Show,
-} from 'solid-js'
+import { createMemo, createSignal, For, onCleanup, Show } from 'solid-js'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useTimeline } from '@/contexts/TimelineContext'
 import { resolveKeyframeValue } from '@/utils/timeline'
@@ -49,17 +42,22 @@ export function CurveEditor(props: CurveEditorProps) {
   let laneRef: HTMLDivElement | undefined
   const [laneHeight, setLaneHeight] = createSignal(0)
 
-  onMount(() => {
-    if (!laneRef) return
-    const ro = new ResizeObserver((entries) => {
-      const r = entries[0]?.contentRect
-      if (r) setLaneHeight(r.height)
-    })
-    ro.observe(laneRef)
+  // Attach the size observer via the lane's ref so it binds when the lane is
+  // actually rendered (it lives inside <Show> branches that only mount once a
+  // numeric keyframe is selected — an onMount would run too early, with the lane
+  // absent, leaving height stuck at 0 → a collapsed/blank curve).
+  function bindLane(el: HTMLDivElement) {
+    laneRef = el
+    const measure = () => {
+      setLaneHeight(el.clientHeight)
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
     onCleanup(() => {
       ro.disconnect()
     })
-  })
+  }
 
   const track = createMemo(() => {
     const p = props.path
@@ -207,7 +205,7 @@ export function CurveEditor(props: CurveEditorProps) {
           </div>
 
           {/* Scroll-synced lane holding the graph at the dope sheet's frame scale */}
-          <div class={ui.lane} ref={laneRef}>
+          <div class={ui.lane} ref={bindLane}>
             <svg
               class={ui.svg}
               width={laneWidth()}
