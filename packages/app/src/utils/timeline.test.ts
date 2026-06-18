@@ -1,10 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { catmullRom } from './easing'
-import {
-  createTimelineState,
-  resolveKeyframeValue,
-  resolveLoopValue,
-} from './timeline'
+import { createTimelineState, resolveKeyframeValue, resolveLoopValue, } from './timeline'
 
 describe('Timeline Utilities', () => {
   let timeline: ReturnType<typeof createTimelineState>
@@ -643,11 +639,18 @@ describe('Timeline Utilities', () => {
     ]
 
     it('equals resolveKeyframeValue when opts is null', () => {
-      expect(resolveLoopValue(kfs, 20, null)).toBe(resolveKeyframeValue(kfs, 20))
+      expect(resolveLoopValue(kfs, 20, null)).toBe(
+        resolveKeyframeValue(kfs, 20),
+      )
     })
 
     it('seamless ramps from the held end value back to the start value', () => {
-      const opts = { mode: 'seamless' as const, startFrame: 0, endFrame: 60, userEnd: 40 }
+      const opts = {
+        mode: 'seamless' as const,
+        startFrame: 0,
+        endFrame: 60,
+        userEnd: 40,
+      }
       expect(resolveLoopValue(kfs, 40, opts)).toBeCloseTo(10) // held
       expect(resolveLoopValue(kfs, 60, opts)).toBeCloseTo(0) // back to start
       const mid = resolveLoopValue(kfs, 50, opts) as number
@@ -729,8 +732,16 @@ describe('Timeline Utilities', () => {
 
     it('interpolates array (colour) values with spline', () => {
       const arr = [
-        { frame: 0, value: [0, 0, 0] as [number, number, number], interp: 'spline' as const },
-        { frame: 10, value: [1, 1, 1] as [number, number, number], interp: 'spline' as const },
+        {
+          frame: 0,
+          value: [0, 0, 0] as [number, number, number],
+          interp: 'spline' as const,
+        },
+        {
+          frame: 10,
+          value: [1, 1, 1] as [number, number, number],
+          interp: 'spline' as const,
+        },
       ]
       const v = resolveKeyframeValue(arr, 5) as number[]
       expect(v).toHaveLength(3)

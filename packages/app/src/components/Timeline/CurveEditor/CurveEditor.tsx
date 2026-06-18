@@ -1,11 +1,4 @@
-import {
-  createEffect,
-  createMemo,
-  createSignal,
-  For,
-  onCleanup,
-  Show,
-} from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useTimeline } from '@/contexts/TimelineContext'
 import { resolveKeyframeValue } from '@/utils/timeline'
@@ -39,7 +32,8 @@ function numericKeyframes(
   kfs: KeyframeData[],
 ): (KeyframeData & { value: number })[] {
   return kfs.filter(
-    (kf): kf is KeyframeData & { value: number } => typeof kf.value === 'number',
+    (kf): kf is KeyframeData & { value: number } =>
+      typeof kf.value === 'number',
   )
 }
 
@@ -138,9 +132,14 @@ export function CurveEditor(props: CurveEditorProps) {
     return d
   })
 
-  const playheadX = createMemo(() => viewport().frameToX(timeline.currentFrame()))
+  const playheadX = createMemo(() =>
+    viewport().frameToX(timeline.currentFrame()),
+  )
 
-  function startNodeDrag(e: PointerEvent, kf: KeyframeData & { value: number }) {
+  function startNodeDrag(
+    e: PointerEvent,
+    kf: KeyframeData & { value: number },
+  ) {
     e.stopPropagation()
     const p = props.path
     if (!p) return

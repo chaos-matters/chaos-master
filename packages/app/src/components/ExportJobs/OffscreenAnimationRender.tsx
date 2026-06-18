@@ -9,11 +9,7 @@ import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
 import { deepClone } from '@/utils/clone'
 import { dismissJob, jobExists, setAnimationJobPoints, setAnimationJobProgress, setJobError, setJobResult, } from '@/utils/exportJobs'
 import { createMetadataPayload, injectMetadataIntoMp4, } from '@/utils/flameInMp4'
-import {
-  applyTracksToFlame,
-  loopOptsFromConfig,
-  resolveLoopValue,
-} from '@/utils/timeline'
+import { applyTracksToFlame, loopOptsFromConfig, resolveLoopValue, } from '@/utils/timeline'
 import { createVideoEncoder } from '@/utils/videoEncoder'
 import type { Setter, Signal } from 'solid-js'
 import type { v2f } from 'typegpu/data'

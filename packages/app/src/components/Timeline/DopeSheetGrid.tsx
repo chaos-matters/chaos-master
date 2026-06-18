@@ -36,7 +36,8 @@ export function DopeSheetGrid(props: DopeSheetGridProps) {
           when={props.activeTracks.length > 0}
           fallback={
             <div class={ui.emptyState}>
-              No keyframes. Click a property and press <kbd>I</kbd> to insert one.
+              No keyframes. Click a property and press <kbd>I</kbd> to insert
+              one.
             </div>
           }
         >

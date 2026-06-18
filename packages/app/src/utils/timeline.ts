@@ -535,7 +535,10 @@ function resolveCycle(
 
   // Bring "head" frames (before k0) into the segment by adding one period.
   const ff = frame >= kn.frame ? frame : frame + period
-  const t = applyEasing(clamp((ff - kn.frame) / wrapLen, 0, 1), k0.easing ?? 'linear')
+  const t = applyEasing(
+    clamp((ff - kn.frame) / wrapLen, 0, 1),
+    k0.easing ?? 'linear',
+  )
   return lerpKfValues(kn.value, k0.value, t)
 }
 

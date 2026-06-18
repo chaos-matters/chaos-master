@@ -291,7 +291,7 @@ export function MainWorkspace(props: AppProps) {
 
   function toggleCollapseAllTransforms() {
     setCollapsedTransforms(
-      anyTransformOpen() ? new Set(visibleTransformTids()) : new Set(),
+      anyTransformOpen() ? new Set(visibleTransformTids()) : new Set<string>(),
     )
   }
 
@@ -308,7 +308,7 @@ export function MainWorkspace(props: AppProps) {
   // otherwise just "Chaos Master".
   createEffect(() => {
     const name = flameDescriptor.metadata?.name?.trim()
-    // eslint-disable-next-line no-restricted-globals
+
     document.title =
       name && name.toLowerCase() !== 'unknown'
         ? `Chaos Master — ${name}`

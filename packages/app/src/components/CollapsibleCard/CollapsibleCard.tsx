@@ -31,7 +31,9 @@ export function CollapsibleCard(
     onToggleOpen?: () => void
   }>,
 ) {
-  const [internalOpen, setInternalOpen] = createSignal(props.defaultOpen ?? true)
+  const [internalOpen, setInternalOpen] = createSignal(
+    props.defaultOpen ?? true,
+  )
   const isOpen = () => props.open ?? internalOpen()
 
   function toggleOpen() {

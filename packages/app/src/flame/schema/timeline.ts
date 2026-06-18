@@ -23,7 +23,11 @@ export const KeyframeValue = v.union([
 // - 'linear'   : straight lerp
 // - 'constant' : hold the previous value (stepped)
 // - 'spline'   : Catmull-Rom through neighbouring keyframes (smooth, C1)
-export const KeyframeInterpolation = v.picklist(['linear', 'constant', 'spline'])
+export const KeyframeInterpolation = v.picklist([
+  'linear',
+  'constant',
+  'spline',
+])
 export type KeyframeInterpolation = v.InferOutput<typeof KeyframeInterpolation>
 
 export const Keyframe = v.object({

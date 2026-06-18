@@ -255,7 +255,9 @@ export function DopeSheet(props: DopeSheetProps) {
           path={selectedKeyframe()?.path ?? null}
           label={curveLabel()}
           selectedFrame={selectedKeyframe()?.frame ?? null}
-          onSelectKeyframe={(path, frame) => setSelectedKeyframe({ path, frame })}
+          onSelectKeyframe={(path, frame) =>
+            setSelectedKeyframe({ path, frame })
+          }
           onContextMenu={handleContextMenu}
           frameWidth={frameWidth()}
           startFrame={timeline.config().startFrame}
