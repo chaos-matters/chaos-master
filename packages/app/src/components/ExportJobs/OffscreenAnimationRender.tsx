@@ -9,7 +9,7 @@ import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
 import { deepClone } from '@/utils/clone'
 import { dismissJob, jobExists, setAnimationJobPoints, setAnimationJobProgress, setJobError, setJobResult, } from '@/utils/exportJobs'
 import { createMetadataPayload, injectMetadataIntoMp4, } from '@/utils/flameInMp4'
-import { applyTracksToFlame } from '@/utils/timeline'
+import { applyTracksToFlame, seamlessOptsFromConfig } from '@/utils/timeline'
 import { createVideoEncoder } from '@/utils/videoEncoder'
 import type { Setter, Signal } from 'solid-js'
 import type { v2f } from 'typegpu/data'
@@ -42,9 +42,11 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
   const resizeWidth = Math.round(job.dimensions.width) & ~1 || 2
   const resizeHeight = Math.round(job.dimensions.height) & ~1 || 2
 
+  const seamlessOpts = seamlessOptsFromConfig(job.config, job.tracks)
+
   function frameFlame(frame: number): FlameDescriptor {
     const clone = deepClone(job.flame)
-    applyTracksToFlame(job.tracks, clone, frame)
+    applyTracksToFlame(job.tracks, clone, frame, seamlessOpts)
     return clone
   }
 

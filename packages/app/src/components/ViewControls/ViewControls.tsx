@@ -24,6 +24,7 @@ type ViewControlProps = {
   blendFlame?: FlameDescriptor
   blendWeight: number
   onPickBlendFlame: () => void
+  onMorphFlame: () => void
   onClearBlendFlame: () => void
   onBlendWeightChange: (weight: number) => void
   is3D?: boolean
@@ -263,6 +264,12 @@ export function ViewControls(props: ViewControlProps) {
             Blend...
           </Button>
         </Show>
+        <Button
+          onClick={props.onMorphFlame}
+          title="Morph: animate this flame into another (animated blend)"
+        >
+          Morph...
+        </Button>
       </Show>
     </div>
   )

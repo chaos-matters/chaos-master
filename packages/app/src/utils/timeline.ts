@@ -364,6 +364,8 @@ export type TimelineConfig = {
   endFrame: number
   loop: boolean
   autoFps?: boolean
+  /** Synthesize a seamless return ramp at resolve time (see resolveSeamlessValue). */
+  seamlessLoop?: boolean
 }
 
 export function defaultConfig(): TimelineConfig {
@@ -374,7 +376,97 @@ export function defaultConfig(): TimelineConfig {
     endFrame: 90,
     loop: true,
     autoFps: false,
+    seamlessLoop: false,
   }
+}
+
+/** Last keyframe frame across all tracks (the end of the user's content). */
+export function getUserEndFrame(tracks: TimelineTrack[], fallback = 0): number {
+  let userEnd = fallback
+  let seen = false
+  for (const t of tracks) {
+    for (const kf of t.keyframes) {
+      if (!seen || kf.frame > userEnd) {
+        userEnd = kf.frame
+        seen = true
+      }
+    }
+  }
+  return seen ? userEnd : fallback
+}
+
+export type SeamlessLoopOptions = {
+  startFrame: number
+  endFrame: number
+  userEnd: number
+}
+
+/**
+ * Build seamless-loop options from a config + tracks, or `null` when the
+ * seamless toggle is off (so callers fall back to plain keyframe resolution).
+ */
+export function seamlessOptsFromConfig(
+  config: TimelineConfig,
+  tracks: TimelineTrack[],
+): SeamlessLoopOptions | null {
+  if (!config.seamlessLoop) return null
+  return {
+    startFrame: config.startFrame,
+    endFrame: config.endFrame,
+    userEnd: getUserEndFrame(tracks, config.startFrame),
+  }
+}
+
+/**
+ * Resolve a track's value at `frame`, optionally synthesizing a seamless
+ * loop-back. In the trailing window `(userEnd, endFrame]` the value ramps from
+ * the track's held last value back to its value at `startFrame`, so the final
+ * frame equals the first and playback wraps with no visible jump. Adds no real
+ * keyframes — this is purely computed. With `opts === null` it is exactly
+ * `resolveKeyframeValue`.
+ */
+export function resolveSeamlessValue(
+  keyframes: KeyframeData[],
+  frame: number,
+  opts: SeamlessLoopOptions | null,
+):
+  | number
+  | string
+  | boolean
+  | [number, number, number]
+  | null
+  | [number, number, number, number] {
+  const natural = resolveKeyframeValue(keyframes, frame)
+  if (opts === null) return natural
+
+  const { startFrame, endFrame, userEnd } = opts
+  // No trailing room, or we're still inside the user's content → no synthesis.
+  if (endFrame <= userEnd || frame <= userEnd) return natural
+
+  const startVal = resolveKeyframeValue(keyframes, startFrame)
+  const endHeld = resolveKeyframeValue(keyframes, userEnd)
+  if (startVal === null || endHeld === null) return natural
+
+  const t = applyEasing(
+    clamp((frame - userEnd) / (endFrame - userEnd), 0, 1),
+    'easeInOut',
+  )
+
+  if (typeof endHeld === 'number' && typeof startVal === 'number') {
+    return endHeld + (startVal - endHeld) * t
+  }
+  if (
+    Array.isArray(endHeld) &&
+    Array.isArray(startVal) &&
+    endHeld.length === startVal.length
+  ) {
+    return endHeld.map(
+      (v, i) => v + ((startVal as number[])[i]! - v) * t,
+    ) as [number, number, number] | [number, number, number, number]
+  }
+  // Strings / booleans can't blend — hold, then snap to the start value at the
+  // final frame so the wrap still matches.
+  return t >= 1 ? startVal : endHeld
 }
 
 /**
@@ -917,7 +1009,11 @@ export function createTimelineState() {
         t.parameterPath === parameterPath,
     )
     if (!track) return null
-    return resolveKeyframeValue(track.keyframes, frame)
+    return resolveSeamlessValue(
+      track.keyframes,
+      frame,
+      seamlessOptsFromConfig(config(), tracks()),
+    )
   }
 
   function advanceFrame() {
@@ -1087,6 +1183,32 @@ export function createTimelineState() {
     setTracks([])
   }
 
+  /**
+   * Toggle the seamless ("GIF") loop on/off. Non-destructive and idempotent:
+   * adds no keyframes. When enabling, it guarantees a trailing return ramp by
+   * extending `endFrame` past the last keyframe if needed, and turns `loop` on.
+   * The actual return is synthesized at resolve time (see resolveSeamlessValue).
+   */
+  function setSeamlessLoop(enabled: boolean) {
+    const cfg = config()
+    if (!enabled) {
+      if (!cfg.seamlessLoop) return
+      setConfig({ ...cfg, seamlessLoop: false })
+      return
+    }
+    const userEnd = getUserEndFrame(tracks(), cfg.startFrame)
+    // Reserve room for the return ramp only when the timeline ends on (or before)
+    // the last keyframe — otherwise the existing trailing gap is used as-is.
+    const span = Math.max(1, userEnd - cfg.startFrame)
+    const endFrame =
+      cfg.endFrame > userEnd ? cfg.endFrame : userEnd + Math.round(span * 0.5)
+    setConfig({ ...cfg, seamlessLoop: true, loop: true, endFrame })
+  }
+
+  function toggleSeamlessLoop() {
+    setSeamlessLoop(!(config().seamlessLoop ?? false))
+  }
+
   /** Replace all tracks with deep-cloned copies (unified with addKeyframeImpl). */
   function loadTracks(incoming: readonly TimelineTrack[]) {
     setTracks(() =>
@@ -1150,6 +1272,8 @@ export function createTimelineState() {
     moveKeyframe,
     loadTracks,
     clearAllTracks,
+    setSeamlessLoop,
+    toggleSeamlessLoop,
     advanceFrame,
     goBackFrame,
     goToFrame,
@@ -1169,20 +1293,21 @@ export function applyTracksToFlame(
   tracks: TimelineTrack[],
   flame: FlameDescriptor,
   frame: number,
+  seamless: SeamlessLoopOptions | null = null,
 ): void {
   const trackMap = new Map(tracks.map((t) => [t.parameterPath, t] as const))
 
   function applyNumber(path: string, setter: (v: number) => void) {
     const track = trackMap.get(path)
     if (!track) return
-    const value = resolveKeyframeValue(track.keyframes, frame)
+    const value = resolveSeamlessValue(track.keyframes, frame, seamless)
     if (value !== null && typeof value === 'number') setter(value)
   }
 
   function applyString(path: string, setter: (v: string) => void) {
     const track = trackMap.get(path)
     if (!track) return
-    const value = resolveKeyframeValue(track.keyframes, frame)
+    const value = resolveSeamlessValue(track.keyframes, frame, seamless)
     if (value !== null && typeof value === 'string') setter(value)
   }
 
@@ -1274,7 +1399,7 @@ export function applyTracksToFlame(
   {
     const track = trackMap.get('backgroundColor')
     if (track) {
-      const value = resolveKeyframeValue(track.keyframes, frame)
+      const value = resolveSeamlessValue(track.keyframes, frame, seamless)
       if (
         value !== null &&
         Array.isArray(value) &&
@@ -1291,7 +1416,7 @@ export function applyTracksToFlame(
   {
     const track = trackMap.get('edgeFadeColor')
     if (track) {
-      const value = resolveKeyframeValue(track.keyframes, frame)
+      const value = resolveSeamlessValue(track.keyframes, frame, seamless)
       if (value !== null && Array.isArray(value) && value.length === 4) {
         flame.edgeFadeColor = value
       }
@@ -1303,7 +1428,7 @@ export function applyTracksToFlame(
   const transforms = flame.transforms as Record<string, any>
   for (const [path, track] of trackMap) {
     if (typeof path !== 'string') continue
-    const value = resolveKeyframeValue(track.keyframes, frame)
+    const value = resolveSeamlessValue(track.keyframes, frame, seamless)
     if (value === null || typeof value !== 'number') continue
 
     const parts = path.split('.')
@@ -1435,7 +1560,13 @@ export function applyTimelineToFlame(
   timeline: TimelineState,
   flame: FlameDescriptor,
 ): void {
-  applyTracksToFlame(timeline.tracks(), flame, timeline.currentFrame())
+  const tracks = timeline.tracks()
+  applyTracksToFlame(
+    tracks,
+    flame,
+    timeline.currentFrame(),
+    seamlessOptsFromConfig(timeline.config(), tracks),
+  )
 }
 
 /**
@@ -1446,5 +1577,11 @@ export function applyTimelineToFlameAtFrame(
   flame: FlameDescriptor,
   frame: number,
 ): void {
-  applyTracksToFlame(timeline.tracks(), flame, frame)
+  const tracks = timeline.tracks()
+  applyTracksToFlame(
+    tracks,
+    flame,
+    frame,
+    seamlessOptsFromConfig(timeline.config(), tracks),
+  )
 }

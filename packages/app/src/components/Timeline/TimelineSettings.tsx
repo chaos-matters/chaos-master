@@ -169,6 +169,25 @@ export function TimelineSettings() {
           data-testid="loop-toggle"
         />
       </label>
+      <Show when={timeline.tracks().length > 0}>
+        <label
+          class={ui.settingItem}
+          title="Seamless loop: synthesize a return ramp (last keyframe → start) so playback loops like a GIF — no keyframes added. On a morph this makes an A → B → A cycle."
+        >
+          <span class={ui.settingLabel}>Seamless</span>
+          <input
+            type="checkbox"
+            class={ui.settingCheckbox}
+            checked={config().seamlessLoop ?? false}
+            onChange={(e) => {
+              timeline.toggleSeamlessLoop()
+              // Release focus so Space starts playback instead of re-toggling.
+              e.currentTarget.blur()
+            }}
+            data-testid="seamless-toggle"
+          />
+        </label>
+      </Show>
     </div>
   )
 }

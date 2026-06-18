@@ -488,9 +488,38 @@ export function MainWorkspace(props: AppProps) {
   )
 
   const [showBlendGallery, setShowBlendGallery] = createSignal(false)
+  // Whether the blend-flame gallery is being used to set a static blend or to
+  // set up a morph animation (animated blendWeight). Branches the gallery's
+  // onSelect handler.
+  const [blendIntent, setBlendIntent] = createSignal<'blend' | 'morph'>('blend')
 
   function pickBlendFlame() {
+    setBlendIntent('blend')
     setShowBlendGallery(true)
+  }
+
+  function pickMorphFlame() {
+    setBlendIntent('morph')
+    setShowBlendGallery(true)
+  }
+
+  /**
+   * Set up an animated morph from the current flame (A) into `endFlame` (B).
+   * Reuses the Blend pipeline: B becomes the blend flame and `blendWeight` is
+   * keyframed 1 (pure A) → 0 (pure B) across the timeline, so playback
+   * cross-dissolves A into B. Combine with "Seamless Loop" for an A→B→A cycle.
+   */
+  function setupMorph(endFlame: FlameDescriptor) {
+    setBlendFlame(deepClone(endFlame))
+    const cfg = timeline.config()
+    timeline.removeAllKeyframesForPath('blendWeight')
+    timeline.addKeyframe('blendWeight', cfg.startFrame, 1, 'easeInOut')
+    timeline.setKeyframeValue('blendWeight', cfg.endFrame, 0, 'easeInOut')
+    setBlendWeight(1)
+    setAnimationEnabled(true)
+    setShowTimeline(true)
+    timeline.goToFrame(cfg.startFrame)
+    showToast('Morph ready — press Play to animate A → B', 3500)
   }
 
   // Hover preview: temporarily set blend flame at 40% weight
@@ -2628,6 +2657,7 @@ export function MainWorkspace(props: AppProps) {
                     blendFlame={blendFlame()}
                     blendWeight={resolvedBlendWeight()}
                     onPickBlendFlame={pickBlendFlame}
+                    onMorphFlame={pickMorphFlame}
                     onClearBlendFlame={() => {
                       setBlendFlame(undefined)
                     }}
@@ -4554,9 +4584,18 @@ export function MainWorkspace(props: AppProps) {
                   }
                 >
                   <BlendFlameGallery
+                    heading={
+                      blendIntent() === 'morph'
+                        ? 'Pick End Flame'
+                        : 'Pick Blend Flame'
+                    }
                     onSelect={(flame) => {
                       prevBlendFlame = undefined
-                      setBlendFlame(deepClone(flame))
+                      if (blendIntent() === 'morph') {
+                        setupMorph(flame)
+                      } else {
+                        setBlendFlame(deepClone(flame))
+                      }
                       setShowBlendGallery(false)
                     }}
                     onPreviewBlend={handlePreviewBlend}
