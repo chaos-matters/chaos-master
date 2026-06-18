@@ -276,8 +276,33 @@ export function MainWorkspace(props: AppProps) {
   // (deselect-all → nothing dimmed). Canvas handles only ever *set* (drag-safe).
   const toggleSelectedTransform = (tid: string) =>
     setSelectedTransformId((prev) => (prev === tid ? null : tid))
-  // Bumped by the sidebar "Collapse all" button to fold every transform card.
-  const [transformCollapseEpoch, setTransformCollapseEpoch] = createSignal(0)
+  // Per-transform collapsed state drives the (controlled) transform cards, so the
+  // sidebar toolbar toggle can collapse-all / expand-all based on actual state:
+  // if any card is open it collapses all, otherwise it expands all.
+  const [collapsedTransforms, setCollapsedTransforms] = createSignal<
+    Set<string>
+  >(new Set())
+  const visibleTransformTids = () =>
+    sortedTransformEntries(recordEntries(flameDescriptor.transforms))
+      .filter(([tid]) => !tid.startsWith('_sym__'))
+      .map(([tid]) => tid)
+  const anyTransformOpen = () =>
+    visibleTransformTids().some((tid) => !collapsedTransforms().has(tid))
+
+  function toggleCollapseAllTransforms() {
+    setCollapsedTransforms(
+      anyTransformOpen() ? new Set(visibleTransformTids()) : new Set(),
+    )
+  }
+
+  function toggleTransformCollapsed(tid: string) {
+    setCollapsedTransforms((prev) => {
+      const next = new Set(prev)
+      if (next.has(tid)) next.delete(tid)
+      else next.add(tid)
+      return next
+    })
+  }
   const [animationEnabled, setAnimationEnabled] = createSignal(true)
   const [blendFlame, setBlendFlame] = createSignal<
     FlameDescriptor | undefined
@@ -3120,14 +3145,16 @@ export function MainWorkspace(props: AppProps) {
                             class={ui.transformHeaderAction}
                             role="button"
                             tabindex={0}
-                            title="Collapse all transform cards"
-                            onClick={() => {
-                              setTransformCollapseEpoch((e) => e + 1)
-                            }}
+                            title={
+                              anyTransformOpen()
+                                ? 'Collapse all transform cards'
+                                : 'Expand all transform cards'
+                            }
+                            onClick={toggleCollapseAllTransforms}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault()
-                                setTransformCollapseEpoch((c) => c + 1)
+                                toggleCollapseAllTransforms()
                               }
                             }}
                           >
@@ -3139,8 +3166,19 @@ export function MainWorkspace(props: AppProps) {
                               stroke-linecap="round"
                               stroke-linejoin="round"
                             >
-                              <polyline points="18 11 12 5 6 11" />
-                              <polyline points="18 19 12 13 6 19" />
+                              {/* Chevrons-up = collapse all; chevrons-down = expand all */}
+                              <Show
+                                when={anyTransformOpen()}
+                                fallback={
+                                  <>
+                                    <polyline points="6 5 12 11 18 5" />
+                                    <polyline points="6 13 12 19 18 13" />
+                                  </>
+                                }
+                              >
+                                <polyline points="18 11 12 5 6 11" />
+                                <polyline points="18 19 12 13 6 19" />
+                              </Show>
                             </svg>
                           </span>
                         </div>
@@ -3152,7 +3190,10 @@ export function MainWorkspace(props: AppProps) {
                           {([tid, transform]) => (
                             <CollapsibleCard
                               title={readableIds().transformLabel[tid]!}
-                              collapseEpoch={transformCollapseEpoch()}
+                              open={!collapsedTransforms().has(tid)}
+                              onToggleOpen={() => {
+                                toggleTransformCollapsed(tid)
+                              }}
                               selected={selectedTransformId() === tid}
                               dimmed={
                                 selectedTransformId() !== null &&
