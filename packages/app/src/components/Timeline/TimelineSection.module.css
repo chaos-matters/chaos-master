@@ -9,7 +9,7 @@
 
   [data-theme='dark'] & {
     border-top-color: var(--neutral-800);
-    background: var(--neutral-925, #131720);
+    background: var(--neutral-950);
   }
 }
 
@@ -26,10 +26,10 @@
   padding: 4px 8px;
   min-height: 32px;
   user-select: none;
-  border-bottom: 1px solid var(--neutral-150, #e8e8e8);
+  border-bottom: 1px solid var(--neutral-200);
 
   [data-theme='dark'] & {
-    border-bottom-color: var(--neutral-800, #1f2937);
+    border-bottom-color: var(--neutral-800);
   }
 }
 
@@ -47,7 +47,7 @@
     background: var(--neutral-100);
 
     [data-theme='dark'] & {
-      background: var(--neutral-850, #1a1f2e);
+      background: var(--neutral-900);
     }
   }
 }
@@ -180,11 +180,11 @@
 
 .frameSep {
   margin: 0 2px;
-  color: var(--neutral-350);
+  color: var(--neutral-400);
   font-weight: 400;
 
   [data-theme='dark'] & {
-    color: var(--neutral-550);
+    color: var(--neutral-600);
   }
 }
 
@@ -206,7 +206,7 @@
 .settingLabel {
   font-size: 0.58rem;
   font-weight: 500;
-  color: var(--neutral-450);
+  color: var(--neutral-500);
   text-transform: uppercase;
   letter-spacing: 0.03em;
   user-select: none;
@@ -271,7 +271,7 @@
   width: 40px;
   height: 20px;
   padding: 0 4px;
-  border: 1px solid var(--neutral-250);
+  border: 1px solid var(--neutral-300);
   border-radius: 3px;
   background: var(--neutral-50);
   color: var(--neutral-700);
@@ -283,7 +283,7 @@
   -moz-appearance: textfield;
 
   [data-theme='dark'] & {
-    background: var(--neutral-850);
+    background: var(--neutral-900);
     border-color: var(--neutral-700);
     color: var(--neutral-300);
   }
@@ -345,7 +345,7 @@
   position: relative;
 
   [data-theme='dark'] & {
-    background: var(--neutral-850);
+    background: var(--neutral-900);
     border-color: var(--neutral-600);
   }
 
@@ -469,27 +469,27 @@
 
 .shortcutHint {
   font-size: 0.55rem;
-  color: var(--neutral-350, #b0b5bd);
+  color: var(--neutral-400);
   display: flex;
   align-items: center;
   gap: 1px;
 
   [data-theme='dark'] & {
-    color: var(--neutral-550, #6b7280);
+    color: var(--neutral-600);
   }
 
   kbd {
     display: inline-block;
     padding: 1px 3px;
-    border: 1px solid var(--neutral-300, #d1d5db);
+    border: 1px solid var(--neutral-300);
     border-radius: 2px;
     font-family: inherit;
     font-size: 0.5rem;
-    background: var(--neutral-100, #f5f5f5);
+    background: var(--neutral-100);
 
     [data-theme='dark'] & {
-      background: var(--neutral-800, #1f2937);
-      border-color: var(--neutral-700, #374151);
+      background: var(--neutral-800);
+      border-color: var(--neutral-700);
     }
   }
 }

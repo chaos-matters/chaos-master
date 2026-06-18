@@ -512,7 +512,7 @@
   }
 
   [data-theme='dark'] & {
-    background: var(--neutral-850);
+    background: var(--neutral-900);
     border-color: var(--neutral-700);
   }
 
