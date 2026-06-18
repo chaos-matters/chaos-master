@@ -28,15 +28,15 @@ const QUALITY_CONFIG: Record<
 > = {
   low: {
     quality: ANIMATION_FRAME_PREVIEW_QUALITY_LOW,
-    delayMs: 600,
+    delayMs: 1100,
     maxFrames: 30,
-    maxEdge: 200,
+    maxEdge: 240,
   },
   mid: {
     quality: ANIMATION_FRAME_PREVIEW_QUALITY_MID,
-    delayMs: 1200,
+    delayMs: 1700,
     maxFrames: 30,
-    maxEdge: 320,
+    maxEdge: 340,
   },
   high: {
     quality: ANIMATION_FRAME_PREVIEW_QUALITY_HIGH,
@@ -89,7 +89,7 @@ export function FramePreviewGallery(props: Props) {
     total: number
   }>()
   const [previewQuality, setPreviewQuality] =
-    createSignal<PreviewQuality>('low')
+    createSignal<PreviewQuality>('mid')
   // Render every Nth frame so long animations can be previewed across their
   // whole range quickly (1 = every frame, the default).
   const [previewStride, setPreviewStride] = createSignal(1)
@@ -288,7 +288,10 @@ export function FramePreviewGallery(props: Props) {
   }
 
   return (
-    <div class={ui.gallery}>
+    // No wrapping element: the controls panel and the previews grid render as
+    // direct children of the body pane (animationPreviewPane), so the controls
+    // live at the body level rather than nested inside a gallery container.
+    <>
       <Show when={isGenerating()}>
         <div
           class={ui.hiddenRenderer}
@@ -368,25 +371,19 @@ export function FramePreviewGallery(props: Props) {
 
           <div class={ui.settingGroup}>
             <span class={ui.settingLabel}>Step</span>
-            <label
-              class={ui.strideControl}
+            <input
+              type="number"
+              class={ui.strideInput}
+              min="1"
+              max={totalFrames}
+              value={previewStride()}
+              disabled={isGenerating()}
               title="Preview every Nth frame, spread across the timeline (faster overview of long animations)"
-            >
-              <span class={ui.strideLabel}>every</span>
-              <input
-                type="number"
-                class={ui.strideInput}
-                min="1"
-                max={totalFrames}
-                value={previewStride()}
-                disabled={isGenerating()}
-                onInput={(e) => {
-                  const n = Math.floor(e.currentTarget.valueAsNumber)
-                  setPreviewStride(Number.isFinite(n) && n >= 1 ? n : 1)
-                }}
-              />
-              <span class={ui.strideLabel}>frame</span>
-            </label>
+              onInput={(e) => {
+                const n = Math.floor(e.currentTarget.valueAsNumber)
+                setPreviewStride(Number.isFinite(n) && n >= 1 ? n : 1)
+              }}
+            />
           </div>
         </div>
 
@@ -528,6 +525,6 @@ export function FramePreviewGallery(props: Props) {
           )
         }}
       </Show>
-    </div>
+    </>
   )
 }

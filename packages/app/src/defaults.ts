@@ -41,7 +41,7 @@ export const DEFAULT_ULTRA_QUALITY = parseFloat(
 
 // Animation frame preview quality presets (animation export gallery thumbnails)
 export const ANIMATION_FRAME_PREVIEW_QUALITY_LOW = parseFloat(
-  import.meta.env.VITE_ANIMATION_FRAME_PREVIEW_QUALITY_LOW ?? '0.95',
+  import.meta.env.VITE_ANIMATION_FRAME_PREVIEW_QUALITY_LOW ?? '0.97',
 )
 export const ANIMATION_FRAME_PREVIEW_QUALITY_MID = parseFloat(
   import.meta.env.VITE_ANIMATION_FRAME_PREVIEW_QUALITY_MID ?? '0.98',
