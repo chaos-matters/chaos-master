@@ -21,19 +21,28 @@
   gap: var(--space-2);
 }
 
+/* Matches the app's primary button (e.g. "Generate Random Flame"). */
 .applyBtn {
-  padding: 0.45rem 1.1rem;
+  padding: 0.5rem 1.1rem;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   font-family: inherit;
   font-size: 0.85rem;
   font-weight: 600;
   color: white;
   cursor: pointer;
-  background: linear-gradient(135deg, oklch(65% 0.22 30), oklch(58% 0.2 25));
-  transition: filter 0.15s;
+  background-color: oklch(60% 0.12 250);
+  transition: background-color 0.15s;
 
   &:hover {
-    filter: brightness(1.08);
+    background-color: oklch(52% 0.12 250);
+  }
+
+  [data-theme='dark'] & {
+    background-color: oklch(45% 0.1 250);
+
+    &:hover {
+      background-color: oklch(52% 0.1 250);
+    }
   }
 }
