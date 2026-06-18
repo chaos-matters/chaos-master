@@ -307,28 +307,28 @@
   padding: 0 2px;
   border: 1px solid var(--neutral-300);
   border-radius: 4px;
-  background: var(--neutral-50);
-  color: var(--neutral-900);
+  background-color: var(--neutral-100);
+  color: var(--neutral-700);
   cursor: pointer;
-  /* Make the native popup (and its options) render with light colors. */
+  /* Make the native popup (arrow/options) render with light colors. */
   color-scheme: light;
 
-  /* The dropdown popup ignores the control's bg in some browsers — set it
-     explicitly so options are never invisible. */
+  /* Chrome propagates the control's bg to the popup options; set it explicitly
+     too so the dropdown is never white-on-white. (--neutral-850 is undefined.) */
   & option {
-    background: var(--neutral-50);
-    color: var(--neutral-900);
+    background-color: var(--neutral-100);
+    color: var(--neutral-700);
   }
 
   [data-theme='dark'] & {
-    background: var(--neutral-850);
-    border-color: var(--neutral-600);
-    color: var(--neutral-100);
+    background-color: var(--neutral-900);
+    border-color: var(--neutral-700);
+    color: var(--neutral-200);
     color-scheme: dark;
 
     & option {
-      background: var(--neutral-850);
-      color: var(--neutral-100);
+      background-color: var(--neutral-900);
+      color: var(--neutral-200);
     }
   }
 }
