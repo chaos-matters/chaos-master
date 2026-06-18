@@ -154,7 +154,13 @@ export function ViewControls(props: ViewControlProps) {
           <div class={ui.camera3DControl}>
             <ScrubInput
               label="θ"
-              value={Math.round(((props.theta ?? 0) * 180) / Math.PI)}
+              // Display azimuth wrapped to 0–360° (the stored theta stays
+              // continuous/unbounded so orbit animations don't jump at the wrap).
+              value={
+                ((Math.round(((props.theta ?? 0) * 180) / Math.PI) % 360) +
+                  360) %
+                360
+              }
               step={1}
               onInput={(v) => props.setTheta?.((v * Math.PI) / 180)}
               dataParameterPath="camera3D.theta"
