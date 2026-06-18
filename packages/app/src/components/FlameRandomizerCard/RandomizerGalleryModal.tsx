@@ -1,7 +1,9 @@
 import { createSignal, For, Show } from 'solid-js'
+import { useRequestModal } from '@/components/Modal/ModalContext'
 import { ModalTitleBar } from '@/components/Modal/ModalTitleBar'
 import { generateRandomFlame, mutateFlame } from '@/flame/randomize'
 import { Root } from '@/lib/Root'
+import { FlameInspectModal } from './FlameInspectModal'
 import { GalleryGrid } from './GalleryGrid'
 import ui from './RandomizerGalleryModal.module.css'
 import type { GenerateRandomFlameConfig, MutateFlameOptions, } from '@/flame/randomize'
@@ -103,6 +105,15 @@ export function RandomizerGalleryModal(props: {
     props.respond()
   }
 
+  const requestModal = useRequestModal()
+  const inspect = (flame: FlameDescriptor) => {
+    void requestModal({
+      content: ({ respond }) => (
+        <FlameInspectModal flame={flame} onApply={apply} respond={respond} />
+      ),
+    })
+  }
+
   return (
     <div class={ui.modal}>
       <ModalTitleBar
@@ -197,6 +208,7 @@ export function RandomizerGalleryModal(props: {
             hardwareTier={props.hardwareTier}
             onApply={apply}
             onMutate={mutate}
+            onInspect={inspect}
             minCellWidth={`${cellSize()}px`}
             maxHeight="100%"
             brightness={brightness()}

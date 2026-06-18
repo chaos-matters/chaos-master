@@ -144,6 +144,8 @@ export function VariationPreview(props: {
   flame: FlameDescriptor
   name: string
   hardwareTier?: HardwareTier | null
+  /** Backing-store render size (default 256×144). Larger = crisper previews. */
+  resolution?: { width: number; height: number }
 }) {
   const is3D = () => (props.flame.renderSettings.dimensions ?? 2) === 3
   const targetQuality = () =>
@@ -258,7 +260,7 @@ export function VariationPreview(props: {
       >
         <AutoCanvas
           pixelRatio={1}
-          fixedResolution={{ width: 256, height: 144 }}
+          fixedResolution={props.resolution ?? { width: 256, height: 144 }}
         >
           <Show
             when={is3D()}

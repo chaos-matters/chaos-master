@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, onCleanup } from 'solid-js'
+import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
 import { VariationPreview } from '@/components/VariationSelector/VariationSelector'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
@@ -10,6 +10,18 @@ import type { HardwareTier } from '@/utils/hardwareTier'
 // (the actual render is still throttled by the ComputeGate below).
 const REVEAL_BATCH = 4
 const REVEAL_INTERVAL_MS = 100
+
+// Preview backing-store size by hardware tier. Capable GPUs render the previews
+// at a higher resolution so they look crisp instead of mushy when scaled up.
+const PREVIEW_RESOLUTION_BY_TIER: Record<
+  HardwareTier,
+  { width: number; height: number }
+> = {
+  low: { width: 256, height: 144 },
+  mid: { width: 384, height: 216 },
+  high: { width: 640, height: 360 },
+  ultra: { width: 768, height: 432 },
+}
 
 /**
  * Responsive grid of flame previews with a subtle top-right Apply / Mutate
@@ -26,6 +38,8 @@ export function GalleryGrid(props: {
   hardwareTier?: HardwareTier | null
   onApply: (flame: FlameDescriptor) => void
   onMutate: (flame: FlameDescriptor) => void
+  /** When set, an "inspect" action opens a hi-res preview of the flame. */
+  onInspect?: (flame: FlameDescriptor) => void
   /** Min cell width for the responsive grid (default 96px). */
   minCellWidth?: string
   /** When set, the grid scrolls vertically beyond this height. */
@@ -110,6 +124,8 @@ export function GalleryGrid(props: {
     })
   })
   const visibleCandidates = () => props.candidates.slice(0, revealCount())
+  const previewResolution = () =>
+    PREVIEW_RESOLUTION_BY_TIER[props.hardwareTier ?? 'mid']
 
   return (
     <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
@@ -149,6 +165,7 @@ export function GalleryGrid(props: {
                 flame={candidate}
                 name={`gallery-${i()}`}
                 hardwareTier={props.hardwareTier ?? null}
+                resolution={previewResolution()}
               />
               <div class={ui.actions}>
                 <button
@@ -171,6 +188,29 @@ export function GalleryGrid(props: {
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                 </button>
+                <Show when={props.onInspect}>
+                  <button
+                    type="button"
+                    class={ui.iconBtn}
+                    title="Inspect: view this flame at high quality"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      props.onInspect?.(candidate)
+                    }}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <circle cx="11" cy="11" r="7" />
+                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                  </button>
+                </Show>
                 <button
                   type="button"
                   class={ui.iconBtn}

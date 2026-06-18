@@ -1,0 +1,39 @@
+.modal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.canvasWrap {
+  align-self: center;
+  height: min(56vh, 576px);
+  aspect-ratio: 16 / 9;
+  max-width: 86vw;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #000;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.applyBtn {
+  padding: 0.45rem 1.1rem;
+  border: none;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  background: linear-gradient(135deg, oklch(65% 0.22 30), oklch(58% 0.2 25));
+  transition: filter 0.15s;
+
+  &:hover {
+    filter: brightness(1.08);
+  }
+}
