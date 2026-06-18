@@ -42,3 +42,21 @@ export function cameraBasis(
 export function rolledUpVector(forward: Vec3, roll: number): Vec3 {
   return cameraBasis(forward, roll).up
 }
+
+/**
+ * Map a screen-space pointer delta (dx right, dy down) into the camera's
+ * un-rolled right/up axes, so fly-mode look turns around the camera's own
+ * (rolled) frame instead of the world azimuth. `dRight` drives yaw (theta),
+ * `dUp` drives pitch (phi). With roll = 0 it is the identity: `{ dRight: dx,
+ * dUp: -dy }`. Without this, any non-zero roll sends mouse-look off in the wrong
+ * direction (the screen axes no longer line up with theta/phi).
+ */
+export function rollAdjustLookDelta(
+  dx: number,
+  dy: number,
+  roll: number,
+): { dRight: number; dUp: number } {
+  const c = Math.cos(roll)
+  const s = Math.sin(roll)
+  return { dRight: dx * c + dy * s, dUp: dx * s - dy * c }
+}
