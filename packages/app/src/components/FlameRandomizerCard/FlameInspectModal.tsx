@@ -42,15 +42,17 @@ export function FlameInspectModal(props: {
               when={is3D()}
               fallback={
                 <Camera2D
-                  position={vec2f(...props.flame.renderSettings.camera.position)}
+                  position={vec2f(
+                    ...props.flame.renderSettings.camera.position,
+                  )}
                   zoom={props.flame.renderSettings.camera.zoom}
                 >
                   <Flam3
                     animationEnabled={false}
-                    quality={0.999}
+                    quality={0.99}
                     pointCountPerBatch={DEFAULT_POINT_COUNT}
                     persistChains={false}
-                    adaptiveFilterEnabled={true}
+                    adaptiveFilterEnabled={false}
                     flameDescriptor={props.flame}
                     renderInterval={1}
                     edgeFadeColor={vec4f(0)}
@@ -58,10 +60,12 @@ export function FlameInspectModal(props: {
                 </Camera2D>
               }
             >
-              <Default3DPreviewCamera camera3D={props.flame.renderSettings.camera3D}>
+              <Default3DPreviewCamera
+                camera3D={props.flame.renderSettings.camera3D}
+              >
                 <Flam3
                   animationEnabled={false}
-                  quality={0.999}
+                  quality={0.99}
                   pointCountPerBatch={DEFAULT_POINT_COUNT}
                   persistChains={false}
                   adaptiveFilterEnabled={false}
