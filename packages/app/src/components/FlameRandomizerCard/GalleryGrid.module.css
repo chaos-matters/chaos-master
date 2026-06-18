@@ -38,6 +38,13 @@
       color-mix(in oklab, var(--accent-color, #6366f1), transparent 55%);
 }
 
+/* Fills the cell and carries the optional brightness filter, so only the
+   preview image is brightened — not the cell border or selected glow. */
+.preview-layer {
+  position: absolute;
+  inset: 0;
+}
+
 /* Subtle action chip, top-right, revealed on hover/focus (or tap on touch). */
 .actions {
   position: absolute;

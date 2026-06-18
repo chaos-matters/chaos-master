@@ -62,6 +62,8 @@ export function GalleryGrid(props: {
 
   const handleCellClick = (candidate: FlameDescriptor, index: number) => {
     if (props.applyOnClick) {
+      // Mark the applied cell so the user can see which one is active.
+      setSelectedIndex(index)
       props.onApply(candidate)
       return
     }
@@ -126,6 +128,12 @@ export function GalleryGrid(props: {
   const visibleCandidates = () => props.candidates.slice(0, revealCount())
   const previewResolution = () =>
     PREVIEW_RESOLUTION_BY_TIER[props.hardwareTier ?? 'mid']
+  // Brightness is applied only to the preview image — not the grid — so cell
+  // borders and the selected-cell glow aren't brightened along with the flame.
+  const brightnessStyle = () =>
+    props.brightness !== undefined && props.brightness !== 1
+      ? { filter: `brightness(${props.brightness})` }
+      : undefined
 
   return (
     <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
@@ -137,9 +145,6 @@ export function GalleryGrid(props: {
           ...(props.maxHeight !== undefined
             ? { 'max-height': props.maxHeight }
             : {}),
-          ...(props.brightness !== undefined && props.brightness !== 1
-            ? { filter: `brightness(${props.brightness})` }
-            : {}),
         }}
       >
         <For each={visibleCandidates()}>
@@ -148,46 +153,56 @@ export function GalleryGrid(props: {
               class={ui.cell}
               classList={{
                 [ui.cellActive!]: activeIndex() === i(),
-                [ui.cellSelected!]: !props.applyOnClick && selectedIndex() === i(),
+                [ui.cellSelected!]: selectedIndex() === i(),
               }}
               title={
                 props.applyOnClick
-                  ? 'Click to apply this flame'
+                  ? selectedIndex() === i()
+                    ? 'Applied — click to re-apply'
+                    : 'Click to apply this flame'
                   : selectedIndex() === i()
                     ? 'Click again (or press Enter) to apply'
                     : 'Click to select'
               }
-              onClick={() => handleCellClick(candidate, i())}
+              onClick={() => {
+                handleCellClick(candidate, i())
+              }}
             >
-              <VariationPreview
-                version={props.version}
-                isSelected={false}
-                flame={candidate}
-                name={`gallery-${i()}`}
-                hardwareTier={props.hardwareTier ?? null}
-                resolution={previewResolution()}
-              />
+              <div class={ui.previewLayer} style={brightnessStyle()}>
+                <VariationPreview
+                  version={props.version}
+                  isSelected={false}
+                  flame={candidate}
+                  name={`gallery-${i()}`}
+                  hardwareTier={props.hardwareTier ?? null}
+                  resolution={previewResolution()}
+                />
+              </div>
               <div class={ui.actions}>
-                <button
-                  type="button"
-                  class={ui.iconBtn}
-                  title="Apply this flame"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    props.onApply(candidate)
-                  }}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
+                {/* In apply-on-click (sidebar) mode the whole cell applies, so
+                    the explicit Apply tick is redundant — hide it there. */}
+                <Show when={!props.applyOnClick}>
+                  <button
+                    type="button"
+                    class={ui.iconBtn}
+                    title="Apply this flame"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      props.onApply(candidate)
+                    }}
                   >
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                </button>
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  </button>
+                </Show>
                 <Show when={props.onInspect}>
                   <button
                     type="button"
