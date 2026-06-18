@@ -1,4 +1,11 @@
+import { render } from 'solid-js/web'
+import { vec2f, vec4f } from 'typegpu/data'
 import { qualityPresets } from '@/components/Quality/QualityPresets'
+import { examples } from '@/flame/examples'
+import { Flam3 } from '@/flame/Flam3'
+import { AutoCanvas } from '@/lib/AutoCanvas'
+import { Camera2D } from '@/lib/Camera2D'
+import { Root } from '@/lib/Root'
 import type { QualityPreset } from '@/components/Quality/QualityPresets'
 
 export type HardwareTier = 'low' | 'mid' | 'high' | 'ultra'
@@ -42,29 +49,8 @@ function bpsToTier(bps: number): HardwareTier {
  * Falls back to 'mid' when WebGPU is unavailable, the adapter can't be
  * acquired, or the safety timeout fires.
  */
-export async function detectHardwareTier(): Promise<HardwareTier> {
-  if (!('gpu' in globalThis.navigator)) return 'mid'
-
-  // Dynamic imports — these modules pull in the WebGPU rendering pipeline and
-  // SolidJS component tree. Loading them lazily avoids bloating the initial
-  // bundle for returning users who already have a persisted tier.
-  const [
-    { render },
-    { vec2f, vec4f },
-    { examples },
-    { Flam3 },
-    { AutoCanvas },
-    { Camera2D },
-    { Root },
-  ] = await Promise.all([
-    import('solid-js/web'),
-    import('typegpu/data'),
-    import('@/flame/examples'),
-    import('@/flame/Flam3'),
-    import('@/lib/AutoCanvas'),
-    import('@/lib/Camera2D'),
-    import('@/lib/Root'),
-  ])
+export function detectHardwareTier(): Promise<HardwareTier> {
+  if (!('gpu' in globalThis.navigator)) return Promise.resolve('mid')
 
   const DEFAULT_POINT_COUNT = 100_000
 
