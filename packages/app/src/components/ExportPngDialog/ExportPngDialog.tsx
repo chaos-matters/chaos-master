@@ -675,6 +675,8 @@ function RenderDialog(props: RenderDialogProps) {
               tracks={props.tracks}
               config={props.config}
               selectedPalette={props.selectedPalette}
+              aspect={props.aspect}
+              viewportAspect={props.viewportAspect}
             />
           </div>
           <div class={ui.controlsPane}>

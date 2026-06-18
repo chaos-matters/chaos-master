@@ -28,6 +28,45 @@
   gap: var(--space-2);
 }
 
+.stride-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.62rem;
+  color: var(--neutral-500);
+  white-space: nowrap;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-400);
+  }
+}
+
+.stride-label {
+  font-weight: 500;
+}
+
+.stride-input {
+  width: 3rem;
+  padding: 2px 4px;
+  font-size: 0.7rem;
+  font-family: inherit;
+  text-align: center;
+  border: 1px solid var(--neutral-300);
+  border-radius: 4px;
+  background: var(--neutral-50);
+  color: var(--neutral-800);
+
+  [data-theme='dark'] & {
+    border-color: var(--neutral-700);
+    background: var(--neutral-900);
+    color: var(--neutral-200);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+  }
+}
+
 /* -- Quality toggle pills (dark-aware) -- */
 
 .qualityButton {
@@ -308,7 +347,7 @@
   overflow: hidden;
   border: 1px solid var(--neutral-200);
   background: var(--neutral-100);
-  aspect-ratio: 4 / 3;
+  /* aspect-ratio is set inline to match the chosen export aspect. */
   cursor: pointer;
   transition:
     border-color 0.15s,
