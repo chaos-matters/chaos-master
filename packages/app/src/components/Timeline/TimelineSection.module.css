@@ -300,6 +300,24 @@
   }
 }
 
+.settingSelect {
+  font-size: 0.6rem;
+  font-weight: 600;
+  height: 20px;
+  padding: 0 2px;
+  border: 1px solid var(--neutral-300);
+  border-radius: 4px;
+  background: var(--neutral-50);
+  color: var(--neutral-700);
+  cursor: pointer;
+
+  [data-theme='dark'] & {
+    background: var(--neutral-850);
+    border-color: var(--neutral-600);
+    color: var(--neutral-300);
+  }
+}
+
 .settingCheckbox {
   appearance: none;
   width: 14px;

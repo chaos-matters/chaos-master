@@ -38,10 +38,10 @@ export const TimelineConfig = v.object({
   endFrame: v.pipe(v.number(), v.minValue(1)),
   loop: v.boolean(),
   autoFps: v.optional(v.boolean(), false),
-  // When on, the trailing gap (last keyframe → endFrame) synthesizes a return
-  // ramp back to each track's start value so playback loops seamlessly. No real
-  // keyframes are added — purely a resolve-time effect.
-  seamlessLoop: v.optional(v.boolean(), false),
+  // Resolve-time loop synthesis (adds no real keyframes):
+  // - 'seamless': trailing gap ramps back to each track's start value.
+  // - 'cycle': per-property cyclic wrap over the whole timeline period.
+  loopMode: v.optional(v.picklist(['off', 'seamless', 'cycle']), 'off'),
 })
 export type TimelineConfig = v.InferOutput<typeof TimelineConfig>
 
@@ -58,6 +58,6 @@ export function defaultTimelineConfig(): TimelineConfig {
     endFrame: 90,
     loop: true,
     autoFps: false,
-    seamlessLoop: false,
+    loopMode: 'off',
   }
 }

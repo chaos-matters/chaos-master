@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   createTimelineState,
   resolveKeyframeValue,
-  resolveSeamlessValue,
+  resolveLoopValue,
 } from './timeline'
 
 describe('Timeline Utilities', () => {
@@ -571,89 +571,108 @@ describe('Timeline Utilities', () => {
     })
   })
 
-  describe('seamless loop (toggle, no baking)', () => {
-    it('toggling on adds no keyframes and enables loop', () => {
-      timeline.setConfig({ ...timeline.config(), startFrame: 0, loop: false })
+  describe('loop modes (toggle, no baking)', () => {
+    it('seamless: adds no keyframes, enables loop, extends endFrame by span', () => {
+      timeline.setConfig({ ...timeline.config(), startFrame: 0, endFrame: 40 })
       timeline.addKeyframe('exposure', 0, 0.2, 'linear')
       timeline.addKeyframe('exposure', 40, 0.9, 'linear')
       const before = timeline.tracks()[0]!.keyframes.length
 
-      timeline.toggleSeamlessLoop()
+      timeline.setLoopMode('seamless')
 
-      expect(timeline.config().seamlessLoop).toBe(true)
+      expect(timeline.config().loopMode).toBe('seamless')
       expect(timeline.config().loop).toBe(true)
-      // No keyframes were inserted — purely a config flag.
+      // userEnd = 40, span = 40 → endFrame extended to 80 (uniform return).
+      expect(timeline.config().endFrame).toBe(80)
       expect(timeline.tracks()[0]!.keyframes).toHaveLength(before)
     })
 
-    it('is idempotent — re-toggling on/off does not pile up frames', () => {
+    it('seamless is idempotent — re-selecting does not pile up frames', () => {
       timeline.addKeyframe('exposure', 0, 0.2, 'linear')
       timeline.addKeyframe('exposure', 40, 0.9, 'linear')
-
-      timeline.toggleSeamlessLoop() // on → extends endFrame to give a ramp
+      timeline.setLoopMode('seamless')
       const extendedEnd = timeline.config().endFrame
-      timeline.toggleSeamlessLoop() // off
-      timeline.toggleSeamlessLoop() // on again
-      // endFrame already has room, so it must not grow further.
+      timeline.setLoopMode('off')
+      timeline.setLoopMode('seamless')
       expect(timeline.config().endFrame).toBe(extendedEnd)
     })
 
-    it('reserves trailing room equal to the forward span (uniform return)', () => {
-      timeline.setConfig({ ...timeline.config(), startFrame: 0, endFrame: 40 })
-      timeline.addKeyframe('exposure', 0, 0.2, 'linear')
-      timeline.addKeyframe('exposure', 40, 0.9, 'linear')
-
-      timeline.setSeamlessLoop(true)
-      // userEnd = 40, span = 40 → endFrame extended to 40 + 40 = 80 so the
-      // return takes the same time as the forward animation.
-      expect(timeline.config().endFrame).toBe(80)
-    })
-
-    it('resolves a value at endFrame equal to the start value when on', () => {
+    it('cycle: enables loop and never extends endFrame', () => {
       timeline.setConfig({ ...timeline.config(), startFrame: 0, endFrame: 60 })
       timeline.addKeyframe('exposure', 0, 0.2, 'linear')
       timeline.addKeyframe('exposure', 40, 0.9, 'linear')
-      timeline.setSeamlessLoop(true)
+      timeline.setLoopMode('cycle')
+      expect(timeline.config().loopMode).toBe('cycle')
+      expect(timeline.config().loop).toBe(true)
+      expect(timeline.config().endFrame).toBe(60)
+    })
 
-      // Inside user content → natural value held.
+    it('seamless resolves endFrame back to the start value', () => {
+      timeline.setConfig({ ...timeline.config(), startFrame: 0, endFrame: 60 })
+      timeline.addKeyframe('exposure', 0, 0.2, 'linear')
+      timeline.addKeyframe('exposure', 40, 0.9, 'linear')
+      timeline.setLoopMode('seamless')
       expect(timeline.resolveValueAtPath('exposure', 40)).toBeCloseTo(0.9)
-      // At the loop boundary → ramped back to the start value (seamless).
       expect(timeline.resolveValueAtPath('exposure', 60)).toBeCloseTo(0.2)
     })
 
-    it('leaves resolution unchanged when off', () => {
+    it('cycle resolves start and end to the same value (seamless wrap)', () => {
+      timeline.setConfig({ ...timeline.config(), startFrame: 0, endFrame: 60 })
+      // First keyframe is NOT at frame 0 — the wrap must still close.
+      timeline.addKeyframe('exposure', 10, 0.2, 'linear')
+      timeline.addKeyframe('exposure', 40, 0.9, 'linear')
+      timeline.setLoopMode('cycle')
+      const atStart = timeline.resolveValueAtPath('exposure', 0) as number
+      const atEnd = timeline.resolveValueAtPath('exposure', 60) as number
+      expect(atEnd).toBeCloseTo(atStart)
+    })
+
+    it('off leaves resolution unchanged', () => {
       timeline.setConfig({ ...timeline.config(), startFrame: 0, endFrame: 60 })
       timeline.addKeyframe('exposure', 0, 0.2, 'linear')
       timeline.addKeyframe('exposure', 40, 0.9, 'linear')
-      // Off → value past the last keyframe is held, not ramped back.
       expect(timeline.resolveValueAtPath('exposure', 60)).toBeCloseTo(0.9)
     })
   })
 
-  describe('resolveSeamlessValue', () => {
+  describe('resolveLoopValue', () => {
     const kfs = [
       { frame: 0, value: 0, easing: 'linear' as const },
       { frame: 40, value: 10, easing: 'linear' as const },
     ]
 
     it('equals resolveKeyframeValue when opts is null', () => {
-      expect(resolveSeamlessValue(kfs, 20, null)).toBe(
-        resolveKeyframeValue(kfs, 20),
-      )
+      expect(resolveLoopValue(kfs, 20, null)).toBe(resolveKeyframeValue(kfs, 20))
     })
 
-    it('ramps from the held end value back to the start value', () => {
-      const opts = { startFrame: 0, endFrame: 60, userEnd: 40 }
-      expect(resolveSeamlessValue(kfs, 40, opts)).toBeCloseTo(10) // held
-      expect(resolveSeamlessValue(kfs, 60, opts)).toBeCloseTo(0) // back to start
-      const mid = resolveSeamlessValue(kfs, 50, opts) as number
+    it('seamless ramps from the held end value back to the start value', () => {
+      const opts = { mode: 'seamless' as const, startFrame: 0, endFrame: 60, userEnd: 40 }
+      expect(resolveLoopValue(kfs, 40, opts)).toBeCloseTo(10) // held
+      expect(resolveLoopValue(kfs, 60, opts)).toBeCloseTo(0) // back to start
+      const mid = resolveLoopValue(kfs, 50, opts) as number
       expect(mid).toBeGreaterThan(0)
       expect(mid).toBeLessThan(10)
     })
 
-    it('does nothing without trailing room (endFrame <= userEnd)', () => {
-      const opts = { startFrame: 0, endFrame: 40, userEnd: 40 }
-      expect(resolveSeamlessValue(kfs, 40, opts)).toBeCloseTo(10)
+    it('cycle interior interpolates normally', () => {
+      const opts = { mode: 'cycle' as const, startFrame: 0, endFrame: 60 }
+      // frame 20 is between kf 0 and 40 → 5.0 (linear).
+      expect(resolveLoopValue(kfs, 20, opts)).toBeCloseTo(5)
+    })
+
+    it('cycle wraps the last keyframe back to the first across the period', () => {
+      // kf at 10 and 40, period [0,60]. Wrap segment 40 → (10 + 60) = 70.
+      const k = [
+        { frame: 10, value: 2, easing: 'linear' as const },
+        { frame: 40, value: 8, easing: 'linear' as const },
+      ]
+      const opts = { mode: 'cycle' as const, startFrame: 0, endFrame: 60 }
+      // Halfway through the wrap (frame 55) → midpoint of 8 → 2.
+      expect(resolveLoopValue(k, 55, opts)).toBeCloseTo(5)
+      // start and end resolve equal.
+      expect(resolveLoopValue(k, 0, opts)).toBeCloseTo(
+        resolveLoopValue(k, 60, opts) as number,
+      )
     })
   })
 })

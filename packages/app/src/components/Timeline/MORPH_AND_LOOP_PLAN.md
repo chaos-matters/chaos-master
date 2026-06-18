@@ -49,53 +49,55 @@ Pressing Play sweeps `blendWeight` 1→0 → A dissolves into B. The morph is a
 normal keyframe track, so it's fully editable in the dope sheet, exportable, and
 shareable like any other animation.
 
-## Feature 2 — Seamless Loop ("smart loop")
+## Feature 2 — Loop synthesis ("smart loop")
 
 **Goal:** make any user animation loop like a GIF — the last frame flows back
 into the first with no visible jump.
 
-**UX:** a `Seamless` **toggle** (checkbox) in the timeline settings bar, next to
-`Loop`. It's a switch — flip it on/off, idempotent. Crucially it **adds no
-keyframes**: the return is synthesized at resolve time, so the user's dope sheet
-stays exactly as they drew it.
+**UX:** a `Loop Style` **selector** in the timeline settings bar (next to
+`Loop`): `None` / `Seamless` / `Cycle`. Both modes **add no keyframes** — the
+loop is synthesized at resolve time, so the dope sheet stays exactly as drawn.
 
-**Config flag:** `TimelineConfig.seamlessLoop: boolean` (persisted in the
-animation schema, so it survives save/share/reload).
+**Config:** `TimelineConfig.loopMode: 'off' | 'seamless' | 'cycle'` (persisted in
+the animation schema, so it survives save/share/reload).
 
-**Resolve-time synthesis (`resolveSeamlessValue`):** given
-`opts = { startFrame, endFrame, userEnd }` where `userEnd` is the last keyframe
-across all tracks:
-- For frames in the trailing window `(userEnd, endFrame]`, a track's value ramps
-  (eased) from its **held last value** back to its value at `startFrame`. So
-  `value(endFrame) === value(startFrame)` and the wrap is invisible.
-- Everywhere else it's exactly `resolveKeyframeValue` (no change).
-- With the flag off (`opts = null`) it is a pure pass-through.
+Two modes (`LoopMode`):
 
-This is threaded through every resolution path via `seamlessOptsFromConfig`:
-`applyTimelineToFlame` / `…AtFrame` (live playback + the timeline-based export
-paths), `applyTracksToFlame` (the offscreen export job, from `job.config`), and
-`resolveValueAtPath` (so the morph's `blendWeight` loops too).
+- **Seamless** — *there-and-back*. Given the last keyframe across all tracks
+  (`userEnd`), in the trailing window `(userEnd, endFrame]` each track ramps
+  (eased) from its held last value back to its value at `startFrame`, so
+  `value(endFrame) === value(startFrame)`. Enabling extends `endFrame` to
+  `userEnd + span` (full forward span) so B→A takes the **same time** as A→B.
 
-**Enabling the toggle (`setSeamlessLoop(true)`):** sets `seamlessLoop = true`
-and `loop = true`, and — only if the timeline currently ends on/before the last
-keyframe (`endFrame <= userEnd`) — extends `endFrame` to `userEnd + span` (the
-full forward span) so the return (B→A) takes the **same time** as the forward
-animation (A→B). Re-enabling when room already exists is a no-op (idempotent — no
-piling up). Disabling just clears the flag; the keyframes were never touched.
+- **Cycle** — *per-property cyclic wrap*. The timeline `[startFrame, endFrame]`
+  is one period `P`. Inside a track's own keyframe span it resolves normally;
+  outside it (before its first keyframe `k0` or after its last `kn`) it
+  interpolates across the wrap `kn → k0 + P`. The wrap duration for a property is
+  `(endFrame − kn) + (k0 − startFrame)` — so it respects each track's **own**
+  keyframe timing/phase, and `value(startFrame) === value(endFrame)` falls out
+  automatically. No timeline extension.
+
+**Resolution (`resolveLoopValue`):** dispatches on `opts.mode`; with `opts =
+null` it's exactly `resolveKeyframeValue`. Threaded through every resolution path
+via `loopOptsFromConfig`: `applyTimelineToFlame` / `…AtFrame` (live playback +
+timeline-based export paths), `applyTracksToFlame` (the offscreen export job,
+from `job.config`), and `resolveValueAtPath` (so the morph's `blendWeight` loops
+too). Setting a mode (`setLoopMode`) is idempotent — re-selecting doesn't pile up
+frames; switching to `None` just clears it; keyframes are never touched.
 
 **Composition with Morph:** a morph is `blendWeight` 1 @ start → 0 @ endFrame.
-Turning Seamless on extends the timeline past that final keyframe and ramps
-`blendWeight` 0 → 1 across the new tail (and every other animated parameter back
-to its origin), giving a seamless **A → B → A** loop for free.
+`Seamless` extends the timeline and ramps `blendWeight` 0 → 1 across the new tail
+(A→B→A); `Cycle` wraps it within the existing period — both give a seamless loop
+for free.
 
 ## Files touched
 
-- `flame/schema/timeline.ts` — `seamlessLoop` config flag (persisted).
-- `utils/timeline.ts` — `seamlessLoop` config field, `resolveSeamlessValue`,
-  `getUserEndFrame`, `seamlessOptsFromConfig`, `setSeamlessLoop` /
-  `toggleSeamlessLoop`; seamless threading in `applyTracksToFlame`,
+- `flame/schema/timeline.ts` — `loopMode` config field (persisted).
+- `utils/timeline.ts` — `loopMode` config field, `LoopMode`, `resolveLoopValue`
+  (`resolveSeamless` + `resolveCycle`), `getUserEndFrame`, `loopOptsFromConfig`,
+  `setLoopMode`; loop threading in `applyTracksToFlame`,
   `applyTimelineToFlame(AtFrame)` and `resolveValueAtPath`.
-- `components/ExportJobs/OffscreenAnimationRender.tsx` — pass seamless opts from
+- `components/ExportJobs/OffscreenAnimationRender.tsx` — pass loop opts from
   `job.config` so exports bake the loop.
 - `components/ViewControls/ViewControls.tsx` — `onMorphFlame` prop + `Morph...`
   button.
