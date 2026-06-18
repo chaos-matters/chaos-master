@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.7] - 2026-06-18
+
+### Added
+
+- **Randomizer preview gallery**: browse a page of random-flame previews and click one to apply it, instead of click-spamming Generate. An **Advanced gallery** modal adds bigger previews, a count selector, mutation "breeding", and preview size/brightness controls.
+- **Inspect before applying**: a hi-res preview action on each gallery item shows a flame large and at high quality before you load it; gallery thumbnails also render sharper on more capable GPUs.
+- **Variation groups in the randomizer**: enable or disable whole categories of variations (General, Blur, …) at once; new flames default to General + Blur.
+- **Collapse all transforms**: a sidebar button folds every transform card at once.
+- **Benchmark workload badge**: the results view and the shareable image now show which benchmark (Small / Medium / Large) was run.
+- **Frame-preview options** in the animation export: preview every Nth frame for a quick overview of long animations, a **Render more** button, and Low / Mid / High quality presets.
+
+### Changed
+
+- **Colour editor**: left-click a wheel handle to select it and click again to deselect (right-click still deselects).
+- **One active selection** across the randomizer card — the gallery and recent-history highlights no longer show at the same time.
+- **Animation export previews** now match the chosen export **aspect ratio** (including the hover popup), and the preview controls are reorganised into a cleaner settings panel that locks while previews render.
+- **Exposure** value in the render settings shows two decimals, so it no longer flickers under 3D auto-exposure.
+
+### Fixed
+
+- Custom variations are now categorised correctly.
+- Quality-preset buttons highlight on hover instead of dimming.
+- The hi-res flame inspect no longer darkens as points accumulate.
+
 ## [0.9.6] - 2026-06-17
 
 ### Added
