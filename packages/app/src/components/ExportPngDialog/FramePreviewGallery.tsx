@@ -110,18 +110,23 @@ export function FramePreviewGallery(props: Props) {
     return clone
   }
 
-  async function generatePreviews() {
+  async function generatePreviews(append = false) {
     aborted = false
     setIsGenerating(true)
-    setThumbnails([])
 
     const cfg = QUALITY_CONFIG[previewQuality()]
-    const results: string[] = []
+    // "Render more" continues from where the last batch stopped; a fresh render
+    // starts at the first frame. Each batch covers up to maxFrames frames.
+    const startIdx = append ? thumbnails().length : 0
+    const endIdx = Math.min(startIdx + cfg.maxFrames, totalFrames)
+    const results: string[] = append ? [...thumbnails()] : []
+    if (!append) setThumbnails([])
+    const batchTotal = endIdx - startIdx
 
-    for (let i = 0; i < displayCount(); i++) {
+    for (let i = startIdx; i < endIdx; i++) {
       if (aborted) break
 
-      setProgress({ current: i + 1, total: displayCount() })
+      setProgress({ current: i - startIdx + 1, total: batchTotal })
       const desc = flameForFrame(i)
       setFrameDescriptor(() => desc)
 
@@ -333,13 +338,27 @@ export function FramePreviewGallery(props: Props) {
                 </svg>
               </button>
             </Show>
+            <Show
+              when={
+                thumbnails().length > 0 && thumbnails().length < totalFrames
+              }
+            >
+              <button
+                type="button"
+                class={ui.generateButton}
+                onClick={() => generatePreviews(true)}
+                title="Render the next batch of frame previews"
+              >
+                Render more ({thumbnails().length}/{totalFrames})
+              </button>
+            </Show>
             <button
               type="button"
               class={ui.generateButton}
-              onClick={generatePreviews}
+              onClick={() => generatePreviews(false)}
               title="Generate previews"
             >
-              Render Previews
+              {thumbnails().length > 0 ? 'Re-render' : 'Render Previews'}
             </button>
           </Show>
         </div>
