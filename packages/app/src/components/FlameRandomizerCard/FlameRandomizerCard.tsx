@@ -130,6 +130,12 @@ function defaultSelectedVariations(
 export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
   const is3D = () => props.flame.renderSettings.dimensions === 3
 
+  // A single "active selection" across the whole card: either a Preview Gallery
+  // cell or a Recent History entry is highlighted, never both.
+  const [selectionOwner, setSelectionOwner] = createSignal<
+    'gallery' | 'history' | null
+  >(null)
+
   // Local settings signals
   const [strength, setStrength] = createSignal(0.5)
   const [minTransforms, setMinTransforms] = createSignal(2)
@@ -300,6 +306,7 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
   })
 
   const handleGenerate = () => {
+    setSelectionOwner(null)
     const config = buildConfig()
     props.onGenerateFlame(
       config,
@@ -322,6 +329,7 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
   }
 
   const handleMutate = () => {
+    setSelectionOwner(null)
     const config = buildConfig()
     props.onMutateFlame(
       config,
@@ -897,7 +905,11 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
                   buildConfig={buildConfig}
                   buildMutationOptions={buildMutationOptions}
                   hardwareTier={props.hardwareTier}
-                  onApply={props.onApplyCandidate}
+                  selectionActive={selectionOwner() === 'gallery'}
+                  onApply={(flame) => {
+                    setSelectionOwner('gallery')
+                    props.onApplyCandidate(flame)
+                  }}
                 />
               </div>
             </Show>
@@ -1008,9 +1020,11 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
                       class={ui.historyThumbBtn}
                       classList={{
                         [ui.historyThumbBtnSelected as string]:
+                          selectionOwner() === 'history' &&
                           props.selectedTimestamp === entry.timestamp,
                       }}
                       onClick={() => {
+                        setSelectionOwner('history')
                         props.onLoadHistory(entry)
                       }}
                       title="Load flame state"

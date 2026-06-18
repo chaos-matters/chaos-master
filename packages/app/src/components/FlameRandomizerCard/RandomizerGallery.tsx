@@ -20,6 +20,8 @@ export function RandomizerGallery(props: {
   buildConfig: () => GenerateRandomFlameConfig
   buildMutationOptions: () => MutateFlameOptions
   hardwareTier?: HardwareTier | null
+  /** False clears the applied-cell highlight (another card section is active). */
+  selectionActive?: boolean
   onApply: (flame: FlameDescriptor) => void
 }) {
   const requestModal = useRequestModal()
@@ -94,6 +96,7 @@ export function RandomizerGallery(props: {
         version={version()}
         hardwareTier={props.hardwareTier}
         applyOnClick
+        selectionActive={props.selectionActive}
         onApply={props.onApply}
         onMutate={(flame) => {
           openModal(flame)

@@ -53,6 +53,11 @@ export function GalleryGrid(props: {
    *   border); clicking the already-selected cell — or pressing Enter — applies.
    */
   applyOnClick?: boolean
+  /**
+   * For apply-on-click mode: when explicitly `false`, the applied-cell highlight
+   * is cleared (another part of the randomizer card became the active selection).
+   */
+  selectionActive?: boolean
 }) {
   // Which cell's chip is revealed by tap. Hover/focus handles desktop via CSS;
   // touch has no hover, so tapping a cell reveals its Apply/Mutate buttons.
@@ -102,6 +107,14 @@ export function GalleryGrid(props: {
     onCleanup(() => {
       document.removeEventListener('keydown', onKeyDown)
     })
+  })
+
+  // Clear the applied-cell highlight when another part of the randomizer card
+  // takes over the selection (apply-on-click mode only).
+  createEffect(() => {
+    if (props.applyOnClick && props.selectionActive === false) {
+      setSelectedIndex(-1)
+    }
   })
 
   // Progressive reveal: re-stagger whenever the candidate set or version
