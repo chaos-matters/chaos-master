@@ -308,13 +308,28 @@
   border: 1px solid var(--neutral-300);
   border-radius: 4px;
   background: var(--neutral-50);
-  color: var(--neutral-700);
+  color: var(--neutral-900);
   cursor: pointer;
+  /* Make the native popup (and its options) render with light colors. */
+  color-scheme: light;
+
+  /* The dropdown popup ignores the control's bg in some browsers — set it
+     explicitly so options are never invisible. */
+  & option {
+    background: var(--neutral-50);
+    color: var(--neutral-900);
+  }
 
   [data-theme='dark'] & {
     background: var(--neutral-850);
     border-color: var(--neutral-600);
-    color: var(--neutral-300);
+    color: var(--neutral-100);
+    color-scheme: dark;
+
+    & option {
+      background: var(--neutral-850);
+      color: var(--neutral-100);
+    }
   }
 }
 
