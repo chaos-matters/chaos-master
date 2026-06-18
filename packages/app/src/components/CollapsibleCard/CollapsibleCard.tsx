@@ -1,4 +1,4 @@
-import { createSignal, Show } from 'solid-js'
+import { createEffect, createSignal, Show } from 'solid-js'
 import { ChevronDown } from '@/icons'
 import ui from './CollapsibleCard.module.css'
 import type { JSX, ParentProps } from 'solid-js'
@@ -21,9 +21,23 @@ export function CollapsibleCard(
     headerActions?: JSX.Element
     /** Tour anchor on the card root (present even while collapsed). */
     'data-tour-target'?: string
+    /** Bumping this number collapses the card (drives "Collapse all"). The
+     *  initial value is ignored; only later changes collapse the card. */
+    collapseEpoch?: number
   }>,
 ) {
   const [isOpen, setIsOpen] = createSignal(props.defaultOpen ?? true)
+
+  // Collapse when an external epoch advances (e.g. the sidebar "Collapse all").
+  let isInitialEpoch = true
+  createEffect(() => {
+    void props.collapseEpoch
+    if (isInitialEpoch) {
+      isInitialEpoch = false
+      return
+    }
+    setIsOpen(false)
+  })
   return (
     <div
       class={ui.card}
