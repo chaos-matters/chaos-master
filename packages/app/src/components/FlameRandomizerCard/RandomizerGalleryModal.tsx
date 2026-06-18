@@ -125,6 +125,10 @@ export function RandomizerGalleryModal(props: {
             <Show when={depth() > 0}>
               <span class={ui.depthTag}> · depth {depth()}</span>
             </Show>
+            <span class={ui.depthTag}>
+              {' '}
+              · click to select, Enter or double-click to apply
+            </span>
           </span>
         </div>
         <div class={ui.toolbarRight}>

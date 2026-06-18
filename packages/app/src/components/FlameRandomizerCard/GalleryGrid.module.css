@@ -29,6 +29,15 @@
   border-color: var(--neutral-500);
 }
 
+.cellSelected,
+.cellSelected:hover {
+  border-color: var(--accent-color, #6366f1);
+  box-shadow:
+    0 0 0 2px var(--accent-color, #6366f1),
+    0 2px 10px
+      color-mix(in oklab, var(--accent-color, #6366f1), transparent 55%);
+}
+
 /* Subtle action chip, top-right, revealed on hover/focus (or tap on touch). */
 .actions {
   position: absolute;

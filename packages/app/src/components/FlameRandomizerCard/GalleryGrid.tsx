@@ -32,10 +32,61 @@ export function GalleryGrid(props: {
   maxHeight?: string
   /** CSS brightness multiplier applied to every preview (inspection aid). */
   brightness?: number
+  /**
+   * Interaction model:
+   * - `true` (sidebar): a single click on a cell applies the flame immediately.
+   * - `false`/unset (modal): the first click selects the cell (highlighted
+   *   border); clicking the already-selected cell — or pressing Enter — applies.
+   */
+  applyOnClick?: boolean
 }) {
   // Which cell's chip is revealed by tap. Hover/focus handles desktop via CSS;
   // touch has no hover, so tapping a cell reveals its Apply/Mutate buttons.
   const [activeIndex, setActiveIndex] = createSignal(-1)
+  // Selected cell (modal "select then apply" model only). -1 = none.
+  const [selectedIndex, setSelectedIndex] = createSignal(-1)
+
+  const handleCellClick = (candidate: FlameDescriptor, index: number) => {
+    if (props.applyOnClick) {
+      props.onApply(candidate)
+      return
+    }
+    // Modal: first click selects, a click on the already-selected cell applies.
+    if (selectedIndex() === index) {
+      props.onApply(candidate)
+    } else {
+      setSelectedIndex(index)
+      setActiveIndex(index)
+    }
+  }
+
+  // Enter applies the selected cell (modal model). Ignore while typing in the
+  // size/brightness inputs.
+  createEffect(() => {
+    if (props.applyOnClick) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter') return
+      const target = e.target
+      if (
+        target instanceof HTMLElement &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return
+      }
+      const candidate = props.candidates[selectedIndex()]
+      if (candidate !== undefined) {
+        e.preventDefault()
+        props.onApply(candidate)
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    onCleanup(() => {
+      document.removeEventListener('keydown', onKeyDown)
+    })
+  })
 
   // Progressive reveal: re-stagger whenever the candidate set or version
   // (re-roll / count change) changes, so previews appear a few at a time.
@@ -43,6 +94,8 @@ export function GalleryGrid(props: {
   createEffect(() => {
     const total = props.candidates.length
     void props.version
+    // A fresh page (re-roll / count change / breeding nav) clears the selection.
+    setSelectedIndex(-1)
     setRevealCount(Math.min(REVEAL_BATCH, total))
     if (total <= REVEAL_BATCH) return
     const timer = setInterval(() => {
@@ -77,8 +130,18 @@ export function GalleryGrid(props: {
           {(candidate, i) => (
             <div
               class={ui.cell}
-              classList={{ [ui.cellActive!]: activeIndex() === i() }}
-              onClick={() => setActiveIndex(i())}
+              classList={{
+                [ui.cellActive!]: activeIndex() === i(),
+                [ui.cellSelected!]: !props.applyOnClick && selectedIndex() === i(),
+              }}
+              title={
+                props.applyOnClick
+                  ? 'Click to apply this flame'
+                  : selectedIndex() === i()
+                    ? 'Click again (or press Enter) to apply'
+                    : 'Click to select'
+              }
+              onClick={() => handleCellClick(candidate, i())}
             >
               <VariationPreview
                 version={props.version}

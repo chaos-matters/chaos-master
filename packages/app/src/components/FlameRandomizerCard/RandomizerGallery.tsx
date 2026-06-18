@@ -93,6 +93,7 @@ export function RandomizerGallery(props: {
         candidates={candidates()}
         version={version()}
         hardwareTier={props.hardwareTier}
+        applyOnClick
         onApply={props.onApply}
         onMutate={(flame) => {
           openModal(flame)
