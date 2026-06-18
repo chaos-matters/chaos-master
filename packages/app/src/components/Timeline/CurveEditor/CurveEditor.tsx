@@ -1,5 +1,4 @@
 import {
-  createEffect,
   createMemo,
   createSignal,
   For,
@@ -60,13 +59,6 @@ export function CurveEditor(props: CurveEditorProps) {
     onCleanup(() => {
       ro.disconnect()
     })
-  })
-
-  // Mirror the dope-sheet horizontal scroll onto the graph lane (one-way DOM
-  // sync; the lane itself is not user-scrollable, so this can't feed back).
-  createEffect(() => {
-    const sl = props.scrollLeft
-    if (laneRef) laneRef.scrollLeft = sl
   })
 
   const track = createMemo(() => {
@@ -176,8 +168,8 @@ export function CurveEditor(props: CurveEditorProps) {
     if (!p || !laneRef) return
     const vp = viewport()
     const rect = laneRef.getBoundingClientRect()
-    // Account for the lane's scroll offset to recover content coordinates.
-    const x = e.clientX - rect.left + laneRef.scrollLeft
+    // Account for the scroll offset (the graph is translated, not scrolled).
+    const x = e.clientX - rect.left + props.scrollLeft
     const y = e.clientY - rect.top
     const frame = Math.round(vp.xToFrame(x))
     if (frame < props.startFrame || frame > props.endFrame) return
@@ -220,6 +212,7 @@ export function CurveEditor(props: CurveEditorProps) {
               class={ui.svg}
               width={laneWidth()}
               height={laneHeight()}
+              style={{ transform: `translateX(${-props.scrollLeft}px)` }}
               onDblClick={addKeyframeAtPoint}
             >
               <title>

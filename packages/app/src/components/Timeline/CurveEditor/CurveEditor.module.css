@@ -61,13 +61,17 @@
   color: var(--neutral-500);
 }
 
-/* Scroll-synced graph area (follows the tracks; not user-scrollable). */
+/* Scroll-synced graph area (follows the tracks via a transform on the svg).
+   `clip` + a small clip-margin lets nodes at the very start/end overflow the
+   gutter/edge a few px so they're fully visible (like the dope-sheet diamonds),
+   while still clipping the scrolled-out content. */
 .lane {
   position: relative;
   flex: 1;
   min-width: 0;
   height: 100%;
-  overflow: hidden;
+  overflow: clip;
+  overflow-clip-margin: 6px;
 }
 
 .svg {
@@ -75,6 +79,7 @@
   height: 100%;
   touch-action: none;
   cursor: crosshair;
+  will-change: transform;
 }
 
 .axisLine {
