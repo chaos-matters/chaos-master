@@ -33,7 +33,7 @@ export function RandomizerGalleryModal(props: {
   const [version, setVersion] = createSignal(0)
   // Preview cell min-width (px) and a CSS brightness multiplier for inspection.
   const [cellSize, setCellSize] = createSignal(190)
-  const [brightness, setBrightness] = createSignal(1)
+  const [brightness, setBrightness] = createSignal(2)
 
   const makeRandom = (n: number): FlameDescriptor[] => {
     const config = props.buildConfig()
@@ -186,7 +186,7 @@ export function RandomizerGalleryModal(props: {
             type="range"
             class={ui.slider}
             min={0.3}
-            max={2.5}
+            max={5}
             step={0.05}
             value={brightness()}
             onInput={(e) => setBrightness(e.currentTarget.valueAsNumber)}
