@@ -344,45 +344,80 @@ export function FramePreviewGallery(props: Props) {
         </div>
       </Show>
 
-      <div class={ui.toolbar}>
-        <div class={ui.qualityToggle}>
-          {(['low', 'mid', 'high'] as PreviewQuality[]).map((q) => (
-            <button
-              type="button"
-              class={ui.qualityButton}
-              classList={{
-                [ui.qualityActive as string]: previewQuality() === q,
-              }}
-              disabled={isGenerating()}
-              onClick={() => setPreviewQuality(q)}
+      {/* Settings panel — visually separated from the previews below. */}
+      <div class={ui.controls}>
+        <div class={ui.settingsRow}>
+          <div class={ui.settingGroup}>
+            <span class={ui.settingLabel}>Quality</span>
+            <div class={ui.qualityToggle}>
+              {(['low', 'mid', 'high'] as PreviewQuality[]).map((q) => (
+                <button
+                  type="button"
+                  class={ui.qualityButton}
+                  classList={{
+                    [ui.qualityActive as string]: previewQuality() === q,
+                  }}
+                  disabled={isGenerating()}
+                  onClick={() => setPreviewQuality(q)}
+                >
+                  {q.charAt(0).toUpperCase() + q.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div class={ui.settingGroup}>
+            <span class={ui.settingLabel}>Step</span>
+            <label
+              class={ui.strideControl}
+              title="Preview every Nth frame, spread across the timeline (faster overview of long animations)"
             >
-              {q.charAt(0).toUpperCase() + q.slice(1)}
-            </button>
-          ))}
+              <span class={ui.strideLabel}>every</span>
+              <input
+                type="number"
+                class={ui.strideInput}
+                min="1"
+                max={totalFrames}
+                value={previewStride()}
+                disabled={isGenerating()}
+                onInput={(e) => {
+                  const n = Math.floor(e.currentTarget.valueAsNumber)
+                  setPreviewStride(Number.isFinite(n) && n >= 1 ? n : 1)
+                }}
+              />
+              <span class={ui.strideLabel}>frame</span>
+            </label>
+          </div>
         </div>
-        <label
-          class={ui.strideControl}
-          title="Preview every Nth frame, spread across the timeline (faster overview of long animations)"
-        >
-          <span class={ui.strideLabel}>Every</span>
-          <input
-            type="number"
-            class={ui.strideInput}
-            min="1"
-            max={totalFrames}
-            value={previewStride()}
-            disabled={isGenerating()}
-            onInput={(e) => {
-              const n = Math.floor(e.currentTarget.valueAsNumber)
-              setPreviewStride(Number.isFinite(n) && n >= 1 ? n : 1)
-            }}
-          />
-          <span class={ui.strideLabel}>frame</span>
-        </label>
-        <div class={ui.actions}>
+
+        <div class={ui.settingsRow}>
+          <div class={`${ui.settingGroup} ${ui.settingGroupGrow}`}>
+            <span class={ui.settingLabel}>Size</span>
+            <div class={ui.sizeSliderRow}>
+              <svg class={ui.sizeIcon} viewBox="0 0 16 16" fill="currentColor">
+                <rect x="5" y="5" width="6" height="6" rx="1" />
+              </svg>
+              <input
+                type="range"
+                class={ui.sizeSlider}
+                min={THUMB_SIZE_MIN}
+                max={THUMB_SIZE_MAX}
+                value={thumbSize()}
+                onInput={(e) => setThumbSize(e.currentTarget.valueAsNumber)}
+                title={`Thumbnail size: ${thumbSize()}px`}
+              />
+              <svg class={ui.sizeIcon} viewBox="0 0 16 16" fill="currentColor">
+                <rect x="3" y="3" width="10" height="10" rx="1.5" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div class={ui.actionsRow}>
           <Show when={isGenerating()}>
             <div class={ui.progressLabel}>
-              {progress()?.current ?? 0}/{progress()?.total ?? displayCount()}
+              Rendering {progress()?.current ?? 0}/
+              {progress()?.total ?? displayCount()}
             </div>
             <button
               type="button"
@@ -427,7 +462,7 @@ export function FramePreviewGallery(props: Props) {
             </Show>
             <button
               type="button"
-              class={ui.generateButton}
+              class={ui.primaryButton}
               onClick={() => generatePreviews(false)}
               title="Generate previews"
             >
@@ -435,25 +470,6 @@ export function FramePreviewGallery(props: Props) {
             </button>
           </Show>
         </div>
-      </div>
-
-      {/* Thumbnail size slider -- always visible */}
-      <div class={ui.sizeSliderRow}>
-        <svg class={ui.sizeIcon} viewBox="0 0 16 16" fill="currentColor">
-          <rect x="5" y="5" width="6" height="6" rx="1" />
-        </svg>
-        <input
-          type="range"
-          class={ui.sizeSlider}
-          min={THUMB_SIZE_MIN}
-          max={THUMB_SIZE_MAX}
-          value={thumbSize()}
-          onInput={(e) => setThumbSize(e.currentTarget.valueAsNumber)}
-          title={`Thumbnail size: ${thumbSize()}px`}
-        />
-        <svg class={ui.sizeIcon} viewBox="0 0 16 16" fill="currentColor">
-          <rect x="3" y="3" width="10" height="10" rx="1.5" />
-        </svg>
       </div>
 
       {/* Grid that fills available space */}

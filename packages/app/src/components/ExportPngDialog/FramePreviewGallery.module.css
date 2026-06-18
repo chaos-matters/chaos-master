@@ -8,12 +8,63 @@
   padding-top: 6px;
 }
 
-.toolbar {
+/* -- Settings panel (top), separated from the previews gallery (bottom) -- */
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--neutral-100);
+  border: 1px solid var(--neutral-200);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+
+  [data-theme='dark'] & {
+    background: oklch(23% 0.008 220);
+    border-color: var(--neutral-800);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+}
+
+.settings-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.setting-group {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.setting-group-grow {
+  flex: 1 1 160px;
+}
+
+.setting-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--neutral-400);
+  white-space: nowrap;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500);
+  }
+}
+
+.actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: var(--space-2);
-  flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .qualityToggle {
@@ -22,10 +73,38 @@
   gap: 3px;
 }
 
-.actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+/* Primary action ("Render Previews" / "Re-render") — app primary blue. */
+.primary-button {
+  appearance: none;
+  border: none;
+  background-color: oklch(60% 0.12 250);
+  color: white;
+  padding: 5px 12px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color 0.15s,
+    transform 0.1s;
+
+  &:hover {
+    background-color: oklch(52% 0.12 250);
+  }
+
+  &:active {
+    transform: scale(0.97);
+  }
+
+  [data-theme='dark'] & {
+    background-color: oklch(48% 0.11 250);
+
+    &:hover {
+      background-color: oklch(54% 0.11 250);
+    }
+  }
 }
 
 .stride-control {
@@ -271,7 +350,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-shrink: 0;
+  flex: 1;
+  min-width: 120px;
 }
 
 .sizeIcon {
