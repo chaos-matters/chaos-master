@@ -53,6 +53,15 @@ export function DopeSheet(props: DopeSheetProps) {
     'timeline-curve-editor',
     false,
   )
+  // Horizontal scroll of the tracks, mirrored onto the curve graph so it stays
+  // pixel-aligned with the diamonds.
+  const [scrollLeft, setScrollLeft] = createSignal(0)
+
+  const curveLabel = () => {
+    const p = selectedKeyframe()?.path
+    if (!p) return null
+    return props.formatTrackLabel ? props.formatTrackLabel(p) : pathLabel(p)
+  }
   let containerRef: HTMLDivElement | undefined
   let tracksScrollRef!: HTMLDivElement
   let seekRulerRef!: HTMLDivElement
@@ -244,8 +253,14 @@ export function DopeSheet(props: DopeSheetProps) {
       <Show when={showCurve()}>
         <CurveEditor
           path={selectedKeyframe()?.path ?? null}
+          label={curveLabel()}
           selectedFrame={selectedKeyframe()?.frame ?? null}
           onSelectKeyframe={(path, frame) => setSelectedKeyframe({ path, frame })}
+          frameWidth={frameWidth()}
+          startFrame={timeline.config().startFrame}
+          endFrame={timeline.config().endFrame}
+          trackNameWidth={TRACK_NAME_WIDTH}
+          scrollLeft={scrollLeft()}
         />
       </Show>
 
@@ -300,6 +315,7 @@ export function DopeSheet(props: DopeSheetProps) {
           if (seekLaneRef) {
             seekLaneRef.scrollLeft = e.currentTarget.scrollLeft
           }
+          setScrollLeft(e.currentTarget.scrollLeft)
         }}
         activeTracks={activeTracks()}
         frameWidth={frameWidth()}

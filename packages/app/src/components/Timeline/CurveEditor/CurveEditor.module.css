@@ -1,4 +1,5 @@
 .curveEditor {
+  display: flex;
   width: 100%;
   height: 150px;
   flex-shrink: 0;
@@ -15,15 +16,62 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
   height: 100%;
   font-size: 0.62rem;
   color: var(--neutral-500);
   user-select: none;
 }
 
+/* Fixed left column, lines up with the dope sheet's track-name column. */
+.gutter {
+  position: relative;
+  flex-shrink: 0;
+  border-right: 1px solid var(--neutral-200);
+  overflow: hidden;
+
+  [data-theme='dark'] & {
+    border-right-color: var(--neutral-800);
+  }
+}
+
+.curveName {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  right: 6px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--neutral-700);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-300);
+  }
+}
+
+.valueMax,
+.valueMin {
+  position: absolute;
+  right: 6px;
+  font-size: 9px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: var(--neutral-500);
+}
+
+/* Scroll-synced graph area (follows the tracks; not user-scrollable). */
+.lane {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
 .svg {
   display: block;
-  width: 100%;
   height: 100%;
   touch-action: none;
   cursor: crosshair;
@@ -37,13 +85,6 @@
   [data-theme='dark'] & {
     stroke: var(--neutral-800);
   }
-}
-
-.axisLabel {
-  fill: var(--neutral-500);
-  font-size: 9px;
-  font-family: 'SF Mono', 'Fira Code', monospace;
-  user-select: none;
 }
 
 .playhead {

@@ -1,4 +1,5 @@
 import {
+  createEffect,
   createMemo,
   createSignal,
   For,
@@ -16,15 +17,27 @@ import type { KeyframeData } from '@/utils/timeline'
 interface CurveEditorProps {
   /** Parameter path of the track to graph, or null when nothing is selected. */
   path: string | null
+  /** Human-readable name of that track, shown in the gutter. */
+  label?: string | null
   /** Currently selected keyframe frame (highlighted), if any. */
   selectedFrame?: number | null
   onSelectKeyframe?: (path: string, frame: number) => void
+  // Geometry shared with the dope sheet so the graph lines up with the diamonds.
+  frameWidth: number
+  startFrame: number
+  endFrame: number
+  trackNameWidth: number
+  /** Horizontal scroll offset of the tracks, mirrored so the graph scrolls too. */
+  scrollLeft: number
 }
 
 const CURVE_SAMPLE_STEP_PX = 2
+const PAD_Y = 14
 
 /** Keyframes reduced to the numeric ones the graph can plot. */
-function numericKeyframes(kfs: KeyframeData[]): (KeyframeData & { value: number })[] {
+function numericKeyframes(
+  kfs: KeyframeData[],
+): (KeyframeData & { value: number })[] {
   return kfs.filter(
     (kf): kf is KeyframeData & { value: number } => typeof kf.value === 'number',
   )
@@ -34,19 +47,26 @@ export function CurveEditor(props: CurveEditorProps) {
   const timeline = useTimeline()!
   const changeHistory = useChangeHistory()
 
-  let svgRef: SVGSVGElement | undefined
-  const [size, setSize] = createSignal({ width: 0, height: 0 })
+  let laneRef: HTMLDivElement | undefined
+  const [laneHeight, setLaneHeight] = createSignal(0)
 
   onMount(() => {
-    if (!svgRef) return
+    if (!laneRef) return
     const ro = new ResizeObserver((entries) => {
       const r = entries[0]?.contentRect
-      if (r) setSize({ width: r.width, height: r.height })
+      if (r) setLaneHeight(r.height)
     })
-    ro.observe(svgRef)
+    ro.observe(laneRef)
     onCleanup(() => {
       ro.disconnect()
     })
+  })
+
+  // Mirror the dope-sheet horizontal scroll onto the graph lane (one-way DOM
+  // sync; the lane itself is not user-scrollable, so this can't feed back).
+  createEffect(() => {
+    const sl = props.scrollLeft
+    if (laneRef) laneRef.scrollLeft = sl
   })
 
   const track = createMemo(() => {
@@ -60,11 +80,17 @@ export function CurveEditor(props: CurveEditorProps) {
     return t ? numericKeyframes(t.keyframes) : []
   })
 
-  // Whether this track is graphable (has numeric keyframes).
+  // Graphable when every keyframe in the track is numeric.
   const isNumeric = createMemo(() => {
     const t = track()
-    return !!t && t.keyframes.length > 0 && keyframes().length === t.keyframes.length
+    return (
+      !!t && t.keyframes.length > 0 && keyframes().length === t.keyframes.length
+    )
   })
+
+  const laneWidth = createMemo(
+    () => (props.endFrame - props.startFrame) * props.frameWidth,
+  )
 
   // Freeze the value axis while dragging so it doesn't rescale under the cursor.
   const [frozenRange, setFrozenRange] = createSignal<{
@@ -79,28 +105,25 @@ export function CurveEditor(props: CurveEditorProps) {
   })
 
   const viewport = createMemo(() => {
-    const { width, height } = size()
-    const cfg = timeline.config()
     const range = valueRange()
     return createCurveViewport({
-      width,
-      height,
-      startFrame: cfg.startFrame,
-      endFrame: cfg.endFrame,
+      frameWidth: props.frameWidth,
+      startFrame: props.startFrame,
+      height: laneHeight(),
       minValue: range.min,
       maxValue: range.max,
+      padY: PAD_Y,
     })
   })
 
-  // Sample the resolved curve across the width into an SVG path.
+  // Sample the resolved curve across the lane into an SVG path.
   const curvePath = createMemo(() => {
     const vp = viewport()
     const t = track()
-    if (!t || vp.width <= 0) return ''
-    const left = vp.padding
-    const right = vp.width - vp.padding
+    const w = laneWidth()
+    if (!t || w <= 0 || laneHeight() <= 0) return ''
     let d = ''
-    for (let x = left; x <= right; x += CURVE_SAMPLE_STEP_PX) {
+    for (let x = 0; x <= w; x += CURVE_SAMPLE_STEP_PX) {
       const frame = vp.xToFrame(x)
       const value = resolveKeyframeValue(t.keyframes, frame)
       if (typeof value !== 'number') continue
@@ -129,7 +152,7 @@ export function CurveEditor(props: CurveEditorProps) {
     timeline.addKeyframe(p, frame, startValue, kf.easing, kf.interp)
 
     const valuePerPx =
-      (vp.maxValue - vp.minValue) / Math.max(1, vp.height - 2 * vp.padding)
+      (vp.maxValue - vp.minValue) / Math.max(1, vp.height - 2 * vp.padY)
 
     function onMove(ev: PointerEvent) {
       const dy = ev.clientY - startY
@@ -150,15 +173,15 @@ export function CurveEditor(props: CurveEditorProps) {
 
   function addKeyframeAtPoint(e: MouseEvent) {
     const p = props.path
-    if (!p || !svgRef) return
+    if (!p || !laneRef) return
     const vp = viewport()
-    const rect = svgRef.getBoundingClientRect()
-    const x = e.clientX - rect.left
+    const rect = laneRef.getBoundingClientRect()
+    // Account for the lane's scroll offset to recover content coordinates.
+    const x = e.clientX - rect.left + laneRef.scrollLeft
     const y = e.clientY - rect.top
     const frame = Math.round(vp.xToFrame(x))
-    const value = vp.yToValue(y)
-    if (frame < vp.startFrame || frame > vp.endFrame) return
-    timeline.addKeyframe(p, frame, value)
+    if (frame < props.startFrame || frame > props.endFrame) return
+    timeline.addKeyframe(p, frame, vp.yToValue(y))
     props.onSelectKeyframe?.(p, frame)
   }
 
@@ -167,9 +190,7 @@ export function CurveEditor(props: CurveEditorProps) {
       <Show
         when={props.path}
         fallback={
-          <div class={ui.placeholder}>
-            Select a keyframe to edit its curve
-          </div>
+          <div class={ui.placeholder}>Select a keyframe to edit its curve</div>
         }
       >
         <Show
@@ -180,65 +201,78 @@ export function CurveEditor(props: CurveEditorProps) {
             </div>
           }
         >
-          <svg ref={svgRef} class={ui.svg} onDblClick={addKeyframeAtPoint}>
-            <title>
-              Drag a point up/down to change its value · double-click to add
-            </title>
-            {/* Min / max value guide lines + labels */}
-            <line
-              class={ui.axisLine}
-              x1={0}
-              y1={viewport().valueToY(viewport().maxValue)}
-              x2={size().width}
-              y2={viewport().valueToY(viewport().maxValue)}
-            />
-            <line
-              class={ui.axisLine}
-              x1={0}
-              y1={viewport().valueToY(viewport().minValue)}
-              x2={size().width}
-              y2={viewport().valueToY(viewport().minValue)}
-            />
-            <text class={ui.axisLabel} x={4} y={12}>
+          {/* Fixed gutter: track name + value range, aligned with the diamonds' name column */}
+          <div class={ui.gutter} style={{ width: `${props.trackNameWidth}px` }}>
+            <span class={ui.curveName} title={props.label ?? undefined}>
+              {props.label ?? props.path}
+            </span>
+            <span class={ui.valueMax} style={{ top: `${PAD_Y - 6}px` }}>
               {viewport().maxValue.toFixed(2)}
-            </text>
-            <text class={ui.axisLabel} x={4} y={size().height - 4}>
+            </span>
+            <span class={ui.valueMin} style={{ bottom: `${PAD_Y - 6}px` }}>
               {viewport().minValue.toFixed(2)}
-            </text>
+            </span>
+          </div>
 
-            {/* Playhead */}
-            <line
-              class={ui.playhead}
-              x1={playheadX()}
-              y1={0}
-              x2={playheadX()}
-              y2={size().height}
-            />
+          {/* Scroll-synced lane holding the graph at the dope sheet's frame scale */}
+          <div class={ui.lane} ref={laneRef}>
+            <svg
+              class={ui.svg}
+              width={laneWidth()}
+              height={laneHeight()}
+              onDblClick={addKeyframeAtPoint}
+            >
+              <title>
+                Drag a point up/down to change its value · double-click to add
+              </title>
+              {/* Min / max value guide lines */}
+              <line
+                class={ui.axisLine}
+                x1={0}
+                y1={viewport().valueToY(viewport().maxValue)}
+                x2={laneWidth()}
+                y2={viewport().valueToY(viewport().maxValue)}
+              />
+              <line
+                class={ui.axisLine}
+                x1={0}
+                y1={viewport().valueToY(viewport().minValue)}
+                x2={laneWidth()}
+                y2={viewport().valueToY(viewport().minValue)}
+              />
 
-            {/* The resolved curve */}
-            <path class={ui.curve} d={curvePath()} />
+              {/* Playhead */}
+              <line
+                class={ui.playhead}
+                x1={playheadX()}
+                y1={0}
+                x2={playheadX()}
+                y2={laneHeight()}
+              />
 
-            {/* Keyframe nodes */}
-            <For each={keyframes()}>
-              {(kf) => {
-                const cx = () => viewport().frameToX(kf.frame)
-                const cy = () => viewport().valueToY(kf.value)
-                const selected = () => props.selectedFrame === kf.frame
-                return (
-                  <circle
-                    class={ui.node}
-                    classList={{ [ui.nodeSelected as string]: selected() }}
-                    cx={cx()}
-                    cy={cy()}
-                    r={selected() ? 5 : 4}
-                    onPointerDown={(ev) => {
-                      startNodeDrag(ev, kf)
-                    }}
-                  />
-                )
-              }}
-            </For>
-          </svg>
+              {/* The resolved curve */}
+              <path class={ui.curve} d={curvePath()} />
+
+              {/* Keyframe nodes */}
+              <For each={keyframes()}>
+                {(kf) => {
+                  const selected = () => props.selectedFrame === kf.frame
+                  return (
+                    <circle
+                      class={ui.node}
+                      classList={{ [ui.nodeSelected as string]: selected() }}
+                      cx={viewport().frameToX(kf.frame)}
+                      cy={viewport().valueToY(kf.value)}
+                      r={selected() ? 5 : 4}
+                      onPointerDown={(ev) => {
+                        startNodeDrag(ev, kf)
+                      }}
+                    />
+                  )
+                }}
+              </For>
+            </svg>
+          </div>
         </Show>
       </Show>
     </div>

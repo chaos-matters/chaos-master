@@ -1,22 +1,23 @@
 /**
- * Pure coordinate math for the curve editor graph: maps between (frame, value)
- * data space and (x, y) pixel space, with an inset padding and a value range
- * auto-fitted to the keyframes. No DOM, no reactivity — trivially unit-testable
- * (mirrors JWildfire's EnvelopeView scale/translate, value-axis inverted).
+ * Pure coordinate math for the curve editor graph. The X axis is deliberately
+ * the SAME mapping the dope sheet uses for its diamonds — `(frame - startFrame) *
+ * frameWidth` — so the graph sits inside a scroll-synced lane and lines up pixel
+ * for pixel with the tracks below it. The Y axis auto-fits the value range with a
+ * vertical inset (`padY`). No DOM, no reactivity — unit-testable.
  */
 
 export interface CurveViewportInput {
-  /** Pixel size of the drawable area. */
-  width: number
-  height: number
-  /** Frame (x) range shown across the width. */
+  /** Pixels per frame — must match the dope sheet's frameWidth. */
+  frameWidth: number
+  /** First frame (x origin). */
   startFrame: number
-  endFrame: number
+  /** Pixel height of the lane. */
+  height: number
   /** Value (y) range shown across the height. */
   minValue: number
   maxValue: number
-  /** Inset in px so nodes near the edges aren't clipped. */
-  padding?: number
+  /** Vertical inset in px so nodes near the top/bottom aren't clipped. */
+  padY?: number
 }
 
 export interface CurveViewport extends Required<CurveViewportInput> {
@@ -26,32 +27,32 @@ export interface CurveViewport extends Required<CurveViewportInput> {
   yToValue(y: number): number
 }
 
-const DEFAULT_PADDING = 12
+const DEFAULT_PAD_Y = 14
 
 export function createCurveViewport(input: CurveViewportInput): CurveViewport {
-  const padding = input.padding ?? DEFAULT_PADDING
-  const { width, height, startFrame, endFrame, minValue, maxValue } = input
+  const padY = input.padY ?? DEFAULT_PAD_Y
+  const { frameWidth, startFrame, height, minValue, maxValue } = input
 
-  const innerW = Math.max(1, width - 2 * padding)
-  const innerH = Math.max(1, height - 2 * padding)
-  const frameSpan = endFrame - startFrame || 1
+  const innerH = Math.max(1, height - 2 * padY)
   const valueSpan = maxValue - minValue || 1
+  const fw = frameWidth || 1
 
   return {
     ...input,
-    padding,
+    padY,
+    // X matches the dope sheet exactly (diamonds are centered on this x).
     frameToX(frame) {
-      return padding + ((frame - startFrame) / frameSpan) * innerW
-    },
-    valueToY(value) {
-      // Inverted: the max value sits at the top of the box.
-      return padding + ((maxValue - value) / valueSpan) * innerH
+      return (frame - startFrame) * frameWidth
     },
     xToFrame(x) {
-      return startFrame + ((x - padding) / innerW) * frameSpan
+      return startFrame + x / fw
+    },
+    // Inverted: the max value sits at the top of the box.
+    valueToY(value) {
+      return padY + ((maxValue - value) / valueSpan) * innerH
     },
     yToValue(y) {
-      return maxValue - ((y - padding) / innerH) * valueSpan
+      return maxValue - ((y - padY) / innerH) * valueSpan
     },
   }
 }

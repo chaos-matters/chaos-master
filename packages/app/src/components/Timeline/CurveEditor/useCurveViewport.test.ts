@@ -3,24 +3,39 @@ import { autoValueRange, createCurveViewport } from './useCurveViewport'
 
 describe('createCurveViewport', () => {
   const vp = createCurveViewport({
-    width: 220,
-    height: 120,
+    frameWidth: 8,
     startFrame: 0,
-    endFrame: 100,
+    height: 120,
     minValue: 0,
     maxValue: 10,
-    padding: 10,
+    padY: 10,
   })
 
-  it('maps frame/value to the padded box corners', () => {
-    expect(vp.frameToX(0)).toBeCloseTo(10) // left inset
-    expect(vp.frameToX(100)).toBeCloseTo(210) // width - inset
-    expect(vp.valueToY(10)).toBeCloseTo(10) // max value → top inset
-    expect(vp.valueToY(0)).toBeCloseTo(110) // min value → bottom inset
+  it('maps frame to x exactly like the dope sheet (frame*frameWidth, no inset)', () => {
+    expect(vp.frameToX(0)).toBeCloseTo(0)
+    expect(vp.frameToX(10)).toBeCloseTo(80) // 10 * 8
+    expect(vp.frameToX(25)).toBeCloseTo(200)
+  })
+
+  it('respects a non-zero startFrame origin', () => {
+    const vp2 = createCurveViewport({
+      frameWidth: 8,
+      startFrame: 5,
+      height: 100,
+      minValue: 0,
+      maxValue: 1,
+    })
+    expect(vp2.frameToX(5)).toBeCloseTo(0)
+    expect(vp2.frameToX(15)).toBeCloseTo(80)
+  })
+
+  it('maps value to the padded box (max → top, min → bottom)', () => {
+    expect(vp.valueToY(10)).toBeCloseTo(10) // top inset
+    expect(vp.valueToY(0)).toBeCloseTo(110) // height - inset
   })
 
   it('round-trips frame<->x and value<->y', () => {
-    for (const f of [0, 17, 50, 99, 100]) {
+    for (const f of [0, 17, 50, 99]) {
       expect(vp.xToFrame(vp.frameToX(f))).toBeCloseTo(f)
     }
     for (const v of [0, 2.5, 7, 10]) {
@@ -28,17 +43,16 @@ describe('createCurveViewport', () => {
     }
   })
 
-  it('does not divide by zero on a flat range', () => {
+  it('does not divide by zero on a flat value range or zero frameWidth', () => {
     const flat = createCurveViewport({
-      width: 100,
+      frameWidth: 0,
+      startFrame: 0,
       height: 100,
-      startFrame: 5,
-      endFrame: 5,
       minValue: 3,
       maxValue: 3,
     })
-    expect(Number.isFinite(flat.frameToX(5))).toBe(true)
     expect(Number.isFinite(flat.valueToY(3))).toBe(true)
+    expect(Number.isFinite(flat.xToFrame(0))).toBe(true)
   })
 })
 
@@ -53,8 +67,6 @@ describe('autoValueRange', () => {
 
   it('adds headroom around the data span', () => {
     const r = autoValueRange([0, 10])
-    expect(r.min).toBeLessThan(0)
-    expect(r.max).toBeGreaterThan(10)
     expect(r.min).toBeCloseTo(-1.5)
     expect(r.max).toBeCloseTo(11.5)
   })
