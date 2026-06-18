@@ -212,6 +212,16 @@
   touch-action: pan-y pan-x;
 }
 
+/* Content-sized layer inside the scroll container: as tall as all the rows and
+   as wide as the widest one, so the absolutely-positioned playhead spans the
+   full track content (not just the visible viewport) and scrolls with it. */
+.tracksInner {
+  position: relative;
+  min-height: 100%;
+  width: max-content;
+  min-width: 100%;
+}
+
 /* ── Track row ── */
 .trackRow {
   display: flex;
