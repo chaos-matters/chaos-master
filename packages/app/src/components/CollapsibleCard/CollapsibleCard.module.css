@@ -131,6 +131,10 @@
   border: 2px solid var(--neutral-200);
   border-top: none;
   border-radius: 0 0 var(--space-3) var(--space-3);
+  /* Clip inner content (incl. deeply-nested elements like the colour wheel) to
+     the rounded bottom so square corners don't poke past. Popups (variation
+     picker/selector, blend gallery) render outside the card, so this is safe. */
+  overflow: hidden;
   background: white;
   color: var(--neutral-900);
   [data-theme='dark'] & {
@@ -140,14 +144,10 @@
   }
 }
 
-/* Inner card blends into our content container — suppress its top border/radius,
-   and round its bottom corners to follow the container's rounded bottom (inset by
-   the 2px border) so a square inner corner doesn't poke past the card's rounding. */
+/* Inner card blends into our content container — suppress its border/radius; the
+   container's `overflow: hidden` rounds the bottom. */
 .content > * {
   border-top: none !important;
   border-bottom: none !important;
-  border-top-left-radius: 0 !important;
-  border-top-right-radius: 0 !important;
-  border-bottom-left-radius: calc(var(--space-3) - 2px) !important;
-  border-bottom-right-radius: calc(var(--space-3) - 2px) !important;
+  border-radius: 0 !important;
 }
