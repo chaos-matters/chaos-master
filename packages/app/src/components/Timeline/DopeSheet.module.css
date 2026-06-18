@@ -479,11 +479,24 @@
     background: white;
     color: var(--neutral-700);
     cursor: pointer;
+    /* Theme the native dropdown popup so options aren't white-on-white. */
+    color-scheme: light;
+
+    & option {
+      background-color: var(--neutral-100);
+      color: var(--neutral-700);
+    }
 
     [data-theme='dark'] & {
       background: var(--neutral-800);
       border-color: var(--neutral-600);
       color: var(--neutral-300);
+      color-scheme: dark;
+
+      & option {
+        background-color: var(--neutral-800);
+        color: var(--neutral-300);
+      }
     }
   }
 }

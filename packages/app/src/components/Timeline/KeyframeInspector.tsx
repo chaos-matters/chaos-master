@@ -3,7 +3,7 @@ import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useTimeline } from '@/contexts/TimelineContext'
 import ui from './DopeSheet.module.css'
-import type { EasingCurve } from '@/utils/timeline'
+import type { EasingCurve, KeyframeInterpolation } from '@/utils/timeline'
 
 interface KeyframeInspectorProps {
   selectedKeyframe: { path: string; frame: number } | null
@@ -17,6 +17,8 @@ const EASING_OPTIONS: EasingCurve[] = [
   'bounce',
   'elastic',
 ]
+
+const INTERP_OPTIONS: KeyframeInterpolation[] = ['linear', 'spline', 'constant']
 
 function formatKeyframeValue(
   value:
@@ -43,7 +45,13 @@ export function KeyframeInspector(props: KeyframeInspectorProps) {
     if (!kf) return null
     const val = kf.value
     if (val === null || typeof val === 'boolean') return null
-    return { frame: kf.frame, value: val, easing: kf.easing, path: sel.path }
+    return {
+      frame: kf.frame,
+      value: val,
+      easing: kf.easing,
+      interp: kf.interp,
+      path: sel.path,
+    }
   })
 
   const [inspectorEditing, setInspectorEditing] = createSignal(false)
@@ -202,6 +210,25 @@ export function KeyframeInspector(props: KeyframeInspectorProps) {
                 }}
               >
                 {EASING_OPTIONS.map((opt) => (
+                  <option value={opt}>{opt}</option>
+                ))}
+              </select>
+            </label>
+
+            <label class={ui.inspectorEasing}>
+              Interp
+              <select
+                value={kf().interp ?? 'linear'}
+                onChange={(e) => {
+                  timeline.setKeyframeInterp(
+                    kf().path,
+                    kf().frame,
+                    e.currentTarget.value as KeyframeInterpolation,
+                  )
+                }}
+                title="Segment interpolation: linear, spline (smooth Catmull-Rom), or constant (hold)"
+              >
+                {INTERP_OPTIONS.map((opt) => (
                   <option value={opt}>{opt}</option>
                 ))}
               </select>
