@@ -144,6 +144,9 @@ export function CurveEditor(props: CurveEditorProps) {
     e.stopPropagation()
     const p = props.path
     if (!p) return
+    // Explicit string type so the narrowing survives into the onMove closure
+    // (older TS used in CI re-widens captured consts otherwise).
+    const path: string = p
     const vp = viewport()
     const startX = e.clientX
     const startY = e.clientY
@@ -152,12 +155,12 @@ export function CurveEditor(props: CurveEditorProps) {
     let currentFrame = startFrame
     ;(e.target as Element).setPointerCapture(e.pointerId)
 
-    props.onSelectKeyframe?.(p, startFrame)
+    props.onSelectKeyframe?.(path, startFrame)
     // Pin the axis (sticky — kept after release so the node doesn't jump) and
     // open a single undo/preview step for the whole drag.
     setStickyRange({ min: vp.minValue, max: vp.maxValue })
     if (!changeHistory.isPreviewing()) changeHistory.startPreview('Curve edit')
-    timeline.addKeyframe(p, startFrame, startValue, kf.easing, kf.interp)
+    timeline.addKeyframe(path, startFrame, startValue, kf.easing, kf.interp)
 
     const valuePerPx =
       (vp.maxValue - vp.minValue) / Math.max(1, vp.height - 2 * vp.padY)
@@ -170,10 +173,13 @@ export function CurveEditor(props: CurveEditorProps) {
         props.startFrame,
         Math.min(props.endFrame, desired),
       )
-      if (clamped !== currentFrame && !timeline.hasKeyframeAtFrame(p, clamped)) {
-        timeline.relocateKeyframe(p, currentFrame, clamped)
+      if (
+        clamped !== currentFrame &&
+        !timeline.hasKeyframeAtFrame(path, clamped)
+      ) {
+        timeline.relocateKeyframe(path, currentFrame, clamped)
         currentFrame = clamped
-        props.onSelectKeyframe?.(p, currentFrame)
+        props.onSelectKeyframe?.(path, currentFrame)
       }
       // Vertical: set the value at the (possibly moved) keyframe. Round to kill
       // float noise (otherwise values like 0.7529950093481053 accrue).
@@ -189,7 +195,13 @@ export function CurveEditor(props: CurveEditorProps) {
           max: Math.max(range.max, newValue + pad),
         })
       }
-      timeline.setKeyframeValue(p, currentFrame, newValue, kf.easing, kf.interp)
+      timeline.setKeyframeValue(
+        path,
+        currentFrame,
+        newValue,
+        kf.easing,
+        kf.interp,
+      )
     }
 
     function onUp() {
