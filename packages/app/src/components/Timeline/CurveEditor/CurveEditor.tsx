@@ -1,4 +1,11 @@
-import { createMemo, createSignal, For, onCleanup, Show } from 'solid-js'
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  onCleanup,
+  Show,
+} from 'solid-js'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useTimeline } from '@/contexts/TimelineContext'
 import { resolveKeyframeValue } from '@/utils/timeline'
@@ -83,17 +90,24 @@ export function CurveEditor(props: CurveEditorProps) {
     () => (props.endFrame - props.startFrame) * props.frameWidth,
   )
 
-  // Freeze the value axis while dragging so it doesn't rescale under the cursor.
-  const [frozenRange, setFrozenRange] = createSignal<{
+  // Sticky value axis: once set (on first view of a track or pinned by a drag)
+  // it stays put, so editing a value doesn't make the axis rescale and slide the
+  // node back under the cursor ("snap-back"). It re-fits only when the graphed
+  // track changes.
+  const [stickyRange, setStickyRange] = createSignal<{
     min: number
     max: number
   } | null>(null)
 
-  const valueRange = createMemo(() => {
-    const frozen = frozenRange()
-    if (frozen) return frozen
-    return autoValueRange(keyframes().map((kf) => kf.value))
+  // Re-fit the axis when the graphed parameter changes.
+  createEffect(() => {
+    void props.path
+    setStickyRange(null)
   })
+
+  const valueRange = createMemo(
+    () => stickyRange() ?? autoValueRange(keyframes().map((kf) => kf.value)),
+  )
 
   const viewport = createMemo(() => {
     const range = valueRange()
@@ -139,8 +153,9 @@ export function CurveEditor(props: CurveEditorProps) {
     ;(e.target as Element).setPointerCapture(e.pointerId)
 
     props.onSelectKeyframe?.(p, startFrame)
-    // Pin the axis and open a single undo/preview step for the whole drag.
-    setFrozenRange({ min: vp.minValue, max: vp.maxValue })
+    // Pin the axis (sticky — kept after release so the node doesn't jump) and
+    // open a single undo/preview step for the whole drag.
+    setStickyRange({ min: vp.minValue, max: vp.maxValue })
     if (!changeHistory.isPreviewing()) changeHistory.startPreview('Curve edit')
     timeline.addKeyframe(p, startFrame, startValue, kf.easing, kf.interp)
 
@@ -160,9 +175,20 @@ export function CurveEditor(props: CurveEditorProps) {
         currentFrame = clamped
         props.onSelectKeyframe?.(p, currentFrame)
       }
-      // Vertical: set the value at the (possibly moved) keyframe.
+      // Vertical: set the value at the (possibly moved) keyframe. Round to kill
+      // float noise (otherwise values like 0.7529950093481053 accrue).
       const sensitivity = ev.shiftKey ? 0.1 : 1
-      const newValue = startValue - (ev.clientY - startY) * valuePerPx * sensitivity
+      const raw = startValue - (ev.clientY - startY) * valuePerPx * sensitivity
+      const newValue = Math.round(raw * 1e6) / 1e6
+      // Grow the axis if dragged past it so the node stays on screen.
+      const range = valueRange()
+      if (newValue < range.min || newValue > range.max) {
+        const pad = Math.max(1e-6, (range.max - range.min) * 0.1)
+        setStickyRange({
+          min: Math.min(range.min, newValue - pad),
+          max: Math.max(range.max, newValue + pad),
+        })
+      }
       timeline.setKeyframeValue(p, currentFrame, newValue, kf.easing, kf.interp)
     }
 
@@ -170,7 +196,7 @@ export function CurveEditor(props: CurveEditorProps) {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       if (changeHistory.isPreviewing()) changeHistory.commit()
-      setFrozenRange(null)
+      // Keep the sticky range so the node stays where it was dragged.
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)

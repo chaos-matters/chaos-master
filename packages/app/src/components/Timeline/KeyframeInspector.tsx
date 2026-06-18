@@ -20,6 +20,11 @@ const EASING_OPTIONS: EasingCurve[] = [
 
 const INTERP_OPTIONS: KeyframeInterpolation[] = ['linear', 'spline', 'constant']
 
+/** Trim floating-point noise to a sane display precision (e.g. 0.7529950093… → 0.753). */
+function formatNumber(n: number): string {
+  return Number(n.toFixed(4)).toString()
+}
+
 function formatKeyframeValue(
   value:
     | number
@@ -27,7 +32,11 @@ function formatKeyframeValue(
     | [number, number, number]
     | [number, number, number, number],
 ): string {
-  return Array.isArray(value) ? `[${value.join(', ')}]` : String(value)
+  if (Array.isArray(value)) {
+    return `[${value.map((v) => formatNumber(v)).join(', ')}]`
+  }
+  if (typeof value === 'number') return formatNumber(value)
+  return value
 }
 
 export function KeyframeInspector(props: KeyframeInspectorProps) {
