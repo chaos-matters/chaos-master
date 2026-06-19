@@ -53,8 +53,8 @@ function gatherDeviceMetadata(): MetadataEntry[] {
   // Browser / OS
   entries.push({ label: 'User Agent', value: navigator.userAgent })
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  entries.push({ label: 'Platform', value: (navigator as any).platform })
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
+  entries.push({ label: 'Platform', value: navigator.platform })
   entries.push({ label: 'Language', value: navigator.language })
 
   // Screen
@@ -75,14 +75,8 @@ function gatherDeviceMetadata(): MetadataEntry[] {
   })
 
   // Memory (Chrome-only)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, no-restricted-globals
-  const mem = (performance as any).memory as
-    | {
-        jsHeapSizeLimit: number
-        usedJSHeapSize: number
-        totalJSHeapSize: number
-      }
-    | undefined
+  // eslint-disable-next-line no-restricted-globals
+  const mem = performance.memory
   if (mem) {
     const mb = (n: number) => `${(n / 1024 / 1024).toFixed(0)} MB`
     entries.push({
@@ -90,8 +84,7 @@ function gatherDeviceMetadata(): MetadataEntry[] {
       value: `${mb(mem.usedJSHeapSize)} / ${mb(mem.totalJSHeapSize)} (limit ${mb(mem.jsHeapSizeLimit)})`,
     })
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const deviceMemory = (navigator as any).deviceMemory as number | undefined
+  const deviceMemory = navigator.deviceMemory
   if (deviceMemory !== undefined) {
     entries.push({ label: 'Device Memory', value: `~${deviceMemory} GB` })
   }
