@@ -216,7 +216,12 @@ function AffineHandle(props: {
       const y = sub(worldToClip(vec2f(b, e)), zero)
       const t = worldToClip(vec2f(c, f))
       const s = aspect()
-      return [x.x * s, y.x * s, x.y, y.y, t.x * s, t.y]
+      const m = [x.x * s, y.x * s, x.y, y.y, t.x * s, t.y]
+      // Guard NaN/Infinity (a stale/transitional transform mid flame-switch, or
+      // an uninitialized camera/aspect): a non-finite value here renders as an
+      // invalid SVG `<g> transform: matrix(NaN,…)` attribute error.
+      if (m.some((n) => !Number.isFinite(n))) return [0, 0, 0, 0, 0.5, 0.5]
+      return m
     } catch {
       // worldToClip may throw if camera hasn't initialized
       return [0, 0, 0, 0, 0.5, 0.5]
