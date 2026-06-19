@@ -1474,12 +1474,15 @@ export function MainWorkspace(props: AppProps) {
     history.replace(deepClone(entry.flame), 'Load History Flame')
   }
 
-  const handleRandomizeAnimation = (presetIds: string[]) => {
+  const handleRandomizeAnimation = (
+    presetIds: string[],
+    clearFirst: boolean,
+  ) => {
     if (presetIds.length === 0) return
 
     isRandomizingAnimation = true
     try {
-      timeline.clearAllTracks()
+      if (clearFirst) timeline.clearAllTracks()
 
       const start = timeline.config().startFrame
       const end = timeline.config().endFrame

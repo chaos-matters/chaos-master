@@ -69,7 +69,7 @@ export interface FlameRandomizerCardProps {
   ) => void
   onLoadHistory: (entry: RandomizerHistoryEntry) => void
   onClearHistory: () => void
-  onRandomizeAnimation: (presetIds: string[]) => void
+  onRandomizeAnimation: (presetIds: string[], clearFirst: boolean) => void
   onUpdateRenderSettings: (
     settings: Partial<FlameDescriptor['renderSettings']>,
   ) => void
@@ -203,6 +203,10 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
   const [animVib, setAnimVib] = createSignal(false)
   const [animOrbit, setAnimOrbit] = createSignal(true)
   const [animFT, setAnimFT] = createSignal(false)
+  // When off (default), Randomize Animation layers onto existing keyframes
+  // (re-running overwrites the same frames but preserves hand-made ones on other
+  // frames/paths); when on, it wipes all tracks first for a clean slate.
+  const [animClearFirst, setAnimClearFirst] = createSignal(false)
 
   // Render settings randomizer signals
   const [renderSettingsExpanded, setRenderSettingsExpanded] =
@@ -363,7 +367,7 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
     if (is3D() && animOrbit()) presetIds.push('orbit')
     if (animFT()) presetIds.push('finalTransform')
 
-    props.onRandomizeAnimation(presetIds)
+    props.onRandomizeAnimation(presetIds, animClearFirst())
   }
 
   const [paletteExpanded, setPaletteExpanded] = createSignal(false)
@@ -872,6 +876,13 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
                     <span>Final Transf. Spin</span>
                   </label>
                 </div>
+                <label class={ui.checkboxField}>
+                  <Checkbox
+                    checked={animClearFirst()}
+                    onChange={setAnimClearFirst}
+                  />
+                  <span>Clear existing keyframes first</span>
+                </label>
               </div>
             </Show>
           </div>
