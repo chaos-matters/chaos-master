@@ -99,33 +99,39 @@ needed.
   `simple3D/types.ts`, `parametric3D/types.ts`). Routing them through `@/valibot`
   removes the duplicate module identity, restores instantiation caching, and adds
   threshold headroom. Low risk.
-- **F2 — Strictness, incrementally.** Baseline (`noImplicitAny:true`): **90
-  errors** (was ~2354 with valibot poisoned), 88 TS7053 (implicit-any dynamic
-  index) + 1 TS2352 + 1 TS2322.
-  - **Done:** `sortedTransformEntries` made generic over its key type so the
-    branded `TransformId` flows through instead of widening to `string`. One
-    clean change cleared **29** errors (all 23 in `MainWorkspace.tsx` + 3 in
-    `AffineListEditor` + 3 in `ColorListEditor`), no casts, no behaviour change.
-    Count now **61**.
-  - **Remaining 61:** `flame/variations/utils.ts` (54 — the variation-registry
-    dynamic indexing of `allTransformVariations[…]`; likely needs typed key
-    unions and may keep a couple of the file's existing load-bearing factory
-    casts), `VariationSelector.tsx` (3 — 1 index + 2 generic `U`→tuple type
-    errors around the camera3D target setter), `DopeSheet.tsx` (3 — ids parsed
-    out of a `parameterPath` string; brand with the `tid()`/`vid()` helpers),
-    `randomize.ts` (1).
-  - **Caution — it cascades.** Tightening a value from `any` to its real type
-    exposes *latent* bugs, not just missing annotations. Example: converting
-    `randomize.ts`'s transform loop to `recordEntries` typed `t`, which revealed
-    the `mutateVariations: 'all'` path rebuilds variations via a local
-    `VariationInstance` type that drops `visible` (a real bug). So F2 is a
-    bug-fixing effort, not a mechanical typing pass — budget accordingly.
-  - **Then:** flip `noImplicitAny: true`; re-enable `@typescript-eslint/no-unsafe-*`
-    (5 rules, one at a time, measure each); drop the per-line `no-explicit-any`
-    disables once the remaining `as any` are gone (the variation-factory casts
-    are load-bearing — revisit last).
-  Note: the old eslint comment attributing ~1900 implicit-anys to TypeGPU/Solid
-  was measured under the poisoned-valibot state; re-measure governs the real plan.
+- **F2 — Strictness. `noImplicitAny: true` is now ON and the build is green.**
+  Baseline was 90 errors (88 TS7053 implicit-any dynamic index + 1 TS2352 + 1
+  TS2322; was ~2354 with valibot poisoned). Fixed in order:
+  - `sortedTransformEntries` made generic over its key type so the branded
+    `TransformId` flows through instead of widening to `string` — one clean
+    change cleared **29** (all 23 in `MainWorkspace.tsx` + the affine/color list
+    editors), no casts.
+  - `variations/utils.ts` — the preview-id cache (`transformPreviewIds`) was
+    typed `{ tid: string; vid: string }`, widening the branded ids returned by
+    `generateTransformId`/`generateVariationId`. Branding the cache type fixed
+    **53** of the file's indexing errors at once. The two remaining
+    (`getParamsEditor` editor access, `getVariationDefault`) keep a bounded `as`
+    assertion (only parametric variations carry an editor/params).
+  - `VariationSelector.tsx` — `setFlameTarget3D` wrote a wgpu-matrix `Vec3` into
+    the schema's `[number,number,number]` tuple; replaced the (now-erroring) `as`
+    cast with a real `Vec3 → tuple` conversion.
+  - `DopeSheet.tsx` — ids parsed out of a `parameterPath` string branded with a
+    `TransformId`/`VariationId` assertion at the parse boundary.
+  - `randomize.ts` — the transform loop now uses `recordEntries`; the variation
+    paths view `t.variations` through one shared loose `RandomVariation` type
+    (randomize perturbs weights/params generically, which the precise
+    per-variation unions can't express) with a single boundary cast on the
+    `'all'` rebuild.
+  - **Lesson (kept for the next strict step):** tightening `any`→real-type
+    cascades into *latent* bugs, not just annotations — e.g. the old
+    `mutateVariations:'all'` path rebuilt variations via a local type that
+    dropped `visible`. Budget the no-unsafe-* re-enable as a bug-fixing effort.
+  - **Remaining strict tail (separate):** re-enable the five
+    `@typescript-eslint/no-unsafe-*` rules one at a time (measure each), then
+    drop the per-line `no-explicit-any` disables once the remaining `as any` are
+    gone (the variation-factory casts in `variations/*/types.ts` are
+    load-bearing — revisit last). The old eslint note blaming ~1900 implicit-anys
+    on TypeGPU/Solid was measured under poisoned valibot; re-measure first.
 - **F3 (optional) — Typecheck config files separately.** `vite.config.ts`,
   `vitest.config.ts`, `playwright.config.ts` are no longer in the main typecheck
   (they were never `src`). Add a small `tsconfig.node.json` if you want them

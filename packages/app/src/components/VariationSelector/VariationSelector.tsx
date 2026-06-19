@@ -591,17 +591,19 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
   }
 
   const setFlameTarget3D: Setter<Vec3> = (value) => {
+    // wgpu-matrix Vec3 is array-like; the schema target is a fixed 3-tuple.
+    const toTuple = (v: Vec3): [number, number, number] => [v[0]!, v[1]!, v[2]!]
     if (typeof value === 'function') {
       setPreviewFlame((draft) => {
         if (!draft.renderSettings.camera3D) return
-        draft.renderSettings.camera3D.target = value(
-          new Float32Array(draft.renderSettings.camera3D.target),
-        ) as [number, number, number]
+        draft.renderSettings.camera3D.target = toTuple(
+          value(new Float32Array(draft.renderSettings.camera3D.target)),
+        )
       })
     } else {
       setPreviewFlame((draft) => {
         if (!draft.renderSettings.camera3D) return
-        draft.renderSettings.camera3D.target = value
+        draft.renderSettings.camera3D.target = toTuple(value)
       })
     }
     return new Float32Array(
