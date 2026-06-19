@@ -36,15 +36,20 @@
   }
 }
 
+/* Solid fill so on/off is unmistakable (used by the Subtle toggle). */
 .active {
   border-color: var(--accent-color, #6366f1);
-  color: var(--accent-color, #6366f1);
-  background: rgba(99, 102, 241, 0.08);
+  color: #fff;
+  background: var(--accent-color, #6366f1);
 
   &:hover {
     border-color: var(--accent-color, #6366f1);
-    color: var(--accent-color, #6366f1);
-    background: rgba(99, 102, 241, 0.14);
+    color: #fff;
+    background: var(--accent-color, #4f46e5);
+  }
+
+  &::before {
+    content: '✓ ';
   }
 }
 
@@ -93,11 +98,11 @@
 
 /* ── Presets panel wrapper ── */
 .wrapper {
-  border-bottom: 1px solid var(--neutral-150, #e8e8e8);
+  border-bottom: 1px solid var(--neutral-200);
   padding: 2px 8px;
 
   [data-theme='dark'] & {
-    border-bottom-color: var(--neutral-800, #1f2937);
+    border-bottom-color: var(--neutral-800);
   }
 }
 
@@ -113,9 +118,9 @@
   padding: 2px 7px;
   font-size: 0.58rem;
   font-weight: 500;
-  border: 1px solid var(--neutral-250, #d4d4d4);
+  border: 1px solid var(--neutral-300);
   border-radius: 6px;
-  background: var(--neutral-50, #fafafa);
+  background: var(--neutral-50);
   color: var(--neutral-600);
   cursor: pointer;
   transition: all 0.12s;
@@ -123,8 +128,8 @@
   user-select: none;
 
   [data-theme='dark'] & {
-    border-color: var(--neutral-700, #374151);
-    background: var(--neutral-850, #1a1f2e);
+    border-color: var(--neutral-700);
+    background: var(--neutral-900);
     color: var(--neutral-400);
   }
 
@@ -147,10 +152,10 @@
   gap: 3px;
   margin-bottom: 4px;
   padding-bottom: 4px;
-  border-bottom: 1px solid var(--neutral-150, #e8e8e8);
+  border-bottom: 1px solid var(--neutral-200);
 
   [data-theme='dark'] & {
-    border-bottom-color: var(--neutral-800, #1f2937);
+    border-bottom-color: var(--neutral-800);
   }
 }
 

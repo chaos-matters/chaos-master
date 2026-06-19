@@ -138,13 +138,9 @@
 }
 
 [data-theme='dark'] .markdownBody code {
-  background: color-mix(in srgb, var(--neutral-600, #525252) 30%, #111);
+  background: color-mix(in srgb, var(--neutral-600) 30%, #111);
   color: var(--neutral-200);
-  border-color: color-mix(
-    in srgb,
-    var(--neutral-500, #737373) 35%,
-    transparent
-  );
+  border-color: color-mix(in srgb, var(--neutral-500) 35%, transparent);
 }
 
 .markdownBody pre {

@@ -1,7 +1,9 @@
 import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useTimeline } from '@/contexts/TimelineContext'
+import { persistentSignal } from '@/utils/persistentSignal'
 import { TIMELINE_PARAMETERS } from '@/utils/timeline'
+import { CurveEditor } from './CurveEditor/CurveEditor'
 import ui from './DopeSheet.module.css'
 import { useScrollSync } from './hooks/useScrollSync'
 import { useSeekScrubber } from './hooks/useSeekScrubber'
@@ -47,6 +49,19 @@ export function DopeSheet(props: DopeSheetProps) {
     timeline.config().endFrame - timeline.config().startFrame
 
   const [seekOnSelect, setSeekOnSelect] = createSignal(false)
+  const [showCurve, setShowCurve] = persistentSignal(
+    'timeline-curve-editor',
+    false,
+  )
+  // Horizontal scroll of the tracks, mirrored onto the curve graph so it stays
+  // pixel-aligned with the diamonds.
+  const [scrollLeft, setScrollLeft] = createSignal(0)
+
+  const curveLabel = () => {
+    const p = selectedKeyframe()?.path
+    if (!p) return null
+    return props.formatTrackLabel ? props.formatTrackLabel(p) : pathLabel(p)
+  }
   let containerRef: HTMLDivElement | undefined
   let tracksScrollRef!: HTMLDivElement
   let seekRulerRef!: HTMLDivElement
@@ -220,11 +235,37 @@ export function DopeSheet(props: DopeSheetProps) {
         >
           Seek
         </button>
+        <button
+          class={ui.zoomBtn}
+          classList={{ [ui.zoomBtnActive as string]: showCurve() }}
+          onClick={() => setShowCurve((v) => !v)}
+          title="Show the value curve for the selected parameter"
+        >
+          Curve
+        </button>
         <span class={ui.zoomHint}>(Alt+wheel or pinch to zoom)</span>
         <span class={ui.frameIndicator}>Frame {currentFrame()}</span>
       </div>
 
       <KeyframeInspector selectedKeyframe={selectedKeyframe()} />
+
+      {/* ── Curve editor (selected parameter) ── */}
+      <Show when={showCurve()}>
+        <CurveEditor
+          path={selectedKeyframe()?.path ?? null}
+          label={curveLabel()}
+          selectedFrame={selectedKeyframe()?.frame ?? null}
+          onSelectKeyframe={(path, frame) =>
+            setSelectedKeyframe({ path, frame })
+          }
+          onContextMenu={handleContextMenu}
+          frameWidth={frameWidth()}
+          startFrame={timeline.config().startFrame}
+          endFrame={timeline.config().endFrame}
+          trackNameWidth={TRACK_NAME_WIDTH}
+          scrollLeft={scrollLeft()}
+        />
+      </Show>
 
       {/* ── Seek ruler ── */}
       <div class={ui.seekRuler} ref={seekRulerRef}>
@@ -277,6 +318,7 @@ export function DopeSheet(props: DopeSheetProps) {
           if (seekLaneRef) {
             seekLaneRef.scrollLeft = e.currentTarget.scrollLeft
           }
+          setScrollLeft(e.currentTarget.scrollLeft)
         }}
         activeTracks={activeTracks()}
         frameWidth={frameWidth()}

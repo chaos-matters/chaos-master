@@ -3,7 +3,7 @@ import { vec3 } from 'wgpu-matrix'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { Camera3D } from '@/lib/Camera3D'
 import { useCamera3D } from '@/lib/Camera3DContext'
-import { cameraBasis } from '@/lib/cameraMath'
+import { cameraBasis, rollAdjustLookDelta } from '@/lib/cameraMath'
 import { useCanvas } from '@/lib/CanvasContext'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { createPinchHandler } from '@/utils/createPinchHandler'
@@ -204,10 +204,14 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
   function applyLook(dx: number, dy: number) {
     const eye = position()
     const r = props.radius[0]()
-    const nextTheta = props.theta[0]() - dx * FLY_LOOK_SENSITIVITY
+    // Rotate the pointer delta into the camera's rolled frame so "mouse right"
+    // always turns around the camera's own up axis. Without this, any roll makes
+    // mouse-look veer off in a wrong direction.
+    const { dRight, dUp } = rollAdjustLookDelta(dx, dy, props.roll?.[0]() ?? 0)
+    const nextTheta = props.theta[0]() - dRight * FLY_LOOK_SENSITIVITY
     const nextPhi = Math.max(
       0.01,
-      Math.min(Math.PI - 0.01, props.phi[0]() - dy * FLY_LOOK_SENSITIVITY),
+      Math.min(Math.PI - 0.01, props.phi[0]() + dUp * FLY_LOOK_SENSITIVITY),
     )
     // offset = eye - target = r · dir(theta, phi)
     const ox = r * Math.sin(nextPhi) * Math.sin(nextTheta)
@@ -552,11 +556,21 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
     })
   })
 
-  // Leaving fly mode releases the captured mouse.
+  // Leaving fly mode releases the captured mouse and re-levels the roll, so the
+  // orbit controls (which assume a world-up horizon) behave again. Roll only
+  // makes sense while flying; persisting it makes orbit/pan feel broken. Tracked
+  // via a transition flag so we never zero an animated/initial roll — only the
+  // fly→orbit handoff resets it.
+  let wasFlying = false
   createEffect(() => {
-    if (props.flyMode?.() === false && isPointerLocked()) {
+    const flying = props.flyMode?.() === true
+    if (!flying && isPointerLocked()) {
       document.exitPointerLock()
     }
+    if (wasFlying && !flying) {
+      props.roll?.[1](0)
+    }
+    wasFlying = flying
   })
 
   return (

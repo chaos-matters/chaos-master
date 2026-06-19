@@ -51,3 +51,28 @@ function elastic(t: number): number {
 export function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
+
+/**
+ * Catmull-Rom spline interpolation between p1 and p2, using p0 and p3 as the
+ * adjacent control points to derive auto-tangents (cubic Hermite basis). Passes
+ * through p1 at t=0 and p2 at t=1. At the ends, callers clamp by passing the
+ * boundary value for the missing neighbour (p0=p1 / p3=p2). Mirrors the spline
+ * used by IFSRenderer and JWildfire (tension 0.5).
+ */
+export function catmullRom(
+  p0: number,
+  p1: number,
+  p2: number,
+  p3: number,
+  t: number,
+): number {
+  const t2 = t * t
+  const t3 = t2 * t
+  const h1 = 2 * t3 - 3 * t2 + 1
+  const h2 = -2 * t3 + 3 * t2
+  const h3 = t3 - 2 * t2 + t
+  const h4 = t3 - t2
+  const m1 = (p2 - p0) / 2
+  const m2 = (p3 - p1) / 2
+  return h1 * p1 + h2 * p2 + h3 * m1 + h4 * m2
+}

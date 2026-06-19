@@ -146,6 +146,11 @@ export function createAnimationExport(
 
         const frame = config.frameStart + (frameIndex % totalFrames)
 
+        // Advance the playhead so anything resolved from currentFrame outside the
+        // flame descriptor — notably the morph's animated blendWeight (read via
+        // resolvedBlendWeight on the live Flam3) — tracks this export frame.
+        timeline.setCurrentFrame(frame)
+
         // Clone flame and apply timeline for this frame
         const flameClone = JSON.parse(
           JSON.stringify(baseFlame),

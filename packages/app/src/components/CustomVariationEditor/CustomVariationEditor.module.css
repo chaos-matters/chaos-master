@@ -120,7 +120,7 @@
 }
 
 [data-theme='dark'] .variationItemActive {
-  background: var(--neutral-750);
+  background: var(--neutral-800);
   border-color: var(--neutral-600);
 }
 
@@ -444,7 +444,7 @@
 
 [data-theme='dark'] .previewPlaceholder {
   border-color: var(--neutral-600);
-  background: var(--neutral-850);
+  background: var(--neutral-900);
   color: var(--neutral-500);
 }
 

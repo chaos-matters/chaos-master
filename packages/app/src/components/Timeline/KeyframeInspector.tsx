@@ -3,7 +3,7 @@ import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useTimeline } from '@/contexts/TimelineContext'
 import ui from './DopeSheet.module.css'
-import type { EasingCurve } from '@/utils/timeline'
+import type { EasingCurve, KeyframeInterpolation } from '@/utils/timeline'
 
 interface KeyframeInspectorProps {
   selectedKeyframe: { path: string; frame: number } | null
@@ -18,6 +18,13 @@ const EASING_OPTIONS: EasingCurve[] = [
   'elastic',
 ]
 
+const INTERP_OPTIONS: KeyframeInterpolation[] = ['linear', 'spline', 'constant']
+
+/** Trim floating-point noise to a sane display precision (e.g. 0.7529950093… → 0.753). */
+function formatNumber(n: number): string {
+  return Number(n.toFixed(4)).toString()
+}
+
 function formatKeyframeValue(
   value:
     | number
@@ -25,7 +32,11 @@ function formatKeyframeValue(
     | [number, number, number]
     | [number, number, number, number],
 ): string {
-  return Array.isArray(value) ? `[${value.join(', ')}]` : String(value)
+  if (Array.isArray(value)) {
+    return `[${value.map((v) => formatNumber(v)).join(', ')}]`
+  }
+  if (typeof value === 'number') return formatNumber(value)
+  return value
 }
 
 export function KeyframeInspector(props: KeyframeInspectorProps) {
@@ -43,7 +54,13 @@ export function KeyframeInspector(props: KeyframeInspectorProps) {
     if (!kf) return null
     const val = kf.value
     if (val === null || typeof val === 'boolean') return null
-    return { frame: kf.frame, value: val, easing: kf.easing, path: sel.path }
+    return {
+      frame: kf.frame,
+      value: val,
+      easing: kf.easing,
+      interp: kf.interp,
+      path: sel.path,
+    }
   })
 
   const [inspectorEditing, setInspectorEditing] = createSignal(false)
@@ -202,6 +219,25 @@ export function KeyframeInspector(props: KeyframeInspectorProps) {
                 }}
               >
                 {EASING_OPTIONS.map((opt) => (
+                  <option value={opt}>{opt}</option>
+                ))}
+              </select>
+            </label>
+
+            <label class={ui.inspectorEasing}>
+              Interp
+              <select
+                value={kf().interp ?? 'linear'}
+                onChange={(e) => {
+                  timeline.setKeyframeInterp(
+                    kf().path,
+                    kf().frame,
+                    e.currentTarget.value as KeyframeInterpolation,
+                  )
+                }}
+                title="Segment interpolation: linear, spline (smooth Catmull-Rom), or constant (hold)"
+              >
+                {INTERP_OPTIONS.map((opt) => (
                   <option value={opt}>{opt}</option>
                 ))}
               </select>

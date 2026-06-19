@@ -5,16 +5,16 @@
   min-height: 0;
   user-select: none;
   -webkit-user-select: none;
-  background: var(--neutral-50, #fafafa);
+  background: var(--neutral-50);
   border-radius: 8px 8px 0 0;
-  border: 1px solid var(--neutral-200, #e5e7eb);
+  border: 1px solid var(--neutral-200);
   border-bottom: none;
   overflow: hidden;
   touch-action: manipulation;
 
   [data-theme='dark'] & {
-    background: var(--neutral-900, #111827);
-    border-color: var(--neutral-800, #1f2937);
+    background: var(--neutral-900);
+    border-color: var(--neutral-800);
   }
 }
 
@@ -24,14 +24,14 @@
   align-items: center;
   gap: 6px;
   padding: 2px 8px;
-  background: var(--neutral-50, #fafafa);
-  border-bottom: 1px solid var(--neutral-150, #e8e8e8);
+  background: var(--neutral-50);
+  border-bottom: 1px solid var(--neutral-200);
   flex-shrink: 0;
   height: 22px;
 
   [data-theme='dark'] & {
-    background: var(--neutral-875, #151a24);
-    border-bottom-color: var(--neutral-750, #2a3040);
+    background: var(--neutral-900);
+    border-bottom-color: var(--neutral-800);
   }
 }
 
@@ -39,17 +39,17 @@
   padding: 1px 8px;
   font-size: 10px;
   font-weight: 600;
-  border: 1px solid var(--neutral-300, #d1d5db);
+  border: 1px solid var(--neutral-300);
   border-radius: 4px;
   background: white;
-  color: var(--neutral-600, #4b5563);
+  color: var(--neutral-600);
   cursor: pointer;
   transition: all 0.1s;
 
   [data-theme='dark'] & {
-    background: var(--neutral-800, #1f2937);
-    border-color: var(--neutral-600, #4b5563);
-    color: var(--neutral-300, #d1d5db);
+    background: var(--neutral-800);
+    border-color: var(--neutral-600);
+    color: var(--neutral-300);
   }
 
   &:hover {
@@ -74,21 +74,21 @@
 .zoomLabel {
   font-size: 10px;
   font-weight: 600;
-  color: var(--neutral-500, #6b7280);
+  color: var(--neutral-500);
   font-variant-numeric: tabular-nums;
 
   [data-theme='dark'] & {
-    color: var(--neutral-400, #9ca3af);
+    color: var(--neutral-400);
   }
 }
 
 .zoomHint {
   font-size: 9px;
-  color: var(--neutral-350, #b0b5bd);
+  color: var(--neutral-400);
   margin-left: 2px;
 
   [data-theme='dark'] & {
-    color: var(--neutral-500, #6b7280);
+    color: var(--neutral-500);
   }
 }
 
@@ -97,14 +97,14 @@
   font-size: 10px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--neutral-700, #374151);
-  background: var(--neutral-200, #e5e7eb);
+  color: var(--neutral-700);
+  background: var(--neutral-200);
   padding: 1px 8px;
   border-radius: 3px;
 
   [data-theme='dark'] & {
-    color: var(--neutral-200, #e5e7eb);
-    background: var(--neutral-700, #374151);
+    color: var(--neutral-200);
+    background: var(--neutral-700);
   }
 }
 
@@ -112,8 +112,8 @@
 .seekRuler {
   position: relative;
   height: 22px;
-  background: var(--neutral-100, #f5f5f5);
-  border-bottom: 1px solid var(--neutral-200, #e5e7eb);
+  background: var(--neutral-100);
+  border-bottom: 1px solid var(--neutral-200);
   cursor: pointer;
   flex-shrink: 0;
   display: flex;
@@ -122,15 +122,15 @@
   touch-action: none;
 
   [data-theme='dark'] & {
-    background: var(--neutral-850, #1a1f2e);
-    border-bottom-color: var(--neutral-700, #374151);
+    background: var(--neutral-900);
+    border-bottom-color: var(--neutral-700);
   }
 
   &:hover {
-    background: var(--neutral-150, #eee);
+    background: var(--neutral-200);
 
     [data-theme='dark'] & {
-      background: var(--neutral-800, #1f2937);
+      background: var(--neutral-800);
     }
   }
 }
@@ -158,12 +158,12 @@
   transform: translateX(-50%);
   font-size: 9px;
   font-weight: 500;
-  color: var(--neutral-400, #9ca3af);
+  color: var(--neutral-400);
   pointer-events: none;
   letter-spacing: 0.02em;
 
   [data-theme='dark'] & {
-    color: var(--neutral-500, #6b7280);
+    color: var(--neutral-500);
   }
 }
 
@@ -212,32 +212,42 @@
   touch-action: pan-y pan-x;
 }
 
+/* Content-sized layer inside the scroll container: as tall as all the rows and
+   as wide as the widest one, so the absolutely-positioned playhead spans the
+   full track content (not just the visible viewport) and scrolls with it. */
+.tracksInner {
+  position: relative;
+  min-height: 100%;
+  width: max-content;
+  min-width: 100%;
+}
+
 /* ── Track row ── */
 .trackRow {
   display: flex;
   width: max-content;
   min-width: 100%;
-  border-bottom: 1px solid var(--neutral-100, #f3f4f6);
+  border-bottom: 1px solid var(--neutral-100);
   align-items: stretch;
   transition: background 0.1s;
 
   [data-theme='dark'] & {
-    border-bottom-color: var(--neutral-850, #1a1f2e);
+    border-bottom-color: var(--neutral-900);
   }
 
   &:nth-child(even) {
-    background: var(--neutral-50, #fafafa);
+    background: var(--neutral-50);
 
     [data-theme='dark'] & {
-      background: var(--neutral-875, #151a24);
+      background: var(--neutral-900);
     }
   }
 
   &:hover {
-    background: var(--neutral-100, #f0f0f0);
+    background: var(--neutral-100);
 
     [data-theme='dark'] & {
-      background: var(--neutral-825, #1c2333);
+      background: var(--neutral-800);
     }
   }
 }
@@ -248,8 +258,8 @@
   padding: 1px 8px;
   font-size: 10px;
   font-weight: 500;
-  color: var(--neutral-500, #6b7280);
-  border-right: 1px solid var(--neutral-200, #e5e7eb);
+  color: var(--neutral-500);
+  border-right: 1px solid var(--neutral-200);
   display: flex;
   align-items: center;
   overflow: hidden;
@@ -258,8 +268,8 @@
   letter-spacing: -0.01em;
 
   [data-theme='dark'] & {
-    color: var(--neutral-450, #8590a0);
-    border-right-color: var(--neutral-750, #2a3040);
+    color: var(--neutral-500);
+    border-right-color: var(--neutral-800);
   }
 }
 
@@ -276,27 +286,27 @@
   justify-content: center;
   height: 52px;
   font-size: 11px;
-  color: var(--neutral-400, #9ca3af);
+  color: var(--neutral-400);
   font-style: italic;
 
   [data-theme='dark'] & {
-    color: var(--neutral-500, #6b7280);
+    color: var(--neutral-500);
   }
 
   kbd {
     display: inline-block;
     padding: 1px 5px;
     margin: 0 2px;
-    border: 1px solid var(--neutral-300, #d1d5db);
+    border: 1px solid var(--neutral-300);
     border-radius: 3px;
     font-family: inherit;
     font-size: 10px;
     font-style: normal;
-    background: var(--neutral-50, #f9fafb);
+    background: var(--neutral-50);
 
     [data-theme='dark'] & {
-      background: var(--neutral-800, #1f2937);
-      border-color: var(--neutral-600, #4b5563);
+      background: var(--neutral-800);
+      border-color: var(--neutral-600);
     }
   }
 }
@@ -373,43 +383,43 @@
   align-items: center;
   gap: 10px;
   padding: 5px 10px;
-  border-bottom: 1px solid var(--neutral-200, #e5e7eb);
-  background: var(--neutral-50, #f9fafb);
+  border-bottom: 1px solid var(--neutral-200);
+  background: var(--neutral-50);
   font-size: 11px;
   flex-shrink: 0;
   min-height: 32px;
 
   [data-theme='dark'] & {
-    border-bottom-color: var(--neutral-750, #2a3040);
-    background: var(--neutral-875, #151a24);
+    border-bottom-color: var(--neutral-800);
+    background: var(--neutral-900);
   }
 }
 
 .inspectorPlaceholder {
-  color: var(--neutral-400, #9ca3af);
+  color: var(--neutral-400);
   font-style: italic;
   font-size: 10px;
 
   [data-theme='dark'] & {
-    color: var(--neutral-400, #9ca3af);
+    color: var(--neutral-400);
   }
 }
 
 .inspectorLabel {
-  color: var(--neutral-600, #4b5563);
+  color: var(--neutral-600);
   font-weight: 600;
   font-size: 11px;
 
   [data-theme='dark'] & {
-    color: var(--neutral-300, #d1d5db);
+    color: var(--neutral-300);
   }
 }
 
 .inspectorValue {
-  color: var(--neutral-700, #374151);
+  color: var(--neutral-700);
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 11px;
-  background: var(--neutral-100, #f3f4f6);
+  background: var(--neutral-100);
   padding: 2px 6px;
   border-radius: 3px;
   cursor: ew-resize;
@@ -419,15 +429,15 @@
   transition: background 0.1s;
 
   [data-theme='dark'] & {
-    color: var(--neutral-200, #e5e7eb);
-    background: var(--neutral-800, #1f2937);
+    color: var(--neutral-200);
+    background: var(--neutral-800);
   }
 
   &:hover {
-    background: var(--neutral-200, #e5e7eb);
+    background: var(--neutral-200);
 
     [data-theme='dark'] & {
-      background: var(--neutral-700, #374151);
+      background: var(--neutral-700);
     }
   }
 }
@@ -439,24 +449,24 @@
   padding: 2px 4px;
   border: 1px solid var(--accent-color, #3b82f6);
   border-radius: 3px;
-  background: var(--neutral-50, #f9fafb);
-  color: var(--neutral-900, #111827);
+  background: var(--neutral-50);
+  color: var(--neutral-900);
   outline: none;
   text-align: right;
 
   [data-theme='dark'] & {
-    background: var(--neutral-800, #1f2937);
-    color: var(--neutral-100, #f3f4f6);
+    background: var(--neutral-800);
+    color: var(--neutral-100);
   }
 }
 
 .inspectorValueReadonly {
-  color: var(--neutral-500, #6b7280);
+  color: var(--neutral-500);
   font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 11px;
 
   [data-theme='dark'] & {
-    color: var(--neutral-400, #9ca3af);
+    color: var(--neutral-400);
   }
 }
 
@@ -464,26 +474,39 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  color: var(--neutral-600, #4b5563);
+  color: var(--neutral-600);
   font-size: 11px;
 
   [data-theme='dark'] & {
-    color: var(--neutral-400, #9ca3af);
+    color: var(--neutral-400);
   }
 
   select {
     font-size: 10px;
     padding: 2px 5px;
-    border: 1px solid var(--neutral-300, #d1d5db);
+    border: 1px solid var(--neutral-300);
     border-radius: 4px;
     background: white;
-    color: var(--neutral-700, #374151);
+    color: var(--neutral-700);
     cursor: pointer;
+    /* Theme the native dropdown popup so options aren't white-on-white. */
+    color-scheme: light;
+
+    & option {
+      background-color: var(--neutral-100);
+      color: var(--neutral-700);
+    }
 
     [data-theme='dark'] & {
-      background: var(--neutral-800, #1f2937);
-      border-color: var(--neutral-600, #4b5563);
-      color: var(--neutral-300, #d1d5db);
+      background: var(--neutral-800);
+      border-color: var(--neutral-600);
+      color: var(--neutral-300);
+      color-scheme: dark;
+
+      & option {
+        background-color: var(--neutral-800);
+        color: var(--neutral-300);
+      }
     }
   }
 }

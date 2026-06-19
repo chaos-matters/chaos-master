@@ -22,13 +22,26 @@ export function CollapsibleCard(
     /** Tour anchor on the card root (present even while collapsed). */
     'data-tour-target'?: string
     /** Bumping this number collapses the card (drives "Collapse all"). The
-     *  initial value is ignored; only later changes collapse the card. */
+     *  initial value is ignored; only later changes collapse the card. Ignored
+     *  when `open` is provided (controlled mode). */
     collapseEpoch?: number
+    /** Controlled open state. When provided, the card is controlled — toggling
+     *  calls `onToggleOpen` instead of managing its own state. */
+    open?: boolean
+    onToggleOpen?: () => void
   }>,
 ) {
-  const [isOpen, setIsOpen] = createSignal(props.defaultOpen ?? true)
+  const [internalOpen, setInternalOpen] = createSignal(
+    props.defaultOpen ?? true,
+  )
+  const isOpen = () => props.open ?? internalOpen()
 
-  // Collapse when an external epoch advances (e.g. the sidebar "Collapse all").
+  function toggleOpen() {
+    if (props.open !== undefined) props.onToggleOpen?.()
+    else setInternalOpen((p) => !p)
+  }
+
+  // Collapse when an external epoch advances (uncontrolled "Collapse all").
   let isInitialEpoch = true
   createEffect(() => {
     void props.collapseEpoch
@@ -36,7 +49,7 @@ export function CollapsibleCard(
       isInitialEpoch = false
       return
     }
-    setIsOpen(false)
+    if (props.open === undefined) setInternalOpen(false)
   })
   return (
     <div
@@ -52,7 +65,7 @@ export function CollapsibleCard(
         [ui.dimmed!]: props.dimmed === true,
       }}
     >
-      <button class={ui.header} onClick={() => setIsOpen((p) => !p)}>
+      <button class={ui.header} onClick={toggleOpen}>
         <span class={ui.headerLeft}>
           <Show when={props.onToggleSelect}>
             <span

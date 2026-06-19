@@ -1184,8 +1184,8 @@
   z-index: 100;
   padding: 6px 16px;
   border-radius: 6px;
-  background: var(--neutral-800, #1e293b);
-  color: var(--neutral-100, #f1f5f9);
+  background: var(--neutral-800);
+  color: var(--neutral-100);
   font-size: 0.75rem;
   font-weight: 500;
   pointer-events: none;
@@ -1193,8 +1193,8 @@
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
 
   [data-theme='dark'] & {
-    background: var(--neutral-200, #e2e8f0);
-    color: var(--neutral-800, #1e293b);
+    background: var(--neutral-200);
+    color: var(--neutral-800);
   }
 }
 

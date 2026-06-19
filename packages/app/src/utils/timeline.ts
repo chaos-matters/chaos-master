@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js'
-import { applyEasing, clamp } from './easing'
+import { applyEasing, catmullRom, clamp } from './easing'
 import { persistentSignal } from './persistentSignal'
 
 interface WindowTimelineState {
@@ -340,6 +340,9 @@ export interface FlameDescriptor {
   edgeFadeColor?: [number, number, number, number]
 }
 
+/** Segment interpolation mode (orthogonal to `easing`). See schema/timeline.ts. */
+export type KeyframeInterpolation = 'linear' | 'constant' | 'spline'
+
 export type KeyframeData = {
   frame: number
   value:
@@ -350,12 +353,23 @@ export type KeyframeData = {
     | boolean
     | null
   easing?: EasingCurve
+  interp?: KeyframeInterpolation
 }
 
 export type TimelineTrack = {
   parameterPath: string
   keyframes: KeyframeData[]
 }
+
+/**
+ * How playback loops back on itself:
+ * - `off`      — no synthesis (a plain `loop` may still jump at the wrap).
+ * - `seamless` — there-and-back: play A→B, then a synthesized B→A return tail.
+ * - `cycle`    — per-property cyclic wrap over the whole timeline period; each
+ *                track's last keyframe flows into its first, respecting that
+ *                track's own keyframe timing/phase. No timeline extension.
+ */
+export type LoopMode = 'off' | 'seamless' | 'cycle'
 
 export type TimelineConfig = {
   fps: number
@@ -364,6 +378,8 @@ export type TimelineConfig = {
   endFrame: number
   loop: boolean
   autoFps?: boolean
+  /** Resolve-time loop synthesis mode (see resolveLoopValue). */
+  loopMode?: LoopMode
 }
 
 export function defaultConfig(): TimelineConfig {
@@ -374,7 +390,156 @@ export function defaultConfig(): TimelineConfig {
     endFrame: 90,
     loop: true,
     autoFps: false,
+    loopMode: 'off',
   }
+}
+
+/** Last keyframe frame across all tracks (the end of the user's content). */
+export function getUserEndFrame(tracks: TimelineTrack[], fallback = 0): number {
+  let userEnd = fallback
+  let seen = false
+  for (const t of tracks) {
+    for (const kf of t.keyframes) {
+      if (!seen || kf.frame > userEnd) {
+        userEnd = kf.frame
+        seen = true
+      }
+    }
+  }
+  return seen ? userEnd : fallback
+}
+
+type ResolvedValue =
+  | number
+  | string
+  | boolean
+  | [number, number, number]
+  | null
+  | [number, number, number, number]
+
+export type LoopOptions =
+  | { mode: 'seamless'; startFrame: number; endFrame: number; userEnd: number }
+  | { mode: 'cycle'; startFrame: number; endFrame: number }
+
+/**
+ * Build loop options from a config + tracks, or `null` when looping synthesis
+ * is off (so callers fall back to plain keyframe resolution).
+ */
+export function loopOptsFromConfig(
+  config: TimelineConfig,
+  tracks: TimelineTrack[],
+): LoopOptions | null {
+  const mode = config.loopMode ?? 'off'
+  if (mode === 'off') return null
+  if (mode === 'cycle') {
+    return {
+      mode: 'cycle',
+      startFrame: config.startFrame,
+      endFrame: config.endFrame,
+    }
+  }
+  return {
+    mode: 'seamless',
+    startFrame: config.startFrame,
+    endFrame: config.endFrame,
+    userEnd: getUserEndFrame(tracks, config.startFrame),
+  }
+}
+
+/** Interpolate between two keyframe values (numbers/arrays blend; else snap). */
+function lerpKfValues(
+  from: ResolvedValue,
+  to: ResolvedValue,
+  t: number,
+): ResolvedValue {
+  if (typeof from === 'number' && typeof to === 'number') {
+    return from + (to - from) * t
+  }
+  if (Array.isArray(from) && Array.isArray(to) && from.length === to.length) {
+    return from.map((v, i) => v + ((to as number[])[i]! - v) * t) as
+      | [number, number, number]
+      | [number, number, number, number]
+  }
+  // Strings / booleans can't blend — hold, then snap to the target at t === 1.
+  return t >= 1 ? to : from
+}
+
+/**
+ * Resolve a track's value at `frame`, optionally synthesizing a loop. With
+ * `opts === null` it is exactly `resolveKeyframeValue`. See {@link LoopMode}.
+ */
+export function resolveLoopValue(
+  keyframes: KeyframeData[],
+  frame: number,
+  opts: LoopOptions | null,
+): ResolvedValue {
+  const natural = resolveKeyframeValue(keyframes, frame)
+  if (opts === null) return natural
+  return opts.mode === 'seamless'
+    ? resolveSeamless(keyframes, frame, natural, opts)
+    : resolveCycle(keyframes, frame, natural, opts)
+}
+
+/**
+ * Seamless (there-and-back) tail. In the trailing window `(userEnd, endFrame]`
+ * the value ramps from the track's held last value back to its value at
+ * `startFrame`, so the final frame equals the first.
+ */
+function resolveSeamless(
+  keyframes: KeyframeData[],
+  frame: number,
+  natural: ResolvedValue,
+  opts: { startFrame: number; endFrame: number; userEnd: number },
+): ResolvedValue {
+  const { startFrame, endFrame, userEnd } = opts
+  if (endFrame <= userEnd || frame <= userEnd) return natural
+
+  const startVal = resolveKeyframeValue(keyframes, startFrame)
+  const endHeld = resolveKeyframeValue(keyframes, userEnd)
+  if (startVal === null || endHeld === null) return natural
+
+  const t = applyEasing(
+    clamp((frame - userEnd) / (endFrame - userEnd), 0, 1),
+    'easeInOut',
+  )
+  return lerpKfValues(endHeld, startVal, t)
+}
+
+/**
+ * Per-property cyclic wrap. The timeline `[startFrame, endFrame]` is one period
+ * `P`. Inside a track's own keyframe span it resolves normally; outside it
+ * (before its first keyframe or after its last) it interpolates across the wrap
+ * from the last keyframe `kn` to the first keyframe `k0` shifted by `+P`. That
+ * makes `value(startFrame) === value(endFrame)` for every track, using each
+ * track's own keyframe timing.
+ */
+function resolveCycle(
+  keyframes: KeyframeData[],
+  frame: number,
+  natural: ResolvedValue,
+  opts: { startFrame: number; endFrame: number },
+): ResolvedValue {
+  if (keyframes.length < 2) return natural
+  const sorted = [...keyframes].sort((a, b) => a.frame - b.frame)
+  const k0 = sorted[0]!
+  const kn = sorted[sorted.length - 1]!
+  const period = opts.endFrame - opts.startFrame
+  if (period <= 0) return natural
+
+  // Inside the track's own keyframe span → ordinary interpolation.
+  if (frame >= k0.frame && frame <= kn.frame) return natural
+
+  // Wrap segment: kn (at kn.frame) → k0 (at k0.frame + period).
+  const wrapLen = k0.frame + period - kn.frame
+  if (wrapLen <= 0) return natural // keyframes already span the full period
+
+  // Bring "head" frames (before k0) into the segment by adding one period.
+  const ff = frame >= kn.frame ? frame : frame + period
+  const t = applyEasing(
+    clamp((ff - kn.frame) / wrapLen, 0, 1),
+    k0.easing ?? 'linear',
+  )
+  return lerpKfValues(kn.value, k0.value, t)
 }
 
 /**
@@ -405,18 +570,16 @@ export function resolveKeyframeValue(
   const lastKf = sorted[sorted.length - 1]!
   if (frame >= lastKf.frame) return lastKf.value
 
-  // Find surrounding keyframes
-  let prev = sorted[0]!
-  let next = sorted[sorted.length - 1]!
+  // Find surrounding keyframes (track the index so spline can reach neighbours).
+  let prevIdx = 0
   for (let i = 0; i < sorted.length - 1; i++) {
-    const current = sorted[i]!
-    const after = sorted[i + 1]!
-    if (current.frame <= frame && after.frame >= frame) {
-      prev = current
-      next = after
+    if (sorted[i]!.frame <= frame && sorted[i + 1]!.frame >= frame) {
+      prevIdx = i
       break
     }
   }
+  const prev = sorted[prevIdx]!
+  const next = sorted[prevIdx + 1]!
 
   const frameRange = next.frame - prev.frame
   if (frameRange === 0) return prev.value
@@ -424,25 +587,51 @@ export function resolveKeyframeValue(
   const rawT = (frame - prev.frame) / frameRange
   const t = clamp(rawT, 0, 1)
 
-  // Type guard: if values are numbers, use lerp with easing, otherwise interpolate strings
+  // The segment prev→next is owned by `next` (its easing + interp), consistent
+  // with how this resolver has always sourced easing.
+  const easedT = applyEasing(t, next.easing ?? 'linear')
+  const interp = next.interp ?? 'linear'
+
+  // Numbers: constant (hold) / spline (Catmull-Rom) / linear (lerp).
   if (typeof prev.value === 'number' && typeof next.value === 'number') {
-    // Use the easing curve from the next keyframe (or default to linear)
-    const easingCurve = next.easing ?? 'linear'
-    const easedT = applyEasing(t, easingCurve)
+    if (interp === 'constant') return prev.value
+    if (interp === 'spline') {
+      const before = sorted[prevIdx - 1]?.value
+      const after = sorted[prevIdx + 2]?.value
+      const p0 = typeof before === 'number' ? before : prev.value
+      const p3 = typeof after === 'number' ? after : next.value
+      return catmullRom(p0, prev.value, next.value, p3, easedT)
+    }
     return prev.value + (next.value - prev.value) * easedT
   }
 
-  // Interpolate array values (RGB/RGBA colors) with easing
+  // Array values (RGB/RGBA colors): same modes, component-wise.
   if (
     Array.isArray(prev.value) &&
     Array.isArray(next.value) &&
     prev.value.length === next.value.length
   ) {
-    const easingCurve = next.easing ?? 'linear'
-    const easedT = applyEasing(t, easingCurve)
-    return prev.value.map(
-      (v, i) => v + ((next.value as number[])[i]! - v) * easedT,
-    ) as [number, number, number] | [number, number, number, number]
+    if (interp === 'constant') return prev.value
+    const nextArr = next.value as number[]
+    if (interp === 'spline') {
+      const before = sorted[prevIdx - 1]?.value
+      const after = sorted[prevIdx + 2]?.value
+      const len = prev.value.length
+      const p0 =
+        Array.isArray(before) && before.length === len
+          ? (before as number[])
+          : (prev.value as number[])
+      const p3 =
+        Array.isArray(after) && after.length === len
+          ? (after as number[])
+          : nextArr
+      return prev.value.map((v, i) =>
+        catmullRom(p0[i]!, v, nextArr[i]!, p3[i]!, easedT),
+      ) as [number, number, number] | [number, number, number, number]
+    }
+    return prev.value.map((v, i) => v + (nextArr[i]! - v) * easedT) as
+      | [number, number, number]
+      | [number, number, number, number]
   }
 
   // For string interpolation (drawMode, colorInitMode, pointInitMode) or boolean
@@ -579,6 +768,7 @@ export function createTimelineState() {
       | [number, number, number]
       | [number, number, number, number],
     easing?: EasingCurve,
+    interp?: KeyframeInterpolation,
   ) {
     setTracks((prev: TimelineTrack[]) => {
       const ti = prev.findIndex(
@@ -589,20 +779,30 @@ export function createTimelineState() {
         const existingKf = track.keyframes.find(
           (kf: KeyframeData) => kf.frame === frame,
         )
+        // On update, preserve fields the caller didn't pass (e.g. a value scrub
+        // or easing change must keep the keyframe's interp mode).
         const newKeyframes = existingKf
           ? track.keyframes.map((kf) =>
               kf.frame === frame
-                ? { frame, value, easing: easing ?? kf.easing }
+                ? {
+                    frame,
+                    value,
+                    easing: easing ?? kf.easing,
+                    interp: interp ?? kf.interp,
+                  }
                 : kf,
             )
-          : [...track.keyframes, { frame, value, easing }]
+          : [...track.keyframes, { frame, value, easing, interp }]
         return [
           ...prev.slice(0, ti),
           { parameterPath, keyframes: newKeyframes },
           ...prev.slice(ti + 1),
         ]
       }
-      return [...prev, { parameterPath, keyframes: [{ frame, value, easing }] }]
+      return [
+        ...prev,
+        { parameterPath, keyframes: [{ frame, value, easing, interp }] },
+      ]
     })
     setLastAddedKeyframe({ path: parameterPath, frame })
     if (frame === currentFrame() && valueWriterFn) {
@@ -636,9 +836,10 @@ export function createTimelineState() {
       | [number, number, number]
       | [number, number, number, number],
     easing?: EasingCurve,
+    interp?: KeyframeInterpolation,
   ) {
     pushUndo()
-    addKeyframeImpl(parameterPath, frame, value, easing)
+    addKeyframeImpl(parameterPath, frame, value, easing, interp)
   }
 
   function removeKeyframe(parameterPath: string, frame: number) {
@@ -655,8 +856,23 @@ export function createTimelineState() {
       | [number, number, number]
       | [number, number, number, number],
     easing?: EasingCurve,
+    interp?: KeyframeInterpolation,
   ) {
-    addKeyframeImpl(parameterPath, frame, value, easing)
+    addKeyframeImpl(parameterPath, frame, value, easing, interp)
+  }
+
+  /**
+   * Set the interpolation mode of an existing keyframe, preserving its value and
+   * easing. No-op if the keyframe's value isn't interpolatable (null/boolean).
+   */
+  function setKeyframeInterp(
+    parameterPath: string,
+    frame: number,
+    interp: KeyframeInterpolation,
+  ) {
+    const kf = getKeyframeAtFrame(parameterPath, frame)
+    if (!kf || kf.value === null || typeof kf.value === 'boolean') return
+    addKeyframe(parameterPath, frame, kf.value, kf.easing, interp)
   }
 
   function getKeysForFrame(frame: number): Record<string, boolean> {
@@ -817,8 +1033,15 @@ export function createTimelineState() {
       originalFrame,
       keyframe.value,
       keyframe.easing,
+      keyframe.interp,
     )
-    addKeyframeImpl(parameterPath, splitFrame, keyframe.value, keyframe.easing)
+    addKeyframeImpl(
+      parameterPath,
+      splitFrame,
+      keyframe.value,
+      keyframe.easing,
+      keyframe.interp,
+    )
 
     return true
   }
@@ -885,6 +1108,7 @@ export function createTimelineState() {
       mirroredFrame,
       keyframe.value,
       keyframe.easing,
+      keyframe.interp,
     )
     return true
   }
@@ -917,7 +1141,11 @@ export function createTimelineState() {
         t.parameterPath === parameterPath,
     )
     if (!track) return null
-    return resolveKeyframeValue(track.keyframes, frame)
+    return resolveLoopValue(
+      track.keyframes,
+      frame,
+      loopOptsFromConfig(config(), tracks()),
+    )
   }
 
   function advanceFrame() {
@@ -1078,13 +1306,62 @@ export function createTimelineState() {
 
     pushUndo()
     removeKeyframeImpl(parameterPath, oldFrame)
-    addKeyframeImpl(parameterPath, newFrame, keyframe.value, keyframe.easing)
+    addKeyframeImpl(
+      parameterPath,
+      newFrame,
+      keyframe.value,
+      keyframe.easing,
+      keyframe.interp,
+    )
+  }
+
+  /**
+   * Move a keyframe to a new frame WITHOUT pushing undo — for use inside an
+   * interactive drag that already opened a single undo step at its start. No-op
+   * if the source is missing/non-interpolatable, or the destination already
+   * holds another keyframe (so a drag can't clobber a neighbour).
+   */
+  function relocateKeyframe(
+    parameterPath: string,
+    oldFrame: number,
+    newFrame: number,
+  ) {
+    if (oldFrame === newFrame) return
+    const kf = getKeyframeAtFrame(parameterPath, oldFrame)
+    if (!kf || kf.value === null || typeof kf.value === 'boolean') return
+    if (hasKeyframeAtFrame(parameterPath, newFrame)) return
+    removeKeyframeImpl(parameterPath, oldFrame)
+    addKeyframeImpl(parameterPath, newFrame, kf.value, kf.easing, kf.interp)
   }
 
   function clearAllTracks() {
     if (tracks().length === 0) return
     pushUndo()
     setTracks([])
+  }
+
+  /**
+   * Set the loop synthesis mode. Non-destructive and idempotent — adds no
+   * keyframes. `seamless`/`cycle` turn `loop` on. `seamless` also guarantees a
+   * trailing return ramp by extending `endFrame` past the last keyframe (by the
+   * forward span, so the return takes the same time as the forward animation);
+   * `cycle` uses the existing timeline as its period and never extends it.
+   * See {@link LoopMode}.
+   */
+  function setLoopMode(mode: LoopMode) {
+    const cfg = config()
+    if (mode === 'off') {
+      setConfig({ ...cfg, loopMode: 'off' })
+      return
+    }
+    if (mode === 'cycle') {
+      setConfig({ ...cfg, loopMode: 'cycle', loop: true })
+      return
+    }
+    const userEnd = getUserEndFrame(tracks(), cfg.startFrame)
+    const span = Math.max(1, userEnd - cfg.startFrame)
+    const endFrame = cfg.endFrame > userEnd ? cfg.endFrame : userEnd + span
+    setConfig({ ...cfg, loopMode: 'seamless', loop: true, endFrame })
   }
 
   /** Replace all tracks with deep-cloned copies (unified with addKeyframeImpl). */
@@ -1096,6 +1373,7 @@ export function createTimelineState() {
           frame: kf.frame,
           value: kf.value,
           easing: kf.easing,
+          interp: kf.interp,
         })),
       })),
     )
@@ -1126,6 +1404,7 @@ export function createTimelineState() {
     addKeyframe,
     removeKeyframe,
     setKeyframeValue,
+    setKeyframeInterp,
     getKeysForFrame,
     hasKeyframeAtFrame,
     getKeyframeAtFrame,
@@ -1148,8 +1427,10 @@ export function createTimelineState() {
     addKeyframeAtCurrentFrame,
     toggleKeyframeAtCurrentFrame,
     moveKeyframe,
+    relocateKeyframe,
     loadTracks,
     clearAllTracks,
+    setLoopMode,
     advanceFrame,
     goBackFrame,
     goToFrame,
@@ -1169,20 +1450,21 @@ export function applyTracksToFlame(
   tracks: TimelineTrack[],
   flame: FlameDescriptor,
   frame: number,
+  loop: LoopOptions | null = null,
 ): void {
   const trackMap = new Map(tracks.map((t) => [t.parameterPath, t] as const))
 
   function applyNumber(path: string, setter: (v: number) => void) {
     const track = trackMap.get(path)
     if (!track) return
-    const value = resolveKeyframeValue(track.keyframes, frame)
+    const value = resolveLoopValue(track.keyframes, frame, loop)
     if (value !== null && typeof value === 'number') setter(value)
   }
 
   function applyString(path: string, setter: (v: string) => void) {
     const track = trackMap.get(path)
     if (!track) return
-    const value = resolveKeyframeValue(track.keyframes, frame)
+    const value = resolveLoopValue(track.keyframes, frame, loop)
     if (value !== null && typeof value === 'string') setter(value)
   }
 
@@ -1274,7 +1556,7 @@ export function applyTracksToFlame(
   {
     const track = trackMap.get('backgroundColor')
     if (track) {
-      const value = resolveKeyframeValue(track.keyframes, frame)
+      const value = resolveLoopValue(track.keyframes, frame, loop)
       if (
         value !== null &&
         Array.isArray(value) &&
@@ -1291,7 +1573,7 @@ export function applyTracksToFlame(
   {
     const track = trackMap.get('edgeFadeColor')
     if (track) {
-      const value = resolveKeyframeValue(track.keyframes, frame)
+      const value = resolveLoopValue(track.keyframes, frame, loop)
       if (value !== null && Array.isArray(value) && value.length === 4) {
         flame.edgeFadeColor = value
       }
@@ -1303,7 +1585,7 @@ export function applyTracksToFlame(
   const transforms = flame.transforms as Record<string, any>
   for (const [path, track] of trackMap) {
     if (typeof path !== 'string') continue
-    const value = resolveKeyframeValue(track.keyframes, frame)
+    const value = resolveLoopValue(track.keyframes, frame, loop)
     if (value === null || typeof value !== 'number') continue
 
     const parts = path.split('.')
@@ -1435,7 +1717,13 @@ export function applyTimelineToFlame(
   timeline: TimelineState,
   flame: FlameDescriptor,
 ): void {
-  applyTracksToFlame(timeline.tracks(), flame, timeline.currentFrame())
+  const tracks = timeline.tracks()
+  applyTracksToFlame(
+    tracks,
+    flame,
+    timeline.currentFrame(),
+    loopOptsFromConfig(timeline.config(), tracks),
+  )
 }
 
 /**
@@ -1446,5 +1734,11 @@ export function applyTimelineToFlameAtFrame(
   flame: FlameDescriptor,
   frame: number,
 ): void {
-  applyTracksToFlame(timeline.tracks(), flame, frame)
+  const tracks = timeline.tracks()
+  applyTracksToFlame(
+    tracks,
+    flame,
+    frame,
+    loopOptsFromConfig(timeline.config(), tracks),
+  )
 }

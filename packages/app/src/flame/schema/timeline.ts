@@ -19,10 +19,22 @@ export const KeyframeValue = v.union([
   v.null_(),
 ])
 
+// How a segment is interpolated, independent of `easing` (which reshapes time):
+// - 'linear'   : straight lerp
+// - 'constant' : hold the previous value (stepped)
+// - 'spline'   : Catmull-Rom through neighbouring keyframes (smooth, C1)
+export const KeyframeInterpolation = v.picklist([
+  'linear',
+  'constant',
+  'spline',
+])
+export type KeyframeInterpolation = v.InferOutput<typeof KeyframeInterpolation>
+
 export const Keyframe = v.object({
   frame: v.number(),
   value: KeyframeValue,
   easing: v.optional(EasingCurve, 'linear'),
+  interp: v.optional(KeyframeInterpolation, 'linear'),
 })
 export type Keyframe = v.InferOutput<typeof Keyframe>
 
@@ -38,6 +50,10 @@ export const TimelineConfig = v.object({
   endFrame: v.pipe(v.number(), v.minValue(1)),
   loop: v.boolean(),
   autoFps: v.optional(v.boolean(), false),
+  // Resolve-time loop synthesis (adds no real keyframes):
+  // - 'seamless': trailing gap ramps back to each track's start value.
+  // - 'cycle': per-property cyclic wrap over the whole timeline period.
+  loopMode: v.optional(v.picklist(['off', 'seamless', 'cycle']), 'off'),
 })
 export type TimelineConfig = v.InferOutput<typeof TimelineConfig>
 
@@ -54,5 +70,6 @@ export function defaultTimelineConfig(): TimelineConfig {
     endFrame: 90,
     loop: true,
     autoFps: false,
+    loopMode: 'off',
   }
 }

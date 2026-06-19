@@ -20,6 +20,8 @@ type BlendFlameGalleryProps = {
   onPreviewBlend?: (flame: FlameDescriptor | null) => void
   onPreviewName?: (name: string | null) => void
   onClose: () => void
+  /** Header label — defaults to the blend wording. */
+  heading?: string
 }
 
 const INITIAL_VISIBLE = 10
@@ -119,7 +121,7 @@ export function BlendFlameGallery(props: BlendFlameGalleryProps) {
   return (
     <div class={ui.container}>
       <div class={ui.header}>
-        <span class={ui.title}>Pick Blend Flame</span>
+        <span class={ui.title}>{props.heading ?? 'Pick Blend Flame'}</span>
         <button class={ui.closeBtn} onClick={props.onClose} title="Close (Esc)">
           <Cross />
         </button>

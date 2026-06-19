@@ -29,46 +29,51 @@ export function DopeSheetGrid(props: DopeSheetGridProps) {
       ref={props.tracksScrollRef}
       onScroll={props.onScroll}
     >
-      <Show
-        when={props.activeTracks.length > 0}
-        fallback={
-          <div class={ui.emptyState}>
-            No keyframes. Click a property and press <kbd>I</kbd> to insert one.
-          </div>
-        }
-      >
-        <For each={props.activeTracks}>
-          {(track) => (
-            <DopeSheetTrack
-              isOrphaned={track.isOrphaned}
-              parameterPath={track.path}
-              label={track.label}
-              frameWidth={props.frameWidth}
-              trackHeight={props.trackHeight}
-              startFrame={props.startFrame}
-              endFrame={props.endFrame}
-              currentFrame={props.currentFrame}
-              selectedKeyframe={props.selectedKeyframe}
-              onSelectKeyframe={props.onSelectKeyframe}
-              onDragKeyframe={props.onDragKeyframe}
-              onContextMenu={props.onContextMenu}
-              onTrackContextMenu={props.onTrackContextMenu}
-              onDeselectKeyframe={props.onDeselectKeyframe}
-            />
-          )}
-        </For>
-      </Show>
+      {/* Content-sized wrapper so the playhead spans ALL tracks, not just the
+          visible viewport — it scrolls with the rows in both directions. */}
+      <div class={ui.tracksInner}>
+        <Show
+          when={props.activeTracks.length > 0}
+          fallback={
+            <div class={ui.emptyState}>
+              No keyframes. Click a property and press <kbd>I</kbd> to insert
+              one.
+            </div>
+          }
+        >
+          <For each={props.activeTracks}>
+            {(track) => (
+              <DopeSheetTrack
+                isOrphaned={track.isOrphaned}
+                parameterPath={track.path}
+                label={track.label}
+                frameWidth={props.frameWidth}
+                trackHeight={props.trackHeight}
+                startFrame={props.startFrame}
+                endFrame={props.endFrame}
+                currentFrame={props.currentFrame}
+                selectedKeyframe={props.selectedKeyframe}
+                onSelectKeyframe={props.onSelectKeyframe}
+                onDragKeyframe={props.onDragKeyframe}
+                onContextMenu={props.onContextMenu}
+                onTrackContextMenu={props.onTrackContextMenu}
+                onDeselectKeyframe={props.onDeselectKeyframe}
+              />
+            )}
+          </For>
+        </Show>
 
-      {/* Playhead line in tracks */}
-      <div
-        class={ui.playhead}
-        style={{
-          left: `${
-            props.trackNameWidth +
-            (props.currentFrame - props.startFrame) * props.frameWidth
-          }px`,
-        }}
-      />
+        {/* Playhead line in tracks (spans the full content height) */}
+        <div
+          class={ui.playhead}
+          style={{
+            left: `${
+              props.trackNameWidth +
+              (props.currentFrame - props.startFrame) * props.frameWidth
+            }px`,
+          }}
+        />
+      </div>
     </div>
   )
 }

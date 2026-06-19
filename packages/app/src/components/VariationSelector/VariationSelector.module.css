@@ -507,7 +507,7 @@
   align-items: center;
   padding: 0.15rem 0.45rem;
   border-radius: 12px;
-  border: 1px solid var(--neutral-250);
+  border: 1px solid var(--neutral-300);
   background: var(--neutral-100);
   color: var(--neutral-600);
   font-size: 0.62rem;
@@ -527,12 +527,12 @@
   }
 
   [data-theme='dark'] & {
-    background: var(--neutral-850);
+    background: var(--neutral-900);
     border-color: var(--neutral-700);
     color: var(--neutral-400);
 
     &:hover {
-      background: var(--neutral-750);
+      background: var(--neutral-800);
       color: var(--neutral-200);
     }
   }

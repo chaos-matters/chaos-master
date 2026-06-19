@@ -276,8 +276,45 @@ export function MainWorkspace(props: AppProps) {
   // (deselect-all → nothing dimmed). Canvas handles only ever *set* (drag-safe).
   const toggleSelectedTransform = (tid: string) =>
     setSelectedTransformId((prev) => (prev === tid ? null : tid))
-  // Bumped by the sidebar "Collapse all" button to fold every transform card.
-  const [transformCollapseEpoch, setTransformCollapseEpoch] = createSignal(0)
+  // Per-transform collapsed state drives the (controlled) transform cards, so the
+  // sidebar toolbar toggle can collapse-all / expand-all based on actual state:
+  // if any card is open it collapses all, otherwise it expands all.
+  const [collapsedTransforms, setCollapsedTransforms] = createSignal<
+    Set<string>
+  >(new Set())
+  const visibleTransformTids = () =>
+    sortedTransformEntries(recordEntries(flameDescriptor.transforms))
+      .filter(([tid]) => !tid.startsWith('_sym__'))
+      .map(([tid]) => tid)
+  const anyTransformOpen = () =>
+    visibleTransformTids().some((tid) => !collapsedTransforms().has(tid))
+
+  function toggleCollapseAllTransforms() {
+    setCollapsedTransforms(
+      anyTransformOpen() ? new Set(visibleTransformTids()) : new Set<string>(),
+    )
+  }
+
+  function toggleTransformCollapsed(tid: string) {
+    setCollapsedTransforms((prev) => {
+      const next = new Set(prev)
+      if (next.has(tid)) next.delete(tid)
+      else next.add(tid)
+      return next
+    })
+  }
+
+  // Browser tab title: "Chaos Master — <flame name>" when the flame is named,
+  // otherwise just "Chaos Master".
+  createEffect(() => {
+    const name = flameDescriptor.metadata?.name?.trim()
+
+    document.title =
+      name && name.toLowerCase() !== 'unknown'
+        ? `Chaos Master — ${name}`
+        : 'Chaos Master'
+  })
+
   const [animationEnabled, setAnimationEnabled] = createSignal(true)
   const [blendFlame, setBlendFlame] = createSignal<
     FlameDescriptor | undefined
@@ -488,9 +525,38 @@ export function MainWorkspace(props: AppProps) {
   )
 
   const [showBlendGallery, setShowBlendGallery] = createSignal(false)
+  // Whether the blend-flame gallery is being used to set a static blend or to
+  // set up a morph animation (animated blendWeight). Branches the gallery's
+  // onSelect handler.
+  const [blendIntent, setBlendIntent] = createSignal<'blend' | 'morph'>('blend')
 
   function pickBlendFlame() {
+    setBlendIntent('blend')
     setShowBlendGallery(true)
+  }
+
+  function pickMorphFlame() {
+    setBlendIntent('morph')
+    setShowBlendGallery(true)
+  }
+
+  /**
+   * Set up an animated morph from the current flame (A) into `endFlame` (B).
+   * Reuses the Blend pipeline: B becomes the blend flame and `blendWeight` is
+   * keyframed 1 (pure A) → 0 (pure B) across the timeline, so playback
+   * cross-dissolves A into B. Combine with "Seamless Loop" for an A→B→A cycle.
+   */
+  function setupMorph(endFlame: FlameDescriptor) {
+    setBlendFlame(deepClone(endFlame))
+    const cfg = timeline.config()
+    timeline.removeAllKeyframesForPath('blendWeight')
+    timeline.addKeyframe('blendWeight', cfg.startFrame, 1, 'easeInOut')
+    timeline.setKeyframeValue('blendWeight', cfg.endFrame, 0, 'easeInOut')
+    setBlendWeight(1)
+    setAnimationEnabled(true)
+    setShowTimeline(true)
+    timeline.goToFrame(cfg.startFrame)
+    showToast('Morph ready — press Play to animate A → B', 3500)
   }
 
   // Hover preview: temporarily set blend flame at 40% weight
@@ -1492,11 +1558,21 @@ export function MainWorkspace(props: AppProps) {
           const q3 = Math.floor(start + (end - start) * 0.75)
           const dir = Math.random() > 0.5 ? 1 : -1
 
+          // Rotate the final transform a full turn. The affine matrix is
+          // [[a, b], [d, e]] (c, f are translation), so rotation by θ is
+          // a = e = cos θ, b = -sin θ, d = sin θ (`dir` flips the spin).
+          // θ steps 0,90,180,270,360 → cos: 1,0,-1,0,1  sin: 0,1,0,-1,0
           timeline.addKeyframe('finalTransform.a', start, 1, 'linear')
           timeline.addKeyframe('finalTransform.a', q1, 0, 'linear')
           timeline.addKeyframe('finalTransform.a', mid, -1, 'linear')
           timeline.addKeyframe('finalTransform.a', q3, 0, 'linear')
           timeline.addKeyframe('finalTransform.a', end, 1, 'linear')
+
+          timeline.addKeyframe('finalTransform.e', start, 1, 'linear')
+          timeline.addKeyframe('finalTransform.e', q1, 0, 'linear')
+          timeline.addKeyframe('finalTransform.e', mid, -1, 'linear')
+          timeline.addKeyframe('finalTransform.e', q3, 0, 'linear')
+          timeline.addKeyframe('finalTransform.e', end, 1, 'linear')
 
           timeline.addKeyframe('finalTransform.b', start, 0, 'linear')
           timeline.addKeyframe('finalTransform.b', q1, -dir, 'linear')
@@ -1504,17 +1580,11 @@ export function MainWorkspace(props: AppProps) {
           timeline.addKeyframe('finalTransform.b', q3, dir, 'linear')
           timeline.addKeyframe('finalTransform.b', end, 0, 'linear')
 
-          timeline.addKeyframe('finalTransform.c', start, 0, 'linear')
-          timeline.addKeyframe('finalTransform.c', q1, dir, 'linear')
-          timeline.addKeyframe('finalTransform.c', mid, 0, 'linear')
-          timeline.addKeyframe('finalTransform.c', q3, -dir, 'linear')
-          timeline.addKeyframe('finalTransform.c', end, 0, 'linear')
-
-          timeline.addKeyframe('finalTransform.d', start, 1, 'linear')
-          timeline.addKeyframe('finalTransform.d', q1, 0, 'linear')
-          timeline.addKeyframe('finalTransform.d', mid, -1, 'linear')
-          timeline.addKeyframe('finalTransform.d', q3, 0, 'linear')
-          timeline.addKeyframe('finalTransform.d', end, 1, 'linear')
+          timeline.addKeyframe('finalTransform.d', start, 0, 'linear')
+          timeline.addKeyframe('finalTransform.d', q1, dir, 'linear')
+          timeline.addKeyframe('finalTransform.d', mid, 0, 'linear')
+          timeline.addKeyframe('finalTransform.d', q3, -dir, 'linear')
+          timeline.addKeyframe('finalTransform.d', end, 0, 'linear')
         }
       }
 
@@ -2182,56 +2252,33 @@ export function MainWorkspace(props: AppProps) {
 
   // Effective camera values: read from timeline whenever animation is enabled
   // so the camera follows keyframes during playback, seeking, and when stopped.
+  const animatingCamera = () =>
+    animationEnabled() && (timeline.isPlaying() || timeline.isScrubbing())
+
   const effectiveZoom = createMemo(() => {
-    if (
-      animationEnabled() &&
-      (timeline.isPlaying() || timeline.isScrubbing())
-    ) {
-      const track = timeline
-        .tracks()
-        .find((t) => t.parameterPath === 'camera.zoom')
-      if (track) {
-        const val = resolveKeyframeValue(
-          track.keyframes,
-          timeline.currentFrame(),
-        )
-        if (val !== null && typeof val === 'number') return val
-      }
+    if (animatingCamera()) {
+      const val = timeline.resolveValueAtPath(
+        'camera.zoom',
+        timeline.currentFrame(),
+      )
+      if (val !== null && typeof val === 'number') return val
     }
     return flameDescriptor.renderSettings.camera.zoom
   })
 
   const effectivePosition = createMemo(() => {
-    if (
-      animationEnabled() &&
-      (timeline.isPlaying() || timeline.isScrubbing())
-    ) {
-      const xTrack = timeline
-        .tracks()
-        .find((t) => t.parameterPath === 'camera.x')
-      const yTrack = timeline
-        .tracks()
-        .find((t) => t.parameterPath === 'camera.y')
-      if (xTrack && yTrack) {
-        const xVal = resolveKeyframeValue(
-          xTrack.keyframes,
-          timeline.currentFrame(),
-        )
-        const yVal = resolveKeyframeValue(
-          yTrack.keyframes,
-          timeline.currentFrame(),
-        )
-        if (
-          xVal !== null &&
-          yVal !== null &&
-          typeof xVal === 'number' &&
-          typeof yVal === 'number'
-        ) {
-          return vec2f(xVal, yVal)
-        }
-      }
+    const base = flameDescriptor.renderSettings.camera.position
+    if (animatingCamera()) {
+      const frame = timeline.currentFrame()
+      // Resolve each axis independently — presets like Pan Left only keyframe
+      // one axis, so requiring both tracks would freeze the camera.
+      const xVal = timeline.resolveValueAtPath('camera.x', frame)
+      const yVal = timeline.resolveValueAtPath('camera.y', frame)
+      const x = typeof xVal === 'number' ? xVal : base[0]
+      const y = typeof yVal === 'number' ? yVal : base[1]
+      return vec2f(x, y)
     }
-    return vec2f(...flameDescriptor.renderSettings.camera.position)
+    return vec2f(...base)
   })
 
   useKeyboardShortcuts({
@@ -2628,6 +2675,7 @@ export function MainWorkspace(props: AppProps) {
                     blendFlame={blendFlame()}
                     blendWeight={resolvedBlendWeight()}
                     onPickBlendFlame={pickBlendFlame}
+                    onMorphFlame={pickMorphFlame}
                     onClearBlendFlame={() => {
                       setBlendFlame(undefined)
                     }}
@@ -3109,14 +3157,16 @@ export function MainWorkspace(props: AppProps) {
                             class={ui.transformHeaderAction}
                             role="button"
                             tabindex={0}
-                            title="Collapse all transform cards"
-                            onClick={() => {
-                              setTransformCollapseEpoch((e) => e + 1)
-                            }}
+                            title={
+                              anyTransformOpen()
+                                ? 'Collapse all transform cards'
+                                : 'Expand all transform cards'
+                            }
+                            onClick={toggleCollapseAllTransforms}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault()
-                                setTransformCollapseEpoch((c) => c + 1)
+                                toggleCollapseAllTransforms()
                               }
                             }}
                           >
@@ -3128,8 +3178,19 @@ export function MainWorkspace(props: AppProps) {
                               stroke-linecap="round"
                               stroke-linejoin="round"
                             >
-                              <polyline points="18 11 12 5 6 11" />
-                              <polyline points="18 19 12 13 6 19" />
+                              {/* Chevrons-up = collapse all; chevrons-down = expand all */}
+                              <Show
+                                when={anyTransformOpen()}
+                                fallback={
+                                  <>
+                                    <polyline points="6 5 12 11 18 5" />
+                                    <polyline points="6 13 12 19 18 13" />
+                                  </>
+                                }
+                              >
+                                <polyline points="18 11 12 5 6 11" />
+                                <polyline points="18 19 12 13 6 19" />
+                              </Show>
                             </svg>
                           </span>
                         </div>
@@ -3141,7 +3202,10 @@ export function MainWorkspace(props: AppProps) {
                           {([tid, transform]) => (
                             <CollapsibleCard
                               title={readableIds().transformLabel[tid]!}
-                              collapseEpoch={transformCollapseEpoch()}
+                              open={!collapsedTransforms().has(tid)}
+                              onToggleOpen={() => {
+                                toggleTransformCollapsed(tid)
+                              }}
                               selected={selectedTransformId() === tid}
                               dimmed={
                                 selectedTransformId() !== null &&
@@ -4554,9 +4618,18 @@ export function MainWorkspace(props: AppProps) {
                   }
                 >
                   <BlendFlameGallery
+                    heading={
+                      blendIntent() === 'morph'
+                        ? 'Pick End Flame'
+                        : 'Pick Blend Flame'
+                    }
                     onSelect={(flame) => {
                       prevBlendFlame = undefined
-                      setBlendFlame(deepClone(flame))
+                      if (blendIntent() === 'morph') {
+                        setupMorph(flame)
+                      } else {
+                        setBlendFlame(deepClone(flame))
+                      }
                       setShowBlendGallery(false)
                     }}
                     onPreviewBlend={handlePreviewBlend}

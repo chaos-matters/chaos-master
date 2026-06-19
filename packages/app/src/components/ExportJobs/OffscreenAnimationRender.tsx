@@ -9,7 +9,7 @@ import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
 import { deepClone } from '@/utils/clone'
 import { dismissJob, jobExists, setAnimationJobPoints, setAnimationJobProgress, setJobError, setJobResult, } from '@/utils/exportJobs'
 import { createMetadataPayload, injectMetadataIntoMp4, } from '@/utils/flameInMp4'
-import { applyTracksToFlame } from '@/utils/timeline'
+import { applyTracksToFlame, loopOptsFromConfig, resolveLoopValue, } from '@/utils/timeline'
 import { createVideoEncoder } from '@/utils/videoEncoder'
 import type { Setter, Signal } from 'solid-js'
 import type { v2f } from 'typegpu/data'
@@ -42,14 +42,32 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
   const resizeWidth = Math.round(job.dimensions.width) & ~1 || 2
   const resizeHeight = Math.round(job.dimensions.height) & ~1 || 2
 
+  const loopOpts = loopOptsFromConfig(job.config, job.tracks)
+
   function frameFlame(frame: number): FlameDescriptor {
     const clone = deepClone(job.flame)
-    applyTracksToFlame(job.tracks, clone, frame)
+    applyTracksToFlame(job.tracks, clone, frame, loopOpts)
     return clone
+  }
+
+  // The morph animates `blendWeight` via its own track (not part of the flame
+  // descriptor), so resolve it per frame here — otherwise the export would blend
+  // at one fixed weight and the morph wouldn't animate. Respects the loop mode.
+  const blendWeightTrack = job.tracks.find(
+    (t) => t.parameterPath === 'blendWeight',
+  )
+
+  function blendWeightAtFrame(frame: number): number {
+    if (!blendWeightTrack) return job.blendWeight
+    const v = resolveLoopValue(blendWeightTrack.keyframes, frame, loopOpts)
+    return typeof v === 'number' ? v : job.blendWeight
   }
 
   const [perFrameFlame, setPerFrameFlame] = createSignal<FlameDescriptor>(
     frameFlame(job.frameStart),
+  )
+  const [perFrameBlendWeight, setPerFrameBlendWeight] = createSignal(
+    blendWeightAtFrame(job.frameStart),
   )
 
   // Camera accessors follow the per-frame flame so animated camera moves bake in.
@@ -161,6 +179,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
     // accumulation so the next frame renders fresh.
     const frame = job.frameStart + (frameIndex % totalFrames)
     setPerFrameFlame(frameFlame(frame))
+    setPerFrameBlendWeight(blendWeightAtFrame(frame))
   }
 
   const handleExport: ExportImageType = (canvas, info) => {
@@ -210,7 +229,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
                 exportDriver
                 flameDescriptor={perFrameFlame()}
                 blendFlame={job.blendFlame}
-                blendWeight={job.blendWeight}
+                blendWeight={perFrameBlendWeight()}
                 renderInterval={0}
                 edgeFadeColor={vec4f(0)}
                 palette={() => job.palette}
@@ -237,7 +256,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
               exportDriver
               flameDescriptor={perFrameFlame()}
               blendFlame={job.blendFlame}
-              blendWeight={job.blendWeight}
+              blendWeight={perFrameBlendWeight()}
               renderInterval={0}
               edgeFadeColor={vec4f(0)}
               palette={() => job.palette}

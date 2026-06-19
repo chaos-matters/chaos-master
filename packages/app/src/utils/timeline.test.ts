@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { createTimelineState } from './timeline'
+import { catmullRom } from './easing'
+import { createTimelineState, resolveKeyframeValue, resolveLoopValue, } from './timeline'
 
 describe('Timeline Utilities', () => {
   let timeline: ReturnType<typeof createTimelineState>
@@ -564,6 +565,219 @@ describe('Timeline Utilities', () => {
       timeline.addKeyframe('exposure', 10, 0.5, 'linear')
       const found = timeline.findClosestKeyframeBeforeFrame('exposure', 10)
       expect(found?.frame).toBe(10)
+    })
+  })
+
+  describe('loop modes (toggle, no baking)', () => {
+    it('seamless: adds no keyframes, enables loop, extends endFrame by span', () => {
+      timeline.setConfig({ ...timeline.config(), startFrame: 0, endFrame: 40 })
+      timeline.addKeyframe('exposure', 0, 0.2, 'linear')
+      timeline.addKeyframe('exposure', 40, 0.9, 'linear')
+      const before = timeline.tracks()[0]!.keyframes.length
+
+      timeline.setLoopMode('seamless')
+
+      expect(timeline.config().loopMode).toBe('seamless')
+      expect(timeline.config().loop).toBe(true)
+      // userEnd = 40, span = 40 → endFrame extended to 80 (uniform return).
+      expect(timeline.config().endFrame).toBe(80)
+      expect(timeline.tracks()[0]!.keyframes).toHaveLength(before)
+    })
+
+    it('seamless is idempotent — re-selecting does not pile up frames', () => {
+      timeline.addKeyframe('exposure', 0, 0.2, 'linear')
+      timeline.addKeyframe('exposure', 40, 0.9, 'linear')
+      timeline.setLoopMode('seamless')
+      const extendedEnd = timeline.config().endFrame
+      timeline.setLoopMode('off')
+      timeline.setLoopMode('seamless')
+      expect(timeline.config().endFrame).toBe(extendedEnd)
+    })
+
+    it('cycle: enables loop and never extends endFrame', () => {
+      timeline.setConfig({ ...timeline.config(), startFrame: 0, endFrame: 60 })
+      timeline.addKeyframe('exposure', 0, 0.2, 'linear')
+      timeline.addKeyframe('exposure', 40, 0.9, 'linear')
+      timeline.setLoopMode('cycle')
+      expect(timeline.config().loopMode).toBe('cycle')
+      expect(timeline.config().loop).toBe(true)
+      expect(timeline.config().endFrame).toBe(60)
+    })
+
+    it('seamless resolves endFrame back to the start value', () => {
+      timeline.setConfig({ ...timeline.config(), startFrame: 0, endFrame: 60 })
+      timeline.addKeyframe('exposure', 0, 0.2, 'linear')
+      timeline.addKeyframe('exposure', 40, 0.9, 'linear')
+      timeline.setLoopMode('seamless')
+      expect(timeline.resolveValueAtPath('exposure', 40)).toBeCloseTo(0.9)
+      expect(timeline.resolveValueAtPath('exposure', 60)).toBeCloseTo(0.2)
+    })
+
+    it('cycle resolves start and end to the same value (seamless wrap)', () => {
+      timeline.setConfig({ ...timeline.config(), startFrame: 0, endFrame: 60 })
+      // First keyframe is NOT at frame 0 — the wrap must still close.
+      timeline.addKeyframe('exposure', 10, 0.2, 'linear')
+      timeline.addKeyframe('exposure', 40, 0.9, 'linear')
+      timeline.setLoopMode('cycle')
+      const atStart = timeline.resolveValueAtPath('exposure', 0) as number
+      const atEnd = timeline.resolveValueAtPath('exposure', 60) as number
+      expect(atEnd).toBeCloseTo(atStart)
+    })
+
+    it('off leaves resolution unchanged', () => {
+      timeline.setConfig({ ...timeline.config(), startFrame: 0, endFrame: 60 })
+      timeline.addKeyframe('exposure', 0, 0.2, 'linear')
+      timeline.addKeyframe('exposure', 40, 0.9, 'linear')
+      expect(timeline.resolveValueAtPath('exposure', 60)).toBeCloseTo(0.9)
+    })
+  })
+
+  describe('resolveLoopValue', () => {
+    const kfs = [
+      { frame: 0, value: 0, easing: 'linear' as const },
+      { frame: 40, value: 10, easing: 'linear' as const },
+    ]
+
+    it('equals resolveKeyframeValue when opts is null', () => {
+      expect(resolveLoopValue(kfs, 20, null)).toBe(
+        resolveKeyframeValue(kfs, 20),
+      )
+    })
+
+    it('seamless ramps from the held end value back to the start value', () => {
+      const opts = {
+        mode: 'seamless' as const,
+        startFrame: 0,
+        endFrame: 60,
+        userEnd: 40,
+      }
+      expect(resolveLoopValue(kfs, 40, opts)).toBeCloseTo(10) // held
+      expect(resolveLoopValue(kfs, 60, opts)).toBeCloseTo(0) // back to start
+      const mid = resolveLoopValue(kfs, 50, opts) as number
+      expect(mid).toBeGreaterThan(0)
+      expect(mid).toBeLessThan(10)
+    })
+
+    it('cycle interior interpolates normally', () => {
+      const opts = { mode: 'cycle' as const, startFrame: 0, endFrame: 60 }
+      // frame 20 is between kf 0 and 40 → 5.0 (linear).
+      expect(resolveLoopValue(kfs, 20, opts)).toBeCloseTo(5)
+    })
+
+    it('cycle wraps the last keyframe back to the first across the period', () => {
+      // kf at 10 and 40, period [0,60]. Wrap segment 40 → (10 + 60) = 70.
+      const k = [
+        { frame: 10, value: 2, easing: 'linear' as const },
+        { frame: 40, value: 8, easing: 'linear' as const },
+      ]
+      const opts = { mode: 'cycle' as const, startFrame: 0, endFrame: 60 }
+      // Halfway through the wrap (frame 55) → midpoint of 8 → 2.
+      expect(resolveLoopValue(k, 55, opts)).toBeCloseTo(5)
+      // start and end resolve equal.
+      expect(resolveLoopValue(k, 0, opts)).toBeCloseTo(
+        resolveLoopValue(k, 60, opts) as number,
+      )
+    })
+  })
+
+  describe('spline (Catmull-Rom) interpolation', () => {
+    it('catmullRom passes through p1 at t=0 and p2 at t=1', () => {
+      expect(catmullRom(0, 1, 2, 3, 0)).toBeCloseTo(1)
+      expect(catmullRom(0, 1, 2, 3, 1)).toBeCloseTo(2)
+    })
+
+    it('catmullRom of collinear points equals the linear midpoint', () => {
+      // p0..p3 = 0,1,2,3 → at t=0.5 the value is 1.5 (no curvature).
+      expect(catmullRom(0, 1, 2, 3, 0.5)).toBeCloseTo(1.5)
+    })
+
+    const splineKfs = [
+      { frame: 0, value: 0, interp: 'spline' as const },
+      { frame: 10, value: 10, interp: 'spline' as const },
+      { frame: 20, value: 0, interp: 'spline' as const },
+    ]
+
+    it('passes through keyframes exactly', () => {
+      expect(resolveKeyframeValue(splineKfs, 0)).toBeCloseTo(0)
+      expect(resolveKeyframeValue(splineKfs, 10)).toBeCloseTo(10)
+      expect(resolveKeyframeValue(splineKfs, 20)).toBeCloseTo(0)
+    })
+
+    it('curves away from the straight line between keyframes', () => {
+      // Over a hump (0→10→0), the spline at the segment midpoint overshoots the
+      // linear value (5).
+      const v = resolveKeyframeValue(splineKfs, 5) as number
+      expect(v).toBeGreaterThan(5)
+    })
+
+    it("'linear' interp is identical to the previous lerp behaviour", () => {
+      const lin = [
+        { frame: 0, value: 0, interp: 'linear' as const },
+        { frame: 10, value: 10, interp: 'linear' as const },
+      ]
+      expect(resolveKeyframeValue(lin, 3)).toBeCloseTo(3)
+      expect(resolveKeyframeValue(lin, 7)).toBeCloseTo(7)
+    })
+
+    it("'constant' interp holds the previous value", () => {
+      const step = [
+        { frame: 0, value: 2, interp: 'constant' as const },
+        { frame: 10, value: 8, interp: 'constant' as const },
+      ]
+      // 'constant' is read from the *next* keyframe (segment owner).
+      expect(resolveKeyframeValue(step, 5)).toBeCloseTo(2)
+      expect(resolveKeyframeValue(step, 9.9)).toBeCloseTo(2)
+      expect(resolveKeyframeValue(step, 10)).toBeCloseTo(8)
+    })
+
+    it('interpolates array (colour) values with spline', () => {
+      const arr = [
+        {
+          frame: 0,
+          value: [0, 0, 0] as [number, number, number],
+          interp: 'spline' as const,
+        },
+        {
+          frame: 10,
+          value: [1, 1, 1] as [number, number, number],
+          interp: 'spline' as const,
+        },
+      ]
+      const v = resolveKeyframeValue(arr, 5) as number[]
+      expect(v).toHaveLength(3)
+      expect(v[0]).toBeGreaterThan(0)
+      expect(v[0]).toBeLessThan(1)
+    })
+  })
+
+  describe('keyframe interp metadata', () => {
+    it('setKeyframeInterp sets the mode and preserves value + easing', () => {
+      timeline.addKeyframe('exposure', 10, 0.5, 'easeIn')
+      timeline.setKeyframeInterp('exposure', 10, 'spline')
+      const kf = timeline.getKeyframeAtFrame('exposure', 10)
+      expect(kf?.interp).toBe('spline')
+      expect(kf?.value).toBe(0.5)
+      expect(kf?.easing).toBe('easeIn')
+    })
+
+    it('is preserved across a value change and an easing change', () => {
+      timeline.addKeyframe('exposure', 10, 0.5)
+      timeline.setKeyframeInterp('exposure', 10, 'spline')
+      // value scrub
+      timeline.setKeyframeValue('exposure', 10, 0.8)
+      expect(timeline.getKeyframeAtFrame('exposure', 10)?.interp).toBe('spline')
+      // easing change
+      timeline.addKeyframe('exposure', 10, 0.8, 'bounce')
+      const kf = timeline.getKeyframeAtFrame('exposure', 10)
+      expect(kf?.interp).toBe('spline')
+      expect(kf?.easing).toBe('bounce')
+    })
+
+    it('is preserved when a keyframe is moved', () => {
+      timeline.addKeyframe('exposure', 10, 0.5)
+      timeline.setKeyframeInterp('exposure', 10, 'spline')
+      timeline.moveKeyframe('exposure', 10, 25)
+      expect(timeline.getKeyframeAtFrame('exposure', 25)?.interp).toBe('spline')
     })
   })
 })

@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.8] - 2026-06-19
+
+### Added
+
+- **Morph**: a **Morph…** action picks an end flame and animates the current flame into it across the timeline (an animated version of Blend), editable like any keyframe track.
+- **Loop styles** for the timeline: **Seamless** (plays there-and-back so the last frame flows into the first) and **Cycle** (each animated property wraps on its own timing) — both make a GIF-style loop without adding keyframes. Combine with a morph for an A→B→A loop.
+- **Smooth (spline) interpolation**: each keyframe can use **Linear**, **Spline** (smooth Catmull-Rom curve), or **Constant** (stepped), set from the keyframe inspector or by right-clicking a keyframe.
+- **Curve editor**: a **Curve** toggle on the dope sheet shows the selected parameter as a value-over-time graph — drag points to change value or retime them, double-click to add, right-click to set easing/interpolation.
+- **New animation presets**: Kaleidoscope (spins the final transform — great with Symmetry), Bloom, Shear Sway, and Glow Pulse.
+
+### Changed
+
+- Palette animation presets are clearer: **Palette Sweep / Palette Bounce / Palette Speed Up / Palette Speed Wave** (was the ambiguous "Phase"/"Speed").
+- The **Subtle** randomize toggle now clearly shows when it's on.
+- In 3D, the camera **θ (theta)** value is shown wrapped to 0–360° instead of growing without bound.
+
+### Fixed
+
+- **Animation presets**: Scale, Rotate 90°, Drift and the auto-animation spin now move the flame correctly (they used the wrong affine coefficients), and the **Pan** presets actually move the camera during playback.
+- **3D fly mode**: mouse-look no longer veers off after you roll the camera, and exiting fly mode re-levels the horizon for orbiting.
+- The timeline playhead now spans **all** tracks when scrolled, not just the visible ones.
+- Keyframe values display with sane precision instead of a long string of decimals.
+- Fixed a shader-compilation error in the **Pixel Flow** variation.
+
 ## [0.9.7] - 2026-06-18
 
 ### Added

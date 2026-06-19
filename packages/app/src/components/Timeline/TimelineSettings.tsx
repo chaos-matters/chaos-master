@@ -1,6 +1,7 @@
 import { createMemo, Show } from 'solid-js'
 import { useTimeline } from '@/contexts/TimelineContext'
 import ui from './TimelineSection.module.css'
+import type { LoopMode } from '@/utils/timeline'
 
 function createSettingScrubber(
   getValue: () => number,
@@ -169,6 +170,32 @@ export function TimelineSettings() {
           data-testid="loop-toggle"
         />
       </label>
+      <Show when={timeline.tracks().length > 0}>
+        <label
+          class={ui.settingItem}
+          title={
+            'Loop style (adds no keyframes):\n' +
+            '• Seamless — there-and-back: play A→B then a synthesized B→A return.\n' +
+            '• Cycle — per-property wrap over the timeline; each track flows from its last keyframe back to its first, respecting its own timing.'
+          }
+        >
+          <span class={ui.settingLabel}>Loop Style</span>
+          <select
+            class={ui.settingSelect}
+            value={config().loopMode ?? 'off'}
+            onChange={(e) => {
+              timeline.setLoopMode(e.currentTarget.value as LoopMode)
+              // Release focus so Space starts playback instead of reopening.
+              e.currentTarget.blur()
+            }}
+            data-testid="loop-mode"
+          >
+            <option value="off">None</option>
+            <option value="seamless">Seamless</option>
+            <option value="cycle">Cycle</option>
+          </select>
+        </label>
+      </Show>
     </div>
   )
 }
