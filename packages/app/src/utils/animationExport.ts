@@ -1,5 +1,6 @@
 import { DEBUG_MODE } from '@/defaults'
 import { accumulatedPointCount, forceAnimationExportNow, qualityPointCountLimit, setAnimationExportCancel, setAnimationExportProgress, setAnimationExportRunning, setExportQuality, setForceAnimationExportNow, } from '@/flame/renderStats'
+import { deepClone } from './clone'
 import { createMetadataPayload, injectMetadataIntoMp4 } from './flameInMp4'
 import { formatPointCount } from './formatPointCount'
 import { logTime } from './logTime'
@@ -7,7 +8,6 @@ import { applyTimelineToFlameAtFrame } from './timeline'
 import { createVideoEncoder } from './videoEncoder'
 import type { FlameDescriptor, TimelineState } from './timeline'
 import type { VideoEncoderConfig } from './videoEncoder'
-import type { FlameDescriptor as SchemaFlameDescriptor } from '@/flame/schema/flameSchema'
 
 const { performance } = globalThis
 
@@ -55,9 +55,7 @@ export function createAnimationExport(
 
   // Snapshot original flame state so we can restore it after export.
   // baseFlame is a reactive store proxy — deep-clone to a plain object.
-  const baseFlameSnapshot = JSON.parse(
-    JSON.stringify(baseFlame),
-  ) as FlameDescriptor
+  const baseFlameSnapshot = deepClone(baseFlame)
 
   const totalFrames = config.frameEnd - config.frameStart + 1
   const totalRenders = totalFrames * config.playCount
@@ -152,9 +150,7 @@ export function createAnimationExport(
         timeline.setCurrentFrame(frame)
 
         // Clone flame and apply timeline for this frame
-        const flameClone = JSON.parse(
-          JSON.stringify(baseFlame),
-        ) as FlameDescriptor
+        const flameClone = deepClone(baseFlame)
         applyTimelineToFlameAtFrame(timeline, flameClone, frame)
 
         // Set flame descriptor to the per-frame clone so Flam3 picks it up
@@ -164,7 +160,8 @@ export function createAnimationExport(
           // Apply transforms
 
           draft.transforms = flameClone.transforms
-          draft.edgeFadeColor = flameClone.edgeFadeColor
+          // edgeFadeColor lives under renderSettings (copied wholesale above);
+          // the old top-level copy was a dead no-op (issue #30 exposed it).
         })
 
         setExportQuality(config.quality)
@@ -264,7 +261,6 @@ export function createAnimationExport(
         setFlameDescriptor((draft) => {
           draft.renderSettings = baseFlameSnapshot.renderSettings
           draft.transforms = baseFlameSnapshot.transforms
-          draft.edgeFadeColor = baseFlameSnapshot.edgeFadeColor
           draft.metadata = baseFlameSnapshot.metadata
         })
       }
@@ -287,7 +283,7 @@ export function createAnimationExport(
           if (config.embedMetadata && !result.usedFallback) {
             const mp4Buffer = await result.blob.arrayBuffer()
             const payload = await createMetadataPayload(
-              baseFlame as SchemaFlameDescriptor,
+              baseFlame,
               timeline.tracks(),
               timeline.config(),
             )

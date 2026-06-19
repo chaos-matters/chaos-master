@@ -28,7 +28,6 @@ import type { v4f } from 'typegpu/data'
 import type { Palette } from './colorMap'
 import type { FlameDescriptor } from './schema/flameSchema'
 import type { ExportImageType } from '@/App'
-import type { FlameDescriptor as TimelineFlameDescriptor } from '@/utils/timeline'
 
 const { sqrt } = Math
 const { performance } = globalThis
@@ -135,8 +134,9 @@ export function Flam3(props: Flam3Props) {
       ).length,
   )
 
-  const [animatedFlame, setAnimatedFlame] =
-    createSignal<TimelineFlameDescriptor>(deepClone(props.flameDescriptor))
+  const [animatedFlame, setAnimatedFlame] = createSignal<FlameDescriptor>(
+    deepClone(props.flameDescriptor),
+  )
 
   const backgroundColorFinal = () => {
     const bg = props.flameDescriptor.renderSettings.backgroundColor
@@ -672,13 +672,9 @@ export function Flam3(props: Flam3Props) {
       const flame = animatedFlame()
 
       if (ifsPipeline3D) {
-        ifsPipeline3D.update(flame as FlameDescriptor)
+        ifsPipeline3D.update(flame)
       } else if (ifsPipeline) {
-        ifsPipeline.update(
-          flame as FlameDescriptor,
-          props.blendFlame,
-          props.blendWeight,
-        )
+        ifsPipeline.update(flame, props.blendFlame, props.blendWeight)
       }
     })
 
