@@ -1,5 +1,5 @@
 #!/bin/sh
-# Pre-push gate — runs the same static checks as CI so a push can't fail
+# Pre-push gate - runs the same static checks as CI so a push can't fail
 # typecheck / lint / formatting only after it reaches GitHub (issue #30: keep
 # local and CI in lockstep). Tests and build stay in CI to keep pushes fast.
 #
@@ -7,13 +7,13 @@
 # (git config core.hooksPath .githooks). Bypass in a pinch with: git push --no-verify
 set -e
 
-echo "▶ pre-push: typecheck"
+echo "pre-push: typecheck"
 pnpm typecheck
 
-echo "▶ pre-push: lint"
+echo "pre-push: lint"
 pnpm lint
 
-echo "▶ pre-push: format check"
+echo "pre-push: format check"
 pnpm fmt
 
-echo "✓ pre-push checks passed"
+echo "pre-push: all checks passed"

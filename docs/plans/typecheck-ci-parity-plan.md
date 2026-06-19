@@ -46,9 +46,9 @@ is marginal — `dist/` is what reliably tips it.)
 `assets/local/valibot-any-mwe/` (gitignored): `node …/run.mjs` prints
 
 ```
-A) real config (dist/ in program)  : any ❌
-B) real config (dist/ removed)     : resolved ✅
-C) real opts + exclude dist/e2e    : resolved ✅
+A) real config (dist/ in program)  : any
+B) real config (dist/ removed)     : resolved
+C) real opts + exclude dist/e2e    : resolved
 ```
 
 `probe-a/b/c.ts` hold the `IsAny` assertions; the runner only greps tsc output
