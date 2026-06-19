@@ -73,6 +73,14 @@ export default defineConfig(
       '@typescript-eslint/no-dynamic-delete': 'off',
       '@typescript-eslint/no-misused-promises': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
+      // The five no-unsafe-* rules stay off deliberately. noImplicitAny is now ON
+      // (issue #30), which removed the valibot-driven `any` flood, but
+      // re-enabling these still reports ~214 errors that are genuine `any`
+      // boundaries, not a regression: dynamic keyframe-path member access
+      // (MainWorkspace), env/config values (defaults.ts), JSON.parse / payload
+      // results, allowJs .js files (public/crashHandler.js) and test mocks.
+      // Fixing them would mostly mean casts/targeted disables, so they're kept
+      // off. See docs/plans/typecheck-ci-parity-plan.md (F2 tail).
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',
@@ -80,12 +88,8 @@ export default defineConfig(
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/restrict-template-expressions': 'off',
       '@typescript-eslint/no-redundant-type-constituents': 'off',
-      // noImplicitAny is now ON (strict) in the app tsconfig — issue #30. The
-      // no-unsafe-* rules above stay off pending the incremental re-enable in
-      // docs/plans/typecheck-ci-parity-plan.md (F2): TypeGPU's tgpu.fn() and
-      // SolidJS reactive wrappers still surface `any`-typed values those rules
-      // would flag. allowAny keeps restrict-plus-operands useful for catching
-      // real string+number mismatches without false positives meanwhile.
+      // allowAny keeps restrict-plus-operands useful for catching real
+      // string+number mismatches without false positives from the `any` above.
       '@typescript-eslint/restrict-plus-operands': [
         'error',
         { allowAny: true },

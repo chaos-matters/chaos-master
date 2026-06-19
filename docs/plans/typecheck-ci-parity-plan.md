@@ -126,12 +126,21 @@ needed.
     cascades into *latent* bugs, not just annotations — e.g. the old
     `mutateVariations:'all'` path rebuilt variations via a local type that
     dropped `visible`. Budget the no-unsafe-* re-enable as a bug-fixing effort.
-  - **Remaining strict tail (separate):** re-enable the five
-    `@typescript-eslint/no-unsafe-*` rules one at a time (measure each), then
-    drop the per-line `no-explicit-any` disables once the remaining `as any` are
-    gone (the variation-factory casts in `variations/*/types.ts` are
-    load-bearing — revisit last). The old eslint note blaming ~1900 implicit-anys
-    on TypeGPU/Solid was measured under poisoned valibot; re-measure first.
+  - **no-unsafe-* rules — measured, kept OFF (decision).** Re-enabling the five
+    `@typescript-eslint/no-unsafe-*` rules now reports **~214** errors. These are
+    NOT a valibot regression (noImplicitAny is on and clean); they're genuine
+    `any` boundaries: dynamic keyframe-path member access (MainWorkspace),
+    env/config values (defaults.ts), JSON.parse / payload results
+    (ShareLinkModal, App), allowJs `.js` files (public/crashHandler.js), and
+    test mocks. Fixing them would mostly add casts or targeted disables, so the
+    rules stay off (see the eslint.config.js comment). The rules predate this
+    work (turned off 2025-03 / 2025-05) for the same reason; the earlier scare
+    number (~1900/2354) was the *noImplicitAny* axis under poisoned valibot,
+    which is now resolved — these 214 are a separate, real axis.
+  - **Still worth doing later:** drop the per-line `no-explicit-any` disables
+    once the remaining `as any` are gone — the browser-API ones are already
+    handled; the variation-factory casts in `variations/*/types.ts` are
+    load-bearing, revisit last.
 - **F3 (optional) — Typecheck config files separately.** `vite.config.ts`,
   `vitest.config.ts`, `playwright.config.ts` are no longer in the main typecheck
   (they were never `src`). Add a small `tsconfig.node.json` if you want them
