@@ -20,6 +20,10 @@ type JobResult = {
   /** Animation only: number of frames actually encoded (may be < total if the
    *  user used Stop & Save). */
   frames?: number
+  /** Animation only: PNG object URL of the first rendered frame, used as the
+   *  <video> poster so the tracker shows a real frame instead of a blank/green
+   *  undecoded video frame. */
+  posterUrl?: string
 }
 
 /** Everything needed to render one image export, snapshotted at enqueue time so
@@ -254,6 +258,7 @@ export function dismissJob(id: string) {
   const job = store.items.find((j) => j.id === id)
   if (job?.result) {
     URL.revokeObjectURL(job.result.blobUrl)
+    if (job.result.posterUrl) URL.revokeObjectURL(job.result.posterUrl)
   }
   setStore('items', (items) => items.filter((j) => j.id !== id))
 }

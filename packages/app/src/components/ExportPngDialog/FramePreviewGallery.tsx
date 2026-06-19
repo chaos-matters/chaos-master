@@ -6,6 +6,7 @@ import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
 import { Default3DPreviewCamera } from '@/lib/Camera3D'
 import { Root } from '@/lib/Root'
+import { deepClone } from '@/utils/clone'
 import { resolveAspectRatio } from '@/utils/exportDimensions'
 import { applyTimelineToFlameAtFrame } from '@/utils/timeline'
 import ui from './FramePreviewGallery.module.css'
@@ -148,13 +149,10 @@ export function FramePreviewGallery(props: Props) {
 
   function flameForFrame(frameIdx: number): FlameDescriptor {
     const frame = props.config.startFrame + frameIdx
-    const clone: FlameDescriptor = JSON.parse(
-      JSON.stringify(props.flameDescriptor),
-    )
+    const clone = deepClone(props.flameDescriptor)
 
     applyTimelineToFlameAtFrame(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      { tracks: () => props.tracks, config: () => props.config } as any,
+      { tracks: () => props.tracks, config: () => props.config },
       clone,
       frame,
     )

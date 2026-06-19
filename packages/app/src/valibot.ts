@@ -24,9 +24,11 @@ export {
   variant,
 } from 'valibot'
 export type {
+  BooleanSchema,
   InferInput,
   InferOutput,
   LiteralSchema,
   NumberSchema,
   ObjectSchema,
+  OptionalSchema,
 } from 'valibot'

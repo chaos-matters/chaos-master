@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.9] - 2026-06-19
+
+### Added
+
+- **Smart Animate**: a one-click animation generator that combines a curated preset from each category (camera, render, color, affine) into a full, designed-feeling loop — alongside the existing pick-the-aspects **Randomize Animation**.
+- A **Clear existing keyframes first** toggle for the animation randomizer (on by default) — turn it off to layer a new animation onto your existing keyframes.
+
+### Changed
+
+- The variation browser's large preview now renders at full quality on capable (high/ultra) GPUs instead of a heavily throttled mode that looked noisy/over-bright and updated jerkily.
+
+### Fixed
+
+- Selecting a variation in the browser no longer over-brightens the preview — the flame keeps its own exposure (variation thumbnails stay bright only for legibility).
+- The timeline/dope-sheet **resize handle now works on touch devices** (e.g. iPhone), not just larger screens.
+- The dope-sheet **Curve** and **Seek** toggles now reflect their on/off state immediately when tapped.
+- **Animation export**: the per-frame point counter no longer reads "0 / 0" for 2D flames, and the finished-export thumbnail shows the real first frame instead of a blank/green rectangle.
+- Animated **edge-fade colour** now actually applies during playback/export (the keyframe track was writing to the wrong place).
+
+### Internal
+
+- Resolved a long-standing case where local `pnpm typecheck` could pass while CI failed on the same commit: the build output (`dist/`) was being type-checked, which silently widened the validation (valibot) types to `any`. The type-check now excludes build output, strict `noImplicitAny` is enabled, and a pre-push hook keeps local and CI in lockstep.
+
 ## [0.9.8] - 2026-06-19
 
 ### Added

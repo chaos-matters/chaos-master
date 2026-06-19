@@ -73,20 +73,23 @@ export default defineConfig(
       '@typescript-eslint/no-dynamic-delete': 'off',
       '@typescript-eslint/no-misused-promises': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
+      // The five no-unsafe-* rules stay off deliberately. noImplicitAny is now ON
+      // (issue #30), which removed the valibot-driven `any` flood, but
+      // re-enabling these still reports ~214 errors that are genuine `any`
+      // boundaries, not a regression: dynamic keyframe-path member access
+      // (MainWorkspace), env/config values (defaults.ts), JSON.parse / payload
+      // results, allowJs .js files (public/crashHandler.js) and test mocks.
+      // Fixing them would mostly mean casts/targeted disables, so they're kept
+      // off. See docs/plans/typecheck-ci-parity-plan.md (F2 tail).
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/restrict-template-expressions': 'off',
-      // Types that resolve to `any` (due to noImplicitAny: false) make unions
-      // like `SomeType | null` appear as `any | null`, triggering this rule.
       '@typescript-eslint/no-redundant-type-constituents': 'off',
-      // noImplicitAny is false in the app tsconfig because TypeGPU's tgpu.fn()
-      // and SolidJS reactive wrappers break contextual typing for ~1900+
-      // callback parameters.  Every other no-unsafe-* rule is already off;
-      // allow `any` in arithmetic too so restrict-plus-operands stays useful
-      // for catching actual string+number mismatches without false positives.
+      // allowAny keeps restrict-plus-operands useful for catching real
+      // string+number mismatches without false positives from the `any` above.
       '@typescript-eslint/restrict-plus-operands': [
         'error',
         { allowAny: true },

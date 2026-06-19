@@ -3,7 +3,7 @@ import { defineExample, defineExample3D } from '../examples/util'
 import { generateTransformId, generateVariationId } from '../transformFunction'
 import { isParametricVariationType3D, isVariationType3D, transformVariations3D, } from '../variations3D'
 import { allTransformVariations, isParametricVariationType, transformVariations, } from '.'
-import type { FlameDescriptor } from '../schema/flameSchema'
+import type { FlameDescriptor, TransformId, VariationId, } from '../schema/flameSchema'
 import type { TransformVariationType3D } from '../variations3D'
 import type { TransformVariationDescriptor, TransformVariationType } from '.'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
@@ -45,7 +45,11 @@ export function getVariationDefault(
 export function getParamsEditor<T extends { type: string; params?: unknown }>(
   variation: T,
 ): { component: EditorFor<T['params']>; value: T['params'] } {
-  const v = allTransformVariations[variation.type]
+  // Only parametric variations (the ones with params) carry an `editor`, which
+  // is exactly what this helper is called for; assert that shape.
+  const v = allTransformVariations[
+    variation.type as keyof typeof allTransformVariations
+  ] as { editor: EditorFor<T['params']> }
   return {
     component: v.editor,
     get value() {
@@ -57,13 +61,16 @@ export function getParamsEditor<T extends { type: string; params?: unknown }>(
 const transformPreviewIds = [
   ...Object.keys(transformVariations),
   ...Object.keys(transformVariations3D),
-].reduce<Record<string, { tid: string; vid: string }>>((acc, type) => {
-  acc[type] = {
-    tid: generateTransformId(type),
-    vid: generateVariationId(),
-  }
-  return acc
-}, {})
+].reduce<Record<string, { tid: TransformId; vid: VariationId }>>(
+  (acc, type) => {
+    acc[type] = {
+      tid: generateTransformId(type),
+      vid: generateVariationId(),
+    }
+    return acc
+  },
+  {},
+)
 export function getTransformPreviewTid(type: AnyVariationType) {
   if (!transformPreviewIds[type]) {
     transformPreviewIds[type] = {

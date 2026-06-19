@@ -197,7 +197,14 @@ function JobCard(props: { job: ExportJob }) {
                 <img class={ui.thumb} src={result.blobUrl} alt={job.name} />
               }
             >
-              <video class={ui.thumb} src={result.blobUrl} muted playsinline />
+              <video
+                class={ui.thumb}
+                src={result.blobUrl}
+                poster={result.posterUrl}
+                preload="metadata"
+                muted
+                playsinline
+              />
             </Show>
             <div class={ui.doneInfo}>
               <div class={ui.metaLine}>

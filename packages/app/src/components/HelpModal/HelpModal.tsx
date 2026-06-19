@@ -81,8 +81,8 @@ const cameraControls: ShortcutDescriptor[] = [
 const { navigator: nav } = globalThis
 
 function isMac() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (nav as any).platform.indexOf('Mac') !== -1
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
+  return nav.platform.indexOf('Mac') !== -1
 }
 
 const ctrlKey = isMac() ? '\u2318 ' : 'Ctrl + '
@@ -103,9 +103,7 @@ async function getGPUDeviceInformation() {
     powerPreference: 'high-performance',
   })
   const { info, limits } = adapter
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const memoryHeaps: { size: number }[] | undefined = (info as any).memoryHeaps
-  const heaps = memoryHeaps?.map((m) => m.size)
+  const heaps = info.memoryHeaps?.map((m) => m.size)
 
   return {
     description: info.description,
@@ -130,8 +128,8 @@ function gatherFullDeviceInfo(
 
   lines.push(`App Version : ${VERSION}${GIT_SHA ? ` (${GIT_SHA})` : ''}`)
   lines.push(`User Agent  : ${n.userAgent}`)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  lines.push(`Platform    : ${(n as any).platform}`)
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
+  lines.push(`Platform    : ${n.platform}`)
   lines.push(`Language    : ${n.language}`)
 
   lines.push(
@@ -143,8 +141,7 @@ function gatherFullDeviceInfo(
   if (n.hardwareConcurrency) {
     lines.push(`CPU Cores   : ${n.hardwareConcurrency}`)
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const deviceMemory = (n as any).deviceMemory as number | undefined
+  const deviceMemory = n.deviceMemory
   lines.push(
     `Device RAM  : ${
       deviceMemory !== undefined

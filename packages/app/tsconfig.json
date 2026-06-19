@@ -2,10 +2,17 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "allowJs": true,
-    "noImplicitAny": false,
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
-  }
+  },
+  // Build output (dist) and e2e specs must never enter the typecheck program:
+  // with allowJs:true the default glob ingested the minified dist/*.js bundles
+  // (~4.6 MB), pushing tsc over a complexity threshold where it SILENTLY widens
+  // valibot's v.InferOutput<…> to `any`. That made local typecheck pass blind
+  // while CI (which typechecks before building, so no dist/) caught real errors
+  // — the root cause of issue #30. Specifying `exclude` overrides tsc's default,
+  // so node_modules must be listed explicitly. See docs/plans/typecheck-ci-parity-plan.md.
+  "exclude": ["dist", "e2e", "node_modules"]
 }

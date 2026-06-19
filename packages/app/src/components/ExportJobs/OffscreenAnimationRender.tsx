@@ -99,6 +99,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
   let lastProgressMs = 0
   let accumulated = 0
   let limitAccessor: () => number = () => 0
+  let posterUrl: string | undefined
   let encoder: Awaited<ReturnType<typeof createVideoEncoder>> | undefined
 
   onCleanup(() => {
@@ -145,6 +146,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
         width: resizeWidth,
         height: resizeHeight,
         frames: frameIndex,
+        posterUrl,
       })
     } catch (err) {
       setJobError(job.id, err instanceof Error ? err.message : String(err))
@@ -155,6 +157,14 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
     if (!encoder) {
       capturing = false
       return
+    }
+    if (frameIndex === 0) {
+      // Poster of the first rendered frame for the tracker thumbnail — a
+      // poster-less <video> shows a blank/green undecoded frame. Best-effort
+      // and async; if it isn't ready by finish() the video just has no poster.
+      canvas.toBlob((blob) => {
+        if (blob && !disposed) posterUrl = URL.createObjectURL(blob)
+      }, 'image/png')
     }
     const bitmap = await globalThis.createImageBitmap(canvas, {
       resizeWidth,
@@ -234,7 +244,12 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
                 edgeFadeColor={vec4f(0)}
                 palette={() => job.palette}
                 onExportImage={handleExport}
-                onAccumulatedPointCount={() => {}}
+                onAccumulatedPointCount={(c) => {
+                  accumulated = c
+                }}
+                setQualityPointCountLimit={(fn) => {
+                  limitAccessor = fn
+                }}
               />
             </WheelZoomCamera2D>
           }

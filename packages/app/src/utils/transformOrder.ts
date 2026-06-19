@@ -26,9 +26,9 @@ function displayIndex(tid: string): number {
  * in the order given (the flame's insertion order), so a freshly added transform
  * sorts to the end and a re-added (undone) one keeps its place.
  */
-export function sortedTransformEntries<V>(
-  entries: readonly [string, V][],
-): [string, V][] {
+export function sortedTransformEntries<K extends string, V>(
+  entries: readonly [K, V][],
+): [K, V][] {
   // Register any ids we haven't seen yet, in the given order, BEFORE sorting.
   for (const [tid] of entries) displayIndex(tid)
   return [...entries].sort(([a], [b]) => displayIndex(a) - displayIndex(b))

@@ -55,9 +55,7 @@ async function getGPUDeviceInformation() {
     powerPreference: 'high-performance',
   })
   const { info, limits } = adapter
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const memoryHeaps: { size: number }[] | undefined = (info as any).memoryHeaps
-  const heaps = memoryHeaps?.map((m) => m.size)
+  const heaps = info.memoryHeaps?.map((m) => m.size)
 
   return {
     description: info.description,
@@ -96,8 +94,7 @@ function gatherBenchmarkLog(
   if (n.hardwareConcurrency) {
     lines.push(`CPU      : ${n.hardwareConcurrency} cores`)
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const deviceMemory = (n as any).deviceMemory as number | undefined
+  const deviceMemory = n.deviceMemory
   if (deviceMemory !== undefined) {
     lines.push(`RAM      : ~${deviceMemory} GB`)
   }
@@ -415,10 +412,7 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
     if (globalThis.navigator.hardwareConcurrency) {
       sysParts.push(`${globalThis.navigator.hardwareConcurrency} CPU cores`)
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const deviceMemory = (globalThis.navigator as any).deviceMemory as
-      | number
-      | undefined
+    const deviceMemory = globalThis.navigator.deviceMemory
     if (deviceMemory !== undefined) {
       sysParts.push(`~${deviceMemory} GB RAM`)
     }

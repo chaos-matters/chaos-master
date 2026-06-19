@@ -529,6 +529,16 @@ export function mutateFlame(
   const mutated = deepClone(flame)
   const transforms = mutated.transforms
 
+  // Randomize perturbs variation weights/params generically; the precise
+  // per-variation params unions can't express that, so within the loop we view
+  // each transform's variations through this loose shape. Values stay valid
+  // descriptors at runtime (mutated in place, or built via getVariationDefault).
+  type RandomVariation = {
+    type: string
+    weight: number
+    params?: Record<string, number>
+  }
+
   const pool =
     allowedVariations.length > 0
       ? allowedVariations
@@ -536,9 +546,7 @@ export function mutateFlame(
         ? [...variationTypes3D]
         : [...variationTypes]
 
-  for (const tid of Object.keys(transforms)) {
-    const t = transforms[tid]!
-
+  for (const [, t] of recordEntries(transforms)) {
     // 1. Mutate Affine
     if (options.mutateAffine) {
       const mutateOne = (affine: Record<string, number>) => {
@@ -559,8 +567,8 @@ export function mutateFlame(
           }
         }
       }
-      if (t.preAffine) mutateOne(t.preAffine as Record<string, number>)
-      if (t.postAffine) mutateOne(t.postAffine as Record<string, number>)
+      if (t.preAffine) mutateOne(t.preAffine)
+      if (t.postAffine) mutateOne(t.postAffine)
     }
 
     // 2. Mutate Colors
@@ -574,11 +582,10 @@ export function mutateFlame(
     // 3. Mutate Variations
     if (options.mutateVariations === 'modify') {
       if (t.variations) {
-        for (const vid of Object.keys(t.variations)) {
-          const v = t.variations[vid]!
-          const vtype = v.type as
-            | TransformVariationType
-            | TransformVariationType3D
+        const vars = t.variations as Record<string, RandomVariation>
+        for (const vid of Object.keys(vars)) {
+          const v = vars[vid]!
+          const vtype = v.type
           const is3D = isVariationType3D(vtype)
           const isParametric = is3D
             ? isParametricVariationType3D(vtype)
@@ -602,16 +609,10 @@ export function mutateFlame(
         }
       }
     } else if (options.mutateVariations === 'all') {
-      type VariationInstance = {
-        type: string
-        weight: number
-        params?: Record<string, number>
-      }
-      const varEntries = t.variations ? Object.entries(t.variations) : []
-      const currentVars = varEntries.map(([vid, v]) => ({
-        vid,
-        v: v as VariationInstance,
-      }))
+      // Record-level loose view (the VariationId→string key change makes this
+      // cast load-bearing, unlike a per-element widening that lint would strip).
+      const vars = (t.variations ?? {}) as Record<string, RandomVariation>
+      const currentVars = Object.entries(vars).map(([vid, v]) => ({ vid, v }))
 
       for (const item of currentVars) {
         const v = item.v
@@ -640,7 +641,7 @@ export function mutateFlame(
       )
       targetVarCount = Math.min(targetVarCount, pool.length)
 
-      const variations: Record<string, VariationInstance> = {}
+      const variations: Record<string, RandomVariation> = {}
 
       if (currentVars.length > targetVarCount) {
         const sorted = [...currentVars].sort((a, b) => b.v.weight - a.v.weight)
@@ -680,13 +681,13 @@ export function mutateFlame(
             const randomizedParams = randomizeVariationParams(vtype, strength)
             if (randomizedParams) {
               variations[vid] = {
-                ...(base as VariationInstance),
+                ...(base as RandomVariation),
                 params: randomizedParams,
               }
               continue
             }
           }
-          variations[vid] = base as VariationInstance
+          variations[vid] = base as RandomVariation
         }
       }
 
@@ -700,23 +701,22 @@ export function mutateFlame(
           variations[vid]!.weight = variations[vid]!.weight / totalWeight
         }
       }
-      t.variations = variations
+      // The 'all' path rebuilds the variation set dynamically (pick types,
+      // perturb params); the entries are valid descriptors at runtime but TS
+      // can't track the discriminated union through that construction.
+      t.variations = variations as typeof t.variations
     }
 
     if (options.mutateVariations !== 'none' && t.variations) {
-      type VariationInstance = {
-        type: string
-        weight: number
-        params?: Record<string, number>
-      }
-      const nextVarEntries = Object.entries(t.variations)
+      const vars = t.variations as Record<string, RandomVariation>
+      const nextVarEntries = Object.entries(vars)
       const totalWeight = nextVarEntries.reduce(
-        (sum, [, v]) => sum + (v as VariationInstance).weight,
+        (sum, [, v]) => sum + v.weight,
         0,
       )
       if (totalWeight > 0) {
-        for (const vid of Object.keys(t.variations)) {
-          const v = t.variations[vid] as VariationInstance
+        for (const vid of Object.keys(vars)) {
+          const v = vars[vid]!
           v.weight = v.weight / totalWeight
         }
       }

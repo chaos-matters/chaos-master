@@ -16,9 +16,15 @@ export type EasingCurve =
   | 'elastic'
 
 import type { PointInitMode } from '@/flame/pointInitMode'
-import type { TransformRecord } from '@/flame/schema/flameSchema'
+import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
-export type { PointInitMode }
+// `FlameDescriptor` is the single source of truth in the schema (derived from
+// the valibot schema). Re-export it here so the timeline helpers and their
+// callers share one type that cannot drift from the schema — the previous
+// hand-written interface silently lagged the schema (missing plotsPerChain /
+// autoExposure3D*, and even put edgeFadeColor at the wrong nesting level),
+// which is exactly what made local and CI typecheck disagree (issue #30).
+export type { FlameDescriptor, PointInitMode }
 
 /**
  * Expandable mapping of variation types to their available parameters.
@@ -277,67 +283,6 @@ export function resolveVariationParameter(
   if (!keyframe) return null
 
   return keyframe.value as number
-}
-
-export interface FlameDescriptor {
-  renderSettings: {
-    exposure: number
-    skipIters: number
-    drawMode: 'light' | 'paint'
-    colorInitMode: 'colorInitZero' | 'colorInitPosition'
-    pointInitMode: PointInitMode
-    vibrancy: number
-    backgroundColor?: [number, number, number]
-    camera?: {
-      zoom: number
-      position: [number, number]
-      rotation?: number
-    }
-    palettePhase?: number
-    paletteSpeed?: number
-    paletteMode?: number
-    densityEstimationQuality?: number
-    estimatorCurve?: number
-    contrast?: number
-    gamma?: number
-    highlightPower: number
-    depthColorPower: number
-    lightPower: number
-    lightDirection?: [number, number, number]
-    camera3D?: {
-      theta: number
-      phi: number
-      radius: number
-      target: [number, number, number]
-      fov: number
-    }
-    dimensions?: number
-    plotsPerChain?: number
-    autoExposure3D?: boolean
-    autoExposure3DStrength?: number
-    autoExposure3DRefRadius?: number
-    autoExposure3DBase?: number
-  }
-  transforms: TransformRecord
-  finalTransform?: {
-    a: number
-    b: number
-    c: number
-    d: number
-    e: number
-    f: number
-    // 3D flames carry a 12-param (a–l) affine; optional so 2D stays a–f.
-    g?: number
-    h?: number
-    i?: number
-    j?: number
-    k?: number
-    l?: number
-  }
-  metadata: {
-    author: string
-  }
-  edgeFadeColor?: [number, number, number, number]
 }
 
 /** Segment interpolation mode (orthogonal to `easing`). See schema/timeline.ts. */
@@ -1471,34 +1416,34 @@ export function applyTracksToFlame(
   // Camera
   if (flame.renderSettings.camera?.position) {
     applyNumber('camera.x', (v) => {
-      flame.renderSettings.camera!.position[0] = v
+      flame.renderSettings.camera.position[0] = v
     })
     applyNumber('camera.y', (v) => {
-      flame.renderSettings.camera!.position[1] = v
+      flame.renderSettings.camera.position[1] = v
     })
   }
   if (flame.renderSettings.camera) {
     applyNumber('camera.zoom', (v) => {
-      flame.renderSettings.camera!.zoom = v
+      flame.renderSettings.camera.zoom = v
     })
     applyNumber('camera.rotation', (v) => {
-      flame.renderSettings.camera!.rotation = v
+      flame.renderSettings.camera.rotation = v
     })
   }
 
   // Camera3D
   if (flame.renderSettings.camera3D) {
     applyNumber('camera3D.theta', (v) => {
-      flame.renderSettings.camera3D!.theta = v
+      flame.renderSettings.camera3D.theta = v
     })
     applyNumber('camera3D.phi', (v) => {
-      flame.renderSettings.camera3D!.phi = v
+      flame.renderSettings.camera3D.phi = v
     })
     applyNumber('camera3D.radius', (v) => {
-      flame.renderSettings.camera3D!.radius = v
+      flame.renderSettings.camera3D.radius = v
     })
     applyNumber('camera3D.fov', (v) => {
-      flame.renderSettings.camera3D!.fov = v
+      flame.renderSettings.camera3D.fov = v
     })
   }
 
@@ -1574,8 +1519,20 @@ export function applyTracksToFlame(
     const track = trackMap.get('edgeFadeColor')
     if (track) {
       const value = resolveLoopValue(track.keyframes, frame, loop)
-      if (value !== null && Array.isArray(value) && value.length === 4) {
-        flame.edgeFadeColor = value
+      if (
+        value !== null &&
+        Array.isArray(value) &&
+        value.length === 4 &&
+        typeof value[0] === 'number' &&
+        typeof value[1] === 'number' &&
+        typeof value[2] === 'number' &&
+        typeof value[3] === 'number'
+      ) {
+        // Lives under renderSettings (the schema's canonical location). The old
+        // top-level `flame.edgeFadeColor` write was a dead prop the renderer
+        // never read, so the animated edge fade never applied (bug exposed once
+        // the typecheck stopped widening the flame type to `any` — issue #30).
+        flame.renderSettings.edgeFadeColor = value
       }
     }
   }
@@ -1730,7 +1687,10 @@ export function applyTimelineToFlame(
  * Applies timeline values to a flame descriptor for a specific frame number.
  */
 export function applyTimelineToFlameAtFrame(
-  timeline: TimelineState,
+  // Only the tracks/config getters are read here, so accept any object that
+  // supplies them (e.g. the lightweight stub the export-preview gallery builds)
+  // rather than forcing a full TimelineState and an `as any` cast at the call.
+  timeline: Pick<TimelineState, 'tracks' | 'config'>,
   flame: FlameDescriptor,
   frame: number,
 ): void {
