@@ -141,10 +141,11 @@ needed.
     once the remaining `as any` are gone — the browser-API ones are already
     handled; the variation-factory casts in `variations/*/types.ts` are
     load-bearing, revisit last.
-- **F3 (optional) — Typecheck config files separately.** `vite.config.ts`,
-  `vitest.config.ts`, `playwright.config.ts` are no longer in the main typecheck
-  (they were never `src`). Add a small `tsconfig.node.json` if you want them
-  covered.
+- **F3 — Not needed (resolved).** Concern was that `vite.config.ts`,
+  `vitest.config.ts`, `playwright.config.ts` might drop out of the typecheck. The
+  fix used `exclude: ["dist","e2e","node_modules"]` (not `include: ["src"]`), so
+  the default glob still picks those config files up — verified they're in the
+  program (`tsc --listFiles`). No separate `tsconfig.node.json` required.
 
 ## References
 
