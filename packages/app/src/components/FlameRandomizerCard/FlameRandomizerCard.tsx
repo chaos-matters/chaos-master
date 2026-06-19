@@ -70,6 +70,7 @@ export interface FlameRandomizerCardProps {
   onLoadHistory: (entry: RandomizerHistoryEntry) => void
   onClearHistory: () => void
   onRandomizeAnimation: (presetIds: string[], clearFirst: boolean) => void
+  onSmartAnimation: (clearFirst: boolean) => void
   onUpdateRenderSettings: (
     settings: Partial<FlameDescriptor['renderSettings']>,
   ) => void
@@ -203,10 +204,10 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
   const [animVib, setAnimVib] = createSignal(false)
   const [animOrbit, setAnimOrbit] = createSignal(true)
   const [animFT, setAnimFT] = createSignal(false)
-  // When off (default), Randomize Animation layers onto existing keyframes
-  // (re-running overwrites the same frames but preserves hand-made ones on other
-  // frames/paths); when on, it wipes all tracks first for a clean slate.
-  const [animClearFirst, setAnimClearFirst] = createSignal(false)
+  // When on (default), Randomize/Smart Animate wipe all tracks first (the
+  // original behaviour); turn off to layer onto existing keyframes (re-running
+  // overwrites the same frames but preserves hand-made ones on other paths).
+  const [animClearFirst, setAnimClearFirst] = createSignal(true)
 
   // Render settings randomizer signals
   const [renderSettingsExpanded, setRenderSettingsExpanded] =
@@ -368,6 +369,10 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
     if (animFT()) presetIds.push('finalTransform')
 
     props.onRandomizeAnimation(presetIds, animClearFirst())
+  }
+
+  const handleSmartAnimation = () => {
+    props.onSmartAnimation(animClearFirst())
   }
 
   const [paletteExpanded, setPaletteExpanded] = createSignal(false)
@@ -977,6 +982,19 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
                 <polygon points="5 3 19 12 5 21 5 3" />
               </svg>
               Randomize Animation
+            </Button>
+            <Button class={ui.secondaryButton} onClick={handleSmartAnimation}>
+              <svg
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+                fill="none"
+                class={ui.btnIcon}
+              >
+                <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />
+                <path d="M19 15l.7 1.8L21.5 17.5 19.7 18.2 19 20l-.7-1.8L16.5 17.5 18.3 16.8z" />
+              </svg>
+              Smart Animate
             </Button>
           </div>
         </div>

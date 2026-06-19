@@ -246,6 +246,29 @@ export function buildPresets(is3D: boolean): PresetDef[] {
   ]
 }
 
+/**
+ * "Smart" animation: apply one random curated preset from each category
+ * (Camera, Render, Color, Affine) for a full, coherent multi-aspect loop.
+ * Categories write disjoint parameter paths (camera.* vs exposure/gamma vs
+ * palette/color vs affine/finalTransform), so one-per-category composes cleanly
+ * without presets fighting over the same keyframes.
+ */
+export function smartRandomAnimation(
+  flame: FlameDescriptor,
+  timeline: TimelineState,
+) {
+  const byCategory = new Map<PresetDef['category'], PresetDef[]>()
+  for (const preset of buildPresets(flame.renderSettings.dimensions === 3)) {
+    const list = byCategory.get(preset.category)
+    if (list) list.push(preset)
+    else byCategory.set(preset.category, [preset])
+  }
+  for (const list of byCategory.values()) {
+    const pick = list[Math.floor(Math.random() * list.length)]
+    pick?.apply(flame, timeline)
+  }
+}
+
 function camera3DPresets(): RawPresetDef[] {
   return [
     {

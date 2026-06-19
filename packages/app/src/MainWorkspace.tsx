@@ -52,6 +52,7 @@ import { Slider } from './components/Sliders/Slider'
 import { SoftwareVersion } from './components/SoftwareVersion/SoftwareVersion'
 import { SpotlightTour } from './components/SpotlightTour/SpotlightTour'
 import { KeyframeDiamond } from './components/Timeline/KeyframeDiamond'
+import { smartRandomAnimation } from './components/Timeline/presets'
 import { TimelineSection } from './components/Timeline/TimelineSection'
 import { createVariationSelector } from './components/VariationSelector/VariationSelector'
 import { ViewControls } from './components/ViewControls/ViewControls'
@@ -1592,6 +1593,22 @@ export function MainWorkspace(props: AppProps) {
       }
 
       timeline.setAnimationEnabled(true)
+      setShowTimeline(true)
+    } finally {
+      setTimeout(() => {
+        isRandomizingAnimation = false
+      }, 200)
+    }
+  }
+
+  // Smart animation: apply a random curated preset from each category for a full
+  // multi-aspect loop (vs the selected-items random tracks above). Honors the
+  // same clear-first toggle.
+  const handleSmartAnimation = (clearFirst: boolean) => {
+    isRandomizingAnimation = true
+    try {
+      if (clearFirst) timeline.clearAllTracks()
+      smartRandomAnimation(flameDescriptor, timeline)
       setShowTimeline(true)
     } finally {
       setTimeout(() => {
@@ -3144,6 +3161,7 @@ export function MainWorkspace(props: AppProps) {
                             onLoadHistory={handleLoadHistory}
                             onClearHistory={handleClearHistory}
                             onRandomizeAnimation={handleRandomizeAnimation}
+                            onSmartAnimation={handleSmartAnimation}
                             onUpdateRenderSettings={handleUpdateRenderSettings}
                             onApplyCandidate={(flame) => {
                               history.replace(
