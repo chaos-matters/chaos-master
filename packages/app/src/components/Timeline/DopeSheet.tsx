@@ -228,16 +228,14 @@ export function DopeSheet(props: DopeSheetProps) {
           Fit
         </button>
         <button
-          class={ui.zoomBtn}
-          classList={{ [ui.zoomBtnActive as string]: seekOnSelect() }}
+          class={`${ui.zoomBtn} ${seekOnSelect() ? ui.zoomBtnActive : ''}`}
           onClick={() => setSeekOnSelect((v) => !v)}
           title="Seek playhead to selected keyframe"
         >
           Seek
         </button>
         <button
-          class={ui.zoomBtn}
-          classList={{ [ui.zoomBtnActive as string]: showCurve() }}
+          class={`${ui.zoomBtn} ${showCurve() ? ui.zoomBtnActive : ''}`}
           onClick={() => setShowCurve((v) => !v)}
           title="Show the value curve for the selected parameter"
         >
