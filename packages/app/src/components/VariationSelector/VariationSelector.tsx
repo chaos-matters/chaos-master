@@ -9,7 +9,7 @@ import { CompactModeProvider } from '@/contexts/CompactModeContext'
 import { ComputeGate, useComputeGate } from '@/contexts/ComputeGateContext'
 import { KeyframeTargetProvider } from '@/contexts/KeyframeTargetContext'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { COMPUTE_GATE_CAPACITY, DEFAULT_VARIATION_PREVIEW_POINT_COUNT, DEFAULT_VARIATION_PREVIEW_QUALITY, DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS, DEFAULT_VARIATION_SHOW_DELAY_MS, } from '@/defaults'
+import { COMPUTE_GATE_CAPACITY, DEFAULT_POINT_COUNT, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_VARIATION_PREVIEW_POINT_COUNT, DEFAULT_VARIATION_PREVIEW_QUALITY, DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS, DEFAULT_VARIATION_SHOW_DELAY_MS, } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
 import { pointInitModeToImplFn } from '@/flame/pointInitMode'
 import { pointInitMode3DToImplFn } from '@/flame/pointInitMode3D'
@@ -71,6 +71,19 @@ export function PreviewFinalFlame(props: {
   const targetQuality = () =>
     props.hardwareTier ? hardwareTierToQuality[props.hardwareTier] : 0.99
 
+  // On capable GPUs (high/ultra) drive the modal preview at the main IFS's full
+  // rate — the main renderer is paused while the modal is open (renderInterval
+  // → Infinity), so the whole GPU budget is free. Lower/unknown tiers keep the
+  // lighter throttled settings so weak hardware stays responsive.
+  const isHighTier = () =>
+    props.hardwareTier === 'high' || props.hardwareTier === 'ultra'
+  const previewPointCount = () =>
+    isHighTier() ? DEFAULT_POINT_COUNT : DEFAULT_VARIATION_PREVIEW_POINT_COUNT
+  const previewInterval = () =>
+    isHighTier()
+      ? DEFAULT_RENDER_INTERVAL_MS
+      : DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS
+
   return (
     <AutoCanvas class={ui.canvas} pixelRatio={1}>
       <Show
@@ -89,10 +102,10 @@ export function PreviewFinalFlame(props: {
             <Flam3
               animationEnabled={false}
               quality={targetQuality()}
-              pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT}
+              pointCountPerBatch={previewPointCount()}
               adaptiveFilterEnabled={true}
               flameDescriptor={props.flame}
-              renderInterval={DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS}
+              renderInterval={previewInterval()}
               edgeFadeColor={vec4f(0)}
             />
           </WheelZoomCamera2D>
@@ -126,10 +139,10 @@ export function PreviewFinalFlame(props: {
           <Flam3
             animationEnabled={false}
             quality={targetQuality()}
-            pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT}
+            pointCountPerBatch={previewPointCount()}
             adaptiveFilterEnabled={true}
             flameDescriptor={props.flame}
-            renderInterval={DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS}
+            renderInterval={previewInterval()}
             edgeFadeColor={vec4f(0)}
           />
         </WheelZoomCamera3D>
@@ -662,22 +675,13 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
               if (previewTr !== undefined) {
                 previewTr.preAffine = transform.preAffine
                 previewTr.variations[props.variationId] = variation
-                draft.renderSettings.exposure =
-                  selectedItem.renderSettings.exposure
-                draft.renderSettings.gamma = selectedItem.renderSettings.gamma
-                draft.renderSettings.vibrancy =
-                  selectedItem.renderSettings.vibrancy
-                draft.renderSettings.contrast =
-                  selectedItem.renderSettings.contrast
-                draft.renderSettings.depthColorPower =
-                  selectedItem.renderSettings.depthColorPower
-                draft.renderSettings.lightPower =
-                  selectedItem.renderSettings.lightPower
-                if (selectedItem.renderSettings.lightDirection) {
-                  draft.renderSettings.lightDirection = [
-                    ...selectedItem.renderSettings.lightDirection,
-                  ] as [number, number, number]
-                }
+                // Deliberately DON'T copy the variation preview's render
+                // settings (exposure, gamma, vibrancy, contrast, lighting):
+                // those are floored bright so the thumbnail shape is legible,
+                // and bleeding them in over-exposed the preview flame (and would
+                // mislead vs the applied result). The flame keeps its OWN
+                // brightness — the variation only contributes its shape. The
+                // camera below is preview-only framing (apply doesn't commit it).
 
                 draft.renderSettings.camera.zoom =
                   selectedItem.renderSettings.camera.zoom
