@@ -2445,7 +2445,10 @@ export function MainWorkspace(props: AppProps) {
     const startHeight = container.offsetHeight
 
     function setHeight(px: number) {
-      const clamped = Math.max(100, Math.min(window.innerHeight * 0.55, px))
+      // Cap matches the CSS max-height (55vh desktop, 45vh on mobile) so the
+      // handle and the rendered panel height stay in sync.
+      const maxPx = window.innerHeight * (isMobile() ? 0.45 : 0.55)
+      const clamped = Math.max(100, Math.min(maxPx, px))
       container!.style.setProperty('--timeline-height', `${clamped}px`)
     }
 
@@ -2729,7 +2732,7 @@ export function MainWorkspace(props: AppProps) {
                       const newHeight = Math.max(
                         100,
                         Math.min(
-                          window.innerHeight * 0.55,
+                          window.innerHeight * (isMobile() ? 0.45 : 0.55),
                           currentHeight + delta,
                         ),
                       )

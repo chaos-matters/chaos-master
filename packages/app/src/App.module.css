@@ -1309,7 +1309,10 @@
   }
 
   .timeline-container {
-    height: var(--timeline-height-mobile, 160px);
+    /* Same --timeline-height the resize handle/wheel write (MainWorkspace), just
+       a smaller mobile default. The old --timeline-height-mobile var was never
+       set by anything, so the handle/drag did nothing on phones. */
+    height: var(--timeline-height, 160px);
     max-height: 45vh;
   }
 }
