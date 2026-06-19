@@ -615,6 +615,21 @@ export function MainWorkspace(props: AppProps) {
     return getCustomVariations()
   })
 
+  // Close the quick variation picker when its target transform/variation no
+  // longer exists in the current flame — i.e. the flame was switched or toggled
+  // 2D<->3D (both replace the flame with different transforms). The picker's ids
+  // are meaningless for another flame; previewing a stale id produced NaN affine
+  // matrices (the SVG `<g>` transform error) and invalid WebGPU textures.
+  createEffect(() => {
+    const state = quickPickState()
+    if (
+      state !== null &&
+      flameDescriptor.transforms[state.tid]?.variations[state.vid] === undefined
+    ) {
+      setQuickPickState(null)
+    }
+  })
+
   // Compute a temporary flame with the hovered variation swapped in.
   // Falls back to the real flameDescriptor when nothing is hovered.
   const effectiveFlame = createMemo<FlameDescriptor>(() => {
