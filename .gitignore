@@ -5,5 +5,7 @@ dist
 test-results
 .wrangler
 **/.claude/settings.local.json
+# Local-only Claude skills (e.g. the fork-specific sync-fork workflow)
+**/.claude/skills/
 # Local scratch space (not part of the project)
 /assets/local/
