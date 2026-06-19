@@ -4,9 +4,9 @@ import * as v from '@/valibot'
 import { AffineParams } from '../../affineTranform'
 import type { TgpuFn } from 'typegpu'
 import type { Infer, v2f, Vec2f } from 'typegpu/data'
-import type { BooleanSchema, OptionalSchema } from 'valibot'
 // Category union lives in ../categories (single source of truth, incl. 'custom').
 import type { VariationCategory } from '../categories'
+import type { BooleanSchema, OptionalSchema } from '@/valibot'
 
 export type VariationInfo = Infer<typeof VariationInfo>
 export const VariationInfo = struct({

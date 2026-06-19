@@ -4,8 +4,8 @@ import * as v from '@/valibot'
 import { AffineParams3D } from '../../affineTransform3D'
 import type { TgpuFn } from 'typegpu'
 import type { Infer, v3f, Vec3f } from 'typegpu/data'
-import type { BooleanSchema, OptionalSchema } from 'valibot'
 import type { VariationCategory } from '../categories'
+import type { BooleanSchema, OptionalSchema } from '@/valibot'
 
 export type VariationInfo3D = Infer<typeof VariationInfo3D>
 export const VariationInfo3D = struct({

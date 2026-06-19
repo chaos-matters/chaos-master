@@ -5,9 +5,9 @@ import * as v from '@/valibot'
 import { VariationInfo3D } from '../simple3D/types'
 import type { TgpuFn } from 'typegpu'
 import type { BaseData, Infer, v3f, Vec3f, WgslStruct } from 'typegpu/data'
-import type { BooleanSchema, OptionalSchema } from 'valibot'
 import type { VariationCategory } from '../categories'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
+import type { BooleanSchema, OptionalSchema } from '@/valibot'
 
 type ParametricVariation3DDescriptor<
   K extends string,
