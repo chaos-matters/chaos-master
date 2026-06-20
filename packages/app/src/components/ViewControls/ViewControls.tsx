@@ -2,6 +2,7 @@ import { For, Show } from 'solid-js'
 import { vec2f } from 'typegpu/data'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
+import { useTimeline } from '@/contexts/TimelineContext'
 import { Cross, Minus, Plus, Redo, Undo } from '@/icons'
 import { Button } from '../Button/Button'
 import { ButtonGroup } from '../Button/ButtonGroup'
@@ -39,12 +40,21 @@ type ViewControlProps = {
   flyMode?: boolean
   flySpeed?: number
   setFlySpeed?: Setter<number>
+  /** Loaded flame's name, for the always-visible status badge. */
+  flameName?: string
 }
 
 export function ViewControls(props: ViewControlProps) {
   const history = useChangeHistory()
   const { setTargetedParameter } = useKeyframeTarget()
+  const timeline = useTimeline()
   const disabled = () => props.controlsDisabled ?? false
+
+  const badgeName = () => props.flameName?.trim() || 'Untitled'
+  const hasAnimation = () => (timeline?.tracks().length ?? 0) > 0
+  // Whether the canvas currently reflects a specific animation frame (playing,
+  // scrubbing, or a held parked frame) vs the base flame.
+  const showingFrame = () => timeline?.isDrivingView() ?? false
   return (
     <div class={ui.viewControls}>
       <ButtonGroup data-tour-target="pixelRatio-buttons">
@@ -277,6 +287,28 @@ export function ViewControls(props: ViewControlProps) {
           Morph...
         </Button>
       </Show>
+      {/* Always-visible status badge: flame name + dimension + animation/frame. */}
+      <div class={ui.flameBadge}>
+        <span class={ui.flameBadgeName} title={badgeName()}>
+          {badgeName()}
+        </span>
+        <span class={ui.flameBadgeTag}>{props.is3D ? '3D' : '2D'}</span>
+        <Show when={hasAnimation()}>
+          <span
+            class={ui.flameBadgeTag}
+            classList={{ [ui.flameBadgeTagActive as string]: showingFrame() }}
+            title={
+              showingFrame()
+                ? 'Showing this animation frame'
+                : 'Animated flame — showing the base view (scrub/play to preview a frame)'
+            }
+          >
+            {showingFrame()
+              ? `Frame ${timeline!.currentFrame()}/${timeline!.config().endFrame}`
+              : 'Base'}
+          </span>
+        </Show>
+      </div>
     </div>
   )
 }
