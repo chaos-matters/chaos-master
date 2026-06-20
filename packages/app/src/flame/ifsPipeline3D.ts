@@ -1,7 +1,7 @@
 import { onCleanup } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { arrayOf, builtin, f32, i32, struct, u32, vec2f, vec2i, vec2u, vec4f, } from 'typegpu/data'
-import { add, arrayLength, atomicAdd, atomicLoad, div, mul, sub, } from 'typegpu/std'
+import { add, arrayLength, atomicAdd, atomicLoad, div, max, mul, sub, } from 'typegpu/std'
 import { DEBUG_MODE } from '@/defaults'
 import { camera3DWorldToClip } from '@/lib/Camera3D'
 import { hash, random, randomState, setSeed } from '@/shaders/random'
@@ -235,7 +235,10 @@ export function createIFSPipeline3D(
           const offsetY = mul(sub(random(), 0.5), mul(filterRadius, 4))
           const wx = mitchellNetravali(div(offsetX, filterRadius))
           const wy = mitchellNetravali(div(offsetY, filterRadius))
-          const accumWeight = mul(mul(wx, wy), 16)
+          // Clamp the (possibly negative) MN lobes to >= 0 before the u32 cast
+          // below: u32(negative) is UNDEFINED in WGSL and wraps to garbage on
+          // some GPUs, producing bright speckle grain. Mirrors the 2D path.
+          const accumWeight = max(mul(mul(wx, wy), 16), f32(0))
           const finalScreen = add(screen, vec2f(offsetX, offsetY))
           const oob =
             finalScreen.x < 0 ||
