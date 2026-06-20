@@ -1,11 +1,43 @@
 #!/bin/sh
-# Pre-push gate - runs the same static checks as CI so a push can't fail
-# typecheck / lint / formatting only after it reaches GitHub (issue #30: keep
-# local and CI in lockstep). Tests and build stay in CI to keep pushes fast.
+# Pre-push gate - runs the static checks CI runs (typecheck + lint) so a push
+# can't fail CI only after it reaches GitHub (issue #30: keep local and CI in
+# lockstep). Tests and build stay in CI to keep pushes fast.
+#
+# No format check here: CI (.github/workflows/node.js.yml) doesn't run Prettier,
+# and the pre-commit hook already formats staged files — so a fmt check would be
+# redundant work that can't fail CI anyway.
 #
 # Installed automatically via the root package.json "prepare" script
 # (git config core.hooksPath .githooks). Bypass in a pinch with: git push --no-verify
 set -e
+
+# Skip when there's nothing new to push (git usually short-circuits this, but the
+# guard also covers pushing an already-synced branch to a second remote): if no
+# ref's local sha differs from the remote's, there's nothing to check.
+has_work=''
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  case "$local_sha" in
+    0000000000000000000000000000000000000000) continue ;; # branch deletion
+  esac
+  if [ "$local_sha" != "$remote_sha" ]; then
+    has_work=1
+  fi
+done
+if [ -z "$has_work" ]; then
+  echo "pre-push: nothing new to push, skipping checks"
+  exit 0
+fi
+
+# Skip when this exact commit already passed on a clean tree — e.g. pushing the
+# same HEAD to both origin and upstream runs identical checks twice otherwise.
+head_sha="$(git rev-parse HEAD)"
+stamp="$(git rev-parse --git-dir)/prepush-passed"
+if [ "$(cat "$stamp" 2>/dev/null)" = "$head_sha" ] &&
+  git diff --quiet &&
+  git diff --cached --quiet; then
+  echo "pre-push: HEAD already verified on a clean tree, skipping checks"
+  exit 0
+fi
 
 echo "pre-push: typecheck"
 pnpm typecheck
@@ -13,7 +45,5 @@ pnpm typecheck
 echo "pre-push: lint"
 pnpm lint
 
-echo "pre-push: format check"
-pnpm fmt
-
+printf '%s' "$head_sha" >"$stamp"
 echo "pre-push: all checks passed"
