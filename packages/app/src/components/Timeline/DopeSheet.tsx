@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useTimeline } from '@/contexts/TimelineContext'
+import { persistentSignal } from '@/utils/persistentSignal'
 import { TIMELINE_PARAMETERS } from '@/utils/timeline'
 import { CurveEditor } from './CurveEditor/CurveEditor'
 import ui from './DopeSheet.module.css'
@@ -48,9 +49,11 @@ export function DopeSheet(props: DopeSheetProps) {
     timeline.config().endFrame - timeline.config().startFrame
 
   const [seekOnSelect, setSeekOnSelect] = createSignal(false)
-  // Defaults OFF every session — the curve view is a transient editing tool,
-  // not a remembered preference.
-  const [showCurve, setShowCurve] = createSignal(false)
+  // Persisted across sessions, but defaults OFF on first load (no stored value).
+  const [showCurve, setShowCurve] = persistentSignal(
+    'timeline-curve-editor',
+    false,
+  )
   // Horizontal scroll of the tracks, mirrored onto the curve graph so it stays
   // pixel-aligned with the diamonds.
   const [scrollLeft, setScrollLeft] = createSignal(0)
