@@ -243,7 +243,7 @@ function HelpModal(props: HelpModalProps) {
             </a>
             <a
               class={ui.iconLink}
-              href={atob('aHR0cHM6Ly9kaXNjb3JkLmdnL1FrUk1aVnFmNHU=')}
+              href="/discord"
               target="_blank"
               title="Join Discord"
             >

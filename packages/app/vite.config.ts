@@ -7,6 +7,7 @@ import bundleAnalyzer from 'vite-bundle-analyzer'
 import { qrcode } from 'vite-plugin-qrcode'
 import solidPlugin from 'vite-plugin-solid'
 import solidSvg from 'vite-plugin-solid-svg'
+import type { ProxyOptions } from 'vite'
 
 const resolveCommitHash = (): string => {
   // Deno Deploy and GitHub Actions expose this automatically.
@@ -25,6 +26,31 @@ const resolveCommitHash = (): string => {
 const commitHash = resolveCommitHash()
 
 const ANALYZE_BUNDLE = Boolean(process.env.VITE_ANALYZE_BUNDLE)
+
+// Proxies Worker routes to local `wrangler dev`. On a proxy error (typically the
+// Worker not running) it answers 502 immediately so the browser fails fast,
+// instead of hanging until the client-side request timeout.
+const workerProxy: ProxyOptions = {
+  target: 'http://localhost:8787',
+  changeOrigin: true,
+  configure: (proxy) => {
+    proxy.on('error', (_err, req, res) => {
+      // Respond 502 AND force the connection closed. Without the close, a large
+      // half-sent upload (Chrome sends `Expect: 100-continue` for multi-MB
+      // bodies like the Discord share image) keeps the keep-alive socket waiting
+      // and the browser stalls until its own request timeout. Closing makes the
+      // app surface the failure (→ manual fallback) immediately.
+      if (res && 'writeHead' in res && !res.headersSent) {
+        res.writeHead(502, {
+          'Content-Type': 'application/json',
+          Connection: 'close',
+        })
+        res.end('{"error":"worker not running — run pnpm wr-dev"}')
+      }
+      req.socket?.destroy()
+    })
+  },
+}
 
 export default defineConfig({
   plugins: [
@@ -53,11 +79,11 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    // Proxy Worker routes to `pnpm wr-dev` (wrangler on :8787) so the API and
+    // the /discord redirect work from the vite dev server. Both run side by side.
     proxy: {
-      '/api': {
-        target: 'http://localhost:8787',
-        changeOrigin: true,
-      },
+      '/api': workerProxy,
+      '/discord': workerProxy,
     },
   },
   // necessary for github pages to work

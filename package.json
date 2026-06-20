@@ -19,7 +19,8 @@
     "ci": "pnpm lint && pnpm typecheck && pnpm test",
     "lines": "cloc packages --exclude-dir=node_modules,dist --by-file-by-lang --not-match-f='(.*[.]d[.]ts|.*[.]stories[.].*|.*[.]test[.].*|.*[.]json)'",
     "deploy:dev": "pnpm --filter chaos-master deploy:dev",
-    "deploy:prod": "pnpm --filter chaos-master deploy:prod"
+    "deploy:prod": "pnpm --filter chaos-master deploy:prod",
+    "wr-dev": "pnpm --filter chaos-master wr-dev"
   },
   "devDependencies": {
     "@codemirror/autocomplete": "^6.20.3",
@@ -67,7 +68,8 @@
       "stylus": "link:./.pnpm-noop",
       "tinyest": "0.3.1",
       "esbuild": "^0.28.1",
-      "ws": "^8.21.0"
+      "ws": "^8.21.0",
+      "undici": "^7.28.0"
     }
   }
 }

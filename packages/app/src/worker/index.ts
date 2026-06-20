@@ -6,13 +6,34 @@ export interface Env {
   OG_IMAGES: any
   // Per-IP rate limiter for the share/OG write endpoints.
   API_RL: { limit: (options: { key: string }) => Promise<{ success: boolean }> }
+  // Stricter per-IP limiter dedicated to the Discord share endpoint.
+  DISCORD_RL: {
+    limit: (options: { key: string }) => Promise<{ success: boolean }>
+  }
   ASSETS: { fetch: typeof fetch }
+  // Secrets (set via `wrangler secret put`). When unset the related feature is
+  // treated as not-configured rather than enforced — keeps local dev working.
+  TURNSTILE_SECRET?: string
+  DISCORD_WEBHOOK_URL?: string
+  DISCORD_INVITE_URL?: string
+  // Comma-separated hostnames a Turnstile token may have been solved on (a var,
+  // set per-env in wrangler.jsonc). When set, a token solved on one origin
+  // can't be replayed against another. Unset → hostname is not pinned.
+  TURNSTILE_ALLOWED_HOSTNAMES?: string
 }
 
 const SHORTEN_TTL = 60 * 24 * 60 * 60 // 60 days in seconds
 // Upper bound on an OG upload (JSON body). Legit previews are ~1–1.5 MB; this
 // caps abuse so R2 storage — and cost — stays bounded.
 const MAX_OG_UPLOAD = 4 * 1024 * 1024 // ~4 MB
+// Discord shares carry the full-res flame PNG (much bigger than an OG thumb).
+// Bound the request generously; Discord itself enforces its own file limit and
+// a too-big upload just falls back to manual sharing. base64 inflates ~1.33x.
+const MAX_DISCORD_UPLOAD = 12 * 1024 * 1024 // ~12 MB request (~9 MB image)
+// Per-IP soft cap on Discord shares per day (secondary to the native limiter).
+const DISCORD_DAILY_CAP = 15
+const TURNSTILE_VERIFY_URL =
+  'https://challenges.cloudflare.com/turnstile/v0/siteverify'
 const SITE_NAME = 'Chaos Master'
 const DEFAULT_TITLE = 'Fractal Flame — Chaos Master'
 const DEFAULT_DESCRIPTION =
@@ -58,6 +79,69 @@ function base64ToBytes(b64: string): Uint8Array {
     bytes[i] = bin.charCodeAt(i)
   }
   return bytes
+}
+
+/**
+ * Verify a Cloudflare Turnstile token server-side. Returns `true` only on an
+ * explicit `success`. Reusable for any bot-gated endpoint (e.g. sign-in).
+ */
+async function verifyTurnstile(
+  secret: string,
+  token: string,
+  ip: string | null,
+  allowedHostnames?: string[],
+): Promise<boolean> {
+  if (!token) return false
+  try {
+    const form = new FormData()
+    form.append('secret', secret)
+    form.append('response', token)
+    if (ip) form.append('remoteip', ip)
+    const res = await fetch(TURNSTILE_VERIFY_URL, {
+      method: 'POST',
+      body: form,
+    })
+    const data = (await res.json()) as { success?: boolean; hostname?: string }
+    if (data.success !== true) return false
+    // Pin the origin the token was solved on (when an allowlist is configured),
+    // so a token obtained on one allowed host can't be replayed against another.
+    if (allowedHostnames && allowedHostnames.length > 0) {
+      if (!data.hostname || !allowedHostnames.includes(data.hostname)) {
+        console.warn('Turnstile hostname rejected:', data.hostname)
+        return false
+      }
+    }
+    return true
+  } catch (err) {
+    console.error('Turnstile verify failed:', err)
+    return false
+  }
+}
+
+/**
+ * Reduce a share title/author to inert plain text before it goes into the
+ * public channel: drop links, strip Discord markdown / mention / link syntax,
+ * and collapse whitespace. Server-side so a crafted client can't bypass it.
+ */
+function sanitizeDiscordText(input: string): string {
+  return input
+    .replace(/\s+/g, ' ') // collapse newlines/whitespace
+    .replace(/\b(?:https?:\/\/|www\.)\S+/gi, '') // drop explicit links
+    .replace(/[`*_~|<>@#\\[\]()]/g, '') // strip markdown / mention / link chars
+    .replace(/\s+/g, ' ') // re-collapse after removals
+    .trim()
+    .slice(0, 200)
+}
+
+/** Discord message text: `**Title** -- by Author` (or just `by Author`). */
+function buildDiscordContent(
+  title: string | undefined,
+  author: string,
+): string {
+  const parts: string[] = []
+  if (title) parts.push(`**${title}**`)
+  parts.push(`by ${author}`)
+  return parts.join(' -- ')
 }
 
 /**
@@ -237,8 +321,8 @@ export default {
         if (body.image.length > MAX_OG_UPLOAD) {
           return json({ error: 'Image too large' }, 413)
         }
-        const bytes = base64ToBytes(body.image)
-        await env.OG_IMAGES.put(key, bytes, {
+        const ogBytes = base64ToBytes(body.image)
+        await env.OG_IMAGES.put(key, ogBytes, {
           httpMetadata: { contentType: 'image/png' },
         })
         const meta: OgMeta = {
@@ -253,6 +337,129 @@ export default {
       } catch (err) {
         console.error('Error handling /api/og POST:', err)
         return json({ error: 'Bad request' }, 400)
+      }
+    }
+
+    // ── Share a flame to Discord (server-side webhook proxy) ───────────────
+    // The webhook URL lives as a Worker secret — never in the client bundle.
+    // Gated by Turnstile + a stricter per-IP limiter + a daily KV cap so the
+    // public channel can't be spammed the way the leaked client webhook was.
+    if (pathname === '/api/share-discord' && request.method === 'POST') {
+      if (
+        Number(request.headers.get('content-length') ?? 0) > MAX_DISCORD_UPLOAD
+      ) {
+        return json({ error: 'Image too large' }, 413)
+      }
+      let body: {
+        image?: string
+        title?: string
+        author?: string
+        token?: string
+      }
+      try {
+        body = (await request.json()) as typeof body
+      } catch {
+        return json({ error: 'Bad request' }, 400)
+      }
+      const { image, token } = body
+      const author = body.author?.trim()
+      const title = body.title?.trim()
+      if (!image || typeof image !== 'string') {
+        return json({ error: 'Missing image' }, 400)
+      }
+      if (image.length > MAX_DISCORD_UPLOAD) {
+        return json({ error: 'Image too large' }, 413)
+      }
+      // Reject non-PNG uploads early (before the Turnstile round-trip). Every
+      // PNG's base64 begins with the encoded 8-byte signature; this inspects
+      // only the header and leaves the embedded flame-data chunk untouched.
+      if (!image.startsWith('iVBORw0KGgo')) {
+        return json({ error: 'Not a PNG image' }, 415)
+      }
+      if (!author) {
+        return json({ error: 'Missing author' }, 400)
+      }
+
+      const ip = request.headers.get('cf-connecting-ip') ?? 'anon'
+
+      // Bot check — fail-closed, but only enforced once a secret is configured.
+      if (env.TURNSTILE_SECRET) {
+        const allowedHostnames = env.TURNSTILE_ALLOWED_HOSTNAMES
+          ? env.TURNSTILE_ALLOWED_HOSTNAMES.split(',')
+              .map((h) => h.trim())
+              .filter(Boolean)
+          : undefined
+        const ok = await verifyTurnstile(
+          env.TURNSTILE_SECRET,
+          token ?? '',
+          request.headers.get('cf-connecting-ip'),
+          allowedHostnames,
+        )
+        if (!ok) return json({ error: 'Bot check failed' }, 403)
+      }
+
+      // Stricter per-IP burst limit, on top of the generic /api/ limiter above.
+      try {
+        const { success } = await env.DISCORD_RL.limit({ key: ip })
+        if (!success) {
+          return json({ error: 'Too many requests, please slow down' }, 429)
+        }
+      } catch (err) {
+        console.error('Discord rate limit check failed (allowing):', err)
+      }
+
+      // Per-IP daily cap via KV (counts attempts, so a broken webhook can't be
+      // used to hammer the endpoint). Fail-open on KV hiccups.
+      try {
+        const day = new Date().toISOString().slice(0, 10)
+        const capKey = `dshare:${ip}:${day}`
+        const used = Number((await env.KV_SHORTENER.get(capKey)) ?? 0)
+        if (used >= DISCORD_DAILY_CAP) {
+          return json({ error: 'Daily share limit reached' }, 429)
+        }
+        await env.KV_SHORTENER.put(capKey, String(used + 1), {
+          expirationTtl: 24 * 60 * 60,
+        })
+      } catch (err) {
+        console.error('Discord daily cap check failed (allowing):', err)
+      }
+
+      if (!env.DISCORD_WEBHOOK_URL) {
+        return json({ error: 'Sharing not configured' }, 503)
+      }
+
+      try {
+        const bytes = base64ToBytes(image)
+        const form = new FormData()
+        form.append(
+          'file',
+          // base64ToBytes returns a fresh full-length view, so its buffer is the
+          // exact image bytes (cast narrows ArrayBufferLike → ArrayBuffer).
+          new Blob([bytes.buffer as ArrayBuffer], { type: 'image/png' }),
+          'flame.png',
+        )
+        form.append(
+          'payload_json',
+          JSON.stringify({
+            content: buildDiscordContent(
+              title ? sanitizeDiscordText(title) || undefined : undefined,
+              sanitizeDiscordText(author) || 'anonymous',
+            ),
+            // Never let a crafted title/author ping anyone.
+            allowed_mentions: { parse: [] },
+            // SUPPRESS_EMBEDS (1 << 2): a URL injected into the title/author
+            // can't auto-expand into a rich link-preview embed in the channel.
+            flags: 4,
+          }),
+        )
+        const res = await fetch(env.DISCORD_WEBHOOK_URL, {
+          method: 'POST',
+          body: form,
+        })
+        return json({ ok: res.ok }, res.ok ? 200 : 502)
+      } catch (err) {
+        console.error('Error forwarding to Discord:', err)
+        return json({ ok: false }, 502)
       }
     }
 
@@ -315,6 +522,22 @@ export default {
         })
         return injectMeta(env, url.origin, card.title, metaHtml)
       }
+    }
+
+    // ── Discord invite redirect ───────────────────────────────────────────
+    // Keeps the real invite out of the static bundle (no scraping) and lets it
+    // be rotated via `wrangler secret put DISCORD_INVITE_URL` — no redeploy.
+    if (pathname === '/discord' && request.method === 'GET') {
+      if (!env.DISCORD_INVITE_URL) {
+        return json({ error: 'Discord invite not configured' }, 503)
+      }
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: env.DISCORD_INVITE_URL,
+          'Cache-Control': 'no-store',
+        },
+      })
     }
 
     // Everything else → static assets (the frontend)

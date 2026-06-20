@@ -191,6 +191,130 @@
   color: oklch(60% 0.2 25);
 }
 
+/* ── Turnstile ────────────────────────────────────────── */
+
+.turnstile {
+  display: flex;
+  justify-content: center;
+  min-height: 65px;
+}
+
+/* ── Fallback (direct share failed) ───────────────────── */
+
+.fallback {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.fallbackHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: oklch(60% 0.2 25);
+
+  & > svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+}
+
+.fallbackMsg {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--neutral-600);
+
+  [data-theme='dark'] & {
+    color: var(--neutral-400);
+  }
+}
+
+.fallbackActions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* ── Manual-share disclosure (form view escape hatch) ─── */
+
+.manualDetails {
+  margin-top: calc(-1 * var(--space-1));
+}
+
+.manualDetails > .fallbackActions {
+  margin-top: var(--space-2);
+}
+
+.manualSummary {
+  cursor: pointer;
+  font-size: 0.72rem;
+  color: var(--neutral-500);
+  user-select: none;
+  width: fit-content;
+
+  &:hover {
+    color: oklch(55% 0.18 280);
+  }
+
+  [data-theme='dark'] & {
+    color: var(--neutral-500);
+
+    &:hover {
+      color: oklch(70% 0.13 280);
+    }
+  }
+}
+
+.fallbackButton {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--neutral-200);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: white;
+  color: var(--neutral-800);
+  text-decoration: none;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.1s;
+
+  & > svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+  }
+
+  &:hover {
+    border-color: oklch(55% 0.18 280);
+    background: oklch(55% 0.18 280 / 6%);
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  [data-theme='dark'] & {
+    background: var(--neutral-900);
+    border-color: var(--neutral-700);
+    color: var(--neutral-200);
+
+    &:hover {
+      border-color: oklch(60% 0.15 280);
+      background: oklch(60% 0.15 280 / 12%);
+    }
+  }
+}
+
 /* ── Footer ───────────────────────────────────────────── */
 
 .footer {
