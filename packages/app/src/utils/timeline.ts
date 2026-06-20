@@ -611,6 +611,11 @@ export function createTimelineState() {
   })
   const [isPlaying, setIsPlaying] = createSignal(false)
   const [isScrubbing, setIsScrubbing] = createSignal(false)
+  // Blender-like: once the playhead is moved (seek/scrub/step/play), the canvas
+  // keeps showing that frame's animated state on release ("held"), instead of
+  // snapping back to the base flame. Editing the base view (camera pan/zoom)
+  // detaches by clearing this. Drives `isDrivingView` below.
+  const [previewHeld, setPreviewHeld] = createSignal(false)
   // Achieved playback FPS while Auto FPS is on. With Auto FPS each frame only
   // advances once it reaches target quality, so the real rate is below the
   // nominal `fps` and varies with scene complexity. Smoothed (EMA) so the
@@ -630,6 +635,13 @@ export function createTimelineState() {
   )
   const [removeMode, setRemoveMode] = createSignal(false)
   const [animationEnabled, setAnimationEnabled] = createSignal(false)
+
+  // True when the canvas should reflect the timeline (a specific frame's
+  // animated values) rather than the base flame: while playing, while scrubbing,
+  // or when a frame is "held" after a seek/step. The single source of truth for
+  // every `effective*` animated accessor.
+  const isDrivingView = () =>
+    animationEnabled() && (isPlaying() || isScrubbing() || previewHeld())
 
   const [lastAddedKeyframe, setLastAddedKeyframe] = createSignal<{
     path: string
@@ -1122,6 +1134,7 @@ export function createTimelineState() {
     } else {
       setCurrentFrame(next)
     }
+    setPreviewHeld(true)
   }
 
   function goBackFrame() {
@@ -1132,10 +1145,12 @@ export function createTimelineState() {
     } else {
       setCurrentFrame(prev)
     }
+    setPreviewHeld(true)
   }
 
   function goToFrame(frame: number) {
     setCurrentFrame(clamp(frame, config().startFrame, config().endFrame))
+    setPreviewHeld(true)
   }
 
   function play() {
@@ -1144,6 +1159,7 @@ export function createTimelineState() {
       setCurrentFrame(cfg.startFrame)
     }
     resetFpsMeter()
+    setPreviewHeld(true)
     setIsPlaying(true)
   }
 
@@ -1280,6 +1296,7 @@ export function createTimelineState() {
   }
 
   function clearAllTracks() {
+    setPreviewHeld(false)
     if (tracks().length === 0) return
     pushUndo()
     setTracks([])
@@ -1311,6 +1328,7 @@ export function createTimelineState() {
 
   /** Replace all tracks with deep-cloned copies (unified with addKeyframeImpl). */
   function loadTracks(incoming: readonly TimelineTrack[]) {
+    setPreviewHeld(false)
     setTracks(() =>
       incoming.map((t) => ({
         parameterPath: t.parameterPath,
@@ -1339,6 +1357,9 @@ export function createTimelineState() {
     measuredFps,
     isScrubbing,
     setIsScrubbing,
+    previewHeld,
+    setPreviewHeld,
+    isDrivingView,
     autoKeyframe,
     setAutoKeyframe,
     removeMode,
