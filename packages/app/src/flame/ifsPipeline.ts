@@ -1,7 +1,7 @@
 import { onCleanup } from 'solid-js'
 import { tgpu } from 'typegpu'
 import { arrayOf, builtin, f32, i32, struct, u32, vec2f, vec2i, vec2u, vec4f, } from 'typegpu/data'
-import { add, arrayLength, atomicAdd, atomicLoad, div, mul, sub, } from 'typegpu/std'
+import { add, arrayLength, atomicAdd, atomicLoad, div, max, mul, sub, } from 'typegpu/std'
 import { camera2DWorldToClip } from '@/lib/Camera2D'
 import { hash, random, randomState, setSeed } from '@/shaders/random'
 import { recordEntries, recordKeys } from '@/utils/record'
@@ -279,7 +279,13 @@ export function createIFSPipeline(
             // weight = kernel / pdf = 16·MN·MN, giving an expected contribution of
             // 1 per point — energy-preserving and independent of the radius, so it
             // matches the non-MN path (count += 1) and the tonemap normalization.
-            const accumWeight = mul(mul(wx, wy), 16)
+            // Clamp to >= 0 before the u32 cast below: 16·MN·MN goes negative when
+            // exactly one of wx/wy lands in a negative MN lobe, and u32(negative)
+            // is UNDEFINED in WGSL — on some GPUs it wraps to a huge value and
+            // produces bright speckle grain (worst while the camera moves and
+            // accumulation is low). Dropping the negative lobes is slightly softer
+            // but correct.
+            const accumWeight = max(mul(mul(wx, wy), 16), f32(0))
             const finalScreen = add(screen, vec2f(offsetX, offsetY))
             const oob =
               finalScreen.x < 0 ||
@@ -506,7 +512,13 @@ export function createIFSPipeline(
             // weight = kernel / pdf = 16·MN·MN, giving an expected contribution of
             // 1 per point — energy-preserving and independent of the radius, so it
             // matches the non-MN path (count += 1) and the tonemap normalization.
-            const accumWeight = mul(mul(wx, wy), 16)
+            // Clamp to >= 0 before the u32 cast below: 16·MN·MN goes negative when
+            // exactly one of wx/wy lands in a negative MN lobe, and u32(negative)
+            // is UNDEFINED in WGSL — on some GPUs it wraps to a huge value and
+            // produces bright speckle grain (worst while the camera moves and
+            // accumulation is low). Dropping the negative lobes is slightly softer
+            // but correct.
+            const accumWeight = max(mul(mul(wx, wy), 16), f32(0))
             const finalScreen = add(screen, vec2f(offsetX, offsetY))
             const oob =
               finalScreen.x < 0 ||

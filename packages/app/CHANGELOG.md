@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Security**: the Discord webhook is no longer embedded in the app bundle — sharing goes through the Worker, which holds the webhook as a secret. The **Join Discord** invite is likewise served via a `/discord` redirect (kept out of the bundle and rotatable) instead of being hard-coded.
 
+### Fixed
+
+- **Mitchell-Netravali (MN) filter grain**: the MN sample weight is now clamped to ≥ 0 before the fixed-point cast. Negative kernel lobes cast to `u32` are undefined in WGSL and wrapped to huge values on some GPUs, producing bright speckle grain (worst while panning/zooming, clearing when still). Fixed in both the 2D and 3D pipelines.
+
 ### Internal
 
 - Extracted shared share-link and OG-preview helpers (`utils/shareLink.ts`, `utils/blob.ts`) so the Share Link modal and the Discord share build links identically — a short link when available, with graceful fallback to the inline `?flame=` link.
