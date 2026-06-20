@@ -14,14 +14,14 @@ export const example18 = defineExample({
       'Spiral nebula arms emerge from fan2 radial segments warped by swirl3Var logarithmic spirals. Julian fractal depth and curl distortion create galactic dust lanes with rich color separation.',
   },
   renderSettings: {
-    exposure: 0.22,
+    exposure: 0.12,
     skipIters: 20,
     drawMode: 'light',
     vibrancy: 0.65,
     contrast: 1.15,
-    highlightPower: 0.55,
+    highlightPower: 0.5,
     camera: {
-      zoom: 1.0,
+      zoom: 5.0,
       position: [0, 0],
     },
   },

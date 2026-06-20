@@ -106,7 +106,6 @@ const p19 = createAnimationPaths(examples.example19)
 const p20 = createAnimationPaths(examples.example20)
 const p21 = createAnimationPaths(examples.example21)
 const p22 = createAnimationPaths(examples.example22)
-const p23 = createAnimationPaths(examples.example23)
 const p24 = createAnimationPaths(examples.example24)
 const p25 = createAnimationPaths(examples.example25)
 const p26 = createAnimationPaths(examples.example26)
@@ -3257,10 +3256,12 @@ const anim18a: AnimationDef = {
     {
       parameterPath: 'camera.zoom',
       keyframes: [
-        { frame: 0, value: 1.3 },
-        { frame: 40, value: 2.2, easing: 'easeIn' as const },
-        { frame: 70, value: 0.6, easing: 'easeOut' as const },
-        { frame: 90, value: 1.3 },
+        // Keep the flame framed throughout (was 0.6–2.2, which shrank it to a
+        // tiny dot away from the peak); preserve the dive-in/pull-back rhythm.
+        { frame: 0, value: 3 },
+        { frame: 40, value: 5, easing: 'easeIn' as const },
+        { frame: 70, value: 2.8, easing: 'easeOut' as const },
+        { frame: 90, value: 3 },
       ],
     },
     {
@@ -3275,10 +3276,12 @@ const anim18a: AnimationDef = {
     {
       parameterPath: 'exposure',
       keyframes: [
-        { frame: 0, value: 0.28 },
-        { frame: 40, value: 0.55, easing: 'easeInOut' as const },
-        { frame: 80, value: 0.12, easing: 'easeInOut' as const },
-        { frame: 90, value: 0.28 },
+        // Dimmer than before (peaked at 0.55 = blown out) to match the closer
+        // framing and keep colour/detail in the arms.
+        { frame: 0, value: 0.13 },
+        { frame: 40, value: 0.2, easing: 'easeInOut' as const },
+        { frame: 80, value: 0.07, easing: 'easeInOut' as const },
+        { frame: 90, value: 0.13 },
       ],
     },
   ],
@@ -4382,25 +4385,23 @@ const anim22c: AnimationDef = {
   ],
 }
 
-// Example 23 — Cosmic Swirl: fan2+swirl3Var spiral arms, juliaScope+curlVar core, horseshoe warp
+// Cosmic Swirl (example18) — these two animations were on a duplicate flame
+// (example23); consolidated onto the single example18 Cosmic Swirl.
 // Transform ordering (sorted): T0=fan2+swirl3Var, T1=juliaScope+curlVar, T2=horseshoe+swirl
-//
 //   T0: V0=fan2, V1=swirl3Var
 //   T1: V0=juliaScope, V1=curlVar
 //   T2: V0=horseshoe, V1=swirl
 // ---------------------------------------------------------------------------
-
-const ex23 = 'example23' as const
 
 const anim23a: AnimationDef = {
   id: 'ex23-galactic-spin',
   name: 'Galactic Spin',
   description:
     'Swirl arms rotate through log-spiral shift, julia power pulse, and camera zoom through the nebula',
-  exampleId: ex23,
+  exampleId: ex18,
   tracks: [
     {
-      parameterPath: p23.variationParam(0, 0, 'y'),
+      parameterPath: p18.variationParam(0, 0, 'y'),
       keyframes: [
         { frame: 0, value: 0.75 },
         { frame: 30, value: 0.3 },
@@ -4409,7 +4410,7 @@ const anim23a: AnimationDef = {
       ],
     },
     {
-      parameterPath: p23.variationParam(0, 1, 'shift'),
+      parameterPath: p18.variationParam(0, 1, 'shift'),
       keyframes: [
         { frame: 0, value: 4.5 },
         { frame: 45, value: 2, easing: 'easeInOut' as const },
@@ -4417,7 +4418,7 @@ const anim23a: AnimationDef = {
       ],
     },
     {
-      parameterPath: p23.variationParam(1, 0, 'power'),
+      parameterPath: p18.variationParam(1, 0, 'power'),
       keyframes: [
         { frame: 0, value: 4 },
         { frame: 30, value: 2.5, easing: 'easeInOut' as const },
@@ -4426,7 +4427,7 @@ const anim23a: AnimationDef = {
       ],
     },
     {
-      parameterPath: p23.variationParam(1, 1, 'c1'),
+      parameterPath: p18.variationParam(1, 1, 'c1'),
       keyframes: [
         { frame: 0, value: 1.2 },
         { frame: 45, value: 2.5, easing: 'easeInOut' as const },
@@ -4436,10 +4437,11 @@ const anim23a: AnimationDef = {
     {
       parameterPath: 'camera.zoom',
       keyframes: [
-        { frame: 0, value: 1.0 },
-        { frame: 40, value: 0.55, easing: 'easeInOut' as const },
-        { frame: 80, value: 1.5, easing: 'easeInOut' as const },
-        { frame: 90, value: 1.0 },
+        // Framed throughout (was 0.55–1.5 = tiny); keep the zoom-out/in rhythm.
+        { frame: 0, value: 3.5 },
+        { frame: 40, value: 2.8, easing: 'easeInOut' as const },
+        { frame: 80, value: 4.5, easing: 'easeInOut' as const },
+        { frame: 90, value: 3.5 },
       ],
     },
     {
@@ -4483,10 +4485,10 @@ const anim23b: AnimationDef = {
   name: 'Probability Cosmos',
   description:
     'Transform probabilities shift, creating evolving structure as the nebula reforms itself',
-  exampleId: ex23,
+  exampleId: ex18,
   tracks: [
     {
-      parameterPath: p23.transformProbability(0),
+      parameterPath: p18.transformProbability(0),
       keyframes: [
         { frame: 0, value: 0.5 },
         { frame: 25, value: 0.8 },
@@ -4496,7 +4498,7 @@ const anim23b: AnimationDef = {
       ],
     },
     {
-      parameterPath: p23.transformProbability(1),
+      parameterPath: p18.transformProbability(1),
       keyframes: [
         { frame: 0, value: 0.35 },
         { frame: 25, value: 0.1 },
@@ -4506,7 +4508,7 @@ const anim23b: AnimationDef = {
       ],
     },
     {
-      parameterPath: p23.variationParam(1, 0, 'dist'),
+      parameterPath: p18.variationParam(1, 0, 'dist'),
       keyframes: [
         { frame: 0, value: 3 },
         { frame: 30, value: 1, easing: 'easeInOut' as const },
@@ -4515,7 +4517,7 @@ const anim23b: AnimationDef = {
       ],
     },
     {
-      parameterPath: p23.transformPreAffine(1, 'e'),
+      parameterPath: p18.transformPreAffine(1, 'e'),
       keyframes: [
         { frame: 0, value: 0.35 },
         { frame: 30, value: 0.6, easing: 'easeInOut' as const },
