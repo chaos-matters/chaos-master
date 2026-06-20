@@ -2724,6 +2724,7 @@ export function MainWorkspace(props: AppProps) {
                     }}
                     onBlendWeightChange={setBlendWeight}
                     is3D={effectiveFlame().renderSettings.dimensions === 3}
+                    flameName={flameDescriptor.metadata?.name}
                     theta={effectiveTheta()}
                     phi={effectivePhi()}
                     radius={effectiveRadius()}

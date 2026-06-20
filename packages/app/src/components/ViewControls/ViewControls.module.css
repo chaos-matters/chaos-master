@@ -93,6 +93,59 @@
   background: rgba(255, 255, 255, 0.15);
 }
 
+/* ── Flame status badge (name + 2D/3D + animation/frame) ── */
+
+.flameBadge {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-left: auto; /* anchor to the right edge of the toolbar */
+  padding: 0 0.25rem;
+  min-width: 0;
+  user-select: none;
+}
+
+.flameBadgeName {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--neutral-700);
+  max-width: 12rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-200);
+  }
+}
+
+.flameBadgeTag {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  background: var(--neutral-200);
+  color: var(--neutral-600);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+
+  [data-theme='dark'] & {
+    background: var(--neutral-800);
+    color: var(--neutral-400);
+  }
+}
+
+.flameBadgeTagActive {
+  background: oklch(55% 0.18 280);
+  color: white;
+
+  [data-theme='dark'] & {
+    background: oklch(62% 0.16 280);
+    color: white;
+  }
+}
+
 .camera3DControl {
   display: flex;
   align-items: center;
