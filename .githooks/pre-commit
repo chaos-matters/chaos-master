@@ -1,0 +1,40 @@
+#!/bin/sh
+# Pre-commit auto-fixer - formats and lint-fixes the STAGED files so every commit
+# lands already clean, matching the static checks the pre-push / CI enforce.
+#
+# Only staged files are touched and re-staged; unstaged work and unrelated files
+# are never modified. Formatting failures block the commit; residual (unfixable)
+# lint errors do NOT - the pre-push hook is the hard gate, so commits stay quick.
+#
+# Installed automatically via the root package.json "prepare" script
+# (git config core.hooksPath .githooks). Bypass in a pinch with:
+#   git commit --no-verify
+#
+# Caveat: a partially-staged file (only some hunks staged) is re-staged whole, so
+# its unstaged hunks get folded into the commit. Use --no-verify for those.
+set -e
+
+# Staged, still-present files (Added/Copied/Modified/Renamed).
+staged="$(git diff --cached --name-only --diff-filter=ACMR)"
+[ -z "$staged" ] && exit 0
+
+# Prettier handles these; ESLint only the JS/TS family. (No svg — Prettier has
+# no SVG parser and errors when handed an explicit .svg path.)
+fmt_files="$(printf '%s\n' "$staged" | grep -Ei '\.(ts|tsx|js|jsx|cjs|mjs|css|json|jsonc|md|html)$' || true)"
+lint_files="$(printf '%s\n' "$staged" | grep -Ei '\.(ts|tsx|js|jsx|cjs|mjs)$' || true)"
+
+if [ -n "$fmt_files" ]; then
+  echo "pre-commit: prettier --write"
+  printf '%s\n' "$fmt_files" | xargs pnpm exec prettier --write --log-level warn
+fi
+
+if [ -n "$lint_files" ]; then
+  echo "pre-commit: eslint --fix"
+  # Don't abort the commit on unfixable lint - pre-push enforces it before CI.
+  printf '%s\n' "$lint_files" | xargs pnpm exec eslint --fix || true
+fi
+
+# Re-stage only the files we just touched.
+printf '%s\n' "$fmt_files" "$lint_files" | grep -v '^$' | sort -u | xargs git add
+
+echo "pre-commit: ok"

@@ -1,47 +1,48 @@
+import { blobToBase64 } from '@/utils/blob'
 import type { DiscordShareMeta } from '@/components/DiscordShareModal/DiscordShareModal'
 
-const DISCORD_WEBHOOK_URL =
-  'https://discord.com/api/webhooks/1509615038250614906/IyaS5WUbzDGqpc15lCLR8XvpVGIIBOGCtEinQqQaZiFwscrB6emZn0QkLdl4bI0lD4g3'
-
 /**
- * Build the message text shown above the image in Discord.
- * Format: **Title** -- by author   (or just: by author)
- */
-function buildContent(meta: DiscordShareMeta): string {
-  const parts: string[] = []
-  if (meta.title) {
-    parts.push(`**${meta.title}**`)
-  }
-  parts.push(`by ${meta.author}`)
-  return parts.join(' -- ')
-}
-
-/**
- * Send a PNG blob to the Discord channel via webhook as a plain message
- * with an attached image. No embed is used so the image renders full-width
- * with no accent border.
- * Returns `true` on success, `false` on failure.
+ * Share a flame PNG to the project Discord via the Worker endpoint
+ * (`POST /api/share-discord`). The real webhook URL lives as a Worker secret —
+ * never in the client bundle — and the Worker verifies the Turnstile `token`,
+ * rate-limits per IP, then forwards the image to Discord.
+ *
+ * `token` is the Cloudflare Turnstile response from the share modal (may be an
+ * empty string in local dev when no site key is configured).
+ *
+ * Returns `true` on success, `false` on failure (bot-check rejected,
+ * rate-limited, webhook unconfigured, or network error).
  */
 export async function sendFlameToDiscord(
   blob: Blob,
   meta: DiscordShareMeta,
+  token: string,
 ): Promise<boolean> {
-  const form = new FormData()
-  form.append('file', blob, 'flame.png')
-  form.append(
-    'payload_json',
-    JSON.stringify({
-      content: buildContent(meta),
-    }),
-  )
-
+  // Bound the request so a hanging / unreachable endpoint (e.g. no Worker
+  // running locally) fails into the manual fallback instead of spinning forever.
+  const controller = new AbortController()
+  const timeout = setTimeout(() => {
+    controller.abort()
+  }, 20000)
   try {
-    const res = await fetch(DISCORD_WEBHOOK_URL, {
+    const image = await blobToBase64(blob)
+    const res = await fetch('/api/share-discord', {
       method: 'POST',
-      body: form,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image,
+        title: meta.title,
+        author: meta.author,
+        token,
+      }),
+      signal: controller.signal,
     })
-    return res.ok
+    if (!res.ok) return false
+    const body = (await res.json().catch(() => null)) as { ok?: boolean } | null
+    return body?.ok === true
   } catch {
     return false
+  } finally {
+    clearTimeout(timeout)
   }
 }

@@ -83,6 +83,7 @@ import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } fro
 import { BoxArrowRight, Cross, Eye, EyeOff, Menu, Plus, Share, Shuffle, Terminal, } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
 import { createAnimationExport } from './utils/animationExport'
+import { downloadBlob } from './utils/blob'
 import { deepClone } from './utils/clone'
 import { createStoreHistory } from './utils/createStoreHistory'
 import { sendFlameToDiscord } from './utils/discordWebhook'
@@ -94,6 +95,7 @@ import { persistentSignal } from './utils/persistentSignal'
 import { addRandomizerHistoryEntry, clearRandomizerHistory, loadRandomizerHistoryEntries, MAX_RANDOMIZER_HISTORY_LIMIT, } from './utils/randomizerHistoryDB'
 import { buildReadableIds } from './utils/readableIds'
 import { getOldestRecentFlame, saveRecentFlame } from './utils/recentFlames'
+import { createShareLink, deriveOgMeta, uploadOgPreview, } from './utils/shareLink'
 import { sum } from './utils/sum'
 import { createTimelineState, resolveKeyframeValue } from './utils/timeline'
 import { sortedTransformEntries } from './utils/transformOrder'
@@ -1204,19 +1206,50 @@ export function MainWorkspace(props: AppProps) {
     )
     const blob = new Blob([pngBytes], { type: 'image/png' })
 
-    // Step 3: Show the modal with a live preview of the captured image
+    // Step 3: Show the modal — it drives the send (with Turnstile) and offers a
+    // manual download / copy-link fallback if the direct post fails.
     const previewUrl = URL.createObjectURL(blob)
-    const meta = await showDiscordShareModal(
-      previewUrl,
-      flameDescriptor.metadata,
-    )
-    URL.revokeObjectURL(previewUrl)
-    if (!meta || !meta.author?.trim()) return
 
-    // Step 4: Send to Discord
-    showToast('Sending to Discord...')
-    const ok = await sendFlameToDiscord(blob, meta)
-    showToast(ok ? 'Shared to Discord' : 'Discord share failed')
+    // Build a proper share link via the same path as the Share Link modal
+    // (short `?s=` link when available, inline `?flame=` link otherwise) so the
+    // fallback "Copy share link" is instant and correct. Runs in parallel; the
+    // OG preview upload is best-effort so the copied link shows a rich card.
+    const sharePromise = createShareLink({
+      flame: flameDescriptor,
+      animation: hasAnimation ? { tracks, config } : undefined,
+    })
+    void sharePromise.then(async ({ encoded: shareEncoded }) => {
+      const ogBlob = await captureOgImageBlob()
+      if (!ogBlob) return
+      const { title, description } = deriveOgMeta(flameDescriptor)
+      void uploadOgPreview({
+        encoded: shareEncoded,
+        blob: ogBlob,
+        title,
+        description,
+      })
+    })
+
+    const shared = await showDiscordShareModal({
+      previewUrl,
+      initialMetadata: flameDescriptor.metadata,
+      onShare: (meta, token) => sendFlameToDiscord(blob, meta, token),
+      onDownload: () => {
+        downloadBlob(blob, 'flame.png')
+      },
+      onCopyLink: async () => {
+        try {
+          const { primaryUrl } = await sharePromise
+          await globalThis.navigator.clipboard.writeText(primaryUrl)
+          return true
+        } catch {
+          return false
+        }
+      },
+      discordUrl: '/discord',
+    })
+    URL.revokeObjectURL(previewUrl)
+    if (shared) showToast('Shared to Discord')
   }
 
   const { showLogoFaviconGenerator } = createLogoFaviconGenerator(

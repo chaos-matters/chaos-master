@@ -2,6 +2,9 @@ node_modules
 dist
 .idea
 .env.local
+# Local Worker secrets for `wrangler dev` (never commit)
+.dev.vars
+**/.dev.vars
 test-results
 .wrangler
 **/.claude/settings.local.json

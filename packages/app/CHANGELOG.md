@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.10] - 2026-06-20
+
+### Added
+
+- **Share to Discord** is now bot-protected: a Cloudflare Turnstile check plus per-IP rate limits guard every share. If the post can't go through, a manual fallback lets you download the image (the flame is embedded in the PNG) or copy a share link.
+
+### Changed
+
+- **Security**: the Discord webhook is no longer embedded in the app bundle — sharing goes through the Worker, which holds the webhook as a secret. The **Join Discord** invite is likewise served via a `/discord` redirect (kept out of the bundle and rotatable) instead of being hard-coded.
+
+### Internal
+
+- Extracted shared share-link and OG-preview helpers (`utils/shareLink.ts`, `utils/blob.ts`) so the Share Link modal and the Discord share build links identically — a short link when available, with graceful fallback to the inline `?flame=` link.
+- Local dev: added a `wr-dev` script (`wrangler dev --env dev`); the vite dev server now proxies `/api` and `/discord` to the Worker and fails fast when it isn't running; added a pre-commit hook that auto-formats staged files.
+- Dependencies: bumped `wrangler` to 4.103.0 and pinned `undici` to `^7.28.0`, clearing the open security advisories.
+
 ## [0.9.9] - 2026-06-19
 
 ### Added
