@@ -34,7 +34,8 @@ if [ -n "$lint_files" ]; then
   printf '%s\n' "$lint_files" | xargs pnpm exec eslint --fix || true
 fi
 
-# Re-stage only the files we just touched.
-printf '%s\n' "$fmt_files" "$lint_files" | grep -v '^$' | sort -u | xargs git add
+# Re-stage only the files we just touched (-r: skip git add when none matched,
+# e.g. an extension-less file like a hook was the only thing staged).
+printf '%s\n' "$fmt_files" "$lint_files" | grep -v '^$' | sort -u | xargs -r git add
 
 echo "pre-commit: ok"
