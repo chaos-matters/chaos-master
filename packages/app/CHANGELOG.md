@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Share to Discord** is now bot-protected: a Cloudflare Turnstile check plus per-IP rate limits guard every share. If the post can't go through, a manual fallback lets you download the image (the flame is embedded in the PNG) or copy a share link.
+- New built-in example **"Clifford Reverie"** (Clifford attractor woven with csch2_bs, swirl and popcorn).
 
 ### Changed
 
