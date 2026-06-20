@@ -765,6 +765,8 @@ export function MainWorkspace(props: AppProps) {
   })
 
   const setFlameZoom: Setter<number> = (value) => {
+    // Editing the base camera detaches the held-frame preview (Blender-like).
+    timeline.setPreviewHeld(false)
     if (typeof value === 'function') {
       setFlameDescriptor((draft) => {
         draft.renderSettings.camera.zoom = clamp(
@@ -785,6 +787,8 @@ export function MainWorkspace(props: AppProps) {
     return flameDescriptor.renderSettings.camera.zoom
   }
   const setFlamePosition: Setter<v2f> = (value) => {
+    // Editing the base camera detaches the held-frame preview (Blender-like).
+    timeline.setPreviewHeld(false)
     if (typeof value === 'function') {
       setFlameDescriptor((draft) => {
         const newPos = value(vec2f(...draft.renderSettings.camera.position))
@@ -799,6 +803,7 @@ export function MainWorkspace(props: AppProps) {
   }
 
   const setFlameTheta: Setter<number> = (value) => {
+    timeline.setPreviewHeld(false)
     setFlameDescriptor((draft) => {
       draft.renderSettings.camera3D.theta =
         typeof value === 'function'
@@ -808,6 +813,7 @@ export function MainWorkspace(props: AppProps) {
     return flameDescriptor.renderSettings.camera3D.theta
   }
   const setFlamePhi: Setter<number> = (value) => {
+    timeline.setPreviewHeld(false)
     setFlameDescriptor((draft) => {
       draft.renderSettings.camera3D.phi =
         typeof value === 'function'
@@ -817,6 +823,7 @@ export function MainWorkspace(props: AppProps) {
     return flameDescriptor.renderSettings.camera3D.phi
   }
   const setFlameRadius: Setter<number> = (value) => {
+    timeline.setPreviewHeld(false)
     setFlameDescriptor((draft) => {
       draft.renderSettings.camera3D.radius =
         typeof value === 'function'
@@ -860,6 +867,7 @@ export function MainWorkspace(props: AppProps) {
     return new Float32Array(flameDescriptor.renderSettings.camera3D.target)
   }
   const setFlameFov: Setter<number> = (value) => {
+    timeline.setPreviewHeld(false)
     setFlameDescriptor((draft) => {
       draft.renderSettings.camera3D.fov =
         typeof value === 'function'
@@ -869,6 +877,7 @@ export function MainWorkspace(props: AppProps) {
     return flameDescriptor.renderSettings.camera3D.fov
   }
   const setFlameRoll: Setter<number> = (value) => {
+    timeline.setPreviewHeld(false)
     setFlameDescriptor((draft) => {
       draft.renderSettings.camera3D.roll =
         typeof value === 'function'
@@ -884,10 +893,7 @@ export function MainWorkspace(props: AppProps) {
   const flySpeed = persistentSignal('camera3D/fly-speed', 1)
 
   const effectiveTheta = () => {
-    if (
-      timeline.animationEnabled() &&
-      (timeline.isPlaying() || timeline.isScrubbing())
-    ) {
+    if (timeline.isDrivingView()) {
       const val = timeline.resolveValueAtPath(
         'camera3D.theta',
         timeline.currentFrame(),
@@ -897,10 +903,7 @@ export function MainWorkspace(props: AppProps) {
     return flameDescriptor.renderSettings.camera3D.theta
   }
   const effectivePhi = () => {
-    if (
-      timeline.animationEnabled() &&
-      (timeline.isPlaying() || timeline.isScrubbing())
-    ) {
+    if (timeline.isDrivingView()) {
       const val = timeline.resolveValueAtPath(
         'camera3D.phi',
         timeline.currentFrame(),
@@ -910,10 +913,7 @@ export function MainWorkspace(props: AppProps) {
     return flameDescriptor.renderSettings.camera3D.phi
   }
   const effectiveRadius = () => {
-    if (
-      timeline.animationEnabled() &&
-      (timeline.isPlaying() || timeline.isScrubbing())
-    ) {
+    if (timeline.isDrivingView()) {
       const val = timeline.resolveValueAtPath(
         'camera3D.radius',
         timeline.currentFrame(),
@@ -927,10 +927,7 @@ export function MainWorkspace(props: AppProps) {
     return new Float32Array(flameDescriptor.renderSettings.camera3D.target)
   }
   const effectiveRoll = () => {
-    if (
-      timeline.animationEnabled() &&
-      (timeline.isPlaying() || timeline.isScrubbing())
-    ) {
+    if (timeline.isDrivingView()) {
       const val = timeline.resolveValueAtPath(
         'camera3D.roll',
         timeline.currentFrame(),
@@ -940,10 +937,7 @@ export function MainWorkspace(props: AppProps) {
     return flameDescriptor.renderSettings.camera3D.roll
   }
   const effectiveFov = () => {
-    if (
-      timeline.animationEnabled() &&
-      (timeline.isPlaying() || timeline.isScrubbing())
-    ) {
+    if (timeline.isDrivingView()) {
       const val = timeline.resolveValueAtPath(
         'camera3D.fov',
         timeline.currentFrame(),
@@ -1888,10 +1882,7 @@ export function MainWorkspace(props: AppProps) {
       case 'edgeFadeColor':
         return fd.renderSettings.edgeFadeColor ?? [0, 0, 0, 0]
       case 'camera.x':
-        if (
-          animationEnabled() &&
-          (timeline.isPlaying() || timeline.isScrubbing())
-        ) {
+        if (timeline.isDrivingView()) {
           if (
             timeline.hasKeyframeAtFrame('camera.x', timeline.currentFrame())
           ) {
@@ -1909,10 +1900,7 @@ export function MainWorkspace(props: AppProps) {
         }
         return fd.renderSettings.camera?.position[0] ?? 0
       case 'camera.y':
-        if (
-          animationEnabled() &&
-          (timeline.isPlaying() || timeline.isScrubbing())
-        ) {
+        if (timeline.isDrivingView()) {
           if (
             timeline.hasKeyframeAtFrame('camera.y', timeline.currentFrame())
           ) {
@@ -1930,10 +1918,7 @@ export function MainWorkspace(props: AppProps) {
         }
         return fd.renderSettings.camera?.position[1] ?? 0
       case 'camera.zoom':
-        if (
-          animationEnabled() &&
-          (timeline.isPlaying() || timeline.isScrubbing())
-        ) {
+        if (timeline.isDrivingView()) {
           if (
             timeline.hasKeyframeAtFrame('camera.zoom', timeline.currentFrame())
           ) {
@@ -1956,10 +1941,7 @@ export function MainWorkspace(props: AppProps) {
             ?.rotation as number | undefined) ?? 0
         )
       case 'camera3D.theta':
-        if (
-          animationEnabled() &&
-          (timeline.isPlaying() || timeline.isScrubbing())
-        ) {
+        if (timeline.isDrivingView()) {
           if (
             timeline.hasKeyframeAtFrame(
               'camera3D.theta',
@@ -1980,10 +1962,7 @@ export function MainWorkspace(props: AppProps) {
         }
         return fd.renderSettings.camera3D?.theta ?? 0
       case 'camera3D.phi':
-        if (
-          animationEnabled() &&
-          (timeline.isPlaying() || timeline.isScrubbing())
-        ) {
+        if (timeline.isDrivingView()) {
           if (
             timeline.hasKeyframeAtFrame('camera3D.phi', timeline.currentFrame())
           ) {
@@ -2001,10 +1980,7 @@ export function MainWorkspace(props: AppProps) {
         }
         return fd.renderSettings.camera3D?.phi ?? Math.PI / 2
       case 'camera3D.radius':
-        if (
-          animationEnabled() &&
-          (timeline.isPlaying() || timeline.isScrubbing())
-        ) {
+        if (timeline.isDrivingView()) {
           if (
             timeline.hasKeyframeAtFrame(
               'camera3D.radius',
@@ -2025,10 +2001,7 @@ export function MainWorkspace(props: AppProps) {
         }
         return fd.renderSettings.camera3D?.radius ?? 5
       case 'camera3D.fov':
-        if (
-          animationEnabled() &&
-          (timeline.isPlaying() || timeline.isScrubbing())
-        ) {
+        if (timeline.isDrivingView()) {
           if (
             timeline.hasKeyframeAtFrame('camera3D.fov', timeline.currentFrame())
           ) {
@@ -2320,8 +2293,7 @@ export function MainWorkspace(props: AppProps) {
 
   // Effective camera values: read from timeline whenever animation is enabled
   // so the camera follows keyframes during playback, seeking, and when stopped.
-  const animatingCamera = () =>
-    animationEnabled() && (timeline.isPlaying() || timeline.isScrubbing())
+  const animatingCamera = () => timeline.isDrivingView()
 
   const effectiveZoom = createMemo(() => {
     if (animatingCamera()) {
