@@ -507,9 +507,21 @@ function CollapsibleSection(props: {
   order: number
   children: JSX.Element
 }) {
+  let headerRef: HTMLHeadingElement | undefined
+  const handleToggle = () => {
+    const willCollapse = !props.collapsed
+    props.onToggle()
+    // On collapse, bring this (now-collapsed) header to the top of the scroll
+    // area so the next group is revealed right below it.
+    if (willCollapse) {
+      requestAnimationFrame(() =>
+        headerRef?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+      )
+    }
+  }
   return (
     <div style={{ order: String(props.order) }}>
-      <h2 class={ui.sectionHeader} onClick={props.onToggle}>
+      <h2 ref={headerRef} class={ui.sectionHeader} onClick={handleToggle}>
         <span class={ui.chevron}>{props.collapsed ? '▶' : '▼'}</span>
         <span>{props.title}</span>
         <span class={ui.sectionCount}>{props.count}</span>

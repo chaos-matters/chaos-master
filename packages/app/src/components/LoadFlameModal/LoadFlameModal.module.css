@@ -311,10 +311,18 @@
   cursor: pointer;
   user-select: none;
   font-size: 0.9rem;
-  margin: var(--space-3) 0 var(--space-2);
+  /* Top margin moved to padding so the sticky background covers the gap above. */
+  margin: 0 0 var(--space-2);
+  padding: var(--space-3) 0 var(--space-1);
+  /* Stick to the top of the scrollport so the current group's label is always
+     visible; the next group's header pushes it out as you scroll past. */
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-color);
 
   &:hover {
-    opacity: 0.8;
+    background: rgb(from var(--neutral-500) r g b / 12%);
   }
 }
 
