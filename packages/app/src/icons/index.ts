@@ -1,4 +1,5 @@
 import ArrowRightToBox from './arrow-right-to-box.svg'
+import Book from './book.svg'
 import Bookmark from './bookmark.svg'
 import BoxArrowRight from './box-arrow-right.svg'
 import CameraIcon from './camera.svg'
@@ -37,6 +38,7 @@ import Zap from './zap.svg'
 // Re-exported for easier auto-importing in components
 export {
   ArrowRightToBox,
+  Book,
   Bookmark,
   BoxArrowRight,
   CameraIcon,

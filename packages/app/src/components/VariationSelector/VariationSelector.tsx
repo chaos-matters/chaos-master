@@ -172,11 +172,17 @@ export function VariationPreview(props: {
     if (quality_ === undefined) {
       return undefined
     }
-    return quality_ > 0.98
-      ? 'done'
-      : quality_ > 0.9
-        ? 'high-quality'
-        : 'low-quality'
+    // 'done' once the preview reaches (essentially) its target quality. For
+    // lower hardware tiers or capped previews the target sits well below 0.98,
+    // and a hardcoded 0.98 ceiling would leave them rendering forever — never
+    // snapshotting to a static image nor freeing the WebGPU canvas. Cap the
+    // threshold at 0.98 so high/ultra targets keep their previous "good enough"
+    // cutoff instead of chasing the asymptote.
+    const doneAt = Math.min(0.98, targetQuality())
+    if (quality_ >= doneAt - 1e-3) {
+      return 'done'
+    }
+    return quality_ > 0.9 ? 'high-quality' : 'low-quality'
   })
   const allowed = useComputeGate(() => {
     const renderStatus_ = renderStatus()

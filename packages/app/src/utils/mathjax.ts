@@ -18,6 +18,28 @@ let mathjaxReady: Promise<void> | null = null
 
 export function ensureMathJax(): Promise<void> {
   if (mathjaxReady) return mathjaxReady
+  // MathJax 4 boots an SRE speech Web Worker (mathjax/sre/speech-worker.js) to
+  // generate screen-reader speech. Its path doesn't resolve under our bundler,
+  // so it throws a console NetworkError on every render. We render math visually
+  // (SVG) and don't surface MathJax's a11y menu, so this is pure noise.
+  //
+  // The worker is spun up by the `attachSpeech` render action — and the
+  // document-level enableSpeech/enableBraille options do NOT gate it (those flags
+  // live on the a11y/menu layer). Clearing the render action removes the worker
+  // outright. Config is read when the component is imported, so set it first.
+  const w = window as unknown as { MathJax?: Record<string, unknown> }
+  w.MathJax = {
+    ...(w.MathJax ?? {}),
+    options: {
+      ...(w.MathJax?.options ?? {}),
+      enableSpeech: false,
+      enableBraille: false,
+      enableEnrichment: false,
+      // Disabling this single render action stops `getWebworker()` from ever
+      // running. `[]` is MathJax's documented way to turn a render action off.
+      renderActions: { attachSpeech: [] },
+    },
+  }
   mathjaxReady = import('mathjax/tex-svg.js').then(() => {
     const mj = getMathJax()
     if (!mj) throw new Error('MathJax failed to initialize')

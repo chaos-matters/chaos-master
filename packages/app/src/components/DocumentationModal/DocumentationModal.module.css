@@ -1,0 +1,430 @@
+.documentation-modal {
+  max-width: 94vw;
+  width: fit-content;
+}
+
+.modal-root {
+  --doc-accent: var(--blue-500);
+  --doc-surface: color-mix(in oklab, var(--bg-color), var(--text-color) 5%);
+  --doc-surface-strong: color-mix(
+    in oklab,
+    var(--bg-color),
+    var(--text-color) 9%
+  );
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: min(1080px, 84vw);
+  height: min(78vh, 780px);
+}
+
+/* ---- Top-level tabs ---- */
+
+.tab-bar {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.9rem;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  opacity: 0.7;
+}
+
+.tab:hover {
+  opacity: 1;
+}
+
+.tab-active {
+  opacity: 1;
+  font-weight: 600;
+  border-bottom-color: var(--doc-accent);
+}
+
+.tab-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.placeholder {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  color: color-mix(in oklab, var(--text-color), transparent 35%);
+  font-style: italic;
+}
+
+/* ---- Variations: two-pane layout ---- */
+
+.docs-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) 1fr;
+  gap: var(--space-4);
+}
+
+.gallery-pane {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.search-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  padding: var(--space-2);
+  border-radius: var(--space-2);
+  border: 1px solid var(--border-color);
+  background: var(--doc-surface);
+  color: inherit;
+  font-size: 0.85rem;
+}
+
+.dims-toggle {
+  display: flex;
+  border-radius: var(--space-2);
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.dim-btn {
+  appearance: none;
+  border: none;
+  background: var(--doc-surface);
+  color: inherit;
+  padding: 0 var(--space-3);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.dim-btn-active {
+  background: var(--doc-accent);
+  color: white;
+}
+
+.category-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.category-pill {
+  appearance: none;
+  border: 1px solid var(--border-color);
+  background: var(--doc-surface);
+  color: inherit;
+  border-radius: 999px;
+  padding: 2px var(--space-2);
+  font-size: 0.72rem;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.category-pill-active {
+  background: var(--doc-accent);
+  border-color: var(--doc-accent);
+  color: white;
+  opacity: 1;
+}
+
+.gallery-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: var(--space-1);
+}
+
+.section-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-color);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+  padding: var(--space-2) 0 var(--space-1);
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+}
+
+.gallery-item {
+  position: relative;
+  appearance: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--space-2);
+  background: var(--doc-surface);
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.gallery-item:hover {
+  border-color: color-mix(in oklab, var(--doc-accent), transparent 40%);
+}
+
+.gallery-item-active {
+  border-color: var(--doc-accent);
+  outline: 1px solid var(--doc-accent);
+}
+
+.gallery-canvas {
+  aspect-ratio: 16 / 11;
+  width: 100%;
+  background: black;
+}
+
+.gallery-item-name {
+  font-size: 0.68rem;
+  padding: 3px 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+
+.doc-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--doc-accent);
+  box-shadow: 0 0 0 2px var(--bg-color);
+}
+
+/* ---- Detail pane ---- */
+
+.detail-pane {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.detail-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.detail-name {
+  margin: 0;
+  font-size: 1.4rem;
+  text-transform: capitalize;
+}
+
+.detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.detail-tag {
+  font-size: 0.72rem;
+  padding: 2px var(--space-2);
+  border-radius: 999px;
+  background: var(--doc-surface-strong);
+  font-family: ui-monospace, monospace;
+}
+
+.summary {
+  margin: 0;
+  line-height: 1.5;
+  font-size: 0.92rem;
+}
+
+.muted {
+  margin: 0;
+  color: color-mix(in oklab, var(--text-color), transparent 40%);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+/* ---- Math / Code sub-tabs ---- */
+
+.sub-tab-bar {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sub-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  font-size: 0.85rem;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  opacity: 0.7;
+}
+
+.sub-tab-active {
+  opacity: 1;
+  font-weight: 600;
+  border-bottom-color: var(--doc-accent);
+}
+
+.sub-panel {
+  min-height: 5rem;
+}
+
+.math-wrap {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-4) var(--space-2);
+  overflow-x: auto;
+  background: var(--doc-surface);
+  border-radius: var(--space-2);
+}
+
+.math :global(svg) {
+  max-width: 100%;
+  /* MathJax SVGs use currentColor for the glyphs. */
+  color: inherit;
+}
+
+.code-toolbar {
+  display: flex;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.code-toggle {
+  appearance: none;
+  border: 1px solid var(--border-color);
+  background: var(--doc-surface);
+  color: inherit;
+  border-radius: var(--space-2);
+  padding: 2px var(--space-2);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.code-toggle-active {
+  background: var(--doc-accent);
+  border-color: var(--doc-accent);
+  color: white;
+}
+
+.code-block {
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
+  padding: var(--space-3);
+  border-radius: var(--space-2);
+  background: var(--doc-surface-strong);
+  font-family: ui-monospace, 'Cascadia Code', monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  white-space: pre;
+  tab-size: 2;
+}
+
+/* ---- Parameters ---- */
+
+.params-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border-top: 1px solid var(--border-color);
+  padding-top: var(--space-3);
+}
+
+.params-title {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.param-table {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.param-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-2);
+  border-radius: var(--space-2);
+  background: var(--doc-surface);
+}
+
+.param-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.param-name {
+  font-family: ui-monospace, monospace;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.param-badge {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--doc-surface-strong);
+  opacity: 0.8;
+}
+
+.param-desc {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.param-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: 0.72rem;
+  font-family: ui-monospace, monospace;
+  opacity: 0.7;
+}
+
+/* Single-column on narrow viewports. */
+@media (max-width: 720px) {
+  .docs-layout {
+    grid-template-columns: 1fr;
+  }
+}

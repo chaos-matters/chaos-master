@@ -26,6 +26,7 @@ import { createShowCustomVariationEditor } from './components/CustomVariationEdi
 import { DebugOverlay } from './components/DebugOverlay'
 import { DiceButton } from './components/DiceButton/DiceButton'
 import { createDiscordShareModal } from './components/DiscordShareModal/DiscordShareModal'
+import { createShowDocumentation } from './components/DocumentationModal/DocumentationModal'
 import { Dropzone } from './components/Dropzone/Dropzone'
 import { ExportActions } from './components/ExportJobs/ExportActions'
 import { ExportJobHost } from './components/ExportJobs/ExportJobHost'
@@ -735,6 +736,10 @@ export function MainWorkspace(props: AppProps) {
 
   // Shared by the toolbar Benchmark button and the `?benchmark` auto-open.
   const showBenchmark = createShowBenchmark()
+
+  const showDocumentation = createShowDocumentation({
+    hardwareTier: () => props.hardwareTier ?? null,
+  })
 
   onMount(() => {
     loadCustomVariations()
@@ -2709,6 +2714,9 @@ export function MainWorkspace(props: AppProps) {
                     onBlendWeightChange={setBlendWeight}
                     is3D={effectiveFlame().renderSettings.dimensions === 3}
                     flameName={flameDescriptor.metadata?.name}
+                    onOpenDocumentation={() => {
+                      void showDocumentation()
+                    }}
                     theta={effectiveTheta()}
                     phi={effectivePhi()}
                     radius={effectiveRadius()}
