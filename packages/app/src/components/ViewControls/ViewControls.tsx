@@ -3,7 +3,7 @@ import { vec2f } from 'typegpu/data'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useTimeline } from '@/contexts/TimelineContext'
-import { Cross, Minus, Plus, Redo, Undo } from '@/icons'
+import { Book, Cross, Minus, Plus, Redo, Undo } from '@/icons'
 import { Button } from '../Button/Button'
 import { ButtonGroup } from '../Button/ButtonGroup'
 import { ScrubInput } from '../Sliders/ScrubInput'
@@ -42,6 +42,8 @@ type ViewControlProps = {
   setFlySpeed?: Setter<number>
   /** Loaded flame's name, for the always-visible status badge. */
   flameName?: string
+  /** Opens the variation documentation modal. */
+  onOpenDocumentation?: () => void
 }
 
 export function ViewControls(props: ViewControlProps) {
@@ -287,6 +289,14 @@ export function ViewControls(props: ViewControlProps) {
           title="Morph: animate this flame into another (animated blend)"
         >
           Morph...
+        </Button>
+      </Show>
+      <Show when={props.onOpenDocumentation}>
+        <Button
+          onClick={() => props.onOpenDocumentation?.()}
+          title="Variation documentation"
+        >
+          <Book />
         </Button>
       </Show>
       {/* Always-visible status badge: flame name + dimension + animation/frame. */}
