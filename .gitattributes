@@ -1,0 +1,61 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Line endings
+#
+# The repository is LF-canonical (Linux default): every text file is stored
+# with LF in git AND checked out with LF on every platform. Forcing `eol=lf`
+# (instead of leaving it to each machine's core.autocrlf) means Windows
+# checkouts don't rewrite line endings, so tools that emit LF — prettier,
+# eslint — stay in sync with git and files stop showing up as spuriously
+# "modified".
+#
+# `text=auto` lets git auto-detect text vs binary; the explicit rules below are
+# belt-and-suspenders for files git could misclassify, plus the two exceptions:
+# Windows scripts need CRLF, and binaries must never be touched.
+# ─────────────────────────────────────────────────────────────────────────────
+
+* text=auto eol=lf
+
+# --- Source & config: LF on all platforms ---
+*.ts     text eol=lf
+*.tsx    text eol=lf
+*.js     text eol=lf
+*.mjs    text eol=lf
+*.cjs    text eol=lf
+*.json   text eol=lf
+*.jsonc  text eol=lf
+*.css    text eol=lf
+*.html   text eol=lf
+*.svg    text eol=lf
+*.xml    text eol=lf
+*.md     text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.toml   text eol=lf
+*.env    text eol=lf
+
+# --- Shell scripts & git hooks: MUST be LF to run (Linux, macOS, Git Bash) ---
+*.sh         text eol=lf
+.githooks/*  text eol=lf
+
+# --- Windows-only scripts: MUST be CRLF (none today; defensive) ---
+*.bat    text eol=crlf
+*.cmd    text eol=crlf
+*.ps1    text eol=crlf
+
+# --- Binary assets: never normalize, never diff as text ---
+*.jpg    binary
+*.jpeg   binary
+*.png    binary
+*.gif    binary
+*.webp   binary
+*.ico    binary
+*.woff   binary
+*.woff2  binary
+*.ttf    binary
+*.otf    binary
+*.eot    binary
+*.wasm   binary
+*.mp4    binary
+*.webm   binary
+*.pdf    binary
+*.zip    binary
