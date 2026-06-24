@@ -6,7 +6,7 @@ Versioned independently from the app. Tag a release as `vA.B.C-web` (e.g.
 
 This file is internal (not surfaced anywhere on the site).
 
-## [0.1.0] — unreleased
+## [0.1.0] — 2026-06-25
 
 Initial marketing landing page (`about.chaos-master.com`) for the Chaos Master
 WebGPU IFS flame generator.

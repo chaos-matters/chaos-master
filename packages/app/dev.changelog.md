@@ -7,102 +7,29 @@ changelog surfaced in the About panel lives in `CHANGELOG.md`.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.10] - 2026-06-20
+## [0.9.0] - 2026-06-20
+
+Consolidated production release covering the full `0.9.0`–`0.9.10` development
+series (the in-development patch versions were squashed into this single `0.9.0`
+entry to match the released app version and tag `v0.9.0`).
 
 ### Added
 
 - **Share to Discord** is now bot-protected: a Cloudflare Turnstile check plus per-IP rate limits guard every share. If the post can't go through, a manual fallback lets you download the image (the flame is embedded in the PNG) or copy a share link.
 - New built-in example **"Clifford Reverie"** (Clifford attractor woven with csch2_bs, swirl and popcorn).
-
-### Changed
-
-- **Security**: the Discord webhook is no longer embedded in the app bundle — sharing goes through the Worker, which holds the webhook as a secret. The **Join Discord** invite is likewise served via a `/discord` redirect (kept out of the bundle and rotatable) instead of being hard-coded.
-
-### Fixed
-
-- **Mitchell-Netravali (MN) filter grain**: the MN sample weight is now clamped to ≥ 0 before the fixed-point cast. Negative kernel lobes cast to `u32` are undefined in WGSL and wrapped to huge values on some GPUs, producing bright speckle grain (worst while panning/zooming, clearing when still). Fixed in both the 2D and 3D pipelines.
-
-### Internal
-
-- Extracted shared share-link and OG-preview helpers (`utils/shareLink.ts`, `utils/blob.ts`) so the Share Link modal and the Discord share build links identically — a short link when available, with graceful fallback to the inline `?flame=` link.
-- Local dev: added a `wr-dev` script (`wrangler dev --env dev`); the vite dev server now proxies `/api` and `/discord` to the Worker and fails fast when it isn't running; added a pre-commit hook that auto-formats staged files.
-- Dependencies: bumped `wrangler` to 4.103.0 and pinned `undici` to `^7.28.0`, clearing the open security advisories.
-
-## [0.9.9] - 2026-06-19
-
-### Added
-
 - **Smart Animate**: a one-click animation generator that combines a curated preset from each category (camera, render, color, affine) into a full, designed-feeling loop — alongside the existing pick-the-aspects **Randomize Animation**.
 - A **Clear existing keyframes first** toggle for the animation randomizer (on by default) — turn it off to layer a new animation onto your existing keyframes.
-
-### Changed
-
-- The variation browser's large preview now renders at full quality on capable (high/ultra) GPUs instead of a heavily throttled mode that looked noisy/over-bright and updated jerkily.
-
-### Fixed
-
-- Selecting a variation in the browser no longer over-brightens the preview — the flame keeps its own exposure (variation thumbnails stay bright only for legibility).
-- The timeline/dope-sheet **resize handle now works on touch devices** (e.g. iPhone), not just larger screens.
-- The dope-sheet **Curve** and **Seek** toggles now reflect their on/off state immediately when tapped.
-- **Animation export**: the per-frame point counter no longer reads "0 / 0" for 2D flames, and the finished-export thumbnail shows the real first frame instead of a blank/green rectangle.
-- Animated **edge-fade colour** now actually applies during playback/export (the keyframe track was writing to the wrong place).
-
-### Internal
-
-- Resolved a long-standing case where local `pnpm typecheck` could pass while CI failed on the same commit: the build output (`dist/`) was being type-checked, which silently widened the validation (valibot) types to `any`. The type-check now excludes build output, strict `noImplicitAny` is enabled, and a pre-push hook keeps local and CI in lockstep.
-
-## [0.9.8] - 2026-06-19
-
-### Added
-
 - **Morph**: a **Morph…** action picks an end flame and animates the current flame into it across the timeline (an animated version of Blend), editable like any keyframe track.
 - **Loop styles** for the timeline: **Seamless** (plays there-and-back so the last frame flows into the first) and **Cycle** (each animated property wraps on its own timing) — both make a GIF-style loop without adding keyframes. Combine with a morph for an A→B→A loop.
 - **Smooth (spline) interpolation**: each keyframe can use **Linear**, **Spline** (smooth Catmull-Rom curve), or **Constant** (stepped), set from the keyframe inspector or by right-clicking a keyframe.
 - **Curve editor**: a **Curve** toggle on the dope sheet shows the selected parameter as a value-over-time graph — drag points to change value or retime them, double-click to add, right-click to set easing/interpolation.
 - **New animation presets**: Kaleidoscope (spins the final transform — great with Symmetry), Bloom, Shear Sway, and Glow Pulse.
-
-### Changed
-
-- Palette animation presets are clearer: **Palette Sweep / Palette Bounce / Palette Speed Up / Palette Speed Wave** (was the ambiguous "Phase"/"Speed").
-- The **Subtle** randomize toggle now clearly shows when it's on.
-- In 3D, the camera **θ (theta)** value is shown wrapped to 0–360° instead of growing without bound.
-
-### Fixed
-
-- **Animation presets**: Scale, Rotate 90°, Drift and the auto-animation spin now move the flame correctly (they used the wrong affine coefficients), and the **Pan** presets actually move the camera during playback.
-- **3D fly mode**: mouse-look no longer veers off after you roll the camera, and exiting fly mode re-levels the horizon for orbiting.
-- The timeline playhead now spans **all** tracks when scrolled, not just the visible ones.
-- Keyframe values display with sane precision instead of a long string of decimals.
-- Fixed a shader-compilation error in the **Pixel Flow** variation.
-
-## [0.9.7] - 2026-06-18
-
-### Added
-
 - **Randomizer preview gallery**: browse a page of random-flame previews and click one to apply it, instead of click-spamming Generate. An **Advanced gallery** modal adds bigger previews, a count selector, mutation "breeding", and preview size/brightness controls.
 - **Inspect before applying**: a hi-res preview action on each gallery item shows a flame large and at high quality before you load it; gallery thumbnails also render sharper on more capable GPUs.
 - **Variation groups in the randomizer**: enable or disable whole categories of variations (General, Blur, …) at once; new flames default to General + Blur.
 - **Collapse all transforms**: a sidebar button folds every transform card at once.
 - **Benchmark workload badge**: the results view and the shareable image now show which benchmark (Small / Medium / Large) was run.
 - **Frame-preview options** in the animation export: preview every Nth frame for a quick overview of long animations, a **Render more** button, and Low / Mid / High quality presets.
-
-### Changed
-
-- **Colour editor**: left-click a wheel handle to select it and click again to deselect (right-click still deselects).
-- **One active selection** across the randomizer card — the gallery and recent-history highlights no longer show at the same time.
-- **Animation export previews** now match the chosen export **aspect ratio** (including the hover popup), and the preview controls are reorganised into a cleaner settings panel that locks while previews render.
-- **Exposure** value in the render settings shows two decimals, so it no longer flickers under 3D auto-exposure.
-
-### Fixed
-
-- Custom variations are now categorised correctly.
-- Quality-preset buttons highlight on hover instead of dimming.
-- The hi-res flame inspect no longer darkens as points accumulate.
-
-## [0.9.6] - 2026-06-17
-
-### Added
-
 - **Background exports**: image and (opt-in) animation exports render in the background, so you can keep editing while they finish. A top-right Exports panel tracks each job with progress, 2D/3D and file-type badges, and frame count, plus **Stop & Save** and **Cancel**.
 - **Export resolution & aspect ratio**: pick 1K / 2K / 4K and an aspect ratio (Auto, 1:1, 16:9, 9:16, 4:3) for both image and video exports.
 - **Fly-mode roll & free flight**: in 3D fly mode, **Q/E** roll the camera and **Space/C** move up/down, for full six-degrees-of-freedom navigation.
@@ -110,16 +37,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Keyframe on randomize**: an opt-in toggle in the colour and affine editors so a single randomize keyframes every changed value at once.
 - **Deselect a transform** by right-clicking (or long-pressing on touch) its affine handle.
 - **GPU details on Firefox**: the device panels now show your GPU on Firefox.
+- **Point Batch** render setting (animatable): how many points each chain plots per batch — set it to 1 for the classic behaviour.
+- **3D auto-exposure**: a toggle and **Strength** slider that keep close-range 3D flames from blowing out as you zoom in.
+- **Mitchell–Netravali filter** (2D and 3D) for sharper resampling, toggled from the action widget.
+- **Transform selection**: click a transform's colour swatch to select it and dim the rest; `Esc` clears it.
+- **Colour editor grid/list views** and animatable per-transform colours — the randomizer can animate colours too, not just the palette.
+- **Export preview shows the blended flame**, so it matches the result.
+- **Benchmark**: small/medium/large flame selector, achievement badges, and save-as-PNG.
+- **Fly mode for 3D flames**: a first-person navigation toggle (action widget, second row, 3D only) that lets you move _through_ the fractal. `W`/`S` fly along the view direction, `A`/`D` strafe, `Q`/`E` descend/ascend. Click the canvas to capture the mouse for first-person look via the **Pointer Lock** API (move to look, `Esc` to release; drag-to-look is the fallback when lock is unavailable). Movement speed is adjustable live by scrolling while flying, and a **Speed** scrub appears in the View Controls next to the camera options.
+- **Smart affine mutation mode**: the Flame Randomizer's _Mutate_ now offers **Smart** vs **Full** affine handling. Smart composes the existing affine with random, well-defined rotate / scale / flip / translate operations (2D and 3D), so mutations stay recognisable instead of collapsing the map; Full keeps the previous per-coefficient randomization. The mode is remembered between sessions.
+- **Copy full (permanent) share link**: the Share dialog now explains that short `?s=` links expire after 60 days and adds a **Copy full link** action for the self-contained `?flame=` link, which carries all the data inline and never expires.
+- **Storage usage & data management (About panel)**: a new _Storage & Data_ section shows how much space each group uses (settings, recent flames, generated history, logo/favicon history) with item counts and a total. A **Danger Zone** offers two separate, confirm-gated actions — clear all settings, or delete all stored flames — each listing exactly how many items and how much space will be recovered.
+- **Backup / export all flames as a ZIP**: from the same panel, export a ZIP of your flames as JSON descriptors and/or PNGs with the flame embedded (from the stored history thumbnails). Recent, generated and logo/favicon groups are individually selectable, the export content is switchable (**JSON + PNG / JSON only / PNG only**), and a `manifest.json` records the export. (Built on `fflate`; fresh high-resolution batch renders are a planned follow-up — any flame can already be loaded and re-exported at full quality.)
+- **Rich link-sharing previews (Open Graph)**: shared flame links now produce a social preview card on Discord, Slack, X, Facebook and LinkedIn that shows the actual rendered flame. When you create a share link the app renders the flame, downscales it, embeds the flame descriptor into the PNG, and stores it on Cloudflare R2 (content-addressed by the payload hash); the Worker serves the image and injects `og:` / `twitter:` meta tags for both `?s=` short links and `?flame=` long links. Downloading the preview image lets you load the flame straight back into the app. Runs entirely on the Cloudflare free tier.
+- **Request-benchmark deep link**: a `?benchmark` query param (also `?benchmark=1` / `?benchmark=true`) skips the welcome screen and opens the benchmark dialog on load, so the app lands one click ("Run Benchmark") from a standardized GPU benchmark. `?benchmark=auto` additionally starts the run automatically; `?benchmark=0` / `?benchmark=false` are treated as off.
+- **More 3D variations**: Added 11 new 3D variations — 7 parametric (`rectangles3D`, `splits3D`, `modulus3D`, `separation3D`, `blob3D`, `bent2_3D`, `zScale3D`) and 4 simple (`hemisphere3D`, `scry3D`, `square3D`, `blur3D`) — ported from their 2D counterparts and extended along the z axis.
+- **3D starting flame preset**: Added `initExample3D`, a clean single-`linear3D` identity flame, to the example/preset list as a blank-slate 3D starting point.
+- **Curated 3D variation previews**: Added tuned `previewFlames3D` overrides (pre-affine, params, exposure and camera) for `pdj3D`, `rectangles3D`, `fan3D` and `sinusoidal3D` so their gallery thumbnails present the variation shape naturally instead of the flat identity default — the 3D analog of the existing 2D `previewFlames` overrides.
+- **3D Fractal Flame Rendering**: Implemented a WebGPU-based 3D rendering pipeline for IFS fractal flames.
+- **3D Example Gallery**: Added new architectural 3D examples (Examples 32-44) and 6 3D animated preset loops.
+- **Smooth 3D Controls**: Added instant key-loop panning (W/A/S/D and arrows) for smooth 3D camera navigation.
+- **Performance Cap**: Integrated dynamic rendering caps (capping active frames to 8 iterations) during viewport orbiting, panning, and timeline playback to keep interactions responsive.
 
 ### Changed
 
+- **Security**: the Discord webhook is no longer embedded in the app bundle — sharing goes through the Worker, which holds the webhook as a secret. The **Join Discord** invite is likewise served via a `/discord` redirect (kept out of the bundle and rotatable) instead of being hard-coded.
+- The variation browser's large preview now renders at full quality on capable (high/ultra) GPUs instead of a heavily throttled mode that looked noisy/over-bright and updated jerkily.
+- Palette animation presets are clearer: **Palette Sweep / Palette Bounce / Palette Speed Up / Palette Speed Wave** (was the ambiguous "Phase"/"Speed").
+- The **Subtle** randomize toggle now clearly shows when it's on.
+- In 3D, the camera **θ (theta)** value is shown wrapped to 0–360° instead of growing without bound.
+- **Colour editor**: left-click a wheel handle to select it and click again to deselect (right-click still deselects).
+- **One active selection** across the randomizer card — the gallery and recent-history highlights no longer show at the same time.
+- **Animation export previews** now match the chosen export **aspect ratio** (including the hover popup), and the preview controls are reorganised into a cleaner settings panel that locks while previews render.
+- **Exposure** value in the render settings shows two decimals, so it no longer flickers under 3D auto-exposure.
 - **Stable transform order**: transforms stay put — new ones appear at the bottom, and undo restores an item to its original place.
 - **Clearer animation button**: a distinct icon and tooltip for each state (enable / pause / disable).
 - **Expanded guided tours** covering the timeline, Point Batch, symmetry, randomizer, metadata, 2D/3D and fly mode — with every step landing on the right control.
 - **Protected transforms**: editing a selected transform no longer disturbs the others, with clearer affine handle states.
+- **Action-widget row regrouped** with clearer tooltips.
+- **Randomize transform colour** now picks any hue evenly (it used to lean toward red/orange).
+- **Variation thumbnails** are brighter and crisper.
+- **3D zoom floor**: orbit zoom is clamped (use fly mode to go closer) so extreme zoom can't blow out brightness.
+- **Theme toggle moved from `D` to `Ctrl/Cmd+D`**: plain `D` is part of the 3D camera's WASD pan controls, so it double-fired (panning the camera _and_ flipping the theme). The dark/light toggle now lives on `Ctrl/Cmd+D`, and the 3D camera ignores movement keys pressed with a modifier. The About panel's shortcut list reflects the new binding and gains a dedicated **3D Camera** section documenting orbit (left-drag), pan (right/middle-drag, WASD/arrows) and scroll-to-zoom.
+- **Schema-validated preview flames (2D & 3D)**: Refactored the flame descriptor schema into a shared `makeFlameDescriptorSchema` factory that produces both 2D (`FlameDescriptor`) and 3D (`FlameDescriptor3D`) descriptors. The variation-preview and randomizer flame builders now go through `defineExample`/`defineExample3D` instead of unchecked `as unknown as FlameDescriptor` casts, so every render default is filled consistently.
+- **Dimension-aware flame validation**: `validateFlame` now dispatches to the 3D schema when a descriptor declares `dimensions: 3`, preserving 12-parameter 3D affines (`a`–`l`) instead of silently stripping them to a 2D affine on load.
+- **Color grading defaults**: Restored the missing `vibrancy` fallback in the color-grading uniform writer to match its sibling fields, hardening against any flame that omits the field.
+- **Brighter, closer 3D variation previews**: Raised the 3D preview exposure and pulled the preview camera closer (via `getDefaultFlameByVarType3D`) so 3D variation thumbnails read clearly at gallery size.
+- **Directional Lighting Shadow Model**: Refactored `lightFactor` calculations in the shader to use saturated interpolation, preventing negative scaling and harsh black creases when `lightPower > 1.0`.
+- **Smoother Shading Normals**: Lowered normal estimation `zScale` from 150.0 to 100.0 to reduce noise artifacts.
 
 ### Fixed
 
+- **Mitchell-Netravali (MN) filter grain**: the MN sample weight is now clamped to ≥ 0 before the fixed-point cast. Negative kernel lobes cast to `u32` are undefined in WGSL and wrapped to huge values on some GPUs, producing bright speckle grain (worst while panning/zooming, clearing when still). Fixed in both the 2D and 3D pipelines.
+- Selecting a variation in the browser no longer over-brightens the preview — the flame keeps its own exposure (variation thumbnails stay bright only for legibility).
+- The timeline/dope-sheet **resize handle now works on touch devices** (e.g. iPhone), not just larger screens.
+- The dope-sheet **Curve** and **Seek** toggles now reflect their on/off state immediately when tapped.
+- **Animation export**: the per-frame point counter no longer reads "0 / 0" for 2D flames, and the finished-export thumbnail shows the real first frame instead of a blank/green rectangle.
+- Animated **edge-fade colour** now actually applies during playback/export (the keyframe track was writing to the wrong place).
+- **Animation presets**: Scale, Rotate 90°, Drift and the auto-animation spin now move the flame correctly (they used the wrong affine coefficients), and the **Pan** presets actually move the camera during playback.
+- **3D fly mode**: mouse-look no longer veers off after you roll the camera, and exiting fly mode re-levels the horizon for orbiting.
+- The timeline playhead now spans **all** tracks when scrolled, not just the visible ones.
+- Keyframe values display with sane precision instead of a long string of decimals.
+- Fixed a shader-compilation error in the **Pixel Flow** variation.
+- Custom variations are now categorised correctly.
+- Quality-preset buttons highlight on hover instead of dimming.
+- The hi-res flame inspect no longer darkens as points accumulate.
 - **Timeline scrubbing on tablets** no longer loses the touch and stops partway.
 - **Pause stays clickable during playback**, and the dope sheet stays readable while playing.
 - **2D and 3D keyframes stay separate** when switching a flame between 2D and 3D.
@@ -128,117 +110,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **About panel** layout on mobile.
 - **More variation thumbnails** render visibly (framing and brightness fixes).
 - **Safer flame loading** for older and 3D saved flames.
-
-### Security
-
-- Patched the **esbuild** and **ws** advisories.
-
-## [0.9.5] - 2026-06-16
+- Slow-mixing flames no longer darken as they keep rendering.
+- The 3D final transform no longer collapses into a flat "pancake" when its handle is dragged.
+- Variation thumbnails no longer render colourless, shrinking, or invisible.
+- The quick-variation gallery keeps its thumbnails when a category filter is applied.
+- Colour editor: handle NaN guard, grid/list toggle placement, and toolbar cleanup.
+- **Right/middle-click drag-to-pan in the 3D view did nothing**: the 3D camera routed middle- and right-button drags to its pan handler, but the shared drag helper (`createDragHandler`) silently ignored every button except the left one, so mouse panning never started — only WASD/arrow-key panning worked. The drag helper now takes an optional `button` set, and the 3D camera registers pan on the middle (1) and right (2) buttons while orbit keeps the left button. Right-click still suppresses the context menu over the canvas.
+- **3D pan speed was unusable at zoom extremes**: pan distance scaled linearly with the orbit radius, so panning was wildly fast when zoomed far out and crawled when zoomed in close. The radius factor is now clamped to a sane range for both mouse and keyboard panning.
+- **`D` could get stuck in 3D camera/fly mode**: `D` is also the theme-shortcut letter, so when a modifier joined a held `D` (or it repeated modified) the camera kept its keyup-less "down" state and drifted. Movement keys pressed with a modifier are now released, and all held keys are dropped when the window loses focus. While flying, movement keys are also claimed in the capture phase so page-level browser extensions (e.g. Vimium's single-key `d`) can't intercept or half-swallow them.
+- **Animation-randomizer keyframes flagged as invalid**: the dope sheet's "orphaned track" check used a hand-maintained allowlist that omitted `finalTransform` (and `blendWeight`, `colorInitMode`, background/edge colors, …), so valid keyframes — e.g. the _Final Transform Spin_ preset — were shown red with a "tracking target is missing" warning. The check now derives the set of valid built-in parameters from the authoritative parameter list.
+- **Variation previews rendered as blank gray blobs**: Preview flames built for the variation selector and quick-picker gallery skipped schema validation after the 3D expansion, leaving render defaults unset. A missing transform `visible` forced the IFS probability to 0 (no shape) and a missing `vibrancy` multiplied chroma by 0 (no color). Previews now show correct, colored variation shapes in both 2D and 3D.
+- **Dark halo around 3D variation previews**: the 3D preview thumbnails ran the adaptive density-estimation blur that the 2D thumbnails skip, which smeared the projected cloud's sparse edge into a vignette. The 3D thumbnails now render without it, matching the 2D path.
+- **3D parametric variations showed no parameters**: the variation selector and the main-workspace sidebar gated the parameter editor on a 2D-only check (`isParametricVariation`), so 3D parametric variations (e.g. `pdj3D`) exposed no sliders. Both now use a combined 2D/3D parametric check (`isAnyParametricVariationType`).
+- **`fan3D` azimuthal seam**: the wedge wrap used `i32()` truncation toward zero instead of `floor`, so azimuths below `-spreadTheta/2` folded the wrong way and left a seam on the −x side. Now uses `floor` for a correct modulo across the full angular range.
+- **WebGPU Memory Leaks**: Solved a critical VRAM leak and crash by untracking animated timeline frames during blur pipeline checks and implementing cleanups for WebGPU pipeline buffers.
+- **Adaptive Blur Depth**: Restored Z-depth copying in the adaptive blur pipeline so that depth coloring and directional lighting apply correctly to blurred frames.
+- **Blend Gallery Exclusion**: Excluded 3D flames from the 2D blending view.
 
 ### Performance
 
 - **~3.4× faster rendering**: flames now resolve much faster (about 5 → 17 billion points/sec on the reference flame) by plotting every iteration after warmup and reusing work between passes. Tune it with the new **Point Batch** setting.
 - The brightest regions no longer overflow into dark or garbage pixels.
 
-### Added
+### Security
 
-- **Point Batch** render setting (animatable): how many points each chain plots per batch — set it to 1 for the classic behaviour.
-- **3D auto-exposure**: a toggle and **Strength** slider that keep close-range 3D flames from blowing out as you zoom in.
-- **Mitchell–Netravali filter** (2D and 3D) for sharper resampling, toggled from the action widget.
-- **Transform selection**: click a transform's colour swatch to select it and dim the rest; `Esc` clears it.
-- **Colour editor grid/list views** and animatable per-transform colours — the randomizer can animate colours too, not just the palette.
-- **Export preview shows the blended flame**, so it matches the result.
-- **Benchmark**: small/medium/large flame selector, achievement badges, and save-as-PNG.
+- Patched the **esbuild** and **ws** advisories.
 
-### Changed
+### Internal
 
-- **Action-widget row regrouped** with clearer tooltips.
-- **Randomize transform colour** now picks any hue evenly (it used to lean toward red/orange).
-- **Variation thumbnails** are brighter and crisper.
-- **3D zoom floor**: orbit zoom is clamped (use fly mode to go closer) so extreme zoom can't blow out brightness.
-
-### Fixed
-
-- Slow-mixing flames no longer darken as they keep rendering.
-- The 3D final transform no longer collapses into a flat "pancake" when its handle is dragged.
-- Variation thumbnails no longer render colourless, shrinking, or invisible.
-- The quick-variation gallery keeps its thumbnails when a category filter is applied.
-- Colour editor: handle NaN guard, grid/list toggle placement, and toolbar cleanup.
-
-## [0.9.4] - 2026-06-13
-
-### Added
-
-- **Fly mode for 3D flames**: a first-person navigation toggle (action widget, second row, 3D only) that lets you move _through_ the fractal. `W`/`S` fly along the view direction, `A`/`D` strafe, `Q`/`E` descend/ascend. Click the canvas to capture the mouse for first-person look via the **Pointer Lock** API (move to look, `Esc` to release; drag-to-look is the fallback when lock is unavailable). Movement speed is adjustable live by scrolling while flying, and a **Speed** scrub appears in the View Controls next to the camera options.
-- **Smart affine mutation mode**: the Flame Randomizer's _Mutate_ now offers **Smart** vs **Full** affine handling. Smart composes the existing affine with random, well-defined rotate / scale / flip / translate operations (2D and 3D), so mutations stay recognisable instead of collapsing the map; Full keeps the previous per-coefficient randomization. The mode is remembered between sessions.
-- **Copy full (permanent) share link**: the Share dialog now explains that short `?s=` links expire after 60 days and adds a **Copy full link** action for the self-contained `?flame=` link, which carries all the data inline and never expires.
-- **Storage usage & data management (About panel)**: a new _Storage & Data_ section shows how much space each group uses (settings, recent flames, generated history, logo/favicon history) with item counts and a total. A **Danger Zone** offers two separate, confirm-gated actions — clear all settings, or delete all stored flames — each listing exactly how many items and how much space will be recovered.
-- **Backup / export all flames as a ZIP**: from the same panel, export a ZIP of your flames as JSON descriptors and/or PNGs with the flame embedded (from the stored history thumbnails). Recent, generated and logo/favicon groups are individually selectable, the export content is switchable (**JSON + PNG / JSON only / PNG only**), and a `manifest.json` records the export. (Built on `fflate`; fresh high-resolution batch renders are a planned follow-up — any flame can already be loaded and re-exported at full quality.)
-
-### Fixed
-
-- **Right/middle-click drag-to-pan in the 3D view did nothing**: the 3D camera routed middle- and right-button drags to its pan handler, but the shared drag helper (`createDragHandler`) silently ignored every button except the left one, so mouse panning never started — only WASD/arrow-key panning worked. The drag helper now takes an optional `button` set, and the 3D camera registers pan on the middle (1) and right (2) buttons while orbit keeps the left button. Right-click still suppresses the context menu over the canvas.
-- **3D pan speed was unusable at zoom extremes**: pan distance scaled linearly with the orbit radius, so panning was wildly fast when zoomed far out and crawled when zoomed in close. The radius factor is now clamped to a sane range for both mouse and keyboard panning.
-- **`D` could get stuck in 3D camera/fly mode**: `D` is also the theme-shortcut letter, so when a modifier joined a held `D` (or it repeated modified) the camera kept its keyup-less "down" state and drifted. Movement keys pressed with a modifier are now released, and all held keys are dropped when the window loses focus. While flying, movement keys are also claimed in the capture phase so page-level browser extensions (e.g. Vimium's single-key `d`) can't intercept or half-swallow them.
-- **Animation-randomizer keyframes flagged as invalid**: the dope sheet's "orphaned track" check used a hand-maintained allowlist that omitted `finalTransform` (and `blendWeight`, `colorInitMode`, background/edge colors, …), so valid keyframes — e.g. the _Final Transform Spin_ preset — were shown red with a "tracking target is missing" warning. The check now derives the set of valid built-in parameters from the authoritative parameter list.
-
-### Changed
-
-- **Theme toggle moved from `D` to `Ctrl/Cmd+D`**: plain `D` is part of the 3D camera's WASD pan controls, so it double-fired (panning the camera _and_ flipping the theme). The dark/light toggle now lives on `Ctrl/Cmd+D`, and the 3D camera ignores movement keys pressed with a modifier. The About panel's shortcut list reflects the new binding and gains a dedicated **3D Camera** section documenting orbit (left-drag), pan (right/middle-drag, WASD/arrows) and scroll-to-zoom.
-
-## [0.9.3] - 2026-06-13
-
-### Added
-
-- **Rich link-sharing previews (Open Graph)**: shared flame links now produce a social preview card on Discord, Slack, X, Facebook and LinkedIn that shows the actual rendered flame. When you create a share link the app renders the flame, downscales it, embeds the flame descriptor into the PNG, and stores it on Cloudflare R2 (content-addressed by the payload hash); the Worker serves the image and injects `og:` / `twitter:` meta tags for both `?s=` short links and `?flame=` long links. Downloading the preview image lets you load the flame straight back into the app. Runs entirely on the Cloudflare free tier.
-
-## [0.9.2] - 2026-06-13
-
-### Added
-
-- **Request-benchmark deep link**: a `?benchmark` query param (also `?benchmark=1` / `?benchmark=true`) skips the welcome screen and opens the benchmark dialog on load, so the app lands one click ("Run Benchmark") from a standardized GPU benchmark. `?benchmark=auto` additionally starts the run automatically; `?benchmark=0` / `?benchmark=false` are treated as off.
-
-## [0.9.1] - 2026-06-13
-
-### Added
-
-- **More 3D variations**: Added 11 new 3D variations — 7 parametric (`rectangles3D`, `splits3D`, `modulus3D`, `separation3D`, `blob3D`, `bent2_3D`, `zScale3D`) and 4 simple (`hemisphere3D`, `scry3D`, `square3D`, `blur3D`) — ported from their 2D counterparts and extended along the z axis.
-- **3D starting flame preset**: Added `initExample3D`, a clean single-`linear3D` identity flame, to the example/preset list as a blank-slate 3D starting point.
-- **Curated 3D variation previews**: Added tuned `previewFlames3D` overrides (pre-affine, params, exposure and camera) for `pdj3D`, `rectangles3D`, `fan3D` and `sinusoidal3D` so their gallery thumbnails present the variation shape naturally instead of the flat identity default — the 3D analog of the existing 2D `previewFlames` overrides.
-
-### Fixed
-
-- **Variation previews rendered as blank gray blobs**: Preview flames built for the variation selector and quick-picker gallery skipped schema validation after the 3D expansion, leaving render defaults unset. A missing transform `visible` forced the IFS probability to 0 (no shape) and a missing `vibrancy` multiplied chroma by 0 (no color). Previews now show correct, colored variation shapes in both 2D and 3D.
-- **Dark halo around 3D variation previews**: the 3D preview thumbnails ran the adaptive density-estimation blur that the 2D thumbnails skip, which smeared the projected cloud's sparse edge into a vignette. The 3D thumbnails now render without it, matching the 2D path.
-- **3D parametric variations showed no parameters**: the variation selector and the main-workspace sidebar gated the parameter editor on a 2D-only check (`isParametricVariation`), so 3D parametric variations (e.g. `pdj3D`) exposed no sliders. Both now use a combined 2D/3D parametric check (`isAnyParametricVariationType`).
-- **`fan3D` azimuthal seam**: the wedge wrap used `i32()` truncation toward zero instead of `floor`, so azimuths below `-spreadTheta/2` folded the wrong way and left a seam on the −x side. Now uses `floor` for a correct modulo across the full angular range.
-
-### Changed
-
-- **Schema-validated preview flames (2D & 3D)**: Refactored the flame descriptor schema into a shared `makeFlameDescriptorSchema` factory that produces both 2D (`FlameDescriptor`) and 3D (`FlameDescriptor3D`) descriptors. The variation-preview and randomizer flame builders now go through `defineExample`/`defineExample3D` instead of unchecked `as unknown as FlameDescriptor` casts, so every render default is filled consistently.
-- **Dimension-aware flame validation**: `validateFlame` now dispatches to the 3D schema when a descriptor declares `dimensions: 3`, preserving 12-parameter 3D affines (`a`–`l`) instead of silently stripping them to a 2D affine on load.
-- **Color grading defaults**: Restored the missing `vibrancy` fallback in the color-grading uniform writer to match its sibling fields, hardening against any flame that omits the field.
-- **Brighter, closer 3D variation previews**: Raised the 3D preview exposure and pulled the preview camera closer (via `getDefaultFlameByVarType3D`) so 3D variation thumbnails read clearly at gallery size.
-
-## [0.9.0] - 2026-06-12
-
-### Added
-
-- **3D Fractal Flame Rendering**: Implemented a WebGPU-based 3D rendering pipeline for IFS fractal flames.
-- **3D Example Gallery**: Added new architectural 3D examples (Examples 32-44) and 6 3D animated preset loops.
-- **Smooth 3D Controls**: Added instant key-loop panning (W/A/S/D and arrows) for smooth 3D camera navigation.
-- **Performance Cap**: Integrated dynamic rendering caps (capping active frames to 8 iterations) during viewport orbiting, panning, and timeline playback to keep interactions responsive.
-
-### Changed
-
-- **Directional Lighting Shadow Model**: Refactored `lightFactor` calculations in the shader to use saturated interpolation, preventing negative scaling and harsh black creases when `lightPower > 1.0`.
-- **Smoother Shading Normals**: Lowered normal estimation `zScale` from 150.0 to 100.0 to reduce noise artifacts.
-
-### Fixed
-
-- **WebGPU Memory Leaks**: Solved a critical VRAM leak and crash by untracking animated timeline frames during blur pipeline checks and implementing cleanups for WebGPU pipeline buffers.
-- **Adaptive Blur Depth**: Restored Z-depth copying in the adaptive blur pipeline so that depth coloring and directional lighting apply correctly to blurred frames.
-- **Blend Gallery Exclusion**: Excluded 3D flames from the 2D blending view.
+- Extracted shared share-link and OG-preview helpers (`utils/shareLink.ts`, `utils/blob.ts`) so the Share Link modal and the Discord share build links identically — a short link when available, with graceful fallback to the inline `?flame=` link.
+- Local dev: added a `wr-dev` script (`wrangler dev --env dev`); the vite dev server now proxies `/api` and `/discord` to the Worker and fails fast when it isn't running; added a pre-commit hook that auto-formats staged files.
+- Dependencies: bumped `wrangler` to 4.103.0 and pinned `undici` to `^7.28.0`, clearing the open security advisories.
+- Resolved a long-standing case where local `pnpm typecheck` could pass while CI failed on the same commit: the build output (`dist/`) was being type-checked, which silently widened the validation (valibot) types to `any`. The type-check now excludes build output, strict `noImplicitAny` is enabled, and a pre-push hook keeps local and CI in lockstep.
 
 ## [0.8.9] - 2026-06-11
 

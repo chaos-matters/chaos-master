@@ -13,6 +13,9 @@ on:
       - main
     tags:
       - 'v*'
+      # Exclude landing release tags (vA.B.C-web) — those deploy the landing
+      # package via landing-deploy-prod.yml, not the app.
+      - '!*-web'
   workflow_dispatch:
     inputs:
       environment:
