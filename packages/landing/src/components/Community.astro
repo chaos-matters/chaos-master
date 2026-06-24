@@ -1,0 +1,165 @@
+---
+import OrbitFlame from './OrbitFlame.tsx'
+const appUrl = 'https://chaos-master.com'
+const repoUrl = 'https://github.com/chaos-matters/chaos-master'
+// Discord via the app worker's /discord redirect (invite stays a rotatable
+// worker secret, never in the static bundle) — same architecture as the app.
+const discordUrl = `${appUrl}/discord`
+// Ko-fi support page — a public link, no worker/secret needed.
+const supportUrl = 'https://ko-fi.com/chaosmatters'
+
+// Stars are rendered inside the flame now (the starfield3D variation) so they
+// orbit with the camera — no CSS star layer needed.
+const cards = [
+  {
+    which: 'rose' as const,
+    title: 'Enchanted Rose',
+    tag: '3D · disc · julia · spiral',
+  },
+  {
+    which: 'earth' as const,
+    title: 'Earth Flame',
+    tag: '3D · sphere · turbulence · stars',
+  },
+]
+---
+
+<section class="wrap">
+  <p class="kicker">Explorers welcome</p>
+  <h2>Share what the chaos gives you.</h2>
+  <p class="sec-lede">
+    Trade flames, palettes and discoveries with a community of generative
+    artists. Open source, free forever, AGPL-3.0. Grab a 3D specimen below and
+    spin it.
+  </p>
+  <div class="chips">
+    <a class="chip" href={discordUrl}>Join the Discord</a>
+    <a class="chip" href={repoUrl}>Star on GitHub</a>
+    <a class="chip" href={supportUrl}>Support on Ko-fi</a>
+  </div>
+
+  <div class="orbit-cards">
+    {
+      cards.map((card) => (
+        <article class="orbit-card">
+          <OrbitFlame which={card.which} client:only="solid-js" />
+          <div class="card-meta">
+            <span class="card-title">{card.title}</span>
+            <span class="card-tag">{card.tag}</span>
+          </div>
+          {
+            card.which !== 'earth' && (
+              <span class="art-hint">
+                drag to orbit · scroll / pinch to zoom · tap to spin
+              </span>
+            )
+          }
+        </article>
+      ))
+    }
+  </div>
+</section>
+
+<style>
+  .chips {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 26px;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 11px 18px;
+    border-radius: var(--round);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    font-size: 0.92rem;
+    color: var(--neutral-200);
+    transition: 0.15s;
+  }
+  .chip:hover {
+    border-color: var(--blue-500);
+    color: #fff;
+    transform: translateY(-2px);
+  }
+
+  .orbit-cards {
+    margin-top: 44px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 18px;
+  }
+  .orbit-card {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 18px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: #000;
+    transition:
+      border-color 0.2s,
+      transform 0.2s;
+  }
+  .orbit-card:hover {
+    border-color: rgba(96, 165, 250, 0.35);
+  }
+  /* deep-space tint behind the (premultiplied/transparent) flame canvas */
+  .orbit-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: radial-gradient(
+      120% 120% at 50% 38%,
+      rgba(16, 18, 44, 0.6),
+      #000 72%
+    );
+  }
+  .orbit-card :global(astro-island),
+  .orbit-card :global(.orbit-mount) {
+    position: absolute;
+    inset: 0;
+    display: block;
+    z-index: 1;
+  }
+  .card-meta {
+    position: absolute;
+    top: 14px;
+    left: 16px;
+    z-index: 2;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .card-title {
+    font-weight: 600;
+    font-size: 0.96rem;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
+  }
+  .card-tag {
+    font-family: var(--mono);
+    font-size: 0.64rem;
+    letter-spacing: 0.04em;
+    color: var(--neutral-400);
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
+  }
+  .art-hint {
+    position: absolute;
+    left: 16px;
+    bottom: 13px;
+    z-index: 2;
+    pointer-events: none;
+    font-family: var(--mono);
+    font-size: 0.64rem;
+    letter-spacing: 0.04em;
+    color: var(--neutral-400);
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.85);
+  }
+  @media (max-width: 720px) {
+    .orbit-cards {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

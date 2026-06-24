@@ -1,3 +1,4 @@
+import { ShareApi } from '@/utils/apiClient'
 import { blobToBase64 } from '@/utils/blob'
 import type { DiscordShareMeta } from '@/components/DiscordShareModal/DiscordShareModal'
 
@@ -18,31 +19,18 @@ export async function sendFlameToDiscord(
   meta: DiscordShareMeta,
   token: string,
 ): Promise<boolean> {
-  // Bound the request so a hanging / unreachable endpoint (e.g. no Worker
-  // running locally) fails into the manual fallback instead of spinning forever.
-  const controller = new AbortController()
-  const timeout = setTimeout(() => {
-    controller.abort()
-  }, 20000)
+  // Transport (incl. the 20s timeout that lets a hanging endpoint fall back to
+  // manual sharing) lives in ShareApi/postJson now.
   try {
     const image = await blobToBase64(blob)
-    const res = await fetch('/api/share-discord', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        image,
-        title: meta.title,
-        author: meta.author,
-        token,
-      }),
-      signal: controller.signal,
+    const res = await ShareApi.shareDiscord({
+      image,
+      title: meta.title,
+      author: meta.author,
+      token,
     })
-    if (!res.ok) return false
-    const body = (await res.json().catch(() => null)) as { ok?: boolean } | null
-    return body?.ok === true
+    return res?.ok === true
   } catch {
     return false
-  } finally {
-    clearTimeout(timeout)
   }
 }

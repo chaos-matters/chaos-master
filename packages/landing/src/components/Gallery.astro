@@ -1,0 +1,34 @@
+---
+import GalleryFlames from './GalleryFlames.tsx'
+// The grid + its live GPU previews are a single Solid island (one shared
+// ComputeGate throttles them). Grid styles live in global.css since the island's
+// DOM isn't Astro-scoped. The header stays here so it's in the static HTML.
+---
+
+<section id="gallery" class="wrap">
+  <div class="gal-head">
+    <div>
+      <p class="kicker">Made with Chaos Master</p>
+      <h2>A living gallery.</h2>
+    </div>
+    <p class="sec-lede" style="margin:0">
+      Every piece below is generated live in your browser, right now — not an
+      image file. Hover to read the variations behind each one.
+    </p>
+  </div>
+  <GalleryFlames client:only="solid-js" />
+</section>
+
+<style>
+  .gal-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  /* The gallery grid is inside a Solid island; make its wrapper block-level. */
+  section :global(astro-island) {
+    display: block;
+  }
+</style>

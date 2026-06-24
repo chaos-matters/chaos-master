@@ -1,0 +1,240 @@
+---
+// Custom inline SVG icons (no emojis — per the project's icon rule). Stroke-based
+// 24x24, currentColor, so they tint with the card accent.
+const icons = {
+  webgpu: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="2"/><path d="M10 3v2M14 3v2M10 19v2M14 19v2M3 10h2M3 14h2M19 10h2M19 14h2"/></svg>`,
+  animation: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4M17 12h4"/><path d="M9 12l3-3 3 3-3 3z"/><path d="M7 12h2M15 12h2"/></svg>`,
+  randomizer: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.1" fill="currentColor"/><circle cx="15" cy="15" r="1.1" fill="currentColor"/><circle cx="15" cy="9" r="1.1" fill="currentColor"/><circle cx="9" cy="15" r="1.1" fill="currentColor"/></svg>`,
+  cube: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 3v9M12 12l8-4.5M12 12L4 7.5"/></svg>`,
+  affine: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="1"/><path d="M5 5l-2-2M19 5l2-2M5 19l-2 2M19 19l2 2"/><circle cx="12" cy="12" r="2"/></svg>`,
+  exportPng: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M12 4l-3 3M12 4l3 3"/><path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg>`,
+  audio: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h2M8 8v8M12 5v14M16 8v8M20 12h0"/></svg>`,
+  vr: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="8" width="20" height="9" rx="3"/><path d="M10 17l-1.5 2M14 17l1.5 2M9 12.5h.01M15 12.5h.01"/></svg>`,
+  games: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="9" rx="4"/><path d="M7 11v3M5.5 12.5h3M15.5 12h.01M18 13.5h.01"/></svg>`,
+  server: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7l7-4 7 4-7 4z"/><path d="M5 12l7 4 7-4M5 17l7 4 7-4"/></svg>`,
+}
+
+const features = [
+  {
+    icon: 'webgpu',
+    title: 'WebGPU rendering',
+    body: 'Real-time IFS evaluation on the GPU — millions of iterations a second, redrawn the instant you touch the flame.',
+  },
+  {
+    icon: 'animation',
+    title: 'Animation',
+    body: 'Keyframe any parameter and play it back. Morphs, seamless loops and timeline scrubbing — your flame in motion.',
+  },
+  {
+    icon: 'randomizer',
+    title: 'Randomizer',
+    body: 'Roll a brand-new flame, then mutate it — shapes, colors and animation — until something surprises you.',
+  },
+  {
+    icon: 'cube',
+    title: '3D flames',
+    body: 'Sculpt fractal flames in three dimensions, with an orientation gizmo and a full set of 3D variations.',
+  },
+  {
+    icon: 'affine',
+    title: 'Affine & variations editor',
+    body: 'Grab transforms directly on the canvas, and write your own variations in WGSL or plain math.',
+  },
+  {
+    icon: 'exportPng',
+    title: 'Metadata-rich exports',
+    body: 'Export PNGs with the full flame state embedded — any image reopens and remixes. Sharing is just a file.',
+  },
+]
+
+const comingSoon = [
+  { icon: 'audio', name: 'Audio flames', tag: 'Hear your chaos' },
+  { icon: 'vr', name: 'VR fractal worlds', tag: 'Step inside' },
+  { icon: 'games', name: 'Flame games', tag: 'Play the chaos' },
+  { icon: 'server', name: 'Server-side HQ render', tag: 'Poster-grade output' },
+]
+---
+
+<section id="features" class="wrap">
+  <p class="kicker">Built for hands-on exploration</p>
+  <h2>A studio that keeps up<br />with your imagination.</h2>
+  <p class="sec-lede">
+    Everything renders live in the browser on modern web standards — no native
+    app, no plugins, no waiting.
+  </p>
+
+  <div class="feat-grid">
+    {
+      features.map((f, i) => (
+        <article class="feat">
+          <div class="feat-top">
+            <span class="feat-icon" set:html={icons[f.icon]} />
+            <div class="idx">{String(i + 1).padStart(2, '0')}</div>
+          </div>
+          <h3>{f.title}</h3>
+          <p>{f.body}</p>
+        </article>
+      ))
+    }
+  </div>
+
+  <div class="soon">
+    <p class="soon-label">On the horizon</p>
+    <div class="soon-grid">
+      {
+        comingSoon.map((c) => (
+          <div class="soon-card">
+            <span class="soon-icon" set:html={icons[c.icon]} />
+            <div>
+              <div class="soon-name">{c.name}</div>
+              <div class="soon-tag">{c.tag}</div>
+            </div>
+            <span class="soon-badge">Soon</span>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+  .feat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    margin-top: 56px;
+  }
+  .feat {
+    padding: 28px;
+    border-radius: 16px;
+    background: var(--neutral-950);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    position: relative;
+    overflow: hidden;
+    transition:
+      border-color 0.2s,
+      transform 0.2s;
+  }
+  .feat:hover {
+    border-color: rgba(96, 165, 250, 0.35);
+    transform: translateY(-3px);
+  }
+  .feat-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .feat-icon {
+    display: inline-flex;
+    width: 42px;
+    height: 42px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 11px;
+    color: var(--blue-400);
+    background: rgba(96, 165, 250, 0.1);
+    border: 1px solid rgba(96, 165, 250, 0.22);
+  }
+  .feat-icon :global(svg) {
+    width: 22px;
+    height: 22px;
+  }
+  .feat .idx {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--neutral-600);
+    letter-spacing: 0.1em;
+  }
+  .feat h3 {
+    font-size: 1.18rem;
+    margin: 18px 0 10px;
+    font-weight: 700;
+  }
+  .feat p {
+    color: var(--neutral-400);
+    line-height: 1.6;
+    margin: 0;
+    font-size: 0.96rem;
+  }
+
+  /* coming soon */
+  .soon {
+    margin-top: 40px;
+    padding-top: 34px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .soon-label {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--neutral-500);
+    margin: 0 0 20px;
+  }
+  .soon-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+  .soon-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    border-radius: 13px;
+    border: 1px dashed rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.015);
+  }
+  .soon-icon {
+    display: inline-flex;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9px;
+    color: var(--neutral-400);
+    background: rgba(255, 255, 255, 0.04);
+  }
+  .soon-icon :global(svg) {
+    width: 18px;
+    height: 18px;
+  }
+  .soon-name {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--neutral-200);
+  }
+  .soon-tag {
+    font-size: 0.78rem;
+    color: var(--neutral-500);
+    margin-top: 2px;
+  }
+  .soon-badge {
+    margin-left: auto;
+    align-self: flex-start;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--blue-300);
+    border: 1px solid rgba(96, 165, 250, 0.3);
+    border-radius: var(--round);
+    padding: 3px 8px;
+  }
+
+  @media (max-width: 980px) {
+    .feat-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .soon-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media (max-width: 560px) {
+    .feat-grid,
+    .soon-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

@@ -167,7 +167,11 @@ export function parseFlam3Palettes(xmlContent: string): Flam3PaletteData[] {
  * L is discarded since we use fixed L=0.7 for rendering.
  * Returns normalized a/b in range roughly -1 to 1.
  */
-function rgbToOklab(r: number, g: number, b: number): { a: number; b: number } {
+export function rgbToOklab(
+  r: number,
+  g: number,
+  b: number,
+): { a: number; b: number } {
   const toLinear = (c: number) =>
     c > 0.04045 ? Math.pow((c + 0.055) / 1.055, 2.4) : c / 12.92
 

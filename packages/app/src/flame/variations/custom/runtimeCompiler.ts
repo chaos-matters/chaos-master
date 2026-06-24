@@ -100,8 +100,16 @@ export function compileCustomVariationCode(wgslBody: string): CompileResult {
     }
   }
 
+  // BUILTIN_EXTERNALS is the security allowlist for untrusted custom-variation
+  // code: reject any identifier not explicitly in it, so unknown/dangerous
+  // externals never compile. Use Object.hasOwn, not `in` — `in` walks the
+  // prototype chain, which would let inherited Object names (constructor,
+  // toString, valueOf, hasOwnProperty, …) slip past the allowlist. BANNED_NAMES
+  // above is a clearer-error denylist on top; its entries aren't in
+  // BUILTIN_EXTERNALS, so they're already rejected here. (Compiled output is
+  // sandboxed WGSL on the GPU, not JS.)
   const missingBuiltins = externalNames.filter(
-    (name: string) => !(name in BUILTIN_EXTERNALS),
+    (name: string) => !Object.hasOwn(BUILTIN_EXTERNALS, name),
   )
   if (missingBuiltins.length > 0) {
     return {
@@ -130,7 +138,7 @@ export function compileCustomVariationCode(wgslBody: string): CompileResult {
         typeof callee.name === 'string'
       ) {
         const name = callee.name
-        if (name in BUILTIN_ARITY) {
+        if (Object.hasOwn(BUILTIN_ARITY, name)) {
           const expected = BUILTIN_ARITY[name]!
           const args = n.arguments
           const actualCount = Array.isArray(args) ? args.length : 0

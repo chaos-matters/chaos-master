@@ -88,6 +88,7 @@ export function ViewControls(props: ViewControlProps) {
             }}
           >
             <Button
+              aria-label="Zoom out"
               disabled={disabled() || props.zoom <= 0.01}
               onClick={(e) => {
                 e.stopPropagation()
@@ -122,6 +123,7 @@ export function ViewControls(props: ViewControlProps) {
             }}
           >
             <Button
+              aria-label="Zoom in"
               disabled={disabled()}
               onClick={() => {
                 setTargetedParameter('camera.zoom')
@@ -226,6 +228,7 @@ export function ViewControls(props: ViewControlProps) {
       </Show>
       <ButtonGroup data-tour-target="undoRedo-controls">
         <Button
+          aria-label="Undo"
           disabled={!history.hasUndo()}
           onClick={() => {
             history.undo()
@@ -234,6 +237,7 @@ export function ViewControls(props: ViewControlProps) {
           <Undo />
         </Button>
         <Button
+          aria-label="Redo"
           disabled={!history.hasRedo()}
           onClick={() => {
             history.redo()
@@ -268,6 +272,7 @@ export function ViewControls(props: ViewControlProps) {
             </div>
             <button
               class={ui.blendClearBtn}
+              aria-label="Remove blend flame"
               onClick={props.onClearBlendFlame}
               title="Remove blend flame"
             >

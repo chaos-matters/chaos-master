@@ -76,3 +76,27 @@ describe('compileCustomVariationCode - Arity Validation', () => {
     }
   })
 })
+
+// S-6: untrusted source must only compile against the builtin allowlist. These
+// guard the rejection paths, including the prototype-chain fix (inherited
+// Object names like constructor/toString must not pass the `in`-based check).
+describe('compileCustomVariationCode - allowlist rejections (S-6)', () => {
+  it('rejects a syntax error', () => {
+    expect(compileCustomVariationCode('this is !! not valid js').valid).toBe(
+      false,
+    )
+  })
+
+  it('rejects an identifier that is not a builtin', () => {
+    expect(
+      compileCustomVariationCode('return definitelyNotABuiltin(pos);').valid,
+    ).toBe(false)
+  })
+
+  it('rejects inherited Object names (constructor / toString)', () => {
+    expect(compileCustomVariationCode('return constructor;').valid).toBe(false)
+    expect(compileCustomVariationCode('return toString(pos);').valid).toBe(
+      false,
+    )
+  })
+})

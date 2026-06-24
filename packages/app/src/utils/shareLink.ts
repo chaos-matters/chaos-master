@@ -1,3 +1,4 @@
+import { ShareApi } from './apiClient'
 import { blobToBase64 } from './blob'
 import { encodeSharePayload } from './jsonQueryParam'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -44,20 +45,8 @@ export async function encodeShareUrl(opts: {
  * to the inline long link.
  */
 export async function shortenShareUrl(encoded: string): Promise<string> {
-  try {
-    const res = await fetch('/api/shorten', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ payload: encoded }),
-    })
-    if (res.ok) {
-      const json = (await res.json()) as { id?: string }
-      if (json.id) return `${globalThis.location.origin}/?s=${json.id}`
-    }
-  } catch (err) {
-    console.error('Failed to shorten URL:', err)
-  }
-  return ''
+  const res = await ShareApi.shorten(encoded)
+  return res?.id ? `${globalThis.location.origin}/?s=${res.id}` : ''
 }
 
 /**
@@ -119,14 +108,10 @@ export async function uploadOgPreview(opts: {
 }): Promise<void> {
   try {
     const image = await blobToBase64(opts.blob)
-    await fetch(`/api/og/${await ogKey(opts.encoded)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        image,
-        title: opts.title,
-        description: opts.description,
-      }),
+    await ShareApi.uploadOg(await ogKey(opts.encoded), {
+      image,
+      title: opts.title,
+      description: opts.description,
     })
   } catch (err) {
     console.error('Failed to upload OG preview image:', err)

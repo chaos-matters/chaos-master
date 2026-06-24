@@ -60,6 +60,15 @@
     background-color 0.1s ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 
+  /* WCAG 2.5.8 Target Size: expand the pointer/touch target to >=24px without
+     enlarging the visible 13px handle (13 + 2*6 = 25px). Pointer events on
+     ::after still target the handle, so dragging is unaffected. */
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+  }
+
   [data-theme='dark'] & {
     background: linear-gradient(
       to bottom,

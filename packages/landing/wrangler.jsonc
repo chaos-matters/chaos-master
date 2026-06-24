@@ -1,0 +1,42 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "chaos-master-landing",
+  "compatibility_date": "2026-05-17",
+
+  // Static-only site: no `main` worker, just the built Astro output served
+  // directly by Cloudflare's static assets. The app (packages/app) owns the
+  // root domain; this landing page lives on a subdomain.
+  "assets": {
+    "directory": "dist",
+  },
+
+  "env": {
+    "prod": {
+      "name": "chaos-master-landing",
+      "routes": [
+        {
+          // custom_domain: true makes `wrangler deploy` provision the DNS record
+          // + SSL cert automatically (no manual CNAME needed), given chaos-master.com
+          // is a zone on this Cloudflare account.
+          "pattern": "about.chaos-master.com",
+          "custom_domain": true,
+        },
+      ],
+      "build": {
+        "command": "pnpm run build",
+      },
+    },
+    "dev": {
+      "name": "chaos-master-landing-dev",
+      "routes": [
+        {
+          "pattern": "about.dev.chaos-master.com",
+          "custom_domain": true,
+        },
+      ],
+      "build": {
+        "command": "pnpm run build",
+      },
+    },
+  },
+}

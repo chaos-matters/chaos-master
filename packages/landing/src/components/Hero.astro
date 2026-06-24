@@ -1,0 +1,233 @@
+---
+import HeroFlame from './HeroFlame.tsx'
+import { LAUNCH_ICON } from '../icons'
+
+const appUrl = 'https://chaos-master.com'
+const repoUrl = 'https://github.com/chaos-matters/chaos-master'
+// The hero poster (hero-flame.jpg) sits behind the live GPU flame as the
+// non-WebGPU fallback; HeroFlame is a client-only Solid island that mounts the
+// app's real-time renderer on top once WebGPU is available.
+---
+
+<header class="hero" id="top">
+  <div class="hero-canvas">
+    <img
+      class="hero-poster"
+      src="/hero-flame.jpg"
+      alt=""
+      aria-hidden="true"
+      loading="eager"
+    />
+    <HeroFlame client:only="solid-js" />
+  </div>
+  <div class="hero-content">
+    <h1>Paint with<br /><em>infinite chaos.</em></h1>
+    <p class="lede">
+      Chaos Master is a GPU-accelerated IFS flame fractal generator for artists
+      and explorers — millions of iterations rendered live, shaped by your hand.
+      No install, no render queue.
+    </p>
+    <div class="hero-cta">
+      <a class="btn btn-primary" href={appUrl}
+        >Launch Chaos Master<span class="btn-ico" set:html={LAUNCH_ICON} /></a
+      >
+      <a class="btn btn-ghost" href={repoUrl}>View on GitHub</a>
+    </div>
+    <ul class="hero-badges">
+      <li>WebGPU</li>
+      <li>TypeGPU</li>
+      <li>In your browser</li>
+    </ul>
+    <p class="note">
+      Move your cursor over the flame. Requires a WebGPU browser — Chrome / Edge
+      113+, Safari 17+.
+    </p>
+  </div>
+  <div class="scroll-hint"><span>Scroll</span><span class="line"></span></div>
+</header>
+
+<script>
+  // Hero reacts to scroll: parallax the flame layer (live canvas OR poster — both
+  // live in .hero-canvas) slower than the page, with a subtle zoom + fade as it
+  // leaves, for depth. Pure transform, so it never resizes the canvas. rAF-
+  // throttled; disabled under prefers-reduced-motion.
+  const hero = document.querySelector<HTMLElement>('.hero')
+  const layer = document.querySelector<HTMLElement>('.hero-canvas')
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (hero && layer && !reduce) {
+    let raf = 0
+    const update = () => {
+      raf = 0
+      const h = hero.offsetHeight || 1
+      const y = Math.min(Math.max(window.scrollY, 0), h)
+      const p = y / h
+      layer.style.transform = `translate3d(0, ${(y * 0.3).toFixed(1)}px, 0) scale(${(1 + p * 0.08).toFixed(3)})`
+      layer.style.opacity = (1 - p * 0.4).toFixed(3)
+    }
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    update()
+  }
+</script>
+
+<style>
+  .hero {
+    position: relative;
+    min-height: 100svh;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+  }
+  .hero-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+  }
+  .hero-poster {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: opacity 0.8s ease;
+  }
+  /* Once the live flame is actually rendering (HeroFlame adds is-gpu-ready),
+     fade the poster out so it doesn't bleed through the flame's dark regions.
+     Stays fully visible if WebGPU never initialises. */
+  .hero.is-gpu-ready .hero-poster {
+    opacity: 0;
+  }
+  /* The live GPU island fills the hero, layered above the poster fallback. */
+  .hero-canvas :global(astro-island) {
+    position: absolute;
+    inset: 0;
+    display: block;
+  }
+  .hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(
+      120% 90% at 50% 50%,
+      rgba(0, 0, 0, 0) 30%,
+      rgba(0, 0, 0, 0.62) 78%,
+      #000 100%
+    );
+  }
+  .hero-content {
+    position: relative;
+    z-index: 3;
+    text-align: center;
+    padding: 120px 28px 80px;
+    pointer-events: none;
+  }
+  .hero-content a {
+    pointer-events: auto;
+  }
+  /* Feature badges, moved below the CTA: real pills with a translucent, blurred
+     backing so they stay legible over a bright flame (the old single eyebrow line
+     above the headline washed out on big screens). */
+  .hero-badges {
+    list-style: none;
+    margin: 30px 0 0;
+    padding: 0;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .hero-badges li {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 15px;
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--neutral-200);
+    background: rgba(10, 10, 12, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--round);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  /* A single small blue accent dot — the lone bit of brand color on the chrome. */
+  .hero-badges li::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--blue-400);
+    box-shadow: 0 0 8px var(--blue-400);
+  }
+  .hero h1 {
+    font-size: clamp(2.6rem, 7vw, 5.6rem);
+    font-weight: 800;
+    line-height: 1.02;
+    margin: 0;
+    letter-spacing: -0.02em;
+    text-shadow: 0 4px 60px rgba(0, 0, 0, 0.6);
+  }
+  .hero h1 em {
+    font-style: normal;
+    background: linear-gradient(110deg, #7be0e8, #a3e635 40%, #ffae34 65%, #ff5e7e);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .lede {
+    max-width: 56ch;
+    margin: 26px auto 0;
+    color: var(--neutral-300);
+    font-size: clamp(1.02rem, 1.6vw, 1.2rem);
+    line-height: 1.6;
+  }
+  .hero-cta {
+    display: flex;
+    gap: 14px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 36px;
+  }
+  .note {
+    margin-top: 22px;
+    font-size: 0.82rem;
+    color: var(--neutral-500);
+  }
+  .scroll-hint {
+    position: absolute;
+    bottom: 26px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 3;
+    font-size: 0.72rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--neutral-500);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .scroll-hint .line {
+    width: 1px;
+    height: 34px;
+    background: linear-gradient(var(--neutral-500), transparent);
+    animation: drop 1.8s ease-in-out infinite;
+  }
+  @keyframes drop {
+    0%,
+    100% {
+      opacity: 0.3;
+      transform: scaleY(0.6);
+    }
+    50% {
+      opacity: 1;
+      transform: scaleY(1);
+    }
+  }
+</style>

@@ -1,5 +1,5 @@
 import { vec2f } from 'typegpu/data'
-import { abs, cos, select, sin, sqrt } from 'typegpu/std'
+import { abs, cos, select, sin } from 'typegpu/std'
 import { random } from '@/shaders/random'
 import { PI } from '../../../constants'
 import { simpleVariation } from '../types'
@@ -42,13 +42,7 @@ export const gaussianBlur = simpleVariation(
   'blur',
 )
 
-export const circleBlur = simpleVariation(
-  'circleBlurVar',
-  (_pos, _varInfo) => {
-    'use gpu'
-    const rad = sqrt(random())
-    const a = random() * 2.0 * PI.$
-    return vec2f(cos(a), sin(a)).mul(rad)
-  },
-  'blur',
-)
+// circleBlurVar lives in its own file (./circleBlurVar), the weight-respecting
+// implementation. The inline copy that used to live here registered the same
+// 'circleBlurVar' type literal, producing a duplicate entry in `variationTypes`
+// (and a duplicate pill in the Blur category).

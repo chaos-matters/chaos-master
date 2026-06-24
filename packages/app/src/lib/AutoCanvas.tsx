@@ -3,7 +3,7 @@ import { useElementSize } from '@/utils/useElementSize'
 import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { CanvasContextProvider } from './CanvasContext'
 import { useRootContext } from './RootContext'
-import type { ParentProps } from 'solid-js'
+import type { JSX, ParentProps } from 'solid-js'
 import type { ElementSize } from '@/utils/useElementSize'
 
 const { navigator } = window
@@ -17,6 +17,12 @@ type AutoCanvasProps = {
   fixedResolution?: { width: number; height: number }
   alphaMode?: GPUCanvasAlphaMode
   onVisibilityChange?: (isVisible: boolean) => void
+  // Accessibility: forwarded to the underlying <canvas>. The default canvas has
+  // no text alternative; the main editor instance sets these so screen readers
+  // get a name + description for the otherwise-opaque WebGPU surface.
+  role?: JSX.HTMLAttributes<HTMLCanvasElement>['role']
+  ariaLabel?: string
+  ariaDescribedby?: string
 }
 
 export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
@@ -108,6 +114,9 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
           props.ref?.(el)
         }}
         class={props.class}
+        role={props.role}
+        aria-label={props.ariaLabel}
+        aria-describedby={props.ariaDescribedby}
         style={{
           width: '100%',
           height: '100%',

@@ -1,5 +1,5 @@
 import { deepClone } from '@/utils/clone'
-import { prettyPrintValibotErrors } from '@/utils/prettyPrintValibotErrors'
+import { prettyPrintValibotErrors, processValibotErrors, } from '@/utils/prettyPrintValibotErrors'
 import { recordEntries } from '@/utils/record'
 import * as v from '@/valibot'
 import { AffineParamsSchema } from '../affineTranform'
@@ -301,6 +301,28 @@ export function validateFlame(data: unknown): FlameDescriptor {
     return parseFlame(schema3D.FlameDescriptor, data)
   }
   return parseFlame(schema2D.FlameDescriptor, data)
+}
+
+/**
+ * Like {@link validateFlame} but collects errors via callback instead of
+ * throwing. Returns `undefined` on failure so the caller can show inline
+ * diagnostics (e.g. the Migration modal).
+ */
+export function validateFlameWithErrors(
+  data: unknown,
+  errorCallback: (err: string) => void,
+): FlameDescriptor | undefined {
+  migrateFlameVariationTypes(data)
+  const dimensions = (data as { renderSettings?: { dimensions?: number } })
+    ?.renderSettings?.dimensions
+  const schema =
+    dimensions === 3 ? schema3D.FlameDescriptor : schema2D.FlameDescriptor
+  const result = v.safeParse(schema, data)
+  if (!result.success) {
+    processValibotErrors(v.flatten(result.issues), errorCallback)
+    return undefined
+  }
+  return result.output
 }
 
 export function validateFlame3D(data: unknown): FlameDescriptor3D {

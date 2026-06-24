@@ -43,6 +43,8 @@ import { example41 } from './example41'
 import { example42 } from './example42'
 import { example43 } from './example43'
 import { example44 } from './example44'
+import { example45 } from './example45'
+import { example46 } from './example46'
 import { initExample } from './initExample'
 import { initExample3D } from './initExample3D'
 import { invCircleEx1, invCircleEx2 } from './invCircle'
@@ -98,6 +100,8 @@ export const examples = {
   example42,
   example43,
   example44,
+  example45,
+  example46,
   linear1,
   invCircleEx1,
   invCircleEx2,

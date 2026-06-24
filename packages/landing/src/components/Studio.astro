@@ -1,0 +1,232 @@
+---
+import StudioDemo from './StudioDemo.tsx'
+// The viewport + TRANSFORMS panel are one interactive Solid island (they share a
+// reactive flame store so scrubbing an affine updates both). Styles are global
+// (the island DOM isn't Astro-scoped) but namespaced under #studio.
+---
+
+<section id="studio" class="wrap">
+  <p class="kicker">Under the hood</p>
+  <h2>The math, live.</h2>
+  <p class="sec-lede">
+    Define affine transforms and variations, weight their probabilities, and let
+    the GPU resolve millions of iterations in real time. Drag the coefficients —
+    the flame re-solves under your hands.
+  </p>
+
+  <StudioDemo client:only="solid-js" />
+</section>
+
+<style is:global>
+  #studio astro-island {
+    display: block;
+  }
+  #studio .studio-stage {
+    margin-top: 48px;
+    display: grid;
+    grid-template-columns: 1.55fr 1fr;
+    gap: 18px;
+    align-items: stretch;
+  }
+  #studio .studio-viewport {
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    overflow: hidden;
+    /* deep-space tint — also the graceful empty state without WebGPU */
+    background: radial-gradient(
+      120% 120% at 50% 40%,
+      rgba(20, 24, 50, 0.45),
+      #000 74%
+    );
+    min-height: 440px;
+  }
+  #studio .studio-viewport astro-island {
+    position: absolute;
+    inset: 0;
+  }
+  #studio .hud {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--neutral-400);
+    letter-spacing: 0.04em;
+  }
+  #studio .hud .row {
+    display: flex;
+    justify-content: space-between;
+  }
+  #studio .corner {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+  }
+  #studio .c1 {
+    top: 10px;
+    left: 10px;
+    border-right: 0;
+    border-bottom: 0;
+  }
+  #studio .c2 {
+    top: 10px;
+    right: 10px;
+    border-left: 0;
+    border-bottom: 0;
+  }
+  #studio .c3 {
+    bottom: 10px;
+    left: 10px;
+    border-right: 0;
+    border-top: 0;
+  }
+  #studio .c4 {
+    bottom: 10px;
+    right: 10px;
+    border-left: 0;
+    border-top: 0;
+  }
+
+  #studio .panel {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    background: var(--neutral-950);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    font-family: var(--mono);
+  }
+  #studio .ph {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.72rem;
+    color: var(--neutral-500);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  #studio .ph-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  #studio .ph-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--neutral-400);
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: var(--round);
+    padding: 3px 10px;
+    cursor: pointer;
+    transition: 0.15s;
+  }
+  #studio .ph-btn:hover {
+    color: #fff;
+    border-color: var(--blue-500);
+  }
+  #studio .ph-btn svg {
+    width: 10px;
+    height: 10px;
+    display: block;
+  }
+  /* animate button while a run is playing — accent + the icon becomes a stop */
+  #studio .animate.running {
+    color: var(--blue-300);
+    border-color: var(--blue-500);
+    background: rgba(37, 99, 235, 0.16);
+  }
+  /* panel is read-only while animating; dim the draggable values */
+  #studio .panel.animating .scrub {
+    cursor: default;
+    color: var(--neutral-400);
+    border-bottom-color: transparent;
+  }
+  #studio .xform {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 11px 12px;
+  }
+  #studio .xh {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.76rem;
+    color: var(--neutral-200);
+  }
+  #studio .swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+  }
+  #studio .prob {
+    margin-left: auto;
+    color: var(--neutral-500);
+  }
+  #studio .matrix {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px 10px;
+    margin-top: 9px;
+    font-size: 0.72rem;
+    color: var(--neutral-400);
+    /* Touch: a scrub is a drag, not text — stop the affine-coef letters and
+       their values from selecting / popping the iOS callout (copy / "look up")
+       on tap or long-press. */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  #studio .matrix b {
+    color: #fff;
+    font-weight: 500;
+  }
+  #studio .scrub {
+    cursor: ew-resize;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.25);
+    padding-bottom: 1px;
+    touch-action: none;
+    transition: color 0.12s;
+  }
+  #studio .scrub:hover {
+    color: var(--blue-300);
+    border-bottom-color: var(--blue-400);
+  }
+  #studio .vbar {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 9px;
+  }
+  #studio .vtag {
+    font-size: 0.64rem;
+    padding: 3px 7px;
+    border-radius: 4px;
+    background: rgba(96, 165, 250, 0.12);
+    color: var(--blue-300);
+  }
+  #studio .live {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--blue-400);
+  }
+
+  @media (max-width: 860px) {
+    #studio .studio-stage {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

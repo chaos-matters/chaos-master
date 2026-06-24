@@ -1,0 +1,32 @@
+---
+// DEV-ONLY page for generating static flame posters via headed Playwright.
+// Renders nothing in production builds (import.meta.env.DEV gate) so it doesn't
+// ship a usable route. Not linked from anywhere.
+// Usage: pnpm --filter @chaos-master/landing dev, then run
+//   scripts/capture-posters.mjs  → public/posters/<name>.jpg
+import PosterCapture from '../components/PosterCapture.tsx'
+
+const isDev = import.meta.env.DEV
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>poster-capture</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+      }
+      :global(.plate-canvas) {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    {isDev && <PosterCapture client:only="solid-js" />}
+  </body>
+</html>

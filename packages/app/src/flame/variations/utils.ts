@@ -2,7 +2,7 @@ import { produce, unfreeze } from 'structurajs'
 import { defineExample, defineExample3D } from '../examples/util'
 import { generateTransformId, generateVariationId } from '../transformFunction'
 import { isParametricVariationType3D, isVariationType3D, transformVariations3D, } from '../variations3D'
-import { allTransformVariations, isParametricVariationType, transformVariations, } from '.'
+import { allTransformVariations, isParametricVariationType, transformVariations, variationTypes, } from '.'
 import type { FlameDescriptor, TransformId, VariationId, } from '../schema/flameSchema'
 import type { TransformVariationType3D } from '../variations3D'
 import type { TransformVariationDescriptor, TransformVariationType } from '.'
@@ -1128,4 +1128,83 @@ export function getVariationPreviewFlame3D(
   type: TransformVariationType3D,
 ): FlameDescriptor {
   return previewFlames3D[type] ?? getDefaultFlameByVarType3D(type)
+}
+
+/**
+ * Generate a flame with one transform containing the given variation types
+ * (all at weight 1.0). Useful as a reference/demo in the Migration modal.
+ *
+ * `types` defaults to every registered variation, but callers should scope it
+ * (e.g. to the 'general'/'blur' categories): packing all ~140 variations into a
+ * single transform overflows the GPU uniform buffer.
+ */
+export function getTransformWithAllVariations(
+  types: readonly TransformVariationType[] = variationTypes,
+): FlameDescriptor {
+  return defineExample({
+    renderSettings: {
+      exposure: 0.3,
+      skipIters: 1,
+      drawMode: 'light',
+      backgroundColor: [0, 0, 0],
+      camera: {
+        zoom: 1,
+        position: [0, 0],
+      },
+      colorInitMode: 'colorInitPosition',
+    },
+    transforms: {
+      [getTransformPreviewTid('linearVar')]: {
+        probability: 1,
+        preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+        postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+        color: { x: 0, y: 0 },
+        variations: Object.fromEntries(
+          types.map((name) => [
+            getTransformPreviewVid(name),
+            getVariationDefault(name, 1.0),
+          ]),
+        ),
+      },
+    },
+  })
+}
+
+/**
+ * Generate a flame where each transform uses a single distinct variation type.
+ * Useful as a reference/demo in the Migration modal.
+ *
+ * `types` defaults to every registered variation; callers should scope it, as
+ * one transform per variation across all ~140 types overflows the GPU buffers.
+ */
+export function getTransformsForEachVariation(
+  types: readonly TransformVariationType[] = variationTypes,
+): FlameDescriptor {
+  return defineExample({
+    renderSettings: {
+      exposure: 0.3,
+      skipIters: 1,
+      drawMode: 'light',
+      backgroundColor: [0, 0, 0],
+      camera: {
+        zoom: 1,
+        position: [0, 0],
+      },
+      colorInitMode: 'colorInitPosition',
+    },
+    transforms: Object.fromEntries(
+      types.map((name) => [
+        getTransformPreviewTid(name),
+        {
+          probability: 1,
+          preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+          postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+          color: { x: 0, y: 0 },
+          variations: {
+            [getTransformPreviewVid(name)]: getVariationDefault(name, 1.0),
+          },
+        },
+      ]),
+    ),
+  })
 }

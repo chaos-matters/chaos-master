@@ -5,6 +5,7 @@ import { EditorView, keymap, lineNumbers } from '@codemirror/view'
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { ensureMathJax, getMathJax } from '@/utils/mathjax'
 import { mathToWgsl } from '@/utils/mathToWgsl'
+import { sanitizeRichHtml } from '@/utils/sanitizeHtml'
 import { rainbowBracketPlugin } from '../WgslEditor/rainbowBrackets'
 import { wgslTheme } from '../WgslEditor/theme'
 import ui from './MathEditor.module.css'
@@ -198,7 +199,7 @@ export function MathEditor(props: MathEditorProps) {
             <div
               ref={previewRef}
               class={ui.mathRender}
-              innerHTML={renderedSvg()}
+              innerHTML={sanitizeRichHtml(renderedSvg())}
             />
           </Show>
           <Show when={!loading() && !error() && !renderedSvg()}>

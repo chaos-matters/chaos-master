@@ -4,6 +4,7 @@ import BoxArrowRight from './box-arrow-right.svg'
 import CameraIcon from './camera.svg'
 import Changelog from './changelog.svg'
 import ChevronDown from './chevron-down.svg'
+import Copy from './copy.svg'
 import Cross from './cross.svg'
 import Discord from './discord.svg'
 import Download from './download.svg'
@@ -41,6 +42,7 @@ export {
   CameraIcon,
   Changelog,
   ChevronDown,
+  Copy,
   Cross,
   Discord,
   Download,

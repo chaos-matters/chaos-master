@@ -1,0 +1,731 @@
+/* Chaos Master landing — design tokens lifted verbatim from packages/app design
+   system (designSystem/colors.css): monochrome oklch neutral ramp + a single blue
+   accent, Inter. Color comes from the art, not the chrome. */
+:root {
+  /* neutrals (oklch grayscale) */
+  --neutral-50: oklch(98.5% 0 0);
+  --neutral-100: oklch(97% 0 0);
+  --neutral-200: oklch(92.2% 0 0);
+  --neutral-300: oklch(87% 0 0);
+  --neutral-400: oklch(70.8% 0 0);
+  --neutral-500: oklch(55.6% 0 0);
+  --neutral-600: oklch(43.9% 0 0);
+  --neutral-700: oklch(37.1% 0 0);
+  --neutral-800: oklch(26.9% 0 0);
+  --neutral-900: oklch(20.5% 0 0);
+  --neutral-950: oklch(14.5% 0 0);
+
+  /* blue accent ramp */
+  --blue-300: #93c5fd;
+  --blue-400: #60a5fa;
+  --blue-500: #3b82f6;
+  --blue-600: #2563eb;
+  --blue-700: #1d4ed8;
+
+  /* spacing (0.25rem base) */
+  --spacing: 0.25rem;
+  --space-1: var(--spacing);
+  --space-2: calc(var(--spacing) * 2);
+  --space-3: calc(var(--spacing) * 3);
+  --space-4: calc(var(--spacing) * 4);
+  --space-6: calc(var(--spacing) * 6);
+  --space-8: calc(var(--spacing) * 8);
+  --round: 100vh;
+
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: #000;
+  color: var(--neutral-100);
+  font-family: var(--font);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: var(--blue-600);
+  color: #fff;
+}
+
+/* ---- shared layout / typography ---- */
+.wrap {
+  max-width: 1240px;
+  margin-inline: auto;
+  padding-inline: 28px;
+}
+
+section {
+  position: relative;
+  padding-block: clamp(80px, 11vw, 150px);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+}
+
+h2 {
+  font-size: clamp(1.9rem, 4vw, 3rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.06;
+}
+
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.74rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--blue-400);
+  margin: 0 0 18px;
+}
+
+.kicker::before {
+  content: '';
+  width: 26px;
+  height: 1px;
+  background: var(--blue-500);
+}
+
+.sec-lede {
+  color: var(--neutral-400);
+  font-size: 1.12rem;
+  line-height: 1.6;
+  max-width: 56ch;
+  margin: 18px 0 0;
+}
+
+/* ---- buttons (shared across nav, hero, CTAs) ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 12px 22px;
+  border-radius: var(--round);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+/* Primary CTA: a frosted blue-tinted glass rather than a solid vivid-blue block,
+   so it reads as the accent action without the harsh contrast — the art stays the
+   loudest thing on the page. The blue tint + border keep it distinct from the
+   neutral ghost button. */
+.btn-primary {
+  color: #fff;
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(96, 165, 250, 0.42);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.3);
+}
+
+.btn-primary:hover {
+  background: rgba(59, 130, 246, 0.26);
+  border-color: rgba(96, 165, 250, 0.7);
+  transform: translateY(-2px);
+}
+
+.btn-ghost {
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.btn-ghost:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-2px);
+}
+
+.pill {
+  padding: 8px 16px;
+}
+
+/* Launch/external-link glyph inside a CTA button (replaces the old "→"). The
+   button is inline-flex with a gap, so the icon sits after the label. */
+.btn-ico {
+  display: inline-flex;
+}
+.btn-ico svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+/* Canvas produced by the app's AutoCanvas inside a live GPU island. Rendered by
+   Solid (outside Astro's scoped styles), so it lives here in global. */
+.hero-gpu-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ---- gallery grid ----
+   The gallery grid is a Solid island (one shared ComputeGate gates every live
+   preview), so its styles are global rather than Astro-scoped. */
+.gallery {
+  margin-top: 52px;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+}
+.plate {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  /* deep-space tint — also the graceful empty state if WebGPU is unavailable */
+  background: radial-gradient(
+    120% 120% at 50% 35%,
+    rgba(22, 26, 52, 0.45),
+    #000 72%
+  );
+  aspect-ratio: 1;
+  will-change: transform;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
+}
+.plate:hover {
+  transform: translateY(-4px) scale(1.012);
+  box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.75);
+  border-color: rgba(96, 165, 250, 0.35);
+  z-index: 2;
+}
+.plate.wide {
+  aspect-ratio: 16/10;
+}
+.plate.tall {
+  aspect-ratio: 3/4;
+}
+.plate-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Interactive 3D canvases (community cards + Explore modal): claim touch gestures
+   so one-finger drag orbits and two-finger pinch zooms, instead of the page
+   scrolling/zooming. Mouse wheel still zooms on desktop. */
+.flame-orbit {
+  touch-action: none;
+}
+
+/* Static poster behind a live flame (gallery plates + community cards). Rendered
+   in the DOM BEFORE the canvas, so the live canvas paints on top once ready; the
+   poster shows whenever the live render can't run (no WebGPU / GPU failure /
+   off-screen / not yet converged). PosterFlame toggles `.is-hidden` to fade it. */
+.flame-poster {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+  transition: opacity 0.8s ease;
+}
+.flame-poster.is-hidden {
+  opacity: 0;
+}
+/* Converged → frozen: the live canvas unmounts and this poster (the same image)
+   takes over. Snap to fully visible with no fade so there's no flash as the
+   canvas disappears. */
+.flame-poster.is-frozen {
+  opacity: 1;
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .flame-poster {
+    transition: none;
+  }
+}
+
+/* "Open in Chaos Master" button — rendered inside the flame islands (gallery
+   plates + community cards), revealed on hover of the card/plate. */
+.open-in-app {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: #fff;
+  background: rgba(37, 99, 235, 0.85);
+  border: 1px solid rgba(147, 197, 253, 0.55);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  transform: translateY(-4px) scale(0.92);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease,
+    background 0.15s ease;
+  pointer-events: none;
+}
+.open-in-app svg {
+  width: 16px;
+  height: 16px;
+}
+.plate:hover .open-in-app,
+.orbit-card:hover .open-in-app,
+.ev-stage:hover .open-in-app,
+.open-in-app:focus-visible {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.open-in-app:hover {
+  background: var(--blue-500);
+  transform: translateY(-1px);
+}
+.plate .meta {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 16px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.78));
+  opacity: 0;
+  transform: translateY(8px);
+  transition: 0.25s;
+  pointer-events: none;
+}
+.plate:hover .meta {
+  opacity: 1;
+  transform: none;
+}
+.plate .meta .t {
+  font-weight: 600;
+  font-size: 0.98rem;
+}
+.plate .meta .v {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--neutral-400);
+  letter-spacing: 0.04em;
+  margin-top: 4px;
+}
+.span6 {
+  grid-column: span 6;
+}
+.span4 {
+  grid-column: span 4;
+}
+.span8 {
+  grid-column: span 8;
+}
+@media (max-width: 860px) {
+  .gallery {
+    grid-template-columns: repeat(6, 1fr);
+  }
+  .span6,
+  .span4,
+  .span8 {
+    grid-column: span 6;
+  }
+}
+
+/* ---- scroll choreography ----
+   Sections fade/slide up as they enter the viewport. Gated on `.js` (set by an
+   inline head script) so no-JS still shows everything, and only under
+   prefers-reduced-motion: no-preference. */
+@media (prefers-reduced-motion: no-preference) {
+  .js main > section {
+    opacity: 0;
+    transform: translateY(28px);
+    transition:
+      opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .js main > section.is-revealed {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* staggered cards once the features section reveals */
+  .js #features .feat,
+  .js #features .soon-card {
+    opacity: 0;
+    transform: translateY(18px);
+    transition:
+      opacity 0.55s ease,
+      transform 0.55s ease;
+  }
+  .js #features.is-revealed .feat,
+  .js #features.is-revealed .soon-card {
+    opacity: 1;
+    transform: none;
+  }
+  .js #features.is-revealed .feat:nth-child(2) {
+    transition-delay: 0.07s;
+  }
+  .js #features.is-revealed .feat:nth-child(3) {
+    transition-delay: 0.14s;
+  }
+  .js #features.is-revealed .feat:nth-child(4) {
+    transition-delay: 0.21s;
+  }
+  .js #features.is-revealed .feat:nth-child(5) {
+    transition-delay: 0.28s;
+  }
+  .js #features.is-revealed .feat:nth-child(6) {
+    transition-delay: 0.35s;
+  }
+}
+
+/* ---- "Explore Earth Flame" CTA (on the earth community card) ---- */
+.explore-btn {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: var(--round);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(13, 16, 38, 0.72);
+  border: 1px solid rgba(147, 197, 253, 0.4);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 24px -10px rgba(0, 0, 0, 0.7);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+.explore-btn svg {
+  width: 15px;
+  height: 15px;
+}
+.explore-btn:hover {
+  background: var(--blue-600);
+  border-color: var(--blue-400);
+  transform: translateX(-50%) translateY(-2px);
+}
+
+/* ---- Earth Flame variants gallery modal (Portal'd to <body>) ---- */
+.ev-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(4, 6, 16, 0.78);
+  backdrop-filter: blur(10px);
+  animation: ev-fade 0.2s ease;
+}
+@keyframes ev-fade {
+  from {
+    opacity: 0;
+  }
+}
+.ev-modal {
+  width: min(680px, 100%);
+  max-height: calc(100svh - 48px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, #0c0f1d, #070810);
+  box-shadow: 0 40px 120px -30px rgba(0, 0, 0, 0.85);
+}
+.ev-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ev-kicker {
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--neutral-400);
+}
+.ev-title {
+  margin: 4px 0 2px;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+.ev-tag {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--neutral-400);
+}
+.ev-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ev-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border-radius: var(--round);
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--neutral-200);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  cursor: pointer;
+  transition: 0.15s;
+}
+.ev-play svg {
+  width: 13px;
+  height: 13px;
+}
+.ev-play:hover {
+  color: #fff;
+  border-color: var(--blue-500);
+}
+.ev-play.playing {
+  color: var(--blue-300);
+  border-color: var(--blue-500);
+  background: rgba(37, 99, 235, 0.16);
+}
+.ev-close {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--neutral-300);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  cursor: pointer;
+  transition: 0.15s;
+}
+.ev-close svg {
+  width: 18px;
+  height: 18px;
+}
+.ev-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+.ev-stage {
+  position: relative;
+  aspect-ratio: 16 / 11;
+  width: 100%;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: radial-gradient(
+    120% 120% at 50% 38%,
+    rgba(16, 18, 44, 0.7),
+    #000 72%
+  );
+}
+.ev-stage-hint {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  z-index: 2;
+  pointer-events: none;
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.04em;
+  color: var(--neutral-400);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.85);
+}
+.ev-thumbs {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+.ev-thumb {
+  position: relative;
+  display: block;
+  padding: 0;
+  border-radius: 9px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #000;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+.ev-thumb img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+.ev-thumb span {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 8px 4px 4px;
+  font-size: 0.58rem;
+  font-weight: 600;
+  text-align: center;
+  color: #fff;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.82));
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.ev-thumb:hover {
+  transform: translateY(-2px);
+  border-color: rgba(147, 197, 253, 0.5);
+}
+.ev-thumb:hover span {
+  opacity: 1;
+}
+.ev-thumb.active {
+  border-color: var(--blue-400);
+  box-shadow: 0 0 0 1px var(--blue-500);
+}
+.ev-thumb.active span {
+  opacity: 1;
+}
+@media (max-width: 560px) {
+  .ev-thumbs {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  /* Collapse Auto-play to an icon-only button so it always fits the top-right. */
+  .ev-play-label {
+    display: none;
+  }
+  .ev-play {
+    padding: 8px;
+  }
+  .ev-title {
+    font-size: 1.15rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ev-backdrop {
+    animation: none;
+  }
+}
+
+/* Touch: stop long-press from selecting / opening the OS context menu over the
+   flame previews (gallery plates, community cards, modal stage + thumbnails) —
+   a long-press there should do nothing, not pop "save image". Paired with
+   onContextMenu preventDefault on the same containers. */
+.plate,
+.orbit-card,
+.ev-stage,
+.ev-thumb {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Phones: the live previews are nearly the full width of the screen, so claiming
+   every touch gesture (touch-action: none) leaves almost no surface to scroll the
+   page — you have to find a thin sliver beside the flame. Instead let a one-finger
+   VERTICAL drag scroll the page through the preview, while the flame still reacts
+   to horizontal drag (pan / orbit), two-finger pinch-zoom (TouchPinchGuard), and
+   tap-to-spin. The big, immersive preview stays; only the wasted scroll-blocking
+   goes. Tablets (more screen around the preview) keep full touch-action: none. */
+@media (max-width: 640px) {
+  .flame-orbit {
+    touch-action: pan-y;
+  }
+}
+
+/* Floating "scroll to top" — phones only. Hidden until the page is scrolled past
+   the first viewport, then fades in bottom-right (thumb-reachable, clear of the
+   sticky nav). Deliberately small, translucent and blurred so it never competes
+   with the art. */
+.to-top {
+  position: fixed;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 90;
+  display: none; /* enabled only on small screens (media query below) */
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  color: var(--neutral-100);
+  background: rgba(18, 18, 20, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(12px) scale(0.92);
+  pointer-events: none;
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+}
+.to-top svg {
+  width: 20px;
+  height: 20px;
+}
+.to-top.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+.to-top:active {
+  background: rgba(40, 40, 44, 0.7);
+}
+@media (max-width: 640px) {
+  .to-top {
+    display: inline-flex;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .to-top,
+  .to-top.visible {
+    transition: opacity 0.2s ease;
+    transform: none;
+  }
+}

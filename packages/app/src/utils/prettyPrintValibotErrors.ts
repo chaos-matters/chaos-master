@@ -24,3 +24,19 @@ export function prettyPrintValibotErrors(
     console.table(other)
   }
 }
+
+export function processValibotErrors(
+  flatErrors: ReturnType<typeof flatten>,
+  errCallback: (err: string) => void,
+) {
+  const { root, nested, other } = flatErrors
+  root?.forEach(errCallback)
+  if (nested !== undefined) {
+    Object.entries(nested).forEach(([key, value]) => {
+      errCallback(
+        `${key}: ${Array.isArray(value) ? value.join(' & ') : 'Unknown Issue'}`,
+      )
+    })
+  }
+  other?.forEach(errCallback)
+}
