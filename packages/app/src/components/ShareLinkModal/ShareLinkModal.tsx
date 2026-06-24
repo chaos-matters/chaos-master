@@ -1,4 +1,5 @@
 import { createEffect, createSignal, Show } from 'solid-js'
+import { exportFlameXml } from '@/flame/flameXml'
 import { deriveOgMeta, encodeShareUrl, shortenShareUrl, uploadOgPreview, } from '@/utils/shareLink'
 import { Button } from '../Button/Button'
 import { Checkbox } from '../Checkbox/Checkbox'
@@ -156,6 +157,25 @@ function ShareLinkModal(props: ShareLinkModalProps) {
         >
           Copy JSON
         </Button>
+        <Show
+          when={(props.flameDescriptor.renderSettings.dimensions ?? 2) === 2}
+        >
+          <Button
+            onClick={() => {
+              // flam3/Apophysis interop: export the (2D) flame as a .flame XML
+              // so it can be opened in Apophysis/flam3. Animation is omitted —
+              // the .flame format carries a single static flame.
+              void copyToClipboard(
+                exportFlameXml(
+                  props.flameDescriptor,
+                  props.flameDescriptor.metadata?.name,
+                ),
+              )
+            }}
+          >
+            Copy flam3 XML
+          </Button>
+        </Show>
       </footer>
     </>
   )

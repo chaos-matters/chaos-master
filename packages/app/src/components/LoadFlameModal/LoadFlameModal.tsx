@@ -5,6 +5,7 @@ import { ANIMATION_PREVIEW_POINT_COUNT, COMPUTE_GATE_CAPACITY, IS_DEV, STATIC_PR
 import { examples } from '@/flame/examples'
 import { animationDefs, getAnimationFlame } from '@/flame/examples/animations'
 import { Flam3 } from '@/flame/Flam3'
+import { isFlameXmlContent, parseFlameXml, registerImportedFlamePalette, } from '@/flame/flameXml'
 import { camera3DDefault } from '@/flame/schema/flameSchema'
 import { Cross } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
@@ -568,13 +569,20 @@ function ExampleItem(props: {
   )
 }
 
-async function pickPngFile(): Promise<File | null> {
+async function pickFlameFile(): Promise<File | null> {
   try {
     if ('showOpenFilePicker' in window) {
       const fileHandles = await window
         .showOpenFilePicker({
           id: 'load-flame-from-file',
-          types: [{ accept: { 'image/png': ['.png'] } }],
+          types: [
+            {
+              accept: {
+                'image/png': ['.png'],
+                'text/xml': ['.flame', '.xml'],
+              },
+            },
+          ],
         })
         .catch(() => undefined)
       if (!fileHandles) {
@@ -591,7 +599,7 @@ async function pickPngFile(): Promise<File | null> {
   return await new Promise<File | null>((resolve) => {
     const input = document.createElement('input')
     input.type = 'file'
-    input.accept = 'image/png,.png'
+    input.accept = 'image/png,.png,.flame,.xml'
     input.style.position = 'fixed'
     input.style.left = '-9999px'
     input.style.width = '1px'
@@ -644,7 +652,33 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
   )
   const is3DWorkspace = (props.currentDimensions ?? 2) === 3
 
-  async function processPngFile(file: File) {
+  async function processImportFile(file: File) {
+    const name = file.name.toLowerCase()
+    const isXml = name.endsWith('.flame') || name.endsWith('.xml')
+
+    if (isXml) {
+      // .flame XML import
+      try {
+        const text = await file.text()
+        if (!isFlameXmlContent(text)) {
+          void showAlert(
+            `'${file.name}' does not appear to be a valid .flame file.`,
+          )
+          return
+        }
+        const flame = parseFlameXml(text)
+        // Save the file's embedded gradient to the user's palette library
+        // (deduped by content) so it can be reapplied / edited later.
+        registerImportedFlamePalette(text)
+        props.respond(flame)
+      } catch (err) {
+        console.warn(err)
+        void showAlert(`Failed to parse '${file.name}' as .flame file.`)
+      }
+      return
+    }
+
+    // PNG import (existing)
     const arrBuf = new Uint8Array(await file.arrayBuffer())
     try {
       const result = await extractFlameFromPng(arrBuf)
@@ -664,9 +698,9 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
   }
 
   async function loadFromFile() {
-    const file = await pickPngFile()
+    const file = await pickFlameFile()
     if (!file) return
-    await processPngFile(file)
+    await processImportFile(file)
   }
 
   function handleDragOver(e: DragEvent) {
@@ -688,7 +722,7 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
     setIsDragging(false)
     const file = e.dataTransfer?.files?.[0]
     if (!file) return
-    await processPngFile(file)
+    await processImportFile(file)
   }
 
   const requestModal = useRequestModal()
@@ -720,7 +754,7 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
       </ModalTitleBar>
       <p class={ui.modalSubtitle}>
         Select a preset to begin, load a recent creation, or import a saved PNG
-        config.
+        or .flame config.
       </p>
       <div
         class={ui.uploadZone}

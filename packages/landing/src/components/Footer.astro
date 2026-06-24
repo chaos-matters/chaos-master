@@ -1,0 +1,87 @@
+---
+import { LAUNCH_ICON } from '../icons'
+
+const appUrl = 'https://chaos-master.com'
+const repoUrl = 'https://github.com/chaos-matters/chaos-master'
+// Discord: hit the app worker's /discord redirect (302 → DISCORD_INVITE_URL
+// secret, rotatable via `wrangler secret put`) instead of baking the raw invite
+// into the static bundle — same architecture the app uses. The landing is
+// static-only, so we point at the app domain that owns the worker.
+const discordUrl = `${appUrl}/discord`
+// Ko-fi support page — a public link, no worker/secret needed.
+const supportUrl = 'https://ko-fi.com/chaosmatters'
+const year = new Date().getFullYear()
+
+// Icons inlined from the app's icon set (packages/app/src/icons/*.svg) so they
+// match exactly — the footer is static Astro, so we can't import the app's Solid
+// SVG components without an island. The launch glyph is shared with the CTA
+// buttons via src/icons.ts.
+const icons = {
+  launch: LAUNCH_ICON,
+  github: `<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 0C4.475 0 0 4.475 0 10a9.994 9.994 0 006.838 9.488c.5.087.687-.213.687-.476 0-.237-.013-1.024-.013-1.862-2.512.463-3.162-.612-3.362-1.175-.113-.287-.6-1.175-1.025-1.412-.35-.188-.85-.65-.013-.663.788-.013 1.35.725 1.538 1.025.9 1.512 2.337 1.087 2.912.825.088-.65.35-1.088.638-1.338-2.225-.25-4.55-1.112-4.55-4.937 0-1.088.387-1.987 1.025-2.688-.1-.25-.45-1.274.1-2.65 0 0 .837-.262 2.75 1.026a9.28 9.28 0 012.5-.338c.85 0 1.7.112 2.5.337 1.912-1.3 2.75-1.024 2.75-1.024.55 1.375.2 2.4.1 2.65.637.7 1.025 1.587 1.025 2.687 0 3.838-2.337 4.688-4.562 4.938.362.312.675.912.675 1.85 0 1.337-.013 2.412-.013 2.75 0 .262.188.574.688.474A10.016 10.016 0 0020 10c0-5.525-4.475-10-10-10z"/></svg>`,
+  discord: `<svg viewBox="0 2 24 20" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>`,
+  heart: `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`,
+}
+
+const links = [
+  { href: appUrl, label: 'Launch app', icon: 'launch' },
+  { href: repoUrl, label: 'GitHub', icon: 'github' },
+  { href: discordUrl, label: 'Discord', icon: 'discord' },
+  { href: supportUrl, label: 'Support', icon: 'heart', accent: true },
+]
+---
+
+<footer>
+  <div class="wrap foot-in">
+    <span class="copy">© {year} Chaos Matters · AGPL-3.0</span>
+    <nav class="foot-nav">
+      {
+        links.map((l) => (
+          <a href={l.href} class={l.accent ? 'accent' : ''}>
+            <span class="foot-ico" set:html={icons[l.icon as keyof typeof icons]} />
+            {l.label}
+          </a>
+        ))
+      }
+    </nav>
+  </div>
+</footer>
+
+<style>
+  footer {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-block: 34px;
+    color: var(--neutral-500);
+    font-size: 0.88rem;
+  }
+  .foot-in {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .foot-nav {
+    display: flex;
+    gap: 22px;
+    flex-wrap: wrap;
+  }
+  .foot-nav a {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--neutral-400);
+    transition: color 0.15s ease;
+  }
+  .foot-nav a:hover {
+    color: var(--neutral-100);
+  }
+  .foot-nav a.accent:hover {
+    color: #ff5e7e;
+  }
+  .foot-ico :global(svg) {
+    width: 15px;
+    height: 15px;
+    display: block;
+  }
+</style>

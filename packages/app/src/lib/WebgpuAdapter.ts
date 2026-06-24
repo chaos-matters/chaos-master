@@ -142,12 +142,26 @@ export async function initializeWebgpuDevice(
     .catch(console.error)
 }
 
+// In-flight initialization, shared by concurrent callers. Without this, several
+// Roots mounting on the same frame (e.g. a gallery of live previews) each see
+// `gpuDevice === null` and call initializeWebgpuDevice, acquiring multiple
+// adapters/devices — the extras are orphaned but still hold GPU memory, which on
+// constrained impls (Firefox/Linux/AMD) pushes the page into OOM. Coalescing to a
+// single init means one shared device for the whole page.
+let initInFlight: Promise<void> | null = null
+
 export async function getWebgpuComponents(
   adapterPreferences?: GPURequestAdapterOptions,
   deviceFeatures?: GPUDeviceDescriptor,
 ) {
   if (gpuDevice === null || gpuAdapter === null) {
-    await initializeWebgpuDevice(adapterPreferences, deviceFeatures)
+    initInFlight ??= initializeWebgpuDevice(
+      adapterPreferences,
+      deviceFeatures,
+    ).finally(() => {
+      initInFlight = null
+    })
+    await initInFlight
   }
 
   assertIfWebgpuAdapterUnavailable(gpuAdapter)

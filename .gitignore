@@ -12,3 +12,6 @@ test-results
 **/.claude/skills/
 # Local scratch space (not part of the project)
 /assets/local/
+
+# Astro generated cache
+**/.astro/

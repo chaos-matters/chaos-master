@@ -1,8 +1,13 @@
 /* @refresh reload */
 import './styles/index.css'
-import 'solid-devtools'
 import { render } from 'solid-js/web'
 import { Wrappers } from './App'
+
+// Solid Devtools is opt-in: it instruments every component (a real dev-startup
+// cost) and must never ship to production. Enable with `VITE_DEVTOOLS=1 pnpm dev`.
+if (import.meta.env.DEV && import.meta.env.VITE_DEVTOOLS) {
+  void import('solid-devtools')
+}
 
 const root = document.getElementById('root')
 

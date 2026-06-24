@@ -30,6 +30,10 @@ type Props = {
   setDimensions: (v: number) => void
   flyMode: () => boolean
   setFlyMode: (v: boolean) => void
+  // Sidebar show/hide (mirrors the 'F' shortcut) — so it's controllable without
+  // a keyboard.
+  sidebarOpen: () => boolean
+  onToggleSidebar: () => void
   isPlaying: () => boolean
   togglePlay: () => void
   // Quality presets
@@ -195,6 +199,7 @@ export function FloatingActions(props: Props) {
             <button
               class={ui.button}
               onClick={props.onLoadFlame}
+              aria-label="Load Flame"
               title="Load Flame"
               data-tour-target="load-flame"
             >
@@ -203,6 +208,7 @@ export function FloatingActions(props: Props) {
             <button
               class={ui.button}
               onClick={props.onSaveForLater}
+              aria-label="Save for Later"
               title="Save for Later"
               data-tour-target="save-for-later"
             >
@@ -212,6 +218,7 @@ export function FloatingActions(props: Props) {
             <button
               class={ui.button}
               onClick={props.onRender}
+              aria-label="Render image or animation"
               title="Render image or animation"
               data-tour-target="export-png"
             >
@@ -220,6 +227,7 @@ export function FloatingActions(props: Props) {
             <button
               class={ui.button}
               onClick={props.onQuickExport}
+              aria-label="Quick Export"
               title="Quick Export"
               data-tour-target="quick-export"
             >
@@ -229,6 +237,7 @@ export function FloatingActions(props: Props) {
             <button
               class={ui.button}
               onClick={props.onShareLink}
+              aria-label="Share Link"
               title="Share Link"
               data-tour-target="share-link"
             >
@@ -237,6 +246,7 @@ export function FloatingActions(props: Props) {
             <button
               class={ui.button}
               onClick={props.onShareDiscord}
+              aria-label="Share to Discord"
               title="Share to Discord"
               data-tour-target="share-discord"
             >
@@ -246,6 +256,11 @@ export function FloatingActions(props: Props) {
               class={ui.button}
               onClick={props.onLogoFavicon}
               disabled={props.dimensions() === 3}
+              aria-label={
+                props.dimensions() === 3
+                  ? 'Logo/Favicon (available only in 2D)'
+                  : 'Logo/Favicon'
+              }
               title={
                 props.dimensions() === 3
                   ? 'Logo/Favicon (available only in 2D)'
@@ -259,6 +274,7 @@ export function FloatingActions(props: Props) {
               <button
                 class={ui.button}
                 onClick={props.onRandomizeColors}
+                aria-label="Randomize Colors"
                 title="Randomize Colors"
                 data-tour-target="randomize-colors"
               >
@@ -400,6 +416,32 @@ export function FloatingActions(props: Props) {
                 <line x1="2" y1="4" x2="14" y2="4" />
                 <line x1="2" y1="8" x2="10" y2="8" />
                 <line x1="2" y1="12" x2="12" y2="12" />
+              </svg>
+            </button>
+
+            {/* Show / Hide Sidebar (mirrors the 'F' shortcut) — grouped with the
+                other show/hide toggles. */}
+            <button
+              class={ui.toggle}
+              classList={{ [ui.toggleActive as string]: props.sidebarOpen() }}
+              onClick={props.onToggleSidebar}
+              title={
+                props.sidebarOpen() ? 'Hide sidebar (F)' : 'Show sidebar (F)'
+              }
+            >
+              {/* Sidebar panel icon — a panel with a left rail. */}
+              <svg
+                viewBox="0 0 16 16"
+                width="13"
+                height="13"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.3"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="2" y="2.5" width="12" height="11" rx="1.5" />
+                <line x1="6.2" y1="2.5" x2="6.2" y2="13.5" />
               </svg>
             </button>
 

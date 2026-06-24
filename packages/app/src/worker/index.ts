@@ -23,6 +23,9 @@ export interface Env {
 }
 
 const SHORTEN_TTL = 60 * 24 * 60 * 60 // 60 days in seconds
+// Upper bound on a shortener payload (an encoded flame + optional timeline).
+// Bounds per-write KV storage and cost; a real payload is well under this.
+const MAX_SHORTEN_PAYLOAD = 256 * 1024 // 256 KB
 // Upper bound on an OG upload (JSON body). Legit previews are ~1–1.5 MB; this
 // caps abuse so R2 storage — and cost — stays bounded.
 const MAX_OG_UPLOAD = 4 * 1024 * 1024 // ~4 MB
@@ -247,7 +250,7 @@ async function injectMeta(
   })
 }
 
-export default {
+const baseHandler = {
   async fetch(request: Request, env: Env, _ctx: unknown): Promise<Response> {
     const url = new URL(request.url)
     const { pathname } = url
@@ -270,9 +273,15 @@ export default {
     // ── Create a short link ────────────────────────────────────────────────
     if (pathname === '/api/shorten' && request.method === 'POST') {
       try {
-        const { payload } = (await request.json()) as { payload: string }
-        if (!payload || typeof payload !== 'string') {
+        const { payload } = (await request.json()) as { payload?: unknown }
+        if (typeof payload !== 'string' || payload.length === 0) {
           return json({ error: 'Invalid payload' }, 400)
+        }
+        // Bound the stored value (the other write endpoints already cap their
+        // uploads; the shortener was the one that didn't). Checking the parsed
+        // string length, not the spoofable content-length header.
+        if (payload.length > MAX_SHORTEN_PAYLOAD) {
+          return json({ error: 'Payload too large' }, 413)
         }
         const shortId = generateShortId()
         await env.KV_SHORTENER.put(shortId, payload, {
@@ -305,11 +314,26 @@ export default {
     // ogKey(payload) — so both ?s= and ?flame= links can resolve it.
     if (pathname.startsWith('/api/og/') && request.method === 'POST') {
       const key = pathname.split('/').pop()
-      if (!key) return json({ error: 'Missing key' }, 400)
+      // The key is a content hash — exactly 32 lowercase hex chars (see
+      // `ogKey`). Validate the shape so a malformed/abusive key never reaches
+      // R2 or KV.
+      if (!key || !/^[0-9a-f]{32}$/.test(key)) {
+        return json({ error: 'Invalid key' }, 400)
+      }
       if (Number(request.headers.get('content-length') ?? 0) > MAX_OG_UPLOAD) {
         return json({ error: 'Image too large' }, 413)
       }
       try {
+        // First-writer-wins. The key is a public, client-recomputable hash of
+        // the share payload, so the first honest upload is by definition the
+        // correct image for that key. Freezing it closes the cache-poisoning
+        // vector — otherwise anyone could recompute a shared flame's key and
+        // overwrite its social-preview image/title/description. Honest
+        // re-uploads of the same content are simply idempotent.
+        const existing = await env.OG_IMAGES.head(key)
+        if (existing) {
+          return json({ ok: true, deduped: true })
+        }
         const body = (await request.json()) as {
           image?: string
           title?: string
@@ -320,6 +344,11 @@ export default {
         }
         if (body.image.length > MAX_OG_UPLOAD) {
           return json({ error: 'Image too large' }, 413)
+        }
+        // Reject non-PNG uploads up front (every PNG's base64 starts with the
+        // encoded 8-byte signature) — the same guard the Discord path uses.
+        if (!body.image.startsWith('iVBORw0KGgo')) {
+          return json({ error: 'Not a PNG image' }, 415)
         }
         const ogBytes = base64ToBytes(body.image)
         await env.OG_IMAGES.put(key, ogBytes, {
@@ -410,6 +439,12 @@ export default {
 
       // Per-IP daily cap via KV (counts attempts, so a broken webhook can't be
       // used to hammer the endpoint). Fail-open on KV hiccups.
+      //
+      // Best-effort by design: KV has no atomic increment, so this get-then-put
+      // races under concurrency and the cap can be modestly overshot. That is
+      // acceptable here — the native per-IP DISCORD_RL limiter (1/min) is the
+      // hard bound; this cap only smooths long-tail daily volume. Promote to a
+      // Durable Object if an exact cap is ever required.
       try {
         const day = new Date().toISOString().slice(0, 10)
         const capKey = `dshare:${ip}:${day}`
@@ -542,5 +577,52 @@ export default {
 
     // Everything else → static assets (the frontend)
     return env.ASSETS.fetch(request)
+  },
+}
+
+// Headers applied to every response (API, OG image, redirect, static assets).
+// CSP is ENFORCED. `'unsafe-eval'` is required: TypeGPU rebuilds shader
+// functions at runtime via `new Function`, so WebGPU rendering breaks without
+// it (it also covers WebAssembly compilation). `'unsafe-inline'` in style-src
+// covers inline / CSS-in-JS styles. This is deliberately not a "strict" CSP,
+// but it still blocks inline <script> / event-handler injection (no
+// 'unsafe-inline' in script-src), cross-origin scripts / frames / connections,
+// clickjacking (frame-ancestors), and <base> injection.
+const SECURITY_HEADERS: Readonly<Record<string, string>> = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'X-Frame-Options': 'DENY',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Content-Security-Policy': [
+    "default-src 'self'",
+    "img-src 'self' data: blob:",
+    // 'unsafe-eval' is mandatory — TypeGPU uses new Function for shader codegen.
+    "script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' https://challenges.cloudflare.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "connect-src 'self' https://challenges.cloudflare.com",
+    'frame-src https://challenges.cloudflare.com',
+    "worker-src 'self' blob:",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+  ].join('; '),
+}
+
+/** Return a copy of `res` with the security headers applied. */
+function withSecurityHeaders(res: Response): Response {
+  const headers = new Headers(res.headers)
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    headers.set(name, value)
+  }
+  return new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers,
+  })
+}
+
+export default {
+  async fetch(request: Request, env: Env, ctx: unknown): Promise<Response> {
+    return withSecurityHeaders(await baseHandler.fetch(request, env, ctx))
   },
 }

@@ -229,6 +229,7 @@ function HelpModal(props: HelpModalProps) {
               class={ui.iconLink}
               href="https://ko-fi.com/chaosmatters"
               target="_blank"
+              aria-label="Support on Ko-fi"
               title="Support on Ko-fi"
             >
               <Heart />
@@ -237,6 +238,7 @@ function HelpModal(props: HelpModalProps) {
               class={ui.iconLink}
               href="https://github.com/sponsors/chaos-matters"
               target="_blank"
+              aria-label="Sponsor on GitHub"
               title="Sponsor on GitHub"
             >
               <GitHub />
@@ -245,6 +247,7 @@ function HelpModal(props: HelpModalProps) {
               class={ui.iconLink}
               href="/discord"
               target="_blank"
+              aria-label="Join Discord"
               title="Join Discord"
             >
               <Discord />
@@ -252,6 +255,7 @@ function HelpModal(props: HelpModalProps) {
             <button
               class={ui.iconBtn}
               onClick={showChangelog}
+              aria-label="View Changelog"
               title="View Changelog"
             >
               <Changelog />
@@ -260,6 +264,7 @@ function HelpModal(props: HelpModalProps) {
               class={ui.iconBtn}
               classList={{ [ui.consoleActive!]: showConsole() }}
               onClick={() => setShowConsole((v) => !v)}
+              aria-label="Console Logs"
               title="Console Logs"
             >
               <Terminal />
@@ -271,6 +276,7 @@ function HelpModal(props: HelpModalProps) {
                   props.respond()
                   props.onInjectCrash?.()
                 }}
+                aria-label="Inject Crash (dev only)"
                 title="Inject Crash (dev only)"
               >
                 <TriangleAlert />

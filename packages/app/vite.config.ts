@@ -27,6 +27,10 @@ const commitHash = resolveCommitHash()
 
 const ANALYZE_BUNDLE = Boolean(process.env.VITE_ANALYZE_BUNDLE)
 
+// Solid Devtools is opt-in — it instruments every component (a real dev-startup
+// cost). Off by default for fast loads; enable with `VITE_DEVTOOLS=1 pnpm dev`.
+const ENABLE_DEVTOOLS = Boolean(process.env.VITE_DEVTOOLS)
+
 // Proxies Worker routes to local `wrangler dev`. On a proxy error (typically the
 // Worker not running) it answers 502 immediately so the browser fails fast,
 // instead of hanging until the client-side request timeout.
@@ -57,7 +61,7 @@ export default defineConfig({
     solidPlugin(),
     solidSvg({ defaultAsComponent: true }),
     typegpuPlugin({}),
-    devtools(),
+    ENABLE_DEVTOOLS ? devtools() : undefined,
     ssl(),
     qrcode(),
     ANALYZE_BUNDLE ? bundleAnalyzer() : undefined,
@@ -79,6 +83,16 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    // Pre-transform the heaviest eagerly-imported modules during server boot so
+    // the first page load isn't stuck transforming the ~400-module variation
+    // catalogue on the critical path (the dev-only white screen). Doesn't reduce
+    // total work — overlaps it with startup so the first navigation hits cache.
+    warmup: {
+      clientFiles: [
+        './src/MainWorkspace.tsx',
+        './src/flame/variations/index.ts',
+      ],
+    },
     // Proxy Worker routes to `pnpm wr-dev` (wrangler on :8787) so the API and
     // the /discord redirect work from the vite dev server. Both run side by side.
     proxy: {

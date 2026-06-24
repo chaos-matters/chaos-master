@@ -1,5 +1,5 @@
 import { f32, vec3f } from 'typegpu/data'
-import { acos, atan2, cos, dot, exp, length, pow, select, sin, sqrt, } from 'typegpu/std'
+import { acos, atan2, cos, dot, exp, floor, fract, length, pow, select, sin, sqrt, } from 'typegpu/std'
 import { random, randomUnitSphere } from '@/shaders/random'
 import { EPS, PI } from '../../constants'
 import { simpleVariation3D } from './types'
@@ -86,6 +86,31 @@ export const gaussian3D = simpleVariation3D(
     'use gpu'
     const r = random() + random() + random() + random() - 2
     return randomUnitSphere().mul(r)
+  },
+  'blur',
+)
+
+// Projects every point onto the unit sphere surface — a clean spherical shell
+// (a planet/globe), unlike spherical3D's inversion or bubble3D's soft bounding.
+export const sphere3D = simpleVariation3D('sphere3D', (pos, _varInfo) => {
+  'use gpu'
+  const r = length(pos) + EPS.$
+  return pos.div(r)
+})
+
+// A real 3D starfield: each hit picks one of a fixed set of stars (a random
+// index hashed to a stable position), so plots CONCENTRATE onto discrete points
+// = bright crisp stars, rather than a continuous (dim) random haze. The stars
+// are real 3D points on a far shell, so they orbit with the camera (parallax).
+export const starfield3D = simpleVariation3D(
+  'starfield3D',
+  (_pos, _varInfo) => {
+    'use gpu'
+    const id = floor(random() * 240) // one of ~240 stars
+    const a = fract(sin(id * 12.9898) * 43758.547) * 2 * PI.$
+    const b = fract(sin(id * 78.233) * 43758.547) * PI.$
+    const rad = 3 + fract(sin(id * 37.719) * 43758.547) * 2.2
+    return vec3f(sin(b) * cos(a), cos(b), sin(b) * sin(a)).mul(rad)
   },
   'blur',
 )

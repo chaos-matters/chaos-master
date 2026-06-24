@@ -39,6 +39,7 @@ import { createShowHelp } from './components/HelpModal/HelpModal'
 import { ConfirmOverwriteRecentModal } from './components/LoadFlameModal/ConfirmOverwriteRecentModal'
 import { createLoadFlame } from './components/LoadFlameModal/LoadFlameModal'
 import { createLogoFaviconGenerator } from './components/LogoFaviconGenerator/LogoFaviconGenerator'
+import { createMigrationModal } from './components/Migration/Migration'
 import { useRequestModal } from './components/Modal/ModalContext'
 import { OrientationGizmo } from './components/OrientationGizmo/OrientationGizmo'
 import { PaletteSelector } from './components/PaletteSelector/PaletteSelector'
@@ -802,55 +803,72 @@ export function MainWorkspace(props: AppProps) {
     return flameDescriptor.renderSettings.camera.position
   }
 
-  const setFlameTheta: Setter<number> = (value) => {
-    timeline.setPreviewHeld(false)
-    setFlameDescriptor((draft) => {
-      draft.renderSettings.camera3D.theta =
-        typeof value === 'function'
-          ? value(draft.renderSettings.camera3D.theta)
-          : value
-    })
-    return flameDescriptor.renderSettings.camera3D.theta
+  // Build a Setter<number> for a uniform camera3D scalar: detach the held-frame
+  // preview (Blender-like), apply the value/updater into the store, return the
+  // result. theta/phi/radius/fov/roll were byte-for-byte identical modulo the
+  // field; zoom (clamped), position (vec2) and target3D (vec3) stay bespoke.
+  function makeCamera3DSetter(
+    read: (c: FlameDescriptor['renderSettings']['camera3D']) => number,
+    write: (draft: FlameDescriptor, next: number) => void,
+  ): Setter<number> {
+    return (value) => {
+      timeline.setPreviewHeld(false)
+      setFlameDescriptor((draft) => {
+        const prev = read(draft.renderSettings.camera3D)
+        write(
+          draft,
+          typeof value === 'function'
+            ? (value as (p: number) => number)(prev)
+            : value,
+        )
+      })
+      return read(flameDescriptor.renderSettings.camera3D)
+    }
   }
-  const setFlamePhi: Setter<number> = (value) => {
-    timeline.setPreviewHeld(false)
-    setFlameDescriptor((draft) => {
-      draft.renderSettings.camera3D.phi =
-        typeof value === 'function'
-          ? value(draft.renderSettings.camera3D.phi)
-          : value
-    })
-    return flameDescriptor.renderSettings.camera3D.phi
-  }
-  const setFlameRadius: Setter<number> = (value) => {
-    timeline.setPreviewHeld(false)
-    setFlameDescriptor((draft) => {
-      draft.renderSettings.camera3D.radius =
-        typeof value === 'function'
-          ? value(draft.renderSettings.camera3D.radius)
-          : value
-    })
-    return flameDescriptor.renderSettings.camera3D.radius
-  }
+  const setFlameTheta = makeCamera3DSetter(
+    (c) => c.theta,
+    (d, v) => {
+      d.renderSettings.camera3D.theta = v
+    },
+  )
+  const setFlamePhi = makeCamera3DSetter(
+    (c) => c.phi,
+    (d, v) => {
+      d.renderSettings.camera3D.phi = v
+    },
+  )
+  const setFlameRadius = makeCamera3DSetter(
+    (c) => c.radius,
+    (d, v) => {
+      d.renderSettings.camera3D.radius = v
+    },
+  )
   // 3D auto-exposure: drive the real Exposure value from the camera zoom so the
   // slider visibly tracks it. exposure = base + strength*log(radius/refRadius),
   // neutral at the radius where the toggle was enabled. The exposure read is
   // untracked so manual edits between zooms aren't immediately reverted.
-  createEffect(() => {
+  // The target is a pure derivation of the camera/auto-exposure settings, so it
+  // lives in a memo; the effect's only job is to write it back (reading the
+  // current exposure untracked so it never re-subscribes to its own output).
+  const autoExposureTarget = createMemo<number | null>(() => {
     const rs = flameDescriptor.renderSettings
-    if (!rs.autoExposure3D || (rs.dimensions ?? 2) !== 3) return
+    if (!rs.autoExposure3D || (rs.dimensions ?? 2) !== 3) return null
     const radius = rs.camera3D?.radius ?? 0
     const ref = rs.autoExposure3DRefRadius
-    if (radius <= 0 || ref <= 0) return
-    const target =
+    if (radius <= 0 || ref <= 0) return null
+    return (
       rs.autoExposure3DBase + rs.autoExposure3DStrength * Math.log(radius / ref)
-    untrack(() => {
-      if (Math.abs(target - flameDescriptor.renderSettings.exposure) > 1e-4) {
-        setFlameDescriptor((draft) => {
-          draft.renderSettings.exposure = target
-        })
-      }
-    })
+    )
+  })
+  createEffect(() => {
+    const target = autoExposureTarget()
+    if (target === null) return
+    const current = untrack(() => flameDescriptor.renderSettings.exposure)
+    if (Math.abs(target - current) > 1e-4) {
+      setFlameDescriptor((draft) => {
+        draft.renderSettings.exposure = target
+      })
+    }
   })
   const setFlameTarget3D = (value: Vec3 | ((prev: Vec3) => Vec3)) => {
     setFlameDescriptor((draft) => {
@@ -866,26 +884,18 @@ export function MainWorkspace(props: AppProps) {
     })
     return new Float32Array(flameDescriptor.renderSettings.camera3D.target)
   }
-  const setFlameFov: Setter<number> = (value) => {
-    timeline.setPreviewHeld(false)
-    setFlameDescriptor((draft) => {
-      draft.renderSettings.camera3D.fov =
-        typeof value === 'function'
-          ? value(draft.renderSettings.camera3D.fov)
-          : value
-    })
-    return flameDescriptor.renderSettings.camera3D.fov
-  }
-  const setFlameRoll: Setter<number> = (value) => {
-    timeline.setPreviewHeld(false)
-    setFlameDescriptor((draft) => {
-      draft.renderSettings.camera3D.roll =
-        typeof value === 'function'
-          ? value(draft.renderSettings.camera3D.roll)
-          : value
-    })
-    return flameDescriptor.renderSettings.camera3D.roll
-  }
+  const setFlameFov = makeCamera3DSetter(
+    (c) => c.fov,
+    (d, v) => {
+      d.renderSettings.camera3D.fov = v
+    },
+  )
+  const setFlameRoll = makeCamera3DSetter(
+    (c) => c.roll,
+    (d, v) => {
+      d.renderSettings.camera3D.roll = v
+    },
+  )
 
   // First-person "fly" navigation for 3D flames. Session-only (you don't want
   // to reopen the app mid-flight); the movement speed is remembered.
@@ -1071,6 +1081,8 @@ export function MainWorkspace(props: AppProps) {
   )
 
   const { showDiscordShareModal } = createDiscordShareModal()
+
+  const { showMigrationModal } = createMigrationModal(history)
 
   /** Waits until the canvas backing-store size stops changing (the resize is
    *  reactive and may be debounced) so export dimensions read a settled size. */
@@ -1293,22 +1305,55 @@ export function MainWorkspace(props: AppProps) {
     })
   }
 
+  type RandomizeSettings = {
+    skipIters: boolean
+    skipItersRange?: [number, number]
+    exposure: boolean
+    exposureRange?: [number, number]
+    contrast: boolean
+    contrastRange?: [number, number]
+    gamma: boolean
+    gammaRange?: [number, number]
+    highlightPower: boolean
+    highlightPowerRange?: [number, number]
+    vibrancy: boolean
+    vibrancyRange?: [number, number]
+  }
+  // Apply the randomizer's per-field "randomize this setting" toggles onto a
+  // render-settings object. Extracted so Generate and Mutate share one source
+  // of truth — the two copies were byte-identical and would silently drift.
+  const applyRandomizeSettings = (
+    rs: FlameDescriptor['renderSettings'],
+    s: RandomizeSettings,
+  ): void => {
+    if (s.skipIters) {
+      const r = s.skipItersRange ?? [5, 30]
+      rs.skipIters = Math.floor(randomRange(r[0], r[1] + 1))
+    }
+    if (s.exposure) {
+      const r = s.exposureRange ?? [-2, 2]
+      rs.exposure = randomRange(r[0], r[1])
+    }
+    if (s.contrast) {
+      const r = s.contrastRange ?? [0.5, 4.0]
+      rs.contrast = randomRange(r[0], r[1])
+    }
+    if (s.gamma) {
+      const r = s.gammaRange ?? [1.0, 3.5]
+      rs.gamma = randomRange(r[0], r[1])
+    }
+    if (s.highlightPower) {
+      const r = s.highlightPowerRange ?? [0.1, 0.9]
+      rs.highlightPower = randomRange(r[0], r[1])
+    }
+    if (s.vibrancy) {
+      const r = s.vibrancyRange ?? [0.2, 0.8]
+      rs.vibrancy = randomRange(r[0], r[1])
+    }
+  }
   const runGenerateFlame = async (
     config: GenerateRandomFlameConfig,
-    randomizeSettings: {
-      skipIters: boolean
-      skipItersRange?: [number, number]
-      exposure: boolean
-      exposureRange?: [number, number]
-      contrast: boolean
-      contrastRange?: [number, number]
-      gamma: boolean
-      gammaRange?: [number, number]
-      highlightPower: boolean
-      highlightPowerRange?: [number, number]
-      vibrancy: boolean
-      vibrancyRange?: [number, number]
-    },
+    randomizeSettings: RandomizeSettings,
     recordHistory: boolean,
   ) => {
     if (recordHistory) {
@@ -1333,41 +1378,7 @@ export function MainWorkspace(props: AppProps) {
     const prevRs = flameDescriptor.renderSettings
     const rs = deepClone(prevRs)
 
-    // Skip Iters
-    if (randomizeSettings.skipIters) {
-      const r = randomizeSettings.skipItersRange ?? [5, 30]
-      rs.skipIters = Math.floor(randomRange(r[0], r[1] + 1))
-    }
-
-    // Exposure
-    if (randomizeSettings.exposure) {
-      const r = randomizeSettings.exposureRange ?? [-2, 2]
-      rs.exposure = randomRange(r[0], r[1])
-    }
-
-    // Contrast
-    if (randomizeSettings.contrast) {
-      const r = randomizeSettings.contrastRange ?? [0.5, 4.0]
-      rs.contrast = randomRange(r[0], r[1])
-    }
-
-    // Gamma
-    if (randomizeSettings.gamma) {
-      const r = randomizeSettings.gammaRange ?? [1.0, 3.5]
-      rs.gamma = randomRange(r[0], r[1])
-    }
-
-    // Highlight Power
-    if (randomizeSettings.highlightPower) {
-      const r = randomizeSettings.highlightPowerRange ?? [0.1, 0.9]
-      rs.highlightPower = randomRange(r[0], r[1])
-    }
-
-    // Vibrancy
-    if (randomizeSettings.vibrancy) {
-      const r = randomizeSettings.vibrancyRange ?? [0.2, 0.8]
-      rs.vibrancy = randomRange(r[0], r[1])
-    }
+    applyRandomizeSettings(rs, randomizeSettings)
 
     newFlame.renderSettings = rs
     history.replace(newFlame, 'Randomize Flame')
@@ -1375,20 +1386,7 @@ export function MainWorkspace(props: AppProps) {
 
   const runMutateFlame = async (
     config: GenerateRandomFlameConfig,
-    randomizeSettings: {
-      skipIters: boolean
-      skipItersRange?: [number, number]
-      exposure: boolean
-      exposureRange?: [number, number]
-      contrast: boolean
-      contrastRange?: [number, number]
-      gamma: boolean
-      gammaRange?: [number, number]
-      highlightPower: boolean
-      highlightPowerRange?: [number, number]
-      vibrancy: boolean
-      vibrancyRange?: [number, number]
-    },
+    randomizeSettings: RandomizeSettings,
     mutationSettings: MutateFlameOptions,
     recordHistory: boolean,
   ) => {
@@ -1414,41 +1412,7 @@ export function MainWorkspace(props: AppProps) {
     const prevRs = flameDescriptor.renderSettings
     const rs = deepClone(prevRs)
 
-    // Skip Iters
-    if (randomizeSettings.skipIters) {
-      const r = randomizeSettings.skipItersRange ?? [5, 30]
-      rs.skipIters = Math.floor(randomRange(r[0], r[1] + 1))
-    }
-
-    // Exposure
-    if (randomizeSettings.exposure) {
-      const r = randomizeSettings.exposureRange ?? [-2, 2]
-      rs.exposure = randomRange(r[0], r[1])
-    }
-
-    // Contrast
-    if (randomizeSettings.contrast) {
-      const r = randomizeSettings.contrastRange ?? [0.5, 4.0]
-      rs.contrast = randomRange(r[0], r[1])
-    }
-
-    // Gamma
-    if (randomizeSettings.gamma) {
-      const r = randomizeSettings.gammaRange ?? [1.0, 3.5]
-      rs.gamma = randomRange(r[0], r[1])
-    }
-
-    // Highlight Power
-    if (randomizeSettings.highlightPower) {
-      const r = randomizeSettings.highlightPowerRange ?? [0.1, 0.9]
-      rs.highlightPower = randomRange(r[0], r[1])
-    }
-
-    // Vibrancy
-    if (randomizeSettings.vibrancy) {
-      const r = randomizeSettings.vibrancyRange ?? [0.2, 0.8]
-      rs.vibrancy = randomRange(r[0], r[1])
-    }
+    applyRandomizeSettings(rs, randomizeSettings)
 
     mutatedFlame.renderSettings = rs
     history.replace(mutatedFlame, 'Mutate Flame')
@@ -2537,8 +2501,28 @@ export function MainWorkspace(props: AppProps) {
                   <Menu />
                 </button>
               </Show>
+              {/* Text alternative for the WebGPU canvas (WCAG 1.1.1): a name
+                  via aria-label plus a live, screen-reader-only description of
+                  the current flame (a pixel-accurate alt is impossible for
+                  generative art, so describe its structure instead). */}
+              <p id="flame-canvas-desc" class="sr-only" aria-live="polite">
+                {(() => {
+                  const name = flameDescriptor.metadata?.name?.trim()
+                  const count = Object.keys(
+                    flameDescriptor.transforms ?? {},
+                  ).length
+                  const label =
+                    name && name.toLowerCase() !== 'unknown'
+                      ? name
+                      : 'Untitled flame'
+                  return `${label}: ${count} transform${count === 1 ? '' : 's'}.`
+                })()}
+              </p>
               <AutoCanvas
                 class={ui.canvas}
+                role="img"
+                ariaLabel="Fractal flame preview"
+                ariaDescribedby="flame-canvas-desc"
                 pixelRatio={canvasPixelRatio()}
                 fixedResolution={exportDimensions()}
               >
@@ -3853,6 +3837,18 @@ export function MainWorkspace(props: AppProps) {
                           <button
                             class={ui.addFlameButton}
                             onClick={() => {
+                              void showMigrationModal(
+                                structuredClone(
+                                  JSON.parse(JSON.stringify(flameDescriptor)),
+                                ),
+                              )
+                            }}
+                          >
+                            Migration
+                          </button>
+                          <button
+                            class={ui.addFlameButton}
+                            onClick={() => {
                               setFlameDescriptor((draft) => {
                                 draft.transforms[generateTransformId()] =
                                   deepClone(newDefaultTransform())
@@ -4817,6 +4813,17 @@ export function MainWorkspace(props: AppProps) {
                 showToast(
                   'Fly mode: click to look around · WASD/arrows move · Space/C up/down · Q/E roll · Esc to release',
                 )
+              }
+            }}
+            sidebarOpen={showSidebar}
+            onToggleSidebar={() => {
+              // Same as the 'F' shortcut, so it works without a keyboard.
+              if ('startViewTransition' in document) {
+                document.startViewTransition(() => {
+                  setShowSidebar((p) => !p)
+                })
+              } else {
+                setShowSidebar((p) => !p)
               }
             }}
           />

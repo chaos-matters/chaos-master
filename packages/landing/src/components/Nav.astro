@@ -1,0 +1,105 @@
+---
+import { LAUNCH_ICON } from '../icons'
+
+const appUrl = 'https://chaos-master.com'
+const repoUrl = 'https://github.com/chaos-matters/chaos-master'
+---
+
+<nav class="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="#top">
+      <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+        <defs>
+          <linearGradient id="navArm" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#06d6c8" />
+            <stop offset="40%" stop-color="#a3e635" />
+            <stop offset="72%" stop-color="#ffae34" />
+            <stop offset="100%" stop-color="#ff5e7e" />
+          </linearGradient>
+          <radialGradient id="navCore" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#fff" />
+            <stop offset="55%" stop-color="#7be0e8" />
+            <stop offset="100%" stop-color="#7be0e8" stop-opacity="0" />
+          </radialGradient>
+        </defs>
+        <rect width="64" height="64" rx="15" fill="#0a0a12" />
+        <g
+          transform="rotate(-20 32 32)"
+          fill="none"
+          stroke="url(#navArm)"
+          stroke-width="6.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M32 32 C 24 19, 9 19, 9 32 C 9 45, 24 45, 32 32 C 40 19, 55 19, 55 32 C 55 45, 40 45, 32 32 Z" />
+        </g>
+        <circle cx="32" cy="32" r="7.5" fill="url(#navCore)" />
+        <circle cx="32" cy="32" r="2.4" fill="#fff" />
+      </svg>
+      Chaos Master
+    </a>
+    <div class="nav-links">
+      <a class="hide" href="#features">Features</a>
+      <a class="hide" href="#gallery">Gallery</a>
+      <a class="hide" href={repoUrl}>GitHub</a>
+      <a class="pill btn btn-primary" href={appUrl}
+        >Launch app<span class="btn-ico" set:html={LAUNCH_ICON} /></a
+      >
+    </div>
+  </div>
+</nav>
+
+<style>
+  .nav {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 40;
+    backdrop-filter: blur(14px);
+    background: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.7),
+      rgba(0, 0, 0, 0)
+    );
+  }
+  .nav-in {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 68px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+  }
+  .brand-mark {
+    width: 24px;
+    height: 24px;
+    flex: none;
+    border-radius: 7px;
+    filter: drop-shadow(0 0 10px rgba(123, 224, 232, 0.35));
+  }
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    font-size: 0.9rem;
+    color: var(--neutral-400);
+  }
+  .nav-links a:hover {
+    color: #fff;
+  }
+  .nav-links .pill {
+    color: #fff;
+  }
+
+  @media (max-width: 860px) {
+    .nav-links .hide {
+      display: none;
+    }
+  }
+</style>

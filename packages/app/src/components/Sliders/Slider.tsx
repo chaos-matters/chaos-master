@@ -122,6 +122,7 @@ export function Slider(props: SliderProps) {
             max={max()}
             step={step()}
             value={value()}
+            aria-valuetext={formatValue()}
             disabled={props.disabled}
             data-parameter-path={props.dataParameterPath}
             onPointerDown={() => {

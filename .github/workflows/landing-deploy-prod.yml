@@ -1,0 +1,41 @@
+name: Deploy landing (prod)
+
+# Deploy the marketing landing page to the PRODUCTION Worker
+# (about.chaos-master.com) on a landing release tag of the form `vA.B.C-web`
+# (A.B.C = the landing package version). Decoupled from the app's `v*` tags so a
+# landing release never ships the app and vice-versa.
+#
+# Building in CI (not a manual `pnpm deploy:prod`) avoids picking up a local
+# `.env.local` (e.g. PUBLIC_REMOTE_LOG=true) — the build uses only the committed
+# `.env`. `wrangler deploy` runs the build.command from wrangler.jsonc.
+on:
+  push:
+    tags:
+      - 'v*.*.*-web'
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy landing → prod
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build landing (static assets → dist/)
+        run: pnpm --filter @chaos-master/landing run build
+      - name: Deploy (prod)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --env prod
+          packageManager: pnpm
+          workingDirectory: packages/landing

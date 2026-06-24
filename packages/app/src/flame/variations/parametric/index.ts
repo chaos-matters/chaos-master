@@ -1,9 +1,7 @@
 import { blurLinear } from './blur/blurLinear'
 import { blurPixelizeVar } from './blur/blurPixelizeVar'
-import { blurZoom } from './blur/blurZoom'
 import { blurZoomVar } from './blur/blurZoomVar'
 import { radialBlurVar } from './blur/radialBlur'
-import { radialBlur } from './blur/radialBlurSimple'
 import { starBlurVar } from './blur/starBlur'
 import { cropBoxVar } from './crop/cropBoxVar'
 import { cropCrossVar } from './crop/cropCrossVar'
@@ -269,7 +267,6 @@ import { synthVar } from './synthVar'
 
 export const parametricVariations = {
   blurLinear,
-  blurZoom,
   postCircleCrop,
   preCurlVar,
   preGaussianVar,
@@ -280,7 +277,6 @@ export const parametricVariations = {
   postHeatVar,
   postMirrorWf,
   postPointSymmetryWf,
-  radialBlur,
   blob,
   cliffordVar,
   circus,

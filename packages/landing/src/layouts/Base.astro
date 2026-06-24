@@ -1,0 +1,157 @@
+---
+import '../styles/global.css'
+import Nav from '../components/Nav.astro'
+import Footer from '../components/Footer.astro'
+
+interface Props {
+  title?: string
+  description?: string
+}
+
+const {
+  title = 'Chaos Master — WebGPU IFS Flame Generator',
+  description = 'High-performance, real-time IFS fractal flame generation in the browser, powered by WebGPU. For artists and explorers.',
+} = Astro.props
+
+const canonical = new URL(Astro.url.pathname, Astro.site).href
+const ogImage = new URL('/hero-flame.jpg', Astro.site).href
+
+// Dev log piping: when PUBLIC_REMOTE_LOG=true (set in .env.local), mirror the
+// device's console + uncaught errors to the dev-server terminal via /__client-log
+// (see remoteLogPlugin in astro.config). For debugging phones/tablets that have
+// no usable console. Off by default; never active in a production build.
+const remoteLog =
+  import.meta.env.DEV && import.meta.env.PUBLIC_REMOTE_LOG === 'true'
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Mark JS available so reveal-on-scroll only hides content when it can be
+         animated back in (no-JS shows everything). Inline + synchronous so it
+         runs before first paint. -->
+    <script is:inline>document.documentElement.classList.add('js')</script>
+    {
+      remoteLog && (
+        <script is:inline>
+          {`(function () {
+            var ENDPOINT = '/__client-log';
+            function ser(a) {
+              try {
+                if (a instanceof Error) return a.name + ': ' + a.message + ' | ' + (a.stack || '');
+                if (typeof a === 'string') return a;
+                return JSON.stringify(a);
+              } catch (e) { return String(a); }
+            }
+            function send(level, args) {
+              try {
+                var payload = JSON.stringify({ level: level, args: [].map.call(args, ser) });
+                var ok = navigator.sendBeacon && navigator.sendBeacon(ENDPOINT, payload);
+                if (!ok) fetch(ENDPOINT, { method: 'POST', body: payload, keepalive: true }).catch(function () {});
+              } catch (e) {}
+            }
+            ['log', 'info', 'warn', 'error'].forEach(function (lvl) {
+              var orig = console[lvl] ? console[lvl].bind(console) : function () {};
+              console[lvl] = function () { orig.apply(console, arguments); send(lvl, arguments); };
+            });
+            window.addEventListener('error', function (e) {
+              send('error', ['[onerror] ' + (e.message || '') + ' @ ' + (e.filename || '') + ':' + (e.lineno || '')]);
+            });
+            window.addEventListener('unhandledrejection', function (e) {
+              send('error', ['[unhandledrejection] ' + ser(e.reason)]);
+            });
+            console.info('[remote-log] device console piped to dev terminal');
+          })();`}
+        </script>
+      )
+    }
+    <meta name="theme-color" content="#000000" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href={canonical} />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap"
+      rel="stylesheet"
+    />
+
+    <title>{title}</title>
+    <meta name="description" content={description} />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:url" content={canonical} />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+  </head>
+  <body>
+    <Nav />
+    <slot />
+    <Footer />
+
+    <button id="to-top" class="to-top" type="button" aria-label="Scroll to top">
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M12 19V5M5 12l7-7 7 7"></path>
+      </svg>
+    </button>
+
+    <script>
+      // Phone-only "scroll to top": reveal once past the first viewport, smooth
+      // (or instant under reduced-motion) scroll home on tap. CSS hides it above
+      // the phone breakpoint, so the listener is cheap and harmless on desktop.
+      const toTop = document.getElementById('to-top')
+      if (toTop) {
+        const onScroll = () => {
+          toTop.classList.toggle(
+            'visible',
+            window.scrollY > window.innerHeight * 0.6,
+          )
+        }
+        window.addEventListener('scroll', onScroll, { passive: true })
+        onScroll()
+        toTop.addEventListener('click', () => {
+          const reduce = window.matchMedia(
+            '(prefers-reduced-motion: reduce)',
+          ).matches
+          window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' })
+        })
+      }
+    </script>
+
+    <script>
+      // Reveal each section as it scrolls into view (one-shot).
+      const obs = new IntersectionObserver(
+        (entries, io) => {
+          for (const e of entries) {
+            if (e.isIntersecting) {
+              e.target.classList.add('is-revealed')
+              io.unobserve(e.target)
+            }
+          }
+        },
+        { rootMargin: '0px 0px -12% 0px', threshold: 0.08 },
+      )
+      document
+        .querySelectorAll('main > section')
+        .forEach((s) => obs.observe(s))
+    </script>
+  </body>
+</html>

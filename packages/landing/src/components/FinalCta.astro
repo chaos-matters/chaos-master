@@ -1,0 +1,29 @@
+---
+import { LAUNCH_ICON } from '../icons'
+
+const appUrl = 'https://chaos-master.com'
+---
+
+<section class="wrap final">
+  <h2>Start making fractals.</h2>
+  <p class="sub">
+    Free, open source, and running entirely in your browser.
+  </p>
+  <a class="btn btn-primary" href={appUrl}
+    >Launch Chaos Master<span class="btn-ico" set:html={LAUNCH_ICON} /></a
+  >
+</section>
+
+<style>
+  .final {
+    text-align: center;
+  }
+  .final h2 {
+    font-size: clamp(2.2rem, 5vw, 3.6rem);
+  }
+  .final .sub {
+    color: var(--neutral-400);
+    font-size: 1.12rem;
+    margin: 16px 0 32px;
+  }
+</style>
