@@ -124,11 +124,19 @@ function DiscordShareModal(props: DiscordShareModalProps) {
     }
   }
 
+  // Track the "Copied!" reset timer so it can't fire after the modal closes
+  // (a no-op write on a disposed scope) and so rapid re-copies don't stack.
+  let copiedResetTimer: ReturnType<typeof setTimeout> | undefined
+  onCleanup(() => {
+    clearTimeout(copiedResetTimer)
+  })
+
   async function copyLink() {
     const ok = await props.onCopyLink()
     if (ok) {
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      clearTimeout(copiedResetTimer)
+      copiedResetTimer = setTimeout(() => setCopied(false), 2000)
     }
   }
 

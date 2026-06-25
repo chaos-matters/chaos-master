@@ -1,4 +1,4 @@
-import { createEffect, createSignal, Show } from 'solid-js'
+import { createEffect, createSignal, onCleanup, Show } from 'solid-js'
 import { exportFlameXml } from '@/flame/flameXml'
 import { deriveOgMeta, encodeShareUrl, shortenShareUrl, uploadOgPreview, } from '@/utils/shareLink'
 import { Button } from '../Button/Button'
@@ -42,11 +42,19 @@ function ShareLinkModal(props: ShareLinkModalProps) {
   const primaryUrl = () => shortUrl() || longUrl()
   const hasShortLink = () => shortUrl() !== ''
 
+  // Track the "Copied!" reset timer so it can't fire after the modal closes
+  // (a no-op write on a disposed scope) and so rapid re-copies don't stack.
+  let copiedResetTimer: ReturnType<typeof setTimeout> | undefined
+  onCleanup(() => {
+    clearTimeout(copiedResetTimer)
+  })
+
   async function copyToClipboard(text: string) {
     if (!text) return
     await navigator.clipboard.writeText(text)
     setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    clearTimeout(copiedResetTimer)
+    copiedResetTimer = setTimeout(() => setCopied(false), 2000)
   }
 
   createEffect(() => {

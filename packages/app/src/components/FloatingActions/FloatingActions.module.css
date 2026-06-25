@@ -163,6 +163,11 @@
     transform: scale(0.92);
   }
 
+  &:focus-visible {
+    outline: 2px solid var(--neutral-500);
+    outline-offset: 2px;
+  }
+
   &:disabled {
     cursor: not-allowed;
     opacity: 0.4;
@@ -211,6 +216,11 @@
 
   &:active {
     transform: scale(0.92);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--neutral-500);
+    outline-offset: 2px;
   }
 
   [data-theme='dark'] & {

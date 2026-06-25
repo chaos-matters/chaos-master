@@ -2,6 +2,7 @@ import eslint from '@eslint/js'
 import tsParser from '@typescript-eslint/parser'
 import { defineConfig } from 'eslint/config'
 import { importX } from 'eslint-plugin-import-x'
+import security from 'eslint-plugin-security'
 import simpleImportSort from 'eslint-plugin-simple-import-sort'
 import tseslint from 'typescript-eslint'
 
@@ -303,6 +304,38 @@ export default defineConfig(
         'webkitResolveLocalFileSystemURL',
         'webkitStorageInfo',
       ],
+    },
+  },
+  {
+    // Security lint for the app source, including the Cloudflare Worker. Added for the
+    // local DevSecOps audit toolchain (see docs/local_security_setup.md). Deliberately
+    // kept at 'warn' so it surfaces findings as advisory telemetry without breaking
+    // `pnpm check`; it is NOT wired into CI.
+    //
+    // Only eslint-plugin-security is used. eslint-plugin-sonarjs was evaluated and
+    // dropped: it depends on `yaml`, which perturbed pnpm's peer resolution and pulled a
+    // duplicate `vite` instance that broke `tsc`, and its findings here were almost
+    // entirely false positives (WGSL `x != x` NaN checks, typed-zero `p - p` idioms).
+    files: ['packages/app/src/**/*.{ts,tsx}'],
+    plugins: { security },
+    rules: {
+      // Data-flow / injection sinks. Most relevant to the worker (Node-ish runtime);
+      // browser code rarely trips these.
+      'security/detect-unsafe-regex': 'warn',
+      'security/detect-non-literal-regexp': 'warn',
+      'security/detect-non-literal-require': 'warn',
+      'security/detect-non-literal-fs-filename': 'warn',
+      'security/detect-eval-with-expression': 'warn',
+      'security/detect-pseudoRandomBytes': 'warn',
+      'security/detect-possible-timing-attacks': 'warn',
+      'security/detect-no-csrf-before-method-override': 'warn',
+      'security/detect-buffer-noassert': 'warn',
+      'security/detect-child-process': 'warn',
+      'security/detect-disable-mustache-escape': 'warn',
+      'security/detect-new-buffer': 'warn',
+      'security/detect-bidi-characters': 'warn',
+      // Floods on every computed member access (obj[key]) — off by design.
+      'security/detect-object-injection': 'off',
     },
   },
   {
