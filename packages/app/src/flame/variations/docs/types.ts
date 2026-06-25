@@ -1,20 +1,22 @@
 import type { AnyVariationType } from '@/flame/variationRegistry'
 
 /**
- * How a parameter's value should be read. `angle` values are stored in
- * radians (and rendered in degrees by the editors). This is authored metadata
- * — the editors bake ranges/types into JSX closures, so they are not
- * machine-readable and must be described here.
+ * How a parameter's value should be read. `angle` values are stored in radians
+ * (rendered in degrees by the editors). The docs modal DERIVES value-type and
+ * range automatically by probing each variation's editor (see
+ * `ParametersOverview` / `paramMetaCapture`), so authored entries usually only
+ * need a `description`. `valueType`/`range` here act as overrides for the rare
+ * case where the derived value needs correcting.
  */
-export type ParamValueType = 'int' | 'float' | 'angle'
+export type ParamValueType = 'int' | 'float' | 'angle' | 'bool'
 
 export type ParamDoc = {
   /** What this parameter controls. */
   description: string
-  /** Inclusive [min, max] the editor allows. */
+  /** Override the derived inclusive [min, max]. */
   range?: readonly [number, number]
-  /** Value semantics, used to pick a badge/format. */
-  valueType: ParamValueType
+  /** Override the derived value semantics. */
+  valueType?: ParamValueType
   /** Optional unit suffix shown after the value (e.g. '×'). */
   unit?: string
 }
