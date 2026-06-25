@@ -1,7 +1,9 @@
 import { createSignal, For, Show } from 'solid-js'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
+import { ApiGuideTab } from './ApiGuideTab'
 import ui from './DocumentationModal.module.css'
+import { IfsGuideTab } from './IfsGuideTab'
 import { VariationDocsTab } from './VariationDocsTab'
 import type { HardwareTier } from '@/utils/hardwareTier'
 
@@ -44,20 +46,12 @@ function DocumentationModal(props: DocumentationModalProps) {
           <VariationDocsTab hardwareTier={props.hardwareTier} />
         </Show>
         <Show when={tab() === 'ifs'}>
-          <ComingSoon name="IFS" />
+          <IfsGuideTab />
         </Show>
         <Show when={tab() === 'api'}>
-          <ComingSoon name="API" />
+          <ApiGuideTab />
         </Show>
       </div>
-    </div>
-  )
-}
-
-function ComingSoon(props: { name: string }) {
-  return (
-    <div class={ui.placeholder}>
-      <p>{props.name} documentation is coming soon.</p>
     </div>
   )
 }

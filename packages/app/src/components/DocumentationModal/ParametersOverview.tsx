@@ -35,35 +35,48 @@ export function ParametersOverview(props: { type: AnyVariationType }) {
       when={fields().length > 0}
       fallback={<p class={ui.muted}>This variation takes no parameters.</p>}
     >
-      <div class={ui.paramTable}>
-        <For each={fields()}>
-          {(name) => {
-            const pd = (): ParamDoc | undefined => doc()?.params?.[name]
-            const def = () => entry()?.paramDefaults?.[name]
-            return (
-              <div class={ui.paramRow}>
-                <div class={ui.paramHead}>
-                  <span class={ui.paramName}>{name}</span>
-                  <Show when={pd()?.valueType}>
-                    <span class={ui.paramBadge}>{pd()!.valueType}</span>
-                  </Show>
-                </div>
-                <p class={ui.paramDesc}>
-                  {pd()?.description ?? 'Not yet documented.'}
-                </p>
-                <div class={ui.paramMeta}>
-                  <Show when={pd()?.range}>
-                    <span>range {formatRange(pd()!.range!)}</span>
-                  </Show>
-                  <Show when={def() !== undefined}>
-                    <span>default {formatNumber(def()!)}</span>
-                  </Show>
-                </div>
-              </div>
-            )
-          }}
-        </For>
-      </div>
+      <table class={ui.paramsTable}>
+        <thead>
+          <tr>
+            <th>Parameter</th>
+            <th>Type</th>
+            <th>Range</th>
+            <th>Default</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <For each={fields()}>
+            {(name) => {
+              const pd = (): ParamDoc | undefined => doc()?.params?.[name]
+              const def = () => entry()?.paramDefaults?.[name]
+              return (
+                <tr>
+                  <td class={ui.paramName}>{name}</td>
+                  <td>
+                    <Show when={pd()?.valueType} fallback="—">
+                      <span class={ui.paramType}>{pd()!.valueType}</span>
+                    </Show>
+                  </td>
+                  <td class={ui.paramMono}>
+                    <Show when={pd()?.range} fallback="—">
+                      {formatRange(pd()!.range!)}
+                    </Show>
+                  </td>
+                  <td class={ui.paramMono}>
+                    <Show when={def() !== undefined} fallback="—">
+                      {formatNumber(def()!)}
+                    </Show>
+                  </td>
+                  <td class={ui.paramDesc}>
+                    {pd()?.description ?? 'Not yet documented.'}
+                  </td>
+                </tr>
+              )
+            }}
+          </For>
+        </tbody>
+      </table>
     </Show>
   )
 }
