@@ -18,6 +18,11 @@ jobs:
   deploy:
     name: Deploy landing → dev
     runs-on: ubuntu-latest
+    # Only the canonical upstream repo deploys; skipped entirely on forks. See
+    # deploy.yml for the rationale and the DISABLE_DEPLOYS override.
+    if: github.repository == 'chaos-matters/chaos-master'
+    env:
+      DEPLOY_ENABLED: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && vars.DISABLE_DEPLOYS != 'true' }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -30,6 +35,7 @@ jobs:
       - name: Build landing (static assets → dist/)
         run: pnpm --filter @chaos-master/landing run build
       - name: Deploy (dev)
+        if: env.DEPLOY_ENABLED == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
