@@ -1,4 +1,6 @@
+import { onMount } from 'solid-js'
 import { Slider } from '../Slider'
+import { rangeValueType, useParamMetaCapture } from './paramMetaCapture'
 import ui from './RangeEditor.module.css'
 import type { EditorProps } from './types'
 
@@ -12,6 +14,24 @@ type RangeEditorProps = EditorProps<number> & {
 }
 
 export function RangeEditor(props: RangeEditorProps) {
+  // Docs param-meta probe: report this param's range/type and render nothing.
+  const capture = useParamMetaCapture()
+  if (capture) {
+    onMount(() => {
+      capture({
+        paramKey: props.paramKey,
+        name: props.name,
+        valueType: props.logarithmic
+          ? 'float'
+          : rangeValueType(props.min, props.step),
+        min: props.min,
+        max: props.max,
+        step: props.step,
+      })
+    })
+    return null
+  }
+
   const step = () => props.step ?? 0.01
   const decimals = () =>
     Number.isInteger(step()) ? 0 : ceil(log10(1 / (step() % 1)))

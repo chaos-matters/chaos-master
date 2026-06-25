@@ -6,6 +6,7 @@ dist
 .dev.vars
 **/.dev.vars
 test-results
+playwright-report
 .wrangler
 **/.claude/settings.local.json
 # Local-only Claude skills (e.g. the fork-specific sync-fork workflow)

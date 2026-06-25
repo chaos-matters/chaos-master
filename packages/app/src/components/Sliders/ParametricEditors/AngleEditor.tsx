@@ -1,4 +1,4 @@
-import { createMemo, Show } from 'solid-js'
+import { createMemo, onMount, Show } from 'solid-js'
 import { ScrubInput } from '@/components/Sliders/ScrubInput'
 import { KeyframeDiamond } from '@/components/Timeline/KeyframeDiamond'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
@@ -8,6 +8,7 @@ import { useTimeline } from '@/contexts/TimelineContext'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
 import ui from './AngleEditor.module.css'
+import { useParamMetaCapture } from './paramMetaCapture'
 import type { EditorProps } from './types'
 
 type AngleEditorProps = EditorProps<number> & {
@@ -31,6 +32,22 @@ function formatDegrees(degrees: number) {
 }
 
 export function AngleEditor(props: AngleEditorProps) {
+  // Docs param-meta probe: report this param as an angle and render nothing.
+  // Must run before the context hooks below so the probe needs no providers.
+  const capture = useParamMetaCapture()
+  if (capture) {
+    onMount(() => {
+      capture({
+        paramKey: props.paramKey,
+        name: props.name,
+        valueType: 'angle',
+        min: 0,
+        max: 2 * Math.PI,
+      })
+    })
+    return null
+  }
+
   const history = useChangeHistory()
   const timeline = useTimeline()
   const { selectedKeyframePath } = useKeyframeTarget()

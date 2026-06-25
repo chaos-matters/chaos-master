@@ -5,6 +5,8 @@ export type EditorProps<T> = {
   value: T
   setValue: (val: T) => void
   dataParameterPath?: string
+  /** Struct field key — lets the docs param-meta capture map ranges to params. */
+  paramKey?: string
 }
 
 export type EditorFor<T> = Component<EditorProps<T>>
@@ -21,6 +23,7 @@ export function editorProps<
   const pathPrefix = dataParameterPath ?? props.dataParameterPath
   return {
     name,
+    paramKey: String(key),
     dataParameterPath: pathPrefix ? `${pathPrefix}.${String(key)}` : undefined,
     get value() {
       return props.value[key]
