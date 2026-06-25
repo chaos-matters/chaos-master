@@ -22,6 +22,9 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         launchOptions: {
           args: [
+            // Enable the WebGPU API in headless chromium; swiftshader provides
+            // the software adapter so tests render the real app (no GPU needed).
+            '--enable-unsafe-webgpu',
             '--enable-unsafe-swiftshader',
             '--use-gl=angle',
             '--use-angle=swiftshader-webgl',

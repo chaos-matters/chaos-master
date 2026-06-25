@@ -1,11 +1,19 @@
-/* About pill — bottom-right floating button */
+/* Floating pills (Docs + version/About) anchored bottom-right. */
 
-.about-pill {
+.version-container {
   position: fixed;
   right: 0.5rem;
   bottom: 0.5rem;
   z-index: 9999;
 
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+/* Shared pill style for the Docs and About buttons. */
+.about-pill,
+.docs-pill {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -47,6 +55,11 @@
 
   &:active {
     transform: translateY(0);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--neutral-500);
+    outline-offset: 2px;
   }
 
   [data-theme='dark'] & {

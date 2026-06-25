@@ -2714,9 +2714,6 @@ export function MainWorkspace(props: AppProps) {
                     onBlendWeightChange={setBlendWeight}
                     is3D={effectiveFlame().renderSettings.dimensions === 3}
                     flameName={flameDescriptor.metadata?.name}
-                    onOpenDocumentation={() => {
-                      void showDocumentation()
-                    }}
                     theta={effectiveTheta()}
                     phi={effectivePhi()}
                     radius={effectiveRadius()}
@@ -4842,6 +4839,9 @@ export function MainWorkspace(props: AppProps) {
             }}
           />
           <SoftwareVersion
+            showDocs={() => {
+              void showDocumentation()
+            }}
             showHelp={createShowHelp(
               quickPickerMode,
               setQuickPickerMode,
