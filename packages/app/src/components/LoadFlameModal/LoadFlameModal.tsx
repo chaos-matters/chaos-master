@@ -752,75 +752,75 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
       >
         Discover Fractal Flames
       </ModalTitleBar>
-      <p class={ui.modalSubtitle}>
-        Select a preset to begin, load a recent creation, or import a saved PNG
-        or .flame config.
-      </p>
-      <div
-        class={ui.uploadZone}
-        classList={{ [ui.uploadZoneDragging as string]: isDragging() }}
-        onClick={loadFromFile}
-        onDragOver={handleDragOver}
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        <svg
-          class={ui.uploadIcon}
-          viewBox="0 0 24 24"
-          width="24"
-          height="24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+      <div class={ui.scrollBody}>
+        <p class={ui.modalSubtitle}>
+          Select a preset to begin, load a recent creation, or import a saved
+          PNG or .flame config.
+        </p>
+        <div
+          class={ui.uploadZone}
+          classList={{ [ui.uploadZoneDragging as string]: isDragging() }}
+          onClick={loadFromFile}
+          onDragOver={handleDragOver}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
         >
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <polyline points="17 8 12 3 7 8" />
-          <line x1="12" y1="3" x2="12" y2="15" />
-        </svg>
-        <div class={ui.uploadTitle}>
-          {isDragging() ? 'Drop PNG Here!' : 'Import from PNG File'}
+          <svg
+            class={ui.uploadIcon}
+            viewBox="0 0 24 24"
+            width="24"
+            height="24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          <div class={ui.uploadTitle}>
+            {isDragging() ? 'Drop PNG Here!' : 'Import from PNG File'}
+          </div>
+          <div class={ui.uploadSubtitle}>
+            {isDragging()
+              ? 'Release to load the flame configuration.'
+              : 'Click to choose a file, or drag and drop an exported PNG flame directly into the app or here to load it.'}
+          </div>
         </div>
-        <div class={ui.uploadSubtitle}>
-          {isDragging()
-            ? 'Release to load the flame configuration.'
-            : 'Click to choose a file, or drag and drop an exported PNG flame directly into the app or here to load it.'}
+        <div class={ui.filterRow} role="group" aria-label="Filter by dimension">
+          <button
+            class={ui.filterPill}
+            classList={{
+              [ui.filterPillActive as string]: dimFilter() === 'all',
+            }}
+            onClick={() => setDimFilter('all')}
+          >
+            All
+          </button>
+          <button
+            class={ui.filterPill}
+            classList={{
+              [ui.filterPillActive as string]: dimFilter() === '2d',
+            }}
+            onClick={() => setDimFilter('2d')}
+          >
+            <Icon2D />
+            2D
+          </button>
+          <button
+            class={ui.filterPill}
+            classList={{
+              [ui.filterPillActive as string]: dimFilter() === '3d',
+            }}
+            onClick={() => setDimFilter('3d')}
+          >
+            <Icon3D />
+            3D
+          </button>
         </div>
-      </div>
-      <div class={ui.filterRow} role="group" aria-label="Filter by dimension">
-        <button
-          class={ui.filterPill}
-          classList={{
-            [ui.filterPillActive as string]: dimFilter() === 'all',
-          }}
-          onClick={() => setDimFilter('all')}
-        >
-          All
-        </button>
-        <button
-          class={ui.filterPill}
-          classList={{
-            [ui.filterPillActive as string]: dimFilter() === '2d',
-          }}
-          onClick={() => setDimFilter('2d')}
-        >
-          <Icon2D />
-          2D
-        </button>
-        <button
-          class={ui.filterPill}
-          classList={{
-            [ui.filterPillActive as string]: dimFilter() === '3d',
-          }}
-          onClick={() => setDimFilter('3d')}
-        >
-          <Icon3D />
-          3D
-        </button>
-      </div>
-      <div class={ui.galleryScroll}>
         <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
           <div class={ui.sections}>
             <Show when={filteredRecents().length > 0}>

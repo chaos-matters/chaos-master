@@ -1,14 +1,12 @@
 .benchmark-btn {
-  position: fixed;
-  right: 0.5rem;
-  bottom: 2.75rem;
-  z-index: 9999;
-
+  /* Sits inline in the bottom-right control row (Benchmark · Docs · version),
+     anchored by SoftwareVersion's container — so it has no fixed position of its
+     own. Sized to match the Docs / About pill height. */
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 1.75rem;
+  height: 1.75rem;
   padding: 0;
   border-radius: 999px;
   border: 1px solid rgba(0, 0, 0, 0.08);
