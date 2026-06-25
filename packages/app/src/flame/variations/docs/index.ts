@@ -2,6 +2,7 @@ import { variationDocsContent } from './content'
 import { variationDocs3D } from './content.3d'
 import { variationDocsGeneral } from './content.general'
 import { variationDocsGeneral2 } from './content.general2'
+import { variationDocsRest } from './content.rest'
 import { variationDocsSimple } from './content.simple'
 import type { VariationDoc, VariationDocMap } from './types'
 import type { AnyVariationType } from '@/flame/variationRegistry'
@@ -18,6 +19,7 @@ export const variationDocs: VariationDocMap = {
   ...variationDocsSimple,
   ...variationDocsGeneral,
   ...variationDocsGeneral2,
+  ...variationDocsRest,
   ...variationDocs3D,
 }
 
