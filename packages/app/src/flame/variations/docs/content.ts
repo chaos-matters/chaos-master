@@ -266,4 +266,89 @@ export const variationDocsContent: VariationDocMap = {
       },
     },
   },
+  juliaScopeVar: {
+    summary:
+      'Like juliaN, but every other branch is mirror-reflected — producing kaleidoscopic, symmetric spiral fans instead of plain rotational copies.',
+    params: {
+      power: { description: 'Number of branches the plane folds into.' },
+      dist: {
+        description:
+          'Radial exponent (dist/power): how far each branch reaches.',
+      },
+    },
+  },
+
+  // --- Second batch: common parametric variations (math from the app's own
+  // implementation; parameter names confirmed against the JWildfire spreadsheet).
+  curlVar: {
+    summary:
+      'A complex curl: maps the point through a quadratic in two coefficients and divides by its squared magnitude, twisting straight lines into curls and scrolls.',
+    tex: 't_1 = 1 + c_1 x + c_2(x^{2}-y^{2}),\\quad t_2 = c_1 y + 2c_2 xy;\\quad V = \\dfrac{(x\\,t_1 + y\\,t_2,\\ \\ y\\,t_1 - x\\,t_2)}{t_1^{2} + t_2^{2}}',
+    params: {
+      c1: { description: 'Linear curl coefficient (shear along x).' },
+      c2: { description: 'Quadratic curl coefficient (the curling strength).' },
+    },
+  },
+  pieVar: {
+    summary:
+      'Slices the plane into angular wedges and scatters points within a chosen slice, fanning the flame into a pie of radial segments.',
+    params: {
+      slices: { description: 'Number of pie slices the circle is cut into.' },
+      rotation: { description: 'Angular offset of the whole pie.' },
+      thickness: {
+        description: 'Spread of points within each slice (0–1 of its width).',
+      },
+    },
+  },
+  cellVar: {
+    summary:
+      'Partitions the plane into square cells of a fixed size and re-stacks them in an interleaved fan-out, shattering the image into a shuffled grid.',
+    params: {
+      size: { description: 'Edge length of each square cell.' },
+    },
+  },
+  fan2Var: {
+    summary:
+      'An angular fan: points are folded into wedges of width π·x² and the split is rotated by y, sweeping the plane into a folding fan.',
+    params: {
+      x: { description: 'Wedge width, applied as π·x².' },
+      y: { description: 'Rotational offset of the fan split.' },
+    },
+  },
+  rings2Var: {
+    summary:
+      'Quantizes the radius into concentric rings spaced by the val parameter, snapping points onto evenly-spaced shells.',
+    tex: 't = r - 2p\\Big\\lfloor \\tfrac{r+p}{2p} \\Big\\rfloor + r(1-p),\\ \\ p = \\text{val};\\quad V = t\\,(\\sin\\theta,\\ \\cos\\theta)',
+    params: {
+      val: { description: 'Spacing between successive rings.' },
+    },
+  },
+  cpowVar: {
+    summary:
+      'Complex power: raises the point (as a complex number) to a complex exponent, generating families of logarithmic spirals with branch symmetry.',
+    params: {
+      r: { description: 'Real part of the complex exponent.' },
+      i: { description: 'Imaginary part of the complex exponent.' },
+      power: { description: 'Number of rotational branches.' },
+    },
+  },
+  bipolarVar: {
+    summary:
+      'Re-expresses the plane in bipolar coordinates, wrapping it into two stereographic lobes; the shift slides the projection pole vertically.',
+    params: {
+      shift: {
+        description: 'Vertical shift of the bipolar pole (in units of π/2).',
+      },
+    },
+  },
+  popcorn2Var: {
+    summary:
+      'A generalized popcorn jitter: adds sin(tan(·)) displacements with independent x/y amounts and a shared frequency, scattering points into a granular, popped texture.',
+    tex: 'V = \\big(x + p_x\\sin(\\tan(c\\,y)),\\ \\ y + p_y\\sin(\\tan(c\\,x))\\big)',
+    params: {
+      x: { description: 'Horizontal jitter amount (pₓ in the formula).' },
+      y: { description: 'Vertical jitter amount (p_y in the formula).' },
+      c: { description: 'Frequency of the tangent folding.' },
+    },
+  },
 }
