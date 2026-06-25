@@ -52,10 +52,12 @@ export const variationDocsContent: VariationDocMap = {
   bentVar: {
     summary:
       'A piecewise linear bend: the negative-x half is doubled in width and the negative-y half is halved in height, kinking the plane along the axes.',
+    tex: "V = w\\,(x',\\ y'),\\ x'=\\begin{cases}2x & x<0\\\\ x & x\\ge0\\end{cases},\\ y'=\\begin{cases}\\tfrac{y}{2} & y<0\\\\ y & y\\ge0\\end{cases}",
   },
   augerVar: {
     summary:
       'A self-referential sine fold that ripples the coordinates against their own absolute value, with an optional symmetric second fold. Creates woven, drill-like lattices.',
+    tex: 'V = w \\cdot (x + weight\\,(\\tfrac{scale}{2}\\,t + |x|\\,t),\\ y + weight\\,(\\tfrac{scale}{2}\\,s + |y|\\,s)),\\ s{=}\\sin(freq\\,x),\\ t{=}\\sin(freq\\,y)',
     params: {
       freq: {
         description: 'Spatial frequency of the sine folding.',
@@ -108,6 +110,7 @@ export const variationDocsContent: VariationDocMap = {
   ngonVar: {
     summary:
       'Bends the radius toward a regular polygon, letting you dial the number of sides and corner sharpness, or blend back toward a circle.',
+    tex: "V = w \\, k \\cdot (x, y),\\ k = \\frac{corners\\,(\\sec\\phi' - 1) + circle}{r^{power}},\\ \\phi' = \\theta - \\tfrac{2\\pi}{sides}\\big\\lfloor \\tfrac{sides\\,\\theta}{2\\pi} + \\tfrac12 \\big\\rfloor",
     params: {
       power: {
         description: 'Exponent applied to the radius.',
@@ -335,6 +338,7 @@ export const variationDocsContent: VariationDocMap = {
   bipolarVar: {
     summary:
       'Re-expresses the plane in bipolar coordinates, wrapping it into two stereographic lobes; the shift slides the projection pole vertically.',
+    tex: 'V = w \\cdot (\\tfrac{1}{2\\pi}\\ln\\tfrac{(x+1)^2+y^2}{(x-1)^2+y^2},\\ \\tfrac{1}{\\pi}\\arctan\\tfrac{2y}{x^2+y^2-1} - shift)',
     params: {
       shift: {
         description: 'Vertical shift of the bipolar pole (in units of π/2).',

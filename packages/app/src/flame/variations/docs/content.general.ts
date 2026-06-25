@@ -38,6 +38,7 @@ export const variationDocsGeneral: VariationDocMap = {
   atan2SpiralsVar: {
     summary:
       'Builds spirals by feeding scaled and offset powers of the squared radius into atan2 for the x output and a sine for the y output.',
+    tex: 'V = weight\\,(x\\_mult\\,\\arctan\\!\\tfrac{r\\cdot r\\_mult + r\\_add}{q\\cdot xy2\\_mult + xy2\\_add} + x\\_add,\\ y\\_mult\\sin(q\\cdot xy2\\_mult + xy2\\_add + sin\\_add) + y\\_add),\\ r=(x^2+y^2)^{r\\_power},\\ q=(x^2+y^2)^{x2y2\\_power}',
     params: {
       r_mult: {
         description:
@@ -112,6 +113,7 @@ export const variationDocsGeneral: VariationDocMap = {
   barycentroidVar: {
     summary:
       'Computes barycentric-style coordinates of the input point relative to two basis vectors defined by the parameters, returning the two weights.',
+    tex: 'V = \\frac{weight}{ad-bc}(d(ax+by) - b(cx+dy),\\ a(cx+dy) - c(ax+by))\\ \\text{(barycentric solve, dots over (a,b),(c,d))}',
     params: {
       a: { description: 'X component of the first basis vector.' },
       b: { description: 'Y component of the first basis vector.' },
@@ -136,6 +138,7 @@ export const variationDocsGeneral: VariationDocMap = {
   bent2Var: {
     summary:
       'Scales the negative half-planes of x and y independently, leaving the positive sides unchanged to bend the plane along each axis.',
+    tex: "V = weight\\,(x',\\ y'),\\ x'=\\begin{cases}factorX\\cdot x & x<0\\\\ x & x\\ge0\\end{cases},\\ y'=\\begin{cases}factorY\\cdot y & y<0\\\\ y & y\\ge0\\end{cases}",
     params: {
       factorX: { description: 'Scale applied to x only when x is negative.' },
       factorY: { description: 'Scale applied to y only when y is negative.' },
@@ -177,6 +180,7 @@ export const variationDocsGeneral: VariationDocMap = {
   blockYVar: {
     summary:
       'Combines a periodic cosine modulation with elliptic-style radial maxima to produce a blocky cellular y-warped pattern.',
+    tex: 'V = \\frac{weight}{(\\pi/2)\\,T}(x_{max}\\,x,\\ y_{max}\\,y),\\ T=\\tfrac{\\cos x+\\cos y}{mp}+1,\\ x_{max}=\\tfrac12(\\sqrt{s+2x}+\\sqrt{s-2x}),\\ y_{max}=\\tfrac12(\\sqrt{s+2y}+\\sqrt{s-2y}),\\ s=x^2+y^2+1',
     params: {
       x: { description: 'Scale applied to the x output.' },
       y: { description: 'Scale applied to the y output.' },
@@ -253,6 +257,7 @@ export const variationDocsGeneral: VariationDocMap = {
   bswirlVar: {
     summary:
       'A bipolar transform whose angular coordinate is swirled by terms proportional to and inversely proportional to the radial coordinate.',
+    tex: 'V = weight\\,\\frac{(\\sinh\\tau,\\ \\sin\\sigma)}{\\cosh\\tau - \\cos\\sigma},\\ \\tau=\\tfrac12\\ln\\tfrac{(x+1)^2+y^2}{(x-1)^2+y^2},\\ \\sigma=\\pi-\\arctan\\tfrac{y}{x+1}-\\arctan\\tfrac{y}{1-x}+\\tau\\,out+\\tfrac{in}{\\tau}',
     params: {
       in: {
         description:
@@ -267,6 +272,7 @@ export const variationDocsGeneral: VariationDocMap = {
   bubble2Var: {
     summary:
       'Pushes points outward by a factor that falls off with squared radius, inflating the plane like a bubble with independent x and y gains.',
+    tex: 'V = (x(1+rx),\\ y(1+ry)),\\ r=\\frac{weight}{(x^2+y^2)/4+1}',
     params: {
       x: { description: 'Strength of the radial inflation along x.' },
       y: { description: 'Strength of the radial inflation along y.' },
@@ -367,6 +373,7 @@ export const variationDocsGeneral: VariationDocMap = {
   cannabisCurveVar: {
     summary:
       'Plots the cannabis leaf polar curve, optionally filling the interior by randomly scaling the radius inward.',
+    tex: 'V = r(\\sin(\\theta+\\tfrac{\\pi}{2}),\\ \\cos(\\theta+\\tfrac{\\pi}{2})),\\ \\theta=\\arctan(y/x),\\ r=(1+0.9\\cos8\\theta)(1+0.1\\cos24\\theta)(0.9+0.1\\cos200\\theta)(1+\\sin\\theta)',
     params: {
       filled: {
         description:
@@ -680,6 +687,7 @@ export const variationDocsGeneral: VariationDocMap = {
   circusVar: {
     summary:
       'Rescales the radius depending on whether the point lies inside or outside the unit circle, shrinking one region and expanding the other to create a discontinuity at radius one.',
+    tex: 'V = r\\,s\\,(\\cos\\theta,\\ \\sin\\theta),\\ s = scale\\ (r\\le1),\\ s = 1/scale\\ (r>1)',
     params: {
       scale: {
         description:
@@ -797,6 +805,7 @@ export const variationDocsGeneral: VariationDocMap = {
   cos2_bsVar: {
     summary:
       'A breaking-symmetry variant of the complex cosine, with independent frequency multipliers on the x and y inputs to each trigonometric and hyperbolic factor.',
+    tex: 'V = (\\cos(x_2 x)\\cosh(y_2 y),\\ -\\sin(x_1 x)\\sinh(y_1 y))',
     params: {
       x1: { description: 'Frequency multiplier on x inside the sine factor.' },
       x2: {
@@ -815,6 +824,7 @@ export const variationDocsGeneral: VariationDocMap = {
   cosh2_bsVar: {
     summary:
       'A breaking-symmetry variant of the complex hyperbolic cosine, with independent frequency multipliers on the x and y inputs to each trigonometric and hyperbolic factor.',
+    tex: 'V = (\\cosh(x_2 x)\\cos(y_2 y),\\ \\sinh(x_1 x)\\sin(y_1 y))',
     params: {
       x1: {
         description:
@@ -833,6 +843,7 @@ export const variationDocsGeneral: VariationDocMap = {
   cot2_bsVar: {
     summary:
       'A breaking-symmetry variant of the complex cotangent, dividing the trigonometric numerator by a hyperbolic denominator with independent frequency multipliers per factor.',
+    tex: 'V = \\tfrac{1}{\\cosh(y_2 y) - \\cos(x_2 x)}(\\sin(x_1 x),\\ -\\sinh(y_1 y))',
     params: {
       x1: { description: 'Frequency multiplier on x inside the sine factor.' },
       x2: {
@@ -851,6 +862,7 @@ export const variationDocsGeneral: VariationDocMap = {
   coth2_bsVar: {
     summary:
       'A breaking-symmetry variant of the complex hyperbolic cotangent, dividing the hyperbolic and trigonometric numerators by a hyperbolic-minus-trigonometric denominator with independent frequency multipliers.',
+    tex: 'V = \\tfrac{1}{\\cosh(x_2 x) - \\cos(y_2 y)}(\\sinh(x_1 x),\\ \\sin(y_1 y))',
     params: {
       x1: {
         description:
@@ -923,6 +935,7 @@ export const variationDocsGeneral: VariationDocMap = {
   csc2_bsVar: {
     summary:
       'A breaking-symmetry variant of the complex cosecant, dividing trigonometric and hyperbolic products by a hyperbolic-minus-cosine denominator with independent frequency multipliers per factor.',
+    tex: 'V = \\tfrac{2}{\\cosh(2y) - \\cos(2x)}(\\sin(x_1 x)\\cosh(y_2 y),\\ -\\cos(x_2 x)\\sinh(y_1 y))',
     params: {
       x1: { description: 'Frequency multiplier on x inside the sine factor.' },
       x2: {
@@ -941,6 +954,7 @@ export const variationDocsGeneral: VariationDocMap = {
   cscSquaredVar: {
     summary:
       'Scales each coordinate by a factor built from the square of a cosecant-like term in x plus a pi offset, raised to a power and biased. The y axis gets an additional independent scale.',
+    tex: 'V = w(x f,\\ \\mathrm{scale\\_y}\\,y f),\\ f = (c^2 + \\mathrm{pi\\_mult}\\,\\pi)^{\\mathrm{csc\\_pow}} + \\mathrm{csc\\_add},\\ c = \\tfrac{\\mathrm{csc\\_div}}{\\cos(x/\\mathrm{cos\\_div})\\tan(x/\\mathrm{tan\\_div})}',
     params: {
       csc_div: {
         description:
@@ -970,6 +984,7 @@ export const variationDocsGeneral: VariationDocMap = {
   csch2_bsVar: {
     summary:
       'A breaking-symmetry variant of the complex hyperbolic cosecant, dividing hyperbolic and trigonometric products by a hyperbolic-minus-cosine denominator with independent frequency multipliers per factor.',
+    tex: 'V = \\tfrac{2w}{d}(\\sinh(x1\\,x)\\cos(y2\\,y),\\ -\\cosh(x2\\,x)\\sin(y1\\,y)),\\ d = \\cosh(2x) - \\cos(2y)',
     params: {
       x1: {
         description:
@@ -1032,6 +1047,7 @@ export const variationDocsGeneral: VariationDocMap = {
   devilWarpVar: {
     summary:
       'Warps each point radially by a power-law expression mixing its squared coordinates with an inverse-square term. The resulting displacement is clamped between a minimum and maximum radius and scaled by an effect strength.',
+    tex: 'V = w(x(1+e),\\ y(1+e)),\\ e = \\mathrm{effect}\\,\\mathrm{clamp}(|r|, \\mathrm{rmin}, \\mathrm{rmax}),\\ r = (x^2 + \\tfrac{b\\,y^2}{x^2+y^2})^{\\mathrm{warp}} - (y^2 + \\tfrac{a\\,x^2}{x^2+y^2})^{\\mathrm{warp}}',
     params: {
       a: {
         description:
@@ -1060,6 +1076,7 @@ export const variationDocsGeneral: VariationDocMap = {
   disc2Var: {
     summary:
       'A rotating disc variation that maps the polar angle into radial spokes while twisting the angle by sine and cosine offsets. Large twist values wrap around and are scaled by a winding factor.',
+    tex: 'V = w\\tfrac{\\theta}{\\pi}(\\sin t + c_a,\\ \\cos t + s_a),\\ t = \\mathrm{rot}\\,\\pi(x+y),\\ s_a = \\sin(\\mathrm{twist}),\\ c_a = \\cos(\\mathrm{twist}) - 1',
     params: {
       rot: {
         description:
@@ -1074,6 +1091,7 @@ export const variationDocsGeneral: VariationDocMap = {
   disc3Var: {
     summary:
       'A flexible disc variation that builds a radius from the polar angle and combines sine and cosine of a scaled distance term, each component independently weighted by its own coefficients.',
+    tex: 'V = w\\,h\\,r(a\\sin\\rho,\\ b\\cos\\rho),\\ \\rho = \\pi\\sqrt{d e\\,x^2 + f g\\,y^2},\\ r = \\tfrac{c}{\\pi}\\arctan(y/x)',
     params: {
       a: { description: 'Scales the sine component of the output.' },
       b: { description: 'Scales the cosine component of the output.' },
@@ -1320,6 +1338,7 @@ export const variationDocsGeneral: VariationDocMap = {
   fdiscVar: {
     summary:
       'A flux-disc variation. An angular factor based on the inverse radius and a radius based on the polar angle are combined into a base point, then mixed through four weighted terms blending it with the original coordinates.',
+    tex: 'V = w(T_1 p_x + T_2 x p_x + T_3 x \\rho + T_4 x,\\ T_1 p_y + T_2 y p_y + T_3 y \\rho + T_4 y),\\ p_x = \\rho\\cos(\\alpha + \\mathrm{xshift}),\\ p_y = \\rho\\sin(\\alpha + \\mathrm{yshift}),\\ \\alpha = \\tfrac{2\\pi}{r + \\mathrm{ashift}},\\ \\rho = \\tfrac{1}{2}(\\tfrac{\\theta}{\\pi} + \\mathrm{rshift})',
     params: {
       ashift: {
         description:
@@ -1351,6 +1370,7 @@ export const variationDocsGeneral: VariationDocMap = {
   fibonacci2Var: {
     summary:
       'A Fibonacci variation built from two complex exponentials whose magnitudes and angles derive from the golden-ratio logarithm, subtracted and normalized by the square root of five.',
+    tex: 'V = \\tfrac{w}{\\sqrt5}(e_1\\cos a - e_2\\cos b,\\ e_1\\sin a - e_2\\sin b),\\ a = ky,\\ b = -(\\pi x + ky),\\ e_1 = \\mathrm{sc}\\,e^{\\mathrm{sc2}\\,kx},\\ e_2 = \\mathrm{sc}\\,e^{-\\mathrm{sc2}(kx - \\pi y)},\\ k = \\ln\\varphi',
     params: {
       sc: { description: 'Overall scale on both exponential radii.' },
       sc2: {
@@ -1401,6 +1421,7 @@ export const variationDocsGeneral: VariationDocMap = {
   fluxVar: {
     summary:
       'A flux variation that treats the point relative to two source points at plus and minus weight on the x axis, averaging their log-radii and angles to produce a dipole-like flow.',
+    tex: 'V = R(\\cos A,\\ \\sin A),\\ R = |w(2+\\mathrm{spread})|\\sqrt{\\tfrac{\\sqrt{y^2+(x+w)^2}}{\\sqrt{y^2+(x-w)^2}}},\\ A = \\tfrac{1}{2}(\\arctan\\tfrac{y}{x-w} - \\arctan\\tfrac{y}{x+w})',
     params: {
       spread: {
         description:
@@ -1445,6 +1466,7 @@ export const variationDocsGeneral: VariationDocMap = {
   funnelVar: {
     summary:
       'Pushes each coordinate outward using a hyperbolic tangent times a secant term, producing a funnel-like flaring. The effect amount adds a constant phase offset to both axes.',
+    tex: 'V = (x + w\\tanh(x)(\\sec x + \\mathrm{effect}\\,\\pi),\\ y + w\\tanh(y)(\\sec y + \\mathrm{effect}\\,\\pi))',
     params: {
       effect: {
         description:
@@ -1587,6 +1609,7 @@ export const variationDocsGeneral: VariationDocMap = {
   gumowskiMiraVar: {
     summary:
       'Applies one iteration of the Gumowski-Mira map, a rational nonlinearity combined with a weak cubic term. Iterating it produces intricate organic, ring-like attractors.',
+    tex: "G(u) = m\\,u + \\tfrac{2(1-m)u^{2}}{1+u^{2}},\\ x' = y + a(1 - b\\,y^{2})y + G(x),\\ V = (x',\\ -x + G(x'))",
     params: {
       a: {
         description:
@@ -1689,6 +1712,7 @@ export const variationDocsGeneral: VariationDocMap = {
   holeVar: {
     summary:
       'Opens a circular hole at the origin by adding an angle-dependent power-law term to the radius. The inside flag switches between pushing points outward and pulling them into the hole.',
+    tex: '\\delta = (\\tfrac{\\alpha}{\\pi} + 1)^{a},\\ \\alpha = \\arctan(y/x),\\ r = \\sqrt{x^{2}+y^{2}+\\delta},\\ V = r(\\cos\\alpha,\\ \\sin\\alpha)',
     params: {
       a: {
         description:
@@ -1703,6 +1727,7 @@ export const variationDocsGeneral: VariationDocMap = {
   hopalongVar: {
     summary:
       'Applies one step of the Hopalong attractor, where the new x subtracts a signed square root of a linear term and the new y is a minus the old x. Iterating it produces sprawling, layered attractor patterns.',
+    tex: 'V = (y - \\operatorname{sign}(x)\\sqrt{|b\\,x - c|},\\ a - x)',
     params: {
       a: {
         description:
@@ -1729,6 +1754,7 @@ export const variationDocsGeneral: VariationDocMap = {
   hypershiftVar: {
     summary:
       'Performs a hyperbolic shift by inverting the point about the unit disc, translating by the shift, and inverting again with a conformal scale. This produces Mobius-style hyperbolic translations of the plane.',
+    tex: '(x_1,y_1) = \\tfrac{(x,y)}{x^{2}+y^{2}} + (shift, 0),\\ k = \\tfrac{1 - shift^{2}}{x_1^{2}+y_1^{2}},\\ V = (k\\,x_1 + shift,\\ stretch\\,k\\,y_1)',
     params: {
       shift: {
         description:
@@ -1743,6 +1769,7 @@ export const variationDocsGeneral: VariationDocMap = {
   hypertile2Var: {
     summary:
       'Maps points into a hyperbolic tiling by contracting the radius toward the Poincare disc edge and perturbing the angle with a sinusoid. The result tiles the disc with p-fold, q-modulated cells.',
+    tex: "r' = \\tfrac{r}{r+1},\\ \\theta' = \\theta + \\tfrac{2\\pi}{p}\\sin(q\\theta),\\ V = r'(\\cos\\theta',\\ \\sin\\theta')",
     params: {
       p: {
         description:
@@ -1757,6 +1784,7 @@ export const variationDocsGeneral: VariationDocMap = {
   hypertileVar: {
     summary:
       'Maps points into a hyperbolic tiling by rotating the angle and scaling it by a q-based sector factor, then contracting the radius toward the Poincare disc boundary. It produces a p-by-q hyperbolic tessellation.',
+    tex: 'a = \\theta + \\tfrac{\\pi}{p},\\ V = \\tfrac{r}{1+r}(\\cos(\\tfrac{2\\pi}{q}a),\\ \\sin(\\tfrac{2\\pi}{q}a))',
     params: {
       p: {
         description:

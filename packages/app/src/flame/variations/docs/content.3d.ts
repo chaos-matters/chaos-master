@@ -40,6 +40,7 @@ export const variationDocs3D: VariationDocMap = {
   rings3D: {
     summary:
       'A 3D map that quantizes points into concentric spherical shells by folding the radius modulo a scaled period, then rescaling along the original direction. Creates nested rings around the origin.',
+    tex: 'V = \\frac{t}{r}\\,(x,\\ y,\\ z),\\ t = (r \\bmod 2\\,radiusScale) - radiusScale + r\\,(1-radiusScale),\\ r = |\\mathbf{p}|',
     params: {
       radiusScale: {
         description:
@@ -160,6 +161,7 @@ export const variationDocs3D: VariationDocMap = {
   separation3D: {
     summary:
       'A 3D map that, per axis, reflects the point to the opposite side of the origin using a hyperbolic-like offset and an inside-pull term. Cleaves space into two separated lobes along each axis.',
+    tex: 'V_i = \\operatorname{sgn}(p_i)\\sqrt{p_i^2 + s_i^2} - p_i\\,inside_i',
     params: {
       x: {
         description:
@@ -190,6 +192,7 @@ export const variationDocs3D: VariationDocMap = {
   blob3D: {
     summary:
       'A 3D map that scales each point by a radial factor oscillating with the azimuthal angle between a low and high bound. Produces lobed, flower-like blobs in space.',
+    tex: 'V = \\left(low + \\tfrac{high-low}{2}(\\sin(waves\\,\\theta)+1)\\right)(x,\\ y,\\ z),\\ \\theta = \\arctan(y/x)',
     params: {
       high: {
         description: 'Upper bound of the radial scaling factor at wave peaks.',
@@ -248,10 +251,12 @@ export const variationDocs3D: VariationDocMap = {
   horseshoe3D: {
     summary:
       'A 3D map that applies a quadratic cross-coordinate transform divided by the radius, bending space into a horseshoe-like fold extended into the depth axis.',
+    tex: 'V = \\tfrac{1}{r}\\big((x-y)(x+y+z),\\ 2x(y+z),\\ (y-z)(y+z)\\big),\\ r=\\sqrt{x^2+y^2+z^2}',
   },
   polar3D: {
     summary:
       'A 3D map that replaces a point with its spherical coordinates, mapping azimuth, polar angle, and radius onto the three output axes. Unwraps space into an angular slab.',
+    tex: 'V = \\big(\\tfrac{\\theta}{\\pi},\\ \\tfrac{2\\phi}{\\pi}-1,\\ r-1\\big),\\ \\theta=\\arctan(y/x),\\ \\phi=\\arccos(z/r)',
   },
   bubble3D: {
     summary:
@@ -279,6 +284,7 @@ export const variationDocs3D: VariationDocMap = {
   spiral3D: {
     summary:
       'A 3D map that applies a radius-dependent rotation in the xy-plane while passing z through, then divides by the radius. The rotation angle is the azimuth plus the radius, giving a spiral twist.',
+    tex: 'V = \\tfrac{1}{r}\\big(x\\cos(\\theta+r)-y\\sin(\\theta+r),\\ x\\sin(\\theta+r)+y\\cos(\\theta+r),\\ z\\big)',
   },
   cross3D: {
     summary:
@@ -288,10 +294,12 @@ export const variationDocs3D: VariationDocMap = {
   curl3D: {
     summary:
       'A 3D map that applies a complex-style curl transform extended to three dimensions, warping the point using terms built from one plus x and the squared y and z. The result is divided by a denominator combining those terms.',
+    tex: 'V = \\tfrac{1}{d}\\big(t^2-(y^2+z^2),\\ 2y\\,t,\\ 2z\\,t\\big),\\ t=1+x,\\ d=t^2+y^2+z^2',
   },
   heart3D: {
     summary:
       'A 3D map that converts the point to spherical coordinates and modulates the azimuth and polar angles by the radius, producing a heart-like folded surface. The output is scaled back up by the radius.',
+    tex: 'V = r\\big(\\sin(r\\theta)\\sin(r\\phi),\\ \\cos(r\\theta)\\sin(r\\phi),\\ \\cos(r\\phi)\\big)',
   },
   fisheye3D: {
     summary:
@@ -306,18 +314,22 @@ export const variationDocs3D: VariationDocMap = {
   ex3D: {
     summary:
       'A 3D map that converts the point to spherical coordinates and builds each output component from cubes of sines and cosines of the angles offset by the radius. This produces the characteristic ex petal-and-fold pattern in three dimensions.',
+    tex: 'V = r\\big(p_0^3+p_1^3,\\ p_1^3+p_2^3,\\ p_2^3+p_3^3\\big),\\ p_0=\\sin(\\theta+r),\\ p_1=\\cos(\\theta-r),\\ p_2=\\sin(\\phi+r),\\ p_3=\\cos(\\phi-r)',
   },
   disc3D: {
     summary:
       'A 3D map that converts the point to spherical coordinates, scales the azimuth by one over pi, and modulates the result with sines and cosines of pi times the radius. This wraps the point into concentric disc rings spread over the polar angle.',
+    tex: 'V = \\tfrac{\\theta}{\\pi}\\big(\\sin(\\pi r)\\sin\\phi,\\ \\cos(\\pi r)\\sin\\phi,\\ \\cos\\phi\\big),\\ \\theta=\\arctan(y/x),\\ \\phi=\\arccos(z/r)',
   },
   diamond3D: {
     summary:
       'A 3D map that normalizes the point onto the unit sphere then modulates each axis by a cosine or sine of the radius. The x and z use cosine while y uses sine, producing a faceted diamond pattern.',
+    tex: 'V = \\tfrac{1}{r}\\big(x\\cos r,\\ y\\sin r,\\ z\\cos r\\big)',
   },
   bent3D: {
     summary:
       'A 3D map that bends space by rescaling negative coordinates per axis. Negative x is doubled while negative y and z are halved, and non-negative values pass through unchanged.',
+    tex: "V = (x',\\ y',\\ z'),\\ x'=\\begin{cases}2x & x<0\\\\ x & x\\ge0\\end{cases},\\ y'=\\begin{cases}\\tfrac{y}{2} & y<0\\\\ y & y\\ge0\\end{cases},\\ z'=\\begin{cases}\\tfrac{z}{2} & z<0\\\\ z & z\\ge0\\end{cases}",
   },
   exponential3D: {
     summary:
@@ -327,14 +339,17 @@ export const variationDocs3D: VariationDocMap = {
   power3D: {
     summary:
       'A 3D map that converts the point to spherical coordinates and raises the radius to the power of the sine of the azimuth. The scaled radius is then redistributed across the spherical direction vector.',
+    tex: 'V = r^{\\sin\\theta}\\big(\\cos\\theta\\sin\\phi,\\ \\sin\\theta\\sin\\phi,\\ \\cos\\phi\\big)',
   },
   handkerchief3D: {
     summary:
       'A 3D map that converts the point to spherical coordinates and folds it using sines and cosines of the angles offset by the radius. This produces the rippled handkerchief surface extended into three dimensions.',
+    tex: 'V = r\\big(\\sin(\\theta+r)\\sin\\phi,\\ \\cos(\\theta-r)\\sin\\phi,\\ \\cos(\\phi+r)\\big)',
   },
   cylindrical3D: {
     summary:
       'A 3D map that wraps the point around a cylinder using the planar radius of x and y, with z passed through. The x and y outputs are the sine and cosine of x scaled by that radius.',
+    tex: 'V = \\big(\\rho\\sin x,\\ \\rho\\cos x,\\ z\\big),\\ \\rho=\\sqrt{x^2+y^2}',
   },
   hemisphere3D: {
     summary:
@@ -344,6 +359,7 @@ export const variationDocs3D: VariationDocMap = {
   scry3D: {
     summary:
       'A 3D map that scales the point by an inverse function of the radius, drawing points toward the origin in a scrying-glass effect. The scale combines the radius, its square, and a reciprocal term.',
+    tex: 'V = \\frac{(x,y,z)}{r^3+1},\\ r=\\sqrt{x^2+y^2+z^2}',
   },
   square3D: {
     summary:
