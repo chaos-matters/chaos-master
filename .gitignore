@@ -15,3 +15,6 @@ test-results
 
 # Astro generated cache
 **/.astro/
+
+# Local security-audit scanner output (semgrep/gitleaks/nuclei/eslint telemetry)
+.audit_telemetry/
