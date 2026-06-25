@@ -62,6 +62,7 @@ const PATTERNS: Pattern[] = [
   // Fractions: \frac{a}{b} → (a) / (b)
   {
     regex:
+      // eslint-disable-next-line security/detect-unsafe-regex -- bounded by MAX_MATH_INPUT; runs only on the user's own local editor text
       /\\frac\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g,
     replace: (_m, num, den) => `((${num}) / (${den}))`,
     description: '\\frac{a}{b} → a / b',
@@ -183,6 +184,25 @@ const PATTERNS: Pattern[] = [
   },
 ]
 
+// Escape a string for safe literal use inside a RegExp. A no-op for plain
+// identifiers; guards the dynamic builds below if a name ever contains a regex
+// metacharacter.
+function escapeRegExp(literal: string): string {
+  return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+// Single, reviewed home for runtime-built patterns. Every caller passes either a
+// fixed internal map key or an escaped identifier, so the source is trusted.
+function dynRegExp(source: string, flags?: string): RegExp {
+  // eslint-disable-next-line security/detect-non-literal-regexp -- callers pass escaped identifiers / fixed map keys
+  return new RegExp(source, flags)
+}
+
+// Upper bound on a single translation input. Real formulas are a few hundred
+// chars; this bounds backtracking on the brace-matching patterns (e.g. \frac),
+// whose only source is the user's own editor text.
+const MAX_MATH_INPUT = 4096
+
 /**
  * Translate math notation to WGSL function body.
  */
@@ -193,10 +213,17 @@ export function mathToWgsl(input: string): TranslationResult {
     return { wgsl: '', errors }
   }
 
+  if (input.length > MAX_MATH_INPUT) {
+    return {
+      wgsl: '',
+      errors: [`Expression too long (max ${MAX_MATH_INPUT} characters)`],
+    }
+  }
+
   // Preprocess: replace Greek Unicode characters with ASCII names
   let processed = input
   for (const [greek, ascii] of Object.entries(GREEK_MAP)) {
-    processed = processed.replace(new RegExp(greek, 'g'), ascii)
+    processed = processed.replace(dynRegExp(escapeRegExp(greek), 'g'), ascii)
   }
 
   // Preprocess: \begin{cases}...\end{cases} → select()
@@ -236,7 +263,7 @@ export function mathToWgsl(input: string): TranslationResult {
     let result = expr
     for (const [base, current] of varNameMap) {
       if (base === current) continue
-      const re = new RegExp(`\\b${base}\\b`, 'g')
+      const re = dynRegExp(`\\b${escapeRegExp(base)}\\b`, 'g')
       result = result.replace(re, current)
     }
     return result
@@ -245,8 +272,8 @@ export function mathToWgsl(input: string): TranslationResult {
   // Detect which local variables are referenced anywhere in the input
   for (const name of Object.keys(MATH_LOCAL_VARS)) {
     const re = name.includes('_')
-      ? new RegExp(`(?:^|(?<=\\W))${name}(?=\\W|$)`)
-      : new RegExp(`\\b${name}\\b`)
+      ? dynRegExp(`(?:^|(?<=\\W))${escapeRegExp(name)}(?=\\W|$)`)
+      : dynRegExp(`\\b${escapeRegExp(name)}\\b`)
     if (re.test(input)) {
       wgslLines.push(`  let ${name} = ${MATH_LOCAL_VARS[name]};`)
       declaredVars.add(name)
@@ -287,7 +314,7 @@ export function mathToWgsl(input: string): TranslationResult {
 
     // Replace read-only shorthand (w → varInfo.weight)
     for (const [name, wgsl] of Object.entries(MATH_READONLY_VARS)) {
-      const re = new RegExp(`\\b${name}\\b`, 'g')
+      const re = dynRegExp(`\\b${escapeRegExp(name)}\\b`, 'g')
       line = line.replace(re, wgsl)
     }
 

@@ -80,33 +80,27 @@ export function ViewControls(props: ViewControlProps) {
         </For>
       </ButtonGroup>
       <Show when={!props.is3D}>
+        {/* Each button targets camera.zoom for keyframing in addition to its
+            zoom action, so the targeting is keyboard-operable (the wrappers are
+            presentational layout only). */}
         <ButtonGroup data-tour-target="zoom-controls">
-          <div
-            class={ui.viewControlWrapper}
-            onClick={() => {
-              setTargetedParameter('camera.zoom')
-            }}
-          >
+          <div class={ui.viewControlWrapper}>
             <Button
               aria-label="Zoom out"
               disabled={disabled() || props.zoom <= 0.01}
-              onClick={(e) => {
-                e.stopPropagation()
+              onClick={() => {
+                setTargetedParameter('camera.zoom')
                 props.setZoom((p) => p * 0.9)
               }}
             >
               <Minus />
             </Button>
           </div>
-          <div
-            class={ui.viewControlWrapper}
-            onClick={() => {
-              setTargetedParameter('camera.zoom')
-            }}
-          >
+          <div class={ui.viewControlWrapper}>
             <Button
               disabled={disabled()}
               onClick={() => {
+                setTargetedParameter('camera.zoom')
                 props.setZoom(1)
                 props.setPosition(vec2f())
               }}
@@ -116,12 +110,7 @@ export function ViewControls(props: ViewControlProps) {
             </Button>
             <KeyframeDiamond parameterPath="camera.zoom" />
           </div>
-          <div
-            class={ui.viewControlWrapper}
-            onClick={() => {
-              setTargetedParameter('camera.zoom')
-            }}
-          >
+          <div class={ui.viewControlWrapper}>
             <Button
               aria-label="Zoom in"
               disabled={disabled()}
@@ -135,28 +124,36 @@ export function ViewControls(props: ViewControlProps) {
           </div>
         </ButtonGroup>
         <ButtonGroup data-tour-target="camera-coordinates">
-          <div
-            class={ui.cameraCoord}
-            onClick={() => {
-              setTargetedParameter('camera.x')
-            }}
-          >
-            <span class={ui.cameraCoordLabel}>X</span>
-            <span class={ui.cameraCoordValue}>
-              {props.position.x.toFixed(2)}
-            </span>
+          <div class={ui.cameraCoord}>
+            <button
+              type="button"
+              class={ui.cameraCoordTarget}
+              aria-label="Target camera X position for keyframing"
+              onClick={() => {
+                setTargetedParameter('camera.x')
+              }}
+            >
+              <span class={ui.cameraCoordLabel}>X</span>
+              <span class={ui.cameraCoordValue}>
+                {props.position.x.toFixed(2)}
+              </span>
+            </button>
             <KeyframeDiamond parameterPath="camera.x" />
           </div>
-          <div
-            class={ui.cameraCoord}
-            onClick={() => {
-              setTargetedParameter('camera.y')
-            }}
-          >
-            <span class={ui.cameraCoordLabel}>Y</span>
-            <span class={ui.cameraCoordValue}>
-              {props.position.y.toFixed(2)}
-            </span>
+          <div class={ui.cameraCoord}>
+            <button
+              type="button"
+              class={ui.cameraCoordTarget}
+              aria-label="Target camera Y position for keyframing"
+              onClick={() => {
+                setTargetedParameter('camera.y')
+              }}
+            >
+              <span class={ui.cameraCoordLabel}>Y</span>
+              <span class={ui.cameraCoordValue}>
+                {props.position.y.toFixed(2)}
+              </span>
+            </button>
             <KeyframeDiamond parameterPath="camera.y" />
           </div>
         </ButtonGroup>
