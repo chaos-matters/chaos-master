@@ -339,6 +339,17 @@ export default defineConfig(
     },
   },
   {
+    // The variation-docs content files are large pure-data literals (~5.6k lines
+    // of object entries, keyed by the ~400-member AnyVariationType union). Running
+    // typescript-eslint's type-aware (`strictTypeChecked`) rules over them is the
+    // dominant memory cost of `pnpm lint` — enough to OOM CI's ~2GB heap. They
+    // contain no logic, so type-aware linting adds nothing: `tsc` still
+    // type-checks them against VariationDocMap, and docs.coverage.test.ts asserts
+    // keys/params. Drop them to syntax-only linting to keep peak memory bounded.
+    files: ['packages/app/src/flame/variations/docs/content*.ts'],
+    ...tseslint.configs.disableTypeChecked,
+  },
+  {
     // Node dev/build scripts (e.g. the Playwright poster-capture tool). Allow the
     // Node globals plus the browser globals referenced inside page.evaluate /
     // waitForFunction callbacks, and unrestricted console output.
