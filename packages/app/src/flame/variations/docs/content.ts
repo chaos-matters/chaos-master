@@ -131,4 +131,139 @@ export const variationDocsContent: VariationDocMap = {
       },
     },
   },
+
+  // --- Classic flam3 variations (formulas per Draves & Reckase, "The Fractal
+  // Flame Algorithm"). Ranges/types are derived from the editors, so these only
+  // need a summary, the math, and (for parametric ones) parameter prose.
+  sinusoidalVar: {
+    summary:
+      'Applies a sine wave to each coordinate independently, folding the plane into a periodic ripple that tiles softly toward the edges.',
+    tex: 'V = (\\sin x,\\ \\sin y)',
+  },
+  sphericalVar: {
+    summary:
+      'Inverts the plane through the unit circle (1/r² falloff): points near the origin fly outward and far points collapse inward, the classic lens warp.',
+    tex: 'V = \\tfrac{1}{r^{2}}\\,(x,\\ y)',
+  },
+  swirlVar: {
+    summary:
+      'Rotates each point by an angle that grows with r², winding the plane into a tightening spiral vortex.',
+    tex: 'V = \\big(x\\sin r^{2} - y\\cos r^{2},\\ \\ x\\cos r^{2} + y\\sin r^{2}\\big)',
+  },
+  handkerchiefVar: {
+    summary:
+      'A polar fold where the radius modulates the angle, draping the plane into soft folded-cloth ripples.',
+    tex: 'V = r\\big(\\sin(\\theta + r),\\ \\cos(\\theta - r)\\big)',
+  },
+  heartVar: {
+    summary:
+      'Twists the angle in proportion to the radius, curling the plane into nested heart / scroll shapes.',
+    tex: 'V = r\\big(\\sin(r\\theta),\\ -\\cos(r\\theta)\\big)',
+  },
+  spiralVar: {
+    summary:
+      'Combines an inverse-radius scaling with sine/cosine of the radius to wind points into an open logarithmic spiral.',
+    tex: 'V = \\tfrac{1}{r}\\big(\\cos\\theta + \\sin r,\\ \\ \\sin\\theta - \\cos r\\big)',
+  },
+  hyperbolicVar: {
+    summary:
+      'Pushes the angle and radius in opposite directions (sinθ/r horizontally, r·cosθ vertically), producing hyperbolic sheets.',
+    tex: 'V = \\big(\\tfrac{\\sin\\theta}{r},\\ \\ r\\cos\\theta\\big)',
+  },
+  diamondVar: {
+    summary:
+      'Multiplies angular and radial sinusoids, tiling the plane into a lattice of diamond cells.',
+    tex: 'V = (\\sin\\theta\\,\\cos r,\\ \\ \\cos\\theta\\,\\sin r)',
+  },
+  exVar: {
+    summary:
+      'Cubes two radius-dependent sinusoids and sums/differences them, blooming the plane into petal-like lobes.',
+    tex: 'p_0 = \\sin(\\theta + r),\\ \\ p_1 = \\cos(\\theta - r);\\quad V = r\\big(p_0^{3} + p_1^{3},\\ \\ p_0^{3} - p_1^{3}\\big)',
+  },
+  fisheyeVar: {
+    summary:
+      'A bulging radial magnification (2/(r+1)) that also swaps the axes — the centre balloons outward like a fisheye lens.',
+    tex: 'V = \\tfrac{2}{r+1}\\,(y,\\ x)',
+  },
+  eyefishVar: {
+    summary:
+      'The same 2/(r+1) radial bulge as fisheye but without the axis swap, magnifying the centre symmetrically.',
+    tex: 'V = \\tfrac{2}{r+1}\\,(x,\\ y)',
+  },
+  powerVar: {
+    summary:
+      'Raises the radius to a sine-of-angle power and re-projects along the angle, sweeping points into feathered power-curve plumes.',
+    tex: 'V = r^{\\,\\sin\\theta}\\,(\\cos\\theta,\\ \\sin\\theta)',
+  },
+  cosineVar: {
+    summary:
+      'Treats the point as a complex number and takes its cosine, mixing trigonometric and hyperbolic terms into rippled columns.',
+    tex: 'V = \\big(\\cos(\\pi x)\\cosh y,\\ \\ -\\sin(\\pi x)\\sinh y\\big)',
+  },
+  cylinderVar: {
+    summary:
+      'Wraps the x-axis through a sine while leaving y untouched, rolling the plane onto a vertical cylinder.',
+    tex: 'V = (\\sin x,\\ y)',
+  },
+  tangentVar: {
+    summary:
+      'Divides a sine of x by a cosine of y and takes the tangent of y, shearing the plane into tangent fans that blow up near the asymptotes.',
+    tex: 'V = \\big(\\tfrac{\\sin x}{\\cos y},\\ \\ \\tan y\\big)',
+  },
+  crossVar: {
+    summary:
+      'Scales by the inverse of |x²−y²|, carving the plane along its diagonals into a sharp four-armed cross.',
+    tex: 'V = \\sqrt{\\dfrac{1}{(x^{2} - y^{2})^{2}}}\\;(x,\\ y)',
+  },
+  expVar: {
+    summary:
+      'Exponentiates x and rotates by y (the complex exponential), mapping vertical lines to rays for exponential plumes.',
+    tex: 'V = e^{x}\\,(\\cos y,\\ \\sin y)',
+  },
+  blurVar: {
+    summary:
+      'Ignores the input and scatters points uniformly within a disc — a pure radial blur used to soften or seed a flame.',
+    tex: 'V = \\xi_1\\big(\\cos(2\\pi\\xi_2),\\ \\sin(2\\pi\\xi_2)\\big),\\quad \\xi_i \\sim U(0,1)',
+  },
+  squareVar: {
+    summary:
+      'Ignores the input and fills a unit square with uniform random points — a flat blur for backgrounds and texture.',
+    tex: 'V = \\big(\\xi_1 - \\tfrac12,\\ \\xi_2 - \\tfrac12\\big),\\quad \\xi_i \\sim U(0,1)',
+  },
+  pdjVar: {
+    summary:
+      'The Peter de Jong attractor map: four independent sine/cosine couplings of x and y that fold the plane into intricate woven curves.',
+    tex: 'V = \\big(\\sin(a\\,y) - \\cos(b\\,x),\\ \\ \\sin(c\\,x) - \\cos(d\\,y)\\big)',
+    params: {
+      a: { description: 'Frequency of the sine term in x driven by y.' },
+      b: { description: 'Frequency of the cosine term in x driven by x.' },
+      c: { description: 'Frequency of the sine term in y driven by x.' },
+      d: { description: 'Frequency of the cosine term in y driven by y.' },
+    },
+  },
+  blobVar: {
+    summary:
+      'Modulates the radius by an angular sine wave, pushing the circle out to "high" at the crests and in to "low" at the troughs — a lobed blob.',
+    tex: 'V = r\\Big(\\text{low} + \\tfrac{\\text{high}-\\text{low}}{2}\\big(\\sin(\\text{waves}\\,\\theta) + 1\\big)\\Big)(\\cos\\theta,\\ \\sin\\theta)',
+    params: {
+      high: { description: 'Outer radius reached at each wave crest.' },
+      low: { description: 'Inner radius reached at each wave trough.' },
+      waves: { description: 'Number of lobes around the circle.' },
+    },
+  },
+  juliaNVar: {
+    summary:
+      'A generalized Julia map: the angle is split into N branches chosen at random and the radius is raised to a dist/N power, fanning out N-fold symmetric spirals.',
+    tex: 't = \\dfrac{\\theta + 2\\pi\\lfloor |N|\\,\\xi\\rfloor}{N};\\quad V = r^{\\,\\text{dist}/N}(\\cos t,\\ \\sin t),\\quad \\xi \\sim U(0,1)',
+    params: {
+      power: {
+        description:
+          'Number of branches N — how many symmetric copies the plane folds into.',
+      },
+      dist: {
+        description:
+          'Radial exponent (dist/N): how far each branch reaches from the centre.',
+      },
+    },
+  },
 }

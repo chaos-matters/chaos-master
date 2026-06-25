@@ -117,7 +117,20 @@ export function SelectedVariationPanel(props: {
             >
               <Show
                 when={tsSource()}
-                fallback={<p class={ui.muted}>Source not available.</p>}
+                fallback={
+                  // 3D variations are defined inline (no per-file TS source),
+                  // so fall back to the resolved WGSL — there's always a source.
+                  <Show
+                    when={wgsl()}
+                    fallback={<p class={ui.muted}>Source not available.</p>}
+                  >
+                    <p class={ui.muted}>
+                      No standalone TypeScript source for this variation —
+                      showing the resolved WGSL.
+                    </p>
+                    <CodeBlock code={wgsl()!} />
+                  </Show>
+                }
               >
                 <CodeBlock code={tsSource()!} />
               </Show>
