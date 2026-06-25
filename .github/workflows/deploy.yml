@@ -36,6 +36,20 @@ jobs:
     name: Build & Deploy App
     runs-on: ubuntu-latest
 
+    # Only the canonical upstream repo builds + deploys. On any fork this whole job is
+    # skipped: forks don't redundantly rebuild (the standalone Chaos-Master CI in
+    # node.js.yml already runs lint/typecheck/test/build there) and never attempt a
+    # Cloudflare deploy they have no credentials for. Update this if the canonical
+    # deployer ever moves.
+    if: github.repository == 'chaos-matters/chaos-master'
+
+    # Second layer, for the upstream repo itself: a PR opened *from* a fork runs here
+    # (the base repo is upstream) but GitHub withholds secrets for fork PRs, so gate
+    # each wrangler step on the token actually being present rather than failing. Set
+    # repo variable DISABLE_DEPLOYS=true to force-disable deploys even where it exists.
+    env:
+      DEPLOY_ENABLED: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && vars.DISABLE_DEPLOYS != 'true' }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -81,7 +95,7 @@ jobs:
 
       # Manual Deploy via workflow_dispatch
       - name: Manual Deploy
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && env.DEPLOY_ENABLED == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -92,7 +106,7 @@ jobs:
 
       # Deploys to dev.chaos-master.com when pushing to the main branch
       - name: Deploy to Dev Environment
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.DEPLOY_ENABLED == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -104,7 +118,7 @@ jobs:
       # Deploys to preview on PRs
       - name: Deploy PR Preview
         id: deploy-preview
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && env.DEPLOY_ENABLED == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -115,7 +129,7 @@ jobs:
 
       # Post or update PR comment with preview link from template
       - name: Post Preview Link
-        if: github.event_name == 'pull_request' && steps.deploy-preview.outputs.deployment-url != ''
+        if: github.event_name == 'pull_request' && env.DEPLOY_ENABLED == 'true' && steps.deploy-preview.outputs.deployment-url != ''
         uses: actions/github-script@v7
         with:
           script: |
@@ -166,7 +180,7 @@ jobs:
 
       # Deploys to chaos-master.com when pushing a tag starting with 'v'
       - name: Deploy to Production Environment
-        if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
+        if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push' && env.DEPLOY_ENABLED == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
