@@ -12,6 +12,15 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    # Type-aware linting (typescript-eslint strictTypeChecked + projectService)
+    # holds the whole TS program in memory; on this codebase peak is ~2.5GB, which
+    # OOMs Node's ~2GB default heap. The runner has 16GB, so lift the ceiling well
+    # clear of the peak rather than throttling CI. Applies to every step (tsc and
+    # vitest build the same program). See eslint.config.js (docs content files are
+    # already dropped to syntax-only linting to trim peak).
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+
     strategy:
       matrix:
         node-version: [24.x]
