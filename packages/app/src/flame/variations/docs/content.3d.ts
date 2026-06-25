@@ -9,7 +9,7 @@ export const variationDocs3D: VariationDocMap = {
   waves3D: {
     summary:
       'A 3D map that shears each coordinate by a sine wave driven by the next axis, with per-axis amplitude and frequency. Produces rippling, woven sheets in space.',
-    tex: 'V=(x+a_x\\\\sin(f_x y),\\\\; y+a_y\\\\sin(f_y z),\\\\; z+a_z\\\\sin(f_z x))',
+    tex: 'V=(x+a_x\\sin(f_x y),\\; y+a_y\\sin(f_y z),\\; z+a_z\\sin(f_z x))',
     params: {
       scaleX: {
         description:
@@ -51,7 +51,7 @@ export const variationDocs3D: VariationDocMap = {
   pdj3D: {
     summary:
       'A 3D map where each output axis is a difference of a sine and a cosine of a scaled neighboring coordinate. Generates intricate looping, web-like attractors.',
-    tex: 'V=(\\\\sin(a y)-\\\\cos(b x),\\\\; \\\\sin(c z)-\\\\cos(d y),\\\\; \\\\sin(e x)-\\\\cos(f z))',
+    tex: 'V=(\\sin(a y)-\\cos(b x),\\; \\sin(c z)-\\cos(d y),\\; \\sin(e x)-\\cos(f z))',
     params: {
       a: {
         description:
@@ -96,7 +96,7 @@ export const variationDocs3D: VariationDocMap = {
   popcorn3D: {
     summary:
       'A 3D map that adds to each coordinate a sine of the tangent of a frequency-scaled neighboring axis. The nested sin-of-tan produces sharp, scattered popcorn-like bursts.',
-    tex: 'V=(x+c\\\\sin(\\\\tan(f y)),\\\\; y+c\\\\sin(\\\\tan(f z)),\\\\; z+c\\\\sin(\\\\tan(f x)))',
+    tex: 'V=(x+c\\sin(\\tan(f y)),\\; y+c\\sin(\\tan(f z)),\\; z+c\\sin(\\tan(f x)))',
     params: {
       c: {
         description:
@@ -123,7 +123,7 @@ export const variationDocs3D: VariationDocMap = {
   rectangles3D: {
     summary:
       'A 3D map that reflects each coordinate within a grid of cells of a chosen size, tiling space into mirrored rectangular boxes.',
-    tex: 'V=((2\\\\lfloor x/p_x\\\\rfloor+1)p_x-x,\\\\; (2\\\\lfloor y/p_y\\\\rfloor+1)p_y-y,\\\\; (2\\\\lfloor z/p_z\\\\rfloor+1)p_z-z)',
+    tex: 'V=((2\\lfloor x/p_x\\rfloor+1)p_x-x,\\; (2\\lfloor y/p_y\\rfloor+1)p_y-y,\\; (2\\lfloor z/p_z\\rfloor+1)p_z-z)',
     params: {
       x: { description: 'Cell size along the x axis.' },
       y: { description: 'Cell size along the y axis.' },
@@ -133,7 +133,7 @@ export const variationDocs3D: VariationDocMap = {
   splits3D: {
     summary:
       'A 3D map that pushes each coordinate outward by a fixed offset whose sign follows the sign of that coordinate. Splits space into separated octant-like slabs around the origin.',
-    tex: 'V=(x+\\\\text{sgn}(x)p_x,\\\\; y+\\\\text{sgn}(y)p_y,\\\\; z+\\\\text{sgn}(z)p_z)',
+    tex: 'V=(x+\\text{sgn}(x)p_x,\\; y+\\text{sgn}(y)p_y,\\; z+\\text{sgn}(z)p_z)',
     params: {
       x: {
         description:
@@ -219,7 +219,7 @@ export const variationDocs3D: VariationDocMap = {
   zScale3D: {
     summary:
       'A 3D map that multiplies only the z coordinate by a factor, leaving x and y untouched. Stretches, squashes, or flips the depth axis.',
-    tex: 'V=(x,\\\\; y,\\\\; s\\\\,z)',
+    tex: 'V=(x,\\; y,\\; s\\,z)',
     params: {
       scale: { description: 'Multiplier applied to the z coordinate.' },
     },
@@ -227,22 +227,22 @@ export const variationDocs3D: VariationDocMap = {
   linear3D: {
     summary:
       'A 3D identity map that returns the point unchanged, the simplest building block for 3D flames.',
-    tex: 'V=(x,\\\\; y,\\\\; z)',
+    tex: 'V=(x,\\; y,\\; z)',
   },
   spherical3D: {
     summary:
       'A 3D map that inverts each point through the unit sphere by dividing by its squared radius. Pulls distant points inward and pushes near points outward.',
-    tex: 'V=\\\\frac{(x,y,z)}{x^2+y^2+z^2}',
+    tex: 'V=\\frac{(x,y,z)}{x^2+y^2+z^2}',
   },
   sinusoidal3D: {
     summary:
       'A 3D map that applies the sine function independently to each coordinate, folding space into a bounded oscillating lattice.',
-    tex: 'V=(\\\\sin x,\\\\; \\\\sin y,\\\\; \\\\sin z)',
+    tex: 'V=(\\sin x,\\; \\sin y,\\; \\sin z)',
   },
   swirl3D: {
     summary:
       'A 3D map that rotates the x and y plane by an angle equal to the squared radius while leaving z unchanged. Creates a spiral swirl that twists tighter with distance.',
-    tex: 'V=(x\\\\cos r^2-y\\\\sin r^2,\\\\; x\\\\sin r^2+y\\\\cos r^2,\\\\; z),\\\\; r^2=x^2+y^2+z^2',
+    tex: 'V=(x\\cos r^2-y\\sin r^2,\\; x\\sin r^2+y\\cos r^2,\\; z),\\; r^2=x^2+y^2+z^2',
   },
   julia3D: {
     summary:
@@ -261,12 +261,12 @@ export const variationDocs3D: VariationDocMap = {
   bubble3D: {
     summary:
       'A 3D map that scales each point by a factor based on its squared radius, wrapping space onto a rounded bubble surface. Distant points compress toward a sphere.',
-    tex: 'V=\\\\frac{4}{x^2+y^2+z^2+4}(x,y,z)',
+    tex: 'V=\\frac{4}{x^2+y^2+z^2+4}(x,y,z)',
   },
   cylinder3D: {
     summary:
       'A 3D map that replaces the x coordinate with its sine while leaving y and z unchanged, wrapping space around a cylinder aligned with the depth axis.',
-    tex: 'V=(\\\\sin x,\\\\; y,\\\\; z)',
+    tex: 'V=(\\sin x,\\; y,\\; z)',
   },
   gaussian3D: {
     summary:
