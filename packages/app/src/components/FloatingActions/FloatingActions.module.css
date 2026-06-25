@@ -137,6 +137,9 @@
   justify-content: center;
   width: 30px;
   height: 28px;
+  /* WCAG 2.5.8 (AA): keep the hit target at least 24x24 CSS px. */
+  min-width: 24px;
+  min-height: 24px;
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -192,6 +195,9 @@
   justify-content: center;
   width: 28px;
   height: 24px;
+  /* WCAG 2.5.8 (AA): keep the hit target at least 24x24 CSS px. */
+  min-width: 24px;
+  min-height: 24px;
   border: none;
   border-radius: 5px;
   cursor: pointer;

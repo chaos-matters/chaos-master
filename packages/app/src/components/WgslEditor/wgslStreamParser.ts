@@ -148,6 +148,7 @@ function readString(stream: StringStream): string | null {
 
 function readNumber(stream: StringStream): string | null {
   if (stream.match(/0[xX][\da-fA-F]+[u]?/)) return 'number'
+  // eslint-disable-next-line security/detect-unsafe-regex -- linear number tokenizer (no nested quantifiers); runs only on local editor text
   if (stream.match(/\d+\.?\d*(?:[eE][+-]?\d+)?[fiu]?/)) return 'number'
   return null
 }

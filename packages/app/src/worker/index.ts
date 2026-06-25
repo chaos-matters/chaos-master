@@ -59,6 +59,12 @@ function generateShortId(): string {
   return id
 }
 
+// Reduce a thrown value to a log-safe message. Avoids dumping full Error objects
+// (and any request/upstream detail they may carry) into log retention.
+function errMsg(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
+
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
@@ -116,7 +122,7 @@ async function verifyTurnstile(
     }
     return true
   } catch (err) {
-    console.error('Turnstile verify failed:', err)
+    console.error('Turnstile verify failed:', errMsg(err))
     return false
   }
 }
@@ -180,7 +186,7 @@ async function resolveOgCard(
       if (meta.img) imageUrl = `${origin}/og/${key}`
     }
   } catch (err) {
-    console.error('Error reading OG meta:', err)
+    console.error('Error reading OG meta:', errMsg(err))
   }
   return { title, description, imageUrl }
 }
@@ -266,7 +272,7 @@ const baseHandler = {
           return json({ error: 'Too many requests, please slow down' }, 429)
         }
       } catch (err) {
-        console.error('Rate limit check failed (allowing):', err)
+        console.error('Rate limit check failed (allowing):', errMsg(err))
       }
     }
 
@@ -289,7 +295,7 @@ const baseHandler = {
         })
         return json({ id: shortId })
       } catch (err) {
-        console.error('Error handling /api/shorten POST:', err)
+        console.error('Error handling /api/shorten POST:', errMsg(err))
         return json({ error: 'Bad request' }, 400)
       }
     }
@@ -303,7 +309,7 @@ const baseHandler = {
         if (!payload) return json({ error: 'Not found' }, 404)
         return json({ payload })
       } catch (err) {
-        console.error('Error handling /api/shorten GET:', err)
+        console.error('Error handling /api/shorten GET:', errMsg(err))
         return json({ error: 'Server error' }, 500)
       }
     }
@@ -364,7 +370,7 @@ const baseHandler = {
         })
         return json({ ok: true })
       } catch (err) {
-        console.error('Error handling /api/og POST:', err)
+        console.error('Error handling /api/og POST:', errMsg(err))
         return json({ error: 'Bad request' }, 400)
       }
     }
@@ -434,7 +440,10 @@ const baseHandler = {
           return json({ error: 'Too many requests, please slow down' }, 429)
         }
       } catch (err) {
-        console.error('Discord rate limit check failed (allowing):', err)
+        console.error(
+          'Discord rate limit check failed (allowing):',
+          errMsg(err),
+        )
       }
 
       // Per-IP daily cap via KV (counts attempts, so a broken webhook can't be
@@ -456,7 +465,7 @@ const baseHandler = {
           expirationTtl: 24 * 60 * 60,
         })
       } catch (err) {
-        console.error('Discord daily cap check failed (allowing):', err)
+        console.error('Discord daily cap check failed (allowing):', errMsg(err))
       }
 
       if (!env.DISCORD_WEBHOOK_URL) {
@@ -493,7 +502,7 @@ const baseHandler = {
         })
         return json({ ok: res.ok }, res.ok ? 200 : 502)
       } catch (err) {
-        console.error('Error forwarding to Discord:', err)
+        console.error('Error forwarding to Discord:', errMsg(err))
         return json({ ok: false }, 502)
       }
     }
@@ -512,7 +521,7 @@ const baseHandler = {
           },
         })
       } catch (err) {
-        console.error('Error serving OG image:', err)
+        console.error('Error serving OG image:', errMsg(err))
         return new Response('Server error', { status: 500 })
       }
     }
@@ -538,7 +547,7 @@ const baseHandler = {
             card = await resolveOgCard(env, url.origin, await ogKey(payload))
           }
         } catch (err) {
-          console.error('Error resolving short link OG:', err)
+          console.error('Error resolving short link OG:', errMsg(err))
         }
         const metaHtml = buildMetaTags({
           ...card,
@@ -593,6 +602,16 @@ const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'X-Frame-Options': 'DENY',
   'Cross-Origin-Opener-Policy': 'same-origin',
+  // Enforce HTTPS for two years incl. subdomains. Browsers ignore this header
+  // over plain HTTP (e.g. `wrangler dev` on localhost), so it is safe to always
+  // send. If HSTS is also managed at the Cloudflare zone level, this is a no-op.
+  'Strict-Transport-Security': 'max-age=63072000; includeSubDomains',
+  // Lock down powerful features the app never uses. WebGPU is not gated by
+  // Permissions-Policy, and clipboard-write / fullscreen stay enabled for self.
+  'Permissions-Policy':
+    'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), browsing-topics=()',
+  // Disable legacy Adobe cross-domain policy files.
+  'X-Permitted-Cross-Domain-Policies': 'none',
   'Content-Security-Policy': [
     "default-src 'self'",
     "img-src 'self' data: blob:",

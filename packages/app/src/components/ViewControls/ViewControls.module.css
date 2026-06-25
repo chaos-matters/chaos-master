@@ -41,6 +41,25 @@
   background-color: rgba(255, 255, 255, 0.1);
 }
 
+/* Keyboard-operable target for "select this parameter for keyframing".
+   Visually transparent — inherits the surrounding layout/typography. */
+.cameraCoordTarget {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.cameraCoordTarget:focus-visible {
+  outline: 2px solid var(--neutral-500);
+  outline-offset: 2px;
+}
+
 .cameraCoordLabel {
   font-size: 0.65rem;
   font-weight: 600;
