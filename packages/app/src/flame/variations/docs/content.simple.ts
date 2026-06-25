@@ -41,10 +41,12 @@ export const variationDocsSimple: VariationDocMap = {
   arcsinhVar: {
     summary:
       'Complex inverse hyperbolic sine (arcsinh) of the input treated as a complex number, computed via a complex square root of z squared plus one and a log, scaled by 2 pi times the weight.',
+    tex: 'V = 2\\pi w \\cdot (\\Re,\\Im)\\,\\ln(z + \\sqrt{z^2+1}),\\ z = x + iy',
   },
   arctanhVar: {
     summary:
       'Complex inverse hyperbolic tangent (arctanh) of the input as a complex number, formed from the log of (1+z)/(1-z) and scaled by 2 pi times the weight.',
+    tex: 'V = 2\\pi w \\cdot (\\Re,\\Im)\\,\\ln\\tfrac{1+z}{1-z},\\ z = x + iy',
   },
   bilinearVar: {
     summary:
@@ -76,10 +78,12 @@ export const variationDocsSimple: VariationDocMap = {
   coshqVar: {
     summary:
       'A quaternion-flavored hyperbolic cosine using only the y component as the imaginary magnitude, returning cosh x times cosine of the magnitude for x and a sinc-weighted sinh term for y, scaled by the weight.',
+    tex: 'V = w \\cdot (\\cosh x \\cos y,\\ \\sinh x \\sin y)',
   },
   cosqVar: {
     summary:
       'A quaternion-flavored cosine using the y component as the imaginary magnitude, returning cos x times cosh of the magnitude for x and a sinc-weighted negative sine term for y, scaled by the weight.',
+    tex: 'V = w \\cdot (\\cos x \\cosh y,\\ -\\sin x \\sinh y)',
   },
   cotVar: {
     summary:
@@ -94,10 +98,12 @@ export const variationDocsSimple: VariationDocMap = {
   cothqVar: {
     summary:
       'A quaternion-flavored hyperbolic cotangent using the y component as imaginary magnitude, combining sinh and cosh of x with sine and cosine of that magnitude through a reciprocal-norm factor, scaled by the weight.',
+    tex: 'V = \\tfrac{w}{x^2+y^2} \\cdot (\\sinh x \\cosh x,\\ \\sin y \\cos y)',
   },
   cotqVar: {
     summary:
       'A quaternion-flavored cotangent using the y component as imaginary magnitude, combining sine and cosine of x with sinh and cosh of that magnitude through a reciprocal-norm factor, scaled by the weight.',
+    tex: 'V = \\tfrac{w}{x^2+y^2} \\cdot (\\sin x \\cos x,\\ -\\sinh y \\cosh y)',
   },
   cscVar: {
     summary:
@@ -112,10 +118,12 @@ export const variationDocsSimple: VariationDocMap = {
   cschqVar: {
     summary:
       'A quaternion-flavored hyperbolic cosecant using the y component as imaginary magnitude, dividing sinh and cosh of x by the squared norm and applying a sinc-weighted term for the y output, scaled by the weight.',
+    tex: 'V = \\tfrac{w}{x^2+y^2} \\cdot (\\sinh x \\cos y,\\ -\\cosh x \\sin y)',
   },
   cscqVar: {
     summary:
       'A quaternion-flavored cosecant using the y component as imaginary magnitude, dividing sine and cosh terms by the squared norm with a sinc-weighted y output, scaled by the weight.',
+    tex: 'V = \\tfrac{w}{x^2+y^2}\\,(\\sin x \\cosh|y|,\\ -\\cos x \\sinh|y|\\,\\operatorname{sgn} y)',
   },
   cylinder2Var: {
     summary:
@@ -139,6 +147,7 @@ export const variationDocsSimple: VariationDocMap = {
   ediscVar: {
     summary:
       'An elliptic disc map. It converts the point to elliptic coordinates, takes a logarithmic radial component and an inverse-cosine angular component, then applies hyperbolic and trigonometric functions to remap the disc, flipping sign when y is positive.',
+    tex: 'x_m = \\tfrac{\\sqrt{r^2+1+2x}+\\sqrt{r^2+1-2x}}{2},\\ a_1 = \\ln(x_m+\\sqrt{x_m-1}),\\ a_2 = -\\arccos\\tfrac{x}{x_m};\\quad V = w\\,(\\cosh a_2 \\cos a_1,\\ -\\operatorname{sgn}(y)\\,\\sinh a_2 \\sin a_1)',
   },
   ennepersVar: {
     summary:
@@ -148,14 +157,17 @@ export const variationDocsSimple: VariationDocMap = {
   fanVar: {
     summary:
       'A fan map that splits the plane into angular wedges of size derived from the affine coefficients, then rotates the polar angle by half a wedge in one direction or the other depending on which half of the wedge the angle falls in.',
+    tex: 't = \\pi c^2;\\quad V = w\\,r\\,(\\cos(\\theta \\pm \\tfrac{t}{2}),\\ \\sin(\\theta \\pm \\tfrac{t}{2}))',
   },
   flipCircleVar: {
     summary:
       'Flips the y coordinate across the x axis only for points outside a circle of radius equal to the weight, leaving points inside the circle unchanged.',
+    tex: 'V = (x,\\ s\\,y),\\quad s = -1\\ \\text{if}\\ x^2+y^2 \\le w^2,\\ \\text{else}\\ 1',
   },
   flipYVar: {
     summary:
       'Flips the sign of the y coordinate for points with positive x, leaving points with non-positive x unchanged, then scales by the weight.',
+    tex: 'V = w\\,(x,\\ s\\,y),\\quad s = -1\\ \\text{if}\\ x>0,\\ \\text{else}\\ 1',
   },
   glynniaVar: {
     summary:
@@ -181,6 +193,7 @@ export const variationDocsSimple: VariationDocMap = {
   invsquircularVar: {
     summary:
       'The inverse of the squircular map, converting a square-like region back toward a circular disc using a radial square-root expression divided by the coordinates and the weight.',
+    tex: 'V = \\tfrac{1}{w}\\sqrt{\\tfrac{r-\\sqrt{r\\,(w^2 r-4x^2y^2)/w}}{2}}\\,(\\tfrac{1}{x},\\ \\tfrac{1}{y}),\\quad r=x^2+y^2',
   },
   invtreeVar: {
     summary:
@@ -210,10 +223,12 @@ export const variationDocsSimple: VariationDocMap = {
   panorama1Var: {
     summary:
       'A panorama projection that first maps the point onto a sphere using one over the square root of r squared plus one, then outputs the resulting angle scaled by one over pi in x and the projected radius minus one half in y.',
+    tex: 'V = w\\,(\\tfrac{1}{\\pi}\\arctan\\tfrac{x}{y},\\ \\tfrac{r}{\\sqrt{r^2+1}}-\\tfrac{1}{2})',
   },
   panorama2Var: {
     summary:
       'A panorama projection like panorama1 but normalizing by one over the radius plus one rather than the spherical form, outputting the angle scaled by one over pi in x and the projected radius minus one half in y.',
+    tex: 'V = w\\,(\\tfrac{1}{\\pi}\\arctan\\tfrac{x}{y},\\ \\tfrac{r}{r+1}-\\tfrac{1}{2})',
   },
   petalVar: {
     summary:
@@ -228,14 +243,17 @@ export const variationDocsSimple: VariationDocMap = {
   rays1Var: {
     summary:
       'A rays map that scales the inverse of each coordinate by the squared radius times a factor built from the cotangent of the radius plus a weight term, producing radial rays.',
+    tex: 't = x^2+y^2,\\ u = \\cot\\sqrt{t} + w\\,\\tfrac{4}{\\pi^2};\\quad V = u\\,t\\,(\\tfrac{1}{x},\\ \\tfrac{1}{y})',
   },
   rays2Var: {
     summary:
       'A rays map that scales the inverse of each coordinate by one tenth of the squared radius times the secant of the squared radius times the tangent of its reciprocal, producing radial ray streaks.',
+    tex: 't = x^2+y^2;\\quad V = \\tfrac{w\\,t}{10}\\sec\\!\\big(t\\tan\\tfrac{1}{t}\\big)\\,(\\tfrac{1}{x},\\ \\tfrac{1}{y})',
   },
   rays3Var: {
     summary:
       'A rays map that scales the inverse of each coordinate by a factor built from one over the square root of a nested cosine and sine expression, modulating x by cosine of the squared radius and y by its tangent.',
+    tex: 't = x^2+y^2;\\quad V = \\tfrac{w\\,t}{10\\sqrt{\\cos(\\sin t^2 \\sin\\tfrac{1}{t^2})}}\\,(\\tfrac{\\cos t}{x},\\ \\tfrac{\\tan t}{y})',
   },
   riftVar: {
     summary:
@@ -244,6 +262,7 @@ export const variationDocsSimple: VariationDocMap = {
   ringsVar: {
     summary:
       'A rings map that wraps the radius into concentric bands of width set by the squared affine c coefficient, then places the point back on its polar direction at the wrapped radius.',
+    tex: 'f = ((r+c^2)\\bmod 2c^2) - c^2 + r\\,(1-c^2);\\quad V = w\\,f\\,(\\cos\\theta,\\ \\sin\\theta)',
   },
   rippledVar: {
     summary:
@@ -253,10 +272,12 @@ export const variationDocsSimple: VariationDocMap = {
   rondspherVar: {
     summary:
       'A round-sphere map that divides each coordinate by the squared radius times a factor of one over the squared radius plus the square of two over pi, contracting points toward the origin.',
+    tex: 'd = x^2+y^2,\\ e = \\tfrac{1}{d}+(\\tfrac{2}{\\pi})^2;\\quad V = \\tfrac{w}{d\\,e}\\,(x,\\ y)',
   },
   roundSpherVar: {
     summary:
       'A round-sphere map that scales each coordinate by the weight divided by the squared radius times a factor of one over the squared radius plus four over pi squared, contracting points toward the origin.',
+    tex: 'd = x^2+y^2,\\ e = \\tfrac{1}{d}+\\tfrac{4}{\\pi^2};\\quad V = \\tfrac{w}{d\\,e}\\,(x,\\ y)',
   },
   secVar: {
     summary:
@@ -266,6 +287,7 @@ export const variationDocsSimple: VariationDocMap = {
   secant2Var: {
     summary:
       'A secant-based curve that keeps x unchanged and replaces y with the reciprocal of cos(r) where r is the weighted radius, offset up or down by one depending on the sign of that reciprocal.',
+    tex: 'V = (x,\\ \\sec r - \\operatorname{sgn}(\\sec r)),\\ r = weight\\sqrt{x^2+y^2}',
   },
   sechVar: {
     summary:
@@ -275,10 +297,12 @@ export const variationDocsSimple: VariationDocMap = {
   sechqVar: {
     summary:
       'A quaternion-flavored hyperbolic secant treating y as the imaginary magnitude. It scales cosh x cos magnitude by the inverse squared norm for x, and folds a sinh-times-sin term divided by the magnitude into y.',
+    tex: 'V = \\frac{weight}{x^2+y^2}(\\cosh x\\cos y,\\ -\\sinh x\\sin y)',
   },
   secqVar: {
     summary:
       'A quaternion-flavored secant using minus x for the trig terms and the y-magnitude for the hyperbolic terms, scaling cos times cosh by the inverse squared norm for x and folding a sin-times-sinh term divided by the magnitude into y.',
+    tex: 'V = \\frac{weight}{x^2+y^2}(\\cos x\\cosh y,\\ \\sin x\\sinh y)',
   },
   sinVar: {
     summary:
@@ -293,10 +317,12 @@ export const variationDocsSimple: VariationDocMap = {
   sinhqVar: {
     summary:
       'A quaternion-flavored hyperbolic sine treating y as the imaginary magnitude. The x output is sinh x times cos magnitude, and the y output multiplies y by cosh x times sin magnitude divided by that magnitude.',
+    tex: 'V = weight\\,(\\sinh x\\cos y,\\ \\cosh x\\sin y)',
   },
   sinqVar: {
     summary:
       'A quaternion-flavored sine treating y as the imaginary magnitude. The x output is sin x times cosh magnitude, and the y output multiplies y by cos x times sinh magnitude divided by that magnitude.',
+    tex: 'V = weight\\,(\\sin x\\cosh y,\\ \\cos x\\sinh y)',
   },
   spiralwingVar: {
     summary:
@@ -324,10 +350,12 @@ export const variationDocsSimple: VariationDocMap = {
   tornadoVar: {
     summary:
       'A vertical vortex swirl whose rotation angle grows as the point nears the center, given by one minus the radius times three pi times the weight. The point is rotated by that angle and pushed slightly upward in proportion to its radius.',
+    tex: 'V = (x\\cos a - y\\sin a,\\ x\\sin a + y\\cos a + 0.1\\,t\\,r),\\ a = 3\\pi(1-r)t,\\ t = weight,\\ r = \\sqrt{x^2+y^2}',
   },
   wavesVar: {
     summary:
       'Adds sinusoidal displacement driven by the affine coefficients: the x shift is the b coefficient times sin of y over c squared, and the y shift is the e coefficient times sin of x over f squared.',
+    tex: 'V = weight\\,(x + b\\sin(y/c^{2}),\\ y + e\\sin(x/f^{2}))',
   },
   wdiscVar: {
     summary:

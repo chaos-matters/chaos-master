@@ -54,6 +54,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   yinYangVar: {
     summary:
       'Rotates the input by angle one, applies a circle-inversion-style transform scaled by radius, then rotates by angle two, optionally negating and choosing inside or outside behavior to form a yin-yang pattern.',
+    tex: 'u = x\\cos(\\pi a_1) + y\\sin(\\pi a_1),\\ v = x\\sin(\\pi a_1) - y\\cos(\\pi a_1),\\ \\varphi = \\tfrac{2\\,radius\\,(v + radius)}{u^{2}+v^{2}}\\,dual\\_t + \\pi a_2,\\ V = (u\\cos\\varphi - v\\sin\\varphi,\\ u\\sin\\varphi + v\\cos\\varphi)',
     params: {
       radius: {
         description:
@@ -174,6 +175,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   mobiusVar: {
     summary:
       'Applies a Mobius transformation in the complex plane, mapping the point z to (az + b) / (cz + d) with a small denominator guard.',
+    tex: 'z = x + iy,\\ V = \\tfrac{(a + c\\,i)z + b}{(c + d\\,i)z + d}',
     params: {
       a: {
         description:
@@ -194,6 +196,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   shredradVar: {
     summary:
       'Divides the plane into n angular wedges and shreds each wedge by compressing the angle within it toward the wedge boundary, controlled by width.',
+    tex: 'V = w\\,r\\,(\\cos z,\\ \\sin z),\\ \\theta=\\arctan(y/x),\\ sa=\\tfrac{2\\pi}{n},\\ sw=1-|width|,\\ \\xi=\\tfrac{\\theta+3\\pi+sa/2}{sa},\\ z=(\\xi-\\lfloor\\xi\\rfloor)\\,sw\\,sa + \\lfloor\\xi\\rfloor sa - \\pi - \\tfrac{sa}{2}sw',
     params: {
       n: {
         description: 'Number of angular wedges the circle is divided into.',
@@ -242,6 +245,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   splitVar: {
     summary:
       'Splits the plane by flipping the sign of each coordinate based on the sign of a cosine of that coordinate, creating alternating mirrored bands.',
+    tex: 'V = w\\,(x\\,\\operatorname{sgn}(\\cos(x\\,xSize\\,\\pi)),\\ y\\,\\operatorname{sgn}(\\cos(y\\,ySize\\,\\pi)))',
     params: {
       xSize: {
         description:
@@ -300,6 +304,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   separationVar: {
     summary:
       'Pushes each coordinate away from the axis using a hyperbola-like square root with a separation gap, then nudges it back inward by an inside factor, with the direction set by the coordinate sign.',
+    tex: 'V = w\\,(\\operatorname{sgn}(x)\\sqrt{x^2+xSep^2} - x\\,xInside,\\ \\operatorname{sgn}(y)\\sqrt{y^2+ySep^2} - y\\,yInside)',
     params: {
       xSep: {
         description:
@@ -322,6 +327,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   spligonVar: {
     summary:
       'Quantizes the point angle into a fixed number of sides and offsets the point along the resulting polygonal direction by a radius, forming a polygon-like splatter.',
+    tex: 'V = w\\,(x + r\\cos t,\\ y + r\\sin t),\\ t=\\tfrac{\\lfloor a\\,th\\rfloor}{th} - \\tfrac{\\pi\\,i}{2\\,sides},\\ a=\\arctan(y/x),\\ th=\\tfrac{sides}{2\\pi}',
     params: {
       sides: {
         description:
@@ -429,6 +435,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   rsquaresVar: {
     summary:
       'Tiles the plane into a grid of square cells and re-centers each cell, offsetting horizontally by a per-quadrant amount to create rows of repeated square panels.',
+    tex: 'V = w\\,(\\tfrac{f_x}{scale} + 0.1\\,q,\\ \\tfrac{f_y}{scale}),\\ q=\\lfloor 2|x|\\rfloor + 2\\lfloor 2|y|\\rfloor,\\ f_x=2|x|-\\lfloor 2|x|\\rfloor-\\tfrac12,\\ f_y=2|y|-\\lfloor 2|y|\\rfloor-\\tfrac12',
     params: {
       depth: {
         description:
@@ -443,6 +450,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   squircularVar: {
     summary:
       'Maps the point through a squircle-like radial transform, blending between circular and square output shapes based on the parameter.',
+    tex: 'V = w\\,(nr\\,\\theta,\\ nr(1-\\theta^2)),\\ r=\\sqrt{x^2+y^2},\\ \\theta=\\tfrac{x+y}{r},\\ nr=\\tfrac{r}{\\sqrt{1+r^2/n^2}}',
     params: {
       n: {
         description:
@@ -504,6 +512,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   vogelVar: {
     summary:
       'Snaps points onto a Vogel phyllotaxis spiral by quantizing the input radius into an index and placing it at the golden-angle position for that index, producing sunflower-seed style patterns.',
+    tex: 'V = w\\,scale\\sqrt{i}\\,(\\cos(i\\,g),\\ \\sin(i\\,g)),\\ i=\\lfloor\\tfrac{n}{2}\\sqrt{x^2+y^2}\\rfloor,\\ g=\\pi(3-\\sqrt5)',
     params: {
       scale: {
         description:
@@ -571,6 +580,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   joukowskiVar: {
     summary:
       'Applies a Joukowski-style conformal transform that maps the input through an airfoil-like mapping, with a thickness parameter shifting and scaling the result.',
+    tex: "V = \\tfrac{w}{2}\\,(x'(1+\\tfrac{a^2}{r^2}),\\ y(1-\\tfrac{a^2}{r^2})),\\ x'=x+thickness,\\ a^2=thickness^2,\\ r^2=x'^2+y^2",
     params: {
       thickness: {
         description:
@@ -751,6 +761,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   sTwinVar: {
     summary:
       'Treats the scaled point as a complex number and squares it, modulating the real and imaginary parts by a sine and cosine of a distortion phase to create twisted twin lobes.',
+    tex: 'V = ((x^2-y^2+10^{-4}(offset_{x2}-offset_{y2}))\\sin t,\\ 2xy\\cos t),\\ x=0.05\\,w\\,x_0,\\ y=0.05\\,w\\,y_0,\\ t=2\\pi\\,distort\\,(x+y+0.1\\,offset_{xy})',
     params: {
       distort: {
         description:
@@ -820,6 +831,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   xheartVar: {
     summary:
       'Produces heart-shaped output by scaling the coordinates with a reciprocal of a shifted squared radius, rotating by an angle, and mirroring the y coordinate based on the sign of the resulting x.',
+    tex: 'V = w\\,(X,\\ \\operatorname{sign}(X)\\,Y),\\ X = \\cos(angle)\\tfrac{4x}{s} - \\sin(angle)\\tfrac{ratio\\,y}{s},\\ Y = \\sin(angle)\\tfrac{4x}{s} + \\cos(angle)\\tfrac{ratio\\,y}{s},\\ s = x^2+y^2+4',
     params: {
       angle: {
         description:
@@ -1051,6 +1063,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   murlVar: {
     summary:
       'A Mobius-style curl that scales the input by a complex factor derived from raising the angle and radius to a power and adding one, then maps the point through the resulting transform to create curling spirals.',
+    tex: "V = w\\,\\tfrac{c'+1}{re^2+im^2}\\,(x\\,re + y\\,im,\\ y\\,re - x\\,im),\\ re = c' r^{power}\\cos(power\\,\\theta)+1,\\ im = c' r^{power}\\sin(power\\,\\theta),\\ c' = \\tfrac{c}{power-1},\\ r=\\sqrt{x^2+y^2}",
     params: {
       c: {
         description:
@@ -1209,6 +1222,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   q_odeVar: {
     summary:
       'Adds a general bivariate quadratic polynomial of x and y to the point, with twelve coefficients defining the two output deltas, emulating a quadratic ordinary differential equation step.',
+    tex: 'V = (x + d_x,\\ y + d_y),\\ d_x = q01 + w\\,q02\\,x + q03\\,x^2 + q04\\,xy + q05\\,y + q06\\,y^2,\\ d_y = q07 + q08\\,x + q09\\,x^2 + q10\\,xy + w\\,q11\\,y + q12\\,y^2',
     params: {
       q_ode01: { description: 'Constant term of the x delta.' },
       q_ode02: {
@@ -1287,6 +1301,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   targetVar: {
     summary:
       'Rotates the point by one of two angles depending on which logarithmic radial ring it falls in, producing concentric target bands with alternating twist.',
+    tex: 'V = w\\,r\\,(\\cos(\\theta + \\delta),\\ \\sin(\\theta + \\delta)),\\ \\delta = \\begin{cases} even & |\\log r \\bmod size| < \\tfrac{size}{2}\\\\ odd & \\text{else}\\end{cases},\\ r=\\sqrt{x^2+y^2}',
     params: {
       even: {
         description:
@@ -1408,6 +1423,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   invEllipseVar: {
     summary:
       'Inverts points across an axis-aligned ellipse centered at (h, k); points outside (or all points when unrestricted) are mapped to the reciprocal of the ellipse equation, while interior points pass through unchanged in restricted mode.',
+    tex: 'V = \\left(h + \\frac{x-h}{D},\\ k + \\frac{y-k}{D}\\right),\\ D = \\frac{(x-h)^2}{a^2} + \\frac{(y-k)^2}{b^2}',
     params: {
       a: { description: 'Major (x) semi-axis length of the ellipse.' },
       b: { description: 'Minor (y) semi-axis length of the ellipse.' },
@@ -1455,6 +1471,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   sinusGridVar: {
     summary:
       'Warps the plane toward a sinusoidal grid by interpolating each coordinate between its original value and a negated cosine of that coordinate scaled by frequency, with per-axis amplitude blending.',
+    tex: 'V = \\left(x + ampx\\,(-\\cos(2\\pi\\,freqx\\,x) - x),\\ y + ampy\\,(-\\cos(2\\pi\\,freqy\\,y) - y)\\right)',
     params: {
       ampx: {
         description: 'Blend amount toward the sinusoidal target along x.',
@@ -1513,6 +1530,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   waves3Var: {
     summary:
       'A waves variation that displaces each coordinate by a sine of the opposite coordinate, where the displacement amplitude is itself modulated by a second sine, creating amplitude-varying ripples.',
+    tex: 'V = \\left(x + \\tfrac{1}{2}scalex\\,(1+\\sin(sxFreq\\,y))\\sin(freqx\\,y),\\ y + \\tfrac{1}{2}scaley\\,(1+\\sin(syFreq\\,x))\\sin(freqy\\,x)\\right)',
     params: {
       scalex: { description: 'Base displacement amplitude along x.' },
       scaley: { description: 'Base displacement amplitude along y.' },
@@ -1559,6 +1577,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   wedgeVar: {
     summary:
       'Folds the plane into angular wedges, adding a radial swirl to the angle, quantizing into segments, and offsetting the radius by a hole term to create gapped pie-slice fans.',
+    tex: "V = (r+hole)(\\cos a',\\ \\sin a'),\\ a = \\theta + swirl\\,r,\\ a' = a\\left(1-\\tfrac{angle\\,count}{2\\pi}\\right) + angle\\left\\lfloor\\tfrac{count\\,a+\\pi}{2\\pi}\\right\\rfloor",
     params: {
       angle: { description: 'Rotation applied to each wedge segment.' },
       hole: {
@@ -1574,6 +1593,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   loqVar: {
     summary:
       'A complex logarithm style map placing the log of the squared magnitude on x and a scaled angular term on y, with the radial scale controlled by an adjustable logarithm base.',
+    tex: 'V = \\left(\\frac{\\log(x^2+y^2)}{2\\log(base)},\\ \\frac{y\\,\\arctan(|y|/x)}{|y|}\\right)',
     params: {
       base: {
         description:
@@ -1615,6 +1635,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   maskVar: {
     summary:
       'A masked sinusoidal map that scales the squared magnitude by a sine and hyperbolic cosine product, projecting onto sine and cosine of a shifted, scaled x to carve out wave-shaped masks. Returns the origin near the singularity.',
+    tex: 'V = \\frac{\\sin^{2}(u)\\,(\\cosh(v)+ushift)}{x^2+y^2}\\,(\\sin^{2}(u),\\ \\sin(u)\\cos(u)),\\ u = xscale\\,x+xshift,\\ v = yscale\\,y+yshift',
     params: {
       xshift: {
         description:
@@ -1679,6 +1700,7 @@ export const variationDocsGeneral2: VariationDocMap = {
   rational3Var: {
     summary:
       'Evaluates a rational function of a complex number with cubic numerator and denominator polynomials, dividing the complex numerator by the complex denominator to produce intricate symmetric warps.',
+    tex: 'V = \\frac{a z^3 + b z^2 + c z + d}{e z^3 + f z^2 + g z + h},\\ z = x+iy',
     params: {
       a: { description: 'Cubic-term coefficient of the numerator polynomial.' },
       b: {
