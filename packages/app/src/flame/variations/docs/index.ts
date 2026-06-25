@@ -1,4 +1,5 @@
 import { variationDocsContent } from './content'
+import { variationDocsSimple } from './content.simple'
 import type { VariationDoc, VariationDocMap } from './types'
 import type { AnyVariationType } from '@/flame/variationRegistry'
 
@@ -9,7 +10,10 @@ export type {
   VariationDocMap,
 } from './types'
 
-export const variationDocs: VariationDocMap = variationDocsContent
+export const variationDocs: VariationDocMap = {
+  ...variationDocsContent,
+  ...variationDocsSimple,
+}
 
 export function getVariationDoc(
   type: AnyVariationType,
