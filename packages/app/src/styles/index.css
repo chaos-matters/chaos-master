@@ -6,6 +6,15 @@
 
 :root {
   interpolate-size: allow-keywords;
+
+  /* Keyboard-focus ring color: the app's indigo accent (light theme) replaces
+     the old violet default so the ring matches the rest of the UI. The dark
+     theme uses a lighter indigo (below) for contrast. */
+  --focus-ring-color: #6366f1;
+}
+
+body[data-theme='dark'] {
+  --focus-ring-color: #818cf8;
 }
 
 body {
@@ -35,8 +44,8 @@ textarea:focus-visible,
 summary:focus-visible,
 [tabindex]:focus-visible,
 [role='button']:focus-visible {
-  outline: 2px solid var(--focus-ring-color, #7c3aed) !important;
-  outline-offset: 2px;
+  outline: 1.5px solid var(--focus-ring-color, #6366f1) !important;
+  outline-offset: 1px;
 }
 
 /* Visually hidden, but still exposed to assistive tech (screen-reader only). */

@@ -1,6 +1,6 @@
 import { createResource, createSignal, For, Show, Suspense } from 'solid-js'
 import { useToast } from '@/contexts/ToastContext'
-import { Changelog, Discord, GitHub, Heart, Terminal, TriangleAlert, } from '@/icons'
+import { Changelog, Discord, GitHub, Globe, Heart, Terminal, TriangleAlert, } from '@/icons'
 import { getWebgpuComponents } from '@/lib/WebgpuAdapter'
 import { getWebglRenderer } from '@/utils/deviceInfo'
 import { formatBytes } from '@/utils/formatBytes'
@@ -225,6 +225,15 @@ function HelpModal(props: HelpModalProps) {
         <h1 class={ui.heroTitle}>Chaos Master</h1>
         <div class={ui.heroRight}>
           <div class={ui.iconRow}>
+            <a
+              class={ui.iconLink}
+              href="https://about.chaos-master.com"
+              target="_blank"
+              aria-label="Visit our home page"
+              title="Visit our home page"
+            >
+              <Globe />
+            </a>
             <a
               class={ui.iconLink}
               href="https://ko-fi.com/chaosmatters"

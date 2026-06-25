@@ -7,6 +7,30 @@ changelog surfaced in the About panel lives in `CHANGELOG.md`.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-06-25
+
+### Added
+
+- **Variation documentation**: a docs "pill" in the variation browser opens an in-app reference for every variation. Parameter types and ranges are derived from the editors themselves; each entry shows its math formula and the generated WGSL for both 2D and 3D variations, alongside IFS-pipeline and API guides. Documentation/formulas were backfilled across the full set — 87 simple (non-parametric) variations, ~200 general-group parametric variations, all 43 3D variations, and the post/pre/crop/cut/blur/dc transforms — including a fix for over-escaped backslashes in 12 3D formulas.
+- **Home-page link** in the Help/About hero icon row: a new stroke-style `Globe` icon (`icons/globe.svg`, registered in `icons/index.ts`) links to `https://about.chaos-master.com`, opened in a new tab. Placed first in the row, ahead of the Ko-fi / GitHub / Discord links.
+
+### Changed
+
+- **LoadFlameModal**: the subtitle, upload/drop zone, dimension filter and gallery now live inside a single scroll container (`.scrollBody`, renamed from `.galleryScroll`), so the whole modal body scrolls as one unit instead of pinning the upload zone at the top. This frees vertical space for the gallery on small / mobile / tablet viewports. The modal title bar (with the close button) stays fixed.
+- **Focus ring** (`styles/index.css`, global `:focus-visible`): introduced a `--focus-ring-color` token (`#6366f1` light / `#818cf8` dark — the app's indigo accent) to replace the hard-coded violet `#7c3aed`, and slimmed the ring from `2px` outline / `2px` offset to `1.5px` / `1px`. Still keyboard-focus only and `!important`, so the WCAG 2.4.7 behavior is preserved.
+- **Sidebar add-flame buttons** reordered to `New transform → Add symmetry → Migration` (was `Migration → New transform → Add symmetry`), in `MainWorkspace.tsx`.
+- **Bottom-right floating controls** consolidated into one row: the standalone fixed-position `BenchmarkButton` now renders inside `SoftwareVersion`'s `.versionContainer` (ordered Benchmark → Docs → version/About) instead of floating separately at `bottom: 2.75rem`. Dropped its own `position: fixed` and tuned its size to match the Docs / About pill height.
+
+### Fixed
+
+- **Migration**: the import-warnings panel is now height-bounded and scrolls instead of overflowing the modal when an imported file produces many warnings.
+- **Timeline**: render the held/seeked frame on scrub release, not just the frame counter.
+
+### Chore
+
+- Bumped the app package version `0.9.0` → `0.9.1` (the in-app version badge reads `version` straight from `package.json` via `src/version.ts`).
+- CI (already on `main`): deploy workflows skip on forks via a job-level `github.repository` gate; the eslint job's heap was raised to avoid OOM; workflows run on Node 24.
+
 ## [0.9.0] - 2026-06-20
 
 Consolidated production release covering the full `0.9.0`–`0.9.10` development

@@ -3,6 +3,25 @@
 What's new in Chaos Master. Concise highlights for each release; the full
 developer history lives in `dev.changelog.md`.
 
+## [0.9.1] - 2026-06-25
+
+### Added
+
+- **Variation documentation**: an in-app reference for every variation — its formula, its parameters (with type and range), and the actual 2D / 3D WGSL — plus IFS and API guides. Open it from the docs pill in the variation browser.
+- **Home-page link** to the Chaos Master site from the Help / About panel.
+
+### Changed
+
+- The **Load Flame** dialog now scrolls as one piece — the upload / drop zone is no longer pinned, so the gallery gets more room on phones and tablets.
+- Slimmer keyboard-focus outline, tinted to match the app instead of the old chunky purple ring.
+- Reordered the transform buttons to **New transform → Add symmetry → Migration**.
+- The floating bottom-right controls (Benchmark, Docs, version / About) now sit together on one tidy row.
+
+### Fixed
+
+- The Migration import-warnings list now scrolls instead of overflowing when a file has many warnings.
+- The timeline now shows the held frame after you release a scrub, not just the frame number.
+
 ## [0.9.0] - 2026-06-20
 
 ### Added

@@ -142,7 +142,10 @@
   line-height: 1.3;
 }
 
-.galleryScroll {
+.scrollBody {
+  /* The whole modal body (upload zone + filter + gallery) scrolls as one unit,
+     so the upload/drop zone is no longer pinned at the top — this gives small
+     and mobile/tablet screens more room for the gallery. */
   flex: 1;
   overflow-y: auto;
   min-height: 0;

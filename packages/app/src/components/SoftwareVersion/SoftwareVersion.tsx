@@ -1,16 +1,19 @@
 import { Book } from '@/icons'
 import { VERSION } from '@/version'
+import { BenchmarkButton } from '../BenchmarkButton/BenchmarkButton'
 import { DebugPanel } from '../Debug/DebugPanel'
 import ui from './SoftwareVersion.module.css'
 
 export function SoftwareVersion(props: {
   showHelp: () => void
   showDocs: () => void
+  showBenchmark: () => void
 }) {
   return (
     <div>
       <DebugPanel />
       <div class={ui.versionContainer}>
+        <BenchmarkButton onClick={props.showBenchmark} />
         <button
           class={ui.docsPill}
           onClick={props.showDocs}

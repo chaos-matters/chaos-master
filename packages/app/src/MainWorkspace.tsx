@@ -14,7 +14,6 @@ import { createDragHandler } from '@/utils/createDragHandler'
 import { recordEntries, recordKeys } from '@/utils/record'
 import ui from './App.module.css'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
-import { BenchmarkButton } from './components/BenchmarkButton/BenchmarkButton'
 import { createShowBenchmark } from './components/BenchmarkModal/BenchmarkModal'
 import { BlendFlameGallery } from './components/BlendFlameGallery/BlendFlameGallery'
 import { Button } from './components/Button/Button'
@@ -3842,18 +3841,6 @@ export function MainWorkspace(props: AppProps) {
                           <button
                             class={ui.addFlameButton}
                             onClick={() => {
-                              void showMigrationModal(
-                                structuredClone(
-                                  JSON.parse(JSON.stringify(flameDescriptor)),
-                                ),
-                              )
-                            }}
-                          >
-                            Migration
-                          </button>
-                          <button
-                            class={ui.addFlameButton}
-                            onClick={() => {
                               setFlameDescriptor((draft) => {
                                 draft.transforms[generateTransformId()] =
                                   deepClone(newDefaultTransform())
@@ -3876,6 +3863,18 @@ export function MainWorkspace(props: AppProps) {
                             }}
                           >
                             Add symmetry
+                          </button>
+                          <button
+                            class={ui.addFlameButton}
+                            onClick={() => {
+                              void showMigrationModal(
+                                structuredClone(
+                                  JSON.parse(JSON.stringify(flameDescriptor)),
+                                ),
+                              )
+                            }}
+                          >
+                            Migration
                           </button>
                         </Card>
                         <CollapsibleCard title="Render">
@@ -4833,12 +4832,10 @@ export function MainWorkspace(props: AppProps) {
             }}
           />
           <SpotlightTour tourContext={tourContext} />
-          <BenchmarkButton
-            onClick={() => {
+          <SoftwareVersion
+            showBenchmark={() => {
               void showBenchmark()
             }}
-          />
-          <SoftwareVersion
             showDocs={() => {
               void showDocumentation()
             }}
