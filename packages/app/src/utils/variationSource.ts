@@ -38,8 +38,17 @@ const SOURCE_BASENAME_OVERRIDES: Partial<Record<string, string>> = {}
 export async function variationTsSource(
   type: string,
 ): Promise<string | undefined> {
-  const basename = SOURCE_BASENAME_OVERRIDES[type] ?? type
-  const loader = sourceByBasename[basename]
+  // The type literal always carries a trailing "Var" (e.g. `blobVar`) so the UI
+  // can strip it for a clean name, but a number of source files drop it
+  // (`blob.tsx`, `curl.tsx`, …). Resolve by trying the literal, then the
+  // Var-stripped basename, then any explicit override — so the lookup works
+  // regardless of whether a file matches its type key.
+  const candidates = [
+    SOURCE_BASENAME_OVERRIDES[type],
+    type,
+    type.replace(/Var$/, ''),
+  ].filter((b): b is string => Boolean(b))
+  const loader = candidates.map((b) => sourceByBasename[b]).find(Boolean)
   if (!loader) return undefined
   try {
     return await loader()
