@@ -9,8 +9,18 @@ export default defineConfig({
   retries: isCI ? 2 : 0,
   workers: isCI ? 1 : undefined,
   reporter: 'html',
+  // Build the app and serve the production preview, then run e2e against it.
+  // The preview server (vite preview + basic-ssl) owns the port, so tests don't
+  // depend on a separately-started dev server.
+  webServer: {
+    command: 'pnpm --filter chaos-master e2e:serve',
+    url: 'https://localhost:4173',
+    reuseExistingServer: !isCI,
+    timeout: 180_000,
+    ignoreHTTPSErrors: true,
+  },
   use: {
-    baseURL: 'https://localhost:3000',
+    baseURL: 'https://localhost:4173',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     ignoreHTTPSErrors: true,

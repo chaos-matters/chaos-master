@@ -8,6 +8,7 @@
     "build:dev": "vite build --mode development",
     "serve": "vite preview",
     "prod": "vite build && vite preview",
+    "e2e:serve": "vite build && vite preview --port 4173 --strictPort",
     "start": "vite",
     "test": "vitest",
     "analyze-bundle": "VITE_ANALYZE_BUNDLE=true vite build",
