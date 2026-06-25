@@ -510,9 +510,15 @@ export function Flam3(props: Flam3Props) {
     const flame = deepClone(props.flameDescriptor)
     const enabled = props.animationEnabled
     const hasTracks = timeline ? timeline.tracks().length : 0
-    // Read currentFrame in the reactive scope so scrubbing triggers re-run.
+    // Read currentFrame in the reactive scope so scrubbing/seeking triggers a
+    // re-run (isDrivingView itself doesn't depend on the frame number).
     const _frame = timeline?.currentFrame() ?? 0
-    const isActive = timeline?.isPlaying() || timeline?.isScrubbing()
+    // Drive the rendered flame whenever the timeline owns the view — playing,
+    // scrubbing, OR holding a seeked/stepped frame (clicking the playhead).
+    // Using the narrower isPlaying||isScrubbing left a clicked/held frame's
+    // transforms unapplied (only the camera, which already uses isDrivingView,
+    // moved), so the canvas didn't match the frame counter.
+    const isActive = timeline?.isDrivingView() ?? false
     if (timeline && enabled && hasTracks > 0 && isActive) {
       applyTimelineToFlame(timeline, flame)
     }
@@ -719,15 +725,15 @@ export function Flam3(props: Flam3Props) {
       resetAccumulation()
     })
 
-    // Reset accumulation on animation frame change during playback or
-    // scrubbing. Without this, IFS points from different frames accumulate
-    // together. Deliberately NOT during export: the export drives flame state
-    // itself, and a playhead-follow UI moving currentFrame mid-frame would
-    // throw away accumulation work.
+    // Reset accumulation on animation frame change whenever the timeline drives
+    // the view (playing, scrubbing, or holding a seeked/clicked frame). Without
+    // this, IFS points from different frames accumulate together. Export drives
+    // flame state itself via its own render path, so this only affects the live
+    // view.
     createEffect(() => {
       if (!timeline) return
       timeline.currentFrame()
-      if (timeline.isPlaying() || timeline.isScrubbing()) {
+      if (timeline.isDrivingView()) {
         resetAccumulation()
       }
     })
