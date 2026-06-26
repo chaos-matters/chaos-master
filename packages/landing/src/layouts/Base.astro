@@ -2,6 +2,7 @@
 import '../styles/global.css'
 import Nav from '../components/Nav.astro'
 import Footer from '../components/Footer.astro'
+import PreviewModeNotice from '../components/PreviewModeNotice.tsx'
 
 interface Props {
   title?: string
@@ -98,6 +99,10 @@ const remoteLog =
     <Nav />
     <slot />
     <Footer />
+
+    {/* Tells visitors on a non-WebGPU browser why the flames are static. Renders
+        only when live previews can't run; client-only (reads navigator.gpu). */}
+    <PreviewModeNotice client:only="solid-js" />
 
     <button id="to-top" class="to-top" type="button" aria-label="Scroll to top">
       <svg

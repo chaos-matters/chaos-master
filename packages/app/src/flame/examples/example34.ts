@@ -38,9 +38,9 @@ export const example34 = defineExample({
     paletteSpeed: 0.5,
     camera: { zoom: 1, position: [0, 0] },
     camera3D: {
-      theta: 6.04,
-      phi: 2.875,
-      radius: 1.84,
+      theta: 6.501777343750011,
+      phi: 3.1080379660897943,
+      radius: 3.242708697088002,
       target: [0, 0, 0],
       fov: 60,
     },

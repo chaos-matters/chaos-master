@@ -1,5 +1,7 @@
 ---
+import { execSync } from 'node:child_process'
 import { LAUNCH_ICON } from '../icons'
+import pkg from '../../package.json'
 
 const appUrl = 'https://chaos-master.com'
 const repoUrl = 'https://github.com/chaos-matters/chaos-master'
@@ -11,6 +13,25 @@ const discordUrl = `${appUrl}/discord`
 // Ko-fi support page — a public link, no worker/secret needed.
 const supportUrl = 'https://ko-fi.com/chaosmatters'
 const year = new Date().getFullYear()
+
+// Build-time version + short commit sha, mirroring the app's SoftwareVersion
+// pill (packages/app: VERSION from package.json + __GIT_SHA__ in vite.config).
+// The footer is static Astro, so we resolve both here in Node at build time:
+// CI exposes GITHUB_SHA; locally we read git directly. `repoUrl` links the pill
+// to the matching commit on GitHub when the sha is real.
+const version = pkg.version
+const resolveSha = (): string => {
+  const fromEnv = process.env.GITHUB_SHA
+  if (fromEnv) return fromEnv.slice(0, 7)
+  try {
+    return execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim()
+  } catch {
+    return process.env.VITE_GIT_SHA ?? 'dev'
+  }
+}
+const sha = resolveSha()
+const commitUrl =
+  sha === 'dev' ? undefined : `${repoUrl}/commit/${sha}`
 
 // Icons inlined from the app's icon set (packages/app/src/icons/*.svg) so they
 // match exactly — the footer is static Astro, so we can't import the app's Solid
@@ -33,7 +54,28 @@ const links = [
 
 <footer>
   <div class="wrap foot-in">
-    <span class="copy">© {year} Chaos Matters · AGPL-3.0</span>
+    <div class="foot-meta">
+      <span class="copy">© {year} Chaos Matters · AGPL-3.0</span>
+      {
+        commitUrl ? (
+          <a
+            class="ver-pill"
+            href={commitUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={`Landing v${version} · commit ${sha}`}
+          >
+            v{version}
+            <span class="ver-sha">{sha}</span>
+          </a>
+        ) : (
+          <span class="ver-pill" title={`Landing v${version}`}>
+            v{version}
+            <span class="ver-sha">{sha}</span>
+          </span>
+        )
+      }
+    </div>
     <nav class="foot-nav">
       {
         links.map((l) => (
@@ -60,6 +102,48 @@ const links = [
     gap: 16px;
     align-items: center;
     justify-content: space-between;
+  }
+  .foot-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  /* Version + short-sha pill — mirrors the app's about/version pill so the
+     deployed landing build is identifiable at a glance. */
+  .ver-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--neutral-400);
+    font-size: 0.76rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1.4;
+    transition:
+      color 0.15s ease,
+      border-color 0.15s ease,
+      background 0.15s ease;
+  }
+  a.ver-pill:hover {
+    color: var(--neutral-100);
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.07);
+  }
+  .ver-sha {
+    font-family:
+      ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    font-weight: 500;
+    color: var(--neutral-500);
+    padding-left: 6px;
+    border-left: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  a.ver-pill:hover .ver-sha {
+    color: var(--neutral-400);
   }
   .foot-nav {
     display: flex;

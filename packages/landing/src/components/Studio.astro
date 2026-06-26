@@ -132,6 +132,7 @@ import StudioDemo from './StudioDemo.tsx'
     padding: 3px 10px;
     cursor: pointer;
     transition: 0.15s;
+    text-decoration: none; /* the "open" action is an <a> sharing this style */
   }
   #studio .ph-btn:hover {
     color: #fff;
@@ -199,6 +200,11 @@ import StudioDemo from './StudioDemo.tsx'
     padding-bottom: 1px;
     touch-action: none;
     transition: color 0.12s;
+    /* The prob / weight scrubs live outside .matrix, so carry the same
+       no-select / no-callout guard on the scrub target itself. */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
   #studio .scrub:hover {
     color: var(--blue-300);
