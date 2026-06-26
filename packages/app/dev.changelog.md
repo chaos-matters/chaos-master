@@ -7,6 +7,32 @@ changelog surfaced in the About panel lives in `CHANGELOG.md`.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-06-26
+
+### Added
+
+- **Share flames with embedded custom variations**: `SharePayload` gained an optional `customVariations` field; `ShareLinkModal` has an "Include N custom variations" toggle (on by default when the flame references any), collected via `collectFlameCustomVariations`. On load, every embedded variation is re-validated through the same allowlist compiler as locally-authored code (`importSharedVariations`) — never trusted as-is — and registered _transiently_ (in-memory, not persisted). A consent modal (`ImportVariationsModal`) lets the recipient pick which to save via toggleable pills (select-all, scrolls when many). Variations whose WGSL already matches one in the library are detected by content and surfaced under "Already in your library" (the flame is remapped to the existing copy, never overwritten); id collisions are re-keyed.
+- **Share a single custom variation** via a self-contained `?cv=` link (`encodeVariationShareUrl` / `decodeVariationShare`, inline deflate+base64, no shortener). A per-item Share action in the Custom Variations sidebar and a Share button in the Custom Variation Editor tab bar (disabled until the variation compiles) both open the link modal. Opening a `?cv=` link decodes + re-validates the variation and shows a load modal (`ShareVariationModal`) with a live GPU preview before saving; when the variation is already owned it shows "Close" instead of "Save to library".
+- **Custom-variation marker** in the per-transform variation list: an accent dot for live custom variations, red when the flame references one deleted from the library (`isCustomVariationRegistered`, reactive via `customVarsVersion`), with a "Custom Variation &lt;name&gt;" tooltip on the dot.
+- **Dev flag `VITE_SKIP_WELCOME`**: when `true` (set it in `.env.local`), skips the welcome screen on startup — and with it the on-startup hardware-tier detection that lives inside it — falling back to the 'high' tier. Off by default; for local dev and for driving the app with Playwright/agents.
+
+### Changed
+
+- **`getNormalizedVariationName`** now returns a custom variation's human name (from the registry) for `custom_*` ids, so the variation browser, transform chips, quick picker, docs and search all show the name instead of the opaque `custom_<uuid>` id (falls back to the id if the def isn't registered).
+- **Custom-variation previews** (the editor preview and the shared-variation load preview) now mirror the VariationSelector gallery settings — exposure floored to 1.3, gamma 5.0, gaussian-disk point init, colorSpeed 0 — extracted to a shared `makeCustomVariationPreviewFlame`; they previously rendered much darker than the gallery.
+- **Loop guard** in `compileCustomVariationCode` (runs before transpile, for every custom variation — local or shared): only statically-counted `for` loops pass; `while`/`do-while` and dynamic-bound `for` are rejected with a hint. Caps: per-loop iterations (1024), nesting depth (3), combined iterations along any nested path (4096), loop count per variation (16). A 16 KB source-length cap bounds untrusted parse/compile cost.
+- **flam3 XML export** omits custom variations (no flam3/Apophysis equivalent); a transform left with none falls back to `linear="1"`, and the "Copy flam3 XML" action toasts how many were dropped.
+
+### Fixed
+
+- **Math Mode tutorial** (`TutorialModal`): the injected MathJax SVG was run through DOMPurify, which strips the `<svg>` wrapper, `viewBox` and glyph `<defs>`, collapsing each equation to a thin rule line. The markdown shell is now sanitized first and the trusted MathJax SVG injected into the placeholders afterward (never through DOMPurify); `svg.fontCache='none'` makes each SVG self-contained; math glyphs use `color: inherit`.
+- **Inline math in table cells**: `renderMarkdown` swapped inline `\(...\)` math for an empty `<mathinline>` element before running `marked`, which escapes such an element's opening tag inside GFM table cells — leaking a literal `<mathinline id="0">` onto the page (e.g. the Exponential & Logarithmic tutorial page). Inline placeholders are now an inert alphanumeric text token that `marked` passes through verbatim.
+- **Editor tab-bar buttons**: the Share and "?" buttons no longer sit flush against each other (6px gap; WGSL/Math tabs stay joined).
+
+### Security
+
+- Custom-variation code arriving via a shared flame or a `?cv=` link is re-validated through the exact same allowlist compiler as locally-authored code (acorn AST parse → tinyest → banned-name denylist → `Object.hasOwn` builtin allowlist → arity → typegpu → sandboxed GPU WGSL) — the payload's claims are never trusted, and shared variations are registered transiently rather than silently persisted. The loop guard and 16 KB length cap bound untrusted parse/compile/GPU cost.
+
 ## [0.9.1] - 2026-06-25
 
 ### Added

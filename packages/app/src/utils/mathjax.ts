@@ -30,6 +30,16 @@ export function ensureMathJax(): Promise<void> {
   const w = window as unknown as { MathJax?: Record<string, unknown> }
   w.MathJax = {
     ...(w.MathJax ?? {}),
+    svg: {
+      ...(w.MathJax?.svg ?? {}),
+      // Inline glyph paths instead of emitting <use> references into a shared
+      // <defs> cache. The default ('local') makes each SVG depend on its own
+      // <defs> by id — fragile once the SVG's outerHTML is concatenated with
+      // others into a single innerHTML container and run through DOMPurify: the
+      // <use> references dangle and the equation collapses to just its rule
+      // lines. 'none' makes every SVG fully self-contained, so it survives both.
+      fontCache: 'none',
+    },
     options: {
       ...(w.MathJax?.options ?? {}),
       enableSpeech: false,

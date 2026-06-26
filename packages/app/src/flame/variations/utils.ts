@@ -3,6 +3,7 @@ import { defineExample, defineExample3D } from '../examples/util'
 import { generateTransformId, generateVariationId } from '../transformFunction'
 import { isParametricVariationType3D, isVariationType3D, transformVariations3D, } from '../variations3D'
 import { allTransformVariations, isParametricVariationType, transformVariations, variationTypes, } from '.'
+import { getCustomVariationDef } from './custom/CustomVariationRegistry'
 import type { FlameDescriptor, TransformId, VariationId, } from '../schema/flameSchema'
 import type { TransformVariationType3D } from '../variations3D'
 import type { TransformVariationDescriptor, TransformVariationType } from '.'
@@ -13,6 +14,13 @@ export type AnyVariationType = TransformVariationType | TransformVariationType3D
 export function getNormalizedVariationName(
   type: TransformVariationType | TransformVariationType3D,
 ): string {
+  // Custom variations are keyed by an opaque `custom_<uuid>` id — show their
+  // human name instead (the id is still their identity under the hood). Falls
+  // back to the normalized id if the def isn't registered.
+  if (type.startsWith('custom_')) {
+    const name = getCustomVariationDef(type)?.name
+    if (name) return name
+  }
   return type.replace(/Var$/, '').replace(/3D$/, '').replace(/_+$/, '')
 }
 
