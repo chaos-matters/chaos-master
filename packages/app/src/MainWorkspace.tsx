@@ -36,6 +36,7 @@ import { handleColor } from './components/FlameColorEditor/FlameColorEditor'
 import { FlameRandomizerCard } from './components/FlameRandomizerCard/FlameRandomizerCard'
 import { FloatingActions } from './components/FloatingActions/FloatingActions'
 import { createShowHelp } from './components/HelpModal/HelpModal'
+import { createImportVariationsModal } from './components/ImportVariationsModal/ImportVariationsModal'
 import { ConfirmOverwriteRecentModal } from './components/LoadFlameModal/ConfirmOverwriteRecentModal'
 import { createLoadFlame } from './components/LoadFlameModal/LoadFlameModal'
 import { createLogoFaviconGenerator } from './components/LogoFaviconGenerator/LogoFaviconGenerator'
@@ -47,6 +48,7 @@ import { ProgressBar } from './components/ProgressBar/ProgressBar'
 import { getPresetFromQuality, qualityPresets, } from './components/Quality/QualityPresets'
 import { QuickVariationPicker } from './components/QuickVariationPicker/QuickVariationPicker'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
+import { createShareVariationLinkModal, createShareVariationLoadModal, } from './components/ShareVariationModal/ShareVariationModal'
 import { AngleEditor } from './components/Sliders/ParametricEditors/AngleEditor'
 import { ScrubInput } from './components/Sliders/ScrubInput'
 import { Slider } from './components/Sliders/Slider'
@@ -78,7 +80,7 @@ import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from './flame/schema/fl
 import { generateTransformId, generateVariationId, } from './flame/transformFunction'
 import { defaultLinearType } from './flame/variationRegistry'
 import { allTransformVariations, isAnyParametricVariationType, isVariationType, } from './flame/variations'
-import { deleteCustomVariation, duplicateCustomVariation, getCustomVariations, loadCustomVariations, } from './flame/variations/custom'
+import { deleteCustomVariation, duplicateCustomVariation, getCustomVariations, isCustomVariationRegistered, loadCustomVariations, persistSharedVariations, } from './flame/variations/custom'
 import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } from './flame/variations/utils'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { BoxArrowRight, Cross, Eye, EyeOff, Menu, Plus, Share, Shuffle, Terminal, } from './icons'
@@ -182,7 +184,26 @@ export type ExportImageType = (
 ) => void
 
 export type AppProps = {
-  flameFromQuery?: SharePayload
+  /**
+   * Decoded shared payload. `importedCustomVariations` /
+   * `alreadyOwnedCustomVariations` are runtime-only (set by the share-load path
+   * in App.tsx, never serialized): respectively the custom variations
+   * re-validated and registered transiently (offered to save via the consent
+   * prompt), and the ones whose code already matches the user's saved library.
+   */
+  flameFromQuery?: SharePayload & {
+    importedCustomVariations?: CustomVariationDef[]
+    alreadyOwnedCustomVariations?: CustomVariationDef[]
+  }
+  /**
+   * A single custom variation shared via a `?cv=` link, already re-validated and
+   * transiently registered by App.tsx. `alreadyOwned` is true when the code
+   * matches one already in the user's library. Runtime-only (never serialized).
+   */
+  sharedVariationFromQuery?: {
+    def: CustomVariationDef
+    alreadyOwned: boolean
+  }
   flameFromWelcome?: () => FlameDescriptor | undefined
   welcomeTracks?: () => TimelineTrack[] | undefined
   resetFlameFromWelcome?: () => void
@@ -617,6 +638,16 @@ export function MainWorkspace(props: AppProps) {
     void customVarsVersion()
     return getCustomVariations()
   })
+
+  // Status of a variation type for the per-transform list badge: 'none' for
+  // built-ins, 'available' for a live custom variation, 'unavailable' for one a
+  // flame still references after it was deleted from the library (or never
+  // imported). Reads customVarsVersion so the badge re-evaluates on delete/import.
+  function customStatus(type: string): 'none' | 'available' | 'unavailable' {
+    if (!type.startsWith('custom_')) return 'none'
+    void customVarsVersion()
+    return isCustomVariationRegistered(type) ? 'available' : 'unavailable'
+  }
 
   // Close the quick variation picker when its target transform/variation no
   // longer exists in the current flame — i.e. the flame was switched or toggled
@@ -1085,6 +1116,12 @@ export function MainWorkspace(props: AppProps) {
   )
 
   const { showDiscordShareModal } = createDiscordShareModal()
+
+  const { showImportVariationsModal } = createImportVariationsModal()
+
+  const { showShareVariationLinkModal } = createShareVariationLinkModal()
+
+  const { showShareVariationLoadModal } = createShareVariationLoadModal()
 
   const { showMigrationModal } = createMigrationModal(history)
 
@@ -1803,6 +1840,49 @@ export function MainWorkspace(props: AppProps) {
       timeline.goToFrame(0)
       timeline.play()
     }
+
+    // Offer to save any custom variations the link brought in. They are already
+    // registered (transiently) so the flame renders; this only asks which to
+    // persist into the recipient's library. Variations whose code the user
+    // already has are surfaced as "already in your library" (not re-saved).
+    const imported = data.importedCustomVariations ?? []
+    const alreadyOwned = data.alreadyOwnedCustomVariations ?? []
+    if (imported.length > 0) {
+      void (async () => {
+        const selectedIds = await showImportVariationsModal(
+          imported,
+          alreadyOwned,
+        )
+        if (selectedIds && selectedIds.length > 0) {
+          persistSharedVariations(selectedIds)
+          setCustomVarsVersion((v) => v + 1)
+          showToast(
+            `Saved ${selectedIds.length} custom variation${selectedIds.length === 1 ? '' : 's'} to your library`,
+          )
+        }
+      })()
+    } else if (alreadyOwned.length > 0) {
+      showToast(
+        `${alreadyOwned.length} custom variation${alreadyOwned.length === 1 ? '' : 's'} from this flame ${alreadyOwned.length === 1 ? 'is' : 'are'} already in your library`,
+      )
+    }
+  })
+
+  // A single custom variation arrived via a `?cv=` link: preview it and offer to
+  // save (fires once when the resource resolves).
+  let sharedVariationApplied = false
+  createEffect(() => {
+    const sv = props.sharedVariationFromQuery
+    if (!sv || sharedVariationApplied) return
+    sharedVariationApplied = true
+    void (async () => {
+      const save = await showShareVariationLoadModal(sv.def, sv.alreadyOwned)
+      if (save && !sv.alreadyOwned) {
+        persistSharedVariations([sv.def.id])
+        setCustomVarsVersion((v) => v + 1)
+        showToast(`Saved "${sv.def.name}" to your library`)
+      }
+    })()
   })
 
   function getFlameValue(
@@ -3108,6 +3188,17 @@ export function MainWorkspace(props: AppProps) {
                                     </button>
                                     <button
                                       class={ui.customVarItemBtn}
+                                      title="Share variation link"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setHoveredCustomVarDef(null)
+                                        void showShareVariationLinkModal(def)
+                                      }}
+                                    >
+                                      <Share />
+                                    </button>
+                                    <button
+                                      class={ui.customVarItemBtn}
                                       title="Duplicate"
                                       onClick={(e) => {
                                         e.stopPropagation()
@@ -3388,9 +3479,14 @@ export function MainWorkspace(props: AppProps) {
                                           class={ui.variationButton}
                                           data-tour-target="variation-type"
                                           value={variation.type}
-                                          title={getNormalizedVariationName(
-                                            variation.type,
-                                          )}
+                                          title={
+                                            customStatus(variation.type) ===
+                                            'unavailable'
+                                              ? `${getNormalizedVariationName(variation.type)} — custom variation unavailable (deleted from your library)`
+                                              : getNormalizedVariationName(
+                                                  variation.type,
+                                                )
+                                          }
                                           onClick={() => {
                                             // Auto-open sidebar on mobile so the picker is visible
                                             if (isMobile() && sidebarHidden()) {
@@ -3461,6 +3557,32 @@ export function MainWorkspace(props: AppProps) {
                                               )}
                                             </span>
                                           </div>
+                                          {/* Custom variation marker: accent dot
+                                              when live, red when the flame still
+                                              references one deleted from the
+                                              library. */}
+                                          <Show
+                                            when={
+                                              customStatus(variation.type) !==
+                                              'none'
+                                            }
+                                          >
+                                            <span
+                                              class={ui.customBadge}
+                                              classList={{
+                                                [ui.customBadgeUnavailable as string]:
+                                                  customStatus(
+                                                    variation.type,
+                                                  ) === 'unavailable',
+                                              }}
+                                              title={
+                                                customStatus(variation.type) ===
+                                                'unavailable'
+                                                  ? 'Custom variation — unavailable (deleted from your library)'
+                                                  : `Custom Variation ${getNormalizedVariationName(variation.type)}`
+                                              }
+                                            />
+                                          </Show>
                                         </button>
                                         <div
                                           class={ui.sliderGridWrapper}

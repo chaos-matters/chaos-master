@@ -526,6 +526,31 @@ describe('exportFlameXml', () => {
     const xml = exportFlameXml(parseFlameXml(SIMPLE_FLAME_XML), 'Export Test')
     expect(isFlameXmlContent(xml)).toBe(true)
   })
+
+  it('omits custom variations (no flam3 equivalent) and falls back to linear', () => {
+    const flame = parseFlameXml(SIMPLE_FLAME_XML)
+    const t = xforms(flame)[0]!
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(t as any).variations = {
+      v0: { type: 'custom_abc123', weight: 1, visible: true },
+    }
+    const xml = exportFlameXml(flame)
+    expect(xml).not.toContain('custom')
+    expect(xml).toContain('linear="1"')
+  })
+
+  it('keeps built-in variations while dropping custom ones in the same xform', () => {
+    const flame = parseFlameXml(SIMPLE_FLAME_XML)
+    const t = xforms(flame)[0]!
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(t as any).variations = {
+      v0: { type: 'sphericalVar', weight: 1, visible: true },
+      v1: { type: 'custom_xyz', weight: 1, visible: true },
+    }
+    const xml = exportFlameXml(flame)
+    expect(xml).toContain('spherical="1.000000"')
+    expect(xml).not.toContain('custom')
+  })
 })
 
 // ── bundled samples ─────────────────────────────────────────────────────────

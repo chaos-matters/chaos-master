@@ -2,11 +2,9 @@ import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, 
 import { vec2f, vec4f } from 'typegpu/data'
 import { useToast } from '@/contexts/ToastContext'
 import { DEFAULT_VARIATION_PREVIEW_POINT_COUNT, DEFAULT_VARIATION_PREVIEW_QUALITY, } from '@/defaults'
-import { defineExample } from '@/flame/examples/util'
 import { Flam3 } from '@/flame/Flam3'
-import { generateTransformId, generateVariationId, } from '@/flame/transformFunction'
-import { createCustomVariation, deleteCustomVariation, duplicateCustomVariation, getCustomVariations, previewCustomVariation, updateCustomVariation, } from '@/flame/variations/custom'
-import { BoxArrowRight, Cross, Plus, Sparkle, Terminal } from '@/icons'
+import { createCustomVariation, deleteCustomVariation, duplicateCustomVariation, generateCustomVariationId, getCustomVariations, makeCustomVariationPreviewFlame, previewCustomVariation, updateCustomVariation, } from '@/flame/variations/custom'
+import { BoxArrowRight, Cross, Plus, Share, Sparkle, Terminal } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
@@ -14,20 +12,17 @@ import { mathModeTutorial } from '@/tutorials/mathModeTutorial'
 import { MathEditor } from '../MathEditor/MathEditor'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
+import { createShareVariationLinkModal } from '../ShareVariationModal/ShareVariationModal'
 import { TutorialModal } from '../TutorialModal/TutorialModal'
 import { WgslEditor } from '../WgslEditor'
 import ui from './CustomVariationEditor.module.css'
 import type { Diagnostic } from '@codemirror/lint'
 import type { TutorialPage } from '../TutorialModal/TutorialModal'
-import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { CustomVariationDef } from '@/flame/variations/custom'
 import type { CompileError } from '@/flame/variations/custom/runtimeCompiler'
 
 const CANCEL = 'cancel' as const
 type RespondType = typeof CANCEL | { def: CustomVariationDef }
-
-const PREVIEW_VARIATION_ID = generateVariationId()
-const PREVIEW_TRANSFORM_ID = generateTransformId('custom_preview')
 
 const WGSL_EXAMPLES = [
   {
@@ -113,35 +108,6 @@ const MATH_EXAMPLES = [
   },
 ]
 
-function makePreviewFlame(variationType: string): FlameDescriptor {
-  return defineExample({
-    renderSettings: {
-      exposure: 0.3,
-      skipIters: 1,
-      drawMode: 'light',
-      backgroundColor: [0, 0, 0],
-      camera: { zoom: 1, position: [0, 0] },
-      colorInitMode: 'colorInitPosition',
-      pointInitMode: 'pointInitUnitDisk',
-    },
-    transforms: {
-      [PREVIEW_TRANSFORM_ID]: {
-        probability: 1,
-        preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-        postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-        color: { x: 0, y: 0 },
-        variations: {
-          [PREVIEW_VARIATION_ID]: {
-            type: variationType,
-            weight: 1,
-            visible: true,
-          },
-        },
-      },
-    },
-  })
-}
-
 type PreviewState =
   | { status: 'idle' }
   | { status: 'compiling' }
@@ -158,6 +124,7 @@ function ShowCustomVariationEditor(props: {
 }) {
   const { showToast } = useToast()
   const requestModal = useRequestModal()
+  const { showShareVariationLinkModal } = createShareVariationLinkModal()
   const [activeId, setActiveId] = createSignal<string | undefined>()
   const [activeExampleName, setActiveExampleName] = createSignal<
     string | undefined
@@ -193,6 +160,22 @@ function ShowCustomVariationEditor(props: {
     return p.status === 'compiled' && isDirty()
   })
 
+  // Sharable as soon as it compiles (even if unsaved/unchanged). Reuses the same
+  // `?cv=` link modal as the sidebar's per-variation Share action.
+  const canShare = () => preview().status === 'compiled'
+
+  function shareCurrentVariation() {
+    if (!canShare()) return
+    const now = Date.now()
+    void showShareVariationLinkModal({
+      id: activeId() ?? generateCustomVariationId(),
+      name: name().trim() || 'Untitled',
+      wgsl: code(),
+      createdAt: now,
+      updatedAt: now,
+    })
+  }
+
   const diagnostics = createMemo((): Diagnostic[] => {
     const p = preview()
     if (p.status !== 'error') return []
@@ -226,7 +209,7 @@ function ShowCustomVariationEditor(props: {
   const previewFlame = createMemo(() => {
     void previewKey()
     const id = previewVariationType()
-    return makePreviewFlame(id)
+    return makeCustomVariationPreviewFlame(id)
   })
 
   onMount(() => {
@@ -595,15 +578,29 @@ function ShowCustomVariationEditor(props: {
               Math
             </button>
             <div style={{ flex: 1 }} />
-            <button
-              class={ui.helpButton}
-              onClick={() => {
-                showTutorialModal(mathModeTutorial)
-              }}
-              title="Math mode tutorial"
-            >
-              ?
-            </button>
+            <div class={ui.tabBarActions}>
+              <button
+                class={ui.helpButton}
+                disabled={!canShare()}
+                onClick={shareCurrentVariation}
+                title={
+                  canShare()
+                    ? 'Share this variation as a link'
+                    : 'Compile the variation first to share it'
+                }
+              >
+                <Share width="0.8rem" />
+              </button>
+              <button
+                class={ui.helpButton}
+                onClick={() => {
+                  showTutorialModal(mathModeTutorial)
+                }}
+                title="Math mode tutorial"
+              >
+                ?
+              </button>
+            </div>
           </div>
 
           <Show

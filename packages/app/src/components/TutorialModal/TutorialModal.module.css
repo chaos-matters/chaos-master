@@ -197,6 +197,8 @@
 .markdownBody :global(.math-block) :global(svg) {
   max-width: 100%;
   height: auto;
+  /* MathJax SVGs paint glyphs with currentColor. */
+  color: inherit;
 }
 
 .markdownBody :global(.math-inline) {
@@ -206,6 +208,8 @@
 .markdownBody :global(.math-inline) :global(svg) {
   vertical-align: middle;
   max-height: 1.2em;
+  /* MathJax SVGs paint glyphs with currentColor. */
+  color: inherit;
 }
 
 .markdownBody hr {

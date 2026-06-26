@@ -1,0 +1,97 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 30rem;
+  max-width: 92vw;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+}
+
+.note {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--text-muted, #999);
+}
+
+.selectAll {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.8rem;
+  color: var(--text-muted, #999);
+}
+
+.pillList {
+  list-style: none;
+  margin: 0;
+  padding: 0.15rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  max-height: 11rem;
+  overflow-y: auto;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.28rem 0.6rem;
+  border: 1px solid var(--border-color, #444);
+  border-radius: 999px;
+  background: var(--bg-input, #1a1a1a);
+  color: var(--text-color, #eee);
+  font-size: 0.82rem;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.pill:hover {
+  border-color: var(--color-accent, #4caf50);
+}
+
+.pillOn {
+  border-color: var(--color-accent, #4caf50);
+  background: color-mix(in srgb, var(--color-accent, #4caf50) 14%, transparent);
+}
+
+.pillOwned {
+  cursor: default;
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.pillOwned:hover {
+  border-color: var(--border-color, #444);
+}
+
+.pillName {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 16rem;
+}
+
+.ownedHeading {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted, #999);
+}
+
+.footer {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: end;
+}

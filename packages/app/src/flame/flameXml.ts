@@ -729,6 +729,11 @@ function coefsFromAffine(a: Record<string, number>): string {
 
 /**
  * Export a FlameDescriptor to .flame XML format (Apophysis/flam3 compatible).
+ *
+ * Custom (user-authored WGSL/math) variations are omitted — the .flame format
+ * has no way to represent them and other tools couldn't render them. A transform
+ * whose only variations were custom is exported as plain linear. Callers can use
+ * collectFlameCustomVariations to tell the user when something was dropped.
  */
 export function exportFlameXml(flame: FlameDescriptor, name?: string): string {
   const dims = flame.renderSettings.dimensions ?? 2
@@ -790,8 +795,11 @@ export function exportFlameXml(flame: FlameDescriptor, name?: string): string {
     xml += ` weight="${prob.toFixed(6)}"`
     xml += ` color="${colorIndex.toFixed(6)}"`
     // flam3 stores variations + their params as xform attributes (the
-    // round-trippable, Apophysis-native form).
-    xml += variationAttrs(vars)
+    // round-trippable, Apophysis-native form). Custom (user-authored WGSL/math)
+    // variations are dropped here — they have no flam3/Apophysis equivalent — so
+    // a transform left with none falls back to plain linear to stay a valid xform.
+    const attrs = variationAttrs(vars)
+    xml += attrs === '' ? ' linear="1"' : attrs
     // chaos preAffine is the pre-variation affine → flam3 `coefs`.
     xml += ` coefs="${coefsFromAffine(pre)}"`
     if (!affineIsIdentity(post)) {
@@ -810,7 +818,12 @@ export function exportFlameXml(flame: FlameDescriptor, name?: string): string {
 }
 
 /** Serialize a transform's variations to flam3 xform attributes —
- *  `linear="1" julian="0.5" julian_power="3"` — params included. */
+ *  `linear="1" julian="0.5" julian_power="3"` — params included.
+ *
+ *  Custom variations (ids prefixed `custom_`) are skipped: they're arbitrary
+ *  user WGSL/math with no flam3 or Apophysis counterpart, so writing their name
+ *  would produce a `.flame` that no other tool can render. They're dropped
+ *  silently here; the export caller surfaces a note to the user. */
 function variationAttrs(
   vars: Record<
     string,
@@ -819,6 +832,7 @@ function variationAttrs(
 ): string {
   let out = ''
   for (const [, vrec] of Object.entries(vars)) {
+    if (vrec.type.startsWith('custom_')) continue
     const flam3Name = chaosTypeToFlam3Name(vrec.type)
     out += ` ${flam3Name}="${vrec.weight.toFixed(6)}"`
     if (vrec.params) {

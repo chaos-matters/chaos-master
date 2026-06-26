@@ -3,6 +3,25 @@
 What's new in Chaos Master. Concise highlights for each release; the full
 developer history lives in `dev.changelog.md`.
 
+## [0.10.0] - 2026-06-26
+
+### Added
+
+- **Share custom variations**: when you share a flame that uses your own math/WGSL variations, the variations now travel inside the link. The recipient's app re-checks the code and shows a live preview before anything is saved, and they can pick which ones to keep.
+- **Share a single variation** as its own link — from the Custom Variations list or the new Share button in the variation editor. Opening it shows a preview and a one-click save.
+- **Custom marker** on a transform's variations: a small dot flags custom ones, turning red if a flame still references one you've deleted.
+
+### Changed
+
+- Custom variations now show their **name** everywhere — the variation browser, the transform list, and search — instead of an internal id.
+- **Brighter custom-variation previews** that match the variation gallery.
+- Loops in custom variations must now be **bounded** (a fixed counted `for`); unbounded loops are rejected so a variation can't hang the GPU.
+- Custom variations are **left out of flam3 (.flame) XML export** — they have no Apophysis/flam3 equivalent — and you're told when any were omitted.
+
+### Fixed
+
+- **Math Mode tutorial**: equations no longer flash and collapse to a line, and inline math inside tables now renders correctly.
+
 ## [0.9.1] - 2026-06-25
 
 ### Added

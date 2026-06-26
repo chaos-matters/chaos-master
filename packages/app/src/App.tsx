@@ -8,6 +8,7 @@ import { createSpotlightTourState, SpotlightTourContext, } from './contexts/Spot
 import { ThemeContextProvider } from './contexts/ThemeContext'
 import { ToastProvider, useToast } from './contexts/ToastContext'
 import { IS_DEV } from './defaults'
+import { importSharedVariations, loadCustomVariations, remapFlameCustomVariations, } from './flame/variations/custom'
 import { Root } from './lib/Root'
 import { MainWorkspace } from './MainWorkspace'
 import { appTour } from './tours/appTour'
@@ -17,7 +18,7 @@ import { flameCreationTour } from './tours/flameCreationTour'
 import { sidebarTour } from './tours/sidebarTour'
 import { timelineTour } from './tours/timelineTour'
 import { isBenchmarkAuto, isBenchmarkRequested } from './utils/benchmarkRequest'
-import { decodeSharePayload } from './utils/jsonQueryParam'
+import { decodeSharePayload, decodeVariationShare, } from './utils/jsonQueryParam'
 import { persistentSignal } from './utils/persistentSignal'
 import { recordKeys } from './utils/record'
 import { dismissWelcome, hasWelcomeBeenDismissed, } from './utils/welcomeDismissed'
@@ -72,8 +73,12 @@ export function Wrappers() {
   // `?benchmark=auto` additionally starts the run on load.
   const benchmarkRequested = isBenchmarkRequested(window.location.search)
   const benchmarkAuto = isBenchmarkAuto(window.location.search)
+  // Local/dev escape hatch (e.g. driving the app with Playwright): skip the
+  // welcome screen — and with it the on-startup hardware-tier detection, which
+  // lives inside WelcomeScreen. Off in production builds (env unset → false).
+  const skipWelcome = import.meta.env.VITE_SKIP_WELCOME === 'true'
   const [showWelcome, setShowWelcome] = createSignal(
-    !hasWelcomeBeenDismissed() && !benchmarkRequested,
+    !hasWelcomeBeenDismissed() && !benchmarkRequested && !skipWelcome,
   )
   const [dontShowAgain, setDontShowAgain] = persistentSignal(
     'dontShowWelcome',
@@ -125,7 +130,34 @@ export function Wrappers() {
               : 0,
             hasAnimation: !!result?.animation,
             animTrackCount: result?.animation?.tracks?.length ?? 0,
+            customVariationCount: result?.customVariations?.length ?? 0,
           })
+        }
+        // Re-validate and register any custom variations embedded in the link.
+        // Untrusted input: importSharedVariations recompiles each through the
+        // allowlist compiler and registers them transiently (not saved) — the
+        // recipient is asked to save them via the consent prompt downstream.
+        if (result.customVariations && result.customVariations.length > 0) {
+          // Load the saved library first so collision detection sees it.
+          loadCustomVariations()
+          const imported = importSharedVariations(result.customVariations)
+          const flame = remapFlameCustomVariations(result.flame, imported.remap)
+          if (imported.rejected.length > 0) {
+            const n = imported.rejected.length
+            setQueryError(
+              `${n} custom variation${n === 1 ? '' : 's'} in this link could not be loaded and ${n === 1 ? 'was' : 'were'} skipped.`,
+            )
+            console.warn(
+              'Rejected shared custom variations:',
+              imported.rejected,
+            )
+          }
+          return {
+            ...result,
+            flame,
+            importedCustomVariations: imported.imported,
+            alreadyOwnedCustomVariations: imported.alreadyOwned,
+          }
         }
         return result
       } catch (err) {
@@ -136,12 +168,39 @@ export function Wrappers() {
     return undefined
   })
 
+  // A single custom variation shared via `?cv=`. Decoded, re-validated through
+  // the allowlist compiler, and transiently registered so MainWorkspace can
+  // preview it and offer to save. Untrusted: importSharedVariations never trusts
+  // the payload's claims.
+  const [sharedVariationFromQuery] = createResource(async () => {
+    const cv = new URLSearchParams(window.location.search).get('cv')
+    if (cv === null) return undefined
+    try {
+      const def = await decodeVariationShare(cv)
+      loadCustomVariations()
+      const result = importSharedVariations([def])
+      if (result.alreadyOwned.length > 0) {
+        return { def: result.alreadyOwned[0]!, alreadyOwned: true }
+      }
+      if (result.imported.length > 0) {
+        return { def: result.imported[0]!, alreadyOwned: false }
+      }
+      setQueryError('The shared variation could not be loaded.')
+      console.warn('Rejected shared variation:', result.rejected)
+      return undefined
+    } catch (err) {
+      setQueryError('Failed to decode the shared variation.')
+      console.error('Failed to decode shared variation:', err)
+      return undefined
+    }
+  })
+
   const spotlightState = createSpotlightTourState(getTour)
 
-  // Auto-dismiss welcome screen when a query flame is present in the URL
+  // Auto-dismiss welcome screen when a query flame or shared variation is present
   createEffect(() => {
     const fq = flameFromQuery()
-    if (fq?.flame) {
+    if (fq?.flame || sharedVariationFromQuery()) {
       setShowWelcome(false)
     }
   })
@@ -216,11 +275,16 @@ export function Wrappers() {
                       <QueryErrorToast error={queryError()} />
                       <MainWorkspace
                         flameFromQuery={flameFromQuery()}
+                        sharedVariationFromQuery={sharedVariationFromQuery()}
                         flameFromWelcome={selectedFlame}
                         welcomeTracks={selectedWelcomeTracks}
                         autoOpenBenchmark={benchmarkRequested}
                         autoStartBenchmark={benchmarkAuto}
-                        hardwareTier={hardwareTier()}
+                        hardwareTier={
+                          // When the welcome screen is skipped, detection never
+                          // runs — fall back to a sane tier so quality is set.
+                          hardwareTier() ?? (skipWelcome ? 'high' : null)
+                        }
                         onHardwareTierChange={setHardwareTier}
                         resetFlameFromWelcome={() => {
                           setSelectedFlame(undefined)

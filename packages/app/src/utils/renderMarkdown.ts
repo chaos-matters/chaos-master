@@ -12,6 +12,11 @@ const ADMONITION_LABELS: Record<AdmonitionType, string> = {
 
 const ADMONITION_RE = /^:::(note|info|warn|tip|danger)\s*\n([\s\S]*?)^:::/gm
 
+// Inert text sentinels for inline math placeholders — pure alphanumerics so
+// marked leaves them untouched in any context (see usage below).
+const MATH_INLINE_TOKEN = 'xMjxInlineTokenx'
+const MATH_TOKEN_END = 'xMjxEndx'
+
 function sanitize(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, '')
@@ -31,11 +36,19 @@ export function renderMarkdown(text: string): string {
     return `<mathblock id="${idx}"></mathblock>`
   })
 
-  // Extract \(...\) inline math blocks
+  // Extract \(...\) inline math blocks.
+  //
+  // Use an inert alphanumeric token, NOT an HTML tag: marked escapes an empty
+  // custom element's opening tag inside a table cell (e.g. `&lt;mathinline ...&gt;`
+  // while leaving the close tag), which breaks the exact-string restore below and
+  // leaks the placeholder into the page. A plain text token survives marked
+  // verbatim in every context (paragraphs, tables, lists). Block math keeps its
+  // <mathblock> tag — those sit on their own line and marked passes them through
+  // as raw HTML blocks, so they're unaffected.
   processed = processed.replace(/\\\(([^)]+?)\\\)/g, (_full, tex: string) => {
     const idx = mathInlines.length
     mathInlines.push(tex.trim())
-    return `<mathinline id="${idx}"></mathinline>`
+    return `${MATH_INLINE_TOKEN}${idx}${MATH_TOKEN_END}`
   })
 
   // Extract admonition blocks and replace with placeholders
@@ -66,8 +79,8 @@ export function renderMarkdown(text: string): string {
   }
 
   for (let i = 0; i < mathInlines.length; i++) {
-    html = html.replace(
-      `<mathinline id="${i}"></mathinline>`,
+    html = html.replaceAll(
+      `${MATH_INLINE_TOKEN}${i}${MATH_TOKEN_END}`,
       `<span class="math-inline" data-tex="${escapeAttr(mathInlines[i]!)}">${escapeHtml(mathInlines[i]!)}</span>`,
     )
   }

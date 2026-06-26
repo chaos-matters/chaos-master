@@ -1,5 +1,7 @@
-import { createEffect, createSignal, onCleanup, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, onCleanup, Show, } from 'solid-js'
+import { useToast } from '@/contexts/ToastContext'
 import { exportFlameXml } from '@/flame/flameXml'
+import { collectFlameCustomVariations } from '@/flame/variations/custom'
 import { deriveOgMeta, encodeShareUrl, shortenShareUrl, uploadOgPreview, } from '@/utils/shareLink'
 import { Button } from '../Button/Button'
 import { Checkbox } from '../Checkbox/Checkbox'
@@ -28,9 +30,23 @@ type ShareLinkModalProps = {
 }
 
 function ShareLinkModal(props: ShareLinkModalProps) {
+  const { showToast } = useToast()
   const [includeAnimation, setIncludeAnimation] = createSignal(
     props.hasAnimation,
   )
+  // Custom (user-authored) variations the flame references. Included by default
+  // so the shared link actually renders — without them the recipient would see
+  // the flame with those variations silently dropped.
+  const customVariations = createMemo(() =>
+    collectFlameCustomVariations(props.flameDescriptor),
+  )
+  const hasCustomVariations = () => customVariations().length > 0
+  const [includeCustomVariations, setIncludeCustomVariations] =
+    createSignal(true)
+  const sharedCustomVariations = () =>
+    includeCustomVariations() && hasCustomVariations()
+      ? customVariations()
+      : undefined
   // The full, self-contained `?flame=` link (carries all data, never expires)
   // and the optional shortened `?s=` link (nicer to share, but expires).
   const [longUrl, setLongUrl] = createSignal('')
@@ -59,6 +75,7 @@ function ShareLinkModal(props: ShareLinkModalProps) {
 
   createEffect(() => {
     const include = includeAnimation()
+    const customVars = sharedCustomVariations()
     void (async () => {
       const { encoded, longUrl } = await encodeShareUrl({
         flame: props.flameDescriptor,
@@ -66,6 +83,7 @@ function ShareLinkModal(props: ShareLinkModalProps) {
           include && props.tracks.length > 0
             ? { tracks: props.tracks, config: props.config }
             : undefined,
+        customVariations: customVars,
       })
 
       // Surface the full link immediately so there's always something to copy,
@@ -108,6 +126,18 @@ function ShareLinkModal(props: ShareLinkModalProps) {
           />
           <span>Include Animation</span>
         </label>
+        <Show when={hasCustomVariations()}>
+          <label class={ui.toggleField}>
+            <Checkbox
+              checked={includeCustomVariations()}
+              onChange={setIncludeCustomVariations}
+            />
+            <span>
+              Include {customVariations().length} custom variation
+              {customVariations().length === 1 ? '' : 's'}
+            </span>
+          </label>
+        </Show>
         <textarea
           class={ui.textarea}
           value={primaryUrl()}
@@ -153,11 +183,19 @@ function ShareLinkModal(props: ShareLinkModalProps) {
         </Show>
         <Button
           onClick={async () => {
+            const customVars = sharedCustomVariations()
+            const withAnimation = includeAnimation() && props.tracks.length > 0
             const payload =
-              includeAnimation() && props.tracks.length > 0
+              withAnimation || customVars
                 ? {
                     flame: props.flameDescriptor,
-                    animation: { tracks: props.tracks, config: props.config },
+                    ...(withAnimation && {
+                      animation: {
+                        tracks: props.tracks,
+                        config: props.config,
+                      },
+                    }),
+                    ...(customVars && { customVariations: customVars }),
                   }
                 : props.flameDescriptor
             await copyToClipboard(JSON.stringify(payload))
@@ -179,6 +217,14 @@ function ShareLinkModal(props: ShareLinkModalProps) {
                   props.flameDescriptor.metadata?.name,
                 ),
               )
+              // Custom variations can't be represented in .flame — let the user
+              // know they were left out of the export.
+              const n = customVariations().length
+              if (n > 0) {
+                showToast(
+                  `${n} custom variation${n === 1 ? '' : 's'} omitted from the flam3 XML — no Apophysis/flam3 equivalent.`,
+                )
+              }
             }}
           >
             Copy flam3 XML

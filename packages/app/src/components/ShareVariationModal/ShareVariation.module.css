@@ -1,0 +1,69 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 30rem;
+  max-width: 92vw;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+}
+
+.note {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--text-muted, #999);
+}
+
+.note strong {
+  color: var(--text-color, #eee);
+  font-weight: 600;
+}
+
+.textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 2.2rem;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85rem;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--border-color, #444);
+  border-radius: 8px;
+  background: var(--bg-input, #1a1a1a);
+  color: var(--text-color, #eee);
+  line-height: 1.4;
+  word-break: break-all;
+  cursor: pointer;
+}
+
+.textarea:hover {
+  border-color: var(--color-accent, #4caf50);
+}
+
+.copiedMsg {
+  font-size: 0.8rem;
+  color: var(--color-accent, #4caf50);
+  text-align: center;
+}
+
+.previewCanvas {
+  aspect-ratio: 1;
+  width: 100%;
+  max-width: 18rem;
+  align-self: center;
+  border: 1px solid var(--border-color, #444);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+}
+
+.footer {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: end;
+}

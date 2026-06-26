@@ -320,6 +320,14 @@
   flex-shrink: 0;
 }
 
+/* The Share + "?" action buttons — kept apart so they never touch, while the
+   WGSL/Math tabs stay joined. */
+.tabBarActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 [data-theme='dark'] .tabBar {
   border-color: var(--neutral-600);
 }
@@ -531,10 +539,15 @@
     border-color 0.15s;
 }
 
-.helpButton:hover {
+.helpButton:hover:not(:disabled) {
   background: var(--neutral-100);
   color: var(--neutral-800);
   border-color: var(--neutral-400);
+}
+
+.helpButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 [data-theme='dark'] .helpButton {
@@ -542,7 +555,7 @@
   color: var(--neutral-400);
 }
 
-[data-theme='dark'] .helpButton:hover {
+[data-theme='dark'] .helpButton:hover:not(:disabled) {
   background: var(--neutral-800);
   color: var(--neutral-200);
   border-color: var(--neutral-500);

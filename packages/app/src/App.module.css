@@ -905,6 +905,26 @@
   }
 }
 
+/* Small corner dot marking a custom (user-authored) variation. Green = live,
+   red = the flame references one that's been deleted from the library. */
+.custom-badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: oklch(68% 0.17 155);
+  box-shadow: 0 0 0 1px oklch(100% 0 0 / 0.45);
+  /* Receive hover so the dot shows its own "Custom Variation <name>" tooltip. */
+  pointer-events: auto;
+  z-index: 1;
+}
+
+.custom-badge-unavailable {
+  background: oklch(62% 0.21 25);
+}
+
 .variation-button::before {
   content: '';
   position: absolute;
