@@ -3,7 +3,7 @@
 What's new in Chaos Master. Concise highlights for each release; the full
 developer history lives in `dev.changelog.md`.
 
-## [0.10.0] - 2026-06-26
+## [0.9.2] - 2026-06-26
 
 ### Added
 
