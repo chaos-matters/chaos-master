@@ -6,6 +6,33 @@ Versioned independently from the app. Tag a release as `vA.B.C-web` (e.g.
 
 This file is internal (not surfaced anywhere on the site).
 
+## [0.1.1] — 2026-06-26
+
+### Studio
+
+- **Animate** now rolls a non-repeating random preset (die icon) with two new
+  moves.
+- Transform **probability** and **variation weights** are scrubbable like the
+  affine coefficients; probability shows its normalized share, and reset restores
+  all of them.
+- **Open in Chaos Master** button encodes the live Studio flame into the app's
+  `?flame=` link.
+
+### Changed
+
+- **Footer version pill**: version + commit-sha chip mirroring the app.
+- **Static-preview notice**: a subtle chip explains when previews are stills (no
+  WebGPU / GPU device-loss) so the page doesn't read as frozen.
+- Community lede reworded to mention custom variations; redundant license line
+  dropped.
+
+### Fixed
+
+- **Enchanted Rose** now renders the app's `example34` (red rose) instead of the
+  unrelated yellow `example44` — colour / grade match the app, poster
+  regenerated, `example34` camera descriptor restored, and `cliffordCsch2` author
+  corrected (`deluksic` → `unknown`).
+
 ## [0.1.0] — 2026-06-25
 
 Initial marketing landing page (`about.chaos-master.com`) for the Chaos Master
