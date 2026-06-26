@@ -6,7 +6,7 @@ import { defineExample, tid, vid } from './util'
 export const cliffordCsch2 = defineExample({
   metadata: {
     name: 'Clifford Reverie',
-    author: 'deluksic',
+    author: 'unknown',
     description:
       'Clifford attractor woven with csch2_bs, swirl and popcorn — a colourful 2D reverie.',
   },

@@ -314,6 +314,79 @@ h2 {
   background: var(--blue-500);
   transform: translateY(-1px);
 }
+
+/* Static-preview notice — a fixed chip shown only when WebGPU previews can't run
+   (unsupported browser or GPU loss), so a visitor knows the flames are stills,
+   not a frozen page. Subtle (small, dark, translucent) but noticeable (amber
+   icon + a one-time slide-in). Dismissible. */
+.preview-notice {
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  max-width: min(92vw, 360px);
+  padding: 9px 10px 9px 12px;
+  border-radius: 12px;
+  color: var(--neutral-300);
+  background: rgba(20, 20, 24, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: 0.78rem;
+  line-height: 1.3;
+  animation: preview-notice-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) 0.4s both;
+}
+@keyframes preview-notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.preview-notice-ico {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  color: #fbbf24; /* warm amber — a heads-up accent, not an alarm */
+}
+.preview-notice-x {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: 2px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--neutral-500);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+}
+.preview-notice-x svg {
+  width: 13px;
+  height: 13px;
+}
+.preview-notice-x:hover {
+  color: var(--neutral-100);
+  background: rgba(255, 255, 255, 0.08);
+}
+@media (prefers-reduced-motion: reduce) {
+  .preview-notice {
+    animation: none;
+  }
+}
 .plate .meta {
   position: absolute;
   inset: auto 0 0 0;

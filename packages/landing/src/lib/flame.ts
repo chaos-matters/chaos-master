@@ -2,8 +2,8 @@ import { produce } from 'structurajs'
 import { example1 } from '@/flame/examples/example1'
 import { example29 } from '@/flame/examples/example29'
 import { example33 } from '@/flame/examples/example33'
+import { example34 } from '@/flame/examples/example34'
 import { example40 } from '@/flame/examples/example40'
-import { example44 } from '@/flame/examples/example44'
 import { example45 } from '@/flame/examples/example45'
 import { example46 } from '@/flame/examples/example46'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -46,12 +46,16 @@ export function overrideFlame(
 }
 
 /**
- * Landing render of the Enchanted Rose (example44) at high density-estimation
- * quality. The shared app example uses 0.6, which converges slowly / blurs during
- * movement; bump it here (landing-only) so it's crisp immediately like the earth.
+ * Landing render of the Enchanted Rose — the SAME app example (example34) the
+ * Chaos Master app ships, so the colour/grade matches the in-app render exactly
+ * (it previously used the unrelated "Enchanted Rose v2" example44, which renders
+ * a yellow bloom instead of the app's red rose). Only density-estimation quality
+ * is bumped here (landing-only, colour-neutral): the app example uses 0.66, which
+ * converges slowly / blurs during the orbit, so raise it for an immediately crisp
+ * render like the earth — no colour or grade override.
  */
-export const ROSE_LANDING: FlameDescriptor = overrideFlame(example44, {
-  renderSettings: { densityEstimationQuality: 1, estimatorCurve: 0.85 },
+export const ROSE_LANDING: FlameDescriptor = overrideFlame(example34, {
+  renderSettings: { densityEstimationQuality: 1 },
 })
 
 /**
