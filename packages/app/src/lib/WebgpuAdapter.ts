@@ -1,5 +1,5 @@
 import { TRACK_PERFORMANCE } from '@/defaults'
-import { gpuStatus, isGpuTerminallyDown, setGpuStatus } from '@/lib/gpuStatus'
+import { gpuStatus, setGpuStatus } from '@/lib/gpuStatus'
 
 let gpuDevice: GPUDevice | null = null
 let gpuAdapter: GPUAdapter | null = null
@@ -142,18 +142,12 @@ export async function initializeWebgpuDevice(
 
   assertIfWebgpuDeviceUnavailable(gpuDevice)
 
-  // Capture uncaptured errors so the browser stops logging them itself. Once the
-  // device is (being) lost, in-flight work fails with a cascade of "<resource>
-  // is invalid" / "destroyed" / "Not enough memory" errors — expected teardown
-  // noise we swallow to keep the console clean (the render-loop gpuReady guards
-  // already prevent most of it). A genuine error on a healthy device still
-  // surfaces, now with explicit resource labels (see createView labels, etc.).
-  gpuDevice.addEventListener('uncapturederror', (ev) => {
-    if (isGpuTerminallyDown() || gpuDevice === null) {
-      return
-    }
-    console.error('[WebGPU] uncaptured error:', ev.error.message)
-  })
+  // NOTE: we deliberately do NOT register an `uncapturederror` listener. Firefox
+  // logs uncaptured WebGPU errors natively REGARDLESS of any listener, so a
+  // re-logging handler only DOUBLES the console flood. The real levers are (1)
+  // explicit resource labels so the native messages are identifiable (see the
+  // createView labels), and (2) the render-loop gpuReady guards that stop new
+  // work hitting a dying device.
 
   // A fresh, live device — previews may render again.
   setGpuStatus('ready')

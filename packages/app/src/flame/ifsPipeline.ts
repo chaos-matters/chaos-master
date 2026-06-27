@@ -50,6 +50,12 @@ const pipelineCache = new Map<
   }
 >()
 
+// Monotonic count of GPUComputePipeline (shader-module) compiles. This runs on
+// EVERY createIFSPipeline call — even a WGSL-definition cache HIT — so scrolling
+// the gallery (each newly-revealed preview) keeps compiling. The IFS-PIP-...
+// "errors while creating shader module" appears here once VRAM is exhausted.
+let pipelineCompiles = 0
+
 export function createIFSPipeline(
   root: TgpuRoot,
   camera: CameraContext,
@@ -110,6 +116,11 @@ export function createIFSPipeline(
   })
 
   let cached = pipelineCache.get(sig)
+  vramLog(
+    cached
+      ? `[ifsPipeline] WGSL def cache HIT (defs=${pipelineCache.size})`
+      : `[ifsPipeline] WGSL def cache MISS — generating WGSL (defs=${pipelineCache.size})`,
+  )
   if (!cached) {
     if (isBlending) {
       // ---- Blending code path ----
@@ -644,6 +655,10 @@ export function createIFSPipeline(
     resetPoints: resetPointsBuffer,
   })
 
+  pipelineCompiles += 1
+  vramLog(
+    `[ifsPipeline] createComputePipeline (shader-module compile) ${globId} compiles=${pipelineCompiles}`,
+  )
   const ifsPipeline = root
     .createComputePipeline({ compute: ifsCompute })
     .with(camera.bindGroup)

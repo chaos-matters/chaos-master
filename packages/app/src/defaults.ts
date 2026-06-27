@@ -62,6 +62,16 @@ export const DEFAULT_VARIATION_PREVIEW_POINT_COUNT = parseFloat(
   import.meta.env.VITE_DEFAULT_VARIATION_PREVIEW_POINT_COUNT,
 )
 
+// A 256x144 gallery thumbnail needs nowhere near a full preview's point count.
+// Cap it independently so a heavy VITE_DEFAULT_VARIATION_PREVIEW_POINT_COUNT
+// (e.g. 1e6, reasonable for one large preview) can't make every one of ~57
+// gallery thumbnails allocate ~32MB of point buffers and OOM the page. Each
+// point costs 32 bytes of buffers (vec2u + vec4f + vec2f), so 1e5 ≈ 3.2MB/tile.
+export const GALLERY_PREVIEW_POINT_COUNT = Math.min(
+  DEFAULT_VARIATION_PREVIEW_POINT_COUNT,
+  1e5,
+)
+
 export const DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS = parseFloat(
   import.meta.env.VITE_DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS,
 )

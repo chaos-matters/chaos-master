@@ -9,7 +9,7 @@ import { CompactModeProvider } from '@/contexts/CompactModeContext'
 import { ComputeGate, useComputeGate } from '@/contexts/ComputeGateContext'
 import { KeyframeTargetProvider } from '@/contexts/KeyframeTargetContext'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { COMPUTE_GATE_CAPACITY, DEFAULT_POINT_COUNT, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_VARIATION_PREVIEW_POINT_COUNT, DEFAULT_VARIATION_PREVIEW_QUALITY, DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS, DEFAULT_VARIATION_SHOW_DELAY_MS, } from '@/defaults'
+import { COMPUTE_GATE_CAPACITY, DEFAULT_POINT_COUNT, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_VARIATION_PREVIEW_POINT_COUNT, DEFAULT_VARIATION_PREVIEW_QUALITY, DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS, DEFAULT_VARIATION_SHOW_DELAY_MS, GALLERY_PREVIEW_POINT_COUNT, } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
 import { pointInitModeToImplFn } from '@/flame/pointInitMode'
 import { pointInitMode3DToImplFn } from '@/flame/pointInitMode3D'
@@ -151,6 +151,11 @@ export function PreviewFinalFlame(props: {
   )
 }
 
+// Count of live (mounted, GPU-allocated) gallery previews. The PEAK during a
+// scroll is the over-mount: with the everVisible/everAllowed latch this climbs
+// without bound as you scroll through all variations. Gated logging only.
+let livePreviewCanvases = 0
+
 export function VariationPreview(props: {
   version: number
   isSelected: boolean
@@ -253,10 +258,17 @@ export function VariationPreview(props: {
       image() === undefined && (allowed() || everAllowed() || everVisible())
 
     if (isMounted) {
-      vramLog(`[VariationPreview] Mounted WebGPU canvas for '${props.name}'`)
+      livePreviewCanvases += 1
+      vramLog(
+        `[VariationPreview] MOUNT '${props.name}' live=${livePreviewCanvases}` +
+          ` allowed=${allowed()} everAllowed=${everAllowed()}` +
+          ` everVisible=${everVisible()} visible=${isVisible()} status=${renderStatus()}`,
+      )
       onCleanup(() => {
+        livePreviewCanvases -= 1
         vramLog(
-          `[VariationPreview] Unmounted WebGPU canvas for '${props.name}'`,
+          `[VariationPreview] UNMOUNT '${props.name}' live=${livePreviewCanvases}` +
+            ` reason=${image() !== undefined ? 'captured-image' : 'gate/visibility'}`,
         )
       })
     }
@@ -291,7 +303,7 @@ export function VariationPreview(props: {
                 <Flam3
                   animationEnabled={false}
                   quality={targetQuality()}
-                  pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT}
+                  pointCountPerBatch={GALLERY_PREVIEW_POINT_COUNT}
                   persistChains={false}
                   adaptiveFilterEnabled={false}
                   flameDescriptor={props.flame}
@@ -309,7 +321,7 @@ export function VariationPreview(props: {
               <Flam3
                 animationEnabled={false}
                 quality={targetQuality()}
-                pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT}
+                pointCountPerBatch={GALLERY_PREVIEW_POINT_COUNT}
                 persistChains={false}
                 // Match the 2D thumbnails: the adaptive density-estimation blur
                 // widens its kernel in sparse regions, smearing the soft edge of

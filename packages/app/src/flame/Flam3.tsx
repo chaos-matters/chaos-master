@@ -11,6 +11,7 @@ import { formatPointCount } from '@/utils/formatPointCount'
 import { logTime } from '@/utils/logTime'
 import { recordEntries } from '@/utils/record'
 import { applyTimelineToFlame } from '@/utils/timeline'
+import { vramTrack } from '@/utils/vramLog'
 import { Camera3DContext } from '../lib/Camera3DContext'
 import { CameraContext } from '../lib/CameraContext'
 import { useCanvas } from '../lib/CanvasContext'
@@ -226,6 +227,13 @@ export function Flam3(props: Flam3Props) {
     .createBuffer(arrayOf(vec2f, props.pointCountPerBatch))
     .$usage('storage')
 
+  // vec2u (8) + vec4f (16) + vec2f (8) = 32 bytes per point. At 1e6 that's ~32MB
+  // per preview — the dominant gallery VRAM term.
+  vramTrack(
+    `Flam3 point buffers pc=${props.pointCountPerBatch}`,
+    props.pointCountPerBatch * 32,
+  )
+
   const colorGradingUniforms = root
     .createBuffer(ColorGradingUniforms, {
       averagePointCountPerBucketInv: 0,
@@ -296,7 +304,12 @@ export function Flam3(props: Flam3Props) {
       .onSubmittedWorkDone()
       .then(() => {
         pointRandomSeeds.destroy()
+        // pointPositions + pointColors were never destroyed here — a real ~24MB
+        // (at 1e6) leak per unmounted preview. Free them with the RNG seeds.
+        pointPositions.destroy()
+        pointColors.destroy()
         colorGradingUniforms.destroy()
+        vramTrack('Flam3 point buffers FREED', -props.pointCountPerBatch * 32)
       })
       .catch(() => {})
   })
