@@ -3,6 +3,18 @@
 What's new in Chaos Master. Concise highlights for each release; the full
 developer history lives in `dev.changelog.md`.
 
+## [0.9.3] - 2026-06-27
+
+### Added
+
+- **Graceful WebGPU fallback.** If WebGPU isn't available — an unsupported browser, or a GPU driver that crashes mid-session — the app stays usable instead of going blank or freezing. Every fractal preview shows a clear "WebGPU preview unavailable" placeholder with a link to check your browser/device support, while the rest of the studio (sidebar, About, Help, docs, settings) keeps working.
+
+### Fixed
+
+- **The variation gallery no longer runs out of GPU memory while scrolling.** Live previews are now bounded and freed as they scroll off-screen, thumbnail detail is capped to a sane level, a per-preview GPU buffer leak is fixed, and each variation's shader is compiled once instead of repeatedly — together cutting a large gallery from ~1.6 GB of GPU memory to a few hundred MB and removing the "Out of memory" crash (notably on Firefox / Linux / AMD).
+- **Firefox: the variation-picker gallery no longer squeezes, collapses, or hides tiles behind the scrollbar.** Preview tiles use a fixed 16:9 aspect ratio with a height floor — so even a GPU device-loss reflow can't collapse them into a pile of overlapping labels — and both galleries reserve their scrollbar gutter so tiles never slide under the Firefox scrollbar.
+- On a GPU device loss, render loops now stop immediately (no console error flood), and the app falls back to the usable shell within a few seconds instead of hanging when a reload can't re-acquire the GPU.
+
 ## [0.9.2] - 2026-06-26
 
 ### Added
