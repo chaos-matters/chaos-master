@@ -1,20 +1,26 @@
 import { defineConfig, devices } from '@playwright/test'
 
 /**
- * Resilience-focused Playwright config (separate from the legacy
- * console-errors config). Drives the dev server over HTTPS (basic-ssl) and
- * exercises the WebGPU graceful-fallback handling.
+ * Headed-GPU e2e config (separate from the legacy console-errors config). Drives
+ * the HTTPS dev server (basic-ssl) and exercises WebGPU-dependent behaviour:
+ * graceful fallback (webgpu-resilience) and gallery preview perf
+ * (variation-gallery). Add future GPU/feature specs to e2e/ and list them in
+ * testMatch below.
  *
  *   chromium-gpu      headed, real AMD GPU + WebGPU flags  -> healthy render,
- *                     then force-degrade via __chaosForceGpuUnavailable()
+ *                     force-degrade via __chaosForceGpuUnavailable(), bounded
+ *                     gallery previews
  *   chromium-degraded headless, no WebGPU -> always-degraded shell + posters
+ *                     (GPU-only specs self-skip here)
  *
- * Run:  pnpm exec playwright test -c playwright.resilience.config.ts
- *       pnpm exec playwright test -c playwright.resilience.config.ts --project chromium-degraded
+ * Start the HTTPS dev server on :5173 first (cd packages/app && pnpm start), then:
+ *   pnpm exec playwright test -c playwright.resilience.config.ts
+ *   pnpm exec playwright test -c playwright.resilience.config.ts --project chromium-gpu variation-gallery
  */
 export default defineConfig({
   testDir: './e2e',
-  testMatch: /webgpu-resilience\.spec\.ts/,
+  // The resilience suite plus every GPU-only suite (`*.gpu.spec.ts`).
+  testMatch: /(webgpu-resilience\.spec|\.gpu\.spec)\.ts$/,
   fullyParallel: false,
   workers: 1,
   retries: 0,
