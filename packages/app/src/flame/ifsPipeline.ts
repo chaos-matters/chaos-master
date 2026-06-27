@@ -50,11 +50,23 @@ const pipelineCache = new Map<
   }
 >()
 
-// Monotonic count of GPUComputePipeline (shader-module) compiles. This runs on
-// EVERY createIFSPipeline call — even a WGSL-definition cache HIT — so scrolling
-// the gallery (each newly-revealed preview) keeps compiling. The IFS-PIP-...
-// "errors while creating shader module" appears here once VRAM is exhausted.
+// Monotonic count of actual GPUComputePipeline (shader-module) compiles. With
+// the per-root cache below this should now climb only once per distinct
+// (root, variation) — not on every createIFSPipeline re-run. The IFS-PIP-...
+// "errors while creating shader module" appeared here once VRAM was exhausted.
 let pipelineCompiles = 0
+
+// Compiled-pipeline cache. The base compute pipeline depends only on the shader
+// (ifsCompute, already keyed by `sig`); `.with(bindGroup)` binds buffers without
+// recompiling. So we cache the COMPILED pipeline per (root, sig) and re-apply
+// `.with()` each call — turning the gallery's ~601 redundant compiles for ~18
+// distinct shaders into one compile per distinct (root, variation).
+//
+// Keyed by root via a WeakMap so a preview's cache is collected with its Root
+// (Root.tsx onCleanup destroys the root). Never shared across roots/devices —
+// each preview has its own Root, and a pipeline is bound to its root's device.
+type IfsBasePipeline = ReturnType<TgpuRoot['createComputePipeline']>
+const basePipelineByRoot = new WeakMap<TgpuRoot, Map<string, IfsBasePipeline>>()
 
 export function createIFSPipeline(
   root: TgpuRoot,
@@ -655,16 +667,26 @@ export function createIFSPipeline(
     resetPoints: resetPointsBuffer,
   })
 
-  pipelineCompiles += 1
-  vramLog(
-    `[ifsPipeline] createComputePipeline (shader-module compile) ${globId} compiles=${pipelineCompiles}`,
-  )
-  const ifsPipeline = root
-    .createComputePipeline({ compute: ifsCompute })
-    .with(camera.bindGroup)
-    .with(bindGroup)
+  let rootCache = basePipelineByRoot.get(root)
+  if (!rootCache) {
+    rootCache = new Map()
+    basePipelineByRoot.set(root, rootCache)
+  }
+  let basePipeline = rootCache.get(sig)
+  if (!basePipeline) {
+    pipelineCompiles += 1
+    vramLog(
+      `[ifsPipeline] createComputePipeline (shader-module COMPILE) ${globId} compiles=${pipelineCompiles} rootCache=${rootCache.size}`,
+    )
+    basePipeline = root.createComputePipeline({ compute: ifsCompute })
+    basePipeline.$name(globId)
+    rootCache.set(sig, basePipeline)
+  } else {
+    vramLog(`[ifsPipeline] compiled-pipeline cache HIT ${globId}`)
+  }
 
-  ifsPipeline.$name(globId)
+  // `.with()` binds resources onto the cached base pipeline without recompiling.
+  const ifsPipeline = basePipeline.with(camera.bindGroup).with(bindGroup)
   return {
     run: (pass: GPUComputePassEncoder, pointCount: number) => {
       ifsPipeline
