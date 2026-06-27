@@ -1,10 +1,10 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, } from 'solid-js'
+import { createEffect, createSignal, For, onCleanup, onMount, Show, } from 'solid-js'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { categoryOf, variationTypesFor } from '@/flame/variationRegistry'
 import { CATEGORIES, CATEGORY_LABELS, sortByCategory, } from '@/flame/variations/categories'
 import { getNormalizedVariationName } from '@/flame/variations/utils'
-import { DelayedShow } from '../DelayedShow/DelayedShow'
+import { createSharedIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { VariationPreview, variationPreviewFlames, } from '../VariationSelector/VariationSelector'
 import ui from './QuickVariationPicker.module.css'
 import type { PointInitMode } from '@/flame/pointInitMode'
@@ -132,6 +132,13 @@ export type QuickVariationPickerProps = {
 
 const PREVIEW_CLEAR_DELAY = 120
 
+/**
+ * rootMargin for the gallery preview IntersectionObserver — preloads the rows
+ * just beyond the scroll viewport so a tile isn't blank the instant it scrolls
+ * into view, while still keeping the number of live preview canvases bounded.
+ */
+const GALLERY_PREVIEW_PRELOAD_MARGIN = '300px'
+
 /* ---- Component ---- */
 
 export function QuickVariationPicker(props: QuickVariationPickerProps) {
@@ -199,22 +206,18 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
     return CATEGORIES.filter((c) => cats.has(c))
   }
 
-  // Stable 0..N-1 index over the CURRENT (filtered) gallery set, so the
-  // staggered-reveal delay never grows. Previously a mutable counter was
-  // incremented inside the per-item render fn, which re-runs on every
-  // category-filter toggle — so the counter accumulated across re-renders and
-  // pushed later items' DelayedShow delay into the multi-second range, leaving
-  // the previews black until it elapsed.
-  const galleryIndexOf = createMemo(() => {
-    const map = new Map<string, number>()
-    let idx = 0
-    for (const group of grouped()) {
-      for (const type of group.types) {
-        map.set(type, idx)
-        idx += 1
-      }
-    }
-    return map
+  // Visibility-gated preview mounting. Every variation tile (~800 in the "All"
+  // category) is always in the DOM for correct scroll height, but a tile only
+  // mounts its live WebGPU preview while it is within — or near — the gallery's
+  // scroll viewport, and unmounts it when scrolled far away. This bounds live
+  // preview canvases to the on-screen window (a few dozen) instead of spawning
+  // one per variation, which OOM-crashed the GPU on Firefox/Linux/AMD. A single
+  // IntersectionObserver rooted on the scroll container (a viewport root cannot
+  // preload rows past the fold — the inner scroll clips them first) fans out to
+  // each tile's visibility signal via the registry below.
+  const [galleryListEl, setGalleryListEl] = createSignal<HTMLDivElement>()
+  const trackTileVisibility = createSharedIntersectionObserver(galleryListEl, {
+    rootMargin: GALLERY_PREVIEW_PRELOAD_MARGIN,
   })
 
   onMount(() => {
@@ -468,7 +471,7 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
             </For>
           </div>
         </Show>
-        <div class={ui.galleryList}>
+        <div class={ui.galleryList} ref={setGalleryListEl}>
           {(() => {
             const previewFlames = variationPreviewFlames(
               props.pointInitMode ?? 'pointInitGaussianDisk',
@@ -483,7 +486,12 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
                       <For each={types}>
                         {(type) => {
                           const flame = () => previewFlames[type]
-                          const i = galleryIndexOf().get(type) ?? 0
+                          const [tileEl, setTileEl] =
+                            createSignal<HTMLElement>()
+                          // Mount this tile's live preview only while it is near
+                          // the gallery viewport (see trackTileVisibility), so we
+                          // never spawn a canvas per off-screen variation.
+                          const nearViewport = trackTileVisibility(tileEl)
                           let longPressTimer:
                             | ReturnType<typeof setTimeout>
                             | undefined
@@ -514,6 +522,7 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
 
                           return (
                             <button
+                              ref={setTileEl}
                               class={ui.galleryItem}
                               classList={{
                                 [ui.galleryItemActive!]:
@@ -543,19 +552,17 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
                                 props.onClose()
                               }}
                             >
-                              <Show when={flame()} keyed>
+                              <Show when={nearViewport() && flame()} keyed>
                                 {(f) => (
-                                  <DelayedShow delayMs={i * 30}>
-                                    <div class={ui.galleryCanvas}>
-                                      <VariationPreview
-                                        version={1}
-                                        isSelected={type === props.currentType}
-                                        name={type}
-                                        flame={f}
-                                        hardwareTier={props.hardwareTier}
-                                      />
-                                    </div>
-                                  </DelayedShow>
+                                  <div class={ui.galleryCanvas}>
+                                    <VariationPreview
+                                      version={1}
+                                      isSelected={type === props.currentType}
+                                      name={type}
+                                      flame={f}
+                                      hardwareTier={props.hardwareTier}
+                                    />
+                                  </div>
                                 )}
                               </Show>
                               <div class={ui.galleryItemName}>
