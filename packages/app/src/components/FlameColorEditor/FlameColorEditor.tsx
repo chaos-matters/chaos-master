@@ -39,7 +39,7 @@ export function handleColor(theme: Theme, color: v2f) {
 function Gradient(props: { isVisible: () => boolean }) {
   const camera = useCamera()
   const { theme } = useTheme()
-  const { device, root } = useLiveRootContext()
+  const { device, root, gpuReady } = useLiveRootContext()
   const { context, canvasFormat } = useCanvas()
 
   createEffect(() => {
@@ -111,11 +111,16 @@ function Gradient(props: { isVisible: () => boolean }) {
 
     const rafLoop = createAnimationFrame(
       () => {
+        // Stop rendering to a lost device (mirrors Flam3): the gpuReady gate in
+        // AutoCanvas unmounts this on loss, but guard the inter-frame window too.
+        if (!gpuReady()) return
         const encoder = device.createCommandEncoder()
         const pass = encoder.beginRenderPass({
           colorAttachments: [
             {
-              view: context.getCurrentTexture().createView(),
+              view: context
+                .getCurrentTexture()
+                .createView({ label: 'flameColorEditorView' }),
               loadOp: 'clear',
               storeOp: 'store',
             },
@@ -126,6 +131,8 @@ function Gradient(props: { isVisible: () => boolean }) {
         device.queue.submit([encoder.finish()])
       },
       () => (props.isVisible() ? 0 : Infinity),
+      undefined,
+      () => !gpuReady(),
     )
   })
   return null

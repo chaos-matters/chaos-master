@@ -1011,7 +1011,9 @@ export function Flam3(props: Flam3Props) {
               {
                 loadOp: 'clear',
                 storeOp: 'store',
-                view: context.getCurrentTexture().createView(),
+                view: context
+                  .getCurrentTexture()
+                  .createView({ label: 'flam3CanvasView' }),
               },
             ],
           }

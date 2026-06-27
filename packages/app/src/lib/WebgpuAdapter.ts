@@ -1,5 +1,5 @@
 import { TRACK_PERFORMANCE } from '@/defaults'
-import { gpuStatus, setGpuStatus } from '@/lib/gpuStatus'
+import { gpuStatus, isGpuTerminallyDown, setGpuStatus } from '@/lib/gpuStatus'
 
 let gpuDevice: GPUDevice | null = null
 let gpuAdapter: GPUAdapter | null = null
@@ -141,6 +141,19 @@ export async function initializeWebgpuDevice(
   }
 
   assertIfWebgpuDeviceUnavailable(gpuDevice)
+
+  // Capture uncaptured errors so the browser stops logging them itself. Once the
+  // device is (being) lost, in-flight work fails with a cascade of "<resource>
+  // is invalid" / "destroyed" / "Not enough memory" errors — expected teardown
+  // noise we swallow to keep the console clean (the render-loop gpuReady guards
+  // already prevent most of it). A genuine error on a healthy device still
+  // surfaces, now with explicit resource labels (see createView labels, etc.).
+  gpuDevice.addEventListener('uncapturederror', (ev) => {
+    if (isGpuTerminallyDown() || gpuDevice === null) {
+      return
+    }
+    console.error('[WebGPU] uncaptured error:', ev.error.message)
+  })
 
   // A fresh, live device — previews may render again.
   setGpuStatus('ready')
