@@ -188,10 +188,11 @@
   min-height: 0;
   align-content: flex-start;
 
-  /* Reserve the scrollbar gutter + thin scrollbar so preview tiles don't slide
-     under the scrollbar on Firefox (overlay/auto scrollbars overlap content
-     otherwise), matching .sidebarScroll and the QuickVariationPicker gallery. */
-  scrollbar-gutter: stable;
+  /* Reserve a real right-side gutter (padding, not scrollbar-gutter) so preview
+     tiles never slide under the scrollbar. scrollbar-gutter:stable is a no-op
+     under Firefox overlay scrollbars (Linux/GTK), which then draw over the last
+     column; an explicit padding gutter clears the bar for overlay AND classic. */
+  padding-right: 0.6rem;
   scrollbar-width: thin;
   scrollbar-color: var(--neutral-300) transparent;
 
