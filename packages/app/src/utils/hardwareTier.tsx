@@ -5,6 +5,7 @@ import { examples } from '@/flame/examples'
 import { Flam3 } from '@/flame/Flam3'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
+import { isGpuTerminallyDown } from '@/lib/gpuStatus'
 import { Root } from '@/lib/Root'
 import type { QualityPreset } from '@/components/Quality/QualityPresets'
 
@@ -52,6 +53,11 @@ function bpsToTier(bps: number): HardwareTier {
 export function detectHardwareTier(): Promise<HardwareTier> {
   if (!('gpu' in globalThis.navigator)) return Promise.resolve('mid')
 
+  // WebGPU already failed this session (e.g. a prior device loss, or "Detect
+  // again" after a crash). Don't mount a benchmark Root — it would only
+  // re-enter the (now early-throwing) init and stall until the safety timeout.
+  if (isGpuTerminallyDown()) return Promise.resolve('mid')
+
   const DEFAULT_POINT_COUNT = 100_000
 
   const benchmarkFlame = examples.benchmark
@@ -65,6 +71,18 @@ export function detectHardwareTier(): Promise<HardwareTier> {
     let totalPoints = 0
     let startTime = 0
     let running = true
+
+    // If the device is lost DURING the benchmark, onAccumulatedPointCount stops
+    // firing — bail promptly to a safe tier instead of waiting out the timeout.
+    const statusPoll = setInterval(() => {
+      if (running && isGpuTerminallyDown()) {
+        running = false
+        clearInterval(statusPoll)
+        dispose()
+        container.remove()
+        resolve('mid')
+      }
+    }, 250)
 
     const dispose = render(
       () => (
@@ -101,6 +119,7 @@ export function detectHardwareTier(): Promise<HardwareTier> {
                   // Simple throttle for logging every ~1 second
                   if (elapsed >= DETECTION_SECONDS) {
                     running = false
+                    clearInterval(statusPoll)
                     const bps = totalPoints / elapsed / 1e9
                     const tier = bpsToTier(bps)
                     dispose()
@@ -120,12 +139,15 @@ export function detectHardwareTier(): Promise<HardwareTier> {
       () => {
         if (running) {
           running = false
+          clearInterval(statusPoll)
           dispose()
           container.remove()
           resolve('mid')
         }
       },
-      (DETECTION_SECONDS + 10) * 1000,
+      // Safety backstop. The statusPoll already bails fast on a device loss, so
+      // this only needs to cover a benchmark that's merely slow, not hung.
+      (DETECTION_SECONDS + 4) * 1000,
     )
   })
 }

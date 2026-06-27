@@ -10,7 +10,7 @@ import { PI } from '@/flame/constants'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { useCamera } from '@/lib/CameraContext'
 import { useCanvas } from '@/lib/CanvasContext'
-import { useRootContext } from '@/lib/RootContext'
+import { useLiveRootContext } from '@/lib/RootContext'
 import { createPosition, createZoom, WheelZoomCamera2D, } from '@/lib/WheelZoomCamera2D'
 import { createAnimationFrame } from '@/utils/createAnimationFrame'
 import { createDragHandler } from '@/utils/createDragHandler'
@@ -39,7 +39,7 @@ export function handleColor(theme: Theme, color: v2f) {
 function Gradient(props: { isVisible: () => boolean }) {
   const camera = useCamera()
   const { theme } = useTheme()
-  const { device, root } = useRootContext()
+  const { device, root } = useLiveRootContext()
   const { context, canvasFormat } = useCanvas()
 
   createEffect(() => {

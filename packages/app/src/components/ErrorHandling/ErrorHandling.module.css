@@ -277,6 +277,59 @@
   white-space: pre-wrap;
 }
 
+/* ---- Preview poster (in-canvas placeholder when WebGPU is unavailable) ---- */
+.preview-poster {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  box-sizing: border-box;
+  text-align: center;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.02) 0,
+      rgba(255, 255, 255, 0.02) 8px,
+      transparent 8px,
+      transparent 16px
+    ),
+    radial-gradient(circle at center, #021018 0%, #01080d 75%);
+  border-radius: inherit;
+  color: rgba(0, 200, 255, 0.85);
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+  /* Keep small thumbnail tiles legible. */
+  container-type: inline-size;
+}
+
+.preview-poster-title {
+  font-size: clamp(0.62rem, 4cqi, 0.95rem);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.3;
+}
+
+.preview-poster-link {
+  font-size: clamp(0.55rem, 3.4cqi, 0.78rem);
+  color: rgba(0, 200, 255, 0.85);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(0, 200, 255, 0.4);
+  padding-bottom: 1px;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: #fff;
+    border-bottom-color: rgba(255, 255, 255, 0.8);
+  }
+}
+
 /* ---- WebGPU Not Supported (legacy fullscreen layout) ---- */
 .fallback {
   position: fixed;

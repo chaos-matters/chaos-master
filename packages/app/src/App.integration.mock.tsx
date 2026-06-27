@@ -68,8 +68,16 @@ vi.mock('./lib/CanvasContext', () => ({
 
 vi.mock('./lib/RootContext', () => ({
   useRootContext: () => ({
+    adapter: null,
     root: null,
     device: null,
+    gpuReady: () => false,
+  }),
+  useLiveRootContext: () => ({
+    adapter: null,
+    root: null,
+    device: null,
+    gpuReady: () => false,
   }),
 }))
 

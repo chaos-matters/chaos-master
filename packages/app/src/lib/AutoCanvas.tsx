@@ -1,4 +1,6 @@
 import { createEffect, createSignal, Show } from 'solid-js'
+import { PreviewPoster } from '@/components/ErrorHandling/PreviewPoster'
+import { gpuStatus, setGpuStatus } from '@/lib/gpuStatus'
 import { useElementSize } from '@/utils/useElementSize'
 import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { CanvasContextProvider } from './CanvasContext'
@@ -26,7 +28,7 @@ type AutoCanvasProps = {
 }
 
 export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
-  const { device } = useRootContext()
+  const { device, gpuReady } = useRootContext()
 
   // iOS Safari fix: canvas.getContext('webgpu') returns null when called before
   // the canvas is fully mounted. Store the element via ref, then defer the signal
@@ -36,7 +38,10 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
 
   const scaledCanvasSize = (size: ElementSize): ElementSize => {
     const pixelRatio = props.pixelRatio ?? 1
-    const maxDim = device.limits.maxTextureDimension2D
+    // The size effect runs in the component body regardless of the gpuReady
+    // gate, so this can be read during the live -> null mid-session transition.
+    // Fall back to the WebGPU spec minimum when there's no device.
+    const maxDim = device?.limits.maxTextureDimension2D ?? 8192
     return {
       ...size,
       widthPX: floor(max(1, min(size.widthPX * pixelRatio, maxDim))),
@@ -88,18 +93,21 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
     }
   })
 
-  function createContext(canEl: HTMLCanvasElement) {
+  function createContext(canEl: HTMLCanvasElement, dev: GPUDevice) {
     const canvasFormat = navigator.gpu.getPreferredCanvasFormat()
     const context = canEl.getContext('webgpu')
     if (!context) {
+      // Mark the session unavailable rather than throwing: ~18 modal canvas
+      // sites have no surrounding ErrorBoundary, so a throw here would reach the
+      // App-level full-screen takeover. Flipping the status re-renders this
+      // gate to the poster instead.
       console.error('[WebGPU] canvas.getContext("webgpu") returned null')
-      throw new Error(`GPUCanvasContext failed to initialize.`, {
-        cause: 'WebGPU',
-      })
+      setGpuStatus('unavailable')
+      return null
     }
     const alphaMode = props.alphaMode ?? 'opaque'
     context.configure({
-      device,
+      device: dev,
       format: canvasFormat,
       alphaMode,
     })
@@ -107,7 +115,10 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
   }
 
   return (
-    <>
+    <Show
+      when={gpuReady()}
+      fallback={<PreviewPoster status={gpuStatus()} class={props.class} />}
+    >
       <canvas
         ref={(el) => {
           canvasRef = el
@@ -124,29 +135,39 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
         }}
       />
       <Show when={canvas()} keyed>
-        {(canvas) => (
-          <CanvasContextProvider
-            value={{
-              canvas,
-              ...createContext(canvas),
-              pixelRatio: () => props.pixelRatio ?? 1,
-              canvasSize: () => {
-                const size = activeSize()
-                if (!size) {
-                  return { width: 0, height: 0 }
-                }
-                const { widthPX, heightPX } = scaledCanvasSize(size)
-                return {
-                  width: widthPX,
-                  height: heightPX,
-                }
-              },
-            }}
-          >
-            {props.children}
-          </CanvasContextProvider>
-        )}
+        {(canvas) => {
+          const dev = device
+          if (!dev) {
+            return null
+          }
+          const created = createContext(canvas, dev)
+          if (!created) {
+            return null
+          }
+          return (
+            <CanvasContextProvider
+              value={{
+                canvas,
+                ...created,
+                pixelRatio: () => props.pixelRatio ?? 1,
+                canvasSize: () => {
+                  const size = activeSize()
+                  if (!size) {
+                    return { width: 0, height: 0 }
+                  }
+                  const { widthPX, heightPX } = scaledCanvasSize(size)
+                  return {
+                    width: widthPX,
+                    height: heightPX,
+                  }
+                },
+              }}
+            >
+              {props.children}
+            </CanvasContextProvider>
+          )
+        }}
       </Show>
-    </>
+    </Show>
   )
 }

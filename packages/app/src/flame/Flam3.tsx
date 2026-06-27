@@ -14,7 +14,7 @@ import { applyTimelineToFlame } from '@/utils/timeline'
 import { Camera3DContext } from '../lib/Camera3DContext'
 import { CameraContext } from '../lib/CameraContext'
 import { useCanvas } from '../lib/CanvasContext'
-import { useRootContext } from '../lib/RootContext'
+import { useLiveRootContext } from '../lib/RootContext'
 import { createAnimationFrame } from '../utils/createAnimationFrame'
 import { createAdaptiveBlurPipeline } from './adaptiveBlurPipeline'
 import { ColorGradingUniforms, createColorGradingPipeline, } from './colorGrading'
@@ -115,7 +115,7 @@ type Flam3Props = {
 export function Flam3(props: Flam3Props) {
   const camera = useContext(CameraContext)
   const camera3D = useContext(Camera3DContext)
-  const { root, device } = useRootContext()
+  const { root, device } = useLiveRootContext()
   const { context, canvasSize, canvas, canvasFormat } = useCanvas()
   const timeline = useTimeline()
   const changeHistory = useChangeHistory()

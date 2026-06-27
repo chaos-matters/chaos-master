@@ -6,7 +6,7 @@ import { mat4, vec3 } from 'wgpu-matrix'
 import { Camera3DContextProvider } from './Camera3DContext'
 import { rolledUpVector } from './cameraMath'
 import { useCanvas } from './CanvasContext'
-import { useRootContext } from './RootContext'
+import { useLiveRootContext } from './RootContext'
 import type { ParentProps } from 'solid-js'
 import type { Vec3 } from 'wgpu-matrix'
 
@@ -85,7 +85,7 @@ export function Default3DPreviewCamera(
 }
 
 export function Camera3D(props: ParentProps<Camera3DProps>) {
-  const { root } = useRootContext()
+  const { root } = useLiveRootContext()
   const { canvasSize, pixelRatio } = useCanvas()
 
   const uniformsBuffer = root
