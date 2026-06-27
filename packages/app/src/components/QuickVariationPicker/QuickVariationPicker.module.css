@@ -275,9 +275,12 @@
   /* position:relative so the absolutely-positioned canvas fills us */
   position: relative;
   overflow: hidden;
-  /* square: padding-bottom forces height == width regardless of content height */
+  /* 16:9 to MATCH the 256x144 preview canvas — same proven trick as the modal
+     .item (VariationSelector) and the randomizer .cell. The old square
+     (padding-bottom:100%) forced the 16:9 canvas to stretch, and the aspect
+     mismatch made tiles overlap on Firefox during the staggered mount. */
   width: 100%;
-  padding-bottom: 100%;
+  padding-bottom: 56.25%;
   border-radius: 6px;
   border: 1.5px solid var(--neutral-200);
   cursor: pointer;

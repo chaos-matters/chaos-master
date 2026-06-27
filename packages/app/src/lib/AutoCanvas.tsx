@@ -122,6 +122,19 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
       <canvas
         ref={(el) => {
           canvasRef = el
+          // For fixedResolution previews (all gallery tiles) the size is known
+          // synchronously, so set the backing store + sizing here in the ref
+          // callback — before Firefox's first layout — so its intrinsic fallback
+          // is the real 16:9 (e.g. 256x144), not the default 300x150 (2:1) that
+          // makes tiles overlap before the size effect runs.
+          if (props.fixedResolution) {
+            const pr = props.pixelRatio ?? 1
+            el.width = floor(max(1, props.fixedResolution.width * pr))
+            el.height = floor(max(1, props.fixedResolution.height * pr))
+            el.style.width = '100%'
+            el.style.height = '100%'
+            el.style.display = 'block'
+          }
           props.ref?.(el)
         }}
         class={props.class}
