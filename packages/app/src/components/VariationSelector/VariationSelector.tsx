@@ -32,7 +32,7 @@ import { hardwareTierToQuality } from '@/utils/hardwareTier'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
-import { adjustLivePreviewCount, livePreviewCount, vramLog, } from '@/utils/vramLog'
+import { livePreviewCount, setLivePreviewLive, vramLog } from '@/utils/vramLog'
 import { AffineEditor } from '../AffineEditor/AffineEditor'
 import { Button } from '../Button/Button'
 import { ButtonGroup } from '../Button/ButtonGroup'
@@ -261,21 +261,22 @@ export function VariationPreview(props: {
     })
   })
 
+  // One token per preview instance; membership in the live set == this preview's
+  // canvas is currently mounted. Idempotent, so the global count can't drift.
+  const previewToken = Symbol('variation-preview')
   createEffect(() => {
-    if (isPreviewMounted()) {
-      adjustLivePreviewCount(1)
+    const live = isPreviewMounted()
+    setLivePreviewLive(previewToken, live)
+    if (live) {
       vramLog(
         `[VariationPreview] MOUNT '${props.name}' live=${livePreviewCount()}` +
           ` allowed=${allowed()} visible=${isVisible()} status=${renderStatus()}`,
       )
-      onCleanup(() => {
-        adjustLivePreviewCount(-1)
-        vramLog(
-          `[VariationPreview] UNMOUNT '${props.name}' live=${livePreviewCount()}` +
-            ` reason=${image() !== undefined ? 'captured-image' : 'gate/visibility'}`,
-        )
-      })
     }
+  })
+  onCleanup(() => {
+    // Free the slot on disposal even if isPreviewMounted was true at teardown.
+    setLivePreviewLive(previewToken, false)
   })
 
   return (

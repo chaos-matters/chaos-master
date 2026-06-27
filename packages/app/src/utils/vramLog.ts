@@ -36,11 +36,26 @@ export function vramTrack(label: string, deltaBytes: number) {
 }
 
 // Count of live (mounted, GPU-allocated) gallery previews, exposed as a signal
-// for the DebugPanel. Bounded to roughly the on-screen window by the galleries'
-// visibility gating; a value that climbs with scroll distance signals a leak.
+// for the DebugPanel. Tracked by a per-preview token in a Set rather than a raw
+// +1/-1 counter: set membership is idempotent, so the count cannot drift negative
+// the way a counter does if a cleanup ever runs without its matching mount (HMR,
+// re-keying, disposal ordering — the panel showed negative counts). Adding a
+// present token or deleting an absent one is a no-op, so the count always equals
+// the true number of live previews and self-corrects. Bounded to roughly the
+// on-screen window by the galleries' visibility gating; a value that climbs with
+// scroll distance still signals a leak.
+const livePreviewTokens = new Set<symbol>()
 const [livePreviewCount, setLivePreviewCount] = createSignal(0)
 export { livePreviewCount }
 
-export function adjustLivePreviewCount(delta: number) {
-  setLivePreviewCount((n) => n + delta)
+export function setLivePreviewLive(token: symbol, live: boolean) {
+  const sizeBefore = livePreviewTokens.size
+  if (live) {
+    livePreviewTokens.add(token)
+  } else {
+    livePreviewTokens.delete(token)
+  }
+  if (livePreviewTokens.size !== sizeBefore) {
+    setLivePreviewCount(livePreviewTokens.size)
+  }
 }

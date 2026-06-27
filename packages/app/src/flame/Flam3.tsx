@@ -228,10 +228,14 @@ export function Flam3(props: Flam3Props) {
     .$usage('storage')
 
   // vec2u (8) + vec4f (16) + vec2f (8) = 32 bytes per point. At 1e6 that's ~32MB
-  // per preview — the dominant gallery VRAM term.
+  // per preview — the dominant gallery VRAM term. Capture the allocated size so
+  // the matching free below subtracts exactly this much: pointCountPerBatch is a
+  // reactive prop and may differ by free time (e.g. a quality change on the main
+  // renderer), which would otherwise drift the VRAM ledger negative.
+  const pointBufferBytes = props.pointCountPerBatch * 32
   vramTrack(
     `Flam3 point buffers pc=${props.pointCountPerBatch}`,
-    props.pointCountPerBatch * 32,
+    pointBufferBytes,
   )
 
   const colorGradingUniforms = root
@@ -309,7 +313,7 @@ export function Flam3(props: Flam3Props) {
         pointPositions.destroy()
         pointColors.destroy()
         colorGradingUniforms.destroy()
-        vramTrack('Flam3 point buffers FREED', -props.pointCountPerBatch * 32)
+        vramTrack('Flam3 point buffers FREED', -pointBufferBytes)
       })
       .catch(() => {})
   })
