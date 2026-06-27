@@ -151,9 +151,10 @@ export function PreviewFinalFlame(props: {
   )
 }
 
-// Count of live (mounted, GPU-allocated) gallery previews. The PEAK during a
-// scroll is the over-mount: with the everVisible/everAllowed latch this climbs
-// without bound as you scroll through all variations. Gated logging only.
+// Count of live (mounted, GPU-allocated) gallery previews. After dropping the
+// everVisible/everAllowed latch (see isPreviewMounted) this should stay bounded
+// to ~(on-screen + the 2 rendering) instead of climbing with scroll distance.
+// Gated logging only.
 let livePreviewCanvases = 0
 
 export function VariationPreview(props: {
@@ -211,15 +212,22 @@ export function VariationPreview(props: {
     setImage(undefined)
   })
 
-  const [everAllowed, setEverAllowed] = createSignal(false)
-  createEffect(() => {
-    if (allowed()) setEverAllowed(true)
-  })
-
-  const [everVisible, setEverVisible] = createSignal(false)
-  createEffect(() => {
-    if (isVisible() === true) setEverVisible(true)
-  })
+  // Mount the live WebGPU preview while it is rendering (allowed), on-screen
+  // (isVisible), OR finished-but-still-capturing its snapshot (renderStatus
+  // 'done', image not yet set). Once the snapshot lands, image() is set → the
+  // static <img> shows and this goes false → the canvas unmounts + frees buffers.
+  //
+  // Deliberately NOT a permanent everVisible/everAllowed latch: an off-screen
+  // preview gets ComputeGate priority 0 (never allowed), so a latched one would
+  // sit mounted-but-frozen forever, never finishing — wasted VRAM that grew
+  // without bound while scrolling (measured peak 49 live). This bounds live
+  // previews to ~(visible + the 2 rendering). Keeping 'done' in the condition
+  // ensures an in-flight snapshot still completes if you scroll away mid-capture.
+  const isPreviewMounted = createMemo(
+    () =>
+      image() === undefined &&
+      (allowed() || isVisible() === true || renderStatus() === 'done'),
+  )
 
   createEffect(() => {
     if (!container() || renderStatus() !== 'done') {
@@ -254,15 +262,11 @@ export function VariationPreview(props: {
   })
 
   createEffect(() => {
-    const isMounted =
-      image() === undefined && (allowed() || everAllowed() || everVisible())
-
-    if (isMounted) {
+    if (isPreviewMounted()) {
       livePreviewCanvases += 1
       vramLog(
         `[VariationPreview] MOUNT '${props.name}' live=${livePreviewCanvases}` +
-          ` allowed=${allowed()} everAllowed=${everAllowed()}` +
-          ` everVisible=${everVisible()} visible=${isVisible()} status=${renderStatus()}`,
+          ` allowed=${allowed()} visible=${isVisible()} status=${renderStatus()}`,
       )
       onCleanup(() => {
         livePreviewCanvases -= 1
@@ -284,11 +288,7 @@ export function VariationPreview(props: {
           image() !== undefined ? `url('${image()}')` : undefined,
       }}
     >
-      <Show
-        when={
-          image() === undefined && (allowed() || everAllowed() || everVisible())
-        }
-      >
+      <Show when={isPreviewMounted()}>
         <AutoCanvas
           pixelRatio={1}
           fixedResolution={props.resolution ?? { width: 256, height: 144 }}
