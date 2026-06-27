@@ -187,6 +187,17 @@
   flex: 1;
   min-height: 0;
   align-content: flex-start;
+
+  /* Reserve the scrollbar gutter + thin scrollbar so preview tiles don't slide
+     under the scrollbar on Firefox (overlay/auto scrollbars overlap content
+     otherwise), matching .sidebarScroll and the QuickVariationPicker gallery. */
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--neutral-300) transparent;
+
+  [data-theme='dark'] & {
+    scrollbar-color: var(--neutral-700) transparent;
+  }
 }
 
 .affine-editor {
