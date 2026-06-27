@@ -7,6 +7,28 @@ changelog surfaced in the About panel lives in `CHANGELOG.md`.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.3] - 2026-06-27
+
+### Added
+
+- **Graceful WebGPU fallback / degraded shell.** When WebGPU is unavailable or the device is lost mid-session, the app degrades instead of going blank or hanging: a `gpuStatus` signal (`lib/gpuStatus.ts`) drives a degraded `RootContext`, `AutoCanvas` gates every surface behind a `PreviewPoster` ("WebGPU preview unavailable" + a support link), and a WebGPU init timeout guarantees the resource resolves so the shell always mounts. `WebgpuAdapter` listens for `uncapturederror`/device-loss and flips the status; render loops halt immediately on loss (no console spiral); recovery is reload-only. `pagehideCleanup` frees GPU resources on teardown (flag-gated experiment, default off).
+- **Debug panel GPU stats.** The perf panel now shows live gallery-preview count and tracked GPU-buffer MiB, surfaced as signals from `vramLog.ts` (cheap `+=` per alloc/free; console tracing still gated on `VITE_DEBUG_VRAM`). Lets you watch the gallery's preview gating keep canvases bounded without console spam.
+- **GPU-enabled e2e suite** (`packages/app/e2e/variation-gallery.gpu.spec.ts`, local-only). Real-GPU regression cover: gallery memory stays bounded under fast/sweep scrolling, closing the picker frees previews, parametric edits re-render their tile. Reusable helpers in `e2e/helpers/gallery.ts`. The `*.gpu.spec.ts` suffix keeps these out of CI (`playwright.config.ts` `testIgnore`) and into the headed `chromium-gpu` project (`playwright.resilience.config.ts`).
+
+### Changed
+
+- **Variation-gallery previews are visibility-gated and scroll-debounced.** A single shared `IntersectionObserver` rooted on the scroll container (`createSharedIntersectionObserver` in `utils/useIntersectionObserver.ts`) mounts a tile's live preview only while it's within — or near (`rootMargin`) — the gallery viewport, replacing the time-based `DelayedShow` that mounted all ~800. A global debounced `isScrolling` signal (`utils/isScrolling.ts`) defers mounting until ~180ms after the last scroll, so fast/jerky scrolling no longer spawns hundreds of half-rendered canvases. Live canvases stay bounded to the on-screen window (~20-30) instead of climbing into the tens of GB; `ComputeGate` still throttles concurrent renders, and each `VariationPreview` snapshots to a static `<img>` and frees its canvas when done.
+- **Gallery VRAM bounds.** Thumbnail point count capped; compiled IFS compute pipeline cached per `(root, signature)` instead of recompiled per preview.
+
+### Fixed
+
+- **Firefox: gallery tiles no longer squeeze, collapse, or overlap.** Tiles size via the `padding-bottom: 56.25%` trick, **not** `aspect-ratio` — a grid item sized only by `aspect-ratio` with absolutely-positioned children doesn't size its auto grid row, so tiles overflowed and overlapped (~40%) in both engines. A `min-height` floor (safe with the global `border-box`) means even a GPU device-loss reflow that drops the resolved percentage padding to ~0 can't collapse a tile into a pile of stacked labels.
+- **Firefox: gallery scrollbar no longer overlaps the last column.** `scrollbar-gutter: stable` is a no-op under Firefox overlay scrollbars (Linux/GTK), so `VariationSelector`'s gallery reserves a real `padding-right` gutter, which clears the bar for both overlay and classic scrollbars.
+- **Main IFS point-count readout no longer clobbered by gallery previews.** Global point-count writes were gated on `!props.onAccumulatedPointCount`, which neither the main renderer nor `VariationPreview` passes; previews overwrote the main readout when a picker was open. Gated on `isExportRenderer` (the main workspace renderer) instead, matching `renderTimings`.
+- **Live-preview count and VRAM ledger could drift negative.** The count is now set-membership by a per-preview token (idempotent — a cleanup without its matching mount can't push it below zero), and `Flam3` frees the exact byte count it allocated (`pointCountPerBatch` is reactive and can differ by free time).
+- **Editing a parametric variation re-renders its gallery tile.** A per-item version bump (`paramRev`) discards that tile's cached snapshot when its sliders change, so the edited tile goes live and re-renders to quality (previously only the right-side preview updated).
+- **Per-preview GPU buffer leak** (`pointPositions`/`pointColors` were never destroyed on unmount — ~24MB each at 1e6 points); legible posters, labelled GPU resources, gated editor loops, hushed teardown noise.
+
 ## [0.9.2] - 2026-06-26
 
 ### Added
