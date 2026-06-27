@@ -790,10 +790,12 @@ export function Flam3(props: Flam3Props) {
       batchIndex = 0
       accumulatedPointCount_ = 0
       lastExportRenderedPointCount = -1
-      // Only update the global counter from the main renderer, not preview instances.
-      // Preview Flam3 instances provide onAccumulatedPointCount and must not clobber
-      // the global signal (which drives the progress bar and quality pills).
-      if (!props.onAccumulatedPointCount) {
+      // Only the main workspace renderer (isExportRenderer) touches the global
+      // counter; preview instances must not clobber it (it drives the debug panel,
+      // progress bar and quality pills). Gating on onAccumulatedPointCount was
+      // wrong — neither the main renderer nor VariationPreview passes it, so an
+      // open gallery's previews were overwriting the main IFS readout.
+      if (props.isExportRenderer ?? false) {
         setAccumulatedPointCountGlobal(0)
       }
       clearRequested = true
@@ -1048,7 +1050,7 @@ export function Flam3(props: Flam3Props) {
       // this renderer down from the callback — doing it before submit would
       // destroy the pipeline's buffers while the just-encoded command buffer
       // still references them ("used in submit while destroyed").
-      if (!props.onAccumulatedPointCount) {
+      if (props.isExportRenderer ?? false) {
         // Ready ticks always write so the capture gate sees a fresh count.
         const nowMs = performance.now()
         if (
