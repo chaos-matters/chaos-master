@@ -29,6 +29,7 @@ import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
 import { deepClone } from '@/utils/clone'
 import { createStoreHistory } from '@/utils/createStoreHistory'
 import { hardwareTierToQuality } from '@/utils/hardwareTier'
+import { useIsScrolling } from '@/utils/isScrolling'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
@@ -173,6 +174,15 @@ export function VariationPreview(props: {
   const [quality, setQuality] = createSignal<() => number>()
   const intersection = useIntersectionObserver(container)
   const isVisible = createMemo(() => intersection()?.isIntersecting)
+  const scrolling = useIsScrolling()
+  // While the user is actively scrolling, treat a tile as not-yet-visible so we
+  // don't mount/allocate a WebGPU canvas for every tile that flickers through the
+  // viewport. Fast/jerky scrolling otherwise spawns hundreds of half-rendered
+  // canvases that are torn down before they snapshot, ballooning VRAM (see
+  // isScrolling.ts). After scrolling settles the visible tiles mount and render
+  // (still throttled by the ComputeGate); already-snapshotted tiles keep their
+  // static image throughout, so the gallery doesn't flash while scrolling.
+  const settledVisible = createMemo(() => isVisible() === true && !scrolling())
   const renderStatus = createMemo<RenderStatus | undefined>(() => {
     const quality_ = quality()?.()
     if (quality_ === undefined) {
@@ -192,12 +202,11 @@ export function VariationPreview(props: {
   })
   const allowed = useComputeGate(() => {
     const renderStatus_ = renderStatus()
-    const isVisible_ = isVisible()
-    if (renderStatus_ === undefined || isVisible_ === undefined) {
+    if (renderStatus_ === undefined) {
       return undefined
     }
     return {
-      isVisible: isVisible_,
+      isVisible: settledVisible(),
       renderStatus: renderStatus_,
       isSelected: props.isSelected,
     }
@@ -212,10 +221,11 @@ export function VariationPreview(props: {
     setImage(undefined)
   })
 
-  // Mount the live WebGPU preview while it is rendering (allowed), on-screen
-  // (isVisible), OR finished-but-still-capturing its snapshot (renderStatus
-  // 'done', image not yet set). Once the snapshot lands, image() is set → the
-  // static <img> shows and this goes false → the canvas unmounts + frees buffers.
+  // Mount the live WebGPU preview while it is rendering (allowed), settled-visible
+  // (on-screen and not mid-scroll), OR finished-but-still-capturing its snapshot
+  // (renderStatus 'done', image not yet set). Once the snapshot lands, image() is
+  // set → the static <img> shows and this goes false → the canvas unmounts + frees
+  // buffers.
   //
   // Deliberately NOT a permanent everVisible/everAllowed latch: an off-screen
   // preview gets ComputeGate priority 0 (never allowed), so a latched one would
@@ -226,7 +236,7 @@ export function VariationPreview(props: {
   const isPreviewMounted = createMemo(
     () =>
       image() === undefined &&
-      (allowed() || isVisible() === true || renderStatus() === 'done'),
+      (allowed() || settledVisible() || renderStatus() === 'done'),
   )
 
   createEffect(() => {
