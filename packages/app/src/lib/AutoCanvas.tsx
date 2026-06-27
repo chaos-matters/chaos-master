@@ -122,6 +122,22 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
       <canvas
         ref={(el) => {
           canvasRef = el
+          // Firefox occlusion fix: a <canvas> with no width/height attributes has
+          // a 300x150 intrinsic backing store, and as a replaced element Firefox
+          // falls back to that intrinsic HEIGHT whenever its containing block's
+          // height isn't definite yet (during the gallery's staggered mount /
+          // panel transition) — so neighbouring tiles overlap. For fixedResolution
+          // previews the size is known synchronously, so set the backing store +
+          // sizing here in the ref callback, before Firefox's first layout/paint,
+          // instead of waiting two effect hops for the size effect below.
+          if (props.fixedResolution) {
+            const pr = props.pixelRatio ?? 1
+            el.width = floor(max(1, props.fixedResolution.width * pr))
+            el.height = floor(max(1, props.fixedResolution.height * pr))
+            el.style.width = '100%'
+            el.style.height = '100%'
+            el.style.display = 'block'
+          }
           props.ref?.(el)
         }}
         class={props.class}

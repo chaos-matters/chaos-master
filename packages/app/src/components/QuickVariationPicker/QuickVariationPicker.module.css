@@ -275,9 +275,15 @@
   /* position:relative so the absolutely-positioned canvas fills us */
   position: relative;
   overflow: hidden;
-  /* square: padding-bottom forces height == width regardless of content height */
+  /* Square cell. aspect-ratio (not the old padding-bottom:100% hack) gives the
+     button a DEFINITE height from first layout — padding-bottom:100% needs the
+     resolved width first, and during the staggered mount / panel transition
+     Firefox momentarily has no definite cell height, so the canvas falls back to
+     its 300x150 intrinsic size and tiles overlap. A min-height floor stops the
+     cell collapsing to 0 in that window. */
   width: 100%;
-  padding-bottom: 100%;
+  aspect-ratio: 1 / 1;
+  min-height: 64px;
   border-radius: 6px;
   border: 1.5px solid var(--neutral-200);
   cursor: pointer;
