@@ -115,7 +115,7 @@ type Flam3Props = {
 export function Flam3(props: Flam3Props) {
   const camera = useContext(CameraContext)
   const camera3D = useContext(Camera3DContext)
-  const { root, device } = useLiveRootContext()
+  const { root, device, gpuReady } = useLiveRootContext()
   const { context, canvasSize, canvas, canvasFormat } = useCanvas()
   const timeline = useTimeline()
   const changeHistory = useChangeHistory()
@@ -810,6 +810,15 @@ export function Flam3(props: Flam3Props) {
     // export driver. Returns what was submitted so the export driver can pace
     // and size the next chunk.
     function renderTick(frameId: number): RenderTickResult {
+      // Halt immediately when the device is gone. Without this, a device loss
+      // with many live previews (e.g. the VariationSelector gallery) lets every
+      // Flam3's rAF loop keep submitting to the dead device — a flood of
+      // "Buffer is invalid" errors that jams the main thread before the reactive
+      // poster swap can flush. Mirrors the colorGradingPipeline bail below.
+      if (!gpuReady()) {
+        return { iterations: 0, presented: false, hadWork: false }
+      }
+
       const currentExportCb = props.onExportImage
       const exportMode = exportDriverActive()
 
@@ -1072,7 +1081,11 @@ export function Flam3(props: Flam3Props) {
           ? props.renderInterval
           : Infinity,
       () => device.queue.onSubmittedWorkDone(),
-      exportDriverActive,
+      // Tear the rAF loop down entirely when an export takes over OR when the
+      // device is lost. The `!gpuReady()` read is reactive, so a device loss
+      // disposes every preview's loop on the spot (no more requestAnimationFrame,
+      // no more onSubmittedWorkDone holds against a dead queue).
+      () => exportDriverActive() || !gpuReady(),
     )
 
     // Export driver: replaces the rAF loop while an export runs. The loop
@@ -1081,7 +1094,9 @@ export function Flam3(props: Flam3Props) {
     // export keeps running in background tabs, and chunk wall time is a valid
     // measurement to size the next chunk with.
     createEffect(() => {
-      if (!exportDriverActive()) return
+      // Stop driving on device loss too: a reactive !gpuReady() re-runs this
+      // effect, fires onCleanup (disposed = true) and breaks the export loop.
+      if (!exportDriverActive() || !gpuReady()) return
 
       let disposed = false
       onCleanup(() => {

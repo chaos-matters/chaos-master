@@ -6,6 +6,29 @@ let gpuAdapter: GPUAdapter | null = null
 
 const { navigator } = globalThis
 
+// After a hard GPU-process crash (e.g. Firefox/wgpu TryFromSliceError SIGSEGV),
+// requestAdapter/requestDevice can HANG instead of rejecting. Without a cap the
+// Root resource never resolves and a RELOADED page just shows a blank/hung shell.
+// Race against a timeout so init always settles into the degraded shell.
+const INIT_TIMEOUT_MS = 8000
+
+function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(
+        new Error(
+          `WebGPU ${label} timed out after ${INIT_TIMEOUT_MS}ms — the GPU process may have crashed. Reload, or restart the browser if reloading doesn't help.`,
+          { cause: 'WebGPU' },
+        ),
+      )
+    }, INIT_TIMEOUT_MS)
+  })
+  return Promise.race([promise, timeout]).finally(() => {
+    clearTimeout(timer)
+  })
+}
+
 function assertIfWebgpuAdapterUnavailable(
   adapter: GPUAdapter | null,
 ): asserts adapter {
@@ -65,44 +88,59 @@ export async function initializeWebgpuDevice(
 
   setGpuStatus('initializing')
 
-  gpuAdapter = await navigator.gpu.requestAdapter({
-    ...adapterPreferences,
-  })
+  try {
+    gpuAdapter = await withTimeout(
+      navigator.gpu.requestAdapter({ ...adapterPreferences }),
+      'adapter request',
+    )
 
-  if (!gpuAdapter) {
-    // navigator.gpu exists but no adapter — e.g. a blocklisted driver or a
-    // crashed GPU process. Not "unsupported": the API is present, it just
-    // can't give us a device right now.
+    if (!gpuAdapter) {
+      // navigator.gpu exists but no adapter — e.g. a blocklisted driver or a
+      // crashed GPU process. Not "unsupported": the API is present, it just
+      // can't give us a device right now.
+      setGpuStatus('unavailable')
+    }
+    assertIfWebgpuAdapterUnavailable(gpuAdapter)
+
+    // Always log adapter info for remote diagnostics
+    const { info, features } = gpuAdapter
+    console.info('[WebGPU] Adapter acquired:', {
+      vendor: info.vendor,
+      architecture: info.architecture,
+      description: info.description,
+      features: [...features].join(', '),
+    })
+
+    const optionalFeatures = negotiateOptionalFeatures(gpuAdapter)
+
+    gpuDevice = await withTimeout(
+      gpuAdapter.requestDevice({
+        ...deviceFeatures,
+        requiredFeatures: [
+          ...(deviceFeatures?.requiredFeatures ?? []),
+          ...optionalFeatures,
+        ],
+        requiredLimits: {
+          ...(deviceFeatures?.requiredLimits ?? {}),
+          maxBufferSize: gpuAdapter.limits.maxBufferSize,
+          maxStorageBufferBindingSize:
+            gpuAdapter.limits.maxStorageBufferBindingSize,
+          maxComputeWorkgroupStorageSize:
+            gpuAdapter.limits.maxComputeWorkgroupStorageSize,
+        },
+      }),
+      'device request',
+    )
+  } catch (err) {
+    // Any failure to acquire an adapter/device — including an init timeout from
+    // a dead GPU process — makes WebGPU terminally unavailable for the session
+    // so re-mounting Roots early-throw instead of re-hanging. ('unsupported',
+    // set above when navigator.gpu is absent, is latched and unaffected.)
     setGpuStatus('unavailable')
+    throw err
   }
-  assertIfWebgpuAdapterUnavailable(gpuAdapter)
 
-  // Always log adapter info for remote diagnostics
-  const { info, features } = gpuAdapter
-  console.info('[WebGPU] Adapter acquired:', {
-    vendor: info.vendor,
-    architecture: info.architecture,
-    description: info.description,
-    features: [...features].join(', '),
-  })
-
-  const optionalFeatures = negotiateOptionalFeatures(gpuAdapter)
-
-  gpuDevice = await gpuAdapter.requestDevice({
-    ...deviceFeatures,
-    requiredFeatures: [
-      ...(deviceFeatures?.requiredFeatures ?? []),
-      ...optionalFeatures,
-    ],
-    requiredLimits: {
-      ...(deviceFeatures?.requiredLimits ?? {}),
-      maxBufferSize: gpuAdapter.limits.maxBufferSize,
-      maxStorageBufferBindingSize:
-        gpuAdapter.limits.maxStorageBufferBindingSize,
-      maxComputeWorkgroupStorageSize:
-        gpuAdapter.limits.maxComputeWorkgroupStorageSize,
-    },
-  })
+  assertIfWebgpuDeviceUnavailable(gpuDevice)
 
   // A fresh, live device — previews may render again.
   setGpuStatus('ready')

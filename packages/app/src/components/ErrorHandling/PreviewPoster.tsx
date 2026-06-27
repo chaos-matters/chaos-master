@@ -18,7 +18,11 @@ export const GPUWEB_IMPL_STATUS_URL =
 export function PreviewPoster(props: { status: GpuStatus; class?: string }) {
   const recovering = () => props.status === 'lost-recovering'
   return (
-    <div class={`${ui.previewPoster} ${props.class ?? ''}`}>
+    <div
+      data-testid="webgpu-poster"
+      data-gpu-status={props.status}
+      class={`${ui.previewPoster} ${props.class ?? ''}`}
+    >
       <Show
         when={recovering()}
         fallback={
