@@ -187,6 +187,18 @@
   flex: 1;
   min-height: 0;
   align-content: flex-start;
+
+  /* Reserve a real right-side gutter (padding, not scrollbar-gutter) so preview
+     tiles never slide under the scrollbar. scrollbar-gutter:stable is a no-op
+     under Firefox overlay scrollbars (Linux/GTK), which then draw over the last
+     column; an explicit padding gutter clears the bar for overlay AND classic. */
+  padding-right: 0.6rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--neutral-300) transparent;
+
+  [data-theme='dark'] & {
+    scrollbar-color: var(--neutral-700) transparent;
+  }
 }
 
 .affine-editor {

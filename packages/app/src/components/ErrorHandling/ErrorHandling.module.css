@@ -277,6 +277,85 @@
   white-space: pre-wrap;
 }
 
+/* ---- Preview poster (in-canvas placeholder when WebGPU is unavailable) ---- */
+/* Reads as a DELIBERATE placeholder (visible slate bg + cyan inset border +
+   GPU-off icon), never a broken black canvas. Container queries keep it legible
+   from tiny gallery thumbnails up to the full editor canvas. */
+.preview-poster {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  box-sizing: border-box;
+  text-align: center;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(0, 200, 255, 0.05) 0,
+      rgba(0, 200, 255, 0.05) 6px,
+      transparent 6px,
+      transparent 15px
+    ),
+    linear-gradient(160deg, #1b2733 0%, #0d161f 100%);
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(0, 200, 255, 0.22);
+  color: rgba(190, 225, 240, 0.9);
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+  container-type: inline-size;
+  overflow: hidden;
+}
+
+.preview-poster-icon {
+  width: clamp(20px, 30cqi, 46px);
+  height: clamp(20px, 30cqi, 46px);
+  color: rgba(0, 200, 255, 0.7);
+  flex-shrink: 0;
+}
+
+.preview-poster-title {
+  font-size: clamp(0.6rem, 7cqi, 0.95rem);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.preview-poster-link {
+  display: none;
+  font-size: clamp(0.55rem, 5cqi, 0.8rem);
+  color: rgba(0, 200, 255, 0.9);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(0, 200, 255, 0.4);
+  padding-bottom: 1px;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: #fff;
+    border-bottom-color: rgba(255, 255, 255, 0.8);
+  }
+}
+
+/* Show the support link only when the tile is wide enough to read it. */
+@container (min-width: 150px) {
+  .preview-poster-link {
+    display: inline-block;
+  }
+}
+
+/* On the smallest gallery tiles, the icon alone carries the message. */
+@container (max-width: 84px) {
+  .preview-poster-title {
+    display: none;
+  }
+}
+
 /* ---- WebGPU Not Supported (legacy fullscreen layout) ---- */
 .fallback {
   position: fixed;

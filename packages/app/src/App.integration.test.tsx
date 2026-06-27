@@ -12,21 +12,19 @@ describe('App Component Integration', () => {
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>
 
   beforeAll(() => {
-    // Spy on console.error to silence expected WebGPU initialization errors
-    // that happen asynchronously after the test completes.
-    consoleErrorSpy = vi
-      .spyOn(console, 'error')
-      .mockImplementation((...args) => {
-        const msg = args.map((arg) => String(arg)).join(' ')
-        // Only log errors that are NOT expected WebGPU errors
-        if (!msg.includes('WebGPU')) {
-          consoleErrorSpy.mock.restore()
-          console.error(...args)
-          consoleErrorSpy = vi
-            .spyOn(console, 'error')
-            .mockImplementation(() => {})
-        }
-      })
+    // These tests assert that the app tree CONSTRUCTS without throwing (the
+    // synchronous expect(...).not.toThrow() below). Construction also starts
+    // async work that — under happy-dom with no WebGPU — renders the degraded
+    // (poster) shell and logs expected errors after the test ends: WebGPU is
+    // absent, and APIs the full shell touches (e.g. IndexedDB) aren't
+    // implemented in the test DOM. Silence console.error so that expected noise
+    // doesn't surface as an unhandled error; genuine construction failures still
+    // fail the synchronous assertion above.
+    //
+    // (The previous implementation called `consoleErrorSpy.mock.restore()`,
+    // which isn't a function — it threw an unhandled rejection the moment any
+    // non-WebGPU error was logged, e.g. the degraded shell's IndexedDB gap.)
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
   })
 
   afterAll(() => {

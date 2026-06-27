@@ -9,7 +9,7 @@ import { CompactModeProvider } from '@/contexts/CompactModeContext'
 import { ComputeGate, useComputeGate } from '@/contexts/ComputeGateContext'
 import { KeyframeTargetProvider } from '@/contexts/KeyframeTargetContext'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { COMPUTE_GATE_CAPACITY, DEFAULT_POINT_COUNT, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_VARIATION_PREVIEW_POINT_COUNT, DEFAULT_VARIATION_PREVIEW_QUALITY, DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS, DEFAULT_VARIATION_SHOW_DELAY_MS, } from '@/defaults'
+import { COMPUTE_GATE_CAPACITY, DEFAULT_POINT_COUNT, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_VARIATION_PREVIEW_POINT_COUNT, DEFAULT_VARIATION_PREVIEW_QUALITY, DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS, DEFAULT_VARIATION_SHOW_DELAY_MS, GALLERY_PREVIEW_POINT_COUNT, } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
 import { pointInitModeToImplFn } from '@/flame/pointInitMode'
 import { pointInitMode3DToImplFn } from '@/flame/pointInitMode3D'
@@ -29,10 +29,11 @@ import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
 import { deepClone } from '@/utils/clone'
 import { createStoreHistory } from '@/utils/createStoreHistory'
 import { hardwareTierToQuality } from '@/utils/hardwareTier'
+import { useIsScrolling } from '@/utils/isScrolling'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
-import { vramLog } from '@/utils/vramLog'
+import { livePreviewCount, setLivePreviewLive, vramLog } from '@/utils/vramLog'
 import { AffineEditor } from '../AffineEditor/AffineEditor'
 import { Button } from '../Button/Button'
 import { ButtonGroup } from '../Button/ButtonGroup'
@@ -151,6 +152,12 @@ export function PreviewFinalFlame(props: {
   )
 }
 
+// Live gallery-preview count lives in vramLog.ts as a signal (livePreviewCount)
+// so the DebugPanel can surface it. After dropping the everVisible/everAllowed
+// latch (see isPreviewMounted) and with the galleries' visibility gating it stays
+// bounded to ~(on-screen + the 2 rendering); a value that climbs with scroll
+// distance is the diagnostic signal of a mount-accumulation leak.
+
 export function VariationPreview(props: {
   version: number
   isSelected: boolean
@@ -167,6 +174,15 @@ export function VariationPreview(props: {
   const [quality, setQuality] = createSignal<() => number>()
   const intersection = useIntersectionObserver(container)
   const isVisible = createMemo(() => intersection()?.isIntersecting)
+  const scrolling = useIsScrolling()
+  // While the user is actively scrolling, treat a tile as not-yet-visible so we
+  // don't mount/allocate a WebGPU canvas for every tile that flickers through the
+  // viewport. Fast/jerky scrolling otherwise spawns hundreds of half-rendered
+  // canvases that are torn down before they snapshot, ballooning VRAM (see
+  // isScrolling.ts). After scrolling settles the visible tiles mount and render
+  // (still throttled by the ComputeGate); already-snapshotted tiles keep their
+  // static image throughout, so the gallery doesn't flash while scrolling.
+  const settledVisible = createMemo(() => isVisible() === true && !scrolling())
   const renderStatus = createMemo<RenderStatus | undefined>(() => {
     const quality_ = quality()?.()
     if (quality_ === undefined) {
@@ -186,12 +202,11 @@ export function VariationPreview(props: {
   })
   const allowed = useComputeGate(() => {
     const renderStatus_ = renderStatus()
-    const isVisible_ = isVisible()
-    if (renderStatus_ === undefined || isVisible_ === undefined) {
+    if (renderStatus_ === undefined) {
       return undefined
     }
     return {
-      isVisible: isVisible_,
+      isVisible: settledVisible(),
       renderStatus: renderStatus_,
       isSelected: props.isSelected,
     }
@@ -206,15 +221,23 @@ export function VariationPreview(props: {
     setImage(undefined)
   })
 
-  const [everAllowed, setEverAllowed] = createSignal(false)
-  createEffect(() => {
-    if (allowed()) setEverAllowed(true)
-  })
-
-  const [everVisible, setEverVisible] = createSignal(false)
-  createEffect(() => {
-    if (isVisible() === true) setEverVisible(true)
-  })
+  // Mount the live WebGPU preview while it is rendering (allowed), settled-visible
+  // (on-screen and not mid-scroll), OR finished-but-still-capturing its snapshot
+  // (renderStatus 'done', image not yet set). Once the snapshot lands, image() is
+  // set → the static <img> shows and this goes false → the canvas unmounts + frees
+  // buffers.
+  //
+  // Deliberately NOT a permanent everVisible/everAllowed latch: an off-screen
+  // preview gets ComputeGate priority 0 (never allowed), so a latched one would
+  // sit mounted-but-frozen forever, never finishing — wasted VRAM that grew
+  // without bound while scrolling (measured peak 49 live). This bounds live
+  // previews to ~(visible + the 2 rendering). Keeping 'done' in the condition
+  // ensures an in-flight snapshot still completes if you scroll away mid-capture.
+  const isPreviewMounted = createMemo(
+    () =>
+      image() === undefined &&
+      (allowed() || settledVisible() || renderStatus() === 'done'),
+  )
 
   createEffect(() => {
     if (!container() || renderStatus() !== 'done') {
@@ -248,18 +271,22 @@ export function VariationPreview(props: {
     })
   })
 
+  // One token per preview instance; membership in the live set == this preview's
+  // canvas is currently mounted. Idempotent, so the global count can't drift.
+  const previewToken = Symbol('variation-preview')
   createEffect(() => {
-    const isMounted =
-      image() === undefined && (allowed() || everAllowed() || everVisible())
-
-    if (isMounted) {
-      vramLog(`[VariationPreview] Mounted WebGPU canvas for '${props.name}'`)
-      onCleanup(() => {
-        vramLog(
-          `[VariationPreview] Unmounted WebGPU canvas for '${props.name}'`,
-        )
-      })
+    const live = isPreviewMounted()
+    setLivePreviewLive(previewToken, live)
+    if (live) {
+      vramLog(
+        `[VariationPreview] MOUNT '${props.name}' live=${livePreviewCount()}` +
+          ` allowed=${allowed()} visible=${isVisible()} status=${renderStatus()}`,
+      )
     }
+  })
+  onCleanup(() => {
+    // Free the slot on disposal even if isPreviewMounted was true at teardown.
+    setLivePreviewLive(previewToken, false)
   })
 
   return (
@@ -272,11 +299,7 @@ export function VariationPreview(props: {
           image() !== undefined ? `url('${image()}')` : undefined,
       }}
     >
-      <Show
-        when={
-          image() === undefined && (allowed() || everAllowed() || everVisible())
-        }
-      >
+      <Show when={isPreviewMounted()}>
         <AutoCanvas
           pixelRatio={1}
           fixedResolution={props.resolution ?? { width: 256, height: 144 }}
@@ -291,7 +314,7 @@ export function VariationPreview(props: {
                 <Flam3
                   animationEnabled={false}
                   quality={targetQuality()}
-                  pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT}
+                  pointCountPerBatch={GALLERY_PREVIEW_POINT_COUNT}
                   persistChains={false}
                   adaptiveFilterEnabled={false}
                   flameDescriptor={props.flame}
@@ -309,7 +332,7 @@ export function VariationPreview(props: {
               <Flam3
                 animationEnabled={false}
                 quality={targetQuality()}
-                pointCountPerBatch={DEFAULT_VARIATION_PREVIEW_POINT_COUNT}
+                pointCountPerBatch={GALLERY_PREVIEW_POINT_COUNT}
                 persistChains={false}
                 // Match the 2D thumbnails: the adaptive density-estimation blur
                 // widens its kernel in sparse regions, smearing the soft edge of
@@ -403,6 +426,11 @@ export const variationPreviewFlames: (
 
 function ShowVariationSelector(props: VariationSelectorModalProps) {
   const [version, setVersion] = createSignal(1)
+  // Per-item re-render bump. Editing a parametric variation's sliders mutates its
+  // gallery example in place, but the tile's cached static image hides the change.
+  // Bumping this for the edited id changes that one tile's `version` prop, which
+  // discards its cached image so it goes live and re-renders to quality again.
+  const [paramRev, setParamRev] = createSignal<Record<string, number>>({})
   const [previewPointInitMode, setPreviewPointInitMode] =
     createSignal<PointInitMode>(props.currentFlame.renderSettings.pointInitMode)
   const [searchQuery, setSearchQuery] = createSignal('')
@@ -898,7 +926,9 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                               }}
                             >
                               <VariationPreview
-                                version={version()}
+                                version={
+                                  version() * 1_000_000 + (paramRev()[id] ?? 0)
+                                }
                                 isSelected={isSelected()}
                                 flame={variationExample}
                                 name={variation.type}
@@ -989,6 +1019,12 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                                         >
                                       },
                                     )
+                                    // Invalidate this tile's cached preview so it
+                                    // re-renders live with the new params.
+                                    setParamRev((r) => ({
+                                      ...r,
+                                      [id]: (r[id] ?? 0) + 1,
+                                    }))
                                   }}
                                 />
                               </div>

@@ -32,4 +32,7 @@ export default defineConfig({
   // Only run these tests in CI or manually
   // They require a running dev server
   testMatch: /.*\.spec\.ts/,
+  // GPU-only suites (`*.gpu.spec.ts`) need a real GPU — they run via the headed
+  // playwright.resilience.config.ts on a local machine, never on CI.
+  testIgnore: /\.gpu\.spec\.ts$/,
 })

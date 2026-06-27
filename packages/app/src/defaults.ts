@@ -62,6 +62,16 @@ export const DEFAULT_VARIATION_PREVIEW_POINT_COUNT = parseFloat(
   import.meta.env.VITE_DEFAULT_VARIATION_PREVIEW_POINT_COUNT,
 )
 
+// A 256x144 gallery thumbnail needs nowhere near a full preview's point count.
+// Cap it independently so a heavy VITE_DEFAULT_VARIATION_PREVIEW_POINT_COUNT
+// (e.g. 1e6, reasonable for one large preview) can't make every one of ~57
+// gallery thumbnails allocate ~32MB of point buffers and OOM the page. Each
+// point costs 32 bytes of buffers (vec2u + vec4f + vec2f), so 1e5 ≈ 3.2MB/tile.
+export const GALLERY_PREVIEW_POINT_COUNT = Math.min(
+  DEFAULT_VARIATION_PREVIEW_POINT_COUNT,
+  1e5,
+)
+
 export const DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS = parseFloat(
   import.meta.env.VITE_DEFAULT_VARIATION_PREVIEW_RENDER_INTERVAL_MS,
 )
@@ -100,6 +110,15 @@ export const CANVAS_RESIZE_DEBOUNCE_MS = Number.parseInt(
 // Enable comprehensive WebGPU buffer lifecycle logging.
 // Set VITE_DEBUG_VRAM=true in .env.local to trace memory leaks.
 export const DEBUG_VRAM = import.meta.env.VITE_DEBUG_VRAM === 'true'
+
+// EXPERIMENT (default OFF): on a real reload/unload, synchronously destroy the
+// tgpu Roots (freeing their VRAM) before the reloaded page initializes — Firefox
+// reloads so fast that the deferred onSubmittedWorkDone destroys never run, so
+// old VRAM lingers during the new page's allocation (transient double pressure
+// that can tip the GFX1201 GPU process over). NEVER destroys the GPUDevice —
+// device.destroy() after submitted work hits an upstream wgpu-hal panic that
+// crashes the Firefox GPU process (deno/deno#21648). A/B with VITE_PAGEHIDE_CLEANUP.
+export const PAGEHIDE_CLEANUP = import.meta.env.VITE_PAGEHIDE_CLEANUP === 'true'
 
 // Default for the "camera control during render" opt-in in the animation
 // render dialog. When enabled, pan/scroll/zoom stay active during an

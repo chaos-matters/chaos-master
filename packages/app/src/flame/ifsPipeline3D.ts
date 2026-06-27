@@ -51,6 +51,14 @@ const pipelineCache3D = new Map<
   }
 >()
 
+// Compiled-pipeline cache per (root, sig) — same rationale as ifsPipeline.ts:
+// avoids recompiling the shader on every createIFSPipeline3D re-run.
+type IfsBasePipeline3D = ReturnType<TgpuRoot['createComputePipeline']>
+const basePipeline3DByRoot = new WeakMap<
+  TgpuRoot,
+  Map<string, IfsBasePipeline3D>
+>()
+
 export function createIFSPipeline3D(
   root: TgpuRoot,
   camera: Camera3DContext,
@@ -375,12 +383,20 @@ export function createIFSPipeline3D(
     resetPoints: resetPointsBuffer,
   })
 
-  const ifsPipeline = root
-    .createComputePipeline({ compute: ifsCompute })
-    .with(camera.bindGroup)
-    .with(bindGroup)
+  let rootCache = basePipeline3DByRoot.get(root)
+  if (!rootCache) {
+    rootCache = new Map()
+    basePipeline3DByRoot.set(root, rootCache)
+  }
+  let basePipeline = rootCache.get(sig)
+  if (!basePipeline) {
+    basePipeline = root.createComputePipeline({ compute: ifsCompute })
+    basePipeline.$name(globId)
+    rootCache.set(sig, basePipeline)
+  }
 
-  ifsPipeline.$name(globId)
+  // `.with()` binds resources onto the cached base pipeline without recompiling.
+  const ifsPipeline = basePipeline.with(camera.bindGroup).with(bindGroup)
   return {
     run: (pass: GPUComputePassEncoder, pointCount: number) => {
       try {

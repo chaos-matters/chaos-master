@@ -12,7 +12,7 @@ import { ArrowRightToBox, BoxArrowRight, GridIcon, ListIcon, Sparkle, } from '@/
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { useCamera } from '@/lib/CameraContext'
 import { useCanvas } from '@/lib/CanvasContext'
-import { useRootContext } from '@/lib/RootContext'
+import { useLiveRootContext } from '@/lib/RootContext'
 import { createPosition, createZoom, WheelZoomCamera2D, } from '@/lib/WheelZoomCamera2D'
 import { createAnimationFrame } from '@/utils/createAnimationFrame'
 import { createDragHandler } from '@/utils/createDragHandler'
@@ -96,7 +96,7 @@ function project3D(x: number, y: number, z: number): v2f {
 function Grid(props: { isVisible: () => boolean }) {
   const { theme } = useTheme()
   const camera = useCamera()
-  const { device, root } = useRootContext()
+  const { device, root, gpuReady } = useLiveRootContext()
   const { context, canvasFormat } = useCanvas()
 
   createEffect(() => {
@@ -155,11 +155,16 @@ function Grid(props: { isVisible: () => boolean }) {
 
     const rafLoop = createAnimationFrame(
       () => {
+        // Stop rendering to a lost device (mirrors Flam3): the gpuReady gate in
+        // AutoCanvas unmounts this on loss, but guard the inter-frame window too.
+        if (!gpuReady()) return
         const encoder = device.createCommandEncoder()
         const pass = encoder.beginRenderPass({
           colorAttachments: [
             {
-              view: context.getCurrentTexture().createView(),
+              view: context
+                .getCurrentTexture()
+                .createView({ label: 'affineEditorView' }),
               loadOp: 'clear',
               storeOp: 'store',
             },
@@ -170,6 +175,8 @@ function Grid(props: { isVisible: () => boolean }) {
         device.queue.submit([encoder.finish()])
       },
       () => (props.isVisible() ? 0 : Infinity),
+      undefined,
+      () => !gpuReady(),
     )
   })
   return null

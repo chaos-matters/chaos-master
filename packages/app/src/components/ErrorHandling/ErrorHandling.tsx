@@ -1,5 +1,6 @@
 import { createSignal, Show } from 'solid-js'
 import { ConsoleLog } from '@/components/ConsoleLog/ConsoleLog'
+import { GPUWEB_IMPL_STATUS_URL } from '@/components/ErrorHandling/PreviewPoster'
 import { GitHub } from '@/icons'
 import { GIT_SHA, VERSION } from '@/version'
 import ui from './ErrorHandling.module.css'
@@ -15,7 +16,7 @@ export function WebgpuNotSupported() {
       </p>
 
       <a
-        href="https://github.com/gpuweb/gpuweb/wiki/Implementation-Status"
+        href={GPUWEB_IMPL_STATUS_URL}
         target="_blank"
         rel="noopener noreferrer"
         class={ui.webgpuBtn}

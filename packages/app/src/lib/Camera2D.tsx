@@ -5,7 +5,7 @@ import { div, mul } from 'typegpu/std'
 import { mat3, mat4 } from 'wgpu-matrix'
 import { CameraContextProvider } from './CameraContext'
 import { useCanvas } from './CanvasContext'
-import { useRootContext } from './RootContext'
+import { useLiveRootContext } from './RootContext'
 import type { ParentProps } from 'solid-js'
 import type { v2f } from 'typegpu/data'
 
@@ -70,7 +70,7 @@ type Camera2DProps = {
 }
 
 export function Camera2D(props: ParentProps<Camera2DProps>) {
-  const { root } = useRootContext()
+  const { root } = useLiveRootContext()
   const { canvasSize, pixelRatio } = useCanvas()
 
   const uniformsBuffer = root

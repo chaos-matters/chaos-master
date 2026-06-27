@@ -11,10 +11,11 @@ import { formatPointCount } from '@/utils/formatPointCount'
 import { logTime } from '@/utils/logTime'
 import { recordEntries } from '@/utils/record'
 import { applyTimelineToFlame } from '@/utils/timeline'
+import { vramTrack } from '@/utils/vramLog'
 import { Camera3DContext } from '../lib/Camera3DContext'
 import { CameraContext } from '../lib/CameraContext'
 import { useCanvas } from '../lib/CanvasContext'
-import { useRootContext } from '../lib/RootContext'
+import { useLiveRootContext } from '../lib/RootContext'
 import { createAnimationFrame } from '../utils/createAnimationFrame'
 import { createAdaptiveBlurPipeline } from './adaptiveBlurPipeline'
 import { ColorGradingUniforms, createColorGradingPipeline, } from './colorGrading'
@@ -115,7 +116,7 @@ type Flam3Props = {
 export function Flam3(props: Flam3Props) {
   const camera = useContext(CameraContext)
   const camera3D = useContext(Camera3DContext)
-  const { root, device } = useRootContext()
+  const { root, device, gpuReady } = useLiveRootContext()
   const { context, canvasSize, canvas, canvasFormat } = useCanvas()
   const timeline = useTimeline()
   const changeHistory = useChangeHistory()
@@ -226,6 +227,17 @@ export function Flam3(props: Flam3Props) {
     .createBuffer(arrayOf(vec2f, props.pointCountPerBatch))
     .$usage('storage')
 
+  // vec2u (8) + vec4f (16) + vec2f (8) = 32 bytes per point. At 1e6 that's ~32MB
+  // per preview — the dominant gallery VRAM term. Capture the allocated size so
+  // the matching free below subtracts exactly this much: pointCountPerBatch is a
+  // reactive prop and may differ by free time (e.g. a quality change on the main
+  // renderer), which would otherwise drift the VRAM ledger negative.
+  const pointBufferBytes = props.pointCountPerBatch * 32
+  vramTrack(
+    `Flam3 point buffers pc=${props.pointCountPerBatch}`,
+    pointBufferBytes,
+  )
+
   const colorGradingUniforms = root
     .createBuffer(ColorGradingUniforms, {
       averagePointCountPerBucketInv: 0,
@@ -296,7 +308,12 @@ export function Flam3(props: Flam3Props) {
       .onSubmittedWorkDone()
       .then(() => {
         pointRandomSeeds.destroy()
+        // pointPositions + pointColors were never destroyed here — a real ~24MB
+        // (at 1e6) leak per unmounted preview. Free them with the RNG seeds.
+        pointPositions.destroy()
+        pointColors.destroy()
         colorGradingUniforms.destroy()
+        vramTrack('Flam3 point buffers FREED', -pointBufferBytes)
       })
       .catch(() => {})
   })
@@ -773,10 +790,12 @@ export function Flam3(props: Flam3Props) {
       batchIndex = 0
       accumulatedPointCount_ = 0
       lastExportRenderedPointCount = -1
-      // Only update the global counter from the main renderer, not preview instances.
-      // Preview Flam3 instances provide onAccumulatedPointCount and must not clobber
-      // the global signal (which drives the progress bar and quality pills).
-      if (!props.onAccumulatedPointCount) {
+      // Only the main workspace renderer (isExportRenderer) touches the global
+      // counter; preview instances must not clobber it (it drives the debug panel,
+      // progress bar and quality pills). Gating on onAccumulatedPointCount was
+      // wrong — neither the main renderer nor VariationPreview passes it, so an
+      // open gallery's previews were overwriting the main IFS readout.
+      if (props.isExportRenderer ?? false) {
         setAccumulatedPointCountGlobal(0)
       }
       clearRequested = true
@@ -810,6 +829,15 @@ export function Flam3(props: Flam3Props) {
     // export driver. Returns what was submitted so the export driver can pace
     // and size the next chunk.
     function renderTick(frameId: number): RenderTickResult {
+      // Halt immediately when the device is gone. Without this, a device loss
+      // with many live previews (e.g. the VariationSelector gallery) lets every
+      // Flam3's rAF loop keep submitting to the dead device — a flood of
+      // "Buffer is invalid" errors that jams the main thread before the reactive
+      // poster swap can flush. Mirrors the colorGradingPipeline bail below.
+      if (!gpuReady()) {
+        return { iterations: 0, presented: false, hadWork: false }
+      }
+
       const currentExportCb = props.onExportImage
       const exportMode = exportDriverActive()
 
@@ -1002,7 +1030,9 @@ export function Flam3(props: Flam3Props) {
               {
                 loadOp: 'clear',
                 storeOp: 'store',
-                view: context.getCurrentTexture().createView(),
+                view: context
+                  .getCurrentTexture()
+                  .createView({ label: 'flam3CanvasView' }),
               },
             ],
           }
@@ -1020,7 +1050,7 @@ export function Flam3(props: Flam3Props) {
       // this renderer down from the callback — doing it before submit would
       // destroy the pipeline's buffers while the just-encoded command buffer
       // still references them ("used in submit while destroyed").
-      if (!props.onAccumulatedPointCount) {
+      if (props.isExportRenderer ?? false) {
         // Ready ticks always write so the capture gate sees a fresh count.
         const nowMs = performance.now()
         if (
@@ -1072,7 +1102,11 @@ export function Flam3(props: Flam3Props) {
           ? props.renderInterval
           : Infinity,
       () => device.queue.onSubmittedWorkDone(),
-      exportDriverActive,
+      // Tear the rAF loop down entirely when an export takes over OR when the
+      // device is lost. The `!gpuReady()` read is reactive, so a device loss
+      // disposes every preview's loop on the spot (no more requestAnimationFrame,
+      // no more onSubmittedWorkDone holds against a dead queue).
+      () => exportDriverActive() || !gpuReady(),
     )
 
     // Export driver: replaces the rAF loop while an export runs. The loop
@@ -1081,7 +1115,9 @@ export function Flam3(props: Flam3Props) {
     // export keeps running in background tabs, and chunk wall time is a valid
     // measurement to size the next chunk with.
     createEffect(() => {
-      if (!exportDriverActive()) return
+      // Stop driving on device loss too: a reactive !gpuReady() re-runs this
+      // effect, fires onCleanup (disposed = true) and breaks the export loop.
+      if (!exportDriverActive() || !gpuReady()) return
 
       let disposed = false
       onCleanup(() => {

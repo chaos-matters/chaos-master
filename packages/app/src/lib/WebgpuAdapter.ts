@@ -1,9 +1,33 @@
-import { IS_DEV, TRACK_PERFORMANCE } from '@/defaults'
+import { TRACK_PERFORMANCE } from '@/defaults'
+import { gpuStatus, setGpuStatus } from '@/lib/gpuStatus'
 
 let gpuDevice: GPUDevice | null = null
 let gpuAdapter: GPUAdapter | null = null
 
 const { navigator } = globalThis
+
+// After a hard GPU-process crash (e.g. Firefox/wgpu TryFromSliceError SIGSEGV),
+// requestAdapter/requestDevice can HANG instead of rejecting. Without a cap the
+// Root resource never resolves and a RELOADED page just shows a blank/hung shell.
+// Race against a timeout so init always settles into the degraded shell.
+const INIT_TIMEOUT_MS = 8000
+
+function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(
+        new Error(
+          `WebGPU ${label} timed out after ${INIT_TIMEOUT_MS}ms — the GPU process may have crashed. Reload, or restart the browser if reloading doesn't help.`,
+          { cause: 'WebGPU' },
+        ),
+      )
+    }, INIT_TIMEOUT_MS)
+  })
+  return Promise.race([promise, timeout]).finally(() => {
+    clearTimeout(timer)
+  })
+}
 
 function assertIfWebgpuAdapterUnavailable(
   adapter: GPUAdapter | null,
@@ -57,40 +81,76 @@ export async function initializeWebgpuDevice(
   adapterPreferences?: GPURequestAdapterOptions,
   deviceFeatures?: GPUDeviceDescriptor,
 ) {
-  assertIfWebgpuUnsupported()
+  if (!('gpu' in navigator)) {
+    setGpuStatus('unsupported')
+    assertIfWebgpuUnsupported()
+  }
 
-  gpuAdapter = await navigator.gpu.requestAdapter({
-    ...adapterPreferences,
-  })
+  setGpuStatus('initializing')
 
-  assertIfWebgpuAdapterUnavailable(gpuAdapter)
+  try {
+    gpuAdapter = await withTimeout(
+      navigator.gpu.requestAdapter({ ...adapterPreferences }),
+      'adapter request',
+    )
 
-  // Always log adapter info for remote diagnostics
-  const { info, features } = gpuAdapter
-  console.info('[WebGPU] Adapter acquired:', {
-    vendor: info.vendor,
-    architecture: info.architecture,
-    description: info.description,
-    features: [...features].join(', '),
-  })
+    if (!gpuAdapter) {
+      // navigator.gpu exists but no adapter — e.g. a blocklisted driver or a
+      // crashed GPU process. Not "unsupported": the API is present, it just
+      // can't give us a device right now.
+      setGpuStatus('unavailable')
+    }
+    assertIfWebgpuAdapterUnavailable(gpuAdapter)
 
-  const optionalFeatures = negotiateOptionalFeatures(gpuAdapter)
+    // Always log adapter info for remote diagnostics
+    const { info, features } = gpuAdapter
+    console.info('[WebGPU] Adapter acquired:', {
+      vendor: info.vendor,
+      architecture: info.architecture,
+      description: info.description,
+      features: [...features].join(', '),
+    })
 
-  gpuDevice = await gpuAdapter.requestDevice({
-    ...deviceFeatures,
-    requiredFeatures: [
-      ...(deviceFeatures?.requiredFeatures ?? []),
-      ...optionalFeatures,
-    ],
-    requiredLimits: {
-      ...(deviceFeatures?.requiredLimits ?? {}),
-      maxBufferSize: gpuAdapter.limits.maxBufferSize,
-      maxStorageBufferBindingSize:
-        gpuAdapter.limits.maxStorageBufferBindingSize,
-      maxComputeWorkgroupStorageSize:
-        gpuAdapter.limits.maxComputeWorkgroupStorageSize,
-    },
-  })
+    const optionalFeatures = negotiateOptionalFeatures(gpuAdapter)
+
+    gpuDevice = await withTimeout(
+      gpuAdapter.requestDevice({
+        ...deviceFeatures,
+        requiredFeatures: [
+          ...(deviceFeatures?.requiredFeatures ?? []),
+          ...optionalFeatures,
+        ],
+        requiredLimits: {
+          ...(deviceFeatures?.requiredLimits ?? {}),
+          maxBufferSize: gpuAdapter.limits.maxBufferSize,
+          maxStorageBufferBindingSize:
+            gpuAdapter.limits.maxStorageBufferBindingSize,
+          maxComputeWorkgroupStorageSize:
+            gpuAdapter.limits.maxComputeWorkgroupStorageSize,
+        },
+      }),
+      'device request',
+    )
+  } catch (err) {
+    // Any failure to acquire an adapter/device — including an init timeout from
+    // a dead GPU process — makes WebGPU terminally unavailable for the session
+    // so re-mounting Roots early-throw instead of re-hanging. ('unsupported',
+    // set above when navigator.gpu is absent, is latched and unaffected.)
+    setGpuStatus('unavailable')
+    throw err
+  }
+
+  assertIfWebgpuDeviceUnavailable(gpuDevice)
+
+  // NOTE: we deliberately do NOT register an `uncapturederror` listener. Firefox
+  // logs uncaptured WebGPU errors natively REGARDLESS of any listener, so a
+  // re-logging handler only DOUBLES the console flood. The real levers are (1)
+  // explicit resource labels so the native messages are identifiable (see the
+  // createView labels), and (2) the render-loop gpuReady guards that stop new
+  // work hitting a dying device.
+
+  // A fresh, live device — previews may render again.
+  setGpuStatus('ready')
 
   // requestDevice will never return null, but if a valid device request can't be
   // fulfilled for some reason it may resolve to a device which has already been lost.
@@ -98,46 +158,31 @@ export async function initializeWebgpuDevice(
   // (ie: browser resource management, driver updates), so it's a good idea to always
   // handle lost devices gracefully.
   //
-  // Retry limit: on Firefox/Linux with GFX1201 an OOM device loss causes SolidJS reactive
-  // effects to immediately hammer the dead device with new resource creation calls, each of
-  // which also fails, causing another device loss, triggering another retry — indefinitely.
-  // Root.tsx holds a stale device reference that cannot be updated without remounting the
-  // resource, so retrying more than once has no practical benefit and only makes the spiral
-  // worse. One retry covers genuinely transient losses (driver update, GPU reset). After
-  // that, the user must reload.
-  const MAX_DEVICE_LOSS_RETRIES = 1
-  let deviceLossRetryCount = 0
-
+  // Recovery model: RELOAD-ONLY. We deliberately do NOT re-acquire a device in
+  // place. Each Root resolves its device once (a one-shot createResource), so a
+  // replacement device cannot reach already-mounted contexts — flipping back to
+  // 'ready' would leave every mounted preview pointed at the dead device. And on
+  // the Firefox/Linux/AMD target, re-acquiring on a just-OOM'd GPU simply
+  // re-crashes it (the spiral we're removing). So one real loss is terminal:
+  // mark 'unavailable', poster the previews, and let the user reload.
   gpuDevice.lost
-    .then(async (info) => {
+    .then((info) => {
       console.warn(`WebGPU device was lost: ${info.message}.`)
 
+      // Clear BOTH stale handles. Previously only the adapter was nulled, so a
+      // consumer could still reach a dead `gpuDevice` and hammer it — part of
+      // the "Buffer is invalid" cascade.
       gpuAdapter = null
+      gpuDevice = null
 
-      if (
-        info.reason !== 'destroyed' &&
-        deviceLossRetryCount < MAX_DEVICE_LOSS_RETRIES
-      ) {
-        deviceLossRetryCount += 1
-        if (IS_DEV)
-          console.info(
-            'Trying to get WebGPU device again, if this fails, reload application to try again',
-          )
-        // Brief backoff to let the GPU process recover before requesting a new device.
-        await new Promise((resolve) =>
-          setTimeout(() => {
-            resolve(undefined)
-          }, 500),
-        )
-        await initializeWebgpuDevice(adapterPreferences, deviceFeatures)
-      } else {
-        deviceLossRetryCount = 0
-        if (info.reason !== 'destroyed') {
-          console.error(
-            'WebGPU device lost and retry limit reached. Reload the page to recover.',
-          )
-        }
+      // reason==='destroyed' is OUR own teardown (Root.tsx onCleanup / HMR),
+      // not a crash — leave the status alone.
+      if (info.reason === 'destroyed') {
+        return
       }
+
+      setGpuStatus('unavailable')
+      console.error('WebGPU device lost. Reload the page to recover.')
     })
     .catch(console.error)
 }
@@ -154,6 +199,17 @@ export async function getWebgpuComponents(
   adapterPreferences?: GPURequestAdapterOptions,
   deviceFeatures?: GPUDeviceDescriptor,
 ) {
+  // Once the session is terminally down, STOP re-entering init. This is the
+  // choke point that kills the "re-mount → re-init → OOM" loop: every Root,
+  // gallery thumbnail, modal and the hardwareTier benchmark funnel through
+  // here, so a single early-throw freezes the whole page's GPU churn.
+  const status = gpuStatus()
+  if (status === 'unavailable' || status === 'unsupported') {
+    throw new Error('WebGPU is unavailable for this session.', {
+      cause: 'WebGPU',
+    })
+  }
+
   if (gpuDevice === null || gpuAdapter === null) {
     initInFlight ??= initializeWebgpuDevice(
       adapterPreferences,

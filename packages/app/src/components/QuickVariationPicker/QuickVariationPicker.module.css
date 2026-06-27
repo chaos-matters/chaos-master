@@ -258,6 +258,10 @@
 .galleryList {
   flex: 1;
   overflow-y: auto;
+  /* Reserve the scrollbar gutter so tiles never slide under the scrollbar on
+     Firefox (whose overlay/auto scrollbars otherwise overlap content), matching
+     .sidebarScroll. */
+  scrollbar-gutter: stable;
   padding: 0.4rem 0.5rem;
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -275,9 +279,19 @@
   /* position:relative so the absolutely-positioned canvas fills us */
   position: relative;
   overflow: hidden;
-  /* square: padding-bottom forces height == width regardless of content height */
+  /* 16:9 via the padding-bottom trick — NOT aspect-ratio. A grid item sized only
+     by aspect-ratio (with absolutely-positioned children, so no in-flow content)
+     does not reliably size its auto grid ROW, so each tile overflows its row and
+     overlaps the next one in both Chrome and Firefox. padding-bottom contributes
+     real box height that the auto row tracks, so tiles sit cleanly one after
+     another. min-height is a hard floor: on Firefox a GPU device-loss reflow (the
+     large live gallery can OOM the GPU on Linux/AMD) can drop the resolved
+     percentage padding to ~0, and without a floor the tiles squeeze to nothing and
+     their labels pile up. box-sizing:border-box is global, so min-height and
+     padding-bottom don't stack into an over-tall tile. */
   width: 100%;
-  padding-bottom: 100%;
+  padding-bottom: 56.25%;
+  min-height: 64px;
   border-radius: 6px;
   border: 1.5px solid var(--neutral-200);
   cursor: pointer;
