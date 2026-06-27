@@ -91,21 +91,39 @@ previews at any scroll position instead of 800. `ComputeGate` (capacity 2,
 `COMPUTE_GATE_CAPACITY`) additionally throttles concurrent renders, and
 `VariationPreview` snapshots to a static `<img>` and frees its canvas when done.
 
+**Also debounce on scroll.** Mounting a canvas the instant a tile intersects
+means fast/jerky scrolling flickers hundreds of tiles through the viewport, each
+allocating a canvas that's torn down before it can snapshot — the abandoned
+buffers (freed only after pending GPU work finishes) pile up and balloon VRAM
+into the tens of GB. Gate canvas mounting on _settled_ visibility:
+`settledVisible = isVisible() && !useIsScrolling()` (the global debounced
+`@/utils/isScrolling`). While scrolling, mount nothing new; ~180ms after the last
+scroll, the visible window mounts and renders. Tiles that already snapshotted keep
+their static `<img>` throughout, so the gallery doesn't flash. This is what makes
+heavy scrolling smooth and keeps VRAM bounded. The debug panel's "live previews"
+and "MiB GPU buffers" rows (see `vramLog.ts`) are the way to watch it.
+
 ## 4. Scrollbar gutter (Firefox overlay scrollbars)
 
 Firefox (esp. Linux/GTK) uses overlay/auto scrollbars that **overlap content**,
 so gallery tiles slide under the scrollbar (Chrome reserves space, so it looks
-fine there). Every gallery scroll container must reserve the gutter, matching
-`.sidebarScroll`:
+fine there). **`scrollbar-gutter: stable` is a no-op under overlay scrollbars** —
+it only reserves space for classic scrollbars, so it does NOT fix Firefox here.
+Reserve a real **`padding-right`** gutter instead; it clears the bar for both
+overlay and classic scrollbars:
 
 ```css
-.galleryList {
+.galleryGrid {
   overflow-y: auto;
-  scrollbar-gutter: stable; /* reserve the gutter */
+  padding-right: 0.6rem; /* real gutter — survives FF overlay scrollbars */
   scrollbar-width: thin;
   scrollbar-color: var(--neutral-300) transparent;
 }
 ```
+
+Watch grids with `grid-template-columns: repeat(auto-fill, minmax(..., 1fr))`:
+the last column expands to fill and is the one that ends up under the bar. The
+`padding-right` shrinks the track area so it fits clear of the scrollbar.
 
 ## 5. Verifying cross-browser (don't trust one engine)
 
