@@ -2,6 +2,7 @@ import { createSignal, Show } from 'solid-js'
 import { IS_DEV } from '@/defaults'
 import { accumulatedPointCount, iterationSpeedPointPerSec, qualityPointCountLimit, renderTimings, } from '@/flame/renderStats'
 import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
+import { livePreviewCount, trackedVramBytes } from '@/utils/vramLog'
 import ui from './DebugPanel.module.css'
 
 const bigNumberFormatter = Intl.NumberFormat('en', { notation: 'compact' })
@@ -60,6 +61,8 @@ export function DebugPanel() {
             <p>{formatMs(renderTimings().ifsMs)} ms IFS</p>
             <p>{formatMs(renderTimings().adaptiveFilterMs)} ms Blur</p>
             <p>{formatMs(renderTimings().colorGradingMs)} ms Grading</p>
+            <p>{livePreviewCount()} live previews</p>
+            <p>{(trackedVramBytes() / 1048576).toFixed(1)} MiB GPU buffers</p>
           </div>
         </Show>
       </div>

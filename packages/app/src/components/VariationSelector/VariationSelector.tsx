@@ -32,7 +32,7 @@ import { hardwareTierToQuality } from '@/utils/hardwareTier'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
-import { vramLog } from '@/utils/vramLog'
+import { adjustLivePreviewCount, livePreviewCount, vramLog, } from '@/utils/vramLog'
 import { AffineEditor } from '../AffineEditor/AffineEditor'
 import { Button } from '../Button/Button'
 import { ButtonGroup } from '../Button/ButtonGroup'
@@ -151,11 +151,11 @@ export function PreviewFinalFlame(props: {
   )
 }
 
-// Count of live (mounted, GPU-allocated) gallery previews. After dropping the
-// everVisible/everAllowed latch (see isPreviewMounted) this should stay bounded
-// to ~(on-screen + the 2 rendering) instead of climbing with scroll distance.
-// Gated logging only.
-let livePreviewCanvases = 0
+// Live gallery-preview count lives in vramLog.ts as a signal (livePreviewCount)
+// so the DebugPanel can surface it. After dropping the everVisible/everAllowed
+// latch (see isPreviewMounted) and with the galleries' visibility gating it stays
+// bounded to ~(on-screen + the 2 rendering); a value that climbs with scroll
+// distance is the diagnostic signal of a mount-accumulation leak.
 
 export function VariationPreview(props: {
   version: number
@@ -263,15 +263,15 @@ export function VariationPreview(props: {
 
   createEffect(() => {
     if (isPreviewMounted()) {
-      livePreviewCanvases += 1
+      adjustLivePreviewCount(1)
       vramLog(
-        `[VariationPreview] MOUNT '${props.name}' live=${livePreviewCanvases}` +
+        `[VariationPreview] MOUNT '${props.name}' live=${livePreviewCount()}` +
           ` allowed=${allowed()} visible=${isVisible()} status=${renderStatus()}`,
       )
       onCleanup(() => {
-        livePreviewCanvases -= 1
+        adjustLivePreviewCount(-1)
         vramLog(
-          `[VariationPreview] UNMOUNT '${props.name}' live=${livePreviewCanvases}` +
+          `[VariationPreview] UNMOUNT '${props.name}' live=${livePreviewCount()}` +
             ` reason=${image() !== undefined ? 'captured-image' : 'gate/visibility'}`,
         )
       })
