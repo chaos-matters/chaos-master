@@ -426,6 +426,11 @@ export const variationPreviewFlames: (
 
 function ShowVariationSelector(props: VariationSelectorModalProps) {
   const [version, setVersion] = createSignal(1)
+  // Per-item re-render bump. Editing a parametric variation's sliders mutates its
+  // gallery example in place, but the tile's cached static image hides the change.
+  // Bumping this for the edited id changes that one tile's `version` prop, which
+  // discards its cached image so it goes live and re-renders to quality again.
+  const [paramRev, setParamRev] = createSignal<Record<string, number>>({})
   const [previewPointInitMode, setPreviewPointInitMode] =
     createSignal<PointInitMode>(props.currentFlame.renderSettings.pointInitMode)
   const [searchQuery, setSearchQuery] = createSignal('')
@@ -921,7 +926,9 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                               }}
                             >
                               <VariationPreview
-                                version={version()}
+                                version={
+                                  version() * 1_000_000 + (paramRev()[id] ?? 0)
+                                }
                                 isSelected={isSelected()}
                                 flame={variationExample}
                                 name={variation.type}
@@ -1012,6 +1019,12 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                                         >
                                       },
                                     )
+                                    // Invalidate this tile's cached preview so it
+                                    // re-renders live with the new params.
+                                    setParamRev((r) => ({
+                                      ...r,
+                                      [id]: (r[id] ?? 0) + 1,
+                                    }))
                                   }}
                                 />
                               </div>
