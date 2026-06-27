@@ -143,16 +143,6 @@
   background-position: center;
   background-repeat: no-repeat;
   transition: background-image 150ms ease-in;
-
-  /* Pin the preview canvas to the cell so Firefox can't lay it out at its
-     300x150 intrinsic size (and overlap neighbours) before the size effect
-     runs. AutoCanvas already sets these inline, but !important wins during the
-     pre-layout window. */
-  & canvas {
-    width: 100% !important;
-    height: 100% !important;
-    display: block;
-  }
 }
 
 .stretch-done {
