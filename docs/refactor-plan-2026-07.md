@@ -24,13 +24,17 @@ commit each:
 - **K** — `@solidjs/testing-library` added; the two placeholder tests rewritten
   to render the real components.
 - **L** — `flameSchema` render-settings boundary tests.
-- **H (partial)** — the byte-identical `select(v, 1e-9, v === 0.0)` divide-guard
-  cluster (29 sites) consolidated into `variations/safeMath.ts#safeDenom`, with
-  `ifsPipeline.resolveAll.test.ts` (all 446 variations resolve to WGSL) as the
-  safety net. **Deferred:** the broader `safeDiv`/`safeSqrt`/`safeAcos` helpers
-  and standardizing the remaining heterogeneous epsilons (`1.0e-10`, `1e-20`,
-  bare `EPS`/`EPS_TINY`) — that changes rendered output (different epsilons /
-  adding domain clamps) and needs a maintainer call.
+- **H** — variation epsilon guards consolidated in two steps: (1) the
+  `select(v, 1e-9, v === 0.0)` divide-guard cluster (29 sites) → `safeMath.ts#
+safeDenom`; (2) all remaining guard literals (1e-6/1e-9/1e-10 in both sci and
+  decimal form, ~30 more sites) → a named tier ladder in `flame/constants.ts`
+  (`EPS`/`EPS_SMALL`/`EPS_TINY`). Every substitution is byte-identical, so
+  rendered output is unchanged; `ifsPipeline.resolveAll.test.ts` (all 446
+  variations resolve to WGSL) is the safety net. Intentional one-offs kept with
+  comments: `hexesVar` 1e-20 pow guard and `nPolar` 1e-7 threshold. **Not done
+  (deliberately skipped):** `safeSqrt`/`safeAcos` NaN-domain helpers — GPU
+  divide-by-zero doesn't crash, and adding domain clamps would change output;
+  only worth it where a negative-sqrt / out-of-domain-acos is actually reachable.
 
 Not started (bigger stuff): Tier 3 god-file splits (J1–J5, incl. MainWorkspace).
 
