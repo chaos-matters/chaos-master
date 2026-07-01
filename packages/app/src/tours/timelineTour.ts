@@ -12,7 +12,7 @@ export const timelineTour: TourGuide = {
       target: '[data-tour-target="timeline-section"]',
       title: 'The Dope Sheet',
       description:
-        'The timeline shows all animation tracks as a dope sheet. Drag the resize handle above to expand or collapse it. Press Space to play/pause.',
+        'The timeline shows all animation tracks as a dope sheet. Drag the resize handle above to expand or collapse it. Use the Play/Pause button in the transport bar to preview the animation.',
       beforeShow: (ctx) => ctx.setTimelineOpen(true),
     },
     {
@@ -25,7 +25,7 @@ export const timelineTour: TourGuide = {
       target: '[data-tour-target="play-button"]',
       title: 'Play Animation',
       description:
-        'Press Play — or tap Space — to run the animation. Frames interpolate smoothly between keyframes at the FPS you set. The playhead moves across the dope sheet in real time.',
+        'Click Play to run the animation. Frames interpolate smoothly between keyframes at the FPS you set. The playhead moves across the dope sheet in real time.',
       beforeShow: (ctx) => ctx.setTimelineOpen(true),
     },
     {
@@ -67,7 +67,7 @@ export const timelineTour: TourGuide = {
       target: '[data-tour-target="sidebar"]',
       title: 'Manual Keyframes',
       description:
-        'Click the diamond icons next to sliders in the sidebar, or press I, to insert keyframes at the current frame. This gives you precise control over which values to animate.',
+        'Click the diamond icons next to sliders in the sidebar to insert keyframes at the current frame. This gives you precise control over which values to animate.',
       beforeShow: (ctx) => ctx.setSidebarOpen(true),
     },
     {

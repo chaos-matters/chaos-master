@@ -12,7 +12,7 @@ export const sidebarTour: TourGuide = {
       target: '[data-tour-target="sidebar"]',
       title: 'The Sidebar',
       description:
-        'All flame parameters are edited here. Press F to show or hide the sidebar. Each transform has affine coefficients, probability, and variation slots.',
+        'All flame parameters are edited here. Press Ctrl+S to show or hide the sidebar. Each transform has affine coefficients, probability, and variation slots.',
       beforeShow: (ctx) => ctx.setSidebarOpen(true),
     },
     {
@@ -82,7 +82,7 @@ export const sidebarTour: TourGuide = {
       target: '[data-tour-target="sidebar"]',
       title: 'Insert Keyframes',
       description:
-        'Press I to insert a keyframe at the current frame for the last-clicked property. This is the fastest way to build up an animation — click a param, press I, repeat.',
+        'Click the diamond icon next to a property to insert a keyframe at the current frame. This is the fastest way to build up an animation — click a param, click its diamond, repeat.',
       beforeShow: (ctx) => ctx.setSidebarOpen(true),
     },
     {

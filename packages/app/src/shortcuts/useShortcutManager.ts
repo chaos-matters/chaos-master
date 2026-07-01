@@ -3,6 +3,23 @@ import { executeCommand, getAllCommands } from '@/commands/registry'
 import { matchesShortcut, parseShortcut } from './shortcutParser'
 import type { CommandContext } from '@/commands/types'
 
+// Input types with a free-text-editing cursor — same as type="text", the
+// browser needs normal keyboard interaction (typing, select-all, copy/paste)
+// uninterrupted by app shortcuts.
+const textEntryInputTypes = new Set([
+  'number',
+  'email',
+  'search',
+  'tel',
+  'url',
+  'password',
+  'date',
+  'time',
+  'datetime-local',
+  'month',
+  'week',
+])
+
 const letBrowserHandleInputTypes = new Set([
   'checkbox',
   'range',
@@ -10,7 +27,7 @@ const letBrowserHandleInputTypes = new Set([
   'submit',
 ])
 
-function letBrowserHandleActiveInput(
+export function letBrowserHandleActiveInput(
   el: Element | null,
   ev: KeyboardEvent,
 ): boolean {
@@ -28,6 +45,7 @@ function letBrowserHandleActiveInput(
   return (
     input.type === '' ||
     input.type === 'text' ||
+    textEntryInputTypes.has(input.type) ||
     (letBrowserHandleInputTypes.has(input.type) &&
       (ev.code === 'Space' ||
         ev.code === 'Enter' ||
