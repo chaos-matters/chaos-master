@@ -2,8 +2,37 @@
 
 Roadmap for the lower-priority §4–§6 items from `docs/audit_bugs_tests_2026-07.md`
 that were intentionally **not** bundled into the bug-fix / quick-cleanup PRs.
-This is a planning document for review — no code changes here. Each workstream
-below is meant to land as **its own branch/PR**, rebased on `main`.
+Each workstream below is meant to land as **its own branch/PR**, rebased on
+`main`.
+
+## Implementation status (branch `claude/refactor-plan`)
+
+The smaller refactors — Tier 1 (A–E), the decided Tier 2 items (F, G, I), Tier 4
+(K, L), and the safe subset of H — have been implemented on this branch, one
+commit each:
+
+- **A** — `rgbToOklab` deduped (reused from `flam3PaletteParser`).
+- **B** — generic Dexie capped-history factory + `fake-indexeddb` dev dep.
+- **C** — shared big-endian byte helpers (`utils/binaryReader.ts`) for PNG/MP4.
+- **D** — `randomize.ts` internal dedup (variation/affine/weight helpers).
+- **E** — tour-step selector + `beforeShow` factory (`tours/stepFactory.ts`).
+- **F** — `colors.ts` reduced to the one used export (dead ColorMap removed).
+- **G** — required contexts throw via `useContextSafe`; the deliberate no-op
+  fallbacks (KeyframeTarget/CompactMode/ChangeHistory/Mobile) are documented as
+  intentional graceful degradation for standalone/preview/export usage.
+- **I** — `ifsPipeline3D.run()` surfaces dispatch errors (parity with 2D).
+- **K** — `@solidjs/testing-library` added; the two placeholder tests rewritten
+  to render the real components.
+- **L** — `flameSchema` render-settings boundary tests.
+- **H (partial)** — the byte-identical `select(v, 1e-9, v === 0.0)` divide-guard
+  cluster (29 sites) consolidated into `variations/safeMath.ts#safeDenom`, with
+  `ifsPipeline.resolveAll.test.ts` (all 446 variations resolve to WGSL) as the
+  safety net. **Deferred:** the broader `safeDiv`/`safeSqrt`/`safeAcos` helpers
+  and standardizing the remaining heterogeneous epsilons (`1.0e-10`, `1e-20`,
+  bare `EPS`/`EPS_TINY`) — that changes rendered output (different epsilons /
+  adding domain clamps) and needs a maintainer call.
+
+Not started (bigger stuff): Tier 3 god-file splits (J1–J5, incl. MainWorkspace).
 
 ## Ground rules for every PR in this plan
 
