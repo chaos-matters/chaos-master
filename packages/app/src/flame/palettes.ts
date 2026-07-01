@@ -7,6 +7,7 @@
 
 import { palette, paletteEntry } from './colorMap'
 import { oklabToRgbForCss } from './colors'
+import { rgbToOklab } from './flam3PaletteParser'
 import type { Palette } from './colorMap'
 
 /** Create a gradient palette from RGB stops */
@@ -25,45 +26,6 @@ function createGradientPalette(
     }),
     source,
   )
-}
-
-/** Convert RGB (0-255) to OkLab a/b coordinates (L fixed at 0.6) */
-function rgbToOklab(r: number, g: number, b: number): { a: number; b: number } {
-  // Normalize to 0-1
-  const rNorm = r / 255
-  const gNorm = g / 255
-  const bNorm = b / 255
-
-  // RGB to linear RGB
-  const rLin =
-    rNorm > 0.04045 ? Math.pow((rNorm + 0.055) / 1.055, 2.4) : rNorm / 12.92
-  const gLin =
-    gNorm > 0.04045 ? Math.pow((gNorm + 0.055) / 1.055, 2.4) : gNorm / 12.92
-  const bLin =
-    bNorm > 0.04045 ? Math.pow((bNorm + 0.055) / 1.055, 2.4) : bNorm / 12.92
-
-  // Linear RGB to XYZ
-  const x = 0.4124564 * rLin + 0.3575761 * gLin + 0.1804375 * bLin
-  const y = 0.2126729 * rLin + 0.7151522 * gLin + 0.072175 * bLin
-  const z = 0.0193339 * rLin + 0.119192 * gLin + 0.9503041 * bLin
-
-  // XYZ to Lab (with D65 illuminant)
-  const xn = 0.95047,
-    yn = 1.0,
-    zn = 1.08883
-
-  const f = (t: number) =>
-    t > 0.008856 ? Math.pow(t, 1 / 3) : (903.3 * t + 16) / 116
-
-  const fx = f(x / xn)
-  const fy = f(y / yn)
-  const fz = f(z / zn)
-
-  const a = 500 * (fx - fy)
-  const bLab = 200 * (fy - fz)
-
-  // Normalize to -1 to 1 range for storage (L is handled separately)
-  return { a: a / 100, b: bLab / 100 }
 }
 
 /** Default palettes inspired by flam3 */
