@@ -53,6 +53,7 @@
     "@types/node": "^25.6.0",
     "eslint": "^9.39.4",
     "eslint-plugin-solid": "^0.14.5",
+    "fake-indexeddb": "^6.2.5",
     "vite-plugin-qrcode": "^0.4.1",
     "wrangler": "^4.103.0"
   }

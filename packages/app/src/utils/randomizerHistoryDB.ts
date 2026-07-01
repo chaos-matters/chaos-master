@@ -1,4 +1,4 @@
-import Dexie from 'dexie'
+import { createHistoryDB } from './createHistoryDB'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 export interface RandomizerHistoryEntry {
@@ -8,40 +8,25 @@ export interface RandomizerHistoryEntry {
   timestamp: number
 }
 
-class RandomizerHistoryDB extends Dexie {
-  entries!: Dexie.Table<RandomizerHistoryEntry, number>
-
-  constructor() {
-    super('chaos-master-randomizer-history')
-    this.version(1).stores({
-      entries: '++id, timestamp',
-    })
-  }
-}
-
-const db = new RandomizerHistoryDB()
+const db = createHistoryDB<RandomizerHistoryEntry>(
+  'chaos-master-randomizer-history',
+)
 
 export const MAX_RANDOMIZER_HISTORY_LIMIT = 150
 
 export function loadRandomizerHistoryEntries(
   maxCount: number = MAX_RANDOMIZER_HISTORY_LIMIT,
 ): Promise<RandomizerHistoryEntry[]> {
-  return db.entries.orderBy('timestamp').reverse().limit(maxCount).toArray()
+  return db.load(maxCount)
 }
 
-export async function addRandomizerHistoryEntry(
+export function addRandomizerHistoryEntry(
   entry: RandomizerHistoryEntry,
   maxCount: number = MAX_RANDOMIZER_HISTORY_LIMIT,
 ): Promise<RandomizerHistoryEntry[]> {
-  await db.entries.add(entry)
-  const all = await db.entries.orderBy('timestamp').reverse().toArray()
-  const toDelete = all.slice(maxCount)
-  if (toDelete.length > 0) {
-    await db.entries.bulkDelete(toDelete.map((e) => e.id!))
-  }
-  return all.slice(0, maxCount)
+  return db.add(entry, maxCount)
 }
 
-export async function clearRandomizerHistory(): Promise<void> {
-  await db.entries.clear()
+export function clearRandomizerHistory(): Promise<void> {
+  return db.clear()
 }
