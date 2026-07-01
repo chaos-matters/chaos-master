@@ -398,22 +398,18 @@ export function createIFSPipeline3D(
   // `.with()` binds resources onto the cached base pipeline without recompiling.
   const ifsPipeline = basePipeline.with(camera.bindGroup).with(bindGroup)
   return {
+    // Mirror the 2D pipeline: let a dispatch error propagate so the app-level
+    // WebGPU-resilience handling (reactive gpuReady + the export driver's
+    // onSubmittedWorkDone catch) sees it, rather than silently swallowing it
+    // here and freezing the canvas frame after frame.
     run: (pass: GPUComputePassEncoder, pointCount: number) => {
-      try {
-        ifsPipeline
-          .with(pass)
-          .dispatchWorkgroups(
-            ceil(pointCount / (IFS_GROUP_SIZE * IFS_GROUP_SIZE)),
-            IFS_GROUP_SIZE,
-            1,
-          )
-      } catch (err) {
-        console.error(
-          `[ifsPipeline3D] Pipeline ${globId} dispatch failed. sig:`,
-          sig,
-          err,
+      ifsPipeline
+        .with(pass)
+        .dispatchWorkgroups(
+          ceil(pointCount / (IFS_GROUP_SIZE * IFS_GROUP_SIZE)),
+          IFS_GROUP_SIZE,
+          1,
         )
-      }
     },
     update: (flameDescriptor: FlameDescriptor) => {
       const uniforms = extractFlameUniforms3D(flameDescriptor)
