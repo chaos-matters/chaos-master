@@ -13,6 +13,8 @@
 
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
 import { addCustomPalette, deleteCustomPalette, paletteEntry, updateCustomPalette, } from '@/flame/colorMap'
+import { oklabToRgbForCss } from '@/flame/colors'
+import { clamp } from '@/utils/easing'
 import ui from './CustomPaletteEditor.module.css'
 import type { Palette, PaletteEntry } from '@/flame/colorMap'
 
@@ -29,12 +31,6 @@ const MIN_STOPS = 2
 function generateId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
 }
-
-function clamp(v: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, v))
-}
-
-import { oklabToRgbForCss } from '@/flame/colors'
 
 export function CustomPaletteEditor(props: CustomPaletteEditorProps) {
   const isEditing = () => props.initialPalette !== undefined

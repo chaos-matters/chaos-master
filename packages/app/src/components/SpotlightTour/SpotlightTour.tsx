@@ -1,6 +1,7 @@
 import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { useSpotlightTour } from '@/contexts/SpotlightTourContext'
+import { clamp } from '@/utils/easing'
 import ui from './SpotlightTour.module.css'
 import type { TourContext } from './tourTypes'
 
@@ -584,8 +585,4 @@ export function SpotlightTour(props: SpotlightTourProps) {
       </Portal>
     </Show>
   )
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value))
 }

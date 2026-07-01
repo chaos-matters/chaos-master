@@ -14,4 +14,14 @@ describe('crc32', () => {
       0xeeea93b8,
     )
   })
+
+  it('empty input gives 0', () => {
+    expect(calculateCRC32(new Uint8Array([]))).toEqual(0x00000000)
+  })
+
+  it('matches the canonical CRC-32 check vector for "123456789"', () => {
+    // "123456789" is the standard CRC-32/ISO-HDLC check value.
+    const bytes = new TextEncoder().encode('123456789')
+    expect(calculateCRC32(bytes) >>> 0).toEqual(0xcbf43926)
+  })
 })
