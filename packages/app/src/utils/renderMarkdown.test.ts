@@ -22,3 +22,30 @@ describe('renderMarkdown inline math', () => {
     expect(html).not.toContain('xMjx')
   })
 })
+
+describe('renderMarkdown sanitize', () => {
+  it('strips <script> tags', () => {
+    const html = renderMarkdown('<script>alert(1)</script>hello')
+    expect(html).not.toContain('<script')
+  })
+
+  it('strips double-quoted event-handler attributes', () => {
+    const html = renderMarkdown('<img src="x" onerror="alert(1)">')
+    expect(html).not.toContain('onerror')
+  })
+
+  it('strips single-quoted event-handler attributes', () => {
+    const html = renderMarkdown("<img src='x' onerror='alert(1)'>")
+    expect(html).not.toContain('onerror')
+  })
+
+  it('strips unquoted event-handler attributes', () => {
+    const html = renderMarkdown('<img src=x onerror=alert(1)>')
+    expect(html).not.toContain('onerror')
+  })
+
+  it('neutralizes javascript: hrefs', () => {
+    const html = renderMarkdown('<a href="javascript:alert(1)">click</a>')
+    expect(html).not.toContain('javascript:')
+  })
+})

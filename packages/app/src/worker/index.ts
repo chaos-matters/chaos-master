@@ -330,16 +330,6 @@ const baseHandler = {
         return json({ error: 'Image too large' }, 413)
       }
       try {
-        // First-writer-wins. The key is a public, client-recomputable hash of
-        // the share payload, so the first honest upload is by definition the
-        // correct image for that key. Freezing it closes the cache-poisoning
-        // vector — otherwise anyone could recompute a shared flame's key and
-        // overwrite its social-preview image/title/description. Honest
-        // re-uploads of the same content are simply idempotent.
-        const existing = await env.OG_IMAGES.head(key)
-        if (existing) {
-          return json({ ok: true, deduped: true })
-        }
         const body = (await request.json()) as {
           image?: string
           title?: string
@@ -357,6 +347,22 @@ const baseHandler = {
           return json({ error: 'Not a PNG image' }, 415)
         }
         const ogBytes = base64ToBytes(body.image)
+        // First-writer-wins. The key is a public, client-recomputable hash of
+        // the share payload, so the first honest upload is by definition the
+        // correct image for that key. Freezing it closes the cache-poisoning
+        // vector — otherwise anyone could recompute a shared flame's key and
+        // overwrite its social-preview image/title/description. Honest
+        // re-uploads of the same content are simply idempotent.
+        //
+        // This check-then-put is not perfectly atomic (R2 has no
+        // put-if-absent primitive), so a sufficiently precise concurrent
+        // request could still race here in principle — but decoding/
+        // validating the body first (rather than between the check and the
+        // write, as before) shrinks that window to just the write itself.
+        const existing = await env.OG_IMAGES.head(key)
+        if (existing) {
+          return json({ ok: true, deduped: true })
+        }
         await env.OG_IMAGES.put(key, ogBytes, {
           httpMetadata: { contentType: 'image/png' },
         })
