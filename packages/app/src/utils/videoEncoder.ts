@@ -338,13 +338,19 @@ function createMediaRecorderFallback(
   })
 
   let cancelled = false
+  let recorderError: Error | undefined
 
   recorder.ondataavailable = (e) => {
     if (e.data.size > 0) chunks.push(e.data)
   }
 
-  const finalizePromise = new Promise<EncodeResult>((resolve, reject) => {
-    recorder.onstop = () => {
+  // Resolve-only on purpose: a recorder error is captured into `recorderError`
+  // and surfaced by finalize() throwing, rather than rejecting this promise.
+  // The promise is created eagerly, so rejecting it could produce an unhandled
+  // rejection when the recorder errors before finalize() attaches an awaiter
+  // (or after cancel(), when finalize() is never called).
+  const finalizePromise = new Promise<EncodeResult>((resolve) => {
+    const settle = () => {
       const mimeType = selectedMimeType || 'video/webm'
       resolve({
         blob: new Blob(chunks, { type: mimeType }),
@@ -352,14 +358,16 @@ function createMediaRecorderFallback(
         usedFallback: true,
       })
     }
-    // Without this, a recorder that errors without ever reaching 'inactive'
-    // (and thus never firing `onstop`) leaves `finalize()` awaiting forever.
+    recorder.onstop = settle
+    // Without an onerror handler, a recorder that errors without ever reaching
+    // 'inactive' (and thus never firing `onstop`) leaves `finalize()` awaiting
+    // forever. Record the error and settle so finalize() can surface it.
     recorder.onerror = (event) => {
-      const message =
+      recorderError =
         'error' in event && event.error instanceof Error
-          ? event.error.message
-          : 'unknown MediaRecorder error'
-      reject(new Error(`MediaRecorder failed: ${message}`))
+          ? event.error
+          : new Error('unknown MediaRecorder error')
+      settle()
     }
   })
 
@@ -371,17 +379,21 @@ function createMediaRecorderFallback(
     bitmap.close()
   }
 
-  const finalize = (): Promise<EncodeResult> => {
+  const finalize = async (): Promise<EncodeResult> => {
     if (cancelled)
-      return Promise.resolve({
+      return {
         blob: new Blob(),
         mimeType: 'video/webm',
         usedFallback: true,
-      })
+      }
     if (recorder.state === 'recording') {
       recorder.stop()
     }
-    return finalizePromise
+    const result = await finalizePromise
+    if (recorderError) {
+      throw new Error(`MediaRecorder failed: ${recorderError.message}`)
+    }
+    return result
   }
 
   const cancel = () => {
