@@ -1,0 +1,147 @@
+# Chaos Master FP — Bug, Refactor & Test-Coverage Audit (2026-07)
+
+Diligence pass across the full `packages/app/src` tree (flame engine, ~380 variation
+files, state/commands/workers, utils/lib, UI components) plus the test suite and CI
+wiring. Every finding below was verified by directly reading the cited file/lines —
+nothing here is speculative. File paths are relative to `packages/app/src/` unless
+otherwise noted.
+
+This complements `docs/audit_report.md` (which covers architecture/feature gaps);
+this document focuses on concrete bugs, refactor debt, and test-coverage holes.
+
+## How to read this
+
+Each finding has a severity tag:
+- **bug** — produces wrong output, a crash, a leak, or silent data corruption today
+- **inconsistency** — works today but is a landmine (differs from sibling code with no
+  documented reason)
+- **refactor** — correct but hard to maintain (duplication, god-files, magic numbers)
+- **test-gap** — missing or misleading test coverage, cited with concrete proposals
+
+---
+
+## 1. Critical bugs — silent data corruption / NaN propagation
+
+These are the highest-value fixes: each one silently corrupts data or renders
+incorrectly with no visible error, so users may never realize it happened.
+
+| # | Location | Problem |
+|---|----------|---------|
+| 1 | `utils/flameInPng.ts:102-105` | Compression-method validation guard is inverted: `separatorByteIdx === -1 && chunkData[separatorByteIdx + 1] !== CHUNK_COMPRESSION_DEFLATE` should use `!==`/`||`. A PNG with a malformed/missing zTXt separator or bad compression byte is never rejected — it proceeds to decompress garbage instead of throwing a clear error. |
+| 2 | `utils/jsonQueryParam.ts:96` | `chunks.join()` defaults to a `,` separator instead of `''`. If a decompressed share-link payload arrives in more than one stream chunk (larger flames/animations), a stray comma is spliced into the JSON text, corrupting `JSON.parse`. Currently masked because small payloads arrive as one chunk. |
+| 3 | `flame/variations/simple/general/ediscVar.ts:15-16` | `sqrt(xmax - 1.0)` is unguarded (goes negative → NaN) and `acos(pos.x / xmax)` is never clamped to `[-1, 1]` before the call, unlike sibling `ellipticVar.tsx`/`eModVar.tsx` which both clamp correctly. Produces NaN pixels for a broad range of valid inputs. |
+| 4 | `flame/histogramPipeline.ts:66-68` | `clamp(u32(adjustedCount * 2000), 0, binCount)` allows the result to equal `binCount` (256), one past the last valid index of a 256-length array — an out-of-bounds `atomicAdd` write whenever a pixel saturates the clamp. |
+| 5 | `flame/Flam3.tsx:208` (`qualityPointCountLimit`) | Divides by `(quality - 1)²`. If `quality === 1` (a plausible UI slider value) this is a divide-by-zero, silently disabling the point-count cap. |
+| 6 | `flame/pointInitMode.ts:68-72` | Gaussian point-init: `u1 = random() + 1e-6` can exceed `1.0` when `random()` lands near 1, making `log(u1)` positive and feeding `sqrt(negative)` → NaN positions. Runs across millions of GPU threads/frame, so this is a real, recurring occurrence, not a theoretical edge case. |
+| 7 | `flame/randomize.ts:59-63` | `sigma = Math.abs(defaultValue) * 0.5 * sigmaScale`. Any variation parameter whose default is `0` (common for offsets/angles) gets `sigma = 0` forever — that parameter can never be randomized by "Randomize" regardless of strength. Dead randomization path. |
+| 8 | `flame/flameXml.ts:840` (`variationAttrs`) | Parametric param values are exported via raw `${value}` interpolation with no finiteness guard, unlike every other numeric field in the file (which use `.toFixed(6)`). A NaN/Infinity param (reachable via #7 or manual editing) exports as `pname="NaN"`, invalid XML that breaks re-import. |
+| 9 | `utils/hexToRgb.ts:6-11` | 3-digit shorthand hex (`#f00`) is parsed as if it were 6-digit (`parseInt('f00', 16)`), turning red into a shade of green. No hex-format validation at all — invalid input silently yields NaN channels. |
+| 10 | `utils/formatBytes.ts:11-18` | For `0 < bytes < 1`, `Math.log` goes negative, indexing `sizes[-n]` → `undefined` → strings like `"512 undefined"`. Same class of bug at the top end (index overflow past the `sizes` array for very large byte counts). |
+| 11 | `utils/formatEta.ts:5,8` | `Math.ceil` on the seconds-within-minute remainder can round up to 60 without carrying into minutes — `formatEta(119.9)` renders `"1m 60s remaining"` instead of `"2m 0s"`. |
+| 12 | `utils/icoEncoder.ts:47,49` | `width >= 256 ? 0 : width` truncates any width in `[256, 65535]` to the ICO "256" sentinel even when the actual frame isn't 256×256 — produces a spec-non-compliant file for any non-256 large icon. |
+| 13 | `utils/base64.ts:38-59` (`decodeBase64`) | No length/charset validation; malformed input (e.g. a hand-edited/truncated share URL) produces `NaN` from `undefined << 2` arithmetic instead of throwing, silently corrupting decoded bytes. Feeds both `shareLink.ts` and `jsonQueryParam.ts`. |
+
+## 2. Memory / GPU-resource leaks
+
+| # | Location | Problem |
+|---|----------|---------|
+| 14 | `flame/Flam3.tsx:599-656` | `ifsPipeline`/`ifsPipeline3D` are reassigned on every parameter-fingerprint change without calling `.destroy()` on the previous instance, and the enclosing ~660-line `createEffect` (starting line 605) has no top-level `onCleanup` at all — unlike `outputTextures` and `runAdaptiveFilter` in the same file, which correctly free GPU allocations. This is a real, reproducible GPU buffer leak on every edit and on unmount. |
+| 15 | `flame/colorGrading.ts:81-100` | `paletteBuffer` is created but never destroyed (only `textureSizeBuffer` gets an `onCleanup`); every palette/texture-size change leaks the buffer. Same bug class as #14, different module. |
+| 16 | `utils/createTimestampQuery.ts:62-64` | GPU `timestampBuffer`/`timestampMappable` are intentionally left to GC per a self-documenting comment — a real VRAM-leak risk on repeated mount/unmount cycles. |
+| 17 | `components/CustomVariationEditor.tsx:298-318` | `handleDelete` resets preview state, but an in-flight debounced `handleCompile` can resolve afterward and unconditionally call `setPreview(...)` with a stale `unregister` handle — leaks the GPU pipeline for a variation that was just deleted (race condition). |
+| 18 | `contexts/ToastContext.tsx:13,17-18` | The pending-toast `setTimeout` id is a plain `let`, never cleared via `onCleanup`. Unmounting while a toast is active leaks a timer that later calls `setToastMessage` on an orphaned signal. |
+| 19 | `utils/videoEncoder.ts:342-376` | No `recorder.onerror` handler. If `MediaRecorder` fails without setting the internal `cancelled` flag, `finalize()` awaits a promise that never resolves — a silent permanent hang during export. |
+
+## 3. Functional/logic bugs (UI & behavior)
+
+| # | Location | Problem |
+|---|----------|---------|
+| 20 | `flame/cpuFlameRenderer.ts:66-179` | The "CPU reference renderer," whose own doc comment claims it tests the same algorithm as the WebGPU path, is a non-functional stub: `render()` never invokes the chaos-game transforms built in the constructor and unconditionally increments every bucket by a fixed amount regardless of flame content. `testCPURenderer` never compares against real GPU output and returns `passed: true` on any non-throwing call — a tautological self-test. |
+| 21 | `components/CustomPaletteEditor.tsx:144-164` | The drag handler captures a sorted-position `currentIdx` once at drag start, but each `mousemove` re-sorts `entries` fresh and indexes `sorted[currentIdx]`. Once the dragged stop crosses a neighbor, the index resolves to a *different* stop — dragging silently starts moving the wrong color stop. |
+| 22 | `components/LoadFlameModal.tsx:682-697` | `new Uint8Array(await file.arrayBuffer())` sits outside the surrounding `try` block. A rejected read (file changed/deleted after picker) becomes an unhandled promise rejection, bypassing the app's `showAlert` error UX entirely. |
+| 23 | `components/SpotlightTour.tsx:~96-106` | The scroll-into-view retry (`setTimeout(…, 350)`) recurses with no retry cap and no step-generation check on the retry path — if the target never becomes measurable, it retries forever, and can measure the wrong step if the user advances the tour mid-retry. |
+| 24 | `tours/sidebarTour.ts:15,85`, `tours/timelineTour.ts:15` | Tour copy instructs users to "Press F", "Press I", "Press Space" for actions that have **no corresponding registered shortcut** anywhere in `shortcuts/`/`commands/builtins/` (confirmed by grep across all shortcut registrations). Following the tour's own instructions does nothing. User-facing correctness bug. |
+| 25 | `commands/builtins/camera.ts:19-22`, `commands/builtins/flame.ts:167-171` | Undo/redo only fires for commands that go through `setFlameDescriptor` (JSON-patch based). Commands that call plain setters directly (`camera.zoomTo` → `setZoom`, `flame.setBlendWeight` → `setBlendWeight`) bypass the undo stack entirely — Ctrl+Z after a zoom does nothing, producing inconsistent undo behavior depending on which command was last run. |
+| 26 | `shortcuts/shortcutParser.ts:9,23` and `useShortcutManager.ts` | The parser rejects single-token shortcuts and silently drops the `alt` modifier (falls through to `null`); `matchesShortcut` never checks `ev.altKey`. Concretely: pressing Ctrl+Alt+S still matches a plain Ctrl+S binding. |
+| 27 | `shortcuts/useShortcutManager.ts:13-36` | The "let the browser handle this input" guard covers text/textarea/select/contenteditable/checkbox/range/button, but not `<input type="number">` or `type="email"`. Focusing a numeric field and pressing Ctrl+S fires the sidebar-toggle command and blocks normal field interaction. |
+| 28 | `worker/index.ts:339,360` | TOCTOU race in the OG-image dedup path: `env.OG_IMAGES.head(key)` is checked before `put()`. Two concurrent uploads for the same new hash can both pass the `head` check; R2's last-writer-wins `put` silently defeats the "first write wins" guarantee the surrounding comment claims. |
+| 29 | `utils/renderMarkdown.ts:20-24` | The bespoke `sanitize()` regex only strips `<script>` and double-quoted `on*="..."` attributes — bypassable via single-quoted/unquoted event handlers or `javascript:` hrefs. Currently masked because the one production call site (`TutorialModal.tsx:77`) also runs content through DOMPurify's `sanitizeRichHtml`, but the function presents itself as self-sanitizing — a trap for future reuse. |
+| 30 | `utils/mathjax.ts:56-73` | `ensureMathJax()` can hang forever with no timeout if MathJax startup fails, because the failure path is swallowed by an empty `.catch(() => {})` — unlike `turnstile.ts`'s comparable 5s poll-timeout pattern elsewhere in the same directory. |
+| 31 | `components/FramePreviewGallery.tsx:162-226,~458-465` | `generatePreviews` has no re-entrancy guard and its trigger button isn't disabled while running; a double-click starts two concurrent generation loops writing into the same thumbnail buffer, corrupting frame order. |
+| 32 | `components/WelcomeScreen.tsx:77-88,123-127` | `startAnimation` (mouseenter) can be invoked twice without an intervening `stopAnimation` (duplicate mouseenter, common on touch-emulated hover); the second call overwrites the stored `rafId`, orphaning the first RAF loop to run forever uncancelled. |
+| 33 | `components/QuickVariationPicker.tsx:236-241` | A `createEffect`-scheduled `setTimeout(focus, 60)` has no `onCleanup`, unlike the equivalent `onMount` pattern a few lines above. Rapid mode toggling stacks overlapping timers and focus jumps unpredictably. |
+| 34 | `utils/Dropzone.tsx` / `useAppDragAndDrop.ts:17-34` | The async `onDrop` handler is never awaited and has no `.catch` — a load failure surfaces as an unhandled promise rejection while the UI still shows the drop as "succeeded." No file-size/type pre-check exists before calling `file.arrayBuffer()`, so a multi-GB misnamed file dropped onto the app can OOM the tab. |
+
+## 4. Inconsistencies (work today, but are landmines)
+
+- **Epsilon guards are inconsistent across ~15+ variation files.** The codebase defines shared `EPS = 1e-6` / `EPS_TINY = 1e-10` constants (`flame/constants.ts:4-5`), but most divide-by-zero guards bypass them: the entire "q" trig family (`sinqVar.ts`, `cosqVar.ts`, `tanhqVar.ts`, `cothqVar.ts`, `cscqVar.ts`, `secqVar.ts`, `sinhqVar.ts`, `coshqVar.ts`, `cschqVar.ts`, `sechqVar.ts`, `cotqVar.ts`, `ediscVar.ts`) hand-rolls an inline `1.0e-9` via `select(x, 1e-9, x === 0.0)`; `pyramidVar.ts:234` uses a raw `0.000000001` literal; `preGaussianSimpleVar.ts:13` uses `1e-10` while `general/index.ts:119` (`butterflyVar`) and `postSpherical.ts:8` use different magnitudes for the same "sum of squares in denominator" pattern; several files (`cothVar.ts:14`, `archVar.ts:14`, `general/index.ts:184,204,275`) use exact `=== 0.0`/`!== 0.0` equality with **no epsilon at all**, which only catches literal zero, not the near-zero values a chaos-game random walk actually produces. A shared `safeDiv`/`safeSqrt`/`safeAcos` helper using the existing `EPS` constants would remove an entire class of copy-paste drift and fix #3 as a side effect.
+- **2D vs 3D variation weight application is architecturally inverted with no enforcement.** 2D variations must multiply by `varInfo.weight` themselves (`transformFunction.ts:91`); 3D variations must *not*, because `transformFunction3D.ts:74` applies weight once at the call site. This is documented only in a comment (`variations/parametric3D/index.ts:180-181`) — nothing prevents a contributor from copy-pasting a 2D pattern into a 3D file and silently double-applying weight (transform strength would then scale quadratically instead of linearly with the weight slider), and no test would catch it today.
+- **`ifsPipeline.ts` vs `ifsPipeline3D.ts` error handling differs with no stated reason.** The 3D `run()` wraps GPU dispatch in try/catch and only logs on failure (silently freezing the canvas on repeated errors); the 2D `run()` has no such guard and would throw. Either 2D is missing protection or 3D's guard is unnecessary — as written, failure modes differ unpredictably between the two render paths.
+- **Four different "missing provider" fallback strategies coexist across `contexts/*.tsx`**: throw via `useContextSafe` (`ThemeContext`, `TimelineContext`), manual throw (`SpotlightTourContext`, `ToastContext`), silent no-op object (`CompactModeContext`, `KeyframeTargetContext`, `ChangeHistoryContext`), and a baked-in default (`MobileContext:12-14`). No way to predict behavior without reading each file.
+- **`flame/colorMap.ts` and `flame/colors.ts` define two parallel, incompatible `ColorMap` shapes** with overlapping-but-different-valued `defaultColorMaps` presets (both have `fire`/`ocean`/`sunset` with different numeric values) and separate `applyColorMap*` functions doing the same job — unclear which is the source of truth, and no test enforces consistency between them.
+- **`flame/palettes.ts:31-67` and `flame/flam3PaletteParser.ts:170-204`** independently implement the identical sRGB→OkLab conversion (same matrices, same magic constants) — a correctness fix to one will not propagate to the other.
+
+## 5. Refactor / duplication debt
+
+- **God-files**: `Flam3.tsx` (1264 lines, deeply nested effects), `LogoFaviconGenerator.tsx` (1272 lines), `ExportPngDialog.tsx` (1231 lines), `LoadFlameModal.tsx` (1029 lines) each mix canvas/GPU logic, file I/O, and presentational JSX. `MainWorkspace.tsx` is already flagged in `docs/audit_report.md`.
+- **Duplicated Dexie "capped history table" pattern**: `utils/logoHistoryDB.ts` and `utils/randomizerHistoryDB.ts` are near character-for-character copies (add/prune/clear); should be a single generic factory.
+- **Duplicated binary-container parsing**: `utils/flameInPng.ts` (PNG chunks) and `utils/flameInMp4.ts` (MP4 boxes) each hand-roll 4-byte tag reads and big-endian uint32 math with different levels of bounds-checking rigor — directly contributed to bug #1's blind spot vs. `flameInMp4.ts`'s more defensive `findBox`.
+- **`clamp()` reimplemented independently** in `utils/easing.ts:51-53`, `components/CustomPaletteEditor.tsx:33`, `components/SpotlightTour.tsx:581`, plus a bespoke `clampSize` in `LogoFaviconGenerator.tsx:209`.
+- **`randomize.ts`** (727 lines): the parametric-variation-pick-and-randomize block is duplicated near-identically at two line ranges, a 5-way dimension/type ternary repeats throughout, and the weight-normalization guard (`totalWeight > 0`) is copy-pasted three times.
+- **Tour step boilerplate**: the 6-part step pattern (target → title → description → `scrollToTarget` → animation delay → `animateValue`/`executeCommand`) repeats 25+ times across `tours/*.ts` with per-file duplicate timing constants (`ANIMATION_GRACE_MS` vs `GRACE_MS`/`SLOW_MS`, different values for the same concept) — a `sliderStep(...)` factory would remove most of this.
+- **`console-store.ts:32-63`** monkey-patches global `console.*` with no re-entry guard — repeated HMR reloads or duplicate imports re-wrap already-wrapped functions, multiplying captured log output per reload.
+- Misleading naming: `utils/convertSeconds.ts:5` — `convertMilliToSeconds`'s parameter is named `valueNs`, copy-pasted from the sibling nanosecond function; body is correct but the name actively misleads future edits.
+
+## 6. Test-suite quality & CI gaps
+
+**The single most impactful infrastructure gap**: the root `tests/*.spec.ts` Playwright
+suite has a working `webServer` config (`playwright.config.ts:15-21`) but **is never
+invoked by any CI workflow** — confirmed by grep across all `.github/workflows/*.yml`
+files (zero matches for "playwright"). Only `pnpm test` (vitest) runs in CI
+(`node.js.yml:48-49`). `packages/app/e2e/*.spec.ts` is also never run in CI. This means
+an entire layer of end-to-end coverage, including the well-built
+`variation-gallery.gpu.spec.ts` and `webgpu-resilience.spec.ts` suites, currently
+provides zero regression protection in practice.
+
+Other config/quality findings:
+- No `test.coverage` block anywhere — there is no coverage collection or threshold gate.
+- `packages/app/TESTING.md` is stale/aspirational: it documents a sample CI YAML that doesn't match any real workflow and recommends "Playwright as primary CI suite," which isn't wired up.
+- **Silent-return anti-pattern** in `tests/sidebar-controls.spec.ts`, `tests/palettes.spec.ts`, `tests/tone-mapping.spec.ts`: several tests `return` early instead of calling `test.skip()` when a precondition isn't met, so they report "passed" while verifying nothing.
+- `tests/timeline.spec.ts` is the weakest e2e file: no GPU-skip guard, four `waitForTimeout(500)` calls with **zero assertions** afterward on whether keyframes actually changed.
+- `App.integration.test.tsx` globally silences `console.error` and its assertions reduce to `not.toThrow()` — despite being named an "integration" test, it never renders or verifies any actual application state.
+- **`components/DelayedShow/DelayedShow.test.tsx` never imports the component it claims to test.** It reimplements `setTimeout`/`createSignal` logic inline and would pass unchanged even if `DelayedShow.tsx` were deleted or rewritten — zero real coverage disguised as a passing suite.
+- **`contexts/KeyframeTargetContext.test.tsx`** has the same problem: it never imports the real provider/hook, fabricates its own mock, and documents throw-on-missing-provider behavior that contradicts what the real file does (safe no-op fallback).
+- `flame/cpuFlameRenderer.test.ts` exhaustively tests array-shape/size but, per bug #20, cannot catch real rendering bugs because the renderer under test is a stub.
+- `flame/schema/flameSchema.test.ts` is 22 lines covering one function; none of the ~15 range-constrained render-settings fields (exposure, vibrancy, contrast, gamma, zoom, etc.) have boundary tests.
+- `flame/randomize.test.ts` only covers `smartMutateAffine2D/3D`; the primary public API (`generateRandomFlame`, `mutateFlame`, `randomizeVariationParams`, `randomizeAllColors`) — including the bug in finding #7 — has zero coverage.
+- `commands/**` (all 8 files, the undo/redo backbone) has **zero test files** — nothing would catch the undo asymmetry in finding #25.
+- `shortcuts/shortcutParser.ts` (pure, trivially testable) has zero tests — a basic test suite would have caught findings #26 directly.
+- `tours/*.ts`, `tutorials/*.ts` (7 files) have zero tests, and reference ~40+ DOM selectors and shortcut copy with nothing to catch drift (finding #24 would have been caught immediately).
+- No test file exists for any of: `histogramPipeline.ts`, `adaptiveBlurPipeline.ts`, `blurPipeline.ts` (also appears to be entirely dead code — no call sites for `createBlurPipeline` found), `densityEstimationPipeline.ts`, `colorGrading.ts`, `colorMap.ts`, `colors.ts`, `palettes.ts`, `flam3PaletteParser.ts`, `pointInitMode.ts`/`pointInitMode3D.ts`, `sanitizeHtml.ts` (the one true XSS boundary reviewed — no test proves it strips `<script>`/`onerror=`/`javascript:` payloads).
+- No test exists anywhere that calls a flame *variation*'s math function directly with sample `(pos, varInfo)` inputs and asserts finite output — the entire ~380-file variation tree has zero correctness coverage of its actual math; existing tests only check metadata/docs/registration plumbing.
+
+### Highest-value concrete new tests to add (prioritized)
+
+1. Wire the root `tests/*.spec.ts` Playwright suite (and ideally `packages/app/e2e`) into CI — it's already runnable, just not invoked.
+2. Add a `variations/mathSanity.test.ts` that runs every registered variation against a fixed grid of sample points (origin, unit axes, near-branch-boundary values) and asserts `Number.isFinite` on every output component — would catch #3 and similar future regressions immediately.
+3. Rewrite `DelayedShow.test.tsx` and `KeyframeTargetContext.test.tsx` to actually exercise the real components/hooks they claim to cover.
+4. `utils/flameInPng.ts` — round-trip embed/extract, corrupted CRC, missing zTXt chunk, malformed compression byte (would have caught #1), truncated buffer.
+5. `utils/sanitizeHtml.ts` — assert `<script>`, `onerror=` (all quote styles), and `javascript:` hrefs are stripped.
+6. `commands/**` — an end-to-end undo test comparing a `setFlameDescriptor`-based command (undoes correctly) against a plain-setter command like `camera.zoomTo` (currently does not undo — locks in or forces a fix for #25).
+7. `shortcuts/shortcutParser.ts` — modifier-order equivalence, malformed shortcut strings, and an event with `altKey: true` against a plain `ctrl+s` binding (would have caught #26).
+8. `flame/randomize.ts` — a test asserting `randomizeVariationParams` actually perturbs a parameter whose default is `0` (would have caught #7), plus coverage for `generateRandomFlame`/`mutateFlame` weight-normalization invariants.
+9. `flame/schema/flameSchema.test.ts` — boundary values for exposure/vibrancy/contrast/gamma/zoom, and confirmation of whether a flame with zero transforms should validate (currently silently does).
+10. Replace the silent-`return` guards in `tests/sidebar-controls.spec.ts`, `tests/palettes.spec.ts`, `tests/tone-mapping.spec.ts` with `test.skip()` so CI reports honestly.
+
+---
+
+## Summary
+
+The engine's core math and architecture are sound, but this pass surfaced 13 concrete
+data-corruption/NaN bugs, 6 resource-leak bugs, and 15 functional/UX bugs — most of
+them in code paths (PNG/XML import-export, share-link encoding, custom palette
+dragging, undo/redo, tour copy) that have **no test coverage today**, which is exactly
+why they weren't caught. The single highest-leverage fix isn't any one bug — it's
+wiring the already-working Playwright suite into CI and adding a finite-output sanity
+test across the variation math tree, since both would have caught multiple issues
+above automatically and will catch the next regression before it ships.
