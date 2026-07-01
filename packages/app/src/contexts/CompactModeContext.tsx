@@ -30,6 +30,10 @@ export function CompactModeProvider(props: ParentProps) {
 export function useCompactMode() {
   const context = useContext(CompactModeContext)
   if (!context) {
+    // Deliberate graceful degradation: controls that read compact mode are also
+    // rendered standalone in dialogs without a CompactModeProvider. Outside a
+    // provider they default to the non-compact layout rather than crashing.
+    // Genuinely-required contexts throw via useContextSafe instead.
     return {
       isCompact: () => false,
       setCompact: () => {},

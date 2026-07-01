@@ -1,4 +1,5 @@
-import { createContext, createSignal, onCleanup, useContext } from 'solid-js'
+import { createContext, createSignal, onCleanup } from 'solid-js'
+import { useContextSafe } from '@/utils/useContextSafe'
 import type { JSX } from 'solid-js'
 
 interface ToastContextValue {
@@ -30,9 +31,5 @@ export function ToastProvider(props: { children: JSX.Element }) {
 }
 
 export function useToast() {
-  const context = useContext(ToastContext)
-  if (!context) {
-    throw new Error('useToast must be used within a ToastProvider')
-  }
-  return context
+  return useContextSafe(ToastContext, 'useToast', 'ToastProvider')
 }
