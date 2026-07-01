@@ -1,4 +1,4 @@
-import { createContext, createSignal, useContext } from 'solid-js'
+import { createContext, createSignal, onCleanup, useContext } from 'solid-js'
 import type { JSX } from 'solid-js'
 
 interface ToastContextValue {
@@ -17,6 +17,10 @@ export function ToastProvider(props: { children: JSX.Element }) {
     clearTimeout(toastTimer)
     toastTimer = setTimeout(() => setToastMessage(null), durationMs)
   }
+
+  onCleanup(() => {
+    clearTimeout(toastTimer)
+  })
 
   return (
     <ToastContext.Provider value={{ toastMessage, showToast }}>

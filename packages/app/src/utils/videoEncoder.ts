@@ -343,7 +343,7 @@ function createMediaRecorderFallback(
     if (e.data.size > 0) chunks.push(e.data)
   }
 
-  const finalizePromise = new Promise<EncodeResult>((resolve) => {
+  const finalizePromise = new Promise<EncodeResult>((resolve, reject) => {
     recorder.onstop = () => {
       const mimeType = selectedMimeType || 'video/webm'
       resolve({
@@ -351,6 +351,15 @@ function createMediaRecorderFallback(
         mimeType,
         usedFallback: true,
       })
+    }
+    // Without this, a recorder that errors without ever reaching 'inactive'
+    // (and thus never firing `onstop`) leaves `finalize()` awaiting forever.
+    recorder.onerror = (event) => {
+      const message =
+        'error' in event && event.error instanceof Error
+          ? event.error.message
+          : 'unknown MediaRecorder error'
+      reject(new Error(`MediaRecorder failed: ${message}`))
     }
   })
 
