@@ -16,7 +16,7 @@ function preventDraggingAnyElement() {
 
 type DropzoneProps = {
   class?: string
-  onDrop: (file: File) => void
+  onDrop: (file: File) => void | Promise<void>
 }
 
 export function Dropzone(props: ParentProps<DropzoneProps>) {
@@ -45,7 +45,11 @@ export function Dropzone(props: ParentProps<DropzoneProps>) {
         const file = ev.dataTransfer?.files.item(0)
         if (file) {
           ev.preventDefault()
-          props.onDrop(file)
+          // onDrop may be async (e.g. it loads/parses the file) — surface
+          // a rejection instead of letting it become an unhandled rejection.
+          Promise.resolve(props.onDrop(file)).catch((err: unknown) => {
+            console.error('Dropzone onDrop handler failed:', err)
+          })
           setDropping(false)
         }
       }}

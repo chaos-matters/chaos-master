@@ -90,10 +90,18 @@ export function CustomPaletteEditor(props: CustomPaletteEditorProps) {
     const rect = gradientBarRef.getBoundingClientRect()
     const pos = clamp((e.clientX - rect.left) / rect.width, 0, 1)
 
-    // Insert at a position between closest entries
+    // Insert at a position between closest entries. Clicking before the
+    // first stop or after the last falls outside every [i, i+1] window
+    // below, so seed a/b from the nearest endpoint's color instead of
+    // leaving them at a default of (0, 0).
     const sorted = sortedEntries()
-    let a = 0
-    let b = 0
+    let a = sorted[0]?.a ?? 0
+    let b = sorted[0]?.b ?? 0
+    const lastEntry = sorted[sorted.length - 1]
+    if (lastEntry && pos >= lastEntry.position) {
+      a = lastEntry.a
+      b = lastEntry.b
+    }
 
     for (let i = 0; i < sorted.length - 1; i++) {
       if (pos >= sorted[i]!.position && pos <= sorted[i + 1]!.position) {
@@ -137,30 +145,31 @@ export function CustomPaletteEditor(props: CustomPaletteEditorProps) {
     setDraggingIndex(index)
   }
 
-  // Event handlers for dragging - ref to track state without causing reactive updates
-  const draggingRef = { current: null as number | null }
+  // Event handlers for dragging - ref to track state without causing reactive updates.
+  // Tracks the dragged entry's stable id (not its sorted-position index): the
+  // index would resolve to a *different* entry the moment the drag crosses a
+  // neighbor and re-sorting changes rank order mid-drag.
+  const draggingIdRef = { current: null as string | null }
 
   // Setup drag event listeners when draggingIndex changes
   createEffect(() => {
     const idx = draggingIndex()
-    draggingRef.current = idx
+    draggingIdRef.current =
+      idx === null ? null : (sortedEntries()[idx]?.id ?? null)
 
-    if (idx === null || !gradientBarRef) return
+    if (draggingIdRef.current === null || !gradientBarRef) return
 
     const onMouseMove = (me: MouseEvent) => {
-      const currentIdx = draggingRef.current
-      if (currentIdx === null) return
+      const draggedId = draggingIdRef.current
+      if (draggedId === null) return
 
       const rect = gradientBarRef.getBoundingClientRect()
       const newPos = clamp((me.clientX - rect.left) / rect.width, 0, 1)
 
       setEntries((prev) =>
-        prev.map((entry) => {
-          const sorted = [...prev].sort((a, b) => a.position - b.position)
-          const origEntry = sorted[currentIdx]!
-          if (entry.id !== origEntry.id) return entry
-          return { ...entry, position: newPos }
-        }),
+        prev.map((entry) =>
+          entry.id === draggedId ? { ...entry, position: newPos } : entry,
+        ),
       )
     }
 
