@@ -1,6 +1,6 @@
 import { vec2f } from 'typegpu/data'
 import { atan2, log, sqrt } from 'typegpu/std'
-import { PI } from '@/flame/constants'
+import { EPS_TINY, PI } from '@/flame/constants'
 import { random } from '@/shaders/random'
 import { simpleVariation } from '../types'
 
@@ -9,7 +9,7 @@ export const acosechVar = simpleVariation(
   (pos, varInfo) => {
     'use gpu'
 
-    const denom = pos.x * pos.x + pos.y * pos.y + 1.0e-10
+    const denom = pos.x * pos.x + pos.y * pos.y + EPS_TINY.$
     const w_re = pos.x / denom
     const w_im = -pos.y / denom
 

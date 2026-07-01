@@ -1,7 +1,7 @@
 import { f32, vec2f } from 'typegpu/data'
 import { abs, atan2, cos, cosh, dot, exp, floor, length, log, pow, select, sin, sinh, sqrt, tan, } from 'typegpu/std'
 import { random, randomUnitDisk } from '@/shaders/random'
-import { EPS, PI } from '../../../constants'
+import { EPS, EPS_SMALL, EPS_TINY, PI } from '../../../constants'
 import { simpleVariation } from '../types'
 
 // ── Unique inline variations (no separate file) ──
@@ -116,7 +116,7 @@ export const butterflyVar = simpleVariation('butterflyVar', (pos, varInfo) => {
   const y2 = pos.y * 2
   const wx = 4 / sqrt(3 * PI.$)
   const denominator = dot(vec2f(pos.x, y2), vec2f(pos.x, y2))
-  const r = wx * sqrt(abs(pos.y * pos.x) / (denominator + 1e-10))
+  const r = wx * sqrt(abs(pos.y * pos.x) / (denominator + EPS_TINY.$))
 
   return vec2f(r * pos.x, r * y2).mul(varInfo.weight)
 })
@@ -231,7 +231,7 @@ export const pyramidVar = simpleVariation('pyramidVar', (pos, varInfo) => {
   const x = pos.x * pos.x * pos.x
   const y = pos.y * pos.y * pos.y
 
-  const div = abs(x) + abs(y) + 0.000000001
+  const div = abs(x) + abs(y) + EPS_SMALL.$
   const r = 1.0 / div
 
   const newX = x * r

@@ -2,7 +2,7 @@ import { f32, struct, vec3f } from 'typegpu/data'
 import { acos, atan2, cos, floor, length, select, sin, sqrt, tan, } from 'typegpu/std'
 import { createObjectEditor, sliderEditor, sliderLogEditor, } from '@/components/Sliders/ParametricEditors/sliderEditor'
 import { random } from '@/shaders/random'
-import { PI } from '../../constants'
+import { EPS, PI } from '../../constants'
 import { parametricVariation3D } from './types'
 
 export const waves3D = parametricVariation3D(
@@ -55,7 +55,7 @@ export const rings3D = parametricVariation3D(
     const r = length(pos)
     const scale = params.radiusScale
     const t = (r % (2 * scale)) - scale + r * (1 - scale)
-    return pos.mul(t / (r + 1e-6))
+    return pos.mul(t / (r + EPS.$))
   },
 )
 
@@ -101,7 +101,7 @@ export const fan3D = parametricVariation3D(
   }),
   (pos, _varInfo, params) => {
     'use gpu'
-    const r = length(pos) + 1e-6
+    const r = length(pos) + EPS.$
     const theta = atan2(pos.y, pos.x)
     const phi = acos(pos.z / r)
     const t = theta + params.spreadTheta / 2

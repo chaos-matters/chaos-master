@@ -2,6 +2,7 @@ import { f32, struct, vec2f } from 'typegpu/data'
 import { round, select } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
+import { EPS } from '@/flame/constants'
 import { random } from '@/shaders/random'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
@@ -35,7 +36,7 @@ export const checksVar = parametricVariation(
   ChecksVarParamsEditor,
   (pos, varInfo, P) => {
     'use gpu'
-    const cs = 1.0 / (P.size + 1.0e-6)
+    const cs = 1.0 / (P.size + EPS.$)
     const ncx = P.x * -1.0
     const ncy = P.y * -1.0
     const isXY = f32(round(pos.x * cs)) + f32(round(pos.y * cs))

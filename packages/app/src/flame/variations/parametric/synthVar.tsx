@@ -2,7 +2,7 @@ import { f32, struct, vec2f, vec3f } from 'typegpu/data'
 import { asin, atan2, cos, floor, length, pow, select, sin, sqrt, } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
-import { EPS, PI } from '@/flame/constants'
+import { EPS, EPS_TINY, PI } from '@/flame/constants'
 import { random } from '@/shaders/random'
 import { parametricVariation } from './types'
 import type { Infer } from 'typegpu/data'
@@ -333,7 +333,7 @@ function bezier_quad_map(xin: number, min: number) {
 
   // iM is "inverse m" used in a few places below
   let iM = f32(1e10)
-  if (m > 1.0e-10) {
+  if (m > EPS_TINY.$) {
     iM = 1.0 / m
   }
 
@@ -352,7 +352,7 @@ function bezier_quad_map(xin: number, min: number) {
     // Control points are (0,0), (m,m) and (1,m)
 
     t = x // Special case when m === 0.5
-    if ((m - 0.5) * (m - 0.5) > 1e-10) {
+    if ((m - 0.5) * (m - 0.5) > EPS_TINY.$) {
       t = (-1.0 * m + sqrt(m * m + (1.0 - 2.0 * m) * x)) / (1.0 - 2.0 * m)
     }
 
@@ -365,7 +365,7 @@ function bezier_quad_map(xin: number, min: number) {
     // Control points are (0,0), (iM,iM) and (1,m)
 
     t = x // Special case when m === 2
-    if ((m - 2.0) * (m - 2.0) > 1e-10) {
+    if ((m - 2.0) * (m - 2.0) > EPS_TINY.$) {
       t = (-1.0 * iM + sqrt(iM * iM + (1.0 - 2.0 * iM) * x)) / (1.0 - 2.0 * iM)
     }
     return a * (x + (m - 1.0) * t * t)
@@ -510,8 +510,8 @@ function process_layer(
 
   if (skew !== 0.0) {
     z = 0.5 + 0.5 * skew
-    if (y > z) y = 0.5 + (0.5 * (y - z)) / (1.0 - z + 0.000001)
-    else y = 0.5 - (0.5 * (z - y)) / (z + 0.000001)
+    if (y > z) y = 0.5 + (0.5 * (y - z)) / (1.0 - z + EPS.$)
+    else y = 0.5 - (0.5 * (z - y)) / (z + EPS.$)
   }
 
   const newVal = synth_sub_calc(x, y, z, type, frq)

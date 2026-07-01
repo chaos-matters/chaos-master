@@ -1,5 +1,6 @@
 import { f32, vec2f } from 'typegpu/data'
 import { floor, sqrt } from 'typegpu/std'
+import { EPS_TINY } from '@/flame/constants'
 import { random } from '@/shaders/random'
 import { simpleVariation } from '../types'
 
@@ -11,7 +12,7 @@ export const apocarpetVar = simpleVariation(
     let x = pos.x
     let y = pos.y
     const r = 1.0 / (1.0 + sqrt(2.0))
-    const denom = pos.x * pos.x + pos.y * pos.y + 1.0e-10
+    const denom = pos.x * pos.x + pos.y * pos.y + EPS_TINY.$
     const branch = f32(floor(6.0 * random()))
 
     if (branch === 0.0) {

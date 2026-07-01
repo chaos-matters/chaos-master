@@ -2,6 +2,7 @@ import { f32, struct, vec2f } from 'typegpu/data'
 import { length, pow } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
+import { EPS_SMALL } from '@/flame/constants'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
@@ -32,7 +33,7 @@ export const bulgeVar = parametricVariation(
     'use gpu'
     const r = length(pos)
     const rn = pow(r, P.N)
-    const factor = varInfo.weight * (rn / (r + 1.0e-9))
+    const factor = varInfo.weight * (rn / (r + EPS_SMALL.$))
     const newX = factor * pos.x
     const newY = factor * pos.y
     return vec2f(newX, newY)

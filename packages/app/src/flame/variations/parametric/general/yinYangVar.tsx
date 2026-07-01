@@ -2,7 +2,7 @@ import { f32, struct, vec2f } from 'typegpu/data'
 import { cos, mix, sin, step } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
-import { PI } from '@/flame/constants'
+import { EPS, PI } from '@/flame/constants'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
@@ -80,7 +80,7 @@ export const yinYangVar = parametricVariation(
 
     const r2 = u * u + v * v
 
-    let t = (2.0 * P.radius * (v + P.radius)) / (r2 + 0.000001)
+    let t = (2.0 * P.radius * (v + P.radius)) / (r2 + EPS.$)
     t = t * P.dual_t
     t = mix(t, -t, step(P.outside, 0.5))
 

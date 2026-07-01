@@ -1,6 +1,6 @@
 import { vec2f } from 'typegpu/data'
 import { atan2, log, sqrt } from 'typegpu/std'
-import { PI } from '@/flame/constants'
+import { EPS_TINY, PI } from '@/flame/constants'
 import { simpleVariation } from '../types'
 
 export const acothVar = simpleVariation(
@@ -14,7 +14,7 @@ export const acothVar = simpleVariation(
     const d_re = pos.x - 1.0
     const d_im = pos.y
 
-    const div_denom = d_re * d_re + d_im * d_im + 1.0e-10
+    const div_denom = d_re * d_re + d_im * d_im + EPS_TINY.$
     const q_re = (n_re * d_re + n_im * d_im) / div_denom
     const q_im = (n_im * d_re - n_re * d_im) / div_denom
 

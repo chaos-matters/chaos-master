@@ -1,12 +1,13 @@
 import { f32, vec2f } from 'typegpu/data'
 import { atan2, log, select, sqrt } from 'typegpu/std'
+import { EPS_TINY } from '@/flame/constants'
 import { simpleVariation } from '../types'
 
 export const arcsech2Var = simpleVariation(
   'arcsech2Var',
   (pos, varInfo) => {
     'use gpu'
-    const denom = pos.x * pos.x + pos.y * pos.y + 1.0e-10
+    const denom = pos.x * pos.x + pos.y * pos.y + EPS_TINY.$
     const z_re = pos.x / denom
     const z_im = -pos.y / denom
 

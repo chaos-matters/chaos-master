@@ -2,6 +2,7 @@ import { f32, i32, struct, vec2f } from 'typegpu/data'
 import { cos, floor, select, sin } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
+import { EPS_SMALL } from '@/flame/constants'
 import { random } from '@/shaders/random'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
@@ -167,7 +168,7 @@ export const chaosCubesVar = parametricVariation(
     }
     if (P.sphereInvert > 0.5) {
       const r2 = px * px + py * py + pz * pz
-      const factor = (P.sphereRadius * P.sphereRadius) / (r2 + 1.0e-9)
+      const factor = (P.sphereRadius * P.sphereRadius) / (r2 + EPS_SMALL.$)
       px *= factor
       py *= factor
       pz *= factor

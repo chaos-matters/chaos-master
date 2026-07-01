@@ -1,6 +1,7 @@
 import { f32, struct, vec2f } from 'typegpu/data'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
+import { EPS } from '@/flame/constants'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
@@ -34,7 +35,7 @@ export const joukowskiVar = parametricVariation(
     'use gpu'
     const x = pos.x + P.thickness
     const y = pos.y
-    const r2 = x * x + y * y + 0.000001
+    const r2 = x * x + y * y + EPS.$
     const a2 = P.thickness * P.thickness
     const nx = x * (1.0 + a2 / r2)
     const ny = y * (1.0 - a2 / r2)
