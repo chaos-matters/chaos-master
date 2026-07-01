@@ -1,6 +1,7 @@
 import { vec2f } from 'typegpu/data'
 import { acos, clamp, cos, cosh, log, select, sin, sinh, sqrt, } from 'typegpu/std'
 import { EPS } from '../../../constants'
+import { safeDenom } from '../../safeMath'
 import { simpleVariation } from '../types'
 
 export const ediscVar = simpleVariation(
@@ -14,9 +15,7 @@ export const ediscVar = simpleVariation(
     const r2 = sqrt(tmp - tmp2)
     const xmax = (r1 + r2) * 0.5
     const a1 = log(xmax + select(0.0, sqrt(xmax - 1.0), xmax - 1.0 >= EPS.$))
-    const a2 = -acos(
-      clamp(pos.x / select(xmax, 1.0e-9, xmax === 0.0), -1.0, 1.0),
-    )
+    const a2 = -acos(clamp(pos.x / safeDenom(xmax), -1.0, 1.0))
     let snv = sin(a1)
     const csv = cos(a1)
     const snhu = sinh(a2)

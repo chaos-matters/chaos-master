@@ -3,6 +3,7 @@ import { abs, cos, dot, select, sin } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { random } from '@/shaders/random'
+import { safeDenom } from '../../safeMath'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
@@ -82,7 +83,7 @@ export const cutFractalVar = parametricVariation(
     const iter = i32(P.iters)
     for (let i = 0; i < iter; i++) {
       const d = dot(U, U)
-      const factor = 0.5 / select(d, 1.0e-9, d === 0.0)
+      const factor = 0.5 / safeDenom(d)
       const absUx = abs(U.x)
       const absUy = abs(U.y)
       U = vec2f(absUx * factor + cx, absUy * factor + cy)

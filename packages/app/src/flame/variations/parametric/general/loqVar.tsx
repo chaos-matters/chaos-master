@@ -1,7 +1,8 @@
 import { f32, struct, vec2f } from 'typegpu/data'
-import { atan2, log, select, sqrt } from 'typegpu/std'
+import { atan2, log, sqrt } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
+import { safeDenom } from '../../safeMath'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
@@ -37,7 +38,7 @@ export const loqVar = parametricVariation(
     const z = f32(0.0)
     const abs_v = sqrt(pos.y * pos.y + z * z)
     const denom = 0.5 / log(P.base)
-    const C = atan2(abs_v, pos.x) / select(abs_v, 1.0e-9, abs_v === 0.0)
+    const C = atan2(abs_v, pos.x) / safeDenom(abs_v)
 
     const newX = log(pos.x * pos.x + abs_v * abs_v) * denom
     const newY = C * pos.y

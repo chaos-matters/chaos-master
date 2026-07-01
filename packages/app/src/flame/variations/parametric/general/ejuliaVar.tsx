@@ -2,6 +2,7 @@ import { f32, struct, vec2f } from 'typegpu/data'
 import { acos, cos, cosh, log, select, sin, sinh, sqrt } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
+import { safeDenom } from '../../safeMath'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
@@ -33,7 +34,7 @@ export const ejuliaVar = parametricVariation(
     let x = pos.x
     let r2 = pos.x * pos.x + pos.y * pos.y
     const negPower = P.power < 0.0
-    const invR2 = 1.0 / select(r2, 1.0e-9, r2 === 0.0)
+    const invR2 = 1.0 / safeDenom(r2)
     x = select(x, x * invR2, negPower)
     r2 = select(r2, invR2, negPower)
     const tmp = r2 + 1.0

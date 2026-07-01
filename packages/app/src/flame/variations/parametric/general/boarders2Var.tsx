@@ -1,8 +1,9 @@
 import { f32, struct, vec2f } from 'typegpu/data'
-import { abs, round, select } from 'typegpu/std'
+import { abs, round } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { random } from '@/shaders/random'
+import { safeDenom } from '../../safeMath'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
@@ -79,29 +80,17 @@ export const boarders2Var = parametricVariation(
       if (abs(offsetX) >= abs(offsetY)) {
         if (offsetX >= 0.0) {
           dx = offsetX * P.c + roundX + cl
-          dy =
-            offsetY * P.c +
-            roundY +
-            (cl * offsetY) / select(offsetX, 1e-9, offsetX === 0.0)
+          dy = offsetY * P.c + roundY + (cl * offsetY) / safeDenom(offsetX)
         } else {
           dx = offsetX * P.c + roundX - cl
-          dy =
-            offsetY * P.c +
-            roundY -
-            (cl * offsetY) / select(offsetX, 1e-9, offsetX === 0.0)
+          dy = offsetY * P.c + roundY - (cl * offsetY) / safeDenom(offsetX)
         }
       } else {
         if (offsetY >= 0.0) {
-          dx =
-            offsetX * P.c +
-            roundX +
-            (ct * offsetX) / select(offsetY, 1e-9, offsetY === 0.0)
+          dx = offsetX * P.c + roundX + (ct * offsetX) / safeDenom(offsetY)
           dy = offsetY * P.c + roundY + ct
         } else {
-          dx =
-            offsetX * P.c +
-            roundX -
-            (ct * offsetX) / select(offsetY, 1e-9, offsetY === 0.0)
+          dx = offsetX * P.c + roundX - (ct * offsetX) / safeDenom(offsetY)
           dy = offsetY * P.c + roundY - ct // Should use cb?
         }
       }
