@@ -64,7 +64,7 @@ export function createHistogramPipeline(
     const count = f32(texel.count) * BUCKET_FIXED_POINT_MULTIPLIER_INV
     const adjustedCount = count * uniforms.averagePointCountPerBucketInv
     const binCount = arrayLength(bindGroupLayout.$.histogram)
-    const bin = clamp(u32(adjustedCount * 2000), 0, binCount)
+    const bin = clamp(u32(adjustedCount * 2000), 0, binCount - 1)
     atomicAdd(bindGroupLayout.$.histogram[bin]!, 1)
   })
 

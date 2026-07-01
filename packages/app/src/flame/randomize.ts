@@ -32,6 +32,20 @@ export function randomPerturbation(
 }
 
 /**
+ * Sigma for perturbing a variation parameter, scaled off its default magnitude.
+ * Many params (offsets, angles) default to 0, which would otherwise force
+ * sigma to 0 and permanently exclude them from randomization — so a minimum
+ * base magnitude is used as a floor.
+ */
+const MIN_PARAM_SIGMA_BASE = 1
+
+function paramSigma(defaultValue: number, sigmaScale: number): number {
+  return (
+    Math.max(Math.abs(defaultValue), MIN_PARAM_SIGMA_BASE) * 0.5 * sigmaScale
+  )
+}
+
+/**
  * Randomize variation params with optional strength control.
  * strength=0 → mild perturbation, strength=1 → wild randomization.
  */
@@ -58,7 +72,7 @@ export function randomizeVariationParams(
   const sigmaScale = 0.05 + strength * 0.95
   for (const key of Object.keys(defaults)) {
     const d = defaults[key]!
-    result[key] = randomPerturbation(d, Math.abs(d) * 0.5 * sigmaScale)
+    result[key] = randomPerturbation(d, paramSigma(d, sigmaScale))
   }
   return result
 }
@@ -598,10 +612,7 @@ export function mutateFlame(
             const sigmaScale = 0.05 + strength * 0.95
             for (const key of Object.keys(defaults.paramDefaults)) {
               const d = params[key] ?? defaults.paramDefaults[key]!
-              params[key] = randomPerturbation(
-                d,
-                Math.abs(d) * 0.5 * sigmaScale,
-              )
+              params[key] = randomPerturbation(d, paramSigma(d, sigmaScale))
             }
             v.params = params
           }
@@ -629,7 +640,7 @@ export function mutateFlame(
           const sigmaScale = 0.05 + strength * 0.95
           for (const key of Object.keys(defaults.paramDefaults)) {
             const d = params[key] ?? defaults.paramDefaults[key]!
-            params[key] = randomPerturbation(d, Math.abs(d) * 0.5 * sigmaScale)
+            params[key] = randomPerturbation(d, paramSigma(d, sigmaScale))
           }
           v.params = params
         }

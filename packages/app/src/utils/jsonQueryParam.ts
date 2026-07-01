@@ -93,7 +93,7 @@ export async function decompressJsonQuery(
   //   chunks.push(chunk)
   // }
 
-  return validateFlame(JSON.parse(chunks.join()))
+  return validateFlame(JSON.parse(chunks.join('')))
 }
 
 export async function decodeJsonQueryParam(param: string) {

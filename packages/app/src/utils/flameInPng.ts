@@ -100,7 +100,7 @@ async function readZtxtChunk(
     throw new Error(`CRC mismatch: PNG: [${readCrc}] ::  [${calculatedCrc}]`)
   }
   if (
-    separatorByteIdx === -1 &&
+    separatorByteIdx === -1 ||
     chunkData[separatorByteIdx + 1] !== CHUNK_COMPRESSION_DEFLATE
   ) {
     throw new Error(

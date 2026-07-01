@@ -44,9 +44,17 @@ export function encodeIco(frames: IcoFrame[]): Blob {
   // Directory entries
   for (let i = 0; i < count; i++) {
     const { width, height, png } = frames[i]!
-    view.setUint8(pos, width >= 256 ? 0 : width)
+    // ICO's 1-byte width/height fields can only represent [1, 256] (with 0
+    // as the sentinel for 256) — anything larger is not representable and
+    // would otherwise be silently truncated to a wrong, smaller size.
+    if (width < 1 || width > 256 || height < 1 || height > 256) {
+      throw new Error(
+        `ICO frame dimensions must be in [1, 256], got ${width}x${height}`,
+      )
+    }
+    view.setUint8(pos, width === 256 ? 0 : width)
     pos += 1
-    view.setUint8(pos, height >= 256 ? 0 : height)
+    view.setUint8(pos, height === 256 ? 0 : height)
     pos += 1
     view.setUint8(pos, 0) // palette size
     pos += 1

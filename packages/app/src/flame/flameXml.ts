@@ -837,7 +837,10 @@ function variationAttrs(
     out += ` ${flam3Name}="${vrec.weight.toFixed(6)}"`
     if (vrec.params) {
       for (const [key, value] of Object.entries(vrec.params)) {
-        out += ` ${flam3Name}_${key}="${value}"`
+        // Guard against NaN/Infinity params (e.g. from a bad randomize/edit)
+        // producing invalid XML like `julian_power="NaN"` that fails re-import.
+        const safeValue = Number.isFinite(value) ? value : 0
+        out += ` ${flam3Name}_${key}="${safeValue.toFixed(6)}"`
       }
     }
   }
