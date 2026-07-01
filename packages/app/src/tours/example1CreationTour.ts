@@ -1,4 +1,5 @@
 import { DEFAULT_ANIMATION_DURATION_MS } from '@/components/SpotlightTour/tourTypes'
+import { scrollTo, tourTarget } from './stepFactory'
 import type { TourGuide } from '@/components/SpotlightTour/tourTypes'
 
 /**
@@ -28,7 +29,7 @@ export const example1CreationTour: TourGuide = {
     //  SETUP
     // -----------------------------------------------------------
     {
-      target: '[data-tour-target="canvas"]',
+      target: tourTarget('canvas'),
       title: 'Building Example 1',
       description:
         'We start from a blank canvas. All transforms have been cleared and Skip Iterations is set to 1 so you can watch the flame evolve as we add each piece.',
@@ -47,7 +48,7 @@ export const example1CreationTour: TourGuide = {
     //  TRANSFORM 1 -- Linear
     // -----------------------------------------------------------
     {
-      target: '[data-tour-target="probability"]',
+      target: tourTarget('probability'),
       targetLast: true,
       title: 'T1: Add Linear Transform',
       description:
@@ -55,11 +56,11 @@ export const example1CreationTour: TourGuide = {
       beforeShow: (ctx) => {
         ctx.executeCommand('flame.addTransform', 'linearVar')
         ctx.executeCommand('flame.setColorSpeed', 0, 0.4)
-        ctx.scrollToTarget('[data-tour-target="probability"]')
+        ctx.scrollToTarget(tourTarget('probability'))
       },
     },
     {
-      target: '[data-tour-target="probability"]',
+      target: tourTarget('probability'),
       targetLast: true,
       title: 'T1: Probability -> 40%',
       description:
@@ -72,13 +73,11 @@ export const example1CreationTour: TourGuide = {
       },
     },
     {
-      target: '[data-tour-target="affine-editor"]',
+      target: tourTarget('affine-editor'),
       title: 'T1: Shrink & Offset',
       description:
         'The pre-affine matrix positions and scales this transform. We shrink it (a=0.8, e=0.6) and shift it right (c=0.5). Watch the affine handles move in the grid.',
-      beforeShow: (ctx) => {
-        ctx.scrollToTarget('[data-tour-target="affine-editor"]')
-      },
+      beforeShow: scrollTo('affine-editor'),
       animationDelay: ANIMATION_GRACE_MS,
       onAnimate: (ctx) => {
         // Animate the primary scale coefficient; set others instantly
@@ -102,7 +101,7 @@ export const example1CreationTour: TourGuide = {
     //  TRANSFORM 2 -- Linear + Swirl + Popcorn
     // -----------------------------------------------------------
     {
-      target: '[data-tour-target="probability"]',
+      target: tourTarget('probability'),
       targetLast: true,
       title: 'T2: Add Second Transform',
       description:
@@ -110,18 +109,16 @@ export const example1CreationTour: TourGuide = {
       beforeShow: (ctx) => {
         ctx.executeCommand('flame.addTransform', 'linearVar')
         ctx.executeCommand('flame.setColorSpeed', 1, 0.4)
-        ctx.scrollToTarget('[data-tour-target="probability"]')
+        ctx.scrollToTarget(tourTarget('probability'))
       },
     },
     {
-      target: '[data-tour-target="variation-weight"]',
+      target: tourTarget('variation-weight'),
       targetLast: true,
       title: 'T2: Linear Weight -> 0.4',
       description:
         'Reducing the Linear weight to 0.4 makes room for Swirl and Popcorn. The variation weights control how much each one contributes to the final mapped position.',
-      beforeShow: (ctx) => {
-        ctx.scrollToTarget('[data-tour-target="variation-weight"]')
-      },
+      beforeShow: scrollTo('variation-weight'),
       animationDelay: ANIMATION_GRACE_MS,
       onAnimate: (ctx) => {
         ctx.animateValue(1, 0.4, DEFAULT_ANIMATION_DURATION_MS, (val) => {
@@ -130,7 +127,7 @@ export const example1CreationTour: TourGuide = {
       },
     },
     {
-      target: '[data-tour-target="variation-type"]',
+      target: tourTarget('variation-type'),
       targetLast: true,
       title: 'T2: Add Swirl (0.5)',
       description:
@@ -138,11 +135,11 @@ export const example1CreationTour: TourGuide = {
       beforeShow: (ctx) => {
         ctx.executeCommand('flame.addVariation', 1, 'swirlVar')
         ctx.executeCommand('flame.setVariationWeight', 1, 1, 0.5)
-        ctx.scrollToTarget('[data-tour-target="variation-type"]')
+        ctx.scrollToTarget(tourTarget('variation-type'))
       },
     },
     {
-      target: '[data-tour-target="variation-type"]',
+      target: tourTarget('variation-type'),
       targetLast: true,
       title: 'T2: Add Popcorn (0.1)',
       description:
@@ -150,18 +147,16 @@ export const example1CreationTour: TourGuide = {
       beforeShow: (ctx) => {
         ctx.executeCommand('flame.addVariation', 1, 'popcornVar')
         ctx.executeCommand('flame.setVariationWeight', 1, 2, 0.1)
-        ctx.scrollToTarget('[data-tour-target="variation-type"]')
+        ctx.scrollToTarget(tourTarget('variation-type'))
       },
     },
     {
-      target: '[data-tour-target="probability"]',
+      target: tourTarget('probability'),
       targetLast: true,
       title: 'T2: Probability -> 30%',
       description:
         'T2 fires less often than T1. The lower probability gives the swirl arms a lighter, more delicate presence.',
-      beforeShow: (ctx) => {
-        ctx.scrollToTarget('[data-tour-target="probability"]')
-      },
+      beforeShow: scrollTo('probability'),
       animationDelay: ANIMATION_GRACE_MS,
       onAnimate: (ctx) => {
         ctx.animateValue(1, 0.3, DEFAULT_ANIMATION_DURATION_MS, (val) => {
@@ -170,13 +165,11 @@ export const example1CreationTour: TourGuide = {
       },
     },
     {
-      target: '[data-tour-target="affine-editor"]',
+      target: tourTarget('affine-editor'),
       title: 'T2: Shear & Offset',
       description:
         'Shearing the pre-affine tilts the spiral (b=0.3) and offsets it vertically (f=0.5). Watch the handles shift and the swirl arms take shape.',
-      beforeShow: (ctx) => {
-        ctx.scrollToTarget('[data-tour-target="affine-editor"]')
-      },
+      beforeShow: scrollTo('affine-editor'),
       animationDelay: ANIMATION_GRACE_MS,
       onAnimate: (ctx) => {
         ctx.animateValue(1, 0.7, DEFAULT_ANIMATION_DURATION_MS, (val) => {
@@ -199,7 +192,7 @@ export const example1CreationTour: TourGuide = {
     //  TRANSFORM 3 -- Pie + Gaussian
     // -----------------------------------------------------------
     {
-      target: '[data-tour-target="probability"]',
+      target: tourTarget('probability'),
       targetLast: true,
       title: 'T3: Add Pie Transform',
       description:
@@ -207,7 +200,7 @@ export const example1CreationTour: TourGuide = {
       beforeShow: (ctx) => {
         ctx.executeCommand('flame.addTransform', 'pieVar')
         ctx.executeCommand('flame.setColorSpeed', 2, 0.4)
-        ctx.scrollToTarget('[data-tour-target="probability"]')
+        ctx.scrollToTarget(tourTarget('probability'))
       },
     },
     {
@@ -232,13 +225,11 @@ export const example1CreationTour: TourGuide = {
       },
     },
     {
-      target: '[data-tour-target="angle-rotation"]',
+      target: tourTarget('angle-rotation'),
       title: 'T3: Rotation -> 0',
       description:
         'Pie defaults to 180-degree rotation. Setting it to 0 aligns the slices symmetrically around the origin.',
-      beforeShow: (ctx) => {
-        ctx.scrollToTarget('[data-tour-target="angle-rotation"]')
-      },
+      beforeShow: scrollTo('angle-rotation'),
       animationDelay: ANIMATION_GRACE_MS,
       onAnimate: (ctx) => {
         ctx.animateValue(Math.PI, 0, DEFAULT_ANIMATION_DURATION_MS, (val) => {
@@ -247,14 +238,12 @@ export const example1CreationTour: TourGuide = {
       },
     },
     {
-      target: '[data-tour-target="variation-weight"]',
+      target: tourTarget('variation-weight'),
       targetLast: true,
       title: 'T3: Pie Weight -> 0.95',
       description:
         'Pie dominates at 0.95 weight so the star shape is clearly defined. The remaining 5% is reserved for a Gaussian softening.',
-      beforeShow: (ctx) => {
-        ctx.scrollToTarget('[data-tour-target="variation-weight"]')
-      },
+      beforeShow: scrollTo('variation-weight'),
       animationDelay: ANIMATION_GRACE_MS,
       onAnimate: (ctx) => {
         ctx.animateValue(1, 0.95, DEFAULT_ANIMATION_DURATION_MS, (val) => {
@@ -263,7 +252,7 @@ export const example1CreationTour: TourGuide = {
       },
     },
     {
-      target: '[data-tour-target="variation-type"]',
+      target: tourTarget('variation-type'),
       targetLast: true,
       title: 'T3: Add Gaussian (0.05)',
       description:
@@ -271,18 +260,16 @@ export const example1CreationTour: TourGuide = {
       beforeShow: (ctx) => {
         ctx.executeCommand('flame.addVariation', 2, 'gaussianVar')
         ctx.executeCommand('flame.setVariationWeight', 2, 1, 0.05)
-        ctx.scrollToTarget('[data-tour-target="variation-type"]')
+        ctx.scrollToTarget(tourTarget('variation-type'))
       },
     },
     {
-      target: '[data-tour-target="probability"]',
+      target: tourTarget('probability'),
       targetLast: true,
       title: 'T3: Probability -> 20%',
       description:
         'At 20% probability, the pie contributes detailed star structure without dominating the overall image.',
-      beforeShow: (ctx) => {
-        ctx.scrollToTarget('[data-tour-target="probability"]')
-      },
+      beforeShow: scrollTo('probability'),
       animationDelay: ANIMATION_GRACE_MS,
       onAnimate: (ctx) => {
         ctx.animateValue(1, 0.2, DEFAULT_ANIMATION_DURATION_MS, (val) => {
@@ -291,13 +278,11 @@ export const example1CreationTour: TourGuide = {
       },
     },
     {
-      target: '[data-tour-target="affine-editor"]',
+      target: tourTarget('affine-editor'),
       title: 'T3: Affine & Post-Affine',
       description:
         'The pre-affine shears the space. A 90-degree post-affine rotation gives the star its final orientation. These transforms work together to tilt the star into position.',
-      beforeShow: (ctx) => {
-        ctx.scrollToTarget('[data-tour-target="affine-editor"]')
-      },
+      beforeShow: scrollTo('affine-editor'),
       animationDelay: ANIMATION_GRACE_MS,
       onAnimate: (ctx) => {
         // Animate key coefficients for visual feedback
@@ -332,7 +317,7 @@ export const example1CreationTour: TourGuide = {
     //  TRANSFORM 4 -- Sinusoidal
     // -----------------------------------------------------------
     {
-      target: '[data-tour-target="probability"]',
+      target: tourTarget('probability'),
       targetLast: true,
       title: 'T4: Add Sinusoidal Transform',
       description:
@@ -340,18 +325,16 @@ export const example1CreationTour: TourGuide = {
       beforeShow: (ctx) => {
         ctx.executeCommand('flame.addTransform', 'sinusoidalVar')
         ctx.executeCommand('flame.setColorSpeed', 3, 0.4)
-        ctx.scrollToTarget('[data-tour-target="probability"]')
+        ctx.scrollToTarget(tourTarget('probability'))
       },
     },
     {
-      target: '[data-tour-target="probability"]',
+      target: tourTarget('probability'),
       targetLast: true,
       title: 'T4: Probability -> 10%',
       description:
         'At just 10%, sinusoidal fires rarely but adds a visible organic texture. This is the final transform -- all four are now in place.',
-      beforeShow: (ctx) => {
-        ctx.scrollToTarget('[data-tour-target="probability"]')
-      },
+      beforeShow: scrollTo('probability'),
       animationDelay: ANIMATION_GRACE_MS,
       onAnimate: (ctx) => {
         ctx.animateValue(1, 0.1, DEFAULT_ANIMATION_DURATION_MS, (val) => {
@@ -360,13 +343,11 @@ export const example1CreationTour: TourGuide = {
       },
     },
     {
-      target: '[data-tour-target="affine-editor"]',
+      target: tourTarget('affine-editor'),
       title: 'T4: Affine & Color',
       description:
         'The sinusoidal transform gets the same shearing as T3 plus its own color. The flame shape is complete but still very noisy at skip iterations = 1.',
-      beforeShow: (ctx) => {
-        ctx.scrollToTarget('[data-tour-target="affine-editor"]')
-      },
+      beforeShow: scrollTo('affine-editor'),
       animationDelay: ANIMATION_GRACE_MS,
       onAnimate: (ctx) => {
         ctx.animateValue(1, 0.6, DEFAULT_ANIMATION_DURATION_MS, (val) => {
@@ -393,14 +374,12 @@ export const example1CreationTour: TourGuide = {
     //  RESOLVING THE CHAOS -- Skip Iterations
     // -----------------------------------------------------------
     {
-      target: '[data-tour-target="skipIters-slider"]',
+      target: tourTarget('skipIters-slider'),
       title: 'Resolving the Chaos (1/3)',
       description:
         'With Skip Iterations at 1, the image is pure noise. Watch the slider climb to 5 -- structure starts to emerge from the chaos.',
       position: 'top',
-      beforeShow: (ctx) => {
-        ctx.scrollToTarget('[data-tour-target="skipIters-slider"]')
-      },
+      beforeShow: scrollTo('skipIters-slider'),
       animationDelay: ANIMATION_GRACE_MS,
       onAnimate: (ctx) => {
         ctx.animateValue(1, 5, DEFAULT_ANIMATION_DURATION_MS, (val) => {
@@ -409,14 +388,12 @@ export const example1CreationTour: TourGuide = {
       },
     },
     {
-      target: '[data-tour-target="skipIters-slider"]',
+      target: tourTarget('skipIters-slider'),
       title: 'Resolving the Chaos (2/3)',
       description:
         'At 10 iterations the spirals, pie slices, and sine waves become clearly visible. The colors begin to separate along the palette.',
       position: 'top',
-      beforeShow: (ctx) => {
-        ctx.scrollToTarget('[data-tour-target="skipIters-slider"]')
-      },
+      beforeShow: scrollTo('skipIters-slider'),
       animationDelay: ANIMATION_GRACE_MS,
       onAnimate: (ctx) => {
         ctx.animateValue(5, 10, DEFAULT_ANIMATION_DURATION_MS, (val) => {
@@ -425,14 +402,12 @@ export const example1CreationTour: TourGuide = {
       },
     },
     {
-      target: '[data-tour-target="skipIters-slider"]',
+      target: tourTarget('skipIters-slider'),
       title: 'Resolving the Chaos (3/3)',
       description:
         'Finally, 20 skip iterations -- exactly like the real Example 1. The flame is perfectly crisp and all detail is resolved.',
       position: 'top',
-      beforeShow: (ctx) => {
-        ctx.scrollToTarget('[data-tour-target="skipIters-slider"]')
-      },
+      beforeShow: scrollTo('skipIters-slider'),
       animationDelay: ANIMATION_GRACE_MS,
       onAnimate: (ctx) => {
         ctx.animateValue(10, 20, DEFAULT_ANIMATION_DURATION_MS, (val) => {
@@ -445,13 +420,11 @@ export const example1CreationTour: TourGuide = {
     //  FINAL TOUCHES -- Gamma & Vibrancy
     // -----------------------------------------------------------
     {
-      target: '[data-tour-target="gamma-slider"]',
+      target: tourTarget('gamma-slider'),
       title: 'Final Touch: Gamma -> 2.42',
       description:
         'Gamma controls the brightness curve. Pushing it to 2.42 lifts the midtones and makes the flame glow.',
-      beforeShow: (ctx) => {
-        ctx.scrollToTarget('[data-tour-target="gamma-slider"]')
-      },
+      beforeShow: scrollTo('gamma-slider'),
       animationDelay: ANIMATION_GRACE_MS,
       onAnimate: (ctx) => {
         ctx.animateValue(2.2, 2.42, DEFAULT_ANIMATION_DURATION_MS, (val) => {
@@ -460,13 +433,11 @@ export const example1CreationTour: TourGuide = {
       },
     },
     {
-      target: '[data-tour-target="vibrancy-slider"]',
+      target: tourTarget('vibrancy-slider'),
       title: 'Final Touch: Vibrancy -> 0.95',
       description:
         "Vibrancy saturates the colors toward the palette. At 0.95 the flame bursts with color -- you've just built Example 1 from scratch!",
-      beforeShow: (ctx) => {
-        ctx.scrollToTarget('[data-tour-target="vibrancy-slider"]')
-      },
+      beforeShow: scrollTo('vibrancy-slider'),
       animationDelay: ANIMATION_GRACE_MS,
       onAnimate: (ctx) => {
         ctx.animateValue(0.5, 0.95, DEFAULT_ANIMATION_DURATION_MS, (val) => {
