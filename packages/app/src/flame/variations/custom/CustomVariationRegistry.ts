@@ -224,6 +224,20 @@ export function deleteCustomVariation(id: string): boolean {
   return unregister(id)
 }
 
+/**
+ * Re-register a previously deleted variation under its ORIGINAL id (the undo
+ * path for deletion — flames referencing the id render again). Recompiles the
+ * stored WGSL; returns false if the id is already taken or the code no longer
+ * compiles.
+ */
+export function restoreCustomVariation(def: CustomVariationDef): boolean {
+  if (customVariationRecords[def.id]) return false
+  const compileResult = compileCustomVariationCode(def.wgsl)
+  if (!compileResult.valid) return false
+  register(def, compileResult.fn)
+  return true
+}
+
 /** Compile and temporarily register for live preview. Returns cleanup function. */
 export function previewCustomVariation(
   wgslBody: string,

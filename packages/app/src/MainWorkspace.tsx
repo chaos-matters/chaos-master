@@ -21,6 +21,7 @@ import { Checkbox } from './components/Checkbox/Checkbox'
 import { CollapsibleCard } from './components/CollapsibleCard/CollapsibleCard'
 import { ColorPicker } from './components/ColorPicker/ColorPicker'
 import { Card } from './components/ControlCard/ControlCard'
+import { ConfirmDeleteVariationModal } from './components/CustomVariationEditor/ConfirmDeleteVariationModal'
 import { createShowCustomVariationEditor } from './components/CustomVariationEditor/CustomVariationEditor'
 import { DebugOverlay } from './components/DebugOverlay'
 import { DiceButton } from './components/DiceButton/DiceButton'
@@ -81,7 +82,7 @@ import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, tryValidateFlame, } from 
 import { generateTransformId, generateVariationId, } from './flame/transformFunction'
 import { defaultLinearType } from './flame/variationRegistry'
 import { allTransformVariations, isAnyParametricVariationType, isVariationType, } from './flame/variations'
-import { deleteCustomVariation, duplicateCustomVariation, getCustomVariations, isCustomVariationRegistered, loadCustomVariations, persistSharedVariations, } from './flame/variations/custom'
+import { deleteCustomVariation, duplicateCustomVariation, getCustomVariations, isCustomVariationRegistered, loadCustomVariations, persistSharedVariations, restoreCustomVariation, } from './flame/variations/custom'
 import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } from './flame/variations/utils'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { BoxArrowRight, Cross, Eye, EyeOff, Menu, Plus, Share, Shuffle, Terminal, } from './icons'
@@ -1617,6 +1618,41 @@ export function MainWorkspace(props: AppProps) {
         ...settings,
       }
     })
+  }
+
+  // Deleting a custom variation the CURRENT flame uses breaks its rendering,
+  // and the library lives outside the flame's undo history — so confirm when
+  // referenced, and always offer recovery through the toast's Undo action.
+  const handleDeleteCustomVariation = async (def: CustomVariationDef) => {
+    const usedByFlame = Object.values(flameDescriptor.transforms).some(
+      (transform) =>
+        Object.values(transform.variations).some(
+          (variation) => variation.type === def.id,
+        ),
+    )
+    if (usedByFlame) {
+      const confirmed = await _requestModal<boolean>({
+        content: ({ respond }) => (
+          <ConfirmDeleteVariationModal name={def.name} respond={respond} />
+        ),
+      })
+      if (!confirmed) return
+    }
+    deleteCustomVariation(def.id)
+    setCustomVarsVersion((v) => v + 1)
+    showToast(`Deleted custom variation "${def.name}"`, 10000, [
+      {
+        label: 'Undo',
+        onClick: () => {
+          if (restoreCustomVariation(def)) {
+            setCustomVarsVersion((v) => v + 1)
+            showToast(`Restored "${def.name}"`)
+          } else {
+            showToast(`Could not restore "${def.name}"`)
+          }
+        },
+      },
+    ])
   }
 
   const handleLoadHistory = (entry: RandomizerHistoryEntry) => {
@@ -3448,8 +3484,7 @@ export function MainWorkspace(props: AppProps) {
                                       title="Delete"
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        deleteCustomVariation(def.id)
-                                        setCustomVarsVersion((v) => v + 1)
+                                        void handleDeleteCustomVariation(def)
                                       }}
                                     >
                                       ×
