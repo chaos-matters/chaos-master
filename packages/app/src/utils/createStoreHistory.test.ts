@@ -238,6 +238,54 @@ describe('createStoreHistory', () => {
     })
   })
 
+  describe('object-replacing edits (affine drags swap whole objects)', () => {
+    // Regression guard: backward-patch values reference the store's raw
+    // nodes, and reconcile mutates those nodes IN PLACE — patches must be
+    // isolated before reconcile runs or undo silently applies a no-op.
+    // Leaf-value edits never trip this (primitives are captured by value).
+    it('undoes a single whole-object replacement', () => {
+      const { store, set, history } = makeHistory()
+      set((draft) => {
+        draft.items.a = { value: 9, nested: { deep: 90 } }
+      })
+      expect(store.items.a!.value).toBe(9)
+      history.undo()
+      expect(store.items.a).toEqual({ value: 1, nested: { deep: 10 } })
+      history.redo()
+      expect(store.items.a).toEqual({ value: 9, nested: { deep: 90 } })
+    })
+
+    it('undoes sequential whole-object replacements step by step', () => {
+      const { store, set, history } = makeHistory()
+      set((draft) => {
+        draft.items.a = { value: 2 }
+      })
+      set((draft) => {
+        draft.items.a = { value: 3 }
+      })
+      history.undo()
+      expect(store.items.a!.value).toBe(2)
+      history.undo()
+      expect(store.items.a!.value).toBe(1)
+    })
+
+    it('undoes a previewed drag that replaces an object per move', () => {
+      const { store, set, history } = makeHistory()
+      history.startPreview('Affine Translation')
+      for (let i = 1; i <= 5; i++) {
+        set((draft) => {
+          draft.items.a = { value: i }
+        })
+      }
+      history.commit()
+      expect(store.items.a!.value).toBe(5)
+      history.undo()
+      expect(store.items.a).toEqual({ value: 1, nested: { deep: 10 } })
+      history.redo()
+      expect(store.items.a!.value).toBe(5)
+    })
+  })
+
   describe('setSilently (automated writers)', () => {
     it('mutates the store without recording history', () => {
       const { store, history } = makeHistory()

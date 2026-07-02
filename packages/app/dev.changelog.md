@@ -7,6 +7,68 @@ changelog surfaced in the About panel lives in `CHANGELOG.md`.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.5] - 2026-07-02
+
+Undo/redo overhaul, driven by a full audit of both undo systems (flame
+change-history + timeline snapshots). Each area landed as its own commit with
+a dedicated test suite; undo behavior is now locked in by ~50 unit tests
+(`createStoreHistory.test.ts`, `timelineUndo.test.ts`, `undoRouting.test.ts`).
+
+### Fixed
+
+- **`createStoreHistory.set()` ran mutation callbacks twice** (once through
+  `produceWithPatches` for patches, once through solid's `produce` for the
+  store). Any non-deterministic callback desynced store from history:
+  "New transform"/"Add variation"/"Add symmetry" mint UUIDs inside setters, so
+  undo was a silent no-op and redo duplicated transforms; dice rolls recorded
+  values never shown. The store now reconciles the `produceWithPatches` result
+  — callbacks run exactly once. Stack payloads are deep-cloned in (and results
+  cloned out on undo/redo), fixing reference-aliasing where later store edits
+  silently rewrote history entries and corrupted redo.
+- **Timeline undo lifecycle**: `loadTracks` clears both stacks + the coalescing
+  key (a load is a document boundary — Ctrl+Z used to restore the previous
+  flame's tracks onto the new flame, orphaned transform ids and all).
+  `addKeyframesAtCurrentFrame(paths, {coalesce})` records grouped multi-path
+  writes as ONE entry with per-gesture coalescing (the symmetry-rotation knob
+  pushed 4 snapshots per pointer-move — ~600/drag, evicting the whole capped
+  history; it now uses AngleEditor's new `keyframePaths` prop).
+  `runWithSingleUndo()` groups bulk ops: Randomize/Smart animation, Colors,
+  preset pills and morph setup were one entry PER KEYFRAME (20-120/click).
+  Gesture ends + playhead moves break coalescing; `removeKeyframe`/
+  `removeAllKeyframesForPath` no-op guards stop junk entries wiping redo.
+- **Cross-system routing** (`utils/undoJournal.ts` + `utils/undoRouting.ts`):
+  entries in both systems carry a shared recency seq; Ctrl+Z/Ctrl+Shift+Z/
+  Ctrl+Y and the toolbar buttons all route through one arbiter — undo reverts
+  the LAST action wherever recorded, redo replays forward in original order,
+  and a new edit in either system invalidates redo in both. Previously Ctrl+Z
+  drained the entire timeline stack first (the first press after a recorded
+  drag looked like a no-op) while the buttons only drove flame history.
+  Journal participation is opt-in; the variation browser's preview histories
+  stay isolated. Timeline stacks got a version signal so button states are
+  reactive.
+- **Writer batching/silencing**: ScrubInput scrubs wrap in preview/commit
+  (was one history entry per pointer-move — camera theta/phi/R/FOV, affine +
+  colour lists, symmetry folds); OrientationGizmo batches drag-orbit and the
+  axis-snap rAF ease (~70 entries per axis click); the 3D wheel-zoom commit
+  timer is tracked/cleared (stale timers committed previews mid-gesture; 2D
+  gets the same drag/pinch takeover cancellation). New
+  `ChangeHistory.setSilently()` for automated writers: animation export wrote
+  one entry per exported frame; the 3D auto-exposure follower re-recorded
+  exposure after every radius undo, destroying redo.
+- **Ctrl+Z in text-entry inputs**: the two keyboard dispatchers each carried a
+  copy of the active-input guard and only one had the text-entry input types
+  (number/search/...). Extracted to `shortcuts/activeInputGuard.ts` and
+  shared — typing in timeline FPS/frames, export dimensions or variation
+  search no longer triggers app undo.
+
+### Known gaps (documented, out of scope)
+
+- `timelineUndo` restores tracks only — it does not write values back into
+  the flame store or restore playhead/preview-held state, so an undo can be
+  visually silent when the view isn't driven by the timeline.
+- Palette selection, blend flame/weight, custom-variation registry and
+  timeline config (fps/frames/loop) live outside both histories.
+
 ## [0.9.4] - 2026-07-02
 
 ### Added

@@ -3,6 +3,17 @@
 What's new in Chaos Master. Concise highlights for each release; the full
 developer history lives in `dev.changelog.md`.
 
+## [0.9.5] - 2026-07-02
+
+### Fixed
+
+- **Undo now reverts your last action — whatever it was.** The app kept two separate undo histories (flame edits and timeline keyframes); Ctrl+Z used to unwind every keyframe change before any flame edit became reachable, while the toolbar Undo button only ever touched flame edits. Both now share one chronological order, the buttons match Ctrl+Z exactly, and their enabled state reflects everything undoable. Redo replays in the order things happened, and making a new edit after undoing clears redo everywhere.
+- **Undoing "New transform", "Add variation", and "Add symmetry" works.** A long-standing engine bug ran the change twice under the hood, so undo silently did nothing and redo duplicated the transform. Dice rolls also redo to exactly the values you saw.
+- **One action = one undo step.** Randomize/Smart animation, the Colors generator, and animation presets used to record one undo entry per keyframe (dozens per click); value scrubs, the camera orientation gizmo, and 3D wheel-zoom recorded one per pointer-move. All are now single steps.
+- **Undo no longer leaks across flames.** Loading a flame, starting a new one, or switching 2D/3D previously kept the old flame's keyframe history alive — Ctrl+Z could dump a previous flame's animation tracks onto the new one.
+- **Ctrl+Z while typing in number or search fields** (timeline FPS/frames, export size, variation search) now edits the text as expected instead of triggering an app undo behind your back.
+- Exporting an animation no longer floods undo history with one entry per rendered frame, and 3D auto-exposure no longer fights undo after camera zooms.
+
 ## [0.9.4] - 2026-07-02
 
 ### Added

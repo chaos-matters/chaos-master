@@ -179,12 +179,20 @@ export function createStoreHistory<T extends object>(
     // another, so undo of "New transform" silently did nothing and redo
     // duplicated it. Unchanged subtrees keep their identity through
     // produceWithPatches, so reconcile still yields fine-grained updates.
-    const [result, forwardPatches, backwardPatches] = produceWithPatches(
+    const [result, forwardPatchesRaw, backwardPatchesRaw] = produceWithPatches(
       unwrap(store),
       (draft) => {
         setFn(draft as T)
       },
     )
+    // Isolate patch payloads BEFORE reconcile touches the store: object-valued
+    // patches reference the store's existing raw nodes, and reconcile mutates
+    // those nodes IN PLACE (that is its point) — without cloning first, a
+    // backward patch's "old value" silently becomes the new one and undo
+    // applies a no-op. (Leaf/primitive patches were immune, which is why this
+    // only bit object-replacing edits like affine drags.)
+    const forwardPatches = deepClone(forwardPatchesRaw)
+    const backwardPatches = deepClone(backwardPatchesRaw)
     batch(() => {
       setStore(reconcile((result ?? unwrap(store)) as T))
       const preview_ = preview()
