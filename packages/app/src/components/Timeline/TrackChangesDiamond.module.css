@@ -20,10 +20,8 @@
     border-color: var(--neutral-700);
   }
 
-  &:hover {
-    border-color: var(--accent-color, #6366f1);
-    color: var(--accent-color, #6366f1);
-    background: rgba(99, 102, 241, 0.06);
+  &:hover .gem {
+    stroke: #ca8a04;
   }
 }
 
@@ -46,65 +44,33 @@
   flex-shrink: 0;
 }
 
+/* Off: outline only — same visual language as an un-keyed parameter diamond. */
 .gem {
-  fill: var(--neutral-300);
+  fill: transparent;
   stroke: var(--neutral-500);
-  stroke-width: 1;
-  transition: fill 0.2s;
+  stroke-width: 1.2;
+  transition:
+    fill 0.15s,
+    stroke 0.15s;
+}
+
+/* On: solid amber like an active keyframe diamond, plus a faint static glow. */
+.active {
+  border-color: #ca8a04;
+  color: #ca8a04;
 
   [data-theme='dark'] & {
-    fill: var(--neutral-700);
-    stroke: var(--neutral-500);
+    border-color: #a16207;
+    color: #eab308;
   }
-}
 
-.facet {
-  fill: none;
-  stroke: rgba(255, 255, 255, 0.4);
-  stroke-width: 0.6;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.shine {
-  fill: none;
-  stroke: #fff;
-  stroke-width: 1.1;
-  stroke-linecap: round;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.active {
-  border-color: var(--accent-color, #6366f1);
-  color: var(--accent-color, #6366f1);
-
-  /* The gem's gradient fill is set inline (per-instance gradient id). */
   & .gem {
-    stroke: #4338ca;
-  }
-
-  & .facet {
-    opacity: 1;
-  }
-
-  & .shine {
-    opacity: 0.9;
+    fill: #eab308;
+    stroke: #ca8a04;
   }
 
   & .diamond {
-    animation: tc-sparkle 2.4s ease-in-out infinite;
-  }
-}
-
-@keyframes tc-sparkle {
-  0%,
-  100% {
-    filter: drop-shadow(0 0 2px rgba(99, 102, 241, 0.55));
-  }
-
-  50% {
-    filter: drop-shadow(0 0 6px rgba(129, 140, 248, 0.95));
+    filter: drop-shadow(0 0 3px rgba(234, 179, 8, 0.5));
   }
 }
 
