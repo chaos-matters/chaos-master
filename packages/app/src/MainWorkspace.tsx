@@ -404,11 +404,23 @@ export function MainWorkspace(props: AppProps) {
   })
   // Hide timeline by default on mobile -- users can toggle it back on
   const [showTimeline, setShowTimeline] = createSignal(window.innerWidth >= 769)
-  const [selectedPaletteId, setSelectedPaletteId] = createSignal<string>('')
-
-  const [selectedPalette, setSelectedPalette] = createSignal<
-    Palette | undefined
-  >(undefined)
+  // Palette selection is part of the flame document (renderSettings.palette):
+  // applying/removing one is a single undoable history entry, and the palette
+  // travels with saves/shares. These accessors derive the UI/render views.
+  const selectedPalette = createMemo<Palette | undefined>(() => {
+    const stored = flameDescriptor.renderSettings.palette
+    if (!stored) return undefined
+    return {
+      id: stored.id,
+      name: stored.name,
+      entries: stored.entries.map((entry) => ({ ...entry })),
+      source: 'imported',
+    }
+  })
+  const selectedPaletteId = () =>
+    flameDescriptor.renderSettings.palette?.id ?? ''
+  // Colors as they were before the first palette apply — lets Unselect
+  // restore the "natural" colors. UI stash only; undo handles the rest.
   const [prePaletteColors, setPrePaletteColors] = createSignal<
     Record<string, { x: number; y: number }>
   >({})
@@ -753,8 +765,6 @@ export function MainWorkspace(props: AppProps) {
       setPrePaletteColors(colors)
     }
 
-    setSelectedPaletteId(palette.id)
-    setSelectedPalette(palette)
     // Convert palette entries to color map entries and apply
     const entries = palette.entries.map((entry) => ({ a: entry.a, b: entry.b }))
     const colorMap: ColorMap = {
@@ -762,14 +772,27 @@ export function MainWorkspace(props: AppProps) {
       name: palette.name,
       entries,
     }
+    // ONE history entry: transform colors AND the palette itself (it lives in
+    // renderSettings.palette), so a single undo fully reverts the apply —
+    // previously the palette identity sat in signals and undo half-reverted
+    // (colors back, palette grading still on).
     setFlameDescriptor((draft) => {
       applyColorMapToFlame(draft, colorMap)
-    })
+      draft.renderSettings.palette = {
+        id: palette.id,
+        name: palette.name,
+        entries: palette.entries.map(({ id, position, a, b }) => ({
+          id,
+          position,
+          a,
+          b,
+        })),
+      }
+    }, 'Apply Palette')
   }
 
   const handlePaletteUnselect = () => {
-    setSelectedPaletteId('')
-    setSelectedPalette(undefined)
+    // One undoable entry: restore pre-palette colors + drop the palette.
     setFlameDescriptor((draft) => {
       const saved = prePaletteColors()
       for (const [tid, t] of recordEntries(draft.transforms)) {
@@ -777,7 +800,8 @@ export function MainWorkspace(props: AppProps) {
           t.color = { x: saved[tid].x, y: saved[tid].y }
         }
       }
-    })
+      delete draft.renderSettings.palette
+    }, 'Remove Palette')
     setPrePaletteColors({})
   }
 
@@ -2655,8 +2679,12 @@ export function MainWorkspace(props: AppProps) {
       currentFrame: timeline.currentFrame,
       setCurrentFrame: timeline.setCurrentFrame,
       play: timeline.play,
-      setLoop: (loop) => { timeline.updateConfigUndoable({ loop }); },
-      setFps: (fps) => { timeline.updateConfigUndoable({ fps }); },
+      setLoop: (loop) => {
+        timeline.updateConfigUndoable({ loop })
+      },
+      setFps: (fps) => {
+        timeline.updateConfigUndoable({ fps })
+      },
       addKeyframe: (path, frame, value, easing) => {
         timeline.addKeyframe(
           path,

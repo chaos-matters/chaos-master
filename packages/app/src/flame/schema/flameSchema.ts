@@ -201,6 +201,23 @@ const RenderSettings = v.object({
   ),
   palettePhase: v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(1)), 0),
   paletteSpeed: v.optional(v.pipe(v.number(), v.minValue(0)), 0.5),
+  // The applied palette travels WITH the flame (entries embedded, not just an
+  // id) so selection is undoable through flame history and survives
+  // save/share/load even when the recipient lacks the palette locally.
+  palette: v.optional(
+    v.object({
+      id: v.string(),
+      name: v.string(),
+      entries: v.array(
+        v.object({
+          id: v.string(),
+          position: v.number(),
+          a: v.number(),
+          b: v.number(),
+        }),
+      ),
+    }),
+  ),
   backgroundColor: v.optional(
     v.tuple([ColorValueSchema, ColorValueSchema, ColorValueSchema]),
   ),
