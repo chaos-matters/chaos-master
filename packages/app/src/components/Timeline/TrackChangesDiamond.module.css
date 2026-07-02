@@ -1,0 +1,79 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--neutral-300);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--neutral-500);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
+
+  [data-theme='dark'] & {
+    border-color: var(--neutral-700);
+  }
+
+  &:hover .gem {
+    stroke: #ca8a04;
+  }
+}
+
+/* Gem-only variant for editor canvas overlays. */
+.compact {
+  gap: 0;
+  padding: 3px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--neutral-100) 72%, transparent);
+  backdrop-filter: blur(2px);
+
+  [data-theme='dark'] & {
+    background: color-mix(in srgb, var(--neutral-900) 72%, transparent);
+  }
+}
+
+.diamond {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+/* Off: outline only — same visual language as an un-keyed parameter diamond. */
+.gem {
+  fill: transparent;
+  stroke: var(--neutral-500);
+  stroke-width: 1.2;
+  transition:
+    fill 0.15s,
+    stroke 0.15s;
+}
+
+/* On: solid amber like an active keyframe diamond, plus a faint static glow. */
+.active {
+  border-color: #ca8a04;
+  color: #ca8a04;
+
+  [data-theme='dark'] & {
+    border-color: #a16207;
+    color: #eab308;
+  }
+
+  & .gem {
+    fill: #eab308;
+    stroke: #ca8a04;
+  }
+
+  & .diamond {
+    filter: drop-shadow(0 0 3px rgba(234, 179, 8, 0.5));
+  }
+}
+
+.label {
+  line-height: 1;
+}

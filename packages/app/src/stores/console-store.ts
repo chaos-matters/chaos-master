@@ -29,35 +29,46 @@ function pushEntry(type: LogType, args: unknown[]) {
   })
 }
 
-const _orig = {
-  log: console.log.bind(console),
-  error: console.error.bind(console),
-  warn: console.warn.bind(console),
-  info: console.info.bind(console),
-  debug: console.debug.bind(console),
-}
+// Guard against re-patching. ES modules are singletons in production, but a
+// dev HMR reload can re-execute this module — without this flag the second run
+// would capture the already-wrapped functions into `_orig` and wrap again, so
+// every log would be pushed (and printed) twice per reload.
+const PATCH_FLAG = '__chaosConsolePatched'
+const consoleFlags = console as unknown as Record<string, boolean>
 
-console.log = (...args: unknown[]) => {
-  pushEntry('log', args)
-  _orig.log(...args)
-}
+if (!consoleFlags[PATCH_FLAG]) {
+  consoleFlags[PATCH_FLAG] = true
 
-console.error = (...args: unknown[]) => {
-  pushEntry('error', args)
-  _orig.error(...args)
-}
+  const _orig = {
+    log: console.log.bind(console),
+    error: console.error.bind(console),
+    warn: console.warn.bind(console),
+    info: console.info.bind(console),
+    debug: console.debug.bind(console),
+  }
 
-console.warn = (...args: unknown[]) => {
-  pushEntry('warn', args)
-  _orig.warn(...args)
-}
+  console.log = (...args: unknown[]) => {
+    pushEntry('log', args)
+    _orig.log(...args)
+  }
 
-console.info = (...args: unknown[]) => {
-  pushEntry('info', args)
-  _orig.info(...args)
-}
+  console.error = (...args: unknown[]) => {
+    pushEntry('error', args)
+    _orig.error(...args)
+  }
 
-console.debug = (...args: unknown[]) => {
-  pushEntry('debug', args)
-  _orig.debug(...args)
+  console.warn = (...args: unknown[]) => {
+    pushEntry('warn', args)
+    _orig.warn(...args)
+  }
+
+  console.info = (...args: unknown[]) => {
+    pushEntry('info', args)
+    _orig.info(...args)
+  }
+
+  console.debug = (...args: unknown[]) => {
+    pushEntry('debug', args)
+    _orig.debug(...args)
+  }
 }

@@ -54,20 +54,33 @@ export function ensureMathJax(): Promise<void> {
     const mj = getMathJax()
     if (!mj) throw new Error('MathJax failed to initialize')
     if (!mj.startup?.document) {
-      return new Promise<void>((resolve) => {
+      return new Promise<void>((resolve, reject) => {
+        // Without this, a startup failure that never calls `ready()` (or
+        // whose `startup.promise` rejects) used to leave this promise
+        // pending forever — matching turnstile.ts's poll-timeout pattern.
+        const timeoutId = setTimeout(() => {
+          reject(new Error('MathJax failed to start within 10s'))
+        }, 10000)
         mj.startup = {
           ...mj.startup,
           ready() {
             mj.startup?.defaultReady?.()
             mj.startup?.promise
               ?.then(() => {
+                clearTimeout(timeoutId)
                 resolve()
               })
-              .catch(() => {})
+              .catch((err: unknown) => {
+                clearTimeout(timeoutId)
+                reject(err instanceof Error ? err : new Error(String(err)))
+              })
           },
         }
         if (mj.loader) mj.loader.load(mj.config?.loader?.load ?? [])
-        else resolve()
+        else {
+          clearTimeout(timeoutId)
+          resolve()
+        }
       })
     }
   })

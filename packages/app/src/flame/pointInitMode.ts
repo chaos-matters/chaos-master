@@ -1,7 +1,7 @@
 import { perlin2d } from '@typegpu/noise'
 import { tgpu } from 'typegpu'
 import { f32, u32, vec2f } from 'typegpu/data'
-import { cos, floor, log, mul, sin, sqrt } from 'typegpu/std'
+import { cos, floor, log, min, mul, sin, sqrt } from 'typegpu/std'
 import { random } from '@/shaders/random'
 import { recordKeys } from '@/utils/record'
 import * as v from '@/valibot'
@@ -67,9 +67,9 @@ export const pointInitModeTriangle = pointInitModeFn((_index) => {
 
 export const pointInitModeGaussian = pointInitModeFn((_index) => {
   'use gpu'
-  // box-muller transform requires non-zero inputs for the log function
-  // Adding a tiny epsilon to avoid log(0)
-  const u1 = random() + f32(1e-6)
+  // box-muller transform requires u1 strictly inside (0, 1) for the log function:
+  // log(0) is -Infinity, and log(u1 > 1) goes positive, making sqrt(-2*log(u1)) NaN.
+  const u1 = min(random() + f32(1e-6), f32(1.0 - 1e-6))
   const u2 = random()
 
   // standard deviation (sigma), 0.4 keeps most points within [-1, 1]

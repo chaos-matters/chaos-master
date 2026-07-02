@@ -9,6 +9,10 @@ interface MobileContextType {
   isMobile: Accessor<boolean>
 }
 
+// Deliberate default: components read `isMobile` from many render sites, some
+// outside a MobileProvider (standalone dialogs/previews). Defaulting to the
+// desktop layout (`false`) is a safe fallback rather than a crash. Genuinely-
+// required contexts throw via useContextSafe instead.
 const MobileContext = createContext<MobileContextType>({
   isMobile: () => false,
 })

@@ -1,8 +1,9 @@
 import { batch, createSignal } from 'solid-js'
-import { produce, reconcile, unwrap } from 'solid-js/store'
+import { reconcile, unwrap } from 'solid-js/store'
 import { applyPatchesMutatively, enableStandardPatches, produceWithPatches, } from 'structurajs'
 import { deepClone } from './clone'
 import { compressPatches, forwardBackwardPatchPairDoesNothing, } from './compressPatches'
+import { clearAllRedos, nextUndoSeq, registerRedoClearer } from './undoJournal'
 import type { SetStoreFunction, Store } from 'solid-js/store'
 import type { Patch } from 'structurajs'
 
@@ -18,6 +19,8 @@ type HistoryItem = {
   description?: string
   forwardPatches: Patch[]
   backwardPatches: Patch[]
+  /** Journal stamp for cross-system chronological undo (journaled mode). */
+  seq?: number
 }
 
 export type HistorySetter<T extends object> = (
@@ -36,12 +39,30 @@ export type ChangeHistory<T> = {
   readonly isPreviewing: () => boolean
   readonly isUndoingOrRedoing: () => boolean
   readonly commit: () => void
+  /** Journal stamp of the entry the next undo/redo would apply (null: none).
+   *  Used by the cross-system undo router; always null when not journaled. */
+  readonly peekUndoSeq: () => number | null
+  readonly peekRedoSeq: () => number | null
+  /** Mutate the store WITHOUT recording history. For automated writers that
+   *  must never pollute undo: the animation export applying per-frame state
+   *  (one entry per exported frame otherwise) and derived follower effects
+   *  like 3D auto-exposure (whose reactive write after an undo would inject
+   *  a fresh entry and destroy redo). */
+  readonly setSilently: (setFn: (draft: T) => void) => void
 }
 
-export function createStoreHistory<T extends object>([store, setStore]: [
-  Store<T>,
-  SetStoreFunction<T>,
-]) {
+type CreateStoreHistoryOptions = {
+  /** Join the app-wide undo journal: entries get recency stamps for the
+   *  cross-system undo router, and any journaled push (here or in the
+   *  timeline) invalidates redo everywhere. Leave OFF for throwaway preview
+   *  histories (e.g. the variation browser) so they stay isolated. */
+  journal?: boolean
+}
+
+export function createStoreHistory<T extends object>(
+  [store, setStore]: [Store<T>, SetStoreFunction<T>],
+  { journal = false }: CreateStoreHistoryOptions = {},
+) {
   const [stackIndex, setStackIndex] = createSignal(-1)
   const [isUndoingOrRedoing, setIsUndoingOrRedoing] =
     createSignal<boolean>(false)
@@ -56,6 +77,18 @@ export function createStoreHistory<T extends object>([store, setStore]: [
   const hasUndo = () => stackIndex() >= 0
   const hasRedo = () => stackIndex() < stack().length - 1
   const isPreviewing = () => Boolean(preview())
+  const peekUndoSeq = () => stack()[stackIndex()]?.seq ?? null
+  const peekRedoSeq = () => stack()[stackIndex() + 1]?.seq ?? null
+
+  if (journal) {
+    // Truncating the forward branch IS this history's redo-clear.
+    registerRedoClearer(() => {
+      setStack((p) => {
+        p.splice(stackIndex() + 1, Infinity)
+        return p
+      })
+    })
+  }
 
   function addToStack(item: HistoryItem) {
     const forwardPatches = compressPatches(item.forwardPatches)
@@ -66,11 +99,19 @@ export function createStoreHistory<T extends object>([store, setStore]: [
     if (forwardBackwardPatchPairDoesNothing(forwardPatches, backwardPatches)) {
       return
     }
+    // Deep-clone the payloads going into the stack: patch values otherwise
+    // share object identity with nodes adopted into the live store (by
+    // reconcile in set/replace/undo/redo), and later in-place store edits
+    // would silently rewrite history entries — corrupting redo.
     const compressedItem: HistoryItem = {
-      forwardPatches,
-      backwardPatches,
+      forwardPatches: deepClone(forwardPatches),
+      backwardPatches: deepClone(backwardPatches),
       description: item.description,
+      seq: journal ? nextUndoSeq() : undefined,
     }
+    // A journaled edit invalidates redo EVERYWHERE (timeline included) — the
+    // local splice below only truncates this history's own forward branch.
+    if (journal) clearAllRedos()
     setStack((p) => {
       p.splice(stackIndex() + 1, Infinity, compressedItem)
       setStackIndex(p.length - 1)
@@ -94,9 +135,12 @@ export function createStoreHistory<T extends object>([store, setStore]: [
     // Using produce + applyPatchesMutatively doesn't truly remove deleted keys
     // from SolidJS stores (produce's proxy converts `delete` to setting
     // undefined), which leaves zombie entries in transform records.
+    // The extra deepClone before reconcile keeps stack payloads isolated:
+    // applyPatchesMutatively splices patch VALUE objects into the result, and
+    // reconcile would adopt them into the live store by reference.
     const plain = deepClone(store)
     const result = applyPatchesMutatively(plain, backwardPatches)
-    setStore(reconcile((result ?? plain) as T))
+    setStore(reconcile(deepClone(result ?? plain) as T))
     setStackIndex(i - 1)
   }
 
@@ -114,19 +158,43 @@ export function createStoreHistory<T extends object>([store, setStore]: [
     const { forwardPatches } = item
     const plain = deepClone(store)
     const result = applyPatchesMutatively(plain, forwardPatches)
-    setStore(reconcile((result ?? plain) as T))
+    setStore(reconcile(deepClone(result ?? plain) as T))
     setStackIndex(i)
   }
 
+  const setSilently = (setFn: (draft: T) => void) => {
+    const [result] = produceWithPatches(unwrap(store), (draft) => {
+      setFn(draft as T)
+    })
+    setStore(reconcile((result ?? unwrap(store)) as T))
+  }
+
   const set: HistorySetter<T> = (setFn, description) => {
-    const [_, forwardPatches, backwardPatches] = produceWithPatches(
+    // Run the mutation callback exactly ONCE. produceWithPatches yields both
+    // the resulting state and the patches; the store is then updated by
+    // reconciling that result. Re-running setFn against the store (the old
+    // `setStore(produce(setFn))`) desynced store from history whenever the
+    // callback wasn't deterministic — e.g. `generateTransformId()` inside a
+    // setter recorded one UUID in the patches while the store received
+    // another, so undo of "New transform" silently did nothing and redo
+    // duplicated it. Unchanged subtrees keep their identity through
+    // produceWithPatches, so reconcile still yields fine-grained updates.
+    const [result, forwardPatchesRaw, backwardPatchesRaw] = produceWithPatches(
       unwrap(store),
       (draft) => {
         setFn(draft as T)
       },
     )
+    // Isolate patch payloads BEFORE reconcile touches the store: object-valued
+    // patches reference the store's existing raw nodes, and reconcile mutates
+    // those nodes IN PLACE (that is its point) — without cloning first, a
+    // backward patch's "old value" silently becomes the new one and undo
+    // applies a no-op. (Leaf/primitive patches were immune, which is why this
+    // only bit object-replacing edits like affine drags.)
+    const forwardPatches = deepClone(forwardPatchesRaw)
+    const backwardPatches = deepClone(backwardPatchesRaw)
     batch(() => {
-      setStore(produce(setFn))
+      setStore(reconcile((result ?? unwrap(store)) as T))
       const preview_ = preview()
       if (preview_) {
         preview_.forwardPatches.push(...forwardPatches)
@@ -200,6 +268,9 @@ export function createStoreHistory<T extends object>([store, setStore]: [
       isPreviewing,
       commit,
       replace,
+      peekUndoSeq,
+      peekRedoSeq,
+      setSilently,
     } satisfies ChangeHistory<T>,
   ] as const
 }

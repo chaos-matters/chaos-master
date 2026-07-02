@@ -1038,7 +1038,7 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
               )
             }}
           </For>
-          <Show when={selectedItemId() && dims() !== 3}>
+          <Show when={selectedItemId()}>
             <h2
               class={ui.collapsibleHeader}
               onClick={() => setAffineCollapsed((v) => !v)}

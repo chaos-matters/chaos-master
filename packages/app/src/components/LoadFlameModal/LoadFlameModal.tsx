@@ -679,8 +679,8 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
     }
 
     // PNG import (existing)
-    const arrBuf = new Uint8Array(await file.arrayBuffer())
     try {
+      const arrBuf = new Uint8Array(await file.arrayBuffer())
       const result = await extractFlameFromPng(arrBuf)
       if (result.animation && result.animation.tracks.length > 0) {
         props.respond({

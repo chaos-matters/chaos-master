@@ -8,7 +8,10 @@ test.describe('Palette System', () => {
     await dismissWelcomeIfPresent(page)
   })
 
-  test('should render app without fatal errors', async ({ page, consoleErrors }) => {
+  test('should render app without fatal errors', async ({
+    page,
+    consoleErrors,
+  }) => {
     const root = page.locator('#root')
     await expect(root).toBeAttached()
 
@@ -23,18 +26,24 @@ test.describe('Palette System', () => {
 
   test('should have palette selector', async ({ page }) => {
     const webgpuError = page.locator('text=WebGPU').first()
-    const webgpuShown = await webgpuError.isVisible({ timeout: 500 }).catch(() => false)
-    if (webgpuShown) return
+    const webgpuShown = await webgpuError
+      .isVisible({ timeout: 500 })
+      .catch(() => false)
+    test.skip(webgpuShown, 'WebGPU unavailable in this session')
 
     await dismissWelcomeIfPresent(page)
-    const paletteLabel = page.locator('text=Palette').or(page.locator('text=palette'))
+    const paletteLabel = page
+      .locator('text=Palette')
+      .or(page.locator('text=palette'))
     await expect(paletteLabel.first()).toBeVisible({ timeout: 10000 })
   })
 
   test('should be able to select different palettes', async ({ page }) => {
     const webgpuError = page.locator('text=WebGPU').first()
-    const webgpuShown = await webgpuError.isVisible({ timeout: 500 }).catch(() => false)
-    if (webgpuShown) return
+    const webgpuShown = await webgpuError
+      .isVisible({ timeout: 500 })
+      .catch(() => false)
+    test.skip(webgpuShown, 'WebGPU unavailable in this session')
 
     await dismissWelcomeIfPresent(page)
     const selectors = page.locator('select')
@@ -44,11 +53,15 @@ test.describe('Palette System', () => {
 
   test('should show palette gradient preview', async ({ page }) => {
     const webgpuError = page.locator('text=WebGPU').first()
-    const webgpuShown = await webgpuError.isVisible({ timeout: 500 }).catch(() => false)
-    if (webgpuShown) return
+    const webgpuShown = await webgpuError
+      .isVisible({ timeout: 500 })
+      .catch(() => false)
+    test.skip(webgpuShown, 'WebGPU unavailable in this session')
 
     await dismissWelcomeIfPresent(page)
-    const gradientPreview = page.locator('[class*="gradient"]').or(page.locator('[style*="gradient"]'))
+    const gradientPreview = page
+      .locator('[class*="gradient"]')
+      .or(page.locator('[style*="gradient"]'))
     await expect(gradientPreview.first()).toBeVisible({ timeout: 10000 })
   })
 })

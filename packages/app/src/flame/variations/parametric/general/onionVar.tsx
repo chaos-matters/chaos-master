@@ -2,6 +2,7 @@ import { f32, struct, vec2f } from 'typegpu/data'
 import { select, sqrt } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
+import { safeDenom } from '../../safeMath'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
@@ -44,7 +45,7 @@ export const onionVar = parametricVariation(
     const y0 = pos.y - P.centre_y
     const d0 = x0 * x0 + y0 * y0
     const dr = sqrt(d0)
-    const safe_dr = select(dr, 1.0e-9, dr === 0.0)
+    const safe_dr = safeDenom(dr)
     const x1_a = x0
     const y1_a = y0
     const term = (2.0 * r0 - dr) / safe_dr

@@ -75,6 +75,10 @@ function FlameThumbnail(props: {
   const LOOP_DURATION_MS = (TOTAL_FRAMES / FPS) * 1000
 
   function startAnimation() {
+    // A duplicate mouseenter (touch-emulated hover, nested pointer events)
+    // without an intervening mouseleave would otherwise overwrite rafId with
+    // a second loop, orphaning the first one to recurse forever uncancelled.
+    if (rafId !== undefined) return
     startTime = globalThis.performance.now()
 
     function tick() {

@@ -7,6 +7,7 @@ export {
   updateCustomVariation,
   duplicateCustomVariation,
   deleteCustomVariation,
+  restoreCustomVariation,
   clearAllCustomVariations,
   previewCustomVariation,
   collectFlameCustomVariations,

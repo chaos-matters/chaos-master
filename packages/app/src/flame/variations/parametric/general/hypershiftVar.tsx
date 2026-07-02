@@ -1,6 +1,7 @@
 import { f32, struct, vec2f } from 'typegpu/data'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
+import { EPS_TINY } from '@/flame/constants'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
@@ -43,10 +44,10 @@ export const hypershiftVar = parametricVariation(
     'use gpu'
 
     const scale = 1.0 - P.shift * P.shift
-    const rad = 1.0 / (pos.x * pos.x + pos.y * pos.y + 1e-10)
+    const rad = 1.0 / (pos.x * pos.x + pos.y * pos.y + EPS_TINY.$)
     const x = rad * pos.x + P.shift
     const y = rad * pos.y
-    const rad2 = scale / (x * x + y * y + 1e-10)
+    const rad2 = scale / (x * x + y * y + EPS_TINY.$)
 
     return vec2f(rad2 * x + P.shift, rad2 * y * P.stretch).mul(varInfo.weight)
   },

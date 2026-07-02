@@ -9,6 +9,7 @@ function createSettingScrubber(
   step: number,
   min: number,
   max: number,
+  onGestureEnd?: () => void,
 ) {
   let scrubbing = false
   return function onPointerDown(e: PointerEvent) {
@@ -33,6 +34,7 @@ function createSettingScrubber(
       scrubbing = false
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
+      onGestureEnd?.()
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
@@ -49,10 +51,15 @@ export function TimelineSettings() {
         class={ui.settingItem}
         onPointerDown={createSettingScrubber(
           () => config().fps,
-          (v) => timeline.setConfig({ ...config(), fps: v }),
+          (v) => {
+            timeline.updateConfigUndoable({ fps: v }, 'fps')
+          },
           0.2,
           1,
           60,
+          () => {
+            timeline.breakUndoCoalescing()
+          },
         )}
       >
         <span class={ui.settingLabel}>FPS</span>
@@ -64,8 +71,7 @@ export function TimelineSettings() {
           max={60}
           step={1}
           onChange={(e) => {
-            timeline.setConfig({
-              ...config(),
+            timeline.updateConfigUndoable({
               fps: Math.round(Number(e.currentTarget.value)),
             })
           }}
@@ -78,8 +84,7 @@ export function TimelineSettings() {
           class={ui.settingCheckbox}
           checked={config().autoFps ?? false}
           onChange={(e) => {
-            timeline.setConfig({
-              ...config(),
+            timeline.updateConfigUndoable({
               autoFps: !(config().autoFps ?? false),
             })
             // Don't keep keyboard focus on the checkbox, otherwise the next
@@ -109,10 +114,15 @@ export function TimelineSettings() {
         class={ui.settingItem}
         onPointerDown={createSettingScrubber(
           () => config().endFrame,
-          (v) => timeline.setConfig({ ...config(), endFrame: v }),
+          (v) => {
+            timeline.updateConfigUndoable({ endFrame: v }, 'endFrame')
+          },
           0.5,
           1,
           999,
+          () => {
+            timeline.breakUndoCoalescing()
+          },
         )}
       >
         <span class={ui.settingLabel}>Frames</span>
@@ -123,8 +133,7 @@ export function TimelineSettings() {
           min={1}
           step={1}
           onChange={(e) => {
-            timeline.setConfig({
-              ...config(),
+            timeline.updateConfigUndoable({
               endFrame: Math.round(Number(e.currentTarget.value)),
             })
           }}
@@ -134,10 +143,15 @@ export function TimelineSettings() {
         class={ui.settingItem}
         onPointerDown={createSettingScrubber(
           () => config().timeScale,
-          (v) => timeline.setConfig({ ...config(), timeScale: v }),
+          (v) => {
+            timeline.updateConfigUndoable({ timeScale: v }, 'timeScale')
+          },
           0.1,
           1,
           10,
+          () => {
+            timeline.breakUndoCoalescing()
+          },
         )}
       >
         <span class={ui.settingLabel}>Speed</span>
@@ -149,8 +163,7 @@ export function TimelineSettings() {
           max={10}
           step={1}
           onChange={(e) => {
-            timeline.setConfig({
-              ...config(),
+            timeline.updateConfigUndoable({
               timeScale: Math.round(Number(e.currentTarget.value)),
             })
           }}
@@ -163,7 +176,7 @@ export function TimelineSettings() {
           class={ui.settingCheckbox}
           checked={config().loop}
           onChange={(e) => {
-            timeline.setConfig({ ...config(), loop: !config().loop })
+            timeline.updateConfigUndoable({ loop: !config().loop })
             // Release focus so Space starts playback instead of re-toggling.
             e.currentTarget.blur()
           }}

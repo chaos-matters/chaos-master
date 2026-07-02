@@ -1,3 +1,4 @@
+import { asciiBytes, readAscii, readUint32BE, writeUint32BE, } from './binaryReader'
 import { compressJsonQueryParam, concatBuffers, decompressJsonPayload, } from './jsonQueryParam'
 import type { SharePayload } from './jsonQueryParam'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -5,27 +6,9 @@ import type { TimelineConfig, TimelineTrack } from '@/utils/timeline'
 
 const BOX_HEADER_SIZE = 8 // 4 bytes size + 4 bytes type
 
-function readUint32BE(view: DataView, offset: number): number {
-  return view.getUint32(offset)
-}
-
+/** ASCII type tag of the box at `offset` (the 4 bytes after the size field). */
 function boxTypeAt(view: DataView, offset: number): string {
-  return String.fromCharCode(
-    view.getUint8(offset + 4),
-    view.getUint8(offset + 5),
-    view.getUint8(offset + 6),
-    view.getUint8(offset + 7),
-  )
-}
-
-function writeUint32BE(value: number): Uint8Array {
-  const buf = new ArrayBuffer(4)
-  new DataView(buf).setUint32(0, value)
-  return new Uint8Array(buf)
-}
-
-function asciiBytes(str: string): Uint8Array {
-  return new TextEncoder().encode(str)
+  return readAscii(view, offset + 4, 4)
 }
 
 /** Build a complete MP4 box: [size:4][type:4][payload] */
@@ -46,12 +29,7 @@ function findBox(
   while (offset + BOX_HEADER_SIZE <= buffer.byteLength) {
     const size = readUint32BE(view, offset)
     if (size < BOX_HEADER_SIZE || offset + size > buffer.byteLength) break
-    const type = String.fromCharCode(
-      view.getUint8(offset + 4),
-      view.getUint8(offset + 5),
-      view.getUint8(offset + 6),
-      view.getUint8(offset + 7),
-    )
+    const type = boxTypeAt(view, offset)
     if (type === boxType) {
       return { offset, size, dataOffset: offset + BOX_HEADER_SIZE }
     }
@@ -197,12 +175,7 @@ export function extractMetadataFromMp4(mp4Buffer: ArrayBuffer): Promise<{
     const childSize = readUint32BE(view, childOffset)
     if (childSize < BOX_HEADER_SIZE || childOffset + childSize > moovEnd) break
 
-    const childType = String.fromCharCode(
-      view.getUint8(childOffset + 4),
-      view.getUint8(childOffset + 5),
-      view.getUint8(childOffset + 6),
-      view.getUint8(childOffset + 7),
-    )
+    const childType = boxTypeAt(view, childOffset)
 
     if (childType === 'udta') {
       const udtaDataOffset = childOffset + BOX_HEADER_SIZE
@@ -217,12 +190,7 @@ export function extractMetadataFromMp4(mp4Buffer: ArrayBuffer): Promise<{
         )
           break
 
-        const udtaChildType = String.fromCharCode(
-          view.getUint8(udtaChildOffset + 4),
-          view.getUint8(udtaChildOffset + 5),
-          view.getUint8(udtaChildOffset + 6),
-          view.getUint8(udtaChildOffset + 7),
-        )
+        const udtaChildType = boxTypeAt(view, udtaChildOffset)
 
         if (udtaChildType === 'flm3') {
           const payloadOffset = udtaChildOffset + BOX_HEADER_SIZE

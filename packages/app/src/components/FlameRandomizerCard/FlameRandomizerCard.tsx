@@ -77,6 +77,12 @@ export interface FlameRandomizerCardProps {
   /** Apply a flame chosen from the preview gallery (replaces the active flame). */
   onApplyCandidate: (flame: FlameDescriptor) => void
   hardwareTier?: HardwareTier | null
+  /** Controlled card open state (see CollapsibleCard). */
+  open?: boolean
+  onToggleOpen?: () => void
+  /** Bumping this expands the Animation Settings section (Timeline "Animate"
+   *  button). The initial value is ignored. */
+  expandAnimationEpoch?: number
 }
 
 function RandomizeToggleButton(props: {
@@ -290,6 +296,18 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
   const [animationExpanded, setAnimationExpanded] = createSignal(false)
   const [historyExpanded, setHistoryExpanded] = createSignal(true)
 
+  // Timeline "Animate" button: a bumped epoch forces the Animation Settings
+  // section open (the card itself is opened via the controlled `open` prop).
+  let isInitialAnimEpoch = true
+  createEffect(() => {
+    void props.expandAnimationEpoch
+    if (isInitialAnimEpoch) {
+      isInitialAnimEpoch = false
+      return
+    }
+    setAnimationExpanded(true)
+  })
+
   const buildConfig = (): GenerateRandomFlameConfig => ({
     strength: strength(),
     minTransforms: minTransforms(),
@@ -379,7 +397,12 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
   const [galleryExpanded, setGalleryExpanded] = createSignal(false)
 
   return (
-    <CollapsibleCard title="Flame Randomizer" defaultOpen={false}>
+    <CollapsibleCard
+      title="Flame Randomizer"
+      defaultOpen={false}
+      open={props.open}
+      onToggleOpen={props.onToggleOpen}
+    >
       <div class={ui.cardBody}>
         {/* Settings Panel */}
         <div class={ui.settingsSection}>

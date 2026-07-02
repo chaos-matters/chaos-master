@@ -2,6 +2,7 @@ import { f32, struct, vec2f } from 'typegpu/data'
 import { abs, pow, select } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
+import { EPS_SMALL } from '@/flame/constants'
 import { random } from '@/shaders/random'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
@@ -72,7 +73,7 @@ export const crobVar = parametricVariation(
     const xInt_2 = xInterval * 0.5
     const yInt_2 = yInterval * 0.5
     const minInt_2 = select(xInt_2, yInt_2, yInt_2 < xInt_2)
-    const setProb = yInterval / (xInterval + yInterval + 1.0e-9)
+    const setProb = yInterval / (xInterval + yInterval + EPS_SMALL.$)
     const setProbH = 0.5 * setProb
     const setProbQ = 0.25 * setProb
     const setProbTQ = 0.75 * setProb

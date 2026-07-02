@@ -36,6 +36,10 @@ export function matchesShortcut(
   ev: KeyboardEvent,
   parsed: ParsedShortcut,
 ): boolean {
+  // No registered shortcut can require Alt (parseShortcut doesn't recognize
+  // it as a modifier token), so an Alt-held combo must never match — otherwise
+  // e.g. Ctrl+Alt+S would incorrectly fire whatever plain Ctrl+S is bound to.
+  if (ev.altKey) return false
   const ctrlPressed = ev.ctrlKey || ev.metaKey
   if (parsed.ctrl !== ctrlPressed) return false
   if (parsed.shift !== ev.shiftKey) return false

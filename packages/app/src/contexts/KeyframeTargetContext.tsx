@@ -36,6 +36,12 @@ export function KeyframeTargetProvider(props: ParentProps) {
 export function useKeyframeTarget() {
   const context = useContext(KeyframeTargetContext)
   if (!context) {
+    // Deliberate graceful degradation: keyframe-targeting controls (Slider,
+    // AngleEditor, ScrubInput) are also rendered standalone in dialogs that
+    // have no timeline (e.g. LogoFaviconGenerator, ExportPngDialog,
+    // FlameRandomizerCard). Outside a provider, targeting is simply a no-op
+    // rather than a crash. Contexts that are genuinely required (Toast,
+    // SpotlightTour, Gate, Theme, Timeline) throw via useContextSafe instead.
     const nilAccessor = () => null as string | null
     const noop = () => {}
     return {

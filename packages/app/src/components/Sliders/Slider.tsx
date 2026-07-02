@@ -6,6 +6,7 @@ import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useCompactMode } from '@/contexts/CompactModeContext'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useTimeline } from '@/contexts/TimelineContext'
+import { keyframeEditedParam } from '@/utils/keyframeOnChange'
 import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
 import ui from './Slider.module.css'
 
@@ -130,21 +131,16 @@ export function Slider(props: SliderProps) {
             }}
             onPointerUp={() => {
               history.commit()
+              // End of gesture: the next drag is its own undo step.
+              timeline?.breakUndoCoalescing()
             }}
             onPointerCancel={() => {
               history.commit()
+              timeline?.breakUndoCoalescing()
             }}
             onInput={(ev) => {
               props.onInput(ev.target.valueAsNumber)
-              // Auto-keyframe: only for already-animated params when auto mode is on
-              if (
-                timeline &&
-                props.dataParameterPath &&
-                timeline.autoKeyframe() &&
-                timeline.hasAnyKeyframes(props.dataParameterPath)
-              ) {
-                timeline.addKeyframeAtCurrentFrame(props.dataParameterPath)
-              }
+              keyframeEditedParam(timeline, props.dataParameterPath)
             }}
             onDblClick={() => {
               if (props.dataParameterPath !== undefined) {

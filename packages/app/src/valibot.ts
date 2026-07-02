@@ -21,6 +21,7 @@ export {
   string,
   tuple,
   union,
+  unknown,
   variant,
 } from 'valibot'
 export type {

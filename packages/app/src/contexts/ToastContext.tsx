@@ -1,34 +1,60 @@
-import { createContext, createSignal, useContext } from 'solid-js'
+import { createContext, createSignal, onCleanup } from 'solid-js'
+import { useContextSafe } from '@/utils/useContextSafe'
 import type { JSX } from 'solid-js'
+
+/** Optional button on a toast; clicking runs the handler and dismisses. */
+export type ToastAction = { label: string; onClick: () => void }
 
 interface ToastContextValue {
   toastMessage: () => string | null
-  showToast: (msg: string, durationMs?: number) => void
+  toastActions: () => ToastAction[] | null
+  showToast: (msg: string, durationMs?: number, actions?: ToastAction[]) => void
+  dismissToast: () => void
 }
 
 const ToastContext = createContext<ToastContextValue>()
 
 export function ToastProvider(props: { children: JSX.Element }) {
   const [toastMessage, setToastMessage] = createSignal<string | null>(null)
+  const [toastActions, setToastActions] = createSignal<ToastAction[] | null>(
+    null,
+  )
   let toastTimer: ReturnType<typeof setTimeout> | undefined
 
-  function showToast(msg: string, durationMs = 2500) {
-    setToastMessage(msg)
+  function dismissToast() {
     clearTimeout(toastTimer)
-    toastTimer = setTimeout(() => setToastMessage(null), durationMs)
+    setToastMessage(null)
+    setToastActions(null)
   }
 
+  function showToast(
+    msg: string,
+    durationMs?: number,
+    actions?: ToastAction[],
+  ) {
+    setToastMessage(msg)
+    setToastActions(actions ?? null)
+    clearTimeout(toastTimer)
+    // Action toasts linger longer by default so the user can react.
+    toastTimer = setTimeout(
+      dismissToast,
+      durationMs ?? (actions ? 12000 : 2500),
+    )
+  }
+
+  onCleanup(() => {
+    clearTimeout(toastTimer)
+  })
+
   return (
-    <ToastContext.Provider value={{ toastMessage, showToast }}>
+    <ToastContext.Provider
+      value={{ toastMessage, toastActions, showToast, dismissToast }}
+    >
       {props.children}
     </ToastContext.Provider>
   )
 }
 
 export function useToast() {
-  const context = useContext(ToastContext)
-  if (!context) {
-    throw new Error('useToast must be used within a ToastProvider')
-  }
-  return context
+  return useContextSafe(ToastContext, 'useToast', 'ToastProvider')
 }

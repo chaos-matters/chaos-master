@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { smartMutateAffine2D, smartMutateAffine3D } from './randomize'
+import { randomizeVariationParams, smartMutateAffine2D, smartMutateAffine3D, } from './randomize'
 
 const identity2D = () => ({ a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 })
 const identity3D = () => ({
@@ -51,6 +51,24 @@ describe('smartMutateAffine2D', () => {
       }
     }
     expect(changed).toBeGreaterThan(45)
+  })
+})
+
+describe('randomizeVariationParams', () => {
+  it('perturbs parameters whose default value is 0', () => {
+    // augerVar's `sym` param defaults to 0 — sigma used to be computed as
+    // Math.abs(0) * ... = 0, permanently excluding zero-default params like
+    // this from randomization regardless of strength.
+    let changed = 0
+    for (let trial = 0; trial < 50; trial++) {
+      const result = randomizeVariationParams('augerVar', 1)
+      if (result?.sym !== 0) changed++
+    }
+    expect(changed).toBeGreaterThan(45)
+  })
+
+  it('returns undefined for non-parametric variation types', () => {
+    expect(randomizeVariationParams('linearVar', 1)).toBeUndefined()
   })
 })
 

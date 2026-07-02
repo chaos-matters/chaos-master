@@ -160,6 +160,11 @@ export function FramePreviewGallery(props: Props) {
   }
 
   async function generatePreviews(append = false) {
+    // The trigger buttons unmount once isGenerating() flips (see the <Show>
+    // blocks below), but that update isn't necessarily synchronous with the
+    // click event that got us here — guard re-entrancy explicitly rather
+    // than relying on the DOM update racing ahead of a second click.
+    if (isGenerating()) return
     aborted = false
     setIsGenerating(true)
 

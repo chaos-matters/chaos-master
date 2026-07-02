@@ -1,147 +1,80 @@
-import { createSignal } from 'solid-js'
+import { renderHook } from '@solidjs/testing-library'
+import { createEffect } from 'solid-js'
 import { describe, expect, it } from 'vitest'
+import { KeyframeTargetProvider, useKeyframeTarget, } from './KeyframeTargetContext'
 
-// Test the KeyframeTargetContext logic conceptually
-// The actual context uses createSignal, createContext, useContext from solid-js
-
-describe('KeyframeTargetContext Logic', () => {
-  describe('targetedParameter Signal', () => {
-    it('should start as null', () => {
-      const [targetedParameter] = createSignal<string | null>(null)
-      expect(targetedParameter()).toBeNull()
+// Exercises the real provider + hook rather than a re-implementation of the
+// signal logic.
+describe('KeyframeTargetContext', () => {
+  describe('within a KeyframeTargetProvider', () => {
+    it('starts with null target and selection', () => {
+      const { result } = renderHook(useKeyframeTarget, {
+        wrapper: KeyframeTargetProvider,
+      })
+      expect(result.targetedParameter()).toBeNull()
+      expect(result.selectedKeyframePath()).toBeNull()
     })
 
-    it('should allow setting a parameter path', () => {
-      const [targetedParameter, setTargetedParameter] = createSignal<
-        string | null
-      >(null)
+    it('reactively tracks the targeted parameter', () => {
+      const { result } = renderHook(useKeyframeTarget, {
+        wrapper: KeyframeTargetProvider,
+      })
 
-      setTargetedParameter('exposure')
-      expect(targetedParameter()).toBe('exposure')
+      result.setTargetedParameter('camera.zoom')
+      expect(result.targetedParameter()).toBe('camera.zoom')
 
-      setTargetedParameter('camera.zoom')
-      expect(targetedParameter()).toBe('camera.zoom')
+      result.setTargetedParameter('transform.color.x')
+      expect(result.targetedParameter()).toBe('transform.color.x')
 
-      setTargetedParameter('transform.color.x')
-      expect(targetedParameter()).toBe('transform.color.x')
+      result.setTargetedParameter(null)
+      expect(result.targetedParameter()).toBeNull()
     })
 
-    it('should allow clearing the parameter', () => {
-      const [targetedParameter, setTargetedParameter] = createSignal<
-        string | null
-      >(null)
+    it('tracks the selected keyframe path independently of the target', () => {
+      const { result } = renderHook(useKeyframeTarget, {
+        wrapper: KeyframeTargetProvider,
+      })
 
-      setTargetedParameter('exposure')
-      expect(targetedParameter()).toBe('exposure')
+      result.setTargetedParameter('exposure')
+      result.setSelectedKeyframePath('vibrancy')
 
-      setTargetedParameter(null)
-      expect(targetedParameter()).toBeNull()
+      expect(result.targetedParameter()).toBe('exposure')
+      expect(result.selectedKeyframePath()).toBe('vibrancy')
     })
 
-    it('should handle dot-notation parameter paths', () => {
-      const [targetedParameter, setTargetedParameter] = createSignal<
-        string | null
-      >(null)
+    it('re-runs a tracking effect when the target changes', () => {
+      const { result } = renderHook(useKeyframeTarget, {
+        wrapper: KeyframeTargetProvider,
+      })
 
-      const paths = [
-        'camera.zoom',
-        'camera.rotation',
-        'camera.x',
-        'camera.y',
-        'transform.color.x',
-        'transform.color.y',
-        'backgroundColor',
-        'edgeFadeColor',
-      ]
+      const seen: (string | null)[] = []
+      // renderHook runs inside a reactive owner, so a createEffect here tracks
+      // the context signal and re-runs on each change.
+      createEffect(() => {
+        seen.push(result.targetedParameter())
+      })
 
-      for (const path of paths) {
-        setTargetedParameter(path)
-        expect(targetedParameter()).toBe(path)
-      }
-    })
-  })
+      result.setTargetedParameter('gamma')
+      result.setTargetedParameter('gamma') // same value: no extra run
+      result.setTargetedParameter(null)
 
-  describe('Context Interface', () => {
-    it('should provide correct interface structure', () => {
-      // Simulating what KeyframeTargetContext provides
-      const targetedParameter = createSignal<string | null>(null)
-      const setTargetedParameter = targetedParameter[1]
-
-      const context = {
-        targetedParameter: targetedParameter[0],
-        setTargetedParameter,
-      }
-
-      // Verify the interface has the correct shape
-      expect(typeof context.targetedParameter).toBe('function')
-      expect(typeof context.setTargetedParameter).toBe('function')
-    })
-
-    it('should allow useKeyframeTarget to throw when context is missing', () => {
-      // Simulating what useKeyframeTarget does
-      const useKeyframeTarget = (ctx: unknown) => {
-        if (ctx === null) {
-          throw new Error(
-            'useKeyframeTarget must be used within KeyframeTargetProvider',
-          )
-        }
-        return ctx
-      }
-
-      expect(() => useKeyframeTarget(null)).toThrow(
-        'useKeyframeTarget must be used within KeyframeTargetProvider',
-      )
+      expect(seen).toEqual([null, 'gamma', null])
     })
   })
 
-  describe('Signal Reactivity', () => {
-    it('should update when setTargetedParameter is called', () => {
-      const [targetedParameter, setTargetedParameter] = createSignal<
-        string | null
-      >(null)
+  describe('outside a provider', () => {
+    it('returns the deliberate no-op fallback instead of throwing', () => {
+      // Standalone controls (Slider, AngleEditor, ScrubInput) are rendered in
+      // dialogs with no timeline; the hook degrades gracefully there.
+      const { result } = renderHook(useKeyframeTarget)
 
-      const updates: (string | null)[] = []
-      const effect = () => {
-        updates.push(targetedParameter())
-      }
-
-      effect() // Initial call
-      expect(updates).toEqual([null])
-
-      setTargetedParameter('exposure')
-      effect() // After update
-      expect(updates).toEqual([null, 'exposure'])
-
-      setTargetedParameter('vibrancy')
-      effect() // After second update
-      expect(updates).toEqual([null, 'exposure', 'vibrancy'])
-
-      setTargetedParameter(null)
-      effect() // After clear
-      expect(updates).toEqual([null, 'exposure', 'vibrancy', null])
-    })
-
-    it('should not trigger effect when setting same value', () => {
-      const [targetedParameter, setTargetedParameter] = createSignal<
-        string | null
-      >('exposure')
-
-      let effectCallCount = 0
-      const effect = () => {
-        effectCallCount++
-        targetedParameter()
-      }
-
-      effect() // Initial call
-
-      setTargetedParameter('exposure') // Same value - should not trigger
-      effect()
-
-      setTargetedParameter('vibrancy') // Different value
-      effect()
-
-      // In SolidJS, the effect should only track when value actually changes
-      expect(effectCallCount).toBe(3)
+      expect(result.targetedParameter()).toBeNull()
+      expect(result.selectedKeyframePath()).toBeNull()
+      // Setters are no-ops: calling them neither throws nor changes state.
+      expect(() => {
+        result.setTargetedParameter('exposure')
+      }).not.toThrow()
+      expect(result.targetedParameter()).toBeNull()
     })
   })
 })

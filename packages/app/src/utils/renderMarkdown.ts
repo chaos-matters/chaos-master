@@ -17,10 +17,25 @@ const ADMONITION_RE = /^:::(note|info|warn|tip|danger)\s*\n([\s\S]*?)^:::/gm
 const MATH_INLINE_TOKEN = 'xMjxInlineTokenx'
 const MATH_TOKEN_END = 'xMjxEndx'
 
+/**
+ * Best-effort, defense-in-depth cleanup only — this is a hand-rolled regex
+ * pass, not a real HTML sanitizer, and is NOT sufficient on its own against
+ * adversarial input (e.g. it doesn't understand nested tags or encoded
+ * entities). The one caller of `renderMarkdown` (TutorialModal) additionally
+ * runs the result through DOMPurify's `sanitizeRichHtml` before rendering —
+ * any future caller MUST do the same rather than trusting this output as-is.
+ */
 function sanitize(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/\son\w+\s*=\s*"[^"]*"/gi, '')
+  return (
+    html
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      // on*="...", on*='...', and on*=bareword event-handler attributes.
+      .replace(/\son\w+\s*=\s*"[^"]*"/gi, '')
+      .replace(/\son\w+\s*=\s*'[^']*'/gi, '')
+      .replace(/\son\w+\s*=\s*[^\s"'>]+/gi, '')
+      // Neutralize javascript: URLs in href/src attributes.
+      .replace(/\s(href|src)\s*=\s*(["'])\s*javascript:[^"']*\2/gi, ' $1="#"')
+  )
 }
 
 export function renderMarkdown(text: string): string {

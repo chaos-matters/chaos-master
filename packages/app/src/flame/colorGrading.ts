@@ -99,6 +99,11 @@ export function createColorGradingPipeline(
     .createBuffer(arrayOf(PaletteEntry, entryCount))
     .$usage('storage')
 
+  onCleanup(() => {
+    vramLog('[colorGrading] Destroying paletteBuffer')
+    paletteBuffer.destroy()
+  })
+
   if (palette) {
     const sorted = [...palette.entries].sort((a, b) => a.position - b.position)
     const entries = sorted.map((entry) => ({

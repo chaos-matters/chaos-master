@@ -1,39 +1,10 @@
 import { createEffect, onCleanup } from 'solid-js'
 import { executeCommand, getAllCommands } from '@/commands/registry'
+import { letBrowserHandleActiveInput } from './activeInputGuard'
 import { matchesShortcut, parseShortcut } from './shortcutParser'
 import type { CommandContext } from '@/commands/types'
 
-const letBrowserHandleInputTypes = new Set([
-  'checkbox',
-  'range',
-  'button',
-  'submit',
-])
-
-function letBrowserHandleActiveInput(
-  el: Element | null,
-  ev: KeyboardEvent,
-): boolean {
-  if (!el) return false
-  if (
-    el.tagName === 'TEXTAREA' ||
-    el.tagName === 'SELECT' ||
-    el.getAttribute('contenteditable') === 'true' ||
-    el.closest('[contenteditable="true"]')
-  ) {
-    return true
-  }
-  if (el.tagName !== 'INPUT') return false
-  const input = el as HTMLInputElement
-  return (
-    input.type === '' ||
-    input.type === 'text' ||
-    (letBrowserHandleInputTypes.has(input.type) &&
-      (ev.code === 'Space' ||
-        ev.code === 'Enter' ||
-        ev.code.startsWith('Arrow')))
-  )
-}
+export { letBrowserHandleActiveInput } from './activeInputGuard'
 
 export function useShortcutManager(ctx: CommandContext) {
   createEffect(() => {

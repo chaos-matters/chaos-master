@@ -71,6 +71,52 @@ export function saveRecentFlame(
   return true
 }
 
+/** Stored entries with only structural validation — no flame-schema pass.
+ *  Used for read-modify-write cycles so a schema-validation regression can't
+ *  make an automated rewrite (autosave runs one every interval) silently drop
+ *  every entry the validator rejects. */
+function loadRecentFlamesForRewrite(): RecentFlame[] {
+  try {
+    const raw = safeGetItem(STORAGE_KEY)
+    if (raw === null) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(isValidRecentFlame)
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Insert-or-update a recent entry by id and move it to the front. Used by
+ * autosave so one editing session keeps updating a single entry instead of
+ * flooding the list; drops the oldest entry when the list is full.
+ * @returns false when the localStorage write failed.
+ */
+export function upsertRecentFlame(
+  id: string,
+  flame: FlameDescriptor,
+  name?: string,
+  tracks?: TimelineTrack[],
+): boolean {
+  const recent = loadRecentFlamesForRewrite()
+  const existing = recent.find((item) => item.id === id)
+  const entry: RecentFlame = {
+    id,
+    name: name || flame.metadata?.name || existing?.name || 'Autosave',
+    flame: deepClone(flame),
+    savedAt: Date.now(),
+  }
+  if (tracks && tracks.length > 0) {
+    entry.tracks = deepClone(tracks)
+  }
+  const updated = [entry, ...recent.filter((item) => item.id !== id)].slice(
+    0,
+    MAX_RECENT_FLAMES,
+  )
+  return safeSetItem(STORAGE_KEY, JSON.stringify(updated))
+}
+
 export function getOldestRecentFlame(): RecentFlame | undefined {
   const recent = loadRecentFlames()
   if (recent.length === 0) return undefined

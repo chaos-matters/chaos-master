@@ -3,6 +3,41 @@
 What's new in Chaos Master. Concise highlights for each release; the full
 developer history lives in `dev.changelog.md`.
 
+## [0.9.5] - 2026-07-02
+
+### Fixed
+
+- **Undo now reverts your last action — whatever it was.** The app kept two separate undo histories (flame edits and timeline keyframes); Ctrl+Z used to unwind every keyframe change before any flame edit became reachable, while the toolbar Undo button only ever touched flame edits. Both now share one chronological order, the buttons match Ctrl+Z exactly, and their enabled state reflects everything undoable. Redo replays in the order things happened, and making a new edit after undoing clears redo everywhere.
+- **Undoing "New transform", "Add variation", and "Add symmetry" works.** A long-standing engine bug ran the change twice under the hood, so undo silently did nothing and redo duplicated the transform. Dice rolls also redo to exactly the values you saw.
+- **One action = one undo step.** Randomize/Smart animation, the Colors generator, and animation presets used to record one undo entry per keyframe (dozens per click); value scrubs, the camera orientation gizmo, and 3D wheel-zoom recorded one per pointer-move. All are now single steps.
+- **Undo no longer leaks across flames.** Loading a flame, starting a new one, or switching 2D/3D previously kept the old flame's keyframe history alive — Ctrl+Z could dump a previous flame's animation tracks onto the new one.
+- **Ctrl+Z while typing in number or search fields** (timeline FPS/frames, export size, variation search) now edits the text as expected instead of triggering an app undo behind your back.
+- Exporting an animation no longer floods undo history with one entry per rendered frame, and 3D auto-exposure no longer fights undo after camera zooms.
+- **Keyframe undos are visible**: undoing a keyframe edit now updates the rendered flame immediately (previously the canvas could keep the old value until you played the timeline).
+- **Timeline settings are undoable** — FPS, frame count, speed, loop and loop style (including Seamless quietly extending the timeline) all revert with Ctrl+Z.
+- **Palettes and blends are part of your flame now**: applying/removing a palette and picking/adjusting/clearing a blend flame are all undoable, and both survive saving, sharing, and loading.
+- **Deleting a custom variation is safe(r)**: the app warns when the current flame uses it, and every delete shows an Undo toast that brings the variation back.
+
+## [0.9.4] - 2026-07-02
+
+### Added
+
+- **Track changes diamond.** A shiny diamond on the affine editor and color wheel (and in their list views): while it's on, every edit records a keyframe at the current frame — dragging a transform handle, scaling/rotating, scrubbing a value, typing a number, or rolling a dice. Unlike the timeline's Auto mode it also creates the _first_ keyframe, so animating is just: turn on the diamond, move things, step frames, move again.
+- **New Flame button** in the floating actions bar: one click resets to a clean starter flame (2D or 3D, matching your mode). No confirmation needed — undo brings the previous flame back, and unsaved work (including its animation) is stashed into Recent flames first.
+- **Animate button** in the timeline header opens the sidebar's animation generator (Flame Randomizer → Animation Settings) and scrolls straight to it — replacing the old one-shot "Gen" randomizer and its "Subtle" toggle.
+- **Your work is never silently lost.** Closing or reloading the tab with unsaved changes now saves the flame (with its animation) into Recent flames automatically — no prompt. Optional periodic auto-save (asked once via a small toast; configurable under Data Management: on/off + 1/2/5/10 min) keeps one auto-updating entry per editing session. Loading another flame, switching 2D/3D, or starting a new flame stashes unsaved work first. A one-time reminder after a few minutes of editing points to save/export/share, with a "Don't show again".
+- **3D variation browser** now shows the same Affine Editor panel the 2D browser has, so you can position a variation's transform while previewing it.
+
+### Changed
+
+- **The selected transform always renders on top.** Overlapping handles used to hide the selected transform behind later-added ones; the selected handle now paints above the stack and receives the click. Scale/rotate edges also always paint _below_ center dots, so one transform's edges can no longer cover another's grab point.
+
+### Fixed
+
+- Clicking stacked transform handles (e.g. several at the origin) now selects and moves the **selected/targeted** transform instead of whichever was added last.
+- Recording keyframes while scrubbing no longer floods the timeline's undo history — one undo reverts the whole scrub, and the history is bounded.
+- Auto/track-changes recording only happens while animation mode is on — no invisible "ghost" keyframes after leaving animation mode.
+
 ## [0.9.3] - 2026-06-27
 
 ### Added

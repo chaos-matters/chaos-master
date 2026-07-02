@@ -2,7 +2,7 @@ import { f32, struct, vec2f } from 'typegpu/data'
 import { atan2, cos, exp, log, sin } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
-import { PI } from '@/flame/constants'
+import { EPS, PI } from '@/flame/constants'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
@@ -38,7 +38,7 @@ export const escherVar = parametricVariation(
     const x = pos.x
     const y = pos.y
     const a = atan2(y, x)
-    const lnr = 0.5 * log(x * x + y * y + 0.000001)
+    const lnr = 0.5 * log(x * x + y * y + EPS.$)
     const n = sin(P.beta * PI.$) * a
     const m = cos(P.beta * PI.$) * lnr
     return vec2f(cos(n) * exp(m), sin(n) * exp(m)).mul(varInfo.weight)

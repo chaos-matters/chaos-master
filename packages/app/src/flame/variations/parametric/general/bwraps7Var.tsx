@@ -83,7 +83,7 @@ export const bwraps7Var = parametricVariation(
 
     // precalc: init values computed inline
     const radius = 0.5 * (P.cellsize / (1.0 + P.space * P.space))
-    const g2 = P.gain * P.gain + 0.000001
+    const g2 = P.gain * P.gain + EPS.$
     let max_bubble = g2 * radius
     if (max_bubble > 2.0) {
       max_bubble = 1.0

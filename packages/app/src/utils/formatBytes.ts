@@ -1,4 +1,4 @@
-const { floor, log, pow } = Math
+const { floor, log, max, min, pow } = Math
 
 /**
  * Pretty print file sizes in bytes, kilobytes, megabytes ... yottabytes
@@ -14,6 +14,8 @@ export function formatBytes(
   if (bytes === 0) return '0 Bytes'
   const k = 1024
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
-  const i = floor(log(bytes) / log(k))
+  // Clamp to a valid index: bytes < 1 makes log(bytes)/log(k) negative, and
+  // bytes beyond the YB range would index past the end of `sizes`.
+  const i = min(sizes.length - 1, max(0, floor(log(bytes) / log(k))))
   return `${parseFloat((bytes / pow(k, i)).toFixed(decimals))} ${sizes[i]}`
 }

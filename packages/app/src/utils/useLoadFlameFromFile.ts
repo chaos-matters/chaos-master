@@ -9,12 +9,21 @@ export type FlameLoadResult = {
   animation?: SharePayload['animation']
 }
 
+// Flame/animation files carry small embedded metadata; a legitimately large
+// exported animation is still well under this, so this only exists to catch
+// an accidental multi-GB drop before reading the whole thing into memory.
+const MAX_DROPPED_FILE_SIZE = 500 * 1024 * 1024
+
 export function useLoadFlameFromFile() {
   const alert = useAlert()
 
   async function loadFromFile(
     file: File,
   ): Promise<FlameLoadResult | undefined> {
+    if (file.size > MAX_DROPPED_FILE_SIZE) {
+      await alert(`'${file.name}' is too large to load.`)
+      return
+    }
     const arrayBuffer = await file.arrayBuffer().catch(() => undefined)
     if (!arrayBuffer) {
       await alert(`Could not load file '${file.name}'.`)

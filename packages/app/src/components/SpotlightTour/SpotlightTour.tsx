@@ -1,6 +1,7 @@
 import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { useSpotlightTour } from '@/contexts/SpotlightTourContext'
+import { clamp } from '@/utils/easing'
 import ui from './SpotlightTour.module.css'
 import type { TourContext } from './tourTypes'
 
@@ -60,7 +61,9 @@ export function SpotlightTour(props: SpotlightTourProps) {
     }
   }
 
-  function measureAndPosition() {
+  const MAX_MEASURE_RETRIES = 10
+
+  function measureAndPosition(retryCount = 0) {
     const s = step()
     if (!s) {
       setHoleRect({ x: 0, y: 0, width: 0, height: 0 })
@@ -90,11 +93,17 @@ export function SpotlightTour(props: SpotlightTourProps) {
       targetRect.left > vw
 
     if (isOffScreen) {
+      // Cap retries (a permanently hidden/off-DOM target would otherwise
+      // recurse forever) and bail if the tour has advanced to a different
+      // step in the meantime, matching the stepGeneration guard used below.
+      if (retryCount >= MAX_MEASURE_RETRIES) return
+      const gen = stepGeneration
       target.scrollIntoView({ behavior: 'smooth', block: 'center' })
       // Retry after scroll animation completes so the spotlight
       // actually lands on the now-visible element.
       setTimeout(() => {
-        measureAndPosition()
+        if (gen !== stepGeneration) return
+        measureAndPosition(retryCount + 1)
       }, 350)
       return
     }
@@ -576,8 +585,4 @@ export function SpotlightTour(props: SpotlightTourProps) {
       </Portal>
     </Show>
   )
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value))
 }

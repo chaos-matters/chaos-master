@@ -236,7 +236,10 @@ export function QuickVariationPicker(props: QuickVariationPickerProps) {
   // Re-focus when switching to list mode
   createEffect(() => {
     if (props.mode === 'list') {
-      setTimeout(() => inputRef?.focus(), 60)
+      const tid = setTimeout(() => inputRef?.focus(), 60)
+      onCleanup(() => {
+        clearTimeout(tid)
+      })
     }
   })
 

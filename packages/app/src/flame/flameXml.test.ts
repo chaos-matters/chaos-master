@@ -502,6 +502,29 @@ describe('exportFlameXml', () => {
     expect(julian!.params!.dist).toBeCloseTo(2)
   })
 
+  it('exports a finite fallback instead of NaN/Infinity for a corrupted param', () => {
+    // A NaN/Infinity param (e.g. from a bad randomize call) used to be
+    // interpolated raw into the XML attribute (`julian_power="NaN"`), which
+    // isn't valid numeric XML and breaks re-import.
+    const flame = parseFlameXml(PARAM_XML)
+    const t = xforms(flame)[0]!
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const vars = (t as any).variations as Record<
+      string,
+      { type: string; params?: Record<string, number> }
+    >
+    const julian = Object.values(vars).find((v) => v.type === 'juliaNVar')!
+    julian.params!.power = Number.NaN
+    julian.params!.dist = Number.POSITIVE_INFINITY
+
+    const xml = exportFlameXml(flame)
+    expect(xml).not.toMatch(/NaN/)
+    expect(xml).not.toMatch(/Infinity/)
+    // Falls back to a finite, re-importable value.
+    expect(xml).toContain('julian_power="0.000000"')
+    expect(xml).toContain('julian_dist="0.000000"')
+  })
+
   it('round-trips a finalxform through finalTransform', () => {
     const original = parseFlameXml(FINAL_XFORM_XML)
     const xml = exportFlameXml(original)

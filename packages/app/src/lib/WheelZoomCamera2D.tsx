@@ -67,12 +67,20 @@ export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
 
   let clipToWorld: (clip: v2f) => v2f | undefined
   let wheelDebounceTimer: ReturnType<typeof setTimeout> | undefined
+  const cancelPendingWheelCommit = () => {
+    clearTimeout(wheelDebounceTimer)
+    wheelDebounceTimer = undefined
+  }
 
   const startPanning = createDragHandler((initEvent) => {
     const grabPosition = clipToWorld(eventToClip(initEvent, el()))
     if (!grabPosition) {
       return
     }
+    // A pan started within the wheel-commit debounce merges into the zoom's
+    // preview — the pending timer would commit it MID-DRAG, after which every
+    // move records its own history entry.
+    cancelPendingWheelCommit()
     if (!changeHistory.isPreviewing()) {
       changeHistory.startPreview('Camera pan')
     }
@@ -118,8 +126,9 @@ export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
       changeHistory.startPreview('Camera zoom')
     }
     zoomKeepPointInPlace(world, 1 - ev.deltaY * SCROLL_SENSITIVITY)
-    clearTimeout(wheelDebounceTimer)
+    cancelPendingWheelCommit()
     wheelDebounceTimer = setTimeout(() => {
+      wheelDebounceTimer = undefined
       changeHistory.commit()
     }, CAMERA_UNDO_DEBOUNCE_MS)
   }
@@ -130,6 +139,7 @@ export function WheelZoomCamera2D(props: ParentProps<WheelZoomCamera2DProps>) {
       return
     }
     let prevDistance = initEvent.distance
+    cancelPendingWheelCommit()
     if (!changeHistory.isPreviewing()) {
       changeHistory.startPreview('Camera pinch')
     }

@@ -177,7 +177,9 @@ export const hexesVar = parametricVariation(
     const DXo = Ux - P_points[0].x
     const DYo = Uy - P_points[0].y
 
-    // const trgL = f32(pow(L1 + EPS_TINY.$, P.power) * P.scale)
+    // Intentionally below the EPS ladder: this only nudges pow() off 0 without
+    // shifting the result. Even EPS_TINY (1e-10) would visibly distort trgL for
+    // small L1, so a dedicated 1e-20 guard is used here.
     const trgL = f32(pow(L1 + 1e-20, P.power) * P.scale)
 
     const rotSin = sin(P.rotate * 2.0 * PI.$)

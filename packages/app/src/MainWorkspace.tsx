@@ -21,6 +21,7 @@ import { Checkbox } from './components/Checkbox/Checkbox'
 import { CollapsibleCard } from './components/CollapsibleCard/CollapsibleCard'
 import { ColorPicker } from './components/ColorPicker/ColorPicker'
 import { Card } from './components/ControlCard/ControlCard'
+import { ConfirmDeleteVariationModal } from './components/CustomVariationEditor/ConfirmDeleteVariationModal'
 import { createShowCustomVariationEditor } from './components/CustomVariationEditor/CustomVariationEditor'
 import { DebugOverlay } from './components/DebugOverlay'
 import { DiceButton } from './components/DiceButton/DiceButton'
@@ -70,22 +71,24 @@ import { drawModeToImplFn } from './flame/drawMode'
 import { example1 } from './flame/examples/example1'
 import { example34 } from './flame/examples/example34'
 import { initExample } from './flame/examples/initExample'
+import { initExample3D } from './flame/examples/initExample3D'
 import { tid as toTransformId, vid as toVariationId, } from './flame/examples/util'
 import { Flam3 } from './flame/Flam3'
 import { pointInitModeToImplFn } from './flame/pointInitMode'
 import { pointInitMode3DToImplFn } from './flame/pointInitMode3D'
 import { generateRandomFlame, mutateFlame, random01, randomizeAllColors, randomizeVariationParams, randomRange, } from './flame/randomize'
 import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, cameraDuringExportEnabled, exportQuality, qualityPointCountLimit, setCurrentQuality, setExportQuality, setForceAnimationExportNow, setQualityPointCountLimit, } from './flame/renderStats'
-import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from './flame/schema/flameSchema'
+import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, tryValidateFlame, } from './flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from './flame/transformFunction'
 import { defaultLinearType } from './flame/variationRegistry'
 import { allTransformVariations, isAnyParametricVariationType, isVariationType, } from './flame/variations'
-import { deleteCustomVariation, duplicateCustomVariation, getCustomVariations, isCustomVariationRegistered, loadCustomVariations, persistSharedVariations, } from './flame/variations/custom'
+import { deleteCustomVariation, duplicateCustomVariation, getCustomVariations, isCustomVariationRegistered, loadCustomVariations, persistSharedVariations, restoreCustomVariation, } from './flame/variations/custom'
 import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } from './flame/variations/utils'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { BoxArrowRight, Cross, Eye, EyeOff, Menu, Plus, Share, Shuffle, Terminal, } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
 import { createAnimationExport } from './utils/animationExport'
+import { autosaveIntervalMin, autosaveRecents, saveReminderDismissed, setAutosaveRecents, setSaveReminderDismissed, } from './utils/autosaveSettings'
 import { downloadBlob } from './utils/blob'
 import { deepClone } from './utils/clone'
 import { createStoreHistory } from './utils/createStoreHistory'
@@ -97,11 +100,12 @@ import { compressJsonQueryParam } from './utils/jsonQueryParam'
 import { persistentSignal } from './utils/persistentSignal'
 import { addRandomizerHistoryEntry, clearRandomizerHistory, loadRandomizerHistoryEntries, MAX_RANDOMIZER_HISTORY_LIMIT, } from './utils/randomizerHistoryDB'
 import { buildReadableIds } from './utils/readableIds'
-import { getOldestRecentFlame, saveRecentFlame } from './utils/recentFlames'
+import { getOldestRecentFlame, saveRecentFlame, upsertRecentFlame, } from './utils/recentFlames'
 import { createShareLink, deriveOgMeta, uploadOgPreview, } from './utils/shareLink'
 import { sum } from './utils/sum'
 import { createTimelineState, resolveKeyframeValue } from './utils/timeline'
 import { sortedTransformEntries } from './utils/transformOrder'
+import { createUndoRouter } from './utils/undoRouting'
 import { useAppDragAndDrop } from './utils/useAppDragAndDrop'
 import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
 import type { Setter } from 'solid-js'
@@ -341,10 +345,6 @@ export function MainWorkspace(props: AppProps) {
   })
 
   const [animationEnabled, setAnimationEnabled] = createSignal(true)
-  const [blendFlame, setBlendFlame] = createSignal<
-    FlameDescriptor | undefined
-  >()
-  const [blendWeight, setBlendWeight] = createSignal(0)
   const [hideDiceButtons, setHideDiceButtons] = createSignal(false)
   // True while a randomize/mutate run is in flight, so the buttons disable and
   // rapid clicks can't pile up concurrent runs (history thumbnail capture).
@@ -357,6 +357,11 @@ export function MainWorkspace(props: AppProps) {
   const [sidebarHidden, setSidebarHidden] = createSignal(
     window.innerWidth < 769,
   )
+  // Flame Randomizer card open state is controlled here so the Timeline
+  // "Animate" button can reveal it; the epoch bump also forces its Animation
+  // Settings section open.
+  const [randomizerOpen, setRandomizerOpen] = createSignal(false)
+  const [randomizerAnimEpoch, setRandomizerAnimEpoch] = createSignal(0)
   const [sidebarLayoutMode, setSidebarLayoutMode] = persistentSignal<
     'compact' | 'wide'
   >('sidebar-layout-mode', 'wide')
@@ -396,11 +401,8 @@ export function MainWorkspace(props: AppProps) {
   })
   // Hide timeline by default on mobile -- users can toggle it back on
   const [showTimeline, setShowTimeline] = createSignal(window.innerWidth >= 769)
-  const [selectedPaletteId, setSelectedPaletteId] = createSignal<string>('')
-
-  const [selectedPalette, setSelectedPalette] = createSignal<
-    Palette | undefined
-  >(undefined)
+  // Colors as they were before the first palette apply — lets Unselect
+  // restore the "natural" colors. UI stash only; undo handles the rest.
   const [prePaletteColors, setPrePaletteColors] = createSignal<
     Record<string, { x: number; y: number }>
   >({})
@@ -410,7 +412,50 @@ export function MainWorkspace(props: AppProps) {
         props.flameFromWelcome?.() ?? props.flameFromQuery?.flame ?? example1,
       ),
     ),
+    // The main flame history joins the app-wide undo journal so Ctrl+Z can
+    // arbitrate chronologically against the timeline's undo stack.
+    { journal: true },
   )
+  // Palette selection is part of the flame document (renderSettings.palette):
+  // applying/removing one is a single undoable history entry, and the palette
+  // travels with saves/shares. These accessors derive the UI/render views.
+  const selectedPalette = createMemo<Palette | undefined>(() => {
+    const stored = flameDescriptor.renderSettings.palette
+    if (!stored) return undefined
+    return {
+      id: stored.id,
+      name: stored.name,
+      entries: stored.entries.map((entry) => ({ ...entry })),
+      source: 'imported',
+    }
+  })
+  const selectedPaletteId = () =>
+    flameDescriptor.renderSettings.palette?.id ?? ''
+  // Blend composition is part of the flame document too (renderSettings
+  // .blendFlame / .blendWeight): picking, adjusting, or clearing a blend is
+  // one undoable history entry each, and the composition survives
+  // save/share/load. The stored blend flame is plain data, re-validated on
+  // read so a hand-edited file can't hand the renderer an invalid flame.
+  const blendFlame = createMemo<FlameDescriptor | undefined>(() => {
+    const stored = flameDescriptor.renderSettings.blendFlame
+    if (stored === undefined) return undefined
+    return tryValidateFlame(stored)
+  })
+  const blendWeight = () => flameDescriptor.renderSettings.blendWeight ?? 0
+  const setBlendFlame = (flame: FlameDescriptor | undefined) => {
+    setFlameDescriptor(
+      (draft) => {
+        if (flame === undefined) delete draft.renderSettings.blendFlame
+        else draft.renderSettings.blendFlame = deepClone(flame)
+      },
+      flame ? 'Set Blend Flame' : 'Remove Blend Flame',
+    )
+  }
+  const setBlendWeight = (weight: number) => {
+    setFlameDescriptor((draft) => {
+      draft.renderSettings.blendWeight = weight
+    }, 'Blend Weight')
+  }
   if (IS_DEV) {
     console.info('[share:app] store initialized', {
       source: props.flameFromWelcome?.()
@@ -427,6 +472,7 @@ export function MainWorkspace(props: AppProps) {
   createEffect(() => {
     const newFlame = props.flameFromWelcome?.()
     if (newFlame !== undefined) {
+      flushDirtyToRecents()
       history.replace(deepClone(newFlame))
       // Load animation tracks if the welcome selection includes them
       const tracks = props.welcomeTracks?.()
@@ -447,6 +493,8 @@ export function MainWorkspace(props: AppProps) {
         })
       }
       props.resetFlameFromWelcome?.()
+      // A welcome pick is a fresh starting point for dirty tracking.
+      markLoadedBaseline()
     }
   })
 
@@ -572,32 +620,51 @@ export function MainWorkspace(props: AppProps) {
    * cross-dissolves A into B. Combine with "Seamless Loop" for an A→B→A cycle.
    */
   function setupMorph(endFlame: FlameDescriptor) {
-    setBlendFlame(deepClone(endFlame))
+    // One flame-history entry for the composition (blend flame + weight)...
+    setFlameDescriptor((draft) => {
+      draft.renderSettings.blendFlame = deepClone(endFlame)
+      draft.renderSettings.blendWeight = 1
+    }, 'Morph Setup')
     const cfg = timeline.config()
-    timeline.removeAllKeyframesForPath('blendWeight')
-    timeline.addKeyframe('blendWeight', cfg.startFrame, 1, 'easeInOut')
-    timeline.setKeyframeValue('blendWeight', cfg.endFrame, 0, 'easeInOut')
-    setBlendWeight(1)
+    // ...and one timeline undo step for the keyframes (remove + both adds).
+    timeline.runWithSingleUndo(() => {
+      timeline.removeAllKeyframesForPath('blendWeight')
+      timeline.addKeyframe('blendWeight', cfg.startFrame, 1, 'easeInOut')
+      timeline.setKeyframeValue('blendWeight', cfg.endFrame, 0, 'easeInOut')
+    })
     setAnimationEnabled(true)
     setShowTimeline(true)
     timeline.goToFrame(cfg.startFrame)
     showToast('Morph ready — press Play to animate A → B', 3500)
   }
 
-  // Hover preview: temporarily set blend flame at 40% weight
+  // Hover preview: temporarily set blend flame at 40% weight. Silent writes —
+  // a transient hover must not create history entries or clobber redo.
   let prevBlendFlame: FlameDescriptor | undefined
   let prevBlendWeight = 0
+  let blendPreviewActive = false
 
   function handlePreviewBlend(flame: FlameDescriptor | null) {
     if (flame) {
-      prevBlendFlame = blendFlame()
-      prevBlendWeight = blendWeight()
-      setBlendFlame(flame)
-      setBlendWeight(0.4)
-    } else if (prevBlendFlame !== undefined) {
-      setBlendFlame(prevBlendFlame)
-      setBlendWeight(prevBlendWeight)
+      if (!blendPreviewActive) {
+        prevBlendFlame = blendFlame()
+        prevBlendWeight = blendWeight()
+        blendPreviewActive = true
+      }
+      history.setSilently((draft) => {
+        draft.renderSettings.blendFlame = deepClone(flame)
+        draft.renderSettings.blendWeight = 0.4
+      })
+    } else if (blendPreviewActive) {
+      const restore = prevBlendFlame
+      const restoreWeight = prevBlendWeight
+      history.setSilently((draft) => {
+        if (restore === undefined) delete draft.renderSettings.blendFlame
+        else draft.renderSettings.blendFlame = deepClone(restore)
+        draft.renderSettings.blendWeight = restoreWeight
+      })
       prevBlendFlame = undefined
+      blendPreviewActive = false
     }
   }
 
@@ -736,8 +803,6 @@ export function MainWorkspace(props: AppProps) {
       setPrePaletteColors(colors)
     }
 
-    setSelectedPaletteId(palette.id)
-    setSelectedPalette(palette)
     // Convert palette entries to color map entries and apply
     const entries = palette.entries.map((entry) => ({ a: entry.a, b: entry.b }))
     const colorMap: ColorMap = {
@@ -745,14 +810,27 @@ export function MainWorkspace(props: AppProps) {
       name: palette.name,
       entries,
     }
+    // ONE history entry: transform colors AND the palette itself (it lives in
+    // renderSettings.palette), so a single undo fully reverts the apply —
+    // previously the palette identity sat in signals and undo half-reverted
+    // (colors back, palette grading still on).
     setFlameDescriptor((draft) => {
       applyColorMapToFlame(draft, colorMap)
-    })
+      draft.renderSettings.palette = {
+        id: palette.id,
+        name: palette.name,
+        entries: palette.entries.map(({ id, position, a, b }) => ({
+          id,
+          position,
+          a,
+          b,
+        })),
+      }
+    }, 'Apply Palette')
   }
 
   const handlePaletteUnselect = () => {
-    setSelectedPaletteId('')
-    setSelectedPalette(undefined)
+    // One undoable entry: restore pre-palette colors + drop the palette.
     setFlameDescriptor((draft) => {
       const saved = prePaletteColors()
       for (const [tid, t] of recordEntries(draft.transforms)) {
@@ -760,7 +838,8 @@ export function MainWorkspace(props: AppProps) {
           t.color = { x: saved[tid].x, y: saved[tid].y }
         }
       }
-    })
+      delete draft.renderSettings.palette
+    }, 'Remove Palette')
     setPrePaletteColors({})
   }
 
@@ -900,7 +979,11 @@ export function MainWorkspace(props: AppProps) {
     if (target === null) return
     const current = untrack(() => flameDescriptor.renderSettings.exposure)
     if (Math.abs(target - current) > 1e-4) {
-      setFlameDescriptor((draft) => {
+      // Silent: this is a derived follower of the camera radius. Recording it
+      // injected a fresh history entry whenever an undo reverted the radius
+      // (effects run after the undo completes) — destroying redo and making
+      // undo fight the user.
+      history.setSilently((draft) => {
         draft.renderSettings.exposure = target
       })
     }
@@ -1012,13 +1095,12 @@ export function MainWorkspace(props: AppProps) {
     }
   })
 
-  const onDrop = useAppDragAndDrop(
-    history,
-    setLoadedAnimation,
-    clearLoadedAnimation,
-  )
+  const onDrop = useAppDragAndDrop(history, setLoadedAnimation)
 
   const timeline = createTimelineState()
+  // One chronological undo across flame history + timeline snapshots —
+  // Ctrl+Z/Ctrl+Y and the toolbar buttons all route through this.
+  const undoRouter = createUndoRouter(history, timeline)
 
   /**
    * Capture the current flame as a downscaled PNG for OG link previews.
@@ -1169,7 +1251,10 @@ export function MainWorkspace(props: AppProps) {
       canvas,
       timeline,
       flameDescriptor,
-      setFlameDescriptor,
+      // Silent writer: the export applies animated state once PER FRAME —
+      // recording it buried the user's real edits under hundreds of
+      // per-frame history entries (uncapped stack).
+      history.setSilently,
       setOnExportImage,
     )
 
@@ -1475,6 +1560,24 @@ export function MainWorkspace(props: AppProps) {
     }
   }
 
+  // Timeline "Animate" button: reveal the sidebar (may be closed, auto-hidden
+  // on mobile, or covered by the blend gallery / quick variation picker), open
+  // the Flame Randomizer card with its Animation Settings section expanded,
+  // and scroll the card into view. Overlay dismissal must happen BEFORE the
+  // epoch bump: mounting the card swallows the current epoch as its initial
+  // value, so a bump-then-mount order would lose the expansion.
+  const openAnimationGenerator = () => {
+    setShowSidebar(true)
+    setSidebarHidden(false)
+    setShowBlendGallery(false)
+    setQuickPickState(null)
+    setRandomizerOpen(true)
+    setRandomizerAnimEpoch((e) => e + 1)
+    setTimeout(() => {
+      randomizerCardRef?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 0)
+  }
+
   // Guard randomize/mutate so a slow run (history thumbnail capture + render)
   // can't be re-triggered until it finishes — rapid clicks would otherwise pile
   // up concurrent captures and lag the UI. Mirrors the logo/favicon generator.
@@ -1517,9 +1620,48 @@ export function MainWorkspace(props: AppProps) {
     })
   }
 
+  // Deleting a custom variation the CURRENT flame uses breaks its rendering,
+  // and the library lives outside the flame's undo history — so confirm when
+  // referenced, and always offer recovery through the toast's Undo action.
+  const handleDeleteCustomVariation = async (def: CustomVariationDef) => {
+    const usedByFlame = Object.values(flameDescriptor.transforms).some(
+      (transform) =>
+        Object.values(transform.variations).some(
+          (variation) => variation.type === def.id,
+        ),
+    )
+    if (usedByFlame) {
+      const confirmed = await _requestModal<boolean>({
+        content: ({ respond }) => (
+          <ConfirmDeleteVariationModal name={def.name} respond={respond} />
+        ),
+      })
+      if (!confirmed) return
+    }
+    deleteCustomVariation(def.id)
+    setCustomVarsVersion((v) => v + 1)
+    showToast(`Deleted custom variation "${def.name}"`, 10000, [
+      {
+        label: 'Undo',
+        onClick: () => {
+          if (restoreCustomVariation(def)) {
+            setCustomVarsVersion((v) => v + 1)
+            showToast(`Restored "${def.name}"`)
+          } else {
+            showToast(`Could not restore "${def.name}"`)
+          }
+        },
+      },
+    ])
+  }
+
   const handleLoadHistory = (entry: RandomizerHistoryEntry) => {
     setSelectedHistoryTimestamp(entry.timestamp)
+    // Loading a history entry is a fresh starting point: keep unsaved work
+    // recoverable and don't autosave the untouched loaded flame.
+    flushDirtyToRecents()
     history.replace(deepClone(entry.flame), 'Load History Flame')
+    markLoadedBaseline()
   }
 
   const handleRandomizeAnimation = (
@@ -1530,6 +1672,26 @@ export function MainWorkspace(props: AppProps) {
 
     isRandomizingAnimation = true
     try {
+      // One click = one undo step, regardless of how many keyframes the
+      // selected presets write (previously each addKeyframe pushed its own
+      // snapshot — dozens of Ctrl+Z to revert, and enough to overflow the
+      // undo cap and lose the pre-click animation entirely).
+      timeline.runWithSingleUndo(() => {
+        randomizeAnimationTracks(presetIds, clearFirst)
+      })
+      setShowTimeline(true)
+    } finally {
+      setTimeout(() => {
+        isRandomizingAnimation = false
+      }, 200)
+    }
+  }
+
+  const randomizeAnimationTracks = (
+    presetIds: string[],
+    clearFirst: boolean,
+  ) => {
+    {
       if (clearFirst) timeline.clearAllTracks()
 
       const start = timeline.config().startFrame
@@ -1640,11 +1802,6 @@ export function MainWorkspace(props: AppProps) {
       }
 
       timeline.setAnimationEnabled(true)
-      setShowTimeline(true)
-    } finally {
-      setTimeout(() => {
-        isRandomizingAnimation = false
-      }, 200)
     }
   }
 
@@ -1654,8 +1811,11 @@ export function MainWorkspace(props: AppProps) {
   const handleSmartAnimation = (clearFirst: boolean) => {
     isRandomizingAnimation = true
     try {
-      if (clearFirst) timeline.clearAllTracks()
-      smartRandomAnimation(flameDescriptor, timeline)
+      // One click = one undo step (see handleRandomizeAnimation).
+      timeline.runWithSingleUndo(() => {
+        if (clearFirst) timeline.clearAllTracks()
+        smartRandomAnimation(flameDescriptor, timeline)
+      })
       setShowTimeline(true)
     } finally {
       setTimeout(() => {
@@ -1810,6 +1970,120 @@ export function MainWorkspace(props: AppProps) {
     }
     // Clear the signal so re-selecting the same animation triggers again
     clearLoadedAnimation()
+    // A load is a fresh starting point, not an edit — reset dirty tracking.
+    markLoadedBaseline()
+  })
+
+  // ── Autosave & save-awareness ──────────────────────────────────────────
+  // Baseline JSON of the last loaded/saved state; the flame is "dirty" when
+  // the current state differs. Loads reset the baseline (and the editing
+  // clock), so untouched examples are never autosaved; any edit diverges.
+  // Every fresh starting point also rotates the autosave id, so a new
+  // load/flame can never clobber the previous flame's autosave entry.
+  const newAutosaveId = () =>
+    `autosave-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+  let autosaveSessionId = newAutosaveId()
+  const autosaveSnapshot = () =>
+    JSON.stringify({ flame: flameDescriptor, tracks: timeline.tracks() })
+  let autosaveBaseline = autosaveSnapshot()
+  let editingSince: number | null = null
+  let lastAutosaveAt = 0
+  let reminderShown = false
+  let autosavePromptShown = false
+
+  const isFlameDirty = () => autosaveSnapshot() !== autosaveBaseline
+  const markSavedBaseline = () => {
+    autosaveBaseline = autosaveSnapshot()
+  }
+  const markLoadedBaseline = () => {
+    autosaveBaseline = autosaveSnapshot()
+    editingSince = null
+    autosaveSessionId = newAutosaveId()
+  }
+
+  const autosaveNow = () => {
+    const saved = upsertRecentFlame(
+      autosaveSessionId,
+      flameDescriptor,
+      undefined,
+      timeline.tracks(),
+    )
+    // A failed write (quota, private mode) must not mark the flame clean —
+    // the pagehide fallback would then skip it and the work would vanish.
+    if (!saved) return
+    lastAutosaveAt = Date.now()
+    markSavedBaseline()
+  }
+
+  // Flush outgoing dirty work before the flame gets replaced (load, New
+  // Flame, 2D/3D switch): the replace resets the baseline, after which the
+  // pagehide safety net no longer sees the old state as dirty.
+  const flushDirtyToRecents = () => {
+    if (isFlameDirty()) autosaveNow()
+  }
+
+  // Reload/close/freeze with unsaved changes: persist silently — no prompt,
+  // the work just shows up in Recent flames. Also saves on bfcache freezes
+  // (`persisted`): frozen pages are routinely evicted without another
+  // pagehide, and the upsert is idempotent when the page is restored.
+  // Independent of the periodic-autosave setting.
+  const saveOnPagehide = () => {
+    flushDirtyToRecents()
+  }
+  window.addEventListener('pagehide', saveOnPagehide)
+  onCleanup(() => {
+    window.removeEventListener('pagehide', saveOnPagehide)
+  })
+
+  const AUTOSAVE_POLL_MS = 30_000
+  const REMINDER_AFTER_MS = 5 * 60_000
+  const autosavePoll = setInterval(() => {
+    const dirty = isFlameDirty()
+    if (dirty && editingSince === null) editingSince = Date.now()
+
+    // First time an edit would be autosaved: ask once, remember the answer.
+    if (dirty && autosaveRecents() === 'unset' && !autosavePromptShown) {
+      autosavePromptShown = true
+      showToast('Auto-save your flames to Recents while you edit?', 15000, [
+        {
+          label: 'Yes',
+          onClick: () => {
+            setAutosaveRecents('on')
+            flushDirtyToRecents()
+          },
+        },
+        { label: 'No', onClick: () => setAutosaveRecents('off') },
+      ])
+      return
+    }
+
+    if (dirty && autosaveRecents() === 'on') {
+      const intervalMs = Math.max(1, autosaveIntervalMin()) * 60_000
+      if (Date.now() - lastAutosaveAt >= intervalMs) autosaveNow()
+    }
+
+    // Gentle one-time pointer to saving/exporting after sustained editing.
+    if (
+      !reminderShown &&
+      !saveReminderDismissed() &&
+      editingSince !== null &&
+      Date.now() - editingSince >= REMINDER_AFTER_MS
+    ) {
+      reminderShown = true
+      showToast(
+        'Enjoying this flame? Save it for later, export a PNG, or share a link from the actions bar.',
+        12000,
+        [
+          {
+            label: "Don't show again",
+            onClick: () => setSaveReminderDismissed(true),
+          },
+        ],
+      )
+    }
+  }, AUTOSAVE_POLL_MS)
+  onCleanup(() => {
+    clearInterval(autosavePoll)
   })
 
   // Apply flame and animation from shared URL (fires once when resource resolves)
@@ -1840,6 +2114,8 @@ export function MainWorkspace(props: AppProps) {
       timeline.goToFrame(0)
       timeline.play()
     }
+    // A shared link is a fresh starting point for dirty tracking.
+    markLoadedBaseline()
 
     // Offer to save any custom variations the link brought in. They are already
     // registered (transiently) so the flame renders; this only asks which to
@@ -2157,12 +2433,16 @@ export function MainWorkspace(props: AppProps) {
       | [number, number, number]
       | [number, number, number, number],
   ) {
-    if (path === 'blendWeight') {
-      setBlendWeight(value as number)
-      return
-    }
-    setFlameDescriptor((draft) => {
+    // Silent: this is the timeline's write-through (recording, playback
+    // holds, and undo/redo write-back). The timeline undo stack owns these
+    // changes — recording them in flame history double-counted every
+    // preset keyframe at the current frame and would turn timeline undo
+    // write-backs into fresh flame entries.
+    history.setSilently((draft) => {
       switch (path) {
+        case 'blendWeight':
+          draft.renderSettings.blendWeight = value as number
+          break
         case 'exposure':
           draft.renderSettings.exposure = value as number
           break
@@ -2383,38 +2663,15 @@ export function MainWorkspace(props: AppProps) {
     KeyZ: (ev) => {
       if (animationExportRunning()) return false
       if (ev.metaKey || ev.ctrlKey) {
-        if (ev.shiftKey) {
-          if (timeline.hasTimelineRedo()) {
-            timeline.timelineRedo()
-            return true
-          }
-          if (history.hasRedo()) {
-            history.redo()
-            return true
-          }
-        } else {
-          if (timeline.hasTimelineUndo()) {
-            timeline.timelineUndo()
-            return true
-          }
-          if (history.hasUndo()) {
-            history.undo()
-            return true
-          }
-        }
+        // Chronological across flame history + timeline (see undoRouting.ts);
+        // the toolbar Undo/Redo buttons route through the same arbiter.
+        return ev.shiftKey ? undoRouter.redoLast() : undoRouter.undoLast()
       }
     },
     KeyY: (ev) => {
       if (animationExportRunning()) return false
       if (ev.metaKey || ev.ctrlKey) {
-        if (timeline.hasTimelineRedo()) {
-          timeline.timelineRedo()
-          return true
-        }
-        if (history.hasRedo()) {
-          history.redo()
-          return true
-        }
+        return undoRouter.redoLast()
       }
     },
     KeyD: (ev) => {
@@ -2462,7 +2719,7 @@ export function MainWorkspace(props: AppProps) {
   const setTimelineDuration: Setter<number> = (value) => {
     const newDuration =
       typeof value === 'function' ? value(timeline.config().endFrame) : value
-    timeline.setConfig({ ...timeline.config(), endFrame: newDuration })
+    timeline.updateConfigUndoable({ endFrame: newDuration })
     return newDuration
   }
 
@@ -2494,8 +2751,12 @@ export function MainWorkspace(props: AppProps) {
       currentFrame: timeline.currentFrame,
       setCurrentFrame: timeline.setCurrentFrame,
       play: timeline.play,
-      setLoop: (loop) => timeline.setConfig({ ...timeline.config(), loop }),
-      setFps: (fps) => timeline.setConfig({ ...timeline.config(), fps }),
+      setLoop: (loop) => {
+        timeline.updateConfigUndoable({ loop })
+      },
+      setFps: (fps) => {
+        timeline.updateConfigUndoable({ fps })
+      },
       addKeyframe: (path, frame, value, easing) => {
         timeline.addKeyframe(
           path,
@@ -2783,6 +3044,10 @@ export function MainWorkspace(props: AppProps) {
                     pixelRatio={pixelRatio()}
                     setPixelRatio={setPixelRatio}
                     controlsDisabled={timeline.isPlaying()}
+                    onUndo={undoRouter.undoLast}
+                    onRedo={undoRouter.redoLast}
+                    canUndo={undoRouter.canUndo}
+                    canRedo={undoRouter.canRedo}
                     blendFlame={blendFlame()}
                     blendWeight={resolvedBlendWeight()}
                     onPickBlendFlame={pickBlendFlame}
@@ -2859,6 +3124,7 @@ export function MainWorkspace(props: AppProps) {
                     <TimelineSection
                       formatTrackLabel={readableIds().formatTrackPath}
                       flameDescriptor={flameDescriptor}
+                      onOpenAnimationGenerator={openAnimationGenerator}
                     />
                   </div>
                 </Show>
@@ -3097,6 +3363,7 @@ export function MainWorkspace(props: AppProps) {
                             }
                             selectedTransformId={selectedTransformId}
                             setSelectedTransformId={setSelectedTransformId}
+                            enableChangeTracking
                           />
                         </CollapsibleCard>
                         <CollapsibleCard title="Color">
@@ -3110,6 +3377,7 @@ export function MainWorkspace(props: AppProps) {
                               }}
                               selectedTransformId={selectedTransformId}
                               setSelectedTransformId={setSelectedTransformId}
+                              enableChangeTracking
                             />
                           </div>
                         </CollapsibleCard>
@@ -3216,8 +3484,7 @@ export function MainWorkspace(props: AppProps) {
                                       title="Delete"
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        deleteCustomVariation(def.id)
-                                        setCustomVarsVersion((v) => v + 1)
+                                        void handleDeleteCustomVariation(def)
                                       }}
                                     >
                                       ×
@@ -3254,6 +3521,9 @@ export function MainWorkspace(props: AppProps) {
                         >
                           <FlameRandomizerCard
                             flame={flameDescriptor}
+                            open={randomizerOpen()}
+                            onToggleOpen={() => setRandomizerOpen((v) => !v)}
+                            expandAnimationEpoch={randomizerAnimEpoch()}
                             historyEntries={randomizerHistory()}
                             selectedTimestamp={selectedHistoryTimestamp()}
                             onGenerateFlame={handleGenerateFlame}
@@ -3875,6 +4145,12 @@ export function MainWorkspace(props: AppProps) {
                                               mode="inline"
                                               value={angle()}
                                               dataParameterPath={`transform.${tid}.preAffine.a`}
+                                              keyframePaths={[
+                                                `transform.${tid}.preAffine.a`,
+                                                `transform.${tid}.preAffine.b`,
+                                                `transform.${tid}.preAffine.d`,
+                                                `transform.${tid}.preAffine.e`,
+                                              ]}
                                               setValue={(newAngle) => {
                                                 const cos = Math.cos(newAngle)
                                                 const sin = Math.sin(newAngle)
@@ -3892,27 +4168,6 @@ export function MainWorkspace(props: AppProps) {
                                                     }
                                                   }
                                                 })
-                                                // Keyframe all 4 rotation components together
-                                                if (
-                                                  timeline &&
-                                                  timeline.autoKeyframe() &&
-                                                  timeline.hasAnyKeyframes(
-                                                    `transform.${tid}.preAffine.a`,
-                                                  )
-                                                ) {
-                                                  timeline.addKeyframeAtCurrentFrame(
-                                                    `transform.${tid}.preAffine.a`,
-                                                  )
-                                                  timeline.addKeyframeAtCurrentFrame(
-                                                    `transform.${tid}.preAffine.b`,
-                                                  )
-                                                  timeline.addKeyframeAtCurrentFrame(
-                                                    `transform.${tid}.preAffine.d`,
-                                                  )
-                                                  timeline.addKeyframeAtCurrentFrame(
-                                                    `transform.${tid}.preAffine.e`,
-                                                  )
-                                                }
                                               }}
                                             />
                                           </Show>
@@ -4791,11 +5046,14 @@ export function MainWorkspace(props: AppProps) {
                         : 'Pick Blend Flame'
                     }
                     onSelect={(flame) => {
+                      // The pick supersedes any hover preview — don't let the
+                      // preview restore stomp the selection afterwards.
                       prevBlendFlame = undefined
+                      blendPreviewActive = false
                       if (blendIntent() === 'morph') {
                         setupMorph(flame)
                       } else {
-                        setBlendFlame(deepClone(flame))
+                        setBlendFlame(flame)
                       }
                       setShowBlendGallery(false)
                     }}
@@ -4815,9 +5073,25 @@ export function MainWorkspace(props: AppProps) {
             disabled={animationExportRunning()}
             initialLeft={floatingLeft()}
             initialTop={floatingTop()}
+            onNewFlame={() => {
+              if (timeline.isPlaying()) timeline.pause()
+              // Undo restores the flame, but keyframe tracks aren't part of
+              // change history — flush unsaved work (flame + animation) to
+              // Recents so a reset can't silently destroy anything. Unlike
+              // saveRecentFlame, the upsert never declines on a full list.
+              flushDirtyToRecents()
+              const is3D =
+                (flameDescriptor.renderSettings.dimensions ?? 2) === 3
+              const flame = deepClone(is3D ? initExample3D : initExample)
+              history.replace(flame, 'New Flame')
+              setLoadedAnimation({ flame, tracks: [] })
+              showToast('Fresh flame loaded — undo restores the previous one')
+            }}
             onLoadFlame={() => {
               if (timeline.isPlaying()) timeline.pause()
-
+              // Loading replaces the flame and resets dirty tracking — flush
+              // unsaved work first so it stays recoverable from Recents.
+              flushDirtyToRecents()
               void showLoadFlameModal()
             }}
             onSaveForLater={async () => {
@@ -4841,6 +5115,7 @@ export function MainWorkspace(props: AppProps) {
                 })
                 if (confirmed) {
                   saveRecentFlame(flameDescriptor, undefined, tracks, true)
+                  markSavedBaseline()
                   showToast(
                     tracks.length > 0
                       ? 'Flame + animation saved (replaced oldest)'
@@ -4848,6 +5123,7 @@ export function MainWorkspace(props: AppProps) {
                   )
                 }
               } else {
+                markSavedBaseline()
                 showToast(
                   tracks.length > 0
                     ? 'Flame + animation saved for later'
@@ -4910,6 +5186,9 @@ export function MainWorkspace(props: AppProps) {
             setDimensions={(v) => {
               const current = flameDescriptor.renderSettings.dimensions ?? 2
               if (v === current) return
+              // The stash below is in-memory only — flush unsaved work to
+              // Recents first so switch-then-close can't lose it.
+              flushDirtyToRecents()
               // Stash the active flame AND its animation tracks under the
               // current dimension; restore the target dimension's own pair so
               // 2D and 3D each keep independent animations.
@@ -4931,6 +5210,8 @@ export function MainWorkspace(props: AppProps) {
               // Swap the timeline to the target dimension's tracks (empty on
               // first entry — matches the starter flame).
               timeline.loadTracks(restoredTracks ?? [])
+              // Mode switches restore stashed/starter state — not an edit.
+              markLoadedBaseline()
             }}
             flyMode={flyMode}
             setFlyMode={(v) => {

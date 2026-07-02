@@ -1,3 +1,4 @@
+import { asciiBytes, readAsciiBytes, writeUint32BE } from './binaryReader'
 import { calculateCRC32 } from './crc32'
 import { concatBuffers, decompressJsonPayload } from './jsonQueryParam'
 import type { SharePayload } from './jsonQueryParam'
@@ -17,16 +18,9 @@ const CHUNK_HEADER_SIZE_IN_BYTES =
 // zTXt type specifies compressed PNG Latin-1 text
 const ztxtTypeBytes = new Uint8Array([0x7a, 0x54, 0x58, 0x74])
 // convert key to ASCII and add null separator
-const keywordBytes = new TextEncoder().encode(`${CHUNK_KEY_STRING}\0`)
+const keywordBytes = asciiBytes(`${CHUNK_KEY_STRING}\0`)
 // compression method (0 for deflate)
 const compressionMethod = new Uint8Array([CHUNK_COMPRESSION_DEFLATE])
-
-function getUint32ValueInArrayBuffer(value: number) {
-  const buffer = new ArrayBuffer(4)
-  const dv = new DataView(buffer)
-  dv.setUint32(0, value)
-  return new Uint8Array(buffer)
-}
 
 function insertZtxtChunk(imageData: Uint8Array, encodedDataBytes: Uint8Array) {
   // construct zTXt chunk data: [keywordBytes] + [compressionMethod] + [encodedData]
@@ -39,8 +33,8 @@ function insertZtxtChunk(imageData: Uint8Array, encodedDataBytes: Uint8Array) {
   // calculate CRC32 on all chunk bytes except length
   const chunkCRC = calculateCRC32(concatBuffers([ztxtTypeBytes, ztxtChunkData]))
   // create zTXt chunk: [Length] + [Type] + [Data] + [CRC]
-  const chunkLength = getUint32ValueInArrayBuffer(ztxtChunkData.length)
-  const chunkCRCBytes = getUint32ValueInArrayBuffer(chunkCRC)
+  const chunkLength = writeUint32BE(ztxtChunkData.length)
+  const chunkCRCBytes = writeUint32BE(chunkCRC)
   const zTXtChunk = concatBuffers([
     chunkLength,
     ztxtTypeBytes,
@@ -52,11 +46,10 @@ function insertZtxtChunk(imageData: Uint8Array, encodedDataBytes: Uint8Array) {
   let imagePos = PNG_HEADER_SIZE_IN_BYTES
   while (imagePos < imageData.length) {
     const chunkLength = new DataView(imageData.buffer).getUint32(imagePos)
-    const chunkType = String.fromCharCode(
-      ...imageData.slice(
-        imagePos + CHUNK_LENGTH_SIZE_IN_BYTES,
-        imagePos + CHUNK_LENGTH_SIZE_IN_BYTES + CHUNK_TYPE_SIZE_IN_BYTES,
-      ),
+    const chunkType = readAsciiBytes(
+      imageData,
+      imagePos + CHUNK_LENGTH_SIZE_IN_BYTES,
+      CHUNK_TYPE_SIZE_IN_BYTES,
     )
     if (chunkType === 'IDAT') {
       break
@@ -100,7 +93,7 @@ async function readZtxtChunk(
     throw new Error(`CRC mismatch: PNG: [${readCrc}] ::  [${calculatedCrc}]`)
   }
   if (
-    separatorByteIdx === -1 &&
+    separatorByteIdx === -1 ||
     chunkData[separatorByteIdx + 1] !== CHUNK_COMPRESSION_DEFLATE
   ) {
     throw new Error(
@@ -123,18 +116,16 @@ export async function extractFlameFromPng(
   let imagePos = PNG_HEADER_SIZE_IN_BYTES
   while (imagePos < imageData.length) {
     const chunkLength = new DataView(imageData.buffer).getUint32(imagePos)
-    const chunkType = String.fromCharCode(
-      ...imageData.slice(
-        imagePos + CHUNK_LENGTH_SIZE_IN_BYTES,
-        imagePos + CHUNK_LENGTH_SIZE_IN_BYTES + CHUNK_TYPE_SIZE_IN_BYTES,
-      ),
+    const chunkType = readAsciiBytes(
+      imageData,
+      imagePos + CHUNK_LENGTH_SIZE_IN_BYTES,
+      CHUNK_TYPE_SIZE_IN_BYTES,
     )
     if (chunkType === 'zTXt') {
-      const chunkKeyword = String.fromCharCode(
-        ...imageData.slice(
-          imagePos + CHUNK_HEADER_SIZE_IN_BYTES,
-          imagePos + CHUNK_HEADER_SIZE_IN_BYTES + CHUNK_KEY_SIZE_IN_BYTES,
-        ),
+      const chunkKeyword = readAsciiBytes(
+        imageData,
+        imagePos + CHUNK_HEADER_SIZE_IN_BYTES,
+        CHUNK_KEY_SIZE_IN_BYTES,
       )
       // we expect only our zTXt chunks, rest are ignored, so multiple compressed texts can be added
       if (chunkKeyword === CHUNK_KEY_STRING) {

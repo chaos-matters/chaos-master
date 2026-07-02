@@ -3,6 +3,7 @@ import { atan2, cos, exp, select, sin, sqrt, tan } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { PI } from '@/flame/constants'
+import { safeDenom } from '../../safeMath'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
@@ -59,7 +60,7 @@ export const onion2Var = parametricVariation(
     const cos_t = cos(t)
     let r_1 = cos_t
     let z_1 = f32(0.0)
-    const safe_tan = select(tan_meet, 1.0e-9, tan_meet === 0.0)
+    const safe_tan = safeDenom(tan_meet)
     const term = exp(cos_meet - r_1) / safe_tan + sin_meet - 1.0 / safe_tan
     z_1 = term
     const isCropped = z_1 > P.top_crop && P.top_crop > 0.0
@@ -71,7 +72,7 @@ export const onion2Var = parametricVariation(
     const cond = t > P.meeting_pt
     let r = select(r_2, r_1, cond)
     r *= P.circle_a * varInfo.weight
-    const len = select(r_pre, 1.0e-9, r_pre === 0.0)
+    const len = safeDenom(r_pre)
     const newX = r * (pos.x / len)
     const newY = r * (pos.y / len)
     return vec2f(newX, newY)

@@ -2,6 +2,7 @@ import { f32, struct, vec2f } from 'typegpu/data'
 import { cos, floor, sin } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
+import { EPS } from '@/flame/constants'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
@@ -52,7 +53,7 @@ export const postBWraps2 = parametricVariation(
     'use gpu'
     const space2 = P.space * P.space
     const radius = (0.5 * P.cellsize) / (1.0 + space2)
-    const g2 = (P.gain * P.gain) / P.cellsize + 0.000001
+    const g2 = (P.gain * P.gain) / P.cellsize + EPS.$
     let max_bubble = g2 * radius
     if (max_bubble > 2.0) {
       max_bubble = 1.0

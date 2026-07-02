@@ -1,5 +1,6 @@
 import { f32, vec2f } from 'typegpu/data'
-import { cos, cosh, select, sin, sinh, sqrt } from 'typegpu/std'
+import { cos, cosh, sin, sinh, sqrt } from 'typegpu/std'
+import { safeDenom } from '../../safeMath'
 import { simpleVariation } from '../types'
 
 export const cosqVar = simpleVariation(
@@ -14,7 +15,7 @@ export const cosqVar = simpleVariation(
     const sh = sinh(abs_v)
     const ch = cosh(abs_v)
 
-    const C = (-s * sh) / select(abs_v, 1.0e-9, abs_v === 0.0)
+    const C = (-s * sh) / safeDenom(abs_v)
 
     const newX = c * ch
     const newY = C * pos.y

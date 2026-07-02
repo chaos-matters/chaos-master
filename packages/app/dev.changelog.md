@@ -7,6 +7,111 @@ changelog surfaced in the About panel lives in `CHANGELOG.md`.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.5] - 2026-07-02
+
+Undo/redo overhaul, driven by a full audit of both undo systems (flame
+change-history + timeline snapshots). Each area landed as its own commit with
+a dedicated test suite; undo behavior is now locked in by ~50 unit tests
+(`createStoreHistory.test.ts`, `timelineUndo.test.ts`, `undoRouting.test.ts`).
+
+### Fixed
+
+- **`createStoreHistory.set()` ran mutation callbacks twice** (once through
+  `produceWithPatches` for patches, once through solid's `produce` for the
+  store). Any non-deterministic callback desynced store from history:
+  "New transform"/"Add variation"/"Add symmetry" mint UUIDs inside setters, so
+  undo was a silent no-op and redo duplicated transforms; dice rolls recorded
+  values never shown. The store now reconciles the `produceWithPatches` result
+  — callbacks run exactly once. Stack payloads are deep-cloned in (and results
+  cloned out on undo/redo), fixing reference-aliasing where later store edits
+  silently rewrote history entries and corrupted redo.
+- **Timeline undo lifecycle**: `loadTracks` clears both stacks + the coalescing
+  key (a load is a document boundary — Ctrl+Z used to restore the previous
+  flame's tracks onto the new flame, orphaned transform ids and all).
+  `addKeyframesAtCurrentFrame(paths, {coalesce})` records grouped multi-path
+  writes as ONE entry with per-gesture coalescing (the symmetry-rotation knob
+  pushed 4 snapshots per pointer-move — ~600/drag, evicting the whole capped
+  history; it now uses AngleEditor's new `keyframePaths` prop).
+  `runWithSingleUndo()` groups bulk ops: Randomize/Smart animation, Colors,
+  preset pills and morph setup were one entry PER KEYFRAME (20-120/click).
+  Gesture ends + playhead moves break coalescing; `removeKeyframe`/
+  `removeAllKeyframesForPath` no-op guards stop junk entries wiping redo.
+- **Cross-system routing** (`utils/undoJournal.ts` + `utils/undoRouting.ts`):
+  entries in both systems carry a shared recency seq; Ctrl+Z/Ctrl+Shift+Z/
+  Ctrl+Y and the toolbar buttons all route through one arbiter — undo reverts
+  the LAST action wherever recorded, redo replays forward in original order,
+  and a new edit in either system invalidates redo in both. Previously Ctrl+Z
+  drained the entire timeline stack first (the first press after a recorded
+  drag looked like a no-op) while the buttons only drove flame history.
+  Journal participation is opt-in; the variation browser's preview histories
+  stay isolated. Timeline stacks got a version signal so button states are
+  reactive.
+- **Writer batching/silencing**: ScrubInput scrubs wrap in preview/commit
+  (was one history entry per pointer-move — camera theta/phi/R/FOV, affine +
+  colour lists, symmetry folds); OrientationGizmo batches drag-orbit and the
+  axis-snap rAF ease (~70 entries per axis click); the 3D wheel-zoom commit
+  timer is tracked/cleared (stale timers committed previews mid-gesture; 2D
+  gets the same drag/pinch takeover cancellation). New
+  `ChangeHistory.setSilently()` for automated writers: animation export wrote
+  one entry per exported frame; the 3D auto-exposure follower re-recorded
+  exposure after every radius undo, destroying redo.
+- **Ctrl+Z in text-entry inputs**: the two keyboard dispatchers each carried a
+  copy of the active-input guard and only one had the text-entry input types
+  (number/search/...). Extracted to `shortcuts/activeInputGuard.ts` and
+  shared — typing in timeline FPS/frames, export dimensions or variation
+  search no longer triggers app undo.
+
+### Follow-up pass — the audit's remaining gaps, closed
+
+- **Timeline undo writes values back.** `timelineUndo`/`timelineRedo` now push
+  each surviving changed track's value at the current frame back through the
+  flame writer (removed tracks stay untouched — their flame edit is its own
+  history entry), so keyframe undos are visible even when the timeline isn't
+  driving the view. `setFlameValue` (the timeline's writer) became silent —
+  recording it double-counted preset keyframes and would have turned
+  write-backs into fresh flame entries.
+- **Timeline config is undoable.** Undo entries snapshot config alongside
+  tracks; `updateConfigUndoable(partial, coalesceId?)` records user edits
+  (fps/frames/speed scrubs coalesce per gesture; loop/auto-fps toggles are
+  single steps); `setLoopMode` is undoable including seamless's `endFrame`
+  extension, with an idempotence guard. Load/system syncs keep raw
+  `setConfig`. +5 tests.
+- **Palette selection lives in the flame** (`renderSettings.palette`,
+  optional schema field, entries embedded): apply/remove is ONE history entry
+  covering colors + palette (no more half-reverts leaving grading on), and
+  the palette survives save/share/load. +1 schema test.
+- **Blend composition lives in the flame** (`renderSettings.blendFlame` as
+  re-validated plain data + `.blendWeight`): pick/adjust/clear/morph-setup
+  are ordinary history entries — the "Remove blend flame" X is no longer an
+  unrecoverable click — and blends survive save/share/load. Gallery hover
+  previews write silently. +1 schema test.
+- **Custom-variation deletes are guarded and recoverable**: deleting a
+  variation the current flame uses asks for confirmation
+  (ConfirmDeleteVariationModal), and every delete offers a 10s toast Undo
+  that re-registers the variation under its original id
+  (`restoreCustomVariation`). The library is app-level state, so recovery
+  goes through the toast rather than Ctrl+Z.
+
+## [0.9.4] - 2026-07-02
+
+### Added
+
+- **Track-changes diamond (keyframe on change).** New global persisted opt-in (`editor/keyframe-on-change`, default off; replaces `keyframeOnRandomize` / the "Keyframe on randomize" checkbox). While on, every edit records keyframes at the current frame — including the _first_ keyframe, unlike the timeline's Auto mode (which is unchanged and composes with it). Wired through shared helpers in `utils/keyframeOnChange.ts`: `keyframeEditedParam` (ScrubInput scrubs + typed commits, Slider, AngleEditor), `keyframeChangedParams` (affine/color dice), and `createGestureKeyframer` (affine graph drags — 2D translate `c,f`, scale/rotate `a,b,d,e`, 3D translate `d,h`, per-axis `a,e,i`/`b,f,j`/`c,g,k` — and color-wheel drags, debounced 300 ms with full paths captured per gesture and flush-on-unmount). All recording is gated on `timeline.animationEnabled()` so a persisted ON state can't write ghost keyframes outside animation mode. UI: `TrackChangesDiamond` (gradient gem, per-instance SVG ids) overlays the affine + color canvases and heads both list editors; `enableChangeTracking` threads from `MainWorkspace` so preview-flame editors (variation modal) stay inert.
+- **New Flame** button (`FloatingActions`, plus icon): `history.replace` to `initExample`/`initExample3D` per current dimension (undoable), plain-load path via `setLoadedAnimation({tracks: []})`; unsaved work (flame + tracks) is flushed to Recents first since tracks aren't in change history.
+- **Timeline "Animate" button** (Sparkle icon) replaces the one-shot `Gen` + `Subtle` (removed: `randomizeParams`, `buildParamPool`, `subtleBlend`, `randomValueForPath`; `randomizeColorsParams` lost its `subtle` param). It opens the sidebar Flame Randomizer with its Animation Settings section expanded and scrolls to it — `FlameRandomizerCard` is now controlled (`open`/`onToggleOpen` + `expandAnimationEpoch`), and `openAnimationGenerator` also dismisses the blend gallery / quick-pick overlays (ordering matters: overlays close before the epoch bump so a remount can't swallow the expansion).
+- **Autosave & save-awareness.** Dirty tracking via a baseline JSON snapshot (flame + tracks) reset on loads (LoadFlame modal, drag-drop, welcome pick, shared link, randomizer-history load, 2D/3D switch) and saves; each starting point rotates a per-session autosave id so sessions can't clobber each other's entry. Silent save-to-Recents on `pagehide` (incl. bfcache freezes) whenever dirty — independent of the periodic setting. Periodic autosave: first dirty tick asks once via an action toast (Yes/No persisted in `editor/autosave-recents`), then upserts one entry per session on a configurable interval (`Data Management` card: enabled + 1/2/5/10 min pills). Outgoing dirty work is also flushed before any load/new/mode-switch replaces the flame. `upsertRecentFlame` reports write failures (quota) so a failed save never marks the flame clean, and rewrites use structural-only validation so a schema regression can't mass-drop stored flames. One-time 5-minute save/export reminder with a persisted "Don't show again". Toasts support action buttons (`ToastAction`), dismiss-before-run.
+- **3D variation browser affine panel**: removed the `dims() !== 3` gate in `VariationSelector` — `AffineEditor`/`AffineListEditor` already handle 12-coef 3D affines.
+
+### Changed
+
+- **Handle layering & stacked-handle picking.** `createSelectedLastEntries` (new util) orders transform entries with the selected id last while preserving tuple identity, so `<For>` _moves_ rows instead of recreating them — the selected handle paints on top, natively receives stacked clicks, and an in-flight select-on-press drag survives the reorder (`createDragHandler` aborts on unmount). Applied to the affine editor and color wheel. The affine editor additionally renders each transform in two passes (`part: 'box' | 'center'`): all scale/rotate boxes paint below all center dots, so one transform's edges can never cover another's grab point; dimmed (non-selected) grips keep `pointer-events: none`.
+- Timeline undo hardening: `undoStack` capped at 100 snapshots and continuous same-param/same-frame re-records (auto-keyframe / track-changes during a scrub) coalesce into a single undo entry (`lastKeyframeUndo` run-tracking, broken by any other push/undo/redo).
+
+### Fixed
+
+- Sidebar tour copy updated for the diamond (was describing the removed "Keyframe on randomize" checkbox).
+- Plain-flame drag-drop now routes through `setLoadedAnimation({tracks: []})` like the modal, clearing stale timeline tracks and resetting dirty tracking.
+
 ## [0.9.3] - 2026-06-27
 
 ### Added

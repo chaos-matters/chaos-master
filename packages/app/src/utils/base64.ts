@@ -35,7 +35,16 @@ export function encodeBase64(
   return base64
 }
 
+// Valid base64url text (optionally padded): a length of 4n+1 is never
+// producible by any valid encoding, and any character outside the alphabet
+// (or trailing `=` padding) means the input was corrupted/tampered with.
+const BASE64_PATTERN = /^[A-Za-z0-9\-_]*={0,2}$/
+
 export function decodeBase64(base64: string): Uint8Array<ArrayBuffer> {
+  if (base64.length % 4 === 1 || !BASE64_PATTERN.test(base64)) {
+    throw new Error('Invalid base64 input')
+  }
+
   let bufferLength = (base64.length * 3) / 4
 
   if (base64.at(-1) === '=') {

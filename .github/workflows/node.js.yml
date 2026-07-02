@@ -47,8 +47,26 @@ jobs:
 
     - name: 🧪 Run tests
       run: pnpm test
-      
+
     - name: 🛠️ Build project
       run: pnpm --filter chaos-master run build
 
-   
+    - name: 🎭 Install Playwright browsers
+      run: pnpm exec playwright install --with-deps chromium
+
+    # CI-stable subset only (tests/smoke.spec.ts): GitHub runners provide flaky
+    # software WebGPU (swiftshader), so the full WebGPU-dependent e2e suite
+    # stays local/manual (see packages/app/TESTING.md). The smoke suite still
+    # guards build/serve/boot regressions unit tests can't catch.
+    - name: 🎭 Run e2e smoke tests
+      run: pnpm test:e2e:ci
+
+    - name: 📎 Upload Playwright report
+      if: ${{ !cancelled() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: playwright-report
+        path: playwright-report/
+        retention-days: 14
+
+

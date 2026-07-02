@@ -1,4 +1,5 @@
-import { createContext, createSignal, useContext } from 'solid-js'
+import { createContext, createSignal } from 'solid-js'
+import { useContextSafe } from '@/utils/useContextSafe'
 import type { Accessor } from 'solid-js'
 import type { TourGuide, TourStep } from '@/components/SpotlightTour/tourTypes'
 
@@ -22,12 +23,11 @@ export interface SpotlightTourContextValue {
 export const SpotlightTourContext = createContext<SpotlightTourContextValue>()
 
 export function useSpotlightTour() {
-  const ctx = useContext(SpotlightTourContext)
-  if (!ctx)
-    throw new Error(
-      'useSpotlightTour must be used within SpotlightTourProvider',
-    )
-  return ctx
+  return useContextSafe(
+    SpotlightTourContext,
+    'useSpotlightTour',
+    'SpotlightTourProvider',
+  )
 }
 
 export function createSpotlightTourState(
