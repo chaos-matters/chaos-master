@@ -683,7 +683,11 @@ export function createTimelineState() {
   // track-changes diamond can push one snapshot per pointer-move during a
   // scrub, and every entry deep-copies every track.
   const MAX_TIMELINE_UNDO = 100
-  type UndoEntry = { tracks: readonly TimelineTrack[]; seq: number }
+  type UndoEntry = {
+    tracks: readonly TimelineTrack[]
+    config: TimelineConfig
+    seq: number
+  }
   const undoStack: UndoEntry[] = []
   const redoStack: UndoEntry[] = []
   // Bumped on every stack mutation so hasTimelineUndo/peek* are reactive
@@ -723,12 +727,30 @@ export function createTimelineState() {
         ...t,
         keyframes: t.keyframes.map((kf) => ({ ...kf })),
       })),
+      config: { ...config() },
       seq: nextUndoSeq(),
     })
     if (undoStack.length > MAX_TIMELINE_UNDO) undoStack.shift()
     // Invalidates redo everywhere (this stack's own clearer included).
     clearAllRedos()
     touchStacks()
+  }
+
+  /** User-facing timeline-config edit as ONE undo entry. `coalesceId` merges
+   *  a continuous scrub of the same control (fps/frames/speed) into a single
+   *  step — gesture end or a playhead move breaks the run. Load/system syncs
+   *  keep calling setConfig directly: they sit behind a load boundary or are
+   *  derived state and must not burn undo entries. */
+  function updateConfigUndoable(
+    partial: Partial<TimelineConfig>,
+    coalesceId?: string,
+  ) {
+    const key = coalesceId ? `config:${coalesceId}` : null
+    if (!key || coalesceKey !== key) {
+      pushUndo() // resets coalesceKey
+      coalesceKey = key
+    }
+    setConfig({ ...config(), ...partial })
   }
 
   /** Run `fn` so that however many undo-pushing timeline mutations it makes,
@@ -787,9 +809,11 @@ export function createTimelineState() {
         ...t,
         keyframes: t.keyframes.map((kf) => ({ ...kf })),
       })),
+      config: { ...config() },
       seq: prev.seq,
     })
     setTracks(() => prev.tracks as TimelineTrack[])
+    setConfig(prev.config)
     writeBackResolvedValues(current, prev.tracks)
     touchStacks()
   }
@@ -804,9 +828,11 @@ export function createTimelineState() {
         ...t,
         keyframes: t.keyframes.map((kf) => ({ ...kf })),
       })),
+      config: { ...config() },
       seq: next.seq,
     })
     setTracks(() => next.tracks as TimelineTrack[])
+    setConfig(next.config)
     writeBackResolvedValues(current, next.tracks)
     touchStacks()
   }
@@ -1468,18 +1494,23 @@ export function createTimelineState() {
    */
   function setLoopMode(mode: LoopMode) {
     const cfg = config()
+    let next: TimelineConfig
     if (mode === 'off') {
-      setConfig({ ...cfg, loopMode: 'off' })
-      return
+      next = { ...cfg, loopMode: 'off' }
+    } else if (mode === 'cycle') {
+      next = { ...cfg, loopMode: 'cycle', loop: true }
+    } else {
+      const userEnd = getUserEndFrame(tracks(), cfg.startFrame)
+      const span = Math.max(1, userEnd - cfg.startFrame)
+      const endFrame = cfg.endFrame > userEnd ? cfg.endFrame : userEnd + span
+      next = { ...cfg, loopMode: 'seamless', loop: true, endFrame }
     }
-    if (mode === 'cycle') {
-      setConfig({ ...cfg, loopMode: 'cycle', loop: true })
-      return
-    }
-    const userEnd = getUserEndFrame(tracks(), cfg.startFrame)
-    const span = Math.max(1, userEnd - cfg.startFrame)
-    const endFrame = cfg.endFrame > userEnd ? cfg.endFrame : userEnd + span
-    setConfig({ ...cfg, loopMode: 'seamless', loop: true, endFrame })
+    // Idempotent no-op — don't burn an undo entry.
+    if (JSON.stringify(next) === JSON.stringify(cfg)) return
+    // Undoable: 'seamless' silently rewrites endFrame; a user must be able
+    // to Ctrl+Z out of the extension.
+    pushUndo()
+    setConfig(next)
   }
 
   /** Replace all tracks with deep-cloned copies (unified with addKeyframeImpl). */
@@ -1576,6 +1607,7 @@ export function createTimelineState() {
     peekRedoSeq,
     runWithSingleUndo,
     breakUndoCoalescing,
+    updateConfigUndoable,
   }
 }
 

@@ -2623,7 +2623,7 @@ export function MainWorkspace(props: AppProps) {
   const setTimelineDuration: Setter<number> = (value) => {
     const newDuration =
       typeof value === 'function' ? value(timeline.config().endFrame) : value
-    timeline.setConfig({ ...timeline.config(), endFrame: newDuration })
+    timeline.updateConfigUndoable({ endFrame: newDuration })
     return newDuration
   }
 
@@ -2655,8 +2655,8 @@ export function MainWorkspace(props: AppProps) {
       currentFrame: timeline.currentFrame,
       setCurrentFrame: timeline.setCurrentFrame,
       play: timeline.play,
-      setLoop: (loop) => timeline.setConfig({ ...timeline.config(), loop }),
-      setFps: (fps) => timeline.setConfig({ ...timeline.config(), fps }),
+      setLoop: (loop) => { timeline.updateConfigUndoable({ loop }); },
+      setFps: (fps) => { timeline.updateConfigUndoable({ fps }); },
       addKeyframe: (path, frame, value, easing) => {
         timeline.addKeyframe(
           path,

@@ -231,6 +231,59 @@ describe('timeline undo/redo', () => {
     })
   })
 
+  describe('config undo', () => {
+    it('round-trips a user config edit', () => {
+      const fpsBefore = timeline.config().fps
+      timeline.updateConfigUndoable({ fps: 12 })
+      expect(timeline.config().fps).toBe(12)
+      timeline.timelineUndo()
+      expect(timeline.config().fps).toBe(fpsBefore)
+      timeline.timelineRedo()
+      expect(timeline.config().fps).toBe(12)
+    })
+
+    it('coalesces a scrub of the same control into one undo step', () => {
+      const fpsBefore = timeline.config().fps
+      for (let v = 10; v <= 40; v++) {
+        timeline.updateConfigUndoable({ fps: v }, 'fps')
+      }
+      timeline.breakUndoCoalescing() // gesture end
+      timeline.updateConfigUndoable({ fps: 50 }, 'fps') // second gesture
+      timeline.timelineUndo()
+      expect(timeline.config().fps).toBe(40)
+      timeline.timelineUndo()
+      expect(timeline.config().fps).toBe(fpsBefore)
+      expect(timeline.hasTimelineUndo()).toBe(false)
+    })
+
+    it('seamless loop mode is undoable, including its endFrame rewrite', () => {
+      timeline.setConfig({ ...timeline.config(), endFrame: 90 })
+      // Last keyframe AT endFrame → seamless must extend past it.
+      timeline.addKeyframe('exposure', 90, 1, 'linear')
+      const endBefore = timeline.config().endFrame
+      timeline.setLoopMode('seamless')
+      expect(timeline.config().loopMode).toBe('seamless')
+      expect(timeline.config().endFrame).toBeGreaterThan(endBefore)
+      timeline.timelineUndo()
+      expect(timeline.config().loopMode ?? 'off').toBe('off')
+      expect(timeline.config().endFrame).toBe(endBefore)
+    })
+
+    it('an idempotent loop-mode set burns no undo entry', () => {
+      timeline.setLoopMode('off') // already off
+      expect(timeline.hasTimelineUndo()).toBe(false)
+    })
+
+    it('track-op undo restores the config captured with it', () => {
+      timeline.updateConfigUndoable({ fps: 24 }) // entry 1
+      timeline.addKeyframe('exposure', 0, 1, 'linear') // entry 2 (fps=24)
+      timeline.timelineUndo() // undo keyframe — config stays at 24
+      expect(timeline.config().fps).toBe(24)
+      timeline.timelineUndo() // undo fps change
+      expect(timeline.config().fps).not.toBe(24)
+    })
+  })
+
   describe('value write-back on undo/redo', () => {
     it('writes the restored value at the current frame back to the flame', () => {
       const written: [string, unknown][] = []
