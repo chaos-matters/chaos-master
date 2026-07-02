@@ -11,11 +11,15 @@ export function safeGetItem(key: string): string | null {
   }
 }
 
-export function safeSetItem(key: string, value: string): void {
+/** @returns false when the write failed (private mode, quota exceeded) so
+ *  callers that track "saved" state don't mark data clean that never landed. */
+export function safeSetItem(key: string, value: string): boolean {
   try {
     localStorage.setItem(key, value)
+    return true
   } catch (e) {
     console.warn(`[storage] Failed to save ${key} to localStorage:`, e)
+    return false
   }
 }
 

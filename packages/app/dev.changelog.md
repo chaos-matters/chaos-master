@@ -7,6 +7,26 @@ changelog surfaced in the About panel lives in `CHANGELOG.md`.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.4] - 2026-07-02
+
+### Added
+
+- **Track-changes diamond (keyframe on change).** New global persisted opt-in (`editor/keyframe-on-change`, default off; replaces `keyframeOnRandomize` / the "Keyframe on randomize" checkbox). While on, every edit records keyframes at the current frame — including the _first_ keyframe, unlike the timeline's Auto mode (which is unchanged and composes with it). Wired through shared helpers in `utils/keyframeOnChange.ts`: `keyframeEditedParam` (ScrubInput scrubs + typed commits, Slider, AngleEditor), `keyframeChangedParams` (affine/color dice), and `createGestureKeyframer` (affine graph drags — 2D translate `c,f`, scale/rotate `a,b,d,e`, 3D translate `d,h`, per-axis `a,e,i`/`b,f,j`/`c,g,k` — and color-wheel drags, debounced 300 ms with full paths captured per gesture and flush-on-unmount). All recording is gated on `timeline.animationEnabled()` so a persisted ON state can't write ghost keyframes outside animation mode. UI: `TrackChangesDiamond` (gradient gem, per-instance SVG ids) overlays the affine + color canvases and heads both list editors; `enableChangeTracking` threads from `MainWorkspace` so preview-flame editors (variation modal) stay inert.
+- **New Flame** button (`FloatingActions`, plus icon): `history.replace` to `initExample`/`initExample3D` per current dimension (undoable), plain-load path via `setLoadedAnimation({tracks: []})`; unsaved work (flame + tracks) is flushed to Recents first since tracks aren't in change history.
+- **Timeline "Animate" button** (Sparkle icon) replaces the one-shot `Gen` + `Subtle` (removed: `randomizeParams`, `buildParamPool`, `subtleBlend`, `randomValueForPath`; `randomizeColorsParams` lost its `subtle` param). It opens the sidebar Flame Randomizer with its Animation Settings section expanded and scrolls to it — `FlameRandomizerCard` is now controlled (`open`/`onToggleOpen` + `expandAnimationEpoch`), and `openAnimationGenerator` also dismisses the blend gallery / quick-pick overlays (ordering matters: overlays close before the epoch bump so a remount can't swallow the expansion).
+- **Autosave & save-awareness.** Dirty tracking via a baseline JSON snapshot (flame + tracks) reset on loads (LoadFlame modal, drag-drop, welcome pick, shared link, randomizer-history load, 2D/3D switch) and saves; each starting point rotates a per-session autosave id so sessions can't clobber each other's entry. Silent save-to-Recents on `pagehide` (incl. bfcache freezes) whenever dirty — independent of the periodic setting. Periodic autosave: first dirty tick asks once via an action toast (Yes/No persisted in `editor/autosave-recents`), then upserts one entry per session on a configurable interval (`Data Management` card: enabled + 1/2/5/10 min pills). Outgoing dirty work is also flushed before any load/new/mode-switch replaces the flame. `upsertRecentFlame` reports write failures (quota) so a failed save never marks the flame clean, and rewrites use structural-only validation so a schema regression can't mass-drop stored flames. One-time 5-minute save/export reminder with a persisted "Don't show again". Toasts support action buttons (`ToastAction`), dismiss-before-run.
+- **3D variation browser affine panel**: removed the `dims() !== 3` gate in `VariationSelector` — `AffineEditor`/`AffineListEditor` already handle 12-coef 3D affines.
+
+### Changed
+
+- **Handle layering & stacked-handle picking.** `createSelectedLastEntries` (new util) orders transform entries with the selected id last while preserving tuple identity, so `<For>` _moves_ rows instead of recreating them — the selected handle paints on top, natively receives stacked clicks, and an in-flight select-on-press drag survives the reorder (`createDragHandler` aborts on unmount). Applied to the affine editor and color wheel. The affine editor additionally renders each transform in two passes (`part: 'box' | 'center'`): all scale/rotate boxes paint below all center dots, so one transform's edges can never cover another's grab point; dimmed (non-selected) grips keep `pointer-events: none`.
+- Timeline undo hardening: `undoStack` capped at 100 snapshots and continuous same-param/same-frame re-records (auto-keyframe / track-changes during a scrub) coalesce into a single undo entry (`lastKeyframeUndo` run-tracking, broken by any other push/undo/redo).
+
+### Fixed
+
+- Sidebar tour copy updated for the diamond (was describing the removed "Keyframe on randomize" checkbox).
+- Plain-flame drag-drop now routes through `setLoadedAnimation({tracks: []})` like the modal, clearing stale timeline tracks and resetting dirty tracking.
+
 ## [0.9.3] - 2026-06-27
 
 ### Added

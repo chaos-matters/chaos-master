@@ -22,41 +22,9 @@ function randomEasing(): EasingCurve {
   return EASING_POOL[Math.floor(Math.random() * EASING_POOL.length)]!
 }
 
-export function randomizeParams(
-  flame: FlameDescriptor,
-  timeline: TimelineState,
-  subtle: boolean,
-) {
-  const pool = buildParamPool(flame)
-  if (pool.length === 0) return
-
-  const endFrame = timeline.config().endFrame
-  const count = 3 + Math.floor(Math.random() * 6) // 3-8
-  const used = new Set<number>()
-
-  for (let i = 0; i < count && i < pool.length; i++) {
-    const idx = Math.floor(Math.random() * pool.length)
-    const entry = pool[idx]!
-
-    let frame: number
-    do {
-      frame = Math.floor(Math.random() * (endFrame + 1))
-    } while (used.has(frame) && used.size < endFrame + 1)
-    used.add(frame)
-
-    timeline.addKeyframe(
-      entry.path,
-      frame,
-      randomValueForPath(entry.path, entry.value, subtle),
-      randomEasing(),
-    )
-  }
-}
-
 export function randomizeColorsParams(
   flame: FlameDescriptor,
   timeline: TimelineState,
-  subtle: boolean,
 ) {
   const endFrame = timeline.config().endFrame
   const transforms = recordEntries(flame.transforms)
@@ -66,7 +34,7 @@ export function randomizeColorsParams(
   const segmentSize = endFrame / totalSteps
 
   let idx = 0
-  for (const [tid, t] of transforms) {
+  for (const [tid] of transforms) {
     const tidStr = String(tid)
     const count = 2 + Math.floor(Math.random() * 2)
     for (let k = 0; k < count; k++) {
@@ -75,8 +43,8 @@ export function randomizeColorsParams(
         Math.round(idx * segmentSize + Math.random() * segmentSize * 2),
       )
       const easing = randomEasing()
-      const cx = subtleBlend(t.color.x, random01(), subtle)
-      const cy = subtleBlend(t.color.y, random01(), subtle)
+      const cx = random01()
+      const cy = random01()
       timeline.addKeyframe(`transform.${tidStr}.color.x`, frame, cx, easing)
       timeline.addKeyframe(`transform.${tidStr}.color.y`, frame, cy, easing)
       idx++
@@ -84,9 +52,7 @@ export function randomizeColorsParams(
   }
 
   const paletteParams = ['paletteSpeed', 'palettePhase'] as const
-  const rs = flame.renderSettings
   for (const param of paletteParams) {
-    const current = param === 'paletteSpeed' ? rs.paletteSpeed : rs.palettePhase
     for (let k = 0; k < 3; k++) {
       const frame = Math.min(
         endFrame,
@@ -95,7 +61,7 @@ export function randomizeColorsParams(
       timeline.addKeyframe(
         param,
         frame,
-        randomValueForPath(param, current, subtle),
+        wildValueForPath(param),
         randomEasing(),
       )
       idx++
@@ -112,63 +78,6 @@ export type PresetDef = {
 type RawPresetDef = {
   label: string
   apply: (flame: FlameDescriptor, timeline: TimelineState) => void
-}
-
-function buildParamPool(
-  flame: FlameDescriptor,
-): { path: string; value: number }[] {
-  const pool: { path: string; value: number }[] = []
-
-  const rs = flame.renderSettings
-  pool.push({ path: 'exposure', value: rs.exposure })
-  pool.push({ path: 'skipIters', value: rs.skipIters })
-  pool.push({ path: 'vibrancy', value: rs.vibrancy })
-  pool.push({ path: 'contrast', value: rs.contrast })
-  pool.push({ path: 'gamma', value: rs.gamma })
-  pool.push({ path: 'highlightPower', value: rs.highlightPower })
-  pool.push({
-    path: 'densityEstimationQuality',
-    value: rs.densityEstimationQuality,
-  })
-  pool.push({ path: 'paletteSpeed', value: rs.paletteSpeed })
-  pool.push({ path: 'palettePhase', value: rs.palettePhase })
-  if (rs.camera) {
-    pool.push({ path: 'camera.x', value: rs.camera.position[0] })
-    pool.push({ path: 'camera.y', value: rs.camera.position[1] })
-    pool.push({ path: 'camera.zoom', value: rs.camera.zoom })
-  }
-
-  for (const [tid, transform] of recordEntries(flame.transforms)) {
-    const tidStr = String(tid)
-    pool.push({
-      path: `transform.${tidStr}.probability`,
-      value: transform.probability,
-    })
-
-    for (const affine of ['preAffine', 'postAffine'] as const) {
-      for (const coeff of ['a', 'b', 'c', 'd', 'e', 'f'] as const) {
-        pool.push({
-          path: `transform.${tidStr}.${affine}.${coeff}`,
-          value: transform[affine][coeff],
-        })
-      }
-    }
-
-    pool.push({ path: `transform.${tidStr}.color.x`, value: transform.color.x })
-    pool.push({ path: `transform.${tidStr}.color.y`, value: transform.color.y })
-
-    for (const [vid, variation] of recordEntries(transform.variations)) {
-      const vidStr = String(vid)
-      pool.push({ path: `${tidStr}.${vidStr}`, value: variation.weight })
-    }
-  }
-
-  return pool
-}
-
-function subtleBlend(current: number, random: number, subtle: boolean): number {
-  if (!subtle) return random
-  return current + (random - current) * 0.15
 }
 
 function wildValueForPath(path: string): number {
@@ -206,14 +115,6 @@ function wildValueForPath(path: string): number {
   // Affine coefficients: 30% chance of zero-centered [-1,1], 70% [0,1]
   if (random01() < 0.3) return (random01() - 0.5) * 2
   return random01()
-}
-
-function randomValueForPath(
-  path: string,
-  current: number,
-  subtle: boolean,
-): number {
-  return subtleBlend(current, wildValueForPath(path), subtle)
 }
 
 /* ──── Presets ──── */

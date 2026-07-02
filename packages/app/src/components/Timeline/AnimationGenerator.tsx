@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from 'solid-js'
+import { Sparkle } from '@/icons'
 import ui from './AnimationGenerator.module.css'
-import { buildPresets, randomizeColorsParams, randomizeParams } from './presets'
+import { buildPresets, randomizeColorsParams } from './presets'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineState } from '@/utils/timeline'
 
@@ -11,30 +12,25 @@ type AnimationControlsProps = {
   timeline: TimelineState
   presetsExpanded: boolean
   onTogglePresets: () => void
+  /** Reveals the sidebar's animation generator (Flame Randomizer card). */
+  onOpenAnimationGenerator?: () => void
 }
 
 export function AnimationControls(props: AnimationControlsProps) {
-  const [subtleMode, setSubtleMode] = createSignal(false)
-
   return (
     <span class={ui.controlsRow}>
       <button
         class={ui.genBtn}
-        onClick={() => {
-          randomizeParams(props.flameDescriptor, props.timeline, subtleMode())
-        }}
-        title="Generate random keyframes from current flame parameters"
+        onClick={() => props.onOpenAnimationGenerator?.()}
+        title="Open the animation generator (randomize or smart-animate this flame)"
       >
-        Gen
+        <Sparkle class={ui.genBtnIcon} />
+        Animate
       </button>
       <button
         class={ui.genBtn}
         onClick={() => {
-          randomizeColorsParams(
-            props.flameDescriptor,
-            props.timeline,
-            subtleMode(),
-          )
+          randomizeColorsParams(props.flameDescriptor, props.timeline)
         }}
         title="Generate random color keyframes for transforms and palette"
       >
@@ -48,18 +44,6 @@ export function AnimationControls(props: AnimationControlsProps) {
         title="Clear all keyframes (undoable)"
       >
         Clear
-      </button>
-      <button
-        class={ui.genBtn}
-        classList={{ [ui.active as string]: subtleMode() }}
-        onClick={() => setSubtleMode(!subtleMode())}
-        title={
-          subtleMode()
-            ? 'Subtle mode on — values stay close to originals'
-            : 'Subtle mode off — full randomization'
-        }
-      >
-        Subtle
       </button>
       <button
         class={ui.presetsToggle}

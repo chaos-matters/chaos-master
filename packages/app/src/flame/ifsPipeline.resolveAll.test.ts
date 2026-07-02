@@ -47,7 +47,7 @@ function mockRoot(capture: (compute: any) => void) {
 function resolve2D(transforms: any): string {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let captured: any
-   
+
   const { root, fakeBuffer } = mockRoot((c) => (captured = c))
   createRoot((dispose) => {
     createIFSPipeline(
@@ -80,7 +80,7 @@ function resolve2D(transforms: any): string {
 function resolve3D(transforms: any): string {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let captured: any
-   
+
   const { root, fakeBuffer } = mockRoot((c) => (captured = c))
   createRoot((dispose) => {
     createIFSPipeline3D(

@@ -4,11 +4,11 @@ import { DiceButton } from '@/components/DiceButton/DiceButton'
 import { handleColor } from '@/components/FlameColorEditor/FlameColorEditor'
 import { ResetButton } from '@/components/ResetButton/ResetButton'
 import { ScrubInput } from '@/components/Sliders/ScrubInput'
-import { KeyframeOnRandomizeToggle } from '@/components/Timeline/KeyframeOnRandomizeToggle'
+import { TrackChangesDiamond } from '@/components/Timeline/TrackChangesDiamond'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useTimeline } from '@/contexts/TimelineContext'
 import { randomizeAffineCoef } from '@/flame/randomize'
-import { keyframeRandomizedParams } from '@/utils/randomizeKeyframes'
+import { keyframeChangedParams } from '@/utils/keyframeOnChange'
 import { buildReadableIds } from '@/utils/readableIds'
 import { recordEntries } from '@/utils/record'
 import { sortedTransformEntries } from '@/utils/transformOrder'
@@ -23,6 +23,10 @@ export type AffineListEditorProps = {
   is3D?: boolean
   selectedTransformId?: () => string | null
   setSelectedTransformId?: (tid: string | null) => void
+  /** Gate for the track-changes diamond + dice keyframing. Only editors bound
+   *  to the real flame pass true — the variation modal edits a PREVIEW flame
+   *  whose paths would resolve against the real one and write junk tracks. */
+  enableChangeTracking?: boolean
 }
 
 const COEFS_2D = ['a', 'b', 'c', 'd', 'e', 'f'] as const
@@ -50,8 +54,8 @@ export function AffineListEditor(props: AffineListEditorProps) {
 
   return (
     <div class={ui.container}>
-      <Show when={timeline?.animationEnabled()}>
-        <KeyframeOnRandomizeToggle />
+      <Show when={props.enableChangeTracking && timeline?.animationEnabled()}>
+        <TrackChangesDiamond />
       </Show>
       <For each={sortedTransformEntries(recordEntries(props.transforms))}>
         {([tid, transform]) => {
@@ -109,12 +113,15 @@ export function AffineListEditor(props: AffineListEditorProps) {
                         )
                       }
                     })
-                    keyframeRandomizedParams(
-                      timeline,
-                      activeCoefs().map(
-                        (key) => `transform.${tid}.${props.affineMode}.${key}`,
-                      ),
-                    )
+                    if (props.enableChangeTracking) {
+                      keyframeChangedParams(
+                        timeline,
+                        activeCoefs().map(
+                          (key) =>
+                            `transform.${tid}.${props.affineMode}.${key}`,
+                        ),
+                      )
+                    }
                   }}
                 />
                 <ResetButton

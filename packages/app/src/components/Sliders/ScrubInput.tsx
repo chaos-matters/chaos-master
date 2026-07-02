@@ -2,6 +2,7 @@ import { createSignal, Show } from 'solid-js'
 import { KeyframeDiamond } from '@/components/Timeline/KeyframeDiamond'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useTimeline } from '@/contexts/TimelineContext'
+import { keyframeChangedParams, keyframeEditedParam, } from '@/utils/keyframeOnChange'
 import ui from './ScrubInput.module.css'
 
 type ScrubInputProps = {
@@ -49,14 +50,7 @@ export function ScrubInput(props: ScrubInputProps) {
       if (props.max !== undefined) newValue = Math.min(props.max, newValue)
       props.onInput(newValue)
 
-      if (
-        timeline &&
-        props.dataParameterPath &&
-        timeline.autoKeyframe() &&
-        timeline.hasAnyKeyframes(props.dataParameterPath)
-      ) {
-        timeline.addKeyframeAtCurrentFrame(props.dataParameterPath)
-      }
+      keyframeEditedParam(timeline, props.dataParameterPath)
     }
 
     function onUp() {
@@ -81,6 +75,10 @@ export function ScrubInput(props: ScrubInputProps) {
       if (props.min !== undefined) val = Math.max(props.min, val)
       if (props.max !== undefined) val = Math.min(props.max, val)
       props.onInput(val)
+      // Typed edits count as changes for the track-changes diamond too.
+      if (props.dataParameterPath) {
+        keyframeChangedParams(timeline, [props.dataParameterPath])
+      }
     }
     setEditing(false)
   }

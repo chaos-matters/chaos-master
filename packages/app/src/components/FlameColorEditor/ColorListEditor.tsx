@@ -5,11 +5,11 @@ import ui from '@/components/AffineEditor/AffineListEditor.module.css'
 import { DiceButton } from '@/components/DiceButton/DiceButton'
 import { ResetButton } from '@/components/ResetButton/ResetButton'
 import { ScrubInput } from '@/components/Sliders/ScrubInput'
-import { KeyframeOnRandomizeToggle } from '@/components/Timeline/KeyframeOnRandomizeToggle'
+import { TrackChangesDiamond } from '@/components/Timeline/TrackChangesDiamond'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useTimeline } from '@/contexts/TimelineContext'
 import { randomRange } from '@/flame/randomize'
-import { keyframeRandomizedParams } from '@/utils/randomizeKeyframes'
+import { keyframeChangedParams } from '@/utils/keyframeOnChange'
 import { buildReadableIds } from '@/utils/readableIds'
 import { recordEntries } from '@/utils/record'
 import { sortedTransformEntries } from '@/utils/transformOrder'
@@ -32,6 +32,8 @@ export function ColorListEditor(props: {
   setTransforms: HistorySetter<TransformRecord>
   selectedTransformId?: () => string | null
   setSelectedTransformId?: (tid: string | null) => void
+  /** Gate for the track-changes diamond + dice keyframing (real flame only). */
+  enableChangeTracking?: boolean
 }) {
   const { theme } = useTheme()
   const timeline = useTimeline()
@@ -39,8 +41,8 @@ export function ColorListEditor(props: {
 
   return (
     <div class={ui.container}>
-      <Show when={timeline?.animationEnabled()}>
-        <KeyframeOnRandomizeToggle />
+      <Show when={props.enableChangeTracking && timeline?.animationEnabled()}>
+        <TrackChangesDiamond />
       </Show>
       <For each={sortedTransformEntries(recordEntries(props.transforms))}>
         {([tid, transform]) => {
@@ -93,10 +95,12 @@ export function ColorListEditor(props: {
                         y: randomRange(-0.4, 0.4),
                       }
                     })
-                    keyframeRandomizedParams(timeline, [
-                      `transform.${tid}.color.x`,
-                      `transform.${tid}.color.y`,
-                    ])
+                    if (props.enableChangeTracking) {
+                      keyframeChangedParams(timeline, [
+                        `transform.${tid}.color.x`,
+                        `transform.${tid}.color.y`,
+                      ])
+                    }
                   }}
                 />
                 <ResetButton

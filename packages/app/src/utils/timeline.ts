@@ -670,21 +670,32 @@ export function createTimelineState() {
       ) => void)
     | null = null
 
-  // Undo/redo stacks for timeline operations
+  // Undo/redo stacks for timeline operations. Capped: auto-keyframe and the
+  // track-changes diamond can push one snapshot per pointer-move during a
+  // scrub, and every entry deep-copies every track.
+  const MAX_TIMELINE_UNDO = 100
   const undoStack: (readonly TimelineTrack[])[] = []
   const redoStack: (readonly TimelineTrack[])[] = []
+  // Set by addKeyframeAtCurrentFrame so a continuous same-param scrub at one
+  // frame coalesces into a single undo entry (one Ctrl+Z reverts the whole
+  // gesture instead of hundreds of per-move steps). Any other undo push
+  // breaks the run.
+  let lastKeyframeUndo: { path: string; frame: number } | null = null
 
   function pushUndo() {
+    lastKeyframeUndo = null
     undoStack.push(
       tracks().map((t) => ({
         ...t,
         keyframes: t.keyframes.map((kf) => ({ ...kf })),
       })),
     )
+    if (undoStack.length > MAX_TIMELINE_UNDO) undoStack.shift()
     redoStack.length = 0
   }
 
   function timelineUndo() {
+    lastKeyframeUndo = null
     const prev = undoStack.pop()
     if (!prev) return
     redoStack.push(
@@ -697,6 +708,7 @@ export function createTimelineState() {
   }
 
   function timelineRedo() {
+    lastKeyframeUndo = null
     const next = redoStack.pop()
     if (!next) return
     undoStack.push(
@@ -1228,7 +1240,16 @@ export function createTimelineState() {
     const frame = currentFrame()
     const value = valueResolverFn ? valueResolverFn(parameterPath) : null
     if (value !== null) {
-      pushUndo()
+      // Coalesce continuous re-records of the same param at the same frame
+      // (auto-keyframe / track-changes fire per pointer-move while scrubbing)
+      // into one undo entry.
+      const coalesce =
+        lastKeyframeUndo?.path === parameterPath &&
+        lastKeyframeUndo.frame === frame
+      if (!coalesce) {
+        pushUndo()
+        lastKeyframeUndo = { path: parameterPath, frame }
+      }
       addKeyframeImpl(parameterPath, frame, value)
     }
   }

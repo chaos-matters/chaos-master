@@ -9,6 +9,8 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 export interface TimelineSectionProps {
   formatTrackLabel?: (path: string) => string
   flameDescriptor?: FlameDescriptor
+  /** Reveals the sidebar's animation generator (Flame Randomizer card). */
+  onOpenAnimationGenerator?: () => void
 }
 
 import { TimelineSettings } from './TimelineSettings'
@@ -57,6 +59,7 @@ export function TimelineSection(props: TimelineSectionProps) {
               timeline={timeline}
               presetsExpanded={presetsExpanded()}
               onTogglePresets={() => setPresetsExpanded((p) => !p)}
+              onOpenAnimationGenerator={props.onOpenAnimationGenerator}
             />
           </Show>
           <button

@@ -1,0 +1,113 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--neutral-300);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--neutral-500);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
+
+  [data-theme='dark'] & {
+    border-color: var(--neutral-700);
+  }
+
+  &:hover {
+    border-color: var(--accent-color, #6366f1);
+    color: var(--accent-color, #6366f1);
+    background: rgba(99, 102, 241, 0.06);
+  }
+}
+
+/* Gem-only variant for editor canvas overlays. */
+.compact {
+  gap: 0;
+  padding: 3px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--neutral-100) 72%, transparent);
+  backdrop-filter: blur(2px);
+
+  [data-theme='dark'] & {
+    background: color-mix(in srgb, var(--neutral-900) 72%, transparent);
+  }
+}
+
+.diamond {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
+.gem {
+  fill: var(--neutral-300);
+  stroke: var(--neutral-500);
+  stroke-width: 1;
+  transition: fill 0.2s;
+
+  [data-theme='dark'] & {
+    fill: var(--neutral-700);
+    stroke: var(--neutral-500);
+  }
+}
+
+.facet {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.4);
+  stroke-width: 0.6;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.shine {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 1.1;
+  stroke-linecap: round;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.active {
+  border-color: var(--accent-color, #6366f1);
+  color: var(--accent-color, #6366f1);
+
+  /* The gem's gradient fill is set inline (per-instance gradient id). */
+  & .gem {
+    stroke: #4338ca;
+  }
+
+  & .facet {
+    opacity: 1;
+  }
+
+  & .shine {
+    opacity: 0.9;
+  }
+
+  & .diamond {
+    animation: tc-sparkle 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes tc-sparkle {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 2px rgba(99, 102, 241, 0.55));
+  }
+
+  50% {
+    filter: drop-shadow(0 0 6px rgba(129, 140, 248, 0.95));
+  }
+}
+
+.label {
+  line-height: 1;
+}

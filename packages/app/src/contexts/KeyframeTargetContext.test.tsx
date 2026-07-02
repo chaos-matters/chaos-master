@@ -71,7 +71,9 @@ describe('KeyframeTargetContext', () => {
       expect(result.targetedParameter()).toBeNull()
       expect(result.selectedKeyframePath()).toBeNull()
       // Setters are no-ops: calling them neither throws nor changes state.
-      expect(() => { result.setTargetedParameter('exposure'); }).not.toThrow()
+      expect(() => {
+        result.setTargetedParameter('exposure')
+      }).not.toThrow()
       expect(result.targetedParameter()).toBeNull()
     })
   })

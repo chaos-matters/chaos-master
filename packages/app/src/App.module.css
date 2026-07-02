@@ -1218,6 +1218,42 @@
   }
 }
 
+/* Toast with buttons: interactive, and no timed CSS fade — the dismiss timer
+   lives in ToastContext so the buttons stay clickable for the full duration. */
+.toast-actionable {
+  pointer-events: auto;
+  animation: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(92vw, 34rem);
+}
+
+.toast-actions {
+  display: inline-flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.toast-btn {
+  padding: 3px 10px;
+  border: 1px solid var(--neutral-500);
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+
+  &:hover {
+    border-color: var(--accent-color, #6366f1);
+    background: rgba(99, 102, 241, 0.14);
+  }
+}
+
 .hover-preview-badge {
   position: absolute;
   top: 10px;

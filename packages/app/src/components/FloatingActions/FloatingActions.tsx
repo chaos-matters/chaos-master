@@ -1,11 +1,12 @@
 import { createEffect, createSignal, Show } from 'solid-js'
-import { Bookmark, CameraIcon, Discord, Eye, FolderOpen, Pause, Share, Shuffle, Zap, } from '@/icons'
+import { Bookmark, CameraIcon, Discord, Eye, FolderOpen, Pause, Plus, Share, Shuffle, Zap, } from '@/icons'
 import { defaultPills, QualityPresets } from '../Quality/QualityPresets'
 import ui from './FloatingActions.module.css'
 
 type Props = {
   initialLeft: number
   initialTop: number
+  onNewFlame: () => void
   onLoadFlame: () => void
   onSaveForLater: () => void
   onRender: () => void
@@ -196,6 +197,14 @@ export function FloatingActions(props: Props) {
         <div class={ui.rows}>
           {/* Row 1: Action buttons */}
           <div class={ui.buttons}>
+            <button
+              class={ui.button}
+              onClick={props.onNewFlame}
+              aria-label="New Flame"
+              title="New Flame (fresh starter — undo brings the current one back)"
+            >
+              <Plus />
+            </button>
             <button
               class={ui.button}
               onClick={props.onLoadFlame}

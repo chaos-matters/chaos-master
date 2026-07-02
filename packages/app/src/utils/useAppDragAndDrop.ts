@@ -10,7 +10,6 @@ export function useAppDragAndDrop(
     flame: FlameDescriptor
     tracks: TimelineTrack[]
   }) => void,
-  clearLoadedAnimation: () => void,
 ) {
   const loadFlameFromFile = useLoadFlameFromFile()
 
@@ -28,7 +27,10 @@ export function useAppDragAndDrop(
           })),
         })
       } else {
-        clearLoadedAnimation()
+        // Route through setLoadedAnimation like the LoadFlame modal: clears
+        // stale timeline tracks from the previous flame and resets dirty
+        // tracking (a plain drop is a load, not an edit).
+        setLoadedAnimation({ flame: deepClone(result.flame), tracks: [] })
       }
     })
   }

@@ -5,8 +5,11 @@
   gap: 3px;
 }
 
-/* ── Gen / Colors button (matches Auto/Del style) ── */
+/* ── Animate / Colors / Clear buttons (match Auto/Del style) ── */
 .genBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   padding: 2px 6px;
   font-size: 0.6rem;
   font-weight: 600;
@@ -36,21 +39,10 @@
   }
 }
 
-/* Solid fill so on/off is unmistakable (used by the Subtle toggle). */
-.active {
-  border-color: var(--accent-color, #6366f1);
-  color: #fff;
-  background: var(--accent-color, #6366f1);
-
-  &:hover {
-    border-color: var(--accent-color, #6366f1);
-    color: #fff;
-    background: var(--accent-color, #4f46e5);
-  }
-
-  &::before {
-    content: '✓ ';
-  }
+.genBtnIcon {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
 }
 
 /* ── Presets toggle ── */

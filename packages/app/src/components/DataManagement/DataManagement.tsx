@@ -1,5 +1,6 @@
 import { createResource, createSignal, For, Show } from 'solid-js'
 import { useToast } from '@/contexts/ToastContext'
+import { autosaveIntervalMin, autosaveRecents, setAutosaveIntervalMin, setAutosaveRecents, } from '@/utils/autosaveSettings'
 import { buildFlameBackupZip, downloadBackupZip } from '@/utils/flameBackup'
 import { formatBytes } from '@/utils/formatBytes'
 import { clearAllFlames, clearSettings, computeStorageUsage, } from '@/utils/storageUsage'
@@ -264,6 +265,47 @@ export function DataManagement() {
           {exporting() ? 'Exporting…' : 'Export Backup'}
           <span class={ui.zipBadge}>ZIP</span>
         </Button>
+      </section>
+
+      {/* Auto-save */}
+      <section class={ui.card}>
+        <div class={ui.cardLabel}>Auto-save</div>
+        <p class={ui.cardHint}>
+          Periodically saves the active flame (and its animation) into Recent
+          flames while you edit — one entry per session, updated in place.
+          Unsaved changes are also stored automatically when the tab closes or
+          reloads, regardless of this setting.
+        </p>
+        <div class={ui.fieldRow}>
+          <span class={ui.fieldName}>Periodic auto-save</span>
+          <label class={ui.groupCheck}>
+            <Checkbox
+              checked={autosaveRecents() === 'on'}
+              onChange={(v) => setAutosaveRecents(v ? 'on' : 'off')}
+            />
+            <span>Enabled</span>
+          </label>
+        </div>
+        <div class={ui.fieldRow}>
+          <span class={ui.fieldName}>Interval</span>
+          <div class={ui.pills}>
+            <For each={[1, 2, 5, 10]}>
+              {(minutes) => (
+                <button
+                  type="button"
+                  class={ui.pill}
+                  classList={{
+                    [ui.pillActive as string]:
+                      autosaveIntervalMin() === minutes,
+                  }}
+                  onClick={() => setAutosaveIntervalMin(minutes)}
+                >
+                  {minutes} min
+                </button>
+              )}
+            </For>
+          </div>
+        </div>
       </section>
 
       {/* Danger zone */}

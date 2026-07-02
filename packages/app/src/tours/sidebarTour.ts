@@ -70,7 +70,7 @@ export const sidebarTour: TourGuide = {
       target: tourTarget('auto-keyframe'),
       title: 'Auto Keyframe Mode',
       description:
-        'When Auto is enabled, any change to a property that already has keyframes automatically inserts a new keyframe at the current frame. The affine and color editors also offer a "Keyframe on randomize" toggle — one 🎲 randomize then drops keyframes for every changed value at once, perfect for building a flow of colors or shapes frame by frame.',
+        'When Auto is enabled, any change to a property that already has keyframes automatically inserts a new keyframe at the current frame. To record from scratch, flip on the shiny "Track changes" diamond in the affine or color editor — every edit, dice roll, and handle drag then drops keyframes at the current frame, perfect for building an animation move by move.',
       beforeShow: openTimeline,
     },
     {

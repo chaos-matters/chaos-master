@@ -32,6 +32,14 @@
   image-rendering: pixelated;
 }
 
+/* Track-changes diamond floating over the colour wheel. */
+.canvas-diamond {
+  position: absolute;
+  top: var(--space-2, 6px);
+  left: var(--space-2, 6px);
+  z-index: 3;
+}
+
 .svg {
   width: 100%;
   height: 100%;

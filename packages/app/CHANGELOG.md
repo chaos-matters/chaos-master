@@ -3,6 +3,26 @@
 What's new in Chaos Master. Concise highlights for each release; the full
 developer history lives in `dev.changelog.md`.
 
+## [0.9.4] - 2026-07-02
+
+### Added
+
+- **Track changes diamond.** A shiny diamond on the affine editor and color wheel (and in their list views): while it's on, every edit records a keyframe at the current frame — dragging a transform handle, scaling/rotating, scrubbing a value, typing a number, or rolling a dice. Unlike the timeline's Auto mode it also creates the _first_ keyframe, so animating is just: turn on the diamond, move things, step frames, move again.
+- **New Flame button** in the floating actions bar: one click resets to a clean starter flame (2D or 3D, matching your mode). No confirmation needed — undo brings the previous flame back, and unsaved work (including its animation) is stashed into Recent flames first.
+- **Animate button** in the timeline header opens the sidebar's animation generator (Flame Randomizer → Animation Settings) and scrolls straight to it — replacing the old one-shot "Gen" randomizer and its "Subtle" toggle.
+- **Your work is never silently lost.** Closing or reloading the tab with unsaved changes now saves the flame (with its animation) into Recent flames automatically — no prompt. Optional periodic auto-save (asked once via a small toast; configurable under Data Management: on/off + 1/2/5/10 min) keeps one auto-updating entry per editing session. Loading another flame, switching 2D/3D, or starting a new flame stashes unsaved work first. A one-time reminder after a few minutes of editing points to save/export/share, with a "Don't show again".
+- **3D variation browser** now shows the same Affine Editor panel the 2D browser has, so you can position a variation's transform while previewing it.
+
+### Changed
+
+- **The selected transform always renders on top.** Overlapping handles used to hide the selected transform behind later-added ones; the selected handle now paints above the stack and receives the click. Scale/rotate edges also always paint _below_ center dots, so one transform's edges can no longer cover another's grab point.
+
+### Fixed
+
+- Clicking stacked transform handles (e.g. several at the origin) now selects and moves the **selected/targeted** transform instead of whichever was added last.
+- Recording keyframes while scrubbing no longer floods the timeline's undo history — one undo reverts the whole scrub, and the history is bounded.
+- Auto/track-changes recording only happens while animation mode is on — no invisible "ghost" keyframes after leaving animation mode.
+
 ## [0.9.3] - 2026-06-27
 
 ### Added
