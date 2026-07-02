@@ -238,6 +238,35 @@ describe('createStoreHistory', () => {
     })
   })
 
+  describe('setSilently (automated writers)', () => {
+    it('mutates the store without recording history', () => {
+      const { store, history } = makeHistory()
+      history.setSilently((draft) => {
+        draft.items.a!.value = 42
+      })
+      expect(store.items.a!.value).toBe(42)
+      expect(history.hasUndo()).toBe(false)
+    })
+
+    it('does not disturb existing undo/redo state', () => {
+      const { store, set, history } = makeHistory()
+      set((draft) => {
+        draft.name = 'edited'
+      })
+      history.undo()
+      expect(history.hasRedo()).toBe(true)
+      // A silent follower write (e.g. auto-exposure after the undo) must not
+      // truncate redo or add entries.
+      history.setSilently((draft) => {
+        draft.items.a!.value = 9
+      })
+      expect(history.hasRedo()).toBe(true)
+      expect(history.hasUndo()).toBe(false)
+      history.redo()
+      expect(store.name).toBe('edited')
+    })
+  })
+
   describe('replace', () => {
     it('is undoable back to the previous state', () => {
       const { store, history } = makeHistory()

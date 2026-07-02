@@ -109,7 +109,20 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
     return Math.max(min, Math.min(max, props.radius[0]()))
   }
 
+  // Wheel-zoom commits its preview on a debounce. The timer must be stored
+  // and cleared: an uncleared timer commits MID-GESTURE — chopping a long
+  // zoom into fragments, and prematurely committing an orbit/pan/pinch that
+  // started within the debounce window (every later move then records its
+  // own history entry).
+  let wheelDebounceTimer: ReturnType<typeof setTimeout> | undefined
+  const cancelPendingWheelCommit = () => {
+    clearTimeout(wheelDebounceTimer)
+    wheelDebounceTimer = undefined
+  }
+
   const startOrbit = createDragHandler((initEvent) => {
+    // The gesture owns the preview now; a pending wheel commit would chop it.
+    cancelPendingWheelCommit()
     if (!changeHistory.isPreviewing()) {
       changeHistory.startPreview('Camera orbit')
     }
@@ -134,6 +147,7 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
 
   const startPanning = createDragHandler(
     (initEvent) => {
+      cancelPendingWheelCommit()
       if (!changeHistory.isPreviewing()) {
         changeHistory.startPreview('Camera pan')
       }
@@ -313,13 +327,16 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
         Math.min(MAX_ORBIT_RADIUS, r * (1 + ev.deltaY * SCROLL_SENSITIVITY)),
       ),
     )
-    setTimeout(() => {
+    cancelPendingWheelCommit()
+    wheelDebounceTimer = setTimeout(() => {
+      wheelDebounceTimer = undefined
       changeHistory.commit()
     }, 300)
   }
 
   const startPinch = createPinchHandler((initEvent) => {
     let prevDistance = initEvent.distance
+    cancelPendingWheelCommit()
     if (!changeHistory.isPreviewing()) {
       changeHistory.startPreview('Camera pinch')
     }
@@ -550,6 +567,7 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
         keyLoopId = null
       }
       activeKeys.clear()
+      cancelPendingWheelCommit()
       if (changeHistory.isPreviewing()) {
         changeHistory.commit()
       }

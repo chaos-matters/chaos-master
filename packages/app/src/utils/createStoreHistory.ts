@@ -43,6 +43,12 @@ export type ChangeHistory<T> = {
    *  Used by the cross-system undo router; always null when not journaled. */
   readonly peekUndoSeq: () => number | null
   readonly peekRedoSeq: () => number | null
+  /** Mutate the store WITHOUT recording history. For automated writers that
+   *  must never pollute undo: the animation export applying per-frame state
+   *  (one entry per exported frame otherwise) and derived follower effects
+   *  like 3D auto-exposure (whose reactive write after an undo would inject
+   *  a fresh entry and destroy redo). */
+  readonly setSilently: (setFn: (draft: T) => void) => void
 }
 
 type CreateStoreHistoryOptions = {
@@ -156,6 +162,13 @@ export function createStoreHistory<T extends object>(
     setStackIndex(i)
   }
 
+  const setSilently = (setFn: (draft: T) => void) => {
+    const [result] = produceWithPatches(unwrap(store), (draft) => {
+      setFn(draft as T)
+    })
+    setStore(reconcile((result ?? unwrap(store)) as T))
+  }
+
   const set: HistorySetter<T> = (setFn, description) => {
     // Run the mutation callback exactly ONCE. produceWithPatches yields both
     // the resulting state and the patches; the store is then updated by
@@ -249,6 +262,7 @@ export function createStoreHistory<T extends object>(
       replace,
       peekUndoSeq,
       peekRedoSeq,
+      setSilently,
     } satisfies ChangeHistory<T>,
   ] as const
 }

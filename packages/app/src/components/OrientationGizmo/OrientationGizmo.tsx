@@ -1,4 +1,5 @@
 import { createSignal } from 'solid-js'
+import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { createDragHandler } from '@/utils/createDragHandler'
 import ui from './OrientationGizmo.module.css'
 import type { Signal } from 'solid-js'
@@ -67,14 +68,18 @@ export function OrientationGizmo(props: OrientationGizmoProps) {
   const CY = 40
   const AXIS_LEN = 25 // px from center to axis endpoint
 
+  const history = useChangeHistory()
   const [animating, setAnimating] = createSignal(false)
 
-  // Smooth snap animation
+  // Smooth snap animation. Batched: theta/phi write into flame history per
+  // frame — without a preview one axis click recorded ~70 entries (two
+  // setter calls x 60fps), making undo useless.
   function snapTo(targetTheta: number, targetPhi: number) {
     const startTheta = props.theta[0]()
     const startPhi = props.phi[0]()
     const startTime = globalThis.performance.now()
     setAnimating(true)
+    history.startPreview('Orient camera')
 
     function tick() {
       const elapsed = globalThis.performance.now() - startTime
@@ -87,13 +92,15 @@ export function OrientationGizmo(props: OrientationGizmoProps) {
         requestAnimationFrame(tick)
       } else {
         setAnimating(false)
+        history.commit()
       }
     }
     requestAnimationFrame(tick)
   }
 
-  // Drag-to-orbit on the gizmo itself
+  // Drag-to-orbit on the gizmo itself (batched like the snap animation).
   const startOrbit = createDragHandler((initEvent) => {
+    history.startPreview('Orbit camera')
     return {
       onPointerMove(event) {
         const dx = event.clientX - initEvent.clientX
@@ -106,7 +113,7 @@ export function OrientationGizmo(props: OrientationGizmoProps) {
         initEvent = event
       },
       onDone() {
-        // no-op
+        history.commit()
       },
     }
   })

@@ -24,6 +24,7 @@ const noopHistory: ChangeHistory<FlameDescriptor> = {
   commit: () => {},
   peekUndoSeq: () => null,
   peekRedoSeq: () => null,
+  setSilently: () => {},
 }
 
 export function useChangeHistory() {

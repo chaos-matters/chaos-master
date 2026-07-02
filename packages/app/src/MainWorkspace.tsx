@@ -917,7 +917,11 @@ export function MainWorkspace(props: AppProps) {
     if (target === null) return
     const current = untrack(() => flameDescriptor.renderSettings.exposure)
     if (Math.abs(target - current) > 1e-4) {
-      setFlameDescriptor((draft) => {
+      // Silent: this is a derived follower of the camera radius. Recording it
+      // injected a fresh history entry whenever an undo reverted the radius
+      // (effects run after the undo completes) — destroying redo and making
+      // undo fight the user.
+      history.setSilently((draft) => {
         draft.renderSettings.exposure = target
       })
     }
@@ -1185,7 +1189,10 @@ export function MainWorkspace(props: AppProps) {
       canvas,
       timeline,
       flameDescriptor,
-      setFlameDescriptor,
+      // Silent writer: the export applies animated state once PER FRAME —
+      // recording it buried the user's real edits under hundreds of
+      // per-frame history entries (uncapped stack).
+      history.setSilently,
       setOnExportImage,
     )
 

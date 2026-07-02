@@ -1,5 +1,6 @@
 import { createSignal, Show } from 'solid-js'
 import { KeyframeDiamond } from '@/components/Timeline/KeyframeDiamond'
+import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useTimeline } from '@/contexts/TimelineContext'
 import { keyframeChangedParams, keyframeEditedParam, } from '@/utils/keyframeOnChange'
@@ -23,6 +24,7 @@ type ScrubInputProps = {
 
 export function ScrubInput(props: ScrubInputProps) {
   const timeline = useTimeline()
+  const history = useChangeHistory()
   const { selectedKeyframePath } = useKeyframeTarget()
   const [editing, setEditing] = createSignal(false)
   const [editValue, setEditValue] = createSignal('')
@@ -41,6 +43,10 @@ export function ScrubInput(props: ScrubInputProps) {
     const startX = e.clientX
     const startValue = props.value
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    // Batch the whole scrub into one history entry (like Slider): without a
+    // preview every pointer-move recorded its own entry, so undoing a drag
+    // rewound it pixel by pixel.
+    history.startPreview(`Edit ${props.label}`)
 
     function onMove(ev: PointerEvent) {
       const dx = ev.clientX - startX
@@ -56,11 +62,14 @@ export function ScrubInput(props: ScrubInputProps) {
     function onUp() {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+      history.commit()
       // End of gesture: the next scrub must be its own undo step.
       timeline?.breakUndoCoalescing()
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
   }
 
   function startEdit() {
