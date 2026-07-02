@@ -231,6 +231,44 @@ describe('timeline undo/redo', () => {
     })
   })
 
+  describe('value write-back on undo/redo', () => {
+    it('writes the restored value at the current frame back to the flame', () => {
+      const written: [string, unknown][] = []
+      timeline.setValueWriter((path, value) => written.push([path, value]))
+      timeline.addKeyframe('exposure', 0, 1, 'linear') // write-through: 1
+      timeline.addKeyframe('exposure', 0, 5, 'linear') // write-through: 5
+      written.length = 0
+
+      timeline.timelineUndo() // keyframe value back to 1
+      expect(written).toEqual([['exposure', 1]])
+      written.length = 0
+
+      timeline.timelineRedo() // forward to 5 again
+      expect(written).toEqual([['exposure', 5]])
+    })
+
+    it('does not write for tracks the swap removed (flame history owns them)', () => {
+      const written: [string, unknown][] = []
+      timeline.setValueWriter((path, value) => written.push([path, value]))
+      timeline.addKeyframe('exposure', 0, 5, 'linear')
+      written.length = 0
+
+      timeline.timelineUndo() // track removed entirely
+      expect(written).toEqual([])
+    })
+
+    it('does not write for tracks untouched by the swap', () => {
+      const written: [string, unknown][] = []
+      timeline.setValueWriter((path, value) => written.push([path, value]))
+      timeline.addKeyframe('exposure', 0, 5, 'linear')
+      timeline.addKeyframe('t.a', 0, 7, 'linear')
+      written.length = 0
+
+      timeline.timelineUndo() // only t.a is removed; exposure unchanged
+      expect(written).toEqual([])
+    })
+  })
+
   describe('load boundaries', () => {
     it('loadTracks clears undo and redo stacks', () => {
       timeline.addKeyframe('exposure', 10, 0.5, 'linear')

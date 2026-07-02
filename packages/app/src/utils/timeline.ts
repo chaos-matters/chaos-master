@@ -744,20 +744,53 @@ export function createTimelineState() {
     }
   }
 
+  /**
+   * After an undo/redo swaps the track set, push each surviving changed
+   * track's value AT THE CURRENT FRAME back into the flame (via the same
+   * writer recording uses). Without this a keyframe undo was often invisible:
+   * recording had written the value into the flame store, and the canvas only
+   * overlays tracks while the timeline drives the view. Paths whose track was
+   * REMOVED by the swap are deliberately left untouched — the flame edit that
+   * produced their value is a separate flame-history entry with its own undo.
+   */
+  function writeBackResolvedValues(
+    before: readonly TimelineTrack[],
+    after: readonly TimelineTrack[],
+  ) {
+    if (!valueWriterFn) return
+    const frame = currentFrame()
+    const prevByPath = new Map(before.map((t) => [t.parameterPath, t]))
+    for (const track of after) {
+      const prev = prevByPath.get(track.parameterPath)
+      if (
+        prev &&
+        JSON.stringify(prev.keyframes) === JSON.stringify(track.keyframes)
+      ) {
+        continue
+      }
+      const value = resolveKeyframeValue(track.keyframes, frame)
+      if (value !== null && typeof value !== 'boolean') {
+        valueWriterFn(track.parameterPath, value)
+      }
+    }
+  }
+
   function timelineUndo() {
     coalesceKey = null
     const prev = undoStack.pop()
     if (!prev) return
+    const current = tracks()
     // The undone entry's stamp travels to the redo side so cross-system redo
     // can replay forward in original chronological order.
     redoStack.push({
-      tracks: tracks().map((t) => ({
+      tracks: current.map((t) => ({
         ...t,
         keyframes: t.keyframes.map((kf) => ({ ...kf })),
       })),
       seq: prev.seq,
     })
     setTracks(() => prev.tracks as TimelineTrack[])
+    writeBackResolvedValues(current, prev.tracks)
     touchStacks()
   }
 
@@ -765,14 +798,16 @@ export function createTimelineState() {
     coalesceKey = null
     const next = redoStack.pop()
     if (!next) return
+    const current = tracks()
     undoStack.push({
-      tracks: tracks().map((t) => ({
+      tracks: current.map((t) => ({
         ...t,
         keyframes: t.keyframes.map((kf) => ({ ...kf })),
       })),
       seq: next.seq,
     })
     setTracks(() => next.tracks as TimelineTrack[])
+    writeBackResolvedValues(current, next.tracks)
     touchStacks()
   }
 

@@ -2340,7 +2340,12 @@ export function MainWorkspace(props: AppProps) {
       setBlendWeight(value as number)
       return
     }
-    setFlameDescriptor((draft) => {
+    // Silent: this is the timeline's write-through (recording, playback
+    // holds, and undo/redo write-back). The timeline undo stack owns these
+    // changes — recording them in flame history double-counted every
+    // preset keyframe at the current frame and would turn timeline undo
+    // write-backs into fresh flame entries.
+    history.setSilently((draft) => {
       switch (path) {
         case 'exposure':
           draft.renderSettings.exposure = value as number
