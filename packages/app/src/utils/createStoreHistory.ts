@@ -1,5 +1,5 @@
 import { batch, createSignal } from 'solid-js'
-import { produce, reconcile, unwrap } from 'solid-js/store'
+import { reconcile, unwrap } from 'solid-js/store'
 import { applyPatchesMutatively, enableStandardPatches, produceWithPatches, } from 'structurajs'
 import { deepClone } from './clone'
 import { compressPatches, forwardBackwardPatchPairDoesNothing, } from './compressPatches'
@@ -66,9 +66,13 @@ export function createStoreHistory<T extends object>([store, setStore]: [
     if (forwardBackwardPatchPairDoesNothing(forwardPatches, backwardPatches)) {
       return
     }
+    // Deep-clone the payloads going into the stack: patch values otherwise
+    // share object identity with nodes adopted into the live store (by
+    // reconcile in set/replace/undo/redo), and later in-place store edits
+    // would silently rewrite history entries — corrupting redo.
     const compressedItem: HistoryItem = {
-      forwardPatches,
-      backwardPatches,
+      forwardPatches: deepClone(forwardPatches),
+      backwardPatches: deepClone(backwardPatches),
       description: item.description,
     }
     setStack((p) => {
@@ -94,9 +98,12 @@ export function createStoreHistory<T extends object>([store, setStore]: [
     // Using produce + applyPatchesMutatively doesn't truly remove deleted keys
     // from SolidJS stores (produce's proxy converts `delete` to setting
     // undefined), which leaves zombie entries in transform records.
+    // The extra deepClone before reconcile keeps stack payloads isolated:
+    // applyPatchesMutatively splices patch VALUE objects into the result, and
+    // reconcile would adopt them into the live store by reference.
     const plain = deepClone(store)
     const result = applyPatchesMutatively(plain, backwardPatches)
-    setStore(reconcile((result ?? plain) as T))
+    setStore(reconcile(deepClone(result ?? plain) as T))
     setStackIndex(i - 1)
   }
 
@@ -114,19 +121,28 @@ export function createStoreHistory<T extends object>([store, setStore]: [
     const { forwardPatches } = item
     const plain = deepClone(store)
     const result = applyPatchesMutatively(plain, forwardPatches)
-    setStore(reconcile((result ?? plain) as T))
+    setStore(reconcile(deepClone(result ?? plain) as T))
     setStackIndex(i)
   }
 
   const set: HistorySetter<T> = (setFn, description) => {
-    const [_, forwardPatches, backwardPatches] = produceWithPatches(
+    // Run the mutation callback exactly ONCE. produceWithPatches yields both
+    // the resulting state and the patches; the store is then updated by
+    // reconciling that result. Re-running setFn against the store (the old
+    // `setStore(produce(setFn))`) desynced store from history whenever the
+    // callback wasn't deterministic — e.g. `generateTransformId()` inside a
+    // setter recorded one UUID in the patches while the store received
+    // another, so undo of "New transform" silently did nothing and redo
+    // duplicated it. Unchanged subtrees keep their identity through
+    // produceWithPatches, so reconcile still yields fine-grained updates.
+    const [result, forwardPatches, backwardPatches] = produceWithPatches(
       unwrap(store),
       (draft) => {
         setFn(draft as T)
       },
     )
     batch(() => {
-      setStore(produce(setFn))
+      setStore(reconcile((result ?? unwrap(store)) as T))
       const preview_ = preview()
       if (preview_) {
         preview_.forwardPatches.push(...forwardPatches)
