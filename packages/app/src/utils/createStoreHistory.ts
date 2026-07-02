@@ -3,6 +3,7 @@ import { reconcile, unwrap } from 'solid-js/store'
 import { applyPatchesMutatively, enableStandardPatches, produceWithPatches, } from 'structurajs'
 import { deepClone } from './clone'
 import { compressPatches, forwardBackwardPatchPairDoesNothing, } from './compressPatches'
+import { clearAllRedos, nextUndoSeq, registerRedoClearer } from './undoJournal'
 import type { SetStoreFunction, Store } from 'solid-js/store'
 import type { Patch } from 'structurajs'
 
@@ -18,6 +19,8 @@ type HistoryItem = {
   description?: string
   forwardPatches: Patch[]
   backwardPatches: Patch[]
+  /** Journal stamp for cross-system chronological undo (journaled mode). */
+  seq?: number
 }
 
 export type HistorySetter<T extends object> = (
@@ -36,12 +39,24 @@ export type ChangeHistory<T> = {
   readonly isPreviewing: () => boolean
   readonly isUndoingOrRedoing: () => boolean
   readonly commit: () => void
+  /** Journal stamp of the entry the next undo/redo would apply (null: none).
+   *  Used by the cross-system undo router; always null when not journaled. */
+  readonly peekUndoSeq: () => number | null
+  readonly peekRedoSeq: () => number | null
 }
 
-export function createStoreHistory<T extends object>([store, setStore]: [
-  Store<T>,
-  SetStoreFunction<T>,
-]) {
+type CreateStoreHistoryOptions = {
+  /** Join the app-wide undo journal: entries get recency stamps for the
+   *  cross-system undo router, and any journaled push (here or in the
+   *  timeline) invalidates redo everywhere. Leave OFF for throwaway preview
+   *  histories (e.g. the variation browser) so they stay isolated. */
+  journal?: boolean
+}
+
+export function createStoreHistory<T extends object>(
+  [store, setStore]: [Store<T>, SetStoreFunction<T>],
+  { journal = false }: CreateStoreHistoryOptions = {},
+) {
   const [stackIndex, setStackIndex] = createSignal(-1)
   const [isUndoingOrRedoing, setIsUndoingOrRedoing] =
     createSignal<boolean>(false)
@@ -56,6 +71,18 @@ export function createStoreHistory<T extends object>([store, setStore]: [
   const hasUndo = () => stackIndex() >= 0
   const hasRedo = () => stackIndex() < stack().length - 1
   const isPreviewing = () => Boolean(preview())
+  const peekUndoSeq = () => stack()[stackIndex()]?.seq ?? null
+  const peekRedoSeq = () => stack()[stackIndex() + 1]?.seq ?? null
+
+  if (journal) {
+    // Truncating the forward branch IS this history's redo-clear.
+    registerRedoClearer(() => {
+      setStack((p) => {
+        p.splice(stackIndex() + 1, Infinity)
+        return p
+      })
+    })
+  }
 
   function addToStack(item: HistoryItem) {
     const forwardPatches = compressPatches(item.forwardPatches)
@@ -74,7 +101,11 @@ export function createStoreHistory<T extends object>([store, setStore]: [
       forwardPatches: deepClone(forwardPatches),
       backwardPatches: deepClone(backwardPatches),
       description: item.description,
+      seq: journal ? nextUndoSeq() : undefined,
     }
+    // A journaled edit invalidates redo EVERYWHERE (timeline included) — the
+    // local splice below only truncates this history's own forward branch.
+    if (journal) clearAllRedos()
     setStack((p) => {
       p.splice(stackIndex() + 1, Infinity, compressedItem)
       setStackIndex(p.length - 1)
@@ -216,6 +247,8 @@ export function createStoreHistory<T extends object>([store, setStore]: [
       isPreviewing,
       commit,
       replace,
+      peekUndoSeq,
+      peekRedoSeq,
     } satisfies ChangeHistory<T>,
   ] as const
 }

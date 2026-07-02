@@ -1,6 +1,7 @@
 import { createSignal } from 'solid-js'
 import { applyEasing, catmullRom, clamp } from './easing'
 import { persistentSignal } from './persistentSignal'
+import { clearAllRedos, nextUndoSeq, registerRedoClearer } from './undoJournal'
 
 interface WindowTimelineState {
   tracks: () => TimelineTrack[]
@@ -682,8 +683,19 @@ export function createTimelineState() {
   // track-changes diamond can push one snapshot per pointer-move during a
   // scrub, and every entry deep-copies every track.
   const MAX_TIMELINE_UNDO = 100
-  const undoStack: (readonly TimelineTrack[])[] = []
-  const redoStack: (readonly TimelineTrack[])[] = []
+  type UndoEntry = { tracks: readonly TimelineTrack[]; seq: number }
+  const undoStack: UndoEntry[] = []
+  const redoStack: UndoEntry[] = []
+  // Bumped on every stack mutation so hasTimelineUndo/peek* are reactive
+  // (the stacks themselves are plain arrays).
+  const [stacksVersion, setStacksVersion] = createSignal(0)
+  const touchStacks = () => setStacksVersion((v) => v + 1)
+  // Journal membership: timeline pushes stamp a recency seq and invalidate
+  // redo across every journaled system (see utils/undoJournal.ts).
+  registerRedoClearer(() => {
+    redoStack.length = 0
+    touchStacks()
+  })
   // Coalescing key set by addKeyframesAtCurrentFrame: continuous re-records
   // of the same param set at the same frame (auto-keyframe / track-changes
   // fire per pointer-move while scrubbing) merge into one undo entry, so one
@@ -706,14 +718,17 @@ export function createTimelineState() {
       if (undoGroupPushed) return
       undoGroupPushed = true
     }
-    undoStack.push(
-      tracks().map((t) => ({
+    undoStack.push({
+      tracks: tracks().map((t) => ({
         ...t,
         keyframes: t.keyframes.map((kf) => ({ ...kf })),
       })),
-    )
+      seq: nextUndoSeq(),
+    })
     if (undoStack.length > MAX_TIMELINE_UNDO) undoStack.shift()
-    redoStack.length = 0
+    // Invalidates redo everywhere (this stack's own clearer included).
+    clearAllRedos()
+    touchStacks()
   }
 
   /** Run `fn` so that however many undo-pushing timeline mutations it makes,
@@ -733,34 +748,53 @@ export function createTimelineState() {
     coalesceKey = null
     const prev = undoStack.pop()
     if (!prev) return
-    redoStack.push(
-      tracks().map((t) => ({
+    // The undone entry's stamp travels to the redo side so cross-system redo
+    // can replay forward in original chronological order.
+    redoStack.push({
+      tracks: tracks().map((t) => ({
         ...t,
         keyframes: t.keyframes.map((kf) => ({ ...kf })),
       })),
-    )
-    setTracks(() => prev as TimelineTrack[])
+      seq: prev.seq,
+    })
+    setTracks(() => prev.tracks as TimelineTrack[])
+    touchStacks()
   }
 
   function timelineRedo() {
     coalesceKey = null
     const next = redoStack.pop()
     if (!next) return
-    undoStack.push(
-      tracks().map((t) => ({
+    undoStack.push({
+      tracks: tracks().map((t) => ({
         ...t,
         keyframes: t.keyframes.map((kf) => ({ ...kf })),
       })),
-    )
-    setTracks(() => next as TimelineTrack[])
+      seq: next.seq,
+    })
+    setTracks(() => next.tracks as TimelineTrack[])
+    touchStacks()
   }
 
   function hasTimelineUndo() {
+    stacksVersion()
     return undoStack.length > 0
   }
 
   function hasTimelineRedo() {
+    stacksVersion()
     return redoStack.length > 0
+  }
+
+  /** Journal stamp of the entry the next timeline undo/redo would apply. */
+  function peekUndoSeq(): number | null {
+    stacksVersion()
+    return undoStack.at(-1)?.seq ?? null
+  }
+
+  function peekRedoSeq(): number | null {
+    stacksVersion()
+    return redoStack.at(-1)?.seq ?? null
   }
 
   function addKeyframeImpl(
@@ -1423,6 +1457,7 @@ export function createTimelineState() {
     undoStack.length = 0
     redoStack.length = 0
     coalesceKey = null
+    touchStacks()
     setTracks(() =>
       incoming.map((t) => ({
         parameterPath: t.parameterPath,
@@ -1502,6 +1537,8 @@ export function createTimelineState() {
     timelineRedo,
     hasTimelineUndo,
     hasTimelineRedo,
+    peekUndoSeq,
+    peekRedoSeq,
     runWithSingleUndo,
     breakUndoCoalescing,
   }

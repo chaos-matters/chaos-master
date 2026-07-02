@@ -42,6 +42,13 @@ type ViewControlProps = {
   setFlySpeed?: Setter<number>
   /** Loaded flame's name, for the always-visible status badge. */
   flameName?: string
+  /** Cross-system undo router (flame history + timeline). When provided the
+   *  buttons match Ctrl+Z exactly; otherwise they fall back to the flame
+   *  change-history context alone. */
+  onUndo?: () => void
+  onRedo?: () => void
+  canUndo?: () => boolean
+  canRedo?: () => boolean
 }
 
 export function ViewControls(props: ViewControlProps) {
@@ -226,18 +233,20 @@ export function ViewControls(props: ViewControlProps) {
       <ButtonGroup data-tour-target="undoRedo-controls">
         <Button
           aria-label="Undo"
-          disabled={!history.hasUndo()}
+          title="Undo (Ctrl+Z)"
+          disabled={!(props.canUndo?.() ?? history.hasUndo())}
           onClick={() => {
-            history.undo()
+            ;(props.onUndo ?? history.undo)()
           }}
         >
           <Undo />
         </Button>
         <Button
           aria-label="Redo"
-          disabled={!history.hasRedo()}
+          title="Redo (Ctrl+Shift+Z)"
+          disabled={!(props.canRedo?.() ?? history.hasRedo())}
           onClick={() => {
-            history.redo()
+            ;(props.onRedo ?? history.redo)()
           }}
         >
           <Redo />

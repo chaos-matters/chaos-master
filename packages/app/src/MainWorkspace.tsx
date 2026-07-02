@@ -104,6 +104,7 @@ import { createShareLink, deriveOgMeta, uploadOgPreview, } from './utils/shareLi
 import { sum } from './utils/sum'
 import { createTimelineState, resolveKeyframeValue } from './utils/timeline'
 import { sortedTransformEntries } from './utils/transformOrder'
+import { createUndoRouter } from './utils/undoRouting'
 import { useAppDragAndDrop } from './utils/useAppDragAndDrop'
 import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
 import type { Setter } from 'solid-js'
@@ -417,6 +418,9 @@ export function MainWorkspace(props: AppProps) {
         props.flameFromWelcome?.() ?? props.flameFromQuery?.flame ?? example1,
       ),
     ),
+    // The main flame history joins the app-wide undo journal so Ctrl+Z can
+    // arbitrate chronologically against the timeline's undo stack.
+    { journal: true },
   )
   if (IS_DEV) {
     console.info('[share:app] store initialized', {
@@ -1028,6 +1032,9 @@ export function MainWorkspace(props: AppProps) {
   const onDrop = useAppDragAndDrop(history, setLoadedAnimation)
 
   const timeline = createTimelineState()
+  // One chronological undo across flame history + timeline snapshots —
+  // Ctrl+Z/Ctrl+Y and the toolbar buttons all route through this.
+  const undoRouter = createUndoRouter(history, timeline)
 
   /**
    * Capture the current flame as a downscaled PNG for OG link previews.
@@ -2548,38 +2555,15 @@ export function MainWorkspace(props: AppProps) {
     KeyZ: (ev) => {
       if (animationExportRunning()) return false
       if (ev.metaKey || ev.ctrlKey) {
-        if (ev.shiftKey) {
-          if (timeline.hasTimelineRedo()) {
-            timeline.timelineRedo()
-            return true
-          }
-          if (history.hasRedo()) {
-            history.redo()
-            return true
-          }
-        } else {
-          if (timeline.hasTimelineUndo()) {
-            timeline.timelineUndo()
-            return true
-          }
-          if (history.hasUndo()) {
-            history.undo()
-            return true
-          }
-        }
+        // Chronological across flame history + timeline (see undoRouting.ts);
+        // the toolbar Undo/Redo buttons route through the same arbiter.
+        return ev.shiftKey ? undoRouter.redoLast() : undoRouter.undoLast()
       }
     },
     KeyY: (ev) => {
       if (animationExportRunning()) return false
       if (ev.metaKey || ev.ctrlKey) {
-        if (timeline.hasTimelineRedo()) {
-          timeline.timelineRedo()
-          return true
-        }
-        if (history.hasRedo()) {
-          history.redo()
-          return true
-        }
+        return undoRouter.redoLast()
       }
     },
     KeyD: (ev) => {
@@ -2948,6 +2932,10 @@ export function MainWorkspace(props: AppProps) {
                     pixelRatio={pixelRatio()}
                     setPixelRatio={setPixelRatio}
                     controlsDisabled={timeline.isPlaying()}
+                    onUndo={undoRouter.undoLast}
+                    onRedo={undoRouter.redoLast}
+                    canUndo={undoRouter.canUndo}
+                    canRedo={undoRouter.canRedo}
                     blendFlame={blendFlame()}
                     blendWeight={resolvedBlendWeight()}
                     onPickBlendFlame={pickBlendFlame}

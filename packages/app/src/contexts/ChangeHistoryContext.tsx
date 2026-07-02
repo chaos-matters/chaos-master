@@ -22,6 +22,8 @@ const noopHistory: ChangeHistory<FlameDescriptor> = {
   isPreviewing: () => false,
   isUndoingOrRedoing: () => false,
   commit: () => {},
+  peekUndoSeq: () => null,
+  peekRedoSeq: () => null,
 }
 
 export function useChangeHistory() {
