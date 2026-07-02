@@ -77,7 +77,7 @@ import { pointInitModeToImplFn } from './flame/pointInitMode'
 import { pointInitMode3DToImplFn } from './flame/pointInitMode3D'
 import { generateRandomFlame, mutateFlame, random01, randomizeAllColors, randomizeVariationParams, randomRange, } from './flame/randomize'
 import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, cameraDuringExportEnabled, exportQuality, qualityPointCountLimit, setCurrentQuality, setExportQuality, setForceAnimationExportNow, setQualityPointCountLimit, } from './flame/renderStats'
-import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from './flame/schema/flameSchema'
+import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, tryValidateFlame, } from './flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from './flame/transformFunction'
 import { defaultLinearType } from './flame/variationRegistry'
 import { allTransformVariations, isAnyParametricVariationType, isVariationType, } from './flame/variations'
@@ -344,10 +344,6 @@ export function MainWorkspace(props: AppProps) {
   })
 
   const [animationEnabled, setAnimationEnabled] = createSignal(true)
-  const [blendFlame, setBlendFlame] = createSignal<
-    FlameDescriptor | undefined
-  >()
-  const [blendWeight, setBlendWeight] = createSignal(0)
   const [hideDiceButtons, setHideDiceButtons] = createSignal(false)
   // True while a randomize/mutate run is in flight, so the buttons disable and
   // rapid clicks can't pile up concurrent runs (history thumbnail capture).
@@ -404,21 +400,6 @@ export function MainWorkspace(props: AppProps) {
   })
   // Hide timeline by default on mobile -- users can toggle it back on
   const [showTimeline, setShowTimeline] = createSignal(window.innerWidth >= 769)
-  // Palette selection is part of the flame document (renderSettings.palette):
-  // applying/removing one is a single undoable history entry, and the palette
-  // travels with saves/shares. These accessors derive the UI/render views.
-  const selectedPalette = createMemo<Palette | undefined>(() => {
-    const stored = flameDescriptor.renderSettings.palette
-    if (!stored) return undefined
-    return {
-      id: stored.id,
-      name: stored.name,
-      entries: stored.entries.map((entry) => ({ ...entry })),
-      source: 'imported',
-    }
-  })
-  const selectedPaletteId = () =>
-    flameDescriptor.renderSettings.palette?.id ?? ''
   // Colors as they were before the first palette apply — lets Unselect
   // restore the "natural" colors. UI stash only; undo handles the rest.
   const [prePaletteColors, setPrePaletteColors] = createSignal<
@@ -434,6 +415,46 @@ export function MainWorkspace(props: AppProps) {
     // arbitrate chronologically against the timeline's undo stack.
     { journal: true },
   )
+  // Palette selection is part of the flame document (renderSettings.palette):
+  // applying/removing one is a single undoable history entry, and the palette
+  // travels with saves/shares. These accessors derive the UI/render views.
+  const selectedPalette = createMemo<Palette | undefined>(() => {
+    const stored = flameDescriptor.renderSettings.palette
+    if (!stored) return undefined
+    return {
+      id: stored.id,
+      name: stored.name,
+      entries: stored.entries.map((entry) => ({ ...entry })),
+      source: 'imported',
+    }
+  })
+  const selectedPaletteId = () =>
+    flameDescriptor.renderSettings.palette?.id ?? ''
+  // Blend composition is part of the flame document too (renderSettings
+  // .blendFlame / .blendWeight): picking, adjusting, or clearing a blend is
+  // one undoable history entry each, and the composition survives
+  // save/share/load. The stored blend flame is plain data, re-validated on
+  // read so a hand-edited file can't hand the renderer an invalid flame.
+  const blendFlame = createMemo<FlameDescriptor | undefined>(() => {
+    const stored = flameDescriptor.renderSettings.blendFlame
+    if (stored === undefined) return undefined
+    return tryValidateFlame(stored)
+  })
+  const blendWeight = () => flameDescriptor.renderSettings.blendWeight ?? 0
+  const setBlendFlame = (flame: FlameDescriptor | undefined) => {
+    setFlameDescriptor(
+      (draft) => {
+        if (flame === undefined) delete draft.renderSettings.blendFlame
+        else draft.renderSettings.blendFlame = deepClone(flame)
+      },
+      flame ? 'Set Blend Flame' : 'Remove Blend Flame',
+    )
+  }
+  const setBlendWeight = (weight: number) => {
+    setFlameDescriptor((draft) => {
+      draft.renderSettings.blendWeight = weight
+    }, 'Blend Weight')
+  }
   if (IS_DEV) {
     console.info('[share:app] store initialized', {
       source: props.flameFromWelcome?.()
@@ -598,35 +619,51 @@ export function MainWorkspace(props: AppProps) {
    * cross-dissolves A into B. Combine with "Seamless Loop" for an A→B→A cycle.
    */
   function setupMorph(endFlame: FlameDescriptor) {
-    setBlendFlame(deepClone(endFlame))
+    // One flame-history entry for the composition (blend flame + weight)...
+    setFlameDescriptor((draft) => {
+      draft.renderSettings.blendFlame = deepClone(endFlame)
+      draft.renderSettings.blendWeight = 1
+    }, 'Morph Setup')
     const cfg = timeline.config()
-    // One morph setup = one timeline undo step (remove + both keyframes).
+    // ...and one timeline undo step for the keyframes (remove + both adds).
     timeline.runWithSingleUndo(() => {
       timeline.removeAllKeyframesForPath('blendWeight')
       timeline.addKeyframe('blendWeight', cfg.startFrame, 1, 'easeInOut')
       timeline.setKeyframeValue('blendWeight', cfg.endFrame, 0, 'easeInOut')
     })
-    setBlendWeight(1)
     setAnimationEnabled(true)
     setShowTimeline(true)
     timeline.goToFrame(cfg.startFrame)
     showToast('Morph ready — press Play to animate A → B', 3500)
   }
 
-  // Hover preview: temporarily set blend flame at 40% weight
+  // Hover preview: temporarily set blend flame at 40% weight. Silent writes —
+  // a transient hover must not create history entries or clobber redo.
   let prevBlendFlame: FlameDescriptor | undefined
   let prevBlendWeight = 0
+  let blendPreviewActive = false
 
   function handlePreviewBlend(flame: FlameDescriptor | null) {
     if (flame) {
-      prevBlendFlame = blendFlame()
-      prevBlendWeight = blendWeight()
-      setBlendFlame(flame)
-      setBlendWeight(0.4)
-    } else if (prevBlendFlame !== undefined) {
-      setBlendFlame(prevBlendFlame)
-      setBlendWeight(prevBlendWeight)
+      if (!blendPreviewActive) {
+        prevBlendFlame = blendFlame()
+        prevBlendWeight = blendWeight()
+        blendPreviewActive = true
+      }
+      history.setSilently((draft) => {
+        draft.renderSettings.blendFlame = deepClone(flame)
+        draft.renderSettings.blendWeight = 0.4
+      })
+    } else if (blendPreviewActive) {
+      const restore = prevBlendFlame
+      const restoreWeight = prevBlendWeight
+      history.setSilently((draft) => {
+        if (restore === undefined) delete draft.renderSettings.blendFlame
+        else draft.renderSettings.blendFlame = deepClone(restore)
+        draft.renderSettings.blendWeight = restoreWeight
+      })
       prevBlendFlame = undefined
+      blendPreviewActive = false
     }
   }
 
@@ -2360,10 +2397,6 @@ export function MainWorkspace(props: AppProps) {
       | [number, number, number]
       | [number, number, number, number],
   ) {
-    if (path === 'blendWeight') {
-      setBlendWeight(value as number)
-      return
-    }
     // Silent: this is the timeline's write-through (recording, playback
     // holds, and undo/redo write-back). The timeline undo stack owns these
     // changes — recording them in flame history double-counted every
@@ -2371,6 +2404,9 @@ export function MainWorkspace(props: AppProps) {
     // write-backs into fresh flame entries.
     history.setSilently((draft) => {
       switch (path) {
+        case 'blendWeight':
+          draft.renderSettings.blendWeight = value as number
+          break
         case 'exposure':
           draft.renderSettings.exposure = value as number
           break
@@ -4975,11 +5011,14 @@ export function MainWorkspace(props: AppProps) {
                         : 'Pick Blend Flame'
                     }
                     onSelect={(flame) => {
+                      // The pick supersedes any hover preview — don't let the
+                      // preview restore stomp the selection afterwards.
                       prevBlendFlame = undefined
+                      blendPreviewActive = false
                       if (blendIntent() === 'morph') {
                         setupMorph(flame)
                       } else {
-                        setBlendFlame(deepClone(flame))
+                        setBlendFlame(flame)
                       }
                       setShowBlendGallery(false)
                     }}

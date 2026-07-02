@@ -8,9 +8,9 @@ export interface CommandContext {
   flameDescriptor: Accessor<FlameDescriptor>
   setFlameDescriptor: HistorySetter<FlameDescriptor>
   blendFlame: Accessor<FlameDescriptor | undefined>
-  setBlendFlame: Setter<FlameDescriptor | undefined>
+  setBlendFlame: (flame: FlameDescriptor | undefined) => void
   blendWeight: Accessor<number>
-  setBlendWeight: Setter<number>
+  setBlendWeight: (weight: number) => void
   pixelRatio: Accessor<number>
   setPixelRatio: Setter<number>
   zoom: Accessor<number>

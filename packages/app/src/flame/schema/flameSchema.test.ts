@@ -39,4 +39,20 @@ describe('tryValidateFlame — recent/stored flame loading soundness', () => {
     const plain = tryValidateFlame(JSON.parse(JSON.stringify(initExample3D)))
     expect(plain?.renderSettings.palette).toBeUndefined()
   })
+
+  it('preserves an embedded blend composition through validation', () => {
+    const stored = JSON.parse(JSON.stringify(initExample3D)) as {
+      renderSettings: Record<string, unknown>
+    }
+    stored.renderSettings.blendWeight = 0.4
+    stored.renderSettings.blendFlame = JSON.parse(JSON.stringify(initExample3D))
+    const result = tryValidateFlame(stored)
+    expect(result?.renderSettings.blendWeight).toBe(0.4)
+    // Stored as plain data; consumers re-validate on read.
+    expect(tryValidateFlame(result?.renderSettings.blendFlame)).toBeDefined()
+    // Absent blend stays absent for older flames.
+    const plain = tryValidateFlame(JSON.parse(JSON.stringify(initExample3D)))
+    expect(plain?.renderSettings.blendFlame).toBeUndefined()
+    expect(plain?.renderSettings.blendWeight).toBeUndefined()
+  })
 })
