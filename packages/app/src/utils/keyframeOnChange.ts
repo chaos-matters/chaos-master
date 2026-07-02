@@ -16,8 +16,9 @@ export const [keyframeOnChange, setKeyframeOnChange] = persistentSignal(
 )
 
 /** When track-changes is on, keyframe each parameter path at the current
- *  frame. Call AFTER applying the value change so the new values are captured.
- *  No-op when the option is off or there is no timeline. */
+ *  frame as ONE undo entry (a dice roll is one Ctrl+Z). Call AFTER applying
+ *  the value change so the new values are captured. No-op when the option is
+ *  off or there is no timeline. */
 export function keyframeChangedParams(
   timeline: TimelineState | null | undefined,
   paths: readonly string[],
@@ -26,28 +27,41 @@ export function keyframeChangedParams(
   // the animation UI is on; without it a persisted ON state would keep
   // recording ghost keyframes after the user leaves animation mode.
   if (!timeline?.animationEnabled() || !keyframeOnChange()) return
-  for (const path of paths) {
-    timeline.addKeyframeAtCurrentFrame(path)
-  }
+  // A deliberate one-shot write: no coalescing, each roll is its own step.
+  timeline.addKeyframesAtCurrentFrame(paths, { coalesce: false })
 }
 
 /** Per-edit keyframe hook shared by the scrub/slider/angle inputs: Auto mode
  *  re-records already-animated params; the track-changes diamond records any
- *  change, creating the first keyframe too. Call AFTER applying the value. */
-export function keyframeEditedParam(
+ *  change, creating the first keyframe too. Multi-path edits (e.g. a symmetry
+ *  rotation touching a/b/d/e) record as one undo entry; per-pointer-move
+ *  repeats coalesce, so a whole scrub costs one undo step — the owning input
+ *  should call `timeline.breakUndoCoalescing()` when its gesture ends. Call
+ *  AFTER applying the value. */
+export function keyframeEditedParams(
   timeline: TimelineState | null | undefined,
-  path: string | undefined,
+  paths: readonly string[],
 ) {
   // Both modes only record while the animation UI is on — their toggles
   // (Auto button, track-changes diamond) are invisible without it, and a
   // persisted ON state must not keep recording ghost keyframes.
-  if (!timeline?.animationEnabled() || !path) return
+  if (!timeline?.animationEnabled() || paths.length === 0) return
   if (
-    (timeline.autoKeyframe() && timeline.hasAnyKeyframes(path)) ||
+    (timeline.autoKeyframe() &&
+      paths.some((path) => timeline.hasAnyKeyframes(path))) ||
     keyframeOnChange()
   ) {
-    timeline.addKeyframeAtCurrentFrame(path)
+    timeline.addKeyframesAtCurrentFrame(paths)
   }
+}
+
+/** Single-path convenience over keyframeEditedParams. */
+export function keyframeEditedParam(
+  timeline: TimelineState | null | undefined,
+  path: string | undefined,
+) {
+  if (!path) return
+  keyframeEditedParams(timeline, [path])
 }
 
 /** Debounced track-changes writer for drag gestures: collects full parameter
@@ -63,10 +77,10 @@ export function createGestureKeyframer(
   let timer: ReturnType<typeof setTimeout> | undefined
   const flush = () => {
     clearTimeout(timer)
-    if (!timeline) return
-    for (const path of pending) {
-      timeline.addKeyframeAtCurrentFrame(path)
-    }
+    if (!timeline || pending.size === 0) return
+    // One undo entry per flush; no coalescing across flushes — two separate
+    // drags stay two undo steps (the debounce already merges nudge bursts).
+    timeline.addKeyframesAtCurrentFrame([...pending], { coalesce: false })
     pending.clear()
   }
   onCleanup(flush)

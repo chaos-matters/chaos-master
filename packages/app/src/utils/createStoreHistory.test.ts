@@ -101,7 +101,7 @@ describe('createStoreHistory', () => {
       // different id than the store received, so undo silently failed and
       // redo duplicated the entry.
       set((draft) => {
-        draft.items[crypto.randomUUID()] = { value: 42 }
+        draft.items[globalThis.crypto.randomUUID()] = { value: 42 }
       })
       const afterAdd = snapshot(store)
       expect(Object.keys(afterAdd.items)).toHaveLength(2)

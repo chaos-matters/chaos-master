@@ -604,7 +604,15 @@ export function getAllTrackFrames(tracks: TimelineTrack[]): number[] {
  * Returns current frame, config, tracks, and utility functions.
  */
 export function createTimelineState() {
-  const [currentFrame, setCurrentFrame] = createSignal(0)
+  const [currentFrame, setCurrentFrameRaw] = createSignal(0)
+  // Moving the playhead ends any keyframe-coalescing run: returning to a
+  // frame later must start a NEW undo step, not merge into the old gesture.
+  const setCurrentFrame: typeof setCurrentFrameRaw = (
+    value: Parameters<typeof setCurrentFrameRaw>[0],
+  ) => {
+    breakUndoCoalescing()
+    return setCurrentFrameRaw(value as never)
+  }
   const [config, setConfig] = createSignal<TimelineConfig>(defaultConfig())
   const [tracks, setTracks] = createSignal<TimelineTrack[]>([], {
     equals: false,
@@ -676,14 +684,28 @@ export function createTimelineState() {
   const MAX_TIMELINE_UNDO = 100
   const undoStack: (readonly TimelineTrack[])[] = []
   const redoStack: (readonly TimelineTrack[])[] = []
-  // Set by addKeyframeAtCurrentFrame so a continuous same-param scrub at one
-  // frame coalesces into a single undo entry (one Ctrl+Z reverts the whole
-  // gesture instead of hundreds of per-move steps). Any other undo push
-  // breaks the run.
-  let lastKeyframeUndo: { path: string; frame: number } | null = null
+  // Coalescing key set by addKeyframesAtCurrentFrame: continuous re-records
+  // of the same param set at the same frame (auto-keyframe / track-changes
+  // fire per pointer-move while scrubbing) merge into one undo entry, so one
+  // Ctrl+Z reverts the whole gesture. Any other push, undo/redo, playhead
+  // move, or an explicit breakUndoCoalescing() (gesture end) breaks the run.
+  let coalesceKey: string | null = null
+  // While > 0 (inside runWithSingleUndo) only the first push records a
+  // snapshot — bulk operations (animation presets, dice rolls, morph setup)
+  // become a single undo step instead of one per keyframe.
+  let undoGroupDepth = 0
+  let undoGroupPushed = false
+
+  function breakUndoCoalescing() {
+    coalesceKey = null
+  }
 
   function pushUndo() {
-    lastKeyframeUndo = null
+    coalesceKey = null
+    if (undoGroupDepth > 0) {
+      if (undoGroupPushed) return
+      undoGroupPushed = true
+    }
     undoStack.push(
       tracks().map((t) => ({
         ...t,
@@ -694,8 +716,21 @@ export function createTimelineState() {
     redoStack.length = 0
   }
 
+  /** Run `fn` so that however many undo-pushing timeline mutations it makes,
+   *  at most ONE undo entry (the pre-`fn` state) is recorded. Nested calls
+   *  join the outermost group. */
+  function runWithSingleUndo<R>(fn: () => R): R {
+    if (undoGroupDepth === 0) undoGroupPushed = false
+    undoGroupDepth++
+    try {
+      return fn()
+    } finally {
+      undoGroupDepth--
+    }
+  }
+
   function timelineUndo() {
-    lastKeyframeUndo = null
+    coalesceKey = null
     const prev = undoStack.pop()
     if (!prev) return
     redoStack.push(
@@ -708,7 +743,7 @@ export function createTimelineState() {
   }
 
   function timelineRedo() {
-    lastKeyframeUndo = null
+    coalesceKey = null
     const next = redoStack.pop()
     if (!next) return
     undoStack.push(
@@ -812,6 +847,9 @@ export function createTimelineState() {
   }
 
   function removeKeyframe(parameterPath: string, frame: number) {
+    // No-op guard: pushing for a keyframe that doesn't exist would cost the
+    // user a "Ctrl+Z that does nothing" and wipe the redo stack.
+    if (!hasKeyframeAtFrame(parameterPath, frame)) return
     pushUndo()
     removeKeyframeImpl(parameterPath, frame)
   }
@@ -1193,6 +1231,8 @@ export function createTimelineState() {
   }
 
   function removeAllKeyframesForPath(parameterPath: string) {
+    // No-op guard (see removeKeyframe).
+    if (!tracks().some((t) => t.parameterPath === parameterPath)) return
     pushUndo()
     setTracks((prev: TimelineTrack[]) =>
       prev.filter((t: TimelineTrack) => t.parameterPath !== parameterPath),
@@ -1236,22 +1276,46 @@ export function createTimelineState() {
     return valueResolverFn ? valueResolverFn(path) : null
   }
 
-  function addKeyframeAtCurrentFrame(parameterPath: string) {
+  /**
+   * Keyframe several parameter paths at the current frame as ONE undo entry
+   * (values come from the resolver; unresolvable paths are skipped). With
+   * `coalesce` (default), repeated calls for the same path set at the same
+   * frame merge into the previous entry — per-pointer-move recording
+   * (auto-keyframe / track-changes) then costs one undo step per gesture.
+   * Pass `coalesce: false` for deliberate one-shot writes (dice rolls,
+   * debounced gesture flushes, diamond clicks) so each stays its own step.
+   */
+  function addKeyframesAtCurrentFrame(
+    parameterPaths: readonly string[],
+    { coalesce = true }: { coalesce?: boolean } = {},
+  ) {
     const frame = currentFrame()
-    const value = valueResolverFn ? valueResolverFn(parameterPath) : null
-    if (value !== null) {
-      // Coalesce continuous re-records of the same param at the same frame
-      // (auto-keyframe / track-changes fire per pointer-move while scrubbing)
-      // into one undo entry.
-      const coalesce =
-        lastKeyframeUndo?.path === parameterPath &&
-        lastKeyframeUndo.frame === frame
-      if (!coalesce) {
-        pushUndo()
-        lastKeyframeUndo = { path: parameterPath, frame }
-      }
-      addKeyframeImpl(parameterPath, frame, value)
+    const writes: [
+      string,
+      (
+        | number
+        | string
+        | [number, number, number]
+        | [number, number, number, number]
+      ),
+    ][] = []
+    for (const path of parameterPaths) {
+      const value = valueResolverFn ? valueResolverFn(path) : null
+      if (value !== null) writes.push([path, value])
     }
+    if (writes.length === 0) return
+    const key = `${writes.map(([path]) => path).join(' ')}@${frame}`
+    if (!coalesce || coalesceKey !== key) {
+      pushUndo() // resets coalesceKey
+      coalesceKey = coalesce ? key : null
+    }
+    for (const [path, value] of writes) {
+      addKeyframeImpl(path, frame, value)
+    }
+  }
+
+  function addKeyframeAtCurrentFrame(parameterPath: string) {
+    addKeyframesAtCurrentFrame([parameterPath])
   }
 
   function toggleKeyframeAtCurrentFrame(parameterPath: string) {
@@ -1261,7 +1325,9 @@ export function createTimelineState() {
       pushUndo()
       removeKeyframeImpl(parameterPath, frame)
     } else {
-      addKeyframeAtCurrentFrame(parameterPath)
+      // A deliberate diamond click is its own undo step — don't open a
+      // coalescing window that a later scrub could silently merge into.
+      addKeyframesAtCurrentFrame([parameterPath], { coalesce: false })
     }
   }
 
@@ -1350,6 +1416,13 @@ export function createTimelineState() {
   /** Replace all tracks with deep-cloned copies (unified with addKeyframeImpl). */
   function loadTracks(incoming: readonly TimelineTrack[]) {
     setPreviewHeld(false)
+    // A track load is a document boundary: without this, Ctrl+Z after
+    // loading another flame (or New Flame / 2D-3D switch) restored the
+    // PREVIOUS flame's track snapshots onto the new one — orphaned
+    // transform ids and all — and stale redo could overwrite loaded tracks.
+    undoStack.length = 0
+    redoStack.length = 0
+    coalesceKey = null
     setTracks(() =>
       incoming.map((t) => ({
         parameterPath: t.parameterPath,
@@ -1412,6 +1485,7 @@ export function createTimelineState() {
     setValueWriter,
     getResolvedValue,
     addKeyframeAtCurrentFrame,
+    addKeyframesAtCurrentFrame,
     toggleKeyframeAtCurrentFrame,
     moveKeyframe,
     relocateKeyframe,
@@ -1428,6 +1502,8 @@ export function createTimelineState() {
     timelineRedo,
     hasTimelineUndo,
     hasTimelineRedo,
+    runWithSingleUndo,
+    breakUndoCoalescing,
   }
 }
 

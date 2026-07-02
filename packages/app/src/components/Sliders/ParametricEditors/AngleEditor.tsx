@@ -6,7 +6,7 @@ import { useCompactMode } from '@/contexts/CompactModeContext'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useTimeline } from '@/contexts/TimelineContext'
 import { createDragHandler } from '@/utils/createDragHandler'
-import { keyframeEditedParam } from '@/utils/keyframeOnChange'
+import { keyframeEditedParams } from '@/utils/keyframeOnChange'
 import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
 import ui from './AngleEditor.module.css'
 import { useParamMetaCapture } from './paramMetaCapture'
@@ -16,6 +16,11 @@ type AngleEditorProps = EditorProps<number> & {
   /** 'full' (default): name + track + value label in a display:contents row.
    *  'inline': self-contained compact knob with degree value inside the track. */
   mode?: 'full' | 'inline'
+  /** Auto/track-changes recording target(s). When the knob drives several
+   *  coefficients at once (symmetry rotation → preAffine a/b/d/e), pass them
+   *  all so recording writes one grouped undo entry per gesture; defaults to
+   *  [dataParameterPath]. */
+  keyframePaths?: readonly string[]
 }
 
 function formatAngle(angleRadians: number) {
@@ -108,12 +113,22 @@ export function AngleEditor(props: AngleEditorProps) {
           newAngle += 2 * Math.PI
         }
         props.setValue(newAngle)
-        keyframeEditedParam(timeline, props.dataParameterPath)
+        // keyframePaths lets one knob record a whole coefficient group (e.g.
+        // a symmetry rotation touching preAffine a/b/d/e) as ONE undo entry.
+        keyframeEditedParams(
+          timeline,
+          props.keyframePaths ??
+            (props.dataParameterPath ? [props.dataParameterPath] : []),
+        )
       }
       setAngle(initEvent)
       return {
         onPointerMove: setAngle,
-        onDone: history.commit,
+        onDone: () => {
+          history.commit()
+          // End of gesture: the next drag is its own undo step.
+          timeline?.breakUndoCoalescing()
+        },
       }
     })
 

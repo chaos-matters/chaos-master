@@ -56,6 +56,8 @@ export function ScrubInput(props: ScrubInputProps) {
     function onUp() {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
+      // End of gesture: the next scrub must be its own undo step.
+      timeline?.breakUndoCoalescing()
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)

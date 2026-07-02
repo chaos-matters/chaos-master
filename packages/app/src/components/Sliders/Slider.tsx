@@ -131,9 +131,12 @@ export function Slider(props: SliderProps) {
             }}
             onPointerUp={() => {
               history.commit()
+              // End of gesture: the next drag is its own undo step.
+              timeline?.breakUndoCoalescing()
             }}
             onPointerCancel={() => {
               history.commit()
+              timeline?.breakUndoCoalescing()
             }}
             onInput={(ev) => {
               props.onInput(ev.target.valueAsNumber)

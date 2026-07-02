@@ -30,7 +30,10 @@ export function AnimationControls(props: AnimationControlsProps) {
       <button
         class={ui.genBtn}
         onClick={() => {
-          randomizeColorsParams(props.flameDescriptor, props.timeline)
+          // One click = one undo step, however many keyframes it writes.
+          props.timeline.runWithSingleUndo(() => {
+            randomizeColorsParams(props.flameDescriptor, props.timeline)
+          })
         }}
         title="Generate random color keyframes for transforms and palette"
       >
@@ -108,7 +111,10 @@ export function AnimationGenerator(props: AnimationGeneratorProps) {
               <button
                 class={ui.pill}
                 onClick={() => {
-                  preset.apply(props.flameDescriptor, props.timeline)
+                  // One preset = one undo step.
+                  props.timeline.runWithSingleUndo(() => {
+                    preset.apply(props.flameDescriptor, props.timeline)
+                  })
                 }}
                 title={preset.label}
               >

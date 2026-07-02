@@ -584,9 +584,12 @@ export function MainWorkspace(props: AppProps) {
   function setupMorph(endFlame: FlameDescriptor) {
     setBlendFlame(deepClone(endFlame))
     const cfg = timeline.config()
-    timeline.removeAllKeyframesForPath('blendWeight')
-    timeline.addKeyframe('blendWeight', cfg.startFrame, 1, 'easeInOut')
-    timeline.setKeyframeValue('blendWeight', cfg.endFrame, 0, 'easeInOut')
+    // One morph setup = one timeline undo step (remove + both keyframes).
+    timeline.runWithSingleUndo(() => {
+      timeline.removeAllKeyframesForPath('blendWeight')
+      timeline.addKeyframe('blendWeight', cfg.startFrame, 1, 'easeInOut')
+      timeline.setKeyframeValue('blendWeight', cfg.endFrame, 0, 'easeInOut')
+    })
     setBlendWeight(1)
     setAnimationEnabled(true)
     setShowTimeline(true)
@@ -1558,6 +1561,26 @@ export function MainWorkspace(props: AppProps) {
 
     isRandomizingAnimation = true
     try {
+      // One click = one undo step, regardless of how many keyframes the
+      // selected presets write (previously each addKeyframe pushed its own
+      // snapshot — dozens of Ctrl+Z to revert, and enough to overflow the
+      // undo cap and lose the pre-click animation entirely).
+      timeline.runWithSingleUndo(() => {
+        randomizeAnimationTracks(presetIds, clearFirst)
+      })
+      setShowTimeline(true)
+    } finally {
+      setTimeout(() => {
+        isRandomizingAnimation = false
+      }, 200)
+    }
+  }
+
+  const randomizeAnimationTracks = (
+    presetIds: string[],
+    clearFirst: boolean,
+  ) => {
+    {
       if (clearFirst) timeline.clearAllTracks()
 
       const start = timeline.config().startFrame
@@ -1668,11 +1691,6 @@ export function MainWorkspace(props: AppProps) {
       }
 
       timeline.setAnimationEnabled(true)
-      setShowTimeline(true)
-    } finally {
-      setTimeout(() => {
-        isRandomizingAnimation = false
-      }, 200)
     }
   }
 
@@ -1682,8 +1700,11 @@ export function MainWorkspace(props: AppProps) {
   const handleSmartAnimation = (clearFirst: boolean) => {
     isRandomizingAnimation = true
     try {
-      if (clearFirst) timeline.clearAllTracks()
-      smartRandomAnimation(flameDescriptor, timeline)
+      // One click = one undo step (see handleRandomizeAnimation).
+      timeline.runWithSingleUndo(() => {
+        if (clearFirst) timeline.clearAllTracks()
+        smartRandomAnimation(flameDescriptor, timeline)
+      })
       setShowTimeline(true)
     } finally {
       setTimeout(() => {
@@ -4025,6 +4046,12 @@ export function MainWorkspace(props: AppProps) {
                                               mode="inline"
                                               value={angle()}
                                               dataParameterPath={`transform.${tid}.preAffine.a`}
+                                              keyframePaths={[
+                                                `transform.${tid}.preAffine.a`,
+                                                `transform.${tid}.preAffine.b`,
+                                                `transform.${tid}.preAffine.d`,
+                                                `transform.${tid}.preAffine.e`,
+                                              ]}
                                               setValue={(newAngle) => {
                                                 const cos = Math.cos(newAngle)
                                                 const sin = Math.sin(newAngle)
@@ -4042,27 +4069,6 @@ export function MainWorkspace(props: AppProps) {
                                                     }
                                                   }
                                                 })
-                                                // Keyframe all 4 rotation components together
-                                                if (
-                                                  timeline &&
-                                                  timeline.autoKeyframe() &&
-                                                  timeline.hasAnyKeyframes(
-                                                    `transform.${tid}.preAffine.a`,
-                                                  )
-                                                ) {
-                                                  timeline.addKeyframeAtCurrentFrame(
-                                                    `transform.${tid}.preAffine.a`,
-                                                  )
-                                                  timeline.addKeyframeAtCurrentFrame(
-                                                    `transform.${tid}.preAffine.b`,
-                                                  )
-                                                  timeline.addKeyframeAtCurrentFrame(
-                                                    `transform.${tid}.preAffine.d`,
-                                                  )
-                                                  timeline.addKeyframeAtCurrentFrame(
-                                                    `transform.${tid}.preAffine.e`,
-                                                  )
-                                                }
                                               }}
                                             />
                                           </Show>
