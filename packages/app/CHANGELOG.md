@@ -13,6 +13,10 @@ developer history lives in `dev.changelog.md`.
 - **Undo no longer leaks across flames.** Loading a flame, starting a new one, or switching 2D/3D previously kept the old flame's keyframe history alive — Ctrl+Z could dump a previous flame's animation tracks onto the new one.
 - **Ctrl+Z while typing in number or search fields** (timeline FPS/frames, export size, variation search) now edits the text as expected instead of triggering an app undo behind your back.
 - Exporting an animation no longer floods undo history with one entry per rendered frame, and 3D auto-exposure no longer fights undo after camera zooms.
+- **Keyframe undos are visible**: undoing a keyframe edit now updates the rendered flame immediately (previously the canvas could keep the old value until you played the timeline).
+- **Timeline settings are undoable** — FPS, frame count, speed, loop and loop style (including Seamless quietly extending the timeline) all revert with Ctrl+Z.
+- **Palettes and blends are part of your flame now**: applying/removing a palette and picking/adjusting/clearing a blend flame are all undoable, and both survive saving, sharing, and loading.
+- **Deleting a custom variation is safe(r)**: the app warns when the current flame uses it, and every delete shows an Undo toast that brings the variation back.
 
 ## [0.9.4] - 2026-07-02
 

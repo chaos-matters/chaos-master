@@ -51,11 +51,15 @@ export function TimelineSettings() {
         class={ui.settingItem}
         onPointerDown={createSettingScrubber(
           () => config().fps,
-          (v) => { timeline.updateConfigUndoable({ fps: v }, 'fps'); },
+          (v) => {
+            timeline.updateConfigUndoable({ fps: v }, 'fps')
+          },
           0.2,
           1,
           60,
-          () => { timeline.breakUndoCoalescing(); },
+          () => {
+            timeline.breakUndoCoalescing()
+          },
         )}
       >
         <span class={ui.settingLabel}>FPS</span>
@@ -110,11 +114,15 @@ export function TimelineSettings() {
         class={ui.settingItem}
         onPointerDown={createSettingScrubber(
           () => config().endFrame,
-          (v) => { timeline.updateConfigUndoable({ endFrame: v }, 'endFrame'); },
+          (v) => {
+            timeline.updateConfigUndoable({ endFrame: v }, 'endFrame')
+          },
           0.5,
           1,
           999,
-          () => { timeline.breakUndoCoalescing(); },
+          () => {
+            timeline.breakUndoCoalescing()
+          },
         )}
       >
         <span class={ui.settingLabel}>Frames</span>
@@ -135,11 +143,15 @@ export function TimelineSettings() {
         class={ui.settingItem}
         onPointerDown={createSettingScrubber(
           () => config().timeScale,
-          (v) => { timeline.updateConfigUndoable({ timeScale: v }, 'timeScale'); },
+          (v) => {
+            timeline.updateConfigUndoable({ timeScale: v }, 'timeScale')
+          },
           0.1,
           1,
           10,
-          () => { timeline.breakUndoCoalescing(); },
+          () => {
+            timeline.breakUndoCoalescing()
+          },
         )}
       >
         <span class={ui.settingLabel}>Speed</span>

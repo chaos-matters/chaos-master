@@ -61,13 +61,36 @@ a dedicated test suite; undo behavior is now locked in by ~50 unit tests
   shared — typing in timeline FPS/frames, export dimensions or variation
   search no longer triggers app undo.
 
-### Known gaps (documented, out of scope)
+### Follow-up pass — the audit's remaining gaps, closed
 
-- `timelineUndo` restores tracks only — it does not write values back into
-  the flame store or restore playhead/preview-held state, so an undo can be
-  visually silent when the view isn't driven by the timeline.
-- Palette selection, blend flame/weight, custom-variation registry and
-  timeline config (fps/frames/loop) live outside both histories.
+- **Timeline undo writes values back.** `timelineUndo`/`timelineRedo` now push
+  each surviving changed track's value at the current frame back through the
+  flame writer (removed tracks stay untouched — their flame edit is its own
+  history entry), so keyframe undos are visible even when the timeline isn't
+  driving the view. `setFlameValue` (the timeline's writer) became silent —
+  recording it double-counted preset keyframes and would have turned
+  write-backs into fresh flame entries.
+- **Timeline config is undoable.** Undo entries snapshot config alongside
+  tracks; `updateConfigUndoable(partial, coalesceId?)` records user edits
+  (fps/frames/speed scrubs coalesce per gesture; loop/auto-fps toggles are
+  single steps); `setLoopMode` is undoable including seamless's `endFrame`
+  extension, with an idempotence guard. Load/system syncs keep raw
+  `setConfig`. +5 tests.
+- **Palette selection lives in the flame** (`renderSettings.palette`,
+  optional schema field, entries embedded): apply/remove is ONE history entry
+  covering colors + palette (no more half-reverts leaving grading on), and
+  the palette survives save/share/load. +1 schema test.
+- **Blend composition lives in the flame** (`renderSettings.blendFlame` as
+  re-validated plain data + `.blendWeight`): pick/adjust/clear/morph-setup
+  are ordinary history entries — the "Remove blend flame" X is no longer an
+  unrecoverable click — and blends survive save/share/load. Gallery hover
+  previews write silently. +1 schema test.
+- **Custom-variation deletes are guarded and recoverable**: deleting a
+  variation the current flame uses asks for confirmation
+  (ConfirmDeleteVariationModal), and every delete offers a 10s toast Undo
+  that re-registers the variation under its original id
+  (`restoreCustomVariation`). The library is app-level state, so recovery
+  goes through the toast rather than Ctrl+Z.
 
 ## [0.9.4] - 2026-07-02
 
