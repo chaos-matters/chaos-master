@@ -1,3 +1,5 @@
+/* Flush with the header above — no card border/radius/inset, so the dope
+   sheet reads as part of the timeline panel rather than a floating box. */
 .container {
   display: flex;
   flex-direction: column;
@@ -6,15 +8,11 @@
   user-select: none;
   -webkit-user-select: none;
   background: var(--neutral-50);
-  border-radius: 8px 8px 0 0;
-  border: 1px solid var(--neutral-200);
-  border-bottom: none;
   overflow: hidden;
   touch-action: manipulation;
 
   [data-theme='dark'] & {
     background: var(--neutral-900);
-    border-color: var(--neutral-800);
   }
 }
 

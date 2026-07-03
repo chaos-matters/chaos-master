@@ -34,7 +34,10 @@ curve value-axis zoom, and live keyframing for affine/color handle drags.
   a `registerViewApi` callback (`DopeSheetViewApi`), cleared on unmount so a
   collapsed timeline hides the View group. `KeyframeInspector` renders only
   while a keyframe is selected instead of holding an empty 32px placeholder
-  row. All `data-testid`/`data-tour-target` hooks preserved.
+  row. The dope sheet container lost its floating-card chrome (8px top radius
+  - 1px border) and the `.content` wrapper its 4px inset, so the sheet joins
+    the header seamlessly and spans the panel edge-to-edge. All
+    `data-testid`/`data-tour-target` hooks preserved.
 - **Affine/color drags keyframe per pointer-move** (`AffineEditor.tsx`,
   `FlameColorEditor.tsx`): handle drags now call `keyframeEditedParams` after
   every `setTransform`/`setColor` — the same contract as the sliders (Auto

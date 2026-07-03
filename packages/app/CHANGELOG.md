@@ -17,8 +17,10 @@ developer history lives in `dev.changelog.md`.
   its controls (zoom −/%/+, Fit, Seek, Curve) moved up into the timeline
   header, organized into labeled clusters — playback, settings, View, Keys —
   with clearer tooltips on every button. The keyframe inspector row now
-  appears only while a keyframe is selected. Net effect: the timeline spends
-  its height on your tracks, and every control says what it does.
+  appears only while a keyframe is selected, and the dope sheet sits flush
+  with the header — no more rounded floating-card border or side inset. Net
+  effect: the timeline spends its height on your tracks, and every control
+  says what it does.
 
 ### Fixed
 

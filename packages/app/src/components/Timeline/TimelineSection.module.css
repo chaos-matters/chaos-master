@@ -551,7 +551,6 @@
 
 /* ── Content ── */
 .content {
-  padding: 0 4px 4px 4px;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -601,10 +600,6 @@
   .viewBtn {
     padding: 4px 8px;
     min-height: 26px;
-  }
-
-  .content {
-    padding: 2px;
   }
 
   .shortcutHint {
