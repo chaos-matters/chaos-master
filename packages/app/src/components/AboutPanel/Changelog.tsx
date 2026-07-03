@@ -51,6 +51,11 @@ async function fetchChangelog(): Promise<ChangelogEntry[]> {
         const itemMatch = line.match(/^- (.*)/)
         if (itemMatch) {
           currentSection.items.push(itemMatch[1]!)
+        } else if (currentSection.items.length > 0 && line.trim() !== '') {
+          // Hard-wrapped bullet: fold the continuation line into the previous
+          // item, otherwise everything after the first line is silently lost.
+          currentSection.items[currentSection.items.length - 1] +=
+            ` ${line.trim()}`
         }
       }
     }
