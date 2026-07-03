@@ -7,6 +7,9 @@ import type { KeyframeData } from '@/utils/timeline'
 type DopeSheetTrackProps = {
   parameterPath: string
   label: string
+  /** Name-column width in px — must match the ruler spacer and playhead
+   *  offset (see useTrackNameWidth), or the lanes shift against the ruler. */
+  trackNameWidth: number
   frameWidth: number
   trackHeight: number
   startFrame: number
@@ -132,7 +135,7 @@ export function DopeSheetTrack(props: DopeSheetTrackProps) {
         props.onTrackContextMenu?.(e, props.parameterPath)
       }}
     >
-      <div class={ui.trackName}>
+      <div class={ui.trackName} style={{ width: `${props.trackNameWidth}px` }}>
         {props.isOrphaned && (
           <span
             title="Tracking target is missing. Please check if the target still exists in the flame, or remove these keyframes."

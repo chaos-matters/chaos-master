@@ -47,6 +47,7 @@ export function DopeSheetGrid(props: DopeSheetGridProps) {
                 isOrphaned={track.isOrphaned}
                 parameterPath={track.path}
                 label={track.label}
+                trackNameWidth={props.trackNameWidth}
                 frameWidth={props.frameWidth}
                 trackHeight={props.trackHeight}
                 startFrame={props.startFrame}

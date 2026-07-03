@@ -17,7 +17,7 @@ import { createPosition, createZoom, WheelZoomCamera2D, } from '@/lib/WheelZoomC
 import { createAnimationFrame } from '@/utils/createAnimationFrame'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'
-import { createGestureKeyframer } from '@/utils/keyframeOnChange'
+import { keyframeEditedParams } from '@/utils/keyframeOnChange'
 import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
 import { createSelectedLastEntries } from '@/utils/selectedLastEntries'
 import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
@@ -149,8 +149,9 @@ function FlameColorHandle(props: {
   hidden?: boolean
   onSelect?: () => void
   onDeselect?: () => void
-  /** Timeline path prefix (`transform.{tid}.color`); when set and the
-   *  track-changes diamond is on, finished drags keyframe x/y. */
+  /** Timeline path prefix (`transform.{tid}.color`); when set, drags keyframe
+   *  x/y live (track-changes diamond, or Auto mode on already-animated
+   *  colours). */
   keyframePathBase?: string
 }) {
   const { theme } = useTheme()
@@ -162,12 +163,14 @@ function FlameColorHandle(props: {
   const changeHistory = useChangeHistory()
   const timeline = useTimeline()
 
-  // Track-changes: keyframe the colour after a finished drag (debounced so
-  // successive nudges land as one write, values read at flush time).
-  const keyframeGesture = createGestureKeyframer(timeline)
-  const scheduleColorKeyframes = () => {
+  // Keyframe the colour on EVERY pointer move (same contract as the sliders
+  // and the affine handles): the keyframe at the current frame is rewritten
+  // live, so a held/scrubbed frame renders the drag as it happens instead of
+  // freezing until a drag-end debounce lands. Per-move writes coalesce into
+  // one undo step, closed by breakUndoCoalescing when the drag finishes.
+  const keyframeDraggedColor = () => {
     const base = props.keyframePathBase
-    if (base) keyframeGesture([`${base}.x`, `${base}.y`])
+    if (base) keyframeEditedParams(timeline, [`${base}.x`, `${base}.y`])
   }
   const clip = createMemo(() => {
     // worldToClip can throw or return NaN before the camera/canvas is
@@ -209,11 +212,12 @@ function FlameColorHandle(props: {
           const diff = sub(position, grabPosition)
           const color = add(initialColor, diff)
           props.setColor(color)
+          keyframeDraggedColor()
         },
         onDone() {
           if (moved) {
             changeHistory.commit()
-            scheduleColorKeyframes()
+            timeline?.breakUndoCoalescing()
           } else if (wasSelected) {
             // A click (no drag) on an already-selected handle deselects it.
             props.onDeselect?.()

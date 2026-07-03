@@ -19,7 +19,7 @@ import { createPosition, createZoom, WheelZoomCamera2D, } from '@/lib/WheelZoomC
 import { createAnimationFrame } from '@/utils/createAnimationFrame'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'
-import { createGestureKeyframer } from '@/utils/keyframeOnChange'
+import { keyframeEditedParams } from '@/utils/keyframeOnChange'
 import { scrollIntoViewAndFocusOnChange } from '@/utils/scrollIntoViewOnChange'
 import { createSelectedLastEntries } from '@/utils/selectedLastEntries'
 import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
@@ -195,8 +195,9 @@ function AffineHandle(props: {
   hidden?: boolean
   onSelect?: () => void
   onDeselect?: () => void
-  /** Timeline path prefix (e.g. `transform.{tid}.preAffine`); when set and the
-   *  track-changes diamond is on, finished drags keyframe the touched coefs. */
+  /** Timeline path prefix (e.g. `transform.{tid}.preAffine`); when set, drags
+   *  keyframe the touched coefs live (track-changes diamond, or Auto mode on
+   *  already-animated coefs). */
   keyframePathBase?: string
   /** Which layer to render: the scale/rotate 'box' or the 'center' dot.
    *  AffineEditor renders each transform twice so ALL boxes paint below ALL
@@ -213,14 +214,22 @@ function AffineHandle(props: {
   const changeHistory = useChangeHistory()
   const timeline = useTimeline()
 
-  // Track-changes: after a drag gesture ends, keyframe the coefs it touches
-  // at the current frame (debounced; full paths captured per gesture so a
-  // pre/post mode switch between gestures can't mislabel earlier coefs).
-  const keyframeGesture = createGestureKeyframer(timeline)
-  const scheduleGestureKeyframes = (coefs: readonly string[]) => {
+  // Keyframe the coefs a drag touches on EVERY pointer move (same contract as
+  // the sliders): with the track-changes diamond on — or Auto mode on and the
+  // coefs already animated — the keyframe at the current frame is rewritten
+  // live, so a held/scrubbed frame renders the drag as it happens instead of
+  // freezing until a drag-end debounce lands. Per-move writes coalesce into
+  // one undo step; recordGestureEnd closes that step when the drag finishes.
+  const keyframeDraggedCoefs = (coefs: readonly string[]) => {
     const base = props.keyframePathBase
     if (!base) return
-    keyframeGesture(coefs.map((coef) => `${base}.${coef}`))
+    keyframeEditedParams(
+      timeline,
+      coefs.map((coef) => `${base}.${coef}`),
+    )
+  }
+  const recordGestureEnd = () => {
+    timeline?.breakUndoCoalescing()
   }
 
   const handleScale = () => Math.max(1, Math.sqrt(zoom()))
@@ -274,10 +283,11 @@ function AffineHandle(props: {
           c: position.x,
           f: position.y,
         })
+        keyframeDraggedCoefs(['c', 'f'])
       },
       onDone() {
         changeHistory.commit()
-        scheduleGestureKeyframes(['c', 'f'])
+        recordGestureEnd()
       },
     }
   })
@@ -314,6 +324,7 @@ function AffineHandle(props: {
           d: yFactor === 0 ? d : (d * cos + e * sin) * ratio * yFactor,
           e: yFactor === 0 ? e : (-d * sin + e * cos) * ratio * yFactor,
         })
+        keyframeDraggedCoefs(['a', 'b', 'd', 'e'])
       }
 
       // immediately respond, as -1 factors are used for flipping axes
@@ -324,7 +335,7 @@ function AffineHandle(props: {
         onPointerMove,
         onDone() {
           changeHistory.commit()
-          scheduleGestureKeyframes(['a', 'b', 'd', 'e'])
+          recordGestureEnd()
         },
       }
     })
@@ -463,10 +474,11 @@ function AffineHandle(props: {
           d: (initialTransform.d ?? 0) + diff.x,
           h: (initialTransform.h ?? 0) + diff.y,
         })
+        keyframeDraggedCoefs(['d', 'h'])
       },
       onDone() {
         changeHistory.commit()
-        scheduleGestureKeyframes(['d', 'h'])
+        recordGestureEnd()
       },
     }
   })
@@ -523,6 +535,13 @@ function AffineHandle(props: {
             k: k * ratio * factor,
           })
         }
+        keyframeDraggedCoefs(
+          axis === 'X'
+            ? ['a', 'e', 'i']
+            : axis === 'Y'
+              ? ['b', 'f', 'j']
+              : ['c', 'g', 'k'],
+        )
       }
 
       onPointerMove(initEvent)
@@ -531,13 +550,7 @@ function AffineHandle(props: {
         onPointerMove,
         onDone() {
           changeHistory.commit()
-          scheduleGestureKeyframes(
-            axis === 'X'
-              ? ['a', 'e', 'i']
-              : axis === 'Y'
-                ? ['b', 'f', 'j']
-                : ['c', 'g', 'k'],
-          )
+          recordGestureEnd()
         },
       }
     })
@@ -992,6 +1005,9 @@ export function AffineEditor(props: {
                     props.setFinalTransform?.(affine)
                   }}
                   is3D={props.is3D}
+                  keyframePathBase={
+                    props.enableChangeTracking ? 'finalTransform' : undefined
+                  }
                 />
               </Show>
             </svg>

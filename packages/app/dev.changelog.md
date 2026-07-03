@@ -7,7 +7,69 @@ changelog surfaced in the About panel lives in `CHANGELOG.md`.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.5] - 2026-07-02
+## [0.9.6] - 2026-07-03
+
+Timeline UX batch: playhead/ruler desync fix, single-row grouped header,
+curve value-axis zoom, and live keyframing for affine/color handle drags.
+
+### Added
+
+- **Curve editor value-axis zoom** (`CurveEditor.tsx`): a non-passive `wheel`
+  listener on the curve lane handles Ctrl/Cmd+wheel by rescaling the sticky
+  value range around the value under the cursor (`span * exp(deltaY * 0.002)`,
+  clamped to [1e-6, 1e9]). `stopPropagation` keeps the workspace's Ctrl+wheel
+  panel-resize from firing on the same gesture; Alt+wheel (frame zoom) and
+  plain wheel (scroll) are untouched.
+
+### Changed
+
+- **Single-row timeline header** (`TimelineSection.tsx` + module CSS): the
+  dope sheet's zoom toolbar row is dissolved into the header, which now reads
+  as bordered "aisles" — playback (transport + frame counter), settings
+  (FPS/frames/speed/loop), View (zoom −/%/+, Fit, Seek, Curve; labeled), and
+  Keys (Auto, Del; labeled) — via new `.headerGroup`/`.headerGroupLabel`/
+  `.viewBtn` styles (labels hidden ≤480px). `seekOnSelect`/`showCurve` state
+  lifted from `DopeSheet` to `TimelineSection` (same persisted key); the zoom
+  controls stay in `DopeSheet` (they need its refs) and are exposed upward via
+  a `registerViewApi` callback (`DopeSheetViewApi`), cleared on unmount so a
+  collapsed timeline hides the View group. `KeyframeInspector` renders only
+  while a keyframe is selected instead of holding an empty 32px placeholder
+  row. All `data-testid`/`data-tour-target` hooks preserved.
+- **Affine/color drags keyframe per pointer-move** (`AffineEditor.tsx`,
+  `FlameColorEditor.tsx`): handle drags now call `keyframeEditedParams` after
+  every `setTransform`/`setColor` — the same contract as the sliders (Auto
+  re-records animated params; the track-changes diamond records anything,
+  creating first keyframes) — with `breakUndoCoalescing()` on gesture end so a
+  whole drag stays one timeline-undo step. The drag-end
+  `createGestureKeyframer` (300 ms debounce) is removed from
+  `keyframeOnChange.ts` along with both call sites. The final-transform handle
+  now passes `keyframePathBase="finalTransform"` so it participates too.
+  Rationale: while the timeline holds a frame (`isDrivingView`),
+  `applyTimelineToFlame` overrides tracked params every render — deferring the
+  keyframe write to a drag-end debounce froze the rendered IFS for the whole
+  drag, then snapped it to the end state.
+
+### Fixed
+
+- **Ruler/tracks playhead desync on panel resize** (`useZoomGestures.ts`): the
+  seek-ruler lane and the tracks area are separate horizontal scrollers, and
+  any `frameWidth` change (zoom buttons, Alt+wheel, pinch, or the panel resize
+  handle driving `containerHeight`) let the browser clamp each `scrollLeft`
+  independently — shifting the ruler arrowhead off the tracks playhead until a
+  Fit/zoom-out reset both. A new effect re-anchors on every `frameWidth`
+  change: the frame at the lane's left edge is kept stable (`scrollLeft *
+ratio`) and the same value — clamped to the smaller of the two scroll
+  ranges — is written to both panes; the ruler wrapper's own scroll is pinned
+  to 0. `useScrollSync` swaps its broken re-entrancy flag (programmatic
+  scrolls fire their events asynchronously, so the flag never covered the
+  echo) for idempotent value-guarded writes.
+- **Responsive track-name column no longer skews alignment**
+  (`useTrackNameWidth.ts`): CSS shrank `.trackName` to 100px/80px under
+  768px/480px while every JS offset (ruler spacer, tracks-playhead `left`,
+  curve gutter, auto-fit math) used the 130px constant, shifting diamonds off
+  the ruler's frame axis on tablets. The width is now a single reactive
+  `matchMedia` signal consumed by the cells and all offset math; the CSS
+  media-query width overrides are gone.
 
 Undo/redo overhaul, driven by a full audit of both undo systems (flame
 change-history + timeline snapshots). Each area landed as its own commit with

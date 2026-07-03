@@ -3,6 +3,44 @@
 What's new in Chaos Master. Concise highlights for each release; the full
 developer history lives in `dev.changelog.md`.
 
+## [0.9.6] - 2026-07-03
+
+### Added
+
+- **Curve editor: Ctrl+wheel zooms the value axis** around the cursor, so
+  nudging a diamond precisely up/down no longer means fighting a cramped
+  auto-fitted range. The zoomed range sticks, just like after a drag.
+
+### Changed
+
+- **One-row timeline header.** The dope sheet's separate zoom toolbar is gone;
+  its controls (zoom −/%/+, Fit, Seek, Curve) moved up into the timeline
+  header, organized into labeled clusters — playback, settings, View, Keys —
+  with clearer tooltips on every button. The keyframe inspector row now
+  appears only while a keyframe is selected. Net effect: the timeline spends
+  its height on your tracks, and every control says what it does.
+
+### Fixed
+
+- **The ruler arrowhead and the playhead line can no longer drift apart.**
+  Resizing the timeline panel (drag handle or Ctrl+wheel) rescales the frame
+  ruler; the ruler and the track lanes are separate scroll panes and could
+  clamp their scroll positions differently, leaving the arrow on a different
+  frame than the red line below (clicking Fit was the workaround). Both panes
+  are now re-anchored to the same scroll offset on every scale change. Also
+  fixed a narrow-screen mismatch where the track-name column shrank but the
+  ruler and playhead math didn't, shifting diamonds off the ruler's frame axis
+  on tablets/phones.
+- **Transform and color handle drags animate live.** With the track-changes
+  diamond (or Auto mode) on while viewing a timeline frame, dragging an affine
+  handle or a color-wheel dot used to freeze the fractal until ~0.3 s after
+  release, then jump to the end state — the keyframe was only written on a
+  drag-end debounce. Drags now record the keyframe continuously (still one
+  undo step per drag), so the IFS follows your pointer and what you see is
+  exactly what's keyframed. Auto mode now re-records affine/color drags on
+  already-animated parameters, matching the sliders, and the final transform's
+  handle participates in change tracking too.
+
 ## [0.9.5] - 2026-07-02
 
 ### Fixed

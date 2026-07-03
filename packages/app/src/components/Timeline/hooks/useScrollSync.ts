@@ -10,18 +10,20 @@ export function useScrollSync(
     const seekLane = seekLaneRef()
     if (!tracksEl || !seekLane) return
 
-    let syncing = false
+    // Value-guarded, not flag-guarded: a programmatic scrollLeft write fires
+    // its scroll event asynchronously, long after any "syncing" flag has been
+    // reset, so a flag can't stop echoes — and a stale echo can overwrite a
+    // newer position. Comparing values makes the sync idempotent (assigning an
+    // equal scrollLeft fires no event, so the echo chain terminates).
     const syncTracksToLane = () => {
-      if (syncing) return
-      syncing = true
-      seekLane.scrollLeft = tracksEl.scrollLeft
-      syncing = false
+      if (seekLane.scrollLeft !== tracksEl.scrollLeft) {
+        seekLane.scrollLeft = tracksEl.scrollLeft
+      }
     }
     const syncLaneToTracks = () => {
-      if (syncing) return
-      syncing = true
-      tracksEl.scrollLeft = seekLane.scrollLeft
-      syncing = false
+      if (tracksEl.scrollLeft !== seekLane.scrollLeft) {
+        tracksEl.scrollLeft = seekLane.scrollLeft
+      }
     }
 
     tracksEl.addEventListener('scroll', syncTracksToLane, { passive: true })

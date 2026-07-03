@@ -18,96 +18,6 @@
   }
 }
 
-/* ── Zoom toolbar ── */
-.zoomToolbar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 8px;
-  background: var(--neutral-50);
-  border-bottom: 1px solid var(--neutral-200);
-  flex-shrink: 0;
-  height: 22px;
-
-  [data-theme='dark'] & {
-    background: var(--neutral-900);
-    border-bottom-color: var(--neutral-800);
-  }
-}
-
-.zoomBtn {
-  padding: 1px 8px;
-  font-size: 10px;
-  font-weight: 600;
-  border: 1px solid var(--neutral-300);
-  border-radius: 4px;
-  background: white;
-  color: var(--neutral-600);
-  cursor: pointer;
-  transition: all 0.1s;
-
-  [data-theme='dark'] & {
-    background: var(--neutral-800);
-    border-color: var(--neutral-600);
-    color: var(--neutral-300);
-  }
-
-  &:hover {
-    background: var(--accent-color, #3b82f6);
-    border-color: var(--accent-color, #3b82f6);
-    color: white;
-  }
-}
-
-.zoomBtnActive {
-  background: var(--accent-color, #3b82f6);
-  border-color: var(--accent-color, #3b82f6);
-  color: white;
-
-  [data-theme='dark'] & {
-    background: var(--accent-color, #3b82f6);
-    border-color: var(--accent-color, #3b82f6);
-    color: white;
-  }
-}
-
-.zoomLabel {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--neutral-500);
-  font-variant-numeric: tabular-nums;
-
-  [data-theme='dark'] & {
-    color: var(--neutral-400);
-  }
-}
-
-.zoomHint {
-  font-size: 9px;
-  color: var(--neutral-400);
-  margin-left: 2px;
-
-  [data-theme='dark'] & {
-    color: var(--neutral-500);
-  }
-}
-
-.frameIndicator {
-  margin-left: auto;
-  font-size: 10px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--neutral-700);
-  background: var(--neutral-200);
-  padding: 1px 8px;
-  border-radius: 3px;
-
-  [data-theme='dark'] & {
-    color: var(--neutral-200);
-    background: var(--neutral-700);
-  }
-}
-
 /* ── Seek ruler (top scrub area) ── */
 .seekRuler {
   position: relative;
@@ -252,8 +162,10 @@
   }
 }
 
+/* Width comes from the trackNameWidth inline style (useTrackNameWidth), the
+   same value used for the ruler spacer / playhead offset / curve gutter —
+   never set it here or the lanes shift against the ruler. */
 .trackName {
-  width: 130px;
   flex-shrink: 0;
   padding: 1px 8px;
   font-size: 10px;
@@ -541,20 +453,7 @@
     top: 4px;
   }
 
-  .zoomToolbar {
-    height: 32px;
-    padding: 2px 10px;
-  }
-
-  .zoomBtn {
-    padding: 4px 10px;
-    font-size: 11px;
-    min-height: 28px;
-    min-width: 36px;
-  }
-
   .trackName {
-    width: 100px;
     font-size: 9px;
   }
 
@@ -575,20 +474,7 @@
     height: 32px;
   }
 
-  .zoomToolbar {
-    height: 28px;
-    padding: 2px 6px;
-    gap: 4px;
-  }
-
-  .zoomBtn {
-    padding: 3px 8px;
-    font-size: 10px;
-    min-height: 24px;
-  }
-
   .trackName {
-    width: 80px;
     font-size: 8px;
   }
 

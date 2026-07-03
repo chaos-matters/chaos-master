@@ -1,9 +1,11 @@
 import { createMemo, createSignal, Show } from 'solid-js'
 import { useTimeline } from '@/contexts/TimelineContext'
 import { Cross } from '@/icons'
+import { persistentSignal } from '@/utils/persistentSignal'
 import { AnimationControls, AnimationGenerator } from './AnimationGenerator'
 import { DopeSheet } from './DopeSheet'
 import ui from './TimelineSection.module.css'
+import type { DopeSheetViewApi } from './DopeSheet'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 export interface TimelineSectionProps {
@@ -25,6 +27,17 @@ export function TimelineSection(props: TimelineSectionProps) {
   const config = createMemo(() => timeline.config())
   const currentFrame = createMemo(() => timeline.currentFrame())
 
+  // View state for the dope sheet, owned here so its controls can share the
+  // header row. The zoom API is registered by the dope sheet on mount (the
+  // zoom state has to live with its scroll/ruler refs).
+  const [viewApi, setViewApi] = createSignal<DopeSheetViewApi | undefined>()
+  const [seekOnSelect, setSeekOnSelect] = createSignal(false)
+  // Persisted across sessions, but defaults OFF on first load (no stored value).
+  const [showCurve, setShowCurve] = persistentSignal(
+    'timeline-curve-editor',
+    false,
+  )
+
   return (
     <div
       class={ui.section}
@@ -32,24 +45,82 @@ export function TimelineSection(props: TimelineSectionProps) {
       data-testid="timeline-section"
       data-tour-target="timeline-section"
     >
-      {/* Compact transport bar */}
+      {/* Single-row header: playback | settings | view | generators + keying */}
       <div class={ui.header}>
         <div class={ui.headerLeft}>
           <span class={ui.headerTitle}>Timeline</span>
         </div>
 
-        <TransportBar />
-
-        {/* Frame info */}
-        <div class={ui.frameInfo}>
-          <span class={ui.frameDisplay}>
-            <span data-testid="current-frame">{currentFrame()}</span>
-            <span class={ui.frameSep}>/</span>
-            <span data-testid="end-frame">{config().endFrame}</span>
-          </span>
+        <div class={ui.headerGroup} role="group" aria-label="Playback">
+          <TransportBar />
+          {/* Frame info */}
+          <div class={ui.frameInfo}>
+            <span class={ui.frameDisplay}>
+              <span data-testid="current-frame">{currentFrame()}</span>
+              <span class={ui.frameSep}>/</span>
+              <span data-testid="end-frame">{config().endFrame}</span>
+            </span>
+          </div>
         </div>
 
-        <TimelineSettings />
+        <div class={ui.headerGroup} role="group" aria-label="Playback settings">
+          <TimelineSettings />
+        </div>
+
+        <Show when={!collapsed()}>
+          <div class={ui.headerGroup} role="group" aria-label="View">
+            <span class={ui.headerGroupLabel}>View</span>
+            <button
+              class={ui.viewBtn}
+              disabled={!viewApi()}
+              onClick={() => {
+                const api = viewApi()
+                api?.setZoomLevel(Math.max(0.1, api.zoomLevel() - 0.2))
+              }}
+              title="Zoom out (condense frames)"
+            >
+              −
+            </button>
+            <span class={ui.zoomLabel}>
+              {Math.round((viewApi()?.zoomLevel() ?? 1) * 100)}%
+            </span>
+            <button
+              class={ui.viewBtn}
+              disabled={!viewApi()}
+              onClick={() => {
+                const api = viewApi()
+                api?.setZoomLevel(Math.min(5, api.zoomLevel() + 0.2))
+              }}
+              title="Zoom in (expand frames)"
+            >
+              +
+            </button>
+            <button
+              class={ui.viewBtn}
+              disabled={!viewApi()}
+              onClick={() => viewApi()?.autoFitZoom()}
+              title="Fit all frames in view (or zoom with Alt+wheel / pinch)"
+            >
+              Fit
+            </button>
+            <button
+              class={ui.viewBtn}
+              classList={{ [ui.viewBtnActive as string]: seekOnSelect() }}
+              onClick={() => setSeekOnSelect((v) => !v)}
+              title="Seek playhead to a keyframe when selecting it"
+            >
+              Seek
+            </button>
+            <button
+              class={ui.viewBtn}
+              classList={{ [ui.viewBtnActive as string]: showCurve() }}
+              onClick={() => setShowCurve((v) => !v)}
+              title="Show the value curve for the selected parameter (Ctrl+wheel zooms its value axis)"
+            >
+              Curve
+            </button>
+          </div>
+        </Show>
 
         {/* Right buttons */}
         <div class={ui.headerRight}>
@@ -62,30 +133,33 @@ export function TimelineSection(props: TimelineSectionProps) {
               onOpenAnimationGenerator={props.onOpenAnimationGenerator}
             />
           </Show>
-          <button
-            class={ui.autoKeyBtn}
-            classList={{ [ui.active as string]: autoKeyframe() }}
-            data-tour-target="auto-keyframe"
-            onClick={(e) => {
-              e.stopPropagation()
-              timeline.setAutoKeyframe(!autoKeyframe())
-            }}
-            title="Auto-keyframe"
-          >
-            Auto
-          </button>
-          <button
-            class={ui.removeBtn}
-            classList={{ [ui.active as string]: removeMode() }}
-            data-tour-target="del-mode"
-            onClick={(e) => {
-              e.stopPropagation()
-              timeline.setRemoveMode(!removeMode())
-            }}
-            title="Remove mode"
-          >
-            Del
-          </button>
+          <div class={ui.headerGroup} role="group" aria-label="Keyframing">
+            <span class={ui.headerGroupLabel}>Keys</span>
+            <button
+              class={ui.autoKeyBtn}
+              classList={{ [ui.active as string]: autoKeyframe() }}
+              data-tour-target="auto-keyframe"
+              onClick={(e) => {
+                e.stopPropagation()
+                timeline.setAutoKeyframe(!autoKeyframe())
+              }}
+              title="Auto-keyframe: re-record animated parameters as you edit them"
+            >
+              Auto
+            </button>
+            <button
+              class={ui.removeBtn}
+              classList={{ [ui.active as string]: removeMode() }}
+              data-tour-target="del-mode"
+              onClick={(e) => {
+                e.stopPropagation()
+                timeline.setRemoveMode(!removeMode())
+              }}
+              title="Remove mode: click keyframes to delete them"
+            >
+              Del
+            </button>
+          </div>
           <button
             class={ui.collapseBtn}
             onClick={(e) => {
@@ -114,6 +188,9 @@ export function TimelineSection(props: TimelineSectionProps) {
           <DopeSheet
             formatTrackLabel={props.formatTrackLabel}
             flameDescriptor={props.flameDescriptor}
+            seekOnSelect={seekOnSelect()}
+            showCurve={showCurve()}
+            registerViewApi={setViewApi}
           />
         </div>
       </Show>
