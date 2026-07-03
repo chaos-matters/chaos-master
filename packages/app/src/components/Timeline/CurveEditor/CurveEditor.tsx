@@ -56,8 +56,38 @@ export function CurveEditor(props: CurveEditorProps) {
     measure()
     const ro = new ResizeObserver(measure)
     ro.observe(el)
+    el.addEventListener('wheel', onLaneWheel, { passive: false })
     onCleanup(() => {
       ro.disconnect()
+      el.removeEventListener('wheel', onLaneWheel)
+    })
+  }
+
+  // Ctrl/Cmd+wheel zooms the VALUE axis around the value under the cursor, so
+  // fine vertical keyframe drags don't fight a cramped auto-fitted range. Uses
+  // the sticky range (like a drag does) so the axis stays put afterwards.
+  // Native listener (not JSX): it must be non-passive to preventDefault the
+  // browser page-zoom, and stopPropagation keeps the workspace's Ctrl+wheel
+  // panel-resize from also firing.
+  function onLaneWheel(e: WheelEvent) {
+    if (!(e.ctrlKey || e.metaKey)) return
+    e.preventDefault()
+    e.stopPropagation()
+    if (!laneRef) return
+    const vp = viewport()
+    const range = valueRange()
+    const span = range.max - range.min
+    // Wheel up (negative deltaY) zooms in — the span shrinks.
+    const newSpan = Math.max(
+      1e-6,
+      Math.min(1e9, span * Math.exp(e.deltaY * 0.002)),
+    )
+    if (newSpan === span) return
+    const anchor = vp.yToValue(e.clientY - laneRef.getBoundingClientRect().top)
+    const k = newSpan / span
+    setStickyRange({
+      min: anchor - (anchor - range.min) * k,
+      max: anchor + (range.max - anchor) * k,
     })
   }
 
@@ -232,7 +262,9 @@ export function CurveEditor(props: CurveEditorProps) {
       <Show
         when={props.path}
         fallback={
-          <div class={ui.placeholder}>Select a keyframe to edit its curve</div>
+          <div class={ui.placeholder}>
+            Click a track or keyframe to see its curve
+          </div>
         }
       >
         <Show
@@ -266,7 +298,8 @@ export function CurveEditor(props: CurveEditorProps) {
               onDblClick={addKeyframeAtPoint}
             >
               <title>
-                Drag a point up/down to change its value · double-click to add
+                Drag a point up/down to change its value · double-click to add ·
+                Ctrl+wheel to zoom the value axis
               </title>
               {/* Min / max value guide lines */}
               <line

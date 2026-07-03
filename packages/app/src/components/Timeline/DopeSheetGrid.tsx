@@ -14,11 +14,12 @@ interface DopeSheetGridProps {
   endFrame: number
   currentFrame: number
   selectedKeyframe: { path: string; frame: number } | null
+  selectedTrack: string | null
   onSelectKeyframe: (path: string, frame: number) => void
+  onSelectTrack: (path: string) => void
   onDragKeyframe: (path: string, oldFrame: number, newFrame: number) => void
   onContextMenu: (e: MouseEvent, path: string, frame: number) => void
   onTrackContextMenu?: (e: MouseEvent, path: string) => void
-  onDeselectKeyframe: () => void
   trackNameWidth: number
 }
 
@@ -47,17 +48,19 @@ export function DopeSheetGrid(props: DopeSheetGridProps) {
                 isOrphaned={track.isOrphaned}
                 parameterPath={track.path}
                 label={track.label}
+                trackNameWidth={props.trackNameWidth}
                 frameWidth={props.frameWidth}
                 trackHeight={props.trackHeight}
                 startFrame={props.startFrame}
                 endFrame={props.endFrame}
                 currentFrame={props.currentFrame}
                 selectedKeyframe={props.selectedKeyframe}
+                selected={props.selectedTrack === track.path}
                 onSelectKeyframe={props.onSelectKeyframe}
+                onSelectTrack={props.onSelectTrack}
                 onDragKeyframe={props.onDragKeyframe}
                 onContextMenu={props.onContextMenu}
                 onTrackContextMenu={props.onTrackContextMenu}
-                onDeselectKeyframe={props.onDeselectKeyframe}
               />
             )}
           </For>

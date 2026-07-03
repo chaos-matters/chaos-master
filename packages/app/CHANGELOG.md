@@ -3,52 +3,106 @@
 What's new in Chaos Master. Concise highlights for each release; the full
 developer history lives in `dev.changelog.md`.
 
+## [0.9.6] - 2026-07-03
+
+### Added
+
+- **Curve editor: Ctrl+wheel zooms the value axis** around the cursor, for
+  precise vertical keyframe moves. The zoomed range sticks, like after a drag.
+- **Click a track to select it.** Clicking a lane or its name highlights the
+  track, points the curve editor (when open) at it, and aims keyboard inserts
+  (I) at it — no need to hunt for a keyframe diamond.
+
+### Changed
+
+- **One-row timeline header.** Zoom −/%/+, Fit, Seek and Curve moved up into
+  the header, grouped into labeled clusters (playback, settings, View, Keys)
+  with clearer tooltips. The keyframe inspector appears only while a keyframe
+  is selected, and the dope sheet sits flush with the header — more height for
+  your tracks.
+
+### Fixed
+
+- **The ruler arrowhead and the playhead line can no longer drift apart**
+  after resizing or zooming the timeline — both panes stay locked to the same
+  scroll offset (clicking Fit was the old workaround). Also fixed diamonds
+  sitting off the ruler's frame axis on narrow screens.
+- **Transform and color handle drags animate live.** With track-changes (or
+  Auto mode) on while viewing a timeline frame, drags used to freeze the
+  fractal until ~0.3 s after release; keyframes now record continuously during
+  the drag (still one undo step), so the IFS follows your pointer.
+
 ## [0.9.5] - 2026-07-02
 
 ### Fixed
 
-- **Undo now reverts your last action — whatever it was.** The app kept two separate undo histories (flame edits and timeline keyframes); Ctrl+Z used to unwind every keyframe change before any flame edit became reachable, while the toolbar Undo button only ever touched flame edits. Both now share one chronological order, the buttons match Ctrl+Z exactly, and their enabled state reflects everything undoable. Redo replays in the order things happened, and making a new edit after undoing clears redo everywhere.
-- **Undoing "New transform", "Add variation", and "Add symmetry" works.** A long-standing engine bug ran the change twice under the hood, so undo silently did nothing and redo duplicated the transform. Dice rolls also redo to exactly the values you saw.
-- **One action = one undo step.** Randomize/Smart animation, the Colors generator, and animation presets used to record one undo entry per keyframe (dozens per click); value scrubs, the camera orientation gizmo, and 3D wheel-zoom recorded one per pointer-move. All are now single steps.
-- **Undo no longer leaks across flames.** Loading a flame, starting a new one, or switching 2D/3D previously kept the old flame's keyframe history alive — Ctrl+Z could dump a previous flame's animation tracks onto the new one.
-- **Ctrl+Z while typing in number or search fields** (timeline FPS/frames, export size, variation search) now edits the text as expected instead of triggering an app undo behind your back.
-- Exporting an animation no longer floods undo history with one entry per rendered frame, and 3D auto-exposure no longer fights undo after camera zooms.
-- **Keyframe undos are visible**: undoing a keyframe edit now updates the rendered flame immediately (previously the canvas could keep the old value until you played the timeline).
-- **Timeline settings are undoable** — FPS, frame count, speed, loop and loop style (including Seamless quietly extending the timeline) all revert with Ctrl+Z.
-- **Palettes and blends are part of your flame now**: applying/removing a palette and picking/adjusting/clearing a blend flame are all undoable, and both survive saving, sharing, and loading.
-- **Deleting a custom variation is safe(r)**: the app warns when the current flame uses it, and every delete shows an Undo toast that brings the variation back.
+- **Undo/redo overhaul.** Ctrl+Z now reverts your last action — whatever it
+  was. Flame edits and timeline keyframes used to live in two separate
+  histories that undid out of order; they now share one chronological order,
+  and the toolbar buttons match the shortcuts.
+- **Undo covers what it used to miss**: "New transform", "Add variation",
+  "Add symmetry" and dice rolls revert correctly; timeline settings (FPS,
+  frames, speed, loop style) are undoable; and keyframe undos update the
+  rendered flame immediately.
+- **One action = one undo step.** Generators, presets, value scrubs, camera
+  drags and animation exports no longer flood the history with dozens of
+  entries per click or drag.
+- **Undo stays inside your flame.** Loading or starting a new flame can no
+  longer resurrect the previous flame's keyframes, and Ctrl+Z while typing in
+  number/search fields edits the text instead of undoing the app.
+- **Palettes and blends are part of your flame now**: applying or removing
+  them is undoable, and both survive saving, sharing, and loading.
+- **Deleting a custom variation is safe(r)**: the app warns when the current
+  flame still uses it, and an Undo toast brings it back.
 
 ## [0.9.4] - 2026-07-02
 
 ### Added
 
-- **Track changes diamond.** A shiny diamond on the affine editor and color wheel (and in their list views): while it's on, every edit records a keyframe at the current frame — dragging a transform handle, scaling/rotating, scrubbing a value, typing a number, or rolling a dice. Unlike the timeline's Auto mode it also creates the _first_ keyframe, so animating is just: turn on the diamond, move things, step frames, move again.
-- **New Flame button** in the floating actions bar: one click resets to a clean starter flame (2D or 3D, matching your mode). No confirmation needed — undo brings the previous flame back, and unsaved work (including its animation) is stashed into Recent flames first.
-- **Animate button** in the timeline header opens the sidebar's animation generator (Flame Randomizer → Animation Settings) and scrolls straight to it — replacing the old one-shot "Gen" randomizer and its "Subtle" toggle.
-- **Your work is never silently lost.** Closing or reloading the tab with unsaved changes now saves the flame (with its animation) into Recent flames automatically — no prompt. Optional periodic auto-save (asked once via a small toast; configurable under Data Management: on/off + 1/2/5/10 min) keeps one auto-updating entry per editing session. Loading another flame, switching 2D/3D, or starting a new flame stashes unsaved work first. A one-time reminder after a few minutes of editing points to save/export/share, with a "Don't show again".
-- **3D variation browser** now shows the same Affine Editor panel the 2D browser has, so you can position a variation's transform while previewing it.
+- **Track changes diamond** on the affine editor and color wheel: while it's
+  on, every edit — handle drags, scrubs, typed values, dice rolls — records a
+  keyframe at the current frame, including the _first_ one (unlike Auto mode).
+  Animating becomes: turn on the diamond, move things, step frames, repeat.
+- **New Flame button**: one click resets to a clean 2D/3D starter. Undo brings
+  the old flame back, and unsaved work is stashed into Recent flames first.
+- **Animate button** in the timeline header jumps straight to the sidebar's
+  animation generator — replacing the old one-shot "Gen" randomizer.
+- **Your work is never silently lost.** Closing or reloading the tab
+  auto-saves unsaved changes (with their animation) to Recent flames, with
+  optional periodic auto-save (configurable under Data Management) and a
+  one-time save/export reminder.
+- **3D variation browser** now shows the same Affine Editor panel as 2D.
 
 ### Changed
 
-- **The selected transform always renders on top.** Overlapping handles used to hide the selected transform behind later-added ones; the selected handle now paints above the stack and receives the click. Scale/rotate edges also always paint _below_ center dots, so one transform's edges can no longer cover another's grab point.
+- **The selected transform always renders on top** — and receives the click —
+  even in a stack of overlapping handles.
 
 ### Fixed
 
-- Clicking stacked transform handles (e.g. several at the origin) now selects and moves the **selected/targeted** transform instead of whichever was added last.
-- Recording keyframes while scrubbing no longer floods the timeline's undo history — one undo reverts the whole scrub, and the history is bounded.
-- Auto/track-changes recording only happens while animation mode is on — no invisible "ghost" keyframes after leaving animation mode.
+- Recording keyframes while scrubbing no longer floods the timeline's undo
+  history, and Auto/track-changes recording stops once animation mode is off
+  (no more invisible "ghost" keyframes).
 
 ## [0.9.3] - 2026-06-27
 
 ### Added
 
-- **Graceful WebGPU fallback.** If WebGPU isn't available — an unsupported browser, or a GPU driver that crashes mid-session — the app stays usable instead of going blank or freezing. Every fractal preview shows a clear "WebGPU preview unavailable" placeholder with a link to check your browser/device support, while the rest of the studio (sidebar, About, Help, docs, settings) keeps working.
+- **Graceful WebGPU fallback.** If WebGPU is unavailable or the GPU crashes
+  mid-session, the app stays usable instead of going blank: previews show a
+  clear placeholder with a support link, and the rest of the studio keeps
+  working.
 
 ### Fixed
 
-- **The variation gallery no longer runs out of GPU memory while scrolling.** Live previews are now bounded and freed as they scroll off-screen, thumbnail detail is capped to a sane level, a per-preview GPU buffer leak is fixed, and each variation's shader is compiled once instead of repeatedly — together cutting a large gallery from ~1.6 GB of GPU memory to a few hundred MB and removing the "Out of memory" crash (notably on Firefox / Linux / AMD).
-- **Firefox: the variation-picker gallery no longer squeezes, collapses, or hides tiles behind the scrollbar.** Preview tiles use a fixed 16:9 aspect ratio with a height floor — so even a GPU device-loss reflow can't collapse them into a pile of overlapping labels — and both galleries reserve their scrollbar gutter so tiles never slide under the Firefox scrollbar.
-- On a GPU device loss, render loops now stop immediately (no console error flood), and the app falls back to the usable shell within a few seconds instead of hanging when a reload can't re-acquire the GPU.
+- **The variation gallery no longer runs out of GPU memory while scrolling.**
+  Live previews are bounded and freed off-screen, cutting a large gallery from
+  ~1.6 GB of GPU memory to a few hundred MB and removing the "Out of memory"
+  crash (notably on Firefox / Linux / AMD).
+- **Firefox gallery layout**: tiles no longer squeeze, collapse, or hide
+  behind the scrollbar.
+- On a GPU device loss, render loops stop cleanly and the app falls back to
+  the usable shell within a few seconds instead of hanging.
 
 ## [0.9.2] - 2026-06-26
 

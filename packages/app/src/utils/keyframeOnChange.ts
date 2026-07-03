@@ -1,4 +1,3 @@
-import { onCleanup } from 'solid-js'
 import { persistentSignal } from './persistentSignal'
 import type { TimelineState } from './timeline'
 
@@ -62,33 +61,4 @@ export function keyframeEditedParam(
 ) {
   if (!path) return
   keyframeEditedParams(timeline, [path])
-}
-
-/** Debounced track-changes writer for drag gestures: collects full parameter
- *  paths as gestures finish and keyframes them at the current frame in one
- *  flush. The debounce coalesces nudge bursts (values are resolved at flush
- *  time, i.e. after the last gesture); pending paths flush — not drop — if
- *  the owning component unmounts mid-wait. Create inside a component. */
-export function createGestureKeyframer(
-  timeline: TimelineState | null | undefined,
-  delayMs = 300,
-) {
-  const pending = new Set<string>()
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const flush = () => {
-    clearTimeout(timer)
-    if (!timeline || pending.size === 0) return
-    // One undo entry per flush; no coalescing across flushes — two separate
-    // drags stay two undo steps (the debounce already merges nudge bursts).
-    timeline.addKeyframesAtCurrentFrame([...pending], { coalesce: false })
-    pending.clear()
-  }
-  onCleanup(flush)
-  return (paths: readonly string[]) => {
-    // Same animationEnabled gate as keyframeChangedParams.
-    if (!timeline?.animationEnabled() || !keyframeOnChange()) return
-    for (const path of paths) pending.add(path)
-    clearTimeout(timer)
-    timer = setTimeout(flush, delayMs)
-  }
 }

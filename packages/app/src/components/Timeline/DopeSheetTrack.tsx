@@ -7,17 +7,22 @@ import type { KeyframeData } from '@/utils/timeline'
 type DopeSheetTrackProps = {
   parameterPath: string
   label: string
+  /** Name-column width in px — must match the ruler spacer and playhead
+   *  offset (see useTrackNameWidth), or the lanes shift against the ruler. */
+  trackNameWidth: number
   frameWidth: number
   trackHeight: number
   startFrame: number
   endFrame: number
   currentFrame: number
   selectedKeyframe: { path: string; frame: number } | null
+  /** This row is the current track (curve target / keyboard target). */
+  selected?: boolean
   onSelectKeyframe: (path: string, frame: number) => void
+  onSelectTrack: (path: string) => void
   onDragKeyframe: (path: string, oldFrame: number, newFrame: number) => void
   onContextMenu: (e: MouseEvent, path: string, frame: number) => void
   onTrackContextMenu?: (e: MouseEvent, path: string) => void
-  onDeselectKeyframe: () => void
   isOrphaned?: boolean
 }
 
@@ -115,7 +120,9 @@ export function DopeSheetTrack(props: DopeSheetTrackProps) {
       Math.min(props.endFrame, frame),
     )
     timeline.goToFrame(clampedFrame)
-    props.onDeselectKeyframe()
+    // A lane click also makes this the current track (clearing any keyframe
+    // selection) — the open curve editor retargets without diamond-hunting.
+    props.onSelectTrack(props.parameterPath)
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -126,13 +133,20 @@ export function DopeSheetTrack(props: DopeSheetTrackProps) {
   return (
     <div
       class={`${ui.trackRow} ${props.isOrphaned ? ui.orphanedTrack : ''}`}
+      classList={{ [ui.trackRowSelected as string]: props.selected }}
       style={{ height: `${props.trackHeight}px` }}
       onContextMenu={(e) => {
         e.preventDefault()
         props.onTrackContextMenu?.(e, props.parameterPath)
       }}
     >
-      <div class={ui.trackName}>
+      <div
+        class={ui.trackName}
+        style={{ width: `${props.trackNameWidth}px` }}
+        onClick={() => {
+          props.onSelectTrack(props.parameterPath)
+        }}
+      >
         {props.isOrphaned && (
           <span
             title="Tracking target is missing. Please check if the target still exists in the flame, or remove these keyframes."

@@ -1,12 +1,12 @@
-import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useTimeline } from '@/contexts/TimelineContext'
-import { persistentSignal } from '@/utils/persistentSignal'
 import { TIMELINE_PARAMETERS } from '@/utils/timeline'
 import { CurveEditor } from './CurveEditor/CurveEditor'
 import ui from './DopeSheet.module.css'
 import { useScrollSync } from './hooks/useScrollSync'
 import { useSeekScrubber } from './hooks/useSeekScrubber'
+import { useTrackNameWidth } from './hooks/useTrackNameWidth'
 import { useZoomGestures } from './hooks/useZoomGestures'
 import { KeyframeContextMenu } from './KeyframeContextMenu'
 import { TrackContextMenu } from './TrackContextMenu'
@@ -30,15 +30,28 @@ function pathLabel(path: string): string {
 
 const BASE_FRAME_WIDTH = 24
 const BASE_TRACK_HEIGHT = 20
-const TRACK_NAME_WIDTH = 130
 
 import { DopeSheetGrid } from './DopeSheetGrid'
 import { KeyframeInspector } from './KeyframeInspector'
 import type { FlameDescriptor, TransformId, VariationId, } from '@/flame/schema/flameSchema'
 
+/** Zoom controls the dope sheet hands up to the timeline header (the buttons
+ *  render there, but the state lives here with the scroll/ruler refs). */
+export interface DopeSheetViewApi {
+  zoomLevel: () => number
+  setZoomLevel: (v: number) => void
+  autoFitZoom: () => void
+}
+
 export interface DopeSheetProps {
   formatTrackLabel?: (path: string) => string
   flameDescriptor?: FlameDescriptor
+  /** Seek the playhead to a keyframe when it's selected (header toggle). */
+  seekOnSelect?: boolean
+  /** Show the value-curve editor for the selected parameter (header toggle). */
+  showCurve?: boolean
+  /** Called on mount with the zoom API consumed by the header's View group. */
+  registerViewApi?: (api: DopeSheetViewApi | undefined) => void
 }
 
 export function DopeSheet(props: DopeSheetProps) {
@@ -48,18 +61,12 @@ export function DopeSheet(props: DopeSheetProps) {
   const totalFrames = () =>
     timeline.config().endFrame - timeline.config().startFrame
 
-  const [seekOnSelect, setSeekOnSelect] = createSignal(false)
-  // Persisted across sessions, but defaults OFF on first load (no stored value).
-  const [showCurve, setShowCurve] = persistentSignal(
-    'timeline-curve-editor',
-    false,
-  )
   // Horizontal scroll of the tracks, mirrored onto the curve graph so it stays
   // pixel-aligned with the diamonds.
   const [scrollLeft, setScrollLeft] = createSignal(0)
 
   const curveLabel = () => {
-    const p = selectedKeyframe()?.path
+    const p = selectedTrack()
     if (!p) return null
     return props.formatTrackLabel ? props.formatTrackLabel(p) : pathLabel(p)
   }
@@ -67,6 +74,8 @@ export function DopeSheet(props: DopeSheetProps) {
   let tracksScrollRef!: HTMLDivElement
   let seekRulerRef!: HTMLDivElement
   let seekLaneRef!: HTMLDivElement | undefined
+
+  const trackNameWidth = useTrackNameWidth()
 
   const { zoomLevel, setZoomLevel, frameWidth, trackHeight, autoFitZoom } =
     useZoomGestures(
@@ -77,8 +86,11 @@ export function DopeSheet(props: DopeSheetProps) {
       totalFrames,
       BASE_FRAME_WIDTH,
       BASE_TRACK_HEIGHT,
-      TRACK_NAME_WIDTH,
+      trackNameWidth,
     )
+
+  props.registerViewApi?.({ zoomLevel, setZoomLevel, autoFitZoom })
+  onCleanup(() => props.registerViewApi?.(undefined))
 
   useScrollSync(
     () => tracksScrollRef,
@@ -91,11 +103,37 @@ export function DopeSheet(props: DopeSheetProps) {
     path: string
     frame: number
   } | null>(null)
+  // The "current" track: set by clicking a lane/name OR a keyframe. Drives
+  // the curve editor's graphed parameter and keyboard targeting (I inserts),
+  // so a parameter can be inspected without hunting for a diamond to click.
+  const [selectedTrack, setSelectedTrack] = createSignal<string | null>(null)
+
+  function selectKeyframe(path: string, frame: number) {
+    setSelectedTrack(path)
+    setSelectedKeyframe({ path, frame })
+  }
+
+  /** Lane/name click: make the track current without selecting a keyframe
+   *  (the inspector row stays hidden; an open curve editor retargets). */
+  function selectTrack(path: string) {
+    setSelectedTrack(path)
+    setSelectedKeyframe(null)
+  }
 
   createEffect(() => {
     const added = timeline.lastAddedKeyframe()
     if (added) {
-      setSelectedKeyframe(added)
+      selectKeyframe(added.path, added.frame)
+    }
+  })
+
+  // Drop a selection whose track was removed (track context menu, orphan
+  // cleanup, loading another flame) so the curve editor can't graph a ghost.
+  createEffect(() => {
+    const path = selectedTrack()
+    if (path && !timeline.tracks().some((t) => t.parameterPath === path)) {
+      setSelectedTrack(null)
+      setSelectedKeyframe(null)
     }
   })
 
@@ -128,12 +166,13 @@ export function DopeSheet(props: DopeSheetProps) {
     newFrame: number,
   ) {
     timeline.moveKeyframe(path, oldFrame, newFrame)
-    setSelectedKeyframe({ path, frame: newFrame })
+    selectKeyframe(path, newFrame)
   }
 
+  // Target the current TRACK (not just a clicked keyframe): picking a lane is
+  // enough to aim keyboard inserts (I) and the sidebar highlight at it.
   createEffect(() => {
-    const sel = selectedKeyframe()
-    const path = sel?.path ?? null
+    const path = selectedTrack()
     setTargetedParameter(path)
     setSelectedKeyframePath(path)
   })
@@ -203,68 +242,23 @@ export function DopeSheet(props: DopeSheetProps) {
 
   return (
     <div class={ui.container} ref={containerRef} data-tour-target="dope-sheet">
-      {/* ── Zoom toolbar ── */}
-      <div class={ui.zoomToolbar}>
-        <button
-          class={ui.zoomBtn}
-          onClick={() => {
-            setZoomLevel(Math.max(0.1, zoomLevel() - 0.2))
-          }}
-          title="Zoom out (condense)"
-        >
-          −
-        </button>
-        <span class={ui.zoomLabel}>{Math.round(zoomLevel() * 100)}%</span>
-        <button
-          class={ui.zoomBtn}
-          onClick={() => {
-            setZoomLevel(Math.min(5, zoomLevel() + 0.2))
-          }}
-          title="Zoom in (expand)"
-        >
-          +
-        </button>
-        <button
-          class={ui.zoomBtn}
-          onClick={autoFitZoom}
-          title="Auto-fit all frames"
-        >
-          Fit
-        </button>
-        <button
-          class={`${ui.zoomBtn} ${seekOnSelect() ? ui.zoomBtnActive : ''}`}
-          onClick={() => setSeekOnSelect((v) => !v)}
-          title="Seek playhead to selected keyframe"
-        >
-          Seek
-        </button>
-        <button
-          class={`${ui.zoomBtn} ${showCurve() ? ui.zoomBtnActive : ''}`}
-          onClick={() => setShowCurve((v) => !v)}
-          title="Show the value curve for the selected parameter"
-        >
-          Curve
-        </button>
-        <span class={ui.zoomHint}>(Alt+wheel or pinch to zoom)</span>
-        <span class={ui.frameIndicator}>Frame {currentFrame()}</span>
-      </div>
+      {/* ── Keyframe inspector (only while a keyframe is selected) ── */}
+      <Show when={selectedKeyframe()}>
+        <KeyframeInspector selectedKeyframe={selectedKeyframe()} />
+      </Show>
 
-      <KeyframeInspector selectedKeyframe={selectedKeyframe()} />
-
-      {/* ── Curve editor (selected parameter) ── */}
-      <Show when={showCurve()}>
+      {/* ── Curve editor (selected track) ── */}
+      <Show when={props.showCurve}>
         <CurveEditor
-          path={selectedKeyframe()?.path ?? null}
+          path={selectedTrack()}
           label={curveLabel()}
           selectedFrame={selectedKeyframe()?.frame ?? null}
-          onSelectKeyframe={(path, frame) =>
-            setSelectedKeyframe({ path, frame })
-          }
+          onSelectKeyframe={selectKeyframe}
           onContextMenu={handleContextMenu}
           frameWidth={frameWidth()}
           startFrame={timeline.config().startFrame}
           endFrame={timeline.config().endFrame}
-          trackNameWidth={TRACK_NAME_WIDTH}
+          trackNameWidth={trackNameWidth()}
           scrollLeft={scrollLeft()}
         />
       </Show>
@@ -273,7 +267,7 @@ export function DopeSheet(props: DopeSheetProps) {
       <div class={ui.seekRuler} ref={seekRulerRef}>
         <div
           style={{
-            width: `${TRACK_NAME_WIDTH}px`,
+            width: `${trackNameWidth()}px`,
             'flex-shrink': '0',
           }}
         />
@@ -329,17 +323,18 @@ export function DopeSheet(props: DopeSheetProps) {
         endFrame={timeline.config().endFrame}
         currentFrame={currentFrame()}
         selectedKeyframe={selectedKeyframe()}
+        selectedTrack={selectedTrack()}
         onSelectKeyframe={(path, frame) => {
-          setSelectedKeyframe({ path, frame })
-          if (seekOnSelect() && frame !== currentFrame()) {
+          selectKeyframe(path, frame)
+          if (props.seekOnSelect && frame !== currentFrame()) {
             timeline.goToFrame(frame)
           }
         }}
+        onSelectTrack={selectTrack}
         onDragKeyframe={handleDragKeyframe}
         onContextMenu={handleContextMenu}
         onTrackContextMenu={handleTrackContextMenu}
-        onDeselectKeyframe={() => setSelectedKeyframe(null)}
-        trackNameWidth={TRACK_NAME_WIDTH}
+        trackNameWidth={trackNameWidth()}
       />
 
       {/* ── Context menu ── */}

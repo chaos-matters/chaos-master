@@ -66,8 +66,101 @@
 .headerRight {
   display: flex;
   align-items: center;
-  gap: 3px;
+  gap: 6px;
   margin-left: auto;
+}
+
+/* ── Header aisles ──
+   Related controls cluster into bordered groups so the single-row header
+   reads as playback | settings | view | keying at a glance. */
+.headerGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 8px;
+  border-left: 1px solid var(--neutral-200);
+
+  [data-theme='dark'] & {
+    border-left-color: var(--neutral-800);
+  }
+}
+
+.headerGroupLabel {
+  font-size: 0.5rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--neutral-400);
+  user-select: none;
+  margin-right: 2px;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-600);
+  }
+}
+
+/* ── View controls (zoom / fit / seek / curve) ── */
+.viewBtn {
+  padding: 2px 7px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  border: 1px solid var(--neutral-300);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--neutral-500);
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  transition: all 0.15s;
+  height: 22px;
+  line-height: 1;
+
+  [data-theme='dark'] & {
+    border-color: var(--neutral-700);
+    color: var(--neutral-400);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  &:hover:not(:disabled) {
+    background: var(--accent-color, #3b82f6);
+    border-color: var(--accent-color, #3b82f6);
+    color: white;
+
+    [data-theme='dark'] & {
+      background: var(--accent-color, #3b82f6);
+      border-color: var(--accent-color, #3b82f6);
+      color: white;
+    }
+  }
+}
+
+.viewBtnActive {
+  background: var(--accent-color, #3b82f6);
+  border-color: var(--accent-color, #3b82f6);
+  color: white;
+
+  [data-theme='dark'] & {
+    background: var(--accent-color, #3b82f6);
+    border-color: var(--accent-color, #3b82f6);
+    color: white;
+  }
+}
+
+.zoomLabel {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--neutral-500);
+  font-variant-numeric: tabular-nums;
+  min-width: 30px;
+  text-align: center;
+  user-select: none;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-400);
+  }
 }
 
 .playDot {
@@ -458,7 +551,6 @@
 
 /* ── Content ── */
 .content {
-  padding: 0 4px 4px 4px;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -501,8 +593,13 @@
     gap: 2px 4px;
   }
 
-  .content {
-    padding: 2px;
+  .headerGroup {
+    padding-left: 6px;
+  }
+
+  .viewBtn {
+    padding: 4px 8px;
+    min-height: 26px;
   }
 
   .shortcutHint {
@@ -524,6 +621,24 @@
 @media (max-width: 480px) {
   .header {
     min-height: 28px;
+  }
+
+  /* The aisles wrap into several short rows here; the labels and borders
+     stop reading as columns, so drop them for space. */
+  .headerGroupLabel {
+    display: none;
+  }
+
+  .headerGroup {
+    padding-left: 4px;
+    border-left: none;
+  }
+
+  .viewBtn {
+    padding: 2px 6px;
+    font-size: 0.55rem;
+    height: 20px;
+    min-height: 0;
   }
 
   .settingsBar {
