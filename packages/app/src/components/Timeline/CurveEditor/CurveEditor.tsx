@@ -262,7 +262,9 @@ export function CurveEditor(props: CurveEditorProps) {
       <Show
         when={props.path}
         fallback={
-          <div class={ui.placeholder}>Select a keyframe to edit its curve</div>
+          <div class={ui.placeholder}>
+            Click a track or keyframe to see its curve
+          </div>
         }
       >
         <Show

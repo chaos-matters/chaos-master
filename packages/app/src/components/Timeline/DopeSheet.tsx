@@ -66,7 +66,7 @@ export function DopeSheet(props: DopeSheetProps) {
   const [scrollLeft, setScrollLeft] = createSignal(0)
 
   const curveLabel = () => {
-    const p = selectedKeyframe()?.path
+    const p = selectedTrack()
     if (!p) return null
     return props.formatTrackLabel ? props.formatTrackLabel(p) : pathLabel(p)
   }
@@ -103,11 +103,37 @@ export function DopeSheet(props: DopeSheetProps) {
     path: string
     frame: number
   } | null>(null)
+  // The "current" track: set by clicking a lane/name OR a keyframe. Drives
+  // the curve editor's graphed parameter and keyboard targeting (I inserts),
+  // so a parameter can be inspected without hunting for a diamond to click.
+  const [selectedTrack, setSelectedTrack] = createSignal<string | null>(null)
+
+  function selectKeyframe(path: string, frame: number) {
+    setSelectedTrack(path)
+    setSelectedKeyframe({ path, frame })
+  }
+
+  /** Lane/name click: make the track current without selecting a keyframe
+   *  (the inspector row stays hidden; an open curve editor retargets). */
+  function selectTrack(path: string) {
+    setSelectedTrack(path)
+    setSelectedKeyframe(null)
+  }
 
   createEffect(() => {
     const added = timeline.lastAddedKeyframe()
     if (added) {
-      setSelectedKeyframe(added)
+      selectKeyframe(added.path, added.frame)
+    }
+  })
+
+  // Drop a selection whose track was removed (track context menu, orphan
+  // cleanup, loading another flame) so the curve editor can't graph a ghost.
+  createEffect(() => {
+    const path = selectedTrack()
+    if (path && !timeline.tracks().some((t) => t.parameterPath === path)) {
+      setSelectedTrack(null)
+      setSelectedKeyframe(null)
     }
   })
 
@@ -140,12 +166,13 @@ export function DopeSheet(props: DopeSheetProps) {
     newFrame: number,
   ) {
     timeline.moveKeyframe(path, oldFrame, newFrame)
-    setSelectedKeyframe({ path, frame: newFrame })
+    selectKeyframe(path, newFrame)
   }
 
+  // Target the current TRACK (not just a clicked keyframe): picking a lane is
+  // enough to aim keyboard inserts (I) and the sidebar highlight at it.
   createEffect(() => {
-    const sel = selectedKeyframe()
-    const path = sel?.path ?? null
+    const path = selectedTrack()
     setTargetedParameter(path)
     setSelectedKeyframePath(path)
   })
@@ -220,15 +247,13 @@ export function DopeSheet(props: DopeSheetProps) {
         <KeyframeInspector selectedKeyframe={selectedKeyframe()} />
       </Show>
 
-      {/* ── Curve editor (selected parameter) ── */}
+      {/* ── Curve editor (selected track) ── */}
       <Show when={props.showCurve}>
         <CurveEditor
-          path={selectedKeyframe()?.path ?? null}
+          path={selectedTrack()}
           label={curveLabel()}
           selectedFrame={selectedKeyframe()?.frame ?? null}
-          onSelectKeyframe={(path, frame) =>
-            setSelectedKeyframe({ path, frame })
-          }
+          onSelectKeyframe={selectKeyframe}
           onContextMenu={handleContextMenu}
           frameWidth={frameWidth()}
           startFrame={timeline.config().startFrame}
@@ -298,16 +323,17 @@ export function DopeSheet(props: DopeSheetProps) {
         endFrame={timeline.config().endFrame}
         currentFrame={currentFrame()}
         selectedKeyframe={selectedKeyframe()}
+        selectedTrack={selectedTrack()}
         onSelectKeyframe={(path, frame) => {
-          setSelectedKeyframe({ path, frame })
+          selectKeyframe(path, frame)
           if (props.seekOnSelect && frame !== currentFrame()) {
             timeline.goToFrame(frame)
           }
         }}
+        onSelectTrack={selectTrack}
         onDragKeyframe={handleDragKeyframe}
         onContextMenu={handleContextMenu}
         onTrackContextMenu={handleTrackContextMenu}
-        onDeselectKeyframe={() => setSelectedKeyframe(null)}
         trackNameWidth={trackNameWidth()}
       />
 

@@ -160,11 +160,32 @@
   }
 }
 
+/* The current track (curve target / keyboard target): accent bar + tinted
+   name, subtle enough not to fight the keyframe/playhead colors. */
+.trackRowSelected {
+  background: color-mix(in srgb, var(--accent-color, #3b82f6) 7%, transparent);
+
+  &:nth-child(even),
+  &:hover {
+    background: color-mix(
+      in srgb,
+      var(--accent-color, #3b82f6) 10%,
+      transparent
+    );
+  }
+
+  .trackName {
+    color: var(--accent-color, #3b82f6);
+    box-shadow: inset 2px 0 0 var(--accent-color, #3b82f6);
+  }
+}
+
 /* Width comes from the trackNameWidth inline style (useTrackNameWidth), the
    same value used for the ruler spacer / playhead offset / curve gutter —
    never set it here or the lanes shift against the ruler. */
 .trackName {
   flex-shrink: 0;
+  cursor: pointer;
   padding: 1px 8px;
   font-size: 10px;
   font-weight: 500;

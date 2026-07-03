@@ -20,6 +20,21 @@ curve value-axis zoom, and live keyframing for affine/color handle drags.
   clamped to [1e-6, 1e9]). `stopPropagation` keeps the workspace's Ctrl+wheel
   panel-resize from firing on the same gesture; Alt+wheel (frame zoom) and
   plain wheel (scroll) are untouched.
+- **Track selection** (`DopeSheet.tsx`): a `selectedTrack` signal lives
+  alongside `selectedKeyframe` — lane/name clicks select the track only
+  (clearing the keyframe selection, so the inspector stays hidden), diamond
+  clicks select both, and `lastAddedKeyframe`/keyframe drags keep them in
+  sync. The curve editor graphs `selectedTrack` (its selected-node highlight
+  still keys off `selectedKeyframe`), and the keyboard-target effect
+  (`setTargetedParameter`/`setSelectedKeyframePath`) follows the track, so a
+  lane click aims the I-insert shortcut. A guard effect drops selections
+  whose track was removed (context-menu delete, orphan cleanup, flame load).
+  The current row is styled via `.trackRowSelected` (accent inset bar +
+  tinted name + row wash, overriding the even-row/hover backgrounds).
+- **About-panel changelog parser** (`Changelog.tsx`) folds hard-wrapped
+  bullet continuation lines into the previous item — it used to keep only
+  the first line of each `- ` bullet. The user-facing 0.9.3–0.9.5 entries
+  were also condensed to outcome-level highlights; the detail lives here.
 
 ### Changed
 
@@ -35,9 +50,9 @@ curve value-axis zoom, and live keyframing for affine/color handle drags.
   collapsed timeline hides the View group. `KeyframeInspector` renders only
   while a keyframe is selected instead of holding an empty 32px placeholder
   row. The dope sheet container lost its floating-card chrome (8px top radius
-  - 1px border) and the `.content` wrapper its 4px inset, so the sheet joins
-    the header seamlessly and spans the panel edge-to-edge. All
-    `data-testid`/`data-tour-target` hooks preserved.
+  and 1px border) and the `.content` wrapper its 4px inset, so the sheet
+  joins the header seamlessly and spans the panel edge-to-edge. All
+  `data-testid`/`data-tour-target` hooks preserved.
 - **Affine/color drags keyframe per pointer-move** (`AffineEditor.tsx`,
   `FlameColorEditor.tsx`): handle drags now call `keyframeEditedParams` after
   every `setTransform`/`setColor` — the same contract as the sliders (Auto
@@ -60,9 +75,10 @@ curve value-axis zoom, and live keyframing for affine/color handle drags.
   handle driving `containerHeight`) let the browser clamp each `scrollLeft`
   independently — shifting the ruler arrowhead off the tracks playhead until a
   Fit/zoom-out reset both. A new effect re-anchors on every `frameWidth`
-  change: the frame at the lane's left edge is kept stable (`scrollLeft *
-ratio`) and the same value — clamped to the smaller of the two scroll
-  ranges — is written to both panes; the ruler wrapper's own scroll is pinned
+  change: the frame at the lane's left edge is kept stable (scrollLeft scales
+  by the width ratio) and the same value — clamped to the smaller of the two
+  scroll ranges — is written to both panes; the ruler wrapper's own scroll is
+  pinned
   to 0. `useScrollSync` swaps its broken re-entrancy flag (programmatic
   scrolls fire their events asynchronously, so the flag never covered the
   echo) for idempotent value-guarded writes.
@@ -73,6 +89,8 @@ ratio`) and the same value — clamped to the smaller of the two scroll
   the ruler's frame axis on tablets. The width is now a single reactive
   `matchMedia` signal consumed by the cells and all offset math; the CSS
   media-query width overrides are gone.
+
+## [0.9.5] - 2026-07-02
 
 Undo/redo overhaul, driven by a full audit of both undo systems (flame
 change-history + timeline snapshots). Each area landed as its own commit with
