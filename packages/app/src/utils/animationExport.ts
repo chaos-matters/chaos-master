@@ -1,11 +1,14 @@
 import { DEBUG_MODE } from '@/defaults'
 import { accumulatedPointCount, forceAnimationExportNow, qualityPointCountLimit, setAnimationExportCancel, setAnimationExportProgress, setAnimationExportRunning, setExportQuality, setForceAnimationExportNow, } from '@/flame/renderStats'
+import { applyAudioMappingsToFlame, createAudioAnalyzer } from './audioAnalysis'
+import { createAudioVideoEncoder } from './audioExport'
 import { deepClone } from './clone'
 import { createMetadataPayload, injectMetadataIntoMp4 } from './flameInMp4'
 import { formatPointCount } from './formatPointCount'
 import { logTime } from './logTime'
 import { applyTimelineToFlameAtFrame } from './timeline'
 import { createVideoEncoder } from './videoEncoder'
+import type { AudioMappingEntry } from './audioAnalysis'
 import type { FlameDescriptor, TimelineState } from './timeline'
 import type { VideoEncoderConfig } from './videoEncoder'
 
@@ -23,6 +26,10 @@ export type AnimationExportConfig = {
   playCount: number
   codec: VideoEncoderConfig['codec']
   embedMetadata: boolean
+  /** When set, produce an MP4 with a synced AAC audio track (WebCodecs AudioEncoder). */
+  audioBuffer?: AudioBuffer
+  /** Audio-reactive mappings applied per frame (requires audioBuffer). */
+  audioMapping?: AudioMappingEntry[]
 }
 
 function estimatePointCount(
@@ -76,18 +83,34 @@ export function createAnimationExport(
   )
 
   const promise = (async () => {
-    const encoder = await createVideoEncoder({
-      codec: config.codec,
-      width: resizeWidth,
-      height: resizeHeight,
-      fps: config.fps,
-    })
+    const encoder = config.audioBuffer
+      ? await createAudioVideoEncoder(
+          {
+            codec: config.codec,
+            width: resizeWidth,
+            height: resizeHeight,
+            fps: config.fps,
+          },
+          config.audioBuffer,
+          config.fps,
+        )
+      : await createVideoEncoder({
+          codec: config.codec,
+          width: resizeWidth,
+          height: resizeHeight,
+          fps: config.fps,
+        })
 
     if (DEBUG_MODE) {
       console.info(
-        `[AnimationExport ${logTime()}] start: ${totalRenders} frames @ ${config.fps}fps, quality ${config.quality}, ${resizeWidth}x${resizeHeight}, codec ${encoder.codec}${encoder.usedFallback ? ' (MediaRecorder fallback)' : ''}`,
+        `[AnimationExport ${logTime()}] start: ${totalRenders} frames @ ${config.fps}fps, quality ${config.quality}, ${resizeWidth}x${resizeHeight}, codec ${encoder.codec}${encoder.usedFallback ? ' (fallback)' : ''}${config.audioBuffer ? ', +audio' : ''}`,
       )
     }
+
+    const audioAnalyzer =
+      config.audioBuffer && config.audioMapping?.length
+        ? await createAudioAnalyzer(config.audioBuffer, config.fps)
+        : undefined
 
     return new Promise<Blob>((resolve, reject) => {
       let frameIndex = 0
@@ -152,6 +175,13 @@ export function createAnimationExport(
         // Clone flame and apply timeline for this frame
         const flameClone = deepClone(baseFlame)
         applyTimelineToFlameAtFrame(timeline, flameClone, frame)
+
+        // Apply audio-reactive mappings if configured
+        if (audioAnalyzer && config.audioMapping) {
+          const audioFrame = frameIndex % audioAnalyzer.totalFrames
+          const frameData = audioAnalyzer.getFrameData(audioFrame)
+          applyAudioMappingsToFlame(flameClone, frameData, config.audioMapping)
+        }
 
         // Set flame descriptor to the per-frame clone so Flam3 picks it up
         setFlameDescriptor((draft) => {

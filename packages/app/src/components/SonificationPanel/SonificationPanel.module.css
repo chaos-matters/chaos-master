@@ -1,0 +1,234 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-card, rgba(255, 255, 255, 0.08));
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text, #e0e0e0);
+}
+
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  color: var(--color-text-muted, #888);
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.closeBtn:hover {
+  background: var(--color-card-hover, rgba(255, 255, 255, 0.08));
+  color: var(--color-text, #e0e0e0);
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* --- Description text --- */
+.description {
+  font-size: 12px;
+  color: var(--color-text-muted, #888);
+  line-height: 1.5;
+}
+
+/* --- Section label --- */
+.sectionLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+/* --- Model selector --- */
+.modelRow {
+  display: flex;
+  gap: 6px;
+}
+
+.modelBtn {
+  flex: 1;
+  font-size: 12px;
+  padding: 8px 6px;
+  border: 1px solid var(--color-card, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
+  background: none;
+  color: var(--color-text-muted, #aaa);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    color 0.15s;
+  text-align: center;
+}
+
+.modelBtn:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--color-text, #e0e0e0);
+}
+
+.modelBtnActive {
+  border-color: var(--color-accent, #7c6ff7);
+  background: rgba(124, 111, 247, 0.12);
+  color: var(--color-accent, #b5a9ff);
+}
+
+.modelLabel {
+  display: block;
+  font-weight: 600;
+}
+
+.modelDesc {
+  display: block;
+  font-size: 10px;
+  opacity: 0.6;
+  margin-top: 2px;
+}
+
+/* --- Scale selector --- */
+.scaleRow {
+  display: flex;
+  gap: 6px;
+}
+
+.scaleBtn {
+  flex: 1;
+  font-size: 11px;
+  padding: 5px 8px;
+  border: 1px solid var(--color-card, rgba(255, 255, 255, 0.12));
+  border-radius: 5px;
+  background: none;
+  color: var(--color-text-muted, #aaa);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    color 0.15s;
+}
+
+.scaleBtn:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--color-text, #e0e0e0);
+}
+
+.scaleBtnActive {
+  border-color: var(--color-accent, #7c6ff7);
+  background: rgba(124, 111, 247, 0.1);
+  color: var(--color-accent, #b5a9ff);
+}
+
+/* --- Slider controls --- */
+.sliderGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sliderHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sliderLabel {
+  font-size: 12px;
+  color: var(--color-text, #d0d0d0);
+}
+
+.sliderValue {
+  font-size: 11px;
+  color: var(--color-text-muted, #888);
+  min-width: 32px;
+  text-align: right;
+}
+
+.sliderInput {
+  width: 100%;
+  accent-color: var(--color-accent, #7c6ff7);
+}
+
+/* --- Bottom bar --- */
+.bottomBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-top: 1px solid var(--color-card, rgba(255, 255, 255, 0.08));
+  flex-shrink: 0;
+}
+
+.enableToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text, #e0e0e0);
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggleSwitch {
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s;
+  background: rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+}
+
+.toggleSwitchOn {
+  background: var(--color-accent, #7c6ff7);
+}
+
+.toggleKnob {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  transition: transform 0.2s;
+}
+
+.toggleSwitchOn .toggleKnob {
+  transform: translateX(16px);
+}
+
+/* --- Model descriptions --- */
+.modelInfo {
+  font-size: 11px;
+  color: var(--color-text-muted, #777);
+  line-height: 1.4;
+  padding: 8px 10px;
+  background: var(--color-card, rgba(255, 255, 255, 0.04));
+  border-radius: 6px;
+  border-left: 3px solid var(--color-accent, #7c6ff7);
+}

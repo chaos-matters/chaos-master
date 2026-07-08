@@ -1,0 +1,1159 @@
+/* ===== Full-screen overlay ===== */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.92);
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ===== Header bar ===== */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.headerTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text, #e0e0e0);
+  letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.headerWireCount {
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--color-accent, #7c6ff7);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.presetRow {
+  display: flex;
+  gap: 4px;
+  margin-left: 16px;
+}
+
+.presetBtn {
+  font-size: 12px;
+  font-family: inherit;
+  padding: 5px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: none;
+  color: var(--color-text-muted, #888);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    color 0.15s;
+}
+
+.presetBtn:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--color-text, #e0e0e0);
+}
+
+.presetBtnActive {
+  border-color: var(--color-accent, #7c6ff7);
+  background: rgba(124, 111, 247, 0.12);
+  color: var(--color-accent, #b5a9ff);
+}
+
+.headerSpacer {
+  flex: 1;
+}
+
+.undoBtn {
+  font-size: 12px;
+  font-family: inherit;
+  padding: 5px 14px;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+  margin-right: 8px;
+}
+
+.undoBtn:hover {
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.randomBtn {
+  font-size: 12px;
+  font-family: inherit;
+  padding: 5px 14px;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 6px;
+  background: rgba(16, 185, 129, 0.08);
+  color: #10b981;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+  margin-right: 8px;
+}
+
+.randomBtn:hover {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
+.randomBtn:active {
+  background: rgba(16, 185, 129, 0.25);
+}
+
+.closeBtn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: none;
+  color: var(--color-text-muted, #888);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.closeBtn:hover {
+  background: rgba(255, 80, 80, 0.15);
+  color: #ff5a5a;
+}
+
+/* ===== Main two-column layout ===== */
+
+.main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ===== Source column (left) ===== */
+
+.sourcesColumn {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  overflow-y: auto;
+  padding: 16px 12px;
+}
+
+.columnLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted, #666);
+  margin-bottom: 10px;
+  padding-left: 4px;
+}
+
+.sourceGroup {
+  margin-bottom: 14px;
+}
+
+.sourceGroupLabel {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted, #555);
+  margin-bottom: 6px;
+  padding-left: 4px;
+}
+
+/* ===== Source node card ===== */
+
+.sourceCard {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+  margin-bottom: 4px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+  position: relative;
+}
+
+.sourceCard:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.sourceCardActive {
+  background: rgba(124, 111, 247, 0.1);
+  border-color: rgba(124, 111, 247, 0.3);
+}
+
+.sourceColorBar {
+  width: 3px;
+  height: 18px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.sourceName {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text, #d0d0d0);
+  flex: 1;
+  min-width: 0;
+}
+
+.sourceMeter {
+  width: 28px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 3px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sourceMeterFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.05s linear;
+}
+
+/* ===== Port circle ===== */
+
+.portWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.sourceBadge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  pointer-events: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.port {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.05);
+  cursor: grab;
+  flex-shrink: 0;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    transform 0.15s;
+}
+
+.port:active {
+  cursor: grabbing;
+}
+
+.port:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(1.15);
+}
+
+.port:focus-visible {
+  outline: 2px solid var(--color-accent, #7c6ff7);
+  outline-offset: 3px;
+}
+
+.portActive {
+  border-color: var(--color-accent, #7c6ff7);
+  background: var(--color-accent, #7c6ff7);
+}
+
+.portConnecting {
+  border-color: var(--color-accent, #7c6ff7);
+  background: var(--color-accent, #7c6ff7);
+  animation: portPulse 0.8s ease-in-out infinite;
+}
+
+.portDropTarget {
+  border-color: var(--color-accent, #7c6ff7);
+  background: rgba(124, 111, 247, 0.25);
+  transform: scale(1.25);
+  box-shadow: 0 0 8px rgba(124, 111, 247, 0.5);
+}
+
+.portHighlighted {
+  border-color: var(--color-accent, #7c6ff7);
+  background: rgba(124, 111, 247, 0.3);
+  box-shadow: 0 0 6px rgba(124, 111, 247, 0.4);
+}
+
+.sourceCardHighlighted {
+  border-color: rgba(124, 111, 247, 0.3);
+  background: rgba(124, 111, 247, 0.08);
+}
+
+@keyframes portPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(124, 111, 247, 0.4);
+  }
+  50% {
+    transform: scale(1.2);
+    box-shadow: 0 0 0 4px rgba(124, 111, 247, 0);
+  }
+}
+
+/* ===== Target column (right) ===== */
+
+.targetsColumn {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 16px 20px;
+  gap: 12px;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text, #d0d0d0);
+  font-size: 12px;
+  outline: none;
+  margin-bottom: 2px;
+}
+
+.searchInput::placeholder {
+  color: var(--color-text-muted, #666);
+}
+
+.searchInput:focus {
+  border-color: rgba(124, 111, 247, 0.4);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.expandRow {
+  display: flex;
+  gap: 6px;
+}
+
+.expandBtn {
+  padding: 3px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text-muted, #888);
+  font-size: 11px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.expandBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text, #d0d0d0);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ===== Target group section ===== */
+
+.targetGroup {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.targetGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.targetGroupHeader:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.targetGroupArrow {
+  font-size: 10px;
+  color: var(--color-text-muted, #666);
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+
+.targetGroupArrowOpen {
+  transform: rotate(90deg);
+}
+
+.targetGroupTitle {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted, #888);
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.groupConnCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(124, 111, 247, 0.15);
+  color: var(--color-accent, #b5a9ff);
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.copyBtn,
+.pasteBtn {
+  font-size: 10px;
+  font-family: inherit;
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text-muted, #888);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.copyBtn:hover {
+  background: rgba(124, 111, 247, 0.12);
+  color: var(--color-accent, #b5a9ff);
+  border-color: rgba(124, 111, 247, 0.3);
+}
+
+.pasteBtn:hover {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.pasteBtnConfirm {
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  animation: pastePulse 1s ease-in-out infinite;
+}
+
+.pasteBtnConfirm:hover {
+  background: rgba(245, 158, 11, 0.22);
+  border-color: rgba(245, 158, 11, 0.7);
+  color: #fbbf24;
+}
+
+@keyframes pastePulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0);
+  }
+}
+
+.targetGroupContent {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 3px;
+  padding: 4px 6px;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===== Target cell (grid item) ===== */
+
+.targetCell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  transition: background 0.15s;
+  min-width: 0;
+  position: relative;
+}
+
+.targetCell:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.targetCellConnected {
+  background: rgba(124, 111, 247, 0.08);
+}
+
+.targetPort {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  cursor: grab;
+  flex-shrink: 0;
+  transition:
+    border-color 0.15s,
+    background 0.15s,
+    transform 0.15s;
+}
+
+.targetPort:active {
+  cursor: grabbing;
+}
+
+.targetPort:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: scale(1.2);
+}
+
+.targetPort:focus-visible {
+  outline: 2px solid var(--color-accent, #7c6ff7);
+  outline-offset: 3px;
+}
+
+.targetPortActive {
+  border-color: var(--color-accent, #7c6ff7);
+  background: var(--color-accent, #7c6ff7);
+}
+
+.targetPortConnecting {
+  border-color: var(--color-accent, #7c6ff7);
+  background: var(--color-accent, #7c6ff7);
+  animation: portPulse 0.8s ease-in-out infinite;
+}
+
+.targetPortDropTarget {
+  border-color: var(--color-accent, #7c6ff7);
+  transform: scale(1.25);
+  box-shadow: 0 0 8px rgba(124, 111, 247, 0.5);
+}
+
+.targetPortHighlighted {
+  border-color: var(--color-accent, #7c6ff7);
+  background: rgba(124, 111, 247, 0.3);
+  box-shadow: 0 0 6px rgba(124, 111, 247, 0.4);
+}
+
+.targetArrow {
+  font-size: 10px;
+  color: var(--color-text-muted, #555);
+  flex-shrink: 0;
+  width: 12px;
+  text-align: center;
+}
+
+.targetName {
+  font-size: 11px;
+  color: var(--color-text-muted, #aaa);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.targetNameConnected {
+  color: var(--color-text, #d0d0d0);
+}
+
+.targetSourceBadge {
+  font-size: 8px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(124, 111, 247, 0.15);
+  color: var(--color-accent, #b5a9ff);
+  white-space: nowrap;
+  flex-shrink: 0;
+  max-width: 40px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===== Sub-section labels within transform groups ===== */
+
+.subSectionLabel {
+  grid-column: 1 / -1;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted, #555);
+  padding: 6px 6px 2px;
+  margin-top: 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.subSectionLabel:first-child {
+  border-top: none;
+  margin-top: 0;
+}
+
+/* ===== Compact affine block ===== */
+
+.affineBlock {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(75px, 1fr));
+  gap: 3px;
+  margin: 2px 0 4px;
+  padding: 0 2px;
+}
+
+.affineCell {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: background 0.15s;
+  min-width: 0;
+}
+
+.affineCell:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.affineCellConnected {
+  background: rgba(124, 111, 247, 0.08);
+}
+
+.affineCellLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-muted, #777);
+  flex-shrink: 0;
+  min-width: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.affineCellPort {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  cursor: grab;
+  flex-shrink: 0;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.affineCellPort:active {
+  cursor: grabbing;
+}
+
+.affineCellPort:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.affineCellPort:focus-visible {
+  outline: 2px solid var(--color-accent, #7c6ff7);
+  outline-offset: 3px;
+}
+
+.affineCellPortActive {
+  border-color: var(--color-accent, #7c6ff7);
+  background: var(--color-accent, #7c6ff7);
+}
+
+.affineCellPortConnecting {
+  border-color: var(--color-accent, #7c6ff7);
+  background: var(--color-accent, #7c6ff7);
+  animation: portPulse 0.8s ease-in-out infinite;
+}
+
+.affineCellPortDropTarget {
+  border-color: var(--color-accent, #7c6ff7);
+  transform: scale(1.25);
+  box-shadow: 0 0 8px rgba(124, 111, 247, 0.5);
+}
+
+.affineCellPortHighlighted {
+  border-color: var(--color-accent, #7c6ff7);
+  background: rgba(124, 111, 247, 0.3);
+  box-shadow: 0 0 6px rgba(124, 111, 247, 0.4);
+}
+
+.affineCellBadge {
+  font-size: 7px;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 2px;
+  background: rgba(124, 111, 247, 0.15);
+  color: var(--color-accent, #b5a9ff);
+  white-space: nowrap;
+  flex-shrink: 0;
+  max-width: 32px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===== SVG wire overlay ===== */
+
+.wireSvg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+  overflow: visible;
+}
+
+.wirePath {
+  fill: none;
+  stroke-width: 2;
+  pointer-events: stroke;
+  cursor: pointer;
+  transition: stroke-width 0.15s;
+  stroke-dasharray: 10 6;
+  animation: wireFlow 1.5s linear infinite;
+}
+
+@keyframes wireFlow {
+  to {
+    stroke-dashoffset: -32;
+  }
+}
+
+.wirePath:hover {
+  stroke-width: 3.5;
+}
+
+.wirePathSelected {
+  stroke-width: 3;
+  stroke-dasharray: none;
+  animation: none;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+.wirePathSelected:hover {
+  stroke: #ef4444;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 6px #ef4444);
+  cursor: pointer;
+}
+
+.wirePreview {
+  fill: none;
+  stroke: rgba(124, 111, 247, 0.5);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  animation: none;
+  pointer-events: none;
+}
+
+/* ===== Bottom parameter panel ===== */
+
+.paramsPanel {
+  flex-shrink: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 12px 20px;
+}
+
+.paramsPanelEmpty {
+  padding: 10px 20px;
+  text-align: center;
+}
+
+.paramsPanelHint {
+  font-size: 11px;
+  color: var(--color-text-muted, #555);
+}
+
+.paramsTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text, #e0e0e0);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.paramsTitleSource {
+  color: var(--color-accent, #b5a9ff);
+}
+
+.paramsTitleArrow {
+  color: var(--color-text-muted, #666);
+}
+
+.paramsTitleTarget {
+  color: var(--color-text, #d0d0d0);
+}
+
+.paramsFields {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.paramsField {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.paramsLabel {
+  font-size: 11px;
+  color: var(--color-text-muted, #888);
+  white-space: nowrap;
+}
+
+.paramsValue {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text, #d0d0d0);
+  min-width: 28px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.paramsSlider {
+  width: 80px;
+  accent-color: var(--color-accent, #7c6ff7);
+}
+
+.paramsRangeSlider {
+  width: 100px;
+  accent-color: var(--color-accent, #7c6ff7);
+}
+
+.paramsRangeInputs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.paramsRangeInput {
+  width: 48px;
+  font-size: 11px;
+  padding: 3px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text, #d0d0d0);
+  font-family: inherit;
+  text-align: center;
+}
+
+.paramsRangeInput:focus {
+  outline: none;
+  border-color: var(--color-accent, #7c6ff7);
+}
+
+.paramsRangeDash {
+  color: var(--color-text-muted, #555);
+  font-size: 10px;
+}
+
+.paramsDeleteBtn {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 4px 12px;
+  border: 1px solid rgba(255, 80, 80, 0.3);
+  border-radius: 5px;
+  background: none;
+  color: #ff5a5a;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.paramsDeleteBtn:hover {
+  background: rgba(255, 80, 80, 0.12);
+  border-color: rgba(255, 80, 80, 0.5);
+}
+
+/* ===== Connecting state message ===== */
+
+.connectingBanner {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 20px;
+  border-radius: 8px;
+  background: rgba(124, 111, 247, 0.9);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 30;
+  pointer-events: none;
+  animation: fadeSlideUp 0.15s ease;
+  white-space: nowrap;
+}
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.replaceToast {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 16px;
+  border-radius: 6px;
+  background: rgba(245, 158, 11, 0.9);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  z-index: 31;
+  pointer-events: none;
+  animation: toastInOut 2.5s ease forwards;
+  white-space: nowrap;
+}
+
+@keyframes toastInOut {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+  10% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  80% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+  }
+}
+
+/* ===== Empty state ===== */
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px;
+  text-align: center;
+}
+
+.emptyStateIcon {
+  font-size: 28px;
+  opacity: 0.4;
+}
+
+.emptyStateText {
+  font-size: 13px;
+  color: var(--color-text-muted, #666);
+  max-width: 320px;
+  line-height: 1.5;
+}
+
+/* ===== Responsive: stack vertically on narrow screens ===== */
+
+@media (max-width: 800px) {
+  .main {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .sourcesColumn {
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    overflow-y: visible;
+    padding: 10px 12px;
+  }
+
+  .columnLabel {
+    width: 100%;
+    margin-bottom: 0;
+  }
+
+  .sourceGroup {
+    margin-bottom: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .sourceGroupLabel {
+    width: 100%;
+    margin-bottom: 2px;
+  }
+
+  .sourceCard {
+    margin-bottom: 0;
+  }
+
+  .targetsColumn {
+    padding: 12px;
+  }
+
+  .targetGroupContent {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+
+  .affineBlock {
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  }
+}
+
+/* ===== View mode toggle ===== */
+
+.viewToggleRow {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.viewToggleBtn {
+  font-size: 11px;
+  font-family: inherit;
+  font-weight: 600;
+  padding: 4px 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: none;
+  color: var(--color-text-muted, #666);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.viewToggleBtn:first-child {
+  border-radius: 5px 0 0 5px;
+}
+
+.viewToggleBtn:last-child {
+  border-radius: 0 5px 5px 0;
+  border-left: none;
+}
+
+.viewToggleBtn:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text, #d0d0d0);
+}
+
+.viewToggleBtnActive {
+  border-color: var(--color-accent, #7c6ff7);
+  background: rgba(124, 111, 247, 0.15);
+  color: var(--color-accent, #b5a9ff);
+}
+
+.viewToggleBtnActive:hover {
+  background: rgba(124, 111, 247, 0.22);
+  color: var(--color-accent, #b5a9ff);
+}
+
+/* ===== Node graph view container ===== */
+
+.nodeGraphContainer {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}

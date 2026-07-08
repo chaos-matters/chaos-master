@@ -14,6 +14,8 @@ import { createDragHandler } from '@/utils/createDragHandler'
 import { recordEntries, recordKeys } from '@/utils/record'
 import ui from './App.module.css'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
+import { AudioReactivePanel } from './components/AudioReactivePanel/AudioReactivePanel'
+import { BenchmarkButton } from './components/BenchmarkButton/BenchmarkButton'
 import { createShowBenchmark } from './components/BenchmarkModal/BenchmarkModal'
 import { BlendFlameGallery } from './components/BlendFlameGallery/BlendFlameGallery'
 import { Button } from './components/Button/Button'
@@ -54,6 +56,7 @@ import { AngleEditor } from './components/Sliders/ParametricEditors/AngleEditor'
 import { ScrubInput } from './components/Sliders/ScrubInput'
 import { Slider } from './components/Sliders/Slider'
 import { SoftwareVersion } from './components/SoftwareVersion/SoftwareVersion'
+import { SonificationPanel } from './components/SonificationPanel/SonificationPanel'
 import { SpotlightTour } from './components/SpotlightTour/SpotlightTour'
 import { KeyframeDiamond } from './components/Timeline/KeyframeDiamond'
 import { smartRandomAnimation } from './components/Timeline/presets'
@@ -89,6 +92,10 @@ import { BoxArrowRight, Cross, Eye, EyeOff, Menu, Plus, Share, Shuffle, Terminal
 import { AutoCanvas } from './lib/AutoCanvas'
 import { createAnimationExport } from './utils/animationExport'
 import { autosaveIntervalMin, autosaveRecents, saveReminderDismissed, setAutosaveRecents, setSaveReminderDismissed, } from './utils/autosaveSettings'
+import { applyAudioMappingsToFlame, createAudioAnalyzer, } from './utils/audioAnalysis'
+import type { AudioMappingEntry, LiveAudioAnalyzer, } from './utils/audioAnalysis'
+import { useAudioReactive } from './utils/useAudioReactive'
+import { useSonification } from './utils/useSonification'
 import { downloadBlob } from './utils/blob'
 import { deepClone } from './utils/clone'
 import { createStoreHistory } from './utils/createStoreHistory'
@@ -111,6 +118,7 @@ import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
 import type { Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
 import type { Vec3 } from 'wgpu-matrix'
+import type { AudioMapping } from './components/AudioReactivePanel/AudioReactivePanel'
 import type { QualityPreset } from './components/Quality/QualityPresets'
 import type { QuickPickerMode } from './components/QuickVariationPicker/QuickVariationPicker'
 import type { TourContext } from './components/SpotlightTour/tourTypes'
@@ -123,10 +131,12 @@ import type { TransformVariationType } from './flame/variations'
 import type { CustomVariationDef } from './flame/variations/custom/types'
 import type { TransformVariationType3D } from './flame/variations3D'
 import type { AnimationExportConfig } from './utils/animationExport'
+import type { AudioAnalyzer } from './utils/audioAnalysis'
 import type { ExportDimensions } from './utils/exportDimensions'
 import type { HardwareTier } from './utils/hardwareTier'
 import type { SharePayload } from './utils/jsonQueryParam'
 import type { RandomizerHistoryEntry } from './utils/randomizerHistoryDB'
+import type { SonificationConfig } from './utils/sonification'
 import type { EasingCurve, TimelineTrack } from './utils/timeline'
 import type { CommandContext } from '@/commands/types'
 
@@ -603,13 +613,94 @@ export function MainWorkspace(props: AppProps) {
   // onSelect handler.
   const [blendIntent, setBlendIntent] = createSignal<'blend' | 'morph'>('blend')
 
+  // Audio-reactive panel state
+  const [showAudioPanel, setShowAudioPanel] = createSignal(false)
+  const [audioBuffer, setAudioBuffer] = createSignal<AudioBuffer | undefined>(
+    undefined,
+  )
+  const [audioEnabled, setAudioEnabled] = createSignal(false)
+  const [audioMapping, setAudioMapping] = createSignal<AudioMapping>({
+    preset: 'pulse',
+    mappings: [
+      {
+        audioFeature: 'bass',
+        target: { kind: 'renderSetting', param: 'vibrancy' },
+        sensitivity: 1,
+        range: [0.3, 1.5],
+      },
+      {
+        audioFeature: 'beat',
+        target: { kind: 'renderSetting', param: 'palettePhase' },
+        sensitivity: 1,
+        range: [0, 3.14],
+      },
+    ],
+  })
+  const [audioSource, setAudioSource] = createSignal<'file' | 'mic'>('file')
+  const [liveAnalyzer, setLiveAnalyzer] = createSignal<
+    LiveAudioAnalyzer | undefined
+  >(undefined)
+  const [playbackPaused, setPlaybackPaused] = createSignal(false)
+  const [seekTarget, setSeekTarget] = createSignal<number | null>(null)
+  const [playbackTime, setPlaybackTime] = createSignal(0)
+  const [fileAnalyzer, setFileAnalyzer] = createSignal<
+    AudioAnalyzer | undefined
+  >(undefined)
+
+  // Reset playback state when switching between file and mic
+  createEffect(() => {
+    const _src = audioSource()
+    setPlaybackPaused(false)
+    setPlaybackTime(0)
+    setSeekTarget(null)
+  })
+
+  // Derive transform list for audio mapping target selectors
+  const transformInfos = createMemo(() => {
+    const txs = flameDescriptor.transforms
+    return Object.entries(txs).map(([id, tx], i) => {
+      const variations = Object.entries(tx.variations ?? {}).map(
+        ([vid, v]) => ({
+          id: vid,
+          type: (v as { type: string }).type,
+        }),
+      )
+      return {
+        id,
+        index: i,
+        label: `Tx ${i}: ${id.split('_')[0]?.slice(0, 12) ?? id.slice(0, 12)}`,
+        variations,
+      }
+    })
+  })
+
+  // Sonification state
+  const [showSonificationPanel, setShowSonificationPanel] = createSignal(false)
+  const [sonificationEnabled, setSonificationEnabled] = createSignal(false)
+  const [sonificationConfig, setSonificationConfig] =
+    createSignal<SonificationConfig>({
+      model: 'orchestral',
+      volume: 0.3,
+      updateRate: 20,
+      scale: 'pentatonicMajor',
+      voiceCount: 8,
+      harmonicDensity: 1.0,
+      triggerRate: 4,
+      spatialSpread: 0.7,
+      reverbMix: 0.3,
+    })
+
   function pickBlendFlame() {
     setBlendIntent('blend')
+    setShowAudioPanel(false)
+    setShowSonificationPanel(false)
     setShowBlendGallery(true)
   }
 
   function pickMorphFlame() {
     setBlendIntent('morph')
+    setShowAudioPanel(false)
+    setShowSonificationPanel(false)
     setShowBlendGallery(true)
   }
 
@@ -1102,6 +1193,24 @@ export function MainWorkspace(props: AppProps) {
   // Ctrl+Z/Ctrl+Y and the toolbar buttons all route through this.
   const undoRouter = createUndoRouter(history, timeline)
 
+  // Audio-reactive loop: plays audio through AudioContext, drives
+  // renderSettings at 30fps synced to playback time.
+  useAudioReactive(
+    audioEnabled,
+    audioBuffer,
+    audioMapping,
+    setFlameDescriptor,
+    liveAnalyzer,
+    audioSource,
+    playbackPaused,
+    seekTarget,
+    setPlaybackTime,
+    fileAnalyzer,
+  )
+
+  // Sonification loop: synthesizes audio in real-time from flame structure.
+  useSonification(sonificationEnabled, sonificationConfig, flameDescriptor)
+
   /**
    * Capture the current flame as a downscaled PNG for OG link previews.
    *
@@ -1302,6 +1411,8 @@ export function MainWorkspace(props: AppProps) {
       startAnimationExport,
       () => blendFlame(),
       () => resolvedBlendWeight(),
+      () => audioBuffer(),
+      () => audioMapping().mappings,
     )
 
   async function shareToDiscord() {
@@ -3069,6 +3180,16 @@ export function MainWorkspace(props: AppProps) {
                     flyMode={flyMode()}
                     flySpeed={flySpeed[0]()}
                     setFlySpeed={flySpeed[1]}
+                    onAudioReactive={() => {
+                      setShowBlendGallery(false)
+                      setShowSonificationPanel(false)
+                      setShowAudioPanel(true)
+                    }}
+                    onSonification={() => {
+                      setShowBlendGallery(false)
+                      setShowAudioPanel(false)
+                      setShowSonificationPanel(true)
+                    }}
                   />
                 </div>
                 <Show when={showTimeline()}>
@@ -3214,7 +3335,11 @@ export function MainWorkspace(props: AppProps) {
               </Show>
               <div class={ui.sidebarScroll} ref={sidebarScrollRef}>
                 <Show
-                  when={showBlendGallery()}
+                  when={
+                    showBlendGallery() ||
+                    showAudioPanel() ||
+                    showSonificationPanel()
+                  }
                   fallback={
                     <>
                       <Show when={quickPickState()} keyed>
@@ -5039,32 +5164,86 @@ export function MainWorkspace(props: AppProps) {
                     </>
                   }
                 >
-                  <BlendFlameGallery
-                    heading={
-                      blendIntent() === 'morph'
-                        ? 'Pick End Flame'
-                        : 'Pick Blend Flame'
+                  <Show
+                    when={showBlendGallery()}
+                    fallback={
+                      <Show
+                        when={showAudioPanel()}
+                        fallback={
+                          <SonificationPanel
+                            onClose={() => setShowSonificationPanel(false)}
+                            enabled={sonificationEnabled}
+                            onEnabledChange={setSonificationEnabled}
+                            config={sonificationConfig}
+                            onConfigChange={setSonificationConfig}
+                          />
+                        }
+                      >
+                        <AudioReactivePanel
+                          onClose={() => setShowAudioPanel(false)}
+                          audioBuffer={audioBuffer}
+                          onAudioChange={(buf) => {
+                            setAudioBuffer(buf)
+                            setFileAnalyzer(undefined)
+                            if (!buf) {
+                              setAudioEnabled(false)
+                            } else {
+                              // Build shared analyzer in a microtask so the UI updates first
+                              setTimeout(async () => {
+                                setFileAnalyzer(
+                                  await createAudioAnalyzer(buf, 30),
+                                )
+                              }, 30)
+                            }
+                            setPlaybackPaused(false)
+                            setPlaybackTime(0)
+                            setSeekTarget(null)
+                          }}
+                          audioMapping={audioMapping}
+                          onMappingChange={setAudioMapping}
+                          audioEnabled={audioEnabled}
+                          onEnabledChange={setAudioEnabled}
+                          audioSource={audioSource}
+                          onSourceChange={setAudioSource}
+                          liveAnalyzer={liveAnalyzer}
+                          onLiveAnalyzerChange={setLiveAnalyzer}
+                          playbackPaused={playbackPaused}
+                          onPausedChange={setPlaybackPaused}
+                          playbackTime={playbackTime}
+                          onSeek={setSeekTarget}
+                          fileAnalyzer={fileAnalyzer}
+                          transforms={transformInfos()}
+                        />
+                      </Show>
                     }
-                    onSelect={(flame) => {
-                      // The pick supersedes any hover preview — don't let the
-                      // preview restore stomp the selection afterwards.
-                      prevBlendFlame = undefined
-                      blendPreviewActive = false
-                      if (blendIntent() === 'morph') {
-                        setupMorph(flame)
-                      } else {
-                        setBlendFlame(flame)
+                  >
+                    <BlendFlameGallery
+                      heading={
+                        blendIntent() === 'morph'
+                          ? 'Pick End Flame'
+                          : 'Pick Blend Flame'
                       }
-                      setShowBlendGallery(false)
-                    }}
-                    onPreviewBlend={handlePreviewBlend}
-                    onPreviewName={(name) => setHoveredBlendName(name)}
-                    onClose={() => {
-                      handlePreviewBlend(null)
-                      setHoveredBlendName(null)
-                      setShowBlendGallery(false)
-                    }}
-                  />
+                      onSelect={(flame) => {
+                        // The pick supersedes any hover preview — don't let the
+                        // preview restore stomp the selection afterwards.
+                        prevBlendFlame = undefined
+                        blendPreviewActive = false
+                        if (blendIntent() === 'morph') {
+                          setupMorph(flame)
+                        } else {
+                          setBlendFlame(flame)
+                        }
+                        setShowBlendGallery(false)
+                      }}
+                      onPreviewBlend={handlePreviewBlend}
+                      onPreviewName={(name) => setHoveredBlendName(name)}
+                      onClose={() => {
+                        handlePreviewBlend(null)
+                        setHoveredBlendName(null)
+                        setShowBlendGallery(false)
+                      }}
+                    />
+                  </Show>
                 </Show>
               </div>
             </div>

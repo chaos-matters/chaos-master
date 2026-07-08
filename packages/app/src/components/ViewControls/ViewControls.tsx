@@ -49,6 +49,8 @@ type ViewControlProps = {
   onRedo?: () => void
   canUndo?: () => boolean
   canRedo?: () => boolean
+  onAudioReactive?: () => void
+  onSonification?: () => void
 }
 
 export function ViewControls(props: ViewControlProps) {
@@ -296,6 +298,18 @@ export function ViewControls(props: ViewControlProps) {
           title="Morph: animate this flame into another (animated blend)"
         >
           Morph...
+        </Button>
+        <Button
+          onClick={props.onAudioReactive}
+          title="Make the flame dance to music (audio-reactive)"
+        >
+          Audio...
+        </Button>
+        <Button
+          onClick={props.onSonification}
+          title="Hear the fractal — flame structure generates real-time audio"
+        >
+          Sonification...
         </Button>
       </Show>
       {/* Always-visible status badge: flame name + dimension + animation/frame. */}
