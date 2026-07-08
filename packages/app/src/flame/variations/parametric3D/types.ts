@@ -4,7 +4,7 @@ import { structToSchema } from '@/utils/schemaUtil'
 import * as v from '@/valibot'
 import { VariationInfo3D } from '../simple3D/types'
 import type { TgpuFn } from 'typegpu'
-import type { BaseData, Infer, v3f, Vec3f, WgslStruct } from 'typegpu/data'
+import type { BaseData, Infer, InferGPU, v3f, Vec3f, WgslStruct, } from 'typegpu/data'
 import type { VariationCategory } from '../categories'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
 import type { BooleanSchema, OptionalSchema } from '@/valibot'
@@ -82,7 +82,7 @@ export function parametricVariation3D<
   impl: (
     pos: v3f,
     varInfo: Infer<typeof VariationInfo3D>,
-    params: Infer<WgslStruct<T>>,
+    params: InferGPU<WgslStruct<T>>,
   ) => v3f,
   category: VariationCategory = 'general',
 ): ParametricVariation3D<K, T> {

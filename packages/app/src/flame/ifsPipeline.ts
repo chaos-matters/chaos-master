@@ -12,7 +12,7 @@ import { isPointInitMode2D, pointInitModeToImplFn } from './pointInitMode'
 import { createFlameWgsl, extractFlameUniforms } from './transformFunction'
 import { AtomicBucket, BUCKET_FIXED_POINT_MULTIPLIER, BUCKET_SATURATION_COUNT, Point, } from './types'
 import { getCacheVersion } from './variations/custom'
-import type { StorageFlag, TgpuBuffer, TgpuRoot } from 'typegpu'
+import type { StorageFlag, TgpuBuffer, TgpuComputeFn, TgpuRoot } from 'typegpu'
 import type { Vec2f, Vec2u, Vec4f, WgslArray } from 'typegpu/data'
 import type { ColorInitMode } from './colorInitMode'
 import type { PointInitMode, PointInitMode2D } from './pointInitMode'
@@ -46,7 +46,7 @@ const pipelineCache = new Map<
   {
     FlameUniforms: ReturnType<typeof struct>
     bindGroupLayout: ReturnType<typeof tgpu.bindGroupLayout>
-    ifsCompute: ReturnType<ReturnType<typeof tgpu.computeFn>>
+    ifsCompute: TgpuComputeFn
   }
 >()
 
