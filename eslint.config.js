@@ -4,6 +4,7 @@ import { defineConfig } from 'eslint/config'
 import { importX } from 'eslint-plugin-import-x'
 import security from 'eslint-plugin-security'
 import simpleImportSort from 'eslint-plugin-simple-import-sort'
+import typegpu from 'eslint-plugin-typegpu'
 import tseslint from 'typescript-eslint'
 
 export default defineConfig(
@@ -24,6 +25,7 @@ export default defineConfig(
   importX.flatConfigs.typescript,
   eslint.configs.recommended,
   tseslint.configs.strictTypeChecked,
+  typegpu.configs.recommended,
   {
     plugins: {
       'simple-import-sort': simpleImportSort,
