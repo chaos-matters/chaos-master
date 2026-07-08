@@ -253,10 +253,9 @@ export function createIFSPipeline3D(
             finalScreen.y < 0 ||
             finalScreen.x > outputTextureDimensionF.x ||
             finalScreen.y > outputTextureDimensionF.y ||
-            // eslint-disable-next-line eqeqeq -- NaN check in WGSL
-            finalScreen.x != finalScreen.x ||
-            // eslint-disable-next-line eqeqeq -- NaN check in WGSL
-            finalScreen.y != finalScreen.y
+            // NaN check (v !== v is true only for NaN)
+            finalScreen.x !== finalScreen.x ||
+            finalScreen.y !== finalScreen.y
           if (!oob) {
             const screenI = vec2i(finalScreen)
             const pixelIndex = screenI.y * outputTextureDimension.x + screenI.x
@@ -289,10 +288,9 @@ export function createIFSPipeline3D(
             jittered.y < 0 ||
             jittered.x > outputTextureDimensionF.x ||
             jittered.y > outputTextureDimensionF.y ||
-            // eslint-disable-next-line eqeqeq -- NaN check in WGSL
-            jittered.x != jittered.x ||
-            // eslint-disable-next-line eqeqeq -- NaN check in WGSL
-            jittered.y != jittered.y
+            // NaN check (v !== v is true only for NaN)
+            jittered.x !== jittered.x ||
+            jittered.y !== jittered.y
           if (!oob) {
             const screenI = vec2i(jittered)
             const pixelIndex = screenI.y * outputTextureDimension.x + screenI.x
