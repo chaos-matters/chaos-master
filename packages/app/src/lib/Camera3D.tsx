@@ -101,7 +101,7 @@ export function Camera3D(props: ParentProps<Camera3DProps>) {
     const size = canvasSize()
     const { width, height } = size
     const { position, target, fov } = props
-    const aspect = width / height
+    const aspect = height > 0 ? width / height : 1
 
     const up = rolledUpVector(vec3.sub(target, position), props.roll ?? 0)
     const viewMatrix = mat4.lookAt(position, target, up)
