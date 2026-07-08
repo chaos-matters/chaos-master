@@ -87,16 +87,20 @@ export function Camera2D(props: ParentProps<Camera2DProps>) {
     const { width, height } = size
     const { position, zoom } = props
     const { x, y } = position
-    const aspect = width / height
+    const aspect = height > 0 ? width / height : 1
     const viewMatrix4 = mat4x4f()
     const fovy = 1 / zoom
+    // near/far are -1/1 (not 0/0): the projection is 2D, so the z entries are
+    // unused (only the xyw of columns 0/1/3 are read below), but 0/0 makes
+    // ortho write NaN/Inf into those entries, which TypeGPU 0.11 rejects
+    // (Finite Math Assumption).
     mat4.ortho(
       x - aspect * fovy,
       x + aspect * fovy,
       y - fovy,
       y + fovy,
-      0,
-      0,
+      -1,
+      1,
       viewMatrix4,
     )
     // prettier-ignore
