@@ -21,6 +21,7 @@ import HoverPreview from './hover-preview.svg'
 import ListIcon from './list.svg'
 import Menu from './menu.svg'
 import Minus from './minus.svg'
+import MusicNote from './music-note.svg'
 import Pause from './pause.svg'
 import PlayPause from './play-pause.svg'
 import Plus from './plus.svg'
@@ -61,6 +62,7 @@ export {
   ListIcon,
   Menu,
   Minus,
+  MusicNote,
   Pause,
   PlayPause,
   Plus,

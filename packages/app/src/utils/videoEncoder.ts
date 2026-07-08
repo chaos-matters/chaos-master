@@ -14,20 +14,20 @@ export type EncodeResult = {
   usedFallback: boolean
 }
 
-type AvcProfile = 'high' | 'main' | 'baseline'
+export type AvcProfile = 'high' | 'main' | 'baseline'
 
 // Preference order: High enables CABAC/B-frames/8x8 transforms (best quality
 // per bit — fractal frames are noise-like and need it), Main is the middle
 // ground, Constrained Baseline is the lowest common denominator.
-const AVC_PROFILE_ORDER: AvcProfile[] = ['high', 'main', 'baseline']
+export const AVC_PROFILE_ORDER: AvcProfile[] = ['high', 'main', 'baseline']
 
-const AVC_PROFILE_PREFIX: Record<AvcProfile, string> = {
+export const AVC_PROFILE_PREFIX: Record<AvcProfile, string> = {
   high: '6400',
   main: '4D40',
   baseline: '42E0',
 }
 
-function getAvcCodecString(
+export function getAvcCodecString(
   width: number,
   height: number,
   profile: AvcProfile = 'high',
@@ -68,7 +68,11 @@ function getCodecString(
 
 /** Offline-export default bitrate: ~0.12 bits per pixel per frame, clamped to
  *  a sane range. A flat 8 Mbps default starves high-resolution exports. */
-function getDefaultBitrate(width: number, height: number, fps: number): number {
+export function getDefaultBitrate(
+  width: number,
+  height: number,
+  fps: number,
+): number {
   return Math.min(
     Math.max(8_000_000, Math.round(width * height * fps * 0.12)),
     60_000_000,
@@ -76,7 +80,7 @@ function getDefaultBitrate(width: number, height: number, fps: number): number {
 }
 
 /** Presentation timestamp on the fixed output frame grid, in microseconds. */
-function frameGridUs(frameIndex: number, fps: number): number {
+export function frameGridUs(frameIndex: number, fps: number): number {
   return Math.round((frameIndex * 1e6) / fps)
 }
 

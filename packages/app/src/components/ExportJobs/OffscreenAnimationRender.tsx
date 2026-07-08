@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, Show } from 'solid-js'
+import { createSignal, createResource, onCleanup, Show } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
 import { DEFAULT_POINT_COUNT } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'
@@ -6,6 +6,8 @@ import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
+import { applyAudioMappingsToFlame, createAudioAnalyzer, } from '@/utils/audioAnalysis'
+import { createAudioVideoEncoder } from '@/utils/audioExport'
 import { deepClone } from '@/utils/clone'
 import { dismissJob, jobExists, setAnimationJobPoints, setAnimationJobProgress, setJobError, setJobResult, } from '@/utils/exportJobs'
 import { createMetadataPayload, injectMetadataIntoMp4, } from '@/utils/flameInMp4'
@@ -44,9 +46,26 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
 
   const loopOpts = loopOptsFromConfig(job.config, job.tracks)
 
+  const [audioAnalyzer] = createResource(
+    () =>
+      job.audioBuffer && job.audioMapping?.length
+        ? ({ buf: job.audioBuffer, fps: job.fps } as const)
+        : null,
+    async (src) => {
+      if (!src) return undefined
+      return await createAudioAnalyzer(src.buf, src.fps)
+    },
+  )
+
   function frameFlame(frame: number): FlameDescriptor {
     const clone = deepClone(job.flame)
     applyTracksToFlame(job.tracks, clone, frame, loopOpts)
+    const analyzer = audioAnalyzer()
+    if (analyzer && job.audioMapping) {
+      const audioFrame = frame % analyzer.totalFrames
+      const frameData = analyzer.getFrameData(audioFrame)
+      applyAudioMappingsToFlame(clone, frameData, job.audioMapping)
+    }
     return clone
   }
 
@@ -109,12 +128,23 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
 
   void (async () => {
     try {
-      encoder = await createVideoEncoder({
-        codec: job.codec,
-        width: resizeWidth,
-        height: resizeHeight,
-        fps: job.fps,
-      })
+      encoder = job.audioBuffer
+        ? await createAudioVideoEncoder(
+            {
+              codec: job.codec,
+              width: resizeWidth,
+              height: resizeHeight,
+              fps: job.fps,
+            },
+            job.audioBuffer,
+            job.fps,
+          )
+        : await createVideoEncoder({
+            codec: job.codec,
+            width: resizeWidth,
+            height: resizeHeight,
+            fps: job.fps,
+          })
       if (disposed) encoder.cancel()
     } catch (err) {
       setJobError(job.id, err instanceof Error ? err.message : String(err))
