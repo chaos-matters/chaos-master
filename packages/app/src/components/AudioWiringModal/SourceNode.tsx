@@ -1,5 +1,5 @@
-import type { AudioFeature } from '../../utils/audioAnalysis'
 import styles from './AudioWiringModal.module.css'
+import type { AudioFeature } from '../../utils/audioAnalysis'
 
 export type SourceNodeData = {
   feature: AudioFeature
@@ -142,7 +142,9 @@ export function SourceNode(props: {
             e.preventDefault()
             props.onDragStart(props.source.feature, e)
           }}
-          onClick={() => props.onStartConnection(props.source.feature)}
+          onClick={() => {
+            props.onStartConnection(props.source.feature)
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault()

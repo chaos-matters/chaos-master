@@ -1,6 +1,6 @@
 import { Show } from 'solid-js'
-import type { AudioMappingEntry } from '../../utils/audioAnalysis'
 import styles from './AudioWiringModal.module.css'
+import type { AudioMappingEntry } from '../../utils/audioAnalysis'
 
 export function HeaderBar(props: {
   presets: Record<string, AudioMappingEntry[]>
@@ -37,7 +37,9 @@ export function HeaderBar(props: {
             classList={{
               [styles.presetBtnActive as string]: props.activePreset === name,
             }}
-            onClick={() => props.onSelectPreset(name)}
+            onClick={() => {
+              props.onSelectPreset(name)
+            }}
             title={
               name === 'clear'
                 ? 'Remove all connections'

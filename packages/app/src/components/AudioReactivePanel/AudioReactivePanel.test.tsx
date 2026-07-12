@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { flameTargetKey, getAudioFeatureNormalized, } from '../../utils/audioAnalysis'
-import type { FlameTarget, AudioFeature } from '../../utils/audioAnalysis'
-import { PRESET_MAPPINGS, defaultTarget } from './AudioReactivePanel'
+import { defaultTarget, PRESET_MAPPINGS } from './AudioReactivePanel'
+import type { FlameTarget } from '../../utils/audioAnalysis'
 
 // --- Helpers ---
 
@@ -113,8 +113,8 @@ describe('defaultTarget', () => {
   describe('returned objects pass flameTargetKey validation', () => {
     for (const cat of ALL_TARGET_CATEGORIES) {
       it(`defaultTarget('${cat}') produces a valid key via flameTargetKey`, () => {
-        const t = defaultTarget(cat as FlameTarget['kind'])
-        const key = flameTargetKey(t as FlameTarget)
+        const t = defaultTarget(cat)
+        const key = flameTargetKey(t)
         expect(key).toBeTruthy()
         expect(typeof key).toBe('string')
         expect(key.length).toBeGreaterThan(0)
@@ -126,17 +126,13 @@ describe('defaultTarget', () => {
     it('produces consistent keys for the same inputs', () => {
       const a = defaultTarget('renderSetting')
       const b = defaultTarget('renderSetting')
-      expect(flameTargetKey(a as FlameTarget)).toBe(
-        flameTargetKey(b as FlameTarget),
-      )
+      expect(flameTargetKey(a)).toBe(flameTargetKey(b))
     })
 
     it('produces different keys for different inputs', () => {
       const a = defaultTarget('transformAffine', 0)
       const b = defaultTarget('transformAffine', 1)
-      expect(flameTargetKey(a as FlameTarget)).not.toBe(
-        flameTargetKey(b as FlameTarget),
-      )
+      expect(flameTargetKey(a)).not.toBe(flameTargetKey(b))
     })
   })
 })
@@ -185,7 +181,7 @@ describe('PRESET_MAPPINGS', () => {
           expect(m.range).toHaveLength(2)
           expect(typeof m.range[0]).toBe('number')
           expect(typeof m.range[1]).toBe('number')
-          expect(m.range[0]!).toBeLessThanOrEqual(m.range[1]!)
+          expect(m.range[0]).toBeLessThanOrEqual(m.range[1])
         })
       }
     }
@@ -200,9 +196,7 @@ describe('PRESET_MAPPINGS', () => {
         const t = mappings[i]!.target
 
         it(`preset '${preset}' mapping ${i} has valid target kind`, () => {
-          expect(
-            validKinds.has(t.kind as (typeof ALL_TARGET_CATEGORIES)[number]),
-          ).toBe(true)
+          expect(validKinds.has(t.kind)).toBe(true)
         })
 
         // Check kind-specific required fields
@@ -247,9 +241,7 @@ describe('PRESET_MAPPINGS', () => {
 
       it(`preset '${preset}' has no duplicate target keys`, () => {
         const mappings = PRESET_MAPPINGS[preset]
-        const keys = mappings.map((m) =>
-          flameTargetKey(m.target as FlameTarget),
-        )
+        const keys = mappings.map((m) => flameTargetKey(m.target))
         const uniqueKeys = new Set(keys)
         expect(uniqueKeys.size).toBe(keys.length)
       })

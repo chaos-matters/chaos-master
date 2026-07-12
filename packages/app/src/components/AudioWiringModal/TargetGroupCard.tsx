@@ -1,7 +1,7 @@
 import { Show } from 'solid-js'
+import styles from './AudioWiringModal.module.css'
 import type { JSX } from 'solid-js'
 import type { TargetGroupData } from './TargetNode'
-import styles from './AudioWiringModal.module.css'
 
 export function TargetGroupCard(props: {
   group: TargetGroupData
