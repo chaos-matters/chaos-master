@@ -1,4 +1,4 @@
-import { createSignal, createResource, onCleanup, Show } from 'solid-js'
+import { createResource, createSignal, onCleanup, Show } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
 import { DEFAULT_POINT_COUNT } from '@/defaults'
 import { Flam3 } from '@/flame/Flam3'

@@ -1,9 +1,10 @@
-import { Accessor, createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
 import { Cross, MusicNote } from '@/icons'
 import { createLiveAnalyzer, decodeAudioFile, getAudioFeatureNormalized, } from '@/utils/audioAnalysis'
 import { AudioWiringModal } from '../AudioWiringModal/AudioWiringModal'
-import { computeBeatFrames, drawWaveform } from './audioWaveform'
 import ui from './AudioReactivePanel.module.css'
+import { computeBeatFrames, drawWaveform } from './audioWaveform'
+import type { Accessor } from 'solid-js'
 import type { AffineKey, AudioAnalyzer, AudioFeature, FlameTarget, LiveAudioAnalyzer, RenderSettingKey, TransformInfo, TransformPropertyKey, } from '@/utils/audioAnalysis'
 
 // Re-export for consumers (MainWorkspace etc.)
@@ -340,7 +341,9 @@ function VariationWeightPills(props: {
               }}
               title={v.type}
               aria-label={v.type}
-              onClick={() => props.onSelect(v.type)}
+              onClick={() => {
+                props.onSelect(v.type)
+              }}
             >
               {v.type}
             </button>
@@ -374,7 +377,7 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
   // Derived: true while the shared analyzer is being built (FFT pass)
   const isAnalyzing = createMemo(() => {
     const buf = props.audioBuffer()
-    return buf != null && props.fileAnalyzer() == null
+    return buf !== null && props.fileAnalyzer() === null
   })
 
   function formatTime(seconds: number): string {
@@ -419,16 +422,10 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
           setBeatProgress(Math.round((current / total) * 100))
         },
       )
-      cachedBeatFrames = beatFrames
-      cachedTotalFrames = totalFrames
       drawWaveform(canvas, buffer, beatFrames, totalFrames, 0)
       setBeatProgress(0)
     }, 30)
   })
-
-  // Cache beat analysis for playhead redraws
-  let cachedBeatFrames: Set<number> = new Set()
-  let cachedTotalFrames = 0
 
   // Scrubbing: window-level mousemove/mouseup while dragging
   let scrubMoveHandler: ((e: MouseEvent) => void) | undefined
@@ -436,7 +433,9 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
 
   createEffect(() => {
     if (!scrubbing()) return
-    scrubMoveHandler = (e: MouseEvent) => seekFromEvent(e)
+    scrubMoveHandler = (e: MouseEvent) => {
+      seekFromEvent(e)
+    }
     scrubUpHandler = () => setScrubbing(false)
     window.addEventListener('mousemove', scrubMoveHandler)
     window.addEventListener('mouseup', scrubUpHandler)
@@ -478,7 +477,9 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
       }
       setLiveFeatureLevels(levels)
     }, 50)
-    onCleanup(() => clearInterval(interval))
+    onCleanup(() => {
+      clearInterval(interval)
+    })
   })
 
   function handleFile(file: File) {

@@ -24,6 +24,7 @@ export async function computeBeatFrames(
   const CHUNK = 100
   return new Promise((resolve) => {
     let i = 0
+
     function processChunk() {
       const end = Math.min(i + CHUNK, analyzer.totalFrames)
       for (; i < end; i++) {

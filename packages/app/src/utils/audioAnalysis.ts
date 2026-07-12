@@ -368,10 +368,7 @@ export function detectBeats(frames: FrameData[]): Set<number> {
 
 // --- Live microphone analyzer ---
 
-function detectBeatFromHistory(
-  history: FrameData[],
-  minGapFrames: number,
-): boolean {
+function detectBeatFromHistory(history: FrameData[]): boolean {
   if (history.length < 4) return false
   const fluxes: number[] = []
   for (let i = 1; i < history.length; i++) {
@@ -399,7 +396,9 @@ function detectBeatFromHistory(
 export async function createLiveAnalyzer(
   targetFps: number = 30,
 ): Promise<LiveAudioAnalyzer> {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+  const stream = await globalThis.navigator.mediaDevices.getUserMedia({
+    audio: true,
+  })
   const audioCtx = new AudioContext()
   const sampleRate = audioCtx.sampleRate
 
@@ -468,8 +467,7 @@ export async function createLiveAnalyzer(
     if (history.length > maxHistory) history.shift()
 
     const isBeatCurrent =
-      frameCount - lastBeatAt >= minGapFrames &&
-      detectBeatFromHistory(history, minGapFrames)
+      frameCount - lastBeatAt >= minGapFrames && detectBeatFromHistory(history)
     if (isBeatCurrent) lastBeatAt = frameCount
 
     frameCount++

@@ -1,16 +1,19 @@
 import { createMemo, createSignal, onCleanup, onMount, Show } from 'solid-js'
-import type { AudioFeature, AudioMappingEntry, FlameTarget, LiveAudioAnalyzer, TransformInfo, } from '../../utils/audioAnalysis'
 import { flameTargetKey } from '../../utils/audioAnalysis'
-import { AUDIO_SOURCE_GROUPS, type SourceNodeData } from './SourceNode'
-import { SourceColumn } from './SourceColumn'
-import { TargetCell, AffineCell, buildTargetGroups, type TargetGroupData, } from './TargetNode'
-import { TargetGroupCard } from './TargetGroupCard'
-import { WireOverlay, wireId, type WireConnection } from './WireOverlay'
-import { ParamsPanel } from './ParamsPanel'
-import { HeaderBar } from './HeaderBar'
-import { ConnectingBanner } from './ConnectingBanner'
-import { NodeGraphView } from './NodeGraphView'
 import styles from './AudioWiringModal.module.css'
+import { ConnectingBanner } from './ConnectingBanner'
+import { HeaderBar } from './HeaderBar'
+import { NodeGraphView } from './NodeGraphView'
+import { ParamsPanel } from './ParamsPanel'
+import { SourceColumn } from './SourceColumn'
+import { AUDIO_SOURCE_GROUPS } from './SourceNode'
+import { TargetGroupCard } from './TargetGroupCard'
+import { AffineCell, buildTargetGroups, TargetCell } from './TargetNode'
+import { wireId, WireOverlay } from './WireOverlay'
+import type { AudioFeature, AudioMappingEntry, FlameTarget, LiveAudioAnalyzer, TransformInfo, } from '../../utils/audioAnalysis'
+import type { SourceNodeData } from './SourceNode'
+import type { TargetGroupData } from './TargetNode'
+import type { WireConnection } from './WireOverlay'
 
 // ── Module-level constants ──
 
@@ -960,7 +963,7 @@ export function AudioWiringModal(props: {
 
   function exportJSON() {
     const json = JSON.stringify(props.mappings, null, 2)
-    navigator.clipboard.writeText(json).catch(() => {
+    globalThis.navigator.clipboard.writeText(json).catch(() => {
       // Fallback: show in a prompt
       prompt('Copy this JSON:', json)
     })
@@ -1358,9 +1361,15 @@ export function AudioWiringModal(props: {
                     pendingPaste()?.transformIdx ?? null
                   }
                   confirmPasteMode={pendingPaste()?.transformIdx === txIdx}
-                  onToggle={() => toggleGroup(group.kind)}
-                  onCopy={() => copyWiring(txIdx)}
-                  onPaste={() => pasteWiring(txIdx)}
+                  onToggle={() => {
+                    toggleGroup(group.kind)
+                  }}
+                  onCopy={() => {
+                    copyWiring(txIdx)
+                  }}
+                  onPaste={() => {
+                    pasteWiring(txIdx)
+                  }}
                 >
                   {renderTargetGroup(
                     group,

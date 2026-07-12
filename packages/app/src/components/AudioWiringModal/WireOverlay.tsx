@@ -1,7 +1,7 @@
 import { createMemo, createSignal, onCleanup, onMount } from 'solid-js'
-import type { AudioFeature, FlameTarget } from '../../utils/audioAnalysis'
 import { flameTargetKey } from '../../utils/audioAnalysis'
 import styles from './AudioWiringModal.module.css'
+import type { AudioFeature, FlameTarget } from '../../utils/audioAnalysis'
 
 export type WireConnection = {
   sourceFeature: AudioFeature
@@ -40,9 +40,7 @@ function getPortCenter(
   const cached = getCached(cacheKey, version)
   if (cached) return cached
 
-  const el = container.querySelector(
-    `[data-source-port="${sourceFeature}"]`,
-  ) as HTMLElement | null
+  const el = container.querySelector(`[data-source-port="${sourceFeature}"]`)
   if (!el) return null
   const rect = el.getBoundingClientRect()
   const containerRect = container.getBoundingClientRect()
@@ -67,9 +65,7 @@ function getTargetPortCenter(
   const cached = getCached(cacheKey, version)
   if (cached) return cached
 
-  const el = container.querySelector(
-    `[data-target-port="${key}"]`,
-  ) as HTMLElement | null
+  const el = container.querySelector(`[data-target-port="${key}"]`)
   if (!el) return null
   const rect = el.getBoundingClientRect()
   const containerRect = container.getBoundingClientRect()
@@ -165,7 +161,7 @@ export function WireOverlay(props: {
     const version = layoutVersion()
     if (!props.containerRef || !props.connectingFrom) return null
     const srcPos = getPortCenter(
-      props.containerRef!,
+      props.containerRef,
       props.connectingFrom,
       version,
     )
@@ -187,7 +183,7 @@ export function WireOverlay(props: {
     if (!props.containerRef || !props.dragPos) return null
     // Source → cursor drag
     if (props.dragFrom) {
-      const srcPos = getPortCenter(props.containerRef!, props.dragFrom, version)
+      const srcPos = getPortCenter(props.containerRef, props.dragFrom, version)
       if (!srcPos) return null
       const color = props.sourceColorMap.get(props.dragFrom) ?? '#888'
       const { x: tx, y: ty } = props.dragPos
@@ -200,7 +196,7 @@ export function WireOverlay(props: {
     // Target → cursor drag
     if (props.dragFromTarget) {
       const tgtPos = getTargetPortCenter(
-        props.containerRef!,
+        props.containerRef,
         props.dragFromTarget,
         version,
       )

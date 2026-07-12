@@ -1,7 +1,8 @@
-import type { AudioFeature } from '../../utils/audioAnalysis'
-import { SourceNode, AUDIO_SOURCE_GROUPS } from './SourceNode'
-import { wireId, type WireConnection } from './WireOverlay'
 import styles from './AudioWiringModal.module.css'
+import { AUDIO_SOURCE_GROUPS, SourceNode } from './SourceNode'
+import { wireId } from './WireOverlay'
+import type { AudioFeature } from '../../utils/audioAnalysis'
+import type { WireConnection } from './WireOverlay'
 
 export { AUDIO_SOURCE_GROUPS }
 

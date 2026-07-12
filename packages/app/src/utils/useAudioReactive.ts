@@ -44,7 +44,7 @@ export function useAudioReactive(
   let seekBaseOffset = 0
   let lastSeekTarget: number | null = null
   let paused = false
-  let smoothingState: MappingSmoothingState = new Map()
+  const smoothingState: MappingSmoothingState = new Map()
   let lastTickTime: number | undefined
 
   // ---- helpers ----
@@ -118,7 +118,7 @@ export function useAudioReactive(
         const offset = seekBaseOffset
         createSource(buffer, offset)
         if (paused) {
-          audioCtx.suspend()
+          void audioCtx.suspend()
         }
       }
 
@@ -137,7 +137,7 @@ export function useAudioReactive(
           lastSeekTarget = st
           createSource(buffer, st)
           if (paused) {
-            audioCtx.suspend()
+            void audioCtx.suspend()
           }
         }
 
@@ -164,8 +164,9 @@ export function useAudioReactive(
             : frame
 
         if (mappings.length > 0) {
-          const now = performance.now()
-          const dt = lastTickTime != null ? (now - lastTickTime) / 1000 : 1 / 30
+          const now = globalThis.performance.now()
+          const dt =
+            lastTickTime !== undefined ? (now - lastTickTime) / 1000 : 1 / 30
           lastTickTime = now
           const frameData = analyzer.getFrameData(
             wrapped % analyzer.totalFrames,
@@ -200,8 +201,9 @@ export function useAudioReactive(
       interval = setInterval(() => {
         const mappings = audioMapping().mappings
         if (mappings.length === 0) return
-        const now = performance.now()
-        const dt = lastTickTime != null ? (now - lastTickTime) / 1000 : 1 / 30
+        const now = globalThis.performance.now()
+        const dt =
+          lastTickTime !== undefined ? (now - lastTickTime) / 1000 : 1 / 30
         lastTickTime = now
         const frameData = mic.getFrameData()
         setFlameDescriptor((draft) => {
@@ -216,7 +218,7 @@ export function useAudioReactive(
       }, tickMs)
 
       onCleanup(() => {
-        clearInterval(interval!)
+        clearInterval(interval)
         interval = undefined
         lastTickTime = undefined
       })
@@ -231,9 +233,9 @@ export function useAudioReactive(
     if (!audioCtx) return
 
     if (shouldPause) {
-      audioCtx.suspend()
+      void audioCtx.suspend()
     } else {
-      audioCtx.resume()
+      void audioCtx.resume()
       // Adjust sourceStartTime so time calculation doesn't jump
       sourceStartTime = audioCtx.currentTime - seekBaseOffset
     }

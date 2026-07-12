@@ -1,6 +1,6 @@
-import type { FlameTarget, TransformInfo } from '../../utils/audioAnalysis'
 import { flameTargetKey } from '../../utils/audioAnalysis'
 import styles from './AudioWiringModal.module.css'
+import type { FlameTarget, TransformInfo } from '../../utils/audioAnalysis'
 
 export type TargetNodeData = {
   target: FlameTarget
@@ -211,7 +211,9 @@ export function TargetCell(props: {
           e.preventDefault()
           props.onDragStart(props.node.target, e)
         }}
-        onClick={() => props.onCompleteConnection(props.node.target)}
+        onClick={() => {
+          props.onCompleteConnection(props.node.target)
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
@@ -274,7 +276,9 @@ export function AffineCell(props: {
           e.preventDefault()
           props.onDragStart(props.target, e)
         }}
-        onClick={() => props.onCompleteConnection(props.target)}
+        onClick={() => {
+          props.onCompleteConnection(props.target)
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()

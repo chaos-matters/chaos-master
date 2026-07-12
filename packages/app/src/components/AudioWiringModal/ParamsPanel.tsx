@@ -1,8 +1,8 @@
 import { Show } from 'solid-js'
-import type { AudioFeature, AudioMappingEntry } from '../../utils/audioAnalysis'
 import { flameTargetKey } from '../../utils/audioAnalysis'
-import type { SourceNodeData } from './SourceNode'
 import styles from './AudioWiringModal.module.css'
+import type { AudioFeature, AudioMappingEntry } from '../../utils/audioAnalysis'
+import type { SourceNodeData } from './SourceNode'
 
 const DEFAULT_ATTACK = 40
 const DEFAULT_RELEASE = 150

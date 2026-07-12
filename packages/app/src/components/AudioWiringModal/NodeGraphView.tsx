@@ -1,10 +1,10 @@
-import { Accessor, createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
-import type { AudioFeature, AudioMappingEntry, FlameTarget, LiveAudioAnalyzer, TransformInfo, } from '../../utils/audioAnalysis'
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
 import { flameTargetKey, getAudioFeatureNormalized, } from '../../utils/audioAnalysis'
+import styles from './NodeGraphView.module.css'
 import { AUDIO_SOURCE_GROUPS } from './SourceNode'
 import { buildTargetGroups } from './TargetNode'
-import type { TargetGroupData, TargetSubGroup } from './TargetNode'
-import styles from './NodeGraphView.module.css'
+import type { Accessor } from 'solid-js'
+import type { AudioFeature, AudioMappingEntry, FlameTarget, LiveAudioAnalyzer, TransformInfo, } from '../../utils/audioAnalysis'
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -114,9 +114,11 @@ function bezierPath(sx: number, sy: number, tx: number, ty: number): string {
 function sourceNodeId(feature: AudioFeature): string {
   return `src-${feature}`
 }
+
 function targetNodeId(groupIdx: number): string {
   return `tgt-${groupIdx}`
 }
+
 function portId(nodeId: string, param: string): string {
   return `${nodeId}:${param}`
 }
@@ -336,7 +338,7 @@ export function NodeGraphView(props: Props) {
     }
   }
 
-  function onCanvasMouseUp(e: MouseEvent) {
+  function onCanvasMouseUp(_e: MouseEvent) {
     // Wire drop
     if (wireDragFrom()) {
       const dropId = wireDropTarget()
@@ -348,7 +350,7 @@ export function NodeGraphView(props: Props) {
         const groupIdx = parseInt(parts[0]?.replace('tgt-', '') ?? '', 10)
         if (!isNaN(groupIdx) && groups[groupIdx]) {
           const paramLabel = parts[1]
-          const sg = groups[groupIdx]!.subGroups
+          const sg = groups[groupIdx].subGroups
           for (const sub of sg) {
             const tgt = sub.targets.find((t) => t.paramLabel === paramLabel)
             if (tgt) {
@@ -423,9 +425,7 @@ export function NodeGraphView(props: Props) {
     if (!world) return
     const worldRect = world.getBoundingClientRect()
     const scale = viewScale()
-    const portEl = (e.target as HTMLElement).closest(
-      '[data-graph-port]',
-    ) as HTMLElement | null
+    const portEl = (e.target as HTMLElement).closest('[data-graph-port]')
     if (!portEl) return
     const rect = portEl.getBoundingClientRect()
     const pos = {
@@ -445,9 +445,7 @@ export function NodeGraphView(props: Props) {
     if (!world) return
     const worldRect = world.getBoundingClientRect()
     const scale = viewScale()
-    const portEl = (e.target as HTMLElement).closest(
-      '[data-graph-port]',
-    ) as HTMLElement | null
+    const portEl = (e.target as HTMLElement).closest('[data-graph-port]')
     if (!portEl) return
     const rect = portEl.getBoundingClientRect()
     const pos = {
@@ -465,7 +463,6 @@ export function NodeGraphView(props: Props) {
   const wireDefs = createMemo<WireDef[]>(() => {
     const conns = props.connectionByTarget()
     const groups = targetGroups()
-    const sources = allSources()
     // Re-compute after DOM paint so port element positions are valid
     void layoutVersion()
     const defs: WireDef[] = []
@@ -579,7 +576,7 @@ export function NodeGraphView(props: Props) {
     function tick() {
       if (!running) return
 
-      const now = performance.now()
+      const now = globalThis.performance.now()
       if (now - lastUpdate < 33) {
         // ~30 fps
         requestAnimationFrame(tick)
@@ -730,9 +727,9 @@ export function NodeGraphView(props: Props) {
                   }}
                   style={{ stroke: wire.color }}
                   data-wire={`${wire.sourceFeature}:${wire.targetKey}`}
-                  onMouseDown={(e) =>
+                  onMouseDown={(e) => {
                     onWireClick(wire.sourceFeature, wire.targetKey, e)
-                  }
+                  }}
                 />
               )
             }}
@@ -843,7 +840,9 @@ export function NodeGraphView(props: Props) {
                       role="button"
                       tabIndex={0}
                       aria-label={`Connect ${src.label}`}
-                      onMouseDown={(e) => onSourcePortDown(src.feature, e)}
+                      onMouseDown={(e) => {
+                        onSourcePortDown(src.feature, e)
+                      }}
                     />
                   </div>
                 )}
@@ -888,10 +887,7 @@ export function NodeGraphView(props: Props) {
                     onMouseDown={(e) => {
                       const t = e.target as HTMLElement
                       if (t.closest('[data-graph-port]')) return
-                      if (
-                        t.closest(`.${styles.subGroupDivider}`)
-                      )
-                        return
+                      if (t.closest(`.${styles.subGroupDivider}`)) return
                       onNodeHeaderDown(nid, e)
                     }}
                   >
@@ -902,7 +898,9 @@ export function NodeGraphView(props: Props) {
                     </div>
                     <div
                       class={styles.nodeBody}
-                      onWheel={(e) => e.stopPropagation()}
+                      onWheel={(e) => {
+                        e.stopPropagation()
+                      }}
                     >
                       <For each={group.subGroups}>
                         {(sg, sgIdx) => {
@@ -1012,12 +1010,12 @@ export function NodeGraphView(props: Props) {
                                           role="button"
                                           tabIndex={0}
                                           aria-label={`Connect to ${tgt.label}`}
-                                          onMouseDown={(e) =>
+                                          onMouseDown={(e) => {
                                             onTargetPortDown(tgt.target, e)
-                                          }
-                                          onClick={() =>
+                                          }}
+                                          onClick={() => {
                                             onTargetPortClick(tgt.target)
-                                          }
+                                          }}
                                         />
                                         <span
                                           class={styles.portLabel}
