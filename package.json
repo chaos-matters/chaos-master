@@ -10,7 +10,7 @@
     "fmt:fix": "prettier packages --write --log-level warn",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
-    "typecheck": "tsc --noEmit --project packages/app/tsconfig.json",
+    "typecheck": "NODE_OPTIONS=\"--max-old-space-size=8192\" tsc --noEmit --project packages/app/tsconfig.json",
     "validate-wgsl": "npx tsx scripts/validate-wgsl-props.ts",
     "check": "pnpm typecheck && pnpm lint:fix && pnpm fmt:fix && pnpm validate-wgsl",
     "test": "pnpm --filter chaos-master exec vitest run",
