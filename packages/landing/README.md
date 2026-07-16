@@ -1,9 +1,9 @@
 # @chaos-master/landing
 
-Marketing landing page for [Chaos Master](https://chaos-master.com), built with
-[Astro](https://astro.build). Ships as a static site and deploys to Cloudflare
-on its own subdomain — the app itself lives in `packages/app` and owns the root
-domain.
+Marketing landing page for [Lumen Apeiron](https://lumenapeiron.com) (formerly
+Chaos Master), built with [Astro](https://astro.build). Ships as a static site
+and deploys to Cloudflare on its own subdomain — the app itself lives in
+`packages/app` and owns the root domain.
 
 ## Develop
 
@@ -31,12 +31,12 @@ Static assets are served directly by Cloudflare (no Worker) — see
 `wrangler.jsonc`.
 
 ```bash
-pnpm --filter @chaos-master/landing deploy:dev    # www.dev.chaos-master.com
-pnpm --filter @chaos-master/landing deploy:prod   # www.chaos-master.com
+pnpm --filter @chaos-master/landing deploy:dev    # about.dev.lumenapeiron.com
+pnpm --filter @chaos-master/landing deploy:prod   # about.lumenapeiron.com
 ```
 
 > **DNS first:** the custom-domain routes in `wrangler.jsonc`
-> (`www.chaos-master.com`, `www.dev.chaos-master.com`) need the matching DNS
-> records configured in the Cloudflare dashboard before the first deploy.
-> Adjust the subdomains there and in `astro.config.mjs` (`site`) if you prefer
-> something other than `www.`.
+> (`about.lumenapeiron.com`, `about.dev.lumenapeiron.com`) need the
+> `lumenapeiron.com` zone on the Cloudflare account; `wrangler deploy`
+> provisions the DNS records + certs. Adjust the subdomains there and in
+> `astro.config.mjs` (`site`) if you prefer something else.

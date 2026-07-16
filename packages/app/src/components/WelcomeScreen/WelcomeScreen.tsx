@@ -397,10 +397,10 @@ export function WelcomeScreen(props: WelcomeScreenProps) {
 
             <div class={ui.content}>
               <div class={ui.branding}>
-                <h1 class={ui.title}>Chaos Master</h1>
+                <h1 class={ui.title}>Lumen Apeiron</h1>
                 <p class={ui.subtitle}>
-                  Create and animate fractal flames using the chaos game
-                  algorithm
+                  Chaos Master — create and animate fractal flames using the
+                  chaos game algorithm
                 </p>
               </div>
 
@@ -507,7 +507,7 @@ export function WelcomeScreen(props: WelcomeScreenProps) {
                   class={`${ui.techPill} ${ui.supportPill}`}
                   href="https://ko-fi.com/chaosmatters"
                   target="_blank"
-                  title="Support Chaos Master"
+                  title="Support Lumen Apeiron"
                 >
                   <Heart />
                   Support

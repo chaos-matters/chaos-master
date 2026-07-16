@@ -11,7 +11,7 @@ export function IfsGuideTab() {
       <h3 class={ui.guideTitle}>Iterated Function Systems (IFS)</h3>
       <p>
         An <strong>Iterated Function System (IFS)</strong> builds fractals from
-        a finite set of contraction mappings. Chaos Master evaluates them in
+        a finite set of contraction mappings. Lumen Apeiron evaluates them in
         parallel on the GPU via <strong>WebGPU</strong>.
       </p>
       <p>

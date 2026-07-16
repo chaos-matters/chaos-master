@@ -1,7 +1,10 @@
 import { expect, test } from './helpers'
 
 test.describe('App Loading', () => {
-  test('should load the app without fatal errors', async ({ page, consoleErrors }) => {
+  test('should load the app without fatal errors', async ({
+    page,
+    consoleErrors,
+  }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' })
     await page.waitForTimeout(3000)
 
@@ -10,17 +13,18 @@ test.describe('App Loading', () => {
     await expect(root).toBeAttached()
 
     // Filter out expected errors (WebGPU not available in headless, devtools network errors)
-    const fatalErrors = consoleErrors.filter(e =>
-      !e.text.includes('No WebGPU adapters found') &&
-      !e.text.includes('Failed to load resource') &&
-      !e.text.includes('solid-devtools')
+    const fatalErrors = consoleErrors.filter(
+      (e) =>
+        !e.text.includes('No WebGPU adapters found') &&
+        !e.text.includes('Failed to load resource') &&
+        !e.text.includes('solid-devtools'),
     )
     expect(fatalErrors).toHaveLength(0)
   })
 
   test('should have correct page title', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' })
-    await expect(page).toHaveTitle(/Chaos Master/)
+    await expect(page).toHaveTitle(/Lumen Apeiron/)
   })
 
   test('should render the app DOM structure', async ({ page }) => {
@@ -49,8 +53,12 @@ test.describe('App Loading', () => {
     const hasRoot = page.locator('#root')
 
     // Either WebGPU error is shown OR the app rendered without crashing
-    const webgpuShown = await webgpuError.isVisible({ timeout: 1000 }).catch(() => false)
-    const rootHasContent = await hasRoot.evaluate(el => el.children.length > 0)
+    const webgpuShown = await webgpuError
+      .isVisible({ timeout: 1000 })
+      .catch(() => false)
+    const rootHasContent = await hasRoot.evaluate(
+      (el) => el.children.length > 0,
+    )
 
     expect(webgpuShown || rootHasContent).toBeTruthy()
   })

@@ -2,7 +2,7 @@
 import HeroFlame from './HeroFlame.tsx'
 import { LAUNCH_ICON } from '../icons'
 
-const appUrl = 'https://chaos-master.com'
+const appUrl = 'https://lumenapeiron.com'
 const repoUrl = 'https://github.com/chaos-matters/chaos-master'
 // The hero poster (hero-flame.jpg) sits behind the live GPU flame as the
 // non-WebGPU fallback; HeroFlame is a client-only Solid island that mounts the
@@ -14,8 +14,9 @@ const repoUrl = 'https://github.com/chaos-matters/chaos-master'
     <img
       class="hero-poster"
       src="/hero-flame.jpg"
-      alt=""
-      aria-hidden="true"
+      alt="A multicolored IFS fractal flame — magenta, teal, and gold filaments swirling on black — rendered in Lumen Apeiron"
+      width="1440"
+      height="1440"
       loading="eager"
     />
     <HeroFlame client:only="solid-js" />
@@ -23,13 +24,13 @@ const repoUrl = 'https://github.com/chaos-matters/chaos-master'
   <div class="hero-content">
     <h1>Paint with<br /><em>infinite chaos.</em></h1>
     <p class="lede">
-      Chaos Master is a GPU-accelerated IFS flame fractal generator for artists
-      and explorers — millions of iterations rendered live, shaped by your hand.
-      No install, no render queue.
+      Lumen Apeiron (formerly Chaos Master) is a GPU-accelerated IFS flame
+      fractal generator for artists and explorers — millions of iterations
+      rendered live, shaped by your hand. No install, no render queue.
     </p>
     <div class="hero-cta">
       <a class="btn btn-primary" href={appUrl}
-        >Launch Chaos Master<span class="btn-ico" set:html={LAUNCH_ICON} /></a
+        >Launch Lumen Apeiron<span class="btn-ico" set:html={LAUNCH_ICON} /></a
       >
       <a class="btn btn-ghost" href={repoUrl}>View on GitHub</a>
     </div>

@@ -37,10 +37,14 @@ const MAX_DISCORD_UPLOAD = 12 * 1024 * 1024 // ~12 MB request (~9 MB image)
 const DISCORD_DAILY_CAP = 15
 const TURNSTILE_VERIFY_URL =
   'https://challenges.cloudflare.com/turnstile/v0/siteverify'
-const SITE_NAME = 'Chaos Master'
-const DEFAULT_TITLE = 'Fractal Flame — Chaos Master'
+const SITE_NAME = 'Lumen Apeiron'
+const DEFAULT_TITLE = 'Fractal Flame — Lumen Apeiron'
 const DEFAULT_DESCRIPTION =
-  'Explore and create fractal flames with Chaos Master.'
+  'Explore and create fractal flames with Lumen Apeiron.'
+// Fallback social-card image, served from static assets (public/og-cover.jpg).
+// Used for the site's default card and for any shared flame that has no uploaded
+// preview image, so every link still renders a rich summary_large_image card.
+const DEFAULT_OG_PATH = '/og-cover.jpg'
 
 interface OgMeta {
   t?: string
@@ -176,7 +180,9 @@ async function resolveOgCard(
 ): Promise<{ title: string; description: string; imageUrl?: string }> {
   let title = DEFAULT_TITLE
   let description = DEFAULT_DESCRIPTION
-  let imageUrl: string | undefined
+  // Default to the site cover so a card without a custom upload still shows an
+  // image; a stored preview (meta.img) overrides it below.
+  let imageUrl: string | undefined = `${origin}${DEFAULT_OG_PATH}`
   try {
     const raw = await env.KV_SHORTENER.get(`og:${key}`)
     if (raw) {
@@ -244,7 +250,17 @@ async function injectMeta(
     /<title>[\s\S]*?<\/title>/,
     `<title>${escapeHtml(title)}</title>`,
   )
-  html = html.replace('</head>', `    ${metaHtml}\n  </head>`)
+  // Swap the static default OG/Twitter block (marked in index.html) for the
+  // share-specific tags, so a shared link never carries duplicate og:* tags.
+  // Fall back to appending before </head> if the markers aren't present.
+  const swapped = html.replace(
+    /<!-- og:default:start -->[\s\S]*?<!-- og:default:end -->/,
+    metaHtml,
+  )
+  html =
+    swapped !== html
+      ? swapped
+      : html.replace('</head>', `    ${metaHtml}\n  </head>`)
 
   return new Response(html, {
     status: 200,
@@ -546,6 +562,7 @@ const baseHandler = {
         let card = {
           title: DEFAULT_TITLE,
           description: DEFAULT_DESCRIPTION,
+          imageUrl: `${url.origin}${DEFAULT_OG_PATH}`,
         } as { title: string; description: string; imageUrl?: string }
         try {
           const payload = await env.KV_SHORTENER.get(shortId)

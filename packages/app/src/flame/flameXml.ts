@@ -530,7 +530,7 @@ export function parseFlameXmlWithReport(xml: string): FlameXmlReport {
 
   if (unmapped.size > 0) {
     warnings.push(
-      `Skipped ${unmapped.size} variation(s) with no Chaos Master equivalent: ${[...unmapped].join(', ')}`,
+      `Skipped ${unmapped.size} variation(s) with no Lumen Apeiron equivalent: ${[...unmapped].join(', ')}`,
     )
   }
 
@@ -565,7 +565,7 @@ export function parseFlameXmlWithReport(xml: string): FlameXmlReport {
         : coefs
     if (hasNonLinearVariation(finalEl)) {
       warnings.push(
-        'The <finalxform> has non-linear variations; only its affine was imported (Chaos Master’s final transform is affine-only).',
+        'The <finalxform> has non-linear variations; only its affine was imported (Lumen Apeiron’s final transform is affine-only).',
       )
     }
   }

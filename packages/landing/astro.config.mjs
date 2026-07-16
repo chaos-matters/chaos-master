@@ -58,7 +58,7 @@ const stub = (p) =>
 // the Cloudflare static-assets deploy in wrangler.jsonc). The app itself lives in
 // packages/app and is deployed separately to the root domain.
 export default defineConfig({
-  site: 'https://about.chaos-master.com',
+  site: 'https://about.lumenapeiron.com',
   output: 'static',
   build: {
     format: 'directory',

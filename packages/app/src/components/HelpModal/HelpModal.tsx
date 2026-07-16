@@ -222,12 +222,12 @@ function HelpModal(props: HelpModalProps) {
     <>
       {/* Compact hero: title left, icons + badges center, close top-right */}
       <div class={ui.heroSection}>
-        <h1 class={ui.heroTitle}>Chaos Master</h1>
+        <h1 class={ui.heroTitle}>Lumen Apeiron</h1>
         <div class={ui.heroRight}>
           <div class={ui.iconRow}>
             <a
               class={ui.iconLink}
-              href="https://about.chaos-master.com"
+              href="https://about.lumenapeiron.com"
               target="_blank"
               aria-label="Visit our home page"
               title="Visit our home page"

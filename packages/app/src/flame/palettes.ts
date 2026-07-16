@@ -1,5 +1,5 @@
 /**
- * Default palettes for Chaos Master.
+ * Default palettes for Lumen Apeiron.
  *
  * These palettes are inspired by flam3 and other fractal flame editors.
  * Each palette defines color stops along a gradient, stored as OkLab a/b coordinates.

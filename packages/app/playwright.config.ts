@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
 /**
- * Playwright configuration for Chaos Master app.
+ * Playwright configuration for Lumen Apeiron app.
  *
  * These tests capture console errors during rendering and help prevent
  * runtime errors like "Cannot read properties of undefined (reading 'x')"

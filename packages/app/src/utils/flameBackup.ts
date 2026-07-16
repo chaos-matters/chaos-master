@@ -138,7 +138,7 @@ export async function buildFlameBackupZip(
 
   files['manifest.json'] = [
     jsonBytes({
-      app: 'Chaos Master',
+      app: 'Lumen Apeiron',
       version: VERSION,
       exportedAt: new Date().toISOString(),
       format,

@@ -1,6 +1,6 @@
 # Testing Infrastructure
 
-This document describes the testing setup created to catch runtime errors in the Chaos Master app.
+This document describes the testing setup created to catch runtime errors in the Lumen Apeiron app.
 
 ## Created Files
 

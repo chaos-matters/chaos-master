@@ -29,12 +29,12 @@ so a link shared without (or after a failed) shortener still gets the full image
 
 ## Files
 
-| File | Change |
-|------|--------|
-| `packages/app/src/worker/index.ts` | `POST /api/og/:id`, `GET /og/:id`, meta injection on `/?s=` and `/?flame=` |
-| `packages/app/wrangler.jsonc` | `OG_IMAGES` R2 binding (prod / dev / preview) |
-| `packages/app/src/MainWorkspace.tsx` | `captureOgImageBlob()` — clean-frame capture + downscale |
-| `packages/app/src/components/ShareLinkModal/ShareLinkModal.tsx` | background upload + title/description |
+| File                                                            | Change                                                                     |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `packages/app/src/worker/index.ts`                              | `POST /api/og/:id`, `GET /og/:id`, meta injection on `/?s=` and `/?flame=` |
+| `packages/app/wrangler.jsonc`                                   | `OG_IMAGES` R2 binding (prod / dev / preview)                              |
+| `packages/app/src/MainWorkspace.tsx`                            | `captureOgImageBlob()` — clean-frame capture + downscale                   |
+| `packages/app/src/components/ShareLinkModal/ShareLinkModal.tsx` | background upload + title/description                                      |
 
 ## One-time setup (before deploy)
 
@@ -59,8 +59,8 @@ image TTL is shorter than the 60-day link TTL, old links fall back to the text c
 
 ```bash
 cd packages/app
-pnpm run deploy:dev     # → dev.chaos-master.com
-# pnpm run deploy:prod  # → chaos-master.com
+pnpm run deploy:dev     # → dev.lumenapeiron.com
+# pnpm run deploy:prod  # → lumenapeiron.com
 ```
 
 ## Testing
@@ -68,11 +68,11 @@ pnpm run deploy:dev     # → dev.chaos-master.com
 1. Open the app, build/select a flame, **Share Link** → copy the `?s=<id>` URL.
 2. Confirm the image stored:
    ```bash
-   curl -I "https://dev.chaos-master.com/og/<id>"      # → 200, Content-Type: image/png
+   curl -I "https://dev.lumenapeiron.com/og/<id>"      # → 200, Content-Type: image/png
    ```
 3. Confirm meta tags injected:
    ```bash
-   curl -s "https://dev.chaos-master.com/?s=<id>" | grep -i 'og:\|twitter:'
+   curl -s "https://dev.lumenapeiron.com/?s=<id>" | grep -i 'og:\|twitter:'
    ```
 4. Validate with the platform debuggers (they also force a re-scrape):
    - Facebook: https://developers.facebook.com/tools/debug/

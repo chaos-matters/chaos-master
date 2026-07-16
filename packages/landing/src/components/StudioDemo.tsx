@@ -148,7 +148,7 @@ export default function StudioDemo() {
   )
 
   // "Open in app": encode the live (scrubbed) flame into the app's self-contained
-  // ?flame= share link so a flame you tweak here opens straight in Chaos Master.
+  // ?flame= share link so a flame you tweak here opens straight in Lumen Apeiron.
   // Re-encoded only when the flame settles (bumpFlame), not every rAF frame.
   // Mirrors OpenInApp.tsx, driven by this component's live store.
   const [flameRev, setFlameRev] = createSignal(1)
@@ -407,7 +407,7 @@ export default function StudioDemo() {
               href={appShareUrl() ?? APP_URL}
               target="_blank"
               rel="noopener"
-              title="Open this flame in Chaos Master"
+              title="Open this flame in Lumen Apeiron"
             >
               <svg
                 viewBox="0 0 24 24"

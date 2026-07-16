@@ -109,11 +109,11 @@ export function deriveOgMeta(flame: FlameDescriptor): {
     ? name
     : author && author !== 'unknown'
       ? `Flame by ${author}`
-      : 'Fractal Flame — Chaos Master'
+      : 'Fractal Flame — Lumen Apeiron'
   const transformCount = Object.keys(flame.transforms ?? {}).length
   const description = meta?.description?.trim()
     ? meta.description.trim()
-    : `${transformCount} transform${transformCount === 1 ? '' : 's'} • Created with Chaos Master`
+    : `${transformCount} transform${transformCount === 1 ? '' : 's'} • Created with Lumen Apeiron`
   return { title, description }
 }
 

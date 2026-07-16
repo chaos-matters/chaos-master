@@ -16,8 +16,15 @@
       "routes": [
         {
           // custom_domain: true makes `wrangler deploy` provision the DNS record
-          // + SSL cert automatically (no manual CNAME needed), given chaos-master.com
+          // + SSL cert automatically (no manual CNAME needed), given lumenapeiron.com
           // is a zone on this Cloudflare account.
+          "pattern": "about.lumenapeiron.com",
+          "custom_domain": true,
+        },
+        {
+          // Legacy domain — keep bound so about.chaos-master.com keeps resolving
+          // until the zone-level redirect to lumenapeiron.com is enabled. Remove
+          // once the redirect is verified live.
           "pattern": "about.chaos-master.com",
           "custom_domain": true,
         },
@@ -30,7 +37,7 @@
       "name": "chaos-master-landing-dev",
       "routes": [
         {
-          "pattern": "about.dev.chaos-master.com",
+          "pattern": "about.dev.lumenapeiron.com",
           "custom_domain": true,
         },
       ],
