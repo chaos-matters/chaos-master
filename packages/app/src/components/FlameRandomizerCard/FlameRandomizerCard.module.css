@@ -501,6 +501,16 @@
   width: 100%;
 }
 
+.mutationLabDivider {
+  height: 1px;
+  background: var(--neutral-200);
+  margin: 4px 0;
+
+  [data-theme='dark'] & {
+    background: var(--neutral-700);
+  }
+}
+
 .mutationContainer,
 .animContainer {
   display: flex;

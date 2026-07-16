@@ -1,4 +1,4 @@
-import { createSignal, For, onCleanup, Show } from 'solid-js'
+import { createMemo, createSignal, For, onCleanup, Show } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
 import { STATIC_PREVIEW_POINT_COUNT, THUMBNAIL_PREVIEW_QUALITY, } from '@/defaults'
 import { examples } from '@/flame/examples'
@@ -75,6 +75,7 @@ export function BlendFlameGallery(props: BlendFlameGalleryProps) {
     createSignal(INITIAL_VISIBLE)
   const [visibleExamplesCount, setVisibleExamplesCount] =
     createSignal(INITIAL_VISIBLE)
+  const [filterText, setFilterText] = createSignal('')
 
   const allRecent = () =>
     loadRecentFlames().filter(
@@ -90,8 +91,29 @@ export function BlendFlameGallery(props: BlendFlameGalleryProps) {
         flame,
       }))
 
-  const showAllRecent = () => visibleRecentCount() >= allRecent().length
-  const showAllExamples = () => visibleExamplesCount() >= allExamples().length
+  const filteredRecent = createMemo(() => {
+    const q = filterText().toLowerCase().trim()
+    if (!q) return allRecent()
+    return allRecent().filter(
+      (r) =>
+        r.name.toLowerCase().includes(q) ||
+        r.flame.metadata?.name?.toLowerCase().includes(q),
+    )
+  })
+
+  const filteredExamples = createMemo(() => {
+    const q = filterText().toLowerCase().trim()
+    if (!q) return allExamples()
+    return allExamples().filter(
+      (e) =>
+        e.name.toLowerCase().includes(q) ||
+        e.flame.metadata?.name?.toLowerCase().includes(q),
+    )
+  })
+
+  const showAllRecent = () => visibleRecentCount() >= filteredRecent().length
+  const showAllExamples = () =>
+    visibleExamplesCount() >= filteredExamples().length
 
   let clearTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -127,17 +149,42 @@ export function BlendFlameGallery(props: BlendFlameGalleryProps) {
         </button>
       </div>
 
+      <div class={ui.filterRow}>
+        <input
+          class={ui.filterInput}
+          type="text"
+          placeholder="Filter by name..."
+          value={filterText()}
+          onInput={(e) => setFilterText(e.currentTarget.value)}
+        />
+        <Show when={filterText().length > 0}>
+          <button
+            class={ui.filterClear}
+            onClick={() => setFilterText('')}
+            title="Clear filter"
+          >
+            <Cross />
+          </button>
+        </Show>
+      </div>
+
       <div class={ui.body}>
         <div>
           <div class={ui.sectionHeader}>
             <span class={ui.sectionLabel}>Recent Flames</span>
           </div>
           <Show
-            when={allRecent().length > 0}
-            fallback={<div class={ui.sectionEmpty}>No recent flames yet</div>}
+            when={filteredRecent().length > 0}
+            fallback={
+              <div class={ui.sectionEmpty}>
+                {allRecent().length > 0
+                  ? 'No matching recent flames'
+                  : 'No recent flames yet'}
+              </div>
+            }
           >
             <div class={ui.grid}>
-              <For each={allRecent()}>
+              <For each={filteredRecent()}>
                 {(recent, i) => (
                   <Show when={i() < visibleRecentCount()}>
                     <button
@@ -169,20 +216,20 @@ export function BlendFlameGallery(props: BlendFlameGalleryProps) {
                 )}
               </For>
             </div>
-            <Show when={allRecent().length > INITIAL_VISIBLE}>
+            <Show when={filteredRecent().length > INITIAL_VISIBLE}>
               <button
                 class={ui.showMoreBtn}
                 onClick={() =>
                   setVisibleRecentCount((c) =>
-                    c >= allRecent().length
+                    c >= filteredRecent().length
                       ? INITIAL_VISIBLE
-                      : allRecent().length,
+                      : filteredRecent().length,
                   )
                 }
               >
                 {showAllRecent()
                   ? 'Show less'
-                  : `Show more (${allRecent().length - INITIAL_VISIBLE} more)`}
+                  : `Show more (${filteredRecent().length - INITIAL_VISIBLE} more)`}
               </button>
             </Show>
           </Show>
@@ -193,7 +240,7 @@ export function BlendFlameGallery(props: BlendFlameGalleryProps) {
             <span class={ui.sectionLabel}>Examples</span>
           </div>
           <div class={ui.grid}>
-            <For each={allExamples()}>
+            <For each={filteredExamples()}>
               {({ name, flame }, i) => (
                 <Show when={i() < visibleExamplesCount()}>
                   <button
@@ -222,20 +269,20 @@ export function BlendFlameGallery(props: BlendFlameGalleryProps) {
               )}
             </For>
           </div>
-          <Show when={allExamples().length > INITIAL_VISIBLE}>
+          <Show when={filteredExamples().length > INITIAL_VISIBLE}>
             <button
               class={ui.showMoreBtn}
               onClick={() =>
                 setVisibleExamplesCount((c) =>
-                  c >= allExamples().length
+                  c >= filteredExamples().length
                     ? INITIAL_VISIBLE
-                    : allExamples().length,
+                    : filteredExamples().length,
                 )
               }
             >
               {showAllExamples()
                 ? 'Show less'
-                : `Show more (${allExamples().length - INITIAL_VISIBLE} more)`}
+                : `Show more (${filteredExamples().length - INITIAL_VISIBLE} more)`}
             </button>
           </Show>
         </div>

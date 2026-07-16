@@ -1,6 +1,10 @@
 .bar {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
   color: var(--neutral-950);
 
   [data-theme='dark'] & {
@@ -24,17 +28,16 @@
   width: 30px;
   height: 30px;
   border-radius: 8px;
-  border: 1px solid var(--neutral-200);
-  background: var(--neutral-50);
-  color: var(--neutral-500);
+  border: 1px solid var(--neutral-300);
+  background: var(--neutral-100);
+  color: var(--neutral-600);
   cursor: pointer;
   transition:
     background 0.15s,
     color 0.15s,
     border-color 0.15s,
     transform 0.1s;
-  /* inset slightly */
-  margin: calc(-1 * var(--space-1));
+  flex-shrink: 0;
 
   & > svg {
     width: 1rem;
@@ -42,9 +45,9 @@
   }
 
   &:hover {
-    background: var(--neutral-100);
-    color: var(--neutral-800);
-    border-color: var(--neutral-400);
+    background: var(--neutral-200);
+    color: var(--neutral-900);
+    border-color: var(--neutral-500);
     transform: translateY(-1px);
   }
 
@@ -53,14 +56,14 @@
   }
 
   [data-theme='dark'] & {
-    border-color: var(--neutral-700);
-    background: var(--neutral-900);
-    color: var(--neutral-400);
+    border-color: var(--neutral-600);
+    background: var(--neutral-800);
+    color: var(--neutral-300);
 
     &:hover {
-      background: var(--neutral-800);
-      color: var(--neutral-200);
-      border-color: var(--neutral-500);
+      background: var(--neutral-700);
+      color: var(--neutral-100);
+      border-color: var(--neutral-400);
     }
   }
 }

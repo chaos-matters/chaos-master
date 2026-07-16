@@ -1,0 +1,373 @@
+.modal {
+  --gallery-cols: 6;
+  --gallery-cell-min: 180px;
+  --gallery-gap: 0.4rem;
+  --gallery-content: calc(
+    var(--gallery-cols) * var(--gallery-cell-min) + (var(--gallery-cols) - 1) *
+      var(--gallery-gap)
+  );
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: min(75vw, var(--gallery-content));
+  max-height: min(88vh, 100%);
+  min-height: 0;
+}
+
+@media (max-width: 1200px) {
+  .modal {
+    width: min(88vw, var(--gallery-content));
+  }
+}
+
+@media (max-width: 768px) {
+  .modal {
+    width: 100vw;
+  }
+}
+
+/* ── Header / generation display ──────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.genBadge {
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.35rem;
+  background: var(--accent, rgba(100, 140, 255, 0.2));
+  border: 1px solid var(--accent, rgba(100, 140, 255, 0.5));
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.parentNames {
+  font-size: 0.75rem;
+  color: var(--text-muted, rgba(128, 128, 128, 0.8));
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.parentName {
+  font-weight: 600;
+  color: var(--text-primary, inherit);
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cross {
+  opacity: 0.5;
+}
+
+.genNav {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.genNavBtn {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 0.3rem;
+  background: transparent;
+  color: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.genNavBtn:hover:not(:disabled) {
+  background: rgba(128, 128, 128, 0.12);
+}
+
+.genNavBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── Toolbar ───────────────────────────────────────────────────────────────── */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.toolbarLeft,
+.toolbarRight {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.countChips,
+.crossoverChips {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.chip {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid rgba(128, 128, 128, 0.25);
+  border-radius: 0.3rem;
+  background: transparent;
+  color: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.chip:hover {
+  background: rgba(128, 128, 128, 0.12);
+}
+
+.chipActive {
+  background: var(--accent, rgba(100, 140, 255, 0.25));
+  border-color: var(--accent, rgba(100, 140, 255, 0.6));
+}
+
+/* ── Mutation slider ──────────────────────────────────────────────────────── */
+
+.mutationRow {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+}
+
+.mutationLabel {
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.mutationSlider {
+  width: 80px;
+  cursor: pointer;
+}
+
+.mutationValue {
+  min-width: 2.4ch;
+  font-weight: 600;
+  font-size: 0.7rem;
+  opacity: 0.8;
+  text-align: right;
+}
+
+/* ── Selection hint ───────────────────────────────────────────────────────── */
+
+.selectHint {
+  font-size: 0.7rem;
+  color: var(--text-muted, rgba(128, 128, 128, 0.7));
+  padding: 0 0.2rem;
+}
+
+.selectHint strong {
+  color: var(--accent, rgba(100, 140, 255, 0.9));
+}
+
+/* ── Body / grid ──────────────────────────────────────────────────────────── */
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--cell-min, 180px), 1fr));
+  gap: 0.5rem;
+  padding: 2px;
+}
+
+/* ── Cell ─────────────────────────────────────────────────────────────────── */
+
+.cell {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border: 2px solid transparent;
+  border-radius: 0.4rem;
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.cell:hover {
+  border-color: rgba(128, 128, 128, 0.4);
+}
+
+.cellSelected {
+  border-color: var(--accent, rgba(100, 140, 255, 0.8));
+  box-shadow: 0 0 12px rgba(100, 140, 255, 0.25);
+}
+
+.cellParent1 {
+  border-color: #4fc3f7;
+  box-shadow: 0 0 14px rgba(79, 195, 247, 0.3);
+}
+
+.cellParent2 {
+  border-color: #ff8a65;
+  box-shadow: 0 0 14px rgba(255, 138, 101, 0.3);
+}
+
+.previewLayer {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Selection badge ──────────────────────────────────────────────────────── */
+
+.badge {
+  position: absolute;
+  top: 0.35rem;
+  left: 0.35rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.badgeParent1 {
+  background: #0288d1;
+}
+
+.badgeParent2 {
+  background: #e64a19;
+}
+
+/* ── Evolve button ────────────────────────────────────────────────────────── */
+
+.evolveBtn {
+  padding: 0.4rem 1rem;
+  border: 1px solid #ff8a65;
+  border-radius: 0.35rem;
+  background: rgba(255, 138, 101, 0.15);
+  color: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.evolveBtn:hover:not(:disabled) {
+  background: rgba(255, 138, 101, 0.3);
+}
+
+.evolveBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  border-color: rgba(128, 128, 128, 0.3);
+  background: transparent;
+}
+
+.rebreedBtn {
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--accent, rgba(100, 140, 255, 0.5));
+  border-radius: 0.35rem;
+  background: var(--accent, rgba(100, 140, 255, 0.15));
+  color: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.rebreedBtn:hover {
+  background: var(--accent, rgba(100, 140, 255, 0.3));
+}
+
+.takeBackBtn {
+  padding: 0.35rem 0.75rem;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 0.35rem;
+  background: transparent;
+  color: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.takeBackBtn:hover {
+  background: rgba(128, 128, 128, 0.1);
+}
+
+.compareBtn {
+  padding: 0.35rem 0.75rem;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  border-radius: 0.35rem;
+  background: rgba(139, 92, 246, 0.1);
+  color: #c4b5fd;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.compareBtn:hover {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: rgba(139, 92, 246, 0.55);
+}
+
+/* ── Gen summary sidebar ──────────────────────────────────────────────────── */
+
+.genSummary {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  font-size: 0.65rem;
+  opacity: 0.55;
+  padding: 0 0.1rem;
+}
+
+.genDot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--accent, rgba(100, 140, 255, 0.5));
+}
+
+.genDotActive {
+  background: var(--accent, rgba(100, 140, 255, 1));
+  box-shadow: 0 0 4px var(--accent, rgba(100, 140, 255, 0.6));
+}
+
+.genArrow {
+  opacity: 0.35;
+}

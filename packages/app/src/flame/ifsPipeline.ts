@@ -624,6 +624,29 @@ export function createIFSPipeline(
 
   const { FlameUniforms, bindGroupLayout, ifsCompute } = cached
 
+  // Capture a template of the expected uniform structure so update() can
+  // defensively fill missing entries with zero-probability defaults when a
+  // flame descriptor has fewer transforms than the pipeline was built for
+  // (avoids "Cannot read properties of undefined (reading 'probability')"
+  // in TypeGPU's compiled writer).
+  const _templateUniforms: Record<string, unknown> = isBlending
+    ? {
+        ...Object.fromEntries(
+          Object.entries(extractFlameUniforms({ transforms })).map(([k, v]) => [
+            k.replace(/^flame/, 'a_'),
+            v,
+          ]),
+        ),
+        ...Object.fromEntries(
+          Object.entries(
+            extractFlameUniforms({ transforms: blendTransforms }),
+          ).map(([k, v]) => [k.replace(/^flame/, 'b_'), v]),
+        ),
+        blendWeight: 0,
+      }
+    : extractFlameUniforms({ transforms })
+  const _uniformKeys = Object.keys(_templateUniforms)
+
   const flameUniformsBuffer = root.createBuffer(FlameUniforms).$usage('storage')
   const outputTextureDimensionBuffer = root
     .createBuffer(vec2i, vec2i(...outputTextureDimension))
@@ -701,7 +724,7 @@ export function createIFSPipeline(
       if (isBlending && blendFlameDescriptor) {
         const a = extractFlameUniforms(flameDescriptor)
         const b = extractFlameUniforms(blendFlameDescriptor)
-        flameUniformsBuffer.write({
+        const uniforms: Record<string, unknown> = {
           ...Object.fromEntries(
             Object.entries(a).map(([k, v]) => [k.replace(/^flame/, 'a_'), v]),
           ),
@@ -709,14 +732,37 @@ export function createIFSPipeline(
             Object.entries(b).map(([k, v]) => [k.replace(/^flame/, 'b_'), v]),
           ),
           blendWeight: blendWeight ?? 0,
-        })
+        }
+        // Defensively merge with template so the compiled writer never
+        // encounters a missing field when transform counts differ.
+        const safe: Record<string, unknown> = {}
+        for (const key of _uniformKeys) {
+          safe[key] =
+            key in uniforms
+              ? uniforms[key]
+              : {
+                  ...(_templateUniforms[key] as Record<string, unknown>),
+                  probability: 0,
+                }
+        }
+        flameUniformsBuffer.write(safe)
+      } else if (_uniformKeys.length === 0) {
+        // Pipeline was built with zero transforms — the struct is the
+        // `{ _dummy }` placeholder, so write its field explicitly.
+        flameUniformsBuffer.write({ _dummy: 0 })
       } else {
         const uniforms = extractFlameUniforms(flameDescriptor)
-        if (Object.keys(uniforms).length === 0) {
-          flameUniformsBuffer.write({ _dummy: 0 })
-        } else {
-          flameUniformsBuffer.write(uniforms)
+        const safe: Record<string, unknown> = {}
+        for (const key of _uniformKeys) {
+          safe[key] =
+            key in uniforms
+              ? uniforms[key]
+              : {
+                  ...(_templateUniforms[key] as Record<string, unknown>),
+                  probability: 0,
+                }
         }
+        flameUniformsBuffer.write(safe)
       }
       finalTransformBuffer.write(
         flameDescriptor.finalTransform ?? {

@@ -39,6 +39,58 @@
   color: var(--neutral-200);
 }
 
+/* ── Filter ──────────────────── */
+
+.filterRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--neutral-800);
+  flex-shrink: 0;
+}
+
+.filterInput {
+  flex: 1;
+  appearance: none;
+  border: 1px solid var(--neutral-700);
+  border-radius: 6px;
+  background: var(--neutral-900);
+  color: var(--neutral-200);
+  font-size: 0.72rem;
+  font-family: inherit;
+  padding: 5px 8px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.filterInput::placeholder {
+  color: var(--neutral-500);
+}
+
+.filterInput:focus {
+  border-color: var(--neutral-500);
+}
+
+.filterClear {
+  appearance: none;
+  border: none;
+  background: none;
+  color: var(--neutral-500);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+
+.filterClear:hover {
+  color: var(--neutral-200);
+}
+
 .body {
   overflow-y: auto;
   padding: 0.75rem 1rem;
@@ -232,4 +284,30 @@
 
 [data-theme='light'] .thumbnailMeta {
   color: rgba(0, 0, 0, 0.4);
+}
+
+[data-theme='light'] .filterRow {
+  border-bottom-color: var(--neutral-200);
+}
+
+[data-theme='light'] .filterInput {
+  background: var(--neutral-50);
+  border-color: var(--neutral-200);
+  color: var(--neutral-800);
+}
+
+[data-theme='light'] .filterInput::placeholder {
+  color: var(--neutral-400);
+}
+
+[data-theme='light'] .filterInput:focus {
+  border-color: var(--neutral-400);
+}
+
+[data-theme='light'] .filterClear {
+  color: var(--neutral-400);
+}
+
+[data-theme='light'] .filterClear:hover {
+  color: var(--neutral-700);
 }

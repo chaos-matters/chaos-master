@@ -83,6 +83,7 @@ function perturbParametricParams(
   is3D: boolean,
   existing: Record<string, number> | undefined,
   strength: number,
+  rateScale = 1,
 ): Record<string, number> {
   const defaults = (
     is3D
@@ -93,7 +94,7 @@ function perturbParametricParams(
   const sigmaScale = paramSigmaScale(strength)
   for (const key of Object.keys(defaults.paramDefaults)) {
     const d = params[key] ?? defaults.paramDefaults[key]!
-    params[key] = randomPerturbation(d, paramSigma(d, sigmaScale))
+    params[key] = randomPerturbation(d, paramSigma(d, sigmaScale) * rateScale)
   }
   return params
 }
@@ -113,17 +114,29 @@ export function randomizeVariationParams(
 
 /**
  * In-place perturbation of an existing variation: randomize its parametric
- * params (when parametric) and nudge its weight.
+ * params (when parametric) and nudge its weight. `rateScale` scales both
+ * sigmas — the Mutation Lab's per-kind rate multiplier (1 = neutral).
  */
 function perturbVariationInPlace(
   v: RandomVariationLike,
   strength: number,
+  rateScale = 1,
 ): void {
   const { is3D, isParametric } = variationDimInfo(v.type)
   if (isParametric) {
-    v.params = perturbParametricParams(v.type, is3D, v.params, strength)
+    v.params = perturbParametricParams(
+      v.type,
+      is3D,
+      v.params,
+      strength,
+      rateScale,
+    )
   }
-  v.weight = randomPerturbation(v.weight, 0.2 * strength, [0.05, 1.0])
+  v.weight = randomPerturbation(
+    v.weight,
+    0.2 * strength * rateScale,
+    [0.05, 1.0],
+  )
 }
 
 /**
@@ -569,9 +582,71 @@ export interface MutateFlameOptions {
    * independently (`randomizeAffineCoef`).
    */
   affineMode: 'smart' | 'full'
+  /** 0–1, how strongly affine coefficients drift (default 0.5). */
+  affineMutationRate?: number
   mutateVariations: 'modify' | 'all' | 'none'
+  /** 0–1, magnitude of variation-weight perturbation (default 0.5). */
+  variationWeightRate?: number
+  /** 0–1, probability of swapping a variation type entirely (default 0.1). */
+  variationSwapChance?: number
   mutateColors: boolean
+  /** 0–1, how strongly OkLab color values shift (default 0.4). */
+  colorMutationRate?: number
+  /** 0–0.3, probability of adding a new random transform (default 0). */
+  addTransformChance?: number
+  /** 0–0.3, probability of removing a transform (default 0). */
+  removeTransformChance?: number
+  /** If provided, restrict mutation to only these transform IDs. */
+  selectedTransformIds?: string[]
 }
+
+/** Sensible defaults for the new fine-grained rate fields. */
+export const MUTATION_RATE_DEFAULTS = {
+  affineMutationRate: 0.5,
+  variationWeightRate: 0.5,
+  variationSwapChance: 0.1,
+  colorMutationRate: 0.4,
+  addTransformChance: 0,
+  removeTransformChance: 0,
+} as const
+
+/** Presets for common mutation styles. */
+export const MUTATION_PRESETS = {
+  Subtle: {
+    affineMutationRate: 0.15,
+    variationWeightRate: 0.15,
+    variationSwapChance: 0.02,
+    colorMutationRate: 0.1,
+    addTransformChance: 0,
+    removeTransformChance: 0,
+  },
+  Moderate: {
+    affineMutationRate: 0.4,
+    variationWeightRate: 0.4,
+    variationSwapChance: 0.1,
+    colorMutationRate: 0.3,
+    addTransformChance: 0,
+    removeTransformChance: 0,
+  },
+  Chaotic: {
+    affineMutationRate: 0.8,
+    variationWeightRate: 0.8,
+    variationSwapChance: 0.35,
+    colorMutationRate: 0.7,
+    addTransformChance: 0.1,
+    removeTransformChance: 0.05,
+  },
+  Structural: {
+    affineMutationRate: 0.2,
+    variationWeightRate: 0.2,
+    variationSwapChance: 0,
+    colorMutationRate: 0.1,
+    addTransformChance: 0.25,
+    removeTransformChance: 0.2,
+  },
+} as const
+
+export type MutationPresetName = keyof typeof MUTATION_PRESETS
 
 export function mutateFlame(
   flame: FlameDescriptor,
@@ -580,6 +655,24 @@ export function mutateFlame(
 ): FlameDescriptor {
   const { strength, minVariations, maxVariations, allowedVariations } = config
   const dims = config.dimensions ?? 2
+
+  // Effective rates — use explicit option values, falling back to defaults.
+  const affineRate =
+    options.affineMutationRate ?? MUTATION_RATE_DEFAULTS.affineMutationRate
+  const weightRate =
+    options.variationWeightRate ?? MUTATION_RATE_DEFAULTS.variationWeightRate
+  const swapChance =
+    options.variationSwapChance ?? MUTATION_RATE_DEFAULTS.variationSwapChance
+  const colorRate =
+    options.colorMutationRate ?? MUTATION_RATE_DEFAULTS.colorMutationRate
+  const addChance =
+    options.addTransformChance ?? MUTATION_RATE_DEFAULTS.addTransformChance
+  const removeChance =
+    options.removeTransformChance ??
+    MUTATION_RATE_DEFAULTS.removeTransformChance
+
+  // Effective affine strength: base strength scaled by affine mutation rate.
+  const affineStrength = strength * affineRate
 
   const mutated = deepClone(flame)
   const transforms = mutated.transforms
@@ -596,22 +689,164 @@ export function mutateFlame(
         ? [...variationTypes3D]
         : [...variationTypes]
 
-  for (const [, t] of recordEntries(transforms)) {
+  // Mutation Lab: occasionally swap a variation's type for another from the
+  // pool (params re-randomized for the new type, or dropped when it has none).
+  const maybeSwapVariationType = (v: RandomVariation) => {
+    if (swapChance <= 0 || random01() >= swapChance) return
+    const others = pool.filter((vt) => vt !== v.type)
+    if (others.length === 0) return
+    const newType = pickRandomVariationType(others)
+    v.type = newType
+    const randomizedParams = randomizeVariationParams(newType, strength)
+    if (randomizedParams) {
+      v.params = randomizedParams
+    } else {
+      delete v.params
+    }
+  }
+
+  // Determine which transform IDs to iterate over.
+  const allEntries = recordEntries(transforms)
+  const targetIds = options.selectedTransformIds
+
+  // --- Structural mutation: remove transforms ---
+  const entriesAfterRemoval =
+    removeChance > 0 && allEntries.length > 1
+      ? allEntries.filter(([tid]) => {
+          if (targetIds && !targetIds.includes(tid)) return true // keep non-targeted
+          return random01() >= removeChance
+        })
+      : allEntries
+
+  const transformEntries =
+    targetIds && targetIds.length > 0
+      ? entriesAfterRemoval.filter(([tid]) => targetIds.includes(tid as string))
+      : entriesAfterRemoval
+
+  // --- Structural mutation: add transforms ---
+  let addedCount = 0
+  if (addChance > 0) {
+    while (random01() < addChance && addedCount < 3) {
+      addedCount++
+    }
+  }
+
+  // Helper to create a new random transform (used by addTransformChance).
+  const createRandomTransform = () => {
+    const varCount = Math.floor(randomRange(minVariations, maxVariations + 1))
+    const usedTypes = new Set<
+      TransformVariationType | TransformVariationType3D
+    >()
+    const variations: Record<string, unknown> = {}
+
+    for (let v = 0; v < varCount; v++) {
+      const available = pool.filter((vt) => !usedTypes.has(vt))
+      if (available.length === 0) break
+      const vtype = pickRandomVariationType(available)
+      usedTypes.add(vtype)
+
+      const vid = generateVariationId()
+      const weight = randomRange(0.3, 1)
+      const base = getVariationDefault(vtype, weight) as Record<string, unknown>
+      const is3D = isVariationType3D(vtype)
+      const isParametric = is3D
+        ? isParametricVariationType3D(vtype)
+        : isParametricVariationType(vtype)
+      if (isParametric) {
+        const randomizedParams = randomizeVariationParams(vtype, strength)
+        if (randomizedParams) {
+          variations[vid] = { ...base, params: randomizedParams }
+          continue
+        }
+      }
+      variations[vid] = base
+    }
+
+    const varEntries = recordEntries(variations)
+    const totalWeight = varEntries.reduce(
+      (sum, [, v]) => sum + ((v as Record<string, unknown>).weight as number),
+      0,
+    )
+    if (totalWeight > 0) {
+      for (const [vid] of varEntries) {
+        ;(variations[vid] as Record<string, unknown>).weight =
+          ((variations[vid] as Record<string, unknown>).weight as number) /
+          totalWeight
+      }
+    }
+
+    return {
+      probability: randomRange(0.3, 1),
+      preAffine:
+        dims === 3
+          ? {
+              a: randomizeAffineCoef(1, 'a', strength, true),
+              b: randomizeAffineCoef(0, 'b', strength, true),
+              c: randomizeAffineCoef(0, 'c', strength, true),
+              d: randomizeAffineCoef(0, 'd', strength, true),
+              e: randomizeAffineCoef(0, 'e', strength, true),
+              f: randomizeAffineCoef(1, 'f', strength, true),
+              g: randomizeAffineCoef(0, 'g', strength, true),
+              h: randomizeAffineCoef(0, 'h', strength, true),
+              i: randomizeAffineCoef(0, 'i', strength, true),
+              j: randomizeAffineCoef(0, 'j', strength, true),
+              k: randomizeAffineCoef(1, 'k', strength, true),
+              l: randomizeAffineCoef(0, 'l', strength, true),
+            }
+          : {
+              a: randomizeAffineCoef(1, 'a', strength, false),
+              b: randomizeAffineCoef(0, 'b', strength, false),
+              c: randomizeAffineCoef(0, 'c', strength, false),
+              d: randomizeAffineCoef(0, 'd', strength, false),
+              e: randomizeAffineCoef(1, 'e', strength, false),
+              f: randomizeAffineCoef(0, 'f', strength, false),
+            },
+      postAffine:
+        dims === 3
+          ? {
+              a: randomizeAffineCoef(1, 'a', strength, true),
+              b: randomizeAffineCoef(0, 'b', strength, true),
+              c: randomizeAffineCoef(0, 'c', strength, true),
+              d: randomizeAffineCoef(0, 'd', strength, true),
+              e: randomizeAffineCoef(0, 'e', strength, true),
+              f: randomizeAffineCoef(1, 'f', strength, true),
+              g: randomizeAffineCoef(0, 'g', strength, true),
+              h: randomizeAffineCoef(0, 'h', strength, true),
+              i: randomizeAffineCoef(0, 'i', strength, true),
+              j: randomizeAffineCoef(0, 'j', strength, true),
+              k: randomizeAffineCoef(1, 'k', strength, true),
+              l: randomizeAffineCoef(0, 'l', strength, true),
+            }
+          : {
+              a: randomizeAffineCoef(1, 'a', strength, false),
+              b: randomizeAffineCoef(0, 'b', strength, false),
+              c: randomizeAffineCoef(0, 'c', strength, false),
+              d: randomizeAffineCoef(0, 'd', strength, false),
+              e: randomizeAffineCoef(1, 'e', strength, false),
+              f: randomizeAffineCoef(0, 'f', strength, false),
+            },
+      color: { x: randomRange(-0.4, 0.4), y: randomRange(-0.4, 0.4) },
+      variations,
+      visible: true,
+    }
+  }
+
+  for (const [, t] of transformEntries) {
     // 1. Mutate Affine
     if (options.mutateAffine) {
       const mutateOne = (affine: Record<string, number>) => {
         if (options.affineMode === 'smart') {
           if (dims === 3) {
-            smartMutateAffine3D(affine, strength)
+            smartMutateAffine3D(affine, affineStrength)
           } else {
-            smartMutateAffine2D(affine, strength)
+            smartMutateAffine2D(affine, affineStrength)
           }
         } else {
           for (const key of Object.keys(affine)) {
             affine[key] = randomizeAffineCoef(
               affine[key] ?? 0,
               key,
-              strength,
+              affineStrength,
               dims === 3,
             )
           }
@@ -624,8 +859,16 @@ export function mutateFlame(
     // 2. Mutate Colors
     if (options.mutateColors && t.color) {
       t.color = {
-        x: randomPerturbation(t.color.x, 0.15 * strength, [-0.4, 0.4]),
-        y: randomPerturbation(t.color.y, 0.15 * strength, [-0.4, 0.4]),
+        x: randomPerturbation(
+          t.color.x,
+          0.15 * strength * colorRate * 2,
+          [-0.4, 0.4],
+        ),
+        y: randomPerturbation(
+          t.color.y,
+          0.15 * strength * colorRate * 2,
+          [-0.4, 0.4],
+        ),
       }
     }
 
@@ -634,7 +877,9 @@ export function mutateFlame(
       if (t.variations) {
         const vars = t.variations as Record<string, RandomVariation>
         for (const vid of Object.keys(vars)) {
-          perturbVariationInPlace(vars[vid]!, strength)
+          perturbVariationInPlace(vars[vid]!, strength, weightRate)
+          // Apply variationSwapChance in 'modify' mode too.
+          maybeSwapVariationType(vars[vid]!)
         }
       }
     } else if (options.mutateVariations === 'all') {
@@ -644,7 +889,9 @@ export function mutateFlame(
       const currentVars = Object.entries(vars).map(([vid, v]) => ({ vid, v }))
 
       for (const item of currentVars) {
-        perturbVariationInPlace(item.v, strength)
+        perturbVariationInPlace(item.v, strength, weightRate)
+        // Apply variation swap chance in 'all' mode.
+        maybeSwapVariationType(item.v)
       }
 
       let targetVarCount = Math.floor(
@@ -694,6 +941,23 @@ export function mutateFlame(
 
     if (options.mutateVariations !== 'none' && t.variations) {
       normalizeVariationWeights(t.variations)
+    }
+  }
+
+  // --- Structural mutation: insert newly created transforms ---
+  for (let i = 0; i < addedCount; i++) {
+    const nt = createRandomTransform()
+    const newTid = generateTransformId()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(mutated.transforms as Record<string, any>)[newTid] = nt
+  }
+
+  // Normalize transform probabilities after structural changes.
+  const finalEntries = recordEntries(mutated.transforms)
+  if (finalEntries.length > 0) {
+    const p = 1 / finalEntries.length
+    for (const [, ft] of finalEntries) {
+      ft.probability = p
     }
   }
 
