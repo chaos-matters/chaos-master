@@ -464,15 +464,20 @@ export function EvolutionChamber(props: {
               {(child, i) => {
                 const isP1 = () => sel()?.[0] === i()
                 const isP2 = () => sel()?.[1] === i()
+                const childName = () =>
+                  child.metadata?.name ?? `Child ${i() + 1}`
 
                 return (
-                  <div
+                  <button
+                    type="button"
                     class={ui.cell}
                     classList={{
                       [ui.cellParent1!]: isP1(),
                       [ui.cellParent2!]: isP2(),
                     }}
-                    title={child.metadata?.name ?? `Child ${i() + 1}`}
+                    title={childName()}
+                    aria-label={`Select ${childName()}`}
+                    aria-pressed={isP1() || isP2()}
                     onClick={() => {
                       toggleSelect(i())
                     }}
@@ -498,7 +503,7 @@ export function EvolutionChamber(props: {
                     {isP2() && (
                       <span class={`${ui.badge} ${ui.badgeParent2}`}>2</span>
                     )}
-                  </div>
+                  </button>
                 )
               }}
             </For>

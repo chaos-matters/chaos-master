@@ -732,11 +732,14 @@ export function PopulationSimulator(props: {
             <div class={ui.gallery}>
               <For each={topN()}>
                 {(sf, idx) => (
-                  <div
+                  <button
+                    type="button"
                     class={ui.galleryItem}
                     classList={{
                       [ui.galleryItemSelected!]: selectedFlame() === sf.flame,
                     }}
+                    aria-pressed={selectedFlame() === sf.flame}
+                    aria-label={`Select flame #${idx() + 1}, score ${sf.score.toFixed(3)}`}
                     onClick={() => setSelectedFlame(sf.flame)}
                   >
                     <DelayedShow delayMs={idx() * STAGGER_DELAY_MS}>
@@ -751,7 +754,7 @@ export function PopulationSimulator(props: {
                     </DelayedShow>
                     <div class={ui.galleryItemRank}>{idx() + 1}</div>
                     <div class={ui.galleryItemScore}>{sf.score.toFixed(3)}</div>
-                  </div>
+                  </button>
                 )}
               </For>
             </div>
@@ -796,8 +799,10 @@ export function PopulationSimulator(props: {
                       <div class={ui.bestLabel}>
                         #{idx() + 1} — {sf.score.toFixed(3)}
                       </div>
-                      <div
+                      <button
+                        type="button"
                         class={ui.galleryItem}
+                        aria-label={`Use best flame #${idx() + 1}, score ${sf.score.toFixed(3)}`}
                         onClick={() => {
                           applyFlame(sf.flame)
                         }}
@@ -810,7 +815,7 @@ export function PopulationSimulator(props: {
                           resolution={resolution()}
                           hardwareTier={tier()}
                         />
-                      </div>
+                      </button>
                     </div>
                   )}
                 </For>
@@ -829,8 +834,10 @@ export function PopulationSimulator(props: {
                             Gen {result.generation + 1} —{' '}
                             {result.best.score.toFixed(3)}
                           </div>
-                          <div
+                          <button
+                            type="button"
                             class={ui.galleryItem}
+                            aria-label={`Use best flame of generation ${result.generation + 1}, score ${result.best.score.toFixed(3)}`}
                             onClick={() => {
                               applyFlame(result.best.flame)
                             }}
@@ -849,7 +856,7 @@ export function PopulationSimulator(props: {
                                 hardwareTier={tier()}
                               />
                             </DelayedShow>
-                          </div>
+                          </button>
                         </div>
                       </Show>
                     )}
@@ -882,8 +889,10 @@ export function PopulationSimulator(props: {
                   <For each={livePopulation()}>
                     {(sf, idx) => (
                       <Show when={idx() < visibleFullPopCount()}>
-                        <div
+                        <button
+                          type="button"
                           class={ui.galleryItem}
+                          aria-label={`Use flame #${idx() + 1}, score ${sf.score.toFixed(3)}`}
                           onClick={() => {
                             applyFlame(sf.flame)
                           }}
@@ -906,7 +915,7 @@ export function PopulationSimulator(props: {
                           <div class={ui.galleryItemScore}>
                             {sf.score.toFixed(3)}
                           </div>
-                        </div>
+                        </button>
                       </Show>
                     )}
                   </For>
