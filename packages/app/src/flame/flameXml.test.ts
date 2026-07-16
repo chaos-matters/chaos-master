@@ -171,7 +171,7 @@ describe('resolveVariationType', () => {
 })
 
 // The canonical flam3 variation set (variations 0-98 from flam3/variations.c).
-// Every one must resolve to a Chaos Master type.
+// Every one must resolve to a Lumen Apeiron type.
 const CANONICAL_FLAM3 = [
   'linear',
   'sinusoidal',

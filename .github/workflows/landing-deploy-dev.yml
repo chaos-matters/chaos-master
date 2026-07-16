@@ -1,6 +1,6 @@
 name: Deploy landing (dev)
 
-# Deploy the landing page to the DEV Worker (about.dev.chaos-master.com) on every
+# Deploy the landing page to the DEV Worker (about.dev.lumenapeiron.com) on every
 # push to main that touches the landing package. The `paths` filter means an app-
 # only change won't redeploy the dev landing (per request). Note: changes to
 # packages/app that the landing bundles won't trigger this either — bump/touch the

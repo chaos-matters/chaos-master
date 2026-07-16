@@ -29,8 +29,8 @@ export default function OpenInApp(props: { flame: FlameDescriptor }) {
         href={url()}
         target="_blank"
         rel="noopener"
-        title="Open this flame in Chaos Master"
-        aria-label="Open this flame in Chaos Master"
+        title="Open this flame in Lumen Apeiron"
+        aria-label="Open this flame in Lumen Apeiron"
         onPointerDown={(e) => e.stopPropagation()}
       >
         <svg

@@ -1,4 +1,4 @@
-/* Chaos Master landing — design tokens lifted verbatim from packages/app design
+/* Lumen Apeiron landing — design tokens lifted verbatim from packages/app design
    system (designSystem/colors.css): monochrome oklch neutral ramp + a single blue
    accent, Inter. Color comes from the art, not the chrome. */
 :root {
@@ -272,7 +272,7 @@ h2 {
   }
 }
 
-/* "Open in Chaos Master" button — rendered inside the flame islands (gallery
+/* "Open in Lumen Apeiron" button — rendered inside the flame islands (gallery
    plates + community cards), revealed on hover of the card/plate. */
 .open-in-app {
   position: absolute;

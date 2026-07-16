@@ -35,7 +35,7 @@ const IGNORED_ERROR_PATTERNS = [
 test.describe('CI smoke', () => {
   test('serves the built app with the correct title', async ({ page }) => {
     await page.goto('/', { waitUntil: 'domcontentloaded' })
-    await expect(page).toHaveTitle(/Chaos Master/)
+    await expect(page).toHaveTitle(/Lumen Apeiron/)
   })
 
   test('mounts the app shell into #root', async ({ page }) => {

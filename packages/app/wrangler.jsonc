@@ -35,11 +35,21 @@
       "name": "chaos-master",
       // Hostnames a Turnstile token may have been solved on (pins the token to
       // this origin). Keep in sync with the Turnstile widget's hostname list.
+      // chaos-master.com stays allowed while the legacy domain still serves the
+      // app (until the Cloudflare redirect to lumenapeiron.com goes live).
       "vars": {
-        "TURNSTILE_ALLOWED_HOSTNAMES": "chaos-master.com",
+        "TURNSTILE_ALLOWED_HOSTNAMES": "lumenapeiron.com,chaos-master.com",
       },
       "routes": [
         {
+          "pattern": "lumenapeiron.com",
+          "custom_domain": true,
+        },
+        {
+          // Legacy domain — keep bound so chaos-master.com keeps resolving and
+          // serving until the zone-level redirect to lumenapeiron.com is
+          // enabled. Remove this route (and the Turnstile hostname above) once
+          // the redirect is verified live.
           "pattern": "chaos-master.com",
           "custom_domain": true,
         },
@@ -80,11 +90,11 @@
       // localhost included so `wrangler dev --env dev` accepts tokens solved on
       // the local Turnstile widget. Keep in sync with the widget hostname list.
       "vars": {
-        "TURNSTILE_ALLOWED_HOSTNAMES": "dev.chaos-master.com,localhost",
+        "TURNSTILE_ALLOWED_HOSTNAMES": "dev.lumenapeiron.com,localhost",
       },
       "routes": [
         {
-          "pattern": "dev.chaos-master.com",
+          "pattern": "dev.lumenapeiron.com",
           "custom_domain": true,
         },
       ],

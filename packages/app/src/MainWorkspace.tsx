@@ -341,15 +341,15 @@ export function MainWorkspace(props: AppProps) {
     })
   }
 
-  // Browser tab title: "Chaos Master — <flame name>" when the flame is named,
-  // otherwise just "Chaos Master".
+  // Browser tab title: "Lumen Apeiron — <flame name>" when the flame is named,
+  // otherwise just "Lumen Apeiron".
   createEffect(() => {
     const name = flameDescriptor.metadata?.name?.trim()
 
     document.title =
       name && name.toLowerCase() !== 'unknown'
-        ? `Chaos Master — ${name}`
-        : 'Chaos Master'
+        ? `Lumen Apeiron — ${name}`
+        : 'Lumen Apeiron'
   })
 
   const [animationEnabled, setAnimationEnabled] = createSignal(true)

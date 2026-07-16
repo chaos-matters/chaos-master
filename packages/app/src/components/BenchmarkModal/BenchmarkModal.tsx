@@ -76,7 +76,7 @@ function gatherBenchmarkLog(
   const lines: string[] = []
   const { navigator: n } = globalThis
 
-  lines.push('**Chaos Master Benchmark**')
+  lines.push('**Lumen Apeiron Benchmark**')
   lines.push(`Version  : ${VERSION}${GIT_SHA ? ` (${GIT_SHA})` : ''}`)
 
   if (gpuInfo) {
@@ -366,7 +366,7 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
     // Title
     ctx.fillStyle = '#ffffff'
     ctx.font = 'bold 22px Inter, system-ui, sans-serif'
-    ctx.fillText('Chaos Master Benchmark', 28, 54)
+    ctx.fillText('Lumen Apeiron Benchmark', 28, 54)
 
     // Version pill
     const versionText = `v${VERSION}${GIT_SHA ? ` (${GIT_SHA})` : ''}`
@@ -483,7 +483,7 @@ function BenchmarkModal(props: { respond: () => void; autoStart?: boolean }) {
     )
 
     ctx.fillStyle = 'rgba(255,255,255,0.15)'
-    ctx.fillText('chaos-master.com', W - 110, H - 24)
+    ctx.fillText('lumenapeiron.com', W - 110, H - 24)
 
     // Border
     ctx.strokeStyle = 'rgba(255,255,255,0.06)'

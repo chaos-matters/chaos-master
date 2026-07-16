@@ -10,12 +10,14 @@ interface Props {
 }
 
 const {
-  title = 'Chaos Master — WebGPU IFS Flame Generator',
-  description = 'High-performance, real-time IFS fractal flame generation in the browser, powered by WebGPU. For artists and explorers.',
+  title = 'Lumen Apeiron — WebGPU IFS Flame Generator',
+  description = 'Lumen Apeiron (formerly Chaos Master): high-performance, real-time IFS fractal flame generation in the browser, powered by WebGPU. For artists and explorers.',
 } = Astro.props
 
 const canonical = new URL(Astro.url.pathname, Astro.site).href
-const ogImage = new URL('/hero-flame.jpg', Astro.site).href
+// Landscape 1200x630 social card (1.91:1) — renders correctly in link previews,
+// unlike the square hero-flame.jpg it replaced.
+const ogImage = new URL('/og-cover.jpg', Astro.site).href
 
 // Dev log piping: when PUBLIC_REMOTE_LOG=true (set in .env.local), mirror the
 // device's console + uncaught errors to the dev-server terminal via /__client-log
@@ -84,9 +86,16 @@ const remoteLog =
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Lumen Apeiron" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="2400" />
+    <meta property="og:image:height" content="1260" />
+    <meta
+      property="og:image:alt"
+      content="A multicolored IFS fractal flame rendered in real time by Lumen Apeiron"
+    />
     <meta property="og:url" content={canonical} />
 
     <!-- Twitter -->

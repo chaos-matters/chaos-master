@@ -104,7 +104,7 @@ jobs:
           packageManager: 'pnpm'
           workingDirectory: 'packages/app'
 
-      # Deploys to dev.chaos-master.com when pushing to the main branch
+      # Deploys to dev.lumenapeiron.com when pushing to the main branch
       - name: Deploy to Dev Environment
         if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.DEPLOY_ENABLED == 'true'
         uses: cloudflare/wrangler-action@v3
@@ -178,7 +178,7 @@ jobs:
               });
             }
 
-      # Deploys to chaos-master.com when pushing a tag starting with 'v'
+      # Deploys to lumenapeiron.com when pushing a tag starting with 'v'
       - name: Deploy to Production Environment
         if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push' && env.DEPLOY_ENABLED == 'true'
         uses: cloudflare/wrangler-action@v3

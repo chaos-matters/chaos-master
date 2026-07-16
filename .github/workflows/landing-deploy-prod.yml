@@ -1,7 +1,7 @@
 name: Deploy landing (prod)
 
 # Deploy the marketing landing page to the PRODUCTION Worker
-# (about.chaos-master.com) on a landing release tag of the form `vA.B.C-web`
+# (about.lumenapeiron.com) on a landing release tag of the form `vA.B.C-web`
 # (A.B.C = the landing package version). Decoupled from the app's `v*` tags so a
 # landing release never ships the app and vice-versa.
 #

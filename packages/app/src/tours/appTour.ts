@@ -5,7 +5,7 @@ export const appTour: TourGuide = {
   id: 'app',
   name: 'App Tour',
   description:
-    'Get familiar with Chaos Master — the canvas, controls, and how to load, export, and share flames.',
+    'Get familiar with Lumen Apeiron — the canvas, controls, and how to load, export, and share flames.',
   nextTourId: 'sidebar',
   nextTourLabel: 'Sidebar Tour',
   steps: [

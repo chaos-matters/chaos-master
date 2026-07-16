@@ -9,7 +9,7 @@ import { example46 } from '@/flame/examples/example46'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 /** The app's origin — where `?flame=` links open. */
-export const APP_URL = 'https://chaos-master.com'
+export const APP_URL = 'https://lumenapeiron.com'
 
 /**
  * A landing-only override layered on top of an app example WITHOUT forking it —
@@ -47,7 +47,7 @@ export function overrideFlame(
 
 /**
  * Landing render of the Enchanted Rose — the SAME app example (example34) the
- * Chaos Master app ships, so the colour/grade matches the in-app render exactly
+ * Lumen Apeiron app ships, so the colour/grade matches the in-app render exactly
  * (it previously used the unrelated "Enchanted Rose v2" example44, which renders
  * a yellow bloom instead of the app's red rose). Only density-estimation quality
  * is bumped here (landing-only, colour-neutral): the app example uses 0.66, which
