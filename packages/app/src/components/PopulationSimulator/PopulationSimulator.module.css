@@ -150,6 +150,14 @@
   background: var(--neutral-700, #444);
 }
 
+/* WCAG 2.5.5 target size: keep chips compact for mouse, grow to 44px on touch */
+@media (pointer: coarse) {
+  .chip {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 /* ── Action buttons ───────────────────────────────────────────────────────── */
 
 .actions {
@@ -219,13 +227,21 @@
 }
 
 .galleryItem {
+  display: block;
+  width: 100%;
   position: relative;
   border-radius: 8px;
   overflow: hidden;
   border: 2px solid transparent;
+  background: none;
   cursor: pointer;
+  touch-action: manipulation;
   transition: border-color 0.15s;
-  aspect-ratio: 16 / 9;
+  /* 16:9 via padding-bottom, not aspect-ratio: all children are absolute, so
+     aspect-ratio would collapse the auto grid row and overlap tiles (see
+     .agents/skills/gallery_preview_layout). */
+  padding-bottom: 56.25%;
+  min-height: 64px; /* floor against the Firefox device-loss reflow squeeze */
 }
 .galleryItem:hover {
   border-color: var(--accent, #6366f1);

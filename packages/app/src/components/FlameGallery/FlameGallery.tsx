@@ -304,7 +304,7 @@ function Cell(props: {
   })
 
   return (
-    <div class={ui.cell} onClick={props.onApply}>
+    <button type="button" class={ui.cell} onClick={props.onApply}>
       <div class={ui.previewArea}>
         <Show when={flame()}>
           {(f) => (
@@ -330,6 +330,6 @@ function Cell(props: {
           </For>
         </div>
       </div>
-    </div>
+    </button>
   )
 }

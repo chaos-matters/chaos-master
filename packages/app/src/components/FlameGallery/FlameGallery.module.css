@@ -155,6 +155,14 @@
   border-color: rgba(239, 68, 68, 0.35);
 }
 
+/* WCAG 2.5.5 target size: keep chips compact for mouse, grow to 44px on touch */
+@media (pointer: coarse) {
+  .tagChip {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 /* ── Section headers ────────────────────── */
 
 .scrollBody {
@@ -190,11 +198,14 @@
 
 .cell {
   position: relative;
+  width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 10px;
   overflow: hidden;
   background: #0a0d14;
   cursor: pointer;
+  touch-action: manipulation;
+  text-align: left; /* buttons default to centered text */
   transition: all 0.18s;
   display: flex;
   flex-direction: column;

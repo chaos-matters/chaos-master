@@ -144,6 +144,14 @@
   border-color: var(--accent, rgba(100, 140, 255, 0.6));
 }
 
+/* WCAG 2.5.5 target size: keep chips compact for mouse, grow to 44px on touch */
+@media (pointer: coarse) {
+  .chip {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 /* ── Mutation slider ──────────────────────────────────────────────────────── */
 
 .mutationRow {
@@ -201,16 +209,23 @@
 /* ── Cell ─────────────────────────────────────────────────────────────────── */
 
 .cell {
+  display: block;
+  width: 100%;
   position: relative;
-  aspect-ratio: 16 / 9;
   border: 2px solid transparent;
   border-radius: 0.4rem;
   overflow: hidden;
   cursor: pointer;
+  touch-action: manipulation;
   transition:
     border-color 0.15s,
     box-shadow 0.15s;
   background: rgba(0, 0, 0, 0.15);
+  /* 16:9 via padding-bottom, not aspect-ratio: all children are absolute, so
+     aspect-ratio would collapse the auto grid row and overlap tiles (see
+     .agents/skills/gallery_preview_layout). */
+  padding-bottom: 56.25%;
+  min-height: 64px; /* floor against the Firefox device-loss reflow squeeze */
 }
 
 .cell:hover {
@@ -233,8 +248,10 @@
 }
 
 .previewLayer {
-  width: 100%;
-  height: 100%;
+  /* Absolute fill: with padding-bottom sizing the cell's content box has zero
+     height, so an in-flow height: 100% child would collapse. */
+  position: absolute;
+  inset: 0;
 }
 
 /* ── Selection badge ──────────────────────────────────────────────────────── */
