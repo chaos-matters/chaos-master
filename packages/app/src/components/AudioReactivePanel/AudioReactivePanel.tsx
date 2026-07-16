@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Index, onCleanup, Show, } from 'solid-js'
 import { Cross, MusicNote } from '@/icons'
 import { createLiveAnalyzer, decodeAudioFile, getAudioFeatureNormalized, } from '@/utils/audioAnalysis'
 import { AudioWiringModal } from '../AudioWiringModal/AudioWiringModal'
@@ -847,213 +847,224 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
         <div>
           <div class={ui.sectionLabel}>Mappings</div>
           <div class={ui.mappingsList} role="list">
-            <For each={props.audioMapping().mappings}>
-              {(mapping, index) => (
-                <div class={ui.mappingRow} role="listitem">
-                  {/* Top row: routing — source -> target category chain */}
-                  <div class={ui.mappingTopRow}>
-                    <select
-                      class={`${ui.mappingSelect} ${ui.sourceSelect}`}
-                      aria-label="Audio source feature"
-                      value={mapping.audioFeature}
-                      onChange={(e) => {
-                        updateMapping(index(), {
-                          audioFeature: e.currentTarget.value as AudioFeature,
-                        })
-                      }}
-                    >
-                      <For each={ALL_FEATURES}>
-                        {(f) => (
-                          <option value={f}>{AUDIO_FEATURE_LABELS[f]}</option>
+            <Index each={props.audioMapping().mappings}>
+              {(mapping, index) => {
+                // Narrow-friendly reads: TS re-widens the target union on every
+                // mapping() call, so each helper narrows one snapshot.
+                const transformIdxOf = () => {
+                  const t = mapping().target
+                  return 'transformIdx' in t ? t.transformIdx : 0
+                }
+                const matrixOf = () => {
+                  const t = mapping().target
+                  return t.kind === 'transformAffine' ? t.matrix : 'preAffine'
+                }
+                const paramValueOf = () => {
+                  const t = mapping().target
+                  if (
+                    t.kind === 'renderSetting' ||
+                    t.kind === 'transformAffine' ||
+                    t.kind === 'finalAffine'
+                  ) {
+                    return t.param
+                  }
+                  return t.kind === 'transformProperty' ? t.property : ''
+                }
+                return (
+                  <div class={ui.mappingRow} role="listitem">
+                    {/* Top row: routing — source -> target category chain */}
+                    <div class={ui.mappingTopRow}>
+                      <select
+                        class={`${ui.mappingSelect} ${ui.sourceSelect}`}
+                        aria-label="Audio source feature"
+                        value={mapping().audioFeature}
+                        onChange={(e) => {
+                          updateMapping(index, {
+                            audioFeature: e.currentTarget.value as AudioFeature,
+                          })
+                        }}
+                      >
+                        <For each={ALL_FEATURES}>
+                          {(f) => (
+                            <option value={f}>{AUDIO_FEATURE_LABELS[f]}</option>
+                          )}
+                        </For>
+                      </select>
+                      <span class={ui.arrow}>→</span>
+                      <select
+                        class={ui.mappingSelect}
+                        aria-label="Target category"
+                        value={mapping().target.kind}
+                        onChange={(e) => {
+                          const cat = e.currentTarget.value as TargetCategory
+                          updateMapping(index, {
+                            target: defaultTarget(cat, transformIdxOf()),
+                          })
+                        }}
+                      >
+                        <For each={TARGET_CATEGORIES}>
+                          {(c) => (
+                            <option value={c}>
+                              {TARGET_CATEGORY_LABELS[c]}
+                            </option>
+                          )}
+                        </For>
+                      </select>
+                      {props.transforms.length > 0 &&
+                        mapping().target.kind !== 'renderSetting' &&
+                        mapping().target.kind !== 'finalAffine' && (
+                          <select
+                            class={ui.mappingSelect}
+                            aria-label="Transform"
+                            value={transformIdxOf()}
+                            onChange={(e) => {
+                              const ti = parseInt(e.currentTarget.value)
+                              updateMapping(index, {
+                                target: {
+                                  ...mapping().target,
+                                  transformIdx: ti,
+                                } as FlameTarget,
+                              })
+                            }}
+                          >
+                            <For each={props.transforms}>
+                              {(t) => (
+                                <option value={t.index}>{t.label}</option>
+                              )}
+                            </For>
+                          </select>
                         )}
-                      </For>
-                    </select>
-                    <span class={ui.arrow}>→</span>
-                    <select
-                      class={ui.mappingSelect}
-                      aria-label="Target category"
-                      value={mapping.target.kind}
-                      onChange={(e) => {
-                        const cat = e.currentTarget.value as TargetCategory
-                        updateMapping(index(), {
-                          target: defaultTarget(
-                            cat,
-                            mapping.target.kind === 'renderSetting' ||
-                              mapping.target.kind === 'finalAffine'
-                              ? 0
-                              : 'transformIdx' in mapping.target
-                                ? mapping.target.transformIdx
-                                : 0,
-                          ),
-                        })
-                      }}
-                    >
-                      <For each={TARGET_CATEGORIES}>
-                        {(c) => (
-                          <option value={c}>{TARGET_CATEGORY_LABELS[c]}</option>
-                        )}
-                      </For>
-                    </select>
-                    {props.transforms.length > 0 &&
-                      mapping.target.kind !== 'renderSetting' &&
-                      mapping.target.kind !== 'finalAffine' && (
+                      {mapping().target.kind === 'transformAffine' && (
                         <select
-                          class={ui.mappingSelect}
-                          aria-label="Transform"
-                          value={
-                            'transformIdx' in mapping.target
-                              ? mapping.target.transformIdx
-                              : 0
-                          }
+                          class={`${ui.mappingSelect} ${ui.matrixSelect}`}
+                          aria-label="Affine matrix"
+                          value={matrixOf()}
                           onChange={(e) => {
-                            const ti = parseInt(e.currentTarget.value)
-                            updateMapping(index(), {
+                            updateMapping(index, {
                               target: {
-                                ...mapping.target,
-                                transformIdx: ti,
+                                ...mapping().target,
+                                matrix: e.currentTarget.value as
+                                  | 'preAffine'
+                                  | 'postAffine',
                               } as FlameTarget,
                             })
                           }}
                         >
-                          <For each={props.transforms}>
-                            {(t) => <option value={t.index}>{t.label}</option>}
-                          </For>
+                          <option value="preAffine">Pre</option>
+                          <option value="postAffine">Post</option>
                         </select>
                       )}
-                    {mapping.target.kind === 'transformAffine' && (
-                      <select
-                        class={`${ui.mappingSelect} ${ui.matrixSelect}`}
-                        aria-label="Affine matrix"
-                        value={mapping.target.matrix}
-                        onChange={(e) => {
-                          updateMapping(index(), {
-                            target: {
-                              ...mapping.target,
-                              matrix: e.currentTarget.value as
-                                | 'preAffine'
-                                | 'postAffine',
-                            } as FlameTarget,
-                          })
+                      <button
+                        class={ui.removeMappingBtn}
+                        onClick={() => {
+                          removeMapping(index)
                         }}
+                        title="Remove mapping"
+                        aria-label="Remove mapping"
                       >
-                        <option value="preAffine">Pre</option>
-                        <option value="postAffine">Post</option>
-                      </select>
-                    )}
-                    <button
-                      class={ui.removeMappingBtn}
-                      onClick={() => {
-                        removeMapping(index())
-                      }}
-                      title="Remove mapping"
-                      aria-label="Remove mapping"
-                    >
-                      ×
-                    </button>
-                  </div>
+                        ×
+                      </button>
+                    </div>
 
-                  {/* Bottom row: param + sensitivity */}
-                  <div class={ui.mappingBottomRow}>
-                    {mapping.target.kind === 'variationWeight' ? (
-                      <VariationWeightPills
-                        mapping={mapping}
-                        transforms={props.transforms}
-                        onSelect={(variationType) => {
-                          updateMapping(index(), {
-                            target: {
-                              ...mapping.target,
-                              variationType,
-                            } as FlameTarget,
+                    {/* Bottom row: param + sensitivity */}
+                    <div class={ui.mappingBottomRow}>
+                      {mapping().target.kind === 'variationWeight' ? (
+                        <VariationWeightPills
+                          mapping={mapping()}
+                          transforms={props.transforms}
+                          onSelect={(variationType) => {
+                            updateMapping(index, {
+                              target: {
+                                ...mapping().target,
+                                variationType,
+                              } as FlameTarget,
+                            })
+                          }}
+                        />
+                      ) : (
+                        <select
+                          class={ui.mappingSelect}
+                          aria-label="Target parameter"
+                          value={paramValueOf()}
+                          onChange={(e) => {
+                            const val = e.currentTarget.value
+                            const t = mapping().target
+                            if (t.kind === 'renderSetting') {
+                              updateMapping(index, {
+                                target: {
+                                  ...t,
+                                  param: val as RenderSettingKey,
+                                },
+                              })
+                            } else if (
+                              t.kind === 'transformAffine' ||
+                              t.kind === 'finalAffine'
+                            ) {
+                              updateMapping(index, {
+                                target: { ...t, param: val as AffineKey },
+                              })
+                            } else if (t.kind === 'transformProperty') {
+                              updateMapping(index, {
+                                target: {
+                                  ...t,
+                                  property: val as TransformPropertyKey,
+                                },
+                              })
+                            }
+                          }}
+                        >
+                          {mapping().target.kind === 'renderSetting' && (
+                            <For each={ALL_RENDER_PARAMS}>
+                              {(p) => (
+                                <option value={p}>
+                                  {RENDER_SETTING_LABELS[p]}
+                                </option>
+                              )}
+                            </For>
+                          )}
+                          {(mapping().target.kind === 'transformAffine' ||
+                            mapping().target.kind === 'finalAffine') && (
+                            <For each={ALL_AFFINE_KEYS}>
+                              {(k) => (
+                                <option value={k}>
+                                  {AFFINE_KEY_LABELS[k]}
+                                </option>
+                              )}
+                            </For>
+                          )}
+                          {mapping().target.kind === 'transformProperty' && (
+                            <For each={ALL_TRANSFORM_PROPS}>
+                              {(p) => (
+                                <option value={p}>
+                                  {TRANSFORM_PROP_LABELS[p]}
+                                </option>
+                              )}
+                            </For>
+                          )}
+                        </select>
+                      )}
+                      <span class={ui.sensitivityLabel}>
+                        {mapping().sensitivity.toFixed(1)}x
+                      </span>
+                      <input
+                        type="range"
+                        class={ui.sensitivitySlider}
+                        min="0.1"
+                        max="2"
+                        step="0.1"
+                        value={mapping().sensitivity}
+                        onInput={(e) => {
+                          updateMapping(index, {
+                            sensitivity: parseFloat(e.currentTarget.value),
                           })
                         }}
+                        aria-label="Sensitivity"
                       />
-                    ) : (
-                      <select
-                        class={ui.mappingSelect}
-                        aria-label="Target parameter"
-                        value={
-                          mapping.target.kind === 'renderSetting'
-                            ? mapping.target.param
-                            : mapping.target.kind === 'transformAffine' ||
-                                mapping.target.kind === 'finalAffine'
-                              ? mapping.target.param
-                              : mapping.target.kind === 'transformProperty'
-                                ? mapping.target.property
-                                : ''
-                        }
-                        onChange={(e) => {
-                          const val = e.currentTarget.value
-                          const t = mapping.target
-                          if (t.kind === 'renderSetting') {
-                            updateMapping(index(), {
-                              target: { ...t, param: val as RenderSettingKey },
-                            })
-                          } else if (
-                            t.kind === 'transformAffine' ||
-                            t.kind === 'finalAffine'
-                          ) {
-                            updateMapping(index(), {
-                              target: { ...t, param: val as AffineKey },
-                            })
-                          } else if (t.kind === 'transformProperty') {
-                            updateMapping(index(), {
-                              target: {
-                                ...t,
-                                property: val as TransformPropertyKey,
-                              },
-                            })
-                          }
-                        }}
-                      >
-                        {mapping.target.kind === 'renderSetting' && (
-                          <For each={ALL_RENDER_PARAMS}>
-                            {(p) => (
-                              <option value={p}>
-                                {RENDER_SETTING_LABELS[p]}
-                              </option>
-                            )}
-                          </For>
-                        )}
-                        {(mapping.target.kind === 'transformAffine' ||
-                          mapping.target.kind === 'finalAffine') && (
-                          <For each={ALL_AFFINE_KEYS}>
-                            {(k) => (
-                              <option value={k}>{AFFINE_KEY_LABELS[k]}</option>
-                            )}
-                          </For>
-                        )}
-                        {mapping.target.kind === 'transformProperty' && (
-                          <For each={ALL_TRANSFORM_PROPS}>
-                            {(p) => (
-                              <option value={p}>
-                                {TRANSFORM_PROP_LABELS[p]}
-                              </option>
-                            )}
-                          </For>
-                        )}
-                      </select>
-                    )}
-                    <span class={ui.sensitivityLabel}>
-                      {mapping.sensitivity.toFixed(1)}x
-                    </span>
-                    <input
-                      type="range"
-                      class={ui.sensitivitySlider}
-                      min="0.1"
-                      max="2"
-                      step="0.1"
-                      value={mapping.sensitivity}
-                      onInput={(e) => {
-                        updateMapping(index(), {
-                          sensitivity: parseFloat(e.currentTarget.value),
-                        })
-                      }}
-                      aria-label="Sensitivity"
-                    />
+                    </div>
                   </div>
-                </div>
-              )}
-            </For>
+                )
+              }}
+            </Index>
           </div>
           <div class={ui.mappingActions}>
             <button
