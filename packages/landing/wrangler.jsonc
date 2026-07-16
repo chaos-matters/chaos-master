@@ -21,13 +21,6 @@
           "pattern": "about.lumenapeiron.com",
           "custom_domain": true,
         },
-        {
-          // Legacy domain — keep bound so about.chaos-master.com keeps resolving
-          // until the zone-level redirect to lumenapeiron.com is enabled. Remove
-          // once the redirect is verified live.
-          "pattern": "about.chaos-master.com",
-          "custom_domain": true,
-        },
       ],
       "build": {
         "command": "pnpm run build",
