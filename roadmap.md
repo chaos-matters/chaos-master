@@ -1,51 +1,58 @@
-# Chaos Master — Roadmap
+# Lumen Apeiron — Roadmap
 
-## How chaos-master compares to established fractal tools
+> Formerly the Chaos Master roadmap. **Status note (2026-07):** several items
+> below were written before they shipped — audio-reactive flames, flame
+> breeding/evolution (incl. the Population Simulator and Ancestry Tree),
+> `.flame` XML import/export, and fractal sonification are all implemented.
+> Sections describing them as future work are kept for context; treat the
+> comparison table as the corrected, current state.
+
+## How Lumen Apeiron compares to established fractal tools
 
 ### Apophysis / flam3
 
-| Feature | Apophysis | chaos-master |
-|---|---|---|
-| Named variations (50+) | Yes — sinusodial, spherical, swirl, julian, horseshoe, etc. | No — uses composable "synth" (parametric) variation builder instead |
-| Mutation / breeding | Yes — genetic crossover of two flames | Partial — randomizer exists, no breeding |
-| Batch rendering | Yes — render .flame files to disk | Partial — offscreen animation export, no batch queue |
-| .flame XML import/export | Yes — standard interchange format | No — uses own JSON format |
-| Gradient editor | Yes — visual gradient editor | Yes — `ColorMapSelector`, `CustomPaletteEditor` |
-| Scripting (Apophysis Script) | Yes — automation language | No |
-| Plugin system | Yes — custom variations as plugins | Yes — custom WGSL variation compiler |
+| Feature                      | Apophysis                                                   | Lumen Apeiron                                                                                 |
+| ---------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Named variations (50+)       | Yes — sinusodial, spherical, swirl, julian, horseshoe, etc. | Yes — 140+ documented variations (2D + 3D) plus custom parametric variations                  |
+| Mutation / breeding          | Yes — genetic crossover of two flames                       | Yes — five crossover modes, Evolution Chamber, autonomous Population Simulator, Ancestry Tree |
+| Batch rendering              | Yes — render .flame files to disk                           | Partial — offscreen animation export, no batch queue                                          |
+| .flame XML import/export     | Yes — standard interchange format                           | Yes — flam3-compatible import and export alongside the native JSON format                     |
+| Gradient editor              | Yes — visual gradient editor                                | Yes — `ColorMapSelector`, `CustomPaletteEditor`                                               |
+| Scripting (Apophysis Script) | Yes — automation language                                   | No                                                                                            |
+| Plugin system                | Yes — custom variations as plugins                          | Yes — custom WGSL variation compiler                                                          |
 
 **Key gap:** Apophysis's mutation/breeding and .flame format compatibility are its defining community features. chaos-master's synth variation system is more powerful than picking from a fixed list, but the community expects named variations and .flame import.
 
 ### Chaotica
 
-| Feature | Chaotica | chaos-master |
-|---|---|---|
-| Node-based world editor | Yes — visual graph for fractal structures | No — flat transform list |
-| HDR / 32-bit float pipeline | Yes — EXR output | No — 8-bit RGBA output |
-| Deterministic renderer | Yes — pixel-perfect mode | No — stochastic only |
-| Network/distributed rendering | Yes — render farm support | No |
-| OpenGL preview | Yes — hardware-accelerated preview | Yes — WebGPU real-time preview |
-| Keyframe animation | Yes — any parameter keyframeable | Partial — camera + some render params keyframeable |
-| Direct video output | Yes — MP4 from timeline | Yes — WebCodecs MP4 export |
-| Motion blur | Yes — temporal anti-aliasing | No |
-| Looping / ping-pong modes | Yes | Partial — loop toggle exists, no ping-pong |
-| Apophysis .flame import | Yes | No |
-| Commercial license | Yes — paid tiers | AGPL-3.0 open source |
+| Feature                       | Chaotica                                  | chaos-master                                       |
+| ----------------------------- | ----------------------------------------- | -------------------------------------------------- |
+| Node-based world editor       | Yes — visual graph for fractal structures | No — flat transform list                           |
+| HDR / 32-bit float pipeline   | Yes — EXR output                          | No — 8-bit RGBA output                             |
+| Deterministic renderer        | Yes — pixel-perfect mode                  | No — stochastic only                               |
+| Network/distributed rendering | Yes — render farm support                 | No                                                 |
+| OpenGL preview                | Yes — hardware-accelerated preview        | Yes — WebGPU real-time preview                     |
+| Keyframe animation            | Yes — any parameter keyframeable          | Partial — camera + some render params keyframeable |
+| Direct video output           | Yes — MP4 from timeline                   | Yes — WebCodecs MP4 export                         |
+| Motion blur                   | Yes — temporal anti-aliasing              | No                                                 |
+| Looping / ping-pong modes     | Yes                                       | Partial — loop toggle exists, no ping-pong         |
+| Apophysis .flame import       | Yes                                       | No                                                 |
+| Commercial license            | Yes — paid tiers                          | AGPL-3.0 open source                               |
 
 **Key gap:** Node-based editing, HDR pipeline, deterministic rendering, motion blur, and .flame import.
 
 ### JWildfire
 
-| Feature | JWildfire | chaos-master |
-|---|---|---|
-| 100+ variations | Yes | No — parametric synth instead |
-| Layers and compositing | Yes — multi-layer with blending | No |
-| GPU rendering (OpenCL) | Yes | Yes — WebGPU |
-| Interactive editor | Yes — real-time preview | Yes |
-| Animation/movie rendering | Yes — keyframing + motion blur | Partial — animation export, no motion blur |
-| Dancing Flame (audio) | Third-party — via external scripts/tools | No — see "Audio-Reactive Flames" below |
-| Sunflow integration (raytracing) | Yes — 3D raytraced renders | No |
-| DOF / bokeh effects | Yes | No |
+| Feature                          | JWildfire                                | chaos-master                               |
+| -------------------------------- | ---------------------------------------- | ------------------------------------------ |
+| 100+ variations                  | Yes                                      | No — parametric synth instead              |
+| Layers and compositing           | Yes — multi-layer with blending          | No                                         |
+| GPU rendering (OpenCL)           | Yes                                      | Yes — WebGPU                               |
+| Interactive editor               | Yes — real-time preview                  | Yes                                        |
+| Animation/movie rendering        | Yes — keyframing + motion blur           | Partial — animation export, no motion blur |
+| Dancing Flame (audio)            | Third-party — via external scripts/tools | No — see "Audio-Reactive Flames" below     |
+| Sunflow integration (raytracing) | Yes — 3D raytraced renders               | No                                         |
+| DOF / bokeh effects              | Yes                                      | No                                         |
 
 **Key gap:** Layers/compositing, audio reactivity, raytraced 3D renders, DOF.
 
@@ -102,16 +109,16 @@ Audio file → Web Audio API decode → FFT analysis per frame
 
 ### Parameter mappings (audio → flame)
 
-| Audio feature | Flame parameter | Effect |
-|---|---|---|
-| Bass amplitude (20-200Hz) | Variation intensity / weight | Pulsing shapes on kick drum |
-| Mid amplitude (200-2kHz) | Transform rotation / scale | Melodic movement |
-| High amplitude (2k-20kHz) | Palette phase / speed | Sparkle on hi-hats |
-| Overall RMS energy | Exposure / vibrancy | Brightness pulses |
-| Spectral centroid | Camera zoom | Zoom in on brighter sections |
-| Beat detection (onset) | Skip iterations / palette reset | Sharp transitions on beat |
-| Spectral flatness | Variation blend weight | Noise ↔ structured shapes |
-| RMS per frequency band | Individual transform weights | Different transforms for different instruments |
+| Audio feature             | Flame parameter                 | Effect                                         |
+| ------------------------- | ------------------------------- | ---------------------------------------------- |
+| Bass amplitude (20-200Hz) | Variation intensity / weight    | Pulsing shapes on kick drum                    |
+| Mid amplitude (200-2kHz)  | Transform rotation / scale      | Melodic movement                               |
+| High amplitude (2k-20kHz) | Palette phase / speed           | Sparkle on hi-hats                             |
+| Overall RMS energy        | Exposure / vibrancy             | Brightness pulses                              |
+| Spectral centroid         | Camera zoom                     | Zoom in on brighter sections                   |
+| Beat detection (onset)    | Skip iterations / palette reset | Sharp transitions on beat                      |
+| Spectral flatness         | Variation blend weight          | Noise ↔ structured shapes                      |
+| RMS per frequency band    | Individual transform weights    | Different transforms for different instruments |
 
 ### UI flow
 
@@ -151,17 +158,20 @@ Render pass → sample N points in viewport → for each point:
 ### Mapping models
 
 **Model A: "Orchestral"** — Points become notes in a scale
+
 - Iteration count mapped to a pentatonic/modal scale
 - Higher density → more simultaneous voices (chords)
 - Camera movement → the "orchestra" shifts as you fly through
 
 **Model B: "Ambient Drone"** — Continuous ambient soundscape
+
 - Overall fractal complexity → harmonic density
 - Palette colors → filter frequencies (warm = low-pass, cool = high-pass)
 - Zoom level → reverb wet/dry mix
 - Flying through dense regions → crescendo
 
 **Model C: "Percussive"** — Each transform becomes a percussive voice
+
 - Transform 1 = kick, Transform 2 = snare, Transform 3 = hi-hat, etc.
 - Weights determine probability of each voice firing per sample
 - Camera movement through high-weight regions triggers more events
@@ -189,6 +199,7 @@ Render pass → sample N points in viewport → for each point:
 From the existing `TIMELINE_FEATURE_PLAN.md`, these items are still open:
 
 **Phase 1 (in progress):**
+
 - All 26 variation parameters keyframeable
 - Variation weights/ratios keyframeable
 - Animation presets save/load
@@ -197,6 +208,7 @@ From the existing `TIMELINE_FEATURE_PLAN.md`, these items are still open:
 - Bezier control points with visual feedback
 
 **Phase 2 (playback):**
+
 - Skip to next/previous keyframe
 - Go-to-frame input
 - Play speed control
@@ -204,6 +216,7 @@ From the existing `TIMELINE_FEATURE_PLAN.md`, these items are still open:
 - Frame counter + time display
 
 **Phase 3 (UI):**
+
 - Track grouping (camera / render / variations)
 - Drag-and-drop track reordering
 - Keyboard shortcuts for timeline

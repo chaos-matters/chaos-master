@@ -1,9 +1,32 @@
+/* ── Lumen Apeiron brand kit (scoped; lift app-wide once proven here) ──────
+   The two anchors are the Welcome-screen wordmark gradient stops. Everything
+   else derives from them so a future global kit is a copy-paste of this
+   block. The signature is the "iterated corner": a corner bracket repeated
+   at half scale inside itself — self-similarity, the app's whole subject. */
 .modal {
+  --la-peri: oklch(78% 0.12 280);
+  --la-blue: oklch(72% 0.14 240);
+  --la-grad: linear-gradient(135deg, var(--la-peri), var(--la-blue));
+  --la-hairline: linear-gradient(
+    135deg,
+    oklch(78% 0.12 280 / 45%),
+    oklch(72% 0.14 240 / 25%)
+  );
+  --la-surface: oklch(97% 0.01 280);
+  --la-surface-tint: oklch(78% 0.12 280 / 6%);
+  --la-text-dim: oklch(45% 0.03 275);
+
   display: flex;
   flex-direction: column;
   height: 100%;
   width: 100%;
   overflow: hidden;
+}
+
+[data-theme='dark'] .modal {
+  --la-surface: oklch(24% 0.03 275 / 55%);
+  --la-surface-tint: oklch(78% 0.12 280 / 7%);
+  --la-text-dim: oklch(72% 0.03 275);
 }
 
 .body {
@@ -23,13 +46,15 @@
   gap: 16px;
   padding: 10px 16px;
   border-radius: 8px;
-  background: var(--neutral-100, #f5f5f5);
+  background:
+    linear-gradient(var(--la-surface), var(--la-surface)) padding-box,
+    var(--la-hairline) border-box;
+  border: 1px solid transparent;
   font-size: 13px;
   color: var(--neutral-800, #333);
   flex-shrink: 0;
 }
 [data-theme='dark'] .statusBar {
-  background: var(--neutral-800, #2a2a2a);
   color: var(--neutral-200, #ddd);
 }
 
@@ -42,18 +67,21 @@
   flex: 1;
   height: 6px;
   border-radius: 3px;
-  background: var(--neutral-200, #e0e0e0);
+  background: oklch(72% 0.14 240 / 14%);
   overflow: hidden;
-}
-[data-theme='dark'] .progressBar {
-  background: var(--neutral-700, #555);
 }
 
 .progressFill {
   height: 100%;
   border-radius: 3px;
-  background: var(--accent, #6366f1);
+  background: var(--la-grad);
   transition: width 0.3s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressFill {
+    transition: none;
+  }
 }
 
 /* ── Controls ─────────────────────────────────────────────────────────────── */
@@ -66,18 +94,47 @@
 }
 
 .controlSection {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 12px;
   border-radius: 10px;
-  background: var(--neutral-50, #fafafa);
-  border: 1px solid var(--neutral-200, #e5e5e5);
+  /* Glassy brand surface: soft periwinkle tint over the base surface, framed
+     by a gradient hairline (padding-box/border-box two-layer background). */
+  background:
+    radial-gradient(120% 90% at 0% 0%, var(--la-surface-tint), transparent 55%)
+      padding-box,
+    linear-gradient(var(--la-surface), var(--la-surface)) padding-box,
+    var(--la-hairline) border-box;
+  border: 1px solid transparent;
 }
 
-[data-theme='dark'] .controlSection {
-  background: var(--neutral-850, #1e1e2e);
-  border-color: var(--neutral-700, #3a3a4e);
+/* The iterated corner — a gradient corner bracket, then the same bracket at
+   half scale nested inside it. One motif, one place, quiet everywhere else. */
+.controlSection::before,
+.controlSection::after {
+  content: '';
+  position: absolute;
+  border-style: solid;
+  border-color: transparent;
+  border-image: var(--la-grad) 1;
+  border-width: 1.5px 1.5px 0 0;
+  pointer-events: none;
+  opacity: 0.85;
+}
+.controlSection::before {
+  top: 6px;
+  right: 6px;
+  width: 14px;
+  height: 14px;
+}
+.controlSection::after {
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  opacity: 0.5;
 }
 
 .sectionHeader {
@@ -85,7 +142,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
-  color: var(--neutral-400, #999);
+  color: var(--la-text-dim);
   margin-bottom: 2px;
 }
 
@@ -128,26 +185,82 @@
   border-radius: 12px;
   font-size: 11px;
   font-weight: 500;
-  border: 1px solid var(--neutral-300, #ccc);
+  border: 1px solid oklch(72% 0.14 240 / 35%);
   background: transparent;
   color: var(--neutral-700, #555);
   cursor: pointer;
   transition: all 0.15s;
 }
 .chip:hover {
-  background: var(--neutral-100, #f5f5f5);
+  background: oklch(78% 0.12 280 / 12%);
 }
-.chipActive {
-  background: var(--accent, #6366f1);
-  color: #fff;
-  border-color: var(--accent, #6366f1);
+.chipActive,
+.chipActive:hover {
+  background: var(--la-grad);
+  color: oklch(18% 0.03 275);
+  border-color: transparent;
+  font-weight: 600;
 }
 [data-theme='dark'] .chip {
-  border-color: var(--neutral-600, #666);
   color: var(--neutral-300, #bbb);
 }
-[data-theme='dark'] .chip:hover {
-  background: var(--neutral-700, #444);
+@media (prefers-reduced-motion: reduce) {
+  .chip {
+    transition: none;
+  }
+}
+
+/* ── Brand sliders — thin gradient track, glowing point-sample thumb ──────── */
+
+.controlGroup input[type='range'] {
+  appearance: none;
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.controlGroup input[type='range']:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.controlGroup input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    135deg,
+    oklch(78% 0.12 280 / 38%),
+    oklch(72% 0.14 240 / 38%)
+  );
+}
+.controlGroup input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  border-radius: 50%;
+  border: none;
+  background: var(--la-peri);
+  box-shadow: 0 0 6px oklch(78% 0.12 280 / 70%);
+}
+.controlGroup input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: oklch(72% 0.14 240 / 22%);
+}
+/* Firefox can paint the elapsed side natively — use the full gradient there. */
+.controlGroup input[type='range']::-moz-range-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--la-grad);
+}
+.controlGroup input[type='range']::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: none;
+  background: var(--la-peri);
+  box-shadow: 0 0 6px oklch(78% 0.12 280 / 70%);
 }
 
 /* WCAG 2.5.5 target size: keep chips compact for mouse, grow to 44px on touch */
@@ -184,11 +297,12 @@
 }
 
 .startBtn {
-  background: var(--accent, #6366f1);
-  color: #fff;
+  background: var(--la-grad);
+  color: oklch(18% 0.03 275);
 }
 .startBtn:hover:not(:disabled) {
-  filter: brightness(1.1);
+  filter: brightness(1.08);
+  box-shadow: 0 0 14px oklch(78% 0.12 280 / 35%);
 }
 
 .pauseBtn {

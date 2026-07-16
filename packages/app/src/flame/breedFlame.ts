@@ -16,6 +16,24 @@ export type CrossoverMode =
   | 'alternate'
   | 'smart'
 
+/** Every crossover mode, in display order (single source for UI chip rows). */
+export const CROSSOVER_MODES: CrossoverMode[] = [
+  'uniform',
+  'weighted',
+  'shuffle',
+  'alternate',
+  'smart',
+]
+
+/** Human-readable crossover labels shared by the breeding UIs. */
+export const CROSSOVER_LABELS: Record<CrossoverMode, string> = {
+  uniform: 'Uniform',
+  weighted: 'Weighted',
+  shuffle: 'Shuffle',
+  alternate: 'Alternate',
+  smart: 'Smart',
+}
+
 export interface BreedConfig {
   /** How many children to generate. Default 9. */
   count: number

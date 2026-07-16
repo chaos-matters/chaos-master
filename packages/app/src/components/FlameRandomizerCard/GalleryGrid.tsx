@@ -2,6 +2,7 @@ import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
 import { VariationPreview } from '@/components/VariationSelector/VariationSelector'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
+import { PREVIEW_RESOLUTION_BY_TIER } from '@/utils/hardwareTier'
 import ui from './GalleryGrid.module.css'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { HardwareTier } from '@/utils/hardwareTier'
@@ -10,18 +11,6 @@ import type { HardwareTier } from '@/utils/hardwareTier'
 // (the actual render is still throttled by the ComputeGate below).
 const REVEAL_BATCH = 4
 const REVEAL_INTERVAL_MS = 100
-
-// Preview backing-store size by hardware tier. Capable GPUs render the previews
-// at a higher resolution so they look crisp instead of mushy when scaled up.
-const PREVIEW_RESOLUTION_BY_TIER: Record<
-  HardwareTier,
-  { width: number; height: number }
-> = {
-  low: { width: 256, height: 144 },
-  mid: { width: 384, height: 216 },
-  high: { width: 640, height: 360 },
-  ultra: { width: 768, height: 432 },
-}
 
 /**
  * Responsive grid of flame previews with a subtle top-right Apply / Mutate

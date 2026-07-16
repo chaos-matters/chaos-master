@@ -2,6 +2,7 @@ import { batch, createMemo, createSignal, ErrorBoundary, For, onCleanup, Show, }
 import { vec2f, vec4f } from 'typegpu/data'
 import { ComputeGate, useComputeGate } from '@/contexts/ComputeGateContext'
 import { ANIMATION_PREVIEW_POINT_COUNT, COMPUTE_GATE_CAPACITY, IS_DEV, STATIC_PREVIEW_POINT_COUNT, THUMBNAIL_PREVIEW_QUALITY, THUMBNAIL_PREVIEW_QUALITY_HOVER, } from '@/defaults'
+import { getAncestryNodes } from '@/flame/ancestry'
 import { examples } from '@/flame/examples'
 import { animationDefs, getAnimationFlame } from '@/flame/examples/animations'
 import { Flam3 } from '@/flame/Flam3'
@@ -454,6 +455,13 @@ type LoadFlameModalProps = {
   /** Workspace dimension when the modal opened — that dimension's examples
    *  are listed first. */
   currentDimensions?: number
+  /**
+   * 'load' (default): the Discover dialog — import zone, recents, examples.
+   * 'gallery': the one-stop browse surface — adds search + variation-tag
+   * filtering and a Bred & Evolved section from the ancestry store; hides
+   * the file-import zone (importing lives in the load flow).
+   */
+  mode?: 'load' | 'gallery'
 }
 
 type DimensionFilter = 'all' | '2d' | '3d'
@@ -618,10 +626,24 @@ async function pickFlameFile(): Promise<File | null> {
   })
 }
 
+/** Distinct variation types used by a flame — the gallery's honest tags. */
+function flameTags(flame: FlameDescriptor): string[] {
+  const types = new Set<string>()
+  for (const [, t] of recordEntries(flame.transforms)) {
+    const variations = (t as { variations?: Record<string, { type: string }> })
+      .variations
+    for (const [, v] of recordEntries(variations ?? {})) {
+      types.add(v.type.toLowerCase())
+    }
+  }
+  return [...types]
+}
+
 export function LoadFlameModal(props: LoadFlameModalProps) {
   const [recentFlames, setRecentFlames] = createSignal(loadRecentFlames())
   const showAlert = useAlert()
   const [isDragging, setIsDragging] = createSignal(false)
+  const isGallery = () => props.mode === 'gallery'
 
   const [dimFilter, setDimFilter] = persistentSignal<DimensionFilter>(
     'load-flame-dimension-filter',
@@ -634,11 +656,32 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
     setCollapsedSections((c) => ({ ...c, [key]: !c[key] }))
   }
 
+  // ── Gallery mode: free-text search + variation-tag filter ──
+  const [galleryQuery, setGalleryQuery] = createSignal('')
+  const [activeTag, setActiveTag] = createSignal<string | null>(null)
+
+  function matchesGallery(
+    name: string,
+    flame: FlameDescriptor,
+    extraTags: string[] = [],
+  ): boolean {
+    if (!isGallery()) return true
+    const q = galleryQuery().trim().toLowerCase()
+    if (q && !name.toLowerCase().includes(q)) return false
+    const tag = activeTag()
+    if (tag && !flameTags(flame).includes(tag) && !extraTags.includes(tag)) {
+      return false
+    }
+    return true
+  }
+
   const show2D = () => dimFilter() !== '3d'
   const show3D = () => dimFilter() !== '2d'
   const filteredRecents = () =>
     recentFlames().filter(
-      (r) => dimFilter() === 'all' || flameDimension(r.flame) === dimFilter(),
+      (r) =>
+        (dimFilter() === 'all' || flameDimension(r.flame) === dimFilter()) &&
+        matchesGallery(r.name, r.flame),
     )
 
   const allExamples = recordEntries(examples)
@@ -651,6 +694,61 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
     (a) => flameDimension(getAnimationFlame(a)) === '3d',
   )
   const is3DWorkspace = (props.currentDimensions ?? 2) === 3
+
+  const exampleName = ([id, e]: (typeof allExamples)[number]) =>
+    e.metadata?.name || id
+  const visibleExamples2D = () =>
+    examples2D.filter((entry) => matchesGallery(exampleName(entry), entry[1]))
+  const visibleExamples3D = () =>
+    examples3D.filter((entry) => matchesGallery(exampleName(entry), entry[1]))
+  const visibleAnimations2D = () =>
+    animations2D.filter((a) =>
+      matchesGallery(a.name, getAnimationFlame(a), ['animated']),
+    )
+  const visibleAnimations3D = () =>
+    animations3D.filter((a) =>
+      matchesGallery(a.name, getAnimationFlame(a), ['animated']),
+    )
+
+  // Bred & Evolved: ancestry nodes that have parents (i.e. were produced by
+  // breeding/evolution), newest first. Reads the reactive ancestry store, so
+  // the section fills in as the user breeds.
+  const BRED_LIMIT = 24
+  const bredNodes = createMemo(() => {
+    if (!isGallery()) return []
+    return Object.values(getAncestryNodes())
+      .filter((n) => n.parentA !== null || n.parentB !== null)
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, BRED_LIMIT)
+  })
+  const visibleBred = () =>
+    bredNodes().filter(
+      (n) =>
+        (dimFilter() === 'all' || flameDimension(n.flame) === dimFilter()) &&
+        matchesGallery(n.name, n.flame),
+    )
+
+  // Tag cloud: variation types across everything browsable. Raw type names
+  // are internal ("swirlVar") — display them without the Var suffix, keep the
+  // cloud to the most common handful so it stays a filter, not a wall.
+  const GALLERY_TAG_LIMIT = 18
+  const tagLabel = (tag: string) => tag.replace(/var$/, '')
+  const galleryTags = createMemo(() => {
+    if (!isGallery()) return []
+    const counts = new Map<string, number>()
+    const bump = (tags: string[]) => {
+      for (const t of new Set(tags)) counts.set(t, (counts.get(t) ?? 0) + 1)
+    }
+    for (const [, e] of allExamples) bump(flameTags(e))
+    for (const a of animationDefs) {
+      bump([...flameTags(getAnimationFlame(a)), 'animated'])
+    }
+    for (const n of bredNodes()) bump(flameTags(n.flame))
+    return [...counts.entries()]
+      .filter(([, count]) => count >= 2)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, GALLERY_TAG_LIMIT)
+  })
 
   async function processImportFile(file: File) {
     const name = file.name.toLowerCase()
@@ -750,46 +848,90 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
           props.respond(CANCEL)
         }}
       >
-        Discover Fractal Flames
+        {isGallery() ? 'Flame Gallery' : 'Discover Fractal Flames'}
       </ModalTitleBar>
       <div class={ui.scrollBody}>
         <p class={ui.modalSubtitle}>
-          Select a preset to begin, load a recent creation, or import a saved
-          PNG or .flame config.
+          {isGallery()
+            ? 'Browse everything in one place — curated examples, animations, and your bred & evolved flames. Search by name or filter by variation.'
+            : 'Select a preset to begin, load a recent creation, or import a saved PNG or .flame config.'}
         </p>
-        <div
-          class={ui.uploadZone}
-          classList={{ [ui.uploadZoneDragging as string]: isDragging() }}
-          onClick={loadFromFile}
-          onDragOver={handleDragOver}
-          onDragEnter={handleDragEnter}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-        >
-          <svg
-            class={ui.uploadIcon}
-            viewBox="0 0 24 24"
-            width="24"
-            height="24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
+        <Show when={isGallery()}>
+          <div class={ui.gallerySearchRow}>
+            <input
+              type="text"
+              class={ui.gallerySearchInput}
+              placeholder="Search flames…"
+              value={galleryQuery()}
+              onInput={(e) => setGalleryQuery(e.currentTarget.value)}
+            />
+          </div>
+          <div class={ui.galleryTagRow}>
+            <Show when={activeTag() || galleryQuery()}>
+              <button
+                type="button"
+                class={`${ui.filterPill} ${ui.galleryTagClear}`}
+                onClick={() => {
+                  setActiveTag(null)
+                  setGalleryQuery('')
+                }}
+              >
+                Clear
+              </button>
+            </Show>
+            <For each={galleryTags()}>
+              {([tag, count]) => (
+                <button
+                  type="button"
+                  class={ui.filterPill}
+                  classList={{
+                    [ui.filterPillActive as string]: activeTag() === tag,
+                  }}
+                  onClick={() =>
+                    setActiveTag((prev) => (prev === tag ? null : tag))
+                  }
+                >
+                  {tagLabel(tag)} ({count})
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
+        <Show when={!isGallery()}>
+          <div
+            class={ui.uploadZone}
+            classList={{ [ui.uploadZoneDragging as string]: isDragging() }}
+            onClick={loadFromFile}
+            onDragOver={handleDragOver}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
           >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="17 8 12 3 7 8" />
-            <line x1="12" y1="3" x2="12" y2="15" />
-          </svg>
-          <div class={ui.uploadTitle}>
-            {isDragging() ? 'Drop PNG Here!' : 'Import from PNG File'}
+            <svg
+              class={ui.uploadIcon}
+              viewBox="0 0 24 24"
+              width="24"
+              height="24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            <div class={ui.uploadTitle}>
+              {isDragging() ? 'Drop PNG Here!' : 'Import from PNG File'}
+            </div>
+            <div class={ui.uploadSubtitle}>
+              {isDragging()
+                ? 'Release to load the flame configuration.'
+                : 'Click to choose a file, or drag and drop an exported PNG flame directly into the app or here to load it.'}
+            </div>
           </div>
-          <div class={ui.uploadSubtitle}>
-            {isDragging()
-              ? 'Release to load the flame configuration.'
-              : 'Click to choose a file, or drag and drop an exported PNG flame directly into the app or here to load it.'}
-          </div>
-        </div>
+        </Show>
         <div class={ui.filterRow} role="group" aria-label="Filter by dimension">
           <button
             class={ui.filterPill}
@@ -823,6 +965,30 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
         </div>
         <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
           <div class={ui.sections}>
+            <Show when={isGallery() && visibleBred().length > 0}>
+              <CollapsibleSection
+                title="Bred & Evolved"
+                count={visibleBred().length}
+                order={0}
+                collapsed={!!collapsedSections().bred}
+                onToggle={() => {
+                  toggleSection('bred')
+                }}
+              >
+                <For each={visibleBred()}>
+                  {(node, i) => (
+                    <ExampleItem
+                      exampleId={node.name}
+                      example={node.flame}
+                      index={i()}
+                      onSelect={(flame) => {
+                        props.respond(flame)
+                      }}
+                    />
+                  )}
+                </For>
+              </CollapsibleSection>
+            </Show>
             <Show when={filteredRecents().length > 0}>
               <CollapsibleSection
                 title="Recent Flames"
@@ -853,17 +1019,17 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
                 </For>
               </CollapsibleSection>
             </Show>
-            <Show when={show2D() && examples2D.length > 0}>
+            <Show when={show2D() && visibleExamples2D().length > 0}>
               <CollapsibleSection
                 title="2D Examples"
-                count={examples2D.length}
+                count={visibleExamples2D().length}
                 order={is3DWorkspace ? 2 : 1}
                 collapsed={!!collapsedSections().examples2d}
                 onToggle={() => {
                   toggleSection('examples2d')
                 }}
               >
-                <For each={examples2D}>
+                <For each={visibleExamples2D()}>
                   {([exampleId, example], i) => (
                     <ExampleItem
                       exampleId={exampleId}
@@ -877,17 +1043,17 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
                 </For>
               </CollapsibleSection>
             </Show>
-            <Show when={show3D() && examples3D.length > 0}>
+            <Show when={show3D() && visibleExamples3D().length > 0}>
               <CollapsibleSection
                 title="3D Examples"
-                count={examples3D.length}
+                count={visibleExamples3D().length}
                 order={is3DWorkspace ? 1 : 3}
                 collapsed={!!collapsedSections().examples3d}
                 onToggle={() => {
                   toggleSection('examples3d')
                 }}
               >
-                <For each={examples3D}>
+                <For each={visibleExamples3D()}>
                   {([exampleId, example], i) => (
                     <ExampleItem
                       exampleId={exampleId}
@@ -901,17 +1067,17 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
                 </For>
               </CollapsibleSection>
             </Show>
-            <Show when={show2D() && animations2D.length > 0}>
+            <Show when={show2D() && visibleAnimations2D().length > 0}>
               <CollapsibleSection
                 title="2D Animation Examples"
-                count={animations2D.length}
+                count={visibleAnimations2D().length}
                 order={is3DWorkspace ? 4 : 2}
                 collapsed={!!collapsedSections().animations2d}
                 onToggle={() => {
                   toggleSection('animations2d')
                 }}
               >
-                <For each={animations2D}>
+                <For each={visibleAnimations2D()}>
                   {(anim, i) => (
                     <AnimatedPreview
                       anim={anim}
@@ -924,17 +1090,17 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
                 </For>
               </CollapsibleSection>
             </Show>
-            <Show when={show3D() && animations3D.length > 0}>
+            <Show when={show3D() && visibleAnimations3D().length > 0}>
               <CollapsibleSection
                 title="3D Animation Examples"
-                count={animations3D.length}
+                count={visibleAnimations3D().length}
                 order={is3DWorkspace ? 2 : 4}
                 collapsed={!!collapsedSections().animations3d}
                 onToggle={() => {
                   toggleSection('animations3d')
                 }}
               >
-                <For each={animations3D}>
+                <For each={visibleAnimations3D()}>
                   {(anim, i) => (
                     <AnimatedPreview
                       anim={anim}
@@ -964,7 +1130,9 @@ export function createLoadFlame(
     AnimationLoad | undefined
   >(undefined)
 
-  async function showLoadFlameModal(): Promise<FlameDescriptor | undefined> {
+  async function showLoadFlameModal(
+    mode: 'load' | 'gallery' = 'load',
+  ): Promise<FlameDescriptor | undefined> {
     setLoadModalIsOpen(true)
     const result = await requestModal<
       FlameDescriptor | AnimationLoad | typeof CANCEL
@@ -974,6 +1142,7 @@ export function createLoadFlame(
         <LoadFlameModal
           respond={respond}
           currentDimensions={currentDimensions?.()}
+          mode={mode}
         />
       ),
     })

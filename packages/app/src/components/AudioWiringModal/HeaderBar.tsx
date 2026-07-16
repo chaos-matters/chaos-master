@@ -1,4 +1,5 @@
 import { Show } from 'solid-js'
+import { Copy, Redo, Undo } from '@/icons'
 import styles from './AudioWiringModal.module.css'
 import type { AudioMappingEntry } from '../../utils/audioAnalysis'
 
@@ -8,6 +9,7 @@ export function HeaderBar(props: {
   canUndo: boolean
   canRedo: boolean
   totalConnections: number
+  exportCopied: boolean
   onSelectPreset: (name: string) => void
   onUndo: () => void
   onRedo: () => void
@@ -58,13 +60,25 @@ export function HeaderBar(props: {
         ))}
       </div>
       <Show when={props.canUndo}>
-        <button type="button" class={styles.undoBtn} onClick={props.onUndo}>
-          ↩
+        <button
+          type="button"
+          class={styles.undoBtn}
+          onClick={props.onUndo}
+          title="Undo"
+          aria-label="Undo"
+        >
+          <Undo />
         </button>
       </Show>
       <Show when={props.canRedo}>
-        <button type="button" class={styles.undoBtn} onClick={props.onRedo}>
-          ↪
+        <button
+          type="button"
+          class={styles.undoBtn}
+          onClick={props.onRedo}
+          title="Redo"
+          aria-label="Redo"
+        >
+          <Redo />
         </button>
       </Show>
       <button
@@ -77,18 +91,20 @@ export function HeaderBar(props: {
       <button
         type="button"
         class={styles.undoBtn}
+        classList={{ [styles.copiedBtn as string]: props.exportCopied }}
         onClick={props.onExportJSON}
-        title="Copy wiring to clipboard as JSON"
+        title="Copy the current wiring to the clipboard as JSON"
       >
-        Export
+        <Copy />
+        {props.exportCopied ? 'Copied' : 'Copy JSON'}
       </button>
       <button
         type="button"
         class={styles.undoBtn}
         onClick={props.onImportJSON}
-        title="Paste wiring JSON from clipboard"
+        title="Import wiring JSON — from clipboard, pasted text, or a file"
       >
-        Import
+        Import…
       </button>
       <div class={styles.headerSpacer} />
       <button type="button" class={styles.closeBtn} onClick={props.onClose}>

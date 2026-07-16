@@ -30,10 +30,10 @@ Add an `AnimationDef` to `packages/app/src/flame/examples/animations.ts`:
 
 ```typescript
 const myNewAnim: AnimationDef = {
-  id: 'ex1-my-animation',        // unique identifier
-  name: 'My Animation',          // display name
+  id: 'ex1-my-animation', // unique identifier
+  name: 'My Animation', // display name
   description: 'What this does', // one-line description
-  exampleId: 'example1',         // key from examples map
+  exampleId: 'example1', // key from examples map
   tracks: [
     {
       parameterPath: 'exposure', // timeline parameter path
@@ -56,39 +56,39 @@ Paths follow the dotted convention used by `applyTimelineToFlame` in `utils/time
 
 ### Global Parameters
 
-| Path              | Type     | Description          |
-|-------------------|----------|----------------------|
-| `exposure`        | number   | Render exposure      |
-| `skipIters`       | number   | Skip iterations      |
-| `vibrancy`        | number   | Palette blend (0–1)  |
-| `palettePhase`    | number   | Palette phase offset |
-| `paletteSpeed`    | number   | Palette cycle speed  |
+| Path           | Type   | Description          |
+| -------------- | ------ | -------------------- |
+| `exposure`     | number | Render exposure      |
+| `skipIters`    | number | Skip iterations      |
+| `vibrancy`     | number | Palette blend (0–1)  |
+| `palettePhase` | number | Palette phase offset |
+| `paletteSpeed` | number | Palette cycle speed  |
 
 ### Camera
 
-| Path              | Type     | Description          |
-|-------------------|----------|----------------------|
-| `camera.x`        | number   | Camera X position    |
-| `camera.y`        | number   | Camera Y position    |
-| `camera.zoom`     | number   | Camera zoom level    |
-| `camera.rotation` | number   | Camera rotation      |
+| Path              | Type   | Description       |
+| ----------------- | ------ | ----------------- |
+| `camera.x`        | number | Camera X position |
+| `camera.y`        | number | Camera Y position |
+| `camera.zoom`     | number | Camera zoom level |
+| `camera.rotation` | number | Camera rotation   |
 
 ### Transform Properties
 
-| Path                                        | Type   | Description               |
-|---------------------------------------------|--------|---------------------------|
-| `transform.{tid}.probability`               | number | Transform probability     |
-| `transform.{tid}.color.x`                   | number | Transform color X         |
-| `transform.{tid}.color.y`                   | number | Transform color Y         |
-| `transform.{tid}.preAffine.{a,b,c,d,e,f}`   | number | Pre-affine coefficients   |
-| `transform.{tid}.postAffine.{a,b,c,d,e,f}`  | number | Post-affine coefficients  |
+| Path                                       | Type   | Description              |
+| ------------------------------------------ | ------ | ------------------------ |
+| `transform.{tid}.probability`              | number | Transform probability    |
+| `transform.{tid}.color.x`                  | number | Transform color X        |
+| `transform.{tid}.color.y`                  | number | Transform color Y        |
+| `transform.{tid}.preAffine.{a,b,c,d,e,f}`  | number | Pre-affine coefficients  |
+| `transform.{tid}.postAffine.{a,b,c,d,e,f}` | number | Post-affine coefficients |
 
 ### Variation Properties
 
-| Path                          | Type   | Description              |
-|-------------------------------|--------|--------------------------|
-| `{tid}.{vid}`                 | number | Variation weight         |
-| `{tid}.{vid}.{paramName}`     | number | Variation parameter      |
+| Path                      | Type   | Description         |
+| ------------------------- | ------ | ------------------- |
+| `{tid}.{vid}`             | number | Variation weight    |
+| `{tid}.{vid}.{paramName}` | number | Variation parameter |
 
 Common variation parameter names: `power`, `dist`, `slices`, `thickness`, `rotation`, `radius`, `angle`, `scale`, `freqX`, `freqY`, etc.
 
@@ -101,6 +101,7 @@ Available easing values: `linear` (default), `easeIn`, `easeOut`, `easeInOut`, `
 Transform IDs (`tid`) and variation IDs (`vid`) are hardcoded UUID-like strings in each example file under `packages/app/src/flame/examples/`. Open the example file (e.g., `example1.ts`) and look for the object keys in the `transforms` and nested `variations` records.
 
 Example from `example1.ts`:
+
 ```typescript
 transforms: {
   [tid('55d4c43f_14b8_4554_a9d1_a94eda857811')]: {    // ← this is a tid
@@ -115,15 +116,15 @@ transforms: {
 }
 ```
 
-## Current Animations (16 total)
+## Current Animations (80+ — list below is the original first batch)
 
-| Example | Animations |
-|---------|-----------|
+| Example  | Animations                                                   |
+| -------- | ------------------------------------------------------------ |
 | example1 | Camera Pan & Exposure, Probability Dance, Pie Slices & Swirl |
-| example2 | Julia Power Wave, Camera Cruise, Probability Shuffle |
-| example3 | Julia Power & Dist, Camera Cruise |
-| example4 | Camera Sweep, Probability Shift |
-| example5 | Julia Power Journey, Camera & Vibrancy, Probability Flow |
-| example6 | Camera Cruise, Vibrancy Pulse, Probability Shift |
+| example2 | Julia Power Wave, Camera Cruise, Probability Shuffle         |
+| example3 | Julia Power & Dist, Camera Cruise                            |
+| example4 | Camera Sweep, Probability Shift                              |
+| example5 | Julia Power Journey, Camera & Vibrancy, Probability Flow     |
+| example6 | Camera Cruise, Vibrancy Pulse, Probability Shift             |
 
 All animations are 90 frames at 30fps (3 seconds) with looping enabled by default.

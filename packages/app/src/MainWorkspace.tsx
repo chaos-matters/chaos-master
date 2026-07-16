@@ -40,7 +40,6 @@ import { ExportJobTracker } from './components/ExportJobs/ExportJobTracker'
 import { createExportPngDialog } from './components/ExportPngDialog/ExportPngDialog'
 import { ColorEditor } from './components/FlameColorEditor/ColorEditor'
 import { handleColor } from './components/FlameColorEditor/FlameColorEditor'
-import { FlameGallery } from './components/FlameGallery/FlameGallery'
 import { FlameRandomizerCard } from './components/FlameRandomizerCard/FlameRandomizerCard'
 import { FloatingActions } from './components/FloatingActions/FloatingActions'
 import { createShowHelp } from './components/HelpModal/HelpModal'
@@ -761,22 +760,9 @@ export function MainWorkspace(props: AppProps) {
   }
 
   function pickGalleryFlame() {
-    void _requestModal({
-      content: ({ respond }) => (
-        <FlameGallery
-          onApply={(flame) => {
-            if (blendFlame())
-              showToast(
-                'Blend is still active — the loaded flame will look mixed',
-                4000,
-              )
-            history.replace(deepClone(flame))
-          }}
-          hardwareTier={props.hardwareTier}
-          respond={respond}
-        />
-      ),
-    })
+    // The gallery is a mode of the Load Flame dialog: same tiles and chrome,
+    // plus search, variation tags, and the Bred & Evolved section.
+    void showLoadFlameModal('gallery')
   }
 
   function pickSimulatorFlame() {
@@ -5490,7 +5476,6 @@ export function MainWorkspace(props: AppProps) {
                             if (blendIntent() === 'morph') {
                               setupMorph(flame)
                             } else if (blendIntent() === 'breed') {
-                              setShowBlendGallery(false)
                               void _requestModal({
                                 content: ({ respond }) => (
                                   <BreedGallery
@@ -5521,7 +5506,6 @@ export function MainWorkspace(props: AppProps) {
                                 ),
                               })
                             } else if (blendIntent() === 'evolve') {
-                              setShowBlendGallery(false)
                               void _requestModal({
                                 content: ({ respond }) => (
                                   <EvolutionChamber
@@ -5552,11 +5536,11 @@ export function MainWorkspace(props: AppProps) {
                                 ),
                               })
                             } else if (blendIntent() === 'diff') {
-                              setShowBlendGallery(false)
                               openDiffView(flameDescriptor, flame)
                             } else {
                               setBlendFlame(deepClone(flame))
                             }
+                            // Single close for every intent branch above.
                             setShowBlendGallery(false)
                           }}
                           onPreviewBlend={handlePreviewBlend}

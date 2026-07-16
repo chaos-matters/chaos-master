@@ -854,7 +854,9 @@ export function AudioWiringModal(props: {
   function handleKeyDown(e: KeyboardEvent) {
     if (e.key === 'Escape') {
       e.stopPropagation()
-      if (pendingPaste()) {
+      if (importPanel()) {
+        setImportPanel(null)
+      } else if (pendingPaste()) {
         setPendingPaste(null)
       } else if (dragFrom()) {
         setDragFrom(null)
@@ -961,27 +963,113 @@ export function AudioWiringModal(props: {
     }
   }
 
+  // ── Wiring JSON export / import ──
+
+  const [exportCopied, setExportCopied] = createSignal(false)
+  let exportCopiedTimer: ReturnType<typeof setTimeout> | undefined
+  onCleanup(() => {
+    clearTimeout(exportCopiedTimer)
+  })
+
   function exportJSON() {
     const json = JSON.stringify(props.mappings, null, 2)
-    globalThis.navigator.clipboard.writeText(json).catch(() => {
-      // Fallback: show in a prompt
-      prompt('Copy this JSON:', json)
-    })
+    globalThis.navigator.clipboard
+      .writeText(json)
+      .then(() => {
+        // Button-local feedback — this overlay sits above every global toast
+        // layer, so confirmation must live inside the modal itself.
+        setExportCopied(true)
+        clearTimeout(exportCopiedTimer)
+        exportCopiedTimer = setTimeout(() => setExportCopied(false), 1600)
+      })
+      .catch(() => {
+        // Clipboard unavailable (permissions/insecure context) — last resort.
+        prompt('Copy this JSON:', json)
+      })
   }
 
-  function importJSON() {
-    const text = prompt('Paste wiring JSON:')
-    if (!text) return
+  /** Parse + validate wiring JSON; null when it isn't a mapping array. */
+  function parseWiringJSON(text: string): AudioMappingEntry[] | null {
     try {
-      const parsed = JSON.parse(text)
-      if (!Array.isArray(parsed)) throw new Error('Expected an array')
-      saveForUndo()
-      props.onMappingsChange(parsed as AudioMappingEntry[])
-      setSelectedWire(null)
-      setConnectingFrom(null)
+      const parsed: unknown = JSON.parse(text)
+      if (!Array.isArray(parsed)) return null
+      const valid = parsed.every((entry: unknown) => {
+        if (entry === null || typeof entry !== 'object') return false
+        const e = entry as Record<string, unknown>
+        return (
+          typeof e.audioFeature === 'string' &&
+          e.target !== null &&
+          typeof e.target === 'object' &&
+          typeof (e.target as Record<string, unknown>).kind === 'string' &&
+          typeof e.sensitivity === 'number' &&
+          Array.isArray(e.range) &&
+          e.range.length === 2
+        )
+      })
+      return valid ? (parsed as AudioMappingEntry[]) : null
     } catch {
-      alert('Invalid wiring JSON. Expected an array of mapping entries.')
+      return null
     }
+  }
+
+  const [importPanel, setImportPanel] = createSignal<{
+    text: string
+    error: string | null
+    fromClipboard: boolean
+  } | null>(null)
+  let importFileInput: HTMLInputElement | undefined
+
+  /** Open the import panel, pre-filled from the clipboard when it already
+   *  holds valid wiring JSON (readText needs a user gesture — this click). */
+  function importJSON() {
+    void (async () => {
+      let text = ''
+      let fromClipboard = false
+      try {
+        const clip = await globalThis.navigator.clipboard.readText()
+        if (clip && parseWiringJSON(clip) !== null) {
+          text = clip
+          fromClipboard = true
+        }
+      } catch {
+        // Read permission denied or unsupported — fall through to manual paste.
+      }
+      setImportPanel({ text, error: null, fromClipboard })
+    })()
+  }
+
+  function applyImport() {
+    const panel = importPanel()
+    if (!panel) return
+    const parsed = parseWiringJSON(panel.text)
+    if (parsed === null) {
+      setImportPanel({
+        ...panel,
+        error:
+          'Invalid wiring JSON — expected an array of mapping entries (audioFeature, target, sensitivity, range).',
+      })
+      return
+    }
+    saveForUndo()
+    props.onMappingsChange(parsed)
+    setSelectedWire(null)
+    setConnectingFrom(null)
+    setImportPanel(null)
+  }
+
+  function loadWiringFile(file: File) {
+    void file.text().then((text) => {
+      const panel = importPanel()
+      if (!panel) return
+      setImportPanel({
+        text,
+        fromClipboard: false,
+        error:
+          parseWiringJSON(text) === null
+            ? 'That file does not contain valid wiring JSON.'
+            : null,
+      })
+    })
   }
 
   function randomizeWiring() {
@@ -1242,6 +1330,7 @@ export function AudioWiringModal(props: {
         onUndo={undo}
         onRedo={redo}
         onRandomize={randomizeWiring}
+        exportCopied={exportCopied()}
         onExportJSON={exportJSON}
         onImportJSON={importJSON}
         onClose={props.onClose}
@@ -1463,6 +1552,80 @@ export function AudioWiringModal(props: {
         onUpdate={updateSelectedEntry}
         onDelete={deleteSelectedEntry}
       />
+
+      {/* ── Wiring JSON import panel (in-modal replacement for prompt()) ── */}
+      <Show when={importPanel()}>
+        {(panel) => (
+          <div
+            class={styles.importScrim}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setImportPanel(null)
+            }}
+          >
+            <div class={styles.importPanel}>
+              <div class={styles.importTitle}>Import wiring</div>
+              <Show when={panel().fromClipboard}>
+                <div class={styles.importHint}>
+                  Found valid wiring JSON in your clipboard — review and apply.
+                </div>
+              </Show>
+              <textarea
+                class={styles.importTextarea}
+                placeholder="Paste wiring JSON here…"
+                value={panel().text}
+                rows={10}
+                spellcheck={false}
+                onInput={(e) => {
+                  setImportPanel({
+                    text: e.currentTarget.value,
+                    error: null,
+                    fromClipboard: false,
+                  })
+                }}
+              />
+              <Show when={panel().error}>
+                <div class={styles.importError}>{panel().error}</div>
+              </Show>
+              <div class={styles.importActions}>
+                <input
+                  ref={importFileInput}
+                  type="file"
+                  accept=".json,application/json"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.currentTarget.files?.[0]
+                    if (file) loadWiringFile(file)
+                    e.currentTarget.value = ''
+                  }}
+                />
+                <button
+                  type="button"
+                  class={styles.importFileBtn}
+                  onClick={() => importFileInput?.click()}
+                >
+                  Load from file…
+                </button>
+                <div class={styles.importActionsSpacer} />
+                <button
+                  type="button"
+                  class={styles.importCancelBtn}
+                  onClick={() => setImportPanel(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  class={styles.importApplyBtn}
+                  disabled={panel().text.trim().length === 0}
+                  onClick={applyImport}
+                >
+                  Apply wiring
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Show>
     </div>
   )
 }

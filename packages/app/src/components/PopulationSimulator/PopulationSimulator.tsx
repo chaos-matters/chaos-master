@@ -5,10 +5,11 @@ import { VariationPreview } from '@/components/VariationSelector/VariationSelect
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { ensureNode } from '@/flame/ancestry'
-import { breedFlames } from '@/flame/breedFlame'
+import { breedFlames, CROSSOVER_LABELS, CROSSOVER_MODES, } from '@/flame/breedFlame'
 import { scoreFlame } from '@/flame/fitness'
 import { generateRandomFlame, mutateFlame } from '@/flame/randomize'
 import { deepClone } from '@/utils/clone'
+import { PREVIEW_RESOLUTION_BY_TIER } from '@/utils/hardwareTier'
 import ui from './PopulationSimulator.module.css'
 import type { CrossoverMode } from '@/flame/breedFlame'
 import type { MutateFlameOptions } from '@/flame/randomize'
@@ -21,30 +22,6 @@ const MAX_GENERATIONS = 500
 const MIN_POPULATION = 8
 const MAX_POPULATION = 256
 const POP_STEP = 8
-const CROSSOVER_MODES: CrossoverMode[] = [
-  'uniform',
-  'weighted',
-  'shuffle',
-  'alternate',
-  'smart',
-]
-const CROSSOVER_LABELS: Record<CrossoverMode, string> = {
-  uniform: 'Uniform',
-  weighted: 'Weighted',
-  shuffle: 'Shuffle',
-  alternate: 'Alternate',
-  smart: 'Smart',
-}
-
-const PREVIEW_RESOLUTION: Record<
-  HardwareTier,
-  { width: number; height: number }
-> = {
-  low: { width: 256, height: 144 },
-  mid: { width: 384, height: 216 },
-  high: { width: 640, height: 360 },
-  ultra: { width: 768, height: 432 },
-}
 
 /** Max items to show initially in result grids — rest expand via "Show more". */
 const INITIAL_VISIBLE = 8
@@ -181,7 +158,7 @@ export function PopulationSimulator(props: {
   respond: () => void
 }) {
   const tier = () => props.hardwareTier ?? 'mid'
-  const resolution = () => PREVIEW_RESOLUTION[tier()]
+  const resolution = () => PREVIEW_RESOLUTION_BY_TIER[tier()]
 
   // ── Config signals ──────────────────────────────────────────────────────
 

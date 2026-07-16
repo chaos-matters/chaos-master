@@ -278,3 +278,44 @@
   min-height: 3.5rem;
   resize: vertical;
 }
+
+/* ── Animated-flame frame snapshot chip ── */
+
+.frameChip {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: oklch(62% 0.16 280 / 16%);
+  border: 1px solid oklch(62% 0.16 280 / 45%);
+  color: oklch(78% 0.12 280);
+  white-space: nowrap;
+}
+
+.frameSyncBtn {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--neutral-300, #bbb);
+  cursor: pointer;
+}
+
+.frameSyncBtn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.frameAtHint {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--neutral-500, #888);
+  margin: 2px 0 -4px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

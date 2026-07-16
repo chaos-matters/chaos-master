@@ -5,7 +5,7 @@ of keyframes flows smoothly instead of the current per-segment easing, and (b) a
 **visual curve editor** (value-vs-frame graph) to edit keyframes and pick
 per-keyframe interpolation — the feel of IFSRenderer's animation panel.
 
-Status: **Phase 1 implemented**; Phases 2–3 planned.
+Status: **Phases 1–2 implemented** (`Timeline/CurveEditor/` shipped, `catmullRom` easing in `easing.ts`); Phase 3 planned.
 
 ---
 
@@ -14,7 +14,7 @@ Status: **Phase 1 implemented**; Phases 2–3 planned.
 **IFSRenderer** (bezo97, C#/.NET — `IFSEngine/Animation/`, `WpfDisplay/Views/Animation/`):
 
 - `Channel` ≙ our `TimelineTrack`. `Keyframe { double t; double Value;
-  InterpolationMode; double EasingPower=1; EasingDirection }`.
+InterpolationMode; double EasingPower=1; EasingDirection }`.
 - `InterpolationMode = { Linear, Constant, CatmullRom }`. The "spline" is
   **Catmull-Rom with auto-computed tangents** — the manual
   `LeftTangent/RightTangent` fields are present but **commented out**: they ship
@@ -37,7 +37,7 @@ Status: **Phase 1 implemented**; Phases 2–3 planned.
 **JWildfire** (`/home/maff/foss/JWildfire/src/org/jwildfire/envelope/`):
 
 - `Envelope { int x[]; double y[]; Interpolation {SPLINE, BEZIER, LINEAR};
-  EditMode {DRAG_POINTS, DRAG_CURVE_HORIZ/VERT, SCALE_CURVE_HORIZ/VERT} }`.
+EditMode {DRAG_POINTS, DRAG_CURVE_HORIZ/VERT, SCALE_CURVE_HORIZ/VERT} }`.
 - `SplineInterpolation` = Catmull-Rom too (tension B=0.5, endpoints clamped). Adds
   `BezierInterpolation` (manual handles) as a separate mode.
 - `EnvelopeView` shows the graph's screen↔(time,value) transform to reuse:
@@ -53,7 +53,7 @@ Catmull-Rom now, Bezier + audio later.
 ## 2. Current state and the gap
 
 - `KeyframeData { frame; value; easing? }`, `easing ∈
-  linear|easeIn|easeOut|easeInOut|bounce|elastic` (`flame/schema/timeline.ts`,
+linear|easeIn|easeOut|easeInOut|bounce|elastic` (`flame/schema/timeline.ts`,
   `utils/easing.ts`).
 - `resolveKeyframeValue` (`utils/timeline.ts`): brackets prev/next, `t`, then
   `applyEasing(t, next.easing)` and **lerp**. C0 only — velocity is discontinuous
@@ -75,7 +75,7 @@ Catmull-Rom now, Bezier + audio later.
 2. **Interp orthogonal to easing.** Keep `easing` (named curve, reshapes `t`); add
    a separate `interp` mode. They compose: `easedT = applyEasing(t, easing)` is
    fed as the spline parameter (exactly IFSRenderer).
-3. **Per-keyframe interp, owned by the *next* keyframe of a segment** — the same
+3. **Per-keyframe interp, owned by the _next_ keyframe of a segment** — the same
    keyframe that already owns the segment's `easing` in our resolver. So a
    keyframe's `interp`/`easing` describe its **incoming** segment. Keeping one
    rule avoids changing existing easing semantics. (Inspector wording: "this
@@ -93,8 +93,13 @@ Catmull-Rom now, Bezier + audio later.
 ## 4. Data model
 
 `flame/schema/timeline.ts` (valibot — persisted, shared/exported):
+
 ```ts
-export const KeyframeInterpolation = v.picklist(['linear', 'constant', 'spline'])
+export const KeyframeInterpolation = v.picklist([
+  'linear',
+  'constant',
+  'spline',
+])
 export type KeyframeInterpolation = v.InferOutput<typeof KeyframeInterpolation>
 
 export const Keyframe = v.object({
@@ -104,11 +109,19 @@ export const Keyframe = v.object({
   interp: v.optional(KeyframeInterpolation, 'linear'), // NEW, defaulted → back-compat
 })
 ```
+
 `utils/timeline.ts` (runtime literal types, kept in sync like `EasingCurve`):
+
 ```ts
 export type KeyframeInterpolation = 'linear' | 'constant' | 'spline'
-export type KeyframeData = { frame; value; easing?: EasingCurve; interp?: KeyframeInterpolation }
+export type KeyframeData = {
+  frame
+  value
+  easing?: EasingCurve
+  interp?: KeyframeInterpolation
+}
 ```
+
 Optional + defaulted so old saved/shared/embedded animations validate unchanged
 (mind the valibot `InferOutput` widening — fix at call sites, trust CI).
 
@@ -117,19 +130,33 @@ Optional + defaulted so old saved/shared/embedded animations validate unchanged
 ## 5. Interpolation algorithm (exact)
 
 `utils/easing.ts`:
+
 ```ts
-export function catmullRom(p0: number, p1: number, p2: number, p3: number, t: number): number {
-  const t2 = t * t, t3 = t2 * t
-  const h1 = 2*t3 - 3*t2 + 1, h2 = -2*t3 + 3*t2, h3 = t3 - 2*t2 + t, h4 = t3 - t2
-  const m1 = (p2 - p0) / 2, m2 = (p3 - p1) / 2
-  return h1*p1 + h2*p2 + h3*m1 + h4*m2
+export function catmullRom(
+  p0: number,
+  p1: number,
+  p2: number,
+  p3: number,
+  t: number,
+): number {
+  const t2 = t * t,
+    t3 = t2 * t
+  const h1 = 2 * t3 - 3 * t2 + 1,
+    h2 = -2 * t3 + 3 * t2,
+    h3 = t3 - 2 * t2 + t,
+    h4 = t3 - t2
+  const m1 = (p2 - p0) / 2,
+    m2 = (p3 - p1) / 2
+  return h1 * p1 + h2 * p2 + h3 * m1 + h4 * m2
 }
 ```
+
 `resolveKeyframeValue` — after computing the bracket `[prev, next]` (capture
 `prevIdx`), `t`, `easedT = applyEasing(t, next.easing)`, and `interp = next.interp`:
+
 - numbers: `constant → prev`; `spline → catmullRom(v0, prev, next, v3, easedT)`
   where `v0 = sorted[prevIdx-1]?.value` (clamp to `prev`), `v3 =
-  sorted[prevIdx+2]?.value` (clamp to `next`); else lerp.
+sorted[prevIdx+2]?.value` (clamp to `next`); else lerp.
 - arrays (colours): same, component-wise.
 - strings/booleans: hold (unchanged; spline N/A).
 
@@ -140,14 +167,15 @@ keys, midpoint == linear midpoint) — **not** identical to linear. `interp:
 
 ---
 
-## 6. Phase 1 — Core interpolation  *(implemented)*
+## 6. Phase 1 — Core interpolation _(implemented)_
 
 Files:
+
 - `utils/easing.ts` — `catmullRom`.
 - `flame/schema/timeline.ts` — `KeyframeInterpolation` + `interp` field.
 - `utils/timeline.ts` — `KeyframeData.interp`, `KeyframeInterpolation`,
   `resolveKeyframeValue` spline/constant branch, `setKeyframeInterp(path, frame,
-  interp)`, and **interp preservation** through `addKeyframeImpl` (update branch),
+interp)`, and **interp preservation** through `addKeyframeImpl` (update branch),
   `moveKeyframe`, `splitKeyframeAtFrame`, mirror ops, `loadTracks`.
 - `utils/timeline.test.ts` — unit tests (below).
 
@@ -157,9 +185,10 @@ modes + export (shared resolver).
 
 ---
 
-## 7. Phase 2 — Visual curve editor  *(next)*
+## 7. Phase 2 — Visual curve editor _(next)_
 
 New `components/Timeline/CurveEditor/`:
+
 - `CurveEditor.tsx` — SVG graph. X = frame (share the dope-sheet ruler's
   zoom/scroll/`frameWidth`), Y = value auto-ranged per visible track
   (EnvelopeView-style scale/translate, with padding). Render each selected
@@ -182,6 +211,7 @@ New `components/Timeline/CurveEditor/`:
   tested; component smoke test for node drag → keyframe update.
 
 Component breakdown (modular, small, single-responsibility):
+
 - `useCurveViewport()` hook — pure frame↔px / value↔px transforms + auto-range
   (testable, no DOM).
 - `CurvePath` — renders one track's sampled `<path>` + nodes.
@@ -189,7 +219,7 @@ Component breakdown (modular, small, single-responsibility):
 
 ---
 
-## 8. Phase 3 — Extensions  *(later, planned now)*
+## 8. Phase 3 — Extensions _(later, planned now)_
 
 1. **Bezier interpolation with manual tangent handles** (JWildfire
    `BezierInterpolation`): add `'bezier'` to `KeyframeInterpolation` and optional
