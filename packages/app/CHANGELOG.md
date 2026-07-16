@@ -1,7 +1,62 @@
 # Changelog
 
-What's new in Chaos Master. Concise highlights for each release; the full
-developer history lives in `dev.changelog.md`.
+What's new in Lumen Apeiron (formerly Chaos Master). Concise highlights for
+each release; the full developer history lives in `dev.changelog.md`.
+
+## [0.9.7] - 2026-07-16
+
+### Added
+
+- **Lumen Apeiron.** New name, new home — the app lives at
+  [lumenapeiron.com](https://lumenapeiron.com) (about pages at
+  about.lumenapeiron.com). Chaos Master lives on as the sub-brand on the
+  welcome screen and social cards. Shared links now render proper Open Graph
+  cards, and the site ships a real SEO baseline (canonical, meta description,
+  sitemap, robots).
+- **Audio flames.** Make the flame dance to music: wire frequency bands,
+  energy, beats and onsets to any parameter — render settings, affines,
+  transform properties, variation weights — with attack/release smoothing.
+  Comes with a full-screen node-graph wiring editor (presets, randomize,
+  undo/redo, JSON copy/import), waveform scrubbing, mic or file input, and
+  audio-synced video export.
+- **Sonification.** The reverse direction: the flame's own structure
+  generates real-time audio, turning the fractal into an instrument.
+- **Flame genetics.** Breed two flames into offspring with five crossover
+  modes (including Smart, which pairs transforms by dominant variation);
+  evolve lineages generation by generation in the Evolution Chamber; or let
+  the autonomous Population Simulator score and evolve whole populations with
+  selectable strategies. Every breeding is recorded in a persistent Ancestry
+  Tree, and a structural Diff view compares any two flames. The randomizer
+  gains a Mutation Lab with fine-grained rate controls.
+- **Flame Gallery.** One place to browse everything: search by name, filter
+  by variation tags, and pick from curated examples, animations, recents, and
+  your own Bred & Evolved flames.
+- **Render dialog, animation-aware.** For animated flames the preview shows
+  which timeline frame it captured (with a one-click Sync), and the settings
+  sliders are labeled with the frame they reflect.
+
+### Changed
+
+- **Cleaner toolbar.** The feature launchers are grouped into Audio and
+  Genetics pull-up menus next to Blend/Morph/Gallery, and the bar pans
+  horizontally on narrow screens so nothing is out of reach on phones.
+- **Population Simulator wears the new brand** — glassy gradient cards,
+  brand sliders and chips; the pilot for a broader visual refresh.
+- **Export preview matches reality.** The Render Flame preview now renders
+  with the same density-estimation filter as the canvas and the export jobs,
+  so what you see is what you get.
+- **TypeGPU 0.11** under the hood, with camera/IFS NaN hardening.
+
+### Fixed
+
+- Audio mapping sliders track pointer drags instead of only responding to
+  clicks.
+- Breeding gallery tiles are keyboard-accessible.
+- Population Simulator: pause/resume no longer discards a bred generation,
+  timers clean up on close, and simulator runs no longer flood the ancestry
+  store.
+- Ancestry tree re-rooting works when clicking nodes, and recorded flames are
+  immutable snapshots (they no longer change when you keep editing).
 
 ## [0.9.6] - 2026-07-03
 

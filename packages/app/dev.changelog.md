@@ -7,6 +7,101 @@ changelog surfaced in the About panel lives in `CHANGELOG.md`.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.7] - 2026-07-16
+
+The Lumen Apeiron release: full rebrand (product + domains + SEO/OG), the
+audio-reactive/sonification suite, the flame-genetics suite (breeding,
+evolution, population simulator, ancestry, diff), a toolbar/gallery/export UX
+polish pass, and a batch of correctness fixes surfaced by review.
+
+### Added
+
+- **Rebrand + SEO** (`index.html`, `worker/index.ts`, `wrangler.jsonc` x2,
+  landing): product renamed Lumen Apeiron; routes moved to `lumenapeiron.com` /
+  `dev.lumenapeiron.com` / `about(.dev).lumenapeiron.com` with the legacy prod
+  custom domains kept bound until the zone redirect flips (comments mark the
+  cleanup spots). Worker names and KV/R2 bindings unchanged on purpose (same
+  workers keep secrets + stored OG images). Marker-wrapped default OG block in
+  `index.html` that the Worker swaps per-share (no duplicate `og:*`), default
+  OG cover for shares without an uploaded preview, `robots.txt` + `sitemap.xml`
+  for both sites, branded 2400x1260 `og-cover.jpg` regenerated via
+  `packages/landing/scripts/generate-og-cover.mjs`.
+- **Audio-reactive flames** (`utils/audioAnalysis.ts`, `AudioReactivePanel/`,
+  `AudioWiringModal/` + `NodeGraphView`, `utils/audioExport.ts`): mic/file
+  analysis (frequency bands, RMS, centroid, flatness, beat/onset), mappings to
+  render settings / affines / transform properties / variation weights with
+  attack/release envelopes, presets + randomize, full-screen node-graph wiring
+  editor with undo/redo, waveform seek, audio-synced MP4 export. Sonification
+  engine renders the flame structure as real-time audio.
+- **Flame genetics** (`flame/breedFlame.ts`, `flame/fitness.ts`,
+  `flame/fdiff.ts`, `flame/ancestry.ts` + `ancestryDb.ts`, `BreedGallery/`,
+  `EvolutionChamber/`, `PopulationSimulator/`, `AncestryTreeModal/`,
+  `DiffViewModal/`): five crossover strategies (uniform/weighted/shuffle/
+  alternate/smart), per-strategy child assembly with param/color cross-breeding
+  and light mutation; Evolution Chamber generational history; autonomous GA
+  simulator (truncation/tournament/roulette selection, elitism, fitness =
+  variation diversity + weight balance + OkLab color spread + structural
+  complexity); IndexedDB-backed ancestry with debounced writes; structural
+  diff (greedy transform matching + render-settings comparison). Mutation Lab
+  rate controls in the randomizer (`MUTATION_PRESETS`, per-kind rates).
+- **Gallery mode of the Load dialog** (`LoadFlameModal.tsx`): search,
+  variation-tag cloud derived from the flames (top 18 by count), Bred &
+  Evolved section fed from the ancestry store; Gallery… toolbar button opens
+  it. The placeholder-XML `FlameGallery` component and `flameGalleryData.ts`
+  are removed.
+- **PullUpMenu** (`components/PullUpMenu/`): portal-based upward menu used to
+  group the toolbar's Audio and Genetics launchers; the view-controls bar pans
+  horizontally on narrow viewports.
+- **Export dialog frame awareness** (`ExportPngDialog.tsx`): "Frame N/M" chip
+  - Sync (re-snapshots the preview from the timeline, keeping metadata edits)
+    and an "@ frame N" hint on the render-setting sliders.
+
+### Changed
+
+- **TypeGPU 0.11** (`chore(deps)`) with strict-eq NaN guards in TGSL
+  (`ifsPipeline*.ts`) and camera NaN/Inf hardening; `eslint-plugin-typegpu`.
+- **Export preview parity**: the Render Flame preview renders with
+  `adaptiveFilterEnabled` like the canvas and the offscreen jobs — with
+  `paletteMode 0` the palette index derives from log-density, so the
+  unfiltered preview used to shift hues, not just sharpness.
+- **Population Simulator brand kit** (`PopulationSimulator.module.css`):
+  scoped `--la-*` tokens from the wordmark gradient, gradient-hairline glass
+  cards with an iterated-corner motif, brand chips/sliders/progress.
+- **Wiring editor JSON flows** (`AudioWiringModal.tsx`, `HeaderBar.tsx`):
+  Copy JSON with button-local "Copied" feedback (the overlay sits above the
+  toast layer), and an in-modal import panel — clipboard auto-read + validate,
+  paste textarea, load-from-file, structural validation.
+- Docs: 31 shipped plans/audits archived to `docs/plans/archive/`; roadmap,
+  templates, and live docs corrected for the rebrand and shipped features.
+
+### Fixed
+
+- **Audio mapping sliders only responded to clicks** (`AudioReactivePanel`):
+  the reference-keyed `<For>` recreated a row's DOM on every `onInput`,
+  killing pointer capture mid-drag — now `<Index>` with narrow-friendly
+  target helpers.
+- **Breeding review batch**: pause/resume no longer discards the already-bred
+  generation (shared `runLoop` with `pendingPopulation`); elapsed timer stops
+  on pause/unmount; roulette fallback picks the best, not worst; empty
+  offspring can't hang the breed loop; simulator breeds no longer flood the
+  ancestry store (applied flames register via `ensureNode`); ancestry stores
+  deep-cloned snapshots instead of live store references; ancestry tree
+  re-rooting no longer snaps back to the workspace flame (`on(() =>
+props.flame)`); zero-transform pipelines write `{ _dummy: 0 }` again;
+  `uniformCrossover` fills from balance-skipped candidates so skewed parents
+  reach the target count; `randomize.ts` re-aligned with main's helper
+  refactor with Mutation Lab rates flowing through shared sigma helpers.
+- **A11y**: breeding gallery tiles are real buttons (keyboard + focus ring);
+  emoji glyphs replaced with SVG icons (new `Lineage` icon).
+- Wiring overlay sits above the floating actions widget; audio panel's
+  mapping actions row separated from the list.
+
+### Tests
+
+- New suites for `fitness`, `fdiff`, `ancestry` (hash determinism, lineage
+  layering, snapshot semantics) and breeding edge cases (smart crossover,
+  skewed-parent uniform crossover) — 1072 tests across 53 files.
+
 ## [0.9.6] - 2026-07-03
 
 Timeline UX batch: playhead/ruler desync fix, single-row grouped header,
