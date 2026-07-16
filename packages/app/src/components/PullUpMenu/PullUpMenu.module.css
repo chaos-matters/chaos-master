@@ -1,0 +1,85 @@
+.wrap {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.caret {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin-left: 0.35rem;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  /* Points up — the menu opens above the toolbar. */
+  border-bottom: 5px solid currentColor;
+  opacity: 0.65;
+  transition: transform 0.15s ease;
+}
+
+.caretOpen {
+  transform: rotate(180deg);
+}
+
+.panel {
+  position: fixed;
+  z-index: 150; /* above toolbar/timeline, below modal overlays (240+) */
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--neutral-50, #fff);
+  border: 1px solid var(--neutral-200, #e5e5e5);
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.18);
+  animation: pullUpIn 0.12s ease;
+
+  [data-theme='dark'] & {
+    background: rgba(26, 26, 32, 0.96);
+    border-color: var(--neutral-700, #3a3a4e);
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+  }
+}
+
+@keyframes pullUpIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
+
+  .caret {
+    transition: none;
+  }
+}
+
+.item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 12px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: var(--neutral-800, #222);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+
+  [data-theme='dark'] & {
+    color: var(--neutral-200, #ddd);
+  }
+}
+
+.item:hover {
+  background: oklch(62% 0.16 280 / 14%);
+}

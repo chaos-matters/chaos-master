@@ -5,6 +5,20 @@
 
   /* Start stacking context so software version can be positioned below controls */
   isolation: isolate;
+
+  /* Narrow screens: the bar stays a single row that pans horizontally
+     (touch-drag or wheel) instead of wrapping or clipping — every control
+     stays reachable on phones/tablets. The pull-up menus escape this scroll
+     container via Portal, so nothing gets clipped vertically. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.view-controls > * {
+  flex-shrink: 0;
 }
 
 .viewControlWrapper {

@@ -1,7 +1,7 @@
 # OG Link Previews — Setup & Testing
 
 Rich social previews (Discord / Slack / X / Facebook / LinkedIn) for shared flame
-links, implemented as **Option C** of [`plans/og-meta-tags-plan.md`](./plans/og-meta-tags-plan.md):
+links, implemented as **Option C** of [`plans/archive/og-meta-tags-plan.md`](./plans/archive/og-meta-tags-plan.md):
 the client GPU-renders the flame, uploads a downscaled PNG, and the existing app
 Worker stores it in R2 and injects `og:*` / `twitter:*` meta tags. **$0 / free tier.**
 

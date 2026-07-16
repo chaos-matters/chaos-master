@@ -2,7 +2,7 @@ import { createMemo, createSignal, For, Show } from 'solid-js'
 import { GalleryGrid } from '@/components/FlameRandomizerCard/GalleryGrid'
 import { ModalTitleBar } from '@/components/Modal/ModalTitleBar'
 import { recordBreed } from '@/flame/ancestry'
-import { analyzeSmartBreedMatch, breedFlames } from '@/flame/breedFlame'
+import { analyzeSmartBreedMatch, breedFlames, CROSSOVER_LABELS, CROSSOVER_MODES, } from '@/flame/breedFlame'
 import { mutateFlame } from '@/flame/randomize'
 import { Sparkle } from '@/icons'
 import { Root } from '@/lib/Root'
@@ -13,14 +13,6 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { HardwareTier } from '@/utils/hardwareTier'
 
 const COUNT_OPTIONS = [9, 18, 32] as const
-
-const CROSSOVER_LABELS: Record<CrossoverMode, string> = {
-  uniform: 'Uniform',
-  weighted: 'Weighted',
-  shuffle: 'Shuffle',
-  alternate: 'Alternate',
-  smart: 'Smart',
-}
 
 export type BreedGalleryParentInfo = {
   nameA: string
@@ -223,17 +215,7 @@ export function BreedGallery(props: {
               </For>
             </div>
             <div class={ui.crossoverChips}>
-              <For
-                each={
-                  [
-                    'uniform',
-                    'weighted',
-                    'shuffle',
-                    'alternate',
-                    'smart',
-                  ] as CrossoverMode[]
-                }
-              >
+              <For each={CROSSOVER_MODES}>
                 {(mode) => (
                   <button
                     type="button"

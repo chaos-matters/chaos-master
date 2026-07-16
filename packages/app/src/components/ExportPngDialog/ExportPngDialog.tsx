@@ -55,6 +55,10 @@ type RenderDialogProps = {
   hasAnimation: boolean
   tracks: TimelineTrack[]
   config: TimelineConfig
+  /** Timeline frame the preview snapshot was taken at (animated flames). */
+  previewFrame: number
+  /** Re-snapshot the preview from the timeline's current frame. */
+  onSyncFrame: () => void
   previewDescriptor: FlameDescriptor
   setPreviewDescriptor: (...args: unknown[]) => void
   selectedPalette: () => Palette | undefined
@@ -288,6 +292,28 @@ function RenderDialog(props: RenderDialogProps) {
                   Render Preview
                 </button>
               </Show>
+              {/* Animated flames: the preview is a snapshot of one timeline
+                  frame — say which, and let the user re-sync while playback
+                  or scrubbing moves the workspace canvas on without us. */}
+              <Show when={props.hasAnimation}>
+                <span
+                  class={ui.frameChip}
+                  title="The preview and the exported image use the flame state at this timeline frame"
+                >
+                  Frame {props.previewFrame}/{props.config.endFrame}
+                </span>
+                <button
+                  type="button"
+                  class={ui.frameSyncBtn}
+                  onClick={() => {
+                    props.onSyncFrame()
+                    if (renderMode() === 'manual') setRenderKey((k) => k + 1)
+                  }}
+                  title="Re-snapshot the preview from the timeline's current frame"
+                >
+                  Sync frame
+                </button>
+              </Show>
             </div>
             <Root adapterOptions={{ powerPreference: 'high-performance' }}>
               <AutoCanvas pixelRatio={DEFAULT_PREVIEW_PIXEL_RATIO}>
@@ -315,7 +341,7 @@ function RenderDialog(props: RenderDialogProps) {
                         <Flam3
                           quality={props.quality}
                           pointCountPerBatch={DEFAULT_POINT_COUNT}
-                          adaptiveFilterEnabled={false}
+                          adaptiveFilterEnabled={true}
                           animationEnabled={false}
                           flameDescriptor={props.previewDescriptor}
                           blendFlame={props.blendFlame?.()}
@@ -385,7 +411,7 @@ function RenderDialog(props: RenderDialogProps) {
                       <Flam3
                         quality={props.quality}
                         pointCountPerBatch={DEFAULT_POINT_COUNT}
-                        adaptiveFilterEnabled={false}
+                        adaptiveFilterEnabled={true}
                         animationEnabled={false}
                         flameDescriptor={props.previewDescriptor}
                         blendFlame={props.blendFlame?.()}
@@ -440,6 +466,14 @@ function RenderDialog(props: RenderDialogProps) {
               />
             </fieldset>
 
+            <Show when={props.hasAnimation}>
+              <div
+                class={ui.frameAtHint}
+                title="Slider values reflect the snapshotted timeline frame, not the base flame"
+              >
+                @ frame {props.previewFrame}
+              </div>
+            </Show>
             <div class={ui.sliderField}>
               <Slider
                 label="Exposure"
@@ -1064,6 +1098,24 @@ export function createExportPngDialog(
     }
 
     const [previewDescriptor, setPreviewDescriptor] = createStore(initialFlame)
+    // Which timeline frame the snapshot above reflects. Playback/scrubbing
+    // moves the workspace canvas on after the dialog opens — the chip in the
+    // preview toolbar shows this frame and Sync re-snapshots on demand.
+    const [previewFrame, setPreviewFrame] = createSignal(currentFrame)
+
+    function syncPreviewToCurrentFrame() {
+      const t = getTimeline()
+      if (!t || !hasAnimation) return
+      const frame = t.currentFrame()
+      const fresh = deepClone(flameDescriptor)
+      applyTimelineToFlameAtFrame(t, fresh, frame)
+      // Keep the dialog's metadata edits — only the flame state re-snapshots.
+      if (previewDescriptor.metadata) {
+        fresh.metadata = { ...previewDescriptor.metadata }
+      }
+      setPreviewDescriptor(fresh)
+      setPreviewFrame(frame)
+    }
 
     function handleExport() {
       const dimensions = computeExportDimensions(
@@ -1185,6 +1237,8 @@ export function createExportPngDialog(
           hasAnimation={hasAnimation}
           tracks={tracks}
           config={config}
+          previewFrame={previewFrame()}
+          onSyncFrame={syncPreviewToCurrentFrame}
           previewDescriptor={previewDescriptor}
           setPreviewDescriptor={
             setPreviewDescriptor as (...args: unknown[]) => void

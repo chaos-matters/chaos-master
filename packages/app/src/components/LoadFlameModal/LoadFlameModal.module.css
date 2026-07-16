@@ -437,3 +437,41 @@
     color: var(--neutral-400);
   }
 }
+
+/* ── Gallery mode: search + tag cloud ── */
+
+.gallerySearchRow {
+  margin-bottom: 10px;
+}
+
+.gallerySearchInput {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--neutral-300, #ccc);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+
+[data-theme='dark'] .gallerySearchInput {
+  border-color: var(--neutral-700, #444);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.gallerySearchInput:focus-visible {
+  border-color: oklch(62% 0.16 280 / 70%);
+}
+
+.galleryTagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.galleryTagClear {
+  border-color: oklch(62% 0.16 280 / 55%);
+  color: oklch(70% 0.14 270);
+}

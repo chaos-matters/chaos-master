@@ -4,40 +4,15 @@ import { VariationPreview } from '@/components/VariationSelector/VariationSelect
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { recordBreed } from '@/flame/ancestry'
-import { breedFlames } from '@/flame/breedFlame'
+import { breedFlames, CROSSOVER_LABELS, CROSSOVER_MODES, } from '@/flame/breedFlame'
 import { deepClone } from '@/utils/clone'
+import { PREVIEW_RESOLUTION_BY_TIER } from '@/utils/hardwareTier'
 import ui from './EvolutionChamber.module.css'
 import type { CrossoverMode } from '@/flame/breedFlame'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { HardwareTier } from '@/utils/hardwareTier'
 
 const COUNT_OPTIONS = [9, 18, 32] as const
-const CROSSOVER_MODES: CrossoverMode[] = [
-  'uniform',
-  'weighted',
-  'shuffle',
-  'alternate',
-  'smart',
-]
-const CROSSOVER_LABELS: Record<CrossoverMode, string> = {
-  uniform: 'Uniform',
-  weighted: 'Weighted',
-  shuffle: 'Shuffle',
-  alternate: 'Alternate',
-  smart: 'Smart',
-}
-
-// ── Preview resolution by hardware tier ────────────────────────────────────
-
-const PREVIEW_RESOLUTION: Record<
-  HardwareTier,
-  { width: number; height: number }
-> = {
-  low: { width: 256, height: 144 },
-  mid: { width: 384, height: 216 },
-  high: { width: 640, height: 360 },
-  ultra: { width: 768, height: 432 },
-}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -280,7 +255,7 @@ export function EvolutionChamber(props: {
 
   // ── Preview resolution ─────────────────────────────────────────────────
 
-  const resolution = () => PREVIEW_RESOLUTION[tier()]
+  const resolution = () => PREVIEW_RESOLUTION_BY_TIER[tier()]
 
   // ── Render ─────────────────────────────────────────────────────────────
 

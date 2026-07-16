@@ -19,7 +19,7 @@ pnpm --filter @chaos-master/landing preview  # preview the build
 ```
 src/
   layouts/Base.astro      # <head>, SEO/OG tags, footer
-  components/             # Hero, Features, CallToAction
+  components/             # Hero, Features, Gallery, FinalCta, …
   pages/index.astro      # homepage
   styles/global.css      # design tokens + shared styles
 public/                  # favicon, hero image (static, copied as-is)

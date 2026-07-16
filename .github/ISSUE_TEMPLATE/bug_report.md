@@ -26,7 +26,7 @@ If applicable, add screenshots to help explain your problem.
 - **Browser:** (e.g., Firefox, Safari, Chrome)
 - **WebGPU:**(e.g., version, adapter or full report from https://webgpureport.org/)
 - **Backend Used:** (e.g., D3D12, Vulkan, Metal)
-- **Chaos-Master version:** (e.g., v1.0.1)
+- **Lumen Apeiron version:** (e.g., v0.9.6 — shown in the app's version pill)
 
 **Additional context**
 

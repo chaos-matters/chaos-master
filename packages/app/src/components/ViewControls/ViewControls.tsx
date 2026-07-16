@@ -6,6 +6,7 @@ import { useTimeline } from '@/contexts/TimelineContext'
 import { Cross, Minus, Plus, Redo, Undo } from '@/icons'
 import { Button } from '../Button/Button'
 import { ButtonGroup } from '../Button/ButtonGroup'
+import { PullUpMenu } from '../PullUpMenu/PullUpMenu'
 import { ScrubInput } from '../Sliders/ScrubInput'
 import { Slider } from '../Sliders/Slider'
 import { KeyframeDiamond } from '../Timeline/KeyframeDiamond'
@@ -262,10 +263,7 @@ export function ViewControls(props: ViewControlProps) {
       </ButtonGroup>
       <Show when={!props.is3D}>
         <Show when={props.blendFlame}>
-          <div
-            class={ui.blendControls}
-            classList={{ [ui.blendControlsActive as string]: true }}
-          >
+          <div class={`${ui.blendControls} ${ui.blendControlsActive}`}>
             <Button
               active
               onClick={props.onPickBlendFlame}
@@ -308,48 +306,59 @@ export function ViewControls(props: ViewControlProps) {
         >
           Morph...
         </Button>
-        <Button
-          onClick={props.onAudioReactive}
-          title="Make the flame dance to music (audio-reactive)"
-        >
-          Audio...
-        </Button>
-        <Button
-          onClick={props.onSonification}
-          title="Hear the fractal — flame structure generates real-time audio"
-        >
-          Sonification...
-        </Button>
-        <Button
-          onClick={props.onBreedFlame}
-          title="Breed: combine two flames to create new hybrid flames"
-        >
-          Breed…
-        </Button>
-        <Button
-          onClick={props.onEvolveFlame}
-          title="Evolution Chamber: breed across generations to evolve flames"
-        >
-          Evolve…
-        </Button>
-        <Button
-          onClick={props.onSimulatorFlame}
-          title="Population Simulator: autonomous genetic algorithm with fitness scoring"
-        >
-          Simulator…
-        </Button>
-        <Button
-          onClick={props.onDiffFlame}
-          title="Diff: compare two flames side by side to see what changed"
-        >
-          Diff…
-        </Button>
-        <Button
-          onClick={props.onAncestryFlame}
-          title="Ancestry Tree: explore the lineage of bred flames"
-        >
-          Ancestry…
-        </Button>
+        {/* Grouped feature launchers — pull-up menus keep the toolbar compact
+            (10 loose buttons condensed to two groups + the direct trio). */}
+        <PullUpMenu
+          label="Audio"
+          title="Audio features — reactive mappings and sonification"
+          items={[
+            {
+              label: 'Audio Reactive…',
+              title: 'Make the flame dance to music (audio-reactive)',
+              onClick: () => props.onAudioReactive?.(),
+            },
+            {
+              label: 'Sonification…',
+              title:
+                'Hear the fractal — flame structure generates real-time audio',
+              onClick: () => props.onSonification?.(),
+            },
+          ]}
+        />
+        <PullUpMenu
+          label="Genetics"
+          title="Breeding features — crossover, evolution, lineage"
+          items={[
+            {
+              label: 'Breed…',
+              title: 'Breed: combine two flames to create new hybrid flames',
+              onClick: props.onBreedFlame,
+            },
+            {
+              label: 'Evolve…',
+              title:
+                'Evolution Chamber: breed across generations to evolve flames',
+              onClick: props.onEvolveFlame,
+            },
+            {
+              label: 'Simulator…',
+              title:
+                'Population Simulator: autonomous genetic algorithm with fitness scoring',
+              onClick: props.onSimulatorFlame,
+            },
+            {
+              label: 'Ancestry…',
+              title: 'Ancestry Tree: explore the lineage of bred flames',
+              onClick: props.onAncestryFlame,
+            },
+            {
+              label: 'Diff…',
+              title:
+                'Diff: compare two flames side by side to see what changed',
+              onClick: props.onDiffFlame,
+            },
+          ]}
+        />
         <Button
           onClick={props.onGalleryFlame}
           title="Flame Gallery: curated collection of classic flame fractals"

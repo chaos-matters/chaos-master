@@ -623,6 +623,11 @@
   display: flex;
   gap: 8px;
   align-items: center;
+  /* Breathing room from the mappings list above — the buttons otherwise sit
+     glued to the last mapping row. */
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .wiringBtn {

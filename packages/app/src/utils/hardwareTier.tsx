@@ -20,6 +20,20 @@ export const hardwareTierToQuality: Record<HardwareTier, number> = {
   ultra: qualityPresets.ultra,
 }
 
+// Preview backing-store size by hardware tier. Capable GPUs render gallery
+// previews at a higher resolution so they look crisp instead of mushy when
+// scaled up. Shared by every 16:9 preview grid (randomizer gallery, breeding
+// galleries, population simulator).
+export const PREVIEW_RESOLUTION_BY_TIER: Record<
+  HardwareTier,
+  { width: number; height: number }
+> = {
+  low: { width: 256, height: 144 },
+  mid: { width: 384, height: 216 },
+  high: { width: 640, height: 360 },
+  ultra: { width: 768, height: 432 },
+}
+
 const HARDWARE_TIER_TO_PRESET: Record<HardwareTier, QualityPreset> = {
   low: 'low',
   mid: 'mid',
