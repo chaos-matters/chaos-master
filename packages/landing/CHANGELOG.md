@@ -6,6 +6,27 @@ Versioned independently from the app. Tag a release as `vA.B.C-web` (e.g.
 
 This file is internal (not surfaced anywhere on the site).
 
+## [0.1.2] — 2026-07-17
+
+### Rebrand
+
+- The site is now **Lumen Apeiron** (formerly Chaos Master): wordmark, hero
+  lede, CTAs, gallery kicker, and "Open in…" labels renamed; app links point at
+  `lumenapeiron.com` and the site moves to `about.lumenapeiron.com` (`astro.config`
+  `site`, `wrangler.jsonc` custom domains — the legacy `about.chaos-master.com`
+  route stays bound until the zone redirect flips).
+- **SEO/OG baseline**: canonical URLs, `robots.txt` + `sitemap.xml`, landscape
+  branded `og-cover.jpg` (2400×1260) with dimensions/alt/site_name —
+  regenerable via `scripts/generate-og-cover.mjs`.
+
+### Features section
+
+- **Audio flames**, **Flame genetics**, and **Sonification** promoted from
+  "coming soon" to the shipped grid (now a full 3×3) with new stroke-style SVG
+  icons (lineage motif, speaker-wave).
+- **Fractal Universe** added to the "On the horizon" row (ringed-planet icon),
+  alongside VR fractal worlds, Flame games, and Server-side HQ render.
+
 ## [0.1.1] — 2026-06-26
 
 ### Studio
