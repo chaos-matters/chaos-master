@@ -18,6 +18,7 @@ import GridIcon from './grid.svg'
 import Heart from './heart.svg'
 import HoverEyePreview from './hover-eye-preview.svg'
 import HoverPreview from './hover-preview.svg'
+import Lineage from './lineage.svg'
 import ListIcon from './list.svg'
 import Menu from './menu.svg'
 import Minus from './minus.svg'
@@ -59,6 +60,7 @@ export {
   Heart,
   HoverEyePreview,
   HoverPreview,
+  Lineage,
   ListIcon,
   Menu,
   Minus,

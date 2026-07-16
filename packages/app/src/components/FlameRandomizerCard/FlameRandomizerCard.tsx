@@ -5,13 +5,14 @@ import { CollapsibleCard } from '@/components/CollapsibleCard/CollapsibleCard'
 import { RangeSlider } from '@/components/Sliders/RangeSlider'
 import { Slider } from '@/components/Sliders/Slider'
 import { VariationMultiSelect } from '@/components/VariationMultiSelect/VariationMultiSelect'
+import { MUTATION_PRESETS, MUTATION_RATE_DEFAULTS } from '@/flame/randomize'
 import { categoryOf } from '@/flame/variationRegistry'
 import { variationTypes } from '@/flame/variations'
 import { variationTypes3D } from '@/flame/variations3D'
 import { persistentSignal } from '@/utils/persistentSignal'
 import ui from './FlameRandomizerCard.module.css'
 import { RandomizerGallery } from './RandomizerGallery'
-import type { GenerateRandomFlameConfig, MutateFlameOptions, } from '@/flame/randomize'
+import type { GenerateRandomFlameConfig, MutateFlameOptions, MutationPresetName, } from '@/flame/randomize'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { Dims } from '@/flame/variationRegistry'
 import type { TransformVariationType } from '@/flame/variations'
@@ -59,12 +60,7 @@ export interface FlameRandomizerCardProps {
       vibrancy: boolean
       vibrancyRange?: [number, number]
     },
-    mutationSettings: {
-      mutateAffine: boolean
-      affineMode: 'smart' | 'full'
-      mutateVariations: 'modify' | 'all' | 'none'
-      mutateColors: boolean
-    },
+    mutationSettings: MutateFlameOptions,
     recordHistory: boolean,
   ) => void
   onLoadHistory: (entry: RandomizerHistoryEntry) => void
@@ -286,12 +282,62 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
     'randomizer/mutate-colors',
     true,
   )
+  // Mutation Lab — fine-grained rate controls persisted to localStorage.
+  const [mutationPreset, setMutationPreset] = persistentSignal<
+    MutationPresetName | 'Custom'
+  >('randomizer/mutation-preset', 'Moderate')
+  const [affineMutationRate, setAffineMutationRate] = persistentSignal<number>(
+    'randomizer/mutation-affineRate',
+    MUTATION_RATE_DEFAULTS.affineMutationRate,
+  )
+  const [colorMutationRate, setColorMutationRate] = persistentSignal<number>(
+    'randomizer/mutation-colorRate',
+    MUTATION_RATE_DEFAULTS.colorMutationRate,
+  )
+  const [variationWeightRate, setVariationWeightRate] =
+    persistentSignal<number>(
+      'randomizer/mutation-weightRate',
+      MUTATION_RATE_DEFAULTS.variationWeightRate,
+    )
+  const [variationSwapChance, setVariationSwapChance] =
+    persistentSignal<number>(
+      'randomizer/mutation-swapChance',
+      MUTATION_RATE_DEFAULTS.variationSwapChance,
+    )
+  const [mutationAddChance, setMutationAddChance] = persistentSignal<number>(
+    'randomizer/mutation-addChance',
+    MUTATION_RATE_DEFAULTS.addTransformChance,
+  )
+  const [mutationRemoveChance, setMutationRemoveChance] =
+    persistentSignal<number>(
+      'randomizer/mutation-removeChance',
+      MUTATION_RATE_DEFAULTS.removeTransformChance,
+    )
+
   const [recordHistoryOnGenerate, setRecordHistoryOnGenerate] =
     persistentSignal('randomizer/record-history-generate', true)
   const [recordHistoryOnMutate, setRecordHistoryOnMutate] = persistentSignal(
     'randomizer/record-history-mutate',
     true,
   )
+
+  /** Apply a preset, copying its values into the individual rate signals. */
+  const applyMutationPreset = (name: MutationPresetName | 'Custom') => {
+    setMutationPreset(name)
+    if (name === 'Custom') return
+    const p = MUTATION_PRESETS[name]
+    setAffineMutationRate(p.affineMutationRate)
+    setColorMutationRate(p.colorMutationRate)
+    setVariationWeightRate(p.variationWeightRate)
+    setVariationSwapChance(p.variationSwapChance)
+    setMutationAddChance(p.addTransformChance)
+    setMutationRemoveChance(p.removeTransformChance)
+  }
+
+  // When any individual slider changes, switch preset to 'Custom'.
+  const markMutationCustom = () => {
+    if (mutationPreset() !== 'Custom') setMutationPreset('Custom')
+  }
 
   const [animationExpanded, setAnimationExpanded] = createSignal(false)
   const [historyExpanded, setHistoryExpanded] = createSignal(true)
@@ -324,8 +370,14 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
   const buildMutationOptions = (): MutateFlameOptions => ({
     mutateAffine: mutateAffine(),
     affineMode: affineMode(),
+    affineMutationRate: affineMutationRate(),
     mutateVariations: mutateVariations(),
+    variationWeightRate: variationWeightRate(),
+    variationSwapChance: variationSwapChance(),
     mutateColors: mutateColors(),
+    colorMutationRate: colorMutationRate(),
+    addTransformChance: mutationAddChance(),
+    removeTransformChance: mutationRemoveChance(),
   })
 
   const handleGenerate = () => {
@@ -744,7 +796,7 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
               >
                 <polyline points="6 9 12 15 18 9" />
               </svg>
-              <span>Mutation Settings</span>
+              <span>Mutation Lab</span>
             </button>
             <Show when={mutationSettingsExpanded()}>
               <div class={ui.mutationContainer}>
@@ -836,6 +888,170 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
                     >
                       None
                     </button>
+                  </div>
+                </div>
+
+                {/* --- Mutation Lab: fine-grained rate controls --- */}
+                <div class={ui.mutationLabDivider} />
+
+                <div class={ui.field}>
+                  <span class={ui.fieldLabel}>Preset</span>
+                  <div class={ui.pillsRow}>
+                    <For
+                      each={
+                        [...Object.keys(MUTATION_PRESETS), 'Custom'] as (
+                          | MutationPresetName
+                          | 'Custom'
+                        )[]
+                      }
+                    >
+                      {(name) => (
+                        <button
+                          type="button"
+                          class={ui.pillButton}
+                          classList={{
+                            [ui.pillButtonActive as string]:
+                              mutationPreset() === name,
+                          }}
+                          title={
+                            name === 'Custom'
+                              ? 'Custom settings from sliders below'
+                              : `${name}: ${Object.entries(
+                                  MUTATION_PRESETS[name],
+                                )
+                                  .map(([k, v]) => `${k}=${v}`)
+                                  .join(', ')}`
+                          }
+                          onClick={() => {
+                            applyMutationPreset(name)
+                          }}
+                        >
+                          {name}
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                </div>
+
+                <Show when={mutateAffine()}>
+                  <div class={ui.field}>
+                    <span class={ui.fieldLabel}>
+                      Affine Rate: {(affineMutationRate() * 100).toFixed(0)}%
+                    </span>
+                    <div class={ui.sliderField}>
+                      <Slider
+                        value={affineMutationRate()}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        onInput={(v) => {
+                          setAffineMutationRate(v)
+                          markMutationCustom()
+                        }}
+                        formatValue={(v) => `${Math.round(v * 100)}%`}
+                      />
+                    </div>
+                  </div>
+                </Show>
+
+                <Show when={mutateColors()}>
+                  <div class={ui.field}>
+                    <span class={ui.fieldLabel}>
+                      Color Rate: {(colorMutationRate() * 100).toFixed(0)}%
+                    </span>
+                    <div class={ui.sliderField}>
+                      <Slider
+                        value={colorMutationRate()}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        onInput={(v) => {
+                          setColorMutationRate(v)
+                          markMutationCustom()
+                        }}
+                        formatValue={(v) => `${Math.round(v * 100)}%`}
+                      />
+                    </div>
+                  </div>
+                </Show>
+
+                <Show when={mutateVariations() !== 'none'}>
+                  <div class={ui.field}>
+                    <span class={ui.fieldLabel}>
+                      Weight Perturb: {(variationWeightRate() * 100).toFixed(0)}
+                      %
+                    </span>
+                    <div class={ui.sliderField}>
+                      <Slider
+                        value={variationWeightRate()}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        onInput={(v) => {
+                          setVariationWeightRate(v)
+                          markMutationCustom()
+                        }}
+                        formatValue={(v) => `${Math.round(v * 100)}%`}
+                      />
+                    </div>
+                  </div>
+                  <div class={ui.field}>
+                    <span class={ui.fieldLabel}>
+                      Swap Type Chance:{' '}
+                      {(variationSwapChance() * 100).toFixed(0)}%
+                    </span>
+                    <div class={ui.sliderField}>
+                      <Slider
+                        value={variationSwapChance()}
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        onInput={(v) => {
+                          setVariationSwapChance(v)
+                          markMutationCustom()
+                        }}
+                        formatValue={(v) => `${Math.round(v * 100)}%`}
+                      />
+                    </div>
+                  </div>
+                </Show>
+
+                <div class={ui.field}>
+                  <span class={ui.fieldLabel}>
+                    Add Transform: {(mutationAddChance() * 100).toFixed(0)}%
+                  </span>
+                  <div class={ui.sliderField}>
+                    <Slider
+                      value={mutationAddChance()}
+                      min={0}
+                      max={0.3}
+                      step={0.01}
+                      onInput={(v) => {
+                        setMutationAddChance(v)
+                        markMutationCustom()
+                      }}
+                      formatValue={(v) => `${Math.round(v * 100)}%`}
+                    />
+                  </div>
+                </div>
+
+                <div class={ui.field}>
+                  <span class={ui.fieldLabel}>
+                    Remove Transform:{' '}
+                    {(mutationRemoveChance() * 100).toFixed(0)}%
+                  </span>
+                  <div class={ui.sliderField}>
+                    <Slider
+                      value={mutationRemoveChance()}
+                      min={0}
+                      max={0.3}
+                      step={0.01}
+                      onInput={(v) => {
+                        setMutationRemoveChance(v)
+                        markMutationCustom()
+                      }}
+                      formatValue={(v) => `${Math.round(v * 100)}%`}
+                    />
                   </div>
                 </div>
               </div>

@@ -112,6 +112,21 @@
   background: rgba(255, 255, 255, 0.15);
 }
 
+.blendControlsActive {
+  background: oklch(0.35 0.12 280 / 15%);
+  border-radius: 0.3rem;
+  box-shadow:
+    0 0 0 1px oklch(0.55 0.18 280 / 50%),
+    inset 0 0 0 1px oklch(0.55 0.18 280 / 15%);
+
+  [data-theme='dark'] & {
+    background: oklch(0.6 0.14 280 / 18%);
+    box-shadow:
+      0 0 0 1px oklch(0.62 0.16 280 / 60%),
+      inset 0 0 0 1px oklch(0.62 0.16 280 / 20%);
+  }
+}
+
 /* ── Flame status badge (name + 2D/3D + animation/frame) ── */
 
 .flameBadge {
@@ -162,6 +177,16 @@
   [data-theme='dark'] & {
     background: oklch(62% 0.16 280);
     color: white;
+  }
+}
+
+.flameBadgeBlendActive {
+  background: oklch(0.65 0.18 40 / 20%);
+  color: oklch(0.55 0.16 40);
+
+  [data-theme='dark'] & {
+    background: oklch(0.7 0.16 40 / 25%);
+    color: oklch(0.75 0.15 40);
   }
 }
 

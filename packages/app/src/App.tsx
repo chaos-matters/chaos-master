@@ -1,4 +1,4 @@
-import { batch, createEffect, createResource, createSignal, ErrorBoundary, onCleanup, Show, Suspense, } from 'solid-js'
+import { batch, createEffect, createResource, createSignal, ErrorBoundary, onCleanup, onMount, Show, Suspense, } from 'solid-js'
 import { AppCrashed, WebgpuNotSupported, } from './components/ErrorHandling/ErrorHandling'
 import { Modal } from './components/Modal/Modal'
 import { WelcomeScreen } from './components/WelcomeScreen/WelcomeScreen'
@@ -8,6 +8,7 @@ import { createSpotlightTourState, SpotlightTourContext, } from './contexts/Spot
 import { ThemeContextProvider } from './contexts/ThemeContext'
 import { ToastProvider, useToast } from './contexts/ToastContext'
 import { IS_DEV } from './defaults'
+import { initAncestry } from './flame/ancestry'
 import { importSharedVariations, loadCustomVariations, remapFlameCustomVariations, } from './flame/variations/custom'
 import { Root } from './lib/Root'
 import { MainWorkspace } from './MainWorkspace'
@@ -68,6 +69,11 @@ function QueryErrorToast(props: { error: string | null }) {
 }
 
 export function Wrappers() {
+  // Load persisted ancestry data from IndexedDB on startup.
+  onMount(() => {
+    void initAncestry()
+  })
+
   // `?benchmark` (or `?benchmark=1`) is the "request benchmark" entry point:
   // skip the welcome screen and open the benchmark dialog straight away.
   // `?benchmark=auto` additionally starts the run on load.
@@ -264,13 +270,13 @@ export function Wrappers() {
         <ThemeContextProvider>
           <KeyframeTargetProvider>
             <ToastProvider>
-              <Modal>
-                <ErrorBoundary fallback={errorHandler}>
-                  <Root
-                    adapterOptions={{
-                      powerPreference: 'high-performance',
-                    }}
-                  >
+              <Root
+                adapterOptions={{
+                  powerPreference: 'high-performance',
+                }}
+              >
+                <Modal>
+                  <ErrorBoundary fallback={errorHandler}>
                     <Suspense>
                       <QueryErrorToast error={queryError()} />
                       <MainWorkspace
@@ -324,9 +330,9 @@ export function Wrappers() {
                         onHardwareTierChange={setHardwareTier}
                       />
                     </Show>
-                  </Root>
-                </ErrorBoundary>
-              </Modal>
+                  </ErrorBoundary>
+                </Modal>
+              </Root>
             </ToastProvider>
           </KeyframeTargetProvider>
         </ThemeContextProvider>

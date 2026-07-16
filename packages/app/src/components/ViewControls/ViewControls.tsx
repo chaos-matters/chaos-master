@@ -26,6 +26,12 @@ type ViewControlProps = {
   blendWeight: number
   onPickBlendFlame: () => void
   onMorphFlame: () => void
+  onBreedFlame: () => void
+  onEvolveFlame: () => void
+  onSimulatorFlame: () => void
+  onDiffFlame: () => void
+  onAncestryFlame: () => void
+  onGalleryFlame: () => void
   onClearBlendFlame: () => void
   onBlendWeightChange: (weight: number) => void
   is3D?: boolean
@@ -256,7 +262,10 @@ export function ViewControls(props: ViewControlProps) {
       </ButtonGroup>
       <Show when={!props.is3D}>
         <Show when={props.blendFlame}>
-          <div class={ui.blendControls}>
+          <div
+            class={ui.blendControls}
+            classList={{ [ui.blendControlsActive as string]: true }}
+          >
             <Button
               active
               onClick={props.onPickBlendFlame}
@@ -311,6 +320,42 @@ export function ViewControls(props: ViewControlProps) {
         >
           Sonification...
         </Button>
+        <Button
+          onClick={props.onBreedFlame}
+          title="Breed: combine two flames to create new hybrid flames"
+        >
+          Breed…
+        </Button>
+        <Button
+          onClick={props.onEvolveFlame}
+          title="Evolution Chamber: breed across generations to evolve flames"
+        >
+          Evolve…
+        </Button>
+        <Button
+          onClick={props.onSimulatorFlame}
+          title="Population Simulator: autonomous genetic algorithm with fitness scoring"
+        >
+          Simulator…
+        </Button>
+        <Button
+          onClick={props.onDiffFlame}
+          title="Diff: compare two flames side by side to see what changed"
+        >
+          Diff…
+        </Button>
+        <Button
+          onClick={props.onAncestryFlame}
+          title="Ancestry Tree: explore the lineage of bred flames"
+        >
+          Ancestry…
+        </Button>
+        <Button
+          onClick={props.onGalleryFlame}
+          title="Flame Gallery: curated collection of classic flame fractals"
+        >
+          Gallery…
+        </Button>
       </Show>
       {/* Always-visible status badge: flame name + dimension + animation/frame. */}
       <div class={ui.flameBadge}>
@@ -331,6 +376,15 @@ export function ViewControls(props: ViewControlProps) {
             {showingFrame()
               ? `Frame ${timeline!.currentFrame()}/${timeline!.config().endFrame}`
               : 'Base'}
+          </span>
+        </Show>
+        <Show when={props.blendFlame}>
+          <span
+            class={ui.flameBadgeTag}
+            classList={{ [ui.flameBadgeBlendActive as string]: true }}
+            title={`Blending with ${props.blendFlame?.metadata?.name || 'Untitled'} — loaded flame looks different from preview`}
+          >
+            Blended: {(props.blendWeight * 100).toFixed(0)}%
           </span>
         </Show>
       </div>
