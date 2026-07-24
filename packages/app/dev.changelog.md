@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 iOS/macOS WebKit rendering correctness (render-loop stall recovery, spurious
 resize rebuilds, stale-swapchain flicker), first-party GA4 telemetry for the
-conversion funnel, and post-rebrand deploy cleanup.
+conversion funnel, a toast/notification overhaul (top-right, stacked, sticky
+questions), and post-rebrand deploy cleanup.
 
 ### Added
 
@@ -46,6 +47,21 @@ conversion funnel, and post-rebrand deploy cleanup.
 
 ### Changed
 
+- **Toast overhaul** (`contexts/ToastContext.tsx` + tests,
+  `components/Toast/Toast.tsx`, `App.tsx`, `MainWorkspace.tsx`,
+  `App.module.css`): one global `ToastHost` fixed top-right at z-index
+  100000 (above modals at 200-301, debug at 10000, export hover overlays at 99999) — previously the only renderer was an inline div in MainWorkspace
+  that sat _under_ every modal, dropped the action buttons (`Toast.tsx` was
+  dead code), and carried a 3.2s CSS fade that killed even 15s toasts.
+  Toasts now stack (cap 4, oldest auto-hiding evicted, duplicates restart
+  their timer) instead of replacing each other, and `'sticky'` toasts have
+  no timer at all — the autosave consent prompt now waits for Yes/No instead
+  of vanishing unanswered. Store API is `untrack`ed so a `showToast` inside
+  a caller's effect can't subscribe to the toast list (that subscription
+  made timer-driven removals re-run the effect and resurrect the toast
+  forever — pinned by a regression test). Verified in-browser end to end:
+  placement, layering (`elementFromPoint`), stickiness past the old timers,
+  Yes persisting `editor/autosave-recents`, plain toasts auto-hiding.
 - **Deploy cleanup** (`wrangler.jsonc`): legacy `chaos-master.com` routes
   dropped after the zone redirect cutover.
 

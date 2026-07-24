@@ -364,7 +364,7 @@ export function MainWorkspace(props: AppProps) {
   // True while a randomize/mutate run is in flight, so the buttons disable and
   // rapid clicks can't pile up concurrent runs (history thumbnail capture).
   const [isRandomizing, setIsRandomizing] = createSignal(false)
-  const { toastMessage, showToast } = useToast()
+  const { showToast } = useToast()
   const SIDEBAR_RESIZABLE = false
   const { isCompact, setCompact } = useCompactMode()
   const [showSidebar, setShowSidebar] = createSignal(true)
@@ -2259,7 +2259,8 @@ export function MainWorkspace(props: AppProps) {
     // First time an edit would be autosaved: ask once, remember the answer.
     if (dirty && autosaveRecents() === 'unset' && !autosavePromptShown) {
       autosavePromptShown = true
-      showToast('Auto-save your flames to Recents while you edit?', 15000, [
+      // Sticky: a question must wait for an answer, never auto-hide.
+      showToast('Auto-save your flames to Recents while you edit?', 'sticky', [
         {
           label: 'Yes',
           onClick: () => {
@@ -3230,9 +3231,6 @@ export function MainWorkspace(props: AppProps) {
                 {(name) => (
                   <div class={ui.hoverPreviewBadge}>Blending with {name}</div>
                 )}
-              </Show>
-              <Show when={toastMessage()}>
-                {(msg) => <div class={ui.toast}>{msg()}</div>}
               </Show>
               <ProgressBar />
               <ExportJobHost />

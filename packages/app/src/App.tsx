@@ -1,6 +1,7 @@
 import { batch, createEffect, createResource, createSignal, ErrorBoundary, onCleanup, onMount, Show, Suspense, } from 'solid-js'
 import { AppCrashed, WebgpuNotSupported, } from './components/ErrorHandling/ErrorHandling'
 import { Modal } from './components/Modal/Modal'
+import { ToastHost } from './components/Toast/Toast'
 import { WelcomeScreen } from './components/WelcomeScreen/WelcomeScreen'
 import { CompactModeProvider } from './contexts/CompactModeContext'
 import { KeyframeTargetProvider } from './contexts/KeyframeTargetContext'
@@ -333,6 +334,7 @@ export function Wrappers() {
                   </ErrorBoundary>
                 </Modal>
               </Root>
+              <ToastHost />
             </ToastProvider>
           </KeyframeTargetProvider>
         </ThemeContextProvider>

@@ -1196,37 +1196,55 @@
   }
 }
 
+/* Global toast column: fixed to the viewport's top-right so notifications are
+   where every app puts them, and above every modal/overlay layer (modals sit
+   at 200-301, debug at 10000, export hover overlays at 99999) — feedback
+   fired from inside a dialog must stay visible. The region itself never eats
+   clicks; only the toasts do. */
+.toast-region {
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  z-index: 100000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: min(92vw, 26rem);
+  pointer-events: none;
+}
+
 .toast {
-  position: absolute;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 100;
-  padding: 6px 16px;
-  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--neutral-600);
   background: var(--neutral-800);
   color: var(--neutral-100);
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 500;
+  line-height: 1.35;
   pointer-events: none;
-  animation: toastFade 3.2s ease forwards;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  animation: toast-in 0.18s ease;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
 
   [data-theme='dark'] & {
+    border-color: var(--neutral-400);
     background: var(--neutral-200);
     color: var(--neutral-800);
   }
 }
 
-/* Toast with buttons: interactive, and no timed CSS fade — the dismiss timer
-   lives in ToastContext so the buttons stay clickable for the full duration. */
+/* Toast with buttons: interactive, with an accent edge so a pending question
+   reads as one. Hiding is the store's job (sticky toasts have no timer), so
+   there is no timed CSS fade anywhere — buttons stay clickable for the
+   toast's whole life. */
 .toast-actionable {
   pointer-events: auto;
-  animation: none;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  max-width: min(92vw, 34rem);
+  flex-wrap: wrap;
+  border-left: 3px solid var(--accent-color, #6366f1);
 }
 
 .toast-actions {
@@ -1468,22 +1486,14 @@
   }
 }
 
-@keyframes toastFade {
-  0% {
+@keyframes toast-in {
+  from {
     opacity: 0;
-    transform: translateX(-50%) translateY(8px);
+    transform: translateX(12px);
   }
-  8% {
+  to {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-  85% {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-8px);
+    transform: translateX(0);
   }
 }
 

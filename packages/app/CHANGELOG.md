@@ -12,6 +12,13 @@ each release; the full developer history lives in `dev.changelog.md`.
   so we can see which features matter. Active only in production builds with
   a configured measurement ID; automated test runs are excluded.
 
+### Changed
+
+- **Notifications.** Toasts now appear in the top-right corner, stack instead
+  of replacing each other, and always show above dialogs. Questions — like
+  the auto-save prompt — stay on screen until you answer instead of
+  disappearing on their own.
+
 ### Fixed
 
 - **iPhone/iPad rendering.** Loading a flame no longer stalls on a blank

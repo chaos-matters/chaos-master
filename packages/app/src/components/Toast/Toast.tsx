@@ -2,41 +2,50 @@ import { For, Show } from 'solid-js'
 import ui from '@/App.module.css'
 import { useToast } from '@/contexts/ToastContext'
 
-export function Toast() {
-  const { toastMessage, toastActions, dismissToast } = useToast()
+/**
+ * Global toast column: fixed top-right, stacked, and above every modal and
+ * overlay so feedback fired from inside a dialog is still visible. Rendered
+ * once at the App level; everything else talks to it through useToast().
+ */
+export function ToastHost() {
+  const { toasts, dismissToast } = useToast()
 
   return (
-    <Show when={toastMessage()}>
-      {(msg) => (
-        <div
-          class={ui.toast}
-          classList={{ [ui.toastActionable as string]: !!toastActions() }}
-        >
-          <span>{msg()}</span>
-          <Show when={toastActions()}>
-            {(actions) => (
-              <span class={ui.toastActions}>
-                <For each={actions()}>
-                  {(action) => (
-                    <button
-                      type="button"
-                      class={ui.toastBtn}
-                      onClick={() => {
-                        // Dismiss first so an action that shows its own toast
-                        // isn't immediately clobbered by this dismissal.
-                        dismissToast()
-                        action.onClick()
-                      }}
-                    >
-                      {action.label}
-                    </button>
-                  )}
-                </For>
-              </span>
-            )}
-          </Show>
-        </div>
-      )}
-    </Show>
+    <div class={ui.toastRegion} aria-live="polite">
+      <For each={toasts()}>
+        {(toast) => (
+          <div
+            class={ui.toast}
+            classList={{ [ui.toastActionable as string]: !!toast.actions }}
+            role={toast.actions ? 'alert' : 'status'}
+          >
+            <span>{toast.message}</span>
+            <Show when={toast.actions}>
+              {(actions) => (
+                <span class={ui.toastActions}>
+                  <For each={actions()}>
+                    {(action) => (
+                      <button
+                        type="button"
+                        class={ui.toastBtn}
+                        onClick={() => {
+                          // Dismiss first so an action that shows its own
+                          // toast isn't immediately clobbered by this one
+                          // being removed.
+                          dismissToast(toast.id)
+                          action.onClick()
+                        }}
+                      >
+                        {action.label}
+                      </button>
+                    )}
+                  </For>
+                </span>
+              )}
+            </Show>
+          </div>
+        )}
+      </For>
+    </div>
   )
 }
