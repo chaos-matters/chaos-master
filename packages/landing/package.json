@@ -19,7 +19,7 @@
     "@typegpu/color": "0.11.0",
     "@typegpu/noise": "0.11.0",
     "@typegpu/sdf": "0.11.1",
-    "astro": "^5.6.1",
+    "astro": "^5.18.2",
     "solid-js": "1.9.11",
     "structurajs": "0.12.6",
     "tinyest-for-wgsl": "^0.3.3",
