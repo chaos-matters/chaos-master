@@ -686,8 +686,31 @@ export function Flam3(props: Flam3Props) {
     let notifyExportWork: (() => void) | undefined
 
     function requestRedraw() {
-      rafLoop.redraw()
+      rafLoop?.redraw()
       notifyExportWork?.()
+    }
+
+    // Re-blit the current color-graded accumulation to the canvas without doing
+    // any IFS work. Used by the present pump to keep iOS WebKit's swapchain warm
+    // between the throttled IFS presents (see the pump loop below).
+    function presentToCanvas() {
+      const cg = colorGradingPipeline()
+      if (cg === undefined) return
+      const encoder = device.createCommandEncoder()
+      const pass = encoder.beginRenderPass({
+        colorAttachments: [
+          {
+            loadOp: 'clear',
+            storeOp: 'store',
+            view: context
+              .getCurrentTexture()
+              .createView({ label: 'flam3PumpView' }),
+          },
+        ],
+      })
+      cg.run(pass)
+      pass.end()
+      device.queue.submit([encoder.finish()])
     }
 
     // Update IFS pipeline uniforms when animatedFlame changes.
@@ -828,6 +851,12 @@ export function Flam3(props: Flam3Props) {
     // final-image passes. Shared by the interactive rAF driver and the async
     // export driver. Returns what was submitted so the export driver can pace
     // and size the next chunk.
+
+    // Diagnostic counters: track consecutive silent bails to surface render
+    // stalls in logs (e.g. iOS Safari canvas-sizing or GPU-init races).
+    let consecutiveGpuNotReadyBails = 0
+    let consecutivePipelineUndefinedBails = 0
+
     function renderTick(frameId: number): RenderTickResult {
       // Halt immediately when the device is gone. Without this, a device loss
       // with many live previews (e.g. the VariationSelector gallery) lets every
@@ -835,8 +864,20 @@ export function Flam3(props: Flam3Props) {
       // "Buffer is invalid" errors that jams the main thread before the reactive
       // poster swap can flush. Mirrors the colorGradingPipeline bail below.
       if (!gpuReady()) {
+        consecutiveGpuNotReadyBails++
+        consecutivePipelineUndefinedBails = 0
+        if (
+          DEBUG_MODE &&
+          (consecutiveGpuNotReadyBails === 1 ||
+            consecutiveGpuNotReadyBails % 60 === 0)
+        ) {
+          console.warn(
+            `[Flam3] renderTick bailing: gpuReady=false (${consecutiveGpuNotReadyBails} consecutive frames)`,
+          )
+        }
         return { iterations: 0, presented: false, hadWork: false }
       }
+      consecutiveGpuNotReadyBails = 0
 
       const currentExportCb = props.onExportImage
       const exportMode = exportDriverActive()
@@ -844,8 +885,22 @@ export function Flam3(props: Flam3Props) {
       const pointCountPerBatch = props.pointCountPerBatch
       const colorGradingPipeline_ = colorGradingPipeline()
       if (colorGradingPipeline_ === undefined) {
+        consecutivePipelineUndefinedBails++
+        if (
+          DEBUG_MODE &&
+          (consecutivePipelineUndefinedBails === 1 ||
+            consecutivePipelineUndefinedBails % 60 === 0)
+        ) {
+          const size = canvasSize()
+          console.warn(
+            `[Flam3] renderTick bailing: colorGradingPipeline undefined ` +
+              `(canvasSize: ${size.width}x${size.height}, ` +
+              `${consecutivePipelineUndefinedBails} consecutive frames)`,
+          )
+        }
         return { iterations: 0, presented: false, hadWork: false }
       }
+      consecutivePipelineUndefinedBails = 0
 
       const timings = timestampQuery.average()
 
@@ -1108,6 +1163,56 @@ export function Flam3(props: Flam3Props) {
       // no more onSubmittedWorkDone holds against a dead queue).
       () => exportDriverActive() || !gpuReady(),
     )
+
+    // Present pump (iOS WebKit): a WebGPU canvas that isn't drawn every frame
+    // shows stale swapchain buffers. The interactive loop above only presents
+    // when an IFS batch completes — on a slow GPU that can be 100-200ms apart
+    // during a load, long enough for WebKit to flash the previous flame between
+    // presents. Re-present the current image every frame while the flame is
+    // still accumulating so no gap is ever visible. Only the main visible canvas
+    // needs this; previews/gallery tiles are excluded to avoid per-tile cost,
+    // and it never runs during an export (that driver owns the canvas).
+    createAnimationFrame(
+      () => {
+        if (!gpuReady() || exportDriverActive()) return
+        // Skip the pre-first-present window (no accumulation yet — avoid a black
+        // flash) and stop once quality is reached (swapchain already warm).
+        if (
+          accumulatedPointCount_ <= 0 ||
+          !continueRendering(accumulatedPointCount_)
+        ) {
+          return
+        }
+        presentToCanvas()
+      },
+      0,
+      undefined,
+      () =>
+        exportDriverActive() ||
+        !gpuReady() ||
+        !(props.isExportRenderer ?? false),
+    )
+
+    // When the render interval drops from Infinity (modal closed) back to a
+    // finite rate, force an immediate redraw so the first frame appears without
+    // waiting for the next rAF delta-time check. On iOS Safari this also helps
+    // recover from any transient GPU-queue stall during the modal transition.
+    // Gate on the Infinity -> finite transition only: every flame load already
+    // redraws via resetAccumulation(), so redrawing on every finite interval
+    // change (e.g. entering/leaving export at interval 0) would be redundant.
+    // Seed with untrack() so this outer (pipeline-building) scope does not
+    // subscribe to renderInterval — only the inner effect below should.
+    let renderIntervalWasFinite = untrack(() =>
+      Number.isFinite(props.renderInterval),
+    )
+    createEffect(() => {
+      const finite = Number.isFinite(props.renderInterval)
+      const resumedFromStall = finite && !renderIntervalWasFinite
+      renderIntervalWasFinite = finite
+      if (resumedFromStall) {
+        requestRedraw()
+      }
+    })
 
     // Export driver: replaces the rAF loop while an export runs. The loop
     // awaits each submission, so at most one chunk is in flight — the browser
