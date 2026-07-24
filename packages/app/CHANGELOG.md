@@ -3,6 +3,22 @@
 What's new in Lumen Apeiron (formerly Chaos Master). Concise highlights for
 each release; the full developer history lives in `dev.changelog.md`.
 
+## [0.9.8] - 2026-07-24
+
+### Added
+
+- **Usage analytics.** Anonymous usage signals — app start (with WebGPU
+  support), share-link shortening, preview-card upload, and Discord shares —
+  so we can see which features matter. Active only in production builds with
+  a configured measurement ID; automated test runs are excluded.
+
+### Fixed
+
+- **iPhone/iPad rendering.** Loading a flame no longer stalls on a blank
+  canvas until you touch the camera, and no longer flips between the old and
+  new flame while it sharpens. Opening and closing dialogs no longer resets
+  the image, and the related iOS Safari console errors are gone.
+
 ## [0.9.7] - 2026-07-16
 
 ### Added

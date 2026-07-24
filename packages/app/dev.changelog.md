@@ -7,6 +7,48 @@ changelog surfaced in the About panel lives in `CHANGELOG.md`.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.8] - 2026-07-24
+
+iOS/macOS WebKit rendering correctness (render-loop stall recovery, spurious
+resize rebuilds, stale-swapchain flicker), first-party GA4 telemetry for the
+conversion funnel, and post-rebrand deploy cleanup.
+
+### Added
+
+- **GA4 telemetry** (`lib/telemetry.ts`, `index.tsx`, `MainWorkspace.tsx`,
+  `utils/shareLink.ts`, `DiscordShareModal/`): gtag bootstrap gated on
+  `VITE_GA_ID` (committed default in `.env`); events `app_init` (with
+  `webgpu_supported`), `flame_shortened`, `og_preview_generated`,
+  `flame_shared_discord`. `e2e:serve` blanks `VITE_GA_ID` at build time so
+  local/CI Playwright runs never load gtag or emit real events.
+
+### Fixed
+
+- **iOS render-loop stall + console errors**
+  (`utils/createAnimationFrame.ts` + new tests): the GPU-queue hold
+  (`onSubmittedWorkDone`) slot is now released on resolve _and_ reject, with a
+  2s per-hold timeout for holds that never settle (hung queue on iOS WebKit) —
+  the `framesPending` cap can no longer wedge the loop after 3 frames
+  ("blank until you touch the camera"). Stall diagnostics throttled to the
+  first + every 60th occurrence.
+- **Spurious same-size rebuilds** (`utils/useElementSize.ts`): identical
+  width/height/physical-px updates from `ResizeObserver` reflows (iOS modal
+  open/close, safe-area/URL-bar shifts) are skipped, so `outputTextures` no
+  longer reallocates every WebGPU buffer and accumulation no longer resets
+  without a real size change.
+- **Stale-swapchain flicker on flame load** (`flame/Flam3.tsx`): a present
+  pump re-blits the color-graded accumulation every frame while a flame is
+  still accumulating (main canvas only, paused during exports, stops at target
+  quality), so iOS WebKit never composites a stale buffer between the
+  throttled IFS presents. Plus `rafLoop?.redraw()` guard, `DEBUG_MODE`-gated
+  renderTick bail diagnostics, and an Infinity→finite `renderInterval` redraw
+  kick after modal-driven pauses. On-device verified (iPhone 13 Pro, iOS 26.x).
+
+### Changed
+
+- **Deploy cleanup** (`wrangler.jsonc`): legacy `chaos-master.com` routes
+  dropped after the zone redirect cutover.
+
 ## [0.9.7] - 2026-07-16
 
 The Lumen Apeiron release: full rebrand (product + domains + SEO/OG), the
