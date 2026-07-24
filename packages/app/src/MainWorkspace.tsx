@@ -7,6 +7,7 @@ import { clamp } from 'typegpu/std'
 import { executeCommand } from '@/commands/registry'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useToast } from '@/contexts/ToastContext'
+import { trackAppInit } from '@/lib/telemetry'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
 import { useShortcutManager } from '@/shortcuts'
@@ -1044,6 +1045,7 @@ export function MainWorkspace(props: AppProps) {
   })
 
   onMount(() => {
+    trackAppInit(Boolean(window.navigator?.gpu))
     loadCustomVariations()
     setCustomVarsVersion((v) => v + 1)
     void loadRandomizerHistoryEntries(MAX_RANDOMIZER_HISTORY_LIMIT).then(

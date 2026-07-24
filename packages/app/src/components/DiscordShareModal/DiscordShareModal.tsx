@@ -1,5 +1,6 @@
 import { createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { Discord, Download, Share, TriangleAlert } from '@/icons'
+import { trackDiscordShare } from '@/lib/telemetry'
 import { persistentSignal } from '@/utils/persistentSignal'
 import { loadTurnstile, TURNSTILE_SITE_KEY } from '@/utils/turnstile'
 import { Button } from '../Button/Button'
@@ -116,6 +117,7 @@ function DiscordShareModal(props: DiscordShareModalProps) {
       token(),
     )
     if (ok) {
+      trackDiscordShare()
       props.respond(true)
     } else {
       // A token is single-use once verified — force a fresh solve on retry.
