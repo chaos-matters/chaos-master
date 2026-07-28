@@ -11,13 +11,16 @@ export function ToastHost() {
   const { toasts, dismissToast } = useToast()
 
   return (
-    <div class={ui.toastRegion} aria-live="polite">
+    // One live region on the container only. Putting role="status"/"alert" on
+    // each item as well nests live regions, which makes politeness resolve off
+    // the inner node and causes some screen readers to announce a newly
+    // inserted toast twice.
+    <div class={ui.toastRegion} aria-live="polite" aria-atomic="false">
       <For each={toasts()}>
         {(toast) => (
           <div
             class={ui.toast}
             classList={{ [ui.toastActionable as string]: !!toast.actions }}
-            role={toast.actions ? 'alert' : 'status'}
           >
             <span>{toast.message}</span>
             <Show when={toast.actions}>

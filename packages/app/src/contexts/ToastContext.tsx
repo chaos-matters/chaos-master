@@ -109,21 +109,35 @@ export function createToastStore() {
       }
     }
 
-    // Evict the oldest auto-hiding toast when at the cap.
-    const evict =
-      toasts().length >= MAX_TOASTS
-        ? toasts().find((t) => !t.sticky)
-        : undefined
-    if (evict) {
-      dismissToast(evict.id)
+    // Evict at the cap, cheapest toast first. A plain status line is
+    // reproducible; a toast carrying actions may be the only route to an
+    // operation (the custom-variation delete offers Undo as its sole recovery
+    // path), and a sticky one is an unanswered question. Falling through to
+    // the oldest of any kind keeps the column bounded even if every slot is
+    // sticky — otherwise MAX_TOASTS silently stops applying.
+    if (toasts().length >= MAX_TOASTS) {
+      const list = toasts()
+      const evict =
+        list.find((t) => !t.sticky && t.actions === null) ??
+        list.find((t) => !t.sticky) ??
+        list[0]
+      if (evict) {
+        dismissToast(evict.id)
+      }
     }
+
+    // A sticky toast is dismissed by answering it, so it must have something
+    // to answer with. Without actions there is no timer AND no control (plain
+    // toasts are pointer-events: none), which would pin it on screen for the
+    // session — fall back to a timed toast rather than stranding it.
+    const dismissible = sticky && (actions?.length ?? 0) > 0
 
     const id = nextId++
     setToasts((list) => [
       ...list,
-      { id, message, actions: actions ?? null, sticky },
+      { id, message, actions: actions ?? null, sticky: dismissible },
     ])
-    if (!sticky) {
+    if (!dismissible) {
       armTimer(id, ms)
     }
     return id

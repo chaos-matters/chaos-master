@@ -183,26 +183,27 @@ const gaId = import.meta.env.PUBLIC_GA_ID
         .forEach((s) => obs.observe(s))
     </script>
     <script>
-      // Track CTA clicks to app. Match the app origin's hostname exactly — a
-      // substring test also matches this site's own links (relative hrefs like
-      // "#features" resolve to about.lumenapeiron.com), which would count every
-      // in-page nav click as a launch-app conversion.
+      // Track CTA clicks through to the app. Match the app origin's hostname
+      // exactly AND require the site root — a substring test also matches this
+      // site's own links (relative hrefs like "#features" resolve to
+      // about.lumenapeiron.com), and the Discord invite is served by the app
+      // Worker at lumenapeiron.com/discord, so hostname alone would count
+      // "Join the Discord" as a launch-app conversion.
       document.addEventListener('click', (e) => {
         const link = (e.target as HTMLElement)?.closest('a')
         if (!link || !link.href) return
-        let isAppLink = false
         try {
-          isAppLink = new URL(link.href).hostname === 'lumenapeiron.com'
+          const url = new URL(link.href)
+          if (url.hostname !== 'lumenapeiron.com') return
+          if (url.pathname !== '/' && url.pathname !== '') return
         } catch {
           return
         }
-        if (isAppLink || link.classList.contains('btn-primary')) {
-          if (typeof window.gtag === 'function') {
-            window.gtag('event', 'click_launch_app', {
-              link_url: link.href,
-              link_text: link.textContent?.trim() || '',
-            })
-          }
+        if (typeof window.gtag === 'function') {
+          window.gtag('event', 'click_launch_app', {
+            link_url: link.href,
+            link_text: link.textContent?.trim() || '',
+          })
         }
       })
     </script>

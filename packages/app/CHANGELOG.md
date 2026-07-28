@@ -7,24 +7,21 @@ each release; the full developer history lives in `dev.changelog.md`.
 
 ### Added
 
-- **Usage analytics.** Anonymous usage signals — app start (with WebGPU
-  support), share-link shortening, preview-card upload, and Discord shares —
-  so we can see which features matter. Active only in production builds with
-  a configured measurement ID; automated test runs are excluded.
+- **Usage analytics.** Anonymous signals about which features get used. Your
+  flames stay yours — share links and flame data are never sent.
 
 ### Changed
 
-- **Notifications.** Toasts now appear in the top-right corner, stack instead
-  of replacing each other, and always show above dialogs. Questions — like
-  the auto-save prompt — stay on screen until you answer instead of
-  disappearing on their own.
+- **Notifications.** Messages now appear top-right and stack instead of
+  replacing each other. Questions, like the auto-save prompt, wait for your
+  answer instead of disappearing on their own.
 
 ### Fixed
 
 - **iPhone/iPad rendering.** Loading a flame no longer stalls on a blank
   canvas until you touch the camera, and no longer flips between the old and
   new flame while it sharpens. Opening and closing dialogs no longer resets
-  the image, and the related iOS Safari console errors are gone.
+  the image.
 
 ## [0.9.7] - 2026-07-16
 

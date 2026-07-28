@@ -12,8 +12,10 @@ This file is internal (not surfaced anywhere on the site).
 
 - **GA4** wired into the base layout (`PUBLIC_GA_ID`, committed default in
   `.env`): gtag snippet plus a `click_launch_app` event for CTA clicks through
-  to the app, matched on the `lumenapeiron.com` hostname so in-page nav clicks
-  (`#features`, `#gallery`, …) don't count as conversions.
+  to the app, matched on the `lumenapeiron.com` hostname _and_ the site root so
+  neither in-page nav clicks (`#features`, `#gallery`, …) nor the Discord
+  invite (served by the app Worker at `lumenapeiron.com/discord`) count as
+  conversions.
 
 ### Maintenance
 

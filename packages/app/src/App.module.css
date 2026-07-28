@@ -1196,67 +1196,79 @@
   }
 }
 
-/* Global toast column: fixed to the viewport's top-right so notifications are
-   where every app puts them, and above every modal/overlay layer (modals sit
-   at 200-301, debug at 10000, export hover overlays at 99999) — feedback
-   fired from inside a dialog must stay visible. The region itself never eats
-   clicks; only the toasts do. */
+/* Global toast column, fixed top-right — the same floating-over-canvas
+   material as .hover-preview-badge (translucent tinted surface, hairline
+   border, blur), so notifications read as part of this app rather than a
+   generic snackbar. The blur is load-bearing, not decoration: these sit over a
+   live fractal of arbitrary colour, and an opaque chip would be the only flat
+   rectangle on screen.
+
+   Sits above every normal-layer overlay (panels 200-301, debug 10000, export
+   hover overlays 99999). It does NOT clear an open <dialog>: those use
+   showModal(), so they live in the top layer and mark the rest of the document
+   inert. Toasts fired from inside a dialog wait until it closes.
+
+   --toast-stack-offset is set by ExportJobTracker while it occupies this
+   corner, so the two never overlap. */
 .toast-region {
   position: fixed;
-  top: max(16px, env(safe-area-inset-top, 0px));
-  right: max(16px, env(safe-area-inset-right, 0px));
+  top: calc(0.75rem + var(--toast-stack-offset, 0px));
+  right: 0.75rem;
   z-index: 100000;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 8px;
-  max-width: min(92vw, 26rem);
+  gap: 6px;
+  max-width: min(88vw, 21rem);
   pointer-events: none;
+  transition: top 0.18s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .toast {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  border: 1px solid var(--neutral-600);
-  background: var(--neutral-800);
-  color: var(--neutral-100);
-  font-size: 0.8rem;
+  gap: 10px;
+  padding: 0.4rem 0.7rem;
+  border-radius: 10px;
+  background: oklch(22% 0.025 240 / 0.88);
+  border: 1px solid oklch(50% 0.08 240 / 0.55);
+  color: oklch(90% 0.02 240);
+  font-size: 0.74rem;
   font-weight: 500;
-  line-height: 1.35;
+  line-height: 1.4;
   pointer-events: none;
-  animation: toast-in 0.18s ease;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 16px oklch(0% 0 0 / 0.35);
+  animation: toast-in 0.18s cubic-bezier(0.22, 1, 0.36, 1);
 
-  [data-theme='dark'] & {
-    border-color: var(--neutral-400);
-    background: var(--neutral-200);
-    color: var(--neutral-800);
+  [data-theme='light'] & {
+    background: oklch(97% 0.008 240 / 0.92);
+    border-color: oklch(65% 0.08 240 / 0.5);
+    color: oklch(26% 0.05 240);
+    box-shadow: 0 4px 16px oklch(50% 0.04 240 / 0.18);
   }
 }
 
-/* Toast with buttons: interactive, with an accent edge so a pending question
-   reads as one. Hiding is the store's job (sticky toasts have no timer), so
-   there is no timed CSS fade anywhere — buttons stay clickable for the
-   toast's whole life. */
+/* Toast with buttons: interactive. Hiding is the store's job (sticky toasts
+   have no timer), so there is no timed CSS fade anywhere — buttons stay
+   clickable for the toast's whole life. */
 .toast-actionable {
   pointer-events: auto;
   flex-wrap: wrap;
-  border-left: 3px solid var(--accent-color, #6366f1);
 }
 
 .toast-actions {
   display: inline-flex;
-  gap: 6px;
+  gap: 4px;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .toast-btn {
-  padding: 3px 10px;
-  border: 1px solid var(--neutral-500);
-  border-radius: 5px;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid oklch(60% 0.06 240 / 0.45);
+  border-radius: 6px;
   background: transparent;
   color: inherit;
   font-size: 0.72rem;
@@ -1267,8 +1279,32 @@
     background 0.15s;
 
   &:hover {
-    border-color: var(--accent-color, #6366f1);
-    background: rgba(99, 102, 241, 0.14);
+    border-color: oklch(70% 0.12 240 / 0.85);
+    background: oklch(70% 0.12 240 / 0.16);
+  }
+
+  &:focus-visible {
+    outline: 2px solid oklch(70% 0.12 240 / 0.9);
+    outline-offset: 1px;
+  }
+
+  [data-theme='light'] & {
+    border-color: oklch(55% 0.06 240 / 0.45);
+
+    &:hover {
+      border-color: oklch(45% 0.12 240 / 0.8);
+      background: oklch(45% 0.12 240 / 0.12);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+
+  .toast-region {
+    transition: none;
   }
 }
 

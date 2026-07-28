@@ -9,6 +9,7 @@ import { deepClone } from '@/utils/clone'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
 import { formatPointCount } from '@/utils/formatPointCount'
 import { logTime } from '@/utils/logTime'
+import { isAppleWebKit } from '@/utils/platform'
 import { recordEntries } from '@/utils/record'
 import { applyTimelineToFlame } from '@/utils/timeline'
 import { vramTrack } from '@/utils/vramLog'
@@ -1164,14 +1165,26 @@ export function Flam3(props: Flam3Props) {
       () => exportDriverActive() || !gpuReady(),
     )
 
-    // Present pump (iOS WebKit): a WebGPU canvas that isn't drawn every frame
-    // shows stale swapchain buffers. The interactive loop above only presents
-    // when an IFS batch completes — on a slow GPU that can be 100-200ms apart
-    // during a load, long enough for WebKit to flash the previous flame between
-    // presents. Re-present the current image every frame while the flame is
-    // still accumulating so no gap is ever visible. Only the main visible canvas
-    // needs this; previews/gallery tiles are excluded to avoid per-tile cost,
-    // and it never runs during an export (that driver owns the canvas).
+    // Present pump (Apple WebKit only): a WebGPU canvas that isn't drawn every
+    // frame shows stale swapchain buffers. The interactive loop above only
+    // presents when an IFS batch completes — on a slow GPU that can be
+    // 100-200ms apart during a load, long enough for WebKit to flash the
+    // previous flame between presents. Re-present the current image every frame
+    // while the flame is still accumulating so no gap is ever visible.
+    //
+    // Scoped tightly, because a re-blit is not free — it submits a full-screen
+    // color-grading pass into the same queue the IFS uses:
+    //  - WebKit only. On Blink/Gecko the pump buys nothing, and its cost lands
+    //    in `ifsMs` (the no-timestamp fallback measures the whole queue
+    //    draining), which shrinks the estimated iteration count and slows
+    //    accumulation for everyone.
+    //  - Main visible canvas only (previews/gallery tiles excluded).
+    //  - Never during an export — that driver owns the canvas.
+    //  - Only while the main renderer is actually running: at
+    //    `renderInterval === Infinity` a modal gallery has deliberately taken
+    //    the GPU, and the accumulation buffer is frozen, so pumping would
+    //    re-blit an identical image at 60Hz against the very previews the
+    //    pause exists to feed.
     createAnimationFrame(
       () => {
         if (!gpuReady() || exportDriverActive()) return
@@ -1188,8 +1201,10 @@ export function Flam3(props: Flam3Props) {
       0,
       undefined,
       () =>
+        !isAppleWebKit() ||
         exportDriverActive() ||
         !gpuReady() ||
+        !Number.isFinite(props.renderInterval) ||
         !(props.isExportRenderer ?? false),
     )
 

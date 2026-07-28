@@ -9,8 +9,26 @@ declare global {
 
 const gaId = import.meta.env.VITE_GA_ID as string | undefined
 
+/**
+ * Local development is not a data source — it would mix developer sessions
+ * into the same property as real traffic. Deployed environments (including
+ * dev.lumenapeiron.com, which is built with `--mode development`) still
+ * report, so the funnel can be validated before it goes to production;
+ * separate them in GA by hostname.
+ */
+function isLocalhost(): boolean {
+  const { hostname } = window.location
+  return (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '[::1]' ||
+    hostname.endsWith('.localhost')
+  )
+}
+
 export function initTelemetry(): void {
   if (!gaId || typeof window === 'undefined') return
+  if (isLocalhost()) return
 
   if (!document.getElementById('ga4-script')) {
     const script = document.createElement('script')
@@ -25,7 +43,16 @@ export function initTelemetry(): void {
       window.dataLayer?.push(arguments)
     }
     window.gtag('js', new Date())
-    window.gtag('config', gaId, { send_page_view: true })
+    window.gtag('config', gaId, {
+      send_page_view: true,
+      // Report the page WITHOUT its query string. Share links carry user
+      // content and capability tokens in the URL — `?flame=` (the encoded
+      // flame + timeline), `?cv=` (user-authored WGSL) and `?s=` (the short
+      // id that resolves to a stored payload). GA4's default page_location is
+      // the full href, which would hand all of that to Google and let anyone
+      // with property access reopen every shared flame.
+      page_location: `${window.location.origin}${window.location.pathname}`,
+    })
   }
 }
 

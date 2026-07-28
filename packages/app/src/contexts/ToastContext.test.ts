@@ -72,6 +72,65 @@ describe('createToastStore', () => {
     expect(store.toasts()).toHaveLength(3)
   })
 
+  it('evicts a plain toast before one carrying actions', () => {
+    // The custom-variation delete toast offers Undo as its ONLY recovery
+    // path, so a burst of routine status lines must not push it out.
+    const store = createToastStore()
+    const undo = store.showToast('Deleted "spiral"', 10_000, [
+      { label: 'Undo', onClick: () => {} },
+    ])
+    store.showToast('a')
+    store.showToast('b')
+    store.showToast('c')
+    store.showToast('d')
+
+    const messages = store.toasts().map((t) => t.message)
+    expect(messages).toContain('Deleted "spiral"')
+    expect(messages).not.toContain('a')
+    expect(store.toasts().find((t) => t.id === undo)).toBeDefined()
+  })
+
+  it('stays bounded even when every slot is sticky', () => {
+    const store = createToastStore()
+    for (let i = 0; i < 8; i++) {
+      store.showToast(`Q${i}`, 'sticky', [{ label: 'Ok', onClick: () => {} }])
+    }
+    // Without a final fallback the cap silently stops applying and the column
+    // grows without limit.
+    expect(store.toasts().length).toBeLessThanOrEqual(4)
+  })
+
+  it('never strands a sticky toast that has no way to be answered', () => {
+    // sticky + no actions = no timer AND no clickable control (plain toasts
+    // are pointer-events: none), which would pin it for the whole session.
+    const store = createToastStore()
+    store.showToast('Orphan', 'sticky')
+    expect(store.toasts()).toHaveLength(1)
+    expect(store.toasts()[0]?.sticky).toBe(false)
+
+    vi.advanceTimersByTime(4000)
+    expect(store.toasts()).toHaveLength(0)
+  })
+
+  it('uses the longer default duration for action toasts', () => {
+    const store = createToastStore()
+    store.showToast('Deleted', undefined, [
+      { label: 'Undo', onClick: () => {} },
+    ])
+    vi.advanceTimersByTime(4000)
+    expect(store.toasts()).toHaveLength(1)
+    vi.advanceTimersByTime(8000)
+    expect(store.toasts()).toHaveLength(0)
+  })
+
+  it('does not dedupe toasts that carry actions', () => {
+    const store = createToastStore()
+    store.showToast('Deleted', 10_000, [{ label: 'Undo', onClick: () => {} }])
+    store.showToast('Deleted', 10_000, [{ label: 'Undo', onClick: () => {} }])
+    // Two separate deletions each need their own Undo.
+    expect(store.toasts()).toHaveLength(2)
+  })
+
   it('does not subscribe a calling effect to the toast list', () => {
     // Regression: showToast reads the list (dedupe/eviction). Without
     // untrack, a caller like QueryErrorToast — showToast inside a
@@ -104,7 +163,15 @@ describe('createToastStore', () => {
     store.dismissToast()
     expect(store.toasts()).toHaveLength(0)
 
-    vi.advanceTimersByTime(10_000)
-    expect(store.toasts()).toHaveLength(0)
+    // Assert on the timer itself: checking the list stays empty would pass
+    // even with a leaked timeout, since firing it just removes an absent id.
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('dismissing an unknown id is a no-op', () => {
+    const store = createToastStore()
+    store.showToast('one')
+    store.dismissToast(9999)
+    expect(store.toasts()).toHaveLength(1)
   })
 })

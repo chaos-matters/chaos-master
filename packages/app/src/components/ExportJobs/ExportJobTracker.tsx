@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
 import { dismissJob, exportJobs, markJobDownloaded, requestJobForceExport, } from '@/utils/exportJobs'
 import { formatEta } from '@/utils/formatEta'
 import { formatPointCount } from '@/utils/formatPointCount'
@@ -14,10 +14,39 @@ import type { ExportJob } from '@/utils/exportJobs'
 export function ExportJobTracker() {
   const [collapsed, setCollapsed] = createSignal(false)
   const jobs = exportJobs
+  let trackerRef: HTMLDivElement | undefined
+
+  // The toast column occupies the same top-right corner. Publish this
+  // popup's height so the toasts stack below it instead of covering the
+  // collapse control and the first job's Download button. Measured rather
+  // than hard-coded because the height depends on job count and collapse
+  // state. Cleared whenever the tracker isn't showing.
+  createEffect(() => {
+    const visible = jobs().length > 0
+    // Re-measure when the job list or collapse state changes.
+    collapsed()
+    const root = document.documentElement
+    if (!visible) {
+      root.style.removeProperty('--toast-stack-offset')
+      return
+    }
+    // After layout: the ref is populated and sized by the time this runs.
+    requestAnimationFrame(() => {
+      if (!trackerRef) return
+      root.style.setProperty(
+        '--toast-stack-offset',
+        `${trackerRef.offsetHeight + 8}px`,
+      )
+    })
+  })
+
+  onCleanup(() => {
+    document.documentElement.style.removeProperty('--toast-stack-offset')
+  })
 
   return (
     <Show when={jobs().length > 0}>
-      <div class={ui.tracker}>
+      <div class={ui.tracker} ref={trackerRef}>
         <button
           type="button"
           class={ui.headerBar}
