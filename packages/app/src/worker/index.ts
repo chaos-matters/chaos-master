@@ -637,17 +637,23 @@ const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   'X-Permitted-Cross-Domain-Policies': 'none',
   'Content-Security-Policy': [
     "default-src 'self'",
-    // google-analytics.com covers GA4's no-JS pixel fallback.
-    "img-src 'self' data: blob: https://*.google-analytics.com",
+    // GA4 pixels: google-analytics.com is the no-JS/beacon fallback,
+    // googletagmanager.com serves /td and /a (verified blocked by Google's Tag
+    // Assistant before these were listed).
+    "img-src 'self' data: blob: https://*.google-analytics.com https://*.googletagmanager.com",
     // 'unsafe-eval' is mandatory — TypeGPU uses new Function for shader codegen.
     // googletagmanager.com serves gtag.js (see lib/telemetry.ts); without it
     // the loader is refused and no analytics event is ever recorded.
-    "script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' https://challenges.cloudflare.com https://www.googletagmanager.com",
+    "script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' https://challenges.cloudflare.com https://*.googletagmanager.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    // GA4 beacons go to google-analytics.com; the regional endpoints live on
-    // analytics.google.com.
-    "connect-src 'self' https://challenges.cloudflare.com https://*.google-analytics.com https://*.analytics.google.com",
+    // GA4 beacons go to google-analytics.com (regional endpoints on
+    // analytics.google.com); googletagmanager.com is needed for the container
+    // /td fetches. This is the allowlist Google documents for gtag.js at
+    // developers.google.com/tag-platform/security/guides/csp — kept explicit
+    // rather than widening to `https:`, which would defeat the point of an
+    // allowlist-based policy.
+    "connect-src 'self' https://challenges.cloudflare.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com",
     'frame-src https://challenges.cloudflare.com',
     "worker-src 'self' blob:",
     "frame-ancestors 'none'",
