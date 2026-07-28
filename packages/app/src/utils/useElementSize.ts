@@ -68,6 +68,22 @@ export function useElementSize(
         window.clearTimeout(resizeTimeout)
       }
       resizeTimeout = window.setTimeout(() => {
+        // Skip identical-size updates. ResizeObserver also fires on layout
+        // reflows that don't change the box — notably a modal opening/closing on
+        // iOS (safe-area / URL-bar shifts). Committing a fresh same-size object
+        // would still notify subscribers (Solid compares by reference),
+        // reallocating every WebGPU buffer and resetting flame accumulation —
+        // a visible flicker for no real size change.
+        const prev = size()
+        if (
+          prev !== undefined &&
+          prev.width === newSize.width &&
+          prev.height === newSize.height &&
+          prev.widthPX === newSize.widthPX &&
+          prev.heightPX === newSize.heightPX
+        ) {
+          return
+        }
         onChange?.(newSize)
         setSize(newSize)
       }, CANVAS_RESIZE_DEBOUNCE_MS)

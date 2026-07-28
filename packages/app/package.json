@@ -1,6 +1,6 @@
 {
   "name": "chaos-master",
-  "version": "0.9.7",
+  "version": "0.9.8",
   "description": "WebGPU based IFS Flame Generator for Artists & Explorers",
   "type": "module",
   "scripts": {
@@ -8,7 +8,7 @@
     "build:dev": "vite build --mode development",
     "serve": "vite preview",
     "prod": "vite build && vite preview",
-    "e2e:serve": "vite build && vite preview --port 4173 --strictPort",
+    "e2e:serve": "VITE_GA_ID= vite build && vite preview --port 4173 --strictPort",
     "start": "vite",
     "test": "vitest",
     "analyze-bundle": "VITE_ANALYZE_BUNDLE=true vite build",

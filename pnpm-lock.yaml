@@ -235,7 +235,7 @@ importers:
         specifier: 0.11.1
         version: 0.11.1(typegpu@0.11.9)
       astro:
-        specifier: ^5.6.1
+        specifier: ^5.18.2
         version: 5.18.2(@types/node@25.9.2)(rollup@4.61.1)(typescript@5.9.3)
       solid-js:
         specifier: 1.9.11

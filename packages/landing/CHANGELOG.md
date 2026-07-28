@@ -6,6 +6,24 @@ Versioned independently from the app. Tag a release as `vA.B.C-web` (e.g.
 
 This file is internal (not surfaced anywhere on the site).
 
+## [0.1.3] — 2026-07-24
+
+### Analytics
+
+- **GA4** wired into the base layout (`PUBLIC_GA_ID`, committed default in
+  `.env`): gtag snippet plus a `click_launch_app` event for CTA clicks through
+  to the app, matched on the `lumenapeiron.com` hostname _and_ the site root so
+  neither in-page nav clicks (`#features`, `#gallery`, …) nor the Discord
+  invite (served by the app Worker at `lumenapeiron.com/discord`) count as
+  conversions.
+
+### Maintenance
+
+- **astro** bumped `^5.6.1` → `^5.18.2` — aligns the manifest with the version
+  the lockfile already resolves and clears the Dependabot alerts.
+- Legacy `about.chaos-master.com` route dropped from `wrangler.jsonc` after
+  the zone redirect cutover.
+
 ## [0.1.2] — 2026-07-17
 
 ### Rebrand

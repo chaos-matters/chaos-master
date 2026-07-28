@@ -25,6 +25,7 @@ const ogImage = new URL('/og-cover.jpg', Astro.site).href
 // no usable console. Off by default; never active in a production build.
 const remoteLog =
   import.meta.env.DEV && import.meta.env.PUBLIC_REMOTE_LOG === 'true'
+const gaId = import.meta.env.PUBLIC_GA_ID
 ---
 
 <!doctype html>
@@ -32,6 +33,20 @@ const remoteLog =
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    {
+      gaId && (
+        <>
+          <script is:inline async src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}></script>
+          <script is:inline define:vars={{ gaId }}>
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            window.gtag = gtag;
+            gtag('js', new Date());
+            gtag('config', gaId, { send_page_view: true });
+          </script>
+        </>
+      )
+    }
     <!-- Mark JS available so reveal-on-scroll only hides content when it can be
          animated back in (no-JS shows everything). Inline + synchronous so it
          runs before first paint. -->
@@ -166,6 +181,31 @@ const remoteLog =
       document
         .querySelectorAll('main > section')
         .forEach((s) => obs.observe(s))
+    </script>
+    <script>
+      // Track CTA clicks through to the app. Match the app origin's hostname
+      // exactly AND require the site root — a substring test also matches this
+      // site's own links (relative hrefs like "#features" resolve to
+      // about.lumenapeiron.com), and the Discord invite is served by the app
+      // Worker at lumenapeiron.com/discord, so hostname alone would count
+      // "Join the Discord" as a launch-app conversion.
+      document.addEventListener('click', (e) => {
+        const link = (e.target as HTMLElement)?.closest('a')
+        if (!link || !link.href) return
+        try {
+          const url = new URL(link.href)
+          if (url.hostname !== 'lumenapeiron.com') return
+          if (url.pathname !== '/' && url.pathname !== '') return
+        } catch {
+          return
+        }
+        if (typeof window.gtag === 'function') {
+          window.gtag('event', 'click_launch_app', {
+            link_url: link.href,
+            link_text: link.textContent?.trim() || '',
+          })
+        }
+      })
     </script>
   </body>
 </html>

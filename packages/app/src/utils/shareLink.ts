@@ -1,3 +1,4 @@
+import { trackFlameShortened, trackOgPreviewGenerated } from '@/lib/telemetry'
 import { ShareApi } from './apiClient'
 import { blobToBase64 } from './blob'
 import { encodeJsonQueryParam, encodeSharePayload } from './jsonQueryParam'
@@ -66,7 +67,11 @@ export async function encodeShareUrl(opts: {
  */
 export async function shortenShareUrl(encoded: string): Promise<string> {
   const res = await ShareApi.shorten(encoded)
-  return res?.id ? `${globalThis.location.origin}/?s=${res.id}` : ''
+  if (res?.id) {
+    trackFlameShortened()
+    return `${globalThis.location.origin}/?s=${res.id}`
+  }
+  return ''
 }
 
 /**
@@ -134,6 +139,7 @@ export async function uploadOgPreview(opts: {
       title: opts.title,
       description: opts.description,
     })
+    trackOgPreviewGenerated()
   } catch (err) {
     console.error('Failed to upload OG preview image:', err)
   }

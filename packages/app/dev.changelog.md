@@ -7,6 +7,108 @@ changelog surfaced in the About panel lives in `CHANGELOG.md`.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.8] - 2026-07-24
+
+iOS/macOS WebKit rendering correctness (render-loop stall recovery, spurious
+resize rebuilds, stale-swapchain flicker), first-party GA4 telemetry for the
+conversion funnel, a toast/notification overhaul (top-right, stacked, sticky
+questions), and post-rebrand deploy cleanup.
+
+### Added
+
+- **GA4 telemetry** (`lib/telemetry.ts`, `index.tsx`, `MainWorkspace.tsx`,
+  `utils/shareLink.ts`, `DiscordShareModal/`, `worker/index.ts`): gtag
+  bootstrap gated on `VITE_GA_ID` (committed default in `.env`); events
+  `app_init` (with `webgpu_supported`), `flame_shortened`,
+  `og_preview_generated`, `flame_shared_discord`. `e2e:serve` blanks
+  `VITE_GA_ID` at build time so local/CI Playwright runs never load gtag or
+  emit real events, and `initTelemetry` bails on localhost so development
+  sessions stay out of the property (deployed dev still reports — separate it
+  by hostname in GA).
+  Two defects found in review and fixed before release:
+  - **CSP allowlist** — the Worker's `Content-Security-Policy` did not include
+    `googletagmanager.com` (`script-src`) or `*.google-analytics.com`
+    (`connect-src`/`img-src`). Since `run_worker_first` routes `/` through the
+    Worker, the loader was refused in production and _no event would ever have
+    been recorded_; only the static landing reported.
+  - **`page_location` scrubbing** — GA4's default page_view sends the full
+    href. The app puts user content and capability tokens in the query
+    (`?flame=` encoded flame + timeline, `?cv=` user-authored WGSL, `?s=` the
+    short id that resolves to a stored payload), so every shared link opened
+    would have handed Google enough to reopen the flame. Now reported as
+    origin + pathname. Fixing the CSP without this would have switched the
+    leak on.
+
+### Fixed
+
+- **iOS render-loop stall + console errors**
+  (`utils/createAnimationFrame.ts` + new tests): the GPU-queue hold
+  (`onSubmittedWorkDone`) slot is now released on resolve _and_ reject, with a
+  2s per-hold timeout for holds that never settle (hung queue on iOS WebKit) —
+  the `framesPending` cap can no longer wedge the loop after 3 frames
+  ("blank until you touch the camera"). Stall diagnostics throttled to the
+  first + every 60th occurrence.
+- **Spurious same-size rebuilds** (`utils/useElementSize.ts`): identical
+  width/height/physical-px updates from `ResizeObserver` reflows (iOS modal
+  open/close, safe-area/URL-bar shifts) are skipped, so `outputTextures` no
+  longer reallocates every WebGPU buffer and accumulation no longer resets
+  without a real size change.
+- **Stale-swapchain flicker on flame load** (`flame/Flam3.tsx`,
+  `utils/platform.ts`): a present pump re-blits the color-graded accumulation
+  every frame while a flame is still accumulating, so iOS WebKit never
+  composites a stale buffer between the throttled IFS presents. Gated to
+  Apple WebKit (`navigator.vendor`), the main canvas, a finite
+  `renderInterval`, and non-export frames — review showed an ungated pump
+  costs real throughput everywhere else: a re-blit is a full-screen
+  color-grading pass in the same queue, and with `TRACK_PERFORMANCE` off the
+  wall-latency estimator folds it into `ifsMs`, shrinking the iteration count
+  and slowing accumulation on Blink/Gecko. The `renderInterval === Infinity`
+  clause matters most: that state means a modal gallery has deliberately taken
+  the GPU and the accumulation buffer is frozen, so an ungated pump re-blit an
+  identical image at 60Hz against the very previews the pause exists to feed. Plus `rafLoop?.redraw()` guard, `DEBUG_MODE`-gated
+  renderTick bail diagnostics, and an Infinity→finite `renderInterval` redraw
+  kick after modal-driven pauses. On-device verified (iPhone 13 Pro, iOS 26.x).
+
+### Changed
+
+- **Toast overhaul** (`contexts/ToastContext.tsx` + tests,
+  `components/Toast/Toast.tsx`, `App.tsx`, `MainWorkspace.tsx`,
+  `components/ExportJobs/ExportJobTracker.tsx`, `App.module.css`): one global
+  `ToastHost` fixed top-right at z-index 100000, above every normal-layer
+  overlay (side panels 200-301, debug 10000, export hover overlays 99999) —
+  previously the only renderer was an inline div in MainWorkspace that sat
+  _under_ those, dropped the action buttons (`Toast.tsx` was dead code), and
+  carried a 3.2s CSS fade that killed even 15s toasts. It does **not** clear an
+  open `<dialog>`: `Modal.tsx` uses `showModal()`, so dialogs sit in the top
+  layer and mark the rest of the document inert — toasts fired from inside one
+  (HelpModal hardware detect, DataManagement backup, ShareLinkModal,
+  CustomVariationEditor) wait until it closes, exactly as before.
+  Toasts now stack (cap 4, duplicates restart their timer) instead of
+  replacing each other, and `'sticky'` toasts have no timer at all — the
+  autosave consent prompt now waits for Yes/No instead of vanishing
+  unanswered. Eviction prefers plain toasts over ones carrying actions (the
+  custom-variation delete offers Undo as its only recovery path) and falls
+  through to the oldest of any kind so the column stays bounded even if every
+  slot is sticky; `'sticky'` with no actions degrades to a timed toast rather
+  than stranding an undismissable one. Store API is `untrack`ed so a
+  `showToast` inside a caller's effect can't subscribe to the toast list (that
+  subscription made timer-driven removals re-run the effect and resurrect the
+  toast forever — pinned by a regression test).
+  Surface adopts the `hover-preview-badge` material (translucent tinted oklch,
+  hairline border, `blur(10px)`, shared `cubic-bezier(0.22, 1, 0.36, 1)`) so it
+  reads as part of the app over a live fractal instead of a generic snackbar;
+  the blur is legibility over arbitrary canvas colour, not decoration. The
+  earlier 3px accent left-border is gone — it was also dead in the default dark
+  theme, where `[data-theme='dark'] .toast` (0,2,0) outspecified
+  `.toast-actionable` (0,1,0). `ExportJobTracker` now publishes its measured
+  height as `--toast-stack-offset` so the toast column stops covering its
+  collapse control and Download buttons in the shared top-right corner.
+  Verified in-browser end to end against the deployed preview build:
+  placement, layering (`elementFromPoint`), stickiness past the old timers,
+  Yes persisting `editor/autosave-recents`, plain toasts auto-hiding.
+- **Deploy cleanup** (`wrangler.jsonc`): legacy `chaos-master.com` routes
+  dropped after the zone redirect cutover.
+
 ## [0.9.7] - 2026-07-16
 
 The Lumen Apeiron release: full rebrand (product + domains + SEO/OG), the

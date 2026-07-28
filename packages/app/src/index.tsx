@@ -21,4 +21,8 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
   )
 }
 
+import { initTelemetry } from './lib/telemetry'
+
+initTelemetry()
+
 render(() => <Wrappers />, root)
