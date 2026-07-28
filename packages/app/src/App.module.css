@@ -1262,7 +1262,6 @@
   display: inline-flex;
   gap: 4px;
   flex-shrink: 0;
-  margin-left: auto;
 }
 
 .toast-btn {
