@@ -52,16 +52,8 @@ export function initTelemetry(): void {
 
     window.gtag('js', new Date())
     window.gtag('config', gaId, {
-      // Suppress GA4's AUTOMATIC page_view and send our own below.
-      //
-      // Setting page_location here is not enough on its own: enhanced
-      // measurement's site-search detection reads the real document URL rather
-      // than the page_location we pass, and `s` is one of GA4's default search
-      // parameters — so a `?s=<shareId>` visit emitted a view_search_results
-      // event carrying the capability token as `search_term`, straight past
-      // the scrub. That detection rides on the automatic page_view, so turning
-      // it off stops the token ever being read. Verified against the live
-      // deployment.
+      // Send page_view explicitly (below) rather than letting GA4 generate it,
+      // so page_location is deterministically the scrubbed value.
       send_page_view: false,
       page_location: cleanLocation,
     })
@@ -69,6 +61,20 @@ export function initTelemetry(): void {
       page_location: cleanLocation,
       page_title: document.title,
     })
+
+    // KNOWN GAP — not fixable from here. GA4 enhanced measurement's site-search
+    // detection reads the real `document.location`, not the page_location above,
+    // and `s` is one of its default search parameters. A `?s=<shareId>` visit
+    // therefore emits `view_search_results` with the capability token as
+    // `search_term`. Suppressing the automatic page_view does NOT stop it —
+    // measured against the live deployment, the event still fires.
+    //
+    // The fix is a property setting: GA4 Admin -> Data streams -> the web
+    // stream -> Enhanced measurement -> turn off "Site search" (or remove `s`
+    // from its query-parameter list). A code-side guarantee would mean either
+    // renaming the share parameter or stripping the query via replaceState
+    // before gtag loads, and the latter changes what a reload of a share link
+    // does — both are deliberate product changes, not a hotfix.
   }
 }
 
