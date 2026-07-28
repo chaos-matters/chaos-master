@@ -42,16 +42,32 @@ export function initTelemetry(): void {
       // eslint-disable-next-line prefer-rest-params
       window.dataLayer?.push(arguments)
     }
+    // Report the page WITHOUT its query string. Share links carry user content
+    // and capability tokens in the URL — `?flame=` (the encoded flame +
+    // timeline), `?cv=` (user-authored WGSL) and `?s=` (the short id that
+    // resolves to a stored payload). GA4's default page_location is the full
+    // href, which would hand all of that to Google and let anyone with
+    // property access reopen every shared flame.
+    const cleanLocation = `${window.location.origin}${window.location.pathname}`
+
     window.gtag('js', new Date())
     window.gtag('config', gaId, {
-      send_page_view: true,
-      // Report the page WITHOUT its query string. Share links carry user
-      // content and capability tokens in the URL — `?flame=` (the encoded
-      // flame + timeline), `?cv=` (user-authored WGSL) and `?s=` (the short
-      // id that resolves to a stored payload). GA4's default page_location is
-      // the full href, which would hand all of that to Google and let anyone
-      // with property access reopen every shared flame.
-      page_location: `${window.location.origin}${window.location.pathname}`,
+      // Suppress GA4's AUTOMATIC page_view and send our own below.
+      //
+      // Setting page_location here is not enough on its own: enhanced
+      // measurement's site-search detection reads the real document URL rather
+      // than the page_location we pass, and `s` is one of GA4's default search
+      // parameters — so a `?s=<shareId>` visit emitted a view_search_results
+      // event carrying the capability token as `search_term`, straight past
+      // the scrub. That detection rides on the automatic page_view, so turning
+      // it off stops the token ever being read. Verified against the live
+      // deployment.
+      send_page_view: false,
+      page_location: cleanLocation,
+    })
+    window.gtag('event', 'page_view', {
+      page_location: cleanLocation,
+      page_title: document.title,
     })
   }
 }
