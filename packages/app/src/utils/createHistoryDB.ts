@@ -42,9 +42,27 @@ export function createHistoryDB<T extends HistoryRecord>(dbName: string) {
     return all.slice(0, maxCount)
   }
 
+  /**
+   * Insert several entries in one transaction, then prune to `maxCount`. The
+   * backup importer restores whole histories at once — looping over `add`
+   * would re-read (and re-sort) the entire table per entry, which on a full
+   * history of thumbnail-carrying records is hundreds of megabytes of reads.
+   */
+  async function addMany(entries: T[], maxCount: number): Promise<T[]> {
+    if (entries.length > 0) {
+      await db.entries.bulkAdd(entries)
+    }
+    const all = await db.entries.orderBy('timestamp').reverse().toArray()
+    const toDelete = all.slice(maxCount)
+    if (toDelete.length > 0) {
+      await db.entries.bulkDelete(toDelete.map((e) => e.id!))
+    }
+    return all.slice(0, maxCount)
+  }
+
   async function clear(): Promise<void> {
     await db.entries.clear()
   }
 
-  return { load, add, clear }
+  return { load, add, addMany, clear }
 }

@@ -1,6 +1,7 @@
 import { batch, createMemo, createSignal, ErrorBoundary, For, onCleanup, Show, } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
 import { ComputeGate, useComputeGate } from '@/contexts/ComputeGateContext'
+import { useToast } from '@/contexts/ToastContext'
 import { ANIMATION_PREVIEW_POINT_COUNT, COMPUTE_GATE_CAPACITY, IS_DEV, STATIC_PREVIEW_POINT_COUNT, THUMBNAIL_PREVIEW_QUALITY, THUMBNAIL_PREVIEW_QUALITY_HOVER, } from '@/defaults'
 import { getAncestryNodes } from '@/flame/ancestry'
 import { examples } from '@/flame/examples'
@@ -14,8 +15,10 @@ import { Camera2D } from '@/lib/Camera2D'
 import { Default3DPreviewCamera } from '@/lib/Camera3D'
 import { Root } from '@/lib/Root'
 import { deepClone } from '@/utils/clone'
+import { applyFlameImport, parseFlameEnvelope, readFlameFiles, summarizeImport, } from '@/utils/flameImport'
 import { extractFlameFromPng } from '@/utils/flameInPng'
 import { persistentSignal } from '@/utils/persistentSignal'
+import { pickFiles } from '@/utils/pickFiles'
 import { deleteRecentFlame, formatRecentDate, loadRecentFlames, } from '@/utils/recentFlames'
 import { recordEntries } from '@/utils/record'
 import { applyTracksToFlame } from '@/utils/timeline'
@@ -577,53 +580,23 @@ function ExampleItem(props: {
   )
 }
 
-async function pickFlameFile(): Promise<File | null> {
-  try {
-    if ('showOpenFilePicker' in window) {
-      const fileHandles = await window
-        .showOpenFilePicker({
-          id: 'load-flame-from-file',
-          types: [
-            {
-              accept: {
-                'image/png': ['.png'],
-                'text/xml': ['.flame', '.xml'],
-              },
-            },
-          ],
-        })
-        .catch(() => undefined)
-      if (!fileHandles) {
-        return null
-      }
-      const [fileHandle] = fileHandles
-      return await fileHandle.getFile()
-    }
-  } catch (_) {
-    // fall through to input-based picker any failure
-  }
-
-  // fallback: hidden input element (works on Firefox and Safari/iOS)
-  return await new Promise<File | null>((resolve) => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = 'image/png,.png,.flame,.xml'
-    input.style.position = 'fixed'
-    input.style.left = '-9999px'
-    input.style.width = '1px'
-    input.style.height = '1px'
-    input.addEventListener('change', () => {
-      const file = input.files && input.files[0] ? input.files[0] : null
-      resolve(file ?? null)
-      input.remove()
-    })
-    input.addEventListener('cancel', () => {
-      resolve(null)
-      input.remove()
-    })
-    document.body.appendChild(input)
-    input.click()
+/** Everything the import zone accepts: an exported PNG, a JSON descriptor, an
+ *  Apophysis `.flame` config, or a whole backup ZIP. */
+async function pickFlameFiles(): Promise<File[]> {
+  return await pickFiles({
+    id: 'load-flame-from-file',
+    multiple: true,
+    accept: {
+      'image/png': ['.png'],
+      'application/json': ['.json'],
+      'application/zip': ['.zip'],
+      'text/xml': ['.flame', '.xml'],
+    },
   })
+}
+
+function isBackupZip(file: File): boolean {
+  return file.name.toLowerCase().endsWith('.zip')
 }
 
 /** Distinct variation types used by a flame — the gallery's honest tags. */
@@ -642,7 +615,9 @@ function flameTags(flame: FlameDescriptor): string[] {
 export function LoadFlameModal(props: LoadFlameModalProps) {
   const [recentFlames, setRecentFlames] = createSignal(loadRecentFlames())
   const showAlert = useAlert()
+  const { showToast } = useToast()
   const [isDragging, setIsDragging] = createSignal(false)
+  const [isImporting, setIsImporting] = createSignal(false)
   const isGallery = () => props.mode === 'gallery'
 
   const [dimFilter, setDimFilter] = persistentSignal<DimensionFilter>(
@@ -776,6 +751,26 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
       return
     }
 
+    if (name.endsWith('.json')) {
+      // JSON descriptor / share payload — same envelopes the backup writes.
+      try {
+        const parsed = parseFlameEnvelope(JSON.parse(await file.text()))
+        if (!parsed) {
+          void showAlert(`No valid flame found in '${file.name}'.`)
+          return
+        }
+        if (parsed.tracks && parsed.tracks.length > 0) {
+          props.respond({ flame: parsed.flame, tracks: parsed.tracks })
+        } else {
+          props.respond(parsed.flame)
+        }
+      } catch (err) {
+        console.warn(err)
+        void showAlert(`Failed to parse '${file.name}' as a flame.`)
+      }
+      return
+    }
+
     // PNG import (existing)
     try {
       const arrBuf = new Uint8Array(await file.arrayBuffer())
@@ -795,10 +790,38 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
     }
   }
 
+  /** Bulk path: store every dropped flame in Recent flames and leave the
+   *  workspace alone — the user asked to load them, not to open them. */
+  async function importIntoRecents(files: File[]) {
+    setIsImporting(true)
+    try {
+      const parsed = await readFlameFiles(files)
+      const summary = await applyFlameImport(parsed.candidates)
+      summary.failed += parsed.failed
+      setRecentFlames(loadRecentFlames())
+      showToast(summarizeImport(summary))
+    } catch (err) {
+      console.warn(err)
+      void showAlert('Could not import those files.')
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
+  /** One flame opens straight away (unchanged). Several files — or a backup
+   *  ZIP, whatever it holds — are loaded into Recent flames instead. */
+  async function processImportFiles(files: File[]) {
+    const [first] = files
+    if (!first || isImporting()) return
+    if (files.length === 1 && !isBackupZip(first)) {
+      await processImportFile(first)
+      return
+    }
+    await importIntoRecents(files)
+  }
+
   async function loadFromFile() {
-    const file = await pickFlameFile()
-    if (!file) return
-    await processImportFile(file)
+    await processImportFiles(await pickFlameFiles())
   }
 
   function handleDragOver(e: DragEvent) {
@@ -818,9 +841,9 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
   async function handleDrop(e: DragEvent) {
     e.preventDefault()
     setIsDragging(false)
-    const file = e.dataTransfer?.files?.[0]
-    if (!file) return
-    await processImportFile(file)
+    const files = [...(e.dataTransfer?.files ?? [])]
+    if (files.length === 0) return
+    await processImportFiles(files)
   }
 
   const requestModal = useRequestModal()
@@ -854,7 +877,7 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
         <p class={ui.modalSubtitle}>
           {isGallery()
             ? 'Browse everything in one place — curated examples, animations, and your bred & evolved flames. Search by name or filter by variation.'
-            : 'Select a preset to begin, load a recent creation, or import a saved PNG or .flame config.'}
+            : 'Select a preset to begin, load a recent creation, or import saved PNGs, .flame configs or a backup ZIP.'}
         </p>
         <Show when={isGallery()}>
           <div class={ui.gallerySearchRow}>
@@ -923,12 +946,18 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
               <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
             <div class={ui.uploadTitle}>
-              {isDragging() ? 'Drop PNG Here!' : 'Import from PNG File'}
+              {isImporting()
+                ? 'Importing…'
+                : isDragging()
+                  ? 'Drop Flames Here!'
+                  : 'Import from File'}
             </div>
             <div class={ui.uploadSubtitle}>
-              {isDragging()
-                ? 'Release to load the flame configuration.'
-                : 'Click to choose a file, or drag and drop an exported PNG flame directly into the app or here to load it.'}
+              {isImporting()
+                ? 'Reading your files into Recent flames.'
+                : isDragging()
+                  ? 'Release to load. One file opens it, several go to Recent flames.'
+                  : 'Click to choose files, or drag and drop exported PNGs, JSON descriptors, .flame configs or a backup ZIP. A single file opens straight away; drop several to load them all into Recent flames without opening any.'}
             </div>
           </div>
         </Show>

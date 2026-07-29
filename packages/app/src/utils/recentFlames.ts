@@ -15,7 +15,7 @@ export type RecentFlame = {
   tracks?: TimelineTrack[]
 }
 
-function generateId(): string {
+export function newRecentFlameId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
 }
 
@@ -55,7 +55,7 @@ export function saveRecentFlame(
   if (recent.length >= MAX_RECENT_FLAMES && !forceOverwriteOldest) {
     return false
   }
-  const id = generateId()
+  const id = newRecentFlameId()
   const entry: RecentFlame = {
     id,
     name: name || flame.metadata?.name || 'Flame',
@@ -71,11 +71,24 @@ export function saveRecentFlame(
   return true
 }
 
+/**
+ * Overwrite the stored list wholesale. Used by the backup importer, which
+ * merges the imported entries with the existing ones (dropping duplicates)
+ * before writing the result back in one go.
+ * @returns false when the localStorage write failed.
+ */
+export function saveRecentFlames(entries: RecentFlame[]): boolean {
+  return safeSetItem(
+    STORAGE_KEY,
+    JSON.stringify(entries.slice(0, MAX_RECENT_FLAMES)),
+  )
+}
+
 /** Stored entries with only structural validation — no flame-schema pass.
  *  Used for read-modify-write cycles so a schema-validation regression can't
  *  make an automated rewrite (autosave runs one every interval) silently drop
  *  every entry the validator rejects. */
-function loadRecentFlamesForRewrite(): RecentFlame[] {
+export function loadRecentFlamesForRewrite(): RecentFlame[] {
   try {
     const raw = safeGetItem(STORAGE_KEY)
     if (raw === null) return []
