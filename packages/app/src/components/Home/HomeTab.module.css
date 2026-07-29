@@ -1,6 +1,9 @@
-/* Home tab — Phase 1 shell.
-   Structure only: plates show a captured poster where one exists and a plain
-   surface where one does not. No live GPU canvases yet (Phase 2). */
+/* Home tab — Phase 2.
+   Plates show a captured poster, with a live WebGPU canvas layered over it once
+   the plate settles into view (see HomeFlame.tsx). The poster is the fallback
+   whenever the live render cannot run, and the final image once it has frozen.
+   Layout rules here are the ones in .agents/skills/gallery_preview_layout —
+   read it before changing the grid or the scroll container. */
 
 /* Home overlays the workspace rather than replacing it: the editor keeps its
    state and — crucially — its canvas keeps its size, so switching tabs never
@@ -91,8 +94,13 @@
 .scroll {
   overflow-y: auto;
   overflow-x: hidden;
-  scrollbar-gutter: stable;
   scroll-behavior: smooth;
+  /* A REAL gutter, not `scrollbar-gutter: stable`: Firefox (esp. Linux/GTK) uses
+     overlay scrollbars that sit on top of the content, and `scrollbar-gutter`
+     only reserves space for classic ones — so it is a no-op exactly where the
+     problem is. Padding clears the bar for both kinds. */
+  padding-right: 0.6rem;
+  scrollbar-width: thin;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -146,16 +154,6 @@
   }
 }
 
-/* The flame sits behind the copy rather than beside it: as a flex sibling it
-   would take the full box and push the overlay out. */
-.hero-img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
 /* Full-width scrim so the overlay spans the plate; the text inside is what
    gets the reading measure. The plate behind is an arbitrary fractal, so the
    copy needs its own ground rather than relying on the image being dark. */
@@ -190,7 +188,19 @@
 }
 
 /* Gallery option B: editorial spans — mixed weights rather than a uniform
-   grid, so the wall reads as curated. */
+   grid, so the wall reads as curated.
+
+   `grid-auto-rows: 12rem` is load-bearing, and it is what makes the plates safe
+   to fill with absolutely-positioned posters and canvases. The overlap failure
+   in gallery_preview_layout §1 needs an AUTO row: a grid item with no in-flow
+   content does not size an auto row, so the row collapses towards min-content
+   while the item paints at its full height and spills over the next one. A fixed
+   track length cannot collapse, so `padding-bottom: %` is not needed here — and
+   would not work anyway, since `.row2` deliberately spans two rows.
+
+   Do NOT change this to `auto`, `min-content` or `masonry` without giving the
+   plates a padding-bottom aspect box first, and re-measuring consecutive tile
+   rects in both engines. */
 .gallery-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -262,10 +272,19 @@
   }
 }
 
+/* Holds a HomeFlame directly rather than a nested <button> (a plate inside a
+   card button is invalid HTML and swallows the card's own click). Positioned so
+   the poster/canvas can absolutely fill it. */
 .card-thumb {
+  position: relative;
   height: 7rem;
   border-radius: var(--space-1);
   overflow: hidden;
+  background: var(--neutral-200);
+
+  [data-theme='dark'] & {
+    background: var(--neutral-900);
+  }
 }
 
 .card-title {
@@ -310,12 +329,20 @@
   aspect-ratio: 16 / 9;
 }
 
-/* A plate: the poster if captured, otherwise a plain surface. Phase 2 swaps
-   this for a live canvas once it scrolls into view. */
+/* A plate: the captured poster, with a live canvas over it once it settles into
+   view. Both layers are absolutely positioned, so the plate's height comes
+   entirely from its container (a fixed 12rem grid row, or an explicitly sized
+   wrapper). */
 .plate {
   position: relative;
   width: 100%;
   height: 100%;
+  /* Floor, per gallery_preview_layout §2: on Firefox a GPU device loss reflows
+     these tiles as the canvases tear down, and a plate whose height resolves to
+     0 piles its absolute caption into an unreadable stack. `box-sizing:
+     border-box` is global, so this only applies when the real height would drop
+     below it. */
+  min-height: 64px;
   border-radius: var(--space-2);
   overflow: hidden;
   background: var(--neutral-200);
@@ -336,11 +363,48 @@
   }
 }
 
-.plate-img {
+/* ---- poster / live-canvas layers (HomeFlame) ----
+   Both fill their plate and both use `object-fit: cover`. The canvas renders at a
+   fixed 16:9 backing store — the posters' own aspect — so cover crops the two
+   identically and the cross-fade, and the freeze-to-poster swap, have nothing to
+   jump between. Ordered poster-then-canvas in the DOM, so the live canvas paints
+   on top without needing a z-index. */
+.flame-poster,
+.flame-canvas {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+  /* The plate itself is the click target; neither layer should intercept. */
+  pointer-events: none;
+  user-select: none;
+}
+
+.flame-poster {
+  transition: opacity 0.8s ease;
+}
+
+/* The live flame has accumulated — fade the poster out from under it. */
+.flame-poster.is-hidden {
+  opacity: 0;
+}
+
+/* Converged: the canvas has unmounted and this poster (the same image) is the
+   final picture. Snap to opaque with no transition, so there is no gap between
+   the canvas disappearing and the poster fading back. Wins over `.is-hidden`
+   both by order and by specificity of intent — HomeFlame clears `.is-hidden`
+   in the same update. */
+.flame-poster.is-frozen {
+  opacity: 1;
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flame-poster {
+    transition: none;
+  }
 }
 
 /* Stand-in while no poster exists. Deliberately plain — it should read as
