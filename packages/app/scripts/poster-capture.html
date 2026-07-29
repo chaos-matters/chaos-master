@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Poster capture (dev only)</title>
+    <!--
+      Dev-only capture surface for the Home gallery poster pipeline. It lives in
+      scripts/ (not at the package root) on purpose: Vite's build input is
+      `index.html` alone, and nothing under scripts/ is ever bundled or copied
+      into dist/, so this page cannot ship. The dev server still serves it at
+      /scripts/poster-capture.html, which is all the capture script needs.
+
+      Driven by scripts/capture-gallery-posters.mjs — see scripts/README.md.
+    -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #000;
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="capture-root"></div>
+    <script src="./posterCapture.tsx" type="module"></script>
+  </body>
+</html>

@@ -146,6 +146,16 @@
   }
 }
 
+/* The flame sits behind the copy rather than beside it: as a flex sibling it
+   would take the full box and push the overlay out. */
+.hero-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 /* Full-width scrim so the overlay spans the plate; the text inside is what
    gets the reading measure. The plate behind is an arbitrary fractal, so the
    copy needs its own ground rather than relying on the image being dark. */

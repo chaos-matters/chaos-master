@@ -141,7 +141,7 @@ export function HomeTab(props: HomeTabProps) {
                 {(item) => (
                   <div class={ui.hero}>
                     <Show when={posterUrl(item)}>
-                      {(src) => <img class={ui.plateImg} src={src()} alt="" />}
+                      {(src) => <img class={ui.heroImg} src={src()} alt="" />}
                     </Show>
                     <div class={ui.heroCopy}>
                       <div class={ui.heroText}>
