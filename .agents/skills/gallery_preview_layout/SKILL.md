@@ -127,10 +127,41 @@ the last column expands to fill and is the one that ends up under the bar. The
 
 ## 5. Verifying cross-browser (don't trust one engine)
 
-- Test **both** Chrome and Firefox. Drive them with Playwright (the repo has it):
-  `chromium` and `firefox` from `playwright`. See the `webgpu-verify-headed-playwright`
-  and `playwright-chaos-master-setup` notes (seed `localStorage`
-  `chaos-master-welcome-dismissed=true`, `ignoreHTTPSErrors`, dev server is HTTPS).
+- **Chrome is the gate; Firefox is the second opinion.** Chrome must work; the
+  Firefox-specific rules above (§2 squeeze, §4 gutter) are why you still check
+  Gecko, but a Chrome regression is the one that ships.
+
+- **Launching real Chrome with a real GPU.** This exact recipe matters — get it
+  wrong and WebGPU is silently absent, `requestAdapter()` returns nothing, the
+  app falls back to posters, and the run _looks_ like the live path is broken
+  when it was never exercised:
+
+  ```js
+  const browser = await chromium.launch({
+    channel: 'chrome', // the installed google-chrome-stable, NOT bundled chromium
+    headless: false, // headless has no usable navigator.gpu on this machine
+    args: [
+      '--enable-unsafe-webgpu',
+      '--enable-features=Vulkan',
+      '--ignore-gpu-blocklist',
+    ],
+  })
+  ```
+
+  Confirm you actually got the GPU before trusting any measurement:
+
+  ```js
+  const a = await navigator.gpu?.requestAdapter()
+  a?.info // expect e.g. { vendor: 'amd', architecture: 'rdna-4' }, not undefined
+  ```
+
+  Do **not** copy the flags out of `playwright.config.ts` for this: those are
+  `--enable-unsafe-swiftshader --use-angle=swiftshader-webgl`, deliberately
+  _software_ rendering so CI is deterministic. They will happily render without
+  touching the GPU, which is the opposite of what a GPU verification needs.
+
+- Also seed `localStorage` `chaos-master-welcome-dismissed=true` and pass
+  `ignoreHTTPSErrors` (the dev server is HTTPS).
 - **Playwright bundles _stable_ Firefox**, which has weak/no WebGPU on Linux. It
   is fine for **layout** (same Gecko engine) but cannot exercise the
   **live-WebGPU → device-loss** path. Use **Firefox Nightly** (real WebGPU +
