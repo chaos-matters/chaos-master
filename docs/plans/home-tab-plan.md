@@ -99,6 +99,15 @@ Each phase is shippable on its own.
 - **Phase 1 — Shell, posters only.** The tab, scroll container, section nav,
   footer. No live GPU work at all. This is where art direction gets settled
   against real images, cheaply.
+  - **1a — pick the structure.** `home-tab-wireframes.html` in this folder is a
+    self-contained greybox tool: 17 layout options across the six sections
+    (shell, hero, gallery, in motion, explore, made here), each with its
+    trade-off written down, and an assembled preview that stacks the current
+    picks in scroll order so the page rhythm is visible. Open it in a browser,
+    choose one per section, and the combination at the bottom is the brief for
+    1b. Deliberately styling-free — no type, colour or motion decisions are
+    encoded in it.
+  - **1b — style the chosen structure.** Only once a combination is agreed.
 - **Phase 2 — Hybrid live.** Hero goes live; gallery plates upgrade
   poster→live on in-view/hover with off-screen unmount.
 - **Phase 3 — In motion.** The animated section, with the auto-play restraint
