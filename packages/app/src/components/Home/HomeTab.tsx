@@ -115,7 +115,9 @@ export function HomeTab(props: HomeTabProps) {
         <button
           type="button"
           class={`${ui.railLink} ${ui.railBack}`}
-          onClick={() => setActiveTab('workspace')}
+          onClick={() => {
+            setActiveTab('workspace')
+          }}
         >
           Back to the editor
         </button>

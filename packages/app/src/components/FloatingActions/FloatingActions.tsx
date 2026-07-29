@@ -200,7 +200,9 @@ export function FloatingActions(props: Props) {
           <div class={ui.buttons}>
             <button
               class={ui.button}
-              onClick={() => setActiveTab('home')}
+              onClick={() => {
+                setActiveTab('home')
+              }}
               aria-label="Home"
               title="Home — gallery and what the app can do"
             >
