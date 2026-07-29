@@ -159,10 +159,54 @@ New endpoints in `serve.mjs`, mirroring the credits pattern exactly:
 4. Poster capture triggered from the console.
 5. Prod publish with the typed-confirmation gate.
 
+## Decisions taken
+
+- **No delete.** Unpublish is reversible and is enough.
+- **Capture or nothing.** No poster override; a flame that cannot be rendered
+  does not become a gallery item.
+- **The whole flow runs on the local machine.** The console spawns the capture,
+  which drives a headed Chromium against the local GPU — the same mechanism
+  used to capture the first 15 posters. Nothing renders in the cloud.
+
+## The flow, as agreed
+
+One guided sequence rather than a set of separate tools:
+
+1. **Drop** a PNG or JSON into the console. It calls `inspect`, which writes
+   nothing and reports what was found — title, transform count, 2D/3D,
+   animation, and any blocking warning.
+2. **Stage** — one button. Calls `put`, which writes the D1 row with
+   `published = 0` and no poster. The item exists but is invisible.
+3. **Capture** — one button. Runs the GPU capture on this machine and uploads
+   the poster to R2, then records `poster_key` on the row.
+4. **Publish** — one button, enabled only once a poster exists. Calls
+   `publish --published 1`.
+
+Each step is separately reversible up to publish, and nothing reaches a live
+page until the last click.
+
+### The dev-server dependency is the sharp edge
+
+The capture page is served by the app's dev server, so step 3 cannot work in
+isolation. Handled explicitly rather than left to fail with a timeout: the
+capture subcommand checks whether the page is reachable and, if not, either
+starts the dev server itself and waits for readiness, or exits with a JSON
+error naming the exact command to run. Whichever it does, the console shows
+that reason rather than a spinner.
+
+## Where the code lives
+
+Split so that nothing can drift:
+
+- **`packages/app/scripts/gallery-admin.mjs`** (product repo) — every
+  operation. It has to stay in step with the flame schema, the D1 migration
+  and the capture page, all of which live here.
+- **`chaos-master-gallery.sh`** (console) — a thin wrapper that resolves the
+  repo, forwards arguments and passes JSON straight through. Repo location
+  overridable via `CHAOS_MASTER_REPO`, matching the existing
+  `CHAOS_MASTER_REPORT_SH` convention. It defaults to **dev**, unlike the
+  reporting scripts beside it.
+
 ## Open questions
 
-- Does the console need to _delete_ gallery rows, or is unpublishing enough?
-  Unpublish is reversible; delete is not.
 - Should posters move to their own bucket (see above)?
-- Should `put` accept a poster override for flames that cannot be rendered
-  headlessly, or is "capture or nothing" the right constraint?
