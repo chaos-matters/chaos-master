@@ -332,6 +332,11 @@ export function Wrappers() {
                           batch(() => {
                             setSelectedFlame(() => flame)
                             setSelectedWelcomeTracks(() => tracks)
+                            // Picking a flame means "take me to the editor".
+                            // Force the workspace tab so a stray #home in the
+                            // URL can't leave Home overlaying the flame the
+                            // user just chose.
+                            setActiveTab('workspace')
                           })
                         }}
                         onStartTour={handleStartTour}
