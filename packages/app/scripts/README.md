@@ -173,7 +173,10 @@ same constraint drives `playwright.resilience.config.ts` and the landing
 package's `capture-posters.mjs`.
 
 As a backstop the capture page decodes each encoded poster and reports its peak
-channel value; the script fails the row rather than writing a black image.
+channel value; the script fails the row rather than writing a black image. The
+same probe reports the mean saturation of the lit pixels, logged per row and
+recorded in the manifest — a poster of a colourful flame that comes back near
+zero has lost its colour somewhere, which is invisible in a byte count.
 
 ## Decisions worth knowing
 
@@ -188,11 +191,20 @@ authored in the app's landscape viewport. 16:9 shows all of it, and a squarer
 plate can always crop a wide poster in CSS. `--aspect 1:1` (or any `w:h`)
 overrides.
 
-**Animated rows are sampled at 35% of the timeline.** Frame 0 is the rest pose —
-for a camera pan or a morph it is the least interesting frame there is, and
-often identical to another row's still. A third of the way in has the motion
-underway. `--frame-fraction` changes the ratio, `--frame <n>` pins an exact
-frame.
+**Animated rows are sampled at 35% of the timeline — unless that frame is
+desaturated.** Frame 0 is the rest pose: for a camera pan or a morph it is the
+least interesting frame there is, and often identical to another row's still. A
+third of the way in has the motion underway. But a timeline animates the _look_
+as freely as the shape, and `vibrancy` multiplies OkLab chroma outright in the
+colour-grading pass, so a blind fraction can land at the bottom of a vibrancy
+dip and poster a warm gold flame as grey-on-black (`depth-of-color` did exactly
+that at frame 31 of 90, where its timeline holds vibrancy at 0.15 against a
+stored 0.5). When the sampled frame resolves below the flame's stored vibrancy,
+the capture page slides to the nearest frame where it is back at or above it —
+still a real frame, still away from the rest pose. Rows that do not animate
+vibrancy resolve to the stored value everywhere and never move.
+`--frame-fraction` changes the ratio, `--frame <n>` pins an exact frame and
+skips the check.
 
 **Convergence is the app's own export gate.** The capture page renders with
 `Flam3`'s `exportDriver` and only hands the image back when `finalImageReady`

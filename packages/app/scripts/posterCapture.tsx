@@ -69,6 +69,12 @@ interface CaptureResult {
   height: number
   /** Brightest channel over a 32x32 downsample — 0 means an all-black poster. */
   peak: number
+  /**
+   * Mean HSV saturation of the lit pixels in that downsample, 0..1. A poster
+   * that comes back near 0 is greyscale — the flame's colour was lost
+   * somewhere between the descriptor and the encoder.
+   */
+  saturation: number
   /** Timeline frame the still was taken at (0 for stills). */
   frame: number
   /** Last keyframe in the timeline (0 for stills). */
@@ -106,10 +112,15 @@ function finite(value: number | undefined): number {
   return value !== undefined && Number.isFinite(value) ? value : 0
 }
 
+/** Below this the pixel is background, and its hue is encoder noise. */
+const LIT_THRESHOLD = 12
+
 /**
- * Peak channel value over a 32x32 downsample of the ENCODED image. A poster
- * that comes back at 0 means the capture grabbed a cleared swapchain rather
- * than the flame, which is worth failing loudly on instead of uploading.
+ * Peak channel value and mean saturation over a 32x32 downsample of the
+ * ENCODED image. A peak of 0 means the capture grabbed a cleared swapchain
+ * rather than the flame, which is worth failing loudly on instead of
+ * uploading; a saturation near 0 means a greyscale poster of a flame that is
+ * not grey, which the driver reports so it cannot pass unnoticed again.
  *
  * Probing the encoded blob rather than the canvas is deliberate: drawImage()
  * from a WebGPU canvas reads back black in Chromium even when the very same
@@ -117,7 +128,9 @@ function finite(value: number | undefined): number {
  * reject every good poster. Decoding what we are about to write also checks
  * the encoder itself.
  */
-async function peakChannel(blob: Blob): Promise<number> {
+async function probeImage(
+  blob: Blob,
+): Promise<{ peak: number; saturation: number }> {
   const bitmap = await globalThis.createImageBitmap(blob, {
     resizeWidth: 32,
     resizeHeight: 32,
@@ -126,15 +139,30 @@ async function peakChannel(blob: Blob): Promise<number> {
   probe.width = 32
   probe.height = 32
   const ctx = probe.getContext('2d')
-  if (!ctx) return -1
+  if (!ctx) return { peak: -1, saturation: 0 }
   ctx.drawImage(bitmap, 0, 0)
   bitmap.close()
   const { data } = ctx.getImageData(0, 0, 32, 32)
   let peak = 0
+  let saturationSum = 0
+  let litCount = 0
   for (let i = 0; i < data.length; i += 4) {
-    peak = Math.max(peak, data[i] ?? 0, data[i + 1] ?? 0, data[i + 2] ?? 0)
+    const r = data[i] ?? 0
+    const g = data[i + 1] ?? 0
+    const b = data[i + 2] ?? 0
+    const hi = Math.max(r, g, b)
+    peak = Math.max(peak, hi)
+    // Every flame sits on a near-black field, so averaging saturation over the
+    // whole plate would mostly measure how much background a row has.
+    if (hi > LIT_THRESHOLD) {
+      saturationSum += (hi - Math.min(r, g, b)) / hi
+      litCount += 1
+    }
   }
-  return peak
+  return {
+    peak,
+    saturation: litCount === 0 ? 0 : saturationSum / litCount,
+  }
 }
 
 async function encode(
@@ -150,6 +178,7 @@ async function encode(
     setState('error')
     return
   }
+  const probe = await probeImage(blob)
   setResult({
     base64: await blobToBase64(blob),
     // Chromium silently falls back to PNG for a format it cannot encode, so
@@ -157,7 +186,8 @@ async function encode(
     mimeType: blob.type,
     width: canvas.width,
     height: canvas.height,
-    peak: await peakChannel(blob),
+    peak: probe.peak,
+    saturation: probe.saturation,
     frame: meta.frame,
     endFrame: meta.endFrame,
   })
@@ -258,18 +288,75 @@ function CaptureApp() {
   )
 }
 
+/** Float slack for comparing an interpolated vibrancy against the stored one. */
+const VIBRANCY_EPSILON = 1e-6
+
+/** Vibrancy the timeline resolves to at `frame`, without disturbing `flame`. */
+function vibrancyAtFrame(
+  flame: FlameDescriptor,
+  tracks: TimelineTrack[],
+  frame: number,
+): number {
+  const probe = JSON.parse(JSON.stringify(flame)) as FlameDescriptor
+  applyTracksToFlame(tracks, probe, frame, null)
+  return probe.renderSettings.vibrancy ?? 0.5
+}
+
 /**
  * Pick the frame to freeze an animated row at. Frame 0 is the rest pose and is
  * usually the least interesting thing the timeline does, so sample a fraction
  * of the way in by default (see capture-gallery-posters.mjs for the value).
+ *
+ * That fraction is blind, though, and a timeline animates the LOOK as freely
+ * as it animates the shape. `vibrancy` is a literal multiplier on the OkLab
+ * chroma in the colour-grading pass (see flame/colorGrading.ts), so a frame
+ * where the timeline has pulled it below the flame's own stored value renders
+ * the piece with less colour than the app shows for that same flame — at the
+ * bottom of a vibrancy dip, a warm gold flame posters as grey-on-black.
+ *
+ * So when the sampled frame is a desaturated moment, slide to the NEAREST
+ * frame where vibrancy is back at (or above) the stored value. The poster
+ * stays a real frame of the animation, away from the rest pose, and shows the
+ * flame's own colours. Rows whose timeline leaves vibrancy alone resolve to
+ * the stored value at every frame, so their frame choice never moves.
  */
 function resolveFrame(
   spec: CaptureSpec,
+  flame: FlameDescriptor,
   tracks: TimelineTrack[],
 ): { frame: number; endFrame: number } {
   const endFrame = getUserEndFrame(tracks, 0)
-  const frame = spec.frame ?? Math.round(endFrame * spec.frameFraction)
-  return { frame: Math.max(0, Math.round(frame)), endFrame }
+  // An explicit --frame is a human decision; never second-guess it.
+  const explicit = spec.frame ?? null
+  if (explicit !== null) {
+    return { frame: Math.max(0, Math.round(explicit)), endFrame }
+  }
+  const desired = Math.min(
+    endFrame,
+    Math.max(0, Math.round(endFrame * spec.frameFraction)),
+  )
+  if (endFrame <= 0 || tracks.length === 0) return { frame: desired, endFrame }
+
+  const stored = (flame.renderSettings.vibrancy ?? 0.5) - VIBRANCY_EPSILON
+  if (vibrancyAtFrame(flame, tracks, desired) >= stored) {
+    return { frame: desired, endFrame }
+  }
+  let bestFrame = desired
+  let bestVibrancy = -1
+  for (let offset = 1; offset <= endFrame; offset++) {
+    for (const frame of [desired - offset, desired + offset]) {
+      if (frame < 0 || frame > endFrame) continue
+      const vibrancy = vibrancyAtFrame(flame, tracks, frame)
+      if (vibrancy >= stored) return { frame, endFrame }
+      if (vibrancy > bestVibrancy) {
+        bestVibrancy = vibrancy
+        bestFrame = frame
+      }
+    }
+  }
+  // The timeline holds vibrancy under the stored value for the whole loop:
+  // there is no faithful frame, so take the most colourful one there is.
+  return { frame: bestFrame, endFrame }
 }
 
 const api: CaptureApi = {
@@ -283,7 +370,7 @@ const api: CaptureApi = {
     // descriptor the app itself would reject.
     const flame = validateFlame(JSON.parse(JSON.stringify(spec.flame)))
     const tracks = spec.animation?.tracks ?? []
-    const { frame, endFrame } = resolveFrame(spec, tracks)
+    const { frame, endFrame } = resolveFrame(spec, flame, tracks)
     if (tracks.length > 0) {
       // No loop options: the stored envelope is `{ tracks }` only, so keyframes
       // resolve on their own timeline exactly as the editor plays them back.

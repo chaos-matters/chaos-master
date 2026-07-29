@@ -35,8 +35,13 @@
 //   --encode-quality <q>  encoder quality 0..1 (default 0.9)
 //   --quality <q>         Flam3 convergence target 0..1 (default 0.97)
 //   --points <n>          points per batch (default 1000000)
-//   --frame-fraction <f>  where to sample an animated row (default 0.35)
+//   --frame-fraction <f>  where to sample an animated row (default 0.35). The
+//                         capture page slides off that frame when the timeline
+//                         has vibrancy below the flame's stored value there,
+//                         so a poster is never the greyed-out moment of a
+//                         colour animation — see scripts/posterCapture.tsx.
 //   --frame <n>           explicit timeline frame; overrides --frame-fraction
+//                         and the vibrancy check both
 //   --timeout <ms>        per-row render budget (default 240000)
 //   --keep-open           leave the browser open after the run (for debugging)
 //   --help
@@ -83,7 +88,9 @@ const DEFAULTS = {
   points: 1_000_000,
   // Frame 0 of an animated row is its rest pose — usually the least
   // interesting thing the timeline does. A third of the way in has the camera
-  // moved, the morph underway and the loop not yet back at the start.
+  // moved, the morph underway and the loop not yet back at the start. Where
+  // that lands on a vibrancy dip the capture page slides off it, so this stays
+  // a preference rather than a promise.
   frameFraction: 0.35,
   frame: null,
   timeout: 240_000,
@@ -357,6 +364,10 @@ async function main() {
         animated: row.animation !== null,
         frame: result.frame,
         endFrame: result.endFrame,
+        // Mean saturation of the lit pixels. A near-zero value on a flame that
+        // is not grey means the poster lost the flame's colour — the failure
+        // this number exists to make visible.
+        saturation: Number(result.saturation.toFixed(3)),
         quality: args.quality,
         capturedAt: new Date().toISOString(),
       }
@@ -369,7 +380,8 @@ async function main() {
           : ` frame ${placement.frame}/${placement.endFrame}`
       console.log(
         `ok -> ${file} ${(bytes.length / 1024).toFixed(0)} KiB ` +
-          `${result.width}x${result.height}${frameNote} in ${seconds}s`,
+          `${result.width}x${result.height}${frameNote} ` +
+          `sat ${result.saturation.toFixed(2)} in ${seconds}s`,
       )
     } catch (err) {
       failures += 1
