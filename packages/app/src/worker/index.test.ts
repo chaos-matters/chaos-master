@@ -203,3 +203,127 @@ describe('worker OG meta injection — XSS escaping guard', () => {
     expect(html).toContain('&lt;script&gt;')
   })
 })
+
+// ── Home gallery content (D1) ───────────────────────────────────────────────
+// A minimal stand-in for the D1 binding: records the SQL and bound params so a
+// test can assert the query shape without a real database.
+function makeD1(rows: Record<string, unknown>[]) {
+  const calls: { sql: string; params: unknown[] }[] = []
+  return {
+    calls,
+    prepare(sql: string) {
+      const call = { sql, params: [] as unknown[] }
+      calls.push(call)
+      const stmt = {
+        bind(...params: unknown[]) {
+          call.params = params
+          return stmt
+        },
+        all: () => Promise.resolve({ results: rows }),
+        first: () => Promise.resolve(rows[0] ?? null),
+      }
+      return stmt
+    },
+  }
+}
+
+const galleryRow = {
+  slug: 'first-light',
+  title: 'First Light',
+  caption: null,
+  author: 'unknown',
+  section: 'hero',
+  capability: null,
+  flame: JSON.stringify({ transforms: { t1: {} } }),
+  animation: null,
+  dimensions: 2,
+  transform_count: 4,
+  poster_key: null,
+  poster_width: null,
+  poster_height: null,
+}
+
+describe('worker /api/gallery', () => {
+  it('returns 503 when no content database is bound', async () => {
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery'),
+      makeEnv(),
+      ctx,
+    )
+    expect(res.status).toBe(503)
+  })
+
+  it('lists published items and omits the flame descriptors', async () => {
+    const db = makeD1([galleryRow])
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { items: Record<string, unknown>[] }
+    expect(body.items).toHaveLength(1)
+    // The list endpoint must stay small — descriptors are fetched per item.
+    expect(db.calls[0]?.sql).not.toContain('flame,')
+    expect(db.calls[0]?.sql).toContain('published = 1')
+    expect(res.headers.get('Cache-Control')).toContain('max-age=')
+  })
+
+  it('filters by section and rejects an unknown one', async () => {
+    const db = makeD1([galleryRow])
+    const ok = await worker.fetch(
+      new Request('https://x.test/api/gallery?section=motion'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+    expect(ok.status).toBe(200)
+    expect(db.calls[0]?.params).toEqual(['motion'])
+
+    const bad = await worker.fetch(
+      new Request('https://x.test/api/gallery?section=; DROP TABLE'),
+      makeEnv({ CONTENT_DB: makeD1([]) }),
+      ctx,
+    )
+    expect(bad.status).toBe(400)
+  })
+
+  it('parses the stored JSON when returning a single item', async () => {
+    const db = makeD1([
+      { ...galleryRow, animation: JSON.stringify({ tracks: [] }) },
+    ])
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/first-light'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      flame: { transforms: Record<string, unknown> }
+      animation: { tracks: unknown[] }
+    }
+    // Clients must receive objects, not strings needing a second decode.
+    expect(body.flame.transforms).toHaveProperty('t1')
+    expect(body.animation.tracks).toEqual([])
+    expect(db.calls[0]?.params).toEqual(['first-light'])
+  })
+
+  it('rejects a malformed slug before it reaches the query', async () => {
+    const db = makeD1([galleryRow])
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/Bad_Slug!'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+    expect(res.status).toBe(400)
+    expect(db.calls).toHaveLength(0)
+  })
+
+  it('404s an unpublished or unknown slug', async () => {
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/nope'),
+      makeEnv({ CONTENT_DB: makeD1([]) }),
+      ctx,
+    )
+    expect(res.status).toBe(404)
+  })
+})

@@ -4,6 +4,11 @@ export interface Env {
   // R2 bucket holding the per-share OG preview PNGs (keyed by short id).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   OG_IMAGES: any
+  // D1 holding the Home tab's gallery content (FlameDescriptor JSON per row).
+  // Read-only from the Worker — rows are written with `wrangler d1 execute`,
+  // so the gallery can be re-curated without a deploy.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  CONTENT_DB?: any
   // Per-IP rate limiter for the share/OG write endpoints.
   API_RL: { limit: (options: { key: string }) => Promise<{ success: boolean }> }
   // Stricter per-IP limiter dedicated to the Discord share endpoint.
@@ -35,6 +40,10 @@ const MAX_OG_UPLOAD = 4 * 1024 * 1024 // ~4 MB
 const MAX_DISCORD_UPLOAD = 12 * 1024 * 1024 // ~12 MB request (~9 MB image)
 // Per-IP soft cap on Discord shares per day (secondary to the native limiter).
 const DISCORD_DAILY_CAP = 15
+// Home tab sections a gallery row can belong to. Mirrors the CHECK constraint
+// in migrations/0001_gallery_content.sql — keep the two in step.
+const GALLERY_SECTIONS = ['hero', 'gallery', 'motion', 'capability']
+const GALLERY_CACHE_SECONDS = 300
 const TURNSTILE_VERIFY_URL =
   'https://challenges.cloudflare.com/turnstile/v0/siteverify'
 const SITE_NAME = 'Lumen Apeiron'
@@ -73,6 +82,22 @@ function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+/**
+ * JSON with an edge/browser cache window. Used by the gallery reads, whose
+ * content only changes when rows are rewritten by hand — `stale-while-
+ * revalidate` keeps Home fast right after an edit without serving a stale
+ * response for long.
+ */
+function jsonCached(data: unknown, seconds: number): Response {
+  return new Response(JSON.stringify(data), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': `public, max-age=${seconds}, stale-while-revalidate=${seconds * 4}`,
+    },
   })
 }
 
@@ -326,6 +351,79 @@ const baseHandler = {
         return json({ payload })
       } catch (err) {
         console.error('Error handling /api/shorten GET:', errMsg(err))
+        return json({ error: 'Server error' }, 500)
+      }
+    }
+
+    // ── Home gallery content ───────────────────────────────────────────────
+    // Public, read-only. Returns the stored FlameDescriptor JSON verbatim so
+    // the client parses exactly what the editor would; the app validates it
+    // against the valibot schema before rendering. Cached at the edge because
+    // the content changes only when rows are rewritten by hand.
+    if (pathname === '/api/gallery' && request.method === 'GET') {
+      if (!env.CONTENT_DB) return json({ error: 'Not configured' }, 503)
+      const section = url.searchParams.get('section')
+      if (section !== null && !GALLERY_SECTIONS.includes(section)) {
+        return json({ error: 'Unknown section' }, 400)
+      }
+      try {
+        // The list view never needs the descriptors themselves — omitting them
+        // keeps this response small even as the gallery grows. Callers fetch a
+        // single item to get its flame.
+        const base =
+          'SELECT slug, title, caption, author, section, capability, ' +
+          'dimensions, transform_count, poster_key, poster_width, ' +
+          'poster_height, sort_order, (animation IS NOT NULL) AS has_animation ' +
+          'FROM gallery_items WHERE published = 1'
+        const stmt =
+          section === null
+            ? env.CONTENT_DB.prepare(
+                `${base} ORDER BY section, sort_order, slug`,
+              )
+            : env.CONTENT_DB.prepare(
+                `${base} AND section = ? ORDER BY sort_order, slug`,
+              ).bind(section)
+        const { results } = await stmt.all()
+        return jsonCached({ items: results ?? [] }, GALLERY_CACHE_SECONDS)
+      } catch (err) {
+        console.error('Error handling /api/gallery:', errMsg(err))
+        return json({ error: 'Server error' }, 500)
+      }
+    }
+
+    if (pathname.startsWith('/api/gallery/') && request.method === 'GET') {
+      if (!env.CONTENT_DB) return json({ error: 'Not configured' }, 503)
+      const slug = pathname.slice('/api/gallery/'.length)
+      // Slugs are hand-authored and URL-safe; reject anything else rather than
+      // letting it reach the query.
+      if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(slug)) {
+        return json({ error: 'Invalid slug' }, 400)
+      }
+      try {
+        const row = await env.CONTENT_DB.prepare(
+          'SELECT slug, title, caption, author, section, capability, flame, ' +
+            'animation, dimensions, transform_count, poster_key, ' +
+            'poster_width, poster_height FROM gallery_items ' +
+            'WHERE slug = ? AND published = 1',
+        )
+          .bind(slug)
+          .first()
+        if (!row) return json({ error: 'Not found' }, 404)
+        // `flame`/`animation` are stored as JSON text. Parse here so clients
+        // get real objects rather than strings they must double-decode.
+        return jsonCached(
+          {
+            ...row,
+            flame: JSON.parse(row.flame as string),
+            animation:
+              row.animation === null
+                ? null
+                : JSON.parse(row.animation as string),
+          },
+          GALLERY_CACHE_SECONDS,
+        )
+      } catch (err) {
+        console.error('Error handling /api/gallery/:slug:', errMsg(err))
         return json({ error: 'Server error' }, 500)
       }
     }

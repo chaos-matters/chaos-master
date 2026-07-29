@@ -59,6 +59,16 @@
           "bucket_name": "chaos-master-og-images",
         },
       ],
+      // Home tab content: FlameDescriptor JSON served to the app so the
+      // gallery renders real flames on the GPU. Read-only from the Worker;
+      // rows are written with `wrangler d1 execute` (see migrations/).
+      "d1_databases": [
+        {
+          "binding": "CONTENT_DB",
+          "database_name": "chaos-master-content",
+          "database_id": "2b704d31-0bb6-48e4-a071-4ba9ad4f1088",
+        },
+      ],
       // Per-IP cap on share/OG write endpoints to bound abuse + cost.
       "ratelimits": [
         {
@@ -104,6 +114,13 @@
           "bucket_name": "chaos-master-og-images-dev",
         },
       ],
+      "d1_databases": [
+        {
+          "binding": "CONTENT_DB",
+          "database_name": "chaos-master-content-dev",
+          "database_id": "068d1ab5-4151-487c-a6c0-75ee7df85e5d",
+        },
+      ],
       "ratelimits": [
         {
           "name": "API_RL",
@@ -133,6 +150,14 @@
         {
           "binding": "OG_IMAGES",
           "bucket_name": "chaos-master-og-images-dev",
+        },
+      ],
+      // PR previews read the dev content so the gallery is populated there too.
+      "d1_databases": [
+        {
+          "binding": "CONTENT_DB",
+          "database_name": "chaos-master-content-dev",
+          "database_id": "068d1ab5-4151-487c-a6c0-75ee7df85e5d",
         },
       ],
       "ratelimits": [

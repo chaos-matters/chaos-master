@@ -1,0 +1,263 @@
+#!/usr/bin/env node
+// Seed the Home tab's gallery content into D1.
+//
+// The flames live in TypeScript modules under src/flame/examples, so this
+// bundles a tiny entry point with esbuild and runs it in plain node — no
+// browser, no GPU, no test runner. Output is SQL, which is deliberately
+// boring: it can be reviewed, checked in, and replayed against any
+// environment.
+//
+//   node scripts/seed-gallery.mjs                 # print SQL to stdout
+//   node scripts/seed-gallery.mjs --out seed.sql  # write to a file
+//   node scripts/seed-gallery.mjs --apply dev     # execute against D1 (dev|prod)
+//
+// Curation lives in CURATION below. Re-running is safe: every row is an
+// upsert keyed on slug, so editing an entry here and re-applying updates the
+// live gallery without a deploy.
+
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const scriptDir = dirname(fileURLToPath(import.meta.url))
+const appDir = resolve(scriptDir, '..')
+
+const DB = { dev: 'chaos-master-content-dev', prod: 'chaos-master-content' }
+
+/**
+ * What Home shows, in the order it shows it.
+ *
+ * `hero` takes exactly one entry; `gallery` is the editorial-span wall;
+ * `motion` are animated pieces; `capability` entries each open a flame chosen
+ * to demonstrate one feature.
+ */
+const CURATION = {
+  hero: [
+    {
+      slug: 'first-light',
+      title: 'First Light',
+      caption: 'The default flame, and the one everything else grew out of.',
+      example: 'example1',
+    },
+  ],
+  gallery: [
+    { slug: 'aurora-drift', title: 'Aurora Drift', example: 'example29' },
+    { slug: 'ember-lattice', title: 'Ember Lattice', example: 'example33' },
+    { slug: 'tidal-bloom', title: 'Tidal Bloom', example: 'example40' },
+    { slug: 'spectrum-swirl', title: 'Spectrum Swirl', example: 'example45' },
+    { slug: 'enchanted-rose', title: 'Enchanted Rose', example: 'example34' },
+    { slug: 'deep-current', title: 'Deep Current', example: 'example46' },
+  ],
+  // Animations are referenced by their definition id from examples/animations.
+  motion: [
+    { slug: 'camera-pan', title: 'Camera Pan', animation: 'ex1-camera-pan' },
+    {
+      slug: 'julia-power-wave',
+      title: 'Julia Power Wave',
+      animation: 'ex2-julia-power-wave',
+    },
+    {
+      slug: 'affine-morph',
+      title: 'Affine Morph',
+      animation: 'ex1-affine-morph',
+    },
+  ],
+  capability: [
+    {
+      slug: 'cap-animation',
+      title: 'Animation',
+      caption: 'Keyframe any parameter and play it back on a timeline.',
+      capability: 'animation',
+      animation: 'ex1-pie-full-morph',
+    },
+    {
+      slug: 'cap-randomizer',
+      title: 'Randomizer',
+      caption: 'Roll a whole flame, then steer it.',
+      capability: 'randomizer',
+      example: 'example45',
+    },
+    {
+      slug: 'cap-genetics',
+      title: 'Flame genetics',
+      caption: 'Breed two flames and evolve the result.',
+      capability: 'genetics',
+      example: 'example33',
+    },
+    {
+      slug: 'cap-audio',
+      title: 'Audio flames',
+      caption: 'Wire frequency bands and beats to any parameter.',
+      capability: 'audio',
+      example: 'example29',
+    },
+    {
+      slug: 'cap-sonification',
+      title: 'Sonification',
+      caption: 'Turn the structure of a flame into sound.',
+      capability: 'sonification',
+      example: 'example40',
+    },
+  ],
+}
+
+function parseArgs(argv) {
+  const args = { out: null, apply: null }
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--out') args.out = argv[++i]
+    else if (argv[i] === '--apply') args.apply = argv[++i]
+    else if (argv[i] === '--help' || argv[i] === '-h') args.help = true
+  }
+  return args
+}
+
+/** Bundle + run the TS entry point, returning the parsed flames/animations. */
+function loadContent() {
+  const dir = mkdtempSync(join(tmpdir(), 'gallery-seed-'))
+  const bundle = join(dir, 'dump.mjs')
+  execFileSync(
+    'pnpm',
+    [
+      'exec',
+      'esbuild',
+      join(scriptDir, 'dump-examples.entry.ts'),
+      '--bundle',
+      '--platform=node',
+      '--format=esm',
+      '--log-level=error',
+      `--alias:@=${join(appDir, 'src')}`,
+      `--outfile=${bundle}`,
+    ],
+    { cwd: appDir, stdio: ['ignore', 'ignore', 'inherit'] },
+  )
+  const out = execFileSync('node', [bundle], {
+    cwd: appDir,
+    maxBuffer: 256 * 1024 * 1024,
+  })
+  return JSON.parse(out.toString())
+}
+
+const sqlStr = (v) =>
+  v === null || v === undefined ? 'NULL' : `'${String(v).replace(/'/g, "''")}'`
+
+function rowFor(entry, section, order, content) {
+  let flame
+  let animation = null
+
+  if (entry.animation) {
+    const anim = content.animations.find((a) => a.id === entry.animation)
+    if (!anim) throw new Error(`Unknown animation id: ${entry.animation}`)
+    flame = anim.flame
+    // Same envelope the app's own animated PNG export writes.
+    animation = { tracks: anim.tracks }
+  } else {
+    flame = content.flames[entry.example]
+    if (!flame) throw new Error(`Unknown example: ${entry.example}`)
+  }
+
+  const dimensions = flame.renderSettings?.dimensions === 3 ? 3 : 2
+  const transformCount = Object.keys(flame.transforms ?? {}).length
+  if (transformCount === 0) {
+    throw new Error(`${entry.slug} resolved to a flame with no transforms`)
+  }
+
+  return [
+    sqlStr(entry.slug),
+    sqlStr(entry.title),
+    sqlStr(entry.caption ?? null),
+    sqlStr(flame.metadata?.author ?? null),
+    sqlStr(section),
+    sqlStr(entry.capability ?? null),
+    sqlStr(JSON.stringify(flame)),
+    animation === null ? 'NULL' : sqlStr(JSON.stringify(animation)),
+    String(dimensions),
+    String(transformCount),
+    'NULL, NULL, NULL',
+    String(order),
+    '1',
+  ].join(', ')
+}
+
+function buildSql(content) {
+  const lines = [
+    '-- Generated by scripts/seed-gallery.mjs — do not edit by hand.',
+    '-- Re-running replaces every row: curation lives in the script.',
+    '',
+  ]
+  const values = []
+  for (const [section, entries] of Object.entries(CURATION)) {
+    entries.forEach((entry, i) => {
+      values.push(`  (${rowFor(entry, section, i, content)})`)
+    })
+  }
+  lines.push(
+    'INSERT INTO gallery_items (',
+    '  slug, title, caption, author, section, capability, flame, animation,',
+    '  dimensions, transform_count, poster_key, poster_width, poster_height,',
+    '  sort_order, published',
+    ') VALUES',
+    values.join(',\n'),
+    'ON CONFLICT(slug) DO UPDATE SET',
+    '  title = excluded.title,',
+    '  caption = excluded.caption,',
+    '  author = excluded.author,',
+    '  section = excluded.section,',
+    '  capability = excluded.capability,',
+    '  flame = excluded.flame,',
+    '  animation = excluded.animation,',
+    '  dimensions = excluded.dimensions,',
+    '  transform_count = excluded.transform_count,',
+    '  sort_order = excluded.sort_order,',
+    '  published = excluded.published;',
+    '',
+  )
+  return lines.join('\n')
+}
+
+function main() {
+  const args = parseArgs(process.argv.slice(2))
+  if (args.help) {
+    console.log(
+      readFileSync(fileURLToPath(import.meta.url), 'utf8')
+        .split('\n')
+        .filter((l) => l.startsWith('//'))
+        .map((l) => l.replace(/^\/\/ ?/, ''))
+        .join('\n'),
+    )
+    return
+  }
+
+  const content = loadContent()
+  const sql = buildSql(content)
+  const total = Object.values(CURATION).reduce((n, e) => n + e.length, 0)
+
+  if (args.apply) {
+    const name = DB[args.apply]
+    if (!name) {
+      console.error(`Unknown target "${args.apply}" — expected dev or prod.`)
+      process.exit(1)
+    }
+    const dir = mkdtempSync(join(tmpdir(), 'gallery-sql-'))
+    const file = join(dir, 'seed.sql')
+    writeFileSync(file, sql)
+    execFileSync(
+      'pnpm',
+      ['exec', 'wrangler', 'd1', 'execute', name, '--remote', `--file=${file}`],
+      { cwd: appDir, stdio: 'inherit' },
+    )
+    console.error(`Applied ${total} rows to ${name}.`)
+    return
+  }
+
+  if (args.out) {
+    writeFileSync(resolve(process.cwd(), args.out), sql)
+    console.error(`Wrote ${total} rows to ${args.out}.`)
+    return
+  }
+
+  process.stdout.write(sql)
+}
+
+main()
