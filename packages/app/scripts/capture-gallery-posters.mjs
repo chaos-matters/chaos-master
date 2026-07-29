@@ -21,6 +21,9 @@
 //   --env dev|prod        content database to read rows from (default dev)
 //   --slug a,b,c          only these slugs (re-do a few without a full sweep)
 //   --section <name>      only this section (hero|gallery|motion|capability)
+//   --include-unpublished also capture rows with published = 0. Staged rows
+//                         (scripts/gallery-admin.mjs put) need a poster BEFORE
+//                         they go live, and they are unpublished by definition.
 //   --out <dir>           output directory
 //                         (default assets/local/gallery-posters, gitignored)
 //   --base <url>          dev server origin (default https://localhost:5173)
@@ -85,7 +88,13 @@ const DEFAULTS = {
 }
 
 function parseArgs(argv) {
-  const args = { ...DEFAULTS, slugs: null, section: null, keepOpen: false }
+  const args = {
+    ...DEFAULTS,
+    slugs: null,
+    section: null,
+    includeUnpublished: false,
+    keepOpen: false,
+  }
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
     if (arg === '--help' || arg === '-h') args.help = true
@@ -96,6 +105,7 @@ function parseArgs(argv) {
         .map((s) => s.trim())
         .filter(Boolean)
     else if (arg === '--section') args.section = argv[++i]
+    else if (arg === '--include-unpublished') args.includeUnpublished = true
     else if (arg === '--out') args.out = resolve(process.cwd(), argv[++i])
     else if (arg === '--base') args.base = argv[++i].replace(/\/$/, '')
     else if (arg === '--size') args.size = Number(argv[++i])
@@ -158,15 +168,16 @@ function resolveDimensions(size, aspect) {
 }
 
 /** Read the published rows straight out of D1 — the same rows Home serves. */
-function readRows(env, section) {
+function readRows(env, section, includeUnpublished) {
   const database = DB[env]
   if (!database) {
     throw new Error(`Unknown --env "${env}" — expected dev or prod.`)
   }
-  const where =
-    section === null
-      ? 'published = 1'
-      : `published = 1 AND section = '${section.replace(/'/g, "''")}'`
+  const clauses = includeUnpublished ? [] : ['published = 1']
+  if (section !== null) {
+    clauses.push(`section = '${section.replace(/'/g, "''")}'`)
+  }
+  const where = clauses.length === 0 ? '1 = 1' : clauses.join(' AND ')
   const sql =
     'SELECT slug, title, section, flame, animation FROM gallery_items ' +
     `WHERE ${where} ORDER BY section, sort_order, slug`
@@ -206,12 +217,15 @@ async function main() {
     process.exit(1)
   }
 
-  let rows = readRows(args.env, args.section)
+  let rows = readRows(args.env, args.section, args.includeUnpublished)
   if (args.slugs) {
     const wanted = new Set(args.slugs)
     const found = new Set(rows.map((r) => r.slug))
+    const qualifier = args.includeUnpublished ? '' : 'published '
     for (const slug of wanted) {
-      if (!found.has(slug)) console.warn(`No published row for slug "${slug}"`)
+      if (!found.has(slug)) {
+        console.warn(`No ${qualifier}row for slug "${slug}"`)
+      }
     }
     rows = rows.filter((r) => wanted.has(r.slug))
   }

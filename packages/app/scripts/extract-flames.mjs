@@ -25,12 +25,17 @@
  *   node packages/app/scripts/extract-flames.mjs [input-dir] [output-dir]
  *   node packages/app/scripts/extract-flames.mjs --help
  *
+ * The reading half is also the extraction path used by scripts/gallery-admin.mjs,
+ * so `readFlameChunk`, `normalizeEnvelope`, `inspectFlame` and friends are
+ * exported and the batch run only happens when this file is executed directly.
+ * There must be exactly one implementation of "what is inside this PNG".
+ *
  * No dependencies — node:fs, node:path, node:zlib, node:crypto, node:util.
  */
 import { createHash } from 'node:crypto'
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, extname, join, relative, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 import { inflateSync } from 'node:zlib'
 
@@ -128,7 +133,7 @@ function hasPngSignature(bytes) {
  * when the file simply has no flame embedded (a hand-made image, a crop that
  * lost its ancillary chunks). Malformed structure throws.
  */
-function readFlameChunk(bytes, warnings) {
+export function readFlameChunk(bytes, warnings) {
   if (!hasPngSignature(bytes)) {
     throw new Error('not a PNG (bad signature)')
   }
@@ -169,12 +174,12 @@ function readFlameChunk(bytes, warnings) {
 
 // ── Normalization ────────────────────────────────────────────────────
 
-function isPlainObject(value) {
+export function isPlainObject(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /** Collapse both export envelopes onto `{ flame, animation, customVariations }`. */
-function normalizeEnvelope(raw) {
+export function normalizeEnvelope(raw) {
   if (!isPlainObject(raw)) {
     throw new Error('payload is not a JSON object')
   }
@@ -219,7 +224,7 @@ function checkAffine(affine, keys, label, errors) {
  * per transform. Returns hard `errors` (drop the flame) and soft `warnings`
  * (still usable, but the seeder should know).
  */
-function inspectFlame(flame) {
+export function inspectFlame(flame) {
   const errors = []
   const warnings = []
   if (!isPlainObject(flame)) {
@@ -335,7 +340,7 @@ function inspectFlame(flame) {
 
 // ── Naming ───────────────────────────────────────────────────────────
 
-function toSlug(fileName) {
+export function toSlug(fileName) {
   const stem = basename(fileName, extname(fileName))
   return (
     stem
@@ -361,7 +366,7 @@ function uniqueSlug(slug, taken) {
 }
 
 /** Short digest of the transform set — identical exports share one hash. */
-function transformsHash(transforms) {
+export function transformsHash(transforms) {
   return createHash('sha1')
     .update(JSON.stringify(transforms))
     .digest('hex')
@@ -387,207 +392,218 @@ function printTable(headers, rows) {
 
 // ── Main ─────────────────────────────────────────────────────────────
 
-const options = parseCliArgs(process.argv.slice(2))
-if (options.help) {
-  printHelp()
-  process.exit(0)
-}
+function main() {
+  const options = parseCliArgs(process.argv.slice(2))
+  if (options.help) {
+    printHelp()
+    return
+  }
 
-let entries
-try {
-  entries = readdirSync(options.inputDir, { withFileTypes: true })
-} catch (error) {
-  console.error(`Cannot read input directory ${options.inputDir}`)
-  console.error(`  ${error.message}`)
-  process.exit(1)
-}
-
-const pngFiles = entries
-  .filter(
-    (entry) => entry.isFile() && extname(entry.name).toLowerCase() === '.png',
-  )
-  .map((entry) => entry.name)
-  .sort((a, b) => a.localeCompare(b))
-
-const extracted = []
-const skipped = []
-const failed = []
-const takenSlugs = new Set()
-
-for (const fileName of pngFiles) {
-  const warnings = []
-  let json
+  let entries
   try {
-    json = readFlameChunk(
-      readFileSync(join(options.inputDir, fileName)),
-      warnings,
-    )
+    entries = readdirSync(options.inputDir, { withFileTypes: true })
   } catch (error) {
-    failed.push({ file: fileName, errors: [`read failed: ${error.message}`] })
-    continue
-  }
-  if (json === null) {
-    skipped.push({ file: fileName, reason: 'no FlameJson chunk' })
-    continue
+    console.error(`Cannot read input directory ${options.inputDir}`)
+    console.error(`  ${error.message}`)
+    process.exit(1)
   }
 
-  let normalized
-  try {
-    normalized = normalizeEnvelope(JSON.parse(json))
-  } catch (error) {
-    failed.push({ file: fileName, errors: [`bad payload: ${error.message}`] })
-    continue
-  }
-
-  const report = inspectFlame(normalized.flame)
-  if (report.errors.length > 0) {
-    failed.push({ file: fileName, errors: report.errors })
-    continue
-  }
-  warnings.push(...report.warnings)
-
-  // The app only ships custom variation source alongside the flame in a share
-  // payload; a PNG that references one without carrying its definition cannot
-  // be rendered by a fresh client.
-  if (report.customTypes.length > 0 && normalized.customVariations === null) {
-    warnings.push(
-      `references custom variations with no definitions: ${report.customTypes.join(', ')}`,
+  const pngFiles = entries
+    .filter(
+      (entry) => entry.isFile() && extname(entry.name).toLowerCase() === '.png',
     )
-  }
+    .map((entry) => entry.name)
+    .sort((a, b) => a.localeCompare(b))
 
-  const flame = normalized.flame
-  const animation = normalized.animation
-  const metadata = isPlainObject(flame.metadata) ? flame.metadata : {}
-  const slug = uniqueSlug(toSlug(fileName), takenSlugs)
-  extracted.push({
-    source: fileName,
-    slug,
-    output: `${slug}.json`,
-    name: typeof metadata.name === 'string' ? metadata.name : '',
-    author: typeof metadata.author === 'string' ? metadata.author : '',
-    schemaVersion: typeof flame.version === 'string' ? flame.version : null,
-    transformCount: report.transformCount,
-    variationCount: report.variationCount,
-    dimensions: report.dimensions,
-    hasAnimation: animation !== null,
-    animationTrackCount: Array.isArray(animation?.tracks)
-      ? animation.tracks.length
-      : 0,
-    transformsHash: transformsHash(flame.transforms),
-    warnings,
-    payload: {
-      slug,
+  const extracted = []
+  const skipped = []
+  const failed = []
+  const takenSlugs = new Set()
+
+  for (const fileName of pngFiles) {
+    const warnings = []
+    let json
+    try {
+      json = readFlameChunk(
+        readFileSync(join(options.inputDir, fileName)),
+        warnings,
+      )
+    } catch (error) {
+      failed.push({ file: fileName, errors: [`read failed: ${error.message}`] })
+      continue
+    }
+    if (json === null) {
+      skipped.push({ file: fileName, reason: 'no FlameJson chunk' })
+      continue
+    }
+
+    let normalized
+    try {
+      normalized = normalizeEnvelope(JSON.parse(json))
+    } catch (error) {
+      failed.push({ file: fileName, errors: [`bad payload: ${error.message}`] })
+      continue
+    }
+
+    const report = inspectFlame(normalized.flame)
+    if (report.errors.length > 0) {
+      failed.push({ file: fileName, errors: report.errors })
+      continue
+    }
+    warnings.push(...report.warnings)
+
+    // The app only ships custom variation source alongside the flame in a share
+    // payload; a PNG that references one without carrying its definition cannot
+    // be rendered by a fresh client.
+    if (report.customTypes.length > 0 && normalized.customVariations === null) {
+      warnings.push(
+        `references custom variations with no definitions: ${report.customTypes.join(', ')}`,
+      )
+    }
+
+    const flame = normalized.flame
+    const animation = normalized.animation
+    const metadata = isPlainObject(flame.metadata) ? flame.metadata : {}
+    const slug = uniqueSlug(toSlug(fileName), takenSlugs)
+    extracted.push({
       source: fileName,
-      flame,
-      animation,
-      customVariations: normalized.customVariations,
-    },
-  })
-}
+      slug,
+      output: `${slug}.json`,
+      name: typeof metadata.name === 'string' ? metadata.name : '',
+      author: typeof metadata.author === 'string' ? metadata.author : '',
+      schemaVersion: typeof flame.version === 'string' ? flame.version : null,
+      transformCount: report.transformCount,
+      variationCount: report.variationCount,
+      dimensions: report.dimensions,
+      hasAnimation: animation !== null,
+      animationTrackCount: Array.isArray(animation?.tracks)
+        ? animation.tracks.length
+        : 0,
+      transformsHash: transformsHash(flame.transforms),
+      warnings,
+      payload: {
+        slug,
+        source: fileName,
+        flame,
+        animation,
+        customVariations: normalized.customVariations,
+      },
+    })
+  }
 
-// Identical transform sets exported more than once — the seeder should pick
-// one representative per group rather than shipping near-duplicate gallery
-// entries.
-const byHash = new Map()
-for (const entry of extracted) {
-  const group = byHash.get(entry.transformsHash) ?? []
-  group.push(entry.slug)
-  byHash.set(entry.transformsHash, group)
-}
-const duplicateGroups = [...byHash.entries()]
-  .filter(([, slugs]) => slugs.length > 1)
-  .map(([hash, slugs]) => ({ hash, slugs }))
-
-const manifest = {
-  generatedAt: new Date().toISOString(),
-  sourceDir: options.inputDir,
-  counts: {
-    found: pngFiles.length,
-    extracted: extracted.length,
-    skipped: skipped.length,
-    failed: failed.length,
-    uniqueTransformSets: byHash.size,
-  },
-  duplicateGroups,
-  flames: extracted.map(({ payload: _payload, ...summary }) => summary),
-  skipped,
-  failed,
-}
-
-if (!options.dryRun) {
-  mkdirSync(options.outputDir, { recursive: true })
-  const indent = options.minify ? undefined : 2
+  // Identical transform sets exported more than once — the seeder should pick
+  // one representative per group rather than shipping near-duplicate gallery
+  // entries.
+  const byHash = new Map()
   for (const entry of extracted) {
+    const group = byHash.get(entry.transformsHash) ?? []
+    group.push(entry.slug)
+    byHash.set(entry.transformsHash, group)
+  }
+  const duplicateGroups = [...byHash.entries()]
+    .filter(([, slugs]) => slugs.length > 1)
+    .map(([hash, slugs]) => ({ hash, slugs }))
+
+  const manifest = {
+    generatedAt: new Date().toISOString(),
+    sourceDir: options.inputDir,
+    counts: {
+      found: pngFiles.length,
+      extracted: extracted.length,
+      skipped: skipped.length,
+      failed: failed.length,
+      uniqueTransformSets: byHash.size,
+    },
+    duplicateGroups,
+    flames: extracted.map(({ payload: _payload, ...summary }) => summary),
+    skipped,
+    failed,
+  }
+
+  if (!options.dryRun) {
+    mkdirSync(options.outputDir, { recursive: true })
+    const indent = options.minify ? undefined : 2
+    for (const entry of extracted) {
+      writeFileSync(
+        join(options.outputDir, entry.output),
+        `${JSON.stringify(entry.payload, null, indent)}\n`,
+      )
+    }
     writeFileSync(
-      join(options.outputDir, entry.output),
-      `${JSON.stringify(entry.payload, null, indent)}\n`,
+      join(options.outputDir, 'manifest.json'),
+      `${JSON.stringify(manifest, null, 2)}\n`,
     )
   }
-  writeFileSync(
-    join(options.outputDir, 'manifest.json'),
-    `${JSON.stringify(manifest, null, 2)}\n`,
+
+  console.log(`Input:  ${options.inputDir}`)
+  console.log(
+    `Output: ${options.dryRun ? '(dry run, nothing written)' : options.outputDir}`,
   )
-}
-
-console.log(`Input:  ${options.inputDir}`)
-console.log(
-  `Output: ${options.dryRun ? '(dry run, nothing written)' : options.outputDir}`,
-)
-console.log('')
-printTable(
-  ['slug', 'tf', 'var', 'dim', 'anim', 'warn', 'source'],
-  extracted.map((entry) => [
-    entry.slug,
-    entry.transformCount,
-    entry.variationCount,
-    `${entry.dimensions}D`,
-    entry.hasAnimation ? `${entry.animationTrackCount} tracks` : '-',
-    entry.warnings.length > 0 ? entry.warnings.length : '-',
-    entry.source,
-  ]),
-)
-
-if (skipped.length > 0) {
   console.log('')
-  console.log('Skipped (no embedded flame):')
-  for (const entry of skipped) {
-    console.log(`  ${entry.file} - ${entry.reason}`)
-  }
-}
+  printTable(
+    ['slug', 'tf', 'var', 'dim', 'anim', 'warn', 'source'],
+    extracted.map((entry) => [
+      entry.slug,
+      entry.transformCount,
+      entry.variationCount,
+      `${entry.dimensions}D`,
+      entry.hasAnimation ? `${entry.animationTrackCount} tracks` : '-',
+      entry.warnings.length > 0 ? entry.warnings.length : '-',
+      entry.source,
+    ]),
+  )
 
-if (failed.length > 0) {
-  console.log('')
-  console.log('Failed validation (not written):')
-  for (const entry of failed) {
-    console.log(`  ${entry.file}`)
-    for (const message of entry.errors) console.log(`    ${message}`)
-  }
-}
-
-const warned = extracted.filter((entry) => entry.warnings.length > 0)
-if (warned.length > 0) {
-  console.log('')
-  console.log('Warnings:')
-  for (const entry of warned) {
-    for (const message of entry.warnings) {
-      console.log(`  ${entry.source}: ${message}`)
+  if (skipped.length > 0) {
+    console.log('')
+    console.log('Skipped (no embedded flame):')
+    for (const entry of skipped) {
+      console.log(`  ${entry.file} - ${entry.reason}`)
     }
   }
+
+  if (failed.length > 0) {
+    console.log('')
+    console.log('Failed validation (not written):')
+    for (const entry of failed) {
+      console.log(`  ${entry.file}`)
+      for (const message of entry.errors) console.log(`    ${message}`)
+    }
+  }
+
+  const warned = extracted.filter((entry) => entry.warnings.length > 0)
+  if (warned.length > 0) {
+    console.log('')
+    console.log('Warnings:')
+    for (const entry of warned) {
+      for (const message of entry.warnings) {
+        console.log(`  ${entry.source}: ${message}`)
+      }
+    }
+  }
+
+  console.log('')
+  printTable(
+    ['metric', 'count'],
+    [
+      ['PNGs found', pngFiles.length],
+      ['Extracted', extracted.length],
+      ['Skipped (no flame)', skipped.length],
+      ['Failed', failed.length],
+      ['Unique transform sets', byHash.size],
+      ['Animated', extracted.filter((entry) => entry.hasAnimation).length],
+      ['3D', extracted.filter((entry) => entry.dimensions === 3).length],
+      ['With warnings', warned.length],
+    ],
+  )
+
+  if (failed.length > 0) process.exitCode = 1
 }
 
-console.log('')
-printTable(
-  ['metric', 'count'],
-  [
-    ['PNGs found', pngFiles.length],
-    ['Extracted', extracted.length],
-    ['Skipped (no flame)', skipped.length],
-    ['Failed', failed.length],
-    ['Unique transform sets', byHash.size],
-    ['Animated', extracted.filter((entry) => entry.hasAnimation).length],
-    ['3D', extracted.filter((entry) => entry.dimensions === 3).length],
-    ['With warnings', warned.length],
-  ],
-)
-
-if (failed.length > 0) process.exitCode = 1
+// Only the batch run is CLI-only: the helpers above are imported by
+// scripts/gallery-admin.mjs, which must not trigger a directory sweep.
+if (
+  process.argv[1] &&
+  pathToFileURL(process.argv[1]).href === import.meta.url
+) {
+  main()
+}

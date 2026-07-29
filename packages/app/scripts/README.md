@@ -4,11 +4,51 @@ Node tooling for the app package. Run everything from `packages/app`.
 
 | Script                                      | What it does                                                |
 | ------------------------------------------- | ----------------------------------------------------------- |
+| `gallery-admin.mjs`                         | JSON-in/JSON-out front door for all gallery content edits.  |
 | `seed-gallery.mjs`                          | Writes the Home gallery's curated rows into D1.             |
 | `capture-gallery-posters.mjs`               | Renders a still poster for every gallery row.               |
 | `upload-gallery-posters.mjs`                | Uploads those posters to R2 and points the D1 rows at them. |
 | `extract-flames.mjs`                        | Pulls flame descriptors out of existing artwork.            |
 | `poster-capture.html` + `posterCapture.tsx` | Dev-only render surface the capture script drives.          |
+
+## gallery-admin
+
+One entry point for curating Home, so the same operations work from a terminal
+and from a local admin console shelling out to it. Every run prints a single
+JSON object on stdout and human progress on stderr.
+
+```sh
+node scripts/gallery-admin.mjs list                      # dev, by default
+node scripts/gallery-admin.mjs inspect --file shot.png   # writes nothing
+node scripts/gallery-admin.mjs put --file shot.png --section gallery
+node scripts/gallery-admin.mjs capture --all-missing
+node scripts/gallery-admin.mjs publish --slug shot --published 1
+node scripts/gallery-admin.mjs reorder --slug shot --order 2
+node scripts/gallery-admin.mjs <command> --help
+```
+
+Three rules it will not bend:
+
+- **`--env` defaults to dev**, and prod needs `--confirm prod` on top of
+  `--env prod`. The console it serves defaults to prod elsewhere; a content
+  tool inheriting that default publishes to production by accident eventually.
+- **`put` stages, it never publishes.** The row lands with `published = 0` and
+  `poster_key = NULL`, so going live is always a separate `publish` call.
+- **There is no delete.** `publish --published 0` is the reversible
+  alternative, and it is enough.
+
+A flame that references a custom variation without carrying its definition is
+refused: `gallery_items` has nowhere to put the WGSL, so it would render as the
+identity fallback rather than the picture that was exported. Four of the 59
+flames in the existing export collection are like this.
+
+`capture` needs the dev server, because posters come from the real renderer. If
+`/scripts/poster-capture.html` does not answer it starts
+`pnpm --filter chaos-master start` on the port from `--base` (with
+`--strictPort`), waits for the page, and stops the server again when it is
+done. `--no-serve` turns that off and fails immediately with the command to
+run. It passes `--include-unpublished` to the capture step so a staged row can
+get its poster before it goes live.
 
 ## The gallery poster pipeline
 
