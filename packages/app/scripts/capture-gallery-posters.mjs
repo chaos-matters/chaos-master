@@ -18,7 +18,8 @@
 //   node scripts/capture-gallery-posters.mjs
 //
 // Options:
-//   --env dev|prod        content database to read rows from (default dev)
+//   --env local|dev|prod  content database to read rows from (default local:
+//                         the dev database in wrangler's own local storage)
 //   --slug a,b,c          only these slugs (re-do a few without a full sweep)
 //   --section <name>      only this section (hero|gallery|motion|capability)
 //   --include-unpublished also capture rows with published = 0. Staged rows
@@ -49,6 +50,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { initCommand, isMissingTable, storageFlags, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
 
 const require = createRequire(import.meta.url)
 const { chromium } = require('playwright')
@@ -57,13 +59,13 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 const appDir = resolve(scriptDir, '..')
 const repoRoot = resolve(appDir, '../..')
 
-const DB = { dev: 'chaos-master-content-dev', prod: 'chaos-master-content' }
-
 const MIME = { webp: 'image/webp', jpeg: 'image/jpeg' }
 const EXT = { 'image/webp': 'webp', 'image/jpeg': 'jpg', 'image/png': 'png' }
 
 const DEFAULTS = {
-  env: 'dev',
+  // Local by default, matching gallery-admin: a capture run should read the
+  // rows you are curating on this machine, not a deployed environment's.
+  env: 'local',
   out: join(repoRoot, 'assets/local/gallery-posters'),
   base: 'https://localhost:5173',
   size: 1600,
@@ -169,9 +171,9 @@ function resolveDimensions(size, aspect) {
 
 /** Read the published rows straight out of D1 — the same rows Home serves. */
 function readRows(env, section, includeUnpublished) {
-  const database = DB[env]
-  if (!database) {
-    throw new Error(`Unknown --env "${env}" — expected dev or prod.`)
+  const target = TARGETS[env]
+  if (!target) {
+    throw new Error(`Unknown --env "${env}" — expected ${TARGET_LIST}.`)
   }
   const clauses = includeUnpublished ? [] : ['published = 1']
   if (section !== null) {
@@ -181,20 +183,44 @@ function readRows(env, section, includeUnpublished) {
   const sql =
     'SELECT slug, title, section, flame, animation FROM gallery_items ' +
     `WHERE ${where} ORDER BY section, sort_order, slug`
-  const stdout = execFileSync(
-    'pnpm',
-    [
-      'exec',
-      'wrangler',
-      'd1',
-      'execute',
-      database,
-      '--remote',
-      '--json',
-      `--command=${sql}`,
-    ],
-    { cwd: appDir, maxBuffer: 64 * 1024 * 1024, encoding: 'utf8' },
-  )
+  let stdout
+  try {
+    stdout = execFileSync(
+      'pnpm',
+      [
+        'exec',
+        'wrangler',
+        'd1',
+        'execute',
+        target.database,
+        ...storageFlags(env),
+        '--json',
+        `--command=${sql}`,
+      ],
+      {
+        cwd: appDir,
+        maxBuffer: 64 * 1024 * 1024,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    )
+  } catch (error) {
+    // Under --json the failure comes back on stdout. An empty target is the
+    // one failure worth naming: it means the schema is missing, not that the
+    // gallery is empty, and gallery-admin is what creates it.
+    const output = `${error.stdout ?? ''}\n${error.stderr ?? ''}`
+    if (isMissingTable(output)) {
+      throw new Error(
+        `${targetLabel(env)} has no gallery_items table. Create it with:\n` +
+          `  cd packages/app && ${initCommand(env)}\n` +
+          `(or just run \`node scripts/gallery-admin.mjs list --env ${env}\`, ` +
+          'which does it for a local target)',
+      )
+    }
+    throw new Error(
+      `wrangler d1 execute failed against ${targetLabel(env)}:\n${output.trim()}`,
+    )
+  }
   // wrangler prints its banner on stderr, but slice from the first bracket
   // anyway so a future banner change cannot break the parse.
   const start = stdout.indexOf('[')
@@ -237,7 +263,7 @@ async function main() {
   mkdirSync(args.out, { recursive: true })
   console.log(
     `Capturing ${rows.length} poster(s) at ${dimensions.width}x${dimensions.height} ` +
-      `(${args.format}, quality ${args.quality}) from ${DB[args.env]}`,
+      `(${args.format}, quality ${args.quality}) from ${targetLabel(args.env)}`,
   )
 
   // Headed, with the same WebGPU flags the repo's GPU e2e config uses. Headless
@@ -357,6 +383,9 @@ async function main() {
       `${JSON.stringify(
         {
           env: args.env,
+          // local and dev name the same database, so the manifest has to say
+          // which storage these posters were rendered from.
+          storage: TARGETS[args.env].storage,
           format: args.format,
           dimensions,
           capturedAt: new Date().toISOString(),

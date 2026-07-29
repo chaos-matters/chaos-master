@@ -13,7 +13,9 @@
 //   node scripts/upload-gallery-posters.mjs --env dev
 //
 // Options:
-//   --env dev|prod   which bucket + content database to write (default dev)
+//   --env local|dev|prod  which bucket + content database to write
+//                         (default local: the dev bucket and database in
+//                         wrangler's own local storage, nothing over the wire)
 //   --in <dir>       captured posters + manifest.json
 //                    (default assets/local/gallery-posters)
 //   --slug a,b,c     only publish these slugs
@@ -26,21 +28,11 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { storageFlags, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const appDir = resolve(scriptDir, '..')
 const repoRoot = resolve(appDir, '../..')
-
-const TARGETS = {
-  dev: {
-    bucket: 'chaos-master-og-images-dev',
-    database: 'chaos-master-content-dev',
-  },
-  prod: {
-    bucket: 'chaos-master-og-images',
-    database: 'chaos-master-content',
-  },
-}
 
 /** Object keys are public URL path segments — the Worker rejects anything else. */
 const KEY_PATTERN = /^[a-z0-9][a-z0-9./-]{0,127}$/
@@ -48,7 +40,9 @@ const KEY_PATTERN = /^[a-z0-9][a-z0-9./-]{0,127}$/
 const DEFAULT_IN = join(repoRoot, 'assets/local/gallery-posters')
 
 function parseArgs(argv) {
-  const args = { env: 'dev', in: DEFAULT_IN, slugs: null, dryRun: false }
+  // Local by default, like gallery-admin: uploading a poster is a write, and a
+  // write should never reach a deployed environment unless it was asked for.
+  const args = { env: 'local', in: DEFAULT_IN, slugs: null, dryRun: false }
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
     if (arg === '--help' || arg === '-h') args.help = true
@@ -98,9 +92,13 @@ function main() {
 
   const target = TARGETS[args.env]
   if (!target) {
-    console.error(`Unknown --env "${args.env}" — expected dev or prod.`)
+    console.error(`Unknown --env "${args.env}" — expected ${TARGET_LIST}.`)
     process.exit(1)
   }
+  // Both halves of a poster — the object and the row that points at it — have
+  // to land in the same storage, or a local row would reference an object only
+  // the deployed bucket has.
+  const where = storageFlags(args.env)
 
   const manifestPath = join(args.in, 'manifest.json')
   if (!existsSync(manifestPath)) {
@@ -149,7 +147,7 @@ function main() {
 
   console.log(
     `${args.dryRun ? '[dry run] ' : ''}Publishing ${uploads.length} poster(s) ` +
-      `to ${target.bucket} and ${target.database}`,
+      `to ${target.bucket} and ${targetLabel(args.env)}`,
   )
 
   for (const { poster, file, bytes, posterKey } of uploads) {
@@ -171,7 +169,7 @@ function main() {
         // Objects are immutable (content-hashed key), so let the edge and the
         // browser hold on to them.
         '--cache-control=public, max-age=31536000, immutable',
-        '--remote',
+        ...where,
       ],
       args.dryRun,
     )
@@ -208,12 +206,15 @@ function main() {
       'd1',
       'execute',
       target.database,
-      '--remote',
+      ...where,
       `--file=${sqlFile}`,
     ],
     false,
   )
-  console.log(`\nPublished ${uploads.length} poster(s) to ${args.env}.`)
+  console.log(
+    `\nPublished ${uploads.length} poster(s) to ${args.env} ` +
+      `(${target.storage} storage).`,
+  )
 }
 
 main()

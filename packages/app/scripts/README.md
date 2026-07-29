@@ -5,11 +5,45 @@ Node tooling for the app package. Run everything from `packages/app`.
 | Script                                      | What it does                                                |
 | ------------------------------------------- | ----------------------------------------------------------- |
 | `gallery-admin.mjs`                         | JSON-in/JSON-out front door for all gallery content edits.  |
+| `gallery-targets.mjs`                       | What `local` / `dev` / `prod` mean, for all four scripts.   |
 | `seed-gallery.mjs`                          | Writes the Home gallery's curated rows into D1.             |
 | `capture-gallery-posters.mjs`               | Renders a still poster for every gallery row.               |
 | `upload-gallery-posters.mjs`                | Uploads those posters to R2 and points the D1 rows at them. |
 | `extract-flames.mjs`                        | Pulls flame descriptors out of existing artwork.            |
 | `poster-capture.html` + `posterCapture.tsx` | Dev-only render surface the capture script drives.          |
+
+## Environments
+
+`--env` takes three values, and every script above agrees on what they mean
+because they all read `gallery-targets.mjs`:
+
+| `--env` | Database                   | Bucket                       | Storage             |
+| ------- | -------------------------- | ---------------------------- | ------------------- |
+| `local` | `chaos-master-content-dev` | `chaos-master-og-images-dev` | `--local --env dev` |
+| `dev`   | `chaos-master-content-dev` | `chaos-master-og-images-dev` | `--remote`          |
+| `prod`  | `chaos-master-content`     | `chaos-master-og-images`     | `--remote`          |
+
+**`local` is not a third database.** It is the dev database and the dev bucket
+addressed through wrangler's own local (miniflare) storage under
+`packages/app/.wrangler`, so it needs `--env dev` as well as `--local`:
+miniflare resolves a store from the _binding_ in `wrangler.jsonc`, and the
+top-level config declares none.
+
+`local` is the **default** everywhere. Curating content and looking at the
+result should reach nobody, so both deployed targets are a deliberate choice —
+and `prod` needs `--confirm prod` on top of `--env prod` in `gallery-admin`.
+
+Because `local` and `dev` share a database _name_, every JSON result carries
+`storage` (`local` or `remote`) next to `env` and `database`. The name alone
+cannot tell the two apart.
+
+A local store starts with no tables. `gallery-admin` applies
+`migrations/0001_gallery_content.sql` itself the first time it finds
+`gallery_items` missing on a local target (and says so, with
+`"initialized": true` in the result); `seed-gallery.mjs --apply local` does the
+same before seeding. Remote targets never get schema written to them
+automatically — there, a missing table means something is wrong, and the error
+names the exact command instead.
 
 ## gallery-admin
 
@@ -18,18 +52,19 @@ and from a local admin console shelling out to it. Every run prints a single
 JSON object on stdout and human progress on stderr.
 
 ```sh
-node scripts/gallery-admin.mjs list                      # dev, by default
+node scripts/gallery-admin.mjs list                      # local, by default
 node scripts/gallery-admin.mjs inspect --file shot.png   # writes nothing
 node scripts/gallery-admin.mjs put --file shot.png --section gallery
 node scripts/gallery-admin.mjs capture --all-missing
 node scripts/gallery-admin.mjs publish --slug shot --published 1
 node scripts/gallery-admin.mjs reorder --slug shot --order 2
+node scripts/gallery-admin.mjs list --env dev            # the deployed dev row set
 node scripts/gallery-admin.mjs <command> --help
 ```
 
 Three rules it will not bend:
 
-- **`--env` defaults to dev**, and prod needs `--confirm prod` on top of
+- **`--env` defaults to local**, and prod needs `--confirm prod` on top of
   `--env prod`. The console it serves defaults to prod elsewhere; a content
   tool inheriting that default publishes to production by accident eventually.
 - **`put` stages, it never publishes.** The row lands with `published = 0` and
@@ -79,11 +114,25 @@ The capture script drives the dev-only page at
 **not** need `wrangler dev`: rows are read straight out of D1 with
 `wrangler d1 execute`, not through the Worker's API.
 
+**Home itself does need `wrangler dev`.** Vite proxies `/api` to `:8787`, so to
+see what a `--env local` run produced, run both:
+
+```sh
+pnpm --filter chaos-master start    # the app on https://localhost:5173
+pnpm wr-dev                         # wrangler dev --env dev, /api on :8787
+```
+
+`wrangler dev --env dev` binds the same local D1 and R2 the `local` target
+writes, so Home renders exactly the rows you just staged and serves posters
+straight out of the local bucket. Restart it after wiping local state — it
+holds its store open and will not pick a recreated one up.
+
 ### 2. Capture
 
 ```sh
-node scripts/capture-gallery-posters.mjs                    # every published row
+node scripts/capture-gallery-posters.mjs                    # every published local row
 node scripts/capture-gallery-posters.mjs --slug first-light,camera-pan
+node scripts/capture-gallery-posters.mjs --env dev          # the deployed dev rows
 node scripts/capture-gallery-posters.mjs --help             # all options
 ```
 
@@ -98,6 +147,7 @@ Defaults: **1600x900 WEBP**, encoder quality 0.9, convergence target 0.97.
 
 ```sh
 node scripts/upload-gallery-posters.mjs --dry-run    # print every command first
+node scripts/upload-gallery-posters.mjs             # local, by default
 node scripts/upload-gallery-posters.mjs --env dev
 node scripts/upload-gallery-posters.mjs --env prod
 ```
@@ -106,6 +156,10 @@ Posters go into the **existing** og-images bucket
 (`chaos-master-og-images-dev` / `chaos-master-og-images`) under a `gallery/`
 prefix — no new bucket. The script then sets `poster_key`, `poster_width` and
 `poster_height` on each row in one batched `wrangler d1 execute` run.
+
+Both halves follow `--env` together. A `local` run puts the object into the
+local bucket and the `poster_key` into the local database, so a local row can
+never point at an object only the deployed bucket has.
 
 `poster_key` is stored **without** the `gallery/` prefix; the Worker adds it
 when serving `/api/gallery/poster/<poster_key>`.

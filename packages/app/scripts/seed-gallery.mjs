@@ -9,7 +9,11 @@
 //
 //   node scripts/seed-gallery.mjs                 # print SQL to stdout
 //   node scripts/seed-gallery.mjs --out seed.sql  # write to a file
-//   node scripts/seed-gallery.mjs --apply dev     # execute against D1 (dev|prod)
+//   node scripts/seed-gallery.mjs --apply local   # execute against D1
+//                                                 # (local|dev|prod)
+//
+// `local` is the dev database in wrangler's own local storage, and is the one
+// target this script will create the schema for first — see below.
 //
 // Curation lives in CURATION below. Re-running is safe: every row is an
 // upsert keyed on slug, so editing an entry here and re-applying updates the
@@ -20,11 +24,10 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { MIGRATION, storageFlags, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const appDir = resolve(scriptDir, '..')
-
-const DB = { dev: 'chaos-master-content-dev', prod: 'chaos-master-content' }
 
 /**
  * What Home shows, in the order it shows it.
@@ -234,20 +237,49 @@ function main() {
   const total = Object.values(CURATION).reduce((n, e) => n + e.length, 0)
 
   if (args.apply) {
-    const name = DB[args.apply]
-    if (!name) {
-      console.error(`Unknown target "${args.apply}" — expected dev or prod.`)
+    const target = TARGETS[args.apply]
+    if (!target) {
+      console.error(`Unknown target "${args.apply}" — expected ${TARGET_LIST}.`)
       process.exit(1)
+    }
+    const where = storageFlags(args.apply)
+    // A local store starts with no tables at all, and the migration is nothing
+    // but `CREATE ... IF NOT EXISTS` against a sqlite file nobody else can
+    // see — so seeding from zero is one command there. Remote targets are left
+    // alone: a missing table on a shared database is a problem to look at, not
+    // something a seed script should quietly fix.
+    if (target.storage === 'local') {
+      execFileSync(
+        'pnpm',
+        [
+          'exec',
+          'wrangler',
+          'd1',
+          'execute',
+          target.database,
+          ...where,
+          `--file=${join(appDir, MIGRATION)}`,
+        ],
+        { cwd: appDir, stdio: ['ignore', 'ignore', 'inherit'] },
+      )
     }
     const dir = mkdtempSync(join(tmpdir(), 'gallery-sql-'))
     const file = join(dir, 'seed.sql')
     writeFileSync(file, sql)
     execFileSync(
       'pnpm',
-      ['exec', 'wrangler', 'd1', 'execute', name, '--remote', `--file=${file}`],
+      [
+        'exec',
+        'wrangler',
+        'd1',
+        'execute',
+        target.database,
+        ...where,
+        `--file=${file}`,
+      ],
       { cwd: appDir, stdio: 'inherit' },
     )
-    console.error(`Applied ${total} rows to ${name}.`)
+    console.error(`Applied ${total} rows to ${targetLabel(args.apply)}.`)
     return
   }
 

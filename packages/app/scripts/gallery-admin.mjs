@@ -9,7 +9,7 @@
 // Every subcommand writes ONE JSON object to stdout and human progress to
 // stderr, so a console can shell out to it and a person can still read it:
 //
-//   node scripts/gallery-admin.mjs list --env dev | jq '.items[].slug'
+//   node scripts/gallery-admin.mjs list | jq '.items[].slug'
 //
 // Exit code is 0 when the command did what was asked and 1 otherwise. A
 // failure still prints JSON: { ok: false, command, error: { code, message } }.
@@ -24,9 +24,13 @@
 //
 // Three deliberate constraints:
 //
-//   --env defaults to dev, and prod additionally requires --confirm prod. The
-//   console this serves defaults to prod elsewhere; a content tool inheriting
-//   that default would eventually publish something to production by accident.
+//   --env defaults to local: the dev database and bucket, addressed through
+//   wrangler's local (miniflare) storage instead of the network. Curating a
+//   gallery and looking at it should cost nothing and reach nobody, so both
+//   deployed targets are a deliberate choice — and prod additionally requires
+//   --confirm prod. The console this serves defaults to prod elsewhere; a
+//   content tool inheriting that default publishes to production by accident
+//   eventually.
 //
 //   put NEVER publishes. It writes published = 0 and poster_key = NULL, so
 //   going live is always the separate, deliberate `publish` call.
@@ -47,12 +51,11 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { inspectFlame, isPlainObject, normalizeEnvelope, readFlameChunk, toSlug, transformsHash, } from './extract-flames.mjs'
+import { initCommand, isMissingTable, MIGRATION, storageFlags, tail, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const appDir = resolve(scriptDir, '..')
 const repoRoot = resolve(appDir, '../..')
-
-const DB = { dev: 'chaos-master-content-dev', prod: 'chaos-master-content' }
 
 // Fixed by the page design and by the CHECK constraint in
 // migrations/0001_gallery_content.sql — a typo must fail here, not in D1.
@@ -113,7 +116,9 @@ function emit(payload) {
 
 // ── Help ─────────────────────────────────────────────────────────────
 
-const COMMON_OPTIONS = `  --env dev|prod        target environment (default dev)
+const COMMON_OPTIONS = `  --env local|dev|prod  where to read and write (default local)
+                        local = the dev database and bucket in wrangler's own
+                        local storage; nothing leaves this machine
   --confirm prod        required alongside --env prod, on every subcommand`
 
 const HELP = {
@@ -135,21 +140,26 @@ ${COMMON_OPTIONS}
                         \`<command> --help\`
 
 Output:
-  One JSON object on stdout per run; progress on stderr. Exit 0 on success,
-  1 on failure (the JSON then carries an \`error\` object).
+  One JSON object on stdout per run; progress on stderr. Every result carries
+  \`env\`, \`storage\` (local|remote) and \`database\`, because local and dev
+  share a database name. Exit 0 on success, 1 on failure (the JSON then
+  carries an \`error\` object).
 
 There is no delete: unpublish with \`publish --published 0\` instead.`,
 
   list: `gallery-admin list — every row in the gallery
 
 Usage:
-  node scripts/gallery-admin.mjs list [--env dev|prod] [--confirm prod]
+  node scripts/gallery-admin.mjs list [--env ${TARGET_LIST}] [--confirm prod]
 
 ${COMMON_OPTIONS}
 
 Prints slug, title, section, capability, sort_order, published, poster_key,
 dimensions, transform_count and has_animation for every row, plus per-section
-totals. The flame descriptors themselves are deliberately omitted.`,
+totals. The flame descriptors themselves are deliberately omitted.
+
+Against --env local this also creates the gallery schema if it is not there
+yet, so a fresh checkout needs no setup step.`,
 
   inspect: `gallery-admin inspect — what is inside a file, without writing anything
 
@@ -190,8 +200,8 @@ it would render wrong on Home.`,
   capture: `gallery-admin capture — posters for rows that have none
 
 Usage:
-  node scripts/gallery-admin.mjs capture --all-missing [--env dev|prod]
-  node scripts/gallery-admin.mjs capture --slug a,b [--env dev|prod]
+  node scripts/gallery-admin.mjs capture --all-missing [--env ${TARGET_LIST}]
+  node scripts/gallery-admin.mjs capture --slug a,b [--env ${TARGET_LIST}]
 
 Options:
   --slug a,b,c          capture exactly these slugs
@@ -206,7 +216,8 @@ ${COMMON_OPTIONS}
 
 Runs capture-gallery-posters.mjs (headed Chromium, real GPU) and then
 upload-gallery-posters.mjs, including unpublished rows so a staged flame can
-get its poster before going live.
+get its poster before going live. Both inherit --env, so a local capture reads
+local rows and uploads into the local bucket.
 
 The capture page is served by the app dev server. If it is not reachable, this
 starts it (\`${DEV_SERVER_COMMAND}\`), waits for the page to
@@ -247,20 +258,86 @@ const sqlStr = (value) =>
     ? 'NULL'
     : `'${String(value).replace(/'/g, "''")}'`
 
+/** Targets whose schema this run created, so the result can say so. */
+const initialized = new Set()
+
+/**
+ * The identity of the target, on every result.
+ *
+ * `storage` is not decoration: local and dev are the SAME database NAME, so a
+ * console showing only `env` or only `database` could not tell a local run
+ * from one that just wrote to the deployed dev environment.
+ */
+function targetFields(env) {
+  return {
+    env,
+    storage: TARGETS[env].storage,
+    database: TARGETS[env].database,
+    ...(initialized.has(env) ? { initialized: true } : {}),
+  }
+}
+
+/**
+ * Create the gallery schema in a LOCAL store, so the caller can retry.
+ *
+ * Automatic, and local-only, rather than an --init flag. The migration is
+ * nothing but `CREATE ... IF NOT EXISTS` against a sqlite file under
+ * packages/app/.wrangler that no one else can see, so there is nothing here
+ * for a confirmation step to protect — and a first run that fails with "now
+ * type this other command" is pure friction on the one target that exists to
+ * be frictionless. A remote target gets the error instead: a missing table
+ * THERE means something is genuinely wrong, and a content tool must not answer
+ * that by writing DDL to a shared database.
+ */
+function initializeLocal(env) {
+  note(`${targetLabel(env)} has no gallery_items table — applying ${MIGRATION}`)
+  try {
+    execFileSync(
+      'pnpm',
+      [
+        'exec',
+        'wrangler',
+        'd1',
+        'execute',
+        TARGETS[env].database,
+        ...storageFlags(env),
+        `--file=${join(appDir, MIGRATION)}`,
+      ],
+      { cwd: appDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+  } catch (error) {
+    throw new AdminError(
+      'init-failed',
+      `Could not create the gallery schema in ${targetLabel(env)}`,
+      {
+        ...targetFields(env),
+        run: initCommand(env),
+        cwd: 'packages/app',
+        stdout: tail(error.stdout),
+        stderr: tail(error.stderr),
+      },
+    )
+  }
+  initialized.add(env)
+  note(`Initialised ${targetLabel(env)} from ${MIGRATION}`)
+}
+
 /**
  * Run SQL through `wrangler d1 execute --json` and return the first
  * statement's rows. Large statements go through a file: a full descriptor is
  * far past a comfortable argv length.
+ *
+ * `initialize` exists only to stop the local retry below from recursing.
  */
-function d1(env, sql) {
-  const database = DB[env]
+function d1(env, sql, { initialize = true } = {}) {
+  const database = TARGETS[env].database
   const args = [
     'exec',
     'wrangler',
     'd1',
     'execute',
     database,
-    '--remote',
+    ...storageFlags(env),
     '--json',
   ]
   let temporaryFile = null
@@ -286,15 +363,33 @@ function d1(env, sql) {
       stdio: ['ignore', 'pipe', 'pipe'],
     })
   } catch (error) {
+    // Under --json wrangler puts the failure on STDOUT, not stderr — both
+    // locally and through the API. Reading only stderr reports "it failed"
+    // with no reason attached.
+    const output = `${error.stdout ?? ''}\n${error.stderr ?? ''}`
+    if (isMissingTable(output)) {
+      if (initialize && TARGETS[env].storage === 'local') {
+        initializeLocal(env)
+        return d1(env, sql, { initialize: false })
+      }
+      throw new AdminError(
+        'content-db-not-initialized',
+        `${targetLabel(env)} has no gallery_items table — the schema in ` +
+          `${MIGRATION} was never applied to it`,
+        {
+          ...targetFields(env),
+          run: initCommand(env),
+          cwd: 'packages/app',
+        },
+      )
+    }
     throw new AdminError(
       'd1-failed',
-      `wrangler d1 execute failed against ${database}`,
+      `wrangler d1 execute failed against ${targetLabel(env)}`,
       {
-        database,
-        stderr: String(error.stderr ?? '')
-          .split('\n')
-          .filter((line) => line.trim().length > 0)
-          .slice(-12),
+        ...targetFields(env),
+        stdout: tail(error.stdout),
+        stderr: tail(error.stderr),
         sql: temporaryFile === null ? sql : `(from ${temporaryFile})`,
       },
     )
@@ -322,11 +417,15 @@ function readRow(env, slug) {
 function requireRow(env, slug) {
   const row = readRow(env, slug)
   if (row === null) {
-    throw new AdminError('slug-not-found', `No row with slug "${slug}"`, {
-      env,
-      slug,
-      hint: 'run `list` to see what exists, or `put` to stage it first',
-    })
+    throw new AdminError(
+      'slug-not-found',
+      `No row with slug "${slug}" in ${targetLabel(env)}`,
+      {
+        ...targetFields(env),
+        slug,
+        hint: 'run `list` to see what exists, or `put` to stage it first',
+      },
+    )
   }
   return row
 }
@@ -334,19 +433,20 @@ function requireRow(env, slug) {
 // ── Validation ───────────────────────────────────────────────────────
 
 function resolveEnv(values) {
-  // The default is dev on purpose. See the header.
-  const env = values.env ?? 'dev'
-  if (!(env in DB)) {
+  // The default is local on purpose. See the header.
+  const env = values.env ?? 'local'
+  if (!(env in TARGETS)) {
     throw new AdminError(
       'unknown-env',
-      `Unknown --env "${env}" — expected dev or prod`,
+      `Unknown --env "${env}" — expected ${TARGET_LIST}`,
+      { known: Object.keys(TARGETS) },
     )
   }
   if (env === 'prod' && values.confirm !== 'prod') {
     throw new AdminError(
       'prod-confirmation-required',
       'Touching prod requires --confirm prod as well as --env prod',
-      { fix: 'add --confirm prod, or drop --env prod to work against dev' },
+      { fix: 'add --confirm prod, or drop --env prod to work locally' },
     )
   }
   return env
@@ -534,7 +634,7 @@ function publicReport(report) {
 
 function commandList(values) {
   const env = resolveEnv(values)
-  note(`Reading ${DB[env]} ...`)
+  note(`Reading ${targetLabel(env)} ...`)
   const { results } = d1(
     env,
     `SELECT ${ROW_COLUMNS} FROM gallery_items ORDER BY section, sort_order, slug`,
@@ -558,10 +658,9 @@ function commandList(values) {
   const summary = Object.entries(sections)
     .map(([section, counts]) => `${section} ${counts.total}`)
     .join(', ')
-  note(`${results.length} row(s): ${summary}`)
+  note(`${results.length} row(s) in ${targetLabel(env)}: ${summary}`)
   return {
-    env,
-    database: DB[env],
+    ...targetFields(env),
     count: results.length,
     sections,
     items: results,
@@ -727,14 +826,13 @@ ON CONFLICT(slug) DO UPDATE SET
 `
 
   const kib = (flameJson.length / 1024).toFixed(1)
-  note(`Staging ${slug} into ${DB[env]} (${kib} KiB descriptor) ...`)
+  note(`Staging ${slug} into ${targetLabel(env)} (${kib} KiB descriptor) ...`)
   d1(env, sql)
   const row = requireRow(env, slug)
   note(`Staged ${slug} in section ${row.section} at order ${row.sort_order}`)
 
   return {
-    env,
-    database: DB[env],
+    ...targetFields(env),
     slug,
     action: existing === null ? 'inserted' : 'updated',
     staged: true,
@@ -777,7 +875,7 @@ function commandPublish(values) {
     warnings.push(`${slug} was already published = ${published}`)
   }
 
-  note(`Setting published = ${published} on ${slug} in ${DB[env]} ...`)
+  note(`Setting published = ${published} on ${slug} in ${targetLabel(env)} ...`)
   d1(
     env,
     `UPDATE gallery_items SET published = ${published} WHERE slug = ${sqlStr(slug)}`,
@@ -786,8 +884,7 @@ function commandPublish(values) {
   note(published === 1 ? `${slug} is live` : `${slug} is hidden`)
 
   return {
-    env,
-    database: DB[env],
+    ...targetFields(env),
     slug,
     published: row.published,
     changed: before.published !== row.published,
@@ -813,7 +910,7 @@ function commandReorder(values) {
   }
 
   const before = requireRow(env, slug)
-  note(`Setting sort_order = ${order} on ${slug} in ${DB[env]} ...`)
+  note(`Setting sort_order = ${order} on ${slug} in ${targetLabel(env)} ...`)
   d1(
     env,
     `UPDATE gallery_items SET sort_order = ${order} WHERE slug = ${sqlStr(slug)}`,
@@ -842,8 +939,7 @@ function commandReorder(values) {
   )
 
   return {
-    env,
-    database: DB[env],
+    ...targetFields(env),
     slug,
     section: row.section,
     order: row.sort_order,
@@ -1083,8 +1179,8 @@ function resolveCaptureSlugs(env, values) {
   if (unknown.length > 0) {
     throw new AdminError(
       'slug-not-found',
-      `No row in ${DB[env]} for ${unknown.join(', ')}`,
-      { env, unknown, hint: 'stage it with `put` first' },
+      `No row in ${targetLabel(env)} for ${unknown.join(', ')}`,
+      { ...targetFields(env), unknown, hint: 'stage it with `put` first' },
     )
   }
   return explicit
@@ -1102,8 +1198,8 @@ async function commandCapture(values) {
   if (slugs.length === 0) {
     note('Every row already has a poster — nothing to capture.')
     return {
-      env,
-      database: DB[env],
+      ...targetFields(env),
+      bucket: TARGETS[env].bucket,
       requested: [],
       captured: [],
       failed: [],
@@ -1112,7 +1208,7 @@ async function commandCapture(values) {
     }
   }
   note(
-    `Capturing ${slugs.length} poster(s) from ${DB[env]}: ${slugs.join(', ')}`,
+    `Capturing ${slugs.length} poster(s) from ${targetLabel(env)}: ${slugs.join(', ')}`,
   )
 
   const timeoutMs =
@@ -1182,8 +1278,10 @@ async function commandCapture(values) {
     .map((row) => row.slug)
 
   const result = {
-    env,
-    database: DB[env],
+    ...targetFields(env),
+    // The poster half of the target: a local capture uploads into the same
+    // bucket NAME, but into wrangler's local store rather than R2 itself.
+    bucket: TARGETS[env].bucket,
     devServer: { mode: server.mode, base: server.base },
     out: outDir,
     requested: slugs,
