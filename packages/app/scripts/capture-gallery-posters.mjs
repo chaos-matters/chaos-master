@@ -44,7 +44,15 @@
 //                         and the vibrancy check both
 //   --timeout <ms>        per-row render budget (default 240000)
 //   --keep-open           leave the browser open after the run (for debugging)
+//   --skip-checkout-check don't verify that --base serves THIS checkout. Only
+//                         for when the check itself is broken — see
+//                         scripts/dev-server-checkout.mjs
 //   --help
+//
+// Before anything else the run checks that whatever answers --base is serving
+// THIS checkout, and refuses to continue otherwise: a dev server from another
+// worktree serves the capture page just as happily and silently renders posters
+// from its own code. See scripts/dev-server-checkout.mjs.
 //
 // Output is <out>/<slug>.<ext> plus a manifest.json that
 // scripts/upload-gallery-posters.mjs consumes.
@@ -55,6 +63,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { CAPTURE_PAGE, checkoutFailure, verifyServedCheckout, } from './dev-server-checkout.mjs'
 import { initCommand, isMissingTable, storageFlags, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
 
 const require = createRequire(import.meta.url)
@@ -103,6 +112,7 @@ function parseArgs(argv) {
     section: null,
     includeUnpublished: false,
     keepOpen: false,
+    skipCheckoutCheck: false,
   }
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
@@ -127,6 +137,7 @@ function parseArgs(argv) {
     else if (arg === '--frame') args.frame = Number(argv[++i])
     else if (arg === '--timeout') args.timeout = Number(argv[++i])
     else if (arg === '--keep-open') args.keepOpen = true
+    else if (arg === '--skip-checkout-check') args.skipCheckoutCheck = true
     else {
       console.error(`Unknown argument: ${arg}`)
       process.exit(1)
@@ -250,6 +261,30 @@ async function main() {
     process.exit(1)
   }
 
+  // Before the database read and long before Chromium: the one thing that makes
+  // a whole run worthless without leaving a trace in its output is a dev server
+  // belonging to a different worktree.
+  const checkout = await verifyServedCheckout({ base: args.base, appDir })
+  if (checkout.verdict === 'unreachable') {
+    console.error(
+      `Nothing is serving ${args.base}${CAPTURE_PAGE} ` +
+        `(HTTP ${checkout.status}).\nStart it with: cd ${appDir} && pnpm start`,
+    )
+    process.exit(1)
+  }
+  const failure = checkoutFailure({ base: args.base, appDir, result: checkout })
+  const waived =
+    failure !== null && failure.bypassable && args.skipCheckoutCheck
+  if (failure !== null && !waived) {
+    console.error(failure.message)
+    process.exit(1)
+  }
+  console.log(
+    waived
+      ? `Dev server at ${args.base}: checkout unverified, continuing on --skip-checkout-check`
+      : `Dev server at ${args.base} serves this checkout (${appDir}, via ${checkout.via})`,
+  )
+
   let rows = readRows(args.env, args.section, args.includeUnpublished)
   if (args.slugs) {
     const wanted = new Set(args.slugs)
@@ -300,7 +335,7 @@ async function main() {
     console.log(`  [page] ${err.message}`)
   })
 
-  const url = `${args.base}/scripts/poster-capture.html`
+  const url = `${args.base}${CAPTURE_PAGE}`
   await page.goto(url, { waitUntil: 'load', timeout: 60_000 })
   await page.waitForFunction(() => '__posterCapture' in window, undefined, {
     timeout: 60_000,

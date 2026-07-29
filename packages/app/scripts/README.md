@@ -11,6 +11,7 @@ Node tooling for the app package. Run everything from `packages/app`.
 | `upload-gallery-posters.mjs`                | Uploads those posters to R2 and points the D1 rows at them. |
 | `extract-flames.mjs`                        | Pulls flame descriptors out of existing artwork.            |
 | `poster-capture.html` + `posterCapture.tsx` | Dev-only render surface the capture script drives.          |
+| `dev-server-checkout.mjs`                   | Proves the dev server at `--base` is serving THIS checkout. |
 
 ## Environments
 
@@ -84,6 +85,16 @@ flames in the existing export collection are like this.
 done. `--no-serve` turns that off and fails immediately with the command to
 run. It passes `--include-unpublished` to the capture step so a staged row can
 get its poster before it goes live.
+
+A dev server that is already up gets reused — but only after it proves whose it
+is. Every worktree of this repo answers `/scripts/poster-capture.html` on the
+same port, so "reuse whatever is listening" once rendered a whole run's posters
+from a DIFFERENT checkout: the log named the right frame, the image looked
+plausible, and the fix under test was simply not in the code being served. Both
+`capture` and `capture-gallery-posters.mjs` now ask the server which tree it is
+serving (`dev-server-checkout.mjs`, from the absolute path in Vite's dev source
+map) and refuse the run on a mismatch, naming both paths. `--no-serve` gets the
+same check.
 
 ## The gallery poster pipeline
 

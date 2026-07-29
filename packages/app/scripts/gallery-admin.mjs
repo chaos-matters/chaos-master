@@ -43,13 +43,12 @@
 
 import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
-import { request as httpRequest } from 'node:http'
-import { request as httpsRequest } from 'node:https'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
+import { CAPTURE_PAGE, checkoutFailure, probeCapturePage, verifyServedCheckout, } from './dev-server-checkout.mjs'
 import { inspectFlame, isPlainObject, normalizeEnvelope, readFlameChunk, toSlug, transformsHash, } from './extract-flames.mjs'
 import { initCommand, isMissingTable, MIGRATION, storageFlags, tail, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
 
@@ -84,7 +83,6 @@ const ROW_COLUMNS =
 
 const DEFAULT_POSTER_DIR = join(repoRoot, 'assets/local/gallery-posters')
 const DEFAULT_DEV_BASE = 'https://localhost:5173'
-const CAPTURE_PAGE = '/scripts/poster-capture.html'
 const DEV_SERVER_TIMEOUT_MS = 180_000
 const DEV_SERVER_COMMAND = 'pnpm --filter chaos-master start'
 
@@ -93,6 +91,35 @@ const DEV_SERVER_COMMAND = 'pnpm --filter chaos-master start'
 // without putting a control character inside a regex.
 const PRINTABLE_ONLY = /[^\x20-\x7E]+/g
 const SERVER_URL = /https?:\/\/[^\s/]*:(\d+)/
+
+// vite-plugin-qrcode prints a heading, a bare URL and a 15-line block-glyph QR
+// code for EVERY LAN address the machine has — three of them here, ~45 lines of
+// ASCII pixels forwarded into a capture log whose whole job is to be read and
+// copied. Vite's own `Local:`/`Network:` lines are three lines above and say the
+// same thing, so drop the QR banner and keep everything else.
+//
+// COLOR_RESIDUE is what PRINTABLE_ONLY leaves of a colour escape once its ESC
+// byte is gone.
+const COLOR_RESIDUE = /\[[0-9;]*m/g
+const QR_HEADING = /^Visit page on\b/
+// The QR code's own caption: a bare URL alone on its line. Vite's URLs carry a
+// `Local:`/`Network:` prefix, so those still get through.
+const BARE_URL = /^https?:\/\/\S+$/
+
+/**
+ * Is this dev-server line QR-code decoration rather than information?
+ *
+ * PRINTABLE_ONLY drops the escape bytes AND every block glyph, so a QR row
+ * reduces to nothing but its own indentation — which beats enumerating the
+ * glyphs, and keeps a control character out of a regex.
+ */
+function isQrBanner(line) {
+  const text = line
+    .replace(PRINTABLE_ONLY, '')
+    .replace(COLOR_RESIDUE, '')
+    .trim()
+  return text.length === 0 || QR_HEADING.test(text) || BARE_URL.test(text)
+}
 
 // ── Output ───────────────────────────────────────────────────────────
 // stdout is the result and nothing else; stderr is for humans.
@@ -222,7 +249,12 @@ local rows and uploads into the local bucket.
 The capture page is served by the app dev server. If it is not reachable, this
 starts it (\`${DEV_SERVER_COMMAND}\`), waits for the page to
 answer, and shuts it down again afterwards. With --no-serve it exits at once
-with the command to run instead.`,
+with the command to run instead.
+
+A dev server that is already up is reused only if it is serving THIS checkout.
+Every worktree answers the capture page on the same port, so reusing whichever
+one owns it renders posters from that tree's code with nothing in the image to
+show for it — so a foreign checkout is a hard failure, naming both paths.`,
 
   publish: `gallery-admin publish — take a row live, or pull it back
 
@@ -953,40 +985,19 @@ function commandReorder(values) {
 // ── capture ──────────────────────────────────────────────────────────
 
 /**
- * Is the capture page being served? A 200 means both "a server is up" and
- * "it is the app's dev server", which a bare TCP check does not.
+ * Refuse to capture through a dev server belonging to a different worktree.
  *
- * rejectUnauthorized is off because the dev server uses basic-ssl's
- * self-signed certificate — the same reason the capture script passes
- * ignoreHTTPSErrors to Playwright. Localhost only.
+ * A wrong poster is worse than no poster: it is a plausible image rendered by
+ * code that is not the code under test, and it looks exactly like a correct one.
+ * So this throws rather than warns. Returns the confirmed checkout path.
  */
-function probeCapturePage(base, timeoutMs = 3000) {
-  return new Promise((settle) => {
-    let target
-    try {
-      target = new URL(CAPTURE_PAGE, base)
-    } catch {
-      settle(0)
-      return
-    }
-    const send = target.protocol === 'http:' ? httpRequest : httpsRequest
-    const request = send(
-      target,
-      { method: 'GET', rejectUnauthorized: false, timeout: timeoutMs },
-      (response) => {
-        response.resume()
-        settle(response.statusCode ?? 0)
-      },
-    )
-    request.on('error', () => {
-      settle(0)
-    })
-    request.on('timeout', () => {
-      request.destroy()
-      settle(0)
-    })
-    request.end()
-  })
+async function assertOwnCheckout(base) {
+  const result = await verifyServedCheckout({ base, appDir })
+  const failure = checkoutFailure({ base, appDir, result })
+  if (failure !== null) {
+    throw new AdminError(failure.code, failure.message, failure.detail)
+  }
+  return result.served ?? appDir
 }
 
 /**
@@ -997,12 +1008,17 @@ function probeCapturePage(base, timeoutMs = 3000) {
  * terminal to run `pnpm start` in, and an unattended run that dies on a
  * connection refused two minutes into a capture is exactly the obscure
  * timeout this is meant to avoid. --no-serve opts out.
+ *
+ * A server that is ALREADY up gets reused, but only after it proves it is
+ * serving this checkout: see scripts/dev-server-checkout.mjs for what goes
+ * wrong otherwise, and note that the reuse line now names the tree it found.
  */
 async function ensureDevServer({ base, autoStart, timeoutMs }) {
   const status = await probeCapturePage(base)
   if (status === 200) {
-    note(`Dev server already serving ${base}${CAPTURE_PAGE}`)
-    return { mode: 'existing', base, stop: async () => {} }
+    const checkout = await assertOwnCheckout(base)
+    note(`Dev server already serving ${base}${CAPTURE_PAGE} from ${checkout}`)
+    return { mode: 'existing', base, checkout, stop: async () => {} }
   }
 
   if (!autoStart) {
@@ -1038,13 +1054,19 @@ async function ensureDevServer({ base, autoStart, timeoutMs }) {
 
   const log = []
   const ports = new Set()
+  // Set the moment WE decide to shut the server down. Everything the child says
+  // from then on is its own death rattle — pnpm reports the SIGTERM we just sent
+  // as ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL, which reads like a capture failure at
+  // the very end of a successful run. Still collected into `log`, so a crash
+  // DURING teardown is recoverable; just not narrated as news.
+  let stopping = false
   const collect = (chunk) => {
     for (const line of String(chunk).split('\n')) {
       const text = line.trimEnd()
       if (text.length === 0) continue
       log.push(text)
       if (log.length > 60) log.shift()
-      note(`  [dev] ${text}`)
+      if (!stopping && !isQrBanner(text)) note(`  [dev] ${text}`)
       const match = SERVER_URL.exec(text.replace(PRINTABLE_ONLY, ''))
       if (match !== null) ports.add(Number(match[1]))
     }
@@ -1061,6 +1083,7 @@ async function ensureDevServer({ base, autoStart, timeoutMs }) {
     process.off('SIGINT', onSignal)
     process.off('SIGTERM', onSignal)
     if (exited !== null || child.pid === undefined) return
+    stopping = true
     note('Stopping the dev server ...')
     try {
       process.kill(-child.pid, 'SIGTERM')
@@ -1112,8 +1135,18 @@ async function ensureDevServer({ base, autoStart, timeoutMs }) {
       )
     }
     if ((await probeCapturePage(base, 2000)) === 200) {
-      note(`Dev server ready at ${base}`)
-      return { mode: 'started', base, stop }
+      // Spawned from repoRoot, so this can only fail if something else grabbed
+      // the port first — which --strictPort should have caught. Check anyway:
+      // it costs one request and it is the whole point of the guard.
+      let checkout
+      try {
+        checkout = await assertOwnCheckout(base)
+      } catch (error) {
+        await stop()
+        throw error
+      }
+      note(`Dev server ready at ${base}, serving ${checkout}`)
+      return { mode: 'started', base, checkout, stop }
     }
     await delay(1000)
   }
@@ -1282,7 +1315,13 @@ async function commandCapture(values) {
     // The poster half of the target: a local capture uploads into the same
     // bucket NAME, but into wrangler's local store rather than R2 itself.
     bucket: TARGETS[env].bucket,
-    devServer: { mode: server.mode, base: server.base },
+    devServer: {
+      mode: server.mode,
+      base: server.base,
+      // Which tree rendered these posters. A reused server is only ever this
+      // one now, but saying so is what makes the log self-explanatory later.
+      checkout: server.checkout,
+    },
     out: outDir,
     requested: slugs,
     captured: captured.map((poster) => ({
