@@ -391,6 +391,35 @@ const baseHandler = {
       }
     }
 
+    // Poster images for the no-WebGPU fallback. Must be matched BEFORE the
+    // per-slug route below, which would otherwise treat 'poster/...' as a slug.
+    if (
+      pathname.startsWith('/api/gallery/poster/') &&
+      request.method === 'GET'
+    ) {
+      const key = pathname.slice('/api/gallery/poster/'.length)
+      // Keys are written by the capture pipeline, but this is a public URL:
+      // constrain it so nothing can walk out of the gallery prefix.
+      if (!/^[a-z0-9][a-z0-9./-]{0,127}$/.test(key) || key.includes('..')) {
+        return new Response('Invalid key', { status: 400 })
+      }
+      try {
+        const obj = await env.OG_IMAGES.get(`gallery/${key}`)
+        if (!obj) return new Response('Not found', { status: 404 })
+        return new Response(obj.body, {
+          headers: {
+            'Content-Type':
+              obj.httpMetadata?.contentType ?? 'application/octet-stream',
+            // Posters are immutable: a re-capture writes a new key.
+            'Cache-Control': 'public, max-age=31536000, immutable',
+          },
+        })
+      } catch (err) {
+        console.error('Error handling /api/gallery/poster:', errMsg(err))
+        return new Response('Server error', { status: 500 })
+      }
+    }
+
     if (pathname.startsWith('/api/gallery/') && request.method === 'GET') {
       if (!env.CONTENT_DB) return json({ error: 'Not configured' }, 503)
       const slug = pathname.slice('/api/gallery/'.length)

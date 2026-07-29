@@ -7,6 +7,7 @@ import { clamp } from 'typegpu/std'
 import { executeCommand } from '@/commands/registry'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useToast } from '@/contexts/ToastContext'
+import { workspaceIsVisible } from '@/lib/activeTab'
 import { trackAppInit } from '@/lib/telemetry'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
@@ -966,7 +967,11 @@ export function MainWorkspace(props: AppProps) {
   })
 
   const finalRenderInterval = () =>
-    isAnyModalOpen()
+    // Home covers the workspace while it is showing, so the canvas has nothing
+    // to display — pause it exactly as an open modal does rather than paying
+    // for frames nobody sees. An export still wins: those run to completion in
+    // the background whichever tab is in front.
+    isAnyModalOpen() || (!workspaceIsVisible() && !onExportImage())
       ? Infinity
       : onExportImage()
         ? 0

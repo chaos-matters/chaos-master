@@ -1,5 +1,6 @@
 import { batch, createEffect, createResource, createSignal, ErrorBoundary, onCleanup, onMount, Show, Suspense, } from 'solid-js'
 import { AppCrashed, WebgpuNotSupported, } from './components/ErrorHandling/ErrorHandling'
+import { HomeTab } from './components/Home/HomeTab'
 import { Modal } from './components/Modal/Modal'
 import { ToastHost } from './components/Toast/Toast'
 import { WelcomeScreen } from './components/WelcomeScreen/WelcomeScreen'
@@ -11,6 +12,7 @@ import { ToastProvider, useToast } from './contexts/ToastContext'
 import { IS_DEV } from './defaults'
 import { initAncestry } from './flame/ancestry'
 import { importSharedVariations, loadCustomVariations, remapFlameCustomVariations, } from './flame/variations/custom'
+import { activeTab, setActiveTab } from './lib/activeTab'
 import { Root } from './lib/Root'
 import { MainWorkspace } from './MainWorkspace'
 import { appTour } from './tours/appTour'
@@ -298,6 +300,23 @@ export function Wrappers() {
                           setSelectedWelcomeTracks(undefined)
                         }}
                       />
+                      {/* Home overlays the workspace, which stays mounted so
+                          the editor keeps its state and its canvas size. It is
+                          suppressed while the welcome screen is up so first-run
+                          still has a single entry point. */}
+                      <Show when={activeTab() === 'home' && !showWelcome()}>
+                        <HomeTab
+                          onOpenFlame={(flame, tracks) => {
+                            // Reuses the welcome screen's hand-off path rather
+                            // than adding a second way to seed the workspace.
+                            batch(() => {
+                              setSelectedFlame(() => flame)
+                              setSelectedWelcomeTracks(() => tracks)
+                              setActiveTab('workspace')
+                            })
+                          }}
+                        />
+                      </Show>
                     </Suspense>
                     <Show when={showWelcome()}>
                       <WelcomeScreen
