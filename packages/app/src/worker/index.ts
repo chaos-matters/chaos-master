@@ -392,6 +392,35 @@ const baseHandler = {
       }
     }
 
+    // ── Home settings (D1) ─────────────────────────────────────────────────
+    // The `home_config` key/value table as one object. Today that is the id of
+    // the tour the "Made here" portal plays; the client falls back to its own
+    // default for a key that is missing, empty, or names a tour this build does
+    // not have (see lib/homeConfig.ts), so a stale or half-written row degrades
+    // rather than breaking Home.
+    //
+    // Must be matched BEFORE the per-slug route below: 'config' is a valid slug
+    // shape, so that route would otherwise look it up in gallery_items and 404.
+    if (pathname === '/api/gallery/config' && request.method === 'GET') {
+      if (!env.CONTENT_DB) return json({ error: 'Not configured' }, 503)
+      try {
+        const { results } = await env.CONTENT_DB.prepare(
+          'SELECT key, value FROM home_config',
+        ).all()
+        const config: Record<string, string> = {}
+        for (const row of (results ?? []) as { key: string; value: string }[]) {
+          config[row.key] = row.value
+        }
+        // Same edge window as the gallery reads: settings change only when a
+        // row is rewritten by hand, and Home must not pay a round trip for
+        // them on every scroll into the portal.
+        return jsonCached({ config }, GALLERY_CACHE_SECONDS)
+      } catch (err) {
+        console.error('Error handling /api/gallery/config:', errMsg(err))
+        return json({ error: 'Server error' }, 500)
+      }
+    }
+
     // Poster images for the no-WebGPU fallback. Must be matched BEFORE the
     // per-slug route below, which would otherwise treat 'poster/...' as a slug.
     if (

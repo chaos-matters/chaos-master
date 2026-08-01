@@ -15,40 +15,15 @@ import { importSharedVariations, loadCustomVariations, remapFlameCustomVariation
 import { activeTab, setActiveTab } from './lib/activeTab'
 import { Root } from './lib/Root'
 import { MainWorkspace } from './MainWorkspace'
-import { appTour } from './tours/appTour'
-import { example1CreationTour } from './tours/example1CreationTour'
-import { example2CreationTour } from './tours/example2CreationTour'
-import { flameCreationTour } from './tours/flameCreationTour'
-import { sidebarTour } from './tours/sidebarTour'
-import { timelineTour } from './tours/timelineTour'
+import { getTour } from './tours/registry'
 import { isBenchmarkAuto, isBenchmarkRequested } from './utils/benchmarkRequest'
 import { decodeSharePayload, decodeVariationShare, } from './utils/jsonQueryParam'
 import { persistentSignal } from './utils/persistentSignal'
 import { recordKeys } from './utils/record'
 import { dismissWelcome, hasWelcomeBeenDismissed, } from './utils/welcomeDismissed'
-import type { TourGuide } from './components/SpotlightTour/tourTypes'
 import type { FlameDescriptor } from './flame/schema/flameSchema'
 import type { HardwareTier } from './utils/hardwareTier'
 import type { TimelineTrack } from './utils/timeline'
-
-function getTour(id: string): TourGuide | undefined {
-  switch (id) {
-    case 'app':
-      return appTour
-    case 'flame-creation':
-      return flameCreationTour
-    case 'sidebar':
-      return sidebarTour
-    case 'timeline':
-      return timelineTour
-    case 'example1-creation':
-      return example1CreationTour
-    case 'example2-creation':
-      return example2CreationTour
-    default:
-      return undefined
-  }
-}
 
 export type ExportImageInfo = {
   /** True when the canvas holds a final color-graded image at the requested

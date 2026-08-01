@@ -357,3 +357,74 @@ describe('worker /api/gallery', () => {
     expect(res.status).toBe(404)
   })
 })
+
+// ── Home settings (D1) ──────────────────────────────────────────────────────
+describe('worker /api/gallery/config', () => {
+  it('returns 503 when no content database is bound', async () => {
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/config'),
+      makeEnv(),
+      ctx,
+    )
+    expect(res.status).toBe(503)
+  })
+
+  it('returns the rows as one object, cached like the gallery reads', async () => {
+    const db = makeD1([
+      { key: 'portal_tour_id', value: 'example2-creation' },
+      { key: 'future_key', value: 'ignored by this build' },
+    ])
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/config'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({
+      config: {
+        portal_tour_id: 'example2-creation',
+        future_key: 'ignored by this build',
+      },
+    })
+    expect(db.calls[0]?.sql).toContain('home_config')
+    expect(res.headers.get('Cache-Control')).toContain('max-age=')
+  })
+
+  it('returns an empty map when nothing is configured', async () => {
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/config'),
+      makeEnv({ CONTENT_DB: makeD1([]) }),
+      ctx,
+    )
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ config: {} })
+  })
+
+  // 'config' is a valid slug shape, so route order is the whole guard here: put
+  // the per-slug route first and this becomes a 404 from gallery_items.
+  it('is matched before the per-slug route', async () => {
+    const db = makeD1([{ key: 'portal_tour_id', value: 'app' }])
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/config'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+    expect(res.status).toBe(200)
+    expect(db.calls[0]?.sql).not.toContain('gallery_items')
+  })
+
+  it('500s rather than leaking the error when the table is missing', async () => {
+    const db = {
+      prepare() {
+        throw new Error('no such table: home_config')
+      },
+    }
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/config'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+    expect(res.status).toBe(500)
+    expect(await res.json()).toEqual({ error: 'Server error' })
+  })
+})

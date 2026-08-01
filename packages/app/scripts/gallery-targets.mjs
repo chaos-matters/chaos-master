@@ -93,11 +93,13 @@ export function migrationsArgs(env) {
 
 // With --json, wrangler reports a failed statement as JSON on STDOUT rather
 // than stderr — both locally and through the API — so callers must test both
-// streams. The word boundary keeps a query against some other missing table
-// from looking like an uninitialised gallery.
-const MISSING_TABLE = /no such table:\s*(?:main\.)?gallery_items\b/i
+// streams. Naming the tables (rather than matching any "no such table") keeps a
+// query against some unrelated missing table from looking like an
+// uninitialised gallery and triggering a migration run.
+const MISSING_TABLE =
+  /no such table:\s*(?:main\.)?(?:gallery_items|home_config)\b/i
 
-/** Did this wrangler failure mean "the gallery table does not exist"? */
+/** Did this wrangler failure mean "a gallery table does not exist"? */
 export const isMissingTable = (output) => MISSING_TABLE.test(output)
 
 /** The exact command that applies them, so an error can be acted on. */

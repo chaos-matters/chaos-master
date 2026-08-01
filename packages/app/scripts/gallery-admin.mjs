@@ -21,6 +21,7 @@
 //   capture  render + upload posters for rows that need one
 //   publish  take a staged row live, or pull a live one back
 //   reorder  set a row's position within its section
+//   config   read or write Home's settings (home_config), allowlisted keys
 //
 // Three deliberate constraints:
 //
@@ -51,6 +52,7 @@ import { parseArgs } from 'node:util'
 import { CAPTURE_PAGE, checkoutFailure, probeCapturePage, verifyServedCheckout, } from './dev-server-checkout.mjs'
 import { inspectFlame, isPlainObject, normalizeEnvelope, readFlameChunk, toSlug, transformsHash, } from './extract-flames.mjs'
 import { initCommand, isMissingTable, MIGRATIONS_DIR, migrationsArgs, storageFlags, tail, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
+import { checkConfigEntry, CONFIG_KEY_LIST, CONFIG_KEYS, } from './home-config.mjs'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const appDir = resolve(scriptDir, '..')
@@ -162,6 +164,7 @@ Commands:
   capture   render and upload posters for rows that have none
   publish   set published to 0 or 1 for one row
   reorder   set sort_order for one row
+  config    read or write Home's settings (allowlisted keys)
 
 ${COMMON_OPTIONS}
   -h, --help            this message, or a command's own with
@@ -285,6 +288,31 @@ Options:
 ${COMMON_OPTIONS}
 
 Prints the section's resulting order so a duplicate position is obvious.`,
+
+  config: `gallery-admin config — Home's settings, as content
+
+Usage:
+  node scripts/gallery-admin.mjs config get [--key <key>] [--env ${TARGET_LIST}]
+  node scripts/gallery-admin.mjs config set --key <key> --value <value> [options]
+
+Options:
+  --key <key>           ${CONFIG_KEY_LIST}
+  --value <value>       the value to store (set only)
+${COMMON_OPTIONS}
+
+\`get\` prints every stored setting, or just one with --key. \`set\` writes one.
+
+Keys are ALLOWLISTED (scripts/home-config.mjs, mirrored by
+src/lib/homeConfig.ts): the table has no CHECK constraint, so a typo'd key
+would otherwise be stored happily and read by nobody.
+
+Today the one key is portal_tour_id — which tour Home's "Made here" portal
+replays. Tour ids live in code (src/tours/registry.ts), so the value is not
+validated against them here; the app falls back to example1-creation for an id
+it does not have, which is also what an unset key gets.
+
+Against --env local this creates the schema if it is not there yet, exactly
+like \`list\`.`,
 }
 
 // ── wrangler / D1 ────────────────────────────────────────────────────
@@ -327,7 +355,7 @@ function targetFields(env) {
  */
 function initializeLocal(env) {
   note(
-    `${targetLabel(env)} has no gallery_items table — applying ${MIGRATIONS_DIR}/`,
+    `${targetLabel(env)} is missing a gallery table — applying ${MIGRATIONS_DIR}/`,
   )
   try {
     execFileSync('pnpm', migrationsArgs(env), {
@@ -404,7 +432,7 @@ function d1(env, sql, { initialize = true } = {}) {
       }
       throw new AdminError(
         'content-db-not-initialized',
-        `${targetLabel(env)} has no gallery_items table — the migrations in ` +
+        `${targetLabel(env)} is missing a gallery table — the migrations in ` +
           `${MIGRATIONS_DIR}/ were never applied to it`,
         {
           ...targetFields(env),
@@ -984,6 +1012,114 @@ function commandReorder(values) {
   }
 }
 
+// ── config ───────────────────────────────────────────────────────────
+
+/** Every stored setting, as `{ key: value }`. */
+function readConfig(env) {
+  const { results } = d1(env, 'SELECT key, value FROM home_config ORDER BY key')
+  const config = {}
+  for (const row of results) {
+    config[row.key] = row.value
+  }
+  return config
+}
+
+/**
+ * Read or write `home_config` — the settings the app fetches from
+ * `/api/gallery/config`.
+ *
+ * `config get` / `config set` rather than two subcommands, because they are one
+ * concept and the console that drives this will offer them as one control. The
+ * action is a positional (the only one in this script) since `--action get`
+ * reads worse than what every other CLI in the world spells `config get`.
+ */
+function commandConfig(values, positionals) {
+  const env = resolveEnv(values)
+  const [action] = positionals
+  if (action !== 'get' && action !== 'set') {
+    throw new AdminError(
+      'usage',
+      `config takes an action: get or set (got ${action === undefined ? 'none' : `"${action}"`})`,
+      { actions: ['get', 'set'] },
+    )
+  }
+
+  // Allowlisted BEFORE anything touches the database, so a typo costs a
+  // wrangler round trip rather than becoming a row nothing reads.
+  const key = values.key
+  if (key !== undefined) {
+    const problem = checkConfigEntry(
+      key,
+      action === 'set' ? values.value : undefined,
+    )
+    if (problem !== null) {
+      throw new AdminError(problem.code, problem.message, problem.detail)
+    }
+  }
+
+  if (action === 'get') {
+    if (values.value !== undefined) {
+      throw new AdminError('usage', 'config get does not take --value')
+    }
+    note(`Reading home_config in ${targetLabel(env)} ...`)
+    const config = readConfig(env)
+    const selected = key === undefined ? config : { [key]: config[key] ?? null }
+    for (const [name, value] of Object.entries(selected)) {
+      note(`  ${name} = ${value === null ? '(unset)' : value}`)
+    }
+    return {
+      ...targetFields(env),
+      action,
+      config: selected,
+      // What the app would do with what is stored right now, so a reader does
+      // not have to know the fallback rule to predict the portal.
+      known: Object.keys(CONFIG_KEYS),
+    }
+  }
+
+  if (key === undefined) {
+    throw new AdminError('usage', `config set needs --key (${CONFIG_KEY_LIST})`)
+  }
+  if (values.value === undefined) {
+    throw new AdminError('usage', 'config set needs --value')
+  }
+  const value = values.value
+
+  const before = readConfig(env)
+  note(`Setting ${key} = ${value} in ${targetLabel(env)} ...`)
+  // Upsert: a settings key has exactly one row, and the trigger in 0003 keeps
+  // updated_at honest on the update branch.
+  d1(
+    env,
+    `INSERT INTO home_config (key, value) VALUES (${sqlStr(key)}, ${sqlStr(value)}) ` +
+      `ON CONFLICT(key) DO UPDATE SET value = ${sqlStr(value)}`,
+  )
+  const config = readConfig(env)
+
+  const warnings = []
+  if (before[key] === value) {
+    warnings.push(`${key} was already ${value}`)
+  }
+  if (key === 'portal_tour_id') {
+    warnings.push(
+      'tour ids are code — if this build has no tour with that id, Home falls ' +
+        'back to example1-creation rather than failing',
+    )
+  }
+  note(`${key} is now ${config[key]}`)
+
+  return {
+    ...targetFields(env),
+    action,
+    key,
+    value: config[key],
+    changed: before[key] !== config[key],
+    previous: { value: before[key] ?? null },
+    config,
+    warnings,
+  }
+}
+
 // ── capture ──────────────────────────────────────────────────────────
 
 /**
@@ -1376,6 +1512,8 @@ const OPTIONS = {
   capability: { type: 'string' },
   published: { type: 'string' },
   order: { type: 'string' },
+  key: { type: 'string' },
+  value: { type: 'string' },
   'all-missing': { type: 'boolean' },
   out: { type: 'string' },
   base: { type: 'string' },
@@ -1421,6 +1559,13 @@ const COMMANDS = {
     run: commandReorder,
     options: ['env', 'confirm', 'slug', 'order'],
   },
+  config: {
+    run: commandConfig,
+    options: ['env', 'confirm', 'key', 'value'],
+    // The only subcommand with a positional: `config get` / `config set` reads
+    // the way every other config CLI spells it, and `--action get` would not.
+    positionals: 1,
+  },
 }
 
 /** Named as soon as it is known, so a failure can say which command failed. */
@@ -1455,18 +1600,20 @@ async function main() {
       commands: Object.keys(COMMANDS),
     })
   }
-  if (extra.length > 0) {
-    throw new AdminError(
-      'usage',
-      `Unexpected argument "${extra[0]}" — every input is a named option`,
-    )
-  }
-
   activeCommand = command
   const spec = COMMANDS[command]
   if (parsed.values.help === true) {
     console.log(HELP[command])
     return null
+  }
+
+  // Every input is a named option, with one exception: `config get` / `config
+  // set` takes its action as a positional (see COMMANDS.config).
+  if (extra.length > (spec.positionals ?? 0)) {
+    throw new AdminError(
+      'usage',
+      `Unexpected argument "${extra[spec.positionals ?? 0]}" — every input is a named option`,
+    )
   }
 
   // Silently ignoring an option that does not apply is how a caller ends up
@@ -1481,7 +1628,7 @@ async function main() {
     )
   }
 
-  const result = await spec.run(parsed.values)
+  const result = await spec.run(parsed.values, extra)
   return { ok: true, command, ...result }
 }
 

@@ -6,6 +6,7 @@ import { bySection, fetchGallery, fetchGalleryItem, needsPosterFrame, posterUrl,
 import { createSharedIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { HomeFlame } from './HomeFlame'
 import { createPlaybackCoordinator } from './homePlayback'
+import { HomePortal } from './HomePortal'
 import ui from './HomeTab.module.css'
 import type { Accessor } from 'solid-js'
 import type { HomeFlamePlacement } from './HomeFlame'
@@ -377,17 +378,19 @@ export function HomeTab(props: HomeTabProps) {
                 <div class={ui.sectionHead}>
                   <h2 class={ui.sectionTitle}>Made here</h2>
                 </div>
+                {/* Says what it actually is. The portal runs the app's real
+                    commands from a real tour's steps into the real renderer —
+                    but not the editor's chrome, so "in the real editor" would
+                    be claiming a screen that is not on screen. */}
                 <p class={ui.sectionNote}>
-                  A flame being built, start to finish, in the real editor.
+                  A flame built start to finish by the app’s own commands,
+                  scripted by a guided tour you can also run in the editor.
                 </p>
-                <div class={ui.portalFrame}>
-                  <div class={ui.portalBar}>Lumen Apeiron</div>
-                  <div class={ui.portalBody}>
-                    <div class={ui.plate}>
-                      <span class={ui.plateEmpty}>Guided build — Phase 5</span>
-                    </div>
-                  </div>
-                </div>
+                {/* Its own Root and ComputeGate live inside — see
+                    HomePortal.tsx. It takes the page's tracker rather than a
+                    boolean so its element registers with the SAME observer as
+                    every plate. */}
+                <HomePortal track={track} />
               </section>
 
               {/* Explore — option A, capability cards */}

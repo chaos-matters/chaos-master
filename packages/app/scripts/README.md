@@ -67,6 +67,8 @@ node scripts/gallery-admin.mjs put --file shot.png --section gallery
 node scripts/gallery-admin.mjs capture --all-missing
 node scripts/gallery-admin.mjs publish --slug shot --published 1
 node scripts/gallery-admin.mjs reorder --slug shot --order 2
+node scripts/gallery-admin.mjs config get
+node scripts/gallery-admin.mjs config set --key portal_tour_id --value example2-creation
 node scripts/gallery-admin.mjs list --env dev            # the deployed dev row set
 node scripts/gallery-admin.mjs <command> --help
 ```
@@ -85,6 +87,17 @@ A flame that references a custom variation without carrying its definition is
 refused: `gallery_items` has nowhere to put the WGSL, so it would render as the
 identity fallback rather than the picture that was exported. Four of the 59
 flames in the existing export collection are like this.
+
+`config` is the same idea applied to Home's settings rather than its rows: the
+`home_config` table (migration `0003`), served as one object by
+`GET /api/gallery/config`. Keys are **allowlisted** in
+`scripts/home-config.mjs`, mirrored by `src/lib/homeConfig.ts` and asserted
+equal by `homeConfig.test.ts` — the table has no `CHECK` constraint, so without
+the allowlist a typo'd key would be stored happily and read by nobody. Today the
+one key is `portal_tour_id`: which tour the "Made here" portal replays. Tour ids
+are code (`src/tours/registry.ts`), so the value is not checked against them
+here — the app falls back to `example1-creation` for an id it does not have,
+which is also what an unset key gets.
 
 `capture` needs the dev server, because posters come from the real renderer. If
 `/scripts/poster-capture.html` does not answer it starts
