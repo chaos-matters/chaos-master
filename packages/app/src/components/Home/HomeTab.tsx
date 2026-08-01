@@ -5,15 +5,17 @@ import { setActiveTab } from '@/lib/activeTab'
 import { bySection, fetchGallery, fetchGalleryItem, needsPosterFrame, posterUrl, } from '@/lib/galleryContent'
 import { createSharedIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { HomeFlame } from './HomeFlame'
+import { createPlaybackCoordinator } from './homePlayback'
 import ui from './HomeTab.module.css'
 import type { Accessor } from 'solid-js'
 import type { HomeFlamePlacement } from './HomeFlame'
+import type { PlaybackCoordinator } from './homePlayback'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { GalleryListItem, GallerySection } from '@/lib/galleryContent'
 import type { TimelineTrack } from '@/utils/timeline'
 
 /**
- * Home — Phase 2.
+ * Home — Phase 2/3/4.
  *
  * Structure is the AABAAA combination chosen from the wireframes: left rail,
  * full-bleed hero with the statement over it, editorial-span gallery, a row of
@@ -22,14 +24,27 @@ import type { TimelineTrack } from '@/utils/timeline'
  * Every plate ships its captured poster and upgrades to a live GPU flame once it
  * settles into view, freezing back to the poster when it converges — see
  * HomeFlame.tsx for the gating, and `.agents/skills/gallery_preview_layout` for
- * why the mounting rules below are shaped the way they are. Two things live here
- * rather than in HomeFlame because they must be shared by every plate on the
- * page: the one IntersectionObserver (rooted on the scroll container, not the
- * viewport) and the one ComputeGate that caps concurrent renders.
+ * why the mounting rules below are shaped the way they are. Three things live
+ * here rather than in HomeFlame because they must be shared by every plate on
+ * the page: the one IntersectionObserver (rooted on the scroll container, not
+ * the viewport), the one ComputeGate that caps concurrent renders, and the one
+ * PlaybackCoordinator that caps concurrently ANIMATING plates.
  */
 
 /** Preload the rows just past the fold, so a plate is not blank on arrival. */
 const PRELOAD_MARGIN = '300px'
+
+/**
+ * How many motion tiles greet you by playing themselves. The plan's whole point
+ * for this section: "one or two auto-play briefly on arrival and then settle;
+ * the rest animate on hover. The restraint matters: everything moving at once
+ * reads as a screensaver, not a gallery."
+ *
+ * This is the number that ARE ASKED to; `MAX_CONCURRENT_PLAYBACK` in
+ * homePlayback.ts is the hard cap that also covers hover, and is what actually
+ * guarantees the page never exceeds it.
+ */
+const AUTO_PLAY_TILES = 2
 
 /** Tracks one element's near-viewport state against Home's scroll container. */
 type TrackVisibility = (
@@ -37,8 +52,17 @@ type TrackVisibility = (
 ) => Accessor<boolean>
 
 export interface HomeTabProps {
-  /** Open a flame in the workspace (switches tab). */
-  onOpenFlame: (flame: FlameDescriptor, tracks?: TimelineTrack[]) => void
+  /**
+   * Open a flame in the workspace (switches tab). `capability` is the row's
+   * `gallery_items.capability` when the flame came from an Explore card, and
+   * asks the workspace to open the matching tool as well as the flame — see
+   * `openCapability` in MainWorkspace.tsx.
+   */
+  onOpenFlame: (
+    flame: FlameDescriptor,
+    tracks?: TimelineTrack[],
+    capability?: string,
+  ) => void
 }
 
 const SECTIONS: { id: GallerySection | 'made'; label: string }[] = [
@@ -58,15 +82,22 @@ function Plate(props: {
   placement: HomeFlamePlacement
   track: TrackVisibility
   onOpen: (slug: string) => void
+  playback?: PlaybackCoordinator
+  autoPlay?: boolean
 }) {
   const [tileEl, setTileEl] = createSignal<HTMLElement>()
   const near = props.track(tileEl)
   const [hovered, setHovered] = createSignal(false)
+  const [playing, setPlaying] = createSignal(false)
   return (
     <button
       ref={setTileEl}
       type="button"
       class={`${ui.plate} ${props.class ?? ''}`}
+      /* Reflects HomeFlame's own playback state, so "how many plates are moving
+         right now" is answerable from the DOM — by the reader, and by the
+         Playwright run that has to prove the cap holds. */
+      data-home-playing={playing() ? 'true' : undefined}
       onClick={() => {
         props.onOpen(props.item.slug)
       }}
@@ -85,6 +116,9 @@ function Plate(props: {
         near={near}
         hovered={hovered}
         posterOnly={needsPosterFrame(props.item)}
+        playback={props.playback}
+        autoPlay={props.autoPlay}
+        onPlayingChange={setPlaying}
         freezeWhenConverged
       />
       <Show when={posterUrl(props.item) === undefined}>
@@ -110,14 +144,17 @@ function CapabilityCard(props: {
   item: GalleryListItem
   track: TrackVisibility
   onOpen: (slug: string) => void
+  playback?: PlaybackCoordinator
 }) {
   const [thumbEl, setThumbEl] = createSignal<HTMLElement>()
   const near = props.track(thumbEl)
   const [hovered, setHovered] = createSignal(false)
+  const [playing, setPlaying] = createSignal(false)
   return (
     <button
       type="button"
       class={ui.card}
+      data-home-playing={playing() ? 'true' : undefined}
       onClick={() => {
         props.onOpen(props.item.slug)
       }}
@@ -136,6 +173,8 @@ function CapabilityCard(props: {
           near={near}
           hovered={hovered}
           posterOnly={needsPosterFrame(props.item)}
+          playback={props.playback}
+          onPlayingChange={setPlaying}
           freezeWhenConverged
         />
       </span>
@@ -154,6 +193,11 @@ function CapabilityCard(props: {
  * past it releases its canvas rather than holding ~33 MiB of buffers for a page
  * nobody is looking at. Once converged Flam3 stops iterating on its own, so a
  * settled hero costs no ongoing GPU work.
+ *
+ * Deliberately given no PlaybackCoordinator: the hero is the one thing on the
+ * page that is always live, and a large flame animating forever above the fold
+ * is the screensaver the plan asks Home not to be. An animated hero row still
+ * renders correctly — it rests at its poster frame like any other plate.
  */
 function Hero(props: { item: GalleryListItem; track: TrackVisibility }) {
   const [heroEl, setHeroEl] = createSignal<HTMLElement>()
@@ -196,15 +240,28 @@ export function HomeTab(props: HomeTabProps) {
     rootMargin: PRELOAD_MARGIN,
   })
 
+  // ONE playback budget for the whole page, for the same reason there is one
+  // ComputeGate: the cap has to hold across sections, so a hovered gallery
+  // plate and an auto-playing motion tile compete for the same slots.
+  const playback = createPlaybackCoordinator()
+
   function scrollTo(id: string) {
     document.getElementById(`home-${id}`)?.scrollIntoView({ block: 'start' })
   }
 
-  /** Fetch the descriptor on demand — the list deliberately omits it. */
+  /**
+   * Fetch the descriptor on demand — the list deliberately omits it. The row's
+   * `capability` travels with it so a card can open the tool it advertises, not
+   * just the flame that demonstrates it; a plain gallery plate has none.
+   */
   async function open(slug: string) {
     try {
       const item = await fetchGalleryItem(slug)
-      props.onOpenFlame(item.flame, item.animation?.tracks)
+      props.onOpenFlame(
+        item.flame,
+        item.animation?.tracks,
+        item.capability ?? undefined,
+      )
     } catch (err) {
       console.error('Could not open gallery flame:', err)
     }
@@ -280,6 +337,7 @@ export function HomeTab(props: HomeTabProps) {
                         placement="plate"
                         track={track}
                         onOpen={open}
+                        playback={playback}
                       />
                     )}
                   </For>
@@ -292,18 +350,21 @@ export function HomeTab(props: HomeTabProps) {
                   <h2 class={ui.sectionTitle}>In motion</h2>
                 </div>
                 <p class={ui.sectionNote}>
-                  Animated pieces. Each carries its own timeline, so opening one
-                  brings the animation with it.
+                  Animated pieces. The first couple play once as you arrive;
+                  point at any of them to see it move. Each carries its own
+                  timeline, so opening one brings the animation with it.
                 </p>
                 <div class={ui.motionRow}>
                   <For each={sections().motion}>
-                    {(item) => (
+                    {(item, i) => (
                       <div style={{ height: '12rem' }}>
                         <Plate
                           item={item}
                           placement="plate"
                           track={track}
                           onOpen={open}
+                          playback={playback}
+                          autoPlay={i() < AUTO_PLAY_TILES}
                         />
                       </div>
                     )}
@@ -335,13 +396,18 @@ export function HomeTab(props: HomeTabProps) {
                   <h2 class={ui.sectionTitle}>Explore</h2>
                 </div>
                 <p class={ui.sectionNote}>
-                  Each card opens a flame chosen to show off one part of the
-                  app.
+                  Each card opens a flame chosen to show off one part of the app
+                  — with that part already open and pointed at it.
                 </p>
                 <div class={ui.cardGrid}>
                   <For each={sections().capability}>
                     {(item) => (
-                      <CapabilityCard item={item} track={track} onOpen={open} />
+                      <CapabilityCard
+                        item={item}
+                        track={track}
+                        onOpen={open}
+                        playback={playback}
+                      />
                     )}
                   </For>
                 </div>

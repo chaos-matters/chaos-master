@@ -226,6 +226,14 @@ export type AppProps = {
   }
   flameFromWelcome?: () => FlameDescriptor | undefined
   welcomeTracks?: () => TimelineTrack[] | undefined
+  /**
+   * One-shot request from a Home "Explore" card: open the tool this flame was
+   * curated to demonstrate, not just the flame. The value is the row's
+   * `gallery_items.capability` — see `openCapability` below for the mapping and
+   * for which capabilities have no sensible programmatic open. Consumed and
+   * cleared in the same effect that consumes `flameFromWelcome`.
+   */
+  capabilityFromHome?: () => string | undefined
   resetFlameFromWelcome?: () => void
   hardwareTier?: HardwareTier | null
   onHardwareTierChange?: (tier: HardwareTier) => void
@@ -489,11 +497,26 @@ export function MainWorkspace(props: AppProps) {
       queryAnimPresent: !!props.flameFromQuery?.animation,
     })
   }
+  /**
+   * A capability handed over by a Home "Explore" card, waiting to be applied.
+   *
+   * Held here rather than acted on in the effect below for the same reason
+   * `loadedAnimation` is: the functions that open the panels are declared much
+   * further down (they need the panel signals), and the hand-off arrives before
+   * the flame has finished landing. A separate effect drains it.
+   */
+  const [pendingCapability, setPendingCapability] = createSignal<string>()
+
   createEffect(() => {
     const newFlame = props.flameFromWelcome?.()
     if (newFlame !== undefined) {
       flushDirtyToRecents()
       history.replace(deepClone(newFlame))
+      // Read BEFORE resetFlameFromWelcome() clears the whole hand-off.
+      const capability = props.capabilityFromHome?.()
+      if (capability !== undefined) {
+        setPendingCapability(capability)
+      }
       // Load animation tracks if the welcome selection includes them
       const tracks = props.welcomeTracks?.()
       if (IS_DEV) {
@@ -1780,23 +1803,114 @@ export function MainWorkspace(props: AppProps) {
     }
   }
 
-  // Timeline "Animate" button: reveal the sidebar (may be closed, auto-hidden
-  // on mobile, or covered by the blend gallery / quick variation picker), open
-  // the Flame Randomizer card with its Animation Settings section expanded,
-  // and scroll the card into view. Overlay dismissal must happen BEFORE the
-  // epoch bump: mounting the card swallows the current epoch as its initial
-  // value, so a bump-then-mount order would lose the expansion.
-  const openAnimationGenerator = () => {
+  /**
+   * Reveal the sidebar (it may be closed, auto-hidden on mobile, covered by the
+   * blend gallery / quick variation picker, or showing a diff), open the Flame
+   * Randomizer card and scroll it into view.
+   *
+   * `expandAnimation` additionally opens the card's Animation Settings section —
+   * what the timeline's "Animate" button wants, and what Home's Randomizer card
+   * does NOT (it is advertising the generator, not the animation generator).
+   * Overlay dismissal must happen BEFORE the epoch bump: mounting the card
+   * swallows the current epoch as its initial value, so a bump-then-mount order
+   * would lose the expansion.
+   */
+  const openRandomizerCard = ({ expandAnimation = false } = {}) => {
     setShowSidebar(true)
     setSidebarHidden(false)
+    setSidebarDiffView(null)
     setShowBlendGallery(false)
     setQuickPickState(null)
     setRandomizerOpen(true)
-    setRandomizerAnimEpoch((e) => e + 1)
+    if (expandAnimation) {
+      setRandomizerAnimEpoch((e) => e + 1)
+    }
     setTimeout(() => {
       randomizerCardRef?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 0)
   }
+
+  // Timeline "Animate" button.
+  const openAnimationGenerator = () => {
+    openRandomizerCard({ expandAnimation: true })
+  }
+
+  /**
+   * Show the sidebar and clear whatever is currently covering it.
+   *
+   * Every sidebar panel below lives behind the same chain of `Show`s
+   * (diff view > blend gallery > audio > sonification > the editor), so opening
+   * one means closing the others as well as un-hiding the sidebar itself — a
+   * hand-off that only set its own flag would silently do nothing on mobile, or
+   * with a diff open.
+   */
+  const revealSidebar = () => {
+    setShowSidebar(true)
+    setSidebarHidden(false)
+    setSidebarDiffView(null)
+    setShowBlendGallery(false)
+    setShowAudioPanel(false)
+    setShowSonificationPanel(false)
+  }
+
+  /**
+   * Open the tool a Home "Explore" card advertises. The names are the
+   * `capability` values gallery-admin accepts (scripts/gallery-admin.mjs).
+   *
+   * Each one lands on the same surface its own toolbar entry does, so there is
+   * one behaviour to maintain rather than a parallel Home-only path:
+   *
+   *  - `animation`    — the timeline, with animation enabled. An animated row
+   *                     also loads its tracks and starts playing through the
+   *                     `loadedAnimation` effect, which is the same thing the
+   *                     Load Flame modal does.
+   *  - `randomizer`   — the Flame Randomizer card, opened and scrolled to.
+   *  - `genetics`     — Breed: the Genetics pull-up menu itself cannot be opened
+   *                     programmatically (PullUpMenu owns a private `open`
+   *                     signal), so this calls what its first entry calls and
+   *                     lands the user on "pick the second parent", which is
+   *                     where breeding actually starts.
+   *  - `audio`        — the Audio Reactive panel.
+   *  - `sonification` — the Sonification panel.
+   */
+  const openCapability = (capability: string) => {
+    switch (capability) {
+      case 'animation':
+        setAnimationEnabled(true)
+        setShowTimeline(true)
+        return
+      case 'randomizer':
+        openRandomizerCard()
+        return
+      case 'genetics':
+        revealSidebar()
+        pickBreedFlame()
+        return
+      case 'audio':
+        revealSidebar()
+        setShowAudioPanel(true)
+        return
+      case 'sonification':
+        revealSidebar()
+        setShowSonificationPanel(true)
+        return
+      default:
+        // Content can be newer than this build: gallery_items.capability is a
+        // free-text column and gallery-admin only WARNS about an unknown value.
+        // Opening the flame alone is the right degradation.
+        console.warn(`No tool mapped for capability "${capability}"`)
+    }
+  }
+
+  // Drain the Home hand-off once the flame it came with has landed.
+  createEffect(() => {
+    const capability = pendingCapability()
+    if (capability === undefined) {
+      return
+    }
+    setPendingCapability(undefined)
+    openCapability(capability)
+  })
 
   // Guard randomize/mutate so a slow run (history thumbnail capture + render)
   // can't be re-triggered until it finishes — rapid clicks would otherwise pile

@@ -315,9 +315,42 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
+  /* The two buttons are one pair — primary with its quieter alternative
+     directly beneath — so they sit closer than a full rhythm step apart. The
+     "Don't show on startup" label is absolutely positioned and unaffected. */
+  gap: 0.55rem;
   position: relative;
   padding-bottom: 2.25rem;
+}
+
+/* The secondary way in: same width and shape as Start so the pair reads as one
+   control group, but flat — no gradient, no shadow, muted text — so it never
+   competes for the eye. Echoes .showMoreBtn, which is this screen's existing
+   language for "a quieter action". */
+.browse-btn {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.browse-btn:hover {
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .dont-show {
@@ -714,6 +747,18 @@
 
 [data-theme='light'] .start-btn:hover {
   background: linear-gradient(135deg, #6d28d9 0%, #4f46e5 100%);
+}
+
+[data-theme='light'] .browse-btn {
+  border-color: rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.03);
+  color: rgba(0, 0, 0, 0.55);
+}
+
+[data-theme='light'] .browse-btn:hover {
+  border-color: rgba(0, 0, 0, 0.22);
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.8);
 }
 
 [data-theme='light'] .techPill {

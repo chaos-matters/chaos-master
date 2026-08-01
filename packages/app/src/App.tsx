@@ -103,6 +103,13 @@ export function Wrappers() {
   const [selectedWelcomeTracks, setSelectedWelcomeTracks] = createSignal<
     TimelineTrack[] | undefined
   >()
+  /**
+   * Set only by Home's "Explore" cards: the capability the chosen flame was
+   * curated to demonstrate. Rides the same one-shot hand-off as the flame and
+   * its tracks — MainWorkspace reads all three in one effect and calls
+   * `resetFlameFromWelcome`, which clears the lot.
+   */
+  const [selectedCapability, setSelectedCapability] = createSignal<string>()
   const [queryError, setQueryError] = createSignal<string | null>(null)
 
   const [flameFromQuery] = createResource(async () => {
@@ -287,6 +294,7 @@ export function Wrappers() {
                         sharedVariationFromQuery={sharedVariationFromQuery()}
                         flameFromWelcome={selectedFlame}
                         welcomeTracks={selectedWelcomeTracks}
+                        capabilityFromHome={selectedCapability}
                         autoOpenBenchmark={benchmarkRequested}
                         autoStartBenchmark={benchmarkAuto}
                         hardwareTier={
@@ -298,6 +306,7 @@ export function Wrappers() {
                         resetFlameFromWelcome={() => {
                           setSelectedFlame(undefined)
                           setSelectedWelcomeTracks(undefined)
+                          setSelectedCapability(undefined)
                         }}
                       />
                       {/* Home overlays the workspace, which stays mounted so
@@ -306,12 +315,13 @@ export function Wrappers() {
                           still has a single entry point. */}
                       <Show when={activeTab() === 'home' && !showWelcome()}>
                         <HomeTab
-                          onOpenFlame={(flame, tracks) => {
+                          onOpenFlame={(flame, tracks, capability) => {
                             // Reuses the welcome screen's hand-off path rather
                             // than adding a second way to seed the workspace.
                             batch(() => {
                               setSelectedFlame(() => flame)
                               setSelectedWelcomeTracks(() => tracks)
+                              setSelectedCapability(capability)
                               setActiveTab('workspace')
                             })
                           }}
@@ -328,6 +338,16 @@ export function Wrappers() {
                           }
                         }}
                         onEnter={() => setShowWelcome(false)}
+                        onBrowseGallery={() => {
+                          // Both flips are required: Home is suppressed while
+                          // the welcome screen is showing (see the Show above),
+                          // so dismissing without switching lands in the editor
+                          // and switching without dismissing shows nothing.
+                          batch(() => {
+                            setActiveTab('home')
+                            setShowWelcome(false)
+                          })
+                        }}
                         onSelectFlame={(flame, tracks) => {
                           batch(() => {
                             setSelectedFlame(() => flame)

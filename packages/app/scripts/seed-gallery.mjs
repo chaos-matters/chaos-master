@@ -54,6 +54,10 @@ const CURATION = {
     { slug: 'deep-current', title: 'Deep Current', example: 'example46' },
   ],
   // Animations are referenced by their definition id from examples/animations.
+  //
+  // One flame per KIND of motion, and no flame twice: camera movement, a
+  // parameter sweep, and a 3D orbit. `ex1-affine-morph` used to hold the third
+  // slot, which made two of the three tiles — and the hero — the same flame.
   motion: [
     { slug: 'camera-pan', title: 'Camera Pan', animation: 'ex1-camera-pan' },
     {
@@ -62,13 +66,18 @@ const CURATION = {
       animation: 'ex2-julia-power-wave',
     },
     {
-      slug: 'affine-morph',
-      title: 'Affine Morph',
-      animation: 'ex1-affine-morph',
+      slug: 'geode-orbit',
+      title: 'Geode Orbit',
+      animation: 'ex36-geode-orbit',
     },
   ],
+  // Each card's flame is chosen to make its feature legible AND is used nowhere
+  // else on the page: four of these used to be the exact flames hanging in the
+  // gallery above, so Explore read as a second, smaller copy of the wall.
   capability: [
     {
+      // Stays a morph of the hero flame on purpose: "the flame you met at the
+      // top of the page, animated" is the clearest possible before/after.
       slug: 'cap-animation',
       title: 'Animation',
       caption: 'Keyframe any parameter and play it back on a timeline.',
@@ -76,32 +85,44 @@ const CURATION = {
       animation: 'ex1-pie-full-morph',
     },
     {
+      // Cyber Mandala: 10 distinct variation types across 4 transforms, the
+      // widest spread in the set — which is exactly what a roll of the dice
+      // produces. (Was example45, which is `spectrum-swirl` on the wall.)
       slug: 'cap-randomizer',
       title: 'Randomizer',
       caption: 'Roll a whole flame, then steer it.',
       capability: 'randomizer',
-      example: 'example45',
+      example: 'example21',
     },
     {
+      // Enchanted Rose v2 is literally a descendant of `enchanted-rose` in the
+      // gallery, so the card shows what breeding produces rather than just
+      // asserting it. (Was example33, which is `ember-lattice` on the wall.)
       slug: 'cap-genetics',
       title: 'Flame genetics',
       caption: 'Breed two flames and evolve the result.',
       capability: 'genetics',
-      example: 'example33',
+      example: 'example44',
     },
     {
+      // Phoenix Ascension: 10 variation types with independent weights, so
+      // there is plenty for a frequency band to visibly drive. (Was example29,
+      // which is `aurora-drift` on the wall.)
       slug: 'cap-audio',
       title: 'Audio flames',
       caption: 'Wire frequency bands and beats to any parameter.',
       capability: 'audio',
-      example: 'example29',
+      example: 'example22',
     },
     {
+      // Ripple Veil: standing waves made visible (ripple/sinusGrid/hexes),
+      // which is the closest the set gets to drawing what sonification hears.
+      // (Was example40, which is `tidal-bloom` on the wall.)
       slug: 'cap-sonification',
       title: 'Sonification',
       caption: 'Turn the structure of a flame into sound.',
       capability: 'sonification',
-      example: 'example40',
+      example: 'example14',
     },
   ],
 }

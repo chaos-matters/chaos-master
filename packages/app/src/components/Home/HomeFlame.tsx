@@ -8,17 +8,21 @@ import { Camera2D } from '@/lib/Camera2D'
 import { Default3DPreviewCamera } from '@/lib/Camera3D'
 import { fetchGalleryItem } from '@/lib/galleryContent'
 import { gpuReady } from '@/lib/gpuStatus'
+import { deepClone } from '@/utils/clone'
 import { useIsScrolling } from '@/utils/isScrolling'
-import { applyTracksToFlame } from '@/utils/timeline'
+import { applyTracksToFlame, getUserEndFrame } from '@/utils/timeline'
 import { setLivePreviewLive, vramLog } from '@/utils/vramLog'
+import { autoPlayComplete, frameAtElapsed, usePrefersReducedMotion, } from './homePlayback'
 import ui from './HomeTab.module.css'
 import type { Accessor } from 'solid-js'
+import type { PlaybackCoordinator, PlaybackReason } from './homePlayback'
 import type { RenderStatus } from '@/contexts/ComputeGateContext'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { TimelineTrack } from '@/utils/timeline'
 
 /**
- * Home — Phase 2. One plate's worth of flame: a static poster with a LIVE GPU
- * render layered over it.
+ * Home — Phase 2/3. One plate's worth of flame: a static poster with a LIVE GPU
+ * render layered over it, which for an animated row can also play its timeline.
  *
  * "Live by default, poster on failure, freeze when done" — ported from the
  * landing's `PosterFlame`/`FlameView` pair (which cannot be imported here: the
@@ -45,6 +49,30 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
  *  3. The descriptor is fetched per plate, on demand. The list endpoint omits
  *     `flame` deliberately, and fetching all of them up front would pull every
  *     descriptor in the gallery for a page that may only ever show three.
+ *
+ * ## Playback (Phase 3)
+ *
+ * An animated plate normally sits frozen at its poster's frame. It ANIMATES
+ * while it holds a slot from the page's `PlaybackCoordinator` — on hover, or
+ * for one auto-play loop on arriving at the section (see homePlayback.ts for
+ * the rules and the frame maths).
+ *
+ * The mechanism is a per-plate rAF clock feeding `applyTracksToFlame` into a
+ * fresh clone of the row's rest-pose descriptor, which is what
+ * `WelcomeScreen`'s hover-animated thumbnails already do. The workspace
+ * mechanism — `Flam3 animationEnabled` + `applyTimelineToFlame` — is
+ * unavailable here and would be wrong if it were: Flam3 reads the timeline from
+ * `useTimeline()`, a context MainWorkspace provides for the ONE editor timeline
+ * (one playhead, one config, one track set). Home renders outside that provider
+ * (App.tsx mounts HomeTab as a sibling of MainWorkspace), every plate carries
+ * its own tracks and its own poster frame, and the editor's playhead is
+ * simultaneously driving the workspace canvas behind Home. So `animationEnabled`
+ * stays false and the plate poses its own descriptor.
+ *
+ * Stopping is the part that has to be exact: the run ends by clearing the play
+ * frame, which drops the plate straight back to `poster_frame` — the same frame
+ * the poster was captured at — so the plate re-converges on the poster's own
+ * image and the freeze swaps in an identical picture.
  */
 
 /**
@@ -125,23 +153,48 @@ function pointBudgetFor(placement: HomeFlamePlacement): number {
   return Math.min(devicePointBudget(), POINT_CAP[placement])
 }
 
-/**
- * Descriptors already fetched this session, by slug — as a PLATE renders them:
- * animated rows have their timeline baked in at the poster's frame (see
- * `loadDescriptor`). Scrolling a plate out of view and back must not re-fetch
- * it, and the same flame can appear in more than one section. Rejections are
- * evicted so a transient failure does not poison the slug for the rest of the
- * session.
- *
- * Deliberately NOT shared with HomeTab's "open in the workspace" path, for two
- * reasons now: that hands the descriptor to the editor, which owns and mutates
- * it from then on and must not be handed the same object a plate is rendering —
- * and what the editor needs is the row's own flame plus its tracks, not one
- * already frozen partway through them.
- */
-const descriptorCache = new Map<string, Promise<FlameDescriptor>>()
+/** Everything a plate needs to pose one gallery row at an arbitrary frame. */
+interface GalleryFlame {
+  /**
+   * The row's REST-POSE descriptor. Never mutated and shared by every plate
+   * showing this slug, so each plate poses a clone of it (see `posedFlame`)
+   * rather than writing tracks into this one.
+   */
+  flame: FlameDescriptor
+  /** The row's timeline, or empty for a still. */
+  tracks: TimelineTrack[]
+  /**
+   * Frame the POSTER was captured at — the frame this plate rests on, and the
+   * frame every playback run starts from and lands back on.
+   *
+   * Not frame 0: the capture page samples a fraction into the timeline and
+   * slides off that frame when it lands on a vibrancy dip (see
+   * scripts/posterCapture.tsx), and `poster_frame` is what records the result.
+   * Posing here is what makes the live render and the poster the same image,
+   * and the freeze-to-poster swap invisible.
+   *
+   * `undefined` leaves the flame at its rest pose, which is safe: the only such
+   * rows that reach here have no poster to disagree with, because
+   * `needsPosterFrame` keeps the ones that do from going live at all.
+   */
+  posterFrame: number | undefined
+  /** Last keyframe — one playback loop. 0 for a still. */
+  endFrame: number
+}
 
-function loadDescriptor(slug: string): Promise<FlameDescriptor> {
+/**
+ * Rows already fetched this session, by slug. Scrolling a plate out of view and
+ * back must not re-fetch it, and the same flame can appear in more than one
+ * section. Rejections are evicted so a transient failure does not poison the
+ * slug for the rest of the session.
+ *
+ * Deliberately NOT shared with HomeTab's "open in the workspace" path: that
+ * hands the descriptor to the editor, which owns and mutates it from then on
+ * and must not be handed the same object a plate is rendering.
+ */
+const descriptorCache = new Map<string, Promise<GalleryFlame>>()
+
+function loadDescriptor(slug: string): Promise<GalleryFlame> {
   const cached = descriptorCache.get(slug)
   if (cached !== undefined) {
     return cached
@@ -150,28 +203,13 @@ function loadDescriptor(slug: string): Promise<FlameDescriptor> {
   // never render from a descriptor the app itself would reject.
   const pending = fetchGalleryItem(slug)
     .then((item) => {
-      const flame = validateFlame(item.flame)
       const tracks = item.animation?.tracks ?? []
-      /**
-       * Freeze an animated row on the frame its POSTER was captured at, not on
-       * frame 0. The capture page picks that frame (a fraction into the
-       * timeline, slid off a vibrancy dip) and `poster_frame` is what records
-       * it — so replaying the timeline here is what makes the live render and
-       * the poster the same image, and the freeze-to-poster swap invisible.
-       *
-       * No loop options, matching scripts/posterCapture.tsx: the stored envelope
-       * is `{ tracks }` only, so keyframes resolve on their own timeline exactly
-       * as the capture resolved them.
-       *
-       * A null frame leaves the flame at its rest pose, which is safe: the only
-       * such rows that reach here have no poster to disagree with, because
-       * `needsPosterFrame` keeps the ones that do from going live at all.
-       */
-      const frame = item.poster_frame
-      if (tracks.length > 0 && typeof frame === 'number') {
-        applyTracksToFlame(tracks, flame, frame)
+      return {
+        flame: validateFlame(item.flame),
+        tracks,
+        posterFrame: item.poster_frame ?? undefined,
+        endFrame: getUserEndFrame(tracks, 0),
       }
-      return flame
     })
     .catch((err: unknown) => {
       descriptorCache.delete(slug)
@@ -231,6 +269,20 @@ export interface HomeFlameProps {
    * zero ongoing GPU). Only for non-interactive plates.
    */
   freezeWhenConverged?: boolean
+  /**
+   * The page's playback budget. Without one a plate never animates — an
+   * animated row simply rests at its poster frame, which is what every section
+   * other than "In motion" wants by default.
+   */
+  playback?: PlaybackCoordinator
+  /**
+   * Play one loop on arriving in view, without being asked. Honoured only for
+   * an animated row, and never under `prefers-reduced-motion`. Re-arms when the
+   * plate leaves Home's near-window, so coming back to the section plays again.
+   */
+  autoPlay?: boolean
+  /** Reactive: is this plate animating right now? For the caller's affordance. */
+  onPlayingChange?: (playing: boolean) => void
 }
 
 export function HomeFlame(props: HomeFlameProps) {
@@ -244,25 +296,14 @@ export function HomeFlame(props: HomeFlameProps) {
   const settled = createMemo(() => props.near() && !scrolling())
 
   const [frozen, setFrozen] = createSignal(false)
-  const [flame, setFlame] = createSignal<FlameDescriptor>()
+  const [row, setRow] = createSignal<GalleryFlame>()
   const [points, setPoints] = createSignal(0)
   const [pointLimit, setPointLimit] = createSignal<() => number>()
+  /** Timeline frame while a playback run owns this plate; undefined at rest. */
+  const [playFrame, setPlayFrame] = createSignal<number>()
 
   const wantsLive = createMemo(
     () => props.posterOnly !== true && gpuReady() && settled() && !frozen(),
-  )
-
-  /**
-   * Freezing means "hand the picture back to the poster", so a row with no
-   * poster captured yet must stay live — otherwise converging would replace the
-   * flame with an empty plate. `noFreeze()` is the dev-only escape hatch used to
-   * check that a frozen plate and its poster really are the same image.
-   */
-  const canFreeze = createMemo(
-    () =>
-      props.freezeWhenConverged === true &&
-      props.poster !== undefined &&
-      !noFreeze(),
   )
 
   /**
@@ -280,8 +321,8 @@ export function HomeFlame(props: HomeFlameProps) {
     requested = true
     const slug = props.slug
     void loadDescriptor(slug).then(
-      (descriptor) => {
-        setFlame(() => descriptor)
+      (loaded) => {
+        setRow(loaded)
       },
       (err: unknown) => {
         // The poster stays: a plate that cannot fetch its flame is still a plate.
@@ -320,30 +361,214 @@ export function HomeFlame(props: HomeFlameProps) {
   })
 
   /**
-   * Register with Home's shared ComputeGate — but only once this plate has
-   * something to render. An undefined state is excluded from the ranking
-   * altogether, so poster-only rows and frozen plates never hold a slot.
-   */
-  const allowed = useComputeGate(() =>
-    props.posterOnly === true || frozen() || flame() === undefined
-      ? undefined
-      : {
-          isVisible: settled(),
-          renderStatus: renderStatus(),
-          isSelected: props.hovered?.() ?? false,
-        },
-  )
-
-  /**
    * Mount while settled-visible and unmount when scrolled away, so concurrent
    * WebGPU canvases stay bounded to the on-screen window. Mounting is gated on
    * visibility rather than on `allowed()`: a plate that lost its gate slot keeps
    * its accumulation buffers (parked, not rendering) so progress is monotonic,
    * instead of throwing the work away and restarting from zero every rotation.
    */
-  const live = createMemo(() => wantsLive() && flame() !== undefined)
+  const live = createMemo(() => wantsLive() && row() !== undefined)
 
-  const liveFlame = createMemo(() => (live() ? flame() : undefined))
+  // ── Playback ────────────────────────────────────────────────────────────
+  // See homePlayback.ts for the rules; this is the plumbing.
+
+  const reducedMotion = usePrefersReducedMotion()
+
+  /**
+   * Could this plate animate if it were asked to? An animated row, on/near
+   * screen, not mid-scroll, with a working GPU and a descriptor in hand — which
+   * is how "scrolling away stops playback" and the settled-visibility rule
+   * survive Phase 3.
+   *
+   * Deliberately NOT `live()`: a plate freezes back to its poster within a
+   * couple of GPU ticks, and `live()` is false the moment it does. Requiring it
+   * here would be a cycle — frozen ⇒ not live ⇒ cannot want playback ⇒ nothing
+   * clears the freeze ⇒ hovering an animated plate did nothing at all. Wanting
+   * playback is what thaws it (`canFreeze` drops, the freeze effect clears
+   * `frozen`, `live()` comes back), so the dependency has to run this way round.
+   */
+  const canPlay = createMemo(
+    () =>
+      props.posterOnly !== true &&
+      gpuReady() &&
+      settled() &&
+      (row()?.tracks.length ?? 0) > 0,
+  )
+
+  /**
+   * Auto-play is a one-shot per arrival. `autoArmed` is a plain variable rather
+   * than a signal on purpose: it must not be a dependency of the effect that
+   * consumes it, or disarming would immediately re-run it.
+   */
+  let autoArmed = true
+  const [autoRunning, setAutoRunning] = createSignal(false)
+
+  // Leaving Home's near-window is a real departure (the observer's margin is
+  // 300px), so coming back counts as arriving at the section again.
+  createEffect(() => {
+    if (!props.near()) {
+      autoArmed = true
+    }
+  })
+
+  createEffect(() => {
+    if (
+      props.autoPlay !== true ||
+      reducedMotion() ||
+      !canPlay() ||
+      !autoArmed
+    ) {
+      return
+    }
+    autoArmed = false
+    setAutoRunning(true)
+  })
+
+  /** What this plate is asking the coordinator for, if anything. */
+  const wants = createMemo<PlaybackReason | undefined>(() => {
+    if (!canPlay()) {
+      return undefined
+    }
+    if (props.hovered?.() === true) {
+      return 'hover'
+    }
+    return autoRunning() ? 'auto' : undefined
+  })
+
+  const playbackToken = Symbol('home-playback')
+  createEffect(() => {
+    const coordinator = props.playback
+    if (coordinator === undefined) {
+      return
+    }
+    const reason = wants()
+    if (reason === undefined) {
+      coordinator.release(playbackToken)
+    } else {
+      coordinator.request(playbackToken, reason)
+    }
+  })
+  onCleanup(() => {
+    props.playback?.release(playbackToken)
+  })
+
+  /**
+   * Asking is not playing: the coordinator caps the whole page at
+   * MAX_CONCURRENT_PLAYBACK, so a plate that wants to animate may have to wait
+   * or be preempted. Losing the slot stops the run exactly as scrolling away
+   * does.
+   */
+  const playing = createMemo(
+    () =>
+      wants() !== undefined &&
+      (props.playback?.isGranted(playbackToken) ?? false),
+  )
+
+  createEffect(() => {
+    props.onPlayingChange?.(playing())
+  })
+
+  // The rAF clock. Elapsed-time based (not a tick counter) so a plate that
+  // misses frames still lands back on its poster frame at the right moment.
+  createEffect(() => {
+    if (!playing()) {
+      return
+    }
+    const current = row()
+    if (current === undefined) {
+      return
+    }
+    const isAuto = wants() === 'auto'
+    const start = current.posterFrame ?? 0
+    const startedAt = globalThis.performance.now()
+    let handle = requestAnimationFrame(function tick() {
+      const elapsed = globalThis.performance.now() - startedAt
+      if (isAuto && autoPlayComplete(elapsed, current.endFrame)) {
+        // Ends the run; the cleanup below is what lands the pose.
+        setAutoRunning(false)
+        return
+      }
+      setPlayFrame(frameAtElapsed(start, current.endFrame, elapsed))
+      handle = requestAnimationFrame(tick)
+    })
+    onCleanup(() => {
+      cancelAnimationFrame(handle)
+      // Land EXACTLY on the poster frame however the run ended — loop complete,
+      // pointer left, slot lost, scrolled away. Clearing the frame drops the
+      // plate back to `posterFrame` rather than wherever the timeline happened
+      // to be, which is what makes the freeze-to-poster swap invisible.
+      setPlayFrame(undefined)
+    })
+  })
+
+  /**
+   * The descriptor to render: the row's rest pose for a still, or a clone posed
+   * at the current frame for an animated row.
+   *
+   * Cloning per frame rather than mutating the cached row is not optional — the
+   * cache is shared by every plate showing this slug, and `applyTracksToFlame`
+   * writes in place. At rest the memo has no reactive reason to recompute, and
+   * during playback `frameAtElapsed` quantises to whole frames, so a 120Hz
+   * display still only clones 30 times a second.
+   */
+  const posedFlame = createMemo(() => {
+    const current = row()
+    if (current === undefined) {
+      return undefined
+    }
+    if (current.tracks.length === 0) {
+      return current.flame
+    }
+    const frame = playFrame() ?? current.posterFrame
+    if (frame === undefined) {
+      return current.flame
+    }
+    const posed = deepClone(current.flame)
+    // No loop options, matching scripts/posterCapture.tsx: the stored envelope
+    // is `{ tracks }` only, so keyframes resolve on their own timeline exactly
+    // as the capture resolved them.
+    applyTracksToFlame(current.tracks, posed, frame)
+    return posed
+  })
+
+  const liveFlame = createMemo(() => (live() ? posedFlame() : undefined))
+
+  /**
+   * Register with Home's shared ComputeGate — but only once this plate has
+   * something to render. An undefined state is excluded from the ranking
+   * altogether, so poster-only rows and frozen plates never hold a slot.
+   *
+   * An animating plate counts as selected: it is the one thing on the page that
+   * is visibly moving, so it must win a slot over a still plate quietly topping
+   * up its accumulation. The concurrency cap makes that safe — at most
+   * MAX_CONCURRENT_PLAYBACK plates can claim the priority at once, which is the
+   * gate's own capacity.
+   */
+  const allowed = useComputeGate(() =>
+    props.posterOnly === true || frozen() || row() === undefined
+      ? undefined
+      : {
+          isVisible: settled(),
+          renderStatus: renderStatus(),
+          isSelected: (props.hovered?.() ?? false) || playing(),
+        },
+  )
+
+  /**
+   * Freezing means "hand the picture back to the poster", so a row with no
+   * poster captured yet must stay live — otherwise converging would replace the
+   * flame with an empty plate. An animating plate must not freeze either: it
+   * would swap a moving flame for a still poster mid-loop. `noFreeze()` is the
+   * dev-only escape hatch used to check that a frozen plate and its poster
+   * really are the same image.
+   */
+  const canFreeze = createMemo(
+    () =>
+      props.freezeWhenConverged === true &&
+      props.poster !== undefined &&
+      !noFreeze() &&
+      !playing(),
+  )
 
   // Re-arm the poster whenever the live render stops (scrolled away, GPU lost),
   // so a re-mounted plate cross-fades from the poster again instead of revealing
@@ -356,8 +581,8 @@ export function HomeFlame(props: HomeFlameProps) {
 
   createEffect(() => {
     if (!canFreeze()) {
-      // Thaw: the dev hook was flipped, or this row has no poster to hand the
-      // picture back to, so it must stay live.
+      // Thaw: the dev hook was flipped, this row has no poster to hand the
+      // picture back to, or it is animating — so it must stay live.
       setFrozen(false)
       return
     }
@@ -409,10 +634,16 @@ export function HomeFlame(props: HomeFlameProps) {
           />
         )}
       </Show>
-      <Show when={liveFlame()} keyed>
+      {/* NOT `keyed`: an animating plate hands down a freshly posed clone every
+          frame, and a keyed Show would tear down and rebuild the canvas — and
+          its WebGPU buffers — 30 times a second. Unkeyed, the callback's
+          accessor stays stable across value changes and only the falsy↔truthy
+          transition remounts, which is exactly the mount/unmount boundary the
+          visibility gating wants. */}
+      <Show when={liveFlame()}>
         {(descriptor) => (
           <LiveFlame
-            flame={descriptor}
+            flame={descriptor()}
             resolution={resolution()}
             pointCountPerBatch={pointCount()}
             renderInterval={renderInterval()}
