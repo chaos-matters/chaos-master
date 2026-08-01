@@ -114,6 +114,18 @@ Each phase is shippable on its own.
   described above.
 - **Phase 4 — Explore.** Capability cards wired to their curated flames.
 - **Phase 5 — Made here.** The live scripted app-in-app portal.
+  - **Decided:** scripted by `example1CreationTour` — it rebuilds First Light,
+    the hero flame, so the portal shows the flame at the top of the page being
+    made.
+  - **Configurable, as content.** Tours are code, so D1 stores only the tour
+    _id_: a `home_config` key-value table (migration 0003) with
+    `portal_tour_id`, served via `GET /api/gallery/config` and resolved
+    client-side through the existing `getTour(id)` registry in App.tsx,
+    falling back to `example1-creation` when unset or unknown. Swapping the
+    portal to any registered tour is then a row write, no deploy — and a
+    `gallery-admin config` subcommand (allowlisted keys) is the hook the
+    launch console's future "portal settings" control calls, same as every
+    other gallery mutation.
 - **Phase 6 — Optional.** Retire the welcome screen once Home has earned it.
 
 Phase 1 being poster-only is deliberate insurance: if the layout, pacing, or
