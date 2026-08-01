@@ -11,6 +11,11 @@ playwright-report
 **/.claude/settings.local.json
 # Local-only Claude skills (e.g. the fork-specific sync-fork workflow)
 **/.claude/skills/
+# Claude Code worktrees: a SECOND full checkout of this repo nested inside it.
+# Never part of the project — and left untracked it also gets walked by any
+# tool rooted here (eslint linted it as if it were source, doubling the run
+# until it OOM'd the 4 GB heap in `pnpm lint`).
+**/.claude/worktrees/
 # Local scratch space (not part of the project)
 /assets/local/
 
