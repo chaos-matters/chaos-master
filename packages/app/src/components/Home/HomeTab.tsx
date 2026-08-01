@@ -2,7 +2,7 @@ import { createResource, createSignal, For, Show } from 'solid-js'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { setActiveTab } from '@/lib/activeTab'
-import { bySection, fetchGallery, fetchGalleryItem, posterUrl, } from '@/lib/galleryContent'
+import { bySection, fetchGallery, fetchGalleryItem, needsPosterFrame, posterUrl, } from '@/lib/galleryContent'
 import { createSharedIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { HomeFlame } from './HomeFlame'
 import ui from './HomeTab.module.css'
@@ -52,15 +52,6 @@ const SECTIONS: { id: GallerySection | 'made'; label: string }[] = [
 /** Editorial spans: the shape of the wall, by position. */
 const SPANS = [ui.span3, ui.row2, ui.span2, '', ui.span2, ui.span2]
 
-/**
- * An animated row keeps its poster in Phase 2. Its poster was captured partway
- * through the timeline and that frame is not stored, so a static live render
- * would be a different image — the animated section is Phase 3's job.
- */
-function isAnimated(item: GalleryListItem) {
-  return item.has_animation === 1
-}
-
 function Plate(props: {
   item: GalleryListItem
   class?: string
@@ -93,7 +84,7 @@ function Plate(props: {
         placement={props.placement}
         near={near}
         hovered={hovered}
-        posterOnly={isAnimated(props.item)}
+        posterOnly={needsPosterFrame(props.item)}
         freezeWhenConverged
       />
       <Show when={posterUrl(props.item) === undefined}>
@@ -144,7 +135,7 @@ function CapabilityCard(props: {
           placement="thumb"
           near={near}
           hovered={hovered}
-          posterOnly={isAnimated(props.item)}
+          posterOnly={needsPosterFrame(props.item)}
           freezeWhenConverged
         />
       </span>
@@ -174,7 +165,7 @@ function Hero(props: { item: GalleryListItem; track: TrackVisibility }) {
         poster={posterUrl(props.item)}
         placement="hero"
         near={near}
-        posterOnly={isAnimated(props.item)}
+        posterOnly={needsPosterFrame(props.item)}
       />
       <div class={ui.heroCopy}>
         <div class={ui.heroText}>

@@ -23,6 +23,17 @@ export interface GalleryListItem {
   poster_key: string | null
   poster_width: number | null
   poster_height: number | null
+  /**
+   * Timeline frame the poster was captured at, or null when no frame applies
+   * (a still) or none was recorded (a poster older than the column).
+   *
+   * An animated row's poster is NOT frame 0: the capture samples a fraction
+   * into the timeline and slides off that frame when it lands on a vibrancy
+   * dip, so the frame is chosen at capture time and stored here. It is what lets
+   * a live plate render the poster's own image instead of the rest pose — see
+   * `needsPosterFrame` and HomeFlame.
+   */
+  poster_frame: number | null
   sort_order: number
   has_animation: number
 }
@@ -40,6 +51,30 @@ export function posterUrl(item: {
   return item.poster_key === null
     ? undefined
     : `/api/gallery/poster/${item.poster_key}`
+}
+
+/**
+ * True when a live render of this row could not reproduce its poster, so the
+ * plate has to stay on the poster (HomeFlame's `posterOnly`).
+ *
+ * The one case is an animated row whose poster predates `poster_frame`: the
+ * poster is some frame partway through its timeline, nothing says which, and a
+ * live render would sit at frame 0 — so going live and then freezing back would
+ * visibly jump between two different images. With the frame recorded, the plate
+ * replays the timeline there and the two agree.
+ *
+ * A row with no poster at all is NOT restricted: there is no second image to
+ * disagree with, and such a plate never freezes (see HomeFlame's `canFreeze`),
+ * so it renders live at frame 0 rather than showing nothing.
+ */
+export function needsPosterFrame(
+  item: Pick<GalleryListItem, 'has_animation' | 'poster_key' | 'poster_frame'>,
+): boolean {
+  return (
+    item.has_animation === 1 &&
+    item.poster_key !== null &&
+    item.poster_frame === null
+  )
 }
 
 export async function fetchGallery(

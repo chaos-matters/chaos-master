@@ -61,8 +61,35 @@ export function targetLabel(env) {
   return `${target.database} (${target.storage})`
 }
 
-/** The schema, relative to packages/app. */
-export const MIGRATION = 'migrations/0001_gallery_content.sql'
+/** Where the schema lives, relative to packages/app. */
+export const MIGRATIONS_DIR = 'migrations'
+
+/**
+ * The wrangler invocation that brings a target's schema up to date — every
+ * migration in `MIGRATIONS_DIR`, in filename order.
+ *
+ * `d1 migrations apply` rather than `d1 execute --file=<the one schema file>`,
+ * which is what this was while there was only one migration. The schema is
+ * applied automatically and repeatedly to local stores (gallery-admin
+ * initialises on a missing table, seed-gallery before every local seed), so
+ * every migration has to be safe to re-run — and `ALTER TABLE ... ADD COLUMN`
+ * cannot be, SQLite having no `IF NOT EXISTS` for it. Wrangler records what it
+ * has applied in `d1_migrations` and skips those, which makes re-running a
+ * no-op no matter what a migration contains. A store created before that table
+ * existed picks up from `0001`, whose `CREATE ... IF NOT EXISTS` statements are
+ * satisfied already.
+ */
+export function migrationsArgs(env) {
+  return [
+    'exec',
+    'wrangler',
+    'd1',
+    'migrations',
+    'apply',
+    TARGETS[env].database,
+    ...storageFlags(env),
+  ]
+}
 
 // With --json, wrangler reports a failed statement as JSON on STDOUT rather
 // than stderr — both locally and through the API — so callers must test both
@@ -73,12 +100,9 @@ const MISSING_TABLE = /no such table:\s*(?:main\.)?gallery_items\b/i
 /** Did this wrangler failure mean "the gallery table does not exist"? */
 export const isMissingTable = (output) => MISSING_TABLE.test(output)
 
-/** The exact command that creates it, so an error can be acted on. */
+/** The exact command that applies them, so an error can be acted on. */
 export function initCommand(env) {
-  return (
-    `pnpm exec wrangler d1 execute ${TARGETS[env].database} ` +
-    `${storageFlags(env).join(' ')} --file=${MIGRATION}`
-  )
+  return `pnpm ${migrationsArgs(env).join(' ')}`
 }
 
 /** The last few meaningful lines of a captured stream, for error details. */

@@ -3,11 +3,17 @@
 //
 // Reads the manifest written by scripts/capture-gallery-posters.mjs, uploads
 // each poster into the EXISTING og-images bucket under a `gallery/` prefix, and
-// sets poster_key / poster_width / poster_height on the matching gallery_items
-// row. The Worker serves them from `/api/gallery/poster/<poster_key>` (it adds
-// the `gallery/` prefix itself), with an immutable cache header — which is why
-// the key carries a content hash: a re-capture writes a NEW key, so nothing has
-// to be purged and no visitor is ever served a stale poster.
+// sets poster_key / poster_width / poster_height / poster_frame on the matching
+// gallery_items row. The Worker serves them from
+// `/api/gallery/poster/<poster_key>` (it adds the `gallery/` prefix itself),
+// with an immutable cache header — which is why the key carries a content hash:
+// a re-capture writes a NEW key, so nothing has to be purged and no visitor is
+// ever served a stale poster.
+//
+// poster_frame is the timeline frame an animated row's poster was frozen at.
+// It travels with the key because it describes that exact image, and because
+// nothing but the capture knows it: Home replays the timeline there so a live
+// plate and the poster are the same picture.
 //
 //   node scripts/upload-gallery-posters.mjs --dry-run
 //   node scripts/upload-gallery-posters.mjs --env dev
@@ -74,6 +80,28 @@ function printHelp() {
 
 const sqlStr = (v) =>
   v === null || v === undefined ? 'NULL' : `'${String(v).replace(/'/g, "''")}'`
+
+const sqlInt = (v) => (v === null ? 'NULL' : String(Math.trunc(v)))
+
+/**
+ * The timeline frame this poster was frozen at, for `poster_frame` — or null
+ * where no frame applies.
+ *
+ * This is the one number the capture step computes and nothing else can
+ * recover: an animated row's poster is sampled a fraction into the timeline and
+ * slid off that frame when it lands on a vibrancy dip, so which frame it ended
+ * up on is a decision, not a formula (see scripts/posterCapture.tsx). Home
+ * replays the timeline at exactly this frame to make a live plate the same
+ * image as the poster it replaces.
+ *
+ * Stills get null: there is no timeline to sample, and 0 would read as a real
+ * frame choice. Frame 0 on an ANIMATED row is a real choice, though — a short
+ * timeline can round to it — so this must not treat 0 as absent.
+ */
+function posterFrame(poster) {
+  if (poster.animated !== true) return null
+  return Number.isFinite(poster.frame) ? poster.frame : null
+}
 
 function run(command, commandArgs, dryRun) {
   if (dryRun) {
@@ -151,9 +179,11 @@ function main() {
   )
 
   for (const { poster, file, bytes, posterKey } of uploads) {
+    const frame = posterFrame(poster)
     console.log(
       `${poster.slug} -> gallery/${posterKey} ` +
-        `(${(bytes.length / 1024).toFixed(0)} KiB, ${poster.width}x${poster.height})`,
+        `(${(bytes.length / 1024).toFixed(0)} KiB, ${poster.width}x${poster.height}` +
+        `${frame === null ? '' : `, frame ${frame}`})`,
     )
     run(
       'pnpm',
@@ -183,7 +213,11 @@ function main() {
     ...uploads.map(
       ({ poster, posterKey }) =>
         `UPDATE gallery_items SET poster_key = ${sqlStr(posterKey)}, ` +
-        `poster_width = ${poster.width}, poster_height = ${poster.height} ` +
+        `poster_width = ${poster.width}, poster_height = ${poster.height}, ` +
+        // Written in the same statement as the key on purpose: the frame
+        // describes THAT poster, so a row must never carry one without the
+        // other, in either direction.
+        `poster_frame = ${sqlInt(posterFrame(poster))} ` +
         `WHERE slug = ${sqlStr(poster.slug)};`,
     ),
     '',

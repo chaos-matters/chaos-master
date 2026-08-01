@@ -1,0 +1,15 @@
+-- Record WHICH timeline frame a poster was captured at.
+--
+-- An animated row's poster is not frame 0. capture-gallery-posters.mjs samples
+-- a fraction of the way into the timeline (--frame-fraction, default 0.35) and
+-- the capture page slides off that frame when the timeline holds vibrancy below
+-- the flame's stored value there, so the frame actually used is decided at
+-- capture time. Without it stored, Home cannot reproduce the poster's image on
+-- the GPU: a live render sits at frame 0, so freezing back to the poster would
+-- visibly jump — which is why every animated row had to stay poster-only.
+--
+-- NULL means "no frame applies or none was recorded": every still (there is no
+-- timeline to sample), and any poster captured before this column existed.
+-- Consumers must treat NULL on an animated row as "the poster's frame is
+-- unknown" and not assume 0.
+ALTER TABLE gallery_items ADD COLUMN poster_frame INTEGER;

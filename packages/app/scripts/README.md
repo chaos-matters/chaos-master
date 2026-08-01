@@ -38,13 +38,21 @@ Because `local` and `dev` share a database _name_, every JSON result carries
 `storage` (`local` or `remote`) next to `env` and `database`. The name alone
 cannot tell the two apart.
 
-A local store starts with no tables. `gallery-admin` applies
-`migrations/0001_gallery_content.sql` itself the first time it finds
+A local store starts with no tables. `gallery-admin` applies everything in
+`migrations/` itself (`wrangler d1 migrations apply`) the first time it finds
 `gallery_items` missing on a local target (and says so, with
 `"initialized": true` in the result); `seed-gallery.mjs --apply local` does the
 same before seeding. Remote targets never get schema written to them
 automatically — there, a missing table means something is wrong, and the error
 names the exact command instead.
+
+It is `migrations apply` rather than `execute --file=<schema>` because those two
+callers re-apply the schema freely, so every migration has to survive being run
+again — and `ALTER TABLE ... ADD COLUMN` cannot (SQLite has no `IF NOT EXISTS`
+for it). Wrangler tracks what it has applied in a `d1_migrations` table and
+skips those, which makes a repeat run a no-op whatever the migration contains. A
+store predating that table replays from `0001`, whose statements are all
+`CREATE ... IF NOT EXISTS`.
 
 ## gallery-admin
 
@@ -165,8 +173,9 @@ node scripts/upload-gallery-posters.mjs --env prod
 
 Posters go into the **existing** og-images bucket
 (`chaos-master-og-images-dev` / `chaos-master-og-images`) under a `gallery/`
-prefix — no new bucket. The script then sets `poster_key`, `poster_width` and
-`poster_height` on each row in one batched `wrangler d1 execute` run.
+prefix — no new bucket. The script then sets `poster_key`, `poster_width`,
+`poster_height` and `poster_frame` on each row in one batched
+`wrangler d1 execute` run.
 
 Both halves follow `--env` together. A `local` run puts the object into the
 local bucket and the `poster_key` into the local database, so a local row can
@@ -216,6 +225,17 @@ still a real frame, still away from the rest pose. Rows that do not animate
 vibrancy resolve to the stored value everywhere and never move.
 `--frame-fraction` changes the ratio, `--frame <n>` pins an exact frame and
 skips the check.
+
+**And the frame that resolves to is stored.** It is a decision, not a formula —
+nothing downstream could recompute where the slide ended up — so the capture
+records it in the manifest and the upload writes it to `poster_frame` alongside
+`poster_key`. That is what lets Home render an animated row live: the plate
+replays the timeline at exactly that frame, so the live flame and the poster are
+the same image and the freeze-to-poster swap is invisible. A row whose poster
+predates the column has `poster_frame = NULL`, which means "frame unknown", and
+Home keeps it on its poster until it is re-captured (`needsPosterFrame` in
+`src/lib/galleryContent.ts`). Stills store `NULL` too: there is no timeline to
+sample, and `0` would read as a real choice.
 
 **Convergence is the app's own export gate.** The capture page renders with
 `Flam3`'s `exportDriver` and only hands the image back when `finalImageReady`

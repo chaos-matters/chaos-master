@@ -40,6 +40,9 @@
 //                         has vibrancy below the flame's stored value there,
 //                         so a poster is never the greyed-out moment of a
 //                         colour animation — see scripts/posterCapture.tsx.
+//                         Whichever frame that resolves to is recorded in the
+//                         manifest and stored on the row as `poster_frame`, so
+//                         Home can render the same image live.
 //   --frame <n>           explicit timeline frame; overrides --frame-fraction
 //                         and the vibrancy check both
 //   --timeout <ms>        per-row render budget (default 240000)
@@ -397,6 +400,10 @@ async function main() {
         height: result.height,
         bytes: bytes.length,
         animated: row.animation !== null,
+        // Which frame this poster IS. upload-gallery-posters.mjs copies it into
+        // `poster_frame`, and Home replays the timeline there so a live plate
+        // renders the same image the poster shows. Nothing downstream can
+        // recompute it: see resolveFrame in scripts/posterCapture.tsx.
         frame: result.frame,
         endFrame: result.endFrame,
         // Mean saturation of the lit pixels. A near-zero value on a flame that

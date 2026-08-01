@@ -373,7 +373,8 @@ const baseHandler = {
         const base =
           'SELECT slug, title, caption, author, section, capability, ' +
           'dimensions, transform_count, poster_key, poster_width, ' +
-          'poster_height, sort_order, (animation IS NOT NULL) AS has_animation ' +
+          'poster_height, poster_frame, sort_order, ' +
+          '(animation IS NOT NULL) AS has_animation ' +
           'FROM gallery_items WHERE published = 1'
         const stmt =
           section === null
@@ -432,7 +433,7 @@ const baseHandler = {
         const row = await env.CONTENT_DB.prepare(
           'SELECT slug, title, caption, author, section, capability, flame, ' +
             'animation, dimensions, transform_count, poster_key, ' +
-            'poster_width, poster_height FROM gallery_items ' +
+            'poster_width, poster_height, poster_frame FROM gallery_items ' +
             'WHERE slug = ? AND published = 1',
         )
           .bind(slug)

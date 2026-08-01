@@ -9,6 +9,7 @@ import { Default3DPreviewCamera } from '@/lib/Camera3D'
 import { fetchGalleryItem } from '@/lib/galleryContent'
 import { gpuReady } from '@/lib/gpuStatus'
 import { useIsScrolling } from '@/utils/isScrolling'
+import { applyTracksToFlame } from '@/utils/timeline'
 import { setLivePreviewLive, vramLog } from '@/utils/vramLog'
 import ui from './HomeTab.module.css'
 import type { Accessor } from 'solid-js'
@@ -125,14 +126,18 @@ function pointBudgetFor(placement: HomeFlamePlacement): number {
 }
 
 /**
- * Descriptors already fetched this session, by slug. Scrolling a plate out of
- * view and back must not re-fetch it, and the same flame can appear in more than
- * one section. Rejections are evicted so a transient failure does not poison the
- * slug for the rest of the session.
+ * Descriptors already fetched this session, by slug — as a PLATE renders them:
+ * animated rows have their timeline baked in at the poster's frame (see
+ * `loadDescriptor`). Scrolling a plate out of view and back must not re-fetch
+ * it, and the same flame can appear in more than one section. Rejections are
+ * evicted so a transient failure does not poison the slug for the rest of the
+ * session.
  *
- * Deliberately NOT shared with HomeTab's "open in the workspace" path: that hands
- * the descriptor to the editor, which owns and mutates it from then on, and it
- * must not be handed the same object a plate is rendering.
+ * Deliberately NOT shared with HomeTab's "open in the workspace" path, for two
+ * reasons now: that hands the descriptor to the editor, which owns and mutates
+ * it from then on and must not be handed the same object a plate is rendering —
+ * and what the editor needs is the row's own flame plus its tracks, not one
+ * already frozen partway through them.
  */
 const descriptorCache = new Map<string, Promise<FlameDescriptor>>()
 
@@ -144,7 +149,30 @@ function loadDescriptor(slug: string): Promise<FlameDescriptor> {
   // Validated exactly as the poster capture validates it, so a live plate can
   // never render from a descriptor the app itself would reject.
   const pending = fetchGalleryItem(slug)
-    .then((item) => validateFlame(item.flame))
+    .then((item) => {
+      const flame = validateFlame(item.flame)
+      const tracks = item.animation?.tracks ?? []
+      /**
+       * Freeze an animated row on the frame its POSTER was captured at, not on
+       * frame 0. The capture page picks that frame (a fraction into the
+       * timeline, slid off a vibrancy dip) and `poster_frame` is what records
+       * it — so replaying the timeline here is what makes the live render and
+       * the poster the same image, and the freeze-to-poster swap invisible.
+       *
+       * No loop options, matching scripts/posterCapture.tsx: the stored envelope
+       * is `{ tracks }` only, so keyframes resolve on their own timeline exactly
+       * as the capture resolved them.
+       *
+       * A null frame leaves the flame at its rest pose, which is safe: the only
+       * such rows that reach here have no poster to disagree with, because
+       * `needsPosterFrame` keeps the ones that do from going live at all.
+       */
+      const frame = item.poster_frame
+      if (tracks.length > 0 && typeof frame === 'number') {
+        applyTracksToFlame(tracks, flame, frame)
+      }
+      return flame
+    })
     .catch((err: unknown) => {
       descriptorCache.delete(slug)
       throw err
@@ -188,11 +216,14 @@ export interface HomeFlameProps {
   /** Hover: raises this plate's ComputeGate priority so it renders first. */
   hovered?: Accessor<boolean>
   /**
-   * Never go live; show the poster only. Used for animated rows: their poster is
-   * captured at a frame partway through the timeline (see posterCapture.tsx) and
-   * that frame is not recorded in the database, so a static live render would be
-   * a different image and every freeze would jump. The animated section gets its
-   * own live treatment in Phase 3.
+   * Never go live; show the poster only. For rows whose poster this plate cannot
+   * reproduce — see `needsPosterFrame` in lib/galleryContent.ts, which is the
+   * one thing that should be deciding this. Today that is an animated row whose
+   * poster was captured before `poster_frame` existed: its frame is unknown, so
+   * a live render would be a different image and every freeze would jump.
+   *
+   * Animated rows in general are NOT poster-only: with the frame recorded, this
+   * plate renders the timeline at exactly that frame (see `loadDescriptor`).
    */
   posterOnly?: boolean
   /**

@@ -18,7 +18,7 @@
 //   list     what is in the gallery
 //   inspect  what is inside dropped PNG/JSON files — writes nothing
 //   put      stage a flame as a gallery row (published = 0, no poster)
-//   capture  render + upload posters for rows that have none
+//   capture  render + upload posters for rows that need one
 //   publish  take a staged row live, or pull a live one back
 //   reorder  set a row's position within its section
 //
@@ -50,7 +50,7 @@ import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
 import { CAPTURE_PAGE, checkoutFailure, probeCapturePage, verifyServedCheckout, } from './dev-server-checkout.mjs'
 import { inspectFlame, isPlainObject, normalizeEnvelope, readFlameChunk, toSlug, transformsHash, } from './extract-flames.mjs'
-import { initCommand, isMissingTable, MIGRATION, storageFlags, tail, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
+import { initCommand, isMissingTable, MIGRATIONS_DIR, migrationsArgs, storageFlags, tail, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const appDir = resolve(scriptDir, '..')
@@ -78,8 +78,9 @@ const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/
 // megabytes of JSON, and nothing reading a list needs them.
 const ROW_COLUMNS =
   'slug, title, caption, author, section, capability, dimensions, ' +
-  'transform_count, poster_key, poster_width, poster_height, sort_order, ' +
-  'published, (animation IS NOT NULL) AS has_animation, created_at, updated_at'
+  'transform_count, poster_key, poster_width, poster_height, poster_frame, ' +
+  'sort_order, published, (animation IS NOT NULL) AS has_animation, ' +
+  'created_at, updated_at'
 
 const DEFAULT_POSTER_DIR = join(repoRoot, 'assets/local/gallery-posters')
 const DEFAULT_DEV_BASE = 'https://localhost:5173'
@@ -224,7 +225,7 @@ never publishes. Existing rows are upserted on slug, keeping their sort_order.
 A flame referencing custom variations whose definitions are absent is refused —
 it would render wrong on Home.`,
 
-  capture: `gallery-admin capture — posters for rows that have none
+  capture: `gallery-admin capture — posters for rows that need one
 
 Usage:
   node scripts/gallery-admin.mjs capture --all-missing [--env ${TARGET_LIST}]
@@ -232,7 +233,10 @@ Usage:
 
 Options:
   --slug a,b,c          capture exactly these slugs
-  --all-missing         capture every row whose poster_key is NULL
+  --all-missing         capture every row Home cannot render live from: no
+                        poster at all, or an animated row whose poster has no
+                        poster_frame recorded (captured before the column
+                        existed, so its frame is unknown)
   --out <dir>           poster output directory
                         (default assets/local/gallery-posters)
   --base <url>          dev server origin (default ${DEFAULT_DEV_BASE})
@@ -322,21 +326,15 @@ function targetFields(env) {
  * that by writing DDL to a shared database.
  */
 function initializeLocal(env) {
-  note(`${targetLabel(env)} has no gallery_items table — applying ${MIGRATION}`)
+  note(
+    `${targetLabel(env)} has no gallery_items table — applying ${MIGRATIONS_DIR}/`,
+  )
   try {
-    execFileSync(
-      'pnpm',
-      [
-        'exec',
-        'wrangler',
-        'd1',
-        'execute',
-        TARGETS[env].database,
-        ...storageFlags(env),
-        `--file=${join(appDir, MIGRATION)}`,
-      ],
-      { cwd: appDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
-    )
+    execFileSync('pnpm', migrationsArgs(env), {
+      cwd: appDir,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
   } catch (error) {
     throw new AdminError(
       'init-failed',
@@ -351,7 +349,7 @@ function initializeLocal(env) {
     )
   }
   initialized.add(env)
-  note(`Initialised ${targetLabel(env)} from ${MIGRATION}`)
+  note(`Initialised ${targetLabel(env)} from ${MIGRATIONS_DIR}/`)
 }
 
 /**
@@ -406,8 +404,8 @@ function d1(env, sql, { initialize = true } = {}) {
       }
       throw new AdminError(
         'content-db-not-initialized',
-        `${targetLabel(env)} has no gallery_items table — the schema in ` +
-          `${MIGRATION} was never applied to it`,
+        `${targetLabel(env)} has no gallery_items table — the migrations in ` +
+          `${MIGRATIONS_DIR}/ were never applied to it`,
         {
           ...targetFields(env),
           run: initCommand(env),
@@ -830,13 +828,13 @@ function commandPut(values) {
   const sql = `INSERT INTO gallery_items (
   slug, title, caption, author, section, capability, flame, animation,
   dimensions, transform_count, poster_key, poster_width, poster_height,
-  sort_order, published
+  poster_frame, sort_order, published
 ) VALUES (
   ${sqlStr(slug)}, ${sqlStr(title)}, ${sqlStr(caption)}, ${sqlStr(source.author)},
   ${sqlStr(section)}, ${sqlStr(capability)},
   ${sqlStr(flameJson)}, ${sqlStr(animationJson)},
   ${source.dimensions}, ${source.transformCount},
-  NULL, NULL, NULL,
+  NULL, NULL, NULL, NULL,
   (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM gallery_items
     WHERE section = ${sqlStr(section)}),
   0
@@ -854,6 +852,10 @@ ON CONFLICT(slug) DO UPDATE SET
   poster_key = NULL,
   poster_width = NULL,
   poster_height = NULL,
+  -- Re-staging replaces the flame, so the frame the old poster was captured at
+  -- describes nothing that still exists. Left behind, it would tell Home a new
+  -- poster's frame is known when it is not.
+  poster_frame = NULL,
   published = 0;
 `
 
@@ -1194,9 +1196,17 @@ function resolveCaptureSlugs(env, values) {
   }
 
   if (allMissing) {
+    // "Missing" is not only a missing poster. An ANIMATED row whose poster
+    // predates the poster_frame column has an image but no record of which
+    // frame it is, and Home cannot go live from that — it keeps such a plate on
+    // its poster (see needsPosterFrame in src/lib/galleryContent.ts). A
+    // re-capture is what fixes it: the capture resolves the frame again and the
+    // upload stores it alongside the new key. Backfilling those rows is the
+    // whole reason this reads more than poster_key.
     const { results } = d1(
       env,
       'SELECT slug FROM gallery_items WHERE poster_key IS NULL ' +
+        'OR (animation IS NOT NULL AND poster_frame IS NULL) ' +
         'ORDER BY section, sort_order, slug',
     )
     return results.map((row) => row.slug)
@@ -1302,8 +1312,8 @@ async function commandCapture(values) {
 
   const { results: rows } = d1(
     env,
-    'SELECT slug, poster_key, poster_width, poster_height, published ' +
-      `FROM gallery_items WHERE slug IN (${slugs.map(sqlStr).join(', ')}) ` +
+    'SELECT slug, poster_key, poster_width, poster_height, poster_frame, ' +
+      `published FROM gallery_items WHERE slug IN (${slugs.map(sqlStr).join(', ')}) ` +
       'ORDER BY slug',
   )
   const failed = rows

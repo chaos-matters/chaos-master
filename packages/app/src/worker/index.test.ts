@@ -241,6 +241,7 @@ const galleryRow = {
   poster_key: null,
   poster_width: null,
   poster_height: null,
+  poster_frame: null,
 }
 
 describe('worker /api/gallery', () => {
@@ -305,6 +306,35 @@ describe('worker /api/gallery', () => {
     expect(body.flame.transforms).toHaveProperty('t1')
     expect(body.animation.tracks).toEqual([])
     expect(db.calls[0]?.params).toEqual(['first-light'])
+  })
+
+  // Home renders an animated row live at the frame its poster was captured at,
+  // so both endpoints have to carry that frame. Dropped from either SELECT, the
+  // client sees "frame unknown" and silently falls back to the poster.
+  it('carries poster_frame through both gallery endpoints', async () => {
+    const row = {
+      ...galleryRow,
+      animation: JSON.stringify({ tracks: [] }),
+      poster_key: 'first-light-abcd1234.webp',
+      poster_frame: 31,
+    }
+    const list = await worker.fetch(
+      new Request('https://x.test/api/gallery'),
+      makeEnv({ CONTENT_DB: makeD1([row]) }),
+      ctx,
+    )
+    const listBody = (await list.json()) as {
+      items: { poster_frame: number | null }[]
+    }
+    expect(listBody.items[0]?.poster_frame).toBe(31)
+
+    const item = await worker.fetch(
+      new Request('https://x.test/api/gallery/first-light'),
+      makeEnv({ CONTENT_DB: makeD1([row]) }),
+      ctx,
+    )
+    const itemBody = (await item.json()) as { poster_frame: number | null }
+    expect(itemBody.poster_frame).toBe(31)
   })
 
   it('rejects a malformed slug before it reaches the query', async () => {

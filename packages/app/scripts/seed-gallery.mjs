@@ -24,7 +24,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { MIGRATION, storageFlags, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
+import { migrationsArgs, storageFlags, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const appDir = resolve(scriptDir, '..')
@@ -177,7 +177,9 @@ function rowFor(entry, section, order, content) {
     animation === null ? 'NULL' : sqlStr(JSON.stringify(animation)),
     String(dimensions),
     String(transformCount),
-    'NULL, NULL, NULL',
+    // poster_key, poster_width, poster_height, poster_frame — the poster
+    // pipeline owns all four (capture + upload-gallery-posters.mjs).
+    'NULL, NULL, NULL, NULL',
     String(order),
     '1',
   ].join(', ')
@@ -199,7 +201,7 @@ function buildSql(content) {
     'INSERT INTO gallery_items (',
     '  slug, title, caption, author, section, capability, flame, animation,',
     '  dimensions, transform_count, poster_key, poster_width, poster_height,',
-    '  sort_order, published',
+    '  poster_frame, sort_order, published',
     ') VALUES',
     values.join(',\n'),
     'ON CONFLICT(slug) DO UPDATE SET',
@@ -243,25 +245,18 @@ function main() {
       process.exit(1)
     }
     const where = storageFlags(args.apply)
-    // A local store starts with no tables at all, and the migration is nothing
-    // but `CREATE ... IF NOT EXISTS` against a sqlite file nobody else can
-    // see — so seeding from zero is one command there. Remote targets are left
-    // alone: a missing table on a shared database is a problem to look at, not
-    // something a seed script should quietly fix.
+    // A local store starts with no tables at all, and it is a sqlite file under
+    // packages/app/.wrangler that nobody else can see — so seeding from zero is
+    // one command there. Wrangler skips the migrations it has already applied,
+    // which is what makes running this before every local seed a no-op after
+    // the first. Remote targets are left alone: a missing table on a shared
+    // database is a problem to look at, not something a seed script should
+    // quietly fix.
     if (target.storage === 'local') {
-      execFileSync(
-        'pnpm',
-        [
-          'exec',
-          'wrangler',
-          'd1',
-          'execute',
-          target.database,
-          ...where,
-          `--file=${join(appDir, MIGRATION)}`,
-        ],
-        { cwd: appDir, stdio: ['ignore', 'ignore', 'inherit'] },
-      )
+      execFileSync('pnpm', migrationsArgs(args.apply), {
+        cwd: appDir,
+        stdio: ['ignore', 'ignore', 'inherit'],
+      })
     }
     const dir = mkdtempSync(join(tmpdir(), 'gallery-sql-'))
     const file = join(dir, 'seed.sql')
