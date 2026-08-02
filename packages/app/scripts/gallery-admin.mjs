@@ -47,7 +47,7 @@
 import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, extname, join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
@@ -1608,6 +1608,102 @@ async function commandCapture(values) {
   return result
 }
 
+// ── poster ───────────────────────────────────────────────────────────
+
+// Poster keys carry their format in the extension; the bucket is not asked.
+const MIME_BY_EXT = {
+  '.webp': 'image/webp',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+}
+
+/**
+ * Hand back a row's captured poster, as base64.
+ *
+ * Exists for `local` above all. dev and prod serve posters over HTTP already
+ * (`GET /api/gallery/poster/<key>` on the deployed Worker), so anything with a
+ * browser can just point an <img> at those and get caching for free. The local
+ * bucket is inside miniflare and has no URL at all unless a dev server happens
+ * to be running — which is a heavy thing to require for a thumbnail.
+ *
+ * Reads nothing but R2: a row must already have been captured. Rendering a
+ * flame that has no poster is a different, far more expensive operation.
+ */
+function commandPoster(values) {
+  const env = resolveEnv(values)
+  if (values.slug === undefined) {
+    throw new AdminError('usage', 'poster needs --slug')
+  }
+  const slug = values.slug
+  if (!SLUG_PATTERN.test(slug)) {
+    throw new AdminError('bad-slug', `"${slug}" is not a valid slug`)
+  }
+  const row = requireRow(env, slug)
+  if (!row.poster_key) {
+    throw new AdminError(
+      'no-poster',
+      `"${slug}" has no poster yet — there is nothing to show`,
+      {
+        ...targetFields(env),
+        slug,
+        fix: `node scripts/gallery-admin.mjs capture --slug ${slug} --env ${env}`,
+      },
+    )
+  }
+
+  let bytes
+  try {
+    bytes = execFileSync(
+      'pnpm',
+      [
+        'exec',
+        'wrangler',
+        'r2',
+        'object',
+        'get',
+        `${TARGETS[env].bucket}/gallery/${row.poster_key}`,
+        // --pipe puts the object on stdout and silences wrangler's banner,
+        // which would otherwise be prepended to the image bytes.
+        '--pipe',
+        ...storageFlags(env),
+      ],
+      {
+        cwd: appDir,
+        // No encoding: this is an image, and decoding it as utf8 would corrupt
+        // every byte above 0x7f.
+        encoding: 'buffer',
+        maxBuffer: 64 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    )
+  } catch (error) {
+    throw new AdminError(
+      'poster-unreadable',
+      `Could not read ${row.poster_key} from ${TARGETS[env].bucket}`,
+      {
+        ...targetFields(env),
+        slug,
+        posterKey: row.poster_key,
+        cause: tail(String(error.stderr ?? '')) || 'no output',
+        hint: 'the row names a poster the bucket does not have — re-capture it',
+      },
+    )
+  }
+
+  return {
+    ...targetFields(env),
+    slug,
+    posterKey: row.poster_key,
+    width: row.poster_width,
+    height: row.poster_height,
+    bytes: bytes.length,
+    mimeType:
+      MIME_BY_EXT[extname(row.poster_key).toLowerCase()] ?? 'image/webp',
+    base64: bytes.toString('base64'),
+  }
+}
+
 // ── delete ───────────────────────────────────────────────────────────
 
 /**
@@ -1939,6 +2035,10 @@ const COMMANDS = {
   delete: {
     run: commandDelete,
     options: ['env', 'confirm', 'slug', 'yes'],
+  },
+  poster: {
+    run: commandPoster,
+    options: ['env', 'confirm', 'slug'],
   },
   reorder: {
     run: commandReorder,

@@ -130,6 +130,16 @@ implementations.
   poster — and because the key exists nowhere else once the row is gone, a
   failed object delete prints the exact command to finish it.
 
+- **`gallery-admin poster`** (`scripts/gallery-admin.mjs`): hands back a row's
+  captured poster as base64, for the console's preview thumbnails. Exists for
+  `local` above all — dev and prod already publish posters at
+  `GET /api/gallery/poster/<key>`, so a browser can point an `<img>` straight
+  at those and get HTTP caching for free, whereas the local bucket lives inside
+  miniflare and has no URL unless a dev server happens to be running. Reads
+  only R2: rendering a flame that has no poster is a different and far more
+  expensive operation, so a row without one is an explicit `no-poster` error
+  carrying the `capture` command that would fix it.
+
 ### Changed
 
 - **Home art direction** (`HomeTab.module.css`): Home now carries its own
