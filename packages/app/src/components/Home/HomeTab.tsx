@@ -1,4 +1,4 @@
-import { createResource, createSignal, For, Show } from 'solid-js'
+import { createEffect, createResource, createSignal, For, onCleanup, Show, } from 'solid-js'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { setActiveTab } from '@/lib/activeTab'
@@ -8,6 +8,7 @@ import { HomeFlame } from './HomeFlame'
 import { createPlaybackCoordinator } from './homePlayback'
 import { HomePortal } from './HomePortal'
 import ui from './HomeTab.module.css'
+import { createPlateGestureRecogniser } from './plateGesture'
 import type { Accessor } from 'solid-js'
 import type { HomeFlamePlacement } from './HomeFlame'
 import type { PlaybackCoordinator } from './homePlayback'
@@ -77,12 +78,124 @@ const SECTIONS: { id: GallerySection | 'made'; label: string }[] = [
 /** Editorial spans: the shape of the wall, by position. */
 const SPANS = [ui.span3, ui.row2, ui.span2, '', ui.span2, ui.span2]
 
+/**
+ * A tile's pointer glue: one gesture recogniser wired to the DOM, shared by both
+ * tile shapes so the interaction cannot drift between them.
+ *
+ * A plain `onClick` is no longer enough now that a selected plate carries a
+ * camera — releasing the pointer after a pan would open the flame the user was
+ * steering. `plateGesture` decides what a sequence meant; this only routes the
+ * verdict and remembers whether it came from a finger, so the hint can say
+ * "pinch" rather than "scroll".
+ */
+function usePlateInteraction(props: {
+  slug: string
+  /** The tile element the gesture is recognised on. */
+  el: Accessor<HTMLElement | undefined>
+  onSelect: (slug: string) => void
+  onOpen: (slug: string) => void
+}) {
+  const recogniser = createPlateGestureRecogniser()
+  const [coarse, setCoarse] = createSignal(false)
+  // A plate can unmount mid-gesture (scrolled out of the near window). Ending
+  // the sequence stops a stale first tap from pairing with the next one into an
+  // unwanted open.
+  onCleanup(() => {
+    recogniser.cancel()
+  })
+
+  /*
+   * CAPTURE phase, and manual listeners rather than JSX `onPointerDown` — this
+   * is load-bearing, not style.
+   *
+   * A selected plate's camera attaches its own listeners to the canvas, and
+   * `createDragHandler` calls `stopImmediatePropagation()` on both pointerdown
+   * and pointerup (it has to: the workspace must not have a drag double as a
+   * click on whatever is underneath). The canvas is the event TARGET, so a
+   * bubble-phase listener on the tile never runs — the camera has already
+   * killed the event by the time it would. Panning worked and double-click did
+   * nothing, because the recogniser was simply never fed.
+   *
+   * Capture runs the other way, document -> tile -> canvas, so the tile sees
+   * every sequence first and nothing downstream can take it away.
+   */
+  createEffect(() => {
+    const el = props.el()
+    if (el === undefined) {
+      return
+    }
+    const options = { capture: true } as const
+    const onDown = (event: PointerEvent) => {
+      setCoarse(event.pointerType !== 'mouse')
+      recogniser.down(event, event.timeStamp)
+    }
+    const onMove = (event: PointerEvent) => {
+      recogniser.move(event, event.timeStamp)
+    }
+    const onUp = (event: PointerEvent) => {
+      const gesture = recogniser.up(event, event.timeStamp)
+      if (gesture === 'select') {
+        props.onSelect(props.slug)
+      } else if (gesture === 'open') {
+        props.onOpen(props.slug)
+      }
+    }
+    const onCancel = () => {
+      recogniser.cancel()
+    }
+    el.addEventListener('pointerdown', onDown, options)
+    el.addEventListener('pointermove', onMove, options)
+    el.addEventListener('pointerup', onUp, options)
+    el.addEventListener('pointercancel', onCancel, options)
+    onCleanup(() => {
+      el.removeEventListener('pointerdown', onDown, options)
+      el.removeEventListener('pointermove', onMove, options)
+      el.removeEventListener('pointerup', onUp, options)
+      el.removeEventListener('pointercancel', onCancel, options)
+    })
+  })
+
+  return {
+    /** The last sequence came from touch or pen, not a mouse. */
+    coarse,
+    cancel: () => {
+      recogniser.cancel()
+    },
+    handlers: {
+      /* Keyboard carries no drag ambiguity, so Enter/Space opens directly
+         rather than making keyboard users "double-press". preventDefault stops
+         Space from also scrolling the page. */
+      onKeyDown(event: KeyboardEvent) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          props.onOpen(props.slug)
+        }
+      },
+    },
+  }
+}
+
+/** What a selected plate can do, phrased for the device that selected it. */
+function PlateHint(props: { coarse: boolean }) {
+  const text = () =>
+    props.coarse
+      ? 'Drag to pan · pinch to zoom · double-tap to open'
+      : 'Drag to pan · scroll to zoom · double-click to open'
+  return (
+    <span class={ui.plateHint} aria-hidden="true">
+      {text()}
+    </span>
+  )
+}
+
 function Plate(props: {
   item: GalleryListItem
   class?: string
   placement: HomeFlamePlacement
   track: TrackVisibility
   onOpen: (slug: string) => void
+  selected: boolean
+  onSelect: (slug: string) => void
   playback?: PlaybackCoordinator
   autoPlay?: boolean
 }) {
@@ -90,25 +203,41 @@ function Plate(props: {
   const near = props.track(tileEl)
   const [hovered, setHovered] = createSignal(false)
   const [playing, setPlaying] = createSignal(false)
+  const interaction = usePlateInteraction({
+    slug: props.item.slug,
+    el: tileEl,
+    onSelect: props.onSelect,
+    onOpen: props.onOpen,
+  })
+  const engaged = () => props.selected
   return (
     <button
       ref={setTileEl}
       type="button"
       class={`${ui.plate} ${props.class ?? ''}`}
+      classList={{ [ui.isSelected!]: props.selected }}
       /* Reflects HomeFlame's own playback state, so "how many plates are moving
          right now" is answerable from the DOM — by the reader, and by the
          Playwright run that has to prove the cap holds. */
       data-home-playing={playing() ? 'true' : undefined}
-      onClick={() => {
-        props.onOpen(props.item.slug)
-      }}
+      data-home-selected={props.selected ? 'true' : undefined}
+      aria-pressed={props.selected}
+      {...interaction.handlers}
       onPointerEnter={() => {
         setHovered(true)
       }}
       onPointerLeave={() => {
         setHovered(false)
+        // Leaving mid-sequence is the camera being used elsewhere, or the
+        // pointer moving to another plate — either way this plate's gesture is
+        // over and must not pair with a later tap.
+        interaction.cancel()
       }}
-      title={`Open ${props.item.title} in the workspace`}
+      title={
+        props.selected
+          ? `Double-click to open ${props.item.title} in the workspace`
+          : `Select ${props.item.title}`
+      }
     >
       <HomeFlame
         slug={props.item.slug}
@@ -116,12 +245,16 @@ function Plate(props: {
         placement={props.placement}
         near={near}
         hovered={hovered}
+        engaged={engaged}
         posterOnly={needsPosterFrame(props.item)}
         playback={props.playback}
         autoPlay={props.autoPlay}
         onPlayingChange={setPlaying}
         freezeWhenConverged
       />
+      <Show when={props.selected}>
+        <PlateHint coarse={interaction.coarse()} />
+      </Show>
       <Show when={posterUrl(props.item) === undefined}>
         <span class={ui.plateEmpty}>No poster yet</span>
       </Show>
@@ -145,25 +278,38 @@ function CapabilityCard(props: {
   item: GalleryListItem
   track: TrackVisibility
   onOpen: (slug: string) => void
+  selected: boolean
+  onSelect: (slug: string) => void
   playback?: PlaybackCoordinator
 }) {
   const [thumbEl, setThumbEl] = createSignal<HTMLElement>()
+  const [cardEl, setCardEl] = createSignal<HTMLElement>()
   const near = props.track(thumbEl)
   const [hovered, setHovered] = createSignal(false)
   const [playing, setPlaying] = createSignal(false)
+  const interaction = usePlateInteraction({
+    slug: props.item.slug,
+    el: cardEl,
+    onSelect: props.onSelect,
+    onOpen: props.onOpen,
+  })
+  const engaged = () => props.selected
   return (
     <button
+      ref={setCardEl}
       type="button"
       class={ui.card}
+      classList={{ [ui.isSelected!]: props.selected }}
       data-home-playing={playing() ? 'true' : undefined}
-      onClick={() => {
-        props.onOpen(props.item.slug)
-      }}
+      data-home-selected={props.selected ? 'true' : undefined}
+      aria-pressed={props.selected}
+      {...interaction.handlers}
       onPointerEnter={() => {
         setHovered(true)
       }}
       onPointerLeave={() => {
         setHovered(false)
+        interaction.cancel()
       }}
     >
       <span class={ui.cardThumb} ref={setThumbEl}>
@@ -173,11 +319,15 @@ function CapabilityCard(props: {
           placement="thumb"
           near={near}
           hovered={hovered}
+          engaged={engaged}
           posterOnly={needsPosterFrame(props.item)}
           playback={props.playback}
           onPlayingChange={setPlaying}
           freezeWhenConverged
         />
+        <Show when={props.selected}>
+          <PlateHint coarse={interaction.coarse()} />
+        </Show>
       </span>
       <span class={ui.cardTitle}>{props.item.title}</span>
       <Show when={props.item.caption}>
@@ -249,6 +399,52 @@ export function HomeTab(props: HomeTabProps) {
   function scrollTo(id: string) {
     document.getElementById(`home-${id}`)?.scrollIntoView({ block: 'start' })
   }
+
+  /**
+   * The one selected plate on the page.
+   *
+   * Page-level rather than per-plate because selection is exclusive: it hands
+   * over the camera, and a second plate holding one would mean two tiles
+   * fighting for the same wheel events — and two plates that refuse to freeze
+   * back to their posters, which is the memory bound. Selecting again clears
+   * it, so a slow second tap is an undo rather than a dead end.
+   */
+  const [selectedSlug, setSelectedSlug] = createSignal<string>()
+
+  function select(slug: string) {
+    setSelectedSlug((current) => (current === slug ? undefined : slug))
+  }
+
+  // Escape, or a press anywhere that is not the selected plate, hands the
+  // camera back. Listeners only exist while something is selected.
+  createEffect(() => {
+    if (selectedSlug() === undefined) {
+      return
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSelectedSlug(undefined)
+      }
+    }
+    // Capture phase, so this runs BEFORE the plate that was pressed: pressing a
+    // different plate clears the old selection first, then that plate's own
+    // gesture selects it on release.
+    const onPointerDown = (event: Event) => {
+      const target = event.target
+      if (
+        !(target instanceof Element) ||
+        target.closest('[data-home-selected="true"]') === null
+      ) {
+        setSelectedSlug(undefined)
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('pointerdown', onPointerDown, true)
+    onCleanup(() => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('pointerdown', onPointerDown, true)
+    })
+  })
 
   /**
    * Fetch the descriptor on demand — the list deliberately omits it. The row's
@@ -338,6 +534,8 @@ export function HomeTab(props: HomeTabProps) {
                         placement="plate"
                         track={track}
                         onOpen={open}
+                        selected={selectedSlug() === item.slug}
+                        onSelect={select}
                         playback={playback}
                       />
                     )}
@@ -364,6 +562,8 @@ export function HomeTab(props: HomeTabProps) {
                           placement="plate"
                           track={track}
                           onOpen={open}
+                          selected={selectedSlug() === item.slug}
+                          onSelect={select}
                           playback={playback}
                           autoPlay={i() < AUTO_PLAY_TILES}
                         />
@@ -411,6 +611,8 @@ export function HomeTab(props: HomeTabProps) {
                         item={item}
                         track={track}
                         onOpen={open}
+                        selected={selectedSlug() === item.slug}
+                        onSelect={select}
                         playback={playback}
                       />
                     )}

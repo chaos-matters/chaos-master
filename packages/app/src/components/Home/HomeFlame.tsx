@@ -1,20 +1,24 @@
 import { createEffect, createMemo, createSignal, on, onCleanup, Show, untrack, } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
+import { clamp } from 'typegpu/std'
 import { useComputeGate } from '@/contexts/ComputeGateContext'
 import { Flam3 } from '@/flame/Flam3'
-import { validateFlame } from '@/flame/schema/flameSchema'
+import { camera3DDefault, validateFlame } from '@/flame/schema/flameSchema'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
 import { Default3DPreviewCamera } from '@/lib/Camera3D'
 import { fetchGalleryItem, sequenceFlames } from '@/lib/galleryContent'
 import { gpuReady } from '@/lib/gpuStatus'
+import { createPosition, createZoom, WheelZoomCamera2D, } from '@/lib/WheelZoomCamera2D'
+import { createSpherical, WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
 import { deepClone } from '@/utils/clone'
 import { useIsScrolling } from '@/utils/isScrolling'
 import { applyTracksToFlame, getUserEndFrame } from '@/utils/timeline'
 import { setLivePreviewLive, vramLog } from '@/utils/vramLog'
 import { AUTO_PLAY_MAX_MS, frameAtElapsed, loopCompletesAtMs, sequenceIndexAt, sequenceLoopMs, timelineLoopMs, usePrefersReducedMotion, } from './homePlayback'
 import ui from './HomeTab.module.css'
-import type { Accessor } from 'solid-js'
+import type { Accessor, Setter, Signal } from 'solid-js'
+import type { v2f } from 'typegpu/data'
 import type { PlaybackCoordinator, PlaybackReason } from './homePlayback'
 import type { RenderStatus } from '@/contexts/ComputeGateContext'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -128,6 +132,34 @@ const FREEZE_PROGRESS_FRACTION = 0.98
 
 /** Fraction of the point target past which a plate stops being "fresh". */
 const HIGH_QUALITY_PROGRESS = 0.5
+
+/**
+ * How far a live render has to get before the poster is faded out from under
+ * it.
+ *
+ * Revealing at the first batch (`points() > 0`) shows a nearly-empty
+ * accumulation — a bright, washed-out ghost of the flame that resolves a beat
+ * later. On a plate that reveals once and converges that is a blink; on the
+ * hero, which re-revealed on every scroll, it was the reported white flash.
+ * With the mounting latch below the hero no longer restarts at all, but a
+ * threshold here is what makes any re-accumulation (a camera pan, a thaw)
+ * unable to look like one.
+ */
+const REVEAL_PROGRESS = 0.25
+
+// ── Camera interaction ──────────────────────────────────────────────────────
+// The clamps that keep a steered plate framed. Ported from the landing's
+// FlameView, which is the reference for wiring the app's WheelZoom cameras
+// around a preview; the numbers are its numbers.
+
+/** 3D orbit radius clamp, as factors of the flame's own start radius. */
+const ORBIT_RADIUS_MIN_FACTOR = 0.5
+const ORBIT_RADIUS_MAX_FACTOR = 1.6
+/** 2D zoom clamp, as factors of the flame's own start zoom. */
+const ZOOM_MIN_FACTOR = 0.4
+const ZOOM_MAX_FACTOR = 3
+/** 2D pan cap, in world units around the flame's own start position. */
+const PAN_CAP_WORLD = 1.6
 
 /** Per-flame point budget for the mobile / low tier. */
 const POINT_BUDGET_TOUCH = 1e5
@@ -299,6 +331,20 @@ export interface HomeFlameProps {
   /** Hover: raises this plate's ComputeGate priority so it renders first. */
   hovered?: Accessor<boolean>
   /**
+   * This is the page's ACTIVE plate — the one the user selected — so it takes
+   * the camera: drag to pan (2D) or orbit (3D), wheel to zoom, pinch on touch.
+   * At most one plate on the page should have this.
+   *
+   * It is a whole mode rather than "attach some listeners", because everything
+   * else about a plate assumes nobody is touching it: an engaged plate holds a
+   * ComputeGate slot, and above all does NOT freeze back to its poster — the
+   * poster is the flame at rest, and handing over to it mid-drag would replace
+   * what the user is steering with a picture of somewhere else. Disengaging
+   * hands it straight back (see the freeze effect), which is also what puts the
+   * camera back where the poster is.
+   */
+  engaged?: Accessor<boolean>
+  /**
    * Never go live; show the poster only. For rows whose poster this plate cannot
    * reproduce — see `needsPosterFrame` in lib/galleryContent.ts, which is the
    * one thing that should be deciding this. Today that is an animated row whose
@@ -351,9 +397,48 @@ export function HomeFlame(props: HomeFlameProps) {
    */
   const [playPos, setPlayPos] = createSignal<number>()
 
-  const wantsLive = createMemo(
-    () => props.posterOnly !== true && gpuReady() && settled() && !frozen(),
+  const engaged = createMemo(() => props.engaged?.() === true)
+
+  /**
+   * Everything about being live EXCEPT the scroll settling — i.e. "should this
+   * plate have a canvas at all".
+   */
+  const eligible = createMemo(
+    () => props.posterOnly !== true && gpuReady() && props.near() && !frozen(),
   )
+
+  /**
+   * A latch, not `eligible() && settled()`, and this is the fix for the hero
+   * flashing on scroll.
+   *
+   * The settled-visibility rule (`.agents/skills/gallery_preview_layout` §3)
+   * exists so a fast scroll does not allocate and abandon a WebGPU canvas per
+   * tile that flickers past. That is a rule about STARTING. Applying it to
+   * STOPPING as well meant every scroll event — anywhere in the app, the signal
+   * is global — tore down the canvas of every plate that was live, threw away
+   * its accumulation buffers, and rebuilt them ~180ms later from zero. Plates
+   * had already frozen to their posters by then so nobody saw it; the hero
+   * never freezes, so the hero re-accumulated from scratch on every scroll and
+   * showed the washed-out first batch each time. That was the flash.
+   *
+   * Keeping an already-live canvas alive through a scroll costs nothing new —
+   * the buffers are already allocated — and the live set is still bounded, by
+   * the same near-window as before: leaving it clears `eligible` and unmounts.
+   * `HomePortal` reached the identical conclusion for the same reason; this is
+   * that latch, per plate.
+   */
+  const [started, setStarted] = createSignal(false)
+  createEffect(() => {
+    if (!eligible()) {
+      setStarted(false)
+      return
+    }
+    if (!scrolling()) {
+      setStarted(true)
+    }
+  })
+
+  const wantsLive = createMemo(() => eligible() && started())
 
   /**
    * Fetch the descriptor the first time this plate is about to go live, never up
@@ -738,17 +823,22 @@ export function HomeFlame(props: HomeFlameProps) {
    *
    * An animating plate counts as selected: it is the one thing on the page that
    * is visibly moving, so it must win a slot over a still plate quietly topping
-   * up its accumulation. The concurrency cap makes that safe — at most
-   * MAX_CONCURRENT_PLAYBACK plates can claim the priority at once, which is the
-   * gate's own capacity.
+   * up its accumulation. So does the ENGAGED plate — a camera the user is
+   * dragging that only redraws when a slot frees up is not a camera. The
+   * concurrency cap makes both safe: at most MAX_CONCURRENT_PLAYBACK plates can
+   * claim the priority at once, and there is only ever one engaged plate.
+   *
+   * `isVisible` stays on settled visibility rather than the latch: an
+   * already-live plate keeps its buffers through a scroll (that is the point of
+   * the latch) but has no need to keep ITERATING during one.
    */
   const allowed = useComputeGate(() =>
     props.posterOnly === true || frozen() || row() === undefined
       ? undefined
       : {
-          isVisible: settled(),
+          isVisible: settled() || engaged(),
           renderStatus: renderStatus(),
-          isSelected: hovered() || playing(),
+          isSelected: hovered() || playing() || engaged(),
         },
   )
 
@@ -772,6 +862,7 @@ export function HomeFlame(props: HomeFlameProps) {
       props.poster !== undefined &&
       !noFreeze() &&
       !playing() &&
+      !engaged() &&
       playPos() === undefined,
   )
 
@@ -787,7 +878,8 @@ export function HomeFlame(props: HomeFlameProps) {
   createEffect(() => {
     if (!canFreeze()) {
       // Thaw: the dev hook was flipped, this row has no poster to hand the
-      // picture back to, or it is animating — so it must stay live.
+      // picture back to, or it is animating or being steered — so it must stay
+      // live.
       setFrozen(false)
       return
     }
@@ -796,8 +888,56 @@ export function HomeFlame(props: HomeFlameProps) {
     }
   })
 
+  /**
+   * Letting go hands the picture straight back to the poster, without waiting
+   * to re-converge.
+   *
+   * The camera resets to the flame's own when the plate stops being engaged,
+   * which resets the accumulation — so the alternative is watching the reset
+   * camera converge back to the image the poster already holds. Freezing on the
+   * spot skips that, and is only ever done for a plate that HAS a poster to
+   * hand back to (the hero has one but never freezes, so it keeps its canvas
+   * and simply re-converges; there is nothing for it to disagree with).
+   *
+   * Placed after the freeze effect deliberately: both write `frozen`, and this
+   * one has to win the update in which `engaged` goes false.
+   */
+  createEffect(
+    on(engaged, (isEngaged, wasEngaged) => {
+      if (isEngaged || wasEngaged !== true) {
+        return
+      }
+      if (untrack(canFreeze) && untrack(live)) {
+        setFrozen(true)
+      }
+    }),
+  )
+
+  /**
+   * Has the live canvas got enough on it to fade the poster out from under it?
+   *
+   * A latch, so it can only ever go one way while the canvas is up. Anything
+   * that resets the accumulation of an already-revealed plate — a camera pan, a
+   * new sequence entry — would otherwise drop the progress back under the
+   * threshold and fade the poster in over the top of the render the user is
+   * steering.
+   */
+  const [revealed, setRevealed] = createSignal(false)
+  createEffect(() => {
+    if (!live()) {
+      setRevealed(false)
+      return
+    }
+    if (
+      points() > 0 &&
+      (props.poster === undefined || progress() >= REVEAL_PROGRESS)
+    ) {
+      setRevealed(true)
+    }
+  })
+
   /** The live canvas has something on it worth revealing the poster for. */
-  const liveShowing = createMemo(() => live() && points() > 0)
+  const liveShowing = createMemo(() => live() && revealed())
 
   // One token per plate; membership in the live set == this plate's canvas is
   // mounted. Idempotent, so the DebugPanel's count cannot drift.
@@ -856,6 +996,7 @@ export function HomeFlame(props: HomeFlameProps) {
             onPointLimit={(get) => {
               setPointLimit(() => get)
             }}
+            engaged={engaged()}
           />
         )}
       </Show>
@@ -876,6 +1017,8 @@ function LiveFlame(props: {
   renderInterval: number
   onPoints: (count: number) => void
   onPointLimit: (get: () => number) => void
+  /** Swap the static preview cameras for the app's steerable ones. */
+  engaged: boolean
 }) {
   // Every conditional (`??`, ternary, `&&`) that feeds Flam3 or a camera is
   // hoisted into a memo owned by this component and passed as the CALLED value.
@@ -894,6 +1037,75 @@ function LiveFlame(props: {
   const cameraZoom = createMemo(() => props.flame.renderSettings.camera.zoom)
   const camera3D = createMemo(() => props.flame.renderSettings.camera3D)
   const edgeFadeColor = createMemo(() => vec4f(0))
+
+  /**
+   * The steerable cameras' state, rebuilt on the engage edge and whenever the
+   * descriptor underneath changes.
+   *
+   * Rebuilding is what resets the camera on release — the signals are seeded
+   * from the descriptor's own camera, so a fresh bundle IS the flame's framing,
+   * and there is no separate reset path that could drift from it. Rebuilding on
+   * a descriptor change matters for the sequence plates, which have a new flame
+   * swapped in underneath them: the previous flame's pan would otherwise be
+   * applied to the next one, which frames differently.
+   *
+   * Both are inert while the plate is not engaged — the WheelZoom cameras that
+   * read them are not mounted, so nothing listens for a pointer either.
+   */
+  const cam2D = createMemo(() => {
+    const startPos = cameraPosition()
+    const startZoom = cameraZoom()
+    void props.engaged
+    const [position, setPositionRaw] = createPosition(startPos)
+    // `createPosition` deliberately has no clamp of its own (the workspace wants
+    // to pan anywhere). A plate does not: without a cap you can drag the flame
+    // clean off its own tile and be left steering an empty black rectangle.
+    const setPosition = ((value: v2f | ((prev: v2f) => v2f)) =>
+      setPositionRaw((prev) => {
+        const next = typeof value === 'function' ? value(prev) : value
+        return vec2f(
+          clamp(next.x, startPos.x - PAN_CAP_WORLD, startPos.x + PAN_CAP_WORLD),
+          clamp(next.y, startPos.y - PAN_CAP_WORLD, startPos.y + PAN_CAP_WORLD),
+        )
+      })) as Setter<v2f>
+    return {
+      position: [position, setPosition] as Signal<v2f>,
+      zoom: createZoom(startZoom, [
+        startZoom * ZOOM_MIN_FACTOR,
+        startZoom * ZOOM_MAX_FACTOR,
+      ]),
+    }
+  })
+
+  const cam3D = createMemo(() => {
+    const c = camera3D() ?? camera3DDefault
+    void props.engaged
+    const spherical = createSpherical(
+      c.theta,
+      c.phi,
+      c.radius,
+      new Float32Array(c.target),
+      c.fov,
+      c.roll,
+    )
+    // WheelZoomCamera3D clamps radius only for pan-speed scaling, not for the
+    // orbit itself — so cap it here, relative to the flame's own radius. Flames
+    // are posed at wildly different scales; a fixed range would be unusable on
+    // most of them.
+    const [radius, setRadiusRaw] = spherical.radius
+    const setRadius = ((value: number | ((prev: number) => number)) =>
+      setRadiusRaw((prev) =>
+        clamp(
+          typeof value === 'function' ? value(prev) : value,
+          c.radius * ORBIT_RADIUS_MIN_FACTOR,
+          c.radius * ORBIT_RADIUS_MAX_FACTOR,
+        ),
+      )) as Setter<number>
+    return {
+      ...spherical,
+      radius: [radius, setRadius] as Signal<number>,
+    }
+  })
 
   const flam3 = () => (
     <Flam3
@@ -918,17 +1130,47 @@ function LiveFlame(props: {
       pixelRatio={1}
       fixedResolution={props.resolution}
     >
+      {/* The static preview cameras stay the default: they cost nothing, and a
+          plate at rest must not be listening for wheel events — the page would
+          stop scrolling over every flame on it. Engaging swaps in the app's own
+          WheelZoom cameras, so pan/orbit/zoom/pinch are the SAME code the
+          workspace uses rather than a second implementation that drifts. */}
       <Show
         when={is3D()}
         fallback={
-          <Camera2D position={cameraPosition()} zoom={cameraZoom()}>
-            {flam3()}
-          </Camera2D>
+          <Show
+            when={props.engaged}
+            fallback={
+              <Camera2D position={cameraPosition()} zoom={cameraZoom()}>
+                {flam3()}
+              </Camera2D>
+            }
+          >
+            <WheelZoomCamera2D position={cam2D().position} zoom={cam2D().zoom}>
+              {flam3()}
+            </WheelZoomCamera2D>
+          </Show>
         }
       >
-        <Default3DPreviewCamera camera3D={camera3D()}>
-          {flam3()}
-        </Default3DPreviewCamera>
+        <Show
+          when={props.engaged}
+          fallback={
+            <Default3DPreviewCamera camera3D={camera3D()}>
+              {flam3()}
+            </Default3DPreviewCamera>
+          }
+        >
+          <WheelZoomCamera3D
+            theta={cam3D().theta}
+            phi={cam3D().phi}
+            radius={cam3D().radius}
+            target={cam3D().target}
+            fov={cam3D().fov}
+            roll={cam3D().roll}
+          >
+            {flam3()}
+          </WheelZoomCamera3D>
+        </Show>
       </Show>
     </AutoCanvas>
   )
