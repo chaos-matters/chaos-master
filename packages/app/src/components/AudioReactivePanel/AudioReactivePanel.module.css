@@ -270,6 +270,42 @@
   flex-wrap: wrap;
 }
 
+/* "Mappings" and its Randomize button share a line — the button rewrites
+   exactly the list beneath it, so it belongs at the head of that list rather
+   than buried in the wiring editor. */
+.mappingsHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.randomizeBtn {
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 1px solid var(--color-card, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
+  background: none;
+  color: var(--color-text-muted, #aaa);
+  cursor: pointer;
+  margin-bottom: 6px;
+  transition:
+    color 140ms ease,
+    border-color 140ms ease;
+
+  &:hover {
+    color: var(--color-text, #eee);
+    border-color: var(--color-accent, #7c6ff7);
+  }
+}
+
+/* A preset this flame cannot satisfy stays visible but inert — hiding it would
+   make the row's contents change shape from flame to flame. */
+.presetBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .presetBtn {
   font-size: 12px;
   padding: 5px 12px;

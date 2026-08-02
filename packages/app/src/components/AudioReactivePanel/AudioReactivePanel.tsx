@@ -1,11 +1,13 @@
 import { createEffect, createMemo, createSignal, For, Index, onCleanup, Show, } from 'solid-js'
 import { Cross, MusicNote } from '@/icons'
 import { createLiveAnalyzer, decodeAudioFile, getAudioFeatureNormalized, } from '@/utils/audioAnalysis'
+import { buildFlamePreset, buildPreset, FLAME_PRESET_IDS, PRESET_DESCRIPTIONS, PRESET_LABELS, randomizeMappings, RENDER_PRESET_IDS, RENDER_PRESETS, } from '@/utils/audioWiringPresets'
 import { AudioWiringModal } from '../AudioWiringModal/AudioWiringModal'
 import ui from './AudioReactivePanel.module.css'
 import { computeBeatFrames, drawWaveform } from './audioWaveform'
 import type { Accessor } from 'solid-js'
 import type { AffineKey, AudioAnalyzer, AudioFeature, FlameTarget, LiveAudioAnalyzer, RenderSettingKey, TransformInfo, TransformPropertyKey, } from '@/utils/audioAnalysis'
+import type { WiringPresetId } from '@/utils/audioWiringPresets'
 
 // Re-export for consumers (MainWorkspace etc.)
 export type { AudioFeature, FlameTarget, TransformInfo }
@@ -28,13 +30,14 @@ export type AudioMapping = {
   mappings: ParamMapping[]
 }
 
-export type AudioPreset =
-  | 'pulse'
-  | 'groove'
-  | 'ambient'
-  | 'chaos'
-  | 'warmth'
-  | 'custom'
+/**
+ * Which quick-start wiring is selected. `custom` means the mappings were
+ * hand-edited or randomised and no longer match any preset.
+ *
+ * The set itself lives in utils/audioWiringPresets.ts, because half of it is
+ * COMPUTED from the loaded flame rather than declared.
+ */
+export type AudioPreset = WiringPresetId | 'custom'
 
 type AudioReactivePanelProps = {
   onClose: () => void
@@ -117,121 +120,6 @@ const TRANSFORM_PROP_LABELS: Record<TransformPropertyKey, string> = {
   colorX: 'Color X',
   colorY: 'Color Y',
   colorSpeed: 'Color Speed',
-}
-
-// --- Presets ---
-
-export const PRESET_MAPPINGS: Record<AudioPreset, ParamMapping[]> = {
-  pulse: [
-    {
-      audioFeature: 'bass',
-      target: { kind: 'renderSetting', param: 'vibrancy' },
-      sensitivity: 1,
-      range: [0.3, 1.5],
-    },
-    {
-      audioFeature: 'beat',
-      target: { kind: 'renderSetting', param: 'palettePhase' },
-      sensitivity: 1,
-      range: [0, 3.14],
-    },
-  ],
-  groove: [
-    {
-      audioFeature: 'mid',
-      target: { kind: 'renderSetting', param: 'zoom' },
-      sensitivity: 1,
-      range: [0.85, 1.15],
-    },
-    {
-      audioFeature: 'bass',
-      target: { kind: 'renderSetting', param: 'vibrancy' },
-      sensitivity: 1,
-      range: [0.5, 1.5],
-    },
-    {
-      audioFeature: 'centroid',
-      target: { kind: 'renderSetting', param: 'palettePhase' },
-      sensitivity: 1,
-      range: [0, 3.14],
-    },
-  ],
-  ambient: [
-    {
-      audioFeature: 'rms',
-      target: { kind: 'renderSetting', param: 'exposure' },
-      sensitivity: 1,
-      range: [0.8, 1.2],
-    },
-    {
-      audioFeature: 'hiMid',
-      target: { kind: 'renderSetting', param: 'paletteSpeed' },
-      sensitivity: 1,
-      range: [0.5, 2],
-    },
-    {
-      audioFeature: 'centroid',
-      target: { kind: 'renderSetting', param: 'gamma' },
-      sensitivity: 1,
-      range: [0.6, 1.4],
-    },
-  ],
-  chaos: [
-    {
-      audioFeature: 'flatness',
-      target: { kind: 'renderSetting', param: 'contrast' },
-      sensitivity: 1,
-      range: [0.5, 2],
-    },
-    {
-      audioFeature: 'fullSpectrum',
-      target: { kind: 'renderSetting', param: 'skipIters' },
-      sensitivity: 1,
-      range: [0.8, 1.2],
-    },
-    {
-      audioFeature: 'beat',
-      target: { kind: 'renderSetting', param: 'highlightPower' },
-      sensitivity: 1,
-      range: [0, 3],
-    },
-    {
-      audioFeature: 'onset',
-      target: { kind: 'renderSetting', param: 'contrast' },
-      sensitivity: 1,
-      range: [0.8, 1.6],
-    },
-  ],
-  warmth: [
-    {
-      audioFeature: 'centroid',
-      target: { kind: 'renderSetting', param: 'palettePhase' },
-      sensitivity: 1,
-      range: [0, 3.14],
-    },
-    {
-      audioFeature: 'bass',
-      target: { kind: 'renderSetting', param: 'vibrancy' },
-      sensitivity: 1,
-      range: [0.4, 1.6],
-    },
-    {
-      audioFeature: 'brilliance',
-      target: { kind: 'renderSetting', param: 'contrast' },
-      sensitivity: 1,
-      range: [0.7, 1.3],
-    },
-  ],
-  custom: [],
-}
-
-const PRESET_LABELS: Record<AudioPreset, string> = {
-  pulse: 'Pulse',
-  groove: 'Groove',
-  ambient: 'Ambient',
-  chaos: 'Chaos',
-  warmth: 'Warmth',
-  custom: 'Custom',
 }
 
 const ALL_FEATURES: AudioFeature[] = [
@@ -625,9 +513,36 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
   }
 
   function applyPreset(preset: AudioPreset) {
+    if (preset === 'custom') return
+    // Built against the CURRENT flame: a flame-aware preset names transform
+    // indices and variation types that only exist for this descriptor, so it
+    // cannot be looked up from a table.
     props.onMappingChange({
       preset,
-      mappings: PRESET_MAPPINGS[preset].map((m) => ({ ...m })),
+      mappings: buildPreset(preset, props.transforms),
+    })
+  }
+
+  /**
+   * What the wiring editor offers in its own preset list: the render presets,
+   * plus whichever flame-aware ones this flame can actually satisfy. Computed,
+   * so the editor and the panel never disagree about what exists.
+   */
+  const wiringPresets = createMemo(() => {
+    const out: Record<string, ParamMapping[]> = { ...RENDER_PRESETS }
+    for (const id of FLAME_PRESET_IDS) {
+      const built = buildFlamePreset(id, props.transforms)
+      if (built.length > 0) {
+        out[id] = built
+      }
+    }
+    return out
+  })
+
+  function randomizeCurrentWiring() {
+    props.onMappingChange({
+      preset: 'custom',
+      mappings: randomizeMappings(props.transforms),
     })
   }
 
@@ -894,7 +809,10 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
           </Show>
         </Show>
 
-        {/* Presets */}
+        {/* Presets — render-only first, then the ones built from THIS flame.
+            Split because they answer different questions: the first three work
+            anywhere, the second three reach into the loaded flame's transforms
+            and are the ones that visibly restructure it. */}
         <div>
           <div class={ui.sectionLabel}>Preset</div>
           <div
@@ -902,7 +820,7 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
             role="radiogroup"
             aria-label="Audio reactive presets"
           >
-            <For each={Object.keys(PRESET_LABELS) as AudioPreset[]}>
+            <For each={RENDER_PRESET_IDS}>
               {(preset) => (
                 <button
                   class={
@@ -915,6 +833,7 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
                     applyPreset(preset)
                   }}
                   aria-label={`${PRESET_LABELS[preset]} preset`}
+                  title={PRESET_DESCRIPTIONS[preset]}
                   role="radio"
                   aria-checked={props.audioMapping().preset === preset}
                 >
@@ -923,11 +842,66 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
               )}
             </For>
           </div>
+
+          <div class={ui.sectionLabel} style="margin-top: 10px;">
+            From this flame
+          </div>
+          <div
+            class={ui.presetRow}
+            role="radiogroup"
+            aria-label="Flame-aware presets"
+          >
+            <For each={FLAME_PRESET_IDS}>
+              {(preset) => {
+                // Offered only when the flame can actually satisfy them —
+                // a disabled button that explains itself beats one that
+                // silently wires nothing.
+                const available = () =>
+                  buildFlamePreset(preset, props.transforms).length > 0
+                return (
+                  <button
+                    class={
+                      ui.presetBtn +
+                      (props.audioMapping().preset === preset
+                        ? ` ${ui.presetBtnActive}`
+                        : '')
+                    }
+                    disabled={!available()}
+                    onClick={() => {
+                      applyPreset(preset)
+                    }}
+                    aria-label={`${PRESET_LABELS[preset]} preset`}
+                    title={
+                      available()
+                        ? PRESET_DESCRIPTIONS[preset]
+                        : 'This flame has nothing for this preset to drive'
+                    }
+                    role="radio"
+                    aria-checked={props.audioMapping().preset === preset}
+                  >
+                    {PRESET_LABELS[preset]}
+                  </button>
+                )
+              }}
+            </For>
+          </div>
         </div>
 
         {/* Mappings */}
         <div>
-          <div class={ui.sectionLabel}>Mappings</div>
+          <div class={ui.mappingsHeader}>
+            <div class={ui.sectionLabel}>Mappings</div>
+            {/* Randomize lives HERE, not only inside the wiring editor: it
+                rewrites exactly the list below, and having to open a modal to
+                reroll the thing you are looking at is a detour. */}
+            <button
+              class={ui.randomizeBtn}
+              onClick={randomizeCurrentWiring}
+              title="Reroll the wiring for this flame"
+            >
+              Randomize
+            </button>
+          </div>
           <div class={ui.mappingsList} role="list">
             <Index each={props.audioMapping().mappings}>
               {(mapping, index) => {
@@ -1231,7 +1205,7 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
         <AudioWiringModal
           mappings={props.audioMapping().mappings}
           transforms={props.transforms}
-          presets={PRESET_MAPPINGS}
+          presets={wiringPresets()}
           featureLevels={liveFeatureLevels()}
           liveAnalyzer={props.liveAnalyzer()}
           onMappingsChange={(mappings) => {

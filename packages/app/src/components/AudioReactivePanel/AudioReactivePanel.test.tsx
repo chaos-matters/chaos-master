@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { flameTargetKey, getAudioFeatureNormalized, } from '../../utils/audioAnalysis'
-import { defaultTarget, PRESET_MAPPINGS } from './AudioReactivePanel'
+import { RENDER_PRESET_IDS, RENDER_PRESETS, } from '../../utils/audioWiringPresets'
+import { defaultTarget } from './AudioReactivePanel'
 import type { FlameTarget } from '../../utils/audioAnalysis'
 
 // --- Helpers ---
@@ -14,14 +15,7 @@ const ALL_TARGET_CATEGORIES = [
   'finalAffine',
 ] as const
 
-const ALL_PRESETS = [
-  'pulse',
-  'groove',
-  'ambient',
-  'chaos',
-  'warmth',
-  'custom',
-] as const
+const ALL_PRESETS = RENDER_PRESET_IDS
 
 /** Creates a minimal FrameData-like object for getAudioFeatureNormalized. */
 function makeFrame(
@@ -138,115 +132,48 @@ describe('defaultTarget', () => {
 })
 
 // =============================================================================
-// PRESET_MAPPINGS
+// RENDER_PRESETS
 // =============================================================================
 
-describe('PRESET_MAPPINGS', () => {
-  describe('contains entries for all presets', () => {
-    for (const preset of ALL_PRESETS) {
-      it(`has entry for '${preset}'`, () => {
-        expect(PRESET_MAPPINGS).toHaveProperty(preset)
-        expect(Array.isArray(PRESET_MAPPINGS[preset])).toBe(true)
-      })
-    }
-  })
-
-  describe('each non-custom preset is non-empty', () => {
-    for (const preset of ALL_PRESETS) {
-      if (preset === 'custom') continue
-      it(`preset '${preset}' has at least one mapping`, () => {
-        expect(PRESET_MAPPINGS[preset].length).toBeGreaterThan(0)
-      })
-    }
-  })
-
-  describe('custom preset is empty', () => {
-    it('has an empty array', () => {
-      expect(PRESET_MAPPINGS.custom).toEqual([])
+describe('RENDER_PRESETS', () => {
+  for (const preset of ALL_PRESETS) {
+    it(`'${preset}' is non-empty`, () => {
+      expect(Array.isArray(RENDER_PRESETS[preset])).toBe(true)
+      expect(RENDER_PRESETS[preset].length).toBeGreaterThan(0)
     })
-  })
 
-  describe('every mapping has required fields', () => {
-    for (const preset of ALL_PRESETS) {
-      const mappings = PRESET_MAPPINGS[preset]
-      for (let i = 0; i < mappings.length; i++) {
-        const m = mappings[i]!
-        it(`preset '${preset}' mapping ${i} has audioFeature, target, sensitivity, range`, () => {
-          expect(m).toHaveProperty('audioFeature')
-          expect(typeof m.audioFeature).toBe('string')
-          expect(m).toHaveProperty('target')
-          expect(typeof m.sensitivity).toBe('number')
-          expect(m.sensitivity).toBeGreaterThan(0)
-          expect(Array.isArray(m.range)).toBe(true)
-          expect(m.range).toHaveLength(2)
-          expect(typeof m.range[0]).toBe('number')
-          expect(typeof m.range[1]).toBe('number')
-          expect(m.range[0]).toBeLessThanOrEqual(m.range[1])
-        })
+    it(`'${preset}' has no duplicate target keys`, () => {
+      const keys = RENDER_PRESETS[preset].map((m) => flameTargetKey(m.target))
+      expect(new Set(keys).size).toBe(keys.length)
+    })
+
+    /*
+     * The point of the rewrite: the previous presets leaned on highlightPower,
+     * skipIters and gamma, which barely move the picture — which is why they
+     * felt like they did nothing. A render preset has to drive at least one
+     * parameter that visibly changes the image.
+     */
+    it(`'${preset}' drives at least one strong mover`, () => {
+      const strong = new Set([
+        'vibrancy',
+        'exposure',
+        'palettePhase',
+        'paletteSpeed',
+        'zoom',
+        'contrast',
+      ])
+      const params = RENDER_PRESETS[preset]
+        .map((m) => (m.target.kind === 'renderSetting' ? m.target.param : ''))
+        .filter(Boolean)
+      expect(params.some((p) => strong.has(p))).toBe(true)
+    })
+
+    it(`'${preset}' only targets render settings`, () => {
+      for (const m of RENDER_PRESETS[preset]) {
+        expect(m.target.kind).toBe('renderSetting')
       }
-    }
-  })
-
-  describe('every target is a valid FlameTarget variant', () => {
-    const validKinds = new Set(ALL_TARGET_CATEGORIES)
-
-    for (const preset of ALL_PRESETS) {
-      const mappings = PRESET_MAPPINGS[preset]
-      for (let i = 0; i < mappings.length; i++) {
-        const t = mappings[i]!.target
-
-        it(`preset '${preset}' mapping ${i} has valid target kind`, () => {
-          expect(validKinds.has(t.kind)).toBe(true)
-        })
-
-        // Check kind-specific required fields
-        if (t.kind === 'renderSetting') {
-          it(`preset '${preset}' mapping ${i} renderSetting has param`, () => {
-            expect(typeof t.param).toBe('string')
-            expect(t.param.length).toBeGreaterThan(0)
-          })
-        } else if (t.kind === 'transformAffine') {
-          it(`preset '${preset}' mapping ${i} transformAffine has required fields`, () => {
-            expect(typeof t.transformIdx).toBe('number')
-            expect(['preAffine', 'postAffine']).toContain(t.matrix)
-            expect(typeof t.param).toBe('string')
-          })
-        } else if (t.kind === 'transformProperty') {
-          it(`preset '${preset}' mapping ${i} transformProperty has required fields`, () => {
-            expect(typeof t.transformIdx).toBe('number')
-            expect(typeof t.property).toBe('string')
-          })
-        } else if (t.kind === 'variationWeight') {
-          it(`preset '${preset}' mapping ${i} variationWeight has required fields`, () => {
-            expect(typeof t.transformIdx).toBe('number')
-            expect(typeof t.variationType).toBe('string')
-          })
-        } else if (t.kind === 'finalAffine') {
-          it(`preset '${preset}' mapping ${i} finalAffine has param`, () => {
-            expect(typeof t.param).toBe('string')
-            expect(t.param.length).toBeGreaterThan(0)
-          })
-        }
-      }
-    }
-  })
-
-  describe('no duplicate targets within a preset', () => {
-    // chaos intentionally maps two audio features (flatness, onset) to the same
-    // render param (contrast) — skip the uniqueness check for that preset.
-    const PRESETS_EXPECT_DUPLICATES = new Set(['chaos'])
-
-    for (const preset of ALL_PRESETS) {
-      if (preset === 'custom' || PRESETS_EXPECT_DUPLICATES.has(preset)) continue
-
-      it(`preset '${preset}' has no duplicate target keys`, () => {
-        const mappings = PRESET_MAPPINGS[preset]
-        const keys = mappings.map((m) => flameTargetKey(m.target))
-        const uniqueKeys = new Set(keys)
-        expect(uniqueKeys.size).toBe(keys.length)
-      })
-    }
-  })
+    })
+  }
 })
 
 // =============================================================================
