@@ -1,8 +1,8 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 // The admin script's own allowlist. Imported rather than restated so the two
 // sides of `home_config` cannot drift apart silently — see the test below.
 import { CONFIG_KEYS } from '../../scripts/home-config.mjs'
-import { DEFAULT_PORTAL_TOUR_ID, fetchHomeConfig, HOME_CONFIG_KEYS, PORTAL_TOUR_ID, resolvePortalTourId, } from './homeConfig'
+import { DEFAULT_PORTAL_TOUR_ID, fetchHomeConfig, HOME_CONFIG_KEYS, loadHomeConfig, PORTAL_TOUR_ID, resetHomeConfigCache, resolvePortalTourId, } from './homeConfig'
 
 /** Stand-in registry: exactly the ids this test pretends the build has. */
 const isKnownTour = (id: string) =>
@@ -99,5 +99,88 @@ describe('fetchHomeConfig', () => {
     )
     await expect(fetchHomeConfig()).rejects.toThrow('503')
     vi.unstubAllGlobals()
+  })
+})
+
+// The portal is mounted and unmounted by SCROLLING — every trip in and out of
+// the section is a fresh component. Owning the request per mount meant one
+// request and one fallback log per trip; these pin the "at most once per page
+// load" that replaced it, failure included.
+describe('loadHomeConfig', () => {
+  afterEach(() => {
+    resetHomeConfigCache()
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('fetches once however many callers ask', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ config: { portal_tour_id: 'app' } })),
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const [a, b] = await Promise.all([loadHomeConfig(), loadHomeConfig()])
+    const c = await loadHomeConfig()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(a).toEqual({ portal_tour_id: 'app' })
+    // The same settled promise, not three copies of the answer.
+    expect(b).toBe(a)
+    expect(c).toBe(a)
+  })
+
+  // Concurrent callers must join the request in flight rather than each start
+  // one — two mounts inside the same scroll are the ordinary case.
+  it('joins a request already in flight', async () => {
+    let release: (() => void) | undefined
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const fetchMock = vi.fn(() =>
+      gate.then(() => new Response(JSON.stringify({ config: {} }))),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const first = loadHomeConfig()
+    const second = loadHomeConfig()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    release?.()
+    await Promise.all([first, second])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  // The case that actually burned: a 500 retried on every mount, each one
+  // logging again. A failure is cached exactly like a success.
+  it('caches the failure — no retry, and the fallback is logged once', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(new Response('', { status: 500 })),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+
+    await loadHomeConfig()
+    await loadHomeConfig()
+    await loadHomeConfig()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(info).toHaveBeenCalledTimes(1)
+  })
+
+  // The contract the portal relies on: no error branch to write, because
+  // unreachable settings are not an error state.
+  it('never rejects — an unreachable backend resolves to the default tour', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new Error('offline'))),
+    )
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+
+    const config = await loadHomeConfig()
+    expect(config).toEqual({})
+    expect(resolvePortalTourId(config, isKnownTour)).toBe(
+      DEFAULT_PORTAL_TOUR_ID,
+    )
   })
 })

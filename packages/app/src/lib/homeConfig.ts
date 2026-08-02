@@ -50,6 +50,51 @@ export async function fetchHomeConfig(): Promise<HomeConfig> {
 }
 
 /**
+ * The one request per page load. Holds the PROMISE, not the value, so callers
+ * that arrive while it is in flight join it instead of starting a second one.
+ */
+let pending: Promise<HomeConfig> | undefined
+
+/**
+ * The settings, fetched at most once per page load — and never again after a
+ * failure.
+ *
+ * The portal mounts and unmounts as you scroll the section in and out of view,
+ * so a per-mount fetch is a per-scroll fetch: the symptom was a console full of
+ * identical requests and identical fallback logs on one page view. The answer
+ * cannot change within a session (the rows are edited by hand, and the response
+ * is edge-cached), so one request is not an optimisation, it is the correct
+ * number.
+ *
+ * Caching the FAILURE matters as much as caching the success. An unreachable or
+ * unconfigured backend is exactly the case that would otherwise retry forever,
+ * and it is the case where retrying is most obviously pointless: the fallback is
+ * already correct. Hence:
+ *
+ * **This never rejects.** Unreachable settings resolve to an empty map, which
+ * `resolvePortalTourId` turns into the built-in default exactly as an unset key
+ * does. Callers have no error branch to write, and no reason to have one.
+ */
+export function loadHomeConfig(): Promise<HomeConfig> {
+  pending ??= fetchHomeConfig().catch((err: unknown) => {
+    // Once per page load, from inside the cached promise — every later caller
+    // gets the same settled promise and logs nothing. Not an error: the portal
+    // plays the default tour, which is a perfectly good thing for it to play.
+    console.info('Home: settings unavailable, using built-in defaults —', err)
+    return {}
+  })
+  return pending
+}
+
+/**
+ * Drop the cache. Tests only — the cache is per page load by design, and
+ * nothing in the app has a reason to re-ask.
+ */
+export function resetHomeConfigCache(): void {
+  pending = undefined
+}
+
+/**
  * Which tour id the portal should play.
  *
  * `isKnownTour` is injected rather than imported so this stays testable without

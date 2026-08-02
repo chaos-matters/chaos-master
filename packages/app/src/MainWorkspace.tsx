@@ -114,7 +114,7 @@ import { buildReadableIds } from './utils/readableIds'
 import { getOldestRecentFlame, saveRecentFlame, upsertRecentFlame, } from './utils/recentFlames'
 import { createShareLink, deriveOgMeta, uploadOgPreview, } from './utils/shareLink'
 import { sum } from './utils/sum'
-import { createTimelineState, resolveKeyframeValue } from './utils/timeline'
+import { createTimelineState, defaultConfig as defaultTimelineConfig, resolveKeyframeValue, } from './utils/timeline'
 import { sortedTransformEntries } from './utils/transformOrder'
 import { createUndoRouter } from './utils/undoRouting'
 import { useAppDragAndDrop } from './utils/useAppDragAndDrop'
@@ -256,6 +256,23 @@ export function extractFlameVariationTypes(
   return result
 }
 
+/**
+ * Viewport width at/above which the workspace lays out "wide": the timeline
+ * strip starts open and the sidebar is not auto-hidden. Mirrors the
+ * `max-width: 768px` media query the mobile layout listens on.
+ */
+const WIDE_LAYOUT_MIN_WIDTH = 769
+const isWideLayout = () => window.innerWidth >= WIDE_LAYOUT_MIN_WIDTH
+
+/**
+ * Animation starts enabled — a flame with no tracks renders identically either
+ * way, and the timeline's affordances are visible from the start.
+ *
+ * Named because `resetWorkspaceForHandoff` has to restore exactly this: a flame
+ * opened from Home second must land in the state it would have landed in first.
+ */
+const DEFAULT_ANIMATION_ENABLED = true
+
 function addTransformWithVariation(draft: FlameDescriptor, type: string) {
   const t = deepClone(
     newDefaultTransform((draft.renderSettings.dimensions ?? 2) as Dims),
@@ -368,7 +385,9 @@ export function MainWorkspace(props: AppProps) {
         : 'Lumen Apeiron'
   })
 
-  const [animationEnabled, setAnimationEnabled] = createSignal(true)
+  const [animationEnabled, setAnimationEnabled] = createSignal(
+    DEFAULT_ANIMATION_ENABLED,
+  )
   const [hideDiceButtons, setHideDiceButtons] = createSignal(false)
   // True while a randomize/mutate run is in flight, so the buttons disable and
   // rapid clicks can't pile up concurrent runs (history thumbnail capture).
@@ -382,9 +401,7 @@ export function MainWorkspace(props: AppProps) {
     flameB: FlameDescriptor
   } | null>(null)
   const _requestModal = useRequestModal()
-  const [sidebarHidden, setSidebarHidden] = createSignal(
-    window.innerWidth < 769,
-  )
+  const [sidebarHidden, setSidebarHidden] = createSignal(!isWideLayout())
   // Flame Randomizer card open state is controlled here so the Timeline
   // "Animate" button can reveal it; the epoch bump also forces its Animation
   // Settings section open.
@@ -428,7 +445,7 @@ export function MainWorkspace(props: AppProps) {
     }
   })
   // Hide timeline by default on mobile -- users can toggle it back on
-  const [showTimeline, setShowTimeline] = createSignal(window.innerWidth >= 769)
+  const [showTimeline, setShowTimeline] = createSignal(isWideLayout())
   // Colors as they were before the first palette apply — lets Unselect
   // restore the "natural" colors. UI stash only; undo handles the rest.
   const [prePaletteColors, setPrePaletteColors] = createSignal<
@@ -510,7 +527,15 @@ export function MainWorkspace(props: AppProps) {
   createEffect(() => {
     const newFlame = props.flameFromWelcome?.()
     if (newFlame !== undefined) {
+      // Order is load-bearing. `flushDirtyToRecents` reads the OUTGOING flame
+      // and its tracks, so it has to run before the reset drops them —
+      // otherwise a hand-off would silently destroy unsaved work.
       flushDirtyToRecents()
+      // Then a clean slate, THEN this flame's own state. Every hand-off starts
+      // from the same baseline, so the second flame you open from Home looks
+      // exactly like the first one would have. See resetWorkspaceForHandoff for
+      // what was leaking and why.
+      resetWorkspaceForHandoff()
       history.replace(deepClone(newFlame))
       // Read BEFORE resetFlameFromWelcome() clears the whole hand-off.
       const capability = props.capabilityFromHome?.()
@@ -1851,6 +1876,85 @@ export function MainWorkspace(props: AppProps) {
     setShowBlendGallery(false)
     setShowAudioPanel(false)
     setShowSonificationPanel(false)
+  }
+
+  /**
+   * Put the workspace back to the state a fresh session would be in, so a flame
+   * handed over from Home (or the welcome screen) lands the same way whether it
+   * is the first one opened or the fifth.
+   *
+   * The workspace stays MOUNTED behind Home — that is deliberate (App.tsx: the
+   * editor keeps its state and its canvas size), but it means every hand-off
+   * inherits whatever the previous one left behind. Nothing here was reset,
+   * and the results were exactly the three things users reported:
+   *
+   *  - **panels left open.** `openCapability` opens a panel and nothing ever
+   *    closes it, so the Audio card opened by one Explore flame was still
+   *    covering the sidebar for the next, unrelated one.
+   *  - **animation running on a still flame.** The hand-off only ever LOADED
+   *    tracks (`tracks.length > 0`); it never cleared them. So the previous
+   *    flame's timeline was still there, still playing, on a flame that has no
+   *    animation of its own.
+   *  - **"too bright".** Same cause, one step further: while the timeline is
+   *    driving the view, `applyTimelineToFlame` writes the old flame's keyframed
+   *    values — vibrancy, exposure, brightness — onto the new descriptor every
+   *    frame. A leftover exposure track reads exactly as a washed-out flame.
+   *
+   * One reset for all of them rather than a clear per symptom: the next symptom
+   * is then a line in this function, not a new bug. It restores the DECLARED
+   * defaults (`DEFAULT_ANIMATION_ENABLED`, `isWideLayout()`) rather than
+   * plausible-looking values, because "identical to opening it first" is the
+   * actual requirement — and layout state changes the canvas size, so an
+   * approximation would render a visibly different flame.
+   *
+   * Not reset: the flame document itself (the caller replaces it wholesale, and
+   * that covers palette/blend/morph/exposure, which all live in
+   * `renderSettings`), and anything the user owns across documents — theme,
+   * quality preset, sidebar layout, autosave preference.
+   */
+  const resetWorkspaceForHandoff = () => {
+    // ── Overlays and panels ────────────────────────────────────────────────
+    // Everything `openCapability`/`revealSidebar` can open, plus the pickers a
+    // previous session could have left covering the sidebar.
+    setShowSidebar(true)
+    setSidebarHidden(!isWideLayout())
+    setSidebarDiffView(null)
+    setShowBlendGallery(false)
+    setBlendIntent('blend')
+    setQuickPickState(null)
+    setRandomizerOpen(false)
+    setShowAudioPanel(false)
+    setShowSonificationPanel(false)
+
+    // ── Live modulation ────────────────────────────────────────────────────
+    // Both loops write render settings continuously while enabled, so left on
+    // they keep driving the NEXT flame — the audio one through
+    // `setFlameDescriptor` itself.
+    setAudioEnabled(false)
+    setSonificationEnabled(false)
+
+    // ── Timeline ───────────────────────────────────────────────────────────
+    // Order matters: pause before dropping the tracks so the playback interval
+    // cannot advance a frame against an empty timeline, and clear `previewHeld`
+    // AFTER `setCurrentFrame` — `goToFrame` deliberately sets it, which would
+    // leave the canvas "holding" frame 0 of nothing.
+    timeline.pause()
+    timeline.setIsScrubbing(false)
+    timeline.setConfig(defaultTimelineConfig())
+    timeline.setCurrentFrame(0)
+    timeline.loadTracks([])
+    timeline.setPreviewHeld(false)
+    timeline.setAnimationEnabled(DEFAULT_ANIMATION_ENABLED)
+    setAnimationEnabled(DEFAULT_ANIMATION_ENABLED)
+    setShowTimeline(isWideLayout())
+
+    // ── Per-document stashes and modes ─────────────────────────────────────
+    // In-memory state that belongs to the flame being replaced: the pre-palette
+    // colours Unselect restores, the randomizer-history highlight, and 3D fly
+    // mode (session-only, and meaningless on a flame you have not flown).
+    setPrePaletteColors({})
+    setSelectedHistoryTimestamp(0)
+    setFlyMode(false)
   }
 
   /**

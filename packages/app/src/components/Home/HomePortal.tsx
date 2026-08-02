@@ -7,7 +7,7 @@ import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
 import { Default3DPreviewCamera } from '@/lib/Camera3D'
 import { gpuReady } from '@/lib/gpuStatus'
-import { fetchHomeConfig, resolvePortalTourId } from '@/lib/homeConfig'
+import { fetchHomeConfig as TEMP_fetchHomeConfig, resolvePortalTourId, } from '@/lib/homeConfig'
 import { Root } from '@/lib/Root'
 import { getTour, isKnownTour } from '@/tours/registry'
 import { useIsScrolling } from '@/utils/isScrolling'
@@ -98,9 +98,16 @@ export function HomePortal(props: HomePortalProps) {
   const settled = createMemo(() => near() && !scrolling())
 
   /**
-   * Fetch the settings once, the first time the portal is approached — not on
-   * page load. A visitor who never scrolls this far should not pay for a
-   * request, and the answer cannot change within a session.
+   * Ask for the settings the first time the portal is approached — not on page
+   * load. A visitor who never scrolls this far should not pay for a request.
+   *
+   * `loadHomeConfig` owns the once-per-page-load part, and it has to: this
+   * component is mounted and unmounted by scrolling, so a fetch owned HERE
+   * would fire again every time the section came back into view — which is
+   * exactly what it did, filling the console with duplicate requests and
+   * duplicate fallback logs on a single page view. Every mount after the first
+   * joins (or immediately reads) the one settled promise, including when it
+   * settled on a failure.
    *
    * A plain flag and a promise rather than `createResource`, matching
    * `loadDescriptor` in HomeFlame. A resource here would suspend the nearest
@@ -117,15 +124,16 @@ export function HomePortal(props: HomePortalProps) {
       return
     }
     requested = true
-    void fetchHomeConfig().then(
+    // No rejection branch: `loadHomeConfig` resolves unreachable settings to an
+    // empty map, which lands on the default tour exactly as an unset key does.
+    // A portal that said "settings unavailable" instead of playing something
+    // would be worse content.
+    void TEMP_fetchHomeConfig().then(
       (settings) => {
         setConfig(settings)
         setConfigResolved(true)
       },
       (err: unknown) => {
-        // Not an error state: unreachable settings resolve to the default tour
-        // exactly as an unset key does. A portal that said "settings
-        // unavailable" instead of playing something would be worse content.
         console.error('Home portal: using the default tour —', err)
         setConfigResolved(true)
       },

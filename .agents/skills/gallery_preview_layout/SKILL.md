@@ -127,6 +127,39 @@ the last column expands to fill and is the one that ends up under the bar. The
 
 ## 5. Verifying cross-browser (don't trust one engine)
 
+> **HARD LIMIT — a browser left open on a live gallery can take down the
+> machine.** This has happened three times on this workstation, once reaching
+> ~60 GB RSS. The gallery is the worst page to leak a browser on, and the
+> measurement technique is itself the amplifier:
+>
+> - measuring live plates means calling `__chaosHomeNoFreeze()`, which disables
+>   freeze-to-poster — the one control that bounds memory. Every plate then
+>   stays live forever;
+> - if the browser launched **without** the WebGPU flags below, `navigator.gpu`
+>   is absent and rendering silently falls back to llvmpipe/swiftshader, which
+>   allocates in **host RAM instead of VRAM**. Many live fractal canvases times
+>   software rendering times a browser nobody closed is how you get to tens of
+>   GB.
+>
+> Therefore, non-negotiable:
+>
+> 1. **One browser at a time, always closed in a `finally`.** Never launch a
+>    second before the first is closed. Verify with `pgrep -c chrome` after.
+> 2. **Wrap every browser script in a shell-level timeout** (`timeout 300 node
+…`) so a hang cannot outlive its purpose.
+> 3. **`__chaosHomeNoFreeze()` is for a single bounded measurement only** —
+>    take the number, close the browser. Never leave a session running with it
+>    on, and never combine it with a long scroll loop.
+> 4. **Assert the adapter before measuring** (recipe below). No adapter means
+>    you are on CPU rendering: close it and fix the flags rather than
+>    continuing — the numbers would be meaningless AND dangerous.
+> 5. **Vitest never fans out here**: `--maxWorkers=1`. The default forks one
+>    worker per core at ~2 GB each with this module graph.
+>
+> Delegating this work to a subagent does not relax any of the above; if
+> anything, hold a subagent to launching **zero** browsers and do the browser
+> pass yourself.
+
 - **Chrome is the gate; Firefox is the second opinion.** Chrome must work; the
   Firefox-specific rules above (§2 squeeze, §4 gutter) are why you still check
   Gecko, but a Chrome regression is the one that ships.

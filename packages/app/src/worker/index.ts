@@ -78,6 +78,25 @@ function errMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
+/**
+ * "That content table has never been created here" — an environment whose
+ * migrations have not been applied, which is a legitimate state for a fresh
+ * deploy rather than a server fault.
+ *
+ * Naming the tables (rather than matching any "no such table") keeps a query
+ * against some unrelated missing table from being reported as an uninitialised
+ * gallery — the same rule, and the same regex, as `isMissingTable` in
+ * scripts/gallery-targets.mjs, which is what decides whether the deploy tooling
+ * offers to run the migrations.
+ */
+const MISSING_TABLE =
+  /no such table:\s*(?:main\.)?(?:gallery_items|home_config)\b/i
+
+/** Did this D1 failure mean "a content table does not exist"? */
+function isMissingTable(err: unknown): boolean {
+  return MISSING_TABLE.test(errMsg(err))
+}
+
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
@@ -416,6 +435,18 @@ const baseHandler = {
         // them on every scroll into the portal.
         return jsonCached({ config }, GALLERY_CACHE_SECONDS)
       } catch (err) {
+        // No `home_config` table means nothing has ever been configured here —
+        // a deploy whose migrations have not been applied. That is the same
+        // answer as an empty table, not a fault: 500ing it made every Home
+        // visit log a server error and told the client to distrust a perfectly
+        // healthy database. Anything else (a real SQL or D1 failure) still is.
+        if (isMissingTable(err)) {
+          console.warn(
+            '/api/gallery/config: home_config is missing — serving an empty ' +
+              'config. Apply the D1 migrations to configure Home.',
+          )
+          return jsonCached({ config: {} }, GALLERY_CACHE_SECONDS)
+        }
         console.error('Error handling /api/gallery/config:', errMsg(err))
         return json({ error: 'Server error' }, 500)
       }

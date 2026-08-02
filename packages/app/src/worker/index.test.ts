@@ -413,10 +413,73 @@ describe('worker /api/gallery/config', () => {
     expect(db.calls[0]?.sql).not.toContain('gallery_items')
   })
 
-  it('500s rather than leaking the error when the table is missing', async () => {
+  // A database whose migrations have not been applied has no settings — which
+  // is what an empty config means. Reporting it as a server fault made every
+  // Home visit on a fresh deploy log a 500 and told the client its perfectly
+  // healthy backend was broken.
+  it('serves an empty config when home_config does not exist', async () => {
     const db = {
       prepare() {
         throw new Error('no such table: home_config')
+      },
+    }
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/config'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ config: {} })
+    // Cached like the real thing: an unconfigured deploy must not be asked
+    // again on every request either.
+    expect(res.headers.get('Cache-Control')).toContain('max-age=')
+  })
+
+  // D1 raises the missing table from the statement, not from prepare(), and
+  // decorates it — the qualified name and the SQLITE_ERROR suffix are what a
+  // real deploy actually threw.
+  it('serves an empty config for D1’s own missing-table wording', async () => {
+    const db = {
+      prepare() {
+        return {
+          all: () =>
+            Promise.reject(
+              new Error(
+                'D1_ERROR: no such table: main.home_config: SQLITE_ERROR',
+              ),
+            ),
+        }
+      },
+    }
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/config'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ config: {} })
+  })
+
+  // The whole point of naming the table: a genuine failure must still be one.
+  it('500s on a real SQL or D1 error', async () => {
+    const db = {
+      prepare() {
+        throw new Error('D1_ERROR: no such column: value: SQLITE_ERROR')
+      },
+    }
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/config'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+    expect(res.status).toBe(500)
+    expect(await res.json()).toEqual({ error: 'Server error' })
+  })
+
+  it('500s rather than leaking the error text of a failure', async () => {
+    const db = {
+      prepare() {
+        throw new Error('connection to 10.0.0.7 refused (secret-host)')
       },
     }
     const res = await worker.fetch(
