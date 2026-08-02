@@ -638,6 +638,51 @@ const DIRTY_THRESHOLD = 0.005 // 0.5% change threshold
  * @param smoothingState - persistent per-target state (smoothed value, last applied).
  * @param deltaTime - seconds since the previous frame (default 1/30).
  */
+/**
+ * What each render setting is allowed to be, mirroring flameSchema.
+ *
+ * Audio modulation writes straight into the live descriptor, so a mapping whose
+ * range exceeds the schema does not merely look wrong — it leaves the flame
+ * PERMANENTLY INVALID. `validateFlame` then throws for everything downstream:
+ * breeding it, exporting it, opening the ancestry tree. Observed in the wild as
+ * `palettePhase: Expected <=1 but received 1.589`, after which that flame could
+ * not be bred again.
+ *
+ * A range is authored by hand in the wiring editor and shipped in presets, so
+ * neither can be trusted to respect a bound it never sees. Clamping happens
+ * HERE, at the one place every mapping funnels through.
+ *
+ * Anything absent is genuinely unbounded in the schema and left alone.
+ */
+const RENDER_SETTING_BOUNDS: Partial<
+  Record<RenderSettingKey, [min: number, max: number]>
+> = {
+  vibrancy: [0, 3],
+  exposure: [-8, 8],
+  palettePhase: [0, 1],
+  paletteSpeed: [0, Number.MAX_SAFE_INTEGER],
+  contrast: [0.01, 20],
+  gamma: [0.1, 8],
+  highlightPower: [0, 2],
+  lightPower: [0, 5],
+  depthColorPower: [0, 5],
+  zoom: [0.01, 500],
+  skipIters: [0, 30],
+}
+
+function clampRenderSetting(param: RenderSettingKey, value: number): number {
+  // NaN would fail validation as surely as an out-of-range number, and can
+  // arrive from a degenerate range.
+  if (!Number.isFinite(value)) return 0
+  const bounds = RENDER_SETTING_BOUNDS[param]
+  const clamped =
+    bounds === undefined
+      ? value
+      : Math.max(bounds[0], Math.min(bounds[1], value))
+  // The schema additionally requires an integer here.
+  return param === 'skipIters' ? Math.round(clamped) : clamped
+}
+
 export function applyAudioMappingsToFlame(
   flame: Record<string, unknown>,
   frameData: FrameData & { isBeat: boolean },
@@ -701,11 +746,12 @@ export function applyAudioMappingsToFlame(
     if (tgt.kind === 'renderSetting') {
       // Render settings
       rs ??= (flame.renderSettings as Record<string, unknown>) ?? {}
+      const safe = clampRenderSetting(tgt.param, val)
       if (tgt.param === 'zoom') {
         camera ??= (rs.camera as Record<string, unknown>) ?? {}
-        ;(camera as Record<string, number>).zoom = val
+        ;(camera as Record<string, number>).zoom = safe
       } else {
-        ;(rs as Record<string, number>)[tgt.param] = val
+        ;(rs as Record<string, number>)[tgt.param] = safe
       }
     } else if (tgt.kind === 'transformAffine') {
       // Transform affine matrix param
@@ -732,8 +778,28 @@ export function applyAudioMappingsToFlame(
         const color = (tx.color as Record<string, number>) ?? { x: 0, y: 0 }
         color.y = val
         tx.color = color
+      } else if (tgt.property === 'probability') {
+        /*
+         * Never let a transform's weight reach zero.
+         *
+         * The chaos game picks transforms by probability; at zero a branch
+         * stops receiving points and vanishes, and if every weight is driven
+         * low together the whole picture thins out to noise — the "flame
+         * collapsed and looks like nothing" people report mid-track. A
+         * negative weight is worse: it makes the cumulative distribution
+         * non-monotonic, so selection is meaningless.
+         *
+         * The schema itself only says `v.number()`, so nothing downstream
+         * would have caught either.
+         */
+        ;(tx as Record<string, number>).probability = Math.max(
+          0.001,
+          Number.isFinite(val) ? val : 0.001,
+        )
       } else {
-        ;(tx as Record<string, number>)[tgt.property] = val
+        ;(tx as Record<string, number>)[tgt.property] = Number.isFinite(val)
+          ? val
+          : 0
       }
     } else if (tgt.kind === 'variationWeight') {
       // Variation weight

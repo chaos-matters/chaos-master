@@ -163,3 +163,56 @@ describe('randomizeMappings', () => {
     }
   })
 })
+
+/*
+ * Audio modulation writes into the LIVE descriptor, so a preset range that
+ * exceeds a schema bound does not merely look wrong — it leaves the flame
+ * permanently invalid, and validateFlame then throws for breeding, export and
+ * the ancestry tree alike. This happened: palettePhase is 0-1, a preset drove
+ * it to 1.589 assuming radians, and that flame could not be bred again.
+ */
+describe('preset ranges stay inside the flame schema', () => {
+  const BOUNDS: Record<string, [number, number]> = {
+    vibrancy: [0, 3],
+    exposure: [-8, 8],
+    palettePhase: [0, 1],
+    contrast: [0.01, 20],
+    gamma: [0.1, 8],
+    highlightPower: [0, 2],
+    lightPower: [0, 5],
+    depthColorPower: [0, 5],
+    zoom: [0.01, 500],
+    skipIters: [0, 30],
+  }
+
+  const everyPreset = () => [
+    ...RENDER_PRESET_IDS.map((id) => [id, buildPreset(id, [])] as const),
+    ...FLAME_PRESET_IDS.map(
+      (id) => [id, buildFlamePreset(id, transforms(4))] as const,
+    ),
+  ]
+
+  for (const [id, mappings] of everyPreset()) {
+    it(`'${id}' never drives a render setting out of range`, () => {
+      for (const m of mappings) {
+        if (m.target.kind !== 'renderSetting') continue
+        const bound = BOUNDS[m.target.param]
+        if (!bound) continue
+        expect(m.range[0]).toBeGreaterThanOrEqual(bound[0])
+        expect(m.range[1]).toBeLessThanOrEqual(bound[1])
+      }
+    })
+  }
+
+  it('randomized wirings stay in range across many rolls', () => {
+    for (let seed = 0; seed < 60; seed++) {
+      for (const m of randomizeMappings(transforms(4), seeded(seed))) {
+        if (m.target.kind !== 'renderSetting') continue
+        const bound = BOUNDS[m.target.param]
+        if (!bound) continue
+        expect(m.range[0]).toBeGreaterThanOrEqual(bound[0])
+        expect(m.range[1]).toBeLessThanOrEqual(bound[1])
+      }
+    }
+  })
+})
