@@ -1633,7 +1633,13 @@ function commandSequence(values) {
     throw new AdminError(
       'sequence-failed',
       `gallery-sequence.mjs failed for "${slug}"`,
-      'Its output is above. A different --seed usually fixes an unwanted path.',
+      // The hint has to match what was actually attempted: suggesting another
+      // seed to someone whose FILE PATH was wrong sends them looking in the
+      // wrong place entirely.
+      appendFiles.length > 0
+        ? 'Its output is above. Check the --file path exists and is a flame ' +
+            'PNG/JSON exported by the app.'
+        : 'Its output is above. A different --seed usually fixes an unwanted path.',
     )
   }
 
