@@ -306,6 +306,17 @@ export function ViewControls(props: ViewControlProps) {
         >
           Morph...
         </Button>
+      </Show>
+      {/* Everything below is dimension-agnostic and must NOT be hidden in 3D.
+          It used to sit inside the `!is3D` block above, which was only ever
+          about Blend and Morph — those interpolate through the blend pipeline,
+          and `ifsPipeline3D.update()` takes a single flame, so there is no 3D
+          blend path. Sweeping the rest under the same guard silently removed
+          Audio Reactive, Sonification, Breed, Evolve, Simulator, Ancestry, Diff
+          and the Gallery from every 3D flame — none of which have anything to
+          do with dimensions. Breeding in particular works in 3D: `breedFlames`
+          carries `variations3D` and dispatches on `isVariationType3D`. */}
+      <>
         {/* Grouped feature launchers — pull-up menus keep the toolbar compact
             (10 loose buttons condensed to two groups + the direct trio). */}
         <PullUpMenu
@@ -365,7 +376,7 @@ export function ViewControls(props: ViewControlProps) {
         >
           Gallery…
         </Button>
-      </Show>
+      </>
       {/* Always-visible status badge: flame name + dimension + animation/frame. */}
       <div class={ui.flameBadge}>
         <span class={ui.flameBadgeName} title={badgeName()}>

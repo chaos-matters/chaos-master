@@ -888,6 +888,14 @@ export function MainWorkspace(props: AppProps) {
   let blendPreviewActive = false
 
   function handlePreviewBlend(flame: FlameDescriptor | null) {
+    // The hover preview IS the blend mechanism, and blending is 2D-only:
+    // `ifsPipeline3D.update()` takes a single flame — it has no blend input at
+    // all, so `renderSettings.blendFlame` is silently ignored in 3D. Writing it
+    // anyway changed the hovered NAME while the picture stayed put, which reads
+    // as a broken preview rather than an unsupported one. Skip it instead.
+    if (flame && (flame.renderSettings.dimensions ?? 2) === 3) {
+      return
+    }
     if (flame) {
       if (!blendPreviewActive) {
         prevBlendFlame = blendFlame()
@@ -5685,7 +5693,17 @@ export function MainWorkspace(props: AppProps) {
                       >
                         <BlendFlameGallery
                           dimensions={
-                            flameDescriptor.renderSettings.dimensions ?? 2
+                            /* Breed and evolve cross transforms, which works in
+                               3D — offer same-dimension partners so a 3D flame
+                               has someone to pair with. Morph interpolates via
+                               the BLEND pipeline, which has no 3D path at all
+                               (ifsPipeline3D.update takes one flame), so it
+                               stays 2D-only as before. */
+                            blendIntent() === 'breed' ||
+                            blendIntent() === 'evolve' ||
+                            blendIntent() === 'diff'
+                              ? (flameDescriptor.renderSettings.dimensions ?? 2)
+                              : 2
                           }
                           heading={
                             blendIntent() === 'morph'
