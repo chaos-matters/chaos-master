@@ -316,67 +316,64 @@ export function ViewControls(props: ViewControlProps) {
           and the Gallery from every 3D flame — none of which have anything to
           do with dimensions. Breeding in particular works in 3D: `breedFlames`
           carries `variations3D` and dispatches on `isVariationType3D`. */}
-      <>
-        {/* Grouped feature launchers — pull-up menus keep the toolbar compact
-            (10 loose buttons condensed to two groups + the direct trio). */}
-        <PullUpMenu
-          label="Audio"
-          title="Audio features — reactive mappings and sonification"
-          items={[
-            {
-              label: 'Audio Reactive…',
-              title: 'Make the flame dance to music (audio-reactive)',
-              onClick: () => props.onAudioReactive?.(),
-            },
-            {
-              label: 'Sonification…',
-              title:
-                'Hear the fractal — flame structure generates real-time audio',
-              onClick: () => props.onSonification?.(),
-            },
-          ]}
-        />
-        <PullUpMenu
-          label="Genetics"
-          title="Breeding features — crossover, evolution, lineage"
-          items={[
-            {
-              label: 'Breed…',
-              title: 'Breed: combine two flames to create new hybrid flames',
-              onClick: props.onBreedFlame,
-            },
-            {
-              label: 'Evolve…',
-              title:
-                'Evolution Chamber: breed across generations to evolve flames',
-              onClick: props.onEvolveFlame,
-            },
-            {
-              label: 'Simulator…',
-              title:
-                'Population Simulator: autonomous genetic algorithm with fitness scoring',
-              onClick: props.onSimulatorFlame,
-            },
-            {
-              label: 'Ancestry…',
-              title: 'Ancestry Tree: explore the lineage of bred flames',
-              onClick: props.onAncestryFlame,
-            },
-            {
-              label: 'Diff…',
-              title:
-                'Diff: compare two flames side by side to see what changed',
-              onClick: props.onDiffFlame,
-            },
-          ]}
-        />
-        <Button
-          onClick={props.onGalleryFlame}
-          title="Flame Gallery: curated collection of classic flame fractals"
-        >
-          Gallery…
-        </Button>
-      </>
+      {/* Grouped feature launchers — pull-up menus keep the toolbar compact
+          (10 loose buttons condensed to two groups + the direct trio). */}
+      <PullUpMenu
+        label="Audio"
+        title="Audio features — reactive mappings and sonification"
+        items={[
+          {
+            label: 'Audio Reactive…',
+            title: 'Make the flame dance to music (audio-reactive)',
+            onClick: () => props.onAudioReactive?.(),
+          },
+          {
+            label: 'Sonification…',
+            title:
+              'Hear the fractal — flame structure generates real-time audio',
+            onClick: () => props.onSonification?.(),
+          },
+        ]}
+      />
+      <PullUpMenu
+        label="Genetics"
+        title="Breeding features — crossover, evolution, lineage"
+        items={[
+          {
+            label: 'Breed…',
+            title: 'Breed: combine two flames to create new hybrid flames',
+            onClick: props.onBreedFlame,
+          },
+          {
+            label: 'Evolve…',
+            title:
+              'Evolution Chamber: breed across generations to evolve flames',
+            onClick: props.onEvolveFlame,
+          },
+          {
+            label: 'Simulator…',
+            title:
+              'Population Simulator: autonomous genetic algorithm with fitness scoring',
+            onClick: props.onSimulatorFlame,
+          },
+          {
+            label: 'Ancestry…',
+            title: 'Ancestry Tree: explore the lineage of bred flames',
+            onClick: props.onAncestryFlame,
+          },
+          {
+            label: 'Diff…',
+            title: 'Diff: compare two flames side by side to see what changed',
+            onClick: props.onDiffFlame,
+          },
+        ]}
+      />
+      <Button
+        onClick={props.onGalleryFlame}
+        title="Flame Gallery: curated collection of classic flame fractals"
+      >
+        Gallery…
+      </Button>
       {/* Always-visible status badge: flame name + dimension + animation/frame. */}
       <div class={ui.flameBadge}>
         <span class={ui.flameBadgeName} title={badgeName()}>
