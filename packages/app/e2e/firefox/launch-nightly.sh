@@ -11,7 +11,7 @@
 #   2. Forces X11 mode (env -u MOZ_ENABLE_WAYLAND GDK_BACKEND=x11), the audit's
 #      workaround for the GFX1201 DMA-BUF submission crash.
 #
-# Usage:  ./launch-nightly.sh [url]        (default: https://localhost:3000/)
+# Usage:  ./launch-nightly.sh [url]        (default: https://localhost:5173/)
 #         ./launch-nightly.sh --close      (just full-close, don't relaunch)
 #         MOZ_LOG_WEBGPU=1 ./launch-nightly.sh   (verbose WebGPU logging)
 #
@@ -19,7 +19,7 @@
 # the pkill below can't match this script's own process.
 set -uo pipefail
 
-URL="${1:-https://localhost:3000/}"
+URL="${1:-https://localhost:5173/}"
 
 full_close() {
   echo ">> Closing Firefox Nightly (and its GPU child processes)..."

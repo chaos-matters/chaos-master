@@ -77,7 +77,7 @@ npx playwright test e2e/console-errors.spec.ts
 
 **Problem**: Dev server not starting on expected port due to port conflicts.
 
-**Error**: `ERR_CONNECTION_REFUSED` when trying to connect to localhost:3000
+**Error**: `ERR_CONNECTION_REFUSED` when trying to connect to localhost:5173
 
 **Root Cause**: Multiple processes using ports, ssl() plugin in vite config causing issues
 

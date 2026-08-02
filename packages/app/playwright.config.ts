@@ -17,7 +17,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'https://localhost:3000',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'https://localhost:5173',
     ignoreHTTPSErrors: true,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
