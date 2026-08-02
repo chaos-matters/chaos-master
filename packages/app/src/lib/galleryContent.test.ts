@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { bySection, needsPosterFrame, posterUrl } from './galleryContent'
-import type { GalleryListItem } from './galleryContent'
+import { bySection, needsPosterFrame, posterUrl, sequenceFlames, } from './galleryContent'
+import type { GalleryItem, GalleryListItem } from './galleryContent'
+import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 const row = (over: Partial<GalleryListItem> = {}): GalleryListItem => ({
   slug: 'first-light',
@@ -63,6 +64,40 @@ describe('posterUrl', () => {
 
   it('is undefined for a row with no poster', () => {
     expect(posterUrl(row({ poster_key: null }))).toBeUndefined()
+  })
+})
+
+describe('sequenceFlames', () => {
+  // A curated `sequence` is what makes `cap-randomizer` play a path instead of
+  // resting on one still. Every other row has none, and "none" has to be the
+  // ordinary case rather than an error.
+  const flame = (id: string) => ({ id }) as unknown as FlameDescriptor
+  const item = (sequence: GalleryItem['sequence']) =>
+    ({ sequence }) as Pick<GalleryItem, 'sequence'>
+
+  it('returns the stored flames in the order they were curated', () => {
+    const stored = [flame('a'), flame('b'), flame('c')]
+    expect(sequenceFlames(item(stored))).toEqual(stored)
+  })
+
+  it('is empty for a row with no sequence — every row but one', () => {
+    expect(sequenceFlames(item(null))).toEqual([])
+    expect(sequenceFlames(undefined)).toEqual([])
+    expect(sequenceFlames({} as Pick<GalleryItem, 'sequence'>)).toEqual([])
+  })
+
+  it('degrades a malformed sequence to the single-flame behaviour', () => {
+    // The column is written by a script and read months later by a build that
+    // may be older or newer. A shape nobody expected must cost the row its
+    // walk, not its place on Home.
+    const bad = 'not-an-array' as unknown as GalleryItem['sequence']
+    expect(sequenceFlames(item(bad))).toEqual([])
+  })
+
+  it('drops the entries that are not descriptors, keeping the rest', () => {
+    const good = flame('a')
+    const mixed = [good, null, 'oops', 42] as unknown as GalleryItem['sequence']
+    expect(sequenceFlames(item(mixed))).toEqual([good])
   })
 })
 

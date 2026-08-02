@@ -97,6 +97,31 @@ function isMissingTable(err: unknown): boolean {
   return MISSING_TABLE.test(errMsg(err))
 }
 
+/**
+ * `gallery_items.sequence` — an ordered array of extra FlameDescriptors — as
+ * real objects, or null.
+ *
+ * Parsed defensively rather than alongside `flame`, and the difference matters:
+ * a row whose descriptor will not parse has nothing to show and 500ing is
+ * honest, but a row whose SEQUENCE will not parse still has a perfectly good
+ * flame. Curated sequences are written by a script against a column that may
+ * not exist yet on every environment, so the failure modes here are "a stale
+ * deploy" and "a bad hand edit" — both of which should degrade this row to the
+ * single-flame behaviour, not take the item off Home.
+ */
+function parseSequence(value: unknown, slug: string): unknown[] | null {
+  if (typeof value !== 'string' || value.length === 0) {
+    return null
+  }
+  try {
+    const parsed: unknown = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : null
+  } catch (err) {
+    console.warn(`gallery '${slug}': unreadable sequence —`, errMsg(err))
+    return null
+  }
+}
+
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
@@ -492,15 +517,15 @@ const baseHandler = {
       try {
         const row = await env.CONTENT_DB.prepare(
           'SELECT slug, title, caption, author, section, capability, flame, ' +
-            'animation, dimensions, transform_count, poster_key, ' +
+            'animation, sequence, dimensions, transform_count, poster_key, ' +
             'poster_width, poster_height, poster_frame FROM gallery_items ' +
             'WHERE slug = ? AND published = 1',
         )
           .bind(slug)
           .first()
         if (!row) return json({ error: 'Not found' }, 404)
-        // `flame`/`animation` are stored as JSON text. Parse here so clients
-        // get real objects rather than strings they must double-decode.
+        // `flame`/`animation`/`sequence` are stored as JSON text. Parse here so
+        // clients get real objects rather than strings they must double-decode.
         return jsonCached(
           {
             ...row,
@@ -509,6 +534,7 @@ const baseHandler = {
               row.animation === null
                 ? null
                 : JSON.parse(row.animation as string),
+            sequence: parseSequence(row.sequence, slug),
           },
           GALLERY_CACHE_SECONDS,
         )

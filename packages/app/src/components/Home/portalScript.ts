@@ -327,74 +327,204 @@ function playStep(
 export interface RunPortalScriptOptions {
   tour: TourGuide
   driver: PortalDriver
-  /** Called as each step begins, with its index into `tour.steps`. */
+  /** Called as each step begins, with its index into `tour.steps`. -1 = idle. */
   onStep: (index: number) => void
   /** Called once the last step's time is up, before the hold. */
-  onFinished: () => void
+  onFinished?: () => void
   timeScale?: number
+  /**
+   * Pause on the finished flame for this long and then play the script again.
+   * 0 stops on the finished flame instead of looping.
+   */
+  holdMs?: number
+  /** Start advancing immediately. False leaves the run parked at step -1. */
+  autoStart?: boolean
 }
 
 /**
- * Play a tour's steps end to end on the portal's own driver, and return a
- * cancel function.
+ * A script in progress. Transport controls rather than a bare cancel function,
+ * because the portal has three separate reasons to interfere with a run and
+ * they must not be the same operation:
  *
- * Cancelling is the teardown path AND the pause path: the portal unmounts
- * whenever it leaves the viewport, and a script that kept its timers running
- * would keep writing into a store nothing renders.
+ *  - it scrolls out of the play threshold, which STOPS it where it is
+ *    (`pause`) — restarting on every small scroll is the thing the section was
+ *    reported for,
+ *  - it scrolls off screen entirely, which puts it back to the beginning
+ *    (`restart`), and
+ *  - the user drags the progress bar, which jumps the flame to a step
+ *    (`seek`) — forward or back, since every step is replayed from the start
+ *    flame rather than undone.
  */
-export function runPortalScript(options: RunPortalScriptOptions): () => void {
+export interface PortalScriptRun {
+  /** Advance from wherever it is. No-op if already running or cancelled. */
+  play: () => void
+  /** Stop advancing. Every value the script has set stays set. */
+  pause: () => void
+  /** Back to "nothing applied". Keeps running if it was running. */
+  restart: () => void
+  /** Rebuild the flame as of `index` and continue from there. */
+  seek: (index: number) => void
+  /** Tear down: no timer will fire again. */
+  cancel: () => void
+  /** The step on screen; -1 before the first one. */
+  stepIndex: () => number
+  isRunning: () => boolean
+}
+
+/**
+ * Play a tour's steps on the portal's own driver.
+ *
+ * Cancelling is the teardown path: the portal unmounts when it leaves the
+ * page's near-window, and a script that kept its timers running would keep
+ * writing into a store nothing renders. `pause` is the softer version, for a
+ * portal that is still on screen but not enough of it to be worth playing.
+ */
+export function runPortalScript(
+  options: RunPortalScriptOptions,
+): PortalScriptRun {
   const { tour, driver, onStep, onFinished } = options
   const timeScale = options.timeScale ?? PORTAL_TIME_SCALE
-  let index = 0
+  const holdMs = options.holdMs ?? PORTAL_HOLD_MS
+  const lastIndex = tour.steps.length - 1
+  let index = -1
   let stepTimer: ReturnType<typeof setTimeout> | undefined
   let animateTimer: ReturnType<typeof setTimeout> | undefined
   let cancelled = false
+  let running = false
 
-  function advance() {
-    if (cancelled) {
-      return
-    }
+  function clearTimers() {
+    clearTimeout(stepTimer)
+    clearTimeout(animateTimer)
+    stepTimer = undefined
+    animateTimer = undefined
+  }
+
+  /** Wait out the current step, then move on. Also the resume path. */
+  function scheduleNext() {
     const step = tour.steps[index]
-    if (step === undefined) {
-      driver.finishAllAnimations()
-      onFinished()
-      return
-    }
-    onStep(index)
-    animateTimer = playStep(step, driver, timeScale)
     stepTimer = setTimeout(
-      () => {
-        index += 1
-        advance()
-      },
-      stepDurationMs(step, timeScale),
+      advance,
+      step === undefined ? 0 : stepDurationMs(step, timeScale),
     )
   }
 
-  advance()
-
-  return () => {
-    cancelled = true
-    clearTimeout(stepTimer)
-    clearTimeout(animateTimer)
-    driver.finishAllAnimations()
+  function advance() {
+    if (cancelled || !running) {
+      return
+    }
+    const next = index + 1
+    const step = tour.steps[next]
+    if (step === undefined) {
+      driver.finishAllAnimations()
+      onFinished?.()
+      if (holdMs <= 0) {
+        running = false
+        return
+      }
+      // Hold the finished flame — the one moment in the loop it is allowed to
+      // converge — then start over.
+      stepTimer = setTimeout(() => {
+        index = -1
+        driver.reset()
+        advance()
+      }, holdMs)
+      return
+    }
+    index = next
+    onStep(next)
+    animateTimer = playStep(step, driver, timeScale)
+    scheduleNext()
   }
+
+  const run: PortalScriptRun = {
+    play() {
+      if (cancelled || running) {
+        return
+      }
+      running = true
+      if (index < 0) {
+        advance()
+      } else {
+        scheduleNext()
+      }
+    },
+    pause() {
+      if (!running) {
+        return
+      }
+      running = false
+      clearTimers()
+      // Land the in-flight tween on its end value, so the held frame is a state
+      // the tour actually describes rather than a moment inside an ease curve.
+      driver.finishAllAnimations()
+    },
+    restart() {
+      clearTimers()
+      driver.reset()
+      index = -1
+      if (running) {
+        advance()
+      } else {
+        onStep(-1)
+      }
+    },
+    seek(target) {
+      if (cancelled) {
+        return
+      }
+      clearTimers()
+      const clamped = Math.min(lastIndex, Math.max(0, Math.floor(target)))
+      // Rebuilt from the start flame rather than stepped backwards: the tour's
+      // steps are writes, not reversible edits, so replaying a prefix is the
+      // only way a backward seek can land on the state that prefix describes.
+      driver.reset()
+      applyStepsUpTo(tour, driver, clamped)
+      index = clamped
+      onStep(clamped)
+      if (running) {
+        scheduleNext()
+      }
+    },
+    cancel() {
+      cancelled = true
+      running = false
+      clearTimers()
+      driver.finishAllAnimations()
+    },
+    stepIndex: () => index,
+    isRunning: () => running,
+  }
+
+  if (options.autoStart !== false) {
+    run.play()
+  }
+  return run
 }
 
 /**
- * Apply every step at once, with no waiting and no animation.
+ * Apply steps `0..lastIndex` at once, with no waiting and no animation.
  *
- * This is what `prefers-reduced-motion: reduce` gets: the finished flame,
- * static, captioned by the tour's last step. Each step still runs through the
- * real commands — the end state is the same flame the animated run arrives at,
- * not a stored picture of it.
+ * Two callers, one mechanism: `prefers-reduced-motion: reduce` gets the whole
+ * script this way (the finished flame, static, captioned by the last step), and
+ * a scrubbed seek gets the prefix. Each step still runs through the real
+ * commands — the result is the same flame the animated run arrives at, not a
+ * stored picture of it.
  */
-export function applyWholeScript(tour: TourGuide, driver: PortalDriver): void {
-  for (const step of tour.steps) {
+export function applyStepsUpTo(
+  tour: TourGuide,
+  driver: PortalDriver,
+  lastIndex: number,
+): void {
+  for (const step of tour.steps.slice(0, Math.max(0, lastIndex + 1))) {
     step.beforeShow?.(driver.ctx)
     step.onAnimate?.(driver.ctx)
     // Snap immediately: `animateValue` returns its finisher, but the tours call
     // it without keeping one, so this is what lands every tween on its end.
     driver.finishAllAnimations()
   }
+}
+
+/** Every step, instantly. See {@link applyStepsUpTo}. */
+export function applyWholeScript(tour: TourGuide, driver: PortalDriver): void {
+  applyStepsUpTo(tour, driver, tour.steps.length - 1)
 }

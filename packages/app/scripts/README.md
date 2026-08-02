@@ -7,6 +7,7 @@ Node tooling for the app package. Run everything from `packages/app`.
 | `gallery-admin.mjs`                         | JSON-in/JSON-out front door for all gallery content edits.  |
 | `gallery-targets.mjs`                       | What `local` / `dev` / `prod` mean, for all four scripts.   |
 | `seed-gallery.mjs`                          | Writes the Home gallery's curated rows into D1.             |
+| `gallery-sequence.mjs`                      | Generates a row's curated flame sequence and stores it.     |
 | `capture-gallery-posters.mjs`               | Renders a still poster for every gallery row.               |
 | `upload-gallery-posters.mjs`                | Uploads those posters to R2 and points the D1 rows at them. |
 | `extract-flames.mjs`                        | Pulls flame descriptors out of existing artwork.            |
@@ -116,6 +117,42 @@ plausible, and the fix under test was simply not in the code being served. Both
 serving (`dev-server-checkout.mjs`, from the absolute path in Vite's dev source
 map) and refuse the run on a mismatch, naming both paths. `--no-serve` gets the
 same check.
+
+## gallery-sequence
+
+Most Home rows are one flame. A row may instead carry an ordered list of extra
+descriptors in `gallery_items.sequence` (migration `0004`), and a plate showing
+it walks `[flame, ...sequence]` on hover. `cap-randomizer` uses it, because
+"roll a whole flame, then steer it" is a path and cannot be shown as a still.
+
+```bash
+node scripts/gallery-sequence.mjs cap-randomizer                 # print the SQL
+node scripts/gallery-sequence.mjs cap-randomizer --apply local
+node scripts/gallery-sequence.mjs cap-randomizer --seed 7 --derived 4
+node scripts/gallery-sequence.mjs cap-randomizer --paths 2       # two paths
+node scripts/gallery-sequence.mjs cap-randomizer --clear --apply local
+```
+
+The flames come from the app's OWN randomiser (`src/flame/randomize.ts`,
+imported through an esbuild bundle exactly as `seed-gallery.mjs` imports the
+examples) with the Randomizer card's own defaults — General + Blur variations,
+2-4 transforms — so what Home plays is what the card produces. That is the whole
+claim the card makes, and reimplementing the randomiser here would quietly
+break it.
+
+**Generated once and stored, never generated live.** Every visitor sees the
+same curated path, a bad roll is fixed by re-running with another `--seed`
+rather than by hoping, and the render path carries no randomiser at all. The
+seed drives transform ids too, so the same seed produces a byte-identical
+column and a re-run is reviewable as a diff.
+
+The column is a **flat ordered list**. `--paths 2` appends a second complete
+run to the first; the player walks the whole thing and wraps, and neither the
+player nor the schema knows where one path ends. That is why a future row can
+hold two curated paths without changing anything.
+
+`--clear` sets the column back to `NULL`, which is the ordinary single-flame
+behaviour every other row has.
 
 ## The gallery poster pipeline
 

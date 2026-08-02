@@ -42,6 +42,20 @@ export interface GalleryListItem {
 export interface GalleryItem extends Omit<GalleryListItem, 'has_animation'> {
   flame: FlameDescriptor
   animation: { tracks: TimelineTrack[] } | null
+  /**
+   * Extra descriptors this row plays through, in order, or null for the single
+   * flame every other row is.
+   *
+   * Curated and stored, not generated live — `scripts/gallery-sequence.mjs`
+   * derives them from the row's own flame with the app's randomiser and writes
+   * them here, so what a visitor sees is a path someone chose. A FLAT list on
+   * purpose: a row holding two different curated paths one after another is
+   * twice as long and needs no player change (see `sequenceFlames`).
+   *
+   * Deliberately absent from the LIST endpoint. It is many times the size of a
+   * row's own descriptor, and the list already omits `flame` for that reason.
+   */
+  sequence: FlameDescriptor[] | null
 }
 
 /** Where a poster lives once captured. Null items render a plain plate. */
@@ -74,6 +88,28 @@ export function needsPosterFrame(
     item.has_animation === 1 &&
     item.poster_key !== null &&
     item.poster_frame === null
+  )
+}
+
+/**
+ * The extra flames this row plays through — `[]` for every row that has none.
+ *
+ * The null case is not an error and not a special mode: an empty walk leaves a
+ * plate resting on its own descriptor, which is what every gallery row has
+ * always done. Content can also be newer or hand-edited, so a `sequence` that
+ * is not an array of objects is treated as absent rather than trusted — a
+ * malformed curation must degrade to the ordinary plate, not break it.
+ */
+export function sequenceFlames(
+  item: Pick<GalleryItem, 'sequence'> | undefined | null,
+): FlameDescriptor[] {
+  const stored = item?.sequence
+  if (!Array.isArray(stored)) {
+    return []
+  }
+  return stored.filter(
+    (entry): entry is FlameDescriptor =>
+      typeof entry === 'object' && entry !== null,
   )
 }
 

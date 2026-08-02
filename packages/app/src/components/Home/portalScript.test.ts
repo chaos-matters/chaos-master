@@ -2,7 +2,7 @@ import { createRoot } from 'solid-js'
 import { describe, expect, it, vi } from 'vitest'
 import { examples } from '@/flame/examples'
 import { example1CreationTour } from '@/tours/example1CreationTour'
-import { applyWholeScript, createPortalDriver, PORTAL_MIN_STEP_MS, PORTAL_STEP_TAIL_MS, PORTAL_TIME_SCALE, runPortalScript, scriptDurationMs, stepDurationMs, } from './portalScript'
+import { applyStepsUpTo, applyWholeScript, createPortalDriver, PORTAL_HOLD_MS, PORTAL_MIN_STEP_MS, PORTAL_STEP_TAIL_MS, PORTAL_TIME_SCALE, runPortalScript, scriptDurationMs, stepDurationMs, } from './portalScript'
 import type { TourGuide } from '@/components/SpotlightTour/tourTypes'
 
 /**
@@ -17,6 +17,23 @@ const tour = example1CreationTour
 function transformCount(flame: { transforms: Record<string, unknown> }) {
   return Object.keys(flame.transforms).length
 }
+
+/** A tour of `count` steps that only takes time — no writes, no tweens. */
+function inertTour(count: number): TourGuide {
+  return {
+    id: 'test',
+    name: 'test',
+    description: '',
+    steps: Array.from({ length: count }, (_, i) => ({
+      target: '',
+      title: `step ${i}`,
+      description: '',
+    })),
+  }
+}
+
+const twoSteps = inertTour(2)
+const threeSteps = inertTour(3)
 
 describe('createPortalDriver — the flame it builds', () => {
   it('replays the whole tour into the state the tour describes', () => {
@@ -159,17 +176,8 @@ describe('runPortalScript', () => {
       const driver = createPortalDriver(examples.example1)
       const seen: number[] = []
       let finished = false
-      const short: TourGuide = {
-        id: 'test',
-        name: 'test',
-        description: '',
-        steps: [
-          { target: '', title: 'one', description: '' },
-          { target: '', title: 'two', description: '' },
-        ],
-      }
-      runPortalScript({
-        tour: short,
+      const run = runPortalScript({
+        tour: twoSteps,
         driver,
         onStep: (index) => seen.push(index),
         onFinished: () => {
@@ -182,6 +190,7 @@ describe('runPortalScript', () => {
       expect(finished).toBe(false)
       vi.advanceTimersByTime(PORTAL_MIN_STEP_MS)
       expect(finished).toBe(true)
+      run.cancel()
       dispose()
     })
     vi.useRealTimers()
@@ -192,27 +201,254 @@ describe('runPortalScript', () => {
     createRoot((dispose) => {
       const driver = createPortalDriver(examples.example1)
       const seen: number[] = []
-      const short: TourGuide = {
-        id: 'test',
-        name: 'test',
-        description: '',
-        steps: [
-          { target: '', title: 'one', description: '' },
-          { target: '', title: 'two', description: '' },
-          { target: '', title: 'three', description: '' },
-        ],
-      }
-      const cancel = runPortalScript({
-        tour: short,
+      const run = runPortalScript({
+        tour: threeSteps,
         driver,
         onStep: (index) => seen.push(index),
         onFinished: () => {},
       })
-      cancel()
+      run.cancel()
       vi.advanceTimersByTime(PORTAL_MIN_STEP_MS * 10)
       expect(seen).toEqual([0])
       dispose()
     })
     vi.useRealTimers()
+  })
+
+  it('loops: holds the finished flame, then plays again', () => {
+    vi.useFakeTimers()
+    createRoot((dispose) => {
+      const driver = createPortalDriver(examples.example1)
+      const seen: number[] = []
+      const run = runPortalScript({
+        tour: twoSteps,
+        driver,
+        onStep: (index) => seen.push(index),
+      })
+      vi.advanceTimersByTime(PORTAL_MIN_STEP_MS * 2)
+      expect(seen).toEqual([0, 1])
+      // The hold is the one moment the flame is allowed to converge; nothing
+      // advances during it.
+      vi.advanceTimersByTime(PORTAL_HOLD_MS - 1)
+      expect(seen).toEqual([0, 1])
+      vi.advanceTimersByTime(1)
+      expect(seen).toEqual([0, 1, 0])
+      run.cancel()
+      dispose()
+    })
+    vi.useRealTimers()
+  })
+})
+
+/**
+ * The transport, which is what "a small scroll must not restart the build" is
+ * made of: the portal stops and resumes a run rather than destroying and
+ * recreating one, and the progress bar moves it about.
+ */
+describe('PortalScriptRun — transport', () => {
+  it('holds where it is on pause and carries on from there', () => {
+    vi.useFakeTimers()
+    createRoot((dispose) => {
+      const driver = createPortalDriver(examples.example1)
+      const seen: number[] = []
+      const run = runPortalScript({
+        tour: threeSteps,
+        driver,
+        onStep: (index) => seen.push(index),
+      })
+      expect(seen).toEqual([0])
+      run.pause()
+      // However long the page sits below the play threshold, the step it was
+      // showing is still the step it is showing.
+      vi.advanceTimersByTime(PORTAL_MIN_STEP_MS * 20)
+      expect(seen).toEqual([0])
+      expect(run.stepIndex()).toBe(0)
+
+      run.play()
+      // Resumed, not restarted: the next thing that happens is step 1.
+      vi.advanceTimersByTime(PORTAL_MIN_STEP_MS)
+      expect(seen).toEqual([0, 1])
+      run.cancel()
+      dispose()
+    })
+    vi.useRealTimers()
+  })
+
+  it('ignores a second play, so a nudge cannot double the pace', () => {
+    vi.useFakeTimers()
+    createRoot((dispose) => {
+      const driver = createPortalDriver(examples.example1)
+      const seen: number[] = []
+      const run = runPortalScript({
+        tour: threeSteps,
+        driver,
+        onStep: (index) => seen.push(index),
+      })
+      run.play()
+      run.play()
+      run.play()
+      vi.advanceTimersByTime(PORTAL_MIN_STEP_MS)
+      expect(seen).toEqual([0, 1])
+      run.cancel()
+      dispose()
+    })
+    vi.useRealTimers()
+  })
+
+  it('starts from the beginning on restart, and only then', () => {
+    vi.useFakeTimers()
+    createRoot((dispose) => {
+      const driver = createPortalDriver(examples.example1)
+      const seen: number[] = []
+      const run = runPortalScript({
+        tour: threeSteps,
+        driver,
+        onStep: (index) => seen.push(index),
+      })
+      vi.advanceTimersByTime(PORTAL_MIN_STEP_MS)
+      expect(seen).toEqual([0, 1])
+      run.restart()
+      expect(run.stepIndex()).toBe(0)
+      expect(seen).toEqual([0, 1, 0])
+      run.cancel()
+      dispose()
+    })
+    vi.useRealTimers()
+  })
+
+  it('rebuilds the flame when seeking backwards', () => {
+    vi.useFakeTimers()
+    createRoot((dispose) => {
+      const driver = createPortalDriver(examples.example1)
+      const run = runPortalScript({
+        tour,
+        driver,
+        onStep: () => {},
+        autoStart: false,
+      })
+
+      run.seek(tour.steps.length - 1)
+      const finished = transformCount(driver.flame)
+      expect(finished).toBe(4)
+
+      // Backwards is a REBUILD, not an undo: the tour's steps are writes, so
+      // the only honest way to show step 3 is to replay steps 0..3.
+      run.seek(3)
+      expect(run.stepIndex()).toBe(3)
+      expect(transformCount(driver.flame)).toBeLessThan(finished)
+
+      // And forwards again lands on exactly the same flame as the first time.
+      run.seek(tour.steps.length - 1)
+      expect(transformCount(driver.flame)).toBe(finished)
+      expect(driver.flame.renderSettings.vibrancy).toBeCloseTo(0.95, 5)
+      run.cancel()
+      dispose()
+    })
+    vi.useRealTimers()
+  })
+
+  it('keeps playing from where a seek landed', () => {
+    vi.useFakeTimers()
+    createRoot((dispose) => {
+      const driver = createPortalDriver(examples.example1)
+      const seen: number[] = []
+      const run = runPortalScript({
+        tour: threeSteps,
+        driver,
+        onStep: (index) => seen.push(index),
+      })
+      run.seek(2)
+      expect(seen).toEqual([0, 2])
+      vi.advanceTimersByTime(PORTAL_MIN_STEP_MS)
+      // Step 2 is the last one, so the next thing is the hold.
+      expect(seen).toEqual([0, 2])
+      expect(run.isRunning()).toBe(true)
+      run.cancel()
+      dispose()
+    })
+    vi.useRealTimers()
+  })
+
+  it('seeks without advancing while paused — the scrubber in use', () => {
+    vi.useFakeTimers()
+    createRoot((dispose) => {
+      const driver = createPortalDriver(examples.example1)
+      const seen: number[] = []
+      const run = runPortalScript({
+        tour: threeSteps,
+        driver,
+        onStep: (index) => seen.push(index),
+        autoStart: false,
+      })
+      run.seek(1)
+      vi.advanceTimersByTime(PORTAL_MIN_STEP_MS * 10)
+      expect(seen).toEqual([1])
+      run.cancel()
+      dispose()
+    })
+    vi.useRealTimers()
+  })
+
+  it('clamps a seek to the steps that exist', () => {
+    createRoot((dispose) => {
+      const driver = createPortalDriver(examples.example1)
+      const run = runPortalScript({
+        tour: threeSteps,
+        driver,
+        onStep: () => {},
+        autoStart: false,
+      })
+      run.seek(99)
+      expect(run.stepIndex()).toBe(2)
+      run.seek(-4)
+      expect(run.stepIndex()).toBe(0)
+      run.cancel()
+      dispose()
+    })
+  })
+
+  it('does nothing at all once cancelled', () => {
+    vi.useFakeTimers()
+    createRoot((dispose) => {
+      const driver = createPortalDriver(examples.example1)
+      const seen: number[] = []
+      const run = runPortalScript({
+        tour: threeSteps,
+        driver,
+        onStep: (index) => seen.push(index),
+      })
+      run.cancel()
+      run.play()
+      run.seek(2)
+      vi.advanceTimersByTime(PORTAL_MIN_STEP_MS * 10)
+      expect(seen).toEqual([0])
+      dispose()
+    })
+    vi.useRealTimers()
+  })
+})
+
+describe('applyStepsUpTo', () => {
+  it('builds the flame a prefix of the tour describes', () => {
+    createRoot((dispose) => {
+      const partial = createPortalDriver(examples.example1)
+      applyStepsUpTo(tour, partial, 3)
+      const whole = createPortalDriver(examples.example1)
+      applyWholeScript(tour, whole)
+      expect(transformCount(partial.flame)).toBeLessThan(
+        transformCount(whole.flame),
+      )
+      dispose()
+    })
+  })
+
+  it('applies nothing for a prefix before the first step', () => {
+    createRoot((dispose) => {
+      const driver = createPortalDriver(examples.example1)
+      const before = transformCount(driver.flame)
+      applyStepsUpTo(tour, driver, -1)
+      expect(transformCount(driver.flame)).toBe(before)
+      dispose()
+    })
   })
 })

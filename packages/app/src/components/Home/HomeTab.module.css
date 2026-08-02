@@ -330,25 +330,51 @@
   flex: none;
 }
 
-/* Position through the script. Reads as chrome, not as a control: the portal is
-   deliberately not scrubbable. */
+/* Position through the script, and the control that moves it. The hit area is
+   the full bar height while the visible track stays a hairline — a 2px pointer
+   target would be unusable, and a keyboard user needs the focus ring to land on
+   something they can see. */
 .portal-bar-track {
+  position: relative;
   flex: 1 1 auto;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--neutral-200);
-  overflow: hidden;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
 
-  [data-theme='dark'] & {
-    background: var(--neutral-800);
+  &::before {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--neutral-200);
+
+    [data-theme='dark'] & {
+      background: var(--neutral-800);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent-color, #3b82f6);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  &[aria-disabled='true'] {
+    cursor: default;
   }
 }
 
 .portal-bar-fill {
+  position: relative;
   display: block;
-  height: 100%;
+  height: 2px;
+  border-radius: 1px;
   background: var(--accent-color, #3b82f6);
   transition: width 220ms linear;
+  pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

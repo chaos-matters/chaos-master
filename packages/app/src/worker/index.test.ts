@@ -337,6 +337,66 @@ describe('worker /api/gallery', () => {
     expect(itemBody.poster_frame).toBe(31)
   })
 
+  // A row may carry a curated ORDERED list of extra descriptors, which is what
+  // makes `cap-randomizer` play a path rather than rest on one still.
+  it('parses a curated sequence for the single item, and keeps it out of the list', async () => {
+    const row = {
+      ...galleryRow,
+      sequence: JSON.stringify([{ transforms: { a: {} } }, { transforms: {} }]),
+    }
+    const itemDb = makeD1([row])
+    const item = await worker.fetch(
+      new Request('https://x.test/api/gallery/first-light'),
+      makeEnv({ CONTENT_DB: itemDb }),
+      ctx,
+    )
+    const body = (await item.json()) as { sequence: unknown[] | null }
+    expect(Array.isArray(body.sequence)).toBe(true)
+    expect(body.sequence).toHaveLength(2)
+    expect(itemDb.calls[0]?.sql).toContain('sequence')
+
+    // The list stays small for the same reason it omits `flame`: these are the
+    // largest values in the table and nothing in a list view reads them.
+    const listDb = makeD1([row])
+    await worker.fetch(
+      new Request('https://x.test/api/gallery'),
+      makeEnv({ CONTENT_DB: listDb }),
+      ctx,
+    )
+    expect(listDb.calls[0]?.sql).not.toContain('sequence')
+  })
+
+  it('reports no sequence for the rows that have none', async () => {
+    for (const stored of [null, undefined, '']) {
+      const res = await worker.fetch(
+        new Request('https://x.test/api/gallery/first-light'),
+        makeEnv({ CONTENT_DB: makeD1([{ ...galleryRow, sequence: stored }]) }),
+        ctx,
+      )
+      const body = (await res.json()) as { sequence: unknown }
+      expect(body.sequence).toBeNull()
+    }
+  })
+
+  it('serves the row anyway when its sequence is unreadable', async () => {
+    // A stale deploy or a bad hand edit costs the row its walk, not its place
+    // on Home — unlike `flame`, which the row cannot be shown without.
+    for (const stored of ['{not json', JSON.stringify({ nope: true })]) {
+      const res = await worker.fetch(
+        new Request('https://x.test/api/gallery/first-light'),
+        makeEnv({ CONTENT_DB: makeD1([{ ...galleryRow, sequence: stored }]) }),
+        ctx,
+      )
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as {
+        sequence: unknown
+        flame: Record<string, unknown>
+      }
+      expect(body.sequence).toBeNull()
+      expect(body.flame).toHaveProperty('transforms')
+    }
+  })
+
   it('rejects a malformed slug before it reaches the query', async () => {
     const db = makeD1([galleryRow])
     const res = await worker.fetch(

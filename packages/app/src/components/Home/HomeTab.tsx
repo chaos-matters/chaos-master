@@ -389,8 +389,10 @@ export function HomeTab(props: HomeTabProps) {
                 {/* Its own Root and ComputeGate live inside — see
                     HomePortal.tsx. It takes the page's tracker rather than a
                     boolean so its element registers with the SAME observer as
-                    every plate. */}
-                <HomePortal track={track} />
+                    every plate, plus the scroll container itself: deciding
+                    whether it is 80% on screen needs a margin-free observer,
+                    which the shared one is not. */}
+                <HomePortal track={track} root={scrollEl} />
               </section>
 
               {/* Explore — option A, capability cards */}

@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, onCleanup, Show, Suspense, } from 'solid-js'
+import { createEffect, createMemo, createSignal, onCleanup, Show, Suspense, untrack, } from 'solid-js'
 import { vec4f } from 'typegpu/data'
 import { ComputeGate, useComputeGate } from '@/contexts/ComputeGateContext'
 import { examples } from '@/flame/examples'
@@ -11,12 +11,14 @@ import { fetchHomeConfig as TEMP_fetchHomeConfig, resolvePortalTourId, } from '@
 import { Root } from '@/lib/Root'
 import { getTour, isKnownTour } from '@/tours/registry'
 import { useIsScrolling } from '@/utils/isScrolling'
+import { createIntersectionMeasure } from '@/utils/useIntersectionObserver'
 import { setLivePreviewLive, vramLog } from '@/utils/vramLog'
-import { usePrefersReducedMotion } from './homePlayback'
+import { nextPortalPlayback, stepFromFraction, usePrefersReducedMotion, visibleFraction, } from './homePlayback'
 import ui from './HomeTab.module.css'
-import { applyWholeScript, createPortalDriver, PORTAL_HOLD_MS, runPortalScript, } from './portalScript'
+import { createPortalDriver, runPortalScript } from './portalScript'
 import type { Accessor } from 'solid-js'
-import type { PortalDriver } from './portalScript'
+import type { PortalPlayback } from './homePlayback'
+import type { PortalDriver, PortalScriptRun } from './portalScript'
 import type { TourGuide } from '@/components/SpotlightTour/tourTypes'
 import type { RenderStatus } from '@/contexts/ComputeGateContext'
 import type { HomeConfig } from '@/lib/homeConfig'
@@ -39,9 +41,8 @@ import type { HomeConfig } from '@/lib/homeConfig'
  * `.agents/skills/gallery_preview_layout`), and the portal is the most
  * expensive single thing on the page, so they are applied more strictly:
  *
- *  - it mounts only on SETTLED visibility (near the viewport AND not
- *    mid-scroll) and unmounts entirely when scrolled away, which is also how
- *    playback pauses — a cancelled script has no timers and no rAF loop;
+ *  - it mounts on SETTLED visibility (near the viewport AND not mid-scroll) and
+ *    unmounts entirely when it leaves the near-window;
  *  - there is exactly ONE, in its own `<ComputeGate capacity={1}>`, so the cap
  *    is structural rather than a thing to remember;
  *  - it gets its own `<Root>`. Home already sits inside App's Root, so this is
@@ -50,6 +51,20 @@ import type { HomeConfig } from '@/lib/homeConfig'
  *    working if it is ever moved into a Portal (the plan's constraint: anything
  *    outside the app Root must re-provide both — `LoadFlameModal` is the
  *    reference).
+ *
+ * ## Scrolling (revised after testing)
+ *
+ * The first cut tied the whole stage to settled visibility, so every scroll
+ * event tore the portal down and the build started over — "actually annoying",
+ * and correctly so. MOUNTING and PLAYING are now separate questions:
+ *
+ *  - mounted while the portal is in the page's near-window (the 300px-margin
+ *    shared observer). Once mounted it stays mounted through any amount of
+ *    scrolling, so the flame, its buffers and the script's progress survive;
+ *  - PLAYING is decided by its own margin-free observer: it starts at
+ *    `PORTAL_PLAY_RATIO` of the screen, ignores every scroll that keeps it
+ *    there, stops and holds below it, and only resets when it is gone
+ *    completely. See `nextPortalPlayback`, which is that rule on its own.
  */
 
 /**
@@ -83,19 +98,65 @@ const START_FLAME = examples.example1
 export interface HomePortalProps {
   /**
    * Home's one shared IntersectionObserver, rooted on the scroll container —
-   * the same tracker every plate registers with, so the portal cannot end up
-   * with a second observer (or a viewport-rooted one, which could not preload
-   * past the fold).
+   * the same tracker every plate registers with, so the portal's MOUNTING is
+   * decided by the same near-window as every plate's.
    */
   track: (target: Accessor<Element | null | undefined>) => Accessor<boolean>
+  /**
+   * Home's scroll container, for the portal's own margin-free observer. The
+   * shared tracker cannot answer "how much of this is on screen": it runs with
+   * a 300px `rootMargin`, which inflates the root and lets an element well below
+   * the fold report a ratio of 1.
+   */
+  root: Accessor<Element | null | undefined>
 }
 
 export function HomePortal(props: HomePortalProps) {
   const [portalEl, setPortalEl] = createSignal<HTMLDivElement>()
   const near = props.track(portalEl)
   const scrolling = useIsScrolling()
-  /** Settled visibility, exactly as HomeFlame defines it. */
+  /**
+   * Mounted while near, and only ever mounted from a standstill.
+   *
+   * A latch rather than `near() && !scrolling()`: the settled rule is there so
+   * a fast scroll does not allocate and abandon GPU buffers, which is about
+   * STARTING. Applying it to stopping as well is what made every scroll destroy
+   * the portal and restart the build.
+   */
+  const [mounted, setMounted] = createSignal(false)
+  createEffect(() => {
+    if (!near()) {
+      setMounted(false)
+      return
+    }
+    if (!scrolling()) {
+      setMounted(true)
+    }
+  })
+  /** Kept for the config fetch, which should still wait for a standstill. */
   const settled = createMemo(() => near() && !scrolling())
+
+  /**
+   * How much of the portal is on screen, 0..1 — the input to the play/hold/
+   * reset rule. Measured against the smaller of the portal and the viewport so
+   * the threshold stays reachable on a short window (see `visibleFraction`).
+   */
+  const shown = createIntersectionMeasure(
+    portalEl,
+    (entry) =>
+      visibleFraction(
+        entry.boundingClientRect.height,
+        entry.rootBounds?.height ?? 0,
+        entry.intersectionRect.height,
+      ),
+    { root: () => props.root() },
+  )
+
+  const [runState, setRunState] = createSignal<PortalPlayback>('idle')
+  createEffect(() => {
+    const fraction = shown()
+    setRunState((previous) => nextPortalPlayback(previous, fraction))
+  })
 
   /**
    * Ask for the settings the first time the portal is approached — not on page
@@ -166,7 +227,7 @@ export function HomePortal(props: HomePortalProps) {
    * settings name something else.
    */
   const live = createMemo(
-    () => settled() && gpuReady() && configResolved() && tour() !== undefined,
+    () => mounted() && gpuReady() && configResolved() && tour() !== undefined,
   )
 
   // Reset the caption when the stage goes away, so a portal scrolled back into
@@ -177,6 +238,77 @@ export function HomePortal(props: HomePortalProps) {
     }
   })
 
+  // ── The scrubber ────────────────────────────────────────────────────────
+  // A real control, not chrome: the build is the section's content, and the one
+  // thing a viewer wants is to go back and look at the step that just went by.
+
+  const [trackEl, setTrackEl] = createSignal<HTMLDivElement>()
+  /** A pointer is down on the track. */
+  const [dragging, setDragging] = createSignal(false)
+  /** The track has keyboard focus. */
+  const [focused, setFocused] = createSignal(false)
+  /**
+   * While the user is working the scrubber the build holds still. Focus counts,
+   * not just a held pointer: a keyboard user stepping with the arrow keys would
+   * otherwise be racing the script's own advance on every press.
+   */
+  const scrubbing = createMemo(() => dragging() || focused())
+  const [seekRequest, setSeekRequest] = createSignal<{
+    index: number
+    nonce: number
+  }>()
+  let seekNonce = 0
+
+  function requestSeek(index: number) {
+    seekNonce += 1
+    setSeekRequest({ index, nonce: seekNonce })
+    setStepIndex(index)
+  }
+
+  function seekToPointer(event: PointerEvent) {
+    const el = trackEl()
+    const total = stepCount()
+    if (el === undefined || total === 0) {
+      return
+    }
+    const rect = el.getBoundingClientRect()
+    if (rect.width <= 0) {
+      return
+    }
+    requestSeek(
+      stepFromFraction((event.clientX - rect.left) / rect.width, total),
+    )
+  }
+
+  /** Steps a Page Up/Down jumps — a chapter rather than a step. */
+  const PAGE_STEPS = 5
+
+  function seekByKey(event: KeyboardEvent): number | undefined {
+    const total = stepCount()
+    if (total === 0) {
+      return undefined
+    }
+    const at = Math.max(0, stepIndex())
+    switch (event.key) {
+      case 'ArrowLeft':
+      case 'ArrowDown':
+        return at - 1
+      case 'ArrowRight':
+      case 'ArrowUp':
+        return at + 1
+      case 'PageDown':
+        return at - PAGE_STEPS
+      case 'PageUp':
+        return at + PAGE_STEPS
+      case 'Home':
+        return 0
+      case 'End':
+        return total - 1
+      default:
+        return undefined
+    }
+  }
+
   const progress = createMemo(() => {
     const total = stepCount()
     if (total === 0 || stepIndex() < 0) {
@@ -185,6 +317,16 @@ export function HomePortal(props: HomePortalProps) {
     return (stepIndex() + 1) / total
   })
   const progressWidth = createMemo(() => `${(progress() * 100).toFixed(1)}%`)
+  /** ARIA counts steps from 1, and reports "nothing yet" as the first step. */
+  const sliderNow = createMemo(() => Math.max(0, stepIndex()) + 1)
+  const sliderMax = createMemo(() => Math.max(1, stepCount()))
+  const sliderText = createMemo(
+    () => `Step ${sliderNow()} of ${sliderMax()}: ${step()?.title ?? 'start'}`,
+  )
+  // Hoisted like every other conditional prop in this file — see the note above
+  // `activeTour`. Uniform, so the rule stays a rule rather than a judgement.
+  const scrubTabIndex = createMemo(() => (live() ? 0 : -1))
+  const scrubDisabled = createMemo(() => (live() ? undefined : 'true'))
 
   // Hoisted out of the JSX: conditionals written inline in a prop compile to
   // lazily-created computations, and the ones feeding a renderer are how the
@@ -192,9 +334,16 @@ export function HomePortal(props: HomePortalProps) {
   // and memory: solid-conditional-prop-memo-leak). Doing it uniformly keeps the
   // rule easy to follow rather than a judgement call per prop.
   const activeTour = createMemo(() => (live() ? tour() : undefined))
+  /**
+   * What the stage should be doing. `held` while the scrubber is in use, so
+   * seeking to a step and looking at it does not become a race with the script.
+   */
+  const stageState = createMemo<PortalPlayback>(() =>
+    scrubbing() && runState() === 'playing' ? 'held' : runState(),
+  )
   const idleMessage = createMemo(() =>
     gpuReady()
-      ? 'The build plays when this section is in view.'
+      ? 'The build plays once this section fills the screen.'
       : 'Live rendering is unavailable on this device.',
   )
   const captionTitle = createMemo(
@@ -219,12 +368,66 @@ export function HomePortal(props: HomePortalProps) {
       data-portal-tour={tour()?.id}
       data-portal-step={stepIndex()}
       data-portal-live={live() ? 'true' : 'false'}
+      /* The play/hold/reset state, so "a small scroll changed nothing" is
+         something a person in devtools — and a Playwright run — can read
+         directly instead of inferring from the step index. */
+      data-portal-state={runState()}
     >
       <div class={ui.portalBar}>
         <span class={ui.portalBarName}>Lumen Apeiron</span>
-        <span class={ui.portalBarTrack} aria-hidden="true">
+        <div
+          ref={setTrackEl}
+          class={ui.portalBarTrack}
+          role="slider"
+          tabindex={scrubTabIndex()}
+          aria-label="Build progress"
+          aria-valuemin={1}
+          aria-valuemax={sliderMax()}
+          aria-valuenow={sliderNow()}
+          aria-valuetext={sliderText()}
+          aria-disabled={scrubDisabled()}
+          onFocus={() => {
+            setFocused(true)
+          }}
+          onBlur={() => {
+            setFocused(false)
+          }}
+          onPointerDown={(event) => {
+            if (!live()) {
+              return
+            }
+            event.currentTarget.setPointerCapture(event.pointerId)
+            setDragging(true)
+            seekToPointer(event)
+          }}
+          onPointerMove={(event) => {
+            if (dragging()) {
+              seekToPointer(event)
+            }
+          }}
+          onPointerUp={(event) => {
+            event.currentTarget.releasePointerCapture(event.pointerId)
+            setDragging(false)
+          }}
+          onPointerCancel={() => {
+            setDragging(false)
+          }}
+          onKeyDown={(event) => {
+            if (!live()) {
+              return
+            }
+            const target = seekByKey(event)
+            if (target === undefined) {
+              return
+            }
+            event.preventDefault()
+            requestSeek(
+              Math.min(stepCount() - 1, Math.max(0, Math.floor(target))),
+            )
+          }}
+        >
           <span class={ui.portalBarFill} style={{ width: progressWidth() }} />
-        </span>
+        </div>
         <button
           type="button"
           class={ui.portalReplay}
@@ -259,6 +462,8 @@ export function HomePortal(props: HomePortalProps) {
                   <PortalStage
                     tour={guide}
                     replayNonce={replayNonce()}
+                    state={stageState()}
+                    seek={seekRequest()}
                     onStep={setStepIndex}
                   />
                 </Root>
@@ -279,14 +484,19 @@ interface PortalStageProps {
   tour: TourGuide
   /** Changes to restart the run from the beginning. */
   replayNonce: number
+  /** Play, hold where it is, or go back to the start. */
+  state: PortalPlayback
+  /** A scrub: jump to `index`. `nonce` makes a repeat of the same step land. */
+  seek?: { index: number; nonce: number }
   onStep: (index: number) => void
 }
 
 /**
- * The live surface plus the script that drives it. Mounted only while the
- * portal is settled in view, so its whole lifetime is one visit to the section:
- * the driver, its flame, its timers and its GPU buffers are created here and
- * destroyed together.
+ * The live surface plus the script that drives it. Mounted while the portal is
+ * in Home's near-window, so its lifetime is one visit to the section: the
+ * driver, its flame, its timers and its GPU buffers are created here and
+ * destroyed together. Scrolling within the section does NOT remount it — see
+ * the note at the top of this file.
  */
 function PortalStage(props: PortalStageProps) {
   const driver = createPortalDriver(START_FLAME)
@@ -295,48 +505,78 @@ function PortalStage(props: PortalStageProps) {
   const [points, setPoints] = createSignal(0)
   const [pointLimit, setPointLimit] = createSignal<() => number>()
 
-  // ── The run loop ────────────────────────────────────────────────────────
-  // Play the steps, hold the finished flame, reset, play again. Re-runs on a
-  // replay or a tour change; `onCleanup` is what makes "scrolled away" and
-  // "Home closed" stop it dead rather than leaving timers behind.
+  // ── The run ─────────────────────────────────────────────────────────────
+  // Created once per tour/replay. It does not start itself: whether it plays is
+  // `props.state`'s business, and separating the two is what lets a scroll stop
+  // the build without destroying it.
+  const [run, setRun] = createSignal<PortalScriptRun>()
   createEffect(() => {
     const guide = props.tour
     // Read in the reactive scope, so bumping it restarts the run.
     const runId = props.replayNonce
     vramLog(`[HomePortal] SCRIPT '${guide.id}' run=${runId}`)
 
+    driver.reset()
+    const script = runPortalScript({
+      tour: guide,
+      driver,
+      onStep: props.onStep,
+      autoStart: false,
+    })
     if (reducedMotion()) {
       // The finished flame, static, captioned by the last step. Still built by
       // the real commands — just with every wait and every tween collapsed.
-      driver.reset()
-      applyWholeScript(guide, driver)
-      props.onStep(guide.steps.length - 1)
-      return
+      // The scrubber still works, which makes this the one mode where the whole
+      // build is inspectable without any motion at all.
+      script.seek(guide.steps.length - 1)
     }
-
-    let holdTimer: ReturnType<typeof setTimeout> | undefined
-    let cancel: (() => void) | undefined
-
-    function start() {
-      driver.reset()
-      cancel = runPortalScript({
-        tour: guide,
-        driver,
-        onStep: props.onStep,
-        onFinished: () => {
-          // Hold the finished flame — the one moment in the loop it is allowed
-          // to converge — then start over.
-          holdTimer = setTimeout(start, PORTAL_HOLD_MS)
-        },
-      })
-    }
-
-    start()
+    setRun(() => script)
 
     onCleanup(() => {
-      cancel?.()
-      clearTimeout(holdTimer)
+      script.cancel()
+      setRun(undefined)
     })
+  })
+
+  // Transport. Reduced motion opts out of advancing entirely — the flame is
+  // already at the end and only the scrubber moves it.
+  createEffect(() => {
+    const script = run()
+    const state = props.state
+    if (script === undefined || reducedMotion()) {
+      return
+    }
+    if (state === 'playing') {
+      script.play()
+    } else if (state === 'held') {
+      script.pause()
+    } else {
+      // Gone from the screen: back to the start flame, so the next approach
+      // opens on step one rather than wherever it stopped.
+      script.pause()
+      script.restart()
+    }
+  })
+
+  /**
+   * The last scrub applied here. Seeded from whatever the scrubber was last
+   * asked for, so a stage created AFTER a seek (a tour change, a replay) opens
+   * on its own first step rather than replaying a request meant for the run it
+   * replaced. The nonce is what makes a repeat of the SAME step land: a drag
+   * that wanders off a step and back must rebuild it, not stick.
+   */
+  let appliedSeek = untrack(() => props.seek?.nonce ?? 0)
+  createEffect(() => {
+    const request = props.seek
+    const script = run()
+    if (request === undefined || script === undefined) {
+      return
+    }
+    if (request.nonce === appliedSeek) {
+      return
+    }
+    appliedSeek = request.nonce
+    script.seek(request.index)
   })
 
   // ── The live surface ────────────────────────────────────────────────────

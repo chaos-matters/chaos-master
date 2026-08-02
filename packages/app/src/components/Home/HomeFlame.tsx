@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, onCleanup, Show, } from 'solid-js'
+import { createEffect, createMemo, createSignal, on, onCleanup, Show, untrack, } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
 import { useComputeGate } from '@/contexts/ComputeGateContext'
 import { Flam3 } from '@/flame/Flam3'
@@ -6,13 +6,13 @@ import { validateFlame } from '@/flame/schema/flameSchema'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
 import { Default3DPreviewCamera } from '@/lib/Camera3D'
-import { fetchGalleryItem } from '@/lib/galleryContent'
+import { fetchGalleryItem, sequenceFlames } from '@/lib/galleryContent'
 import { gpuReady } from '@/lib/gpuStatus'
 import { deepClone } from '@/utils/clone'
 import { useIsScrolling } from '@/utils/isScrolling'
 import { applyTracksToFlame, getUserEndFrame } from '@/utils/timeline'
 import { setLivePreviewLive, vramLog } from '@/utils/vramLog'
-import { autoPlayComplete, frameAtElapsed, usePrefersReducedMotion, } from './homePlayback'
+import { AUTO_PLAY_MAX_MS, frameAtElapsed, loopCompletesAtMs, sequenceIndexAt, sequenceLoopMs, timelineLoopMs, usePrefersReducedMotion, } from './homePlayback'
 import ui from './HomeTab.module.css'
 import type { Accessor } from 'solid-js'
 import type { PlaybackCoordinator, PlaybackReason } from './homePlayback'
@@ -69,10 +69,25 @@ import type { TimelineTrack } from '@/utils/timeline'
  * simultaneously driving the workspace canvas behind Home. So `animationEnabled`
  * stays false and the plate poses its own descriptor.
  *
- * Stopping is the part that has to be exact: the run ends by clearing the play
- * frame, which drops the plate straight back to `poster_frame` — the same frame
- * the poster was captured at — so the plate re-converges on the poster's own
- * image and the freeze swaps in an identical picture.
+ * Stopping is the part that has to be exact, and it is two different things:
+ *
+ *  - a run that COMPLETES (an auto-play loop, or the tail played out after the
+ *    pointer left) clears the playhead, which drops the plate back to
+ *    `poster_frame` — the same frame the poster was captured at — so the plate
+ *    re-converges on the poster's own image and the freeze swaps in an
+ *    identical picture;
+ *  - a run that is merely INTERRUPTED (mid-scroll, a lost coordinator slot)
+ *    holds its playhead, so the pointer coming back resumes rather than
+ *    restarts. Nothing about it is a new run.
+ *
+ * ## Sequences (Phase 6)
+ *
+ * A row may carry an ordered list of extra descriptors (`gallery_items.
+ * sequence`), and then playback is a WALK through `[flame, ...sequence]` rather
+ * than a timeline: same clock, same coordinator, same rules, a different thing
+ * being interpolated. That is what makes `cap-randomizer` show "roll a whole
+ * flame, then steer it" instead of asserting it. Rows without one — every other
+ * row — are untouched.
  */
 
 /**
@@ -180,6 +195,15 @@ interface GalleryFlame {
   posterFrame: number | undefined
   /** Last keyframe — one playback loop. 0 for a still. */
   endFrame: number
+  /**
+   * Extra descriptors this row plays through, in order — empty for every row
+   * that is one flame, which is all of them but `cap-randomizer`.
+   *
+   * The plate walks `[flame, ...sequence]`: index 0 is the row's own flame, so
+   * a run always begins and ends on the image the poster was captured from,
+   * exactly as a timeline run begins and ends on `posterFrame`.
+   */
+  sequence: FlameDescriptor[]
 }
 
 /**
@@ -193,6 +217,26 @@ interface GalleryFlame {
  * and must not be handed the same object a plate is rendering.
  */
 const descriptorCache = new Map<string, Promise<GalleryFlame>>()
+
+/**
+ * The entries of a curated sequence this build can actually render.
+ *
+ * Validated one by one rather than as a batch: a sequence is generated content
+ * written by a script into a column the app reads months later, so the failure
+ * to design for is "one entry is stale", and dropping the whole walk for it
+ * would take the card's whole point away. A shorter walk is still a walk.
+ */
+function validSequence(slug: string, stored: FlameDescriptor[]) {
+  const usable: FlameDescriptor[] = []
+  for (const [index, entry] of stored.entries()) {
+    try {
+      usable.push(validateFlame(entry))
+    } catch (err) {
+      console.error(`Home: sequence[${index}] of '${slug}' is unusable:`, err)
+    }
+  }
+  return usable
+}
 
 function loadDescriptor(slug: string): Promise<GalleryFlame> {
   const cached = descriptorCache.get(slug)
@@ -209,6 +253,7 @@ function loadDescriptor(slug: string): Promise<GalleryFlame> {
         tracks,
         posterFrame: item.poster_frame ?? undefined,
         endFrame: getUserEndFrame(tracks, 0),
+        sequence: validSequence(item.slug, sequenceFlames(item)),
       }
     })
     .catch((err: unknown) => {
@@ -299,8 +344,12 @@ export function HomeFlame(props: HomeFlameProps) {
   const [row, setRow] = createSignal<GalleryFlame>()
   const [points, setPoints] = createSignal(0)
   const [pointLimit, setPointLimit] = createSignal<() => number>()
-  /** Timeline frame while a playback run owns this plate; undefined at rest. */
-  const [playFrame, setPlayFrame] = createSignal<number>()
+  /**
+   * Where the playhead is: a timeline FRAME for an animated row, an index into
+   * the walk for a sequence row. `undefined` is "at rest", which for both means
+   * the image the poster was captured from.
+   */
+  const [playPos, setPlayPos] = createSignal<number>()
 
   const wantsLive = createMemo(
     () => props.posterOnly !== true && gpuReady() && settled() && !frozen(),
@@ -375,7 +424,43 @@ export function HomeFlame(props: HomeFlameProps) {
   const reducedMotion = usePrefersReducedMotion()
 
   /**
-   * Could this plate animate if it were asked to? An animated row, on/near
+   * How this row plays, if it plays at all.
+   *
+   * A row with a curated `sequence` walks it; otherwise a row with keyframes
+   * plays its timeline. Sequence first because the two answer different
+   * questions and only one row has both available in principle — "which flames"
+   * is a stronger statement than "which frames", and a curated walk is
+   * something a person chose.
+   */
+  const playMode = createMemo<'sequence' | 'timeline' | 'still'>(() => {
+    const current = row()
+    if (current === undefined) {
+      return 'still'
+    }
+    if (current.sequence.length > 0) {
+      return 'sequence'
+    }
+    return current.tracks.length > 0 ? 'timeline' : 'still'
+  })
+
+  /** Wall-clock length of one whole run, and 0 for a row that cannot play. */
+  const loopMs = createMemo(() => {
+    const current = row()
+    if (current === undefined) {
+      return 0
+    }
+    switch (playMode()) {
+      case 'sequence':
+        return sequenceLoopMs(current.sequence.length + 1)
+      case 'timeline':
+        return timelineLoopMs(current.endFrame)
+      default:
+        return 0
+    }
+  })
+
+  /**
+   * Could this plate animate if it were asked to? A playable row, on/near
    * screen, not mid-scroll, with a working GPU and a descriptor in hand — which
    * is how "scrolling away stops playback" and the settled-visibility rule
    * survive Phase 3.
@@ -392,8 +477,10 @@ export function HomeFlame(props: HomeFlameProps) {
       props.posterOnly !== true &&
       gpuReady() &&
       settled() &&
-      (row()?.tracks.length ?? 0) > 0,
+      playMode() !== 'still',
   )
+
+  const hovered = createMemo(() => props.hovered?.() === true)
 
   /**
    * Auto-play is a one-shot per arrival. `autoArmed` is a plain variable rather
@@ -402,12 +489,40 @@ export function HomeFlame(props: HomeFlameProps) {
    */
   let autoArmed = true
   const [autoRunning, setAutoRunning] = createSignal(false)
+  /** True while a run with no reason left is playing out the rest of its loop. */
+  const [finishing, setFinishing] = createSignal(false)
+
+  /**
+   * The run clock, in ms. A plain variable and not a signal: it changes on
+   * every animation frame and nothing renders from it directly (the quantised
+   * `playPos` is what the view reads), so making it reactive would only add
+   * recomputations.
+   *
+   * It SURVIVES a stop. That is the whole of "re-entering a plate must not
+   * restart it": losing the pointer, losing a coordinator slot or a scroll all
+   * leave the clock where it was, and the next run continues from there. Only
+   * a completed run or leaving the near-window puts it back to zero.
+   */
+  let elapsed = 0
+  /** When the current run should land, or undefined for "as long as asked". */
+  let stopAt: number | undefined
+
+  /** Back to rest: the poster's own frame, and nothing pending. */
+  function resetRun() {
+    elapsed = 0
+    stopAt = undefined
+    setPlayPos(undefined)
+    setFinishing(false)
+    setAutoRunning(false)
+  }
 
   // Leaving Home's near-window is a real departure (the observer's margin is
-  // 300px), so coming back counts as arriving at the section again.
+  // 300px), so coming back counts as arriving at the section again — and is the
+  // one thing besides a completed run that rewinds the clock.
   createEffect(() => {
     if (!props.near()) {
       autoArmed = true
+      resetRun()
     }
   })
 
@@ -421,16 +536,68 @@ export function HomeFlame(props: HomeFlameProps) {
       return
     }
     autoArmed = false
+    stopAt = Math.min(untrack(loopMs), AUTO_PLAY_MAX_MS)
     setAutoRunning(true)
   })
+
+  /**
+   * The pointer takes over from the greeting, page-wide.
+   *
+   * Without this, a page capped at two playback slots means pointing at a third
+   * plate preempts one that is mid-loop — a plate the user is NOT pointing at
+   * stops dead, which is what "hovering appears to affect other tiles" was.
+   * Retiring auto-play instead makes the hand-over deliberate and visible once,
+   * rather than arbitrary and repeated.
+   */
+  createEffect(() => {
+    if (props.playback?.pointerActive() === true) {
+      autoArmed = false
+      setAutoRunning(false)
+    }
+  })
+
+  /**
+   * Hover ends: play out the rest of the loop instead of cutting.
+   *
+   * Stopping the instant the pointer leaves would freeze the plate on an
+   * arbitrary frame and then snap it to its poster; carrying on to the end of
+   * the loop lands it on the poster's own image. It is also what makes a
+   * pointer sweeping back and forth harmless — it finds the same run still
+   * going and simply keeps it, which is what `stopAt` being cleared on the way
+   * IN is for.
+   */
+  createEffect(
+    on(hovered, (isHovered, wasHovered) => {
+      if (isHovered) {
+        stopAt = undefined
+        setFinishing(false)
+        return
+      }
+      if (wasHovered !== true) {
+        return
+      }
+      const target = loopCompletesAtMs(elapsed, untrack(loopMs))
+      if (target <= elapsed) {
+        // Already landed — a pointer that crossed a corner, or a run that
+        // finished under the pointer. Nothing left to play out.
+        resetRun()
+        return
+      }
+      stopAt = target
+      setFinishing(true)
+    }),
+  )
 
   /** What this plate is asking the coordinator for, if anything. */
   const wants = createMemo<PlaybackReason | undefined>(() => {
     if (!canPlay()) {
       return undefined
     }
-    if (props.hovered?.() === true) {
+    if (hovered()) {
       return 'hover'
+    }
+    if (finishing()) {
+      return 'finishing'
     }
     return autoRunning() ? 'auto' : undefined
   })
@@ -468,47 +635,72 @@ export function HomeFlame(props: HomeFlameProps) {
     props.onPlayingChange?.(playing())
   })
 
-  // The rAF clock. Elapsed-time based (not a tick counter) so a plate that
-  // misses frames still lands back on its poster frame at the right moment.
+  /**
+   * The rAF clock. Elapsed-time based (not a tick counter) so a plate that
+   * misses frames still lands back on its poster frame at the right moment.
+   *
+   * It tracks `playing()` and NOTHING else on purpose. It used to read
+   * `wants()` to decide whether the run was an auto-play one, which meant the
+   * pointer arriving on a plate mid-run changed the reason, re-ran this effect,
+   * and restarted the animation from the poster frame under the user's cursor —
+   * the reported "hovering restarts the tile". Why the run is happening is now
+   * read inside the tick, where reading it is not a subscription.
+   */
   createEffect(() => {
     if (!playing()) {
       return
     }
-    const current = row()
+    const current = untrack(row)
     if (current === undefined) {
       return
     }
-    const isAuto = wants() === 'auto'
+    const walk = current.sequence.length + 1
+    const sequenced = untrack(playMode) === 'sequence'
     const start = current.posterFrame ?? 0
-    const startedAt = globalThis.performance.now()
+    // Resume, not restart: the clock carries over from the last run, so a
+    // pointer that leaves and comes back continues where it was.
+    const startedAt = globalThis.performance.now() - elapsed
     let handle = requestAnimationFrame(function tick() {
-      const elapsed = globalThis.performance.now() - startedAt
-      if (isAuto && autoPlayComplete(elapsed, current.endFrame)) {
-        // Ends the run; the cleanup below is what lands the pose.
-        setAutoRunning(false)
+      const now = globalThis.performance.now() - startedAt
+      // A hovered plate never lands: the pointer is an open-ended request, and
+      // an auto-play cap or a queued landing must not stop a plate the user is
+      // actively pointing at.
+      if (stopAt !== undefined && now >= stopAt && !hovered()) {
+        resetRun()
         return
       }
-      setPlayFrame(frameAtElapsed(start, current.endFrame, elapsed))
+      elapsed = now
+      setPlayPos(
+        sequenced
+          ? sequenceIndexAt(now, walk)
+          : frameAtElapsed(start, current.endFrame, now),
+      )
       handle = requestAnimationFrame(tick)
     })
     onCleanup(() => {
       cancelAnimationFrame(handle)
-      // Land EXACTLY on the poster frame however the run ended — loop complete,
-      // pointer left, slot lost, scrolled away. Clearing the frame drops the
-      // plate back to `posterFrame` rather than wherever the timeline happened
-      // to be, which is what makes the freeze-to-poster swap invisible.
-      setPlayFrame(undefined)
+      // The playhead is deliberately NOT cleared here. Losing a slot, a scroll
+      // or a lost GPU is a PAUSE — the plate holds the frame it reached and the
+      // next run continues from it. Landing back on the poster frame is the job
+      // of `resetRun`, which runs when a loop completes or the plate leaves the
+      // near-window; both of those land on the poster's own image, which is
+      // what keeps the freeze-to-poster swap invisible.
     })
   })
 
   /**
-   * The descriptor to render: the row's rest pose for a still, or a clone posed
-   * at the current frame for an animated row.
+   * The descriptor to render.
+   *
+   * Three shapes, one memo: a still row's own flame; the entry a curated
+   * sequence's walk is on (index 0 being the row's own flame, so a run starts
+   * and ends on the poster's image); or a clone of the row posed at the current
+   * timeline frame.
    *
    * Cloning per frame rather than mutating the cached row is not optional — the
    * cache is shared by every plate showing this slug, and `applyTracksToFlame`
-   * writes in place. At rest the memo has no reactive reason to recompute, and
-   * during playback `frameAtElapsed` quantises to whole frames, so a 120Hz
+   * writes in place. Sequence entries are handed over as they are, because
+   * nothing poses them. At rest the memo has no reactive reason to recompute,
+   * and during playback `frameAtElapsed` quantises to whole frames, so a 120Hz
    * display still only clones 30 times a second.
    */
   const posedFlame = createMemo(() => {
@@ -516,10 +708,16 @@ export function HomeFlame(props: HomeFlameProps) {
     if (current === undefined) {
       return undefined
     }
+    if (current.sequence.length > 0) {
+      const index = playPos() ?? 0
+      return index <= 0
+        ? current.flame
+        : (current.sequence[index - 1] ?? current.flame)
+    }
     if (current.tracks.length === 0) {
       return current.flame
     }
-    const frame = playFrame() ?? current.posterFrame
+    const frame = playPos() ?? current.posterFrame
     if (frame === undefined) {
       return current.flame
     }
@@ -550,7 +748,7 @@ export function HomeFlame(props: HomeFlameProps) {
       : {
           isVisible: settled(),
           renderStatus: renderStatus(),
-          isSelected: (props.hovered?.() ?? false) || playing(),
+          isSelected: hovered() || playing(),
         },
   )
 
@@ -561,13 +759,20 @@ export function HomeFlame(props: HomeFlameProps) {
    * would swap a moving flame for a still poster mid-loop. `noFreeze()` is the
    * dev-only escape hatch used to check that a frozen plate and its poster
    * really are the same image.
+   *
+   * A PAUSED plate — one holding a mid-run frame because it lost its slot or
+   * the page is mid-scroll — must not freeze either, and that is what
+   * `playPos()` rules out. It is not playing, but the picture on it is not the
+   * poster's, so handing over would be the visible jump the whole freeze design
+   * exists to avoid.
    */
   const canFreeze = createMemo(
     () =>
       props.freezeWhenConverged === true &&
       props.poster !== undefined &&
       !noFreeze() &&
-      !playing(),
+      !playing() &&
+      playPos() === undefined,
   )
 
   // Re-arm the poster whenever the live render stops (scrolled away, GPU lost),
