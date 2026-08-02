@@ -249,9 +249,25 @@ export function useAudioReactive(
     if (shouldPause) {
       void audioCtx.suspend()
     } else {
+      /*
+       * Resume and touch NOTHING else.
+       *
+       * There used to be a `sourceStartTime = audioCtx.currentTime -
+       * seekBaseOffset` here, "so time calculation doesn't jump". Substituting
+       * it into the position formula
+       *
+       *     position = audioCtx.currentTime - sourceStartTime + seekBaseOffset
+       *
+       * gives `ctx - (ctx - seekBaseOffset) + seekBaseOffset`, i.e. exactly
+       * `2 * seekBaseOffset` — so every resume jumped to DOUBLE the last seek
+       * position. Seek to 2:30, pause anywhere, press play: 5:00.
+       *
+       * No correction is needed in the first place: `AudioContext.currentTime`
+       * does not advance while the context is suspended, and the buffer source
+       * is suspended with it, so the mapping from context time to playback
+       * position survives a pause untouched.
+       */
       void audioCtx.resume()
-      // Adjust sourceStartTime so time calculation doesn't jump
-      sourceStartTime = audioCtx.currentTime - seekBaseOffset
     }
   })
 }
