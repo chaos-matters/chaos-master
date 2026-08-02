@@ -17,6 +17,13 @@
  * `vibrancy` (colour intensity), `palettePhase` (hue sweep), `exposure`
  * (brightness), `zoom`, and `contrast`. Everything here sticks to those, and
  * uses ranges wide enough to see from across the room.
+ *
+ * RANGES MUST MATCH flameSchema. Audio modulation writes into the live
+ * descriptor, so a range past a schema bound leaves the flame permanently
+ * invalid — `palettePhase` is 0-1 (NOT radians, which is what [0, 6.28] here
+ * assumed), and driving it to 1.589 meant that flame could never be bred,
+ * exported or opened in the ancestry tree again. `applyAudioMappingsToFlame`
+ * clamps as a backstop; these ranges should not need it.
  */
 import type { AudioFeature, AudioMappingEntry, FlameTarget, TransformInfo, } from './audioAnalysis'
 
@@ -83,7 +90,7 @@ export const RENDER_PRESETS: Record<RenderPresetId, AudioMappingEntry[]> = {
     // Wide vibrancy swing is the single most legible reaction there is.
     entry('bass', render('vibrancy'), [0.25, 2.4], { releaseMs: 160 }),
     // A full turn of the palette on every beat, snapped hard.
-    entry('beat', render('palettePhase'), [0, 6.28], {
+    entry('beat', render('palettePhase'), [0, 1], {
       attackMs: 0,
       releaseMs: 320,
     }),
@@ -92,7 +99,7 @@ export const RENDER_PRESETS: Record<RenderPresetId, AudioMappingEntry[]> = {
   bloom: [
     entry('rms', render('exposure'), [0.6, 1.9], { attackMs: 120 }),
     entry('presence', render('vibrancy'), [0.4, 1.9]),
-    entry('centroid', render('palettePhase'), [0, 3.14], { attackMs: 200 }),
+    entry('centroid', render('palettePhase'), [0, 1], { attackMs: 200 }),
     entry('onset', render('contrast'), [0.9, 1.6], { releaseMs: 140 }),
   ],
   drift: [
@@ -101,7 +108,7 @@ export const RENDER_PRESETS: Record<RenderPresetId, AudioMappingEntry[]> = {
       attackMs: 260,
       releaseMs: 420,
     }),
-    entry('centroid', render('palettePhase'), [0, 6.28], { attackMs: 400 }),
+    entry('centroid', render('palettePhase'), [0, 1], { attackMs: 400 }),
     entry('hiMid', render('paletteSpeed'), [0.4, 2.4]),
     entry('subBass', render('vibrancy'), [0.5, 1.6], { attackMs: 180 }),
   ],
@@ -185,7 +192,7 @@ export function buildFlamePreset(
       }
     }
     if (out.length === 0) return []
-    out.push(entry('centroid', render('palettePhase'), [0, 6.28]))
+    out.push(entry('centroid', render('palettePhase'), [0, 1]))
     return out
   }
 
@@ -297,7 +304,7 @@ export function randomizeMappings(
   const globals: [AudioFeature, FlameTarget, [number, number]][] = [
     ['bass', render('vibrancy'), [0.35, 2.1]],
     ['rms', render('exposure'), [0.7, 1.6]],
-    ['beat', render('palettePhase'), [0, 6.28]],
+    ['beat', render('palettePhase'), [0, 1]],
     ['centroid', render('paletteSpeed'), [0.4, 2.2]],
     ['onset', render('contrast'), [0.9, 1.6]],
   ]
