@@ -20,6 +20,15 @@
 //   --no-roll      Derive straight from the row's own flame instead of opening
 //                  each path with a freshly rolled one.
 //   --strength <f> Randomiser strength (default 0.5, the card's own default).
+//   --mode <m>     What the derived flames are (default steer):
+//                    steer — the row's flame pushed around by mutation, which
+//                            is the Randomizer card's claim.
+//                    breed — the row's flame crossed with a freshly rolled
+//                            mate, one child per crossover mode, which is the
+//                            Genetics card's. The mate is emitted first so the
+//                            walk shows both parents before their children.
+//                  e.g. node scripts/gallery-sequence.mjs cap-genetics \
+//                         --mode breed --derived 5 --apply local
 //   --apply <env>  local | dev | prod. Writing anywhere but local is a
 //                  deliberate act; this script does not default to it.
 //   --out <file>   Write the SQL to a file.
@@ -44,7 +53,14 @@ const appDir = resolve(scriptDir, '..')
 /** The Worker's own slug guard — a slug it would reject can never be fetched. */
 const SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/
 
-const DEFAULTS = { seed: 20260802, paths: 1, derived: 3, strength: 0.5 }
+const DEFAULTS = {
+  seed: 20260802,
+  paths: 1,
+  derived: 3,
+  strength: 0.5,
+  mode: 'steer',
+}
+const MODES = ['steer', 'breed']
 
 const sqlStr = (value) =>
   value === null || value === undefined
@@ -66,6 +82,7 @@ function parseArgs(argv) {
     else if (arg === '--paths') args.paths = Number(argv[++i])
     else if (arg === '--derived') args.derived = Number(argv[++i])
     else if (arg === '--strength') args.strength = Number(argv[++i])
+    else if (arg === '--mode') args.mode = String(argv[++i])
     else if (arg === '--no-roll') args.roll = false
     else if (arg === '--apply') args.apply = argv[++i]
     else if (arg === '--out') args.out = argv[++i]
@@ -73,6 +90,12 @@ function parseArgs(argv) {
     else if (arg.startsWith('-')) fail(`unknown option ${arg}`)
     else if (args.slug === null) args.slug = arg
     else fail(`unexpected argument ${arg}`)
+  }
+  if (!MODES.includes(args.mode)) {
+    fail(
+      `unknown --mode "${args.mode}"`,
+      `expected one of: ${MODES.join(', ')}`,
+    )
   }
   return args
 }
@@ -222,11 +245,13 @@ async function main() {
       derived: args.derived,
       roll: args.roll,
       strength: args.strength,
+      mode: args.mode,
     })
     sequence = derived.sequence
     console.error(
       `Derived ${sequence.length} flame(s) for "${args.slug}" — ` +
-        `${args.paths} path(s), seed ${args.seed}, ${derived.dimensions}D.`,
+        `${args.mode}, ${args.paths} path(s), seed ${args.seed}, ` +
+        `${derived.dimensions}D.`,
     )
   }
 

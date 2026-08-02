@@ -29,6 +29,16 @@ interface Options {
   roll: boolean
   /** Randomiser strength, matching the card's own default. */
   strength: number
+  /**
+   * What the derived flames ARE.
+   *
+   * `steer` (default) is the Randomizer card's claim — one flame pushed around
+   * by mutation. `breed` is the Genetics card's: the row's flame is parent A, a
+   * freshly rolled flame is parent B, and each derived entry is a CHILD of the
+   * two, cycling the crossover modes so the walk actually shows off the thing
+   * the card advertises rather than five near-identical children of one mode.
+   */
+  mode: 'steer' | 'breed'
 }
 
 /**
@@ -93,6 +103,7 @@ async function main() {
   // but keeping the order explicit is what stops a future top-level `Math.
   // random()` in that file from escaping the seed.
   const { generateRandomFlame, mutateFlame } = await import('@/flame/randomize')
+  const { breedFlames, CROSSOVER_MODES } = await import('@/flame/breedFlame')
 
   const start = validateFlame(options.flame)
   const dimensions = start.renderSettings.dimensions === 3 ? 3 : 2
@@ -147,6 +158,34 @@ async function main() {
    */
   const sequence: FlameDescriptor[] = []
   for (let path = 0; path < Math.max(1, options.paths); path++) {
+    if (options.mode === 'breed') {
+      /*
+       * Parent A is the row's own flame — the still the poster was captured
+       * from — so the walk opens on something the curator chose. Parent B is
+       * rolled here and pushed FIRST, because a breed sequence that never shows
+       * the second parent is indistinguishable from mutation: the viewer has to
+       * see both sides before the children mean anything.
+       *
+       * `breedFlames` is the app's own, the same call the Genetics card makes,
+       * and it requires both parents share a dimension — parent B is rolled
+       * with `config`, whose `dimensions` came from parent A.
+       */
+      const parentB = generateRandomFlame(config)
+      sequence.push(parentB)
+      for (let i = 0; i < Math.max(0, options.derived); i++) {
+        const [child] = breedFlames(start, parentB, {
+          count: 1,
+          // Cycle the modes rather than repeat one: five children of 'uniform'
+          // look like one child five times, which sells nothing.
+          crossoverMode: CROSSOVER_MODES[i % CROSSOVER_MODES.length]!,
+          mutationStrength: 0.1,
+        })
+        if (child !== undefined) {
+          sequence.push(child)
+        }
+      }
+      continue
+    }
     const opening = options.roll ? generateRandomFlame(config) : start
     if (options.roll) {
       sequence.push(opening)

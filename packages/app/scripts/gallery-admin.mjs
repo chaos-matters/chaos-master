@@ -82,6 +82,11 @@ const ROW_COLUMNS =
   'slug, title, caption, author, section, capability, dimensions, ' +
   'transform_count, poster_key, poster_width, poster_height, poster_frame, ' +
   'sort_order, published, (animation IS NOT NULL) AS has_animation, ' +
+  // Presence, not the value: a curated sequence is the largest thing in the
+  // table and no console view needs the flames themselves — but an operator
+  // does need to see that this row plays a walk rather than resting on one
+  // still, because re-staging clears it (see the upsert in commandPut).
+  '(sequence IS NOT NULL) AS has_sequence, ' +
   'created_at, updated_at'
 
 const DEFAULT_POSTER_DIR = join(repoRoot, 'assets/local/gallery-posters')
@@ -832,6 +837,13 @@ function commandPut(values) {
           'run `publish --published 1` again',
       )
     }
+    if (existing.has_sequence === 1) {
+      warnings.push(
+        `${slug} had a curated sequence derived from the flame you just ` +
+          'replaced, so it was cleared — the card rests on one still until ' +
+          'you re-run scripts/gallery-sequence.mjs',
+      )
+    }
   }
   if (section === 'hero') {
     const { results } = d1(
@@ -884,6 +896,13 @@ ON CONFLICT(slug) DO UPDATE SET
   -- describes nothing that still exists. Left behind, it would tell Home a new
   -- poster's frame is known when it is not.
   poster_frame = NULL,
+  -- Same reasoning, and the same trap: a curated sequence is DERIVED from the
+  -- flame being replaced here (the mutation walk for cap-randomizer, the
+  -- crossover children for cap-genetics). Kept, the card would open on the new
+  -- flame and then play a path belonging to the old one -- which looks like a
+  -- rendering bug rather than stale content. Cleared, the row is simply "one
+  -- flame" again until scripts/gallery-sequence.mjs is re-run.
+  sequence = NULL,
   published = 0;
 `
 
@@ -903,6 +922,13 @@ ON CONFLICT(slug) DO UPDATE SET
     warnings,
     next: [
       `node scripts/gallery-admin.mjs capture --env ${env} --slug ${slug}`,
+      ...(existing?.has_sequence === 1
+        ? [
+            `node scripts/gallery-sequence.mjs ${slug} --apply ${env}${
+              capability === 'genetics' ? ' --mode breed --derived 5' : ''
+            }`,
+          ]
+        : []),
       `node scripts/gallery-admin.mjs publish --env ${env} --slug ${slug} --published 1`,
     ],
   }
