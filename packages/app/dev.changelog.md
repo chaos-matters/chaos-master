@@ -7,6 +7,125 @@ changelog surfaced in the About panel lives in `CHANGELOG.md`.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+A Home tab backed by a D1 content database — live WebGPU flames rather than
+screenshots, bounded by the existing visibility/compute gating — plus the
+poster-capture pipeline and admin flow that curate it, and a `wrangler dev`
+custom-build fix that had been OOM-killing developer workstations.
+
+### Added
+
+- **Gallery content database** (`migrations/0001..0004`, `worker/index.ts`,
+  `lib/galleryContent.ts`): D1 holds the FlameDescriptor spec itself, not
+  images — `gallery_items` (section, slug, capability, dimensions, transform
+  count, animation tracks), `poster_key` + the timeline frame the poster was
+  captured at (so an animated row can freeze back to the exact pose), a
+  `home_config` table for the tour, and a generated-once `sequence` column for
+  the curated roll-then-steer walkthrough. `GET /api/gallery` lists rows
+  WITHOUT the descriptor; `GET /api/gallery/:slug` fetches it on demand, so
+  Home never pulls every flame up front.
+- **Home tab** (`components/Home/`): the AABAAA layout — left rail, full-bleed
+  hero, editorial-span gallery, motion row, "Made here" portal, capability
+  cards. Plates mount a live `Flam3` only once settled in view and freeze back
+  to their poster on convergence; `HomeFlame` holds the gating,
+  `homePlayback.ts` the one page-wide playback budget, `portalScript.ts` the
+  tour. Posters are the fallback wherever WebGPU is unavailable.
+- **Poster capture + gallery admin** (`scripts/`, companyReportViewer console):
+  capture runs on the local GPU and uploads the D1 row and R2 poster in one
+  click; drag-and-drop curation, local/dev/prod targets, publish/unpublish.
+- **Plate camera** (`components/Home/HomeFlame.tsx`): a selected plate swaps
+  its static preview camera for the app's own `WheelZoomCamera2D` /
+  `WheelZoomCamera3D` — pan, orbit, wheel zoom and pinch are the SAME code the
+  workspace uses, not a second implementation. Per-flame clamps (zoom
+  0.4-3x, orbit radius 0.5-1.6x, pan ±1.6 world units) keep a steered plate
+  framed; the signal bundles are rebuilt on the engage edge, so releasing
+  resets the camera without a separate reset path that could drift.
+- **Click-vs-drag disambiguation** (`components/Home/plateGesture.ts` + 20
+  tests): a plate is now a two-step control, because "the pointer went up here"
+  stopped meaning "open this" once plates carried a camera. A DOM-free state
+  machine over `{clientX, clientY}` + an injected clock decides drag (>5px) vs
+  press (>500ms) vs tap, and pairs taps into a double-click (400ms / 24px slop)
+  itself rather than listening for the browser's `dblclick`, which fires after
+  `click` and would make every open follow a select. Keyboard opens directly on
+  Enter/Space — no drag ambiguity there.
+  Two defects found by testing the wiring rather than reading it:
+  - **The camera was unreachable.** `WheelZoomCamera*` listens on the CANVAS
+    (`props.eventTarget ?? canvas`), which is `pointer-events: none` so an
+    unselected plate stays a single click target — mounted, listening, and
+    unhittable. Dragging did nothing at all. A selected plate's canvas now
+    takes pointer events, plus `touch-action: none` so a finger pans the flame
+    instead of scrolling Home out from under it.
+  - **...and then the gesture starved.** `createDragHandler` calls
+    `stopImmediatePropagation()` on pointerdown and pointerup — it must, or a
+    workspace drag would double as a click on whatever is underneath. The
+    canvas is the event target, so the tile's bubble-phase handlers never ran:
+    panning worked and double-click did nothing. The tile listens in the
+    CAPTURE phase now (document -> tile -> canvas), so it sees every sequence
+    before anything downstream can take it away.
+- **Breed sequences** (`scripts/derive-sequence.entry.ts`,
+  `scripts/gallery-sequence.mjs`): `--mode breed` derives a row's sequence with
+  the app's own `breedFlames` — the row's flame is parent A, a freshly rolled
+  flame is parent B, each entry a child of the two, cycling the crossover mode
+  per child. Parent B is emitted first: a breed sequence that never shows the
+  second parent is indistinguishable from mutation. `cap-genetics` plays a walk
+  now instead of resting on a still it could not justify. No schema or player
+  change — migration 0004 already specified that nothing knows how long a path
+  is.
+
+### Changed
+
+- **Home art direction** (`HomeTab.module.css`): Home now carries its own
+  scoped palette rather than following the app theme, matching the Benchmark
+  Studio language — near-black ground, hairline borders, ambient warm/cool
+  radials, ember (`#ff7448`) as the accent. A gallery is a dark room: the same
+  posters read as washed-out thumbnails on a light surface, and committing to
+  one palette keeps the full-bleed hero framed identically regardless of a
+  theme setting nobody chose for this page. The nine `[data-theme='dark']`
+  overrides are gone with it.
+
+### Fixed
+
+- **`wrangler dev` OOM-killed the workstation** (`packages/app/wrangler.jsonc`,
+  `packages/app/package.json`): both envs declared `build.command`, and
+  wrangler runs a custom build for `dev` as well as `deploy`, re-running it on
+  every change under `watch_dir` — which defaults to `./src`, the whole app.
+  The documented dev setup (`vite.config.ts`) is vite on :5173 proxying `/api`
+  and `/discord` to wrangler on :8787, so during development NOTHING reads the
+  bundle wrangler produced — vite serves the app. Every file save therefore
+  started a full `vite build --mode development` (~1.5 GB, ~1 min) whose output
+  was discarded, and wrangler neither queues nor cancels them: an editing
+  session stacked dozens concurrently until earlyoom started killing processes
+  (observed four times, once at ~60 GB RSS). Removed from both envs; deploys
+  build explicitly instead (`deploy:dev`/`deploy:prod`, and CI's existing
+  "Build app" + "Verify build output" steps). Verified: `wrangler dev` boots
+  and three source-file touches produce zero builds.
+- **Hero flashed white on scroll** (`HomeFlame.tsx`): mounting was gated on
+  _settled_ visibility per `gallery_preview_layout` §3 — correct for STARTING a
+  canvas, wrong for STOPPING one. Because the scrolling signal is global, every
+  scroll anywhere tore down the canvas of every live plate and rebuilt it
+  ~180ms later from zero. Ordinary plates had already frozen to their posters
+  so nobody saw it; the hero never freezes, so it re-accumulated from scratch
+  and showed the washed-out first batch each time. Mounting is now latched:
+  settled visibility starts a canvas, only leaving the near-window stops it.
+  Reveal is also thresholded (25% progress) and latched, so a camera pan cannot
+  drop an already-revealed plate back under the threshold and fade the poster
+  in over the render the user is steering.
+- **Re-staging left a stale sequence** (`scripts/gallery-admin.mjs`): `put`
+  upserts a row and deliberately clears `poster_key`/`poster_frame`, because
+  both describe the flame being replaced. A curated `sequence` is derived from
+  that flame too, and was never added when migration 0004 introduced the
+  column — so re-staging left the card opening on the new flame and then
+  playing a path belonging to the old one, which reads as a rendering bug
+  rather than as stale content. Cleared with the rest now, warned about
+  explicitly, and the `next` hints carry the regenerate command. `ROW_COLUMNS`
+  also reports `has_sequence` (presence, not the flames), so the console can
+  show which rows play a walk.
+- **Workspace hand-off** (`MainWorkspace.tsx`): opening a gallery flame resets
+  panels, live modulation and the timeline first, so leftover exposure/vibrancy
+  tracks stop modulating the new descriptor every frame ("too bright"), and no
+  dialog stays open across the hand-off.
+
 ## [0.9.8] - 2026-07-24
 
 iOS/macOS WebKit rendering correctness (render-loop stall recovery, spurious

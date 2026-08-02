@@ -3,6 +3,21 @@
 What's new in Lumen Apeiron (formerly Chaos Master). Concise highlights for
 each release; the full developer history lives in `dev.changelog.md`.
 
+## [Unreleased]
+
+### Added
+
+- **Home.** A front page for the app: a curated wall of flames, a row of
+  animated pieces, a walkthrough of one flame being built step by step, and
+  cards that open the tool each piece shows off. Nothing here is a screenshot —
+  every flame renders live on your GPU, and falls back to a captured image when
+  it can't. Click a flame to take its camera (drag to pan, scroll or pinch to
+  zoom), double-click to open it in the editor. Reach it any time from the
+  welcome screen, and reload straight back into it — Home has its own address.
+  The Explore cards demonstrate what they describe rather than sitting still:
+  the randomizer rolls a flame and steers it, and breeding crosses two flames
+  and plays through their children, one for each crossover mode.
+
 ## [0.9.8] - 2026-07-24
 
 ### Added
