@@ -98,6 +98,58 @@ implementations.
   the poster pipeline) rather than duplicating the one piece of tooling that has
   to run app TypeScript. The wrapper is a pass-through, so the console reaches
   it with no dotfiles change — only buttons to wire.
+- **Sequence preview, then pick** (`scripts/render-flames.mjs`,
+  `scripts/sequence-pick.mjs`, `gallery-sequence.mjs --preview/--pick/--read`):
+  a derived walk was previously written sight-unseen and judged by reloading
+  Home. `--preview` now renders every candidate and returns them as base64
+  data URLs on stdout, writing nothing; `--pick 0,3,5` then commits exactly
+  those, in that order. The two agree because derivation is deterministic in
+  `--seed` and the preview reports the seed it used, so the commit re-derives
+  the identical flames — no candidate is carried between runs in a temp file
+  that could go stale. Rendering is the poster capture's own browser loop,
+  extracted to `render-flames.mjs` and taking flames directly rather than D1
+  rows (the capture page already accepted a spec carrying its own flame), so
+  preview and poster share one quality gate and one blank-canvas check.
+  `--read <env>` was added with it: `--preview` must derive from the row the
+  eventual commit will update, and reusing `--apply` for that would have made
+  a look-only command hold a write path. A failed candidate is reported in
+  place rather than failing the batch, and cannot be picked — committing one
+  would put a flame on Home that nobody saw.
+
+- **`gallery-admin delete`** (`scripts/gallery-admin.mjs`): there was no way to
+  remove a row, only to unpublish it — deliberate while rows were curated by
+  hand, but staging mistakes and test rows then accumulate as hidden clutter
+  with no exit. The one destructive command, guarded three ways: a PUBLISHED
+  row is refused (unpublish first, so deleting is never a one-step way to take
+  something off Home, where a mistyped slug would be an outage rather than an
+  inconvenience), `--yes <slug>` must repeat the slug (a fixed confirmation
+  word gets typed on reflex; retyping the name means what was confirmed is
+  what goes), and prod keeps its own `--confirm prod`. The R2 poster goes with
+  the row: the row is deleted first and the object second, so a half-failure
+  orphans an invisible object rather than leaving a row pointing at a missing
+  poster — and because the key exists nowhere else once the row is gone, a
+  failed object delete prints the exact command to finish it.
+
+- **`gallery-admin poster`** (`scripts/gallery-admin.mjs`): hands back a row's
+  captured poster as base64, for the console's preview thumbnails. Exists for
+  `local` above all — dev and prod already publish posters at
+  `GET /api/gallery/poster/<key>`, so a browser can point an `<img>` straight
+  at those and get HTTP caching for free, whereas the local bucket lives inside
+  miniflare and has no URL unless a dev server happens to be running. Reads
+  only R2: rendering a flame that has no poster is a different and far more
+  expensive operation, so a row without one is an explicit `no-poster` error
+  carrying the `capture` command that would fix it.
+
+- **Microphone blocked in production** (`worker/index.ts`): `Permissions-Policy`
+  sent `microphone=()`, an EMPTY allowlist, which denies the feature to the
+  document's own origin as well as to embedders. `getUserMedia` therefore never
+  prompted — it threw "microphone is not allowed in this document" — so live
+  input for the audio-reactive wiring and the sonification panel was dead on
+  every deployed site while working locally, where no such header is sent. Now
+  `microphone=(self)`: still refused to embedders (and `frame-ancestors 'none'`
+  means there are none), allowed for us. Covered by a test, because nothing
+  else catches this class of bug — the app builds, deploys and renders
+  perfectly, and the only symptom is a prompt that never appears.
 
 ### Changed
 

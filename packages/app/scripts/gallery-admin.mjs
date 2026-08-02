@@ -22,6 +22,7 @@
 //   publish  take a staged row live, or pull a live one back
 //   reorder  set a row's position within its section
 //   sequence give a row a curated flame walk (or clear it back to one still)
+//   delete   remove an unpublished row and its poster — the only destructive one
 //   config   read or write Home's settings (home_config), allowlisted keys
 //
 // Three deliberate constraints:
@@ -46,7 +47,7 @@
 import { execFileSync, spawn } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, extname, join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
@@ -171,6 +172,7 @@ Commands:
   publish   set published to 0 or 1 for one row
   reorder   set sort_order for one row
   sequence  give a row a curated flame walk, or clear it back to one still
+  delete    remove an unpublished row and its poster (not reversible)
   config    read or write Home's settings (allowlisted keys)
 
 ${COMMON_OPTIONS}
@@ -315,6 +317,15 @@ Options:
   --file <path>         append ONE hand-picked flame (PNG/JSON) to the end of
                         the row's existing walk instead of generating. Held to
                         the same validation the put command applies.
+  --preview             render every candidate and print them as base64 images
+                        WITHOUT writing anything. Needs a dev server (started
+                        for you unless --no-serve). Look, then pick.
+  --pick <a,b,c>        commit only these candidate indices, in this order.
+                        Pass the SAME --seed the preview reported, or you will
+                        re-derive a different set and pick from the wrong one.
+  --base <url>          dev server the preview renders through
+                        (default ${DEFAULT_DEV_BASE})
+  --no-serve            refuse rather than starting a dev server for --preview
 ${COMMON_OPTIONS}
 
 Most rows are one flame. A few play a walk, because a single still cannot show
@@ -322,10 +333,41 @@ what the card claims — "roll a whole flame, then steer it" is a path, and so i
 "breed two flames". The walk is generated ONCE and stored, so every visitor
 sees the same one and a bad roll is fixed by re-running with another seed.
 
+Preview first. Deriving is cheap and deterministic in --seed, so the honest
+loop is: --preview to see the candidates, then re-run with the seed it reports
+plus --pick to keep the ones worth keeping. The order in --pick is the order
+they play, and repeats are allowed.
+
 Composes scripts/gallery-sequence.mjs, which runs the app's own randomiser and
 breeder. NOTE: \`put\` clears a row's sequence, because it was derived from the
 flame being replaced — so the order is put, then sequence, then capture, then
 publish.`,
+
+  delete: `gallery-admin delete — remove a row, and its poster with it
+
+Usage:
+  node scripts/gallery-admin.mjs delete --slug <slug> --yes <slug> [options]
+
+Options:
+  --slug <slug>         the row to remove
+  --yes <slug>          repeat the slug to confirm. Not a bare --yes on
+                        purpose: a generic flag gets typed reflexively, and
+                        this is the one command with nothing to undo it.
+${COMMON_OPTIONS}
+
+The ONLY destructive command here. Everything else is reversible — publish 0
+hides a row and publish 1 brings it back — so reach for that first if you are
+not certain.
+
+A PUBLISHED row is refused: unpublish it, then delete it. Deleting must not be
+a one-step way to take something off Home, or a mistyped slug becomes an
+outage instead of an inconvenience.
+
+The R2 poster goes too. The row is removed first and the object second, so a
+half-failure leaves an orphaned object (invisible, cheap) rather than a row
+pointing at a poster that is gone. If the object delete fails, the exact
+command to finish the job is printed — the key exists nowhere else once the
+row is gone.`,
 
   config: `gallery-admin config — Home's settings, as content
 
@@ -1566,6 +1608,204 @@ async function commandCapture(values) {
   return result
 }
 
+// ── poster ───────────────────────────────────────────────────────────
+
+// Poster keys carry their format in the extension; the bucket is not asked.
+const MIME_BY_EXT = {
+  '.webp': 'image/webp',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+}
+
+/**
+ * Hand back a row's captured poster, as base64.
+ *
+ * Exists for `local` above all. dev and prod serve posters over HTTP already
+ * (`GET /api/gallery/poster/<key>` on the deployed Worker), so anything with a
+ * browser can just point an <img> at those and get caching for free. The local
+ * bucket is inside miniflare and has no URL at all unless a dev server happens
+ * to be running — which is a heavy thing to require for a thumbnail.
+ *
+ * Reads nothing but R2: a row must already have been captured. Rendering a
+ * flame that has no poster is a different, far more expensive operation.
+ */
+function commandPoster(values) {
+  const env = resolveEnv(values)
+  if (values.slug === undefined) {
+    throw new AdminError('usage', 'poster needs --slug')
+  }
+  const slug = values.slug
+  if (!SLUG_PATTERN.test(slug)) {
+    throw new AdminError('bad-slug', `"${slug}" is not a valid slug`)
+  }
+  const row = requireRow(env, slug)
+  if (!row.poster_key) {
+    throw new AdminError(
+      'no-poster',
+      `"${slug}" has no poster yet — there is nothing to show`,
+      {
+        ...targetFields(env),
+        slug,
+        fix: `node scripts/gallery-admin.mjs capture --slug ${slug} --env ${env}`,
+      },
+    )
+  }
+
+  let bytes
+  try {
+    bytes = execFileSync(
+      'pnpm',
+      [
+        'exec',
+        'wrangler',
+        'r2',
+        'object',
+        'get',
+        `${TARGETS[env].bucket}/gallery/${row.poster_key}`,
+        // --pipe puts the object on stdout and silences wrangler's banner,
+        // which would otherwise be prepended to the image bytes.
+        '--pipe',
+        ...storageFlags(env),
+      ],
+      {
+        cwd: appDir,
+        // No encoding: this is an image, and decoding it as utf8 would corrupt
+        // every byte above 0x7f.
+        encoding: 'buffer',
+        maxBuffer: 64 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    )
+  } catch (error) {
+    throw new AdminError(
+      'poster-unreadable',
+      `Could not read ${row.poster_key} from ${TARGETS[env].bucket}`,
+      {
+        ...targetFields(env),
+        slug,
+        posterKey: row.poster_key,
+        cause: tail(String(error.stderr ?? '')) || 'no output',
+        hint: 'the row names a poster the bucket does not have — re-capture it',
+      },
+    )
+  }
+
+  return {
+    ...targetFields(env),
+    slug,
+    posterKey: row.poster_key,
+    width: row.poster_width,
+    height: row.poster_height,
+    bytes: bytes.length,
+    mimeType:
+      MIME_BY_EXT[extname(row.poster_key).toLowerCase()] ?? 'image/webp',
+    base64: bytes.toString('base64'),
+  }
+}
+
+// ── delete ───────────────────────────────────────────────────────────
+
+/**
+ * Remove a row from the gallery, and its poster with it.
+ *
+ * Every other write here is reversible — `publish 0` hides a row and `publish
+ * 1` brings it back. This one is not, so it is guarded three ways:
+ *
+ *   1. a PUBLISHED row is refused outright. Unpublish it first. Deleting must
+ *      never be the one-step way to take something off Home, because then a
+ *      mistyped slug is an outage rather than an inconvenience.
+ *   2. `--yes <slug>` must repeat the slug exactly. A generic confirmation
+ *      flag would be typed reflexively; retyping the name means the thing you
+ *      confirmed is the thing that goes.
+ *   3. prod still needs its own `--confirm prod`, as everywhere else.
+ */
+function commandDelete(values) {
+  const env = resolveEnv(values)
+  if (values.slug === undefined) {
+    throw new AdminError('usage', 'delete needs --slug')
+  }
+  const slug = values.slug
+  if (!SLUG_PATTERN.test(slug)) {
+    throw new AdminError('bad-slug', `"${slug}" is not a valid slug`)
+  }
+  const row = requireRow(env, slug)
+
+  if (row.published === 1) {
+    throw new AdminError(
+      'refuses-published',
+      `"${slug}" is live on Home — unpublish it before deleting it`,
+      {
+        ...targetFields(env),
+        slug,
+        fix: `node scripts/gallery-admin.mjs publish --slug ${slug} --published 0 --env ${env}`,
+        why: 'deleting must not be a one-step way to take a row off Home',
+      },
+    )
+  }
+
+  if (values.yes !== slug) {
+    throw new AdminError(
+      'delete-confirmation-required',
+      `Deleting "${slug}" is not reversible — repeat the slug to confirm`,
+      {
+        ...targetFields(env),
+        slug,
+        fix: `add --yes ${slug}`,
+        alternative: `publish --published 0 hides a row without destroying it`,
+      },
+    )
+  }
+
+  // Read the key BEFORE the row goes: it is recorded nowhere else, so losing
+  // it here would leave an R2 object nobody can ever name again.
+  const posterKey = row.poster_key ?? null
+
+  note(`Deleting ${slug} from ${targetLabel(env)} ...`)
+  d1(env, `DELETE FROM gallery_items WHERE slug = ${sqlStr(slug)};`)
+
+  // Row first, object second, deliberately. If this half fails we are left
+  // with an orphaned object — invisible and cheap — rather than a row pointing
+  // at a poster that no longer exists. The key is printed either way so a
+  // failure here stays fixable by hand.
+  let posterDeleted = null
+  if (posterKey !== null) {
+    try {
+      execFileSync(
+        'pnpm',
+        [
+          'exec',
+          'wrangler',
+          'r2',
+          'object',
+          'delete',
+          `${TARGETS[env].bucket}/gallery/${posterKey}`,
+          ...storageFlags(env),
+        ],
+        { cwd: appDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+      )
+      posterDeleted = true
+      note(`Deleted its poster ${posterKey}.`)
+    } catch (error) {
+      posterDeleted = false
+      note(
+        `WARNING: the row is gone but its poster is not. Remove it with:\n` +
+          `  pnpm exec wrangler r2 object delete ${TARGETS[env].bucket}/gallery/${posterKey} ${storageFlags(env).join(' ')}\n` +
+          `  (${tail(error.stderr ?? '') || 'no output'})`,
+      )
+    }
+  }
+
+  return {
+    ...targetFields(env),
+    slug,
+    deleted: true,
+    title: row.title,
+    posterKey,
+    posterDeleted,
+  }
+}
+
 // ── sequence ─────────────────────────────────────────────────────────
 
 /**
@@ -1580,7 +1820,7 @@ async function commandCapture(values) {
  * shells out to (chaos-master-gallery.sh) only ever execs THIS script, so
  * anything not routed through here is terminal-only.
  */
-function commandSequence(values) {
+async function commandSequence(values) {
   const env = resolveEnv(values)
   if (values.slug === undefined) {
     throw new AdminError('usage', 'sequence needs --slug')
@@ -1613,6 +1853,65 @@ function commandSequence(values) {
     if (values.derived !== undefined) args.push('--derived', values.derived)
     if (values.seed !== undefined) args.push('--seed', values.seed)
     if (values.paths !== undefined) args.push('--paths', values.paths)
+    if (values.pick !== undefined) args.push('--pick', values.pick)
+  }
+
+  /*
+   * A preview renders the candidates and returns them as images, writing
+   * nothing. It needs a dev server for the same reason `capture` does — the
+   * flames render on a real GPU through the app's own page — so it borrows the
+   * same bootstrap, including auto-start.
+   *
+   * `--apply` is stripped: this must not be able to touch the database even if
+   * the script it calls were to change under it.
+   */
+  if (values.preview === true) {
+    // --apply becomes --read: same row, same parent flame, no write path at
+    // all. Leaving --apply in place would work today only because the preview
+    // returns before the UPDATE, which is one refactor away from writing.
+    args[args.indexOf('--apply')] = '--read'
+    args.push('--preview')
+
+    const base = (values.base ?? DEFAULT_DEV_BASE).replace(/\/$/, '')
+    const server = await ensureDevServer({
+      base,
+      autoStart: values['no-serve'] !== true,
+      timeoutMs: 120_000,
+    })
+    args.push('--base', server.base)
+    try {
+      // Piped, not inherited: the payload is JSON for the console to render,
+      // and progress chatter goes to stderr where it cannot corrupt it.
+      const stdout = execFileSync('node', args, {
+        cwd: appDir,
+        encoding: 'utf8',
+        maxBuffer: 256 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'inherit'],
+      })
+      // Returned, not emitted: the dispatcher wraps and prints it, so emitting
+      // here would put two JSON objects on stdout and break every parser.
+      return {
+        preview: true,
+        env,
+        slug,
+        title: row.title,
+        ...JSON.parse(stdout),
+      }
+    } catch (error) {
+      throw new AdminError(
+        'preview-failed',
+        `could not preview a sequence for "${slug}"`,
+        {
+          cause: error instanceof Error ? error.message : String(error),
+          hint:
+            'the derivation itself is cheap; a failure here is usually the ' +
+            'dev server or the GPU. Re-run without --preview to see the ' +
+            'derivation on its own.',
+        },
+      )
+    } finally {
+      await server.stop()
+    }
   }
 
   note(
@@ -1694,6 +1993,9 @@ const OPTIONS = {
   seed: { type: 'string' },
   paths: { type: 'string' },
   clear: { type: 'boolean' },
+  preview: { type: 'boolean' },
+  pick: { type: 'string' },
+  yes: { type: 'string' },
   help: { type: 'boolean', short: 'h' },
 }
 
@@ -1730,6 +2032,14 @@ const COMMANDS = {
     run: commandPublish,
     options: ['env', 'confirm', 'slug', 'published'],
   },
+  delete: {
+    run: commandDelete,
+    options: ['env', 'confirm', 'slug', 'yes'],
+  },
+  poster: {
+    run: commandPoster,
+    options: ['env', 'confirm', 'slug'],
+  },
   reorder: {
     run: commandReorder,
     options: ['env', 'confirm', 'slug', 'order'],
@@ -1746,6 +2056,14 @@ const COMMANDS = {
       'paths',
       'clear',
       'file',
+      // Look-before-you-write: --preview renders the candidates and returns
+      // them as images without touching the row; --pick then commits the ones
+      // that were worth keeping. --base/--no-serve are the dev server the
+      // rendering needs, same as `capture`.
+      'preview',
+      'pick',
+      'base',
+      'no-serve',
     ],
   },
   config: {

@@ -29,10 +29,21 @@
 //                            walk shows both parents before their children.
 //                  e.g. node scripts/gallery-sequence.mjs cap-genetics \
 //                         --mode breed --derived 5 --apply local
+//   --read <env>   read the parent flame from this env WITHOUT writing.
+//                  Implied by nothing; --preview uses it so the candidates it
+//                  shows come from the same row a later --apply would update.
 //   --apply <env>  local | dev | prod. Writing anywhere but local is a
 //                  deliberate act; this script does not default to it.
 //   --out <file>   Write the SQL to a file.
 //   --clear        Set the column back to NULL — the single-flame behaviour.
+//   --preview      Derive candidates, RENDER each one, and print them as
+//                  base64 images WITHOUT writing to the database. The point is
+//                  to see a walk before committing to it; sequences are
+//                  generated once and stared at for a long time afterwards.
+//                  Needs the dev server (--base, default https://localhost:5173).
+//   --pick <list>  Commit only these candidate indices, in this order, e.g.
+//                  `--pick 0,3,4`. Re-derives from the same --seed, so what is
+//                  written is exactly what was previewed.
 //   --append <file>  Append ONE hand-picked flame from a PNG/JSON to the end of
 //                  the row's existing sequence, instead of generating. The file
 //                  is validated exactly as `gallery-admin put` validates one.
@@ -49,9 +60,11 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { describeSource } from './gallery-admin.mjs'
 import { initCommand, isMissingTable, migrationsArgs, storageFlags, tail, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
+import { renderFlames } from './render-flames.mjs'
+import { parsePick } from './sequence-pick.mjs'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const appDir = resolve(scriptDir, '..')
@@ -84,9 +97,13 @@ function parseArgs(argv) {
     ...DEFAULTS,
     slug: null,
     apply: null,
+    read: null,
     out: null,
     roll: true,
     append: null,
+    preview: false,
+    pick: null,
+    base: 'https://localhost:5173',
   }
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
@@ -98,9 +115,13 @@ function parseArgs(argv) {
     else if (arg === '--mode') args.mode = String(argv[++i])
     else if (arg === '--no-roll') args.roll = false
     else if (arg === '--apply') args.apply = argv[++i]
+    else if (arg === '--read') args.read = argv[++i]
     else if (arg === '--out') args.out = argv[++i]
     else if (arg === '--clear') args.clear = true
     else if (arg === '--append') args.append = argv[++i]
+    else if (arg === '--preview') args.preview = true
+    else if (arg === '--pick') args.pick = argv[++i]
+    else if (arg === '--base') args.base = argv[++i]
     else if (arg.startsWith('-')) fail(`unknown option ${arg}`)
     else if (args.slug === null) args.slug = arg
     else fail(`unexpected argument ${arg}`)
@@ -290,8 +311,20 @@ async function main() {
     fail(`unknown target "${args.apply}" — expected ${TARGET_LIST}`)
   }
   // Reading the row needs a database even when only printing SQL, so a plain
-  // dry run reads from local. Writing still needs --apply.
-  const readEnv = args.apply ?? 'local'
+  if (args.read !== null && !(args.read in TARGETS)) {
+    fail(`unknown target "${args.read}" — expected ${TARGET_LIST}`)
+  }
+  /*
+   * Where the PARENT flame is read from. Normally that is wherever the result
+   * is being written, so the walk starts from the flame that env actually has.
+   *
+   * `--read` names it without `--apply`, which is what `--preview` needs: it
+   * must derive from the same row the eventual commit will, while being
+   * structurally unable to write. Defaulting a preview to local instead would
+   * render a walk from a different parent flame than the one committed — a
+   * preview that lies, which is worse than no preview.
+   */
+  const readEnv = args.read ?? args.apply ?? 'local'
 
   let sequence = null
   if (args.append !== null) {
@@ -342,6 +375,89 @@ async function main() {
         `${args.mode}, ${args.paths} path(s), seed ${args.seed}, ` +
         `${derived.dimensions}D.`,
     )
+
+    /*
+     * `--pick` keeps only the chosen candidates, in the order given.
+     *
+     * Derivation is deterministic in `--seed`, so re-deriving here yields the
+     * exact flames the preview rendered — the indices mean the same thing in
+     * both runs, and nothing has to be carried between them in a temp file that
+     * could go stale or be pointed at the wrong row.
+     */
+    if (args.pick !== null) {
+      let picked
+      try {
+        picked = parsePick(args.pick, sequence.length)
+      } catch (error) {
+        fail(error.message, error.hint)
+      }
+      sequence = picked.map((i) => sequence[i])
+      console.error(
+        `Keeping ${sequence.length} of them: [${picked.join(', ')}].`,
+      )
+    }
+
+    /*
+     * A preview RENDERS and prints, and writes nothing. Deciding whether a walk
+     * is any good by publishing it and reloading Home is backwards; this is the
+     * look-first half.
+     */
+    if (args.preview) {
+      console.error(`Rendering ${sequence.length} candidate(s) ...`)
+      const images = await renderFlames({
+        flames: sequence,
+        base: args.base.replace(/\/$/, ''),
+        onProgress: (m) => {
+          console.error(m)
+        },
+      })
+      const candidates = sequence.map((flame, index) => {
+        const image = images.find((i) => i.index === index)
+        return {
+          index,
+          transformCount: Object.keys(flame.transforms ?? {}).length,
+          dimensions: flame.renderSettings?.dimensions ?? 2,
+          error: image?.error ?? 'not rendered',
+          // Inline base64 rather than files on disk: the console that shows
+          // these talks to this script over stdout and has nowhere to serve a
+          // temp directory from.
+          image:
+            image?.bytes === null || image?.bytes === undefined
+              ? null
+              : `data:${image.mimeType};base64,${image.bytes.toString('base64')}`,
+        }
+      })
+      for (const c of candidates) {
+        if (c.image !== null) c.error = null
+      }
+      process.stdout.write(
+        `${JSON.stringify(
+          {
+            ok: true,
+            preview: true,
+            slug: args.slug,
+            seed: args.seed,
+            mode: args.mode,
+            // Everything needed to commit exactly this set later.
+            commit: {
+              slug: args.slug,
+              seed: args.seed,
+              mode: args.mode,
+              derived: args.derived,
+              paths: args.paths,
+            },
+            candidates,
+          },
+          null,
+          2,
+        )}\n`,
+      )
+      console.error(
+        `Previewed ${candidates.filter((c) => c.image).length}/${candidates.length}` +
+          ' — nothing written. Re-run with --pick <indices> --apply <env> to keep some.',
+      )
+      return
+    }
   }
 
   const sql = buildSql(args.slug, sequence)
@@ -362,4 +478,13 @@ async function main() {
   process.stdout.write(sql)
 }
 
-await main()
+/*
+ * Only run the CLI when this file IS the command being run — importing it for
+ * `parsePick` must not execute main() against the importer's argv.
+ */
+if (
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  await main()
+}
