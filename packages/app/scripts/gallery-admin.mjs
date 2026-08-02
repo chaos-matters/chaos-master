@@ -21,6 +21,7 @@
 //   capture  render + upload posters for rows that need one
 //   publish  take a staged row live, or pull a live one back
 //   reorder  set a row's position within its section
+//   sequence give a row a curated flame walk (or clear it back to one still)
 //   config   read or write Home's settings (home_config), allowlisted keys
 //
 // Three deliberate constraints:
@@ -169,6 +170,7 @@ Commands:
   capture   render and upload posters for rows that have none
   publish   set published to 0 or 1 for one row
   reorder   set sort_order for one row
+  sequence  give a row a curated flame walk, or clear it back to one still
   config    read or write Home's settings (allowlisted keys)
 
 ${COMMON_OPTIONS}
@@ -293,6 +295,34 @@ Options:
 ${COMMON_OPTIONS}
 
 Prints the section's resulting order so a duplicate position is obvious.`,
+
+  sequence: `gallery-admin sequence — a curated flame walk for one row
+
+Usage:
+  node scripts/gallery-admin.mjs sequence --slug <slug> [options]
+
+Options:
+  --slug <slug>         the row to give a sequence
+  --mode steer|breed    what the derived flames ARE (default steer):
+                          steer — the row's flame pushed around by mutation,
+                                  which is what cap-randomizer claims
+                          breed — crossed with a freshly rolled mate, one child
+                                  per crossover mode, which is cap-genetics'
+  --derived <n>         how many derived flames (default 3)
+  --seed <n>            PRNG seed; the same seed gives the same flames
+  --paths <n>           concatenate N whole runs into the one column
+  --clear               back to a single still
+${COMMON_OPTIONS}
+
+Most rows are one flame. A few play a walk, because a single still cannot show
+what the card claims — "roll a whole flame, then steer it" is a path, and so is
+"breed two flames". The walk is generated ONCE and stored, so every visitor
+sees the same one and a bad roll is fixed by re-running with another seed.
+
+Composes scripts/gallery-sequence.mjs, which runs the app's own randomiser and
+breeder. NOTE: \`put\` clears a row's sequence, because it was derived from the
+flame being replaced — so the order is put, then sequence, then capture, then
+publish.`,
 
   config: `gallery-admin config — Home's settings, as content
 
@@ -1525,6 +1555,82 @@ async function commandCapture(values) {
   return result
 }
 
+// ── sequence ─────────────────────────────────────────────────────────
+
+/**
+ * Give a row a curated flame SEQUENCE, or clear it.
+ *
+ * Composes `gallery-sequence.mjs` rather than reimplementing it, exactly as
+ * `capture` composes the poster pipeline: that script is the only piece of
+ * gallery tooling that has to run the app's own TypeScript (the randomiser and
+ * the breeder), and duplicating that here would guarantee drift.
+ *
+ * It exists as a subcommand purely so the console can reach it — the wrapper it
+ * shells out to (chaos-master-gallery.sh) only ever execs THIS script, so
+ * anything not routed through here is terminal-only.
+ */
+function commandSequence(values) {
+  const env = resolveEnv(values)
+  if (values.slug === undefined) {
+    throw new AdminError('usage', 'sequence needs --slug')
+  }
+  const slug = values.slug
+  if (!SLUG_PATTERN.test(slug)) {
+    throw new AdminError('bad-slug', `"${slug}" is not a valid slug`)
+  }
+  // Fail before doing any work if the row is not there — the sibling script
+  // would report it too, but the console reads THIS error.
+  const row = requireRow(env, slug)
+
+  const args = [join(scriptDir, 'gallery-sequence.mjs'), slug, '--apply', env]
+  if (values.clear === true) {
+    args.push('--clear')
+  } else {
+    if (values.mode !== undefined) args.push('--mode', values.mode)
+    if (values.derived !== undefined) args.push('--derived', values.derived)
+    if (values.seed !== undefined) args.push('--seed', values.seed)
+    if (values.paths !== undefined) args.push('--paths', values.paths)
+  }
+
+  note(
+    `${values.clear === true ? 'Clearing' : 'Deriving'} the sequence for ` +
+      `${slug} in ${targetLabel(env)} ...`,
+  )
+  try {
+    execFileSync('node', args, {
+      cwd: appDir,
+      stdio: ['ignore', 'inherit', 'inherit'],
+    })
+  } catch {
+    throw new AdminError(
+      'sequence-failed',
+      `gallery-sequence.mjs failed for "${slug}"`,
+      'Its output is above. A different --seed usually fixes an unwanted path.',
+    )
+  }
+
+  const after = requireRow(env, slug)
+  return {
+    ...targetFields(env),
+    slug,
+    cleared: values.clear === true,
+    mode: values.clear === true ? null : (values.mode ?? 'steer'),
+    hasSequence: after.has_sequence === 1,
+    row: after,
+    warnings:
+      row.published === 1
+        ? [
+            `${slug} is published — the change is live as soon as it is ` +
+              'written, unlike put, which stages',
+          ]
+        : [],
+    next:
+      after.has_sequence === 1
+        ? [`node scripts/gallery-admin.mjs list --env ${env}`]
+        : [],
+  }
+}
+
 // ── CLI ──────────────────────────────────────────────────────────────
 
 const OPTIONS = {
@@ -1545,6 +1651,11 @@ const OPTIONS = {
   base: { type: 'string' },
   timeout: { type: 'string' },
   'no-serve': { type: 'boolean' },
+  mode: { type: 'string' },
+  derived: { type: 'string' },
+  seed: { type: 'string' },
+  paths: { type: 'string' },
+  clear: { type: 'boolean' },
   help: { type: 'boolean', short: 'h' },
 }
 
@@ -1584,6 +1695,19 @@ const COMMANDS = {
   reorder: {
     run: commandReorder,
     options: ['env', 'confirm', 'slug', 'order'],
+  },
+  sequence: {
+    run: commandSequence,
+    options: [
+      'env',
+      'confirm',
+      'slug',
+      'mode',
+      'derived',
+      'seed',
+      'paths',
+      'clear',
+    ],
   },
   config: {
     run: commandConfig,
