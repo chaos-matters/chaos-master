@@ -11,43 +11,69 @@
    workspace's own chrome (<= 1000) but below the debug panel, version pill and
    toasts, which should still reach the user. */
 .home {
+  /* Home carries its own palette rather than following the app theme, the way
+     the Benchmark Studio page does. Two reasons: a gallery is a dark room —
+     luminous flames on near-black is the whole point, and on a light surface
+     the same posters read as washed-out thumbnails; and the chrome around them
+     has to stay quiet and IDENTICAL in both themes, or the one full-bleed hero
+     ends up framed differently depending on a setting nobody chose for this
+     page. Ember is the accent because these are flames. */
+  --home-bg: #080a0e;
+  --home-surface: #0d1117;
+  --home-surface-raised: #121821;
+  --home-line: rgba(255, 255, 255, 0.09);
+  --home-line-strong: rgba(255, 255, 255, 0.16);
+  --home-text: #f2f3f5;
+  --home-muted: #929aa7;
+  --home-faint: #78818e;
+  --home-ember: #ff7448;
+  --home-ember-soft: rgba(255, 116, 72, 0.14);
+  --home-cyan: #73d9ff;
+
   position: fixed;
   inset: 0;
   z-index: 2000;
   display: grid;
   grid-template-columns: auto 1fr;
   overflow: hidden;
-  background: var(--neutral-100);
-  color: var(--neutral-900);
-
-  [data-theme='dark'] & {
-    background: var(--neutral-950);
-    color: var(--neutral-100);
-  }
+  color: var(--home-text);
+  /* Ambient warmth top-left, a cool counterpoint top-right — the light the
+     flames would cast on the room. Fixed to the shell, so it does not travel
+     with the scroll and never competes with a plate. */
+  background:
+    radial-gradient(
+      900px 520px at 14% -12%,
+      rgba(255, 105, 62, 0.11),
+      transparent 70%
+    ),
+    radial-gradient(
+      720px 480px at 92% 8%,
+      rgba(63, 177, 214, 0.08),
+      transparent 72%
+    ),
+    var(--home-bg);
 }
 
 /* Shell option A: a persistent left rail listing the sections. */
 .rail {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 2px;
   padding: var(--space-4) var(--space-3);
-  border-right: 1px solid var(--neutral-200);
+  border-right: 1px solid var(--home-line);
   min-width: 11rem;
   overflow-y: auto;
-
-  [data-theme='dark'] & {
-    border-right-color: var(--neutral-800);
-  }
+  background: rgba(8, 10, 14, 0.55);
+  backdrop-filter: blur(18px) saturate(130%);
 }
 
 .rail-brand {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--neutral-500);
-  padding-bottom: var(--space-2);
+  color: var(--home-faint);
+  padding-bottom: var(--space-3);
 }
 
 .rail-link {
@@ -57,37 +83,39 @@
   text-align: left;
   font: inherit;
   font-size: 0.82rem;
-  color: var(--neutral-600);
+  color: var(--home-muted);
   padding: var(--space-2);
   border-radius: var(--space-1);
   cursor: pointer;
+  /* The bar that marks the active section. Always present but transparent, so
+     becoming active is a colour change rather than a reflow of the whole rail. */
+  border-left: 2px solid transparent;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease;
 
   &:hover {
-    color: var(--neutral-900);
-    background: var(--neutral-200);
+    color: var(--home-text);
+    background: rgba(255, 255, 255, 0.04);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--accent-color, #3b82f6);
+    outline: 2px solid var(--home-ember);
     outline-offset: 1px;
-  }
-
-  [data-theme='dark'] & {
-    color: var(--neutral-400);
-
-    &:hover {
-      color: var(--neutral-100);
-      background: var(--neutral-900);
-    }
   }
 }
 
 .rail-link-active {
-  color: var(--neutral-900);
+  color: var(--home-text);
   font-weight: 600;
+  border-left-color: var(--home-ember);
+  background: var(--home-ember-soft);
+}
 
-  [data-theme='dark'] & {
-    color: var(--neutral-50);
+@media (prefers-reduced-motion: reduce) {
+  .rail-link {
+    transition: none;
   }
 }
 
@@ -124,15 +152,30 @@
 }
 
 .section-title {
-  font-size: 1.35rem;
+  font-size: clamp(1.35rem, 2.4vw, 1.75rem);
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   margin: 0;
+  color: var(--home-text);
+}
+
+/* A hairline that starts at the title and runs out to the edge — the editorial
+   rule that makes a row of plates read as a section rather than a pile. */
+.section-head::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    var(--home-line-strong),
+    transparent 85%
+  );
 }
 
 .section-note {
   font-size: 0.85rem;
-  color: var(--neutral-500);
+  line-height: 1.6;
+  color: var(--home-muted);
   margin: 0 0 var(--space-5);
   max-width: 60ch;
 }
@@ -147,11 +190,7 @@
   align-items: flex-end;
   /* Reads as a plate even before its poster exists, rather than leaving the
      copy floating on the page background. */
-  background: var(--neutral-200);
-
-  [data-theme='dark'] & {
-    background: var(--neutral-900);
-  }
+  background: var(--home-surface);
 }
 
 /* Full-width scrim so the overlay spans the plate; the text inside is what
@@ -249,26 +288,37 @@
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-3);
-  border: 1px solid var(--neutral-200);
+  border: 1px solid var(--home-line);
   border-radius: var(--space-2);
-  background: var(--neutral-50);
+  background: var(--home-surface);
   text-align: left;
   font: inherit;
   color: inherit;
   cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
 
   &:hover {
-    border-color: var(--accent-color, #3b82f6);
+    border-color: rgba(255, 116, 72, 0.42);
+    background: var(--home-surface-raised);
+    transform: translateY(-2px);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--accent-color, #3b82f6);
+    outline: 2px solid var(--home-ember);
     outline-offset: 1px;
   }
+}
 
-  [data-theme='dark'] & {
-    border-color: var(--neutral-800);
-    background: var(--neutral-900);
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
   }
 }
 
@@ -280,11 +330,7 @@
   height: 7rem;
   border-radius: var(--space-1);
   overflow: hidden;
-  background: var(--neutral-200);
-
-  [data-theme='dark'] & {
-    background: var(--neutral-900);
-  }
+  background: var(--home-surface);
 }
 
 .card-title {
@@ -294,36 +340,27 @@
 
 .card-caption {
   font-size: 0.82rem;
-  color: var(--neutral-500);
+  color: var(--home-muted);
   margin: 0;
 }
 
 /* Portal option A: the app framed as an exhibit. */
 .portal-frame {
-  border: 1px solid var(--neutral-200);
+  border: 1px solid var(--home-line);
   border-radius: var(--space-3);
   overflow: hidden;
-  background: var(--neutral-50);
-
-  [data-theme='dark'] & {
-    border-color: var(--neutral-800);
-    background: var(--neutral-900);
-  }
+  background: var(--home-surface);
 }
 
 .portal-bar {
   height: 1.75rem;
-  border-bottom: 1px solid var(--neutral-200);
+  border-bottom: 1px solid var(--home-line);
   display: flex;
   align-items: center;
   gap: var(--space-3);
   padding: 0 var(--space-3);
   font-size: 0.72rem;
-  color: var(--neutral-500);
-
-  [data-theme='dark'] & {
-    border-bottom-color: var(--neutral-800);
-  }
+  color: var(--home-muted);
 }
 
 .portal-bar-name {
@@ -349,15 +386,11 @@
     inset-inline: 0;
     height: 2px;
     border-radius: 1px;
-    background: var(--neutral-200);
-
-    [data-theme='dark'] & {
-      background: var(--neutral-800);
-    }
+    background: var(--home-surface);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--accent-color, #3b82f6);
+    outline: 2px solid var(--home-ember);
     outline-offset: 2px;
     border-radius: 2px;
   }
@@ -372,7 +405,7 @@
   display: block;
   height: 2px;
   border-radius: 1px;
-  background: var(--accent-color, #3b82f6);
+  background: var(--home-ember);
   transition: width 220ms linear;
   pointer-events: none;
 }
@@ -389,13 +422,13 @@
   background: none;
   padding: 0;
   font: inherit;
-  color: var(--neutral-500);
+  color: var(--home-muted);
   cursor: pointer;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 
   &:hover:not(:disabled) {
-    color: var(--accent-color, #3b82f6);
+    color: var(--home-ember);
   }
 
   &:disabled {
@@ -404,7 +437,7 @@
   }
 
   &:focus-visible {
-    outline: 2px solid var(--accent-color, #3b82f6);
+    outline: 2px solid var(--home-ember);
     outline-offset: 2px;
   }
 }
@@ -420,11 +453,7 @@
   padding-bottom: 56.25%;
   min-height: 64px;
   overflow: hidden;
-  background: var(--neutral-200);
-
-  [data-theme='dark'] & {
-    background: var(--neutral-900);
-  }
+  background: var(--home-surface);
 }
 
 /* Shown instead of the stage: off-screen (nothing is mounted) or no WebGPU. */
@@ -439,7 +468,7 @@
   font-size: 0.72rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--neutral-500);
+  color: var(--home-muted);
 }
 
 /* The step's own text, from the tour definition. A fixed min-height keeps the
@@ -450,11 +479,7 @@
   gap: var(--space-1);
   padding: var(--space-3);
   min-height: 5.25rem;
-  border-top: 1px solid var(--neutral-200);
-
-  [data-theme='dark'] & {
-    border-top-color: var(--neutral-800);
-  }
+  border-top: 1px solid var(--home-line);
 }
 
 .portal-caption-title {
@@ -466,7 +491,7 @@
   margin: 0;
   font-size: 0.82rem;
   line-height: 1.4;
-  color: var(--neutral-500);
+  color: var(--home-muted);
 }
 
 /* A plate: the captured poster, with a live canvas over it once it settles into
@@ -485,21 +510,41 @@
   min-height: 64px;
   border-radius: var(--space-2);
   overflow: hidden;
-  background: var(--neutral-200);
+  background: var(--home-surface);
   display: block;
-  border: 0;
+  /* A hairline, not a heavy frame: it separates plate from page while the flame
+     is still loading, then all but disappears once the picture fills it. */
+  border: 1px solid var(--home-line);
   padding: 0;
   cursor: pointer;
   color: inherit;
   font: inherit;
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
 
-  &:focus-visible {
-    outline: 2px solid var(--accent-color, #3b82f6);
-    outline-offset: 2px;
+  &:hover {
+    border-color: rgba(255, 116, 72, 0.42);
+    /* Barely a lift. Enough to say "this responds to you" without the whole
+       wall bouncing as the pointer crosses it. */
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px -18px rgba(0, 0, 0, 0.9);
   }
 
-  [data-theme='dark'] & {
-    background: var(--neutral-900);
+  &:focus-visible {
+    outline: 2px solid var(--home-ember);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plate {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
   }
 }
 
@@ -520,6 +565,21 @@
   /* The plate itself is the click target; neither layer should intercept. */
   pointer-events: none;
   user-select: none;
+}
+
+/* ...except once the plate is selected and carries a camera. The WheelZoom
+   cameras attach their pointer/wheel/touch listeners to the CANVAS element
+   itself (`props.eventTarget ?? canvas`), so with the rule above still in force
+   the camera is mounted and listening on an element that can never be hit —
+   dragging a selected plate did nothing at all. Re-enabling it here does not
+   cost the plate its gesture: pointer events bubble from the canvas up to the
+   button, so `plateGesture` still sees the whole sequence and still resolves a
+   pan to 'none'. `touch-action: none` is what makes a finger drag pan the flame
+   instead of scrolling Home out from under it. */
+.plate.is-selected .flame-canvas,
+.card.is-selected .flame-canvas {
+  pointer-events: auto;
+  touch-action: none;
 }
 
 .flame-poster {
@@ -558,7 +618,58 @@
   font-size: 0.72rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--neutral-500);
+  color: var(--home-muted);
+}
+
+/* ---- selection ----
+   A tile is now a two-step control: the first click selects it and hands it the
+   camera, a second one opens it. The ring is what makes "this plate is yours to
+   steer" visible; without it a user who pans has no idea why the picture moved.
+   Both tile shapes share it so the interaction reads the same everywhere. */
+.plate.is-selected,
+.card.is-selected {
+  outline: 2px solid var(--home-ember);
+  outline-offset: 2px;
+}
+
+/* The affordance itself: what this plate can do, worded for the device that
+   selected it (pinch vs scroll). Top-anchored so it never fights the caption
+   gradient at the bottom, and `pointer-events: none` so it can never eat the
+   second click it is asking for. */
+.plate-hint {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  right: var(--space-2);
+  z-index: 1;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: oklch(12% 0.02 250 / 0.72);
+  backdrop-filter: blur(6px);
+  color: oklch(98% 0 0);
+  font-size: 0.7rem;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  text-align: center;
+  pointer-events: none;
+  animation: hint-in 180ms ease-out both;
+}
+
+@keyframes hint-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plate-hint {
+    animation: none;
+  }
 }
 
 .plate-caption {
@@ -590,17 +701,13 @@
 }
 
 .footer {
-  border-top: 1px solid var(--neutral-200);
+  border-top: 1px solid var(--home-line);
   padding: var(--space-6);
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-4);
   font-size: 0.82rem;
-  color: var(--neutral-500);
-
-  [data-theme='dark'] & {
-    border-top-color: var(--neutral-800);
-  }
+  color: var(--home-muted);
 
   & a {
     color: inherit;
@@ -609,7 +716,7 @@
 
 .state {
   padding: var(--space-6);
-  color: var(--neutral-500);
+  color: var(--home-muted);
   font-size: 0.88rem;
 }
 
@@ -617,11 +724,7 @@
    action from jumping between its sections. */
 .rail-back {
   margin-top: auto;
-  border-top: 1px solid var(--neutral-200);
+  border-top: 1px solid var(--home-line);
   border-radius: 0;
   padding-top: var(--space-3);
-
-  [data-theme='dark'] & {
-    border-top-color: var(--neutral-800);
-  }
 }
