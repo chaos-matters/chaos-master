@@ -48,7 +48,7 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 import { CAPTURE_PAGE, checkoutFailure, probeCapturePage, verifyServedCheckout, } from './dev-server-checkout.mjs'
 import { inspectFlame, isPlainObject, normalizeEnvelope, readFlameChunk, toSlug, transformsHash, } from './extract-flames.mjs'
@@ -312,6 +312,9 @@ Options:
   --seed <n>            PRNG seed; the same seed gives the same flames
   --paths <n>           concatenate N whole runs into the one column
   --clear               back to a single still
+  --file <path>         append ONE hand-picked flame (PNG/JSON) to the end of
+                        the row's existing walk instead of generating. Held to
+                        the same validation the put command applies.
 ${COMMON_OPTIONS}
 
 Most rows are one flame. A few play a walk, because a single still cannot show
@@ -583,7 +586,15 @@ const PNG_MAGIC = 0x89504e47
  * `blocking` entries are why `put` would refuse. `warnings` are worth saying
  * out loud but do not stop anything.
  */
-function describeSource(path) {
+/**
+ * Everything worth knowing about a dropped PNG/JSON, without writing anything.
+ *
+ * Exported so `gallery-sequence.mjs --append` holds a hand-picked flame to the
+ * SAME bar as one staged with `put` — a stripped PNG chunk, an invalid
+ * descriptor, or a flame needing custom variations nobody shipped are all
+ * caught here rather than surfacing later as a plate that renders wrong.
+ */
+export function describeSource(path) {
   const warnings = []
   const blocking = []
   const report = {
@@ -1583,8 +1594,20 @@ function commandSequence(values) {
   const row = requireRow(env, slug)
 
   const args = [join(scriptDir, 'gallery-sequence.mjs'), slug, '--apply', env]
+  const appendFiles = values.file ?? []
   if (values.clear === true) {
     args.push('--clear')
+  } else if (appendFiles.length > 0) {
+    // One at a time: each append reads the sequence, adds one flame and writes
+    // it back, so handing the script two files at once would silently keep only
+    // the last. `--file` is `multiple: true` for `put`'s sake, so guard it here.
+    if (appendFiles.length > 1) {
+      throw new AdminError(
+        'usage',
+        'sequence --file appends ONE flame; run it once per file',
+      )
+    }
+    args.push('--append', resolve(process.cwd(), appendFiles[0]))
   } else {
     if (values.mode !== undefined) args.push('--mode', values.mode)
     if (values.derived !== undefined) args.push('--derived', values.derived)
@@ -1593,8 +1616,13 @@ function commandSequence(values) {
   }
 
   note(
-    `${values.clear === true ? 'Clearing' : 'Deriving'} the sequence for ` +
-      `${slug} in ${targetLabel(env)} ...`,
+    `${
+      values.clear === true
+        ? 'Clearing'
+        : appendFiles.length > 0
+          ? 'Appending to'
+          : 'Deriving'
+    } the sequence for ${slug} in ${targetLabel(env)} ...`,
   )
   try {
     execFileSync('node', args, {
@@ -1614,7 +1642,11 @@ function commandSequence(values) {
     ...targetFields(env),
     slug,
     cleared: values.clear === true,
-    mode: values.clear === true ? null : (values.mode ?? 'steer'),
+    appended: appendFiles.length > 0 ? basename(appendFiles[0]) : null,
+    mode:
+      values.clear === true || appendFiles.length > 0
+        ? null
+        : (values.mode ?? 'steer'),
     hasSequence: after.has_sequence === 1,
     row: after,
     warnings:
@@ -1707,6 +1739,7 @@ const COMMANDS = {
       'seed',
       'paths',
       'clear',
+      'file',
     ],
   },
   config: {
@@ -1782,24 +1815,34 @@ async function main() {
   return { ok: true, command, ...result }
 }
 
-try {
-  const result = await main()
-  if (result !== null) {
-    emit(result)
-    if (result.ok === false) process.exitCode = 1
+/*
+ * Only run the CLI when this file IS the command being run. Without the guard,
+ * importing it for `describeSource` would execute main() against the importer's
+ * argv and fail on an unknown subcommand.
+ */
+if (
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  try {
+    const result = await main()
+    if (result !== null) {
+      emit(result)
+      if (result.ok === false) process.exitCode = 1
+    }
+  } catch (error) {
+    const known = error instanceof AdminError
+    emit({
+      ok: false,
+      command: activeCommand,
+      error: {
+        code: known ? error.code : 'unexpected',
+        message: error.message,
+        ...(known && error.detail !== null ? { detail: error.detail } : {}),
+        ...(known ? {} : { stack: error.stack }),
+      },
+    })
+    note(`FAILED: ${error.message}`)
+    process.exitCode = 1
   }
-} catch (error) {
-  const known = error instanceof AdminError
-  emit({
-    ok: false,
-    command: activeCommand,
-    error: {
-      code: known ? error.code : 'unexpected',
-      message: error.message,
-      ...(known && error.detail !== null ? { detail: error.detail } : {}),
-      ...(known ? {} : { stack: error.stack }),
-    },
-  })
-  note(`FAILED: ${error.message}`)
-  process.exitCode = 1
 }
