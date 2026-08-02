@@ -44,9 +44,7 @@
           "custom_domain": true,
         },
       ],
-      "build": {
-        "command": "pnpm run build",
-      },
+      // NO `build.command` here on purpose — see the dev env below.
       "kv_namespaces": [
         {
           "binding": "KV_SHORTENER",
@@ -98,9 +96,22 @@
           "custom_domain": true,
         },
       ],
-      "build": {
-        "command": "pnpm run build:dev",
-      },
+      // DO NOT reintroduce `build.command` here.
+      //
+      // Wrangler runs a custom build for `dev` as well as `deploy`, and re-runs
+      // it on every change under `watch_dir` — which defaults to `./src`, i.e.
+      // the whole app. The documented dev setup (vite.config.ts) is vite on
+      // :5173 proxying /api and /discord to `wrangler dev` on :8787, so during
+      // development NOTHING reads the bundle wrangler would produce — vite
+      // serves the app itself. Every save therefore kicked off a full
+      // `vite build --mode development` (~1.5 GB, ~1 min) whose output was
+      // discarded, and wrangler neither queues nor cancels them: an editing
+      // session stacked dozens concurrently and OOM-killed the workstation
+      // (four times, once at ~60 GB).
+      //
+      // Deploys build explicitly instead — CI at .github/workflows/deploy.yml
+      // ("Build app" + "Verify build output"), and locally via the deploy:dev /
+      // deploy:prod scripts in package.json.
       "kv_namespaces": [
         {
           "binding": "KV_SHORTENER",
