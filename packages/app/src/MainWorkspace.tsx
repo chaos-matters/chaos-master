@@ -676,6 +676,16 @@ export function MainWorkspace(props: AppProps) {
 
   // Audio-reactive panel state
   const [showAudioPanel, setShowAudioPanel] = createSignal(false)
+  /**
+   * Does the track keep playing once the audio panel is closed?
+   *
+   * OFF by default, deliberately: audio coming from a panel that is no longer
+   * on screen has no visible cause and no obvious way to stop it — the user is
+   * left hunting for which pane is making noise. Opt in when you actually want
+   * to keep listening while working on the flame.
+   */
+  const [keepAudioPlayingWhenClosed, setKeepAudioPlayingWhenClosed] =
+    createSignal(false)
   const [audioBuffer, setAudioBuffer] = createSignal<AudioBuffer | undefined>(
     undefined,
   )
@@ -749,6 +759,37 @@ export function MainWorkspace(props: AppProps) {
   // Sonification state
   const [showSonificationPanel, setShowSonificationPanel] = createSignal(false)
   const [sonificationEnabled, setSonificationEnabled] = createSignal(false)
+
+  /*
+   * Closing a sound panel silences it, unless the user opted out.
+   *
+   * Keyed off each panel's visibility rather than bolted onto its `onClose`,
+   * because a panel also disappears when the sidebar closes, when the other
+   * panel takes its place, and on the gallery hand-off reset. Audio still
+   * playing after any of those is a sound with no visible source and no
+   * obvious stop button — the user is left hunting for which pane is making
+   * noise. Sonification matters more here, not less: it generates audio
+   * continuously from the flame, so every edit keeps feeding it.
+   *
+   * The file transport is only PAUSED — buffer, analysis and position all
+   * survive, so reopening resumes instead of reloading.
+   */
+  createEffect(() => {
+    if (showAudioPanel() || keepAudioPlayingWhenClosed()) {
+      return
+    }
+    if (!untrack(playbackPaused)) {
+      setPlaybackPaused(true)
+    }
+  })
+  createEffect(() => {
+    if (showSonificationPanel() || keepAudioPlayingWhenClosed()) {
+      return
+    }
+    if (untrack(sonificationEnabled)) {
+      setSonificationEnabled(false)
+    }
+  })
   const [sonificationConfig, setSonificationConfig] =
     createSignal<SonificationConfig>({
       model: 'orchestral',
@@ -5764,6 +5805,12 @@ export function MainWorkspace(props: AppProps) {
                                 onEnabledChange={setSonificationEnabled}
                                 config={sonificationConfig}
                                 onConfigChange={setSonificationConfig}
+                                keepPlayingWhenClosed={
+                                  keepAudioPlayingWhenClosed
+                                }
+                                onKeepPlayingChange={
+                                  setKeepAudioPlayingWhenClosed
+                                }
                               />
                             }
                           >
@@ -5823,6 +5870,11 @@ export function MainWorkspace(props: AppProps) {
                               onSeek={setSeekTarget}
                               fileAnalyzer={fileAnalyzer}
                               analysisProgress={analysisProgress}
+                              flameName={flameDescriptor.metadata?.name}
+                              keepPlayingWhenClosed={keepAudioPlayingWhenClosed}
+                              onKeepPlayingChange={
+                                setKeepAudioPlayingWhenClosed
+                              }
                               transforms={transformInfos()}
                             />
                           </Show>

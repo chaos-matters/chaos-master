@@ -9,6 +9,13 @@ type SonificationPanelProps = {
   onEnabledChange: (enabled: boolean) => void
   config: () => SonificationConfig
   onConfigChange: (config: SonificationConfig) => void
+  /**
+   * Whether the sound should survive this panel being closed. Default OFF:
+   * sonification generates continuously from the flame, so a panel you cannot
+   * see keeps making noise with every edit.
+   */
+  keepPlayingWhenClosed: () => boolean
+  onKeepPlayingChange: (keep: boolean) => void
 }
 
 const MODEL_LABELS: Record<SonificationModel, { label: string; desc: string }> =
@@ -259,7 +266,7 @@ export function SonificationPanel(props: SonificationPanelProps) {
         )}
       </div>
 
-      {/* Bottom bar */}
+      {/* Status bar — what is playing, and whether it outlives this panel. */}
       <div class={ui.bottomBar}>
         <label class={ui.enableToggle}>
           <button
@@ -274,6 +281,29 @@ export function SonificationPanel(props: SonificationPanelProps) {
             <span class={ui.toggleKnob} />
           </button>
           Enable Audio
+        </label>
+        <span class={ui.statusDim}>
+          {props.config().model} · {props.config().voiceCount} voices
+        </span>
+        {/* Same rule as the audio panel: closing this stops the sound unless
+            you asked otherwise. Sonification is the worse offender of the two —
+            it generates continuously from the flame, so every edit keeps
+            feeding it, from a panel you can no longer see. */}
+        <label class={`${ui.enableToggle} ${ui.statusToggle}`}>
+          <button
+            class={
+              ui.toggleSwitch +
+              (props.keepPlayingWhenClosed() ? ` ${ui.toggleSwitchOn}` : '')
+            }
+            onClick={() => {
+              props.onKeepPlayingChange(!props.keepPlayingWhenClosed())
+            }}
+            aria-label="Keep sound playing after closing this panel"
+            title="Keep playing after this panel is closed"
+          >
+            <span class={ui.toggleKnob} />
+          </button>
+          Keep playing when closed
         </label>
       </div>
     </div>

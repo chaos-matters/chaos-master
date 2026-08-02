@@ -58,6 +58,15 @@ type AudioReactivePanelProps = {
    * being analysed. Owned by MainWorkspace, which runs the pass.
    */
   analysisProgress: Accessor<number | null>
+  /** Name of the flame being driven, for the status bar. */
+  flameName?: string
+  /**
+   * Whether audio should survive this panel being closed. Default OFF: a track
+   * playing from a panel you cannot see has no visible cause and no obvious
+   * stop button.
+   */
+  keepPlayingWhenClosed: Accessor<boolean>
+  onKeepPlayingChange: (keep: boolean) => void
   /** Available transforms (id+label) for per-transform target selectors. */
   transforms: TransformInfo[]
 }
@@ -774,6 +783,27 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
                     {' / '}
                     {formatTime(props.audioBuffer()!.duration)}
                   </span>
+                  {/* Live Preview sits WITH the transport, not in a footer at
+                      the far end of a long scrolling panel. It is the switch
+                      you reach for immediately after pressing play — "I can
+                      hear it, now drive the flame with it" — and it belongs
+                      next to the thing it follows. */}
+                  <label class={`${ui.enableToggle} ${ui.enableToggleInline}`}>
+                    <button
+                      class={
+                        ui.toggleSwitch +
+                        (props.audioEnabled() ? ` ${ui.toggleSwitchOn}` : '')
+                      }
+                      onClick={() => {
+                        props.onEnabledChange(!props.audioEnabled())
+                      }}
+                      aria-label="Toggle audio reactive preview"
+                      title="Drive the flame from this audio"
+                    >
+                      <span class={ui.toggleKnob} />
+                    </button>
+                    Live Preview
+                  </label>
                 </div>
 
                 {/* Waveform */}
@@ -1137,22 +1167,54 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
         </div>
       </div>
 
-      {/* Bottom bar */}
+      {/* Status bar — what is loaded and what it is doing. The Live Preview
+          toggle used to live down here, a scroll away from the transport it
+          belongs to; this space is worth more as the answer to "what am I
+          looking at". */}
       <div class={ui.bottomBar}>
-        <label class={ui.enableToggle}>
+        <span class={ui.statusItem} title="Flame being driven">
+          {props.flameName?.trim() || 'Untitled'}
+        </span>
+        <Show
+          when={props.audioSource() === 'file'}
+          fallback={<span class={ui.statusItem}>Microphone</span>}
+        >
+          <span class={ui.statusItem} title="Loaded track">
+            {audioFileName() ?? 'No track'}
+          </span>
+          <Show when={props.audioBuffer()}>
+            {(buffer) => (
+              <span class={ui.statusDim}>
+                {formatTime(buffer().duration)} ·{' '}
+                {Math.round(buffer().sampleRate / 1000)} kHz
+              </span>
+            )}
+          </Show>
+        </Show>
+        <span class={ui.statusDim}>
+          {props.audioMapping().mappings.length} mapping
+          {props.audioMapping().mappings.length === 1 ? '' : 's'}
+        </span>
+        {/* Closing the panel stops the audio, unless you say otherwise. A track
+            left playing from a panel you cannot see is a sound with no visible
+            cause and no obvious way to stop it — so this defaults OFF, and is
+            opt-in for the case where you DO want to keep listening while you
+            work on the flame. */}
+        <label class={`${ui.enableToggle} ${ui.statusToggle}`}>
           <button
             class={
               ui.toggleSwitch +
-              (props.audioEnabled() ? ` ${ui.toggleSwitchOn}` : '')
+              (props.keepPlayingWhenClosed() ? ` ${ui.toggleSwitchOn}` : '')
             }
             onClick={() => {
-              props.onEnabledChange(!props.audioEnabled())
+              props.onKeepPlayingChange(!props.keepPlayingWhenClosed())
             }}
-            aria-label="Toggle audio reactive preview"
+            aria-label="Keep audio playing after closing this panel"
+            title="Keep playing after this panel is closed"
           >
             <span class={ui.toggleKnob} />
           </button>
-          Live Preview
+          Keep playing when closed
         </label>
       </div>
 

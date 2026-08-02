@@ -412,13 +412,42 @@
 }
 
 /* --- Bottom bar --- */
+/* Status bar: what is loaded, and whether it outlives the panel. Wraps rather
+   than truncating — a long track name is exactly what you want to read here. */
 .bottomBar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 6px 12px;
+  flex-wrap: wrap;
   padding: 10px 16px;
   border-top: 1px solid var(--color-card, rgba(255, 255, 255, 0.08));
   flex-shrink: 0;
+  font-size: 11px;
+}
+
+.statusItem {
+  max-width: 16ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusDim {
+  color: var(--color-text-dim, rgba(255, 255, 255, 0.45));
+  white-space: nowrap;
+}
+
+/* Pushed to the far end, so the read-only facts and the one control in this
+   bar do not read as the same kind of thing. */
+.statusToggle {
+  margin-left: auto;
+}
+
+/* Live Preview beside the transport it follows. */
+.enableToggleInline {
+  margin-left: auto;
+  white-space: nowrap;
 }
 
 .enableToggle {
