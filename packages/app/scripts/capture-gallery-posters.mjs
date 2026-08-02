@@ -67,7 +67,7 @@ import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { CAPTURE_PAGE, checkoutFailure, verifyServedCheckout, } from './dev-server-checkout.mjs'
-import { initCommand, isMissingTable, storageFlags, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
+import { couldNotRun, couldNotRunLines, initCommand, isMissingTable, storageFlags, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
 
 const require = createRequire(import.meta.url)
 const { chromium } = require('playwright')
@@ -226,6 +226,16 @@ function readRows(env, section, includeUnpublished) {
       },
     )
   } catch (error) {
+    // First: a child that never started has no output, so the branches below
+    // would blame the schema for a `pnpm` that is not on PATH.
+    if (couldNotRun(error)) {
+      const why = couldNotRunLines('pnpm', error)
+        .map((line) => `  ${line}`)
+        .join('\n')
+      throw new Error(
+        `Could not run \`pnpm\` — nothing was read from ${targetLabel(env)}:\n${why}`,
+      )
+    }
     // Under --json the failure comes back on stdout. An empty target is the
     // one failure worth naming: it means the schema is missing, not that the
     // gallery is empty, and gallery-admin is what creates it.

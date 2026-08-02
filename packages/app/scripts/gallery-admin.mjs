@@ -53,7 +53,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 import { CAPTURE_PAGE, checkoutFailure, probeCapturePage, verifyServedCheckout, } from './dev-server-checkout.mjs'
 import { inspectFlame, isPlainObject, normalizeEnvelope, readFlameChunk, toSlug, transformsHash, } from './extract-flames.mjs'
-import { initCommand, isMissingTable, MIGRATIONS_DIR, migrationsArgs, storageFlags, tail, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
+import { couldNotRun, couldNotRunDetail, initCommand, isMissingTable, MIGRATIONS_DIR, migrationsArgs, storageFlags, tail, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
 import { checkConfigEntry, CONFIG_KEY_LIST, CONFIG_KEYS, } from './home-config.mjs'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -444,6 +444,19 @@ function initializeLocal(env) {
       stdio: ['ignore', 'pipe', 'pipe'],
     })
   } catch (error) {
+    if (couldNotRun(error)) {
+      throw new AdminError(
+        'command-not-runnable',
+        `Could not run \`pnpm\` — nothing from ${MIGRATIONS_DIR}/ was applied ` +
+          `to ${targetLabel(env)}`,
+        {
+          ...targetFields(env),
+          ...couldNotRunDetail('pnpm', error),
+          run: initCommand(env),
+          cwd: 'packages/app',
+        },
+      )
+    }
     throw new AdminError(
       'init-failed',
       `Could not create the gallery schema in ${targetLabel(env)}`,
@@ -501,6 +514,21 @@ function d1(env, sql, { initialize = true } = {}) {
       stdio: ['ignore', 'pipe', 'pipe'],
     })
   } catch (error) {
+    // First, because every branch below reads wrangler's output and a child
+    // that never started has none: without this, `pnpm` missing from PATH is
+    // reported as a query that ran and failed, with an empty stdout and an
+    // empty stderr as its entire explanation.
+    if (couldNotRun(error)) {
+      throw new AdminError(
+        'command-not-runnable',
+        `Could not run \`pnpm\` — no query reached ${targetLabel(env)}`,
+        {
+          ...targetFields(env),
+          ...couldNotRunDetail('pnpm', error),
+          cwd: 'packages/app',
+        },
+      )
+    }
     // Under --json wrangler puts the failure on STDOUT, not stderr — both
     // locally and through the API. Reading only stderr reports "it failed"
     // with no reason attached.

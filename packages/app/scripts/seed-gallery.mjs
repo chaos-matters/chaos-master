@@ -24,10 +24,37 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { migrationsArgs, storageFlags, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
+import { couldNotRun, couldNotRunLines, migrationsArgs, storageFlags, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const appDir = resolve(scriptDir, '..')
+
+/**
+ * Run a child, and say so plainly when it never started.
+ *
+ * `captured` says whether THIS call piped the child's streams. Where stderr is
+ * inherited node captures nothing, so empty streams are the default rather
+ * than a signal, and only a spawn error proves nothing ran — testing emptiness
+ * there would report a wrangler that failed loudly on the terminal as a
+ * command that could not be found.
+ *
+ * Worth catching at all because the alternative is an ENOENT stack trace
+ * naming node's internals instead of PATH, which is what a run from a desktop
+ * launcher or a systemd unit gets: both inherit a PATH without the nvm bin
+ * dir, and that one directory holds node, pnpm and esbuild alike.
+ */
+function run(command, args, options, { captured, consequence }) {
+  try {
+    return execFileSync(command, args, { cwd: appDir, ...options })
+  } catch (error) {
+    if (!couldNotRun(error, { captured })) throw error
+    console.error(`Could not run \`${command}\` — ${consequence}.`)
+    for (const line of couldNotRunLines(command, error)) {
+      console.error(`  ${line}`)
+    }
+    process.exit(1)
+  }
+}
 
 /**
  * What Home shows, in the order it shows it.
@@ -141,7 +168,7 @@ function parseArgs(argv) {
 function loadContent() {
   const dir = mkdtempSync(join(tmpdir(), 'gallery-seed-'))
   const bundle = join(dir, 'dump.mjs')
-  execFileSync(
+  run(
     'pnpm',
     [
       'exec',
@@ -154,13 +181,16 @@ function loadContent() {
       `--alias:@=${join(appDir, 'src')}`,
       `--outfile=${bundle}`,
     ],
-    { cwd: appDir, stdio: ['ignore', 'ignore', 'inherit'] },
+    { stdio: ['ignore', 'ignore', 'inherit'] },
+    { captured: false, consequence: 'the example flames were never bundled' },
   )
-  const out = execFileSync('node', [bundle], {
-    cwd: appDir,
-    maxBuffer: 256 * 1024 * 1024,
-  })
-  return JSON.parse(out.toString())
+  const out = run(
+    'node',
+    [bundle],
+    { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 },
+    { captured: true, consequence: 'the bundled examples were never read' },
+  )
+  return JSON.parse(out)
 }
 
 const sqlStr = (v) =>
@@ -274,15 +304,20 @@ function main() {
     // database is a problem to look at, not something a seed script should
     // quietly fix.
     if (target.storage === 'local') {
-      execFileSync('pnpm', migrationsArgs(args.apply), {
-        cwd: appDir,
-        stdio: ['ignore', 'ignore', 'inherit'],
-      })
+      run(
+        'pnpm',
+        migrationsArgs(args.apply),
+        { stdio: ['ignore', 'ignore', 'inherit'] },
+        {
+          captured: false,
+          consequence: `no migrations were applied to ${targetLabel(args.apply)}`,
+        },
+      )
     }
     const dir = mkdtempSync(join(tmpdir(), 'gallery-sql-'))
     const file = join(dir, 'seed.sql')
     writeFileSync(file, sql)
-    execFileSync(
+    run(
       'pnpm',
       [
         'exec',
@@ -293,7 +328,11 @@ function main() {
         ...where,
         `--file=${file}`,
       ],
-      { cwd: appDir, stdio: 'inherit' },
+      { stdio: 'inherit' },
+      {
+        captured: false,
+        consequence: `no rows reached ${targetLabel(args.apply)}`,
+      },
     )
     console.error(`Applied ${total} rows to ${targetLabel(args.apply)}.`)
     return

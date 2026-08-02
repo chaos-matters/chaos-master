@@ -115,3 +115,68 @@ export function tail(text, lines = 12) {
     .filter((line) => line.length > 0)
     .slice(-lines)
 }
+
+/**
+ * Did this failure mean the child never RAN, rather than ran and failed?
+ *
+ * Two shapes, one conclusion. A spawn error — ENOENT for an executable that is
+ * not on PATH, EACCES for one that cannot be executed — never reaches an exit
+ * status at all: node reports `status: null` and captures no streams. And a
+ * real exit code with nothing on either stream (127, typically, from a
+ * launcher that could not resolve what it was asked to run) leaves nothing to
+ * quote back, so reporting THAT as "the query failed" hands the reader the
+ * symptom when the only thing they can act on is the cause.
+ *
+ * The emptiness test is `tail` on purpose: this is true in exactly the cases
+ * where the `stdout` and `stderr` these scripts attach to a failure would both
+ * come out `[]`, which is the report that cannot be acted on.
+ *
+ * `captured` is not optional thinking. A child spawned with an inherited
+ * stderr writes past this process to the terminal, so node captures nothing
+ * and `error.stderr` is null for EVERY failure it can have — emptiness there
+ * is the default, not a signal, and testing it would report a migration that
+ * ran and failed loudly as a command that never started. Those callers get the
+ * spawn-error shape alone, which is the only evidence they actually hold.
+ */
+export function couldNotRun(error, { captured = true } = {}) {
+  if (typeof error?.status !== 'number') return true
+  if (!captured) return false
+  return tail(error.stdout).length === 0 && tail(error.stderr).length === 0
+}
+
+/**
+ * What to say instead, for the detail of the error that replaces the empty one.
+ *
+ * It names the executable and it names PATH, because PATH is essentially
+ * always what is wrong and it is the one thing the reader can check. The
+ * failure is invisible from an interactive shell and total from anywhere else:
+ * a console started from a desktop launcher or a `systemd-run --user` unit
+ * inherits the session environment rather than the login shell's, so a node
+ * installed by nvm — node, pnpm and wrangler all in one version-scoped bin dir
+ * that only ~/.zshrc puts on PATH — is simply not there, and every command
+ * fails at once. Reporting the PATH actually seen makes the hint checkable at
+ * a glance instead of a guess.
+ */
+export function couldNotRunDetail(command, error) {
+  return {
+    command,
+    reason:
+      typeof error?.status === 'number'
+        ? `\`${command}\` exited ${error.status} without writing to stdout or stderr`
+        : `\`${command}\` could not be started (${error?.code ?? 'spawn failed'})`,
+    hint:
+      `PATH must contain the directory holding \`node\` and \`${command}\` — ` +
+      `with nvm that is ~/.nvm/versions/node/<version>/bin, which only an ` +
+      `interactive shell adds. Set PATH explicitly in the launcher or unit.`,
+    searchPath: process.env.PATH ?? '(unset)',
+  }
+}
+
+/**
+ * The same thing as lines, for the scripts whose failures are text rather than
+ * a JSON detail. Derived from `couldNotRunDetail` so the two cannot drift.
+ */
+export function couldNotRunLines(command, error) {
+  const { reason, hint, searchPath } = couldNotRunDetail(command, error)
+  return [reason, hint, `PATH was: ${searchPath}`]
+}
