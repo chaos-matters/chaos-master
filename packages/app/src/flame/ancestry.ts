@@ -10,9 +10,32 @@ import type { FlameDescriptor } from './schema/flameSchema'
  * Uses a dual-32-bit hash (multiply-shift) over `JSON.stringify` output.
  * Not cryptographic — collision resistance is statistical, which is sufficient
  * for a single-user local ancestry tree.
+ *
+ * Hashes the flame's GENETICS — its transforms, plus the dimension they live in
+ * — and deliberately nothing else.
+ *
+ * It used to stringify the whole descriptor, which made the ancestry tree
+ * unusable in practice: the hash is the node's identity, so panning the camera,
+ * zooming, adjusting exposure, renaming, or leaving a hover blend applied all
+ * produced a DIFFERENT identity for the same flame. The lookup then missed,
+ * `ensureNode` filed it as a fresh root, and the modal showed a lone "Current"
+ * card — a bred child sitting next to a "Blended: 40%" badge with its parents
+ * apparently gone.
+ *
+ * A flame you panned is the same flame. Two flames are relatives because of
+ * their transforms, which is exactly what breeding crosses; the camera and the
+ * colour grade are how you are looking at one, not which one it is. Dimension
+ * stays in because 2D and 3D transforms are not interchangeable.
+ *
+ * Changing this orphans ancestry recorded by older builds — their hashes were
+ * computed over the whole descriptor. That is a one-time reset of a local
+ * cache which did not work anyway.
  */
 export function contentHash(flame: FlameDescriptor): string {
-  const str = JSON.stringify(flame)
+  const str = JSON.stringify({
+    transforms: flame.transforms,
+    dimensions: flame.renderSettings.dimensions ?? 2,
+  })
   let h1 = 0xdeadbeef
   let h2 = 0x41c6ce57
   for (let i = 0; i < str.length; i++) {

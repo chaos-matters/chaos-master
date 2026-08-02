@@ -79,6 +79,46 @@ describe('contentHash', () => {
     // Same name but different transforms is still a different flame
     expect(contentHash(makeFlame('Original'))).not.toBe(contentHash(flame))
   })
+
+  /*
+   * The hash IS the node's identity, so anything it covers can orphan a
+   * lineage. It used to stringify the whole descriptor: a bred child whose
+   * camera you nudged — or which still carried a 40% hover blend — hashed
+   * differently from the child that was recorded, so the tree lost its parents
+   * and showed a lone "Current" card.
+   */
+  it('survives everything that is not the flame itself', () => {
+    const flame = makeFlame('Steady')
+    const hash = contentHash(flame)
+
+    const renamed = deepClone(flame)
+    renamed.metadata = { ...renamed.metadata, name: 'Renamed' }
+    expect(contentHash(renamed)).toBe(hash)
+
+    const panned = deepClone(flame)
+    panned.renderSettings.camera = {
+      ...panned.renderSettings.camera,
+      position: [0.37, -0.2],
+      zoom: 2.5,
+    }
+    expect(contentHash(panned)).toBe(hash)
+
+    const blended = deepClone(flame)
+    blended.renderSettings.blendFlame = deepClone(flame)
+    blended.renderSettings.blendWeight = 0.4
+    expect(contentHash(blended)).toBe(hash)
+
+    const graded = deepClone(flame)
+    graded.renderSettings.exposure = (flame.renderSettings.exposure ?? 0) + 1
+    expect(contentHash(graded)).toBe(hash)
+  })
+
+  it('still separates 2D from 3D with identical transforms', () => {
+    const flat = makeFlame('Same Genes')
+    const deep = deepClone(flat)
+    deep.renderSettings.dimensions = 3
+    expect(contentHash(deep)).not.toBe(contentHash(flat))
+  })
 })
 
 describe('recordBreed', () => {
