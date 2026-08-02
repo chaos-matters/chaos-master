@@ -5684,6 +5684,9 @@ export function MainWorkspace(props: AppProps) {
                         }
                       >
                         <BlendFlameGallery
+                          dimensions={
+                            flameDescriptor.renderSettings.dimensions ?? 2
+                          }
                           heading={
                             blendIntent() === 'morph'
                               ? 'Pick End Flame'

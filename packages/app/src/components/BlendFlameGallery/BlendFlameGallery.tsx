@@ -22,6 +22,16 @@ type BlendFlameGalleryProps = {
   onClose: () => void
   /** Header label — defaults to the blend wording. */
   heading?: string
+  /**
+   * Only offer flames of this dimension.
+   *
+   * Every consumer of this picker pairs the choice with the CURRENT flame —
+   * morph interpolates, breed crosses transforms, diff compares — and none of
+   * those survive a 2D/3D mismatch: a 3D transform's affine carries `g`..`l`
+   * and a 2D one does not, so the result fails schema validation outright.
+   * Defaults to 2 so existing callers keep the behaviour they had.
+   */
+  dimensions?: number
 }
 
 const INITIAL_VISIBLE = 10
@@ -77,14 +87,26 @@ export function BlendFlameGallery(props: BlendFlameGalleryProps) {
     createSignal(INITIAL_VISIBLE)
   const [filterText, setFilterText] = createSignal('')
 
+  /*
+   * MATCH the caller's dimension rather than excluding 3D.
+   *
+   * Excluding it meant a 3D flame could never find a partner: every candidate
+   * offered was a guaranteed mismatch, and picking any of them threw inside
+   * `breedFlames` (the 2D transform has no `g`..`l` affine components, so the
+   * child fails validation) — which surfaced as a "Pick Second Parent" list
+   * where clicking did nothing at all. Home's Genetics card made that the
+   * default path, since the flame it loads is 3D.
+   */
+  const wantDimensions = () => props.dimensions ?? 2
+  const sameDimension = (flame: FlameDescriptor) =>
+    (flame.renderSettings.dimensions ?? 2) === wantDimensions()
+
   const allRecent = () =>
-    loadRecentFlames().filter(
-      (recent) => (recent.flame.renderSettings.dimensions ?? 2) !== 3,
-    )
+    loadRecentFlames().filter((recent) => sameDimension(recent.flame))
 
   const allExamples = () =>
     recordEntries(examples)
-      .filter(([, flame]) => (flame.renderSettings.dimensions ?? 2) !== 3)
+      .filter(([, flame]) => sameDimension(flame))
       .map(([id, flame]) => ({
         id,
         name: id === 'initExample' ? 'Init' : id,
