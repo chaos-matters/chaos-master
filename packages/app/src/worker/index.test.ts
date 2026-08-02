@@ -178,6 +178,32 @@ describe('worker — S-3 security headers', () => {
     expect(csp).toContain("default-src 'self'")
     expect(csp).toContain("'unsafe-eval'")
   })
+
+  /*
+   * The mic is a FEATURE here — audio-reactive wiring and sonification both
+   * take live input. `microphone=()` is an empty allowlist, which blocks our
+   * own origin too: getUserMedia never prompts, it throws "microphone is not
+   * allowed in this document", and the panel looks broken rather than denied.
+   *
+   * Worth a test because nothing else catches it: the app builds, deploys and
+   * renders perfectly, and the only symptom is a permission prompt that never
+   * appears on a page nobody tests headlessly.
+   */
+  it('allows the microphone for this origin, and nothing else it does not use', async () => {
+    const res = await worker.fetch(
+      post('https://x.test/api/shorten', { payload: 'abc' }),
+      makeEnv(),
+      ctx,
+    )
+    const pp = res.headers.get('Permissions-Policy') ?? ''
+    expect(pp).toContain('microphone=(self)')
+    // Still denied to embedders — `self` is not `*`.
+    expect(pp).not.toContain('microphone=*')
+    // Features the app genuinely never uses stay fully locked.
+    for (const denied of ['camera', 'geolocation', 'payment', 'usb']) {
+      expect(pp).toContain(`${denied}=()`)
+    }
+  })
 })
 
 describe('worker OG meta injection — XSS escaping guard', () => {

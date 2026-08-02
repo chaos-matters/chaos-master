@@ -140,6 +140,17 @@ implementations.
   expensive operation, so a row without one is an explicit `no-poster` error
   carrying the `capture` command that would fix it.
 
+- **Microphone blocked in production** (`worker/index.ts`): `Permissions-Policy`
+  sent `microphone=()`, an EMPTY allowlist, which denies the feature to the
+  document's own origin as well as to embedders. `getUserMedia` therefore never
+  prompted — it threw "microphone is not allowed in this document" — so live
+  input for the audio-reactive wiring and the sonification panel was dead on
+  every deployed site while working locally, where no such header is sent. Now
+  `microphone=(self)`: still refused to embedders (and `frame-ancestors 'none'`
+  means there are none), allowed for us. Covered by a test, because nothing
+  else catches this class of bug — the app builds, deploys and renders
+  perfectly, and the only symptom is a prompt that never appears.
+
 ### Changed
 
 - **Home art direction** (`HomeTab.module.css`): Home now carries its own

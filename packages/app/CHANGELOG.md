@@ -35,6 +35,10 @@ each release; the full developer history lives in `dev.changelog.md`.
 
 ### Fixed
 
+- **The microphone works on the site.** Live mic input for audio-reactive
+  flames and sonification was blocked outright on lumenapeiron.com — the
+  browser never even asked for permission. It worked locally, which is why it
+  went unnoticed.
 - **Sonification's drums.** The percussive model was silent on every flame.
 - **Sound stops when you close its panel**, unless you ask it to keep playing.
 - **Loading a song tells you what it's doing.** The progress bar now reflects

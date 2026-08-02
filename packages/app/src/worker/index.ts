@@ -863,8 +863,14 @@ const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   'Strict-Transport-Security': 'max-age=63072000; includeSubDomains',
   // Lock down powerful features the app never uses. WebGPU is not gated by
   // Permissions-Policy, and clipboard-write / fullscreen stay enabled for self.
+  //
+  // microphone=(self), NOT (): the audio-reactive wiring and the sonification
+  // panel both offer live mic input, and an empty allowlist blocks it for our
+  // own origin too — getUserMedia never even prompts, it throws
+  // "microphone is not allowed in this document". `self` still refuses every
+  // embedder, and frame-ancestors 'none' means there are none.
   'Permissions-Policy':
-    'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=(), browsing-topics=()',
+    'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(self), payment=(), usb=(), browsing-topics=()',
   // Disable legacy Adobe cross-domain policy files.
   'X-Permitted-Cross-Domain-Policies': 'none',
   'Content-Security-Policy': [
