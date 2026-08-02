@@ -1172,50 +1172,58 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
           belongs to; this space is worth more as the answer to "what am I
           looking at". */}
       <div class={ui.bottomBar}>
-        <span class={ui.statusItem} title="Flame being driven">
-          {props.flameName?.trim() || 'Untitled'}
-        </span>
-        <Show
-          when={props.audioSource() === 'file'}
-          fallback={<span class={ui.statusItem}>Microphone</span>}
-        >
-          <span class={ui.statusItem} title="Loaded track">
-            {audioFileName() ?? 'No track'}
+        {/* Controls first, on their own row; the read-only facts span the full
+            width beneath. Mixed on one line, whichever toggle did not fit
+            wrapped onto a row by itself and read as an afterthought rather
+            than as part of a set. */}
+        <div class={ui.statusToggles}>
+          {/* Closing the panel stops the audio, unless you say otherwise. A
+              track left playing from a panel you cannot see is a sound with no
+              visible cause and no obvious way to stop it — so this defaults
+              OFF, and is opt-in for when you DO want to keep listening while
+              working on the flame. */}
+          <label class={ui.enableToggle}>
+            <button
+              class={
+                ui.toggleSwitch +
+                (props.keepPlayingWhenClosed() ? ` ${ui.toggleSwitchOn}` : '')
+              }
+              onClick={() => {
+                props.onKeepPlayingChange(!props.keepPlayingWhenClosed())
+              }}
+              aria-label="Keep audio playing after closing this panel"
+              title="Keep playing after this panel is closed"
+            >
+              <span class={ui.toggleKnob} />
+            </button>
+            Keep playing when closed
+          </label>
+        </div>
+        <div class={ui.statusMeta}>
+          <span class={ui.statusItem} title="Flame being driven">
+            {props.flameName?.trim() || 'Untitled'}
           </span>
-          <Show when={props.audioBuffer()}>
-            {(buffer) => (
-              <span class={ui.statusDim}>
-                {formatTime(buffer().duration)} ·{' '}
-                {Math.round(buffer().sampleRate / 1000)} kHz
-              </span>
-            )}
-          </Show>
-        </Show>
-        <span class={ui.statusDim}>
-          {props.audioMapping().mappings.length} mapping
-          {props.audioMapping().mappings.length === 1 ? '' : 's'}
-        </span>
-        {/* Closing the panel stops the audio, unless you say otherwise. A track
-            left playing from a panel you cannot see is a sound with no visible
-            cause and no obvious way to stop it — so this defaults OFF, and is
-            opt-in for the case where you DO want to keep listening while you
-            work on the flame. */}
-        <label class={`${ui.enableToggle} ${ui.statusToggle}`}>
-          <button
-            class={
-              ui.toggleSwitch +
-              (props.keepPlayingWhenClosed() ? ` ${ui.toggleSwitchOn}` : '')
-            }
-            onClick={() => {
-              props.onKeepPlayingChange(!props.keepPlayingWhenClosed())
-            }}
-            aria-label="Keep audio playing after closing this panel"
-            title="Keep playing after this panel is closed"
+          <Show
+            when={props.audioSource() === 'file'}
+            fallback={<span class={ui.statusDim}>Microphone</span>}
           >
-            <span class={ui.toggleKnob} />
-          </button>
-          Keep playing when closed
-        </label>
+            <span class={ui.statusItem} title="Loaded track">
+              {audioFileName() ?? 'No track'}
+            </span>
+            <Show when={props.audioBuffer()}>
+              {(buffer) => (
+                <span class={ui.statusDim}>
+                  {formatTime(buffer().duration)} ·{' '}
+                  {Math.round(buffer().sampleRate / 1000)} kHz
+                </span>
+              )}
+            </Show>
+          </Show>
+          <span class={ui.statusDim}>
+            {props.audioMapping().mappings.length} mapping
+            {props.audioMapping().mappings.length === 1 ? '' : 's'}
+          </span>
+        </div>
       </div>
 
       {/* Wiring modal overlay */}

@@ -172,26 +172,42 @@
 }
 
 /* --- Bottom bar --- */
+/* Two rows: switches, then facts — see AudioReactivePanel for the reasoning.
+   The two panels share this shape so their footers read the same. */
 .bottomBar {
   display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 6px 12px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   padding: 10px 16px;
   border-top: 1px solid var(--color-card, rgba(255, 255, 255, 0.08));
   flex-shrink: 0;
+}
+
+.statusToggles {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.statusMeta {
+  display: flex;
+  align-items: center;
+  gap: 4px 10px;
+  flex-wrap: wrap;
   font-size: 11px;
+
+  & > * + *::before {
+    content: '·';
+    margin-right: 10px;
+    color: var(--color-text-dim, rgba(255, 255, 255, 0.3));
+  }
 }
 
 .statusDim {
   color: var(--color-text-dim, rgba(255, 255, 255, 0.45));
   white-space: nowrap;
-}
-
-/* The one control here, held apart from the read-only facts. */
-.statusToggle {
-  margin-left: auto;
 }
 
 .enableToggle {

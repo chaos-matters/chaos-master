@@ -266,45 +266,56 @@ export function SonificationPanel(props: SonificationPanelProps) {
         )}
       </div>
 
-      {/* Status bar — what is playing, and whether it outlives this panel. */}
+      {/* Controls on their own row, then the read-only facts across the full
+          width beneath. Mixing the two on one line left whichever toggle did
+          not fit wrapping onto a second row on its own, which read as an
+          afterthought rather than as a pair of switches. */}
       <div class={ui.bottomBar}>
-        <label class={ui.enableToggle}>
-          <button
-            class={
-              ui.toggleSwitch + (props.enabled() ? ` ${ui.toggleSwitchOn}` : '')
-            }
-            onClick={() => {
-              props.onEnabledChange(!props.enabled())
-            }}
-            aria-label="Toggle sonification"
-          >
-            <span class={ui.toggleKnob} />
-          </button>
-          Enable Audio
-        </label>
-        <span class={ui.statusDim}>
-          {props.config().model} · {props.config().voiceCount} voices
-        </span>
-        {/* Same rule as the audio panel: closing this stops the sound unless
-            you asked otherwise. Sonification is the worse offender of the two —
-            it generates continuously from the flame, so every edit keeps
-            feeding it, from a panel you can no longer see. */}
-        <label class={`${ui.enableToggle} ${ui.statusToggle}`}>
-          <button
-            class={
-              ui.toggleSwitch +
-              (props.keepPlayingWhenClosed() ? ` ${ui.toggleSwitchOn}` : '')
-            }
-            onClick={() => {
-              props.onKeepPlayingChange(!props.keepPlayingWhenClosed())
-            }}
-            aria-label="Keep sound playing after closing this panel"
-            title="Keep playing after this panel is closed"
-          >
-            <span class={ui.toggleKnob} />
-          </button>
-          Keep playing when closed
-        </label>
+        <div class={ui.statusToggles}>
+          <label class={ui.enableToggle}>
+            <button
+              class={
+                ui.toggleSwitch +
+                (props.enabled() ? ` ${ui.toggleSwitchOn}` : '')
+              }
+              onClick={() => {
+                props.onEnabledChange(!props.enabled())
+              }}
+              aria-label="Toggle sonification"
+            >
+              <span class={ui.toggleKnob} />
+            </button>
+            Enable Audio
+          </label>
+          {/* Same rule as the audio panel: closing this stops the sound unless
+              you asked otherwise. Sonification is the worse offender of the
+              two — it generates continuously from the flame, so every edit
+              keeps feeding it, from a panel you can no longer see. */}
+          <label class={ui.enableToggle}>
+            <button
+              class={
+                ui.toggleSwitch +
+                (props.keepPlayingWhenClosed() ? ` ${ui.toggleSwitchOn}` : '')
+              }
+              onClick={() => {
+                props.onKeepPlayingChange(!props.keepPlayingWhenClosed())
+              }}
+              aria-label="Keep sound playing after closing this panel"
+              title="Keep playing after this panel is closed"
+            >
+              <span class={ui.toggleKnob} />
+            </button>
+            Keep playing when closed
+          </label>
+        </div>
+        <div class={ui.statusMeta}>
+          <span class={ui.statusDim}>{props.config().model}</span>
+          <span class={ui.statusDim}>{props.config().voiceCount} voices</span>
+          <span class={ui.statusDim}>{props.config().scale}</span>
+          <span class={ui.statusDim}>
+            {Math.round(props.config().volume * 100)}% volume
+          </span>
+        </div>
       </div>
     </div>
   )
