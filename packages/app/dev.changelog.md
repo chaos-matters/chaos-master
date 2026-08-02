@@ -7,15 +7,34 @@ changelog surfaced in the About panel lives in `CHANGELOG.md`.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.9] - 2026-08-02
 
 A Home tab backed by a D1 content database — live WebGPU flames rather than
 screenshots, bounded by the existing visibility/compute gating — plus the
 poster-capture pipeline and admin flow that curate it, and a `wrangler dev`
 custom-build fix that had been OOM-killing developer workstations.
 
+Also introduces the local Benchmark Studio: an isolated `/benchmarks` WebGPU
+environment for reproducible, paired comparisons of the production flame
+pipeline, reconstruction profiles, random sequences and validated variation
+implementations.
+
 ### Added
 
+- **Benchmark Studio** (`pages/Benchmarks/`, `benchmarks/`): a dedicated local
+  lab that runs the production renderer without mounting the editor or its
+  unrelated GPU previews. It supports built-in, recent, uploaded and seeded
+  generated flames; renderer and Mitchell–Netravali reconstruction profiles;
+  explicit point initialization, RNG, seed and workload controls; warmups and
+  interleaved paired samples; queue-fenced completion throughput; confidence
+  intervals, stability and validity checks; immutable local result history;
+  JSON/CSV exports and a share-card PNG. The setup can also isolate one or more
+  variations and compare a built-in implementation with custom WGSL accepted
+  by the existing bounded runtime compiler. A toolbar Lab entry point, Worker
+  route fallback, keyboard-equivalent controls, reduced-motion behavior,
+  visibility-gated flame previews, branded chaos dial and fractal dividers
+  complete the browser-only workflow. Server execution remains intentionally
+  unavailable until isolated GPU workers and result attestation exist.
 - **Gallery content database** (`migrations/0001..0004`, `worker/index.ts`,
   `lib/galleryContent.ts`): D1 holds the FlameDescriptor spec itself, not
   images — `gallery_items` (section, slug, capability, dimensions, transform

@@ -3,10 +3,17 @@
 What's new in Lumen Apeiron (formerly Chaos Master). Concise highlights for
 each release; the full developer history lives in `dev.changelog.md`.
 
-## [Unreleased]
+## [0.9.9] - 2026-08-02
 
 ### Added
 
+- **Benchmark Studio.** Open the Lab from the bottom toolbar or visit
+  `/benchmarks` to compare the real WebGPU flame pipeline with repeatable,
+  paired A/B runs. Choose example, recent, uploaded, or freshly generated
+  flames; control the renderer, reconstruction filter, random sequence,
+  initialization and workload; then inspect confidence intervals and raw
+  samples or export JSON, CSV, and a shareable result card. Variation authors
+  can also compare the built-in implementation with validated custom WGSL.
 - **Home.** A front page for the app: a curated wall of flames, a row of
   animated pieces, a walkthrough of one flame being built step by step, and
   cards that open the tool each piece shows off. Nothing here is a screenshot —
