@@ -436,6 +436,10 @@ export function compileCustomVariationCode(wgslBody: string): CompileResult {
     set: (key: object, value: object) => void
   }
   meta.set(dummyFn, {
+    // TypeGPU 0.11+ rejects unversioned metadata. Keep this in lockstep with
+    // unplugin-typegpu's METADATA_FORMAT_VERSION for the v1 AST shape emitted
+    // by tinyest-for-wgsl.
+    v: 1,
     externals: BUILTIN_EXTERNALS,
     ast: { params, body, externalNames },
   })

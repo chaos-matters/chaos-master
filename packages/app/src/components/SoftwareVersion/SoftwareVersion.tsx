@@ -1,4 +1,5 @@
-import { Book } from '@/icons'
+import { Book, GridIcon } from '@/icons'
+import { BENCHMARKS_PATH } from '@/routing/appPath'
 import { VERSION } from '@/version'
 import { BenchmarkButton } from '../BenchmarkButton/BenchmarkButton'
 import { DebugPanel } from '../Debug/DebugPanel'
@@ -14,6 +15,15 @@ export function SoftwareVersion(props: {
       <DebugPanel />
       <div class={ui.versionContainer}>
         <BenchmarkButton onClick={props.showBenchmark} />
+        <a
+          class={ui.benchmarkLabPill}
+          href={BENCHMARKS_PATH}
+          aria-label="Open Benchmark Lab"
+          title="Open Benchmark Lab"
+        >
+          <GridIcon />
+          Lab
+        </a>
         <button
           class={ui.docsPill}
           onClick={props.showDocs}

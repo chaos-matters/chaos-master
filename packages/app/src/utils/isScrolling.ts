@@ -1,4 +1,5 @@
-import { createSignal } from 'solid-js'
+import { createEffect, createSignal, onCleanup } from 'solid-js'
+import type { Accessor } from 'solid-js'
 
 /**
  * Global, debounced "is the user actively scrolling" signal.
@@ -45,4 +46,38 @@ function ensureAttached() {
 export function useIsScrolling() {
   ensureAttached()
   return isScrolling
+}
+
+/**
+ * Debounced scroll activity for one scroll container.
+ *
+ * Unlike the global signal above, this reacts only when the element's own
+ * scroll position changes. It is useful for an isolated gallery that should
+ * keep rendering while the surrounding document scrolls.
+ */
+export function useElementIsScrolling(
+  element: Accessor<HTMLElement | undefined>,
+) {
+  const [elementIsScrolling, setElementIsScrolling] = createSignal(false)
+
+  createEffect(() => {
+    const target = element()
+    if (!target) return
+
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const onElementScroll = () => {
+      setElementIsScrolling(true)
+      clearTimeout(timer)
+      timer = setTimeout(() => setElementIsScrolling(false), SETTLE_MS)
+    }
+
+    target.addEventListener('scroll', onElementScroll, { passive: true })
+    onCleanup(() => {
+      target.removeEventListener('scroll', onElementScroll)
+      clearTimeout(timer)
+      setElementIsScrolling(false)
+    })
+  })
+
+  return elementIsScrolling
 }

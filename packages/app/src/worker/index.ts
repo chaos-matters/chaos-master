@@ -346,6 +346,17 @@ const baseHandler = {
     const url = new URL(request.url)
     const { pathname } = url
 
+    // Keep the benchmark route canonical. The Vite build currently uses a
+    // relative asset base, so serving index.html at `/benchmarks/` would make
+    // its asset URLs resolve under `/benchmarks/assets/`.
+    if (
+      pathname === '/benchmarks/' &&
+      (request.method === 'GET' || request.method === 'HEAD')
+    ) {
+      url.pathname = '/benchmarks'
+      return Response.redirect(url.toString(), 308)
+    }
+
     // ── Rate-limit the write endpoints per IP ──────────────────────────────
     // Bounds spam/abuse (and R2/KV cost). Fail-open: a limiter hiccup or a
     // missing binding never breaks sharing.
@@ -819,6 +830,13 @@ const baseHandler = {
           'Cache-Control': 'no-store',
         },
       })
+    }
+
+    // Unknown API routes must remain API-shaped 404s. With the asset binding's
+    // SPA fallback enabled, allowing these through would return index.html
+    // with status 200.
+    if (pathname === '/api' || pathname.startsWith('/api/')) {
+      return json({ error: 'Not found' }, 404)
     }
 
     // Everything else → static assets (the frontend)
