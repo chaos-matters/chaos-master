@@ -18,6 +18,17 @@ each release; the full developer history lives in `dev.changelog.md`.
   the randomizer rolls a flame and steers it, and breeding crosses two flames
   and plays through their children, one for each crossover mode.
 
+### Fixed
+
+- **Loading a song tells you what it's doing.** The progress bar now reflects
+  the real analysis pass instead of sitting at nothing, and a track can be
+  played and scrubbed as soon as it decodes — you no longer wait for the whole
+  analysis, or have to leave live preview switched on, just to hear it.
+- **3D flames keep their tools.** Breeding, evolution, the population
+  simulator, ancestry, diff, audio-reactive, sonification and the gallery were
+  all hidden whenever a 3D flame was loaded. Breeding a 3D flame also found no
+  partners to offer, so picking a second parent did nothing at all.
+
 ## [0.9.8] - 2026-07-24
 
 ### Added

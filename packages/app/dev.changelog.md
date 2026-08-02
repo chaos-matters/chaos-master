@@ -72,6 +72,13 @@ custom-build fix that had been OOM-killing developer workstations.
   now instead of resting on a still it could not justify. No schema or player
   change — migration 0004 already specified that nothing knows how long a path
   is.
+- **`gallery-admin sequence`** (`scripts/gallery-admin.mjs`): curated sequences
+  were terminal-only, because the console's wrapper always execs
+  `gallery-admin.mjs` and a sibling script is unreachable from there. The new
+  subcommand COMPOSES `gallery-sequence.mjs` (the same way `capture` composes
+  the poster pipeline) rather than duplicating the one piece of tooling that has
+  to run app TypeScript. The wrapper is a pass-through, so the console reaches
+  it with no dotfiles change — only buttons to wire.
 
 ### Changed
 
@@ -111,6 +118,38 @@ custom-build fix that had been OOM-killing developer workstations.
   Reveal is also thresholded (25% progress) and latched, so a camera pan cannot
   drop an already-revealed plate back under the threshold and fade the poster
   in over the render the user is steering.
+- **Audio loading reported nothing, and playback was hostage to it**
+  (`AudioReactivePanel.tsx`, `MainWorkspace.tsx`, `utils/useAudioReactive.ts`).
+  Three causes, all separate: `isAnalyzing` compared `fileAnalyzer() === null`
+  against a signal holding `undefined`, so the memo was ALWAYS false and the
+  "Analyzing audio…" overlay it gates had never once rendered; that overlay's
+  bar was hard-wired to `beatProgress`, which stays 0 for the whole analysis, so
+  it would have shown 0% anyway; and `createAudioAnalyzer` already accepted an
+  `onProgress(current, total)` that nobody passed. Now wired, throttled to whole
+  percents — the callback fires once per FRAME, ~32k times for 18 minutes at
+  30fps, so publishing every call would cost more than the analysis. Separately,
+  `useAudioReactive` ran `fullCleanup()` (closing the AudioContext) whenever
+  `audioEnabled` went false and returned early when the analyzer was missing —
+  so the transport died with live preview, and the play button was inert during
+  analysis. Transport is no longer gated on either; only the feature→parameter
+  mapping is. Mic mode stays gated, deliberately: a file has something to
+  audition, an open capture is all cost and a privacy surprise.
+- **3D flames lost most of the toolbar** (`ViewControls.tsx`,
+  `BlendFlameGallery.tsx`, `MainWorkspace.tsx`, `flame/breedFlame.ts`): a single
+  `<Show when={!props.is3D}>` wrapped Blend, Morph AND everything after them, so
+  loading a 3D flame silently removed Audio Reactive, Sonification, Breed,
+  Evolve, Simulator, Ancestry, Diff and the Gallery. Only Blend and Morph have a
+  reason — they interpolate through the blend pipeline, and `ifsPipeline3D`
+  has no blend input at all. The picker also filtered candidates with
+  `dimensions !== 3`, so a 3D flame was offered only 2D partners; every one was
+  a mismatch, and a mismatch does not degrade — crossover copies whole
+  transforms, a 2D transform's affine has no `g`..`l`, and the child fails
+  `validateFlame`, which THREW inside BreedGallery's signal initialiser. The
+  modal never rendered and the click looked ignored. The picker now matches the
+  caller's dimension (morph still asks for 2D), `breedFlames` returns `[]` on a
+  mismatch instead of throwing, and the hover preview — which IS the blend
+  mechanism — is skipped in 3D rather than changing the name while the picture
+  stays still. Two regression tests.
 - **Re-staging left a stale sequence** (`scripts/gallery-admin.mjs`): `put`
   upserts a row and deliberately clears `poster_key`/`poster_frame`, because
   both describe the flame being replaced. A curated `sequence` is derived from
