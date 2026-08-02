@@ -98,6 +98,23 @@ implementations.
   the poster pipeline) rather than duplicating the one piece of tooling that has
   to run app TypeScript. The wrapper is a pass-through, so the console reaches
   it with no dotfiles change — only buttons to wire.
+- **Sequence preview, then pick** (`scripts/render-flames.mjs`,
+  `scripts/sequence-pick.mjs`, `gallery-sequence.mjs --preview/--pick/--read`):
+  a derived walk was previously written sight-unseen and judged by reloading
+  Home. `--preview` now renders every candidate and returns them as base64
+  data URLs on stdout, writing nothing; `--pick 0,3,5` then commits exactly
+  those, in that order. The two agree because derivation is deterministic in
+  `--seed` and the preview reports the seed it used, so the commit re-derives
+  the identical flames — no candidate is carried between runs in a temp file
+  that could go stale. Rendering is the poster capture's own browser loop,
+  extracted to `render-flames.mjs` and taking flames directly rather than D1
+  rows (the capture page already accepted a spec carrying its own flame), so
+  preview and poster share one quality gate and one blank-canvas check.
+  `--read <env>` was added with it: `--preview` must derive from the row the
+  eventual commit will update, and reusing `--apply` for that would have made
+  a look-only command hold a write path. A failed candidate is reported in
+  place rather than failing the batch, and cannot be picked — committing one
+  would put a flame on Home that nobody saw.
 
 ### Changed
 

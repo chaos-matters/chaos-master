@@ -315,12 +315,26 @@ Options:
   --file <path>         append ONE hand-picked flame (PNG/JSON) to the end of
                         the row's existing walk instead of generating. Held to
                         the same validation the put command applies.
+  --preview             render every candidate and print them as base64 images
+                        WITHOUT writing anything. Needs a dev server (started
+                        for you unless --no-serve). Look, then pick.
+  --pick <a,b,c>        commit only these candidate indices, in this order.
+                        Pass the SAME --seed the preview reported, or you will
+                        re-derive a different set and pick from the wrong one.
+  --base <url>          dev server the preview renders through
+                        (default ${DEFAULT_DEV_BASE})
+  --no-serve            refuse rather than starting a dev server for --preview
 ${COMMON_OPTIONS}
 
 Most rows are one flame. A few play a walk, because a single still cannot show
 what the card claims — "roll a whole flame, then steer it" is a path, and so is
 "breed two flames". The walk is generated ONCE and stored, so every visitor
 sees the same one and a bad roll is fixed by re-running with another seed.
+
+Preview first. Deriving is cheap and deterministic in --seed, so the honest
+loop is: --preview to see the candidates, then re-run with the seed it reports
+plus --pick to keep the ones worth keeping. The order in --pick is the order
+they play, and repeats are allowed.
 
 Composes scripts/gallery-sequence.mjs, which runs the app's own randomiser and
 breeder. NOTE: \`put\` clears a row's sequence, because it was derived from the
@@ -1580,7 +1594,7 @@ async function commandCapture(values) {
  * shells out to (chaos-master-gallery.sh) only ever execs THIS script, so
  * anything not routed through here is terminal-only.
  */
-function commandSequence(values) {
+async function commandSequence(values) {
   const env = resolveEnv(values)
   if (values.slug === undefined) {
     throw new AdminError('usage', 'sequence needs --slug')
@@ -1613,6 +1627,65 @@ function commandSequence(values) {
     if (values.derived !== undefined) args.push('--derived', values.derived)
     if (values.seed !== undefined) args.push('--seed', values.seed)
     if (values.paths !== undefined) args.push('--paths', values.paths)
+    if (values.pick !== undefined) args.push('--pick', values.pick)
+  }
+
+  /*
+   * A preview renders the candidates and returns them as images, writing
+   * nothing. It needs a dev server for the same reason `capture` does — the
+   * flames render on a real GPU through the app's own page — so it borrows the
+   * same bootstrap, including auto-start.
+   *
+   * `--apply` is stripped: this must not be able to touch the database even if
+   * the script it calls were to change under it.
+   */
+  if (values.preview === true) {
+    // --apply becomes --read: same row, same parent flame, no write path at
+    // all. Leaving --apply in place would work today only because the preview
+    // returns before the UPDATE, which is one refactor away from writing.
+    args[args.indexOf('--apply')] = '--read'
+    args.push('--preview')
+
+    const base = (values.base ?? DEFAULT_DEV_BASE).replace(/\/$/, '')
+    const server = await ensureDevServer({
+      base,
+      autoStart: values['no-serve'] !== true,
+      timeoutMs: 120_000,
+    })
+    args.push('--base', server.base)
+    try {
+      // Piped, not inherited: the payload is JSON for the console to render,
+      // and progress chatter goes to stderr where it cannot corrupt it.
+      const stdout = execFileSync('node', args, {
+        cwd: appDir,
+        encoding: 'utf8',
+        maxBuffer: 256 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'inherit'],
+      })
+      // Returned, not emitted: the dispatcher wraps and prints it, so emitting
+      // here would put two JSON objects on stdout and break every parser.
+      return {
+        preview: true,
+        env,
+        slug,
+        title: row.title,
+        ...JSON.parse(stdout),
+      }
+    } catch (error) {
+      throw new AdminError(
+        'preview-failed',
+        `could not preview a sequence for "${slug}"`,
+        {
+          cause: error instanceof Error ? error.message : String(error),
+          hint:
+            'the derivation itself is cheap; a failure here is usually the ' +
+            'dev server or the GPU. Re-run without --preview to see the ' +
+            'derivation on its own.',
+        },
+      )
+    } finally {
+      await server.stop()
+    }
   }
 
   note(
@@ -1694,6 +1767,8 @@ const OPTIONS = {
   seed: { type: 'string' },
   paths: { type: 'string' },
   clear: { type: 'boolean' },
+  preview: { type: 'boolean' },
+  pick: { type: 'string' },
   help: { type: 'boolean', short: 'h' },
 }
 
@@ -1746,6 +1821,14 @@ const COMMANDS = {
       'paths',
       'clear',
       'file',
+      // Look-before-you-write: --preview renders the candidates and returns
+      // them as images without touching the row; --pick then commits the ones
+      // that were worth keeping. --base/--no-serve are the dev server the
+      // rendering needs, same as `capture`.
+      'preview',
+      'pick',
+      'base',
+      'no-serve',
     ],
   },
   config: {
