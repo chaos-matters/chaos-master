@@ -242,6 +242,10 @@
   overflow: hidden;
 }
 
+/* No extra .progressFill rule here — the real one below already eases width
+   (0.15s), which is what the analysis bar needs to avoid visibly stepping
+   between whole-percent updates. */
+
 .progressFill {
   height: 100%;
   background: var(--color-accent, #7c6ff7);

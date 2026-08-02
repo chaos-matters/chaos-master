@@ -53,6 +53,11 @@ type AudioReactivePanelProps = {
   playbackTime: Accessor<number>
   onSeek: (seconds: number) => void
   fileAnalyzer: Accessor<AudioAnalyzer | undefined>
+  /**
+   * Progress of the post-decode analysis pass, 0-1, or null when nothing is
+   * being analysed. Owned by MainWorkspace, which runs the pass.
+   */
+  analysisProgress: Accessor<number | null>
   /** Available transforms (id+label) for per-transform target selectors. */
   transforms: TransformInfo[]
 }
@@ -360,6 +365,41 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
   const [dragOver, setDragOver] = createSignal(false)
   const [loading, setLoading] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
+
+  /**
+   * What the panel is actually doing right now.
+   *
+   * Loading a track is two jobs, not one: decode (browser-owned, no progress to
+   * report) and the analysis pass that builds the frame data (MainWorkspace,
+   * reports per-frame). Only the first was ever surfaced, so an 18-minute file
+   * showed "Loading..." for a moment and then a silent, apparently-dead panel
+   * for the minute that the second job took.
+   *
+   * Playback is deliberately NOT part of this: the transport works as soon as
+   * the buffer decodes (see useAudioReactive), so the track is playable and
+   * scrubbable while the analysis is still running — only the modulation has to
+   * wait.
+   */
+  const loadPhase = () => {
+    if (loading()) return 'decoding' as const
+    const progress = props.analysisProgress()
+    if (progress !== null) return 'analyzing' as const
+    return 'idle' as const
+  }
+  const loadLabel = () =>
+    loadPhase() === 'decoding'
+      ? 'Decoding audio…'
+      : 'Drop audio file or click to browse'
+
+  /**
+   * The one percentage the overlay shows: the analysis pass while it runs, then
+   * the beat scan that follows it. Two sequential jobs, one bar — the user is
+   * waiting on "is the track ready", not on which internal stage is running.
+   */
+  const analyzePercent = () =>
+    isAnalyzing()
+      ? Math.round((props.analysisProgress() ?? 0) * 100)
+      : beatProgress()
   const [beatProgress, setBeatProgress] = createSignal(0)
   const [audioFileName, setAudioFileName] = createSignal<string | null>(null)
   const [micError, setMicError] = createSignal<string | null>(null)
@@ -375,9 +415,16 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
   const [scrubbing, setScrubbing] = createSignal(false)
 
   // Derived: true while the shared analyzer is being built (FFT pass)
+  /*
+   * Both of these signals hold `undefined`, never `null` — so the original
+   * `fileAnalyzer() === null` was always FALSE and this memo always returned
+   * false. The "Analyzing audio…" overlay it gates has therefore never
+   * rendered: loading a long track showed a decoded-but-silent panel with no
+   * indication that a minute of analysis was still running.
+   */
   const isAnalyzing = createMemo(() => {
     const buf = props.audioBuffer()
-    return buf !== null && props.fileAnalyzer() === null
+    return buf !== undefined && props.fileAnalyzer() === undefined
   })
 
   function formatTime(seconds: number): string {
@@ -735,17 +782,23 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
                     <div class={ui.analyzeOverlay}>
                       <span class={ui.analyzeLabel}>
                         {isAnalyzing()
-                          ? 'Analyzing audio...'
+                          ? 'Analyzing audio — playable already, mappings when it finishes'
                           : 'Scanning beats...'}
                       </span>
+                      {/* The bar was hard-wired to `beatProgress`, which stays
+                          0 for the whole analysis pass — so even if the overlay
+                          had rendered it would have sat at 0% for a minute.
+                          The analysis reports per frame; use it. */}
                       <div class={ui.progressTrack}>
                         <div
                           class={ui.progressFill}
-                          style={{ width: `${beatProgress()}%` }}
+                          style={{ width: `${analyzePercent()}%` }}
                         />
                       </div>
-                      <Show when={beatProgress() > 0}>
-                        <span class={ui.analyzePercent}>{beatProgress()}%</span>
+                      <Show when={analyzePercent() > 0}>
+                        <span class={ui.analyzePercent}>
+                          {analyzePercent()}%
+                        </span>
                       </Show>
                     </div>
                   </Show>
@@ -787,11 +840,10 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
               <div class={ui.dropIcon}>
                 <MusicNote />
               </div>
-              <div class={ui.dropLabel}>
-                {loading()
-                  ? 'Loading...'
-                  : 'Drop audio file or click to browse'}
-              </div>
+              {/* Decode only — once the buffer exists this whole drop zone is
+                  replaced by the waveform, and the analysis progress belongs to
+                  the overlay there. */}
+              <div class={ui.dropLabel}>{loadLabel()}</div>
               <div class={ui.dropFormats}>MP3, WAV, OGG, FLAC</div>
               <Show when={error()}>
                 <div style="color: #ff5a5a; font-size: 12px; margin-top: 8px;">

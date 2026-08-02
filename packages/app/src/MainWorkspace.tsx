@@ -706,6 +706,17 @@ export function MainWorkspace(props: AppProps) {
   const [fileAnalyzer, setFileAnalyzer] = createSignal<
     AudioAnalyzer | undefined
   >(undefined)
+  /**
+   * How far the post-decode analysis pass has got, 0-1, or null when idle.
+   *
+   * The panel used to show a single "Loading..." that covered ONLY the decode,
+   * then went quiet for the whole analysis — which on an 18-minute track is the
+   * long part. The panel looked idle and unresponsive while the work that
+   * actually takes the minute was running.
+   */
+  const [analysisProgress, setAnalysisProgress] = createSignal<number | null>(
+    null,
+  )
 
   // Reset playback state when switching between file and mic
   createEffect(() => {
@@ -5660,13 +5671,36 @@ export function MainWorkspace(props: AppProps) {
                               onAudioChange={(buf) => {
                                 setAudioBuffer(buf)
                                 setFileAnalyzer(undefined)
+                                setAnalysisProgress(null)
                                 if (!buf) {
                                   setAudioEnabled(false)
                                 } else {
+                                  // Report from 0 immediately: the panel has to
+                                  // say "analyzing" before the first frame is
+                                  // done, or it looks idle for the whole
+                                  // scheduling gap on a long file.
+                                  setAnalysisProgress(0)
                                   setTimeout(async () => {
-                                    setFileAnalyzer(
-                                      await createAudioAnalyzer(buf, 30),
+                                    // `onProgress` fires once PER FRAME —
+                                    // ~32k times for 18 minutes at 30fps. Only
+                                    // publish whole percents, or the signal
+                                    // write costs more than the analysis.
+                                    let lastPercent = -1
+                                    const analyzer = await createAudioAnalyzer(
+                                      buf,
+                                      30,
+                                      (current, total) => {
+                                        if (total <= 0) return
+                                        const percent = Math.floor(
+                                          (current / total) * 100,
+                                        )
+                                        if (percent === lastPercent) return
+                                        lastPercent = percent
+                                        setAnalysisProgress(percent / 100)
+                                      },
                                     )
+                                    setFileAnalyzer(analyzer)
+                                    setAnalysisProgress(null)
                                   }, 30)
                                 }
                                 setPlaybackPaused(false)
@@ -5686,6 +5720,7 @@ export function MainWorkspace(props: AppProps) {
                               playbackTime={playbackTime}
                               onSeek={setSeekTarget}
                               fileAnalyzer={fileAnalyzer}
+                              analysisProgress={analysisProgress}
                               transforms={transformInfos()}
                             />
                           </Show>
