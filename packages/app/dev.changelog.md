@@ -116,6 +116,20 @@ implementations.
   place rather than failing the batch, and cannot be picked — committing one
   would put a flame on Home that nobody saw.
 
+- **`gallery-admin delete`** (`scripts/gallery-admin.mjs`): there was no way to
+  remove a row, only to unpublish it — deliberate while rows were curated by
+  hand, but staging mistakes and test rows then accumulate as hidden clutter
+  with no exit. The one destructive command, guarded three ways: a PUBLISHED
+  row is refused (unpublish first, so deleting is never a one-step way to take
+  something off Home, where a mistyped slug would be an outage rather than an
+  inconvenience), `--yes <slug>` must repeat the slug (a fixed confirmation
+  word gets typed on reflex; retyping the name means what was confirmed is
+  what goes), and prod keeps its own `--confirm prod`. The R2 poster goes with
+  the row: the row is deleted first and the object second, so a half-failure
+  orphans an invisible object rather than leaving a row pointing at a missing
+  poster — and because the key exists nowhere else once the row is gone, a
+  failed object delete prints the exact command to finish it.
+
 ### Changed
 
 - **Home art direction** (`HomeTab.module.css`): Home now carries its own

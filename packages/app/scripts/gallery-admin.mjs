@@ -22,6 +22,7 @@
 //   publish  take a staged row live, or pull a live one back
 //   reorder  set a row's position within its section
 //   sequence give a row a curated flame walk (or clear it back to one still)
+//   delete   remove an unpublished row and its poster — the only destructive one
 //   config   read or write Home's settings (home_config), allowlisted keys
 //
 // Three deliberate constraints:
@@ -171,6 +172,7 @@ Commands:
   publish   set published to 0 or 1 for one row
   reorder   set sort_order for one row
   sequence  give a row a curated flame walk, or clear it back to one still
+  delete    remove an unpublished row and its poster (not reversible)
   config    read or write Home's settings (allowlisted keys)
 
 ${COMMON_OPTIONS}
@@ -340,6 +342,32 @@ Composes scripts/gallery-sequence.mjs, which runs the app's own randomiser and
 breeder. NOTE: \`put\` clears a row's sequence, because it was derived from the
 flame being replaced — so the order is put, then sequence, then capture, then
 publish.`,
+
+  delete: `gallery-admin delete — remove a row, and its poster with it
+
+Usage:
+  node scripts/gallery-admin.mjs delete --slug <slug> --yes <slug> [options]
+
+Options:
+  --slug <slug>         the row to remove
+  --yes <slug>          repeat the slug to confirm. Not a bare --yes on
+                        purpose: a generic flag gets typed reflexively, and
+                        this is the one command with nothing to undo it.
+${COMMON_OPTIONS}
+
+The ONLY destructive command here. Everything else is reversible — publish 0
+hides a row and publish 1 brings it back — so reach for that first if you are
+not certain.
+
+A PUBLISHED row is refused: unpublish it, then delete it. Deleting must not be
+a one-step way to take something off Home, or a mistyped slug becomes an
+outage instead of an inconvenience.
+
+The R2 poster goes too. The row is removed first and the object second, so a
+half-failure leaves an orphaned object (invisible, cheap) rather than a row
+pointing at a poster that is gone. If the object delete fails, the exact
+command to finish the job is printed — the key exists nowhere else once the
+row is gone.`,
 
   config: `gallery-admin config — Home's settings, as content
 
@@ -1580,6 +1608,108 @@ async function commandCapture(values) {
   return result
 }
 
+// ── delete ───────────────────────────────────────────────────────────
+
+/**
+ * Remove a row from the gallery, and its poster with it.
+ *
+ * Every other write here is reversible — `publish 0` hides a row and `publish
+ * 1` brings it back. This one is not, so it is guarded three ways:
+ *
+ *   1. a PUBLISHED row is refused outright. Unpublish it first. Deleting must
+ *      never be the one-step way to take something off Home, because then a
+ *      mistyped slug is an outage rather than an inconvenience.
+ *   2. `--yes <slug>` must repeat the slug exactly. A generic confirmation
+ *      flag would be typed reflexively; retyping the name means the thing you
+ *      confirmed is the thing that goes.
+ *   3. prod still needs its own `--confirm prod`, as everywhere else.
+ */
+function commandDelete(values) {
+  const env = resolveEnv(values)
+  if (values.slug === undefined) {
+    throw new AdminError('usage', 'delete needs --slug')
+  }
+  const slug = values.slug
+  if (!SLUG_PATTERN.test(slug)) {
+    throw new AdminError('bad-slug', `"${slug}" is not a valid slug`)
+  }
+  const row = requireRow(env, slug)
+
+  if (row.published === 1) {
+    throw new AdminError(
+      'refuses-published',
+      `"${slug}" is live on Home — unpublish it before deleting it`,
+      {
+        ...targetFields(env),
+        slug,
+        fix: `node scripts/gallery-admin.mjs publish --slug ${slug} --published 0 --env ${env}`,
+        why: 'deleting must not be a one-step way to take a row off Home',
+      },
+    )
+  }
+
+  if (values.yes !== slug) {
+    throw new AdminError(
+      'delete-confirmation-required',
+      `Deleting "${slug}" is not reversible — repeat the slug to confirm`,
+      {
+        ...targetFields(env),
+        slug,
+        fix: `add --yes ${slug}`,
+        alternative: `publish --published 0 hides a row without destroying it`,
+      },
+    )
+  }
+
+  // Read the key BEFORE the row goes: it is recorded nowhere else, so losing
+  // it here would leave an R2 object nobody can ever name again.
+  const posterKey = row.poster_key ?? null
+
+  note(`Deleting ${slug} from ${targetLabel(env)} ...`)
+  d1(env, `DELETE FROM gallery_items WHERE slug = ${sqlStr(slug)};`)
+
+  // Row first, object second, deliberately. If this half fails we are left
+  // with an orphaned object — invisible and cheap — rather than a row pointing
+  // at a poster that no longer exists. The key is printed either way so a
+  // failure here stays fixable by hand.
+  let posterDeleted = null
+  if (posterKey !== null) {
+    try {
+      execFileSync(
+        'pnpm',
+        [
+          'exec',
+          'wrangler',
+          'r2',
+          'object',
+          'delete',
+          `${TARGETS[env].bucket}/gallery/${posterKey}`,
+          ...storageFlags(env),
+        ],
+        { cwd: appDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+      )
+      posterDeleted = true
+      note(`Deleted its poster ${posterKey}.`)
+    } catch (error) {
+      posterDeleted = false
+      note(
+        `WARNING: the row is gone but its poster is not. Remove it with:\n` +
+          `  pnpm exec wrangler r2 object delete ${TARGETS[env].bucket}/gallery/${posterKey} ${storageFlags(env).join(' ')}\n` +
+          `  (${tail(error.stderr ?? '') || 'no output'})`,
+      )
+    }
+  }
+
+  return {
+    ...targetFields(env),
+    slug,
+    deleted: true,
+    title: row.title,
+    posterKey,
+    posterDeleted,
+  }
+}
+
 // ── sequence ─────────────────────────────────────────────────────────
 
 /**
@@ -1769,6 +1899,7 @@ const OPTIONS = {
   clear: { type: 'boolean' },
   preview: { type: 'boolean' },
   pick: { type: 'string' },
+  yes: { type: 'string' },
   help: { type: 'boolean', short: 'h' },
 }
 
@@ -1804,6 +1935,10 @@ const COMMANDS = {
   publish: {
     run: commandPublish,
     options: ['env', 'confirm', 'slug', 'published'],
+  },
+  delete: {
+    run: commandDelete,
+    options: ['env', 'confirm', 'slug', 'yes'],
   },
   reorder: {
     run: commandReorder,
