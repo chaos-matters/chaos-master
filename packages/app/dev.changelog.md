@@ -150,6 +150,39 @@ custom-build fix that had been OOM-killing developer workstations.
   mismatch instead of throwing, and the hover preview — which IS the blend
   mechanism — is skipped in 3D rather than changing the name while the picture
   stays still. Two regression tests.
+- **Audio wiring presets rebuilt** (`utils/audioWiringPresets.ts` + 26 tests):
+  the old set drove `highlightPower`, `skipIters` and `gamma` — parameters that
+  barely move the image — and being static data could only ever touch render
+  settings. Now three RENDER presets restricted to the visible movers
+  (`vibrancy`, `palettePhase`, `exposure`, `zoom`, `contrast`), and three
+  FLAME-AWARE ones computed from the loaded transforms (probabilities,
+  variation weights, pre-affine scale). The computed ones are deterministic, so
+  a preset stays reproducible, and are offered disabled with a reason when a
+  flame cannot satisfy them rather than silently wiring nothing. Randomize moved
+  from inside the wiring editor to the Mappings header and is weighted ~2:1
+  toward flame structure over render settings. Generation is shared, so the
+  panel and the editor cannot disagree about what exists.
+- **Percussive sonification was silent** (`utils/sonification.ts`): `voiceIdx`
+  reset each update and the probability gate usually passed one transform, so
+  nearly every hit routed to `voices[0]` — the kick — which was white noise
+  through an 80 Hz 2nd-order lowpass, under 1% of the noise energy. Drum choice
+  now derives from the transform id (stable, so a pattern reads as one); kick
+  and tom are synthesised from a pitch-dropping sine; hits own their nodes
+  instead of sharing a pool that cut itself off. Verified by tapping the graph
+  with an AnalyserNode in real Chrome: peak RMS 0.066 against silence.
+- **Reverb mix could not mix** (`utils/sonification.ts`): orchestral and
+  percussive connected `masterGain` to `ctx.destination` directly AND through
+  `dryGain`, pinning dry at full level.
+- **Ancestry pedigree view** (`flame/ancestry.ts`, `AncestryTreeModal.tsx` + 9
+  tests): `getPedigreeTree` layers by distance from the focal flame — parents
+  above, children below — where `getLineageTree` groups by generation, which is
+  a property of the flame and so puts a late-introduced mate in Gen 0. Runs both
+  directions so a founder still shows its family; every flame drawn at most once
+  across a backcross. Also: the edge tooltip multiplied an already-percentage
+  `edgeSim` by 100, reading "8400% similar".
+- **Audio panel layout**: Live Preview moved from the footer to the transport
+  row; footers on both sound panels became status bars (flame, track, duration,
+  mapping count / model, voices, scale, volume) with switches on their own row.
 - **Re-staging left a stale sequence** (`scripts/gallery-admin.mjs`): `put`
   upserts a row and deliberately clears `poster_key`/`poster_frame`, because
   both describe the flame being replaced. A curated `sequence` is derived from

@@ -18,8 +18,18 @@ each release; the full developer history lives in `dev.changelog.md`.
   the randomizer rolls a flame and steers it, and breeding crosses two flames
   and plays through their children, one for each crossover mode.
 
+- **Audio presets that do something.** The wiring presets now drive the
+  settings that visibly change the picture, and three of them are built from
+  the flame you have loaded — re-weighting its own transforms, variation
+  weights and affines, which is what actually makes a fractal move. A
+  Randomize button sits with the mappings for a fresh wiring any time.
+- **Ancestry as a family tree.** A Pedigree view puts a flame's parents above
+  it and its children below, alongside the existing generations view.
+
 ### Fixed
 
+- **Sonification's drums.** The percussive model was silent on every flame.
+- **Sound stops when you close its panel**, unless you ask it to keep playing.
 - **Loading a song tells you what it's doing.** The progress bar now reflects
   the real analysis pass instead of sitting at nothing, and a track can be
   played and scrubbed as soon as it decodes — you no longer wait for the whole
