@@ -1,5 +1,5 @@
 import { autocompletion } from '@codemirror/autocomplete'
-import { defaultKeymap, history, historyKeymap, indentWithTab, } from '@codemirror/commands'
+import { defaultKeymap, history, historyKeymap, indentWithTab, simplifySelection, temporarilySetTabFocusMode, } from '@codemirror/commands'
 import { bracketMatching, indentOnInput } from '@codemirror/language'
 import { lintGutter, setDiagnostics } from '@codemirror/lint'
 import { highlightSelectionMatches } from '@codemirror/search'
@@ -16,6 +16,8 @@ import type { Accessor } from 'solid-js'
 interface WgslEditorProps {
   code: string
   onChange: (code: string) => void
+  /** Accessible name applied to CodeMirror's editable content element. */
+  ariaLabel?: string
   readOnly?: boolean
   placeholder?: string
   diagnostics?: Accessor<readonly Diagnostic[]>
@@ -42,7 +44,23 @@ export function WgslEditor(props: WgslEditorProps) {
       autocompletion({ override: [wgslCompletions] }),
       EditorState.tabSize.of(2),
       EditorView.lineWrapping,
-      keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+      EditorView.contentAttributes.of({
+        'aria-label': props.ariaLabel ?? 'WGSL code editor',
+        'aria-description':
+          'Press Escape, then Tab to move focus out of the editor.',
+      }),
+      keymap.of([
+        {
+          key: 'Escape',
+          run: (editorView) => {
+            simplifySelection(editorView)
+            return temporarilySetTabFocusMode(editorView)
+          },
+        },
+        ...defaultKeymap,
+        ...historyKeymap,
+        indentWithTab,
+      ]),
       wgslTheme,
       WGSL_SYNTAX_HIGHLIGHTING,
     ]

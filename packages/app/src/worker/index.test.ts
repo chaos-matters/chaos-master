@@ -551,3 +551,54 @@ describe('worker /api/gallery/config', () => {
     expect(await res.json()).toEqual({ error: 'Server error' })
   })
 })
+
+describe('worker frontend routing', () => {
+  it('redirects the trailing-slash benchmark route to its canonical URL', async () => {
+    const res = await worker.fetch(
+      new Request('https://x.test/benchmarks/?suite=renderer'),
+      makeEnv(),
+      ctx,
+    )
+
+    expect(res.status).toBe(308)
+    expect(res.headers.get('location')).toBe(
+      'https://x.test/benchmarks?suite=renderer',
+    )
+  })
+
+  it.each(['/api', '/api/not-a-real-route'])(
+    'keeps unknown API route %s as a JSON 404 response',
+    async (pathname) => {
+      const res = await worker.fetch(
+        new Request(`https://x.test${pathname}`),
+        makeEnv(),
+        ctx,
+      )
+
+      expect(res.status).toBe(404)
+      expect(res.headers.get('content-type')).toContain('application/json')
+      expect(await res.json()).toEqual({ error: 'Not found' })
+    },
+  )
+
+  it('delegates the canonical benchmark route to the asset binding', async () => {
+    const assetFetch = vi.fn(() =>
+      Promise.resolve(
+        new Response('<html><body>benchmark app</body></html>', {
+          headers: { 'Content-Type': 'text/html' },
+        }),
+      ),
+    )
+    const request = new Request('https://x.test/benchmarks')
+
+    const res = await worker.fetch(
+      request,
+      makeEnv({ ASSETS: { fetch: assetFetch } }),
+      ctx,
+    )
+
+    expect(res.status).toBe(200)
+    expect(assetFetch).toHaveBeenCalledOnce()
+    expect(assetFetch).toHaveBeenCalledWith(request)
+  })
+})

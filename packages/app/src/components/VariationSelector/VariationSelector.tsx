@@ -166,15 +166,31 @@ export function VariationPreview(props: {
   hardwareTier?: HardwareTier | null
   /** Backing-store render size (default 256×144). Larger = crisper previews. */
   resolution?: { width: number; height: number }
+  /** Optional shared visibility result for galleries that already own an
+   * IntersectionObserver. Avoids creating one observer per preview tile. */
+  isVisible?: boolean
+  /** Keep the live convergence canvas hidden; reveal only its final snapshot. */
+  snapshotOnly?: boolean
+  /** Suspend GPU work without discarding an already-captured snapshot. */
+  paused?: boolean
+  /** Optional gallery-local scroll activity override. */
+  scrolling?: boolean
 }) {
   const is3D = () => (props.flame.renderSettings.dimensions ?? 2) === 3
   const targetQuality = () =>
     props.hardwareTier ? hardwareTierToQuality[props.hardwareTier] : 0.99
   const [container, setContainer] = createSignal<HTMLElement>()
   const [quality, setQuality] = createSignal<() => number>()
-  const intersection = useIntersectionObserver(container)
-  const isVisible = createMemo(() => intersection()?.isIntersecting)
-  const scrolling = useIsScrolling()
+  const usesSharedVisibility = props.isVisible !== undefined
+  const intersection = usesSharedVisibility
+    ? undefined
+    : useIntersectionObserver(container)
+  const isVisible = createMemo(() =>
+    usesSharedVisibility ? props.isVisible : intersection?.()?.isIntersecting,
+  )
+  const globalScrolling =
+    props.scrolling === undefined ? useIsScrolling() : undefined
+  const scrolling = () => props.scrolling ?? globalScrolling?.() ?? false
   // While the user is actively scrolling, treat a tile as not-yet-visible so we
   // don't mount/allocate a WebGPU canvas for every tile that flickers through the
   // viewport. Fast/jerky scrolling otherwise spawns hundreds of half-rendered
@@ -224,7 +240,7 @@ export function VariationPreview(props: {
   // Mount the live WebGPU preview while it is rendering (allowed), settled-visible
   // (on-screen and not mid-scroll), OR finished-but-still-capturing its snapshot
   // (renderStatus 'done', image not yet set). Once the snapshot lands, image() is
-  // set → the static <img> shows and this goes false → the canvas unmounts + frees
+  // set → the static poster shows and this goes false → the canvas unmounts + frees
   // buffers.
   //
   // Deliberately NOT a permanent everVisible/everAllowed latch: an off-screen
@@ -235,6 +251,7 @@ export function VariationPreview(props: {
   // ensures an in-flight snapshot still completes if you scroll away mid-capture.
   const isPreviewMounted = createMemo(
     () =>
+      !props.paused &&
       image() === undefined &&
       (allowed() || settledVisible() || renderStatus() === 'done'),
   )
@@ -292,7 +309,18 @@ export function VariationPreview(props: {
   return (
     <div
       class={ui.stretch}
-      classList={{ [ui.stretchDone as string]: image() !== undefined }}
+      classList={{
+        [ui.stretchDone as string]: image() !== undefined,
+        [ui.stretchSnapshotPending as string]:
+          props.snapshotOnly === true && image() === undefined,
+      }}
+      data-preview-state={
+        image() !== undefined
+          ? 'snapshot'
+          : isPreviewMounted()
+            ? 'rendering'
+            : 'idle'
+      }
       ref={setContainer}
       style={{
         ['--background']:

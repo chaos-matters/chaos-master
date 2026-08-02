@@ -9,7 +9,8 @@ export function BenchmarkButton(props: { onClick: () => void }) {
       onContextMenu={(e) => {
         e.preventDefault()
       }}
-      title="Run Benchmark"
+      aria-label="Run quick benchmark"
+      title="Run quick benchmark"
     >
       <Zap />
     </button>

@@ -1,7 +1,7 @@
 /* @refresh reload */
 import './styles/index.css'
 import { render } from 'solid-js/web'
-import { Wrappers } from './App'
+import { isBenchmarksPath } from './routing/appPath'
 
 // Solid Devtools is opt-in: it instruments every component (a real dev-startup
 // cost) and must never ship to production. Enable with `VITE_DEVTOOLS=1 pnpm dev`.
@@ -25,4 +25,8 @@ import { initTelemetry } from './lib/telemetry'
 
 initTelemetry()
 
-render(() => <Wrappers />, root)
+const Entry = isBenchmarksPath(window.location.pathname)
+  ? (await import('./pages/Benchmarks/BenchmarksApp')).BenchmarksApp
+  : (await import('./App')).Wrappers
+
+render(() => <Entry />, root)

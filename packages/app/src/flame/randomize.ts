@@ -9,12 +9,38 @@ import type { FlameDescriptor } from './schema/flameSchema'
 import type { TransformVariationType } from './variations'
 import type { TransformVariationType3D } from './variations3D'
 
+export type RandomSource = () => number
+
+let activeRandomSource: RandomSource = Math.random
+
+function withRandomSource<T>(source: RandomSource, fn: () => T): T {
+  const previous = activeRandomSource
+  activeRandomSource = source
+  try {
+    return fn()
+  } finally {
+    activeRandomSource = previous
+  }
+}
+
+/** Small deterministic CPU PRNG used to snapshot reproducible generated flames. */
+export function createSeededRandomSource(seed: number): RandomSource {
+  let state = seed >>> 0
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0
+    let value = state
+    value = Math.imul(value ^ (value >>> 15), value | 1)
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61)
+    return ((value ^ (value >>> 14)) >>> 0) / 0x1_0000_0000
+  }
+}
+
 export function random01(): number {
-  return Math.random()
+  return activeRandomSource()
 }
 
 export function randomRange(min: number, max: number): number {
-  return min + Math.random() * (max - min)
+  return min + random01() * (max - min)
 }
 
 export function randomPerturbation(
@@ -23,7 +49,7 @@ export function randomPerturbation(
   clampRange?: [number, number],
 ): number {
   let sum = 0
-  for (let i = 0; i < 6; i++) sum += Math.random()
+  for (let i = 0; i < 6; i++) sum += random01()
   const gaussian = (sum - 3) * sigma
   const result = current + gaussian
   if (clampRange)
@@ -206,7 +232,7 @@ export function randomizeVariationType(
   currentType: TransformVariationType,
 ): TransformVariationType {
   const others = variationTypes.filter((t) => t !== currentType)
-  return others[Math.floor(Math.random() * others.length)]!
+  return others[Math.floor(random01() * others.length)]!
 }
 
 /**
@@ -215,7 +241,7 @@ export function randomizeVariationType(
 export function pickRandomVariationType(
   pool: TransformVariationType[],
 ): TransformVariationType {
-  return pool[Math.floor(Math.random() * pool.length)]!
+  return pool[Math.floor(random01() * pool.length)]!
 }
 
 export function randomizeAllColors<T extends Record<string, unknown>>(
@@ -251,10 +277,10 @@ export function randomizeAllColors<T extends Record<string, unknown>>(
   }
 
   // Anchor one transform at (0,0) and another at (1,1) for spread
-  const anchor0Idx = Math.floor(Math.random() * keys.length)
+  const anchor0Idx = Math.floor(random01() * keys.length)
   let anchor1Idx: number
   do {
-    anchor1Idx = Math.floor(Math.random() * keys.length)
+    anchor1Idx = Math.floor(random01() * keys.length)
   } while (anchor1Idx === anchor0Idx && keys.length > 1)
 
   const tid0 = keys[anchor0Idx]!
@@ -268,8 +294,8 @@ export function randomizeAllColors<T extends Record<string, unknown>>(
     ;(result as Record<string, unknown>)[tid1] = {
       ...((result as Record<string, unknown>)[tid1] as object),
       color: {
-        x: randomRange(0.2, 0.35) * (Math.random() > 0.5 ? 1 : -1),
-        y: randomRange(0.2, 0.35) * (Math.random() > 0.5 ? 1 : -1),
+        x: randomRange(0.2, 0.35) * (random01() > 0.5 ? 1 : -1),
+        y: randomRange(0.2, 0.35) * (random01() > 0.5 ? 1 : -1),
       },
     }
   }
@@ -571,6 +597,48 @@ export function generateRandomFlame(
     },
     transforms: coloredTransforms,
   })
+}
+
+/**
+ * Deterministic benchmark-friendly random flame.
+ *
+ * The regular randomizer deliberately uses fresh UUIDs and ambient randomness.
+ * Benchmarks need a stable descriptor, so this runs the same generator under a
+ * seeded source and canonicalizes transform/variation ids afterward.
+ */
+export function generateSeededRandomFlame(
+  config: GenerateRandomFlameConfig,
+  seed: number,
+): FlameDescriptor {
+  const generated = withRandomSource(createSeededRandomSource(seed), () =>
+    generateRandomFlame(config),
+  )
+  const transforms = Object.fromEntries(
+    Object.values(generated.transforms).map((transform, transformIndex) => [
+      `_benchmark_${seed >>> 0}_${transformIndex}`,
+      {
+        ...transform,
+        variations: Object.fromEntries(
+          Object.values(transform.variations).map(
+            (variation, variationIndex) => [
+              `benchmark_${transformIndex}_${variationIndex}`,
+              variation,
+            ],
+          ),
+        ),
+      },
+    ]),
+  )
+
+  return {
+    ...generated,
+    metadata: {
+      ...generated.metadata,
+      name: `Surprise ${seed >>> 0}`,
+      description: `Deterministic benchmark flame generated from seed ${seed >>> 0}.`,
+    },
+    transforms,
+  }
 }
 
 export interface MutateFlameOptions {

@@ -12,7 +12,7 @@
  *  - closing the picker frees previews (live count returns to 0 — no leak)
  *  - editing a parametric variation's slider re-renders its gallery tile
  *
- * Run locally (start the HTTPS dev server on :5173 first — cd packages/app && pnpm start):
+ * Run locally (start the HTTPS dev server on :3000 first — cd packages/app && pnpm start):
  *   pnpm exec playwright test -c playwright.resilience.config.ts --project chromium-gpu
  *   pnpm exec playwright test variation-gallery.gpu -c playwright.resilience.config.ts --project chromium-gpu
  */
