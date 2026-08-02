@@ -62,7 +62,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { describeSource } from './gallery-admin.mjs'
-import { initCommand, isMissingTable, migrationsArgs, storageFlags, tail, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
+import { couldNotRun, couldNotRunLines, initCommand, isMissingTable, migrationsArgs, storageFlags, tail, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
 import { renderFlames } from './render-flames.mjs'
 import { parsePick } from './sequence-pick.mjs'
 
@@ -172,6 +172,14 @@ function d1(env, sql, { initialize = true } = {}) {
       stdio: ['ignore', 'pipe', 'pipe'],
     })
   } catch (error) {
+    // First: a child that never started has no output at all, so every branch
+    // below reads wrangler's silence as a query that ran and failed.
+    if (couldNotRun(error)) {
+      fail(
+        `could not run \`pnpm\` — no query reached ${targetLabel(env)}`,
+        couldNotRunLines('pnpm', error).join('\n'),
+      )
+    }
     // Under --json wrangler reports a failed statement on STDOUT, not stderr.
     const output = `${error.stdout ?? ''}\n${error.stderr ?? ''}`
     if (
@@ -180,10 +188,23 @@ function d1(env, sql, { initialize = true } = {}) {
       TARGETS[env].storage === 'local'
     ) {
       console.error(`Applying migrations to ${targetLabel(env)}…`)
-      execFileSync('pnpm', migrationsArgs(env), {
-        cwd: appDir,
-        stdio: ['ignore', 'ignore', 'inherit'],
-      })
+      try {
+        execFileSync('pnpm', migrationsArgs(env), {
+          cwd: appDir,
+          stdio: ['ignore', 'ignore', 'inherit'],
+        })
+      } catch (migrateError) {
+        // captured: false — this child's stderr is inherited, so it has
+        // already said its piece on the terminal and the empty streams here
+        // mean nothing. Only a spawn error is evidence.
+        if (couldNotRun(migrateError, { captured: false })) {
+          fail(
+            `could not run \`pnpm\` — nothing was applied to ${targetLabel(env)}`,
+            couldNotRunLines('pnpm', migrateError).join('\n'),
+          )
+        }
+        throw migrateError
+      }
       return d1(env, sql, { initialize: false })
     }
     fail(

@@ -22,7 +22,7 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { isMissingTable, storageFlags, tail, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
+import { couldNotRun, couldNotRunLines, isMissingTable, storageFlags, tail, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const appDir = resolve(scriptDir, '..')
@@ -66,6 +66,14 @@ function d1(env, sql) {
       stdio: ['ignore', 'pipe', 'pipe'],
     })
   } catch (error) {
+    // First: a child that never started has no output, and "nothing to
+    // validate" is a badly wrong thing to tell someone whose PATH is broken.
+    if (couldNotRun(error)) {
+      fail(
+        `could not run \`pnpm\` — nothing was read from ${targetLabel(env)}`,
+        couldNotRunLines('pnpm', error).join('\n'),
+      )
+    }
     const output = `${error.stdout ?? ''}\n${error.stderr ?? ''}`
     if (isMissingTable(output)) {
       fail(`no gallery tables in ${targetLabel(env)} — nothing to validate`)
