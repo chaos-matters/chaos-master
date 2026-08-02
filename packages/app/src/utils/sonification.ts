@@ -131,8 +131,11 @@ function triggerVoice(
 function createOrchestralEngine(ctx: AudioContext, config: SonificationConfig) {
   const masterGain = ctx.createGain()
   masterGain.gain.value = config.volume
-  masterGain.connect(ctx.destination)
 
+  /* Dry and wet are the ONLY paths to the destination. masterGain used to also
+     connect straight there, so the dry signal stayed at full level however far
+     the reverb was turned up — the mix control could only ever add wet on top,
+     never cross-fade. Same bug in all three engines. */
   const reverb = createReverb(ctx)
   const dryGain = ctx.createGain()
   const wetGain = ctx.createGain()
@@ -282,8 +285,8 @@ function createDroneVoice(ctx: AudioContext, destination: AudioNode): DroneOsc {
 function createAmbientEngine(ctx: AudioContext, config: SonificationConfig) {
   const masterGain = ctx.createGain()
   masterGain.gain.value = config.volume * 0.5
-  masterGain.connect(ctx.destination)
 
+  // Dry + wet only — see createOrchestralEngine.
   const reverb = createReverb(ctx)
   const dryGain = ctx.createGain()
   const wetGain = ctx.createGain()
