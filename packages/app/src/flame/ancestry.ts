@@ -10,9 +10,32 @@ import type { FlameDescriptor } from './schema/flameSchema'
  * Uses a dual-32-bit hash (multiply-shift) over `JSON.stringify` output.
  * Not cryptographic — collision resistance is statistical, which is sufficient
  * for a single-user local ancestry tree.
+ *
+ * Hashes the flame's GENETICS — its transforms, plus the dimension they live in
+ * — and deliberately nothing else.
+ *
+ * It used to stringify the whole descriptor, which made the ancestry tree
+ * unusable in practice: the hash is the node's identity, so panning the camera,
+ * zooming, adjusting exposure, renaming, or leaving a hover blend applied all
+ * produced a DIFFERENT identity for the same flame. The lookup then missed,
+ * `ensureNode` filed it as a fresh root, and the modal showed a lone "Current"
+ * card — a bred child sitting next to a "Blended: 40%" badge with its parents
+ * apparently gone.
+ *
+ * A flame you panned is the same flame. Two flames are relatives because of
+ * their transforms, which is exactly what breeding crosses; the camera and the
+ * colour grade are how you are looking at one, not which one it is. Dimension
+ * stays in because 2D and 3D transforms are not interchangeable.
+ *
+ * Changing this orphans ancestry recorded by older builds — their hashes were
+ * computed over the whole descriptor. That is a one-time reset of a local
+ * cache which did not work anyway.
  */
 export function contentHash(flame: FlameDescriptor): string {
-  const str = JSON.stringify(flame)
+  const str = JSON.stringify({
+    transforms: flame.transforms,
+    dimensions: flame.renderSettings.dimensions ?? 2,
+  })
   let h1 = 0xdeadbeef
   let h2 = 0x41c6ce57
   for (let i = 0; i < str.length; i++) {
@@ -322,4 +345,89 @@ if (typeof window !== 'undefined') {
       void flushNow()
     }
   })
+}
+
+// ── Pedigree ────────────────────────────────────────────────────────────────
+
+export interface PedigreeLayer {
+  /** Steps from the focal flame — 1 is its parents OR its children. */
+  depth: number
+  /** Which way this layer lies from the focal flame. */
+  direction: 'ancestor' | 'focal' | 'descendant'
+  nodes: AncestryNode[]
+  isFocal: boolean
+}
+
+/**
+ * The focal flame's ANCESTRY, layered by how far back each flame is.
+ *
+ * This is a different question from `getLineageTree`, which groups by
+ * `generation` — "how many breeding steps from a founder". Generation is a
+ * property of the flame itself, so a mate introduced late still sits in Gen 0
+ * alongside the original grandparents, because it was never bred FROM anything.
+ * That is correct, and it is also confusing when what you wanted to see was
+ * "who are this flame's parents".
+ *
+ * Depth answers that instead: it is measured from the focal flame outward, so
+ * both parents of a child are always adjacent to it whatever their own history.
+ * The trade-off, and the reason both views exist: a flame's depth depends on
+ * which descendant you are looking at, so this cannot double as an overview the
+ * way generations can.
+ *
+ * Runs BOTH ways from the focal flame — parents above, children below — so a
+ * founder still shows the family it started rather than a lone card.
+ *
+ * Returned oldest-first: deepest ancestors, then the focal flame, then its
+ * descendants. Every flame appears at most once across the whole tree, so a
+ * flame bred back into its own line is drawn where it is first reached instead
+ * of recurring forever.
+ */
+export function getPedigreeTree(focalHash: string): PedigreeLayer[] {
+  const focal = getNode(focalHash)
+  if (!focal) return []
+
+  // Shared across BOTH walks: a flame bred with its own descendant is reachable
+  // as an ancestor and a descendant at once, and must not be drawn twice.
+  const seen = new Set<string>([focalHash])
+
+  function walk(
+    step: (node: AncestryNode) => AncestryNode[],
+    direction: 'ancestor' | 'descendant',
+  ): PedigreeLayer[] {
+    const out: PedigreeLayer[] = []
+    let frontier = [focal!]
+    let depth = 0
+    while (frontier.length > 0) {
+      const next: AncestryNode[] = []
+      for (const node of frontier) {
+        for (const relative of step(node)) {
+          if (seen.has(relative.hash)) continue
+          seen.add(relative.hash)
+          next.push(relative)
+        }
+      }
+      if (next.length === 0) break
+      depth++
+      out.push({ depth, direction, nodes: next, isFocal: false })
+      frontier = next
+    }
+    return out
+  }
+
+  const ancestors = walk(
+    (node) =>
+      [node.parentA, node.parentB]
+        .filter((h): h is string => h !== null)
+        .map((h) => getNode(h))
+        .filter((n): n is AncestryNode => n !== undefined),
+    'ancestor',
+  )
+  const descendants = walk((node) => getChildrenOf(node.hash), 'descendant')
+
+  return [
+    // Deepest ancestor first, so the tree reads top-to-bottom in time order.
+    ...ancestors.reverse(),
+    { depth: 0, direction: 'focal', nodes: [focal], isFocal: true },
+    ...descendants,
+  ]
 }

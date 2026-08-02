@@ -1,0 +1,730 @@
+/* Home tab — Phase 2.
+   Plates show a captured poster, with a live WebGPU canvas layered over it once
+   the plate settles into view (see HomeFlame.tsx). The poster is the fallback
+   whenever the live render cannot run, and the final image once it has frozen.
+   Layout rules here are the ones in .agents/skills/gallery_preview_layout —
+   read it before changing the grid or the scroll container. */
+
+/* Home overlays the workspace rather than replacing it: the editor keeps its
+   state and — crucially — its canvas keeps its size, so switching tabs never
+   triggers a resize and the WebGPU buffers are not reallocated. Above the
+   workspace's own chrome (<= 1000) but below the debug panel, version pill and
+   toasts, which should still reach the user. */
+.home {
+  /* Home carries its own palette rather than following the app theme, the way
+     the Benchmark Studio page does. Two reasons: a gallery is a dark room —
+     luminous flames on near-black is the whole point, and on a light surface
+     the same posters read as washed-out thumbnails; and the chrome around them
+     has to stay quiet and IDENTICAL in both themes, or the one full-bleed hero
+     ends up framed differently depending on a setting nobody chose for this
+     page. Ember is the accent because these are flames. */
+  --home-bg: #080a0e;
+  --home-surface: #0d1117;
+  --home-surface-raised: #121821;
+  --home-line: rgba(255, 255, 255, 0.09);
+  --home-line-strong: rgba(255, 255, 255, 0.16);
+  --home-text: #f2f3f5;
+  --home-muted: #929aa7;
+  --home-faint: #78818e;
+  --home-ember: #ff7448;
+  --home-ember-soft: rgba(255, 116, 72, 0.14);
+  --home-cyan: #73d9ff;
+
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  overflow: hidden;
+  color: var(--home-text);
+  /* Ambient warmth top-left, a cool counterpoint top-right — the light the
+     flames would cast on the room. Fixed to the shell, so it does not travel
+     with the scroll and never competes with a plate. */
+  background:
+    radial-gradient(
+      900px 520px at 14% -12%,
+      rgba(255, 105, 62, 0.11),
+      transparent 70%
+    ),
+    radial-gradient(
+      720px 480px at 92% 8%,
+      rgba(63, 177, 214, 0.08),
+      transparent 72%
+    ),
+    var(--home-bg);
+}
+
+/* Shell option A: a persistent left rail listing the sections. */
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-4) var(--space-3);
+  border-right: 1px solid var(--home-line);
+  min-width: 11rem;
+  overflow-y: auto;
+  background: rgba(8, 10, 14, 0.55);
+  backdrop-filter: blur(18px) saturate(130%);
+}
+
+.rail-brand {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--home-faint);
+  padding-bottom: var(--space-3);
+}
+
+.rail-link {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--home-muted);
+  padding: var(--space-2);
+  border-radius: var(--space-1);
+  cursor: pointer;
+  /* The bar that marks the active section. Always present but transparent, so
+     becoming active is a colour change rather than a reflow of the whole rail. */
+  border-left: 2px solid transparent;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease;
+
+  &:hover {
+    color: var(--home-text);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--home-ember);
+    outline-offset: 1px;
+  }
+}
+
+.rail-link-active {
+  color: var(--home-text);
+  font-weight: 600;
+  border-left-color: var(--home-ember);
+  background: var(--home-ember-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail-link {
+    transition: none;
+  }
+}
+
+.scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  /* A REAL gutter, not `scrollbar-gutter: stable`: Firefox (esp. Linux/GTK) uses
+     overlay scrollbars that sit on top of the content, and `scrollbar-gutter`
+     only reserves space for classic ones — so it is a no-op exactly where the
+     problem is. Padding clears the bar for both kinds. */
+  padding-right: 0.6rem;
+  scrollbar-width: thin;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll {
+    scroll-behavior: auto;
+  }
+}
+
+.section {
+  padding: var(--space-8) var(--space-6);
+  max-width: 78rem;
+  margin: 0 auto;
+  scroll-margin-top: var(--space-4);
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.section-title {
+  font-size: clamp(1.35rem, 2.4vw, 1.75rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+  color: var(--home-text);
+}
+
+/* A hairline that starts at the title and runs out to the edge — the editorial
+   rule that makes a row of plates read as a section rather than a pile. */
+.section-head::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    var(--home-line-strong),
+    transparent 85%
+  );
+}
+
+.section-note {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--home-muted);
+  margin: 0 0 var(--space-5);
+  max-width: 60ch;
+}
+
+/* Hero option A: full-bleed plate with the statement laid over it. */
+.hero {
+  position: relative;
+  min-height: min(62vh, 34rem);
+  border-radius: var(--space-3);
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  /* Reads as a plate even before its poster exists, rather than leaving the
+     copy floating on the page background. */
+  background: var(--home-surface);
+}
+
+/* Full-width scrim so the overlay spans the plate; the text inside is what
+   gets the reading measure. The plate behind is an arbitrary fractal, so the
+   copy needs its own ground rather than relying on the image being dark. */
+.hero-copy {
+  position: relative;
+  width: 100%;
+  padding: var(--space-6);
+  background: linear-gradient(
+    to top,
+    oklch(12% 0.02 250 / 0.92),
+    oklch(12% 0.02 250 / 0)
+  );
+}
+
+.hero-text {
+  max-width: 46ch;
+}
+
+.hero-title {
+  font-size: clamp(1.6rem, 3.4vw, 2.6rem);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin: 0 0 var(--space-2);
+  color: oklch(97% 0.01 250);
+  text-wrap: balance;
+}
+
+.hero-lede {
+  margin: 0 0 var(--space-4);
+  color: oklch(85% 0.02 250);
+  font-size: 0.95rem;
+}
+
+/* Gallery option B: editorial spans — mixed weights rather than a uniform
+   grid, so the wall reads as curated.
+
+   `grid-auto-rows: 12rem` is load-bearing, and it is what makes the plates safe
+   to fill with absolutely-positioned posters and canvases. The overlap failure
+   in gallery_preview_layout §1 needs an AUTO row: a grid item with no in-flow
+   content does not size an auto row, so the row collapses towards min-content
+   while the item paints at its full height and spills over the next one. A fixed
+   track length cannot collapse, so `padding-bottom: %` is not needed here — and
+   would not work anyway, since `.row2` deliberately spans two rows.
+
+   Do NOT change this to `auto`, `min-content` or `masonry` without giving the
+   plates a padding-bottom aspect box first, and re-measuring consecutive tile
+   rects in both engines. */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-3);
+  grid-auto-rows: 12rem;
+}
+
+.span3 {
+  grid-column: span 3;
+}
+.span2 {
+  grid-column: span 2;
+}
+.row2 {
+  grid-row: span 2;
+}
+
+@media (max-width: 900px) {
+  .gallery-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .span3 {
+    grid-column: span 2;
+  }
+  .row2 {
+    grid-row: span 1;
+  }
+}
+
+/* Motion option A: a row of equal tiles. */
+.motion-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--space-3);
+}
+
+/* Explore option A: capability cards. */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--space-3);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--home-line);
+  border-radius: var(--space-2);
+  background: var(--home-surface);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+
+  &:hover {
+    border-color: rgba(255, 116, 72, 0.42);
+    background: var(--home-surface-raised);
+    transform: translateY(-2px);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--home-ember);
+    outline-offset: 1px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
+  }
+}
+
+/* Holds a HomeFlame directly rather than a nested <button> (a plate inside a
+   card button is invalid HTML and swallows the card's own click). Positioned so
+   the poster/canvas can absolutely fill it. */
+.card-thumb {
+  position: relative;
+  height: 7rem;
+  border-radius: var(--space-1);
+  overflow: hidden;
+  background: var(--home-surface);
+}
+
+.card-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.card-caption {
+  font-size: 0.82rem;
+  color: var(--home-muted);
+  margin: 0;
+}
+
+/* Portal option A: the app framed as an exhibit. */
+.portal-frame {
+  border: 1px solid var(--home-line);
+  border-radius: var(--space-3);
+  overflow: hidden;
+  background: var(--home-surface);
+}
+
+.portal-bar {
+  height: 1.75rem;
+  border-bottom: 1px solid var(--home-line);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+  font-size: 0.72rem;
+  color: var(--home-muted);
+}
+
+.portal-bar-name {
+  flex: none;
+}
+
+/* Position through the script, and the control that moves it. The hit area is
+   the full bar height while the visible track stays a hairline — a 2px pointer
+   target would be unusable, and a keyboard user needs the focus ring to land on
+   something they can see. */
+.portal-bar-track {
+  position: relative;
+  flex: 1 1 auto;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--home-surface);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--home-ember);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  &[aria-disabled='true'] {
+    cursor: default;
+  }
+}
+
+.portal-bar-fill {
+  position: relative;
+  display: block;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--home-ember);
+  transition: width 220ms linear;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-bar-fill {
+    transition: none;
+  }
+}
+
+.portal-replay {
+  flex: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--home-muted);
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+
+  &:hover:not(:disabled) {
+    color: var(--home-ember);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--home-ember);
+    outline-offset: 2px;
+  }
+}
+
+/* The stage. `padding-bottom` rather than `aspect-ratio` (gallery_preview_layout
+   §1): the only child is the absolutely-positioned canvas, so there is no
+   in-flow content, and a percentage padding is what actually gives the box a
+   height every engine agrees on. `min-height` is the §2 floor — on a GPU device
+   loss the teardown reflow can resolve the percentage to ~0. */
+.portal-body {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%;
+  min-height: 64px;
+  overflow: hidden;
+  background: var(--home-surface);
+}
+
+/* Shown instead of the stage: off-screen (nothing is mounted) or no WebGPU. */
+.portal-idle {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-6);
+  text-align: center;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--home-muted);
+}
+
+/* The step's own text, from the tour definition. A fixed min-height keeps the
+   frame from resizing as steps with different-length descriptions go by. */
+.portal-caption {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  min-height: 5.25rem;
+  border-top: 1px solid var(--home-line);
+}
+
+.portal-caption-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.portal-caption-text {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--home-muted);
+}
+
+/* A plate: the captured poster, with a live canvas over it once it settles into
+   view. Both layers are absolutely positioned, so the plate's height comes
+   entirely from its container (a fixed 12rem grid row, or an explicitly sized
+   wrapper). */
+.plate {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  /* Floor, per gallery_preview_layout §2: on Firefox a GPU device loss reflows
+     these tiles as the canvases tear down, and a plate whose height resolves to
+     0 piles its absolute caption into an unreadable stack. `box-sizing:
+     border-box` is global, so this only applies when the real height would drop
+     below it. */
+  min-height: 64px;
+  border-radius: var(--space-2);
+  overflow: hidden;
+  background: var(--home-surface);
+  display: block;
+  /* A hairline, not a heavy frame: it separates plate from page while the flame
+     is still loading, then all but disappears once the picture fills it. */
+  border: 1px solid var(--home-line);
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
+
+  &:hover {
+    border-color: rgba(255, 116, 72, 0.42);
+    /* Barely a lift. Enough to say "this responds to you" without the whole
+       wall bouncing as the pointer crosses it. */
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px -18px rgba(0, 0, 0, 0.9);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--home-ember);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plate {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
+  }
+}
+
+/* ---- poster / live-canvas layers (HomeFlame) ----
+   Both fill their plate and both use `object-fit: cover`. The canvas renders at a
+   fixed 16:9 backing store — the posters' own aspect — so cover crops the two
+   identically and the cross-fade, and the freeze-to-poster swap, have nothing to
+   jump between. Ordered poster-then-canvas in the DOM, so the live canvas paints
+   on top without needing a z-index. */
+.flame-poster,
+.flame-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  /* The plate itself is the click target; neither layer should intercept. */
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ...except once the plate is selected and carries a camera. The WheelZoom
+   cameras attach their pointer/wheel/touch listeners to the CANVAS element
+   itself (`props.eventTarget ?? canvas`), so with the rule above still in force
+   the camera is mounted and listening on an element that can never be hit —
+   dragging a selected plate did nothing at all. Re-enabling it here does not
+   cost the plate its gesture: pointer events bubble from the canvas up to the
+   button, so `plateGesture` still sees the whole sequence and still resolves a
+   pan to 'none'. `touch-action: none` is what makes a finger drag pan the flame
+   instead of scrolling Home out from under it. */
+.plate.is-selected .flame-canvas,
+.card.is-selected .flame-canvas {
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.flame-poster {
+  transition: opacity 0.8s ease;
+}
+
+/* The live flame has accumulated — fade the poster out from under it. */
+.flame-poster.is-hidden {
+  opacity: 0;
+}
+
+/* Converged: the canvas has unmounted and this poster (the same image) is the
+   final picture. Snap to opaque with no transition, so there is no gap between
+   the canvas disappearing and the poster fading back. Wins over `.is-hidden`
+   both by order and by specificity of intent — HomeFlame clears `.is-hidden`
+   in the same update. */
+.flame-poster.is-frozen {
+  opacity: 1;
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flame-poster {
+    transition: none;
+  }
+}
+
+/* Stand-in while no poster exists. Deliberately plain — it should read as
+   "not captured yet", not as a designed element. */
+.plate-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--home-muted);
+}
+
+/* ---- selection ----
+   A tile is now a two-step control: the first click selects it and hands it the
+   camera, a second one opens it. The ring is what makes "this plate is yours to
+   steer" visible; without it a user who pans has no idea why the picture moved.
+   Both tile shapes share it so the interaction reads the same everywhere. */
+.plate.is-selected,
+.card.is-selected {
+  outline: 2px solid var(--home-ember);
+  outline-offset: 2px;
+}
+
+/* The affordance itself: what this plate can do, worded for the device that
+   selected it (pinch vs scroll). Top-anchored so it never fights the caption
+   gradient at the bottom, and `pointer-events: none` so it can never eat the
+   second click it is asking for. */
+.plate-hint {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  right: var(--space-2);
+  z-index: 1;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: oklch(12% 0.02 250 / 0.72);
+  backdrop-filter: blur(6px);
+  color: oklch(98% 0 0);
+  font-size: 0.7rem;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  text-align: center;
+  pointer-events: none;
+  animation: hint-in 180ms ease-out both;
+}
+
+@keyframes hint-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plate-hint {
+    animation: none;
+  }
+}
+
+.plate-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: linear-gradient(
+    to top,
+    oklch(12% 0.02 250 / 0.85),
+    oklch(12% 0.02 250 / 0)
+  );
+  text-align: left;
+}
+
+.plate-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: oklch(97% 0.01 250);
+}
+
+.plate-meta {
+  font-size: 0.72rem;
+  color: oklch(80% 0.02 250);
+}
+
+.footer {
+  border-top: 1px solid var(--home-line);
+  padding: var(--space-6);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  font-size: 0.82rem;
+  color: var(--home-muted);
+
+  & a {
+    color: inherit;
+  }
+}
+
+.state {
+  padding: var(--space-6);
+  color: var(--home-muted);
+  font-size: 0.88rem;
+}
+
+/* Pushed to the bottom of the rail: leaving Home is a different kind of
+   action from jumping between its sections. */
+.rail-back {
+  margin-top: auto;
+  border-top: 1px solid var(--home-line);
+  border-radius: 0;
+  padding-top: var(--space-3);
+}

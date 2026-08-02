@@ -27,6 +27,14 @@ export function addRandomizerHistoryEntry(
   return db.add(entry, maxCount)
 }
 
+/** Bulk insert (backup import) — see {@link createHistoryDB} `addMany`. */
+export function addRandomizerHistoryEntries(
+  entries: RandomizerHistoryEntry[],
+  maxCount: number = MAX_RANDOMIZER_HISTORY_LIMIT,
+): Promise<RandomizerHistoryEntry[]> {
+  return db.addMany(entries, maxCount)
+}
+
 export function clearRandomizerHistory(): Promise<void> {
   return db.clear()
 }

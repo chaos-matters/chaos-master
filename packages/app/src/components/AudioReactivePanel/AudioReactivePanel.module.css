@@ -242,6 +242,10 @@
   overflow: hidden;
 }
 
+/* No extra .progressFill rule here — the real one below already eases width
+   (0.15s), which is what the analysis bar needs to avoid visibly stepping
+   between whole-percent updates. */
+
 .progressFill {
   height: 100%;
   background: var(--color-accent, #7c6ff7);
@@ -264,6 +268,42 @@
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+/* "Mappings" and its Randomize button share a line — the button rewrites
+   exactly the list beneath it, so it belongs at the head of that list rather
+   than buried in the wiring editor. */
+.mappingsHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.randomizeBtn {
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 1px solid var(--color-card, rgba(255, 255, 255, 0.12));
+  border-radius: 6px;
+  background: none;
+  color: var(--color-text-muted, #aaa);
+  cursor: pointer;
+  margin-bottom: 6px;
+  transition:
+    color 140ms ease,
+    border-color 140ms ease;
+
+  &:hover {
+    color: var(--color-text, #eee);
+    border-color: var(--color-accent, #7c6ff7);
+  }
+}
+
+/* A preset this flame cannot satisfy stays visible but inert — hiding it would
+   make the row's contents change shape from flame to flame. */
+.presetBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .presetBtn {
@@ -408,13 +448,59 @@
 }
 
 /* --- Bottom bar --- */
+/* Status bar: what is loaded, and whether it outlives the panel. Wraps rather
+   than truncating — a long track name is exactly what you want to read here. */
+/* Two rows: switches, then facts. Controls and read-only text on one line meant
+   whichever toggle did not fit wrapped alone onto a second row, which read as
+   leftover rather than as part of a set. */
 .bottomBar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   padding: 10px 16px;
   border-top: 1px solid var(--color-card, rgba(255, 255, 255, 0.08));
   flex-shrink: 0;
+}
+
+.statusToggles {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.statusMeta {
+  display: flex;
+  align-items: center;
+  gap: 4px 10px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  /* Separators between facts, so they read as a list without needing a
+     literal middot in every JSX line. */
+  & > * + *::before {
+    content: '·';
+    margin-right: 10px;
+    color: var(--color-text-dim, rgba(255, 255, 255, 0.3));
+  }
+}
+
+.statusItem {
+  max-width: 18ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusDim {
+  color: var(--color-text-dim, rgba(255, 255, 255, 0.45));
+  white-space: nowrap;
+}
+
+/* Live Preview beside the transport it follows. */
+.enableToggleInline {
+  margin-left: auto;
+  white-space: nowrap;
 }
 
 .enableToggle {

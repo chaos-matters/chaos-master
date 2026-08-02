@@ -4,6 +4,11 @@ export interface Env {
   // R2 bucket holding the per-share OG preview PNGs (keyed by short id).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   OG_IMAGES: any
+  // D1 holding the Home tab's gallery content (FlameDescriptor JSON per row).
+  // Read-only from the Worker — rows are written with `wrangler d1 execute`,
+  // so the gallery can be re-curated without a deploy.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  CONTENT_DB?: any
   // Per-IP rate limiter for the share/OG write endpoints.
   API_RL: { limit: (options: { key: string }) => Promise<{ success: boolean }> }
   // Stricter per-IP limiter dedicated to the Discord share endpoint.
@@ -35,6 +40,10 @@ const MAX_OG_UPLOAD = 4 * 1024 * 1024 // ~4 MB
 const MAX_DISCORD_UPLOAD = 12 * 1024 * 1024 // ~12 MB request (~9 MB image)
 // Per-IP soft cap on Discord shares per day (secondary to the native limiter).
 const DISCORD_DAILY_CAP = 15
+// Home tab sections a gallery row can belong to. Mirrors the CHECK constraint
+// in migrations/0001_gallery_content.sql — keep the two in step.
+const GALLERY_SECTIONS = ['hero', 'gallery', 'motion', 'capability']
+const GALLERY_CACHE_SECONDS = 300
 const TURNSTILE_VERIFY_URL =
   'https://challenges.cloudflare.com/turnstile/v0/siteverify'
 const SITE_NAME = 'Lumen Apeiron'
@@ -69,10 +78,70 @@ function errMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
+/**
+ * "That content table has never been created here" — an environment whose
+ * migrations have not been applied, which is a legitimate state for a fresh
+ * deploy rather than a server fault.
+ *
+ * Naming the tables (rather than matching any "no such table") keeps a query
+ * against some unrelated missing table from being reported as an uninitialised
+ * gallery — the same rule, and the same regex, as `isMissingTable` in
+ * scripts/gallery-targets.mjs, which is what decides whether the deploy tooling
+ * offers to run the migrations.
+ */
+const MISSING_TABLE =
+  /no such table:\s*(?:main\.)?(?:gallery_items|home_config)\b/i
+
+/** Did this D1 failure mean "a content table does not exist"? */
+function isMissingTable(err: unknown): boolean {
+  return MISSING_TABLE.test(errMsg(err))
+}
+
+/**
+ * `gallery_items.sequence` — an ordered array of extra FlameDescriptors — as
+ * real objects, or null.
+ *
+ * Parsed defensively rather than alongside `flame`, and the difference matters:
+ * a row whose descriptor will not parse has nothing to show and 500ing is
+ * honest, but a row whose SEQUENCE will not parse still has a perfectly good
+ * flame. Curated sequences are written by a script against a column that may
+ * not exist yet on every environment, so the failure modes here are "a stale
+ * deploy" and "a bad hand edit" — both of which should degrade this row to the
+ * single-flame behaviour, not take the item off Home.
+ */
+function parseSequence(value: unknown, slug: string): unknown[] | null {
+  if (typeof value !== 'string' || value.length === 0) {
+    return null
+  }
+  try {
+    const parsed: unknown = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : null
+  } catch (err) {
+    console.warn(`gallery '${slug}': unreadable sequence —`, errMsg(err))
+    return null
+  }
+}
+
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: { 'Content-Type': 'application/json' },
+  })
+}
+
+/**
+ * JSON with an edge/browser cache window. Used by the gallery reads, whose
+ * content only changes when rows are rewritten by hand — `stale-while-
+ * revalidate` keeps Home fast right after an edit without serving a stale
+ * response for long.
+ */
+function jsonCached(data: unknown, seconds: number): Response {
+  return new Response(JSON.stringify(data), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': `public, max-age=${seconds}, stale-while-revalidate=${seconds * 4}`,
+    },
   })
 }
 
@@ -326,6 +395,151 @@ const baseHandler = {
         return json({ payload })
       } catch (err) {
         console.error('Error handling /api/shorten GET:', errMsg(err))
+        return json({ error: 'Server error' }, 500)
+      }
+    }
+
+    // ── Home gallery content ───────────────────────────────────────────────
+    // Public, read-only. Returns the stored FlameDescriptor JSON verbatim so
+    // the client parses exactly what the editor would; the app validates it
+    // against the valibot schema before rendering. Cached at the edge because
+    // the content changes only when rows are rewritten by hand.
+    if (pathname === '/api/gallery' && request.method === 'GET') {
+      if (!env.CONTENT_DB) return json({ error: 'Not configured' }, 503)
+      const section = url.searchParams.get('section')
+      if (section !== null && !GALLERY_SECTIONS.includes(section)) {
+        return json({ error: 'Unknown section' }, 400)
+      }
+      try {
+        // The list view never needs the descriptors themselves — omitting them
+        // keeps this response small even as the gallery grows. Callers fetch a
+        // single item to get its flame.
+        const base =
+          'SELECT slug, title, caption, author, section, capability, ' +
+          'dimensions, transform_count, poster_key, poster_width, ' +
+          'poster_height, poster_frame, sort_order, ' +
+          '(animation IS NOT NULL) AS has_animation ' +
+          'FROM gallery_items WHERE published = 1'
+        const stmt =
+          section === null
+            ? env.CONTENT_DB.prepare(
+                `${base} ORDER BY section, sort_order, slug`,
+              )
+            : env.CONTENT_DB.prepare(
+                `${base} AND section = ? ORDER BY sort_order, slug`,
+              ).bind(section)
+        const { results } = await stmt.all()
+        return jsonCached({ items: results ?? [] }, GALLERY_CACHE_SECONDS)
+      } catch (err) {
+        console.error('Error handling /api/gallery:', errMsg(err))
+        return json({ error: 'Server error' }, 500)
+      }
+    }
+
+    // ── Home settings (D1) ─────────────────────────────────────────────────
+    // The `home_config` key/value table as one object. Today that is the id of
+    // the tour the "Made here" portal plays; the client falls back to its own
+    // default for a key that is missing, empty, or names a tour this build does
+    // not have (see lib/homeConfig.ts), so a stale or half-written row degrades
+    // rather than breaking Home.
+    //
+    // Must be matched BEFORE the per-slug route below: 'config' is a valid slug
+    // shape, so that route would otherwise look it up in gallery_items and 404.
+    if (pathname === '/api/gallery/config' && request.method === 'GET') {
+      if (!env.CONTENT_DB) return json({ error: 'Not configured' }, 503)
+      try {
+        const { results } = await env.CONTENT_DB.prepare(
+          'SELECT key, value FROM home_config',
+        ).all()
+        const config: Record<string, string> = {}
+        for (const row of (results ?? []) as { key: string; value: string }[]) {
+          config[row.key] = row.value
+        }
+        // Same edge window as the gallery reads: settings change only when a
+        // row is rewritten by hand, and Home must not pay a round trip for
+        // them on every scroll into the portal.
+        return jsonCached({ config }, GALLERY_CACHE_SECONDS)
+      } catch (err) {
+        // No `home_config` table means nothing has ever been configured here —
+        // a deploy whose migrations have not been applied. That is the same
+        // answer as an empty table, not a fault: 500ing it made every Home
+        // visit log a server error and told the client to distrust a perfectly
+        // healthy database. Anything else (a real SQL or D1 failure) still is.
+        if (isMissingTable(err)) {
+          console.warn(
+            '/api/gallery/config: home_config is missing — serving an empty ' +
+              'config. Apply the D1 migrations to configure Home.',
+          )
+          return jsonCached({ config: {} }, GALLERY_CACHE_SECONDS)
+        }
+        console.error('Error handling /api/gallery/config:', errMsg(err))
+        return json({ error: 'Server error' }, 500)
+      }
+    }
+
+    // Poster images for the no-WebGPU fallback. Must be matched BEFORE the
+    // per-slug route below, which would otherwise treat 'poster/...' as a slug.
+    if (
+      pathname.startsWith('/api/gallery/poster/') &&
+      request.method === 'GET'
+    ) {
+      const key = pathname.slice('/api/gallery/poster/'.length)
+      // Keys are written by the capture pipeline, but this is a public URL:
+      // constrain it so nothing can walk out of the gallery prefix.
+      if (!/^[a-z0-9][a-z0-9./-]{0,127}$/.test(key) || key.includes('..')) {
+        return new Response('Invalid key', { status: 400 })
+      }
+      try {
+        const obj = await env.OG_IMAGES.get(`gallery/${key}`)
+        if (!obj) return new Response('Not found', { status: 404 })
+        return new Response(obj.body, {
+          headers: {
+            'Content-Type':
+              obj.httpMetadata?.contentType ?? 'application/octet-stream',
+            // Posters are immutable: a re-capture writes a new key.
+            'Cache-Control': 'public, max-age=31536000, immutable',
+          },
+        })
+      } catch (err) {
+        console.error('Error handling /api/gallery/poster:', errMsg(err))
+        return new Response('Server error', { status: 500 })
+      }
+    }
+
+    if (pathname.startsWith('/api/gallery/') && request.method === 'GET') {
+      if (!env.CONTENT_DB) return json({ error: 'Not configured' }, 503)
+      const slug = pathname.slice('/api/gallery/'.length)
+      // Slugs are hand-authored and URL-safe; reject anything else rather than
+      // letting it reach the query.
+      if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(slug)) {
+        return json({ error: 'Invalid slug' }, 400)
+      }
+      try {
+        const row = await env.CONTENT_DB.prepare(
+          'SELECT slug, title, caption, author, section, capability, flame, ' +
+            'animation, sequence, dimensions, transform_count, poster_key, ' +
+            'poster_width, poster_height, poster_frame FROM gallery_items ' +
+            'WHERE slug = ? AND published = 1',
+        )
+          .bind(slug)
+          .first()
+        if (!row) return json({ error: 'Not found' }, 404)
+        // `flame`/`animation`/`sequence` are stored as JSON text. Parse here so
+        // clients get real objects rather than strings they must double-decode.
+        return jsonCached(
+          {
+            ...row,
+            flame: JSON.parse(row.flame as string),
+            animation:
+              row.animation === null
+                ? null
+                : JSON.parse(row.animation as string),
+            sequence: parseSequence(row.sequence, slug),
+          },
+          GALLERY_CACHE_SECONDS,
+        )
+      } catch (err) {
+        console.error('Error handling /api/gallery/:slug:', errMsg(err))
         return json({ error: 'Server error' }, 500)
       }
     }

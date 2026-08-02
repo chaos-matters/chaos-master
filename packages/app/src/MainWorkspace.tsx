@@ -1,12 +1,13 @@
 import '@/commands/builtins'
 import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, onMount, Show, Suspense, untrack, } from 'solid-js'
-import { createStore } from 'solid-js/store'
+import { createStore, unwrap } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { vec2f, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { executeCommand } from '@/commands/registry'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useToast } from '@/contexts/ToastContext'
+import { workspaceIsVisible } from '@/lib/activeTab'
 import { trackAppInit } from '@/lib/telemetry'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
@@ -74,6 +75,7 @@ import { useCompactMode } from './contexts/CompactModeContext'
 import { useTheme } from './contexts/ThemeContext'
 import { TimelineContextProvider } from './contexts/TimelineContext'
 import { DEFAULT_POINT_COUNT, DEFAULT_QUALITY, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_RESOLUTION, IS_DEV, } from './defaults'
+import { breedFlames } from './flame/breedFlame'
 import { colorInitModeToImplFn } from './flame/colorInitMode'
 import { applyColorMapToFlame } from './flame/colorMap'
 import { drawModeToImplFn } from './flame/drawMode'
@@ -113,7 +115,7 @@ import { buildReadableIds } from './utils/readableIds'
 import { getOldestRecentFlame, saveRecentFlame, upsertRecentFlame, } from './utils/recentFlames'
 import { createShareLink, deriveOgMeta, uploadOgPreview, } from './utils/shareLink'
 import { sum } from './utils/sum'
-import { createTimelineState, resolveKeyframeValue } from './utils/timeline'
+import { createTimelineState, defaultConfig as defaultTimelineConfig, resolveKeyframeValue, } from './utils/timeline'
 import { sortedTransformEntries } from './utils/transformOrder'
 import { createUndoRouter } from './utils/undoRouting'
 import { useAppDragAndDrop } from './utils/useAppDragAndDrop'
@@ -225,6 +227,14 @@ export type AppProps = {
   }
   flameFromWelcome?: () => FlameDescriptor | undefined
   welcomeTracks?: () => TimelineTrack[] | undefined
+  /**
+   * One-shot request from a Home "Explore" card: open the tool this flame was
+   * curated to demonstrate, not just the flame. The value is the row's
+   * `gallery_items.capability` — see `openCapability` below for the mapping and
+   * for which capabilities have no sensible programmatic open. Consumed and
+   * cleared in the same effect that consumes `flameFromWelcome`.
+   */
+  capabilityFromHome?: () => string | undefined
   resetFlameFromWelcome?: () => void
   hardwareTier?: HardwareTier | null
   onHardwareTierChange?: (tier: HardwareTier) => void
@@ -246,6 +256,23 @@ export function extractFlameVariationTypes(
   }
   return result
 }
+
+/**
+ * Viewport width at/above which the workspace lays out "wide": the timeline
+ * strip starts open and the sidebar is not auto-hidden. Mirrors the
+ * `max-width: 768px` media query the mobile layout listens on.
+ */
+const WIDE_LAYOUT_MIN_WIDTH = 769
+const isWideLayout = () => window.innerWidth >= WIDE_LAYOUT_MIN_WIDTH
+
+/**
+ * Animation starts enabled — a flame with no tracks renders identically either
+ * way, and the timeline's affordances are visible from the start.
+ *
+ * Named because `resetWorkspaceForHandoff` has to restore exactly this: a flame
+ * opened from Home second must land in the state it would have landed in first.
+ */
+const DEFAULT_ANIMATION_ENABLED = true
 
 function addTransformWithVariation(draft: FlameDescriptor, type: string) {
   const t = deepClone(
@@ -359,7 +386,9 @@ export function MainWorkspace(props: AppProps) {
         : 'Lumen Apeiron'
   })
 
-  const [animationEnabled, setAnimationEnabled] = createSignal(true)
+  const [animationEnabled, setAnimationEnabled] = createSignal(
+    DEFAULT_ANIMATION_ENABLED,
+  )
   const [hideDiceButtons, setHideDiceButtons] = createSignal(false)
   // True while a randomize/mutate run is in flight, so the buttons disable and
   // rapid clicks can't pile up concurrent runs (history thumbnail capture).
@@ -373,9 +402,7 @@ export function MainWorkspace(props: AppProps) {
     flameB: FlameDescriptor
   } | null>(null)
   const _requestModal = useRequestModal()
-  const [sidebarHidden, setSidebarHidden] = createSignal(
-    window.innerWidth < 769,
-  )
+  const [sidebarHidden, setSidebarHidden] = createSignal(!isWideLayout())
   // Flame Randomizer card open state is controlled here so the Timeline
   // "Animate" button can reveal it; the epoch bump also forces its Animation
   // Settings section open.
@@ -419,7 +446,7 @@ export function MainWorkspace(props: AppProps) {
     }
   })
   // Hide timeline by default on mobile -- users can toggle it back on
-  const [showTimeline, setShowTimeline] = createSignal(window.innerWidth >= 769)
+  const [showTimeline, setShowTimeline] = createSignal(isWideLayout())
   // Colors as they were before the first palette apply — lets Unselect
   // restore the "natural" colors. UI stash only; undo handles the rest.
   const [prePaletteColors, setPrePaletteColors] = createSignal<
@@ -488,11 +515,34 @@ export function MainWorkspace(props: AppProps) {
       queryAnimPresent: !!props.flameFromQuery?.animation,
     })
   }
+  /**
+   * A capability handed over by a Home "Explore" card, waiting to be applied.
+   *
+   * Held here rather than acted on in the effect below for the same reason
+   * `loadedAnimation` is: the functions that open the panels are declared much
+   * further down (they need the panel signals), and the hand-off arrives before
+   * the flame has finished landing. A separate effect drains it.
+   */
+  const [pendingCapability, setPendingCapability] = createSignal<string>()
+
   createEffect(() => {
     const newFlame = props.flameFromWelcome?.()
     if (newFlame !== undefined) {
+      // Order is load-bearing. `flushDirtyToRecents` reads the OUTGOING flame
+      // and its tracks, so it has to run before the reset drops them —
+      // otherwise a hand-off would silently destroy unsaved work.
       flushDirtyToRecents()
+      // Then a clean slate, THEN this flame's own state. Every hand-off starts
+      // from the same baseline, so the second flame you open from Home looks
+      // exactly like the first one would have. See resetWorkspaceForHandoff for
+      // what was leaking and why.
+      resetWorkspaceForHandoff()
       history.replace(deepClone(newFlame))
+      // Read BEFORE resetFlameFromWelcome() clears the whole hand-off.
+      const capability = props.capabilityFromHome?.()
+      if (capability !== undefined) {
+        setPendingCapability(capability)
+      }
       // Load animation tracks if the welcome selection includes them
       const tracks = props.welcomeTracks?.()
       if (IS_DEV) {
@@ -626,6 +676,16 @@ export function MainWorkspace(props: AppProps) {
 
   // Audio-reactive panel state
   const [showAudioPanel, setShowAudioPanel] = createSignal(false)
+  /**
+   * Does the track keep playing once the audio panel is closed?
+   *
+   * OFF by default, deliberately: audio coming from a panel that is no longer
+   * on screen has no visible cause and no obvious way to stop it — the user is
+   * left hunting for which pane is making noise. Opt in when you actually want
+   * to keep listening while working on the flame.
+   */
+  const [keepAudioPlayingWhenClosed, setKeepAudioPlayingWhenClosed] =
+    createSignal(false)
   const [audioBuffer, setAudioBuffer] = createSignal<AudioBuffer | undefined>(
     undefined,
   )
@@ -657,6 +717,17 @@ export function MainWorkspace(props: AppProps) {
   const [fileAnalyzer, setFileAnalyzer] = createSignal<
     AudioAnalyzer | undefined
   >(undefined)
+  /**
+   * How far the post-decode analysis pass has got, 0-1, or null when idle.
+   *
+   * The panel used to show a single "Loading..." that covered ONLY the decode,
+   * then went quiet for the whole analysis — which on an 18-minute track is the
+   * long part. The panel looked idle and unresponsive while the work that
+   * actually takes the minute was running.
+   */
+  const [analysisProgress, setAnalysisProgress] = createSignal<number | null>(
+    null,
+  )
 
   // Reset playback state when switching between file and mic
   createEffect(() => {
@@ -688,6 +759,37 @@ export function MainWorkspace(props: AppProps) {
   // Sonification state
   const [showSonificationPanel, setShowSonificationPanel] = createSignal(false)
   const [sonificationEnabled, setSonificationEnabled] = createSignal(false)
+
+  /*
+   * Closing a sound panel silences it, unless the user opted out.
+   *
+   * Keyed off each panel's visibility rather than bolted onto its `onClose`,
+   * because a panel also disappears when the sidebar closes, when the other
+   * panel takes its place, and on the gallery hand-off reset. Audio still
+   * playing after any of those is a sound with no visible source and no
+   * obvious stop button — the user is left hunting for which pane is making
+   * noise. Sonification matters more here, not less: it generates audio
+   * continuously from the flame, so every edit keeps feeding it.
+   *
+   * The file transport is only PAUSED — buffer, analysis and position all
+   * survive, so reopening resumes instead of reloading.
+   */
+  createEffect(() => {
+    if (showAudioPanel() || keepAudioPlayingWhenClosed()) {
+      return
+    }
+    if (!untrack(playbackPaused)) {
+      setPlaybackPaused(true)
+    }
+  })
+  createEffect(() => {
+    if (showSonificationPanel() || keepAudioPlayingWhenClosed()) {
+      return
+    }
+    if (untrack(sonificationEnabled)) {
+      setSonificationEnabled(false)
+    }
+  })
   const [sonificationConfig, setSonificationConfig] =
     createSignal<SonificationConfig>({
       model: 'orchestral',
@@ -832,13 +934,105 @@ export function MainWorkspace(props: AppProps) {
     showToast('Morph ready — press Play to animate A → B', 3500)
   }
 
+  /**
+   * How long a candidate must stay hovered before its child is rendered.
+   *
+   * Slightly longer than the gallery's own 120ms clear delay: a child has a
+   * different transform structure from its parent, so showing one rebuilds the
+   * IFS pipeline, and sweeping the pointer down a list must not do that once
+   * per tile.
+   */
+  const BREED_PREVIEW_DELAY_MS = 220
+
   // Hover preview: temporarily set blend flame at 40% weight. Silent writes —
   // a transient hover must not create history entries or clobber redo.
   let prevBlendFlame: FlameDescriptor | undefined
   let prevBlendWeight = 0
   let blendPreviewActive = false
 
+  /**
+   * The child generated for whichever candidate is hovered, so clicking opens
+   * the gallery on the flame you were actually looking at rather than nine
+   * unrelated ones.
+   */
+  const [breedPreviewChild, setBreedPreviewChild] = createSignal<
+    FlameDescriptor | undefined
+  >(undefined)
+  /** The workspace flame as it was before a breed preview replaced it. */
+  let breedPreviewRestore: FlameDescriptor | undefined
+  let breedPreviewTimer: ReturnType<typeof setTimeout> | undefined
+
+  function writeDescriptor(next: FlameDescriptor) {
+    const value = deepClone(next)
+    history.setSilently((draft) => {
+      draft.version = value.version
+      draft.metadata = value.metadata
+      draft.renderSettings = value.renderSettings
+      draft.transforms = value.transforms
+    })
+  }
+
+  function endBreedPreview() {
+    clearTimeout(breedPreviewTimer)
+    breedPreviewTimer = undefined
+    setBreedPreviewChild(undefined)
+    if (breedPreviewRestore !== undefined) {
+      writeDescriptor(breedPreviewRestore)
+      breedPreviewRestore = undefined
+    }
+  }
+
+  /**
+   * Hovering a candidate while breeding shows an actual CHILD of the two
+   * flames, not a 40% blend of them.
+   *
+   * A blend is the wrong thing to show here twice over: it is not what
+   * breeding produces, and it cannot render at all in 3D — `ifsPipeline3D`
+   * has no blend input, so the old preview changed the hovered NAME while the
+   * picture sat still. A real child works in both dimensions, because
+   * `breedFlames` carries `variations3D`.
+   *
+   * Debounced, and this matters: a child has a different transform STRUCTURE
+   * from its parent, so applying one rebuilds the IFS pipeline. Sweeping the
+   * pointer across a list must not rebuild once per tile.
+   */
+  function previewBreedChild(flame: FlameDescriptor) {
+    clearTimeout(breedPreviewTimer)
+    breedPreviewTimer = setTimeout(() => {
+      const parentA = breedPreviewRestore ?? unwrap(flameDescriptor)
+      const [child] = breedFlames(parentA, flame, {
+        count: 1,
+        crossoverMode: 'uniform',
+        mutationStrength: 0.1,
+      })
+      if (child === undefined) {
+        return
+      }
+      // Snapshot once per hover run, not per tile: the restore target is the
+      // flame the user arrived with, never a previously previewed child.
+      breedPreviewRestore ??= deepClone(unwrap(flameDescriptor))
+      setBreedPreviewChild(child)
+      writeDescriptor(child)
+    }, BREED_PREVIEW_DELAY_MS)
+  }
+
   function handlePreviewBlend(flame: FlameDescriptor | null) {
+    if (blendIntent() === 'breed') {
+      if (flame) {
+        previewBreedChild(flame)
+      } else {
+        endBreedPreview()
+      }
+      return
+    }
+    // The hover preview IS the blend mechanism, and blending is 2D-only:
+    // `ifsPipeline3D.update()` takes a single flame — it has no blend input at
+    // all, so `renderSettings.blendFlame` is silently ignored in 3D. Writing it
+    // anyway changed the hovered NAME while the picture stayed put, which reads
+    // as a broken preview rather than an unsupported one. Skip it instead.
+    if (flame && (flame.renderSettings.dimensions ?? 2) === 3) {
+      return
+    }
     if (flame) {
       if (!blendPreviewActive) {
         prevBlendFlame = blendFlame()
@@ -861,6 +1055,23 @@ export function MainWorkspace(props: AppProps) {
       blendPreviewActive = false
     }
   }
+
+  /*
+   * The catch-all for the breed preview.
+   *
+   * A preview replaces the workspace flame with a child, so every route out of
+   * the picker has to put it back. The gallery's own `onClose` does, but it is
+   * not the only way out — the hand-off reset, Escape and the sidebar toggles
+   * all clear `showBlendGallery` directly, and any of them would otherwise
+   * leave the child installed as the user's flame with no history entry
+   * explaining where it came from. Keying off the visibility itself covers
+   * every path, present and future.
+   */
+  createEffect(() => {
+    if (!showBlendGallery()) {
+      endBreedPreview()
+    }
+  })
 
   const [hoveredBlendName, setHoveredBlendName] = createSignal<string | null>(
     null,
@@ -966,7 +1177,11 @@ export function MainWorkspace(props: AppProps) {
   })
 
   const finalRenderInterval = () =>
-    isAnyModalOpen()
+    // Home covers the workspace while it is showing, so the canvas has nothing
+    // to display — pause it exactly as an open modal does rather than paying
+    // for frames nobody sees. An export still wins: those run to completion in
+    // the background whichever tab is in front.
+    isAnyModalOpen() || (!workspaceIsVisible() && !onExportImage())
       ? Infinity
       : onExportImage()
         ? 0
@@ -1775,23 +1990,193 @@ export function MainWorkspace(props: AppProps) {
     }
   }
 
-  // Timeline "Animate" button: reveal the sidebar (may be closed, auto-hidden
-  // on mobile, or covered by the blend gallery / quick variation picker), open
-  // the Flame Randomizer card with its Animation Settings section expanded,
-  // and scroll the card into view. Overlay dismissal must happen BEFORE the
-  // epoch bump: mounting the card swallows the current epoch as its initial
-  // value, so a bump-then-mount order would lose the expansion.
-  const openAnimationGenerator = () => {
+  /**
+   * Reveal the sidebar (it may be closed, auto-hidden on mobile, covered by the
+   * blend gallery / quick variation picker, or showing a diff), open the Flame
+   * Randomizer card and scroll it into view.
+   *
+   * `expandAnimation` additionally opens the card's Animation Settings section —
+   * what the timeline's "Animate" button wants, and what Home's Randomizer card
+   * does NOT (it is advertising the generator, not the animation generator).
+   * Overlay dismissal must happen BEFORE the epoch bump: mounting the card
+   * swallows the current epoch as its initial value, so a bump-then-mount order
+   * would lose the expansion.
+   */
+  const openRandomizerCard = ({ expandAnimation = false } = {}) => {
     setShowSidebar(true)
     setSidebarHidden(false)
+    setSidebarDiffView(null)
     setShowBlendGallery(false)
     setQuickPickState(null)
     setRandomizerOpen(true)
-    setRandomizerAnimEpoch((e) => e + 1)
+    if (expandAnimation) {
+      setRandomizerAnimEpoch((e) => e + 1)
+    }
     setTimeout(() => {
       randomizerCardRef?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 0)
   }
+
+  // Timeline "Animate" button.
+  const openAnimationGenerator = () => {
+    openRandomizerCard({ expandAnimation: true })
+  }
+
+  /**
+   * Show the sidebar and clear whatever is currently covering it.
+   *
+   * Every sidebar panel below lives behind the same chain of `Show`s
+   * (diff view > blend gallery > audio > sonification > the editor), so opening
+   * one means closing the others as well as un-hiding the sidebar itself — a
+   * hand-off that only set its own flag would silently do nothing on mobile, or
+   * with a diff open.
+   */
+  const revealSidebar = () => {
+    setShowSidebar(true)
+    setSidebarHidden(false)
+    setSidebarDiffView(null)
+    setShowBlendGallery(false)
+    setShowAudioPanel(false)
+    setShowSonificationPanel(false)
+  }
+
+  /**
+   * Put the workspace back to the state a fresh session would be in, so a flame
+   * handed over from Home (or the welcome screen) lands the same way whether it
+   * is the first one opened or the fifth.
+   *
+   * The workspace stays MOUNTED behind Home — that is deliberate (App.tsx: the
+   * editor keeps its state and its canvas size), but it means every hand-off
+   * inherits whatever the previous one left behind. Nothing here was reset,
+   * and the results were exactly the three things users reported:
+   *
+   *  - **panels left open.** `openCapability` opens a panel and nothing ever
+   *    closes it, so the Audio card opened by one Explore flame was still
+   *    covering the sidebar for the next, unrelated one.
+   *  - **animation running on a still flame.** The hand-off only ever LOADED
+   *    tracks (`tracks.length > 0`); it never cleared them. So the previous
+   *    flame's timeline was still there, still playing, on a flame that has no
+   *    animation of its own.
+   *  - **"too bright".** Same cause, one step further: while the timeline is
+   *    driving the view, `applyTimelineToFlame` writes the old flame's keyframed
+   *    values — vibrancy, exposure, brightness — onto the new descriptor every
+   *    frame. A leftover exposure track reads exactly as a washed-out flame.
+   *
+   * One reset for all of them rather than a clear per symptom: the next symptom
+   * is then a line in this function, not a new bug. It restores the DECLARED
+   * defaults (`DEFAULT_ANIMATION_ENABLED`, `isWideLayout()`) rather than
+   * plausible-looking values, because "identical to opening it first" is the
+   * actual requirement — and layout state changes the canvas size, so an
+   * approximation would render a visibly different flame.
+   *
+   * Not reset: the flame document itself (the caller replaces it wholesale, and
+   * that covers palette/blend/morph/exposure, which all live in
+   * `renderSettings`), and anything the user owns across documents — theme,
+   * quality preset, sidebar layout, autosave preference.
+   */
+  const resetWorkspaceForHandoff = () => {
+    // ── Overlays and panels ────────────────────────────────────────────────
+    // Everything `openCapability`/`revealSidebar` can open, plus the pickers a
+    // previous session could have left covering the sidebar.
+    setShowSidebar(true)
+    setSidebarHidden(!isWideLayout())
+    setSidebarDiffView(null)
+    setShowBlendGallery(false)
+    setBlendIntent('blend')
+    setQuickPickState(null)
+    setRandomizerOpen(false)
+    setShowAudioPanel(false)
+    setShowSonificationPanel(false)
+
+    // ── Live modulation ────────────────────────────────────────────────────
+    // Both loops write render settings continuously while enabled, so left on
+    // they keep driving the NEXT flame — the audio one through
+    // `setFlameDescriptor` itself.
+    setAudioEnabled(false)
+    setSonificationEnabled(false)
+
+    // ── Timeline ───────────────────────────────────────────────────────────
+    // Order matters: pause before dropping the tracks so the playback interval
+    // cannot advance a frame against an empty timeline, and clear `previewHeld`
+    // AFTER `setCurrentFrame` — `goToFrame` deliberately sets it, which would
+    // leave the canvas "holding" frame 0 of nothing.
+    timeline.pause()
+    timeline.setIsScrubbing(false)
+    timeline.setConfig(defaultTimelineConfig())
+    timeline.setCurrentFrame(0)
+    timeline.loadTracks([])
+    timeline.setPreviewHeld(false)
+    timeline.setAnimationEnabled(DEFAULT_ANIMATION_ENABLED)
+    setAnimationEnabled(DEFAULT_ANIMATION_ENABLED)
+    setShowTimeline(isWideLayout())
+
+    // ── Per-document stashes and modes ─────────────────────────────────────
+    // In-memory state that belongs to the flame being replaced: the pre-palette
+    // colours Unselect restores, the randomizer-history highlight, and 3D fly
+    // mode (session-only, and meaningless on a flame you have not flown).
+    setPrePaletteColors({})
+    setSelectedHistoryTimestamp(0)
+    setFlyMode(false)
+  }
+
+  /**
+   * Open the tool a Home "Explore" card advertises. The names are the
+   * `capability` values gallery-admin accepts (scripts/gallery-admin.mjs).
+   *
+   * Each one lands on the same surface its own toolbar entry does, so there is
+   * one behaviour to maintain rather than a parallel Home-only path:
+   *
+   *  - `animation`    — the timeline, with animation enabled. An animated row
+   *                     also loads its tracks and starts playing through the
+   *                     `loadedAnimation` effect, which is the same thing the
+   *                     Load Flame modal does.
+   *  - `randomizer`   — the Flame Randomizer card, opened and scrolled to.
+   *  - `genetics`     — Breed: the Genetics pull-up menu itself cannot be opened
+   *                     programmatically (PullUpMenu owns a private `open`
+   *                     signal), so this calls what its first entry calls and
+   *                     lands the user on "pick the second parent", which is
+   *                     where breeding actually starts.
+   *  - `audio`        — the Audio Reactive panel.
+   *  - `sonification` — the Sonification panel.
+   */
+  const openCapability = (capability: string) => {
+    switch (capability) {
+      case 'animation':
+        setAnimationEnabled(true)
+        setShowTimeline(true)
+        return
+      case 'randomizer':
+        openRandomizerCard()
+        return
+      case 'genetics':
+        revealSidebar()
+        pickBreedFlame()
+        return
+      case 'audio':
+        revealSidebar()
+        setShowAudioPanel(true)
+        return
+      case 'sonification':
+        revealSidebar()
+        setShowSonificationPanel(true)
+        return
+      default:
+        // Content can be newer than this build: gallery_items.capability is a
+        // free-text column and gallery-admin only WARNS about an unknown value.
+        // Opening the flame alone is the right degradation.
+        console.warn(`No tool mapped for capability "${capability}"`)
+    }
+  }
+
+  // Drain the Home hand-off once the flame it came with has landed.
+  createEffect(() => {
+    const capability = pendingCapability()
+    if (capability === undefined) {
+      return
+    }
+    setPendingCapability(undefined)
+    openCapability(capability)
+  })
 
   // Guard randomize/mutate so a slow run (history thumbnail capture + render)
   // can't be re-triggered until it finishes — rapid clicks would otherwise pile
@@ -5420,6 +5805,12 @@ export function MainWorkspace(props: AppProps) {
                                 onEnabledChange={setSonificationEnabled}
                                 config={sonificationConfig}
                                 onConfigChange={setSonificationConfig}
+                                keepPlayingWhenClosed={
+                                  keepAudioPlayingWhenClosed
+                                }
+                                onKeepPlayingChange={
+                                  setKeepAudioPlayingWhenClosed
+                                }
                               />
                             }
                           >
@@ -5429,13 +5820,36 @@ export function MainWorkspace(props: AppProps) {
                               onAudioChange={(buf) => {
                                 setAudioBuffer(buf)
                                 setFileAnalyzer(undefined)
+                                setAnalysisProgress(null)
                                 if (!buf) {
                                   setAudioEnabled(false)
                                 } else {
+                                  // Report from 0 immediately: the panel has to
+                                  // say "analyzing" before the first frame is
+                                  // done, or it looks idle for the whole
+                                  // scheduling gap on a long file.
+                                  setAnalysisProgress(0)
                                   setTimeout(async () => {
-                                    setFileAnalyzer(
-                                      await createAudioAnalyzer(buf, 30),
+                                    // `onProgress` fires once PER FRAME —
+                                    // ~32k times for 18 minutes at 30fps. Only
+                                    // publish whole percents, or the signal
+                                    // write costs more than the analysis.
+                                    let lastPercent = -1
+                                    const analyzer = await createAudioAnalyzer(
+                                      buf,
+                                      30,
+                                      (current, total) => {
+                                        if (total <= 0) return
+                                        const percent = Math.floor(
+                                          (current / total) * 100,
+                                        )
+                                        if (percent === lastPercent) return
+                                        lastPercent = percent
+                                        setAnalysisProgress(percent / 100)
+                                      },
                                     )
+                                    setFileAnalyzer(analyzer)
+                                    setAnalysisProgress(null)
                                   }, 30)
                                 }
                                 setPlaybackPaused(false)
@@ -5455,12 +5869,31 @@ export function MainWorkspace(props: AppProps) {
                               playbackTime={playbackTime}
                               onSeek={setSeekTarget}
                               fileAnalyzer={fileAnalyzer}
+                              analysisProgress={analysisProgress}
+                              flameName={flameDescriptor.metadata?.name}
+                              keepPlayingWhenClosed={keepAudioPlayingWhenClosed}
+                              onKeepPlayingChange={
+                                setKeepAudioPlayingWhenClosed
+                              }
                               transforms={transformInfos()}
                             />
                           </Show>
                         }
                       >
                         <BlendFlameGallery
+                          dimensions={
+                            /* Breed and evolve cross transforms, which works in
+                               3D — offer same-dimension partners so a 3D flame
+                               has someone to pair with. Morph interpolates via
+                               the BLEND pipeline, which has no 3D path at all
+                               (ifsPipeline3D.update takes one flame), so it
+                               stays 2D-only as before. */
+                            blendIntent() === 'breed' ||
+                            blendIntent() === 'evolve' ||
+                            blendIntent() === 'diff'
+                              ? (flameDescriptor.renderSettings.dimensions ?? 2)
+                              : 2
+                          }
                           heading={
                             blendIntent() === 'morph'
                               ? 'Pick End Flame'
@@ -5476,11 +5909,19 @@ export function MainWorkspace(props: AppProps) {
                             if (blendIntent() === 'morph') {
                               setupMorph(flame)
                             } else if (blendIntent() === 'breed') {
+                              /* The hover preview REPLACED the workspace flame
+                                 with a child. Take the child first, then put
+                                 the real flame back — otherwise parentA below
+                                 would be the preview, and the gallery would
+                                 breed a child with its own parent. */
+                              const seed = breedPreviewChild()
+                              endBreedPreview()
                               void _requestModal({
                                 content: ({ respond }) => (
                                   <BreedGallery
                                     parentA={flameDescriptor}
                                     parentB={deepClone(flame)}
+                                    seedChild={seed}
                                     parentInfo={{
                                       nameA:
                                         flameDescriptor.metadata?.name ||

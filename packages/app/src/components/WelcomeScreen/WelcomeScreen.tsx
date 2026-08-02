@@ -27,6 +27,12 @@ type WelcomeScreenProps = {
   showDontShowAgain?: boolean
   onDontShowAgainChange?: (checked: boolean, ev: Event) => void
   onEnter: () => void
+  /**
+   * Leave the welcome screen for the Home tab rather than the editor. Home is
+   * suppressed while this screen is up, so the handler has to both dismiss and
+   * switch tabs — see App.tsx.
+   */
+  onBrowseGallery?: () => void
   onSelectFlame?: (flame: FlameDescriptor, tracks?: TimelineTrack[]) => void
   onStartTour?: (tourId: string) => void
   onShowAbout?: () => void
@@ -468,6 +474,19 @@ export function WelcomeScreen(props: WelcomeScreenProps) {
                 <button class={ui.startBtn} onClick={props.onEnter}>
                   Start
                 </button>
+
+                {/* The quieter alternative to Start: a way into the app that
+                    shows the work first. Deliberately unstyled-looking next to
+                    the primary — no gradient, no shadow — so the hierarchy
+                    reads at a glance. */}
+                <Show when={props.onBrowseGallery}>
+                  <button
+                    class={ui.browseBtn}
+                    onClick={() => props.onBrowseGallery?.()}
+                  >
+                    Browse the gallery
+                  </button>
+                </Show>
 
                 <label class={ui.dontShow}>
                   <Checkbox

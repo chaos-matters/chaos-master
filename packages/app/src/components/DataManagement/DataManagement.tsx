@@ -2,7 +2,9 @@ import { createResource, createSignal, For, Show } from 'solid-js'
 import { useToast } from '@/contexts/ToastContext'
 import { autosaveIntervalMin, autosaveRecents, setAutosaveIntervalMin, setAutosaveRecents, } from '@/utils/autosaveSettings'
 import { buildFlameBackupZip, downloadBackupZip } from '@/utils/flameBackup'
+import { applyFlameImport, readFlameFiles, summarizeImport, } from '@/utils/flameImport'
 import { formatBytes } from '@/utils/formatBytes'
+import { pickFiles } from '@/utils/pickFiles'
 import { clearAllFlames, clearSettings, computeStorageUsage, } from '@/utils/storageUsage'
 import { Button } from '../Button/Button'
 import { Checkbox } from '../Checkbox/Checkbox'
@@ -102,20 +104,22 @@ export function DataManagement() {
   const [backupLogo, setBackupLogo] = createSignal(true)
   const [backupFormat, setBackupFormat] = createSignal<BackupFormat>('both')
   const [exporting, setExporting] = createSignal(false)
+  const [importing, setImporting] = createSignal(false)
 
   const anyGroupSelected = () =>
     backupRecents() || backupGenerated() || backupLogo()
+
+  const selectedGroups = (): BackupGroups => ({
+    recents: backupRecents(),
+    generated: backupGenerated(),
+    logo: backupLogo(),
+  })
 
   async function handleExport() {
     if (exporting() || !anyGroupSelected()) return
     setExporting(true)
     try {
-      const groups: BackupGroups = {
-        recents: backupRecents(),
-        generated: backupGenerated(),
-        logo: backupLogo(),
-      }
-      const result = await buildFlameBackupZip(groups, backupFormat())
+      const result = await buildFlameBackupZip(selectedGroups(), backupFormat())
       const total =
         result.counts.recents + result.counts.generated + result.counts.logo
       if (total === 0) {
@@ -131,6 +135,28 @@ export function DataManagement() {
       showToast('Backup export failed')
     } finally {
       setExporting(false)
+    }
+  }
+
+  async function handleImport() {
+    if (importing() || !anyGroupSelected()) return
+    const [file] = await pickFiles({
+      id: 'import-flame-backup',
+      accept: { 'application/zip': ['.zip'] },
+    })
+    if (!file) return
+    setImporting(true)
+    try {
+      const parsed = await readFlameFiles([file], selectedGroups())
+      const summary = await applyFlameImport(parsed.candidates)
+      summary.failed += parsed.failed
+      showToast(summarizeImport(summary))
+      void refetch()
+    } catch (err) {
+      console.error('Backup import failed:', err)
+      showToast('Backup import failed')
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -211,12 +237,13 @@ export function DataManagement() {
         </Show>
       </section>
 
-      {/* Backup / export */}
+      {/* Backup / export / import */}
       <section class={ui.card}>
-        <div class={ui.cardLabel}>Backup &amp; Export</div>
+        <div class={ui.cardLabel}>Backup &amp; Restore</div>
         <p class={ui.cardHint}>
           Bundle your flames into a ZIP — JSON descriptors and/or PNGs with the
-          flame embedded (from history thumbnails).
+          flame embedded (from history thumbnails). Restoring reads the same ZIP
+          back into the groups ticked below.
         </p>
         <div class={ui.fieldRow}>
           <span class={ui.fieldName}>Include</span>
@@ -256,15 +283,33 @@ export function DataManagement() {
               )}
             </For>
           </div>
+          <span class={ui.fieldNote}>export only</span>
         </div>
-        <Button
-          class={ui.exportBtn}
-          onClick={handleExport}
-          disabled={exporting() || !anyGroupSelected()}
-        >
-          {exporting() ? 'Exporting…' : 'Export Backup'}
-          <span class={ui.zipBadge}>ZIP</span>
-        </Button>
+        <div class={ui.actionRow}>
+          <Button
+            class={ui.exportBtn}
+            onClick={handleExport}
+            disabled={exporting() || !anyGroupSelected()}
+          >
+            {exporting() ? 'Exporting…' : 'Export Backup'}
+            <span class={ui.zipBadge}>ZIP</span>
+          </Button>
+          <Button
+            class={ui.exportBtn}
+            onClick={handleImport}
+            disabled={importing() || !anyGroupSelected()}
+          >
+            {importing() ? 'Importing…' : 'Import Backup'}
+            <span class={ui.zipBadge}>ZIP</span>
+          </Button>
+        </div>
+        <p class={ui.cardHint}>
+          Importing never overwrites what you already have: a flame that is
+          already stored is skipped, and nothing is evicted to make room.
+          Generated and logo flames restore into their galleries when the ZIP
+          carries their image; from a JSON-only backup they land in Recent
+          flames instead.
+        </p>
       </section>
 
       {/* Auto-save */}

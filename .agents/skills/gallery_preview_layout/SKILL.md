@@ -127,10 +127,74 @@ the last column expands to fill and is the one that ends up under the bar. The
 
 ## 5. Verifying cross-browser (don't trust one engine)
 
-- Test **both** Chrome and Firefox. Drive them with Playwright (the repo has it):
-  `chromium` and `firefox` from `playwright`. See the `webgpu-verify-headed-playwright`
-  and `playwright-chaos-master-setup` notes (seed `localStorage`
-  `chaos-master-welcome-dismissed=true`, `ignoreHTTPSErrors`, dev server is HTTPS).
+> **HARD LIMIT — a browser left open on a live gallery can take down the
+> machine.** This has happened three times on this workstation, once reaching
+> ~60 GB RSS. The gallery is the worst page to leak a browser on, and the
+> measurement technique is itself the amplifier:
+>
+> - measuring live plates means calling `__chaosHomeNoFreeze()`, which disables
+>   freeze-to-poster — the one control that bounds memory. Every plate then
+>   stays live forever;
+> - if the browser launched **without** the WebGPU flags below, `navigator.gpu`
+>   is absent and rendering silently falls back to llvmpipe/swiftshader, which
+>   allocates in **host RAM instead of VRAM**. Many live fractal canvases times
+>   software rendering times a browser nobody closed is how you get to tens of
+>   GB.
+>
+> Therefore, non-negotiable:
+>
+> 1. **One browser at a time, always closed in a `finally`.** Never launch a
+>    second before the first is closed. Verify with `pgrep -c chrome` after.
+> 2. **Wrap every browser script in a shell-level timeout** (`timeout 300 node
+…`) so a hang cannot outlive its purpose.
+> 3. **`__chaosHomeNoFreeze()` is for a single bounded measurement only** —
+>    take the number, close the browser. Never leave a session running with it
+>    on, and never combine it with a long scroll loop.
+> 4. **Assert the adapter before measuring** (recipe below). No adapter means
+>    you are on CPU rendering: close it and fix the flags rather than
+>    continuing — the numbers would be meaningless AND dangerous.
+> 5. **Vitest never fans out here**: `--maxWorkers=1`. The default forks one
+>    worker per core at ~2 GB each with this module graph.
+>
+> Delegating this work to a subagent does not relax any of the above; if
+> anything, hold a subagent to launching **zero** browsers and do the browser
+> pass yourself.
+
+- **Chrome is the gate; Firefox is the second opinion.** Chrome must work; the
+  Firefox-specific rules above (§2 squeeze, §4 gutter) are why you still check
+  Gecko, but a Chrome regression is the one that ships.
+
+- **Launching real Chrome with a real GPU.** This exact recipe matters — get it
+  wrong and WebGPU is silently absent, `requestAdapter()` returns nothing, the
+  app falls back to posters, and the run _looks_ like the live path is broken
+  when it was never exercised:
+
+  ```js
+  const browser = await chromium.launch({
+    channel: 'chrome', // the installed google-chrome-stable, NOT bundled chromium
+    headless: false, // headless has no usable navigator.gpu on this machine
+    args: [
+      '--enable-unsafe-webgpu',
+      '--enable-features=Vulkan',
+      '--ignore-gpu-blocklist',
+    ],
+  })
+  ```
+
+  Confirm you actually got the GPU before trusting any measurement:
+
+  ```js
+  const a = await navigator.gpu?.requestAdapter()
+  a?.info // expect e.g. { vendor: 'amd', architecture: 'rdna-4' }, not undefined
+  ```
+
+  Do **not** copy the flags out of `playwright.config.ts` for this: those are
+  `--enable-unsafe-swiftshader --use-angle=swiftshader-webgl`, deliberately
+  _software_ rendering so CI is deterministic. They will happily render without
+  touching the GPU, which is the opposite of what a GPU verification needs.
+
+- Also seed `localStorage` `chaos-master-welcome-dismissed=true` and pass
+  `ignoreHTTPSErrors` (the dev server is HTTPS).
 - **Playwright bundles _stable_ Firefox**, which has weak/no WebGPU on Linux. It
   is fine for **layout** (same Gecko engine) but cannot exercise the
   **live-WebGPU → device-loss** path. Use **Firefox Nightly** (real WebGPU +

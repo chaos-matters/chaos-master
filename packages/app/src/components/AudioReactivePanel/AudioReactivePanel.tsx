@@ -1,11 +1,13 @@
 import { createEffect, createMemo, createSignal, For, Index, onCleanup, Show, } from 'solid-js'
 import { Cross, MusicNote } from '@/icons'
 import { createLiveAnalyzer, decodeAudioFile, getAudioFeatureNormalized, } from '@/utils/audioAnalysis'
+import { buildFlamePreset, buildPreset, FLAME_PRESET_IDS, PRESET_DESCRIPTIONS, PRESET_LABELS, randomizeMappings, RENDER_PRESET_IDS, RENDER_PRESETS, } from '@/utils/audioWiringPresets'
 import { AudioWiringModal } from '../AudioWiringModal/AudioWiringModal'
 import ui from './AudioReactivePanel.module.css'
 import { computeBeatFrames, drawWaveform } from './audioWaveform'
 import type { Accessor } from 'solid-js'
 import type { AffineKey, AudioAnalyzer, AudioFeature, FlameTarget, LiveAudioAnalyzer, RenderSettingKey, TransformInfo, TransformPropertyKey, } from '@/utils/audioAnalysis'
+import type { WiringPresetId } from '@/utils/audioWiringPresets'
 
 // Re-export for consumers (MainWorkspace etc.)
 export type { AudioFeature, FlameTarget, TransformInfo }
@@ -28,13 +30,14 @@ export type AudioMapping = {
   mappings: ParamMapping[]
 }
 
-export type AudioPreset =
-  | 'pulse'
-  | 'groove'
-  | 'ambient'
-  | 'chaos'
-  | 'warmth'
-  | 'custom'
+/**
+ * Which quick-start wiring is selected. `custom` means the mappings were
+ * hand-edited or randomised and no longer match any preset.
+ *
+ * The set itself lives in utils/audioWiringPresets.ts, because half of it is
+ * COMPUTED from the loaded flame rather than declared.
+ */
+export type AudioPreset = WiringPresetId | 'custom'
 
 type AudioReactivePanelProps = {
   onClose: () => void
@@ -53,6 +56,20 @@ type AudioReactivePanelProps = {
   playbackTime: Accessor<number>
   onSeek: (seconds: number) => void
   fileAnalyzer: Accessor<AudioAnalyzer | undefined>
+  /**
+   * Progress of the post-decode analysis pass, 0-1, or null when nothing is
+   * being analysed. Owned by MainWorkspace, which runs the pass.
+   */
+  analysisProgress: Accessor<number | null>
+  /** Name of the flame being driven, for the status bar. */
+  flameName?: string
+  /**
+   * Whether audio should survive this panel being closed. Default OFF: a track
+   * playing from a panel you cannot see has no visible cause and no obvious
+   * stop button.
+   */
+  keepPlayingWhenClosed: Accessor<boolean>
+  onKeepPlayingChange: (keep: boolean) => void
   /** Available transforms (id+label) for per-transform target selectors. */
   transforms: TransformInfo[]
 }
@@ -103,121 +120,6 @@ const TRANSFORM_PROP_LABELS: Record<TransformPropertyKey, string> = {
   colorX: 'Color X',
   colorY: 'Color Y',
   colorSpeed: 'Color Speed',
-}
-
-// --- Presets ---
-
-export const PRESET_MAPPINGS: Record<AudioPreset, ParamMapping[]> = {
-  pulse: [
-    {
-      audioFeature: 'bass',
-      target: { kind: 'renderSetting', param: 'vibrancy' },
-      sensitivity: 1,
-      range: [0.3, 1.5],
-    },
-    {
-      audioFeature: 'beat',
-      target: { kind: 'renderSetting', param: 'palettePhase' },
-      sensitivity: 1,
-      range: [0, 3.14],
-    },
-  ],
-  groove: [
-    {
-      audioFeature: 'mid',
-      target: { kind: 'renderSetting', param: 'zoom' },
-      sensitivity: 1,
-      range: [0.85, 1.15],
-    },
-    {
-      audioFeature: 'bass',
-      target: { kind: 'renderSetting', param: 'vibrancy' },
-      sensitivity: 1,
-      range: [0.5, 1.5],
-    },
-    {
-      audioFeature: 'centroid',
-      target: { kind: 'renderSetting', param: 'palettePhase' },
-      sensitivity: 1,
-      range: [0, 3.14],
-    },
-  ],
-  ambient: [
-    {
-      audioFeature: 'rms',
-      target: { kind: 'renderSetting', param: 'exposure' },
-      sensitivity: 1,
-      range: [0.8, 1.2],
-    },
-    {
-      audioFeature: 'hiMid',
-      target: { kind: 'renderSetting', param: 'paletteSpeed' },
-      sensitivity: 1,
-      range: [0.5, 2],
-    },
-    {
-      audioFeature: 'centroid',
-      target: { kind: 'renderSetting', param: 'gamma' },
-      sensitivity: 1,
-      range: [0.6, 1.4],
-    },
-  ],
-  chaos: [
-    {
-      audioFeature: 'flatness',
-      target: { kind: 'renderSetting', param: 'contrast' },
-      sensitivity: 1,
-      range: [0.5, 2],
-    },
-    {
-      audioFeature: 'fullSpectrum',
-      target: { kind: 'renderSetting', param: 'skipIters' },
-      sensitivity: 1,
-      range: [0.8, 1.2],
-    },
-    {
-      audioFeature: 'beat',
-      target: { kind: 'renderSetting', param: 'highlightPower' },
-      sensitivity: 1,
-      range: [0, 3],
-    },
-    {
-      audioFeature: 'onset',
-      target: { kind: 'renderSetting', param: 'contrast' },
-      sensitivity: 1,
-      range: [0.8, 1.6],
-    },
-  ],
-  warmth: [
-    {
-      audioFeature: 'centroid',
-      target: { kind: 'renderSetting', param: 'palettePhase' },
-      sensitivity: 1,
-      range: [0, 3.14],
-    },
-    {
-      audioFeature: 'bass',
-      target: { kind: 'renderSetting', param: 'vibrancy' },
-      sensitivity: 1,
-      range: [0.4, 1.6],
-    },
-    {
-      audioFeature: 'brilliance',
-      target: { kind: 'renderSetting', param: 'contrast' },
-      sensitivity: 1,
-      range: [0.7, 1.3],
-    },
-  ],
-  custom: [],
-}
-
-const PRESET_LABELS: Record<AudioPreset, string> = {
-  pulse: 'Pulse',
-  groove: 'Groove',
-  ambient: 'Ambient',
-  chaos: 'Chaos',
-  warmth: 'Warmth',
-  custom: 'Custom',
 }
 
 const ALL_FEATURES: AudioFeature[] = [
@@ -360,6 +262,41 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
   const [dragOver, setDragOver] = createSignal(false)
   const [loading, setLoading] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
+
+  /**
+   * What the panel is actually doing right now.
+   *
+   * Loading a track is two jobs, not one: decode (browser-owned, no progress to
+   * report) and the analysis pass that builds the frame data (MainWorkspace,
+   * reports per-frame). Only the first was ever surfaced, so an 18-minute file
+   * showed "Loading..." for a moment and then a silent, apparently-dead panel
+   * for the minute that the second job took.
+   *
+   * Playback is deliberately NOT part of this: the transport works as soon as
+   * the buffer decodes (see useAudioReactive), so the track is playable and
+   * scrubbable while the analysis is still running — only the modulation has to
+   * wait.
+   */
+  const loadPhase = () => {
+    if (loading()) return 'decoding' as const
+    const progress = props.analysisProgress()
+    if (progress !== null) return 'analyzing' as const
+    return 'idle' as const
+  }
+  const loadLabel = () =>
+    loadPhase() === 'decoding'
+      ? 'Decoding audio…'
+      : 'Drop audio file or click to browse'
+
+  /**
+   * The one percentage the overlay shows: the analysis pass while it runs, then
+   * the beat scan that follows it. Two sequential jobs, one bar — the user is
+   * waiting on "is the track ready", not on which internal stage is running.
+   */
+  const analyzePercent = () =>
+    isAnalyzing()
+      ? Math.round((props.analysisProgress() ?? 0) * 100)
+      : beatProgress()
   const [beatProgress, setBeatProgress] = createSignal(0)
   const [audioFileName, setAudioFileName] = createSignal<string | null>(null)
   const [micError, setMicError] = createSignal<string | null>(null)
@@ -375,9 +312,16 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
   const [scrubbing, setScrubbing] = createSignal(false)
 
   // Derived: true while the shared analyzer is being built (FFT pass)
+  /*
+   * Both of these signals hold `undefined`, never `null` — so the original
+   * `fileAnalyzer() === null` was always FALSE and this memo always returned
+   * false. The "Analyzing audio…" overlay it gates has therefore never
+   * rendered: loading a long track showed a decoded-but-silent panel with no
+   * indication that a minute of analysis was still running.
+   */
   const isAnalyzing = createMemo(() => {
     const buf = props.audioBuffer()
-    return buf !== null && props.fileAnalyzer() === null
+    return buf !== undefined && props.fileAnalyzer() === undefined
   })
 
   function formatTime(seconds: number): string {
@@ -569,9 +513,36 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
   }
 
   function applyPreset(preset: AudioPreset) {
+    if (preset === 'custom') return
+    // Built against the CURRENT flame: a flame-aware preset names transform
+    // indices and variation types that only exist for this descriptor, so it
+    // cannot be looked up from a table.
     props.onMappingChange({
       preset,
-      mappings: PRESET_MAPPINGS[preset].map((m) => ({ ...m })),
+      mappings: buildPreset(preset, props.transforms),
+    })
+  }
+
+  /**
+   * What the wiring editor offers in its own preset list: the render presets,
+   * plus whichever flame-aware ones this flame can actually satisfy. Computed,
+   * so the editor and the panel never disagree about what exists.
+   */
+  const wiringPresets = createMemo(() => {
+    const out: Record<string, ParamMapping[]> = { ...RENDER_PRESETS }
+    for (const id of FLAME_PRESET_IDS) {
+      const built = buildFlamePreset(id, props.transforms)
+      if (built.length > 0) {
+        out[id] = built
+      }
+    }
+    return out
+  })
+
+  function randomizeCurrentWiring() {
+    props.onMappingChange({
+      preset: 'custom',
+      mappings: randomizeMappings(props.transforms),
     })
   }
 
@@ -727,6 +698,27 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
                     {' / '}
                     {formatTime(props.audioBuffer()!.duration)}
                   </span>
+                  {/* Live Preview sits WITH the transport, not in a footer at
+                      the far end of a long scrolling panel. It is the switch
+                      you reach for immediately after pressing play — "I can
+                      hear it, now drive the flame with it" — and it belongs
+                      next to the thing it follows. */}
+                  <label class={`${ui.enableToggle} ${ui.enableToggleInline}`}>
+                    <button
+                      class={
+                        ui.toggleSwitch +
+                        (props.audioEnabled() ? ` ${ui.toggleSwitchOn}` : '')
+                      }
+                      onClick={() => {
+                        props.onEnabledChange(!props.audioEnabled())
+                      }}
+                      aria-label="Toggle audio reactive preview"
+                      title="Drive the flame from this audio"
+                    >
+                      <span class={ui.toggleKnob} />
+                    </button>
+                    Live Preview
+                  </label>
                 </div>
 
                 {/* Waveform */}
@@ -735,17 +727,23 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
                     <div class={ui.analyzeOverlay}>
                       <span class={ui.analyzeLabel}>
                         {isAnalyzing()
-                          ? 'Analyzing audio...'
+                          ? 'Analyzing audio — playable already, mappings when it finishes'
                           : 'Scanning beats...'}
                       </span>
+                      {/* The bar was hard-wired to `beatProgress`, which stays
+                          0 for the whole analysis pass — so even if the overlay
+                          had rendered it would have sat at 0% for a minute.
+                          The analysis reports per frame; use it. */}
                       <div class={ui.progressTrack}>
                         <div
                           class={ui.progressFill}
-                          style={{ width: `${beatProgress()}%` }}
+                          style={{ width: `${analyzePercent()}%` }}
                         />
                       </div>
-                      <Show when={beatProgress() > 0}>
-                        <span class={ui.analyzePercent}>{beatProgress()}%</span>
+                      <Show when={analyzePercent() > 0}>
+                        <span class={ui.analyzePercent}>
+                          {analyzePercent()}%
+                        </span>
                       </Show>
                     </div>
                   </Show>
@@ -787,11 +785,10 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
               <div class={ui.dropIcon}>
                 <MusicNote />
               </div>
-              <div class={ui.dropLabel}>
-                {loading()
-                  ? 'Loading...'
-                  : 'Drop audio file or click to browse'}
-              </div>
+              {/* Decode only — once the buffer exists this whole drop zone is
+                  replaced by the waveform, and the analysis progress belongs to
+                  the overlay there. */}
+              <div class={ui.dropLabel}>{loadLabel()}</div>
               <div class={ui.dropFormats}>MP3, WAV, OGG, FLAC</div>
               <Show when={error()}>
                 <div style="color: #ff5a5a; font-size: 12px; margin-top: 8px;">
@@ -812,7 +809,10 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
           </Show>
         </Show>
 
-        {/* Presets */}
+        {/* Presets — render-only first, then the ones built from THIS flame.
+            Split because they answer different questions: the first three work
+            anywhere, the second three reach into the loaded flame's transforms
+            and are the ones that visibly restructure it. */}
         <div>
           <div class={ui.sectionLabel}>Preset</div>
           <div
@@ -820,7 +820,7 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
             role="radiogroup"
             aria-label="Audio reactive presets"
           >
-            <For each={Object.keys(PRESET_LABELS) as AudioPreset[]}>
+            <For each={RENDER_PRESET_IDS}>
               {(preset) => (
                 <button
                   class={
@@ -833,6 +833,7 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
                     applyPreset(preset)
                   }}
                   aria-label={`${PRESET_LABELS[preset]} preset`}
+                  title={PRESET_DESCRIPTIONS[preset]}
                   role="radio"
                   aria-checked={props.audioMapping().preset === preset}
                 >
@@ -841,11 +842,66 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
               )}
             </For>
           </div>
+
+          <div class={ui.sectionLabel} style="margin-top: 10px;">
+            From this flame
+          </div>
+          <div
+            class={ui.presetRow}
+            role="radiogroup"
+            aria-label="Flame-aware presets"
+          >
+            <For each={FLAME_PRESET_IDS}>
+              {(preset) => {
+                // Offered only when the flame can actually satisfy them —
+                // a disabled button that explains itself beats one that
+                // silently wires nothing.
+                const available = () =>
+                  buildFlamePreset(preset, props.transforms).length > 0
+                return (
+                  <button
+                    class={
+                      ui.presetBtn +
+                      (props.audioMapping().preset === preset
+                        ? ` ${ui.presetBtnActive}`
+                        : '')
+                    }
+                    disabled={!available()}
+                    onClick={() => {
+                      applyPreset(preset)
+                    }}
+                    aria-label={`${PRESET_LABELS[preset]} preset`}
+                    title={
+                      available()
+                        ? PRESET_DESCRIPTIONS[preset]
+                        : 'This flame has nothing for this preset to drive'
+                    }
+                    role="radio"
+                    aria-checked={props.audioMapping().preset === preset}
+                  >
+                    {PRESET_LABELS[preset]}
+                  </button>
+                )
+              }}
+            </For>
+          </div>
         </div>
 
         {/* Mappings */}
         <div>
-          <div class={ui.sectionLabel}>Mappings</div>
+          <div class={ui.mappingsHeader}>
+            <div class={ui.sectionLabel}>Mappings</div>
+            {/* Randomize lives HERE, not only inside the wiring editor: it
+                rewrites exactly the list below, and having to open a modal to
+                reroll the thing you are looking at is a detour. */}
+            <button
+              class={ui.randomizeBtn}
+              onClick={randomizeCurrentWiring}
+              title="Reroll the wiring for this flame"
+            >
+              Randomize
+            </button>
+          </div>
           <div class={ui.mappingsList} role="list">
             <Index each={props.audioMapping().mappings}>
               {(mapping, index) => {
@@ -1085,23 +1141,63 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
         </div>
       </div>
 
-      {/* Bottom bar */}
+      {/* Status bar — what is loaded and what it is doing. The Live Preview
+          toggle used to live down here, a scroll away from the transport it
+          belongs to; this space is worth more as the answer to "what am I
+          looking at". */}
       <div class={ui.bottomBar}>
-        <label class={ui.enableToggle}>
-          <button
-            class={
-              ui.toggleSwitch +
-              (props.audioEnabled() ? ` ${ui.toggleSwitchOn}` : '')
-            }
-            onClick={() => {
-              props.onEnabledChange(!props.audioEnabled())
-            }}
-            aria-label="Toggle audio reactive preview"
+        {/* Controls first, on their own row; the read-only facts span the full
+            width beneath. Mixed on one line, whichever toggle did not fit
+            wrapped onto a row by itself and read as an afterthought rather
+            than as part of a set. */}
+        <div class={ui.statusToggles}>
+          {/* Closing the panel stops the audio, unless you say otherwise. A
+              track left playing from a panel you cannot see is a sound with no
+              visible cause and no obvious way to stop it — so this defaults
+              OFF, and is opt-in for when you DO want to keep listening while
+              working on the flame. */}
+          <label class={ui.enableToggle}>
+            <button
+              class={
+                ui.toggleSwitch +
+                (props.keepPlayingWhenClosed() ? ` ${ui.toggleSwitchOn}` : '')
+              }
+              onClick={() => {
+                props.onKeepPlayingChange(!props.keepPlayingWhenClosed())
+              }}
+              aria-label="Keep audio playing after closing this panel"
+              title="Keep playing after this panel is closed"
+            >
+              <span class={ui.toggleKnob} />
+            </button>
+            Keep playing when closed
+          </label>
+        </div>
+        <div class={ui.statusMeta}>
+          <span class={ui.statusItem} title="Flame being driven">
+            {props.flameName?.trim() || 'Untitled'}
+          </span>
+          <Show
+            when={props.audioSource() === 'file'}
+            fallback={<span class={ui.statusDim}>Microphone</span>}
           >
-            <span class={ui.toggleKnob} />
-          </button>
-          Live Preview
-        </label>
+            <span class={ui.statusItem} title="Loaded track">
+              {audioFileName() ?? 'No track'}
+            </span>
+            <Show when={props.audioBuffer()}>
+              {(buffer) => (
+                <span class={ui.statusDim}>
+                  {formatTime(buffer().duration)} ·{' '}
+                  {Math.round(buffer().sampleRate / 1000)} kHz
+                </span>
+              )}
+            </Show>
+          </Show>
+          <span class={ui.statusDim}>
+            {props.audioMapping().mappings.length} mapping
+            {props.audioMapping().mappings.length === 1 ? '' : 's'}
+          </span>
+        </div>
       </div>
 
       {/* Wiring modal overlay */}
@@ -1109,7 +1205,7 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
         <AudioWiringModal
           mappings={props.audioMapping().mappings}
           transforms={props.transforms}
-          presets={PRESET_MAPPINGS}
+          presets={wiringPresets()}
           featureLevels={liveFeatureLevels()}
           liveAnalyzer={props.liveAnalyzer()}
           onMappingsChange={(mappings) => {

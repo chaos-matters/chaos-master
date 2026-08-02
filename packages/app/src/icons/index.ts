@@ -16,6 +16,7 @@ import GitHub from './github.svg'
 import Globe from './globe.svg'
 import GridIcon from './grid.svg'
 import Heart from './heart.svg'
+import Home from './home.svg'
 import HoverEyePreview from './hover-eye-preview.svg'
 import HoverPreview from './hover-preview.svg'
 import Lineage from './lineage.svg'
@@ -58,6 +59,7 @@ export {
   Globe,
   GridIcon,
   Heart,
+  Home,
   HoverEyePreview,
   HoverPreview,
   Lineage,

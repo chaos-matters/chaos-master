@@ -19,6 +19,10 @@ export default defineConfig(
       '**/.pnpm-store', // present in CI
       '**/.wrangler',
       '**/assets/local', // gitignored local scratch (snapshots, throwaway scripts)
+      // Claude Code worktrees — a second checkout of this repo nested inside
+      // it. Linting it doubles every run (and OOM'd the heap `pnpm lint` sets)
+      // while reporting the same files twice under a path no fix applies to.
+      '**/.claude/worktrees',
     ],
   },
   importX.flatConfigs.recommended,

@@ -3,6 +3,7 @@ import { breedFlames, DEFAULT_BREED_CONFIG } from './breedFlame'
 import { example1 } from './examples/example1'
 import { example3 } from './examples/example3'
 import { example5 } from './examples/example5'
+import { example34 } from './examples/example34'
 import { validateFlame } from './schema/flameSchema'
 import type { BreedConfig } from './breedFlame'
 
@@ -238,6 +239,37 @@ describe('breedFlames', () => {
       )
       expect(totalProb).toBeGreaterThan(0.99)
       expect(totalProb).toBeLessThan(1.01)
+    }
+  })
+})
+
+describe('mismatched dimensions', () => {
+  /*
+   * This used to THROW rather than return nothing, and the throw happened
+   * inside BreedGallery's signal initialiser — so the modal never rendered and
+   * "Pick Second Parent" looked like a list where clicking did nothing.
+   *
+   * The cause is structural: crossover copies whole transforms between
+   * parents, and a 2D transform's affine has no `g`..`l`, so a 3D child built
+   * from one fails schema validation. Pickers filter to matching dimensions
+   * now; this is the backstop that keeps a mismatch survivable.
+   */
+  it('returns no children instead of throwing when parents differ', () => {
+    const dims2d = example1.renderSettings.dimensions ?? 2
+    const dims3d = example34.renderSettings.dimensions ?? 2
+    expect(dims2d).not.toBe(dims3d)
+
+    expect(() => breedFlames(example34, example1, { count: 4 })).not.toThrow()
+    expect(breedFlames(example34, example1, { count: 4 })).toEqual([])
+    expect(breedFlames(example1, example34, { count: 4 })).toEqual([])
+  })
+
+  it('still breeds two 3D parents', () => {
+    const children = breedFlames(example34, example34, { count: 3 })
+    expect(children.length).toBe(3)
+    for (const child of children) {
+      expect(child.renderSettings.dimensions).toBe(3)
+      expectValidFlame(child)
     }
   })
 })
