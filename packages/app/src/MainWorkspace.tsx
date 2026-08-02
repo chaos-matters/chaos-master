@@ -1,6 +1,6 @@
 import '@/commands/builtins'
 import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, onMount, Show, Suspense, untrack, } from 'solid-js'
-import { createStore } from 'solid-js/store'
+import { createStore, unwrap } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { vec2f, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
@@ -75,6 +75,7 @@ import { useCompactMode } from './contexts/CompactModeContext'
 import { useTheme } from './contexts/ThemeContext'
 import { TimelineContextProvider } from './contexts/TimelineContext'
 import { DEFAULT_POINT_COUNT, DEFAULT_QUALITY, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_RESOLUTION, IS_DEV, } from './defaults'
+import { breedFlames } from './flame/breedFlame'
 import { colorInitModeToImplFn } from './flame/colorInitMode'
 import { applyColorMapToFlame } from './flame/colorMap'
 import { drawModeToImplFn } from './flame/drawMode'
@@ -892,13 +893,97 @@ export function MainWorkspace(props: AppProps) {
     showToast('Morph ready — press Play to animate A → B', 3500)
   }
 
+  /**
+   * How long a candidate must stay hovered before its child is rendered.
+   *
+   * Slightly longer than the gallery's own 120ms clear delay: a child has a
+   * different transform structure from its parent, so showing one rebuilds the
+   * IFS pipeline, and sweeping the pointer down a list must not do that once
+   * per tile.
+   */
+  const BREED_PREVIEW_DELAY_MS = 220
+
   // Hover preview: temporarily set blend flame at 40% weight. Silent writes —
   // a transient hover must not create history entries or clobber redo.
   let prevBlendFlame: FlameDescriptor | undefined
   let prevBlendWeight = 0
   let blendPreviewActive = false
 
+  /**
+   * The child generated for whichever candidate is hovered, so clicking opens
+   * the gallery on the flame you were actually looking at rather than nine
+   * unrelated ones.
+   */
+  const [breedPreviewChild, setBreedPreviewChild] = createSignal<
+    FlameDescriptor | undefined
+  >(undefined)
+  /** The workspace flame as it was before a breed preview replaced it. */
+  let breedPreviewRestore: FlameDescriptor | undefined
+  let breedPreviewTimer: ReturnType<typeof setTimeout> | undefined
+
+  function writeDescriptor(next: FlameDescriptor) {
+    const value = deepClone(next)
+    history.setSilently((draft) => {
+      draft.version = value.version
+      draft.metadata = value.metadata
+      draft.renderSettings = value.renderSettings
+      draft.transforms = value.transforms
+    })
+  }
+
+  function endBreedPreview() {
+    clearTimeout(breedPreviewTimer)
+    breedPreviewTimer = undefined
+    setBreedPreviewChild(undefined)
+    if (breedPreviewRestore !== undefined) {
+      writeDescriptor(breedPreviewRestore)
+      breedPreviewRestore = undefined
+    }
+  }
+
+  /**
+   * Hovering a candidate while breeding shows an actual CHILD of the two
+   * flames, not a 40% blend of them.
+   *
+   * A blend is the wrong thing to show here twice over: it is not what
+   * breeding produces, and it cannot render at all in 3D — `ifsPipeline3D`
+   * has no blend input, so the old preview changed the hovered NAME while the
+   * picture sat still. A real child works in both dimensions, because
+   * `breedFlames` carries `variations3D`.
+   *
+   * Debounced, and this matters: a child has a different transform STRUCTURE
+   * from its parent, so applying one rebuilds the IFS pipeline. Sweeping the
+   * pointer across a list must not rebuild once per tile.
+   */
+  function previewBreedChild(flame: FlameDescriptor) {
+    clearTimeout(breedPreviewTimer)
+    breedPreviewTimer = setTimeout(() => {
+      const parentA = breedPreviewRestore ?? unwrap(flameDescriptor)
+      const [child] = breedFlames(parentA, flame, {
+        count: 1,
+        crossoverMode: 'uniform',
+        mutationStrength: 0.1,
+      })
+      if (child === undefined) {
+        return
+      }
+      // Snapshot once per hover run, not per tile: the restore target is the
+      // flame the user arrived with, never a previously previewed child.
+      breedPreviewRestore ??= deepClone(unwrap(flameDescriptor))
+      setBreedPreviewChild(child)
+      writeDescriptor(child)
+    }, BREED_PREVIEW_DELAY_MS)
+  }
+
   function handlePreviewBlend(flame: FlameDescriptor | null) {
+    if (blendIntent() === 'breed') {
+      if (flame) {
+        previewBreedChild(flame)
+      } else {
+        endBreedPreview()
+      }
+      return
+    }
     // The hover preview IS the blend mechanism, and blending is 2D-only:
     // `ifsPipeline3D.update()` takes a single flame — it has no blend input at
     // all, so `renderSettings.blendFlame` is silently ignored in 3D. Writing it
@@ -929,6 +1014,23 @@ export function MainWorkspace(props: AppProps) {
       blendPreviewActive = false
     }
   }
+
+  /*
+   * The catch-all for the breed preview.
+   *
+   * A preview replaces the workspace flame with a child, so every route out of
+   * the picker has to put it back. The gallery's own `onClose` does, but it is
+   * not the only way out — the hand-off reset, Escape and the sidebar toggles
+   * all clear `showBlendGallery` directly, and any of them would otherwise
+   * leave the child installed as the user's flame with no history entry
+   * explaining where it came from. Keying off the visibility itself covers
+   * every path, present and future.
+   */
+  createEffect(() => {
+    if (!showBlendGallery()) {
+      endBreedPreview()
+    }
+  })
 
   const [hoveredBlendName, setHoveredBlendName] = createSignal<string | null>(
     null,
@@ -5755,11 +5857,19 @@ export function MainWorkspace(props: AppProps) {
                             if (blendIntent() === 'morph') {
                               setupMorph(flame)
                             } else if (blendIntent() === 'breed') {
+                              /* The hover preview REPLACED the workspace flame
+                                 with a child. Take the child first, then put
+                                 the real flame back — otherwise parentA below
+                                 would be the preview, and the gallery would
+                                 breed a child with its own parent. */
+                              const seed = breedPreviewChild()
+                              endBreedPreview()
                               void _requestModal({
                                 content: ({ respond }) => (
                                   <BreedGallery
                                     parentA={flameDescriptor}
                                     parentB={deepClone(flame)}
+                                    seedChild={seed}
                                     parentInfo={{
                                       nameA:
                                         flameDescriptor.metadata?.name ||
