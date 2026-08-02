@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { deepClone } from '@/utils/clone'
-import { contentHash, ensureNode, getAncestryNodes, getChildrenOf, getLineageTree, getNode, getRoots, initAncestry, recordBreed, } from './ancestry'
+import { contentHash, ensureNode, getAncestryNodes, getChildrenOf, getLineageTree, getNode, getPedigreeTree, getRoots, initAncestry, recordBreed, } from './ancestry'
 import { validateFlame } from './schema/flameSchema'
 import type { FlameDescriptor } from './schema/flameSchema'
 
@@ -251,5 +251,116 @@ describe('getLineageTree', () => {
     expect(tree[0]!.generation).toBe(0)
     expect(tree[0]!.isFocal).toBe(true)
     expect(tree[0]!.nodes.map((n) => n.hash)).toEqual([contentHash(flame)])
+  })
+})
+
+describe('getPedigreeTree', () => {
+  it('returns nothing for an unknown hash', () => {
+    expect(getPedigreeTree('nope')).toEqual([])
+  })
+
+  it('puts a lone root in its own focal layer', () => {
+    const flame = makeFlame('Alone')
+    ensureNode(flame)
+    const tree = getPedigreeTree(contentHash(flame))
+    expect(tree).toHaveLength(1)
+    expect(tree[0]!.depth).toBe(0)
+    expect(tree[0]!.isFocal).toBe(true)
+  })
+
+  /*
+   * The reason this view exists. In `getLineageTree` a late-introduced mate
+   * sits in Gen 0 with the original grandparents, because generation is a
+   * property of the flame (it was never bred FROM anything) rather than of
+   * this pedigree. Depth is measured from the focal flame instead, so both
+   * parents of a child are always adjacent to it.
+   */
+  it('places both parents of the focal flame at depth 1, whatever their generation', () => {
+    const { grandchild, parent, mate } = buildLineage()
+    const tree = getPedigreeTree(contentHash(grandchild))
+
+    const focalLayer = tree.find((l) => l.isFocal)!
+    expect(focalLayer.nodes.map((n) => n.hash)).toEqual([
+      contentHash(grandchild),
+    ])
+
+    const depth1 = tree
+      .find((l) => l.direction === 'ancestor' && l.depth === 1)!
+      .nodes.map((n) => n.hash)
+      .sort()
+    expect(depth1).toEqual([contentHash(parent), contentHash(mate)].sort())
+
+    // ...even though those two are NOT the same generation.
+    expect(getNode(contentHash(parent))!.generation).toBe(1)
+    expect(getNode(contentHash(mate))!.generation).toBe(0)
+  })
+
+  it('walks back to the grandparents, drawn furthest from the focal flame', () => {
+    const { grandchild, gpA, gpB } = buildLineage()
+    const tree = getPedigreeTree(contentHash(grandchild))
+    const grandparents = tree.find(
+      (l) => l.direction === 'ancestor' && l.depth === 2,
+    )!
+    expect(grandparents.nodes.map((n) => n.hash).sort()).toEqual(
+      [contentHash(gpA), contentHash(gpB)].sort(),
+    )
+    // Oldest first: grandparents lead the list.
+    expect(tree[0]!.depth).toBe(2)
+  })
+
+  it('shows a flame once even when it is both parents of a child', () => {
+    const only = makeFlame('Self')
+    const child = makeFlame('Selfed')
+    recordBreed(only, only, [child])
+    const tree = getPedigreeTree(contentHash(child))
+    const parents = tree.find(
+      (l) => l.direction === 'ancestor' && l.depth === 1,
+    )!
+    expect(parents.nodes).toHaveLength(1)
+  })
+
+  it('terminates when a flame is bred back into its own descendant', () => {
+    const a = makeFlame('A')
+    const b = makeFlame('B')
+    const child = makeFlame('Child')
+    recordBreed(a, b, [child])
+    const backcross = makeFlame('Backcross')
+    recordBreed(child, a, [backcross])
+    // `a` is reachable by two routes; it must be drawn once and not loop.
+    const tree = getPedigreeTree(contentHash(backcross))
+    const all = tree.flatMap((l) => l.nodes.map((n) => n.hash))
+    expect(new Set(all).size).toBe(all.length)
+  })
+
+  it('runs both ways — a founder still shows the family it started', () => {
+    const { gpA, parent, grandchild } = buildLineage()
+    const tree = getPedigreeTree(contentHash(gpA))
+    const all = tree.flatMap((l) => l.nodes.map((n) => n.hash))
+    // gpA has no parents, but it does have descendants.
+    expect(all).toContain(contentHash(parent))
+    expect(all).toContain(contentHash(grandchild))
+    expect(tree.find((l) => l.isFocal)!.nodes[0]!.hash).toBe(contentHash(gpA))
+  })
+
+  it('orders oldest first: ancestors, focal, then descendants', () => {
+    const { parent } = buildLineage()
+    const tree = getPedigreeTree(contentHash(parent))
+    const dirs = tree.map((l) => l.direction)
+    expect(dirs[0]).toBe('ancestor')
+    expect(dirs[dirs.length - 1]).toBe('descendant')
+    expect(tree.filter((l) => l.isFocal)).toHaveLength(1)
+  })
+
+  it('draws every flame at most once across both directions', () => {
+    const a = makeFlame('A')
+    const b = makeFlame('B')
+    const child = makeFlame('Child')
+    recordBreed(a, b, [child])
+    const backcross = makeFlame('Backcross')
+    recordBreed(child, a, [backcross])
+    // `a` is both an ancestor of the focal AND a parent of its sibling line.
+    const tree = getPedigreeTree(contentHash(child))
+    const all = tree.flatMap((l) => l.nodes.map((n) => n.hash))
+    expect(new Set(all).size).toBe(all.length)
   })
 })

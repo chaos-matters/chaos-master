@@ -257,3 +257,61 @@
   color: #a3e635;
   line-height: 1.3;
 }
+
+/* ---- layout toggle ---- */
+
+.viewToggle {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+  margin-right: 12px;
+  padding: 2px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.viewToggleBtn {
+  font: inherit;
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--color-text-muted, #999);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--color-text, #eee);
+  }
+}
+
+.viewToggleBtnActive {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--color-text, #f2f3f5);
+}
+
+/* Pedigree stacks: oldest at the top, the current flame at the bottom, which
+   is how a family tree is read. The generations view stays horizontal, where
+   the left-to-right run of columns is the point. */
+.treeVertical {
+  flex-direction: column;
+  align-items: stretch;
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  & .layer {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+  }
+
+  & .layerNodes {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  & .layerLabel {
+    min-width: 11ch;
+    text-align: right;
+  }
+}
