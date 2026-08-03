@@ -1,22 +1,20 @@
 /**
- * Implements xoroshiro64++ random number generator with vec2u state
+ * Implements xoroshiro64** random number generator with vec2u state.
+ *
+ * The raw state remains local because the renderer persists it between
+ * dispatches. The algorithm primitives come from @typegpu/noise, which
+ * upstreamed this generator from Chaos Master.
  * https://prng.di.unimi.it/xoroshiro64starstar.c
  */
 
+import { rotl, u32To01F32 } from '@typegpu/noise'
 import { tgpu } from 'typegpu'
-import { u32, vec2f, vec2u, vec3f } from 'typegpu/data'
-import { acos, bitcastU32toF32, cos, mul, pow, sin, sqrt } from 'typegpu/std'
+import { vec2f, vec2u, vec3f } from 'typegpu/data'
+import { acos, cos, mul, pow, sin, sqrt } from 'typegpu/std'
 import { PI } from '@/flame/constants'
 import type { v2u } from 'typegpu/data'
 
 export const randomState = tgpu.privateVar(vec2u, vec2u(0, 0))
-
-const rotl = tgpu.fn(
-  [u32, u32],
-  u32,
-)((x: number, k: number) => {
-  return (x << k) | (x >> (32 - k))
-})
 
 export function setSeed(seed: v2u) {
   'use gpu'
@@ -38,24 +36,8 @@ export function next() {
 
 export function random() {
   'use gpu'
-  next()
-  const a = randomState.$.x
-  return bitcastU32toF32((a & 0x007fffff) | 0x3f800000) - 1.0
+  return u32To01F32(next())
 }
-
-export const hash = tgpu.fn(
-  [u32],
-  u32,
-)((i) => {
-  let x = i ^ (i >> 17)
-  x *= u32(0xed5ad4bb)
-  x ^= x >> 11
-  x *= u32(0xac4c1b51)
-  x ^= x >> 15
-  x *= u32(0x31848bab)
-  x ^= x >> 14
-  return x
-})
 
 export const randomUnitDisk = tgpu.fn(
   [],

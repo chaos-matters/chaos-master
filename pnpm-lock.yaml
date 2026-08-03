@@ -133,13 +133,13 @@ importers:
         version: 0.1.4(solid-js@1.9.11)
       '@typegpu/color':
         specifier: 0.11.0
-        version: 0.11.0(typegpu@0.11.9)
+        version: 0.11.0(typegpu@https://pkg.pr.new/software-mansion/TypeGPU/typegpu@93333b34a0b7f2e55bdd377fd3130be46ce07d3d)
       '@typegpu/noise':
-        specifier: 0.11.0
-        version: 0.11.0(typegpu@0.11.9)
+        specifier: https://pkg.pr.new/software-mansion/TypeGPU/@typegpu/noise@93333b34a0b7f2e55bdd377fd3130be46ce07d3d
+        version: https://pkg.pr.new/software-mansion/TypeGPU/@typegpu/noise@93333b34a0b7f2e55bdd377fd3130be46ce07d3d(typegpu@https://pkg.pr.new/software-mansion/TypeGPU/typegpu@93333b34a0b7f2e55bdd377fd3130be46ce07d3d)
       '@typegpu/sdf':
         specifier: 0.11.1
-        version: 0.11.1(typegpu@0.11.9)
+        version: 0.11.1(typegpu@https://pkg.pr.new/software-mansion/TypeGPU/typegpu@93333b34a0b7f2e55bdd377fd3130be46ce07d3d)
       '@vercel/analytics':
         specifier: 1.6.1
         version: 1.6.1
@@ -177,8 +177,8 @@ importers:
         specifier: ^0.3.3
         version: 0.3.3
       typegpu:
-        specifier: 0.11.9
-        version: 0.11.9
+        specifier: https://pkg.pr.new/software-mansion/TypeGPU/typegpu@93333b34a0b7f2e55bdd377fd3130be46ce07d3d
+        version: https://pkg.pr.new/software-mansion/TypeGPU/typegpu@93333b34a0b7f2e55bdd377fd3130be46ce07d3d
       valibot:
         specifier: 1.2.0
         version: 1.2.0(typescript@5.9.3)
@@ -1248,6 +1248,7 @@ packages:
 
   '@typegpu/color@0.11.0':
     resolution: {integrity: sha512-Ft/f5y6nL9LG325l3B7r6KKgq+Y6QKmk1Oe4rKNSgUJu1+jFCCJUoTxJmEoyCUlS2jxvlBubcVZN4X4QC0qhug==}
+    version: 0.11.0
     peerDependencies:
       typegpu: ^0.11.0
 
@@ -1256,8 +1257,15 @@ packages:
     peerDependencies:
       typegpu: ^0.11.0
 
+  '@typegpu/noise@https://pkg.pr.new/software-mansion/TypeGPU/@typegpu/noise@93333b34a0b7f2e55bdd377fd3130be46ce07d3d':
+    resolution: {tarball: https://pkg.pr.new/software-mansion/TypeGPU/@typegpu/noise@93333b34a0b7f2e55bdd377fd3130be46ce07d3d}
+    version: 0.11.0
+    peerDependencies:
+      typegpu: ^0.11.9
+
   '@typegpu/sdf@0.11.1':
     resolution: {integrity: sha512-FThfBk15JDWSaTuCbQ1ZZYoaa07qSnobyG2aKf+5jaNqH5r1iRxwWsHf0fDHifG8DqAuHFRkoNu2iwDCRpW8aw==}
+    version: 0.11.1
     peerDependencies:
       typegpu: ^0.11.2
 
@@ -3120,6 +3128,12 @@ packages:
     engines: {node: '>=12.20.0'}
     hasBin: true
 
+  typegpu@https://pkg.pr.new/software-mansion/TypeGPU/typegpu@93333b34a0b7f2e55bdd377fd3130be46ce07d3d:
+    resolution: {integrity: sha512-G/6qGpo8hk4VgxIwwQNFr6DuUVeTqPzmdNZK5WU4J1bmrXbPSq3cfBp52rsiOHcxa2zegRUaVxDjcnVuxpnSdw==, tarball: https://pkg.pr.new/software-mansion/TypeGPU/typegpu@93333b34a0b7f2e55bdd377fd3130be46ce07d3d}
+    version: 0.11.9
+    engines: {node: '>=12.20.0'}
+    hasBin: true
+
   typescript-eslint@8.61.0:
     resolution: {integrity: sha512-8y31Rd0eGTrDKqhy6vT0HtzhN+YLjQizwX3aA3hPXP/ynSfnrBXcQY5IzsP9/DM7+klX4IUncZZjkchP0z+rUw==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
@@ -4528,13 +4542,25 @@ snapshots:
     dependencies:
       typegpu: 0.11.9
 
+  '@typegpu/color@0.11.0(typegpu@https://pkg.pr.new/software-mansion/TypeGPU/typegpu@93333b34a0b7f2e55bdd377fd3130be46ce07d3d)':
+    dependencies:
+      typegpu: https://pkg.pr.new/software-mansion/TypeGPU/typegpu@93333b34a0b7f2e55bdd377fd3130be46ce07d3d
+
   '@typegpu/noise@0.11.0(typegpu@0.11.9)':
     dependencies:
       typegpu: 0.11.9
 
+  '@typegpu/noise@https://pkg.pr.new/software-mansion/TypeGPU/@typegpu/noise@93333b34a0b7f2e55bdd377fd3130be46ce07d3d(typegpu@https://pkg.pr.new/software-mansion/TypeGPU/typegpu@93333b34a0b7f2e55bdd377fd3130be46ce07d3d)':
+    dependencies:
+      typegpu: https://pkg.pr.new/software-mansion/TypeGPU/typegpu@93333b34a0b7f2e55bdd377fd3130be46ce07d3d
+
   '@typegpu/sdf@0.11.1(typegpu@0.11.9)':
     dependencies:
       typegpu: 0.11.9
+
+  '@typegpu/sdf@0.11.1(typegpu@https://pkg.pr.new/software-mansion/TypeGPU/typegpu@93333b34a0b7f2e55bdd377fd3130be46ce07d3d)':
+    dependencies:
+      typegpu: https://pkg.pr.new/software-mansion/TypeGPU/typegpu@93333b34a0b7f2e55bdd377fd3130be46ce07d3d
 
   '@types/aria-query@5.0.4': {}
 
@@ -6717,6 +6743,12 @@ snapshots:
   typed-binary@4.3.3: {}
 
   typegpu@0.11.9:
+    dependencies:
+      tinyest: 0.3.1
+      tsover-runtime: 0.0.7
+      typed-binary: 4.3.3
+
+  typegpu@https://pkg.pr.new/software-mansion/TypeGPU/typegpu@93333b34a0b7f2e55bdd377fd3130be46ce07d3d:
     dependencies:
       tinyest: 0.3.1
       tsover-runtime: 0.0.7
