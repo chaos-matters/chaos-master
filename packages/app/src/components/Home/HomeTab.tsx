@@ -4,6 +4,7 @@ import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { setActiveTab } from '@/lib/activeTab'
 import { bySection, fetchGallery, fetchGalleryItem, needsPosterFrame, posterUrl, } from '@/lib/galleryContent'
 import { createSharedIntersectionObserver } from '@/utils/useIntersectionObserver'
+import { installHomeEscapeBoundary } from './homeEscape'
 import { HomeFlame } from './HomeFlame'
 import { createPlaybackCoordinator } from './homePlayback'
 import { HomePortal } from './HomePortal'
@@ -411,20 +412,28 @@ export function HomeTab(props: HomeTabProps) {
    */
   const [selectedSlug, setSelectedSlug] = createSignal<string>()
 
+  function exitHome() {
+    setActiveTab('workspace')
+  }
+
   function select(slug: string) {
     setSelectedSlug((current) => (current === slug ? undefined : slug))
   }
 
-  // Escape, or a press anywhere that is not the selected plate, hands the
-  // camera back. Listeners only exist while something is selected.
+  // Home is a full-screen layer over a still-mounted workspace. Escape leaves
+  // it in one step, including while a plate owns the camera; an open modal is
+  // the nearer layer and keeps Escape first. The boundary also prevents the
+  // hidden workspace from acting on the same key.
+  createEffect(() => {
+    const remove = installHomeEscapeBoundary(exitHome)
+    onCleanup(remove)
+  })
+
+  // A press anywhere that is not the selected plate hands its camera back.
+  // This listener only exists while something is selected.
   createEffect(() => {
     if (selectedSlug() === undefined) {
       return
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setSelectedSlug(undefined)
-      }
     }
     // Capture phase, so this runs BEFORE the plate that was pressed: pressing a
     // different plate clears the old selection first, then that plate's own
@@ -438,10 +447,8 @@ export function HomeTab(props: HomeTabProps) {
         setSelectedSlug(undefined)
       }
     }
-    document.addEventListener('keydown', onKeyDown)
     document.addEventListener('pointerdown', onPointerDown, true)
     onCleanup(() => {
-      document.removeEventListener('keydown', onKeyDown)
       document.removeEventListener('pointerdown', onPointerDown, true)
     })
   })
@@ -484,9 +491,7 @@ export function HomeTab(props: HomeTabProps) {
         <button
           type="button"
           class={`${ui.railLink} ${ui.railBack}`}
-          onClick={() => {
-            setActiveTab('workspace')
-          }}
+          onClick={exitHome}
         >
           Back to the editor
         </button>

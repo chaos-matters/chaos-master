@@ -7,6 +7,7 @@
   "scripts": {
     "prepare": "git config core.hooksPath .githooks || true",
     "start": "pnpm --filter chaos-master start",
+    "capture:readme": "pnpm --filter chaos-master capture:readme",
     "fmt": "prettier packages --check",
     "fmt:fix": "prettier packages --write --log-level warn",
     "lint": "NODE_OPTIONS=\"--max-old-space-size=4096\" eslint",

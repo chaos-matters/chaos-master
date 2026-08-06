@@ -1,4 +1,5 @@
 import { benchmark } from './benchmark'
+import { classicExamples } from './classics'
 import { cliffordCsch2 } from './cliffordCsch2'
 import { example1 } from './example1'
 import { example2 } from './example2'
@@ -54,6 +55,7 @@ import type { FlameDescriptor } from '../schema/flameSchema'
 
 export const examples = {
   benchmark,
+  ...classicExamples,
   cliffordCsch2,
   initExample,
   initExample3D,
