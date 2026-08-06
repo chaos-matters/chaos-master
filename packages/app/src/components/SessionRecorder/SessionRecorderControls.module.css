@@ -1,0 +1,87 @@
+/* Same translucent-pill material as App.module.css .hover-preview-badge,
+   anchored to the canvas container's top-left (the badge owns top-center). */
+.recorder {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 101;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.28rem 0.6rem;
+  border-radius: 20px;
+  background: oklch(22% 0.025 240 / 0.88);
+  border: 1px solid oklch(50% 0.08 240 / 0.6);
+  color: oklch(88% 0.04 240);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 12px oklch(0% 0 0 / 0.4);
+  white-space: nowrap;
+
+  [data-theme='light'] & {
+    background: oklch(96% 0.01 240 / 0.92);
+    border-color: oklch(65% 0.08 240 / 0.5);
+    color: oklch(28% 0.06 240);
+    box-shadow: 0 2px 12px oklch(50% 0.04 240 / 0.2);
+  }
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 12px;
+  border: 1px solid oklch(50% 0.08 240 / 0.5);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+
+  &:hover {
+    background: oklch(50% 0.08 240 / 0.25);
+  }
+}
+
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.dot,
+.dot-recording {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: oklch(60% 0.22 25);
+}
+
+.dot-recording {
+  animation: recorder-pulse 1.2s ease-in-out infinite;
+}
+
+.unnamed {
+  padding: 0.1rem 0.45rem;
+  border-radius: 12px;
+  background: oklch(60% 0.18 60 / 0.35);
+  cursor: help;
+}
+
+@keyframes recorder-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot-recording {
+    animation: none;
+  }
+}

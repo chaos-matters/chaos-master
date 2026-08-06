@@ -1,3 +1,4 @@
+import { recordCommandExecution } from '@/recorder/recorder'
 import { IS_DEV } from '../defaults'
 import type { CommandContext, FlameCommand } from './types'
 
@@ -26,5 +27,10 @@ export function executeCommand(
     return
   }
   if (IS_DEV) console.info('[cmd:execute]', id, 'args:', ...args)
-  cmd.execute(ctx, ...args)
+  // Every execution passes through the session recorder: logged when a
+  // recording is active, and scoped either way so history writes are
+  // attributed to their command (see recorder/recorder.ts).
+  recordCommandExecution(cmd, args, () => {
+    cmd.execute(ctx, ...args)
+  })
 }

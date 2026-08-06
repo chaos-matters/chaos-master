@@ -1,4 +1,5 @@
 import './flame'
 import './camera'
+import './history'
 import './timeline'
 import './ui'
