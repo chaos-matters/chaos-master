@@ -1,11 +1,13 @@
 import { createSignal } from 'solid-js'
 import { latestSchemaVersion } from '@/flame/schema/flameSchema'
 import { deepClone } from '@/utils/clone'
+import { currentUndoSeq } from '@/utils/undoJournal'
 import { VERSION } from '@/version'
 import { SESSION_FORMAT_VERSION } from './schema'
 import type { RecordedAction, RecordedSession } from './schema'
 import type { FlameCommand } from '@/commands/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { UndoTarget } from '@/utils/undoRouting'
 
 /**
  * The session recorder: turns an editing session into a `.steps.json` log of
@@ -37,6 +39,9 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 type ActiveRecording = {
   startedAt: number
   createdAt: string
+  /** Undo-journal watermark at record start: entries with a greater seq were
+   *  created during this session, and only those can an undo replay against. */
+  baselineSeq: number
   initial: FlameDescriptor
   actions: RecordedAction[]
   unnamedWrites: { t: number; description?: string }[]
@@ -45,6 +50,9 @@ type ActiveRecording = {
 let active: ActiveRecording | undefined
 let commandDepth = 0
 let suppressDepth = 0
+/** Index of the action logged for the top-level command currently running,
+ *  so that command can retract it (see {@link reportUnreplayable}). */
+let pendingActionIndex: number | undefined
 
 const [isSessionRecording, setIsSessionRecording] = createSignal(false)
 const [recordedActionCount, setRecordedActionCount] = createSignal(0)
@@ -66,6 +74,7 @@ export function startSessionRecording(initial: FlameDescriptor): void {
   active = {
     startedAt: globalThis.performance.now(),
     createdAt: new Date().toISOString(),
+    baselineSeq: currentUndoSeq(),
     initial: deepClone(initial),
     actions: [],
     unnamedWrites: [],
@@ -118,6 +127,7 @@ export function recordCommandExecution(
       args: deepClone([...args]),
       label: cmd.label,
     })
+    pendingActionIndex = rec.actions.length - 1
     setRecordedActionCount(rec.actions.length)
   }
   commandDepth++
@@ -125,7 +135,51 @@ export function recordCommandExecution(
     run()
   } finally {
     commandDepth--
+    if (commandDepth === 0) pendingActionIndex = undefined
   }
+}
+
+/**
+ * "What just happened cannot be replayed from this log."
+ *
+ * Retracts the action logged for the command currently running (if any) and
+ * counts an unnamed write instead, so the honesty marker rises rather than the
+ * log quietly claiming a fidelity it does not have. Two callers today:
+ *
+ *  - `history.undo`/`history.redo`, when the entry they would apply was not
+ *    created during this recording (see {@link isUndoTargetWithinRecording}),
+ *  - the workspace, when it mounts while a recording started against a
+ *    different document is still active.
+ */
+export function reportUnreplayable(reason: string): void {
+  const rec = active
+  if (!rec || suppressDepth > 0) return
+  if (pendingActionIndex !== undefined) {
+    rec.actions.splice(pendingActionIndex, 1)
+    pendingActionIndex = undefined
+    setRecordedActionCount(rec.actions.length)
+  }
+  rec.unnamedWrites.push({ t: elapsedMs(rec), description: reason })
+  setUnnamedWriteCount(rec.unnamedWrites.length)
+  console.warn('[recorder] Unreplayable during recording:', reason)
+}
+
+/**
+ * Can an undo/redo of `target` be reproduced by replaying this log?
+ *
+ * Only if it lands on a FLAME entry created after recording started. A
+ * timeline entry is outside the recorded document entirely; an older flame
+ * entry predates `initial` and, on replay, the undo would instead revert the
+ * replayer's own load of `initial`. True when nothing is being recorded —
+ * there is no log to keep faithful.
+ */
+export function isUndoTargetWithinRecording(
+  target: UndoTarget | undefined,
+): boolean {
+  const rec = active
+  if (!rec) return true
+  if (target?.system !== 'flame') return false
+  return target.seq !== null && target.seq > rec.baselineSeq
 }
 
 /** Coverage hook: called by the main flame history for every entry that

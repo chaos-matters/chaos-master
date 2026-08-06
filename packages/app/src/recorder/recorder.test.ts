@@ -35,7 +35,10 @@ import type { TimelineTrack } from '@/utils/timeline'
 function makeHeadlessWorld(start: FlameDescriptor) {
   const [flame, setFlameDescriptor, history] = createStoreHistory(
     createStore<FlameDescriptor>(deepClone(start)),
-    { onEntryPushed: reportDocumentWrite },
+    // Journaled like MainWorkspace's: the recorder reads journal stamps to
+    // tell in-session edits from ones predating the recording, so an
+    // unjournaled history here would not exercise that rule at all.
+    { journal: true, onEntryPushed: reportDocumentWrite },
   )
   const [zoom, setZoom] = createSignal(1)
   const [position, setPosition] = createSignal(vec2f(0, 0))
@@ -85,7 +88,20 @@ function makeHeadlessWorld(start: FlameDescriptor) {
       },
     },
     modal: { open: () => {} },
-    history: { undo: history.undo, redo: history.redo },
+    // No timeline stack here, so the peeks report this history directly —
+    // the router's own arbitration is covered in undoRouting.test.ts.
+    history: {
+      undo: history.undo,
+      redo: history.redo,
+      peekUndoTarget: () =>
+        history.hasUndo()
+          ? { system: 'flame', seq: history.peekUndoSeq() }
+          : undefined,
+      peekRedoTarget: () =>
+        history.hasRedo()
+          ? { system: 'flame', seq: history.peekRedoSeq() }
+          : undefined,
+    },
   }
   return { flame, setFlameDescriptor, history, ctx }
 }
@@ -200,6 +216,29 @@ describe('record → replay round-trip', () => {
     })
   })
 
+  it('keeps an absent transform ref a no-op across the JSON boundary', () => {
+    createRoot((dispose) => {
+      const a = makeHeadlessWorld(examples.example1)
+      const before = Object.keys(a.flame.transforms)
+      startSessionRecording(a.flame)
+      executeCommand('flame.removeTransform', a.ctx) // no ref: a no-op
+      const session = stopOrThrow()
+
+      expect(Object.keys(a.flame.transforms)).toEqual(before)
+      // JSON has no undefined: both deepClone and .steps.json turn the absent
+      // ref into null, which must NOT fall through to "index 0" and delete
+      // the first transform on replay.
+      expect(session.actions[0]?.args).toEqual([null])
+      const parsed = parseSession(serializeSession(session))
+      if (!parsed) throw new Error('session did not round-trip')
+
+      const b = makeHeadlessWorld(examples.example1)
+      replayIntoWorld(parsed, b)
+      expect(Object.keys(b.flame.transforms)).toEqual(before)
+      dispose()
+    })
+  })
+
   it('replays seeded randomize/mutate identically, seed pinned into args', () => {
     createRoot((dispose) => {
       const a = makeHeadlessWorld(examples.example1)
@@ -271,6 +310,66 @@ describe('record → replay round-trip', () => {
       const b = makeHeadlessWorld(examples.initExample)
       replayIntoWorld(session, b)
       expect(b.flame.renderSettings.gamma).toBe(originalGamma)
+      dispose()
+    })
+  })
+})
+
+describe('undo that reaches outside the recorded session', () => {
+  it('flags an undo of an edit made BEFORE recording started', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      // Pre-recording edit: its journal stamp is below the session baseline.
+      executeCommand('flame.setGamma', world.ctx, 7)
+      startSessionRecording(world.flame)
+      executeCommand('history.undo', world.ctx)
+      const session = stopOrThrow()
+
+      // The undo still happened — it is just not claimable as replayable, so
+      // the action is retracted and the honesty marker rises instead.
+      expect(world.flame.renderSettings.gamma).not.toBe(7)
+      expect(session.actions).toEqual([])
+      expect(session.unnamedWriteCount).toBe(1)
+      dispose()
+    })
+  })
+
+  it('flags an undo routed to the timeline (not part of the document)', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      let undone = false
+      const ctx: CommandContext = {
+        ...world.ctx,
+        history: {
+          undo: () => {
+            undone = true
+          },
+          redo: () => {},
+          // What the router reports after, say, a keyframe drag.
+          peekUndoTarget: () => ({ system: 'timeline', seq: 9999 }),
+        },
+      }
+      startSessionRecording(world.flame)
+      executeCommand('history.undo', ctx)
+      const session = stopOrThrow()
+
+      expect(undone).toBe(true)
+      expect(session.actions).toEqual([])
+      expect(session.unnamedWriteCount).toBe(1)
+      dispose()
+    })
+  })
+
+  it('flags an undo with nothing left to revert', () => {
+    createRoot((dispose) => {
+      // On replay this would undo the replayer's own load of `initial`, so it
+      // is not the no-op it looks like.
+      const world = makeHeadlessWorld(examples.example1)
+      startSessionRecording(world.flame)
+      executeCommand('history.undo', world.ctx)
+      const session = stopOrThrow()
+      expect(session.actions).toEqual([])
+      expect(session.unnamedWriteCount).toBe(1)
       dispose()
     })
   })

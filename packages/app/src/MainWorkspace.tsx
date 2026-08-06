@@ -99,7 +99,7 @@ import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } fro
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { BoxArrowRight, Cross, Eye, EyeOff, Menu, Plus, Share, Shuffle, Terminal, } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
-import { reportDocumentWrite } from './recorder/recorder'
+import { isSessionRecording, reportDocumentWrite, reportUnreplayable, } from './recorder/recorder'
 import { createAnimationExport } from './utils/animationExport'
 import { createAudioAnalyzer } from './utils/audioAnalysis'
 import { autosaveIntervalMin, autosaveRecents, saveReminderDismissed, setAutosaveRecents, setSaveReminderDismissed, } from './utils/autosaveSettings'
@@ -1264,6 +1264,16 @@ export function MainWorkspace(props: AppProps) {
   })
 
   onMount(() => {
+    // A recording is module-global and outlives this component, so one that
+    // is already running belongs to a PREVIOUS workspace instance — this
+    // mount brought a fresh store and a fresh document with it. Anything
+    // recorded from here on would replay against the wrong initial flame, so
+    // say so instead of letting the log claim fidelity it lost.
+    if (isSessionRecording()) {
+      reportUnreplayable(
+        'Workspace remounted — the recording started against a different document',
+      )
+    }
     trackAppInit(Boolean(window.navigator?.gpu))
     loadCustomVariations()
     setCustomVarsVersion((v) => v + 1)
@@ -3404,6 +3414,8 @@ export function MainWorkspace(props: AppProps) {
     history: {
       undo: undoRouter.undoLast,
       redo: undoRouter.redoLast,
+      peekUndoTarget: undoRouter.peekUndoTarget,
+      peekRedoTarget: undoRouter.peekRedoTarget,
     },
   }
   useShortcutManager(cmdContext)

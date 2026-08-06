@@ -2,7 +2,6 @@ import { Show } from 'solid-js'
 import { cancelSessionRecording, isSessionRecording, recordedActionCount, startSessionRecording, stopSessionRecording, unnamedWriteCount, } from '@/recorder/recorder'
 import { serializeSession, sessionFilename } from '@/recorder/schema'
 import { downloadBlob } from '@/utils/blob'
-import { deepClone } from '@/utils/clone'
 import styles from './SessionRecorderControls.module.css'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
@@ -18,7 +17,9 @@ export function SessionRecorderControls(props: {
   flameDescriptor: FlameDescriptor
 }) {
   const startRecording = () => {
-    startSessionRecording(deepClone(props.flameDescriptor))
+    // No clone here: startSessionRecording owns that (and cloning a whole
+    // flame document twice is not free on large flames).
+    startSessionRecording(props.flameDescriptor)
   }
 
   const stopAndSave = () => {

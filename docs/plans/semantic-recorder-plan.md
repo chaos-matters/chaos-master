@@ -129,6 +129,13 @@ Decisions baked into this shape:
    such a write is logged as a diagnostic `unnamed` event with its
    `description` (if any) and a stack-trace-derived hint in dev builds.
 
+A third path exists for things the log cannot reproduce even though no
+anonymous write happened — an undo reverting an edit made before recording
+started or one held on the timeline's own stack, or a workspace remount that
+swapped the document underneath an active recording. These retract the action
+just logged (if any) and count an unnamed write instead, so the marker rises
+rather than the log asserting a fidelity it lost.
+
 Seam 2 is the **coverage ratchet**. Recording is correct when a session
 produces zero `unnamed` events. Until then, every unnamed event is a
 work-item pointing at a `MainWorkspace` handler that needs promoting to a

@@ -12,8 +12,11 @@ import type { Dims } from '@/flame/variationRegistry'
  * Resolve a transform reference — a stable `TransformId` or a 0-based index —
  * against a transform record. Commands accept both; `normalizeArgs` converts
  * indices to ids at execution time so recorded logs address transforms by
- * identity and survive reordering (semantic-recorder-plan, M2). An undefined
- * ref means "the first transform", preserving the old index-default behavior.
+ * identity and survive reordering (semantic-recorder-plan, M2). A missing ref
+ * means "the first transform", preserving the old index-default behavior —
+ * and missing covers `null` as well as `undefined`, because recorded args
+ * make a JSON round-trip (in `deepClone` and in `.steps.json`) that turns
+ * every `undefined` into `null`.
  */
 function resolveTransformKey(
   transforms: Record<string, unknown>,
@@ -38,6 +41,13 @@ function resolveVariationKey(
   const index = typeof ref === 'number' ? ref : 0
   const keys = Object.keys(variations) as VariationId[]
   return index >= 0 && index < keys.length ? keys[index] : undefined
+}
+
+/** No reference supplied. `null` counts because recorded args make a JSON
+ *  round-trip (in `deepClone` and in `.steps.json`) that rewrites every
+ *  `undefined` to `null`. */
+function isAbsentRef(ref: unknown): boolean {
+  return ref === undefined || ref === null
 }
 
 /** normalizeArgs helper: an id when the ref resolves, the original arg
@@ -72,26 +82,50 @@ registerCommand({
   },
 })
 
+/**
+ * Ids for added entities are minted by `normalizeArgs`, never inside a store
+ * setter: normalized args are what the session recorder logs, so a replayed
+ * add creates the same `TransformId`/`VariationId` and every later
+ * id-addressed action still finds its target.
+ *
+ * These resolvers are shared by `normalizeArgs` and `execute` so the two can
+ * never drift. They are idempotent — running them on already-normalized args
+ * (the registry path) returns those args unchanged, while a direct
+ * `execute()` call still gets sane values.
+ */
+function resolveVariationType(ctx: CommandContext, variationType: unknown) {
+  const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
+  return typeof variationType === 'string'
+    ? variationType
+    : defaultLinearType(dims)
+}
+
+function resolveNewTransformId(transformId: unknown): TransformId {
+  return (
+    typeof transformId === 'string' && transformId !== ''
+      ? transformId
+      : generateTransformId()
+  ) as TransformId
+}
+
+function resolveNewVariationId(variationId: unknown): VariationId {
+  return (
+    typeof variationId === 'string' && variationId !== ''
+      ? variationId
+      : generateVariationId()
+  ) as VariationId
+}
+
 registerCommand({
   id: 'flame.addTransform',
   label: 'Add Transform',
   description: 'Add a new transform with an optional variation type',
   shortcut: 'Shift+T',
-  // Ids are minted HERE, not inside the setter: normalized args are what the
-  // session recorder logs, so a replayed add creates the same TransformId/
-  // VariationId and every later id-addressed action still finds its target.
   normalizeArgs(ctx, [variationType, transformId, variationId]) {
-    const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
     return [
-      typeof variationType === 'string'
-        ? variationType
-        : defaultLinearType(dims),
-      typeof transformId === 'string' && transformId !== ''
-        ? transformId
-        : generateTransformId(),
-      typeof variationId === 'string' && variationId !== ''
-        ? variationId
-        : generateVariationId(),
+      resolveVariationType(ctx, variationType),
+      resolveNewTransformId(transformId),
+      resolveNewVariationId(variationId),
     ]
   },
   execute(
@@ -100,21 +134,9 @@ registerCommand({
     transformId?: unknown,
     variationId?: unknown,
   ) {
-    const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
-    const type =
-      typeof variationType === 'string'
-        ? variationType
-        : defaultLinearType(dims)
-    const tid = (
-      typeof transformId === 'string' && transformId !== ''
-        ? transformId
-        : generateTransformId()
-    ) as TransformId
-    const vid = (
-      typeof variationId === 'string' && variationId !== ''
-        ? variationId
-        : generateVariationId()
-    ) as VariationId
+    const type = resolveVariationType(ctx, variationType)
+    const tid = resolveNewTransformId(transformId)
+    const vid = resolveNewVariationId(variationId)
     ctx.setFlameDescriptor((draft) => {
       draft.transforms[tid] = {
         probability: 1,
@@ -137,11 +159,13 @@ registerCommand({
   description: 'Remove a transform by id or index (0-based)',
   normalizeArgs(ctx, [ref]) {
     // Deliberately no first-transform default: an absent ref stays absent
-    // (and no-ops), matching the old index-default of -1.
-    return [ref === undefined ? ref : normalizeTransformRef(ctx, ref)]
+    // (and no-ops), matching the old index-default of -1. Treating null as
+    // absent is what keeps that true after a JSON round-trip — otherwise a
+    // live no-op would replay as deleting the first transform.
+    return [isAbsentRef(ref) ? ref : normalizeTransformRef(ctx, ref)]
   },
   execute(ctx, ref?: unknown) {
-    if (ref === undefined) return
+    if (isAbsentRef(ref)) return
     ctx.setFlameDescriptor((draft) => {
       const key = resolveTransformKey(draft.transforms, ref)
       if (key) delete draft.transforms[key]
@@ -185,15 +209,10 @@ registerCommand({
   label: 'Add Variation',
   description: 'Add a variation type to a specific transform',
   normalizeArgs(ctx, [transformRef, variationType, variationId]) {
-    const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
     return [
       normalizeTransformRef(ctx, transformRef),
-      typeof variationType === 'string'
-        ? variationType
-        : defaultLinearType(dims),
-      typeof variationId === 'string' && variationId !== ''
-        ? variationId
-        : generateVariationId(),
+      resolveVariationType(ctx, variationType),
+      resolveNewVariationId(variationId),
     ]
   },
   execute(
@@ -202,16 +221,8 @@ registerCommand({
     variationType?: unknown,
     variationId?: unknown,
   ) {
-    const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
-    const type =
-      typeof variationType === 'string'
-        ? variationType
-        : defaultLinearType(dims)
-    const vid = (
-      typeof variationId === 'string' && variationId !== ''
-        ? variationId
-        : generateVariationId()
-    ) as VariationId
+    const type = resolveVariationType(ctx, variationType)
+    const vid = resolveNewVariationId(variationId)
     ctx.setFlameDescriptor((draft) => {
       const key = resolveTransformKey(draft.transforms, transformRef)
       const transform = key ? draft.transforms[key] : undefined
