@@ -50,6 +50,14 @@ export interface CommandContext {
   modal: {
     open: (name: string) => void
   }
+  /** Chronological undo/redo across flame history + timeline (the undo
+   *  router — see utils/undoRouting.ts). Optional: sandboxed contexts (the
+   *  Home portal, tests) have no undo systems, and `history.undo`/
+   *  `history.redo` are no-ops there. */
+  history?: {
+    undo: () => void
+    redo: () => void
+  }
 }
 
 export interface FlameCommand {

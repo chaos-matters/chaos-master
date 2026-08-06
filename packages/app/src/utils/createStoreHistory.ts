@@ -57,11 +57,17 @@ type CreateStoreHistoryOptions = {
    *  timeline) invalidates redo everywhere. Leave OFF for throwaway preview
    *  histories (e.g. the variation browser) so they stay isolated. */
   journal?: boolean
+  /** Called whenever a NEW entry lands on the stack (set, commit, replace) —
+   *  exactly once per undoable edit, after no-op elision, and never for
+   *  undo/redo/setSilently. The session recorder hooks the main flame
+   *  history here to detect writes that did not arrive through a registered
+   *  command (see recorder/recorder.ts). */
+  onEntryPushed?: (description?: string) => void
 }
 
 export function createStoreHistory<T extends object>(
   [store, setStore]: [Store<T>, SetStoreFunction<T>],
-  { journal = false }: CreateStoreHistoryOptions = {},
+  { journal = false, onEntryPushed }: CreateStoreHistoryOptions = {},
 ) {
   const [stackIndex, setStackIndex] = createSignal(-1)
   const [isUndoingOrRedoing, setIsUndoingOrRedoing] =
@@ -117,6 +123,7 @@ export function createStoreHistory<T extends object>(
       setStackIndex(p.length - 1)
       return p
     })
+    onEntryPushed?.(compressedItem.description)
   }
 
   function undo() {

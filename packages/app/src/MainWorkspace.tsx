@@ -57,6 +57,7 @@ import { PopulationSimulator } from './components/PopulationSimulator/Population
 import { ProgressBar } from './components/ProgressBar/ProgressBar'
 import { getPresetFromQuality, qualityPresets, } from './components/Quality/QualityPresets'
 import { QuickVariationPicker } from './components/QuickVariationPicker/QuickVariationPicker'
+import { SessionRecorderControls } from './components/SessionRecorder/SessionRecorderControls'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
 import { createShareVariationLinkModal, createShareVariationLoadModal, } from './components/ShareVariationModal/ShareVariationModal'
 import { AngleEditor } from './components/Sliders/ParametricEditors/AngleEditor'
@@ -74,7 +75,7 @@ import { ChangeHistoryContextProvider } from './contexts/ChangeHistoryContext'
 import { useCompactMode } from './contexts/CompactModeContext'
 import { useTheme } from './contexts/ThemeContext'
 import { TimelineContextProvider } from './contexts/TimelineContext'
-import { DEFAULT_POINT_COUNT, DEFAULT_QUALITY, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_RESOLUTION, IS_DEV, } from './defaults'
+import { DEBUG_MODE, DEFAULT_POINT_COUNT, DEFAULT_QUALITY, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_RESOLUTION, IS_DEV, } from './defaults'
 import { breedFlames } from './flame/breedFlame'
 import { colorInitModeToImplFn } from './flame/colorInitMode'
 import { applyColorMapToFlame } from './flame/colorMap'
@@ -98,6 +99,7 @@ import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } fro
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { BoxArrowRight, Cross, Eye, EyeOff, Menu, Plus, Share, Shuffle, Terminal, } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
+import { reportDocumentWrite } from './recorder/recorder'
 import { createAnimationExport } from './utils/animationExport'
 import { createAudioAnalyzer } from './utils/audioAnalysis'
 import { autosaveIntervalMin, autosaveRecents, saveReminderDismissed, setAutosaveRecents, setSaveReminderDismissed, } from './utils/autosaveSettings'
@@ -459,8 +461,10 @@ export function MainWorkspace(props: AppProps) {
       ),
     ),
     // The main flame history joins the app-wide undo journal so Ctrl+Z can
-    // arbitrate chronologically against the timeline's undo stack.
-    { journal: true },
+    // arbitrate chronologically against the timeline's undo stack. The
+    // session recorder listens to every pushed entry to flag edits that
+    // bypassed the command registry (its coverage ratchet).
+    { journal: true, onEntryPushed: reportDocumentWrite },
   )
   // Palette selection is part of the flame document (renderSettings.palette):
   // applying/removing one is a single undoable history entry, and the palette
@@ -3273,13 +3277,24 @@ export function MainWorkspace(props: AppProps) {
       if (ev.metaKey || ev.ctrlKey) {
         // Chronological across flame history + timeline (see undoRouting.ts);
         // the toolbar Undo/Redo buttons route through the same arbiter.
-        return ev.shiftKey ? undoRouter.redoLast() : undoRouter.undoLast()
+        // Routed through the command registry so a session recording sees
+        // the undo; guarded so a no-op never lands in the log.
+        if (ev.shiftKey ? !undoRouter.canRedo() : !undoRouter.canUndo()) {
+          return false
+        }
+        executeCommand(
+          ev.shiftKey ? 'history.redo' : 'history.undo',
+          cmdContext,
+        )
+        return true
       }
     },
     KeyY: (ev) => {
       if (animationExportRunning()) return false
       if (ev.metaKey || ev.ctrlKey) {
-        return undoRouter.redoLast()
+        if (!undoRouter.canRedo()) return false
+        executeCommand('history.redo', cmdContext)
+        return true
       }
     },
     KeyD: (ev) => {
@@ -3385,6 +3400,10 @@ export function MainWorkspace(props: AppProps) {
         if (name === 'exportPng') void showExportPngDialog()
         if (name === 'exportAnimation') void showExportPngDialog('animation')
       },
+    },
+    history: {
+      undo: undoRouter.undoLast,
+      redo: undoRouter.redoLast,
     },
   }
   useShortcutManager(cmdContext)
@@ -3620,6 +3639,12 @@ export function MainWorkspace(props: AppProps) {
               <ProgressBar />
               <ExportJobHost />
               <ExportJobTracker />
+              {/* M1 stub (docs/plans/semantic-recorder-plan.md): dev-gated
+                  until replay lands and command coverage makes logs faithful
+                  for a full editing session. */}
+              <Show when={IS_DEV || DEBUG_MODE}>
+                <SessionRecorderControls flameDescriptor={flameDescriptor} />
+              </Show>
               <div class={ui.bottomBar}>
                 <Show when={effectiveFlame().renderSettings.dimensions === 3}>
                   <OrientationGizmo
@@ -3649,8 +3674,12 @@ export function MainWorkspace(props: AppProps) {
                     pixelRatio={pixelRatio()}
                     setPixelRatio={setPixelRatio}
                     controlsDisabled={timeline.isPlaying()}
-                    onUndo={undoRouter.undoLast}
-                    onRedo={undoRouter.redoLast}
+                    onUndo={() => {
+                      executeCommand('history.undo', cmdContext)
+                    }}
+                    onRedo={() => {
+                      executeCommand('history.redo', cmdContext)
+                    }}
                     canUndo={undoRouter.canUndo}
                     canRedo={undoRouter.canRedo}
                     blendFlame={blendFlame()}
