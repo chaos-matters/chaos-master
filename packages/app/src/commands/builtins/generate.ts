@@ -1,6 +1,7 @@
 import { generateSeededRandomFlame, mutateFlameSeeded, MUTATION_PRESETS, } from '@/flame/randomize'
 import { deepClone } from '@/utils/clone'
 import { registerCommand } from '../registry'
+import type { CommandContext } from '../types'
 import type { GenerateRandomFlameConfig, MutateFlameOptions, } from '@/flame/randomize'
 
 /**
@@ -40,22 +41,34 @@ const MUTATE_DEFAULTS: MutateFlameOptions = {
   ...MUTATION_PRESETS.Moderate,
 }
 
+/**
+ * Shared by `normalizeArgs` and `execute` so the two can never drift, and
+ * idempotent: re-running it on already-normalized args (the registry path)
+ * returns them unchanged, while a direct `execute()` call still gets sane
+ * values.
+ */
+function resolveSeededArgs(
+  ctx: CommandContext,
+  seed: unknown,
+  config: unknown,
+): [number, GenerateRandomFlameConfig] {
+  const dims = ctx.flameDescriptor().renderSettings.dimensions ?? 2
+  return [
+    typeof seed === 'number' ? seed : mintSeed(),
+    (config ?? generateDefaults(dims)) as GenerateRandomFlameConfig,
+  ]
+}
+
 registerCommand({
   id: 'flame.randomize',
   label: 'Randomize Flame',
   description:
     'Replace the flame with a generated one — deterministic per seed',
   normalizeArgs(ctx, [seed, config]) {
-    const dims = ctx.flameDescriptor().renderSettings.dimensions ?? 2
-    return [
-      typeof seed === 'number' ? seed : mintSeed(),
-      config ?? generateDefaults(dims),
-    ]
+    return resolveSeededArgs(ctx, seed, config)
   },
   execute(ctx, seed?: unknown, config?: unknown) {
-    const s = typeof seed === 'number' ? seed : mintSeed()
-    const dims = ctx.flameDescriptor().renderSettings.dimensions ?? 2
-    const cfg = (config ?? generateDefaults(dims)) as GenerateRandomFlameConfig
+    const [s, cfg] = resolveSeededArgs(ctx, seed, config)
     // Built OUTSIDE the setter: the setter must stay pure (it runs once
     // under produceWithPatches, but purity is the contract).
     const generated = generateSeededRandomFlame(cfg, s)
@@ -69,17 +82,10 @@ registerCommand({
   description:
     'Mutate the current flame — deterministic per seed and input flame',
   normalizeArgs(ctx, [seed, config, options]) {
-    const dims = ctx.flameDescriptor().renderSettings.dimensions ?? 2
-    return [
-      typeof seed === 'number' ? seed : mintSeed(),
-      config ?? generateDefaults(dims),
-      options ?? MUTATE_DEFAULTS,
-    ]
+    return [...resolveSeededArgs(ctx, seed, config), options ?? MUTATE_DEFAULTS]
   },
   execute(ctx, seed?: unknown, config?: unknown, options?: unknown) {
-    const s = typeof seed === 'number' ? seed : mintSeed()
-    const dims = ctx.flameDescriptor().renderSettings.dimensions ?? 2
-    const cfg = (config ?? generateDefaults(dims)) as GenerateRandomFlameConfig
+    const [s, cfg] = resolveSeededArgs(ctx, seed, config)
     const opts = (options ?? MUTATE_DEFAULTS) as MutateFlameOptions
     const mutated = mutateFlameSeeded(
       deepClone(ctx.flameDescriptor()),

@@ -1060,23 +1060,57 @@ export function mutateFlameSeeded(
       new Set(Object.keys(transform.variations)),
     ]),
   )
-  let newTransformCount = 0
+
+  /**
+   * A stable name for a minted id, skipped past anything already in use.
+   *
+   * The skip matters because these names are derived from the seed alone, and
+   * a script may reuse one seed across several mutates: the second run would
+   * otherwise mint the exact name a survivor of the first run already holds,
+   * and `Object.fromEntries` would silently drop the survivor. `taken` is
+   * seeded with every id in the mutated flame, so a minted name can collide
+   * neither with a survivor nor with an earlier mint in this same pass.
+   */
+  const nextFreeId = (
+    prefix: string,
+    counter: { n: number },
+    taken: Set<string>,
+  ): string => {
+    let candidate = `${prefix}${counter.n++}`
+    while (taken.has(candidate)) {
+      candidate = `${prefix}${counter.n++}`
+    }
+    taken.add(candidate)
+    return candidate
+  }
+
+  const takenTransformIds = new Set(Object.keys(mutated.transforms))
+  const transformCounter = { n: 0 }
   const transforms = Object.fromEntries(
     Object.entries(mutated.transforms).map(
       ([tid, transform], transformIndex) => {
         const knownVids = inputVariationIds.get(tid)
-        let newVariationCount = 0
+        const takenVariationIds = new Set(Object.keys(transform.variations))
+        const variationCounter = { n: 0 }
         const variations = Object.fromEntries(
           Object.entries(transform.variations).map(([vid, variation]) => [
             knownVids?.has(vid) === true
               ? vid
-              : `mut_${seedTag}_${transformIndex}_${newVariationCount++}`,
+              : nextFreeId(
+                  `mut_${seedTag}_${transformIndex}_`,
+                  variationCounter,
+                  takenVariationIds,
+                ),
             variation,
           ]),
         )
         return [
           knownVids === undefined
-            ? `_mut_${seedTag}_${newTransformCount++}`
+            ? nextFreeId(
+                `_mut_${seedTag}_`,
+                transformCounter,
+                takenTransformIds,
+              )
             : tid,
           { ...transform, variations },
         ]

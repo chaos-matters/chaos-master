@@ -23,6 +23,14 @@ export function nextUndoSeq(): number {
   return ++seq
 }
 
+/** The most recently issued stamp, WITHOUT issuing one. A watermark: every
+ *  entry journaled after this call has a strictly greater seq, which is how
+ *  the session recorder tells edits made during a recording from ones that
+ *  predate it. */
+export function currentUndoSeq(): number {
+  return seq
+}
+
 const redoClearers = new Set<() => void>()
 
 /** Register a system's redo-clearer; returns an unregister function. */

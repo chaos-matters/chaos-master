@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { randomizeVariationParams, smartMutateAffine2D, smartMutateAffine3D, } from './randomize'
+import { recordEntries } from '@/utils/record'
+import { examples } from './examples'
+import { createSeededRandomSource, mutateFlame, mutateFlameSeeded, randomizeVariationParams, smartMutateAffine2D, smartMutateAffine3D, withRandomSource, } from './randomize'
+import type { GenerateRandomFlameConfig, MutateFlameOptions } from './randomize'
+import type { FlameDescriptor } from './schema/flameSchema'
 
 const identity2D = () => ({ a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 })
 const identity3D = () => ({
@@ -95,5 +99,86 @@ describe('smartMutateAffine3D', () => {
     expect(Object.keys(af).sort()).toEqual(
       ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'].sort(),
     )
+  })
+})
+
+/**
+ * `mutateFlameSeeded` is the session recorder's replay contract for Mutate:
+ * one (flame, config, options, seed) tuple must always yield one descriptor,
+ * ids included. See docs/plans/semantic-recorder-plan.md.
+ */
+describe('mutateFlameSeeded', () => {
+  const config: GenerateRandomFlameConfig = {
+    strength: 0.5,
+    minTransforms: 2,
+    maxTransforms: 4,
+    minVariations: 1,
+    maxVariations: 3,
+    allowedVariations: [],
+    dimensions: 2,
+  }
+  // Force the structural paths — added transforms and topped-up variations
+  // are the only things that mint ids, so they are what needs pinning.
+  const options: MutateFlameOptions = {
+    mutateAffine: true,
+    affineMode: 'smart',
+    mutateVariations: 'all',
+    mutateColors: true,
+    addTransformChance: 0.3,
+    removeTransformChance: 0.05,
+  }
+
+  it('is deterministic for one seed, and differs across seeds', () => {
+    const a = mutateFlameSeeded(examples.example1, config, options, 1234)
+    const b = mutateFlameSeeded(examples.example1, config, options, 1234)
+    expect(b).toEqual(a)
+    expect(
+      mutateFlameSeeded(examples.example1, config, options, 99),
+    ).not.toEqual(a)
+  })
+
+  it('keeps surviving ids untouched (timeline tracks reference them)', () => {
+    // No structural churn, so nothing is added or removed: every input id
+    // must come out the other side unchanged.
+    const stable: MutateFlameOptions = {
+      ...options,
+      mutateVariations: 'modify',
+      addTransformChance: 0,
+      removeTransformChance: 0,
+    }
+    const mutated = mutateFlameSeeded(examples.example1, config, stable, 7)
+    for (const [tid, transform] of recordEntries(
+      examples.example1.transforms,
+    )) {
+      expect(Object.keys(mutated.transforms)).toContain(tid)
+      expect(Object.keys(mutated.transforms[tid]!.variations)).toEqual(
+        Object.keys(transform.variations),
+      )
+    }
+  })
+
+  it('renames without dropping entries when a re-run reuses the seed', () => {
+    // A hand-written .steps.json may reuse one seed across mutates, so the
+    // second pass can mint a name the first pass already handed to a
+    // survivor — and Object.fromEntries would silently drop one of them.
+    // Renaming is pure bookkeeping: it must preserve the shape mutateFlame
+    // produced, entry for entry.
+    const shape = (f: FlameDescriptor) => [
+      Object.keys(f.transforms).length,
+      ...Object.values(f.transforms).map(
+        (t) => Object.keys(t.variations).length,
+      ),
+    ]
+    // Swept rather than pinned to one seed: whether a re-run mints a name a
+    // survivor already holds depends on where the mutator happens to add
+    // entities, so a single lucky seed proves nothing.
+    for (let seed = 0; seed < 40; seed++) {
+      const once = mutateFlameSeeded(examples.example1, config, options, seed)
+      const raw = withRandomSource(createSeededRandomSource(seed), () =>
+        mutateFlame(once, config, options),
+      )
+      const twice = mutateFlameSeeded(once, config, options, seed)
+      expect(shape(twice), `seed ${seed}`).toEqual(shape(raw))
+    }
   })
 })

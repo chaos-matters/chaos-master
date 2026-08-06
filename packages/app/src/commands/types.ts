@@ -3,6 +3,7 @@ import type { v2f } from 'typegpu/data'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { HistorySetter } from '@/utils/createStoreHistory'
 import type { TimelineTrack } from '@/utils/timeline'
+import type { UndoTarget } from '@/utils/undoRouting'
 
 export interface CommandContext {
   flameDescriptor: Accessor<FlameDescriptor>
@@ -53,10 +54,14 @@ export interface CommandContext {
   /** Chronological undo/redo across flame history + timeline (the undo
    *  router — see utils/undoRouting.ts). Optional: sandboxed contexts (the
    *  Home portal, tests) have no undo systems, and `history.undo`/
-   *  `history.redo` are no-ops there. */
+   *  `history.redo` are no-ops there. The peeks report what undo/redo WOULD
+   *  apply, which is how the session recorder decides whether the operation
+   *  is replayable from its log. */
   history?: {
     undo: () => void
     redo: () => void
+    peekUndoTarget?: () => UndoTarget | undefined
+    peekRedoTarget?: () => UndoTarget | undefined
   }
 }
 
