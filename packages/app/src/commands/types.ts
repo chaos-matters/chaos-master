@@ -65,5 +65,15 @@ export interface FlameCommand {
   label: string
   description: string
   shortcut?: string
+  /**
+   * Resolve args to their canonical, replayable form BEFORE recording and
+   * execution: positional transform/variation references become stable ids,
+   * ids for to-be-created entities are minted here (never inside a store
+   * setter — see createStoreHistory's single-execution contract), and random
+   * commands pin a concrete seed. The returned array is what the session
+   * recorder logs AND what `execute` receives, so a recorded action replays
+   * the exact entities and randomness of the original run.
+   */
+  normalizeArgs?: (ctx: CommandContext, args: unknown[]) => unknown[]
   execute: (ctx: CommandContext, ...args: unknown[]) => void
 }

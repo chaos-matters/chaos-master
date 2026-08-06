@@ -149,7 +149,7 @@ describe('record → replay round-trip', () => {
     })
   })
 
-  it('replays id-minting commands up to fresh ids (determinism gap, M2)', () => {
+  it('replays id-minting commands identically (ids pre-minted into args)', () => {
     createRoot((dispose) => {
       const a = makeHeadlessWorld(examples.example1)
       startSessionRecording(a.flame)
@@ -158,21 +158,94 @@ describe('record → replay round-trip', () => {
       executeCommand('flame.setProbability', a.ctx, 0, 0.6)
       const session = stopOrThrow()
 
+      // normalizeArgs minted the new TransformId/VariationId at record time,
+      // so the log carries them and replay creates the SAME entities.
+      const addArgs = session.actions[1]?.args ?? []
+      expect(typeof addArgs[0]).toBe('string') // resolved variation type
+      expect(typeof addArgs[1]).toBe('string') // pre-minted TransformId
+      expect(typeof addArgs[2]).toBe('string') // pre-minted VariationId
+      // The index-addressed follow-up was normalized to that same id.
+      expect(session.actions[2]?.args[0]).toBe(addArgs[1])
+
       const b = makeHeadlessWorld(examples.initExample)
       replayIntoWorld(session, b)
+      expect(deepClone(b.flame)).toEqual(deepClone(a.flame))
+      dispose()
+    })
+  })
 
-      // `flame.addTransform` mints a fresh TransformId/VariationId inside its
-      // setter, so the replayed document matches only structurally — the M2
-      // milestone (ids recorded as args) upgrades this to strict equality.
-      const shape = (f: FlameDescriptor) =>
-        Object.values(deepClone(f).transforms).map((t) => ({
-          ...t,
-          variations: Object.values(t.variations),
-        }))
-      expect(shape(b.flame)).toEqual(shape(a.flame))
-      expect(deepClone(b.flame).renderSettings).toEqual(
-        deepClone(a.flame).renderSettings,
-      )
+  it('normalizes positional refs to stable ids in the recorded args', () => {
+    createRoot((dispose) => {
+      const a = makeHeadlessWorld(examples.example1)
+      const transformIds = Object.keys(a.flame.transforms)
+      const secondId = transformIds[1]
+      if (secondId === undefined) throw new Error('example1 needs 2 transforms')
+      const firstVariationId = Object.keys(
+        a.flame.transforms[secondId as keyof typeof a.flame.transforms]!
+          .variations,
+      )[0]
+
+      startSessionRecording(a.flame)
+      executeCommand('flame.setProbability', a.ctx, 1, 0.25)
+      executeCommand('flame.setVariationWeight', a.ctx, 1, 0, 0.5)
+      const session = stopOrThrow()
+
+      expect(session.actions[0]?.args).toEqual([secondId, 0.25])
+      expect(session.actions[1]?.args).toEqual([
+        secondId,
+        firstVariationId,
+        0.5,
+      ])
+      dispose()
+    })
+  })
+
+  it('replays seeded randomize/mutate identically, seed pinned into args', () => {
+    createRoot((dispose) => {
+      const a = makeHeadlessWorld(examples.example1)
+      startSessionRecording(a.flame)
+      executeCommand('flame.randomize', a.ctx)
+      executeCommand('flame.mutate', a.ctx, undefined, undefined, {
+        mutateAffine: true,
+        affineMode: 'smart',
+        mutateVariations: 'all',
+        mutateColors: true,
+        // Force the structural paths: added transforms and topped-up
+        // variations mint ids, which the seed must make reproducible.
+        addTransformChance: 0.3,
+        removeTransformChance: 0.05,
+      })
+      const session = stopOrThrow()
+
+      // normalizeArgs pinned a concrete seed and the full config, so the log
+      // is self-contained even if command defaults change later.
+      for (const action of session.actions) {
+        expect(typeof action.args[0]).toBe('number')
+        expect(action.args[1]).toBeTypeOf('object')
+      }
+      expect(session.unnamedWriteCount).toBe(0)
+
+      const b = makeHeadlessWorld(examples.initExample)
+      replayIntoWorld(session, b)
+      expect(deepClone(b.flame)).toEqual(deepClone(a.flame))
+      dispose()
+    })
+  })
+
+  it('replays replacement-style commands (reset/loadPreset) for real', () => {
+    createRoot((dispose) => {
+      const a = makeHeadlessWorld(examples.example1)
+      startSessionRecording(a.flame)
+      executeCommand('flame.reset', a.ctx)
+      const session = stopOrThrow()
+
+      // Guards against the swallowed-return regression: reset must actually
+      // replace the document through the history-backed setter.
+      expect(deepClone(a.flame)).toEqual(deepClone(examples.initExample))
+
+      const b = makeHeadlessWorld(examples.example1)
+      replayIntoWorld(session, b)
+      expect(deepClone(b.flame)).toEqual(deepClone(examples.initExample))
       dispose()
     })
   })

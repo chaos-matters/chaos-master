@@ -181,6 +181,33 @@ describe('createStoreHistory', () => {
     })
   })
 
+  describe('replacement-style setters (setFn returns a whole new state)', () => {
+    it('replaces the store and round-trips undo/redo', () => {
+      const { store, set, history } = makeHistory()
+      const replacement: TestState = {
+        name: 'replaced',
+        items: { z: { value: 99 } },
+      }
+      set(() => structuredClone(replacement), 'Load')
+      expect(snapshot(store)).toEqual(replacement)
+      history.undo()
+      expect(snapshot(store)).toEqual(initialState())
+      history.redo()
+      expect(snapshot(store)).toEqual(replacement)
+    })
+
+    it('reports the entry to onEntryPushed like any other edit', () => {
+      const pushed: (string | undefined)[] = []
+      const [store, set] = createStoreHistory(
+        createStore<TestState>(initialState()),
+        { onEntryPushed: (d) => pushed.push(d) },
+      )
+      set(() => ({ name: 'swap', items: {} }), 'Replace All')
+      expect(store.name).toBe('swap')
+      expect(pushed).toEqual(['Replace All'])
+    })
+  })
+
   describe('preview batching (drag gestures)', () => {
     it('collapses startPreview → many sets → commit into one undo step', () => {
       const { store, set, history } = makeHistory()
