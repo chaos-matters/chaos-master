@@ -27,10 +27,14 @@ export function executeCommand(
     return
   }
   if (IS_DEV) console.info('[cmd:execute]', id, 'args:', ...args)
+  // Canonicalize BEFORE recording: normalizeArgs pins minted ids/seeds and
+  // converts positional refs to stable ids, so the log and the execution see
+  // the same, replayable arguments.
+  const finalArgs = cmd.normalizeArgs ? cmd.normalizeArgs(ctx, args) : args
   // Every execution passes through the session recorder: logged when a
   // recording is active, and scoped either way so history writes are
   // attributed to their command (see recorder/recorder.ts).
-  recordCommandExecution(cmd, args, () => {
-    cmd.execute(ctx, ...args)
+  recordCommandExecution(cmd, finalArgs, () => {
+    cmd.execute(ctx, ...finalArgs)
   })
 }

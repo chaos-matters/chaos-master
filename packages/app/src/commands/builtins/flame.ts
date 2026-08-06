@@ -4,15 +4,59 @@ import { defaultLinearType } from '@/flame/variationRegistry'
 import { getVariationDefault } from '@/flame/variations/utils'
 import { deepClone } from '@/utils/clone'
 import { registerCommand } from '../registry'
+import type { CommandContext } from '../types'
 import type { TransformId, VariationId } from '@/flame/schema/flameSchema'
 import type { Dims } from '@/flame/variationRegistry'
 
-function getTransformKey(
+/**
+ * Resolve a transform reference — a stable `TransformId` or a 0-based index —
+ * against a transform record. Commands accept both; `normalizeArgs` converts
+ * indices to ids at execution time so recorded logs address transforms by
+ * identity and survive reordering (semantic-recorder-plan, M2). An undefined
+ * ref means "the first transform", preserving the old index-default behavior.
+ */
+function resolveTransformKey(
   transforms: Record<string, unknown>,
-  index: number,
+  ref: unknown,
 ): TransformId | undefined {
+  if (typeof ref === 'string') {
+    return ref in transforms ? (ref as TransformId) : undefined
+  }
+  const index = typeof ref === 'number' ? ref : 0
   const keys = Object.keys(transforms) as TransformId[]
   return index >= 0 && index < keys.length ? keys[index] : undefined
+}
+
+/** Same contract as {@link resolveTransformKey}, for variations. */
+function resolveVariationKey(
+  variations: Record<string, unknown>,
+  ref: unknown,
+): VariationId | undefined {
+  if (typeof ref === 'string') {
+    return ref in variations ? (ref as VariationId) : undefined
+  }
+  const index = typeof ref === 'number' ? ref : 0
+  const keys = Object.keys(variations) as VariationId[]
+  return index >= 0 && index < keys.length ? keys[index] : undefined
+}
+
+/** normalizeArgs helper: an id when the ref resolves, the original arg
+ *  otherwise (so an unresolvable ref replays as the same no-op). */
+function normalizeTransformRef(ctx: CommandContext, ref: unknown): unknown {
+  return resolveTransformKey(ctx.flameDescriptor().transforms, ref) ?? ref
+}
+
+/** normalizeArgs helper for a (transformRef, variationRef) pair. */
+function normalizeVariationRef(
+  ctx: CommandContext,
+  transformRef: unknown,
+  variationRef: unknown,
+): unknown {
+  const transforms = ctx.flameDescriptor().transforms
+  const key = resolveTransformKey(transforms, transformRef)
+  const transform = key ? transforms[key] : undefined
+  if (!transform) return variationRef
+  return resolveVariationKey(transform.variations, variationRef) ?? variationRef
 }
 
 registerCommand({
@@ -33,14 +77,46 @@ registerCommand({
   label: 'Add Transform',
   description: 'Add a new transform with an optional variation type',
   shortcut: 'Shift+T',
-  execute(ctx, variationType?: unknown) {
+  // Ids are minted HERE, not inside the setter: normalized args are what the
+  // session recorder logs, so a replayed add creates the same TransformId/
+  // VariationId and every later id-addressed action still finds its target.
+  normalizeArgs(ctx, [variationType, transformId, variationId]) {
+    const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
+    return [
+      typeof variationType === 'string'
+        ? variationType
+        : defaultLinearType(dims),
+      typeof transformId === 'string' && transformId !== ''
+        ? transformId
+        : generateTransformId(),
+      typeof variationId === 'string' && variationId !== ''
+        ? variationId
+        : generateVariationId(),
+    ]
+  },
+  execute(
+    ctx,
+    variationType?: unknown,
+    transformId?: unknown,
+    variationId?: unknown,
+  ) {
     const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
     const type =
       typeof variationType === 'string'
         ? variationType
         : defaultLinearType(dims)
+    const tid = (
+      typeof transformId === 'string' && transformId !== ''
+        ? transformId
+        : generateTransformId()
+    ) as TransformId
+    const vid = (
+      typeof variationId === 'string' && variationId !== ''
+        ? variationId
+        : generateVariationId()
+    ) as VariationId
     ctx.setFlameDescriptor((draft) => {
-      draft.transforms[generateTransformId()] = {
+      draft.transforms[tid] = {
         probability: 1,
         colorSpeed: 0.4,
         color: { x: 0, y: 0 },
@@ -48,7 +124,7 @@ registerCommand({
         preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
         postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
         variations: {
-          [generateVariationId()]: getVariationDefault(type, 1),
+          [vid]: getVariationDefault(type, 1),
         },
       }
     })
@@ -58,11 +134,16 @@ registerCommand({
 registerCommand({
   id: 'flame.removeTransform',
   label: 'Remove Transform',
-  description: 'Remove a transform by index (0-based)',
-  execute(ctx, index?: unknown) {
-    const idx = typeof index === 'number' ? index : -1
+  description: 'Remove a transform by id or index (0-based)',
+  normalizeArgs(ctx, [ref]) {
+    // Deliberately no first-transform default: an absent ref stays absent
+    // (and no-ops), matching the old index-default of -1.
+    return [ref === undefined ? ref : normalizeTransformRef(ctx, ref)]
+  },
+  execute(ctx, ref?: unknown) {
+    if (ref === undefined) return
     ctx.setFlameDescriptor((draft) => {
-      const key = getTransformKey(draft.transforms, idx)
+      const key = resolveTransformKey(draft.transforms, ref)
       if (key) delete draft.transforms[key]
     })
   },
@@ -72,31 +153,28 @@ registerCommand({
   id: 'flame.setVariationWeight',
   label: 'Set Variation Weight',
   description: 'Set the weight of a variation on a specific transform',
+  normalizeArgs(ctx, [transformRef, variationRef, weight]) {
+    return [
+      normalizeTransformRef(ctx, transformRef),
+      normalizeVariationRef(ctx, transformRef, variationRef),
+      weight,
+    ]
+  },
   execute(
     ctx,
-    transformIndex?: unknown,
-    variationIndex?: unknown,
+    transformRef?: unknown,
+    variationRef?: unknown,
     weight?: unknown,
   ) {
-    const tidx = typeof transformIndex === 'number' ? transformIndex : 0
-    const vidx = typeof variationIndex === 'number' ? variationIndex : 0
     const w = typeof weight === 'number' ? weight : 1
     ctx.setFlameDescriptor((draft) => {
-      const key = getTransformKey(draft.transforms, tidx)
-      if (key) {
-        const transform = draft.transforms[key]
-        if (transform) {
-          const vKeys = Object.keys(transform.variations) as VariationId[]
-          if (vidx >= 0 && vidx < vKeys.length) {
-            const vKey = vKeys[vidx]
-            if (vKey) {
-              const variation = transform.variations[vKey]
-              if (variation) {
-                variation.weight = w
-              }
-            }
-          }
-        }
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const transform = key ? draft.transforms[key] : undefined
+      if (!transform) return
+      const vKey = resolveVariationKey(transform.variations, variationRef)
+      const variation = vKey ? transform.variations[vKey] : undefined
+      if (variation) {
+        variation.weight = w
       }
     })
   },
@@ -106,23 +184,39 @@ registerCommand({
   id: 'flame.addVariation',
   label: 'Add Variation',
   description: 'Add a variation type to a specific transform',
-  execute(ctx, transformIndex?: unknown, variationType?: unknown) {
-    const tidx = typeof transformIndex === 'number' ? transformIndex : 0
+  normalizeArgs(ctx, [transformRef, variationType, variationId]) {
+    const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
+    return [
+      normalizeTransformRef(ctx, transformRef),
+      typeof variationType === 'string'
+        ? variationType
+        : defaultLinearType(dims),
+      typeof variationId === 'string' && variationId !== ''
+        ? variationId
+        : generateVariationId(),
+    ]
+  },
+  execute(
+    ctx,
+    transformRef?: unknown,
+    variationType?: unknown,
+    variationId?: unknown,
+  ) {
     const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
     const type =
       typeof variationType === 'string'
         ? variationType
         : defaultLinearType(dims)
+    const vid = (
+      typeof variationId === 'string' && variationId !== ''
+        ? variationId
+        : generateVariationId()
+    ) as VariationId
     ctx.setFlameDescriptor((draft) => {
-      const key = getTransformKey(draft.transforms, tidx)
-      if (key) {
-        const transform = draft.transforms[key]
-        if (transform) {
-          transform.variations[generateVariationId()] = getVariationDefault(
-            type,
-            1,
-          )
-        }
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const transform = key ? draft.transforms[key] : undefined
+      if (transform) {
+        transform.variations[vid] = getVariationDefault(type, 1)
       }
     })
   },
@@ -132,16 +226,16 @@ registerCommand({
   id: 'flame.setColorSpeed',
   label: 'Set Color Speed',
   description: 'Set the color speed of a specific transform',
-  execute(ctx, transformIndex?: unknown, speed?: unknown) {
-    const tidx = typeof transformIndex === 'number' ? transformIndex : 0
+  normalizeArgs(ctx, [transformRef, speed]) {
+    return [normalizeTransformRef(ctx, transformRef), speed]
+  },
+  execute(ctx, transformRef?: unknown, speed?: unknown) {
     const s = typeof speed === 'number' ? speed : 0.5
     ctx.setFlameDescriptor((draft) => {
-      const key = getTransformKey(draft.transforms, tidx)
-      if (key) {
-        const transform = draft.transforms[key]
-        if (transform) {
-          transform.colorSpeed = s
-        }
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const transform = key ? draft.transforms[key] : undefined
+      if (transform) {
+        transform.colorSpeed = s
       }
     })
   },
@@ -173,16 +267,16 @@ registerCommand({
 registerCommand({
   id: 'flame.setProbability',
   label: 'Set Transform Probability',
-  description: 'Set the probability weight of a transform by index',
-  execute(ctx, transformIndex?: unknown, probability?: unknown) {
-    const tidx = typeof transformIndex === 'number' ? transformIndex : 0
+  description: 'Set the probability weight of a transform by id or index',
+  normalizeArgs(ctx, [transformRef, probability]) {
+    return [normalizeTransformRef(ctx, transformRef), probability]
+  },
+  execute(ctx, transformRef?: unknown, probability?: unknown) {
     const p = typeof probability === 'number' ? probability : 1
     ctx.setFlameDescriptor((draft) => {
-      const key = getTransformKey(draft.transforms, tidx)
-      if (key) {
-        const t = draft.transforms[key]
-        if (t) t.probability = p
-      }
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const t = key ? draft.transforms[key] : undefined
+      if (t) t.probability = p
     })
   },
 })
@@ -191,14 +285,16 @@ registerCommand({
   id: 'flame.setAffine',
   label: 'Set Affine Coefficient',
   description: 'Set a pre/post affine coefficient on a transform',
+  normalizeArgs(ctx, [transformRef, affineType, param, value]) {
+    return [normalizeTransformRef(ctx, transformRef), affineType, param, value]
+  },
   execute(
     ctx,
-    transformIndex?: unknown,
+    transformRef?: unknown,
     affineType?: unknown,
     param?: unknown,
     value?: unknown,
   ) {
-    const tidx = typeof transformIndex === 'number' ? transformIndex : 0
     const type =
       typeof affineType === 'string' && affineType === 'post'
         ? 'postAffine'
@@ -206,12 +302,10 @@ registerCommand({
     const p = typeof param === 'string' ? param : 'a'
     const v = typeof value === 'number' ? value : 1
     ctx.setFlameDescriptor((draft) => {
-      const key = getTransformKey(draft.transforms, tidx)
-      if (key) {
-        const t = draft.transforms[key]
-        if (t && p in t[type]) {
-          ;(t[type] as Record<string, number>)[p] = v
-        }
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const t = key ? draft.transforms[key] : undefined
+      if (t && p in t[type]) {
+        ;(t[type] as Record<string, number>)[p] = v
       }
     })
   },
@@ -221,16 +315,16 @@ registerCommand({
   id: 'flame.setTransformColor',
   label: 'Set Transform Color',
   description: 'Set the color x/y coordinates of a transform',
-  execute(ctx, transformIndex?: unknown, x?: unknown, y?: unknown) {
-    const tidx = typeof transformIndex === 'number' ? transformIndex : 0
+  normalizeArgs(ctx, [transformRef, x, y]) {
+    return [normalizeTransformRef(ctx, transformRef), x, y]
+  },
+  execute(ctx, transformRef?: unknown, x?: unknown, y?: unknown) {
     const cx = typeof x === 'number' ? x : 0
     const cy = typeof y === 'number' ? y : 0
     ctx.setFlameDescriptor((draft) => {
-      const key = getTransformKey(draft.transforms, tidx)
-      if (key) {
-        const t = draft.transforms[key]
-        if (t) t.color = { x: cx, y: cy }
-      }
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const t = key ? draft.transforms[key] : undefined
+      if (t) t.color = { x: cx, y: cy }
     })
   },
 })
@@ -334,34 +428,32 @@ registerCommand({
   label: 'Set Variation Params',
   description:
     'Set a parametric variation parameter by name on a specific transform/variation',
+  normalizeArgs(ctx, [transformRef, variationRef, paramName, paramValue]) {
+    return [
+      normalizeTransformRef(ctx, transformRef),
+      normalizeVariationRef(ctx, transformRef, variationRef),
+      paramName,
+      paramValue,
+    ]
+  },
   execute(
     ctx,
-    transformIndex?: unknown,
-    variationIndex?: unknown,
+    transformRef?: unknown,
+    variationRef?: unknown,
     paramName?: unknown,
     paramValue?: unknown,
   ) {
-    const tidx = typeof transformIndex === 'number' ? transformIndex : 0
-    const vidx = typeof variationIndex === 'number' ? variationIndex : 0
     const name = typeof paramName === 'string' ? paramName : ''
     const value = typeof paramValue === 'number' ? paramValue : 0
     if (!name) return
     ctx.setFlameDescriptor((draft) => {
-      const key = getTransformKey(draft.transforms, tidx)
-      if (key) {
-        const transform = draft.transforms[key]
-        if (transform) {
-          const vKeys = Object.keys(transform.variations) as VariationId[]
-          if (vidx >= 0 && vidx < vKeys.length) {
-            const vKey = vKeys[vidx]
-            if (vKey) {
-              const variation = transform.variations[vKey]
-              if (variation && 'params' in variation) {
-                ;(variation.params as Record<string, number>)[name] = value
-              }
-            }
-          }
-        }
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const transform = key ? draft.transforms[key] : undefined
+      if (!transform) return
+      const vKey = resolveVariationKey(transform.variations, variationRef)
+      const variation = vKey ? transform.variations[vKey] : undefined
+      if (variation && 'params' in variation) {
+        ;(variation.params as Record<string, number>)[name] = value
       }
     })
   },

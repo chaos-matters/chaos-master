@@ -186,11 +186,16 @@ export function createStoreHistory<T extends object>(
     // another, so undo of "New transform" silently did nothing and redo
     // duplicated it. Unchanged subtrees keep their identity through
     // produceWithPatches, so reconcile still yields fine-grained updates.
+    // The recipe passes setFn's return through: a replacement-style setter
+    // (`() => newFlame` — flame.reset, flame.loadPreset, seeded generate)
+    // replaces the document wholesale, exactly like replace() below, whose
+    // `() => value` recipe is what proves structurajs supports recipe
+    // returns. A mutation-style setter returns undefined and behaves as
+    // before. (Previously the braces swallowed the return, silently turning
+    // every replacement-style command into a no-op.)
     const [result, forwardPatchesRaw, backwardPatchesRaw] = produceWithPatches(
       unwrap(store),
-      (draft) => {
-        setFn(draft as T)
-      },
+      (draft) => setFn(draft as T),
     )
     // Isolate patch payloads BEFORE reconcile touches the store: object-valued
     // patches reference the store's existing raw nodes, and reconcile mutates

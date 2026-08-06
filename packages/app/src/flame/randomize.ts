@@ -13,7 +13,10 @@ export type RandomSource = () => number
 
 let activeRandomSource: RandomSource = Math.random
 
-function withRandomSource<T>(source: RandomSource, fn: () => T): T {
+/** Run `fn` with every random01()-based helper drawing from `source`.
+ *  Exported for deterministic wrappers (seeded generate/mutate commands,
+ *  benchmarks); ambient callers keep Math.random. */
+export function withRandomSource<T>(source: RandomSource, fn: () => T): T {
   const previous = activeRandomSource
   activeRandomSource = source
   try {
@@ -1030,4 +1033,55 @@ export function mutateFlame(
   }
 
   return mutated
+}
+
+/**
+ * Deterministic mutation: {@link mutateFlame} under a seeded source, with the
+ * ids it mints made reproducible. Mutation preserves every surviving id and
+ * generates fresh UUIDs only for ADDED transforms (`addTransformChance`) and
+ * ADDED variations (the 'all' mode top-up) — exactly those are renamed from
+ * the seed, so one (input, config, options, seed) tuple yields one descriptor:
+ * the session recorder's replay contract. Surviving ids must never be touched
+ * here; timeline tracks and selections reference them.
+ */
+export function mutateFlameSeeded(
+  flame: FlameDescriptor,
+  config: GenerateRandomFlameConfig,
+  options: MutateFlameOptions,
+  seed: number,
+): FlameDescriptor {
+  const mutated = withRandomSource(createSeededRandomSource(seed), () =>
+    mutateFlame(flame, config, options),
+  )
+  const seedTag = seed >>> 0
+  const inputVariationIds = new Map(
+    Object.entries(flame.transforms).map(([tid, transform]) => [
+      tid,
+      new Set(Object.keys(transform.variations)),
+    ]),
+  )
+  let newTransformCount = 0
+  const transforms = Object.fromEntries(
+    Object.entries(mutated.transforms).map(
+      ([tid, transform], transformIndex) => {
+        const knownVids = inputVariationIds.get(tid)
+        let newVariationCount = 0
+        const variations = Object.fromEntries(
+          Object.entries(transform.variations).map(([vid, variation]) => [
+            knownVids?.has(vid) === true
+              ? vid
+              : `mut_${seedTag}_${transformIndex}_${newVariationCount++}`,
+            variation,
+          ]),
+        )
+        return [
+          knownVids === undefined
+            ? `_mut_${seedTag}_${newTransformCount++}`
+            : tid,
+          { ...transform, variations },
+        ]
+      },
+    ),
+  )
+  return { ...mutated, transforms }
 }
