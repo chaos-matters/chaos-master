@@ -2,6 +2,7 @@
 // the built-in animations, then prints them as JSON so seeding can run in plain
 // node with no browser and no GPU. Bundled by esbuild (see seed-gallery.mjs).
 import { animationDefs, getAnimationFlame } from '@/flame/examples/animations'
+import { classicExamples } from '@/flame/examples/classics'
 import { example1 } from '@/flame/examples/example1'
 import { example14 } from '@/flame/examples/example14'
 import { example21 } from '@/flame/examples/example21'
@@ -15,6 +16,7 @@ import { example45 } from '@/flame/examples/example45'
 import { example46 } from '@/flame/examples/example46'
 
 const flames = {
+  ...classicExamples,
   example1,
   example14,
   example21,

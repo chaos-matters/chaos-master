@@ -30,13 +30,13 @@
 }
 
 .item {
-  padding: 0;
+  padding: 0 0 56.25%;
   margin: 0;
   position: relative;
   overflow: hidden;
   width: 100%;
-  height: auto;
-  aspect-ratio: 16 / 9;
+  min-height: 64px;
+  box-sizing: border-box;
   border: 1px solid var(--item-border-color);
   border-radius: 0.5rem;
   cursor: pointer;
@@ -58,6 +58,11 @@
 
 .item:hover .deleteBtn {
   opacity: 1;
+}
+
+.live-preview-layer {
+  position: absolute;
+  inset: 0;
 }
 
 .deleteBtn:hover {

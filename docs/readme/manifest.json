@@ -1,0 +1,267 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-05T16:46:13.753Z",
+  "source": {
+    "commit": "401d9df307aec478d3bcb87563bfa8cf49bd1e0d",
+    "shortCommit": "401d9df3",
+    "headTree": "8bf11aeabf936a75230b208c16fcc08587b39b05",
+    "branch": "feat/readme-product-showcase",
+    "dirty": true,
+    "statusSha256": "a0ee88887c5fe2f745badd7be42765910b8ce2a780c44ec1fb215392e8658bd1",
+    "trackedDiffSha256": "3a658d0643e32a1e74b01dc539b289a45a22acac2659243f91738b095b963709",
+    "base": "https://127.0.0.1:5193",
+    "mode": "owned-vite",
+    "servedCheckout": "packages/app"
+  },
+  "browser": {
+    "engine": "chromium",
+    "version": "148.0.7778.96",
+    "headless": false,
+    "sequential": true
+  },
+  "captures": [
+    {
+      "id": "studio",
+      "route": "/",
+      "output": "docs/readme/lumen-apeiron-studio.jpg",
+      "viewport": {
+        "width": 1600,
+        "height": 900,
+        "deviceScaleFactor": 1
+      },
+      "setup": [
+        "fresh browser context",
+        "dark theme",
+        "welcome dismissed",
+        "high hardware tier"
+      ],
+      "readiness": "waitForStudio",
+      "jpegQuality": 91,
+      "galleryContentProxy": "https://dev.lumenapeiron.com",
+      "galleryResponses": [],
+      "bytes": 208700,
+      "visualStats": {
+        "mean": 21.52979814824402,
+        "standardDeviation": 20.056734088415627,
+        "maximum": 252,
+        "colorfulFraction": 0.19451188016528925
+      },
+      "warnings": []
+    },
+    {
+      "id": "home",
+      "route": "/#home",
+      "output": "docs/readme/lumen-apeiron-home.jpg",
+      "viewport": {
+        "width": 1600,
+        "height": 900,
+        "deviceScaleFactor": 1
+      },
+      "setup": [
+        "fresh browser context",
+        "dark theme",
+        "welcome dismissed",
+        "high hardware tier"
+      ],
+      "readiness": "waitForHome",
+      "jpegQuality": 91,
+      "galleryContentProxy": "https://dev.lumenapeiron.com",
+      "galleryResponses": [
+        {
+          "url": "https://dev.lumenapeiron.com/api/gallery",
+          "status": 200,
+          "sha256": "e68b3c2945ea14e9f5108055ce909718f2031967d39bd30ad070d39362e0077f",
+          "itemCount": 17,
+          "itemIds": [
+            "cap-animation",
+            "cap-randomizer",
+            "cap-genetics",
+            "cap-audio",
+            "cap-sonification",
+            "aurora-drift",
+            "ember-lattice",
+            "tidal-bloom",
+            "spectrum-swirl",
+            "enchanted-rose",
+            "deep-current",
+            "likey-me",
+            "depth-of-color",
+            "first-light",
+            "camera-pan",
+            "julia-power-wave",
+            "geode-orbit"
+          ]
+        },
+        {
+          "url": "https://dev.lumenapeiron.com/api/gallery/poster/first-light-2d4f845d.webp",
+          "status": 200,
+          "sha256": "2d4f845d4d4a28ad9c23e9cc4279f22c1d6e1e1daa645f44eed1bf394c81e4ee",
+          "itemCount": 0,
+          "itemIds": []
+        },
+        {
+          "url": "https://dev.lumenapeiron.com/api/gallery/tidal-bloom",
+          "status": 200,
+          "sha256": "a173e466187708928d210c03d1deca90e3ef1d280756c12fea4d1ba158494e50",
+          "itemCount": 0,
+          "itemIds": []
+        },
+        {
+          "url": "https://dev.lumenapeiron.com/api/gallery/first-light",
+          "status": 200,
+          "sha256": "4f32a1ad8881f7066fc36132e53dc743976baa00465f5bd6b541311ef082b787",
+          "itemCount": 0,
+          "itemIds": []
+        },
+        {
+          "url": "https://dev.lumenapeiron.com/api/gallery/enchanted-rose",
+          "status": 200,
+          "sha256": "0827c0dda4e5ee8290fb83a178c1cfa74194038ceda41510fd2b2d7dd70ef5d7",
+          "itemCount": 0,
+          "itemIds": []
+        },
+        {
+          "url": "https://dev.lumenapeiron.com/api/gallery/poster/tidal-bloom-b0582f61.webp",
+          "status": 200,
+          "sha256": "b0582f61bba3b4bf5118d83d7fa674877316d047e0f90ac6b46a0f9cd3b39205",
+          "itemCount": 0,
+          "itemIds": []
+        },
+        {
+          "url": "https://dev.lumenapeiron.com/api/gallery/aurora-drift",
+          "status": 200,
+          "sha256": "a144e75573fdc25843e74d4d098e79ea472cc98a23258c29e62c5b03f80259aa",
+          "itemCount": 0,
+          "itemIds": []
+        },
+        {
+          "url": "https://dev.lumenapeiron.com/api/gallery/poster/aurora-drift-1c9b2245.webp",
+          "status": 200,
+          "sha256": "1c9b2245272bd1b10e35a93f8e94a22a645dadb9cc91c6a7c78a8da1bc7ec7a0",
+          "itemCount": 0,
+          "itemIds": []
+        },
+        {
+          "url": "https://dev.lumenapeiron.com/api/gallery/poster/geode-orbit-7d03860a.webp",
+          "status": 200,
+          "sha256": "7d03860a96bd040ef1dd7a6fb8c7fe5be197f540e4d7667dca8fd017dd1af2a4",
+          "itemCount": 0,
+          "itemIds": []
+        },
+        {
+          "url": "https://dev.lumenapeiron.com/api/gallery/poster/ember-lattice-0965822b.webp",
+          "status": 200,
+          "sha256": "0965822bd7eccfb64e6085626cb8386eb3f2fccf38efdc79e2746815c5cb76bf",
+          "itemCount": 0,
+          "itemIds": []
+        },
+        {
+          "url": "https://dev.lumenapeiron.com/api/gallery/poster/depth-of-color-0d687f4f.webp",
+          "status": 200,
+          "sha256": "0d687f4f6e92055e92ed45d4723326c6abb79487a70750ef591f842996c9156e",
+          "itemCount": 0,
+          "itemIds": []
+        },
+        {
+          "url": "https://dev.lumenapeiron.com/api/gallery/deep-current",
+          "status": 200,
+          "sha256": "c1c71a9886bec86f4fd92058c6476ac27ed3a27732a34ca4f96d0dce43e59780",
+          "itemCount": 0,
+          "itemIds": []
+        },
+        {
+          "url": "https://dev.lumenapeiron.com/api/gallery/ember-lattice",
+          "status": 200,
+          "sha256": "10627cfe7c5895a50c0282bd55c2d716d4e5b572907fea93b2b2a33fa4a86210",
+          "itemCount": 0,
+          "itemIds": []
+        },
+        {
+          "url": "https://dev.lumenapeiron.com/api/gallery/spectrum-swirl",
+          "status": 200,
+          "sha256": "f97c865b55c134f7a8ff4d8e91c5f6cd573c2bc61238e36254e94e5e6e61792b",
+          "itemCount": 0,
+          "itemIds": []
+        },
+        {
+          "url": "https://dev.lumenapeiron.com/api/gallery/poster/likey-me-19bb69af.webp",
+          "status": 200,
+          "sha256": "19bb69afef655921975bd56159837c0bd7329d631b6bce223545f5e614be08d0",
+          "itemCount": 0,
+          "itemIds": []
+        },
+        {
+          "url": "https://dev.lumenapeiron.com/api/gallery/poster/deep-current-9afdae6f.webp",
+          "status": 200,
+          "sha256": "9afdae6fe2a4a771141b0e08a991a36aa740209483db7b24e2ada23d37bdf0d6",
+          "itemCount": 0,
+          "itemIds": []
+        },
+        {
+          "url": "https://dev.lumenapeiron.com/api/gallery/poster/enchanted-rose-6a7e3ce1.webp",
+          "status": 200,
+          "sha256": "6a7e3ce1ae46559e878308dee946167e23b3cccb67fcf28d322d33f32de697c3",
+          "itemCount": 0,
+          "itemIds": []
+        },
+        {
+          "url": "https://dev.lumenapeiron.com/api/gallery/poster/camera-pan-61af30a1.webp",
+          "status": 200,
+          "sha256": "61af30a1f243179ddc5f526b9a7d5ed03125248c73e8b601d6bea9b643671e52",
+          "itemCount": 0,
+          "itemIds": []
+        },
+        {
+          "url": "https://dev.lumenapeiron.com/api/gallery/poster/spectrum-swirl-4d33a335.webp",
+          "status": 200,
+          "sha256": "4d33a335083a0f23b4f293fd9d83fed1850f1a9965b0f1e1376ebff61bf19bb7",
+          "itemCount": 0,
+          "itemIds": []
+        },
+        {
+          "url": "https://dev.lumenapeiron.com/api/gallery/poster/julia-power-wave-0af1cb6f.webp",
+          "status": 200,
+          "sha256": "0af1cb6f25c2ff04803de38b024d66296fe6d95e14ba37efa559cf6614696491",
+          "itemCount": 0,
+          "itemIds": []
+        }
+      ],
+      "bytes": 128769,
+      "visualStats": {
+        "mean": 17.79429571314256,
+        "standardDeviation": 27.09728927593444,
+        "maximum": 253,
+        "colorfulFraction": 0.20570913461538462
+      },
+      "warnings": []
+    },
+    {
+      "id": "benchmarks",
+      "route": "/benchmarks",
+      "output": "docs/readme/lumen-apeiron-benchmarks.jpg",
+      "viewport": {
+        "width": 1600,
+        "height": 900,
+        "deviceScaleFactor": 1
+      },
+      "setup": [
+        "fresh browser context",
+        "dark theme",
+        "welcome dismissed",
+        "high hardware tier"
+      ],
+      "readiness": "waitForBenchmarks",
+      "jpegQuality": 91,
+      "galleryContentProxy": "https://dev.lumenapeiron.com",
+      "galleryResponses": [],
+      "bytes": 143285,
+      "visualStats": {
+        "mean": 15.836598152783761,
+        "standardDeviation": 16.09993461051471,
+        "maximum": 253,
+        "colorfulFraction": 0.003958333333333334
+      },
+      "warnings": []
+    }
+  ]
+}

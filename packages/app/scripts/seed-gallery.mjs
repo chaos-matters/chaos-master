@@ -73,6 +73,45 @@ const CURATION = {
     },
   ],
   gallery: [
+    // Rights-safe launch collection: canonical public mathematical
+    // constructions, implemented here as original flame descriptors. These
+    // remain structurally exact; only color and camera are presentation.
+    {
+      slug: 'classic-sierpinski-triangle',
+      title: 'Sierpiński Triangle',
+      caption: 'Classic IFS · Three exact maps, one infinite gasket.',
+      example: 'sierpinskiTriangle',
+    },
+    {
+      slug: 'classic-sierpinski-carpet',
+      title: 'Sierpiński Carpet',
+      caption: 'Classic IFS · Eight maps remove the center at every scale.',
+      example: 'sierpinskiCarpet',
+    },
+    {
+      slug: 'classic-barnsley-fern',
+      title: 'Barnsley Fern',
+      caption: 'Classic IFS · Four probabilities grow a botanical silhouette.',
+      example: 'barnsleyFern',
+    },
+    {
+      slug: 'classic-koch-curve',
+      title: 'Koch Curve',
+      caption: 'Classic IFS · Four joined thirds make an edge without end.',
+      example: 'kochCurve',
+    },
+    {
+      slug: 'classic-heighway-dragon',
+      title: 'Heighway Dragon',
+      caption: 'Classic IFS · Two folded maps meet at the dragon’s hinge.',
+      example: 'heighwayDragon',
+    },
+    {
+      slug: 'classic-menger-sponge',
+      title: 'Menger Sponge',
+      caption: 'Classic IFS · Twenty affine branches carve an endless void.',
+      example: 'mengerSponge',
+    },
     { slug: 'aurora-drift', title: 'Aurora Drift', example: 'example29' },
     { slug: 'ember-lattice', title: 'Ember Lattice', example: 'example33' },
     { slug: 'tidal-bloom', title: 'Tidal Bloom', example: 'example40' },
