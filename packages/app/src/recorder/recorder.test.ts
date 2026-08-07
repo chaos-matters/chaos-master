@@ -651,6 +651,118 @@ describe('transform-card commands', () => {
   })
 })
 
+describe('camera and symmetry commands', () => {
+  it('addresses nested camera fields by path', () => {
+    createRoot((dispose) => {
+      const a = makeHeadlessWorld(examples.example1)
+      startSessionRecording(a.flame)
+      executeCommand('flame.setRenderSetting', a.ctx, 'camera.zoom', 2.5)
+      executeCommand(
+        'flame.setRenderSetting',
+        a.ctx,
+        'camera.position',
+        [0.25, -0.5],
+      )
+      executeCommand('flame.setRenderSetting', a.ctx, 'camera3D.theta', 1.2)
+      const session = stopOrThrow()
+
+      expect(a.flame.renderSettings.camera.zoom).toBeCloseTo(2.5, 5)
+      expect(a.flame.renderSettings.camera.position).toEqual([0.25, -0.5])
+      expect(session.unnamedWriteCount).toBe(0)
+
+      const b = makeHeadlessWorld(examples.initExample)
+      replayIntoWorld(session, b)
+      expect(deepClone(b.flame)).toEqual(deepClone(a.flame))
+      dispose()
+    })
+  })
+
+  it('folds a camera pan into one action but keeps zoom separate', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      startSessionRecording(world.flame)
+      // WheelZoomCamera2D brackets each gesture with startPreview/commit.
+      world.history.startPreview('Camera pan')
+      for (const x of [0.1, 0.2, 0.3]) {
+        executeCommand('flame.setRenderSetting', world.ctx, 'camera.position', [
+          x,
+          0,
+        ])
+      }
+      executeCommand('flame.setRenderSetting', world.ctx, 'camera.zoom', 3)
+      world.history.commit()
+      const session = stopOrThrow()
+
+      expect(session.actions.map((a) => a.args)).toEqual([
+        ['camera.position', [0.3, 0]],
+        ['camera.zoom', 3],
+      ])
+      expect(session.unnamedWriteCount).toBe(0)
+      dispose()
+    })
+  })
+
+  it('rejects a nested path outside the vocabulary', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      const before = deepClone(world.flame)
+      startSessionRecording(world.flame)
+      executeCommand('flame.setRenderSetting', world.ctx, 'camera.nope', 1)
+      executeCommand('flame.setRenderSetting', world.ctx, 'camera', 1)
+      executeCommand(
+        'flame.setRenderSetting',
+        world.ctx,
+        'camera.position',
+        [1, 2, 3],
+      )
+      stopOrThrow()
+      expect(deepClone(world.flame)).toEqual(before)
+      dispose()
+    })
+  })
+
+  it('replays symmetry with the ids it minted', () => {
+    createRoot((dispose) => {
+      const a = makeHeadlessWorld(examples.example1)
+      startSessionRecording(a.flame)
+      executeCommand('flame.applySymmetry', a.ctx, 4, 'dihedral')
+      const session = stopOrThrow()
+
+      // 4-fold rotational adds 3, dihedral adds its mirror: 4 pairs.
+      const ids = session.actions[0]?.args[2]
+      expect(Array.isArray(ids) && ids.length).toBe(4)
+      const symmetryIds = Object.keys(a.flame.transforms).filter((tid) =>
+        tid.startsWith('_sym__'),
+      )
+      expect(symmetryIds).toHaveLength(4)
+
+      const b = makeHeadlessWorld(examples.example1)
+      replayIntoWorld(session, b)
+      expect(deepClone(b.flame)).toEqual(deepClone(a.flame))
+      dispose()
+    })
+  })
+
+  it('regenerating symmetry replaces the previous set', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      executeCommand('flame.applySymmetry', world.ctx, 6, 'rotational')
+      expect(
+        Object.keys(world.flame.transforms).filter((t) =>
+          t.startsWith('_sym__'),
+        ),
+      ).toHaveLength(5)
+      executeCommand('flame.applySymmetry', world.ctx, 3, 'rotational')
+      expect(
+        Object.keys(world.flame.transforms).filter((t) =>
+          t.startsWith('_sym__'),
+        ),
+      ).toHaveLength(2)
+      dispose()
+    })
+  })
+})
+
 describe('palette and document-load commands', () => {
   const palette = {
     id: 'test-palette',

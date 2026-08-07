@@ -843,3 +843,89 @@ registerCommand({
     )
   },
 })
+
+/** How many transforms an n-fold symmetry of this type adds. */
+function symmetryTransformCount(n: unknown, type: unknown): number {
+  const folds = typeof n === 'number' && n > 1 ? Math.floor(n) : 0
+  if (folds === 0) return type === 'dihedral' ? 1 : 0
+  return folds - 1 + (type === 'dihedral' ? 1 : 0)
+}
+
+registerCommand({
+  id: 'flame.applySymmetry',
+  label: 'Apply Symmetry',
+  description:
+    'Replace the generated symmetry transforms with an n-fold rotational or dihedral set',
+  // Every symmetry transform it creates needs an id, and minting them inside
+  // the setter would hand replay different UUIDs. normalizeArgs pre-mints one
+  // (transform, variation) pair per transform the command is about to add, so
+  // the log carries them. Re-running with the same n and type reuses them.
+  normalizeArgs(_ctx, [n, type, ids]) {
+    const count = symmetryTransformCount(n, type)
+    const existing = Array.isArray(ids) ? ids : []
+    return [
+      n,
+      type === 'dihedral' ? 'dihedral' : 'rotational',
+      Array.from({ length: count }, (_, i) => {
+        const pair = existing[i]
+        return Array.isArray(pair) &&
+          typeof pair[0] === 'string' &&
+          typeof pair[1] === 'string'
+          ? pair
+          : [generateTransformId('sym'), generateVariationId()]
+      }),
+    ]
+  },
+  execute(ctx, n?: unknown, type?: unknown, ids?: unknown) {
+    const count = symmetryTransformCount(n, type)
+    if (count === 0) return
+    const pairs = Array.isArray(ids) ? ids : []
+    const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
+    const linear = () => getVariationDefault(defaultLinearType(dims), 1)
+    const folds = typeof n === 'number' ? n : 0
+    ctx.setFlameDescriptor((draft) => {
+      // Regenerating replaces the previous set rather than stacking on it.
+      for (const tid of Object.keys(draft.transforms) as TransformId[]) {
+        if (tid.startsWith('_sym__')) delete draft.transforms[tid]
+      }
+      const totalWeight = Object.values(draft.transforms).reduce(
+        (total, t) => total + t.probability,
+        0,
+      )
+      const symWeight = Math.max(totalWeight, 1)
+      const identity = { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 }
+      const add = (
+        index: number,
+        preAffine: {
+          a: number
+          b: number
+          c: number
+          d: number
+          e: number
+          f: number
+        },
+      ) => {
+        const pair = pairs[index] as [string, string] | undefined
+        if (!pair) return
+        draft.transforms[pair[0] as TransformId] = {
+          probability: symWeight,
+          colorSpeed: 0,
+          color: { x: 0, y: 0 },
+          visible: true,
+          preAffine,
+          postAffine: identity,
+          variations: { [pair[1] as VariationId]: linear() },
+        }
+      }
+      for (let i = 1; i < folds; i++) {
+        const angle = (2 * Math.PI * i) / folds
+        const cos = Math.cos(angle)
+        const sin = Math.sin(angle)
+        add(i - 1, { a: cos, b: -sin, c: 0, d: sin, e: cos, f: 0 })
+      }
+      if (type === 'dihedral') {
+        add(count - 1, { a: -1, b: 0, c: 0, d: 0, e: 1, f: 0 })
+      }
+    }, 'Apply Symmetry')
+  },
+})
