@@ -2,8 +2,9 @@
 
 Status: **in progress**. M1 (recorder core, coverage ratchet, `.steps.json`),
 M2 (determinism: `normalizeArgs`, id addressing, pre-minted ids, seeded
-generate/mutate) and M4 (replay: transport, step list, jump-to-step,
-fork-from-step) are implemented. M3 is largely done: gesture handling
+generate/mutate), M4 (replay: transport, step list, jump-to-step,
+fork-from-step) and the PNG half of M5 (a `FlameSteps` chunk beside
+`FlameJson`; dropping such a PNG offers its replay) are implemented. M3 is largely done: gesture handling
 landed, and the render settings, transform card, affine editor, colour
 editors, palette, camera, symmetry, randomize/mutate and document loads are
 converted. Roughly two dozen direct writes remain in `MainWorkspace.tsx` —

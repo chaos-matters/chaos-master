@@ -65,12 +65,16 @@ export function serializeSession(session: RecordedSession): string {
  *  malformed JSON, unknown format version, or an initial flame that does
  *  not survive validation/migration. */
 export function parseSession(json: string): RecordedSession | undefined {
-  let data: unknown
   try {
-    data = JSON.parse(json)
+    return validateSession(JSON.parse(json))
   } catch {
     return undefined
   }
+}
+
+/** Same checks against an already-decoded value — the form a session takes
+ *  when it arrives from a PNG chunk rather than a file. */
+export function validateSession(data: unknown): RecordedSession | undefined {
   const shell = v.safeParse(RecordedSessionShellSchema, data)
   if (!shell.success) return undefined
   const initial = tryValidateFlame(shell.output.initial)

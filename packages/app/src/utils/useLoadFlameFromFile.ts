@@ -1,12 +1,17 @@
 import { useAlert } from '@/components/Modal/useAlert'
+import { validateSession } from '@/recorder/schema'
 import { extractMetadataFromMp4 } from './flameInMp4'
-import { extractFlameFromPng } from './flameInPng'
+import { extractFlameFromPng, extractStepsFromPng } from './flameInPng'
 import type { SharePayload } from './jsonQueryParam'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { RecordedSession } from '@/recorder/schema'
 
 export type FlameLoadResult = {
   flame: FlameDescriptor
   animation?: SharePayload['animation']
+  /** The session that produced this flame, when the PNG carries one — the
+   *  caller can then offer to replay how it was made (M5). */
+  session?: RecordedSession
 }
 
 // Flame/animation files carry small embedded metadata; a legitimately large
@@ -43,7 +48,11 @@ export function useLoadFlameFromFile() {
     }
 
     try {
-      return await extractFlameFromPng(arrBuf)
+      const result = await extractFlameFromPng(arrBuf)
+      // A missing or unreadable steps chunk is not an error: the PNG simply
+      // predates step recording, or was not recorded.
+      const session = validateSession(await extractStepsFromPng(arrBuf))
+      return session ? { ...result, session } : result
     } catch (_) {
       await alert(`No valid flame found in '${file.name}'.`)
     }

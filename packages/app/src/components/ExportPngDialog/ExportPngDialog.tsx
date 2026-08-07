@@ -12,6 +12,7 @@ import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
+import { lastFinishedSession } from '@/recorder/recorder'
 import { deepClone } from '@/utils/clone'
 import { computeExportDimensions, DEFAULT_EXPORT_ASPECT, DEFAULT_EXPORT_RESOLUTION, } from '@/utils/exportDimensions'
 import { addFlameDataToPng } from '@/utils/flameInPng'
@@ -981,8 +982,19 @@ export function createExportPngDialog(
               }
             : flameDescriptor
           const encoded = await compressJsonQueryParam(payload)
+          // If a session was recorded for this flame, it rides along in a
+          // second chunk, so a dropped PNG can offer to replay how it was
+          // made (docs/plans/semantic-recorder-plan.md, M5).
+          const session = lastFinishedSession()
+          const encodedSteps = session
+            ? await compressJsonQueryParam(session)
+            : undefined
           pngBytes = new Uint8Array(
-            await addFlameDataToPng(encoded, pngBytes).arrayBuffer(),
+            await addFlameDataToPng(
+              encoded,
+              pngBytes,
+              encodedSteps,
+            ).arrayBuffer(),
           )
           saveRecentFlame(flameDescriptor, undefined, currentTracks)
           const fileUrlExt = URL.createObjectURL(

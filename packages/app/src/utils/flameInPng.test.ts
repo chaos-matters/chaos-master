@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseFlameXml } from '@/flame/flameXml'
 import { calculateCRC32 } from './crc32'
-import { addFlameDataToPng, extractFlameFromPng } from './flameInPng'
+import { addFlameDataToPng, extractFlameFromPng, extractStepsFromPng, } from './flameInPng'
 import { compressJsonQueryParam } from './jsonQueryParam'
 
 const SIMPLE_FLAME_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -71,5 +71,48 @@ describe('flameInPng', () => {
 
   it('throws when no flame chunk is present', async () => {
     await expect(extractFlameFromPng(MINIMAL_PNG)).rejects.toThrow()
+  })
+})
+
+describe('flameInPng — embedded session (M5)', () => {
+  const session = {
+    version: 1,
+    app: { version: 'test', flameSchemaVersion: '1.0' },
+    createdAt: '1970-01-01T00:00:00.000Z',
+    initial: { placeholder: true },
+    actions: [{ t: 0, id: 'flame.setGamma', args: [2.4], label: 'Set Gamma' }],
+    unnamedWriteCount: 0,
+  }
+
+  it('carries the flame and the session in separate chunks', async () => {
+    const flame = parseFlameXml(SIMPLE_FLAME_XML)
+    const png = addFlameDataToPng(
+      await compressJsonQueryParam(flame),
+      MINIMAL_PNG,
+      await compressJsonQueryParam(session),
+    )
+    const bytes = new Uint8Array(await png.arrayBuffer())
+
+    // Both keywords must resolve to their OWN payload. 'FlameJson' and
+    // 'FlameSteps' differ in length, so a reader slicing at a fixed keyword
+    // width would decode one chunk at the other's offset.
+    const extractedFlame = await extractFlameFromPng(bytes)
+    expect(Object.keys(extractedFlame.flame.transforms)).toHaveLength(1)
+    expect(await extractStepsFromPng(bytes)).toEqual(session)
+  })
+
+  it('reports no session for a PNG that carries only a flame', async () => {
+    const flame = parseFlameXml(SIMPLE_FLAME_XML)
+    const png = addFlameDataToPng(
+      await compressJsonQueryParam(flame),
+      MINIMAL_PNG,
+    )
+    const bytes = new Uint8Array(await png.arrayBuffer())
+    // Every PNG exported before this feature takes this path; it must be a
+    // quiet "nothing to replay", not a failure.
+    expect(await extractStepsFromPng(bytes)).toBeUndefined()
+    expect(
+      Object.keys((await extractFlameFromPng(bytes)).flame.transforms),
+    ).toHaveLength(1)
   })
 })

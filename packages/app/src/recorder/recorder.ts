@@ -68,6 +68,7 @@ function resetGestureState() {
 const [isSessionRecording, setIsSessionRecording] = createSignal(false)
 const [recordedActionCount, setRecordedActionCount] = createSignal(0)
 const [unnamedWriteCount, setUnnamedWriteCount] = createSignal(0)
+const [lastSession, setLastSession] = createSignal<RecordedSession>()
 
 export { isSessionRecording, recordedActionCount, unnamedWriteCount }
 
@@ -93,7 +94,19 @@ export function startSessionRecording(initial: FlameDescriptor): void {
   resetGestureState()
   setRecordedActionCount(0)
   setUnnamedWriteCount(0)
+  // A finished session describes the flame it was recorded against; once a
+  // new recording starts it must not be embedded into anything.
+  setLastSession(undefined)
   setIsSessionRecording(true)
+}
+
+/**
+ * The most recently finished recording, kept so an export can embed the steps
+ * that produced the image (M5). Cleared when a new recording starts, so a PNG
+ * never carries a session that describes a different flame.
+ */
+export function lastFinishedSession(): RecordedSession | undefined {
+  return lastSession()
 }
 
 export function stopSessionRecording(): RecordedSession | undefined {
@@ -108,6 +121,7 @@ export function stopSessionRecording(): RecordedSession | undefined {
   }
   active = undefined
   setIsSessionRecording(false)
+  setLastSession(session)
   return session
 }
 

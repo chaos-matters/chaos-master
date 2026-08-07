@@ -1377,7 +1377,11 @@ export function MainWorkspace(props: AppProps) {
     }
   })
 
-  const onDrop = useAppDragAndDrop(history, setLoadedAnimation)
+  const onDrop = useAppDragAndDrop(
+    history,
+    setLoadedAnimation,
+    setReplaySession,
+  )
 
   const timeline = createTimelineState()
   // One chronological undo across flame history + timeline snapshots —

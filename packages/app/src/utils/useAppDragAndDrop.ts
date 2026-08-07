@@ -2,6 +2,7 @@ import { batch } from 'solid-js'
 import { deepClone } from '@/utils/clone'
 import { useLoadFlameFromFile } from '@/utils/useLoadFlameFromFile'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { RecordedSession } from '@/recorder/schema'
 import type { TimelineTrack } from '@/utils/timeline'
 
 export function useAppDragAndDrop(
@@ -10,6 +11,8 @@ export function useAppDragAndDrop(
     flame: FlameDescriptor
     tracks: TimelineTrack[]
   }) => void,
+  /** Offered the session a dropped PNG carried, if any (M5). */
+  onSessionDropped?: (session: RecordedSession) => void,
 ) {
   const loadFlameFromFile = useLoadFlameFromFile()
 
@@ -33,6 +36,9 @@ export function useAppDragAndDrop(
         setLoadedAnimation({ flame: deepClone(result.flame), tracks: [] })
       }
     })
+    // After the flame is in place, so replaying starts from the same
+    // document the file describes.
+    if (result.session) onSessionDropped?.(result.session)
   }
 
   return onDrop
