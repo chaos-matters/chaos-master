@@ -1,11 +1,14 @@
+import { applyColorMapToFlame } from '@/flame/colorMap'
 import { examples } from '@/flame/examples'
 import { newDefaultTransform } from '@/flame/newTransform'
+import { tryValidateFlame } from '@/flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from '@/flame/transformFunction'
 import { defaultLinearType } from '@/flame/variationRegistry'
 import { getVariationDefault } from '@/flame/variations/utils'
 import { deepClone } from '@/utils/clone'
 import { registerCommand } from '../registry'
 import type { CommandContext } from '../types'
+import type { Palette } from '@/flame/colorMap'
 import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from '@/flame/schema/flameSchema'
 import type { Dims } from '@/flame/variationRegistry'
 
@@ -49,6 +52,28 @@ function resolveVariationKey(
  *  `undefined` to `null`. */
 function isAbsentRef(ref: unknown): boolean {
   return ref === undefined || ref === null
+}
+
+const AFFINE_2D_KEYS = ['a', 'b', 'c', 'd', 'e', 'f']
+const AFFINE_3D_KEYS = [...AFFINE_2D_KEYS, 'g', 'h', 'i', 'j', 'k', 'l']
+
+/**
+ * Exactly the 2D (a–f) or 3D (a–l) coefficient set, every value finite.
+ *
+ * Checked by key set rather than "an object of numbers": that weaker test
+ * accepts `{}` (nothing to fail) and `NaN`/`Infinity` (both are `number`),
+ * either of which would be written straight into the document by a
+ * hand-edited `.steps.json` and produce a flame that renders as nothing.
+ */
+function isAffineLike(affine: unknown): affine is Record<string, number> {
+  if (affine === null || typeof affine !== 'object') return false
+  const keys = Object.keys(affine)
+  const expected =
+    keys.length === AFFINE_3D_KEYS.length ? AFFINE_3D_KEYS : AFFINE_2D_KEYS
+  if (keys.length !== expected.length) return false
+  return expected.every((key) =>
+    Number.isFinite((affine as Record<string, unknown>)[key]),
+  )
 }
 
 /** normalizeArgs helper: an id when the ref resolves, the original arg
@@ -675,8 +700,7 @@ registerCommand({
       variation === null ||
       typeof variation !== 'object' ||
       typeof (variation as { type?: unknown }).type !== 'string' ||
-      preAffine === null ||
-      typeof preAffine !== 'object'
+      !isAffineLike(preAffine)
     ) {
       console.warn('[cmd] flame.applyVariationSelection: rejected', {
         preAffine,
@@ -717,13 +741,7 @@ registerCommand({
   coalesceKey: ([transformRef, which]) =>
     `affineMatrix:${String(transformRef)}:${String(which)}`,
   execute(ctx, transformRef?: unknown, which?: unknown, affine?: unknown) {
-    // 2D affines carry a–f and 3D a–l, so the shape is checked structurally:
-    // an object of finite numbers, which is all either layout is.
-    if (
-      affine === null ||
-      typeof affine !== 'object' ||
-      Object.values(affine).some((v) => typeof v !== 'number')
-    ) {
+    if (!isAffineLike(affine)) {
       console.warn('[cmd] flame.setTransformAffine: not an affine', affine)
       return
     }
@@ -734,5 +752,94 @@ registerCommand({
       const transform = tKey ? draft.transforms[tKey] : undefined
       if (transform) transform[key] = next
     }, 'Affine')
+  },
+})
+
+registerCommand({
+  id: 'flame.applyPalette',
+  label: 'Apply Palette',
+  description:
+    'Recolour every transform from a palette and record the palette itself',
+  // One command for both halves, because applying is one history entry: the
+  // colours AND renderSettings.palette, so a single undo fully reverts it.
+  // `applyColorMapToFlame` is index-based and deterministic, so the palette
+  // is all replay needs.
+  execute(ctx, palette?: unknown) {
+    const entries = (palette as { entries?: unknown })?.entries
+    if (
+      palette === null ||
+      typeof palette !== 'object' ||
+      !Array.isArray(entries) ||
+      entries.length === 0
+    ) {
+      console.warn('[cmd] flame.applyPalette: not a palette', palette)
+      return
+    }
+    const next = deepClone(palette) as Palette
+    ctx.setFlameDescriptor((draft) => {
+      applyColorMapToFlame(draft, {
+        id: next.id,
+        name: next.name,
+        entries: next.entries.map((entry) => ({ a: entry.a, b: entry.b })),
+      })
+      draft.renderSettings.palette = {
+        id: next.id,
+        name: next.name,
+        entries: next.entries.map(({ id, position, a, b }) => ({
+          id,
+          position,
+          a,
+          b,
+        })),
+      }
+    }, 'Apply Palette')
+  },
+})
+
+registerCommand({
+  id: 'flame.removePalette',
+  label: 'Remove Palette',
+  description:
+    'Drop the palette, restoring the colours transforms had before it',
+  // The colours to restore are passed in rather than read from the document:
+  // the editor stashes them in a signal when the palette is applied, and UI
+  // state is not something a log can replay. Without them the palette is
+  // simply dropped and the current colours stay.
+  execute(ctx, restoreColors?: unknown) {
+    const saved =
+      restoreColors !== null && typeof restoreColors === 'object'
+        ? (deepClone(restoreColors) as Record<string, { x: number; y: number }>)
+        : {}
+    ctx.setFlameDescriptor((draft) => {
+      for (const [tid, transform] of Object.entries(draft.transforms)) {
+        const color = saved[tid]
+        if (color && Number.isFinite(color.x) && Number.isFinite(color.y)) {
+          transform.color = { x: color.x, y: color.y }
+        }
+      }
+      delete draft.renderSettings.palette
+    }, 'Remove Palette')
+  },
+})
+
+registerCommand({
+  id: 'flame.load',
+  label: 'Load Flame',
+  description:
+    'Replace the whole document — opening a saved flame, an import, a bred child',
+  // Carries the descriptor itself, so a session that begins by opening a file
+  // still replays: the log never depends on what happened to be on disk.
+  // Validated through the normal migrate-on-parse path, the same one saved
+  // flames and imports go through.
+  execute(ctx, descriptor?: unknown, label?: unknown) {
+    const flame = tryValidateFlame(deepClone(descriptor))
+    if (!flame) {
+      console.warn('[cmd] flame.load: not a valid flame', descriptor)
+      return
+    }
+    ctx.setFlameDescriptor(
+      () => flame,
+      typeof label === 'string' && label !== '' ? label : 'Load Flame',
+    )
   },
 })

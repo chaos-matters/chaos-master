@@ -651,6 +651,102 @@ describe('transform-card commands', () => {
   })
 })
 
+describe('palette and document-load commands', () => {
+  const palette = {
+    id: 'test-palette',
+    name: 'Test',
+    entries: [
+      { id: 'e0', position: 0, a: -0.5, b: 0.1 },
+      { id: 'e1', position: 1, a: 0.2, b: 0.5 },
+    ],
+  }
+
+  it('applies a palette as one step: colours and the palette itself', () => {
+    createRoot((dispose) => {
+      const a = makeHeadlessWorld(examples.example1)
+      startSessionRecording(a.flame)
+      executeCommand('flame.applyPalette', a.ctx, palette)
+      const session = stopOrThrow()
+
+      expect(session.actions).toHaveLength(1)
+      expect(a.flame.renderSettings.palette?.id).toBe('test-palette')
+      // Recolouring is index-based and deterministic, so the palette is all
+      // the log needs to carry.
+      const b = makeHeadlessWorld(examples.example1)
+      replayIntoWorld(session, b)
+      expect(deepClone(b.flame)).toEqual(deepClone(a.flame))
+
+      // One undo takes back both halves, as it did before commands.
+      a.history.undo()
+      expect(a.flame.renderSettings.palette).toBeUndefined()
+      expect(deepClone(a.flame)).toEqual(deepClone(examples.example1))
+      dispose()
+    })
+  })
+
+  it('carries the restore colours for a palette removal in the args', () => {
+    createRoot((dispose) => {
+      const a = makeHeadlessWorld(examples.example1)
+      const before = Object.fromEntries(
+        Object.entries(a.flame.transforms).map(([tid, t]) => [
+          tid,
+          { x: t.color.x, y: t.color.y },
+        ]),
+      )
+      startSessionRecording(a.flame)
+      executeCommand('flame.applyPalette', a.ctx, palette)
+      // The editor stashes the pre-palette colours in a SIGNAL, which no log
+      // can reconstruct — so they travel as an argument.
+      executeCommand('flame.removePalette', a.ctx, before)
+      const session = stopOrThrow()
+
+      expect(a.flame.renderSettings.palette).toBeUndefined()
+      expect(deepClone(a.flame)).toEqual(deepClone(examples.example1))
+
+      const b = makeHeadlessWorld(examples.initExample)
+      replayIntoWorld(session, b)
+      expect(deepClone(b.flame)).toEqual(deepClone(a.flame))
+      dispose()
+    })
+  })
+
+  it('embeds the document in a load, so an import still replays', () => {
+    createRoot((dispose) => {
+      const a = makeHeadlessWorld(examples.example1)
+      startSessionRecording(a.flame)
+      executeCommand(
+        'flame.load',
+        a.ctx,
+        examples.example2,
+        'Load History Flame',
+      )
+      executeCommand('flame.setGamma', a.ctx, 2.9)
+      const session = stopOrThrow()
+
+      // Replay into a world that never saw example2: the descriptor rides
+      // along in the log rather than being looked up.
+      const b = makeHeadlessWorld(examples.initExample)
+      replayIntoWorld(session, b)
+      expect(deepClone(b.flame)).toEqual(deepClone(a.flame))
+      expect(b.flame.renderSettings.gamma).toBeCloseTo(2.9, 5)
+      expect(session.unnamedWriteCount).toBe(0)
+      dispose()
+    })
+  })
+
+  it('refuses a load whose payload is not a flame', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      const before = deepClone(world.flame)
+      startSessionRecording(world.flame)
+      executeCommand('flame.load', world.ctx, { nonsense: true })
+      stopOrThrow()
+      expect(deepClone(world.flame)).toEqual(before)
+      dispose()
+    })
+  })
+})
+
 describe('undo that reaches outside the recorded session', () => {
   it('flags an undo of an edit made BEFORE recording started', () => {
     createRoot((dispose) => {

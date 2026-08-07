@@ -14,7 +14,7 @@ import { buildReadableIds } from '@/utils/readableIds'
 import { recordEntries } from '@/utils/record'
 import { sortedTransformEntries } from '@/utils/transformOrder'
 import { handleColor } from './FlameColorEditor'
-import type { TransformRecord } from '@/flame/schema/flameSchema'
+import type { TransformId, TransformRecord } from '@/flame/schema/flameSchema'
 import type { HistorySetter } from '@/utils/createStoreHistory'
 
 // The flame color is an OkLab (a, b) coordinate stored as { x, y }. Exposing
@@ -30,6 +30,12 @@ const COLOR_COMPONENTS = [
 export function ColorListEditor(props: {
   transforms: TransformRecord
   setTransforms: HistorySetter<TransformRecord>
+  /**
+   * Apply a colour edit semantically, so a recording captures it as a
+   * replayable step (docs/plans/semantic-recorder-plan.md). Absent for
+   * preview copies, which fall back to the raw setter.
+   */
+  setTransformColor?: (tid: string, x: number, y: number) => void
   selectedTransformId?: () => string | null
   setSelectedTransformId?: (tid: string | null) => void
   /** Gate for the track-changes diamond + dice keyframing (real flame only). */
@@ -38,6 +44,18 @@ export function ColorListEditor(props: {
   const { theme } = useTheme()
   const timeline = useTimeline()
   const readableIds = createMemo(() => buildReadableIds(props.transforms))
+
+  /** Semantic dispatch when the host provides one, raw setter otherwise. */
+  const setColor = (tid: TransformId, x: number, y: number) => {
+    const applySemantically = props.setTransformColor
+    if (applySemantically) {
+      applySemantically(tid, x, y)
+    } else {
+      props.setTransforms((draft) => {
+        draft[tid]!.color = { x, y }
+      })
+    }
+  }
 
   return (
     <div class={ui.container}>
@@ -89,12 +107,13 @@ export function ColorListEditor(props: {
                 <DiceButton
                   title="Randomize color"
                   onClick={() => {
-                    props.setTransforms((draft) => {
-                      draft[tid]!.color = {
-                        x: randomRange(-0.4, 0.4),
-                        y: randomRange(-0.4, 0.4),
-                      }
-                    })
+                    // Rolled here, so the recorded action carries the result
+                    // and replay needs no seed.
+                    const next = {
+                      x: randomRange(-0.4, 0.4),
+                      y: randomRange(-0.4, 0.4),
+                    }
+                    setColor(tid, next.x, next.y)
                     if (props.enableChangeTracking) {
                       keyframeChangedParams(timeline, [
                         `transform.${tid}.color.x`,
@@ -106,9 +125,7 @@ export function ColorListEditor(props: {
                 <ResetButton
                   title="Reset color to neutral (0, 0)"
                   onClick={() => {
-                    props.setTransforms((draft) => {
-                      draft[tid]!.color = { x: 0, y: 0 }
-                    })
+                    setColor(tid, 0, 0)
                   }}
                 />
               </div>
@@ -120,9 +137,13 @@ export function ColorListEditor(props: {
                       value={transform.color[comp.key]}
                       step={0.001}
                       onInput={(val) => {
-                        props.setTransforms((draft) => {
-                          draft[tid]!.color[comp.key] = val
-                        })
+                        // The command takes both components, so the one not
+                        // being scrubbed is carried through unchanged.
+                        setColor(
+                          tid,
+                          comp.key === 'x' ? val : transform.color.x,
+                          comp.key === 'y' ? val : transform.color.y,
+                        )
                       }}
                       dataParameterPath={`transform.${tid}.color.${comp.key}`}
                     />
