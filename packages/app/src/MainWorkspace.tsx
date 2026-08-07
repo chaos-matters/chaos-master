@@ -3608,13 +3608,16 @@ export function MainWorkspace(props: AppProps) {
               <ProgressBar />
               <ExportJobHost />
               <ExportJobTracker />
-              {/* M1 stub (docs/plans/semantic-recorder-plan.md): dev-gated
-                  until replay lands and command coverage makes logs faithful
-                  for a full editing session. */}
-              <Show when={IS_DEV || DEBUG_MODE}>
-                <SessionRecorderControls flameDescriptor={flameDescriptor} />
-              </Show>
               <div class={ui.bottomBar}>
+                {/* M1 stub (docs/plans/semantic-recorder-plan.md): dev-gated
+                    until replay lands and command coverage makes logs
+                    faithful for a full editing session. In the bottom bar's
+                    normal flow rather than floating over the canvas — the
+                    draggable FloatingActions widget is fixed at z-index 200
+                    and would sit on top of it, swallowing its clicks. */}
+                <Show when={IS_DEV || DEBUG_MODE}>
+                  <SessionRecorderControls flameDescriptor={flameDescriptor} />
+                </Show>
                 <Show when={effectiveFlame().renderSettings.dimensions === 3}>
                   <OrientationGizmo
                     theta={[effectiveTheta, setFlameTheta]}
