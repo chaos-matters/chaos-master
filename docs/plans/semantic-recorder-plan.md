@@ -2,11 +2,12 @@
 
 Status: **in progress**. M1 (recorder core, coverage ratchet, `.steps.json`)
 and M2 (determinism: `normalizeArgs`, id addressing, pre-minted ids, seeded
-generate/mutate) are implemented. M3 is under way: gesture handling
+generate/mutate) are implemented. M3 is largely done: gesture handling
 landed, and the render settings, transform card, affine editor, colour
-editors, palette apply/remove and document loads are converted; the remaining
-named handlers (symmetry, morph, breeding wiring) and the camera writes are
-still open. Captured 2026-08-06.
+editors, palette, camera, symmetry, randomize/mutate and document loads are
+converted. Roughly two dozen direct writes remain in `MainWorkspace.tsx` —
+blend/morph, breeding wiring, audio wiring, custom variation code and the
+affine list editor. Captured 2026-08-06.
 
 ## The ask
 
@@ -263,9 +264,13 @@ session (**render settings, item 6, are done**):
    `setupMorph`, `runGenerateFlame`, `runMutateFlame`, breeding apply,
    `applyRandomizeSettings`, `handleUpdateRenderSettings`,
    `handleLoadHistory`, `handleRandomizeAnimation`, `handleSmartAnimation`.
-3. **Camera writes** — `setFlameZoom`, `setFlamePosition`, the
-   `makeCamera3DSetter` family (theta/phi/radius/target/fov/roll). These are
-   gesture-heavy; they lean on commit-level coalescing.
+3. **Camera writes** — **done**. `setFlameZoom`, `setFlamePosition` and the
+   `makeCamera3DSetter` family keep Solid's Setter contract but resolve the
+   updater against current state and dispatch a concrete value, so the
+   `flame.setRenderSetting` path vocabulary (now dotted: `camera.zoom`,
+   `camera3D.theta`) carries it. Every camera gesture is already bracketed by
+   `startPreview`/`commit` in `WheelZoomCamera2D`/`3D`, so a whole pan or
+   orbit folds into one recorded step.
 4. **Document lifecycle** — **mostly done**: `flame.load` carries the
    descriptor itself, so a mid-session open, history load or bred child
    replays without looking anything up. The mount-time paths (Home hand-off,

@@ -572,59 +572,7 @@ export function MainWorkspace(props: AppProps) {
   })
 
   const applySymmetry = (n: number, type: 'rotational' | 'dihedral') => {
-    setFlameDescriptor((draft) => {
-      for (const tid of recordKeys(draft.transforms)) {
-        if (tid.startsWith('_sym__')) {
-          delete draft.transforms[tid]
-        }
-      }
-
-      const totalWeight = sum(
-        Object.values(draft.transforms).map((t) => t.probability),
-      )
-      const symWeight = Math.max(totalWeight, 1)
-
-      for (let i = 1; i < n; i++) {
-        const angle = (2 * Math.PI * i) / n
-        const cos = Math.cos(angle)
-        const sin = Math.sin(angle)
-        draft.transforms[generateTransformId('sym')] = {
-          probability: symWeight,
-          colorSpeed: 0,
-          color: { x: 0, y: 0 },
-          visible: true,
-          preAffine: { a: cos, b: -sin, c: 0, d: sin, e: cos, f: 0 },
-          postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-          variations: {
-            [generateVariationId()]: getVariationDefault(
-              defaultLinearType(
-                (flameDescriptor.renderSettings.dimensions ?? 2) as Dims,
-              ),
-              1,
-            ),
-          },
-        }
-      }
-
-      if (type === 'dihedral') {
-        draft.transforms[generateTransformId('sym')] = {
-          probability: symWeight,
-          colorSpeed: 0,
-          color: { x: 0, y: 0 },
-          visible: true,
-          preAffine: { a: -1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-          postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-          variations: {
-            [generateVariationId()]: getVariationDefault(
-              defaultLinearType(
-                (flameDescriptor.renderSettings.dimensions ?? 2) as Dims,
-              ),
-              1,
-            ),
-          },
-        }
-      }
-    })
+    executeCommand('flame.applySymmetry', cmdContext, n, type)
   }
 
   const totalProbability = createMemo(() =>
@@ -1250,41 +1198,30 @@ export function MainWorkspace(props: AppProps) {
     })
   })
 
+  // The camera setters keep Solid's Setter contract (a value OR an updater),
+  // but resolve it against the CURRENT state before dispatching, so the
+  // command — and therefore the recorded action — carries a concrete value.
+  // Every camera gesture is bracketed by startPreview/commit in
+  // WheelZoomCamera2D/3D, so a whole pan or orbit folds into one recorded
+  // step, matching the single undo entry it already produced.
   const setFlameZoom: Setter<number> = (value) => {
     // Editing the base camera detaches the held-frame preview (Blender-like).
     timeline.setPreviewHeld(false)
-    if (typeof value === 'function') {
-      setFlameDescriptor((draft) => {
-        draft.renderSettings.camera.zoom = clamp(
-          value(draft.renderSettings.camera.zoom),
-          MIN_CAMERA_ZOOM_VALUE,
-          MAX_CAMERA_ZOOM_VALUE,
-        )
-      })
-    } else {
-      setFlameDescriptor((draft) => {
-        draft.renderSettings.camera.zoom = clamp(
-          value,
-          MIN_CAMERA_ZOOM_VALUE,
-          MAX_CAMERA_ZOOM_VALUE,
-        )
-      })
-    }
+    const current = flameDescriptor.renderSettings.camera.zoom
+    const next = clamp(
+      typeof value === 'function' ? value(current) : value,
+      MIN_CAMERA_ZOOM_VALUE,
+      MAX_CAMERA_ZOOM_VALUE,
+    )
+    setRenderSetting('camera.zoom', next)
     return flameDescriptor.renderSettings.camera.zoom
   }
   const setFlamePosition: Setter<v2f> = (value) => {
     // Editing the base camera detaches the held-frame preview (Blender-like).
     timeline.setPreviewHeld(false)
-    if (typeof value === 'function') {
-      setFlameDescriptor((draft) => {
-        const newPos = value(vec2f(...draft.renderSettings.camera.position))
-        draft.renderSettings.camera.position = [newPos.x, newPos.y]
-      })
-    } else {
-      setFlameDescriptor((draft) => {
-        draft.renderSettings.camera.position = [value.x, value.y]
-      })
-    }
+    const current = vec2f(...flameDescriptor.renderSettings.camera.position)
+    const next = typeof value === 'function' ? value(current) : value
+    setRenderSetting('camera.position', [next.x, next.y])
     return flameDescriptor.renderSettings.camera.position
   }
 
@@ -1293,41 +1230,22 @@ export function MainWorkspace(props: AppProps) {
   // result. theta/phi/radius/fov/roll were byte-for-byte identical modulo the
   // field; zoom (clamped), position (vec2) and target3D (vec3) stay bespoke.
   function makeCamera3DSetter(
-    read: (c: FlameDescriptor['renderSettings']['camera3D']) => number,
-    write: (draft: FlameDescriptor, next: number) => void,
+    field: 'theta' | 'phi' | 'radius' | 'fov' | 'roll',
   ): Setter<number> {
     return (value) => {
       timeline.setPreviewHeld(false)
-      setFlameDescriptor((draft) => {
-        const prev = read(draft.renderSettings.camera3D)
-        write(
-          draft,
-          typeof value === 'function'
-            ? (value as (p: number) => number)(prev)
-            : value,
-        )
-      })
-      return read(flameDescriptor.renderSettings.camera3D)
+      const current = flameDescriptor.renderSettings.camera3D[field]
+      const next =
+        typeof value === 'function'
+          ? (value as (p: number) => number)(current)
+          : value
+      setRenderSetting(`camera3D.${field}`, next)
+      return flameDescriptor.renderSettings.camera3D[field]
     }
   }
-  const setFlameTheta = makeCamera3DSetter(
-    (c) => c.theta,
-    (d, v) => {
-      d.renderSettings.camera3D.theta = v
-    },
-  )
-  const setFlamePhi = makeCamera3DSetter(
-    (c) => c.phi,
-    (d, v) => {
-      d.renderSettings.camera3D.phi = v
-    },
-  )
-  const setFlameRadius = makeCamera3DSetter(
-    (c) => c.radius,
-    (d, v) => {
-      d.renderSettings.camera3D.radius = v
-    },
-  )
+  const setFlameTheta = makeCamera3DSetter('theta')
+  const setFlamePhi = makeCamera3DSetter('phi')
+  const setFlameRadius = makeCamera3DSetter('radius')
   // 3D auto-exposure: drive the real Exposure value from the camera zoom so the
   // slider visibly tracks it. exposure = base + strength*log(radius/refRadius),
   // neutral at the radius where the toggle was enabled. The exposure read is
@@ -1360,31 +1278,19 @@ export function MainWorkspace(props: AppProps) {
     }
   })
   const setFlameTarget3D = (value: Vec3 | ((prev: Vec3) => Vec3)) => {
-    setFlameDescriptor((draft) => {
-      const newTarget =
-        typeof value === 'function'
-          ? value(new Float32Array(draft.renderSettings.camera3D.target))
-          : value
-      draft.renderSettings.camera3D.target = [
-        newTarget[0] ?? 0,
-        newTarget[1] ?? 0,
-        newTarget[2] ?? 0,
-      ]
-    })
+    const current = new Float32Array(
+      flameDescriptor.renderSettings.camera3D.target,
+    )
+    const newTarget = typeof value === 'function' ? value(current) : value
+    setRenderSetting('camera3D.target', [
+      newTarget[0] ?? 0,
+      newTarget[1] ?? 0,
+      newTarget[2] ?? 0,
+    ])
     return new Float32Array(flameDescriptor.renderSettings.camera3D.target)
   }
-  const setFlameFov = makeCamera3DSetter(
-    (c) => c.fov,
-    (d, v) => {
-      d.renderSettings.camera3D.fov = v
-    },
-  )
-  const setFlameRoll = makeCamera3DSetter(
-    (c) => c.roll,
-    (d, v) => {
-      d.renderSettings.camera3D.roll = v
-    },
-  )
+  const setFlameFov = makeCamera3DSetter('fov')
+  const setFlameRoll = makeCamera3DSetter('roll')
 
   // First-person "fly" navigation for 3D flames. Session-only (you don't want
   // to reopen the app mid-flight); the movement speed is remembered.
@@ -1898,7 +1804,12 @@ export function MainWorkspace(props: AppProps) {
     applyRandomizeSettings(rs, randomizeSettings)
 
     newFlame.renderSettings = rs
-    history.replace(newFlame, 'Randomize Flame')
+    // Recorded as a load carrying the finished flame. The seeded
+    // flame.randomize command would read better in a log, but this handler
+    // also runs applyRandomizeSettings over the render settings with ambient
+    // randomness; carrying the result keeps replay exact until that is
+    // seeded too.
+    executeCommand('flame.load', cmdContext, newFlame, 'Randomize Flame')
   }
 
   const runMutateFlame = async (
@@ -1932,7 +1843,8 @@ export function MainWorkspace(props: AppProps) {
     applyRandomizeSettings(rs, randomizeSettings)
 
     mutatedFlame.renderSettings = rs
-    history.replace(mutatedFlame, 'Mutate Flame')
+    // Same reasoning as Randomize above.
+    executeCommand('flame.load', cmdContext, mutatedFlame, 'Mutate Flame')
   }
 
   // Keep the randomizer card visually fixed across a flame swap. Changing the
@@ -6031,7 +5943,7 @@ export function MainWorkspace(props: AppProps) {
               const is3D =
                 (flameDescriptor.renderSettings.dimensions ?? 2) === 3
               const flame = deepClone(is3D ? initExample3D : initExample)
-              history.replace(flame, 'New Flame')
+              executeCommand('flame.load', cmdContext, flame, 'New Flame')
               setLoadedAnimation({ flame, tracks: [] })
               showToast('Fresh flame loaded — undo restores the previous one')
             }}
