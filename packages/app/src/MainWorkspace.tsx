@@ -99,7 +99,7 @@ import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } fro
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { BoxArrowRight, Cross, Eye, EyeOff, Menu, Plus, Share, Shuffle, Terminal, } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
-import { isSessionRecording, reportDocumentWrite, reportUnreplayable, } from './recorder/recorder'
+import { isSessionRecording, notePreviewStarted, reportDocumentWrite, reportUnreplayable, } from './recorder/recorder'
 import { createAnimationExport } from './utils/animationExport'
 import { createAudioAnalyzer } from './utils/audioAnalysis'
 import { autosaveIntervalMin, autosaveRecents, saveReminderDismissed, setAutosaveRecents, setSaveReminderDismissed, } from './utils/autosaveSettings'
@@ -463,8 +463,13 @@ export function MainWorkspace(props: AppProps) {
     // The main flame history joins the app-wide undo journal so Ctrl+Z can
     // arbitrate chronologically against the timeline's undo stack. The
     // session recorder listens to every pushed entry to flag edits that
-    // bypassed the command registry (its coverage ratchet).
-    { journal: true, onEntryPushed: reportDocumentWrite },
+    // bypassed the command registry (its coverage ratchet), and to the
+    // gesture boundary so a drag records as one step rather than hundreds.
+    {
+      journal: true,
+      onEntryPushed: reportDocumentWrite,
+      onPreviewStarted: notePreviewStarted,
+    },
   )
   // Palette selection is part of the flame document (renderSettings.palette):
   // applying/removing one is a single undoable history entry, and the palette
@@ -3420,6 +3425,16 @@ export function MainWorkspace(props: AppProps) {
   }
   useShortcutManager(cmdContext)
 
+  /**
+   * Every render-settings control goes through the registry, so a recording
+   * captures it as a replayable step (semantic-recorder-plan, M3). The path
+   * is the same one the control already declares as `dataParameterPath` and
+   * the timeline uses for keyframes.
+   */
+  const setRenderSetting = (path: string, value: unknown) => {
+    executeCommand('flame.setRenderSetting', cmdContext, path, value)
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   runTourCommand.fn = (id, ...args: any[]) => {
     executeCommand(id, cmdContext, ...args)
@@ -5032,10 +5047,10 @@ export function MainWorkspace(props: AppProps) {
                                       max={30}
                                       step={1}
                                       onInput={(newSkipIters) => {
-                                        setFlameDescriptor((draft) => {
-                                          draft.renderSettings.skipIters =
-                                            newSkipIters
-                                        })
+                                        setRenderSetting(
+                                          'skipIters',
+                                          newSkipIters,
+                                        )
                                       }}
                                       formatValue={(value) => value.toString()}
                                       dataParameterPath="skipIters"
@@ -5059,10 +5074,10 @@ export function MainWorkspace(props: AppProps) {
                                       max={32}
                                       step={1}
                                       onInput={(plotsPerChain) => {
-                                        setFlameDescriptor((draft) => {
-                                          draft.renderSettings.plotsPerChain =
-                                            plotsPerChain
-                                        })
+                                        setRenderSetting(
+                                          'plotsPerChain',
+                                          plotsPerChain,
+                                        )
                                       }}
                                       formatValue={(value) => value.toString()}
                                       dataParameterPath="plotsPerChain"
@@ -5166,10 +5181,10 @@ export function MainWorkspace(props: AppProps) {
                                           max={3}
                                           step={0.05}
                                           onInput={(strength) => {
-                                            setFlameDescriptor((draft) => {
-                                              draft.renderSettings.autoExposure3DStrength =
-                                                strength
-                                            })
+                                            setRenderSetting(
+                                              'autoExposure3DStrength',
+                                              strength,
+                                            )
                                           }}
                                           formatValue={(value) =>
                                             value.toFixed(2)
@@ -5193,9 +5208,7 @@ export function MainWorkspace(props: AppProps) {
                                       max={8}
                                       step={0.01}
                                       onInput={(newVal) => {
-                                        setFlameDescriptor((draft) => {
-                                          draft.renderSettings.gamma = newVal
-                                        })
+                                        setRenderSetting('gamma', newVal)
                                       }}
                                       formatValue={(value) => value.toFixed(2)}
                                       dataParameterPath="gamma"
@@ -5217,9 +5230,7 @@ export function MainWorkspace(props: AppProps) {
                                       max={20}
                                       step={0.01}
                                       onInput={(newVal) => {
-                                        setFlameDescriptor((draft) => {
-                                          draft.renderSettings.contrast = newVal
-                                        })
+                                        setRenderSetting('contrast', newVal)
                                       }}
                                       formatValue={(value) => value.toFixed(2)}
                                       dataParameterPath="contrast"
@@ -5241,10 +5252,10 @@ export function MainWorkspace(props: AppProps) {
                                       max={3}
                                       step={0.05}
                                       onInput={(newVibrancy) => {
-                                        setFlameDescriptor((draft) => {
-                                          draft.renderSettings.vibrancy =
-                                            newVibrancy
-                                        })
+                                        setRenderSetting(
+                                          'vibrancy',
+                                          newVibrancy,
+                                        )
                                       }}
                                       formatValue={(value) => value.toFixed(2)}
                                       dataParameterPath="vibrancy"
@@ -5267,10 +5278,10 @@ export function MainWorkspace(props: AppProps) {
                                       max={2}
                                       step={0.01}
                                       onInput={(newVal) => {
-                                        setFlameDescriptor((draft) => {
-                                          draft.renderSettings.highlightPower =
-                                            newVal
-                                        })
+                                        setRenderSetting(
+                                          'highlightPower',
+                                          newVal,
+                                        )
                                       }}
                                       formatValue={(value) => value.toFixed(2)}
                                       dataParameterPath="highlightPower"
@@ -5299,10 +5310,10 @@ export function MainWorkspace(props: AppProps) {
                                         max={5}
                                         step={0.05}
                                         onInput={(newVal) => {
-                                          setFlameDescriptor((draft) => {
-                                            draft.renderSettings.depthColorPower =
-                                              newVal
-                                          })
+                                          setRenderSetting(
+                                            'depthColorPower',
+                                            newVal,
+                                          )
                                         }}
                                         formatValue={(value) =>
                                           value.toFixed(2)
@@ -5327,10 +5338,7 @@ export function MainWorkspace(props: AppProps) {
                                         max={1.5}
                                         step={0.01}
                                         onInput={(newVal) => {
-                                          setFlameDescriptor((draft) => {
-                                            draft.renderSettings.lightPower =
-                                              newVal
-                                          })
+                                          setRenderSetting('lightPower', newVal)
                                         }}
                                         formatValue={(value) =>
                                           value.toFixed(2)
@@ -5358,10 +5366,10 @@ export function MainWorkspace(props: AppProps) {
                                       max={1}
                                       step={0.01}
                                       onInput={(newVal) => {
-                                        setFlameDescriptor((draft) => {
-                                          draft.renderSettings.densityEstimationQuality =
-                                            newVal
-                                        })
+                                        setRenderSetting(
+                                          'densityEstimationQuality',
+                                          newVal,
+                                        )
                                       }}
                                       formatValue={(value) => value.toFixed(2)}
                                       dataParameterPath="densityEstimationQuality"
@@ -5384,10 +5392,10 @@ export function MainWorkspace(props: AppProps) {
                                       max={1}
                                       step={0.05}
                                       onInput={(newVal) => {
-                                        setFlameDescriptor((draft) => {
-                                          draft.renderSettings.estimatorCurve =
-                                            newVal
-                                        })
+                                        setRenderSetting(
+                                          'estimatorCurve',
+                                          newVal,
+                                        )
                                       }}
                                       formatValue={(value) => value.toFixed(2)}
                                       dataParameterPath="estimatorCurve"
@@ -5426,10 +5434,7 @@ export function MainWorkspace(props: AppProps) {
                                         onChange={(ev) => {
                                           const mode = ev.currentTarget.value
                                           const update = () => {
-                                            setFlameDescriptor((draft) => {
-                                              draft.renderSettings.drawMode =
-                                                mode as 'light' | 'paint'
-                                            })
+                                            setRenderSetting('drawMode', mode)
                                           }
                                           if (
                                             'startViewTransition' in document
@@ -5476,12 +5481,10 @@ export function MainWorkspace(props: AppProps) {
                                         onChange={(ev) => {
                                           const mode = ev.currentTarget.value
                                           const update = () => {
-                                            setFlameDescriptor((draft) => {
-                                              draft.renderSettings.colorInitMode =
-                                                mode as
-                                                  | 'colorInitZero'
-                                                  | 'colorInitPosition'
-                                            })
+                                            setRenderSetting(
+                                              'colorInitMode',
+                                              mode,
+                                            )
                                           }
                                           if (
                                             'startViewTransition' in document
@@ -5530,10 +5533,10 @@ export function MainWorkspace(props: AppProps) {
                                         onChange={(ev) => {
                                           const mode = ev.currentTarget.value
                                           const update = () => {
-                                            setFlameDescriptor((draft) => {
-                                              draft.renderSettings.pointInitMode =
-                                                mode as PointInitMode
-                                            })
+                                            setRenderSetting(
+                                              'pointInitMode',
+                                              mode,
+                                            )
                                           }
                                           if (
                                             'startViewTransition' in document
@@ -5588,10 +5591,10 @@ export function MainWorkspace(props: AppProps) {
                                             : undefined
                                         }
                                         setValue={(newBgColor) => {
-                                          setFlameDescriptor((draft) => {
-                                            draft.renderSettings.backgroundColor =
-                                              newBgColor
-                                          })
+                                          setRenderSetting(
+                                            'backgroundColor',
+                                            newBgColor,
+                                          )
                                         }}
                                       />
                                     </label>
@@ -5655,10 +5658,10 @@ export function MainWorkspace(props: AppProps) {
                                         max={10}
                                         step={0.1}
                                         onInput={(newVal) => {
-                                          setFlameDescriptor((draft) => {
-                                            draft.renderSettings.paletteSpeed =
-                                              newVal
-                                          })
+                                          setRenderSetting(
+                                            'paletteSpeed',
+                                            newVal,
+                                          )
                                         }}
                                         formatValue={(value) =>
                                           value.toFixed(1)
@@ -5688,10 +5691,10 @@ export function MainWorkspace(props: AppProps) {
                                             const mode = parseInt(
                                               ev.currentTarget.value,
                                             ) as 0 | 1
-                                            setFlameDescriptor((draft) => {
-                                              draft.renderSettings.paletteMode =
-                                                mode
-                                            })
+                                            setRenderSetting(
+                                              'paletteMode',
+                                              mode,
+                                            )
                                           }}
                                         >
                                           <option value={0}>
@@ -5720,10 +5723,10 @@ export function MainWorkspace(props: AppProps) {
                                         max={1}
                                         step={0.05}
                                         onInput={(newVal) => {
-                                          setFlameDescriptor((draft) => {
-                                            draft.renderSettings.palettePhase =
-                                              newVal
-                                          })
+                                          setRenderSetting(
+                                            'palettePhase',
+                                            newVal,
+                                          )
                                         }}
                                         formatValue={(value) =>
                                           value.toFixed(2)

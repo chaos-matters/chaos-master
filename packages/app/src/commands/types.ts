@@ -80,5 +80,14 @@ export interface FlameCommand {
    * the exact entities and randomness of the original run.
    */
   normalizeArgs?: (ctx: CommandContext, args: unknown[]) => unknown[]
+  /**
+   * Identifies "the same control being set again" for value-setting commands,
+   * computed from normalized args (e.g. the parameter path, or
+   * transform+affine+coefficient). Repeats within one gesture fold into a
+   * single recorded action carrying the final value, so a slider drag logs
+   * one step rather than the hundred `onInput` events it fires. Leave unset
+   * for commands whose repeats are each meaningful.
+   */
+  coalesceKey?: (args: unknown[]) => string | undefined
   execute: (ctx: CommandContext, ...args: unknown[]) => void
 }

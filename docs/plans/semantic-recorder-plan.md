@@ -2,8 +2,9 @@
 
 Status: **in progress**. M1 (recorder core, coverage ratchet, `.steps.json`)
 and M2 (determinism: `normalizeArgs`, id addressing, pre-minted ids, seeded
-generate/mutate) are implemented; M3 command coverage onward pending.
-Captured 2026-08-06.
+generate/mutate) are implemented. M3 has started: gesture handling landed and
+the render-settings controls are converted; transform-card, camera, palette
+and document-lifecycle sites remain. Captured 2026-08-06.
 
 ## The ask
 
@@ -217,10 +218,36 @@ That round-trip is the recorder's core test and belongs in vitest, not e2e.
 
 ### Command coverage (the real work)
 
-The registry's 33 commands cover maybe a third of real user actions. The
+Two things learned while starting this milestone, both of which changed the
+shape of the work:
+
+**Gestures had to be solved before any control could be converted.** A slider
+drag fires `onInput` continuously, and the control — not the handler — opens
+a preview and commits it (`Slider.tsx`), so the drag is one undo step whose
+commit happens _outside_ any command. Converting a slider naively logs a
+hundred actions and still leaves an unnamed write. So the recorder learned
+about gestures: `createStoreHistory` reports `onPreviewStarted` and marks
+pushed entries `fromPreview`, a gesture whose writes came from commands is
+counted as accounted-for, and commands carry an optional `coalesceKey` whose
+repeats fold into one action holding the final value. Folding is bounded by
+entry pushes, so two drags of one control stay two actions against two undo
+steps — otherwise a later recorded undo would revert too much.
+
+**Render settings get one command, not twenty.** `flame.setRenderSetting(path,
+value)` addresses them by the parameter path the controls already declare as
+`data-parameter-path` and the timeline already uses for keyframes. For these,
+the path IS the intent, and a new setting becomes recordable without a new
+command. Paths and value shapes are validated against the schema defaults —
+the plan's "per-command arg schemas" idea, in the one place it earns its keep,
+since hand-edited logs are a supported workflow. Structural edits keep named
+commands, where the intent is more than "this field took this value". The
+existing single-purpose setters (`flame.setGamma` and friends) stay for
+scripts and tours.
+
+The registry's commands still cover only part of real user actions. The
 labeled-but-anonymous and fully anonymous mutations in `MainWorkspace.tsx`
 need promoting, roughly in order of how often they appear in an editing
-session:
+session (**render settings, item 6, are done**):
 
 1. **Prop-adapter mutations** — the setters handed to `AffineEditor`,
    `AffineListEditor`, `FlameColorEditor`, `ColorListEditor`, `ColorEditor`
@@ -239,6 +266,11 @@ session:
    that starts from an import still replays.
 5. **Blend, audio wiring, custom variation code edits** — later; each is a
    self-contained vocabulary addition.
+6. **Render settings** — ~~the sliders and mode pickers writing
+   `renderSettings.*`~~ **done**: 18 controls route through
+   `flame.setRenderSetting`. `blendWeight` deliberately stays on its own
+   handler — it is not in the schema's render-settings defaults, so it is not
+   part of that path vocabulary.
 
 UI-only state (sidebar tabs, modals, theme) is _not_ flame mutation and is
 recorded only where it already has commands (`sidebar.open`/`close`) — useful
@@ -246,11 +278,20 @@ for video/tutorial sync, ignored by the condensed recipe.
 
 This milestone is also where element addressability lands: the repo has
 essentially no `data-testid` convention (16 occurrences, nearly all in
-Timeline). As each control is rewired through a command, it gains
-`data-command="flame.setVariationWeight"` (plus arg context where needed).
-That single attribute serves Playwright, the recorder's dev overlay, and any
-future model-driven operation — the "every UI element must be recognized"
-requirement — without inventing a parallel naming scheme.
+Timeline). Controls that carry a parameter path are already addressable by it
+(`data-parameter-path`, which is also the command's argument); the ones that
+need a name are the structural actions — add/remove/duplicate transform,
+apply palette, symmetry — which gain `data-command` as they are rewired. That
+serves Playwright, the recorder's dev overlay, and any future model-driven
+operation without inventing a parallel naming scheme.
+
+**The ratchet is not yet enforceable in CI.** Coverage is a property of the
+UI, not of the command layer: a unit test cannot notice a control that still
+writes directly. Making it enforceable needs the recorder reachable from a
+production build under test (the record pill is dev-gated), so the honest
+statement today is that the unnamed-write count is observable in dev, the
+mechanism that makes zero reachable is in place and unit-tested, and the
+e2e ratchet lands once the remaining surfaces above are converted.
 
 ### Persistence and sharing
 

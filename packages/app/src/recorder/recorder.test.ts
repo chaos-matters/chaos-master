@@ -9,7 +9,7 @@ import { executeCommand } from '@/commands/registry'
 import { examples } from '@/flame/examples'
 import { deepClone } from '@/utils/clone'
 import { createStoreHistory } from '@/utils/createStoreHistory'
-import { cancelSessionRecording, recordedActionCount, reportDocumentWrite, startSessionRecording, stopSessionRecording, unnamedWriteCount, withRecordingSuppressed, } from './recorder'
+import { cancelSessionRecording, notePreviewStarted, recordedActionCount, reportDocumentWrite, startSessionRecording, stopSessionRecording, unnamedWriteCount, withRecordingSuppressed, } from './recorder'
 import { replaySessionInstant } from './replay'
 import { parseSession, serializeSession, sessionFilename } from './schema'
 import type { RecordedSession } from './schema'
@@ -38,7 +38,11 @@ function makeHeadlessWorld(start: FlameDescriptor) {
     // Journaled like MainWorkspace's: the recorder reads journal stamps to
     // tell in-session edits from ones predating the recording, so an
     // unjournaled history here would not exercise that rule at all.
-    { journal: true, onEntryPushed: reportDocumentWrite },
+    {
+      journal: true,
+      onEntryPushed: reportDocumentWrite,
+      onPreviewStarted: notePreviewStarted,
+    },
   )
   const [zoom, setZoom] = createSignal(1)
   const [position, setPosition] = createSignal(vec2f(0, 0))
@@ -310,6 +314,133 @@ describe('record → replay round-trip', () => {
       const b = makeHeadlessWorld(examples.initExample)
       replayIntoWorld(session, b)
       expect(b.flame.renderSettings.gamma).toBe(originalGamma)
+      dispose()
+    })
+  })
+})
+
+/**
+ * A drag fires `onInput` continuously but is ONE undo step: the control opens
+ * a preview, every change accumulates into it, and the commit pushes a single
+ * entry. The log has to match that shape — one action per gesture, and the
+ * gesture's commit accounted for even though it happens in the control rather
+ * than inside a command.
+ */
+describe('gestures (slider drags)', () => {
+  /** What Slider.tsx does around its onInput stream. */
+  const drag = (
+    world: ReturnType<typeof makeHeadlessWorld>,
+    values: number[],
+    path = 'gamma',
+  ) => {
+    world.history.startPreview(`Edit ${path}`)
+    for (const value of values) {
+      executeCommand('flame.setRenderSetting', world.ctx, path, value)
+    }
+    world.history.commit()
+  }
+
+  it('folds one drag into a single action holding the final value', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      startSessionRecording(world.flame)
+      drag(world, [1.1, 1.4, 1.9, 2.3, 2.42])
+      const session = stopOrThrow()
+
+      expect(session.actions).toHaveLength(1)
+      expect(session.actions[0]?.args).toEqual(['gamma', 2.42])
+      // The commit lands outside any command; it is claimed by the gesture,
+      // not counted as an anonymous write.
+      expect(session.unnamedWriteCount).toBe(0)
+      expect(world.flame.renderSettings.gamma).toBeCloseTo(2.42, 5)
+      dispose()
+    })
+  })
+
+  it('keeps two drags of the same control as two actions (two undo steps)', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      startSessionRecording(world.flame)
+      drag(world, [1.5, 2])
+      drag(world, [2.5, 3])
+      const session = stopOrThrow()
+
+      // Folding across the entry boundary would leave one action against two
+      // undo steps, and a later recorded undo would revert too much.
+      expect(session.actions.map((a) => a.args)).toEqual([
+        ['gamma', 2],
+        ['gamma', 3],
+      ])
+      expect(session.unnamedWriteCount).toBe(0)
+      dispose()
+    })
+  })
+
+  it('does not fold different controls together', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      startSessionRecording(world.flame)
+      world.history.startPreview('Edit')
+      executeCommand('flame.setRenderSetting', world.ctx, 'gamma', 2)
+      executeCommand('flame.setRenderSetting', world.ctx, 'contrast', 3)
+      executeCommand('flame.setRenderSetting', world.ctx, 'gamma', 2.5)
+      world.history.commit()
+      const session = stopOrThrow()
+
+      expect(session.actions.map((a) => a.args)).toEqual([
+        ['gamma', 2],
+        ['contrast', 3],
+        ['gamma', 2.5],
+      ])
+      dispose()
+    })
+  })
+
+  it('still flags a gesture no command took part in', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      startSessionRecording(world.flame)
+      // An editor still driving the raw setter — exactly what M3 has left
+      // to convert, and the ratchet must keep seeing it.
+      world.history.startPreview('Affine Translation')
+      world.setFlameDescriptor((draft) => {
+        draft.renderSettings.exposure = 0.8
+      })
+      world.history.commit()
+      const session = stopOrThrow()
+
+      expect(session.actions).toEqual([])
+      expect(session.unnamedWriteCount).toBe(1)
+      dispose()
+    })
+  })
+
+  it('replays a folded drag into the same document', () => {
+    createRoot((dispose) => {
+      const a = makeHeadlessWorld(examples.example1)
+      startSessionRecording(a.flame)
+      drag(a, [1.2, 1.8, 2.42])
+      drag(a, [0.2, 0.35], 'paletteSpeed')
+      const session = stopOrThrow()
+
+      const b = makeHeadlessWorld(examples.initExample)
+      replayIntoWorld(session, b)
+      expect(deepClone(b.flame)).toEqual(deepClone(a.flame))
+      dispose()
+    })
+  })
+
+  it('rejects a path outside the schema vocabulary', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      const before = deepClone(world.flame)
+      startSessionRecording(world.flame)
+      // Hand-edited logs are a supported workflow, so a bad path must be
+      // refused rather than written into the document.
+      executeCommand('flame.setRenderSetting', world.ctx, 'notAThing', 1)
+      executeCommand('flame.setRenderSetting', world.ctx, 'gamma', 'nope')
+      stopOrThrow()
+      expect(deepClone(world.flame)).toEqual(before)
       dispose()
     })
   })
