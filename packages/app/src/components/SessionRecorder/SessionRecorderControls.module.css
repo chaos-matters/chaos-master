@@ -52,6 +52,16 @@
   gap: 0.35rem;
 }
 
+/* The "Open steps" control is a <label> wrapping a file input, so the input
+   itself is hidden and the label is the button. */
+.file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .dot,
 .dot-recording {
   width: 0.55rem;

@@ -62,6 +62,12 @@ registerCommand({
   // A drag re-fires onInput for the whole gesture; all of it is one undo step
   // live, so it is one action in the log too.
   coalesceKey: ([path]) => (typeof path === 'string' ? path : undefined),
+  // "Set gamma", not "Set Render Setting" — the replay step list is only
+  // readable if each step says which parameter it moved.
+  describe: ([path, value]) =>
+    typeof path === 'string'
+      ? `Set ${path}${typeof value === 'number' ? ` to ${Number(value.toFixed(3))}` : ''}`
+      : undefined,
   execute(ctx, path?: unknown, value?: unknown) {
     const expected = defaultAtPath(path)
     if (expected === undefined || !matchesDefaultShape(expected, value)) {
