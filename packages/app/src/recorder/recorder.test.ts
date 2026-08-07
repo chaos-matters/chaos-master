@@ -349,6 +349,10 @@ describe('gestures (slider drags)', () => {
 
       expect(session.actions).toHaveLength(1)
       expect(session.actions[0]?.args).toEqual(['gamma', 2.42])
+      // The label has to fold with the args: a describing command renders
+      // the value into its label, and keeping the gesture's FIRST label left
+      // real recordings quoting a value the action no longer carried.
+      expect(session.actions[0]?.label).toBe('Set gamma to 2.42')
       // The commit lands outside any command; it is claimed by the gesture,
       // not counted as an anonymous write.
       expect(session.unnamedWriteCount).toBe(0)
