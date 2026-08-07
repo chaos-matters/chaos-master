@@ -91,10 +91,40 @@ function errMsg(err: unknown): string {
  */
 const MISSING_TABLE =
   /no such table:\s*(?:main\.)?(?:gallery_items|home_config)\b/i
+const MISSING_GALLERY_PROVENANCE_COLUMN =
+  /no such column:\s*(?:collection|provenance_kind|source_url|license|license_url|attribution|changes|original_id)\b/i
+
+const GALLERY_PROVENANCE_COLUMNS =
+  'collection, provenance_kind, source_url, license, license_url, ' +
+  'attribution, changes, original_id'
+const LEGACY_GALLERY_PROVENANCE_COLUMNS =
+  "CASE WHEN slug LIKE 'classic-%' THEN 'foundation' ELSE 'original' END " +
+  "AS collection, 'unknown' AS provenance_kind, NULL AS source_url, " +
+  'NULL AS license, NULL AS license_url, NULL AS attribution, ' +
+  'NULL AS changes, NULL AS original_id'
 
 /** Did this D1 failure mean "a content table does not exist"? */
 function isMissingTable(err: unknown): boolean {
   return MISSING_TABLE.test(errMsg(err))
+}
+
+/**
+ * Migration 0005 can be applied just after a Worker deploy without taking Home
+ * down in between. Only a known missing provenance column gets the legacy
+ * projection; every other D1 error still fails loudly.
+ */
+async function withGalleryProvenanceFallback<T>(
+  read: (columns: string) => Promise<T>,
+): Promise<T> {
+  try {
+    return await read(GALLERY_PROVENANCE_COLUMNS)
+  } catch (err) {
+    if (!MISSING_GALLERY_PROVENANCE_COLUMN.test(errMsg(err))) throw err
+    console.warn(
+      'gallery provenance migration is pending — serving compatible defaults',
+    )
+    return read(LEGACY_GALLERY_PROVENANCE_COLUMNS)
+  }
 }
 
 /**
@@ -425,21 +455,25 @@ const baseHandler = {
         // The list view never needs the descriptors themselves — omitting them
         // keeps this response small even as the gallery grows. Callers fetch a
         // single item to get its flame.
-        const base =
-          'SELECT slug, title, caption, author, section, capability, ' +
-          'dimensions, transform_count, poster_key, poster_width, ' +
-          'poster_height, poster_frame, sort_order, ' +
-          '(animation IS NOT NULL) AS has_animation ' +
-          'FROM gallery_items WHERE published = 1'
-        const stmt =
-          section === null
-            ? env.CONTENT_DB.prepare(
-                `${base} ORDER BY section, sort_order, slug`,
-              )
-            : env.CONTENT_DB.prepare(
-                `${base} AND section = ? ORDER BY sort_order, slug`,
-              ).bind(section)
-        const { results } = await stmt.all()
+        const { results } = await withGalleryProvenanceFallback<{
+          results?: unknown[]
+        }>((provenance) => {
+          const base =
+            'SELECT slug, title, caption, author, section, capability, ' +
+            `${provenance}, dimensions, transform_count, poster_key, ` +
+            'poster_width, poster_height, poster_frame, sort_order, ' +
+            '(animation IS NOT NULL) AS has_animation ' +
+            'FROM gallery_items WHERE published = 1'
+          const stmt =
+            section === null
+              ? env.CONTENT_DB.prepare(
+                  `${base} ORDER BY section, sort_order, slug`,
+                )
+              : env.CONTENT_DB.prepare(
+                  `${base} AND section = ? ORDER BY sort_order, slug`,
+                ).bind(section)
+          return stmt.all()
+        })
         return jsonCached({ items: results ?? [] }, GALLERY_CACHE_SECONDS)
       } catch (err) {
         console.error('Error handling /api/gallery:', errMsg(err))
@@ -526,14 +560,20 @@ const baseHandler = {
         return json({ error: 'Invalid slug' }, 400)
       }
       try {
-        const row = await env.CONTENT_DB.prepare(
-          'SELECT slug, title, caption, author, section, capability, flame, ' +
-            'animation, sequence, dimensions, transform_count, poster_key, ' +
-            'poster_width, poster_height, poster_frame FROM gallery_items ' +
-            'WHERE slug = ? AND published = 1',
+        const row = await withGalleryProvenanceFallback<Record<
+          string,
+          unknown
+        > | null>((provenance) =>
+          env.CONTENT_DB.prepare(
+            'SELECT slug, title, caption, author, section, capability, flame, ' +
+              `animation, sequence, ${provenance}, dimensions, ` +
+              'transform_count, poster_key, poster_width, poster_height, ' +
+              'poster_frame FROM gallery_items ' +
+              'WHERE slug = ? AND published = 1',
+          )
+            .bind(slug)
+            .first(),
         )
-          .bind(slug)
-          .first()
         if (!row) return json({ error: 'Not found' }, 404)
         // `flame`/`animation`/`sequence` are stored as JSON text. Parse here so
         // clients get real objects rather than strings they must double-decode.

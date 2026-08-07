@@ -10,9 +10,8 @@
  *     `pie`), and
  *   - both embedded-palette encodings (Apophysis hex text + `<color>` children).
  *
- * Known limitation: parametric-variation parameters (e.g. `julian_power`) are
- * not imported — variations resolve to their chaos-master defaults — so the
- * samples omit them to keep imports warning-free.
+ * Parametric-variation parameters (for example `julian_power`) are included in
+ * the samples because the importer preserves them alongside their variation.
  */
 export type Flam3Sample = {
   name: string

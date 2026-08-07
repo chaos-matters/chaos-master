@@ -10,9 +10,28 @@ Node tooling for the app package. Run everything from `packages/app`.
 | `gallery-sequence.mjs`                      | Generates a row's curated flame sequence and stores it.     |
 | `capture-gallery-posters.mjs`               | Renders a still poster for every gallery row.               |
 | `upload-gallery-posters.mjs`                | Uploads those posters to R2 and points the D1 rows at them. |
+| `gallery-poster-manifest.mjs`               | Binds each poster to its target and source descriptors.     |
 | `extract-flames.mjs`                        | Pulls flame descriptors out of existing artwork.            |
 | `poster-capture.html` + `posterCapture.tsx` | Dev-only render surface the capture script drives.          |
 | `dev-server-checkout.mjs`                   | Proves the dev server at `--base` is serving THIS checkout. |
+| `flam3-compat.mjs`                          | Batch-audits FLAM3/XML packs with the app's real importer.  |
+
+## flam3-compat
+
+Before curating an external FLAM3 or Apophysis pack, audit every document with
+the same parser the app uses. Directories are walked recursively, multi-flame
+XML documents report every `<flame>`, and nothing is imported or persisted.
+
+```sh
+pnpm flam3:compat ~/Downloads/flame-pack
+pnpm flam3:compat --json pack-a pack-b > compatibility.json
+pnpm flam3:compat --strict candidate.flame
+```
+
+The default exit code is non-zero for invalid entries. `--strict` also rejects
+otherwise importable flames that lose an unsupported variation or final
+transform behavior. The JSON output is path-sorted and has no timestamps or
+generated IDs, so two runs are directly diffable.
 
 ## Environments
 
@@ -32,8 +51,9 @@ miniflare resolves a store from the _binding_ in `wrangler.jsonc`, and the
 top-level config declares none.
 
 `local` is the **default** everywhere. Curating content and looking at the
-result should reach nobody, so both deployed targets are a deliberate choice —
-and `prod` needs `--confirm prod` on top of `--env prod` in `gallery-admin`.
+result should reach nobody, so both deployed targets are a deliberate choice.
+Every prod writer requires `--confirm prod`, including the low-level poster
+upload and sequence scripts; `gallery-admin` passes that confirmation through.
 
 Because `local` and `dev` share a database _name_, every JSON result carries
 `storage` (`local` or `remote`) next to `env` and `database`. The name alone
@@ -63,6 +83,7 @@ JSON object on stdout and human progress on stderr.
 
 ```sh
 node scripts/gallery-admin.mjs list                      # local, by default
+node scripts/gallery-admin.mjs audit --env dev            # strict, read-only gate
 node scripts/gallery-admin.mjs inspect --file shot.png   # writes nothing
 node scripts/gallery-admin.mjs put --file shot.png --section gallery
 node scripts/gallery-admin.mjs capture --all-missing
@@ -81,13 +102,46 @@ Three rules it will not bend:
   tool inheriting that default publishes to production by accident eventually.
 - **`put` stages, it never publishes.** The row lands with `published = 0` and
   `poster_key = NULL`, so going live is always a separate `publish` call.
-- **There is no delete.** `publish --published 0` is the reversible
-  alternative, and it is enough.
+- **Shared publication has a gate.** Dev/prod rows need a poster, positive
+  poster dimensions, public creator credit, provenance, and reuse terms.
+  Artist Editions also need a source and visible attribution; third-party work
+  stays in gallery/motion sections whose layouts show that credit. Remixes
+  identify the original and describe the changes. Local publication keeps
+  those as warnings so unfinished curation is easy.
+- **Delete is intentionally awkward.** It accepts only an unpublished row and
+  requires the slug again as confirmation. Prefer reversible unpublishing.
 
 A flame that references a custom variation without carrying its definition is
 refused: `gallery_items` has nowhere to put the WGSL, so it would render as the
 identity fallback rather than the picture that was exported. Four of the 59
 flames in the existing export collection are like this.
+
+`put` accepts `--collection`, `--author`, `--provenance`, `--source-url`,
+`--license`, `--license-url`, `--attribution`, `--changes`, and `--original-id`.
+The first call may stage incomplete metadata; `publish` is the point that checks
+the complete public record. Migration `0005_gallery_provenance.sql` must be
+applied to a shared database before its admin tools can use these fields. The
+public Worker has a narrow legacy projection during that rollout, so deploying
+the code before applying 0005 does not take the existing gallery down.
+
+`gallery-admin audit` applies the strict shared gate to every currently
+published row and exits non-zero when anything is unresolved. It is read-only:
+it does not auto-create a missing local schema or change D1/R2.
+
+## seed-gallery
+
+The checked-in curation seed is a local preview fixture, not a remote publishing
+path. It clears stale posters/sequences whenever a descriptor changes and
+stages every row by default:
+
+```sh
+node scripts/seed-gallery.mjs --apply local
+node scripts/seed-gallery.mjs --apply local --publish  # visible only locally
+```
+
+`--apply dev` and `--apply prod` are refused. Shared rows go through
+`gallery-admin put` → `capture` → `publish`, so provenance and poster checks
+cannot be bypassed by a bulk seed.
 
 `config` is the same idea applied to Home's settings rather than its rows: the
 `home_config` table (migration `0003`), served as one object by
@@ -131,6 +185,7 @@ node scripts/gallery-sequence.mjs cap-randomizer --apply local
 node scripts/gallery-sequence.mjs cap-randomizer --seed 7 --derived 4
 node scripts/gallery-sequence.mjs cap-randomizer --paths 2       # two paths
 node scripts/gallery-sequence.mjs cap-randomizer --clear --apply local
+node scripts/gallery-sequence.mjs cap-randomizer --apply prod --confirm prod
 ```
 
 The flames come from the app's OWN randomiser (`src/flame/randomize.ts`,
@@ -153,6 +208,10 @@ hold two curated paths without changing anything.
 
 `--clear` sets the column back to `NULL`, which is the ordinary single-flame
 behaviour every other row has.
+
+The low-level script requires `--confirm prod` for a production write. Through
+`gallery-admin`, a published row in remote dev/prod must be unpublished before
+its sequence can change; preview remains read-only and is still allowed.
 
 ## The gallery poster pipeline
 
@@ -210,6 +269,10 @@ Output goes to `assets/local/gallery-posters/` (gitignored) as
 puts it somewhere else. Re-capturing a few slugs merges into the existing
 manifest rather than replacing it.
 
+The versioned manifest records the exact environment/storage target and a
+canonical SHA-256 digest of each row's flame + animation JSON. Formatting and
+object-key order do not change the digest, but any descriptor change does.
+
 Defaults: **1600x900 WEBP**, encoder quality 0.9, convergence target 0.97.
 
 ### 3. Upload and publish
@@ -218,7 +281,7 @@ Defaults: **1600x900 WEBP**, encoder quality 0.9, convergence target 0.97.
 node scripts/upload-gallery-posters.mjs --dry-run    # print every command first
 node scripts/upload-gallery-posters.mjs             # local, by default
 node scripts/upload-gallery-posters.mjs --env dev
-node scripts/upload-gallery-posters.mjs --env prod
+node scripts/upload-gallery-posters.mjs --env prod --confirm prod
 ```
 
 Posters go into the **existing** og-images bucket
@@ -230,6 +293,12 @@ prefix — no new bucket. The script then sets `poster_key`, `poster_width`,
 Both halves follow `--env` together. A `local` run puts the object into the
 local bucket and the `poster_key` into the local database, so a local row can
 never point at an object only the deployed bucket has.
+
+Before the first write, upload checks that the manifest target matches
+`--env`, rereads the selected rows from D1, and verifies every canonical
+descriptor/animation digest. A stale or cross-environment capture is refused.
+`--dry-run` performs that D1 read and all validations, but writes neither R2
+nor D1.
 
 `poster_key` is stored **without** the `gallery/` prefix; the Worker adds it
 when serving `/api/gallery/poster/<poster_key>`.

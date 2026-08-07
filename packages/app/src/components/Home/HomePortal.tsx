@@ -316,7 +316,7 @@ export function HomePortal(props: HomePortalProps) {
     }
     return (stepIndex() + 1) / total
   })
-  const progressWidth = createMemo(() => `${(progress() * 100).toFixed(1)}%`)
+  const progressScale = createMemo(() => progress().toFixed(4))
   /** ARIA counts steps from 1, and reports "nothing yet" as the first step. */
   const sliderNow = createMemo(() => Math.max(0, stepIndex()) + 1)
   const sliderMax = createMemo(() => Math.max(1, stepCount()))
@@ -426,7 +426,10 @@ export function HomePortal(props: HomePortalProps) {
             )
           }}
         >
-          <span class={ui.portalBarFill} style={{ width: progressWidth() }} />
+          <span
+            class={ui.portalBarFill}
+            style={{ transform: `scaleX(${progressScale()})` }}
+          />
         </div>
         <button
           type="button"
