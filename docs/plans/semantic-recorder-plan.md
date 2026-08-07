@@ -7,9 +7,10 @@ fork-from-step) and M5 (sessions embedded in exported PNGs and MP4s; dropping ei
 offers its replay) are implemented. The recorder is no longer dev-gated. M3 is largely done: gesture handling
 landed, and the render settings, transform card, affine editor, colour
 editors, palette, camera, symmetry, randomize/mutate and document loads are
-converted. Roughly two dozen direct writes remain in `MainWorkspace.tsx` —
-blend/morph, breeding wiring, audio wiring, custom variation code and the
-affine list editor. Captured 2026-08-06.
+converted. Blend, morph, the render-settings merge and the
+quick variation picker are converted too; about twenty direct writes remain
+in `MainWorkspace.tsx` — breeding wiring, audio wiring, custom variation
+code, the tour/share/hand-off loads and the affine list editor. Captured 2026-08-06.
 
 ## The ask
 
