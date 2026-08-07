@@ -158,7 +158,15 @@ export function recordCommandExecution(
       // A drag re-sets the same target dozens of times inside ONE undo step;
       // the log keeps the last value and the timestamp the gesture began.
       const existing = rec.actions[anchor.index]
-      if (existing) existing.args = deepClone([...args])
+      if (existing) {
+        existing.args = deepClone([...args])
+        // The label has to move with the args. Describing commands render
+        // the value into their label ("Set gamma to 2.42"), so keeping the
+        // first one left the step list quoting a value the action no longer
+        // carried — visible in real recordings as a label that disagreed
+        // with its own args.
+        existing.label = cmd.describe?.([...args]) ?? cmd.label
+      }
       pendingActionIndex = anchor.index
     } else {
       rec.actions.push({
