@@ -3,8 +3,8 @@
 Status: **in progress**. M1 (recorder core, coverage ratchet, `.steps.json`),
 M2 (determinism: `normalizeArgs`, id addressing, pre-minted ids, seeded
 generate/mutate), M4 (replay: transport, step list, jump-to-step,
-fork-from-step) and the PNG half of M5 (a `FlameSteps` chunk beside
-`FlameJson`; dropping such a PNG offers its replay) are implemented. M3 is largely done: gesture handling
+fork-from-step) and M5 (sessions embedded in exported PNGs and MP4s; dropping either
+offers its replay) are implemented. The recorder is no longer dev-gated. M3 is largely done: gesture handling
 landed, and the render settings, transform card, affine editor, colour
 editors, palette, camera, symmetry, randomize/mutate and document loads are
 converted. Roughly two dozen direct writes remain in `MainWorkspace.tsx` —
@@ -316,9 +316,12 @@ e2e ratchet lands once the remaining surfaces above are converted.
   (`FlameSteps`) next to `FlameJson` — `flameInPng.ts` already has the chunk
   machinery. A dropped PNG then offers "Load flame" _and_ "Replay creation".
   Same trick for MP4 via `flameInMp4.ts`'s metadata payload.
-- Recent-flames (`utils/recentFlames.ts`) already persists `tracks?`
-  alongside flames; an optional `session?` field follows the same pattern for
-  autosaving in-progress recordings across reloads.
+- Recent-flames deliberately does NOT carry sessions. It holds up to 150
+  entries in localStorage, and a session (an embedded initial flame plus its
+  actions) per entry would risk the quota — silently failing the write that
+  keeps the user's recent work. The PNG/MP4 chunks and the `.steps.json`
+  download already cover sharing; persisting an in-progress recording across
+  a reload, if wanted, should store the ONE active session, not 150.
 - Gallery/endpoint publishing is out of scope here — it composes on top
   (the gallery-admin plan's D1/R2 pipeline gains one more file per item).
 

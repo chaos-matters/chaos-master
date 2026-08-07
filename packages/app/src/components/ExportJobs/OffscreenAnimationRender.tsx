@@ -6,6 +6,7 @@ import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
+import { lastFinishedSession } from '@/recorder/recorder'
 import { applyAudioMappingsToFlame, createAudioAnalyzer, } from '@/utils/audioAnalysis'
 import { createAudioVideoEncoder } from '@/utils/audioExport'
 import { deepClone } from '@/utils/clone'
@@ -165,6 +166,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
           job.flame,
           job.tracks,
           job.config,
+          lastFinishedSession(),
         )
         blob = new Blob([injectMetadataIntoMp4(mp4Buffer, payload)], {
           type: result.mimeType,
