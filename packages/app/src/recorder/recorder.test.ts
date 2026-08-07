@@ -446,6 +446,171 @@ describe('gestures (slider drags)', () => {
   })
 })
 
+/**
+ * The transform card's structural actions (M3). Each one either has a
+ * state-dependent branch or carries computed randomness, so each needs to
+ * come back byte-identical on replay.
+ */
+describe('transform-card commands', () => {
+  const firstTransformId = (flame: FlameDescriptor) =>
+    Object.keys(flame.transforms)[0]!
+  const firstVariationId = (flame: FlameDescriptor, tid: string) =>
+    Object.keys(
+      flame.transforms[tid as keyof typeof flame.transforms]!.variations,
+    )[0]!
+
+  it('records visibility as a target state, not a toggle', () => {
+    createRoot((dispose) => {
+      const a = makeHeadlessWorld(examples.example1)
+      const tid = firstTransformId(a.flame)
+      startSessionRecording(a.flame)
+      executeCommand('flame.setTransformVisible', a.ctx, tid, false)
+      const session = stopOrThrow()
+
+      expect(session.actions[0]?.args).toEqual([tid, false])
+      // A toggle would flip whatever the replayed document showed; an
+      // explicit target lands the same way from any starting state.
+      const b = makeHeadlessWorld(examples.example1)
+      b.setFlameDescriptor((draft) => {
+        draft.transforms[tid as keyof typeof draft.transforms]!.visible = false
+      })
+      replayIntoWorld(session, b)
+      expect(
+        b.flame.transforms[tid as keyof typeof b.flame.transforms]!.visible,
+      ).toBe(false)
+      dispose()
+    })
+  })
+
+  it('deletes a transform, and resets rather than empties the last one', () => {
+    createRoot((dispose) => {
+      const a = makeHeadlessWorld(examples.example1)
+      const ids = Object.keys(a.flame.transforms)
+      expect(ids.length).toBeGreaterThan(1)
+      startSessionRecording(a.flame)
+      // Delete every transform, one by one: the final call must reset.
+      for (const tid of ids) {
+        executeCommand('flame.deleteTransform', a.ctx, tid)
+      }
+      const session = stopOrThrow()
+
+      const remaining = Object.keys(a.flame.transforms)
+      expect(remaining).toHaveLength(1)
+      // The reset branch mints a variation id — pre-minted into the args, so
+      // replay reproduces it exactly rather than generating a fresh UUID.
+      const b = makeHeadlessWorld(examples.example1)
+      replayIntoWorld(session, b)
+      expect(deepClone(b.flame)).toEqual(deepClone(a.flame))
+      dispose()
+    })
+  })
+
+  it('deletes a variation, and resets rather than empties the last one', () => {
+    createRoot((dispose) => {
+      const a = makeHeadlessWorld(examples.example1)
+      const tid = firstTransformId(a.flame)
+      const vids = Object.keys(
+        a.flame.transforms[tid as keyof typeof a.flame.transforms]!.variations,
+      )
+      startSessionRecording(a.flame)
+      for (const vid of vids) {
+        executeCommand('flame.deleteVariation', a.ctx, tid, vid)
+      }
+      const session = stopOrThrow()
+
+      expect(
+        Object.keys(
+          a.flame.transforms[tid as keyof typeof a.flame.transforms]!
+            .variations,
+        ),
+      ).toHaveLength(1)
+      const b = makeHeadlessWorld(examples.example1)
+      replayIntoWorld(session, b)
+      expect(deepClone(b.flame)).toEqual(deepClone(a.flame))
+      dispose()
+    })
+  })
+
+  it('replays a randomized variation without re-rolling it', () => {
+    createRoot((dispose) => {
+      const a = makeHeadlessWorld(examples.example1)
+      const tid = firstTransformId(a.flame)
+      const vid = firstVariationId(a.flame, tid)
+      startSessionRecording(a.flame)
+      // The dice button rolls in the handler and passes the result, so the
+      // log carries the outcome rather than an intent to randomize.
+      executeCommand('flame.setVariation', a.ctx, tid, vid, {
+        type: 'linearVar',
+        weight: 0.731,
+        visible: true,
+      })
+      const session = stopOrThrow()
+
+      const b = makeHeadlessWorld(examples.initExample)
+      replayIntoWorld(session, b)
+      expect(deepClone(b.flame.transforms)).toEqual(
+        deepClone(a.flame.transforms),
+      )
+      dispose()
+    })
+  })
+
+  it('applies a variation selection as one step', () => {
+    createRoot((dispose) => {
+      const a = makeHeadlessWorld(examples.example1)
+      const tid = firstTransformId(a.flame)
+      const vid = firstVariationId(a.flame, tid)
+      startSessionRecording(a.flame)
+      executeCommand(
+        'flame.applyVariationSelection',
+        a.ctx,
+        tid,
+        vid,
+        { a: 0.5, b: 0.1, c: 0, d: 0.2, e: 0.5, f: 0 },
+        { type: 'swirlVar', weight: 0.8, visible: true },
+      )
+      const session = stopOrThrow()
+
+      // One action, so one undo step on replay — matching the single setter
+      // the variation browser uses live.
+      expect(session.actions).toHaveLength(1)
+      expect(a.history.hasUndo()).toBe(true)
+      a.history.undo()
+      expect(deepClone(a.flame)).toEqual(deepClone(examples.example1))
+
+      const b = makeHeadlessWorld(examples.example1)
+      replayIntoWorld(session, b)
+      const t = b.flame.transforms[tid as keyof typeof b.flame.transforms]!
+      expect(t.preAffine.a).toBeCloseTo(0.5, 5)
+      expect(t.variations[vid as keyof typeof t.variations]!.type).toBe(
+        'swirlVar',
+      )
+      dispose()
+    })
+  })
+
+  it('folds a probability drag per transform, not across transforms', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      const [t0, t1] = Object.keys(world.flame.transforms)
+      startSessionRecording(world.flame)
+      world.history.startPreview('Edit Probability')
+      executeCommand('flame.setProbability', world.ctx, t0, 0.3)
+      executeCommand('flame.setProbability', world.ctx, t0, 0.4)
+      executeCommand('flame.setProbability', world.ctx, t1, 0.9)
+      world.history.commit()
+      const session = stopOrThrow()
+
+      expect(session.actions.map((a) => a.args)).toEqual([
+        [t0, 0.4],
+        [t1, 0.9],
+      ])
+      expect(session.unnamedWriteCount).toBe(0)
+      dispose()
+    })
+  })
+})
+
 describe('undo that reaches outside the recorded session', () => {
   it('flags an undo of an edit made BEFORE recording started', () => {
     createRoot((dispose) => {

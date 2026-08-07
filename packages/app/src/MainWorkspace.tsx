@@ -86,6 +86,7 @@ import { initExample } from './flame/examples/initExample'
 import { initExample3D } from './flame/examples/initExample3D'
 import { tid as toTransformId, vid as toVariationId, } from './flame/examples/util'
 import { Flam3 } from './flame/Flam3'
+import { newDefaultTransform } from './flame/newTransform'
 import { pointInitModeToImplFn } from './flame/pointInitMode'
 import { pointInitMode3DToImplFn } from './flame/pointInitMode3D'
 import { generateRandomFlame, mutateFlame, random01, randomizeAllColors, randomizeVariationParams, randomRange, } from './flame/randomize'
@@ -134,7 +135,7 @@ import type { TourContext } from './components/SpotlightTour/tourTypes'
 import type { ColorMap, Palette } from './flame/colorMap'
 import type { PointInitMode } from './flame/pointInitMode'
 import type { GenerateRandomFlameConfig, MutateFlameOptions, } from './flame/randomize'
-import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from './flame/schema/flameSchema'
+import type { FlameDescriptor, TransformId, VariationId, } from './flame/schema/flameSchema'
 import type { Dims } from './flame/variationRegistry'
 import type { TransformVariationType } from './flame/variations'
 import type { CustomVariationDef } from './flame/variations/custom/types'
@@ -159,40 +160,6 @@ function formatPercent(x: number) {
     return `100 %`
   }
   return `${(x * 100).toFixed(1)} %`
-}
-
-function newDefaultTransform(dims: Dims = 2): TransformFunction {
-  const is3D = dims === 3
-  const identity = is3D
-    ? {
-        a: 1,
-        b: 0,
-        c: 0,
-        d: 0,
-        e: 0,
-        f: 1,
-        g: 0,
-        h: 0,
-        i: 0,
-        j: 0,
-        k: 1,
-        l: 0,
-      }
-    : { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 }
-  return {
-    probability: 1,
-    colorSpeed: 0.4,
-    color: { x: 0, y: 0 },
-    preAffine: identity,
-    postAffine: identity,
-    visible: true,
-    variations: {
-      [generateVariationId()]: getVariationDefault(
-        defaultLinearType(dims),
-        1.0,
-      ),
-    },
-  }
 }
 
 export type ExportImageInfo = {
@@ -3991,16 +3958,14 @@ export function MainWorkspace(props: AppProps) {
                                         ) {
                                           return
                                         }
-                                        setFlameDescriptor((draft) => {
-                                          draft.transforms[
-                                            state.tid
-                                          ]!.preAffine =
-                                            newValue.transform.preAffine
-                                          draft.transforms[
-                                            state.tid
-                                          ]!.variations[state.vid] =
-                                            newValue.variation
-                                        })
+                                        executeCommand(
+                                          'flame.applyVariationSelection',
+                                          cmdContext,
+                                          state.tid,
+                                          state.vid,
+                                          newValue.transform.preAffine,
+                                          newValue.variation,
+                                        )
                                       })
                                       .catch((err: unknown) => {
                                         console.warn(
@@ -4046,9 +4011,11 @@ export function MainWorkspace(props: AppProps) {
                                     : { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 })
                                 }
                                 setFinalTransform={(affine) => {
-                                  setFlameDescriptor((draft) => {
-                                    draft.finalTransform = affine
-                                  })
+                                  executeCommand(
+                                    'flame.setFinalTransform',
+                                    cmdContext,
+                                    affine,
+                                  )
                                 }}
                                 is3D={
                                   (flameDescriptor.renderSettings.dimensions ??
@@ -4341,12 +4308,16 @@ export function MainWorkspace(props: AppProps) {
                                             const hue = random01() * 2 * Math.PI
                                             const chroma =
                                               0.25 + random01() * 0.15
-                                            setFlameDescriptor((draft) => {
-                                              draft.transforms[tid]!.color.x =
-                                                chroma * Math.cos(hue)
-                                              draft.transforms[tid]!.color.y =
-                                                chroma * Math.sin(hue)
-                                            })
+                                            // The randomness lands in the
+                                            // recorded args, so the log needs
+                                            // no seed to replay this exactly.
+                                            executeCommand(
+                                              'flame.setTransformColor',
+                                              cmdContext,
+                                              tid,
+                                              chroma * Math.cos(hue),
+                                              chroma * Math.sin(hue),
+                                            )
                                           }}
                                         >
                                           <Shuffle />
@@ -4363,10 +4334,12 @@ export function MainWorkspace(props: AppProps) {
                                         }
                                         onClick={(e) => {
                                           e.stopPropagation()
-                                          setFlameDescriptor((draft) => {
-                                            draft.transforms[tid]!.visible =
-                                              !draft.transforms[tid]!.visible
-                                          })
+                                          executeCommand(
+                                            'flame.setTransformVisible',
+                                            cmdContext,
+                                            tid,
+                                            !transform.visible,
+                                          )
                                         }}
                                       >
                                         {transform.visible ? (
@@ -4382,18 +4355,11 @@ export function MainWorkspace(props: AppProps) {
                                         title="Delete transform"
                                         onClick={(e) => {
                                           e.stopPropagation()
-                                          setFlameDescriptor((draft) => {
-                                            if (
-                                              recordKeys(draft.transforms)
-                                                .length === 1
-                                            ) {
-                                              draft.transforms[tid] = deepClone(
-                                                newDefaultTransform(),
-                                              )
-                                            } else {
-                                              delete draft.transforms[tid]
-                                            }
-                                          })
+                                          executeCommand(
+                                            'flame.deleteTransform',
+                                            cmdContext,
+                                            tid,
+                                          )
                                         }}
                                       >
                                         <Cross />
@@ -4422,10 +4388,12 @@ export function MainWorkspace(props: AppProps) {
                                         max={1}
                                         step={0.001}
                                         onInput={(probability) => {
-                                          setFlameDescriptor((draft) => {
-                                            draft.transforms[tid]!.probability =
-                                              probability
-                                          })
+                                          executeCommand(
+                                            'flame.setProbability',
+                                            cmdContext,
+                                            tid,
+                                            probability,
+                                          )
                                         }}
                                         formatValue={(value) =>
                                           formatPercent(
@@ -4453,10 +4421,12 @@ export function MainWorkspace(props: AppProps) {
                                         max={1}
                                         step={0.01}
                                         onInput={(val) => {
-                                          setFlameDescriptor((draft) => {
-                                            draft.transforms[tid]!.colorSpeed =
-                                              val
-                                          })
+                                          executeCommand(
+                                            'flame.setColorSpeed',
+                                            cmdContext,
+                                            tid,
+                                            val,
+                                          )
                                         }}
                                         dataParameterPath={`transform.${tid}.colorSpeed`}
                                         data-tour-target="colorSpeed-slider"
@@ -4518,17 +4488,14 @@ export function MainWorkspace(props: AppProps) {
                                                     ) {
                                                       return
                                                     }
-                                                    setFlameDescriptor(
-                                                      (draft) => {
-                                                        draft.transforms[
-                                                          tid
-                                                        ]!.preAffine =
-                                                          newValue.transform.preAffine
-                                                        draft.transforms[
-                                                          tid
-                                                        ]!.variations[vid] =
-                                                          newValue.variation
-                                                      },
+                                                    executeCommand(
+                                                      'flame.applyVariationSelection',
+                                                      cmdContext,
+                                                      tid,
+                                                      vid,
+                                                      newValue.transform
+                                                        .preAffine,
+                                                      newValue.variation,
                                                     )
                                                   })
                                                   .catch((err: unknown) => {
@@ -4604,14 +4571,12 @@ export function MainWorkspace(props: AppProps) {
                                                 step={0.001}
                                                 dataParameterPath={`${tid}.${vid}`}
                                                 onInput={(weight) => {
-                                                  setFlameDescriptor(
-                                                    (draft) => {
-                                                      draft.transforms[
-                                                        tid
-                                                      ]!.variations[
-                                                        vid
-                                                      ]!.weight = weight
-                                                    },
+                                                  executeCommand(
+                                                    'flame.setVariationWeight',
+                                                    cmdContext,
+                                                    tid,
+                                                    vid,
+                                                    weight,
                                                   )
                                                 }}
                                                 formatValue={formatPercent}
@@ -4620,26 +4585,25 @@ export function MainWorkspace(props: AppProps) {
                                             <Show when={!hideDiceButtons()}>
                                               <DiceButton
                                                 onClick={() => {
-                                                  setFlameDescriptor(
-                                                    (draft) => {
-                                                      const v =
-                                                        draft.transforms[tid]!
-                                                          .variations[vid]!
-                                                      v.weight = random01()
-                                                      const params =
-                                                        randomizeVariationParams(
-                                                          v.type,
-                                                        )
-                                                      if (params) {
-                                                        ;(
-                                                          v as {
-                                                            params?: Record<
-                                                              string,
-                                                              number
-                                                            >
-                                                          }
-                                                        ).params = params
-                                                      }
+                                                  // Rolled here, recorded as
+                                                  // the resulting descriptor:
+                                                  // replay reproduces it
+                                                  // without re-rolling.
+                                                  const params =
+                                                    randomizeVariationParams(
+                                                      variation.type,
+                                                    )
+                                                  executeCommand(
+                                                    'flame.setVariation',
+                                                    cmdContext,
+                                                    tid,
+                                                    vid,
+                                                    {
+                                                      ...deepClone(variation),
+                                                      weight: random01(),
+                                                      ...(params
+                                                        ? { params }
+                                                        : {}),
                                                     },
                                                   )
                                                 }}
@@ -4654,12 +4618,13 @@ export function MainWorkspace(props: AppProps) {
                                                   : 'Show variation'
                                               }
                                               onClick={() => {
-                                                setFlameDescriptor((draft) => {
-                                                  const v =
-                                                    draft.transforms[tid]!
-                                                      .variations[vid]!
-                                                  v.visible = !v.visible
-                                                })
+                                                executeCommand(
+                                                  'flame.setVariationVisible',
+                                                  cmdContext,
+                                                  tid,
+                                                  vid,
+                                                  !variation.visible,
+                                                )
                                               }}
                                             >
                                               {variation.visible ? (
@@ -4671,28 +4636,12 @@ export function MainWorkspace(props: AppProps) {
                                             <button
                                               class={ui.deleteVariationButton}
                                               onClick={() => {
-                                                setFlameDescriptor((draft) => {
-                                                  if (
-                                                    recordKeys(
-                                                      draft.transforms[tid]!
-                                                        .variations,
-                                                    ).length === 1
-                                                  ) {
-                                                    draft.transforms[
-                                                      tid
-                                                    ]!.variations[vid] =
-                                                      deepClone(
-                                                        getVariationDefault(
-                                                          variation.type,
-                                                          1,
-                                                        ),
-                                                      )
-                                                  } else {
-                                                    delete draft.transforms[
-                                                      tid
-                                                    ]!.variations[vid]
-                                                  }
-                                                })
+                                                executeCommand(
+                                                  'flame.deleteVariation',
+                                                  cmdContext,
+                                                  tid,
+                                                  vid,
+                                                )
                                               }}
                                             >
                                               <Cross />

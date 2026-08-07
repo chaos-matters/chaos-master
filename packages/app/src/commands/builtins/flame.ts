@@ -1,11 +1,12 @@
 import { examples } from '@/flame/examples'
+import { newDefaultTransform } from '@/flame/newTransform'
 import { generateTransformId, generateVariationId, } from '@/flame/transformFunction'
 import { defaultLinearType } from '@/flame/variationRegistry'
 import { getVariationDefault } from '@/flame/variations/utils'
 import { deepClone } from '@/utils/clone'
 import { registerCommand } from '../registry'
 import type { CommandContext } from '../types'
-import type { TransformId, VariationId } from '@/flame/schema/flameSchema'
+import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from '@/flame/schema/flameSchema'
 import type { Dims } from '@/flame/variationRegistry'
 
 /**
@@ -184,6 +185,8 @@ registerCommand({
       weight,
     ]
   },
+  coalesceKey: ([transformRef, variationRef]) =>
+    `weight:${String(transformRef)}:${String(variationRef)}`,
   execute(
     ctx,
     transformRef?: unknown,
@@ -240,6 +243,7 @@ registerCommand({
   normalizeArgs(ctx, [transformRef, speed]) {
     return [normalizeTransformRef(ctx, transformRef), speed]
   },
+  coalesceKey: ([transformRef]) => `colorSpeed:${String(transformRef)}`,
   execute(ctx, transformRef?: unknown, speed?: unknown) {
     const s = typeof speed === 'number' ? speed : 0.5
     ctx.setFlameDescriptor((draft) => {
@@ -282,6 +286,7 @@ registerCommand({
   normalizeArgs(ctx, [transformRef, probability]) {
     return [normalizeTransformRef(ctx, transformRef), probability]
   },
+  coalesceKey: ([transformRef]) => `probability:${String(transformRef)}`,
   execute(ctx, transformRef?: unknown, probability?: unknown) {
     const p = typeof probability === 'number' ? probability : 1
     ctx.setFlameDescriptor((draft) => {
@@ -299,6 +304,8 @@ registerCommand({
   normalizeArgs(ctx, [transformRef, affineType, param, value]) {
     return [normalizeTransformRef(ctx, transformRef), affineType, param, value]
   },
+  coalesceKey: ([transformRef, affineType, param]) =>
+    `affine:${String(transformRef)}:${String(affineType)}:${String(param)}`,
   execute(
     ctx,
     transformRef?: unknown,
@@ -329,6 +336,7 @@ registerCommand({
   normalizeArgs(ctx, [transformRef, x, y]) {
     return [normalizeTransformRef(ctx, transformRef), x, y]
   },
+  coalesceKey: ([transformRef]) => `color:${String(transformRef)}`,
   execute(ctx, transformRef?: unknown, x?: unknown, y?: unknown) {
     const cx = typeof x === 'number' ? x : 0
     const cy = typeof y === 'number' ? y : 0
@@ -447,6 +455,8 @@ registerCommand({
       paramValue,
     ]
   },
+  coalesceKey: ([transformRef, variationRef, paramName]) =>
+    `param:${String(transformRef)}:${String(variationRef)}:${String(paramName)}`,
   execute(
     ctx,
     transformRef?: unknown,
@@ -467,5 +477,224 @@ registerCommand({
         ;(variation.params as Record<string, number>)[name] = value
       }
     })
+  },
+})
+
+registerCommand({
+  id: 'flame.setTransformVisible',
+  label: 'Set Transform Visibility',
+  description: 'Show or hide a transform',
+  // An explicit target state, never a toggle: a recorded toggle would flip
+  // whatever the replayed document happened to be showing.
+  normalizeArgs(ctx, [transformRef, visible]) {
+    return [normalizeTransformRef(ctx, transformRef), visible === true]
+  },
+  execute(ctx, transformRef?: unknown, visible?: unknown) {
+    ctx.setFlameDescriptor((draft) => {
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const transform = key ? draft.transforms[key] : undefined
+      if (transform) transform.visible = visible === true
+    }, 'Toggle Transform')
+  },
+})
+
+registerCommand({
+  id: 'flame.setVariationVisible',
+  label: 'Set Variation Visibility',
+  description: 'Show or hide a variation on a transform',
+  normalizeArgs(ctx, [transformRef, variationRef, visible]) {
+    return [
+      normalizeTransformRef(ctx, transformRef),
+      normalizeVariationRef(ctx, transformRef, variationRef),
+      visible === true,
+    ]
+  },
+  execute(
+    ctx,
+    transformRef?: unknown,
+    variationRef?: unknown,
+    visible?: unknown,
+  ) {
+    ctx.setFlameDescriptor((draft) => {
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const transform = key ? draft.transforms[key] : undefined
+      if (!transform) return
+      const vKey = resolveVariationKey(transform.variations, variationRef)
+      const variation = vKey ? transform.variations[vKey] : undefined
+      if (variation) variation.visible = visible === true
+    }, 'Toggle Variation')
+  },
+})
+
+registerCommand({
+  id: 'flame.setVariation',
+  label: 'Set Variation',
+  description:
+    'Replace a variation descriptor wholesale (type, weight and params)',
+  normalizeArgs(ctx, [transformRef, variationRef, descriptor]) {
+    return [
+      normalizeTransformRef(ctx, transformRef),
+      normalizeVariationRef(ctx, transformRef, variationRef),
+      descriptor,
+    ]
+  },
+  execute(
+    ctx,
+    transformRef?: unknown,
+    variationRef?: unknown,
+    descriptor?: unknown,
+  ) {
+    // The whole descriptor rather than a diff: the variation browser and the
+    // "randomize this variation" button both compute a new one outright, and
+    // recording the result keeps replay exact without re-running their
+    // randomness.
+    if (
+      descriptor === null ||
+      typeof descriptor !== 'object' ||
+      typeof (descriptor as { type?: unknown }).type !== 'string'
+    ) {
+      console.warn('[cmd] flame.setVariation: not a variation', descriptor)
+      return
+    }
+    const next = deepClone(
+      descriptor,
+    ) as TransformFunction['variations'][VariationId]
+    ctx.setFlameDescriptor((draft) => {
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const transform = key ? draft.transforms[key] : undefined
+      if (!transform) return
+      const vKey = resolveVariationKey(transform.variations, variationRef)
+      if (vKey) transform.variations[vKey] = next
+    }, 'Set Variation')
+  },
+})
+
+registerCommand({
+  id: 'flame.deleteTransform',
+  label: 'Delete Transform',
+  description:
+    'Delete a transform, or reset it to a blank one when it is the last',
+  // The editor never leaves a flame with zero transforms: deleting the last
+  // one resets it instead. That replacement mints a variation id, so it is
+  // pre-minted here — the branch itself is state-dependent and replay takes
+  // the same one from the same document.
+  normalizeArgs(ctx, [transformRef, resetVariationId]) {
+    return [
+      normalizeTransformRef(ctx, transformRef),
+      typeof resetVariationId === 'string' && resetVariationId !== ''
+        ? resetVariationId
+        : generateVariationId(),
+    ]
+  },
+  execute(ctx, transformRef?: unknown, resetVariationId?: unknown) {
+    const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
+    const vid = resolveNewVariationId(resetVariationId)
+    ctx.setFlameDescriptor((draft) => {
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      if (!key) return
+      if (Object.keys(draft.transforms).length === 1) {
+        draft.transforms[key] = newDefaultTransform(dims, vid)
+      } else {
+        delete draft.transforms[key]
+      }
+    }, 'Delete Transform')
+  },
+})
+
+registerCommand({
+  id: 'flame.deleteVariation',
+  label: 'Delete Variation',
+  description:
+    'Delete a variation, or reset it to its type default when it is the last',
+  normalizeArgs(ctx, [transformRef, variationRef]) {
+    return [
+      normalizeTransformRef(ctx, transformRef),
+      normalizeVariationRef(ctx, transformRef, variationRef),
+    ]
+  },
+  execute(ctx, transformRef?: unknown, variationRef?: unknown) {
+    ctx.setFlameDescriptor((draft) => {
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const transform = key ? draft.transforms[key] : undefined
+      if (!transform) return
+      const vKey = resolveVariationKey(transform.variations, variationRef)
+      if (!vKey) return
+      const existing = transform.variations[vKey]
+      if (Object.keys(transform.variations).length === 1 && existing) {
+        // Same rule as transforms: a transform never ends up with none.
+        transform.variations[vKey] = deepClone(
+          getVariationDefault(existing.type, 1),
+        )
+      } else {
+        delete transform.variations[vKey]
+      }
+    }, 'Delete Variation')
+  },
+})
+
+registerCommand({
+  id: 'flame.setFinalTransform',
+  label: 'Set Final Transform',
+  description: 'Set or clear the flame-wide final affine transform',
+  execute(ctx, affine?: unknown) {
+    const next =
+      affine === null || affine === undefined
+        ? undefined
+        : (deepClone(affine) as FlameDescriptor['finalTransform'])
+    ctx.setFlameDescriptor((draft) => {
+      draft.finalTransform = next
+    }, 'Final Transform')
+  },
+})
+
+registerCommand({
+  id: 'flame.applyVariationSelection',
+  label: 'Apply Variation Selection',
+  description:
+    "Apply the variation browser's result: a transform's pre-affine and one variation, together",
+  // One command rather than setAffine + setVariation, because the browser
+  // applies both in a single setter and so is a single undo step. Two
+  // commands would replay as two, and a recorded undo would then only get
+  // half of it back.
+  normalizeArgs(ctx, [transformRef, variationRef, preAffine, variation]) {
+    return [
+      normalizeTransformRef(ctx, transformRef),
+      normalizeVariationRef(ctx, transformRef, variationRef),
+      preAffine,
+      variation,
+    ]
+  },
+  execute(
+    ctx,
+    transformRef?: unknown,
+    variationRef?: unknown,
+    preAffine?: unknown,
+    variation?: unknown,
+  ) {
+    if (
+      variation === null ||
+      typeof variation !== 'object' ||
+      typeof (variation as { type?: unknown }).type !== 'string' ||
+      preAffine === null ||
+      typeof preAffine !== 'object'
+    ) {
+      console.warn('[cmd] flame.applyVariationSelection: rejected', {
+        preAffine,
+        variation,
+      })
+      return
+    }
+    const nextAffine = deepClone(preAffine) as TransformFunction['preAffine']
+    const nextVariation = deepClone(
+      variation,
+    ) as TransformFunction['variations'][VariationId]
+    ctx.setFlameDescriptor((draft) => {
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const transform = key ? draft.transforms[key] : undefined
+      if (!transform) return
+      transform.preAffine = nextAffine
+      const vKey = resolveVariationKey(transform.variations, variationRef)
+      if (vKey) transform.variations[vKey] = nextVariation
+    }, 'Apply Variation')
   },
 })
