@@ -70,6 +70,28 @@ registerCommand({
       : undefined,
   execute(ctx, path?: unknown, value?: unknown) {
     const expected = defaultAtPath(path)
+    // `null` clears the setting instead of writing one — the app's own
+    // "Auto" background button deletes the key so the theme picks it, and a
+    // recorded action needs a way to say that. (undefined arrives as null
+    // through the JSON round-trip, so this is the same case.)
+    if (expected !== undefined && value === null) {
+      const segments = (path as string).split('.')
+      const leaf = segments.pop()
+      if (leaf === undefined) return
+      ctx.setFlameDescriptor(
+        (draft) => {
+          let node = draft.renderSettings as unknown as Record<string, unknown>
+          for (const segment of segments) {
+            const next = node[segment]
+            if (next === null || typeof next !== 'object') return
+            node = next as Record<string, unknown>
+          }
+          delete node[leaf]
+        },
+        `Clear ${path as string}`,
+      )
+      return
+    }
     if (expected === undefined || !matchesDefaultShape(expected, value)) {
       console.warn('[cmd] flame.setRenderSetting: rejected', path, value)
       return
