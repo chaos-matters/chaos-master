@@ -380,7 +380,7 @@ describe('gestures (slider drags)', () => {
     })
   })
 
-  it('does not fold different controls together', () => {
+  it('keeps distinct controls apart but folds a return to an earlier one', () => {
     createRoot((dispose) => {
       const world = makeHeadlessWorld(examples.example1)
       startSessionRecording(world.flame)
@@ -391,11 +391,15 @@ describe('gestures (slider drags)', () => {
       world.history.commit()
       const session = stopOrThrow()
 
+      // Two targets, so two actions — but the second gamma folds into the
+      // first rather than appending, since only its final value survives the
+      // gesture anyway. Position is the first touch, value is the last.
       expect(session.actions.map((a) => a.args)).toEqual([
-        ['gamma', 2],
-        ['contrast', 3],
         ['gamma', 2.5],
+        ['contrast', 3],
       ])
+      expect(world.flame.renderSettings.gamma).toBeCloseTo(2.5, 5)
+      expect(world.flame.renderSettings.contrast).toBeCloseTo(3, 5)
       dispose()
     })
   })
@@ -700,6 +704,33 @@ describe('camera and symmetry commands', () => {
       expect(session.actions.map((a) => a.args)).toEqual([
         ['camera.position', [0.3, 0]],
         ['camera.zoom', 3],
+      ])
+      expect(session.unnamedWriteCount).toBe(0)
+      dispose()
+    })
+  })
+
+  it('folds an interleaved zoom-about-a-point gesture', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      startSessionRecording(world.flame)
+      // What the wheel actually does: zoom and re-position alternately, all
+      // inside ONE debounced preview. Matching only the immediately previous
+      // action never folded this, so a real scroll logged dozens of steps.
+      world.history.startPreview('Camera zoom')
+      for (let i = 1; i <= 12; i++) {
+        executeCommand('flame.setRenderSetting', world.ctx, 'camera.zoom', i)
+        executeCommand('flame.setRenderSetting', world.ctx, 'camera.position', [
+          i / 100,
+          0,
+        ])
+      }
+      world.history.commit()
+      const session = stopOrThrow()
+
+      expect(session.actions.map((a) => a.args)).toEqual([
+        ['camera.zoom', 12],
+        ['camera.position', [0.12, 0]],
       ])
       expect(session.unnamedWriteCount).toBe(0)
       dispose()
