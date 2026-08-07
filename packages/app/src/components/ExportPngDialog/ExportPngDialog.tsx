@@ -42,6 +42,15 @@ import type { AnimationJobSpec, ImageJobSpec } from '@/utils/exportJobs'
 import type { TimelineConfig, TimelineState, TimelineTrack, } from '@/utils/timeline'
 import type { VideoEncoderConfig } from '@/utils/videoEncoder'
 
+/**
+ * Whether an exported file carries the recorded session. Module scope
+ * because BOTH export paths need it — the dialog and the no-dialog quick
+ * export — and persistentSignal is localStorage-backed, so one instance is
+ * the shared preference. Opt-out rather than silent: the session describes
+ * the whole editing process and adds weight to every exported file.
+ */
+const [embedSteps, setEmbedSteps] = persistentSignal('export/embed-steps', true)
+
 const QUALITY_MIN = 0.5
 const QUALITY_MAX = 0.9999
 
@@ -51,6 +60,10 @@ type RenderDialogProps = {
   viewportAspect: number
   quality: number
   embedFlame: boolean
+  /** Whether a recorded session exists to offer at all. */
+  hasSession: boolean
+  embedSteps: boolean
+  onEmbedStepsChange: (v: boolean) => void
   embedAnimation: boolean
   condenseHidden: boolean
   hasAnimation: boolean
@@ -680,6 +693,20 @@ function RenderDialog(props: RenderDialogProps) {
               <span>Embed flame data</span>
             </label>
 
+            <Show when={props.hasSession}>
+              <label class={ui.checkboxField}>
+                <Checkbox
+                  checked={props.embedSteps}
+                  onChange={(checked) => {
+                    props.onEmbedStepsChange(checked)
+                  }}
+                />
+                <span title="Embeds the recorded steps so the PNG can replay how this flame was made. It describes your whole editing session, so turn it off if you would rather not share that.">
+                  Embed recorded steps
+                </span>
+              </label>
+            </Show>
+
             <label
               class={ui.checkboxField}
               classList={{ [ui.disabled as string]: !props.hasAnimation }}
@@ -985,7 +1012,7 @@ export function createExportPngDialog(
           // If a session was recorded for this flame, it rides along in a
           // second chunk, so a dropped PNG can offer to replay how it was
           // made (docs/plans/semantic-recorder-plan.md, M5).
-          const session = lastFinishedSession()
+          const session = embedSteps() ? lastFinishedSession() : undefined
           const encodedSteps = session
             ? await compressJsonQueryParam(session)
             : undefined
@@ -1244,6 +1271,9 @@ export function createExportPngDialog(
           viewportAspect={viewportAspect}
           quality={quality()}
           embedFlame={embedFlame()}
+          hasSession={lastFinishedSession() !== undefined}
+          embedSteps={embedSteps()}
+          onEmbedStepsChange={setEmbedSteps}
           embedAnimation={embedAnimation()}
           condenseHidden={condenseHidden()}
           hasAnimation={hasAnimation}

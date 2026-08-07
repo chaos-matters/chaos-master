@@ -76,7 +76,7 @@ import { ChangeHistoryContextProvider } from './contexts/ChangeHistoryContext'
 import { useCompactMode } from './contexts/CompactModeContext'
 import { useTheme } from './contexts/ThemeContext'
 import { TimelineContextProvider } from './contexts/TimelineContext'
-import { DEBUG_MODE, DEFAULT_POINT_COUNT, DEFAULT_QUALITY, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_RESOLUTION, IS_DEV, } from './defaults'
+import { DEFAULT_POINT_COUNT, DEFAULT_QUALITY, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_RESOLUTION, IS_DEV, } from './defaults'
 import { breedFlames } from './flame/breedFlame'
 import { colorInitModeToImplFn } from './flame/colorInitMode'
 import { drawModeToImplFn } from './flame/drawMode'
@@ -3551,29 +3551,28 @@ export function MainWorkspace(props: AppProps) {
               <ExportJobHost />
               <ExportJobTracker />
               <div class={ui.bottomBar}>
-                {/* M1 stub (docs/plans/semantic-recorder-plan.md): dev-gated
-                    until replay lands and command coverage makes logs
-                    faithful for a full editing session. In the bottom bar's
-                    normal flow rather than floating over the canvas — the
-                    draggable FloatingActions widget is fixed at z-index 200
-                    and would sit on top of it, swallowing its clicks. */}
-                <Show when={IS_DEV || DEBUG_MODE}>
-                  <Show when={replaySession()} keyed>
-                    {(session) => (
-                      <SessionReplayPanel
-                        session={session}
-                        target={replayTarget}
-                        onClose={() => {
-                          setReplaySession(undefined)
-                        }}
-                      />
-                    )}
-                  </Show>
-                  <SessionRecorderControls
-                    flameDescriptor={flameDescriptor}
-                    onOpenSession={setReplaySession}
-                  />
+                {/* In the bottom bar's normal flow rather than floating over
+                    the canvas — the draggable FloatingActions widget is fixed
+                    at z-index 200 and would sit on top of it, swallowing its
+                    clicks. Was dev-gated while replay did not exist; now that
+                    it does, and a log states its own fidelity via the
+                    unnamed-write count, there is nothing to hide behind a
+                    build flag. */}
+                <Show when={replaySession()} keyed>
+                  {(session) => (
+                    <SessionReplayPanel
+                      session={session}
+                      target={replayTarget}
+                      onClose={() => {
+                        setReplaySession(undefined)
+                      }}
+                    />
+                  )}
                 </Show>
+                <SessionRecorderControls
+                  flameDescriptor={flameDescriptor}
+                  onOpenSession={setReplaySession}
+                />
                 <Show when={effectiveFlame().renderSettings.dimensions === 3}>
                   <OrientationGizmo
                     theta={[effectiveTheta, setFlameTheta]}
