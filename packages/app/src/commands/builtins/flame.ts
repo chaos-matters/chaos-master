@@ -635,6 +635,10 @@ registerCommand({
       descriptor,
     ]
   },
+  // Also used by the parametric-params editors, which are scrub/slider
+  // driven, so repeats on one variation fold per gesture.
+  coalesceKey: ([transformRef, variationRef]) =>
+    `variation:${String(transformRef)}:${String(variationRef)}`,
   execute(
     ctx,
     transformRef?: unknown,
@@ -999,5 +1003,54 @@ registerCommand({
         add(count - 1, { a: -1, b: 0, c: 0, d: 0, e: 1, f: 0 })
       }
     }, 'Apply Symmetry')
+  },
+})
+
+registerCommand({
+  id: 'flame.setMetadata',
+  label: 'Set Flame Metadata',
+  description: 'Set the flame name, author or description',
+  coalesceKey: ([field]) => `metadata:${String(field)}`,
+  describe: ([field]) => `Set flame ${String(field)}`,
+  execute(ctx, field?: unknown, value?: unknown) {
+    if (
+      (field !== 'name' && field !== 'author' && field !== 'description') ||
+      typeof value !== 'string'
+    ) {
+      console.warn('[cmd] flame.setMetadata: rejected', field, value)
+      return
+    }
+    ctx.setFlameDescriptor((draft) => {
+      // The document may predate metadata entirely.
+      draft.metadata ??= { name: '', description: '', author: '' }
+      draft.metadata[field] = value
+    }, 'Flame Metadata')
+  },
+})
+
+registerCommand({
+  id: 'flame.setAllTransformColors',
+  label: 'Randomize All Colors',
+  description: 'Set every transform colour at once, by transform id',
+  // The colours are rolled by the caller and recorded as data, so replay
+  // reproduces them without a seed — same shape as the per-transform dice.
+  execute(ctx, colors?: unknown) {
+    if (colors === null || typeof colors !== 'object') {
+      console.warn('[cmd] flame.setAllTransformColors: not a record', colors)
+      return
+    }
+    const next = deepClone(colors) as Record<string, { x: number; y: number }>
+    ctx.setFlameDescriptor((draft) => {
+      for (const [tid, color] of Object.entries(next)) {
+        const transform = draft.transforms[tid as TransformId]
+        if (
+          transform &&
+          Number.isFinite(color?.x) &&
+          Number.isFinite(color?.y)
+        ) {
+          transform.color = { x: color.x, y: color.y }
+        }
+      }
+    }, 'Randomize All Colors')
   },
 })

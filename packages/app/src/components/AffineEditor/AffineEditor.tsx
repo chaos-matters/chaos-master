@@ -1037,6 +1037,7 @@ export function AffineEditor(props: {
         <AffineListEditor
           transforms={props.transforms}
           setTransforms={props.setTransforms}
+          setTransformAffine={props.setTransformAffine}
           affineMode={affineMode() as 'preAffine' | 'postAffine'}
           is3D={props.is3D}
           selectedTransformId={props.selectedTransformId}

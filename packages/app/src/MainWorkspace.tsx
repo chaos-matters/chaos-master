@@ -94,7 +94,6 @@ import { generateRandomFlame, mutateFlame, random01, randomizeAllColors, randomi
 import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, cameraDuringExportEnabled, exportQuality, qualityPointCountLimit, setCurrentQuality, setExportQuality, setForceAnimationExportNow, setQualityPointCountLimit, } from './flame/renderStats'
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, tryValidateFlame, } from './flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from './flame/transformFunction'
-import { defaultLinearType } from './flame/variationRegistry'
 import { allTransformVariations, isAnyParametricVariationType, isVariationType, } from './flame/variations'
 import { deleteCustomVariation, duplicateCustomVariation, getCustomVariations, isCustomVariationRegistered, loadCustomVariations, persistSharedVariations, restoreCustomVariation, } from './flame/variations/custom'
 import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } from './flame/variations/utils'
@@ -245,20 +244,6 @@ const isWideLayout = () => window.innerWidth >= WIDE_LAYOUT_MIN_WIDTH
  * opened from Home second must land in the state it would have landed in first.
  */
 const DEFAULT_ANIMATION_ENABLED = true
-
-function addTransformWithVariation(draft: FlameDescriptor, type: string) {
-  const t = deepClone(
-    newDefaultTransform((draft.renderSettings.dimensions ?? 2) as Dims),
-  )
-  t.variations = {
-    [generateVariationId()]: {
-      type,
-      weight: 1,
-      visible: true,
-    },
-  }
-  draft.transforms[generateTransformId()] = t
-}
 
 export function MainWorkspace(props: AppProps) {
   const { theme, setTheme } = useTheme()
@@ -3287,6 +3272,15 @@ export function MainWorkspace(props: AppProps) {
     executeCommand('flame.setRenderSetting', cmdContext, path, value)
   }
 
+  /** Several render settings applied as one edit — used where a control
+   *  derives a small batch (the auto-exposure re-base) rather than moving a
+   *  single parameter. */
+  const setRenderSettings = (
+    patch: Partial<FlameDescriptor['renderSettings']>,
+  ) => {
+    executeCommand('flame.updateRenderSettings', cmdContext, patch)
+  }
+
   /**
    * Where a replayed session writes (M4). `loadInitial` goes through the
    * SETTER rather than `history.replace`, because replace pushes its own
@@ -4049,12 +4043,11 @@ export function MainWorkspace(props: AppProps) {
                                           def,
                                         ).then((addedDef) => {
                                           if (addedDef) {
-                                            setFlameDescriptor((draft) => {
-                                              addTransformWithVariation(
-                                                draft,
-                                                addedDef.id,
-                                              )
-                                            })
+                                            executeCommand(
+                                              'flame.addTransform',
+                                              cmdContext,
+                                              addedDef.id,
+                                            )
                                           }
                                           setCustomVarsVersion((v) => v + 1)
                                         })
@@ -4073,12 +4066,11 @@ export function MainWorkspace(props: AppProps) {
                                           onClick={(e) => {
                                             e.stopPropagation()
                                             setHoveredCustomVarDef(null)
-                                            setFlameDescriptor((draft) => {
-                                              addTransformWithVariation(
-                                                draft,
-                                                def.id,
-                                              )
-                                            })
+                                            executeCommand(
+                                              'flame.addTransform',
+                                              cmdContext,
+                                              def.id,
+                                            )
                                           }}
                                         >
                                           <BoxArrowRight />
@@ -4132,12 +4124,11 @@ export function MainWorkspace(props: AppProps) {
                                     const addedDef =
                                       await showCustomVariationEditor()
                                     if (addedDef) {
-                                      setFlameDescriptor((draft) => {
-                                        addTransformWithVariation(
-                                          draft,
-                                          addedDef.id,
-                                        )
-                                      })
+                                      executeCommand(
+                                        'flame.addTransform',
+                                        cmdContext,
+                                        addedDef.id,
+                                      )
                                     }
                                     setCustomVarsVersion((v) => v + 1)
                                   }}
@@ -4176,8 +4167,10 @@ export function MainWorkspace(props: AppProps) {
                                       'Blend is still active — the loaded flame will look mixed',
                                       4000,
                                     )
-                                  history.replace(
-                                    deepClone(flame),
+                                  executeCommand(
+                                    'flame.load',
+                                    cmdContext,
+                                    flame,
                                     'Apply Random Flame',
                                   )
                                 }}
@@ -4636,34 +4629,14 @@ export function MainWorkspace(props: AppProps) {
                                                   )}
                                                   dataParameterPath={`${tid}.${vid}`}
                                                   setValue={(value) => {
-                                                    setFlameDescriptor(
-                                                      (draft) => {
-                                                        const variationDraft =
-                                                          draft.transforms[tid]
-                                                            ?.variations[vid]
-                                                        if (
-                                                          variationDraft ===
-                                                            undefined ||
-                                                          !isAnyParametricVariationType(
-                                                            variationDraft.type,
-                                                          )
-                                                        ) {
-                                                          throw new Error(
-                                                            `Unreachable code`,
-                                                          )
-                                                        }
-                                                        ;(
-                                                          variationDraft as {
-                                                            params: Record<
-                                                              string,
-                                                              number
-                                                            >
-                                                          }
-                                                        ).params =
-                                                          value as Record<
-                                                            string,
-                                                            number
-                                                          >
+                                                    executeCommand(
+                                                      'flame.setVariation',
+                                                      cmdContext,
+                                                      tid,
+                                                      vid,
+                                                      {
+                                                        ...deepClone(variation),
+                                                        params: value,
                                                       },
                                                     )
                                                   }}
@@ -4678,19 +4651,11 @@ export function MainWorkspace(props: AppProps) {
                                     <button
                                       class={ui.addTransformVariationButton}
                                       onClick={() => {
-                                        setFlameDescriptor((draft) => {
-                                          draft.transforms[tid]!.variations[
-                                            generateVariationId()
-                                          ] = deepClone(
-                                            getVariationDefault(
-                                              defaultLinearType(
-                                                (flameDescriptor.renderSettings
-                                                  .dimensions ?? 2) as Dims,
-                                              ),
-                                              1,
-                                            ),
-                                          )
-                                        })
+                                        executeCommand(
+                                          'flame.addVariation',
+                                          cmdContext,
+                                          tid,
+                                        )
                                       }}
                                     >
                                       <Plus />
@@ -4824,20 +4789,18 @@ export function MainWorkspace(props: AppProps) {
                                                       Math.cos(newAngle)
                                                     const sin =
                                                       Math.sin(newAngle)
-                                                    setFlameDescriptor(
-                                                      (draft) => {
-                                                        const t =
-                                                          draft.transforms[tid]
-                                                        if (t) {
-                                                          t.preAffine = {
-                                                            a: cos,
-                                                            b: -sin,
-                                                            c: 0,
-                                                            d: sin,
-                                                            e: cos,
-                                                            f: 0,
-                                                          }
-                                                        }
+                                                    executeCommand(
+                                                      'flame.setTransformAffine',
+                                                      cmdContext,
+                                                      tid,
+                                                      'pre',
+                                                      {
+                                                        a: cos,
+                                                        b: -sin,
+                                                        c: 0,
+                                                        d: sin,
+                                                        e: cos,
+                                                        f: 0,
                                                       },
                                                     )
                                                   }}
@@ -4853,14 +4816,11 @@ export function MainWorkspace(props: AppProps) {
                                                     : 'Show'
                                                 }
                                                 onClick={() => {
-                                                  setFlameDescriptor(
-                                                    (draft) => {
-                                                      draft.transforms[
-                                                        tid
-                                                      ]!.visible =
-                                                        !draft.transforms[tid]!
-                                                          .visible
-                                                    },
+                                                  executeCommand(
+                                                    'flame.setTransformVisible',
+                                                    cmdContext,
+                                                    tid,
+                                                    !transform().visible,
                                                   )
                                                 }}
                                               >
@@ -4874,12 +4834,10 @@ export function MainWorkspace(props: AppProps) {
                                                 class={ui.symActionBtn}
                                                 title="Remove"
                                                 onClick={() => {
-                                                  setFlameDescriptor(
-                                                    (draft) => {
-                                                      delete draft.transforms[
-                                                        tid
-                                                      ]
-                                                    },
+                                                  executeCommand(
+                                                    'flame.removeTransform',
+                                                    cmdContext,
+                                                    tid,
                                                   )
                                                 }}
                                               >
@@ -4898,10 +4856,10 @@ export function MainWorkspace(props: AppProps) {
                               <button
                                 class={ui.addFlameButton}
                                 onClick={() => {
-                                  setFlameDescriptor((draft) => {
-                                    draft.transforms[generateTransformId()] =
-                                      deepClone(newDefaultTransform())
-                                  })
+                                  executeCommand(
+                                    'flame.addTransform',
+                                    cmdContext,
+                                  )
                                 }}
                               >
                                 New transform
@@ -5009,25 +4967,29 @@ export function MainWorkspace(props: AppProps) {
                                       max={8}
                                       step={0.001}
                                       onInput={(newExp) => {
-                                        setFlameDescriptor((draft) => {
-                                          draft.renderSettings.exposure = newExp
-                                          // With auto-exposure on, a manual change
-                                          // re-bases it: this value becomes the
-                                          // baseline at the current zoom, and zoom
-                                          // scales from here.
-                                          if (
-                                            draft.renderSettings
-                                              .autoExposure3D &&
-                                            (draft.renderSettings.dimensions ??
-                                              2) === 3
-                                          ) {
-                                            draft.renderSettings.autoExposure3DBase =
-                                              newExp
-                                            draft.renderSettings.autoExposure3DRefRadius =
-                                              draft.renderSettings.camera3D
-                                                ?.radius ?? 5
-                                          }
-                                        })
+                                        {
+                                          // With auto-exposure on, a manual
+                                          // change re-bases it: this value
+                                          // becomes the baseline at the
+                                          // current zoom. Computed here so
+                                          // the whole re-base records as one
+                                          // merge.
+                                          const rs =
+                                            flameDescriptor.renderSettings
+                                          const rebasing =
+                                            rs.autoExposure3D &&
+                                            (rs.dimensions ?? 2) === 3
+                                          setRenderSettings(
+                                            rebasing
+                                              ? {
+                                                  exposure: newExp,
+                                                  autoExposure3DBase: newExp,
+                                                  autoExposure3DRefRadius:
+                                                    rs.camera3D?.radius ?? 5,
+                                                }
+                                              : { exposure: newExp },
+                                          )
+                                        }
                                       }}
                                       formatValue={(value) => value.toFixed(2)}
                                       dataParameterPath="exposure"
@@ -5060,17 +5022,21 @@ export function MainWorkspace(props: AppProps) {
                                             .autoExposure3D
                                         }
                                         onChange={(checked) => {
-                                          setFlameDescriptor((draft) => {
-                                            draft.renderSettings.autoExposure3D =
+                                          {
+                                            const rs =
+                                              flameDescriptor.renderSettings
+                                            setRenderSettings(
                                               checked
-                                            if (checked) {
-                                              draft.renderSettings.autoExposure3DRefRadius =
-                                                draft.renderSettings.camera3D
-                                                  ?.radius ?? 5
-                                              draft.renderSettings.autoExposure3DBase =
-                                                draft.renderSettings.exposure
-                                            }
-                                          })
+                                                ? {
+                                                    autoExposure3D: true,
+                                                    autoExposure3DRefRadius:
+                                                      rs.camera3D?.radius ?? 5,
+                                                    autoExposure3DBase:
+                                                      rs.exposure,
+                                                  }
+                                                : { autoExposure3D: false },
+                                            )
+                                          }
                                         }}
                                       />
                                       <span>Auto exposure on zoom</span>
@@ -5519,10 +5485,10 @@ export function MainWorkspace(props: AppProps) {
                                   >
                                     <Button
                                       onClick={() => {
-                                        setFlameDescriptor((draft) => {
-                                          delete draft.renderSettings
-                                            .backgroundColor
-                                        })
+                                        setRenderSetting(
+                                          'backgroundColor',
+                                          null,
+                                        )
                                       }}
                                     >
                                       Auto
@@ -5675,17 +5641,12 @@ export function MainWorkspace(props: AppProps) {
                                         flameDescriptor.metadata?.name ?? ''
                                       }
                                       onInput={(e) => {
-                                        setFlameDescriptor((draft) => {
-                                          if (!draft.metadata) {
-                                            draft.metadata = {
-                                              name: '',
-                                              description: '',
-                                              author: '',
-                                            }
-                                          }
-                                          draft.metadata.name =
-                                            e.currentTarget.value
-                                        })
+                                        executeCommand(
+                                          'flame.setMetadata',
+                                          cmdContext,
+                                          'name',
+                                          e.currentTarget.value,
+                                        )
                                       }}
                                     />
                                   </div>
@@ -5701,17 +5662,12 @@ export function MainWorkspace(props: AppProps) {
                                         ''
                                       }
                                       onInput={(e) => {
-                                        setFlameDescriptor((draft) => {
-                                          if (!draft.metadata) {
-                                            draft.metadata = {
-                                              name: '',
-                                              description: '',
-                                              author: '',
-                                            }
-                                          }
-                                          draft.metadata.description =
-                                            e.currentTarget.value
-                                        })
+                                        executeCommand(
+                                          'flame.setMetadata',
+                                          cmdContext,
+                                          'description',
+                                          e.currentTarget.value,
+                                        )
                                       }}
                                     />
                                   </div>
@@ -5727,17 +5683,12 @@ export function MainWorkspace(props: AppProps) {
                                         flameDescriptor.metadata?.author ?? ''
                                       }
                                       onInput={(e) => {
-                                        setFlameDescriptor((draft) => {
-                                          if (!draft.metadata) {
-                                            draft.metadata = {
-                                              name: '',
-                                              description: '',
-                                              author: '',
-                                            }
-                                          }
-                                          draft.metadata.author =
-                                            e.currentTarget.value
-                                        })
+                                        executeCommand(
+                                          'flame.setMetadata',
+                                          cmdContext,
+                                          'author',
+                                          e.currentTarget.value,
+                                        )
                                       }}
                                     />
                                   </div>
@@ -6059,9 +6010,15 @@ export function MainWorkspace(props: AppProps) {
             onShareDiscord={shareToDiscord}
             onLogoFavicon={showLogoFaviconGenerator}
             onRandomizeColors={() => {
-              setFlameDescriptor((draft) => {
-                draft.transforms = randomizeAllColors(draft.transforms)
-              })
+              executeCommand(
+                'flame.setAllTransformColors',
+                cmdContext,
+                Object.fromEntries(
+                  recordEntries(
+                    randomizeAllColors(deepClone(flameDescriptor.transforms)),
+                  ).map(([tid, t]) => [tid, { x: t.color.x, y: t.color.y }]),
+                ),
+              )
             }}
             hideDiceButtons={hideDiceButtons}
             setHideDiceButtons={setHideDiceButtons}
