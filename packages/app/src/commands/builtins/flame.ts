@@ -698,3 +698,41 @@ registerCommand({
     }, 'Apply Variation')
   },
 })
+
+registerCommand({
+  id: 'flame.setTransformAffine',
+  label: 'Set Transform Affine',
+  description:
+    "Replace a transform's whole pre- or post-affine (the affine editor's drag)",
+  // A drag recomputes the entire matrix each frame, so this takes the whole
+  // affine rather than one coefficient: with the per-coefficient command a
+  // single drag would log six actions instead of one.
+  normalizeArgs(ctx, [transformRef, which, affine]) {
+    return [
+      normalizeTransformRef(ctx, transformRef),
+      which === 'post' ? 'post' : 'pre',
+      affine,
+    ]
+  },
+  coalesceKey: ([transformRef, which]) =>
+    `affineMatrix:${String(transformRef)}:${String(which)}`,
+  execute(ctx, transformRef?: unknown, which?: unknown, affine?: unknown) {
+    // 2D affines carry a–f and 3D a–l, so the shape is checked structurally:
+    // an object of finite numbers, which is all either layout is.
+    if (
+      affine === null ||
+      typeof affine !== 'object' ||
+      Object.values(affine).some((v) => typeof v !== 'number')
+    ) {
+      console.warn('[cmd] flame.setTransformAffine: not an affine', affine)
+      return
+    }
+    const key = which === 'post' ? 'postAffine' : 'preAffine'
+    const next = deepClone(affine) as TransformFunction['preAffine']
+    ctx.setFlameDescriptor((draft) => {
+      const tKey = resolveTransformKey(draft.transforms, transformRef)
+      const transform = tKey ? draft.transforms[tKey] : undefined
+      if (transform) transform[key] = next
+    }, 'Affine')
+  },
+})

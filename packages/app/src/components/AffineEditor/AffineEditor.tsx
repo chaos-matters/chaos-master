@@ -826,6 +826,18 @@ export function AffineEditor(props: {
   setTransforms: HistorySetter<TransformRecord>
   finalTransform?: AffineParams
   setFinalTransform?: (affine: AffineParams) => void
+  /**
+   * Apply a handle drag semantically. The workspace passes a command
+   * dispatch, so a recording captures the drag as one replayable step
+   * (docs/plans/semantic-recorder-plan.md). Preview copies — the variation
+   * browser, editing its own throwaway store — omit it and get the raw
+   * setter, which is right: those edits are not the user's document.
+   */
+  setTransformAffine?: (
+    tid: string,
+    which: 'pre' | 'post',
+    affine: AffineParams,
+  ) => void
   is3D?: boolean
   selectedTransformId?: () => string | null
   setSelectedTransformId?: (tid: string | null) => void
@@ -864,9 +876,15 @@ export function AffineEditor(props: {
       transform={transform[affineMode() as 'preAffine' | 'postAffine']}
       color={vec2f(transform.color.x, transform.color.y)}
       setTransform={(affine) => {
-        props.setTransforms((draft) => {
-          draft[tid]![affineMode() as 'preAffine' | 'postAffine'] = affine
-        })
+        const mode = affineMode() as 'preAffine' | 'postAffine'
+        const applySemantically = props.setTransformAffine
+        if (applySemantically) {
+          applySemantically(tid, mode === 'postAffine' ? 'post' : 'pre', affine)
+        } else {
+          props.setTransforms((draft) => {
+            draft[tid]![mode] = affine
+          })
+        }
       }}
       is3D={props.is3D}
       selected={props.selectedTransformId?.() === tid}

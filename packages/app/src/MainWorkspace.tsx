@@ -3988,6 +3988,15 @@ export function MainWorkspace(props: AppProps) {
                                     setFn(draft.transforms)
                                   })
                                 }}
+                                setTransformAffine={(tid, which, affine) => {
+                                  executeCommand(
+                                    'flame.setTransformAffine',
+                                    cmdContext,
+                                    tid,
+                                    which,
+                                    affine,
+                                  )
+                                }}
                                 finalTransform={
                                   flameDescriptor.finalTransform ??
                                   ((flameDescriptor.renderSettings.dimensions ??
