@@ -90,10 +90,29 @@
   flex: 1;
 }
 
+/* A button rather than a span: clicking it starts the rename, so it has to be
+   reachable by keyboard too. Styled to look like the text it replaces. */
 .entry-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: text;
+}
+
+.entry-rename {
+  width: 100%;
+  padding: 0 0.15rem;
+  border: 1px solid oklch(50% 0.08 240 / 0.6);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
 }
 
 .entry-meta {

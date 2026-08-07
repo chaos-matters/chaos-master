@@ -15,6 +15,10 @@ import type { RecordedSession } from '@/recorder/schema'
 export function SessionReplayPanel(props: {
   session: RecordedSession
   target: ReplayTarget
+  /** Drop the step list and the speed picker, keeping the transport. The step
+   *  list is the tall part, and it is the reason the dock offers collapsing at
+   *  all — but a collapsed dock that could not play would be pointless. */
+  compact?: boolean
   onClose: () => void
 }) {
   const [speed, setSpeed] = createSignal(1)
@@ -33,7 +37,10 @@ export function SessionReplayPanel(props: {
   }
 
   return (
-    <div class={styles.panel}>
+    <div
+      class={styles.panel}
+      classList={{ [styles.compact as string]: props.compact }}
+    >
       <div class={styles.header}>
         <span class={styles.title}>Replay</span>
         <span class={styles.count}>
@@ -117,42 +124,46 @@ export function SessionReplayPanel(props: {
         >
           ▶|
         </button>
-        <select
-          class={styles.speed}
-          value={speed()}
-          onChange={(ev) => {
-            setSpeed(Number(ev.currentTarget.value))
-          }}
-          title="Playback speed"
-        >
-          <For each={PLAYBACK_SPEEDS}>
-            {(value) => <option value={value}>{value}×</option>}
-          </For>
-        </select>
+        <Show when={props.compact !== true}>
+          <select
+            class={styles.speed}
+            value={speed()}
+            onChange={(ev) => {
+              setSpeed(Number(ev.currentTarget.value))
+            }}
+            title="Playback speed"
+          >
+            <For each={PLAYBACK_SPEEDS}>
+              {(value) => <option value={value}>{value}×</option>}
+            </For>
+          </select>
+        </Show>
       </div>
 
-      <ol class={styles.steps}>
-        <For each={props.session.actions}>
-          {(_action, index) => (
-            <li>
-              <button
-                type="button"
-                class={styles.step}
-                classList={{
-                  [styles.current as string]: player.stepIndex() === index(),
-                  [styles.applied as string]: player.stepIndex() >= index(),
-                }}
-                onClick={() => {
-                  player.seek(index())
-                }}
-              >
-                <span class={styles.stepIndex}>{index() + 1}</span>
-                <span class={styles.stepLabel}>{stepLabel(index())}</span>
-              </button>
-            </li>
-          )}
-        </For>
-      </ol>
+      <Show when={props.compact !== true}>
+        <ol class={styles.steps}>
+          <For each={props.session.actions}>
+            {(_action, index) => (
+              <li>
+                <button
+                  type="button"
+                  class={styles.step}
+                  classList={{
+                    [styles.current as string]: player.stepIndex() === index(),
+                    [styles.applied as string]: player.stepIndex() >= index(),
+                  }}
+                  onClick={() => {
+                    player.seek(index())
+                  }}
+                >
+                  <span class={styles.stepIndex}>{index() + 1}</span>
+                  <span class={styles.stepLabel}>{stepLabel(index())}</span>
+                </button>
+              </li>
+            )}
+          </For>
+        </ol>
+      </Show>
     </div>
   )
 }

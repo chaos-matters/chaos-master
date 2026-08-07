@@ -65,6 +65,13 @@ export function createSessionPlayer(
   const [isPlaying, setIsPlaying] = createSignal(false)
   let timer: ReturnType<typeof setTimeout> | undefined
   let batchOpen = false
+  /**
+   * Has `session.initial` been loaded into the target yet? Until it has, the
+   * document is whatever the viewer was editing, and applying actions to that
+   * replays the session against the wrong flame. Every path that moves
+   * forwards checks this first.
+   */
+  let baselineLoaded = false
 
   const speed = () => {
     const value = options.speed?.() ?? 1
@@ -97,6 +104,7 @@ export function createSessionPlayer(
     withRecordingSuppressed(() => {
       target.loadInitial(deepClone(session.initial))
     })
+    baselineLoaded = true
     setStepIndex(-1)
     for (let i = 0; i <= index; i++) {
       applyAction(i)
@@ -135,9 +143,11 @@ export function createSessionPlayer(
   return {
     play() {
       if (isPlaying() || actions.length === 0) return
-      // Replaying past the end starts over, so the button always does
-      // something rather than sitting dead on the last step.
-      if (stepIndex() >= actions.length - 1) {
+      // Load the flame the session was recorded against before the first step
+      // (otherwise the steps land on the viewer's own document), and start
+      // over when Play is pressed on the last step — so the button always does
+      // something rather than sitting dead at the end.
+      if (!baselineLoaded || stepIndex() >= actions.length - 1) {
         openBatch()
         rebuildTo(-1)
       }
@@ -160,7 +170,17 @@ export function createSessionPlayer(
         Math.max(-1, Math.floor(index)),
       )
       openBatch()
-      rebuildTo(clamped)
+      if (baselineLoaded && clamped > stepIndex()) {
+        // Forwards is already the state we are in plus the missing actions.
+        // Rebuilding from `initial` here would make stepping through a
+        // 200-step session quadratic — and visibly flicker, since each step
+        // would reload the initial flame before replaying up to it.
+        for (let i = stepIndex() + 1; i <= clamped; i++) applyAction(i)
+      } else {
+        // Backwards, or re-seeking the step we are on — which is how the user
+        // discards their own edits and gets the recorded state back.
+        rebuildTo(clamped)
+      }
       if (isPlaying()) {
         scheduleNext()
       } else {

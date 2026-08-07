@@ -953,8 +953,10 @@ registerCommand({
     ]
   },
   execute(ctx, n?: unknown, type?: unknown, ids?: unknown) {
+    // No early return on count === 0: "1-fold rotational" means NO symmetry,
+    // and its job is then to clear the set a previous call created. Bailing
+    // out left the old mirror transforms in place.
     const count = symmetryTransformCount(n, type)
-    if (count === 0) return
     const pairs = Array.isArray(ids) ? ids : []
     const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
     const linear = () => getVariationDefault(defaultLinearType(dims), 1)

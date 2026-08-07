@@ -57,9 +57,8 @@ import { PopulationSimulator } from './components/PopulationSimulator/Population
 import { ProgressBar } from './components/ProgressBar/ProgressBar'
 import { getPresetFromQuality, qualityPresets, } from './components/Quality/QualityPresets'
 import { QuickVariationPicker } from './components/QuickVariationPicker/QuickVariationPicker'
-import { SessionLibraryPanel } from './components/SessionRecorder/SessionLibraryPanel'
-import { SessionRecorderControls } from './components/SessionRecorder/SessionRecorderControls'
-import { SessionReplayPanel } from './components/SessionRecorder/SessionReplayPanel'
+import { recorderVisible } from './components/SessionRecorder/recorderUi'
+import { SessionRecorderDock } from './components/SessionRecorder/SessionRecorderDock'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
 import { createShareVariationLinkModal, createShareVariationLoadModal, } from './components/ShareVariationModal/ShareVariationModal'
 import { AngleEditor } from './components/Sliders/ParametricEditors/AngleEditor'
@@ -404,12 +403,9 @@ export function MainWorkspace(props: AppProps) {
   })
   // Hide timeline by default on mobile -- users can toggle it back on
   const [showTimeline, setShowTimeline] = createSignal(isWideLayout())
-  // The session currently open for replay (M4), if any.
+  // The session currently open for replay (M4), if any. Lives here rather than
+  // in the dock because dropping a .steps.json opens one too.
   const [replaySession, setReplaySession] = createSignal<RecordedSession>()
-  // Saved-recordings panel: open state, plus a counter the panel watches so
-  // storing a new recording refetches the list.
-  const [showSessionLibrary, setShowSessionLibrary] = createSignal(false)
-  const [sessionLibraryRevision, setSessionLibraryRevision] = createSignal(0)
   // Colors as they were before the first palette apply — lets Unselect
   // restore the "natural" colors. UI stash only; undo handles the rest.
   const [prePaletteColors, setPrePaletteColors] = createSignal<
@@ -3541,40 +3537,18 @@ export function MainWorkspace(props: AppProps) {
                     it does, and a log states its own fidelity via the
                     unnamed-write count, there is nothing to hide behind a
                     build flag. */}
-                <Show when={replaySession()} keyed>
-                  {(session) => (
-                    <SessionReplayPanel
-                      session={session}
-                      target={replayTarget}
-                      onClose={() => {
-                        setReplaySession(undefined)
-                      }}
-                    />
-                  )}
-                </Show>
-                <Show when={showSessionLibrary()}>
-                  <SessionLibraryPanel
-                    revision={sessionLibraryRevision()}
-                    onReplay={(session) => {
-                      setReplaySession(session)
-                      setShowSessionLibrary(false)
-                    }}
-                    onClose={() => {
-                      setShowSessionLibrary(false)
-                    }}
+                {/* Stays mounted while a recording is running whatever the
+                    toolbar toggle says — hiding the only Stop button mid-take
+                    would strand the recording. */}
+                <Show when={recorderVisible() || isSessionRecording()}>
+                  <SessionRecorderDock
+                    flameDescriptor={flameDescriptor}
+                    target={replayTarget}
+                    session={replaySession()}
+                    onSessionChange={setReplaySession}
+                    busy={animationExportRunning() || timeline.isPlaying()}
                   />
                 </Show>
-                <SessionRecorderControls
-                  flameDescriptor={flameDescriptor}
-                  onOpenSession={setReplaySession}
-                  onSessionStored={() => {
-                    setSessionLibraryRevision((n) => n + 1)
-                    setShowSessionLibrary(true)
-                  }}
-                  onToggleLibrary={() => {
-                    setShowSessionLibrary((open) => !open)
-                  }}
-                />
                 <Show when={effectiveFlame().renderSettings.dimensions === 3}>
                   <OrientationGizmo
                     theta={[effectiveTheta, setFlameTheta]}

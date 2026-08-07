@@ -67,20 +67,21 @@ case (its own doc comment names derived, non-user writes) and is what the
 animation exporter uses. Recommend switching it — this is an undo bug in its
 own right, independent of recording.
 
-**2. Wheel zoom logs one action per tick.** Each wheel notch opens and
-commits its own preview, so a long scroll-zoom produces a long run of
-`camera.zoom` / `camera.position` steps rather than one. The log is _correct_
-— it matches the undo stack exactly — but it is noisy, and it is the main
-reason a real session file looks longer than the work felt. Coalescing wheel
-ticks would need the camera to hold one preview across a debounce window,
-which changes undo granularity, so it is deliberately not done yet.
+**2. ~~Wheel zoom logs one action per tick.~~ Fixed.** The original diagnosis
+here was wrong: `WheelZoomCamera2D`/`3D` do bracket a whole gesture in one
+`startPreview`/`commit`, so the undo stack was always one entry per gesture.
+The flood came from the recorder's own coalescing, which only matched the
+_immediately preceding_ action — and zoom-about-a-point alternates
+`camera.zoom` and `camera.position`, so nothing ever matched. Coalescing now
+keys anchors by command + target within the gesture, and one scroll-zoom is
+one step again.
 
 ## Where recordings live
 
 Stopping a recording saves it to IndexedDB (`chaos-master-sessions`, capped
 at 100) rather than pushing a file at you. The **Recordings** button opens
-the library, where each entry can be replayed, downloaded as `.steps.json`,
-or deleted. A storage failure falls back to downloading the file, so a
+the library, where each entry can be replayed, renamed (click the name),
+downloaded as `.steps.json`, or deleted. A storage failure falls back to downloading the file, so a
 recording is never lost to a full or unavailable database.
 
 Three ways to bring a session back:
@@ -96,6 +97,26 @@ unknown format version or an initial flame that fails the schema is refused,
 and each command validates its own arguments (paths against the schema
 vocabulary, affines by exact key set and finiteness). A hostile file can at
 worst produce an odd-looking flame; nothing in a session is executable.
+
+## The dock (recorder UI)
+
+Everything lives in one dock in the bottom-left: the record pill, and above it
+the replay and library panels it opens.
+
+- **Show/hide** — the record-dot toggle in the FloatingActions toolbar, or the
+  dock's own `×`. Hiding is refused while a recording is running, so the Stop
+  button can never disappear mid-take.
+- **Collapse (`▾`/`▴`)** — drops the step list and the library, keeping the pill
+  and the replay transport. This is the answer to a loaded session covering a
+  third of the canvas; playback still works collapsed.
+- **Transparency (`◐`)** — a resting-opacity slider plus a "fade" checkbox that
+  dims the dock while the canvas is animating or an export is running, so it
+  stays out of a screen recording. Hovering or focusing the dock always brings
+  it back to full opacity, whatever the slider says.
+- **Drag** — grab the dots at the left of the pill. Docked (the default) it
+  sits in the bottom bar's flow; dragging switches it to fixed positioning so
+  the bar does not keep a hole where it was. Double-click the grip to dock it
+  again. Position, opacity, collapsed and visible states all persist.
 
 ## Practical notes for recording
 

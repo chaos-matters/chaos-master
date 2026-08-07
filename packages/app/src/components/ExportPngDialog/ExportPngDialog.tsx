@@ -15,6 +15,7 @@ import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
 import { lastFinishedSession } from '@/recorder/recorder'
 import { deepClone } from '@/utils/clone'
 import { computeExportDimensions, DEFAULT_EXPORT_ASPECT, DEFAULT_EXPORT_RESOLUTION, } from '@/utils/exportDimensions'
+import { embedStepsInExports, sessionForExport, setEmbedStepsInExports, } from '@/utils/exportPreferences'
 import { addFlameDataToPng } from '@/utils/flameInPng'
 import { compressJsonQueryParam } from '@/utils/jsonQueryParam'
 import { persistentSignal } from '@/utils/persistentSignal'
@@ -41,15 +42,6 @@ import type { ExportAspectKey } from '@/utils/exportDimensions'
 import type { AnimationJobSpec, ImageJobSpec } from '@/utils/exportJobs'
 import type { TimelineConfig, TimelineState, TimelineTrack, } from '@/utils/timeline'
 import type { VideoEncoderConfig } from '@/utils/videoEncoder'
-
-/**
- * Whether an exported file carries the recorded session. Module scope
- * because BOTH export paths need it — the dialog and the no-dialog quick
- * export — and persistentSignal is localStorage-backed, so one instance is
- * the shared preference. Opt-out rather than silent: the session describes
- * the whole editing process and adds weight to every exported file.
- */
-const [embedSteps, setEmbedSteps] = persistentSignal('export/embed-steps', true)
 
 const QUALITY_MIN = 0.5
 const QUALITY_MAX = 0.9999
@@ -1012,7 +1004,7 @@ export function createExportPngDialog(
           // If a session was recorded for this flame, it rides along in a
           // second chunk, so a dropped PNG can offer to replay how it was
           // made (docs/plans/semantic-recorder-plan.md, M5).
-          const session = embedSteps() ? lastFinishedSession() : undefined
+          const session = sessionForExport()
           const encodedSteps = session
             ? await compressJsonQueryParam(session)
             : undefined
@@ -1193,6 +1185,7 @@ export function createExportPngDialog(
         condenseHidden: condenseHidden(),
         tracks: timeline?.tracks() ?? [],
         config: timeline?.config() ?? defaultTimelineConfig(),
+        session: sessionForExport(),
       })
     }
 
@@ -1272,8 +1265,8 @@ export function createExportPngDialog(
           quality={quality()}
           embedFlame={embedFlame()}
           hasSession={lastFinishedSession() !== undefined}
-          embedSteps={embedSteps()}
-          onEmbedStepsChange={setEmbedSteps}
+          embedSteps={embedStepsInExports()}
+          onEmbedStepsChange={setEmbedStepsInExports}
           embedAnimation={embedAnimation()}
           condenseHidden={condenseHidden()}
           hasAnimation={hasAnimation}

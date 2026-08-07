@@ -1,5 +1,9 @@
+import { ColorInitMode } from '@/flame/colorInitMode'
+import { DrawMode } from '@/flame/drawMode'
+import { PointInitMode } from '@/flame/pointInitMode'
 import { renderSettingsDefault } from '@/flame/schema/flameSchema'
 import { deepClone } from '@/utils/clone'
+import * as v from '@/valibot'
 import { registerCommand } from '../registry'
 
 /**
@@ -37,12 +41,38 @@ function defaultAtPath(path: unknown): unknown {
 }
 
 /**
+ * Settings whose value is a closed set of names. `typeof value === 'string'`
+ * would accept "banana" for a draw mode, which then resolves to an undefined
+ * implementation at render time.
+ */
+const STRING_SETTING_SCHEMAS: Record<string, v.GenericSchema<string>> = {
+  drawMode: DrawMode,
+  colorInitMode: ColorInitMode,
+  pointInitMode: PointInitMode,
+}
+
+/**
+ * `camera` and `camera3D` are containers, not settings: only their leaves are
+ * addressable. Writing one wholesale (or clearing it) is refused, because the
+ * renderer reads `camera.position` / `camera.zoom` unconditionally — a `{}`
+ * or a missing camera is a crash on the next frame, and both are reachable
+ * from a hand-edited `.steps.json`.
+ */
+function isContainerDefault(expected: unknown): boolean {
+  return (
+    expected !== null &&
+    typeof expected === 'object' &&
+    !Array.isArray(expected)
+  )
+}
+
+/**
  * A value is acceptable when it matches the shape of the default at that
  * path. Replayed args cross a JSON boundary and hand-edited `.steps.json` is
  * an explicitly supported workflow, so this is where a wrong type is stopped
  * rather than written into the document.
  */
-function matchesDefaultShape(expected: unknown, value: unknown) {
+function matchesDefaultShape(path: string, expected: unknown, value: unknown) {
   if (Array.isArray(expected)) {
     return (
       Array.isArray(value) &&
@@ -51,6 +81,8 @@ function matchesDefaultShape(expected: unknown, value: unknown) {
     )
   }
   if (typeof expected === 'number') return Number.isFinite(value)
+  const enumSchema = STRING_SETTING_SCHEMAS[path]
+  if (enumSchema) return v.safeParse(enumSchema, value).success
   return typeof value === typeof expected
 }
 
@@ -70,11 +102,15 @@ registerCommand({
       : undefined,
   execute(ctx, path?: unknown, value?: unknown) {
     const expected = defaultAtPath(path)
+    if (expected === undefined || isContainerDefault(expected)) {
+      console.warn('[cmd] flame.setRenderSetting: rejected', path, value)
+      return
+    }
     // `null` clears the setting instead of writing one — the app's own
     // "Auto" background button deletes the key so the theme picks it, and a
     // recorded action needs a way to say that. (undefined arrives as null
     // through the JSON round-trip, so this is the same case.)
-    if (expected !== undefined && value === null) {
+    if (value === null) {
       const segments = (path as string).split('.')
       const leaf = segments.pop()
       if (leaf === undefined) return
@@ -92,7 +128,7 @@ registerCommand({
       )
       return
     }
-    if (expected === undefined || !matchesDefaultShape(expected, value)) {
+    if (!matchesDefaultShape(path as string, expected, value)) {
       console.warn('[cmd] flame.setRenderSetting: rejected', path, value)
       return
     }
