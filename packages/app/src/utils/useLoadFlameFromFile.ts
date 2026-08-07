@@ -1,5 +1,5 @@
 import { useAlert } from '@/components/Modal/useAlert'
-import { validateSession } from '@/recorder/schema'
+import { parseSession, validateSession } from '@/recorder/schema'
 import { extractMetadataFromMp4 } from './flameInMp4'
 import { extractFlameFromPng, extractStepsFromPng } from './flameInPng'
 import type { SharePayload } from './jsonQueryParam'
@@ -7,7 +7,9 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { RecordedSession } from '@/recorder/schema'
 
 export type FlameLoadResult = {
-  flame: FlameDescriptor
+  /** Absent when the file was a bare `.steps.json`: there is a session to
+   *  replay but no flame to load. */
+  flame?: FlameDescriptor
   animation?: SharePayload['animation']
   /** The session that produced this flame, when the PNG carries one — the
    *  caller can then offer to replay how it was made (M5). */
@@ -35,6 +37,17 @@ export function useLoadFlameFromFile() {
       return
     }
     const arrBuf = new Uint8Array(arrayBuffer)
+
+    // A dropped .steps.json is a session on its own — no flame to load, so
+    // the caller gets one to replay against whatever is open. Validated the
+    // same way as a session from a PNG: unknown format versions and initial
+    // flames that fail the schema are refused.
+    if (file.type === 'application/json' || file.name.endsWith('.json')) {
+      const session = parseSession(new TextDecoder().decode(arrBuf))
+      if (session) return { session }
+      await alert(`No valid flame or steps found in '${file.name}'.`)
+      return
+    }
 
     if (file.type === 'video/mp4' || file.name.endsWith('.mp4')) {
       try {
