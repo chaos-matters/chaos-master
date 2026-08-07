@@ -53,6 +53,17 @@ let suppressDepth = 0
 /** Index of the action logged for the top-level command currently running,
  *  so that command can retract it (see {@link reportUnreplayable}). */
 let pendingActionIndex: number | undefined
+/** A command has run since the current gesture opened, so the entry that
+ *  gesture eventually pushes is accounted for by the log. */
+let gestureClaimed = false
+/** The action a repeat of the same command+target folds into. Cleared
+ *  whenever a history entry lands, so folding can never cross an undo step. */
+let coalesceAnchor: { index: number; id: string; key: string } | undefined
+
+function resetGestureState() {
+  gestureClaimed = false
+  coalesceAnchor = undefined
+}
 
 const [isSessionRecording, setIsSessionRecording] = createSignal(false)
 const [recordedActionCount, setRecordedActionCount] = createSignal(0)
@@ -79,6 +90,7 @@ export function startSessionRecording(initial: FlameDescriptor): void {
     actions: [],
     unnamedWrites: [],
   }
+  resetGestureState()
   setRecordedActionCount(0)
   setUnnamedWriteCount(0)
   setIsSessionRecording(true)
@@ -115,20 +127,39 @@ export function cancelSessionRecording(): void {
  * replay anyway and is caught by schema validation on load.
  */
 export function recordCommandExecution(
-  cmd: Pick<FlameCommand, 'id' | 'label'>,
+  cmd: Pick<FlameCommand, 'id' | 'label' | 'coalesceKey'>,
   args: readonly unknown[],
   run: () => void,
 ): void {
   const rec = active
   if (rec && commandDepth === 0 && suppressDepth === 0) {
-    rec.actions.push({
-      t: elapsedMs(rec),
-      id: cmd.id,
-      args: deepClone([...args]),
-      label: cmd.label,
-    })
-    pendingActionIndex = rec.actions.length - 1
-    setRecordedActionCount(rec.actions.length)
+    // Any command during a gesture accounts for the entry that gesture will
+    // push, so the commit is not reported as an anonymous write.
+    gestureClaimed = true
+    const key = cmd.coalesceKey?.([...args])
+    const anchor = coalesceAnchor
+    const folded =
+      key !== undefined && anchor?.id === cmd.id && anchor.key === key
+    if (folded && anchor) {
+      // A drag re-sets the same target dozens of times inside ONE undo step;
+      // the log keeps the last value and the timestamp the gesture began.
+      const existing = rec.actions[anchor.index]
+      if (existing) existing.args = deepClone([...args])
+      pendingActionIndex = anchor.index
+    } else {
+      rec.actions.push({
+        t: elapsedMs(rec),
+        id: cmd.id,
+        args: deepClone([...args]),
+        label: cmd.label,
+      })
+      pendingActionIndex = rec.actions.length - 1
+      coalesceAnchor =
+        key === undefined
+          ? undefined
+          : { index: pendingActionIndex, id: cmd.id, key }
+      setRecordedActionCount(rec.actions.length)
+    }
   }
   commandDepth++
   try {
@@ -159,6 +190,7 @@ export function reportUnreplayable(reason: string): void {
     pendingActionIndex = undefined
     setRecordedActionCount(rec.actions.length)
   }
+  coalesceAnchor = undefined
   rec.unnamedWrites.push({ t: elapsedMs(rec), description: reason })
   setUnnamedWriteCount(rec.unnamedWrites.length)
   console.warn('[recorder] Unreplayable during recording:', reason)
@@ -182,18 +214,39 @@ export function isUndoTargetWithinRecording(
   return target.seq !== null && target.seq > rec.baselineSeq
 }
 
-/** Coverage hook: called by the main flame history for every entry that
- *  lands on its stack. Outside a command scope that entry is a mutation the
- *  log cannot replay — count it and say so. */
-export function reportDocumentWrite(description?: string): void {
+/**
+ * Coverage hook: called by the main flame history for every entry that lands
+ * on its stack. An entry is accounted for when it was pushed inside a command
+ * (`commandDepth > 0`) or when it commits a gesture whose writes came from
+ * commands ({@link gestureClaimed}) — the slider case, where the commit
+ * itself happens in the Slider, outside any command. Anything else is a
+ * mutation the log cannot replay: count it and say so.
+ *
+ * Either way the entry ends a coalescing run, so a second drag of the same
+ * control becomes a second action — matching the second undo step it created.
+ */
+export function reportDocumentWrite(
+  description?: string,
+  fromPreview = false,
+): void {
   const rec = active
-  if (!rec || commandDepth > 0 || suppressDepth > 0) return
+  const claimed = commandDepth > 0 || (fromPreview && gestureClaimed)
+  coalesceAnchor = undefined
+  gestureClaimed = false
+  if (!rec || claimed || suppressDepth > 0) return
   rec.unnamedWrites.push({ t: elapsedMs(rec), description })
   setUnnamedWriteCount(rec.unnamedWrites.length)
   console.warn(
     '[recorder] Unnamed write during recording — not replayable:',
     description ?? '(no description)',
   )
+}
+
+/** Gesture boundary from the flame history's `startPreview`. Opens a fresh
+ *  coalescing window: a drag folds into one action, but the next drag of the
+ *  same control starts its own. */
+export function notePreviewStarted(): void {
+  resetGestureState()
 }
 
 /** Run `fn` invisibly to any active recording: its commands are not logged

@@ -59,15 +59,27 @@ type CreateStoreHistoryOptions = {
   journal?: boolean
   /** Called whenever a NEW entry lands on the stack (set, commit, replace) —
    *  exactly once per undoable edit, after no-op elision, and never for
-   *  undo/redo/setSilently. The session recorder hooks the main flame
-   *  history here to detect writes that did not arrive through a registered
-   *  command (see recorder/recorder.ts). */
-  onEntryPushed?: (description?: string) => void
+   *  undo/redo/setSilently. `fromPreview` marks the entry a gesture produced,
+   *  whose writes arrived during the preview rather than under the call that
+   *  pushes it. The session recorder hooks the main flame history here to
+   *  detect writes that did not arrive through a registered command (see
+   *  recorder/recorder.ts). */
+  onEntryPushed?: (
+    description: string | undefined,
+    fromPreview: boolean,
+  ) => void
+  /** Called when a gesture opens (`startPreview`). Bounds the window in which
+   *  the recorder coalesces a drag's repeated commands into one action. */
+  onPreviewStarted?: () => void
 }
 
 export function createStoreHistory<T extends object>(
   [store, setStore]: [Store<T>, SetStoreFunction<T>],
-  { journal = false, onEntryPushed }: CreateStoreHistoryOptions = {},
+  {
+    journal = false,
+    onEntryPushed,
+    onPreviewStarted,
+  }: CreateStoreHistoryOptions = {},
 ) {
   const [stackIndex, setStackIndex] = createSignal(-1)
   const [isUndoingOrRedoing, setIsUndoingOrRedoing] =
@@ -96,7 +108,7 @@ export function createStoreHistory<T extends object>(
     })
   }
 
-  function addToStack(item: HistoryItem) {
+  function addToStack(item: HistoryItem, fromPreview = false) {
     const forwardPatches = compressPatches(item.forwardPatches)
     const backwardPatches = compressPatches(item.backwardPatches)
     if (forwardPatches.length === 0 && backwardPatches.length === 0) {
@@ -123,7 +135,7 @@ export function createStoreHistory<T extends object>(
       setStackIndex(p.length - 1)
       return p
     })
-    onEntryPushed?.(compressedItem.description)
+    onEntryPushed?.(compressedItem.description, fromPreview)
   }
 
   function undo() {
@@ -229,6 +241,7 @@ export function createStoreHistory<T extends object>(
       commit()
     }
     setPreview({ forwardPatches: [], backwardPatches: [], description })
+    onPreviewStarted?.()
   }
 
   function commit() {
@@ -240,7 +253,7 @@ export function createStoreHistory<T extends object>(
       return
     }
     batch(() => {
-      addToStack(item)
+      addToStack(item, true)
       setPreview(undefined)
     })
   }
