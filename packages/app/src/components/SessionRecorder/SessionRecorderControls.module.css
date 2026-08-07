@@ -1,10 +1,11 @@
-/* Same translucent-pill material as App.module.css .hover-preview-badge,
-   anchored to the canvas container's top-left (the badge owns top-center). */
+/* Same translucent-pill material as App.module.css .hover-preview-badge, but
+   laid out in the bottom bar's flow instead of floating over the canvas:
+   anything absolutely positioned there ends up under the draggable
+   FloatingActions widget (position: fixed, z-index 200) and stops taking
+   clicks. `align-self` keeps it pill-sized inside the column. */
 .recorder {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  z-index: 101;
+  align-self: flex-start;
+  margin: 0 0 var(--space-2) var(--space-2);
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
