@@ -3,9 +3,10 @@
 Status: **in progress**. M1 (recorder core, coverage ratchet, `.steps.json`)
 and M2 (determinism: `normalizeArgs`, id addressing, pre-minted ids, seeded
 generate/mutate) are implemented. M3 is under way: gesture handling
-landed, and the render-settings controls, the transform card and the affine
-editor are converted; the colour editors, named handlers, camera and
-document-lifecycle sites remain. Captured 2026-08-06.
+landed, and the render settings, transform card, affine editor, colour
+editors, palette apply/remove and document loads are converted; the remaining
+named handlers (symmetry, morph, breeding wiring) and the camera writes are
+still open. Captured 2026-08-06.
 
 ## The ask
 
@@ -252,21 +253,25 @@ session (**render settings, item 6, are done**):
 
 1. **Prop-adapter mutations** — ~~the affine editor~~ **done** (it takes a
    `setTransformAffine` dispatch; preview copies keep the raw setter). Still
-   open: the setters handed to
-   `AffineListEditor`, `FlameColorEditor`, `ColorListEditor`, `ColorEditor`
-   (`MainWorkspace.tsx:3965` area). Highest leverage: five adapters route
-   nearly all transform/color editing. The adapters become thin
-   `executeCommand` wrappers instead of raw closure forwarders.
-2. **Named handlers** — `applySymmetry`, `handlePaletteSelect`/`Unselect`,
+   open: `AffineListEditor` only — `ColorEditor`, `FlameColorEditor` and
+   `ColorListEditor` now take a `setTransformColor` dispatch on the same
+   pattern (optional, so preview copies keep the raw setter).
+2. **Named handlers** — palette apply/remove are done (`flame.applyPalette`
+   / `flame.removePalette`; removal takes the restore colours as an argument,
+   since the editor keeps them in a signal and no log can reconstruct UI
+   state). Still open: `applySymmetry`,
    `setupMorph`, `runGenerateFlame`, `runMutateFlame`, breeding apply,
    `applyRandomizeSettings`, `handleUpdateRenderSettings`,
    `handleLoadHistory`, `handleRandomizeAnimation`, `handleSmartAnimation`.
 3. **Camera writes** — `setFlameZoom`, `setFlamePosition`, the
    `makeCamera3DSetter` family (theta/phi/radius/target/fov/roll). These are
    gesture-heavy; they lean on commit-level coalescing.
-4. **Document lifecycle** — new/load/import (`.flame` XML, PNG drop, share
-   link) recorded as `flame.load` with the embedded descriptor, so a session
-   that starts from an import still replays.
+4. **Document lifecycle** — **mostly done**: `flame.load` carries the
+   descriptor itself, so a mid-session open, history load or bred child
+   replays without looking anything up. The mount-time paths (Home hand-off,
+   shared-URL apply) still use `history.replace` directly; they run before a
+   recording can be under way, and the workspace-remount flag covers the case
+   where one is.
 5. **Blend, audio wiring, custom variation code edits** — later; each is a
    self-contained vocabulary addition.
 6. **Render settings** — ~~the sliders and mode pickers writing

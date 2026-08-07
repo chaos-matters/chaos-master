@@ -78,7 +78,6 @@ import { TimelineContextProvider } from './contexts/TimelineContext'
 import { DEBUG_MODE, DEFAULT_POINT_COUNT, DEFAULT_QUALITY, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_RESOLUTION, IS_DEV, } from './defaults'
 import { breedFlames } from './flame/breedFlame'
 import { colorInitModeToImplFn } from './flame/colorInitMode'
-import { applyColorMapToFlame } from './flame/colorMap'
 import { drawModeToImplFn } from './flame/drawMode'
 import { example1 } from './flame/examples/example1'
 import { example34 } from './flame/examples/example34'
@@ -132,7 +131,7 @@ import type { AudioMapping } from './components/AudioReactivePanel/AudioReactive
 import type { QualityPreset } from './components/Quality/QualityPresets'
 import type { QuickPickerMode } from './components/QuickVariationPicker/QuickVariationPicker'
 import type { TourContext } from './components/SpotlightTour/tourTypes'
-import type { ColorMap, Palette } from './flame/colorMap'
+import type { Palette } from './flame/colorMap'
 import type { PointInitMode } from './flame/pointInitMode'
 import type { GenerateRandomFlameConfig, MutateFlameOptions, } from './flame/randomize'
 import type { FlameDescriptor, TransformId, VariationId, } from './flame/schema/flameSchema'
@@ -856,7 +855,7 @@ export function MainWorkspace(props: AppProps) {
                 'Blend is still active — the loaded flame will look mixed',
                 4000,
               )
-            history.replace(deepClone(flame))
+            executeCommand('flame.load', cmdContext, flame)
           }}
           respond={respond}
         />
@@ -876,7 +875,7 @@ export function MainWorkspace(props: AppProps) {
                 'Blend is still active — the loaded flame will look mixed',
                 4000,
               )
-            history.replace(deepClone(flame))
+            executeCommand('flame.load', cmdContext, flame)
           }}
           onCompare={openDiffAsModal}
           respond={respond}
@@ -1188,43 +1187,19 @@ export function MainWorkspace(props: AppProps) {
       setPrePaletteColors(colors)
     }
 
-    // Convert palette entries to color map entries and apply
-    const entries = palette.entries.map((entry) => ({ a: entry.a, b: entry.b }))
-    const colorMap: ColorMap = {
-      id: palette.id,
-      name: palette.name,
-      entries,
-    }
     // ONE history entry: transform colors AND the palette itself (it lives in
     // renderSettings.palette), so a single undo fully reverts the apply —
     // previously the palette identity sat in signals and undo half-reverted
-    // (colors back, palette grading still on).
-    setFlameDescriptor((draft) => {
-      applyColorMapToFlame(draft, colorMap)
-      draft.renderSettings.palette = {
-        id: palette.id,
-        name: palette.name,
-        entries: palette.entries.map(({ id, position, a, b }) => ({
-          id,
-          position,
-          a,
-          b,
-        })),
-      }
-    }, 'Apply Palette')
+    // (colors back, palette grading still on). The command keeps both halves
+    // together for the same reason.
+    executeCommand('flame.applyPalette', cmdContext, palette)
   }
 
   const handlePaletteUnselect = () => {
-    // One undoable entry: restore pre-palette colors + drop the palette.
-    setFlameDescriptor((draft) => {
-      const saved = prePaletteColors()
-      for (const [tid, t] of recordEntries(draft.transforms)) {
-        if (saved[tid]) {
-          t.color = { x: saved[tid].x, y: saved[tid].y }
-        }
-      }
-      delete draft.renderSettings.palette
-    }, 'Remove Palette')
+    // One undoable entry: restore pre-palette colors + drop the palette. The
+    // colors come from a UI signal, so they are passed as an argument —
+    // nothing outside the document can be reconstructed on replay.
+    executeCommand('flame.removePalette', cmdContext, prePaletteColors())
     setPrePaletteColors({})
   }
 
@@ -2246,7 +2221,7 @@ export function MainWorkspace(props: AppProps) {
     // Loading a history entry is a fresh starting point: keep unsaved work
     // recoverable and don't autosave the untouched loaded flame.
     flushDirtyToRecents()
-    history.replace(deepClone(entry.flame), 'Load History Flame')
+    executeCommand('flame.load', cmdContext, entry.flame, 'Load History Flame')
     markLoadedBaseline()
   }
 
@@ -4043,6 +4018,15 @@ export function MainWorkspace(props: AppProps) {
                                     setFlameDescriptor((draft) => {
                                       setFn(draft.transforms)
                                     })
+                                  }}
+                                  setTransformColor={(tid, x, y) => {
+                                    executeCommand(
+                                      'flame.setTransformColor',
+                                      cmdContext,
+                                      tid,
+                                      x,
+                                      y,
+                                    )
                                   }}
                                   selectedTransformId={selectedTransformId}
                                   setSelectedTransformId={
@@ -5937,7 +5921,12 @@ export function MainWorkspace(props: AppProps) {
                                           'Blend is still active — the loaded flame will look mixed',
                                           4000,
                                         )
-                                      history.replace(deepClone(child))
+                                      executeCommand(
+                                        'flame.load',
+                                        cmdContext,
+                                        child,
+                                        'Load Bred Flame',
+                                      )
                                     }}
                                     onChangeParent={() => {
                                       respond()
@@ -5967,7 +5956,12 @@ export function MainWorkspace(props: AppProps) {
                                           'Blend is still active — the loaded flame will look mixed',
                                           4000,
                                         )
-                                      history.replace(deepClone(child))
+                                      executeCommand(
+                                        'flame.load',
+                                        cmdContext,
+                                        child,
+                                        'Load Bred Flame',
+                                      )
                                     }}
                                     onChangeParent={() => {
                                       respond()
