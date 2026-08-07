@@ -58,6 +58,7 @@ import { ProgressBar } from './components/ProgressBar/ProgressBar'
 import { getPresetFromQuality, qualityPresets, } from './components/Quality/QualityPresets'
 import { QuickVariationPicker } from './components/QuickVariationPicker/QuickVariationPicker'
 import { SessionRecorderControls } from './components/SessionRecorder/SessionRecorderControls'
+import { SessionReplayPanel } from './components/SessionRecorder/SessionReplayPanel'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
 import { createShareVariationLinkModal, createShareVariationLoadModal, } from './components/ShareVariationModal/ShareVariationModal'
 import { AngleEditor } from './components/Sliders/ParametricEditors/AngleEditor'
@@ -139,6 +140,8 @@ import type { Dims } from './flame/variationRegistry'
 import type { TransformVariationType } from './flame/variations'
 import type { CustomVariationDef } from './flame/variations/custom/types'
 import type { TransformVariationType3D } from './flame/variations3D'
+import type { ReplayTarget } from './recorder/replay'
+import type { RecordedSession } from './recorder/schema'
 import type { AnimationExportConfig } from './utils/animationExport'
 import type { AudioAnalyzer, LiveAudioAnalyzer } from './utils/audioAnalysis'
 import type { ExportDimensions } from './utils/exportDimensions'
@@ -415,6 +418,8 @@ export function MainWorkspace(props: AppProps) {
   })
   // Hide timeline by default on mobile -- users can toggle it back on
   const [showTimeline, setShowTimeline] = createSignal(isWideLayout())
+  // The session currently open for replay (M4), if any.
+  const [replaySession, setReplaySession] = createSignal<RecordedSession>()
   // Colors as they were before the first palette apply — lets Unselect
   // restore the "natural" colors. UI stash only; undo handles the rest.
   const [prePaletteColors, setPrePaletteColors] = createSignal<
@@ -3289,6 +3294,27 @@ export function MainWorkspace(props: AppProps) {
     executeCommand('flame.setRenderSetting', cmdContext, path, value)
   }
 
+  /**
+   * Where a replayed session writes (M4). `loadInitial` goes through the
+   * SETTER rather than `history.replace`, because replace pushes its own
+   * entry and would escape the batch — the batch is what makes a whole
+   * replayed run a single undo step the viewer can take back in one go.
+   */
+  const replayTarget: ReplayTarget = {
+    loadInitial: (flame) => {
+      setFlameDescriptor(() => deepClone(flame), 'Replay: initial state')
+    },
+    execute: (id, args) => {
+      executeCommand(id, cmdContext, ...args)
+    },
+    beginBatch: () => {
+      history.startPreview('Replay')
+    },
+    endBatch: () => {
+      if (history.isPreviewing()) history.commit()
+    },
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   runTourCommand.fn = (id, ...args: any[]) => {
     executeCommand(id, cmdContext, ...args)
@@ -3528,7 +3554,21 @@ export function MainWorkspace(props: AppProps) {
                     draggable FloatingActions widget is fixed at z-index 200
                     and would sit on top of it, swallowing its clicks. */}
                 <Show when={IS_DEV || DEBUG_MODE}>
-                  <SessionRecorderControls flameDescriptor={flameDescriptor} />
+                  <Show when={replaySession()} keyed>
+                    {(session) => (
+                      <SessionReplayPanel
+                        session={session}
+                        target={replayTarget}
+                        onClose={() => {
+                          setReplaySession(undefined)
+                        }}
+                      />
+                    )}
+                  </Show>
+                  <SessionRecorderControls
+                    flameDescriptor={flameDescriptor}
+                    onOpenSession={setReplaySession}
+                  />
                 </Show>
                 <Show when={effectiveFlame().renderSettings.dimensions === 3}>
                   <OrientationGizmo

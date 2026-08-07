@@ -1,8 +1,9 @@
 # Semantic action recorder — every step as a named, replayable command
 
-Status: **in progress**. M1 (recorder core, coverage ratchet, `.steps.json`)
-and M2 (determinism: `normalizeArgs`, id addressing, pre-minted ids, seeded
-generate/mutate) are implemented. M3 is largely done: gesture handling
+Status: **in progress**. M1 (recorder core, coverage ratchet, `.steps.json`),
+M2 (determinism: `normalizeArgs`, id addressing, pre-minted ids, seeded
+generate/mutate) and M4 (replay: transport, step list, jump-to-step,
+fork-from-step) are implemented. M3 is largely done: gesture handling
 landed, and the render settings, transform card, affine editor, colour
 editors, palette, camera, symmetry, randomize/mutate and document loads are
 converted. Roughly two dozen direct writes remain in `MainWorkspace.tsx` —
@@ -340,14 +341,14 @@ Each ships independently; nothing blocks the app in a half-migrated state
 because unrecorded mutations still work — they're just visible as `unnamed`
 diagnostics.
 
-| #   | Deliverable                                                                                                                                                                                                                           | Effort                 |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| M1  | `src/recorder/` module: session schema, recorder hooked into `executeCommand` + history push, `unnamed` coverage diagnostics, record/stop UI stub, `.steps.json` export. Round-trip vitest for the already-command-routed vocabulary. | ~1 week                |
-| M2  | Determinism: id-based addressing in `builtins/flame.ts`, pre-minted ids on add-commands, exported seeded-RNG wrappers, seeded `randomize`/`mutate` commands. Round-trip test extended to random commands.                             | 3–5 days               |
-| M3  | Command coverage of the core editing surface (prop adapters, named handlers, camera) + `data-command` attributes as controls are rewired. Coverage ratchet test in Playwright.                                                        | 1–2 weeks, incremental |
-| M4  | Replay: `createSessionReplayer`, step-list panel, timed playback, jump-to-step, fork-from-step.                                                                                                                                       | 1–2 weeks              |
-| M5  | Sharing: PNG `FlameSteps` chunk, MP4 metadata, export-dialog bundle, recent-flames `session?` field.                                                                                                                                  | 3–5 days               |
-| —   | Later: sandboxed replay for gallery previews, scripting/MCP surface over the registry, condensed-recipe editor, gallery publishing.                                                                                                   | separate plans         |
+| #   | Deliverable                                                                                                                                                                                                                             | Effort                 |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| M1  | `src/recorder/` module: session schema, recorder hooked into `executeCommand` + history push, `unnamed` coverage diagnostics, record/stop UI stub, `.steps.json` export. Round-trip vitest for the already-command-routed vocabulary.   | ~1 week                |
+| M2  | Determinism: id-based addressing in `builtins/flame.ts`, pre-minted ids on add-commands, exported seeded-RNG wrappers, seeded `randomize`/`mutate` commands. Round-trip test extended to random commands.                               | 3–5 days               |
+| M3  | Command coverage of the core editing surface (prop adapters, named handlers, camera) + `data-command` attributes as controls are rewired. Coverage ratchet test in Playwright.                                                          | 1–2 weeks, incremental |
+| M4  | ~~Replay~~ **done**: `createSessionPlayer` transport, step-list panel, timed playback with speed control, jump-to-step, fork-from-step. A run or a seek is ONE undo step, so watching a session does not bury the viewer's own history. | shipped                |
+| M5  | Sharing: PNG `FlameSteps` chunk, MP4 metadata, export-dialog bundle, recent-flames `session?` field.                                                                                                                                    | 3–5 days               |
+| —   | Later: sandboxed replay for gallery previews, scripting/MCP surface over the registry, condensed-recipe editor, gallery publishing.                                                                                                     | separate plans         |
 
 M1 + M2 is the demoable core (record a session using existing commands +
 randomize, replay it deterministically). M3 is the long tail and can proceed

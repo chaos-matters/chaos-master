@@ -127,7 +127,7 @@ export function cancelSessionRecording(): void {
  * replay anyway and is caught by schema validation on load.
  */
 export function recordCommandExecution(
-  cmd: Pick<FlameCommand, 'id' | 'label' | 'coalesceKey'>,
+  cmd: Pick<FlameCommand, 'id' | 'label' | 'coalesceKey' | 'describe'>,
   args: readonly unknown[],
   run: () => void,
 ): void {
@@ -151,7 +151,7 @@ export function recordCommandExecution(
         t: elapsedMs(rec),
         id: cmd.id,
         args: deepClone([...args]),
-        label: cmd.label,
+        label: cmd.describe?.([...args]) ?? cmd.label,
       })
       pendingActionIndex = rec.actions.length - 1
       coalesceAnchor =

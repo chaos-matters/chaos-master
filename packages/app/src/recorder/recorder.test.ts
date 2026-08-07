@@ -1004,6 +1004,19 @@ describe('.steps.json serialization', () => {
     })
   }
 
+  /** Labels for a couple of path-addressed edits. */
+  function recordDescribed(): (string | undefined)[] {
+    return createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      startSessionRecording(world.flame)
+      executeCommand('flame.setRenderSetting', world.ctx, 'gamma', 2.42)
+      executeCommand('flame.setRenderSetting', world.ctx, 'camera.zoom', 3)
+      const session = stopOrThrow()
+      dispose()
+      return session.actions.map((a) => a.label)
+    })
+  }
+
   it('round-trips through serialize/parse', () => {
     const session = recordSmallSession()
     const parsed = parseSession(serializeSession(session))
@@ -1012,6 +1025,13 @@ describe('.steps.json serialization', () => {
     expect(parsed?.actions.map((x) => x.label)).toEqual([
       'Set Gamma',
       'Set Vibrancy',
+    ])
+    // A generic command describes the invocation instead of itself, so the
+    // replay step list reads "Set gamma to 2.42" rather than repeating "Set
+    // Render Setting" for every parameter.
+    expect(recordDescribed()).toEqual([
+      'Set gamma to 2.42',
+      'Set camera.zoom to 3',
     ])
     const times = parsed?.actions.map((x) => x.t) ?? []
     expect([...times].sort((x, y) => x - y)).toEqual(times)

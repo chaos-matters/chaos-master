@@ -89,5 +89,12 @@ export interface FlameCommand {
    * for commands whose repeats are each meaningful.
    */
   coalesceKey?: (args: unknown[]) => string | undefined
+  /**
+   * A label for THIS invocation, from its normalized args, used by the
+   * recorder in place of the static `label`. Generic commands need it:
+   * every render-setting edit would otherwise read "Set Render Setting" in a
+   * replay step list, where "Set gamma" is the point.
+   */
+  describe?: (args: unknown[]) => string | undefined
   execute: (ctx: CommandContext, ...args: unknown[]) => void
 }

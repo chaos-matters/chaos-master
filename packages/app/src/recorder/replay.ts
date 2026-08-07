@@ -18,6 +18,14 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 export type ReplayTarget = {
   loadInitial: (flame: FlameDescriptor) => void
   execute: (id: string, args: unknown[]) => void
+  /**
+   * Bracket a run of applied actions so the whole thing lands as ONE undoable
+   * step. The workspace maps these to the history's `startPreview`/`commit`;
+   * a sandbox with no history can leave them unset. Without it, replaying a
+   * long session buries the user's own undo stack under one entry per step.
+   */
+  beginBatch?: () => void
+  endBatch?: () => void
 }
 
 /**

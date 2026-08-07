@@ -1,0 +1,179 @@
+import { createSignal } from 'solid-js'
+import { deepClone } from '@/utils/clone'
+import { withRecordingSuppressed } from './recorder'
+import type { ReplayTarget } from './replay'
+import type { RecordedSession } from './schema'
+
+/**
+ * Timed playback of a recorded session (semantic-recorder-plan, M4).
+ *
+ * Transport controls rather than a bare `run()`, for the same reasons the
+ * Home portal needs them: the viewer scrubs, pauses, and takes over. The
+ * shape follows `portalScript.ts`'s `PortalScriptRun`, which already proved
+ * this model against the real command registry.
+ *
+ * Two rules the rest of the design hangs off:
+ *
+ *  - **Backwards is a rebuild, not an undo.** Actions are writes, not
+ *    reversible edits, so landing on "the state after step N" means replaying
+ *    `initial` plus the first N+1 actions. Same conclusion `portalScript`'s
+ *    `seek` reached.
+ *  - **A run is one undo step.** Every applied batch is bracketed by the
+ *    target's `beginBatch`/`endBatch`, which the workspace maps to the
+ *    history's `startPreview`/`commit`. Otherwise replaying a 200-step
+ *    session would bury the user's own history under 200 entries, and
+ *    "watch it, then carry on from here" — the point of the feature — would
+ *    be unusable.
+ */
+
+/** Longest wait between two steps, however long the human paused for. */
+export const MAX_STEP_GAP_MS = 1200
+
+/** Playback speeds the panel offers. 1 = the pace it was recorded at. */
+export const PLAYBACK_SPEEDS = [0.5, 1, 2, 4] as const
+
+export type SessionPlayer = {
+  readonly play: () => void
+  readonly pause: () => void
+  /** Rebuild the document as of `index` (-1 = the initial flame). */
+  readonly seek: (index: number) => void
+  /** Stop and close the open batch; the document stays where it is. */
+  readonly stop: () => void
+  /** Index of the last applied action; -1 = only the initial flame. */
+  readonly stepIndex: () => number
+  readonly isPlaying: () => boolean
+  readonly total: number
+}
+
+export type SessionPlayerOptions = {
+  /**
+   * Read when the wait for each step is scheduled, so the panel can change it
+   * mid-run. The already-pending wait keeps the old speed, so a change lands
+   * on the step after it — at most one gap late, which MAX_STEP_GAP_MS bounds.
+   */
+  speed?: () => number
+  onFinished?: () => void
+}
+
+export function createSessionPlayer(
+  session: RecordedSession,
+  target: ReplayTarget,
+  options: SessionPlayerOptions = {},
+): SessionPlayer {
+  const actions = session.actions
+  const [stepIndex, setStepIndex] = createSignal(-1)
+  const [isPlaying, setIsPlaying] = createSignal(false)
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let batchOpen = false
+
+  const speed = () => {
+    const value = options.speed?.() ?? 1
+    return value > 0 ? value : 1
+  }
+
+  function openBatch() {
+    if (batchOpen) return
+    target.beginBatch?.()
+    batchOpen = true
+  }
+
+  function closeBatch() {
+    if (!batchOpen) return
+    batchOpen = false
+    target.endBatch?.()
+  }
+
+  /** Apply one action. Suppressed so an active recording never absorbs it. */
+  function applyAction(index: number) {
+    const action = actions[index]
+    if (!action) return
+    withRecordingSuppressed(() => {
+      target.execute(action.id, deepClone(action.args))
+    })
+    setStepIndex(index)
+  }
+
+  function rebuildTo(index: number) {
+    withRecordingSuppressed(() => {
+      target.loadInitial(deepClone(session.initial))
+    })
+    setStepIndex(-1)
+    for (let i = 0; i <= index; i++) {
+      applyAction(i)
+    }
+  }
+
+  /** Wait out the gap the recording has between these two steps. */
+  function gapBefore(index: number): number {
+    const next = actions[index]
+    if (!next) return 0
+    const previous = index > 0 ? actions[index - 1] : undefined
+    const delta = previous ? next.t - previous.t : next.t
+    return Math.min(MAX_STEP_GAP_MS, Math.max(0, delta) / speed())
+  }
+
+  function scheduleNext() {
+    const next = stepIndex() + 1
+    if (next >= actions.length) {
+      setIsPlaying(false)
+      closeBatch()
+      options.onFinished?.()
+      return
+    }
+    timer = setTimeout(() => {
+      if (!isPlaying()) return
+      applyAction(next)
+      scheduleNext()
+    }, gapBefore(next))
+  }
+
+  function clearTimer() {
+    clearTimeout(timer)
+    timer = undefined
+  }
+
+  return {
+    play() {
+      if (isPlaying() || actions.length === 0) return
+      // Replaying past the end starts over, so the button always does
+      // something rather than sitting dead on the last step.
+      if (stepIndex() >= actions.length - 1) {
+        openBatch()
+        rebuildTo(-1)
+      }
+      openBatch()
+      setIsPlaying(true)
+      scheduleNext()
+    },
+    pause() {
+      if (!isPlaying()) return
+      setIsPlaying(false)
+      clearTimer()
+      // Commit what has been applied: undo becomes available again, and the
+      // user can edit on from here (the "fork from step N" case).
+      closeBatch()
+    },
+    seek(index) {
+      clearTimer()
+      const clamped = Math.min(
+        actions.length - 1,
+        Math.max(-1, Math.floor(index)),
+      )
+      openBatch()
+      rebuildTo(clamped)
+      if (isPlaying()) {
+        scheduleNext()
+      } else {
+        closeBatch()
+      }
+    },
+    stop() {
+      setIsPlaying(false)
+      clearTimer()
+      closeBatch()
+    },
+    stepIndex,
+    isPlaying,
+    total: actions.length,
+  }
+}
