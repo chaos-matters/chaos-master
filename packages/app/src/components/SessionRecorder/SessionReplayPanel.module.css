@@ -26,6 +26,13 @@
   }
 }
 
+/* Collapsed dock: transport only, so the panel shrinks to its content instead
+   of holding a step list's worth of width. */
+.compact {
+  width: auto;
+  max-height: none;
+}
+
 .header {
   display: flex;
   align-items: center;

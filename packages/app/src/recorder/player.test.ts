@@ -50,8 +50,10 @@ function makeTarget(start: FlameDescriptor) {
     setZoom,
   } as unknown as CommandContext
   let entries = 0
+  let loads = 0
   const target = {
     loadInitial: (next: FlameDescriptor) => {
+      loads++
       // Through the SETTER, not history.replace: replace pushes its own entry
       // and would escape the batch the player opened.
       setFlameDescriptor(() => deepClone(next), 'Replay: initial state')
@@ -69,7 +71,14 @@ function makeTarget(start: FlameDescriptor) {
       }
     },
   }
-  return { flame, history, ctx, target, committed: () => entries }
+  return {
+    flame,
+    history,
+    ctx,
+    target,
+    committed: () => entries,
+    loaded: () => loads,
+  }
 }
 
 beforeEach(() => {
@@ -99,6 +108,24 @@ describe('createSessionPlayer', () => {
       vi.advanceTimersByTime(150)
       expect(flame.renderSettings.gamma).toBeCloseTo(3.5, 5)
       expect(player.isPlaying()).toBe(false)
+      dispose()
+    })
+  })
+
+  it('starts from the flame the session was recorded against', () => {
+    createRoot((dispose) => {
+      // The target holds a different flame from the session's `initial` — the
+      // ordinary case: the viewer was editing something when they hit Play.
+      const { flame, target } = makeTarget(examples.initExample)
+      const player = createSessionPlayer(gammaSteps, target)
+      player.play()
+      vi.advanceTimersByTime(0)
+
+      // Everything the session did not touch comes from `initial`, not from
+      // what happened to be on screen. Replaying onto the viewer's own flame
+      // would produce a hybrid that matches neither.
+      expect(flame.transforms).toEqual(examples.example1.transforms)
+      expect(flame.renderSettings.gamma).toBeCloseTo(1.5, 5)
       dispose()
     })
   })
@@ -197,6 +224,33 @@ describe('createSessionPlayer', () => {
       player.seek(-1)
       expect(deepClone(flame)).toEqual(deepClone(examples.example1))
       expect(player.stepIndex()).toBe(-1)
+      dispose()
+    })
+  })
+
+  it('seeks forwards by applying only the missing steps', () => {
+    createRoot((dispose) => {
+      const { flame, ctx, target, loaded } = makeTarget(examples.initExample)
+      const player = createSessionPlayer(gammaSteps, target)
+
+      // The first move loads the recorded flame, whichever direction it is.
+      // After that, stepping forward one at a time — the common case, from the
+      // ▶| button and from clicking down the step list — applies only the
+      // missing actions: rebuilding from `initial` each time would make that
+      // quadratic and flicker the whole document once per step.
+      player.seek(0)
+      expect(loaded()).toBe(1)
+      player.seek(1)
+      player.seek(2)
+      expect(loaded()).toBe(1)
+      expect(flame.renderSettings.gamma).toBeCloseTo(3.5, 5)
+
+      // Re-seeking the step we are on still rebuilds — that is how the viewer
+      // discards edits of their own and gets the recorded state back.
+      executeCommand('flame.setGamma', ctx, 9)
+      player.seek(2)
+      expect(loaded()).toBe(2)
+      expect(flame.renderSettings.gamma).toBeCloseTo(3.5, 5)
       dispose()
     })
   })

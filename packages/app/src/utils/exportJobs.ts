@@ -4,6 +4,7 @@ import type { TimelineConfig, TimelineTrack } from './timeline'
 import type { VideoEncoderConfig } from './videoEncoder'
 import type { Palette } from '@/flame/colorMap'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { RecordedSession } from '@/recorder/schema'
 
 /**
  * Background export jobs. Image (and opt-in animation) exports run OFFSCREEN (see
@@ -42,6 +43,11 @@ export type ImageJobSpec = {
   condenseHidden: boolean
   tracks: TimelineTrack[]
   config: TimelineConfig
+  /** Recorded session to embed alongside the flame, snapshotted at enqueue time
+   *  like everything else here — a recording started while the job renders must
+   *  not leak into an image it did not produce. Undefined when there is no
+   *  finished recording or the user opted out. */
+  session: RecordedSession | undefined
 }
 
 /** Everything needed to render one animation (video) export offscreen. `flame`

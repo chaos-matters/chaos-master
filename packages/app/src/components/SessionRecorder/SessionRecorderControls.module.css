@@ -1,32 +1,11 @@
-/* Same translucent-pill material as App.module.css .hover-preview-badge, but
-   laid out in the bottom bar's flow instead of floating over the canvas:
-   anything absolutely positioned there ends up under the draggable
-   FloatingActions widget (position: fixed, z-index 200) and stops taking
-   clicks. `align-self` keeps it pill-sized inside the column. */
+/* Just the controls; the surrounding pill (material, placement, opacity,
+   dragging) belongs to SessionRecorderDock, which draws one chrome around
+   these buttons and its own. */
 .recorder {
-  align-self: flex-start;
-  margin: 0 0 var(--space-2) var(--space-2);
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.28rem 0.6rem;
-  border-radius: 20px;
-  background: oklch(22% 0.025 240 / 0.88);
-  border: 1px solid oklch(50% 0.08 240 / 0.6);
-  color: oklch(88% 0.04 240);
-  font-size: 0.7rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  backdrop-filter: blur(6px);
-  box-shadow: 0 2px 12px oklch(0% 0 0 / 0.4);
   white-space: nowrap;
-
-  [data-theme='light'] & {
-    background: oklch(96% 0.01 240 / 0.92);
-    border-color: oklch(65% 0.08 240 / 0.5);
-    color: oklch(28% 0.06 240);
-    box-shadow: 0 2px 12px oklch(50% 0.04 240 / 0.2);
-  }
 }
 
 .button {

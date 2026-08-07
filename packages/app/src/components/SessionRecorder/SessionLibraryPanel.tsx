@@ -1,7 +1,7 @@
-import { createResource, For, Show } from 'solid-js'
+import { createResource, createSignal, For, Show } from 'solid-js'
 import { serializeSession, sessionFilename } from '@/recorder/schema'
 import { downloadBlob } from '@/utils/blob'
-import { deleteStoredSession, loadStoredSessions } from '@/utils/sessionsDB'
+import { deleteStoredSession, loadStoredSessions, renameStoredSession, } from '@/utils/sessionsDB'
 import styles from './SessionLibraryPanel.module.css'
 import type { RecordedSession } from '@/recorder/schema'
 import type { StoredSession } from '@/utils/sessionsDB'
@@ -36,6 +36,20 @@ export function SessionLibraryPanel(props: {
     void deleteStoredSession(entry.id).then(mutate)
   }
 
+  // Recordings are named from the flame's title, or a timestamp when it has
+  // none — neither of which says what the recording is, so the name is
+  // editable in place: click it, type, Enter or blur to commit.
+  const [editingId, setEditingId] = createSignal<number>()
+
+  const commitRename = (entry: StoredSession, name: string) => {
+    setEditingId(undefined)
+    const trimmed = name.trim()
+    if (entry.id === undefined || trimmed === '' || trimmed === entry.name) {
+      return
+    }
+    void renameStoredSession(entry.id, trimmed).then(mutate)
+  }
+
   const when = (timestamp: number) =>
     new Date(timestamp).toLocaleString(undefined, {
       month: 'short',
@@ -67,7 +81,34 @@ export function SessionLibraryPanel(props: {
             {(entry) => (
               <li class={styles.entry}>
                 <div class={styles.entryMain}>
-                  <span class={styles.entryName}>{entry.name}</span>
+                  <Show
+                    when={editingId() !== undefined && editingId() === entry.id}
+                    fallback={
+                      <button
+                        type="button"
+                        class={styles.entryName}
+                        onClick={() => {
+                          setEditingId(entry.id)
+                        }}
+                        title="Rename this recording"
+                      >
+                        {entry.name}
+                      </button>
+                    }
+                  >
+                    <input
+                      class={styles.entryRename}
+                      value={entry.name}
+                      autofocus
+                      onBlur={(ev) => {
+                        commitRename(entry, ev.currentTarget.value)
+                      }}
+                      onKeyDown={(ev) => {
+                        if (ev.key === 'Enter') ev.currentTarget.blur()
+                        if (ev.key === 'Escape') setEditingId(undefined)
+                      }}
+                    />
+                  </Show>
                   <span class={styles.entryMeta}>
                     {when(entry.timestamp)} · {entry.actionCount} steps
                     <Show when={entry.unnamedWriteCount > 0}>

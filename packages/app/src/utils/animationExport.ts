@@ -1,9 +1,9 @@
 import { DEBUG_MODE } from '@/defaults'
 import { accumulatedPointCount, forceAnimationExportNow, qualityPointCountLimit, setAnimationExportCancel, setAnimationExportProgress, setAnimationExportRunning, setExportQuality, setForceAnimationExportNow, } from '@/flame/renderStats'
-import { lastFinishedSession } from '@/recorder/recorder'
 import { applyAudioMappingsToFlame, createAudioAnalyzer } from './audioAnalysis'
 import { createAudioVideoEncoder } from './audioExport'
 import { deepClone } from './clone'
+import { sessionForExport } from './exportPreferences'
 import { createMetadataPayload, injectMetadataIntoMp4 } from './flameInMp4'
 import { formatPointCount } from './formatPointCount'
 import { logTime } from './logTime'
@@ -317,7 +317,7 @@ export function createAnimationExport(
               baseFlame,
               timeline.tracks(),
               timeline.config(),
-              lastFinishedSession(),
+              sessionForExport(),
             )
             const patchedBuffer = injectMetadataIntoMp4(mp4Buffer, payload)
             resolve(new Blob([patchedBuffer], { type: result.mimeType }))
