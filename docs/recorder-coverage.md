@@ -76,6 +76,28 @@ reason a real session file looks longer than the work felt. Coalescing wheel
 ticks would need the camera to hold one preview across a debounce window,
 which changes undo granularity, so it is deliberately not done yet.
 
+## Where recordings live
+
+Stopping a recording saves it to IndexedDB (`chaos-master-sessions`, capped
+at 100) rather than pushing a file at you. The **Recordings** button opens
+the library, where each entry can be replayed, downloaded as `.steps.json`,
+or deleted. A storage failure falls back to downloading the file, so a
+recording is never lost to a full or unavailable database.
+
+Three ways to bring a session back:
+
+- the **Recordings** library,
+- **Open steps** (file picker), or
+- **dropping** a `.steps.json` on the canvas — which loads no flame, just
+  offers the session against whatever is open. Dropping one of our PNGs or
+  MP4s loads the flame _and_ offers its session.
+
+Everything that arrives from outside goes through the same validation: an
+unknown format version or an initial flame that fails the schema is refused,
+and each command validates its own arguments (paths against the schema
+vocabulary, affines by exact key set and finiteness). A hostile file can at
+worst produce an odd-looking flame; nothing in a session is executable.
+
 ## Practical notes for recording
 
 - Start the recording **before** the work you want captured; the log embeds

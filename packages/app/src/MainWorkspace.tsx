@@ -57,6 +57,7 @@ import { PopulationSimulator } from './components/PopulationSimulator/Population
 import { ProgressBar } from './components/ProgressBar/ProgressBar'
 import { getPresetFromQuality, qualityPresets, } from './components/Quality/QualityPresets'
 import { QuickVariationPicker } from './components/QuickVariationPicker/QuickVariationPicker'
+import { SessionLibraryPanel } from './components/SessionRecorder/SessionLibraryPanel'
 import { SessionRecorderControls } from './components/SessionRecorder/SessionRecorderControls'
 import { SessionReplayPanel } from './components/SessionRecorder/SessionReplayPanel'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
@@ -420,6 +421,10 @@ export function MainWorkspace(props: AppProps) {
   const [showTimeline, setShowTimeline] = createSignal(isWideLayout())
   // The session currently open for replay (M4), if any.
   const [replaySession, setReplaySession] = createSignal<RecordedSession>()
+  // Saved-recordings panel: open state, plus a counter the panel watches so
+  // storing a new recording refetches the list.
+  const [showSessionLibrary, setShowSessionLibrary] = createSignal(false)
+  const [sessionLibraryRevision, setSessionLibraryRevision] = createSignal(0)
   // Colors as they were before the first palette apply — lets Unselect
   // restore the "natural" colors. UI stash only; undo handles the rest.
   const [prePaletteColors, setPrePaletteColors] = createSignal<
@@ -3553,9 +3558,28 @@ export function MainWorkspace(props: AppProps) {
                     />
                   )}
                 </Show>
+                <Show when={showSessionLibrary()}>
+                  <SessionLibraryPanel
+                    revision={sessionLibraryRevision()}
+                    onReplay={(session) => {
+                      setReplaySession(session)
+                      setShowSessionLibrary(false)
+                    }}
+                    onClose={() => {
+                      setShowSessionLibrary(false)
+                    }}
+                  />
+                </Show>
                 <SessionRecorderControls
                   flameDescriptor={flameDescriptor}
                   onOpenSession={setReplaySession}
+                  onSessionStored={() => {
+                    setSessionLibraryRevision((n) => n + 1)
+                    setShowSessionLibrary(true)
+                  }}
+                  onToggleLibrary={() => {
+                    setShowSessionLibrary((open) => !open)
+                  }}
                 />
                 <Show when={effectiveFlame().renderSettings.dimensions === 3}>
                   <OrientationGizmo

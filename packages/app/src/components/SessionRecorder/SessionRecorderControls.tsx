@@ -3,6 +3,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { cancelSessionRecording, isSessionRecording, recordedActionCount, startSessionRecording, stopSessionRecording, unnamedWriteCount, } from '@/recorder/recorder'
 import { parseSession, serializeSession, sessionFilename, } from '@/recorder/schema'
 import { downloadBlob } from '@/utils/blob'
+import { storeSession } from '@/utils/sessionsDB'
 import styles from './SessionRecorderControls.module.css'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { RecordedSession } from '@/recorder/schema'
@@ -18,6 +19,9 @@ import type { RecordedSession } from '@/recorder/schema'
 export function SessionRecorderControls(props: {
   flameDescriptor: FlameDescriptor
   onOpenSession: (session: RecordedSession) => void
+  /** Called after a recording is stored, so the library list refetches. */
+  onSessionStored: () => void
+  onToggleLibrary: () => void
 }) {
   const { showToast } = useToast()
 
@@ -27,13 +31,33 @@ export function SessionRecorderControls(props: {
     startSessionRecording(props.flameDescriptor)
   }
 
+  /**
+   * Stopping keeps the recording in the browser rather than pushing a file at
+   * the user; the library offers download when they actually want one.
+   */
   const stopAndSave = () => {
     const session = stopSessionRecording()
     if (!session) return
-    downloadBlob(
-      new Blob([serializeSession(session)], { type: 'application/json' }),
-      sessionFilename(props.flameDescriptor.metadata?.name),
-    )
+    // A locale timestamp here produced filenames like
+    // "Recording_8_7_2026_6_32_32_PM.steps.json" once the filename sanitiser
+    // replaced its punctuation; a sortable stamp reads better in both places.
+    const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ')
+    const name =
+      props.flameDescriptor.metadata?.name?.trim() || `Recording ${stamp}`
+    void storeSession(session, name)
+      .then(() => {
+        props.onSessionStored()
+        showToast(`Saved "${name}" — ${session.actions.length} steps`, 3500)
+      })
+      .catch((err: unknown) => {
+        // Never lose the work to a storage failure: fall back to the file.
+        console.warn('[recorder] could not store session', err)
+        downloadBlob(
+          new Blob([serializeSession(session)], { type: 'application/json' }),
+          sessionFilename(name),
+        )
+        showToast('Could not save locally — downloaded the steps instead', 5000)
+      })
   }
 
   const openSessionFile = async (file: File | undefined) => {
@@ -59,6 +83,14 @@ export function SessionRecorderControls(props: {
               title="Record every action as a replayable step log"
             >
               <span class={styles.dot} /> Record steps
+            </button>
+            <button
+              type="button"
+              class={styles.button}
+              onClick={props.onToggleLibrary}
+              title="Saved recordings — replay, download or delete"
+            >
+              ⛁ Recordings
             </button>
             <label class={styles.button} title="Replay a saved .steps.json">
               Open steps
