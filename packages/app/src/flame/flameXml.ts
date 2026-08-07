@@ -58,6 +58,11 @@ const FLAM3_ALIASES: Record<string, string> = Object.fromEntries(
   }),
 )
 
+// These aliases are useful fallbacks, but they are not mathematically exact.
+// Keep them importable while making the compatibility report honest about the
+// visual difference.
+const APPROXIMATE_FLAM3_ALIASES = new Set(['blur'])
+
 /**
  * Resolve a flam3 variation name to a chaos-master internal type, or `undefined`
  * if it has no equivalent (so the caller can skip it and report it). Order:
@@ -183,6 +188,20 @@ const NON_VARIATION_ATTRS = new Set([
   'plots',
 ])
 
+// Recognised flam3 xform controls that Chaos Master does not currently model.
+// They are bookkeeping rather than variations, but an active value still
+// changes the source flame and therefore must make an import explicitly lossy.
+const UNSUPPORTED_XFORM_ATTRS = new Set(['animate', 'chaos', 'plots'])
+
+function hasActiveNumericValue(value: string): boolean {
+  const values = value.trim().split(/\s+/)
+  if (values.length === 0 || values[0] === '') return false
+  return values.some((token) => {
+    const parsed = Number(token)
+    return !Number.isFinite(parsed) || parsed !== 0
+  })
+}
+
 /**
  * Parse an xform's variations (both the attribute form `linear="1"` and the
  * child `<var name="linear" weight="1"/>` form), resolving each to a chaos type
@@ -194,6 +213,7 @@ const NON_VARIATION_ATTRS = new Set([
 function parseVariations(
   el: Element,
   unmapped: Set<string>,
+  approximated: Set<string>,
 ): Record<string, unknown> {
   type Resolved = {
     flam3Name: string
@@ -212,6 +232,7 @@ function parseVariations(
     if (weight === 0) continue
     const chaosType = resolveVariationType(attr.name)
     if (chaosType === undefined) continue // maybe a param of another variation
+    if (APPROXIMATE_FLAM3_ALIASES.has(lower)) approximated.add(attr.name)
     vars.push({
       flam3Name: lower,
       chaosType,
@@ -252,6 +273,7 @@ function parseVariations(
     const lower = attr.name.toLowerCase()
     if (NON_VARIATION_ATTRS.has(lower) || varNames.has(lower)) continue
     if (consumed.has(lower)) continue
+    if (!hasActiveNumericValue(attr.value)) continue
     if (resolveVariationType(attr.name) === undefined) unmapped.add(attr.name)
   }
 
@@ -280,6 +302,9 @@ function parseVariations(
       unmapped.add(name)
       continue
     }
+    if (APPROXIMATE_FLAM3_ALIASES.has(name.toLowerCase())) {
+      approximated.add(name)
+    }
     variations[`_flam3_${count++}`] = getVariationDefault(chaosType, weight)
   }
 
@@ -297,13 +322,13 @@ function hasNonLinearVariation(el: Element): boolean {
     if (NON_VARIATION_ATTRS.has(lower)) continue
     if (parseFloatSafe(attr.value, 0) === 0) continue
     const type = resolveVariationType(attr.name)
-    if (type !== undefined && type !== 'linearVar') return true
+    if (type !== 'linearVar') return true
   }
   for (const varEl of el.querySelectorAll('var')) {
     const w = parseFloatSafe(varEl.getAttribute('weight'), 0)
     if (w === 0) continue
     const type = resolveVariationType(varEl.getAttribute('name') ?? '')
-    if (type !== undefined && type !== 'linearVar') return true
+    if (type !== 'linearVar') return true
   }
   return false
 }
@@ -415,20 +440,8 @@ export type FlameXmlReport = {
  * OkLab colour so the import renders true to the original without needing a
  * palette object selected.
  */
-export function parseFlameXmlWithReport(xml: string): FlameXmlReport {
+function parseFlameElementWithReport(flameEl: Element): FlameXmlReport {
   const warnings: string[] = []
-  const parser = new DOMParser()
-  const doc = parser.parseFromString(xml, 'text/xml')
-
-  const parseError = doc.querySelector('parsererror')
-  if (parseError) {
-    throw new Error(`Failed to parse .flame XML: ${parseError.textContent}`)
-  }
-
-  const flameEl = doc.querySelector('flame')
-  if (!flameEl) {
-    throw new Error('Invalid .flame file: no <flame> element found')
-  }
 
   // ── Flame-level attributes ────────────────────────────────────────────
 
@@ -470,11 +483,21 @@ export function parseFlameXmlWithReport(xml: string): FlameXmlReport {
   // ── Parse transforms (xforms) ─────────────────────────────────────────
 
   const xformEls = flameEl.querySelectorAll('xform')
+  if (xformEls.length === 0) {
+    throw new Error('Invalid .flame: no <xform> elements found')
+  }
   const transforms: Record<string, unknown> = {}
   const unmapped = new Set<string>()
+  const approximated = new Set<string>()
+  const ignoredFeatures = new Set<string>()
 
-  for (const xformEl of xformEls) {
+  for (const [index, xformEl] of [...xformEls].entries()) {
     const weight = parseFloatSafe(xformEl.getAttribute('weight'), 1)
+    if (weight < 0) {
+      throw new Error(
+        `Invalid .flame: <xform> ${index + 1} has a negative weight`,
+      )
+    }
     const colorIndex = parseFloatSafe(xformEl.getAttribute('color'), 0)
     const opacity = parseFloatSafe(xformEl.getAttribute('opacity'), 1)
     // flam3 `color_speed` (newer) or `symmetry` (older: speed = (1−sym)/2).
@@ -514,7 +537,20 @@ export function parseFlameXmlWithReport(xml: string): FlameXmlReport {
     // Variations (+ parametric params) from both the attribute and <var> forms.
     // NOTE: flam3 variation weights are additive blend amounts (a transform can
     // be linear=1 + spherical=1), NOT probabilities — they are NOT normalized.
-    const variations = parseVariations(xformEl, unmapped)
+    const variations = parseVariations(xformEl, unmapped, approximated)
+
+    for (const attr of xformEl.attributes) {
+      const name = attr.name.toLowerCase()
+      if (
+        UNSUPPORTED_XFORM_ATTRS.has(name) &&
+        // A chaos vector's normal behavior is not an all-zero vector: zeroes
+        // disable transitions. Its presence is meaningful even when every
+        // token is 0, unlike scalar enable/amount controls.
+        (name === 'chaos' || hasActiveNumericValue(attr.value))
+      ) {
+        ignoredFeatures.add(attr.name)
+      }
+    }
 
     const tid = generateTransformId('flam3')
     transforms[tid] = {
@@ -533,6 +569,16 @@ export function parseFlameXmlWithReport(xml: string): FlameXmlReport {
       `Skipped ${unmapped.size} variation(s) with no Lumen Apeiron equivalent: ${[...unmapped].join(', ')}`,
     )
   }
+  if (approximated.size > 0) {
+    warnings.push(
+      `Approximated ${approximated.size} variation(s) with the nearest Lumen Apeiron equivalent: ${[...approximated].join(', ')}`,
+    )
+  }
+  if (ignoredFeatures.size > 0) {
+    warnings.push(
+      `Ignored ${ignoredFeatures.size} unsupported xform feature(s): ${[...ignoredFeatures].join(', ')}`,
+    )
+  }
 
   // Normalize transform probabilities (flam3 xform weights are relative).
   const xformEntries = Object.entries(transforms) as [
@@ -543,9 +589,12 @@ export function parseFlameXmlWithReport(xml: string): FlameXmlReport {
     (s, [, t]) => s + (t.probability || 0),
     0,
   )
-  if (totalProb > 0) {
-    for (const [, t] of xformEntries) t.probability /= totalProb
+  if (totalProb <= 0) {
+    throw new Error(
+      'Invalid .flame: transform weights must total more than zero',
+    )
   }
+  for (const [, t] of xformEntries) t.probability /= totalProb
 
   // ── Final transform ───────────────────────────────────────────────────
   // flam3 `<finalxform>` is applied to every point after the chosen xform.
@@ -610,6 +659,59 @@ export function parseFlameXmlWithReport(xml: string): FlameXmlReport {
   }
 
   return { flame: validateFlame(descriptor), warnings }
+}
+
+/** One flame inside a possibly multi-flame XML document. A malformed entry is
+ * retained as a result so batch tooling can audit the rest of the pack. */
+export type FlameXmlDocumentEntry =
+  | ({ index: number; name: string; ok: true } & FlameXmlReport)
+  | { index: number; name: string; ok: false; error: string }
+
+/**
+ * Parse every `<flame>` in one XML document through the same importer used by
+ * the UI. This is intentionally an orchestration layer: it neither registers
+ * palettes nor writes imported flames anywhere.
+ */
+export function parseFlameXmlDocumentWithReport(
+  xml: string,
+): FlameXmlDocumentEntry[] {
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(xml, 'text/xml')
+
+  const parseError = doc.querySelector('parsererror')
+  if (parseError) {
+    throw new Error(`Failed to parse .flame XML: ${parseError.textContent}`)
+  }
+
+  const flameEls = [...doc.querySelectorAll('flame')]
+  if (flameEls.length === 0) {
+    throw new Error('Invalid .flame file: no <flame> element found')
+  }
+
+  return flameEls.map((flameEl, index) => {
+    const name = flameEl.getAttribute('name')?.trim() || `Flame ${index + 1}`
+    try {
+      return {
+        index,
+        name,
+        ok: true as const,
+        ...parseFlameElementWithReport(flameEl),
+      }
+    } catch (error) {
+      return {
+        index,
+        name,
+        ok: false as const,
+        error: error instanceof Error ? error.message : String(error),
+      }
+    }
+  })
+}
+
+export function parseFlameXmlWithReport(xml: string): FlameXmlReport {
+  const first = parseFlameXmlDocumentWithReport(xml)[0]!
+  if (!first.ok) throw new Error(first.error)
+  return { flame: first.flame, warnings: first.warnings }
 }
 
 /**

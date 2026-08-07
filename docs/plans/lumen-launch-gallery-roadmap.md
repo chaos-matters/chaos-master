@@ -108,14 +108,18 @@ contractive affine IFS presets. Keep the product labels mathematically honest.
    meaningful action: opening a gallery flame, editing it, and exporting or
    sharing it. Optimize for that activation path, not visits alone.
 
-## Next executable slice
+## Current executable slice
 
-The eight canonical Fractal Classics are now implemented as exact, editable
-descriptors. The next slice turns those foundations into a launch collection:
+The eight canonical Fractal Classics are implemented as exact, editable
+descriptors. The curation foundation now adds:
 
-1. Add provenance fields and publication validation to the gallery pipeline.
-2. Curate clearly labelled **Flame Remix** companions for the exact classics.
-3. Stage the Home hero and first six classic gallery plates, then capture their
-   posters before publication.
-4. Re-run `pnpm capture:readme`, replace launch stills, and perform the final
-   release gate.
+1. A batch FLAM3 compatibility report that reuses the production importer,
+   including multi-flame documents and deterministic JSON output.
+2. Provenance fields plus a rights/poster gate for shared publication.
+3. Home chapters for Foundations, Lumen Originals, Flame Remixes, and Artist
+   Editions; empty future chapters stay hidden until content exists.
+
+Next, run promising permission-compatible XML packs through `pnpm
+flam3:compat`, curate clearly labelled **Flame Remix** companions for the exact
+classics, then stage/capture/publish the final Home plates. Once that gallery is
+locked, re-run `pnpm capture:readme` and perform the release gate.

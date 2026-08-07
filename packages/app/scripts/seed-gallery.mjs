@@ -9,25 +9,27 @@
 //
 //   node scripts/seed-gallery.mjs                 # print SQL to stdout
 //   node scripts/seed-gallery.mjs --out seed.sql  # write to a file
-//   node scripts/seed-gallery.mjs --apply local   # execute against D1
-//                                                 # (local|dev|prod)
+//   node scripts/seed-gallery.mjs --apply local   # stage in local D1
+//   node scripts/seed-gallery.mjs --apply local --publish  # local preview
 //
 // `local` is the dev database in wrangler's own local storage, and is the one
 // target this script will create the schema for first — see below.
 //
-// Curation lives in CURATION below. Re-running is safe: every row is an
-// upsert keyed on slug, so editing an entry here and re-applying updates the
-// live gallery without a deploy.
+// Curation lives in CURATION below. This seed path is local-only and staged by
+// default; shared dev/prod curation goes through gallery-admin's poster and
+// provenance publication gate.
 
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { couldNotRun, couldNotRunLines, migrationsArgs, storageFlags, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
+import { couldNotRun, couldNotRunLines, migrationsArgs, storageFlags, targetLabel, TARGETS, } from './gallery-targets.mjs'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const appDir = resolve(scriptDir, '..')
+const PROJECT_LICENSE_URL =
+  'https://github.com/chaos-matters/chaos-master/blob/main/LICENSE'
 
 /**
  * Run a child, and say so plainly when it never started.
@@ -194,11 +196,19 @@ const CURATION = {
 }
 
 function parseArgs(argv) {
-  const args = { out: null, apply: null }
+  const args = { out: null, apply: null, publish: false }
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--out') args.out = argv[++i]
-    else if (argv[i] === '--apply') args.apply = argv[++i]
+    if (argv[i] === '--out' || argv[i] === '--apply') {
+      const option = argv[i]
+      const value = argv[++i]
+      if (value === undefined || value.startsWith('--')) {
+        throw new Error(`${option} requires a value`)
+      }
+      if (option === '--out') args.out = value
+      else args.apply = value
+    } else if (argv[i] === '--publish') args.publish = true
     else if (argv[i] === '--help' || argv[i] === '-h') args.help = true
+    else throw new Error(`Unknown option: ${argv[i]}`)
   }
   return args
 }
@@ -207,35 +217,42 @@ function parseArgs(argv) {
 function loadContent() {
   const dir = mkdtempSync(join(tmpdir(), 'gallery-seed-'))
   const bundle = join(dir, 'dump.mjs')
-  run(
-    'pnpm',
-    [
-      'exec',
-      'esbuild',
-      join(scriptDir, 'dump-examples.entry.ts'),
-      '--bundle',
-      '--platform=node',
-      '--format=esm',
-      '--log-level=error',
-      `--alias:@=${join(appDir, 'src')}`,
-      `--outfile=${bundle}`,
-    ],
-    { stdio: ['ignore', 'ignore', 'inherit'] },
-    { captured: false, consequence: 'the example flames were never bundled' },
-  )
-  const out = run(
-    'node',
-    [bundle],
-    { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 },
-    { captured: true, consequence: 'the bundled examples were never read' },
-  )
-  return JSON.parse(out)
+  try {
+    run(
+      'pnpm',
+      [
+        'exec',
+        'esbuild',
+        join(scriptDir, 'dump-examples.entry.ts'),
+        '--bundle',
+        '--platform=node',
+        '--format=esm',
+        '--log-level=error',
+        `--alias:@=${join(appDir, 'src')}`,
+        `--outfile=${bundle}`,
+      ],
+      { stdio: ['ignore', 'ignore', 'inherit'] },
+      {
+        captured: false,
+        consequence: 'the example flames were never bundled',
+      },
+    )
+    const out = run(
+      'node',
+      [bundle],
+      { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 },
+      { captured: true, consequence: 'the bundled examples were never read' },
+    )
+    return JSON.parse(out)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 }
 
 const sqlStr = (v) =>
   v === null || v === undefined ? 'NULL' : `'${String(v).replace(/'/g, "''")}'`
 
-function rowFor(entry, section, order, content) {
+function rowFor(entry, section, order, content, published) {
   let flame
   let animation = null
 
@@ -256,26 +273,50 @@ function rowFor(entry, section, order, content) {
     throw new Error(`${entry.slug} resolved to a flame with no transforms`)
   }
 
+  const storedAuthor = flame.metadata?.author?.trim()
+  const author =
+    storedAuthor && storedAuthor.toLowerCase() !== 'unknown'
+      ? storedAuthor
+      : null
+  const collection = entry.slug.startsWith('classic-')
+    ? 'foundation'
+    : 'original'
+  const provenance = author === null ? 'unknown' : 'project-original'
+  const attribution =
+    author === null
+      ? null
+      : collection === 'foundation'
+        ? `Canonical construction · encoded by ${author}`
+        : `Created by ${author}`
+
   return [
     sqlStr(entry.slug),
     sqlStr(entry.title),
     sqlStr(entry.caption ?? null),
-    sqlStr(flame.metadata?.author ?? null),
+    sqlStr(author),
     sqlStr(section),
     sqlStr(entry.capability ?? null),
     sqlStr(JSON.stringify(flame)),
     animation === null ? 'NULL' : sqlStr(JSON.stringify(animation)),
+    sqlStr(collection),
+    sqlStr(provenance),
+    'NULL',
+    sqlStr(author === null ? null : 'AGPL-3.0-only'),
+    sqlStr(author === null ? null : PROJECT_LICENSE_URL),
+    sqlStr(attribution),
+    'NULL',
+    'NULL',
     String(dimensions),
     String(transformCount),
     // poster_key, poster_width, poster_height, poster_frame — the poster
     // pipeline owns all four (capture + upload-gallery-posters.mjs).
     'NULL, NULL, NULL, NULL',
     String(order),
-    '1',
+    published ? '1' : '0',
   ].join(', ')
 }
 
-function buildSql(content) {
+function buildSql(content, { published = false } = {}) {
   const lines = [
     '-- Generated by scripts/seed-gallery.mjs — do not edit by hand.',
     '-- Re-running replaces every row: curation lives in the script.',
@@ -284,12 +325,14 @@ function buildSql(content) {
   const values = []
   for (const [section, entries] of Object.entries(CURATION)) {
     entries.forEach((entry, i) => {
-      values.push(`  (${rowFor(entry, section, i, content)})`)
+      values.push(`  (${rowFor(entry, section, i, content, published)})`)
     })
   }
   lines.push(
     'INSERT INTO gallery_items (',
     '  slug, title, caption, author, section, capability, flame, animation,',
+    '  collection, provenance_kind, source_url, license, license_url,',
+    '  attribution, changes, original_id,',
     '  dimensions, transform_count, poster_key, poster_width, poster_height,',
     '  poster_frame, sort_order, published',
     ') VALUES',
@@ -300,10 +343,23 @@ function buildSql(content) {
     '  author = excluded.author,',
     '  section = excluded.section,',
     '  capability = excluded.capability,',
+    '  collection = excluded.collection,',
+    '  provenance_kind = excluded.provenance_kind,',
+    '  source_url = excluded.source_url,',
+    '  license = excluded.license,',
+    '  license_url = excluded.license_url,',
+    '  attribution = excluded.attribution,',
+    '  changes = excluded.changes,',
+    '  original_id = excluded.original_id,',
     '  flame = excluded.flame,',
     '  animation = excluded.animation,',
     '  dimensions = excluded.dimensions,',
     '  transform_count = excluded.transform_count,',
+    '  poster_key = NULL,',
+    '  poster_width = NULL,',
+    '  poster_height = NULL,',
+    '  poster_frame = NULL,',
+    '  sequence = NULL,',
     '  sort_order = excluded.sort_order,',
     '  published = excluded.published;',
     '',
@@ -324,16 +380,23 @@ function main() {
     return
   }
 
+  if (args.apply !== null && args.apply !== 'local') {
+    throw new Error(
+      'seed-gallery only applies to local D1; use gallery-admin to stage shared dev/prod rows',
+    )
+  }
+  if (args.publish && args.apply !== 'local') {
+    throw new Error('--publish is only valid with --apply local')
+  }
+
+  // Refuse unsafe targets before bundling the examples. Besides being faster,
+  // this guarantees a rejected command cannot reach Wrangler or any database.
   const content = loadContent()
-  const sql = buildSql(content)
+  const sql = buildSql(content, { published: args.publish })
   const total = Object.values(CURATION).reduce((n, e) => n + e.length, 0)
 
   if (args.apply) {
     const target = TARGETS[args.apply]
-    if (!target) {
-      console.error(`Unknown target "${args.apply}" — expected ${TARGET_LIST}.`)
-      process.exit(1)
-    }
     const where = storageFlags(args.apply)
     // A local store starts with no tables at all, and it is a sqlite file under
     // packages/app/.wrangler that nobody else can see — so seeding from zero is
@@ -354,25 +417,29 @@ function main() {
       )
     }
     const dir = mkdtempSync(join(tmpdir(), 'gallery-sql-'))
-    const file = join(dir, 'seed.sql')
-    writeFileSync(file, sql)
-    run(
-      'pnpm',
-      [
-        'exec',
-        'wrangler',
-        'd1',
-        'execute',
-        target.database,
-        ...where,
-        `--file=${file}`,
-      ],
-      { stdio: 'inherit' },
-      {
-        captured: false,
-        consequence: `no rows reached ${targetLabel(args.apply)}`,
-      },
-    )
+    try {
+      const file = join(dir, 'seed.sql')
+      writeFileSync(file, sql)
+      run(
+        'pnpm',
+        [
+          'exec',
+          'wrangler',
+          'd1',
+          'execute',
+          target.database,
+          ...where,
+          `--file=${file}`,
+        ],
+        { stdio: 'inherit' },
+        {
+          captured: false,
+          consequence: `no rows reached ${targetLabel(args.apply)}`,
+        },
+      )
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
     console.error(`Applied ${total} rows to ${targetLabel(args.apply)}.`)
     return
   }

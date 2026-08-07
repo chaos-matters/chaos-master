@@ -34,6 +34,7 @@
 //                  shows come from the same row a later --apply would update.
 //   --apply <env>  local | dev | prod. Writing anywhere but local is a
 //                  deliberate act; this script does not default to it.
+//   --confirm prod  required with --apply prod.
 //   --out <file>   Write the SQL to a file.
 //   --clear        Set the column back to NULL — the single-flame behaviour.
 //   --preview      Derive candidates, RENDER each one, and print them as
@@ -103,6 +104,7 @@ function parseArgs(argv) {
     append: null,
     preview: false,
     pick: null,
+    confirm: null,
     base: 'https://localhost:5173',
   }
   for (let i = 0; i < argv.length; i++) {
@@ -121,6 +123,7 @@ function parseArgs(argv) {
     else if (arg === '--append') args.append = argv[++i]
     else if (arg === '--preview') args.preview = true
     else if (arg === '--pick') args.pick = argv[++i]
+    else if (arg === '--confirm') args.confirm = argv[++i]
     else if (arg === '--base') args.base = argv[++i]
     else if (arg.startsWith('-')) fail(`unknown option ${arg}`)
     else if (args.slug === null) args.slug = arg
@@ -330,6 +333,9 @@ async function main() {
   if (!SLUG.test(args.slug)) fail(`"${args.slug}" is not a servable slug`)
   if (args.apply !== null && !(args.apply in TARGETS)) {
     fail(`unknown target "${args.apply}" — expected ${TARGET_LIST}`)
+  }
+  if (args.apply === 'prod' && args.confirm !== 'prod') {
+    fail('writing prod requires the explicit flag --confirm prod')
   }
   // Reading the row needs a database even when only printing SQL, so a plain
   if (args.read !== null && !(args.read in TARGETS)) {
