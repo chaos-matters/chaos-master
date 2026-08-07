@@ -298,9 +298,81 @@ registerCommand({
   id: 'flame.setBlendWeight',
   label: 'Set Blend Weight',
   description: 'Set the blend weight for crossfading (0-1)',
+  // Slider-driven, so it folds per gesture.
+  coalesceKey: () => 'blendWeight',
+  // Writes the document rather than calling ctx.setBlendWeight: the weight
+  // LIVES in renderSettings (that is why a single undo reverts a blend), and
+  // the workspace's own setter now dispatches this command — going back
+  // through the context would recurse. It is not part of the
+  // setRenderSetting path vocabulary because it has no schema default.
   execute(ctx, weight?: unknown) {
     const w = typeof weight === 'number' ? Math.max(0, Math.min(1, weight)) : 0
-    ctx.setBlendWeight(w)
+    ctx.setFlameDescriptor((draft) => {
+      draft.renderSettings.blendWeight = w
+    }, 'Blend Weight')
+  },
+})
+
+registerCommand({
+  id: 'flame.setBlendFlame',
+  label: 'Set Blend Flame',
+  description: 'Set or clear the flame being blended with (null clears)',
+  // The descriptor travels in the args, like flame.load, so a session that
+  // picked a blend partner replays without needing that file again.
+  execute(ctx, flame?: unknown) {
+    const next = isAbsentRef(flame) ? undefined : tryValidateFlame(flame)
+    if (!isAbsentRef(flame) && !next) {
+      console.warn('[cmd] flame.setBlendFlame: not a valid flame', flame)
+      return
+    }
+    ctx.setFlameDescriptor(
+      (draft) => {
+        if (next === undefined) delete draft.renderSettings.blendFlame
+        else draft.renderSettings.blendFlame = next
+      },
+      next ? 'Set Blend Flame' : 'Remove Blend Flame',
+    )
+  },
+})
+
+registerCommand({
+  id: 'flame.setupMorph',
+  label: 'Morph Setup',
+  description:
+    'Make this flame the blend partner at full weight, ready for a morph animation',
+  // Only the flame half: the keyframes the editor adds afterwards live on the
+  // timeline's own undo stack, which the session format does not cover yet.
+  execute(ctx, endFlame?: unknown) {
+    const next = tryValidateFlame(endFlame)
+    if (!next) {
+      console.warn('[cmd] flame.setupMorph: not a valid flame', endFlame)
+      return
+    }
+    ctx.setFlameDescriptor((draft) => {
+      draft.renderSettings.blendFlame = next
+      draft.renderSettings.blendWeight = 1
+    }, 'Morph Setup')
+  },
+})
+
+registerCommand({
+  id: 'flame.updateRenderSettings',
+  label: 'Update Render Settings',
+  description: 'Merge a partial render-settings object into the flame',
+  // A bulk merge, used where a panel applies several settings at once. The
+  // per-key flame.setRenderSetting is the better-behaved command; this one
+  // exists because those call sites genuinely apply a batch as one edit.
+  execute(ctx, settings?: unknown) {
+    if (settings === null || typeof settings !== 'object') {
+      console.warn('[cmd] flame.updateRenderSettings: not an object', settings)
+      return
+    }
+    const patch = deepClone(settings) as Partial<
+      FlameDescriptor['renderSettings']
+    >
+    ctx.setFlameDescriptor((draft) => {
+      draft.renderSettings = { ...draft.renderSettings, ...patch }
+    }, 'Render Settings')
   },
 })
 

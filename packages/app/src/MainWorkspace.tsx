@@ -469,18 +469,10 @@ export function MainWorkspace(props: AppProps) {
   })
   const blendWeight = () => flameDescriptor.renderSettings.blendWeight ?? 0
   const setBlendFlame = (flame: FlameDescriptor | undefined) => {
-    setFlameDescriptor(
-      (draft) => {
-        if (flame === undefined) delete draft.renderSettings.blendFlame
-        else draft.renderSettings.blendFlame = deepClone(flame)
-      },
-      flame ? 'Set Blend Flame' : 'Remove Blend Flame',
-    )
+    executeCommand('flame.setBlendFlame', cmdContext, flame ?? null)
   }
   const setBlendWeight = (weight: number) => {
-    setFlameDescriptor((draft) => {
-      draft.renderSettings.blendWeight = weight
-    }, 'Blend Weight')
+    executeCommand('flame.setBlendWeight', cmdContext, weight)
   }
   if (IS_DEV) {
     console.info('[share:app] store initialized', {
@@ -845,10 +837,7 @@ export function MainWorkspace(props: AppProps) {
    */
   function setupMorph(endFlame: FlameDescriptor) {
     // One flame-history entry for the composition (blend flame + weight)...
-    setFlameDescriptor((draft) => {
-      draft.renderSettings.blendFlame = deepClone(endFlame)
-      draft.renderSettings.blendWeight = 1
-    }, 'Morph Setup')
+    executeCommand('flame.setupMorph', cmdContext, endFlame)
     const cfg = timeline.config()
     // ...and one timeline undo step for the keyframes (remove + both adds).
     timeline.runWithSingleUndo(() => {
@@ -2094,12 +2083,7 @@ export function MainWorkspace(props: AppProps) {
   const handleUpdateRenderSettings = (
     settings: Partial<FlameDescriptor['renderSettings']>,
   ) => {
-    setFlameDescriptor((draft) => {
-      draft.renderSettings = {
-        ...draft.renderSettings,
-        ...settings,
-      }
-    })
+    executeCommand('flame.updateRenderSettings', cmdContext, settings)
   }
 
   // Deleting a custom variation the CURRENT flame uses breaks its rendering,
@@ -3818,22 +3802,25 @@ export function MainWorkspace(props: AppProps) {
                                   flameDescriptor.renderSettings.pointInitMode
                                 }
                                 onSelect={(newType) => {
-                                  setFlameDescriptor((draft) => {
-                                    const existingVar =
-                                      draft.transforms[state.tid]?.variations[
-                                        state.vid
-                                      ]
-                                    if (existingVar) {
-                                      draft.transforms[state.tid]!.variations[
-                                        state.vid
-                                      ] = deepClone(
-                                        getVariationDefault(
-                                          newType,
-                                          existingVar.weight,
-                                        ),
-                                      )
-                                    }
-                                  })
+                                  // The new descriptor is built here and
+                                  // recorded whole, so replay lands on the
+                                  // same variation without re-deriving it.
+                                  const existingVar =
+                                    flameDescriptor.transforms[state.tid]
+                                      ?.variations[state.vid]
+                                  if (!existingVar) return
+                                  executeCommand(
+                                    'flame.setVariation',
+                                    cmdContext,
+                                    state.tid,
+                                    state.vid,
+                                    deepClone(
+                                      getVariationDefault(
+                                        newType,
+                                        existingVar.weight,
+                                      ),
+                                    ),
+                                  )
                                 }}
                                 onClose={() => {
                                   // Save scroll position before the Show block unmounts

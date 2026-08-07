@@ -763,6 +763,93 @@ describe('camera and symmetry commands', () => {
   })
 })
 
+describe('blend and morph commands', () => {
+  it('carries the blend partner in the args, and clears it with null', () => {
+    createRoot((dispose) => {
+      const a = makeHeadlessWorld(examples.example1)
+      startSessionRecording(a.flame)
+      executeCommand('flame.setBlendFlame', a.ctx, examples.example2)
+      executeCommand('flame.setBlendWeight', a.ctx, 0.4)
+      const session = stopOrThrow()
+
+      expect(a.flame.renderSettings.blendFlame).toBeDefined()
+      expect(a.flame.renderSettings.blendWeight).toBeCloseTo(0.4, 5)
+      expect(session.unnamedWriteCount).toBe(0)
+
+      // Replayed into a world that never saw example2 — the partner rides
+      // along in the log rather than being looked up.
+      const b = makeHeadlessWorld(examples.initExample)
+      replayIntoWorld(session, b)
+      expect(deepClone(b.flame)).toEqual(deepClone(a.flame))
+
+      // Clearing round-trips too (null, since JSON has no undefined).
+      startSessionRecording(a.flame)
+      executeCommand('flame.setBlendFlame', a.ctx, null)
+      const clearing = stopOrThrow()
+      expect(a.flame.renderSettings.blendFlame).toBeUndefined()
+      replayIntoWorld(clearing, b)
+      expect(b.flame.renderSettings.blendFlame).toBeUndefined()
+      dispose()
+    })
+  })
+
+  it('sets up a morph as one step: partner and full weight', () => {
+    createRoot((dispose) => {
+      const a = makeHeadlessWorld(examples.example1)
+      startSessionRecording(a.flame)
+      executeCommand('flame.setupMorph', a.ctx, examples.example2)
+      const session = stopOrThrow()
+
+      expect(session.actions).toHaveLength(1)
+      expect(a.flame.renderSettings.blendWeight).toBe(1)
+      // One undo reverts both halves, as the single setter did before.
+      a.history.undo()
+      expect(deepClone(a.flame)).toEqual(deepClone(examples.example1))
+      dispose()
+    })
+  })
+
+  it('folds a blend-weight drag into one action', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      startSessionRecording(world.flame)
+      world.history.startPreview('Blend Weight')
+      for (const w of [0.1, 0.3, 0.7]) {
+        executeCommand('flame.setBlendWeight', world.ctx, w)
+      }
+      world.history.commit()
+      const session = stopOrThrow()
+
+      expect(session.actions).toHaveLength(1)
+      expect(session.actions[0]?.args).toEqual([0.7])
+      expect(session.unnamedWriteCount).toBe(0)
+      dispose()
+    })
+  })
+
+  it('merges a partial render-settings patch', () => {
+    createRoot((dispose) => {
+      const a = makeHeadlessWorld(examples.example1)
+      const before = a.flame.renderSettings.gamma
+      startSessionRecording(a.flame)
+      executeCommand('flame.updateRenderSettings', a.ctx, {
+        exposure: 0.42,
+        vibrancy: 0.66,
+      })
+      const session = stopOrThrow()
+
+      expect(a.flame.renderSettings.exposure).toBeCloseTo(0.42, 5)
+      // A merge, not a replacement: untouched keys survive.
+      expect(a.flame.renderSettings.gamma).toBe(before)
+
+      const b = makeHeadlessWorld(examples.initExample)
+      replayIntoWorld(session, b)
+      expect(deepClone(b.flame)).toEqual(deepClone(a.flame))
+      dispose()
+    })
+  })
+})
+
 describe('palette and document-load commands', () => {
   const palette = {
     id: 'test-palette',
