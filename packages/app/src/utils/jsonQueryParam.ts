@@ -100,25 +100,44 @@ export async function decodeJsonQueryParam(param: string) {
   return decompressJsonQuery(decodeBase64(param))
 }
 
-/** Decompress and parse a JSON payload that may be bare FlameDescriptor or SharePayload format. */
-export async function decompressJsonPayload(
+/**
+ * Decompress and JSON-parse, with no assumption about the shape. Separate
+ * from {@link decompressJsonPayload} because not every embedded payload is a
+ * flame — a PNG also carries the recorded session that produced it, which
+ * flame validation would reject.
+ */
+export async function decompressJsonValue(
   compressedBytes: Uint8Array<ArrayBuffer>,
-): Promise<{ flame: FlameDescriptor; animation?: SharePayload['animation'] }> {
+): Promise<unknown> {
   const rawBytes = await decompressJsonQueryRaw(compressedBytes)
-  const rawText = new TextDecoder().decode(rawBytes)
-  const raw = JSON.parse(rawText)
-  if ('transforms' in raw) {
+  return JSON.parse(new TextDecoder().decode(rawBytes))
+}
+
+/** Validate a decoded payload as a bare FlameDescriptor or SharePayload. */
+export function coerceFlamePayload(value: unknown): {
+  flame: FlameDescriptor
+  animation?: SharePayload['animation']
+} {
+  const raw = value as Record<string, unknown>
+  if (raw && typeof raw === 'object' && 'transforms' in raw) {
     return { flame: validateFlame(raw) }
   }
   if (raw && typeof raw === 'object' && 'flame' in raw) {
     return {
       flame: validateFlame(raw.flame),
-      animation: raw.animation ?? undefined,
+      animation: (raw.animation ?? undefined) as SharePayload['animation'],
     }
   }
   throw new Error(
     'Invalid payload: expected flame descriptor or { flame, animation? }',
   )
+}
+
+/** Decompress and parse a JSON payload that may be bare FlameDescriptor or SharePayload format. */
+export async function decompressJsonPayload(
+  compressedBytes: Uint8Array<ArrayBuffer>,
+): Promise<{ flame: FlameDescriptor; animation?: SharePayload['animation'] }> {
+  return coerceFlamePayload(await decompressJsonValue(compressedBytes))
 }
 
 // ── Share payload (flame + optional animation) ──
