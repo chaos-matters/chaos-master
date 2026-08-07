@@ -2,9 +2,10 @@
 
 Status: **in progress**. M1 (recorder core, coverage ratchet, `.steps.json`)
 and M2 (determinism: `normalizeArgs`, id addressing, pre-minted ids, seeded
-generate/mutate) are implemented. M3 has started: gesture handling landed and
-the render-settings controls are converted; transform-card, camera, palette
-and document-lifecycle sites remain. Captured 2026-08-06.
+generate/mutate) are implemented. M3 is under way: gesture handling
+landed, and the render-settings controls, the transform card and the affine
+editor are converted; the colour editors, named handlers, camera and
+document-lifecycle sites remain. Captured 2026-08-06.
 
 ## The ask
 
@@ -249,7 +250,9 @@ labeled-but-anonymous and fully anonymous mutations in `MainWorkspace.tsx`
 need promoting, roughly in order of how often they appear in an editing
 session (**render settings, item 6, are done**):
 
-1. **Prop-adapter mutations** — the setters handed to `AffineEditor`,
+1. **Prop-adapter mutations** — ~~the affine editor~~ **done** (it takes a
+   `setTransformAffine` dispatch; preview copies keep the raw setter). Still
+   open: the setters handed to
    `AffineListEditor`, `FlameColorEditor`, `ColorListEditor`, `ColorEditor`
    (`MainWorkspace.tsx:3965` area). Highest leverage: five adapters route
    nearly all transform/color editing. The adapters become thin

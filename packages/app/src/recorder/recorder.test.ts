@@ -589,6 +589,46 @@ describe('transform-card commands', () => {
     })
   })
 
+  it('folds an affine drag into one action per transform and side', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      const tid = firstTransformId(world.flame)
+      startSessionRecording(world.flame)
+      // The affine editor recomputes the whole matrix each frame.
+      world.history.startPreview('Affine Translation')
+      for (const f of [0.1, 0.2, 0.3]) {
+        executeCommand('flame.setTransformAffine', world.ctx, tid, 'pre', {
+          a: 1,
+          b: 0,
+          c: f,
+          d: 0,
+          e: 1,
+          f: 0,
+        })
+      }
+      // Same transform, other side: a separate target, so its own action.
+      executeCommand('flame.setTransformAffine', world.ctx, tid, 'post', {
+        a: 2,
+        b: 0,
+        c: 0,
+        d: 0,
+        e: 2,
+        f: 0,
+      })
+      world.history.commit()
+      const session = stopOrThrow()
+
+      expect(session.actions).toHaveLength(2)
+      expect(session.actions[0]?.args[2]).toMatchObject({ c: 0.3 })
+      expect(session.unnamedWriteCount).toBe(0)
+
+      const b = makeHeadlessWorld(examples.example1)
+      replayIntoWorld(session, b)
+      expect(deepClone(b.flame)).toEqual(deepClone(world.flame))
+      dispose()
+    })
+  })
+
   it('folds a probability drag per transform, not across transforms', () => {
     createRoot((dispose) => {
       const world = makeHeadlessWorld(examples.example1)
