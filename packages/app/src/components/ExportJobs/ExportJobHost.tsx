@@ -113,8 +113,15 @@ function OffscreenRender(props: { job: ImageJob }) {
           ? { flame, animation: { tracks: job.tracks, config: job.config } }
           : flame
       const encoded = await compressJsonQueryParam(payload)
+      // The session snapshotted at enqueue time rides along in a second chunk,
+      // so a dropped PNG can offer to replay how it was made (M5). Same
+      // condition as the flame itself: with no flame chunk there is nothing for
+      // a replay to start from.
+      const encodedSteps = job.session
+        ? await compressJsonQueryParam(job.session)
+        : undefined
       bytes = new Uint8Array(
-        await addFlameDataToPng(encoded, bytes).arrayBuffer(),
+        await addFlameDataToPng(encoded, bytes, encodedSteps).arrayBuffer(),
       )
     }
     saveRecentFlame(job.flame, undefined, job.tracks)

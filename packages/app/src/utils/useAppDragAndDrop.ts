@@ -2,6 +2,7 @@ import { batch } from 'solid-js'
 import { deepClone } from '@/utils/clone'
 import { useLoadFlameFromFile } from '@/utils/useLoadFlameFromFile'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { RecordedSession } from '@/recorder/schema'
 import type { TimelineTrack } from '@/utils/timeline'
 
 export function useAppDragAndDrop(
@@ -10,17 +11,26 @@ export function useAppDragAndDrop(
     flame: FlameDescriptor
     tracks: TimelineTrack[]
   }) => void,
+  /** Offered the session a dropped PNG carried, if any (M5). */
+  onSessionDropped?: (session: RecordedSession) => void,
 ) {
   const loadFlameFromFile = useLoadFlameFromFile()
 
   async function onDrop(file: File) {
     const result = await loadFlameFromFile(file)
     if (!result) return
+    // A bare .steps.json carries no flame: there is nothing to load, only a
+    // session to offer against whatever is already open.
+    if (!result.flame) {
+      if (result.session) onSessionDropped?.(result.session)
+      return
+    }
+    const flame = result.flame
     batch(() => {
-      history.replace(deepClone(result.flame))
+      history.replace(deepClone(flame))
       if (result.animation && result.animation.tracks.length > 0) {
         setLoadedAnimation({
-          flame: deepClone(result.flame),
+          flame: deepClone(flame),
           tracks: result.animation.tracks.map((t) => ({
             ...t,
             keyframes: t.keyframes.map((kf) => ({ ...kf })),
@@ -30,9 +40,12 @@ export function useAppDragAndDrop(
         // Route through setLoadedAnimation like the LoadFlame modal: clears
         // stale timeline tracks from the previous flame and resets dirty
         // tracking (a plain drop is a load, not an edit).
-        setLoadedAnimation({ flame: deepClone(result.flame), tracks: [] })
+        setLoadedAnimation({ flame: deepClone(flame), tracks: [] })
       }
     })
+    // After the flame is in place, so replaying starts from the same
+    // document the file describes.
+    if (result.session) onSessionDropped?.(result.session)
   }
 
   return onDrop

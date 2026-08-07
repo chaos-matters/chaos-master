@@ -17,6 +17,12 @@ type ColorView = 'grid' | 'list'
 export function ColorEditor(props: {
   transforms: TransformRecord
   setTransforms: HistorySetter<TransformRecord>
+  /**
+   * Apply a colour edit semantically, so a recording captures it as a
+   * replayable step (docs/plans/semantic-recorder-plan.md). Absent for
+   * preview copies, which fall back to the raw setter.
+   */
+  setTransformColor?: (tid: string, x: number, y: number) => void
   selectedTransformId?: () => string | null
   setSelectedTransformId?: (tid: string | null) => void
   /** Enables the track-changes diamond + drag keyframing (real flame only). */
@@ -51,6 +57,7 @@ export function ColorEditor(props: {
             <ColorListEditor
               transforms={props.transforms}
               setTransforms={props.setTransforms}
+              setTransformColor={props.setTransformColor}
               selectedTransformId={props.selectedTransformId}
               setSelectedTransformId={props.setSelectedTransformId}
               enableChangeTracking={props.enableChangeTracking}
@@ -61,6 +68,7 @@ export function ColorEditor(props: {
         <FlameColorEditor
           transforms={props.transforms}
           setTransforms={props.setTransforms}
+          setTransformColor={props.setTransformColor}
           selectedTransformId={props.selectedTransformId}
           setSelectedTransformId={props.setSelectedTransformId}
           enableChangeTracking={props.enableChangeTracking}

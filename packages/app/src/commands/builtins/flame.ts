@@ -1,18 +1,98 @@
+import { applyColorMapToFlame } from '@/flame/colorMap'
 import { examples } from '@/flame/examples'
+import { newDefaultTransform } from '@/flame/newTransform'
+import { tryValidateFlame } from '@/flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from '@/flame/transformFunction'
 import { defaultLinearType } from '@/flame/variationRegistry'
 import { getVariationDefault } from '@/flame/variations/utils'
 import { deepClone } from '@/utils/clone'
 import { registerCommand } from '../registry'
-import type { TransformId, VariationId } from '@/flame/schema/flameSchema'
+import type { CommandContext } from '../types'
+import type { Palette } from '@/flame/colorMap'
+import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from '@/flame/schema/flameSchema'
 import type { Dims } from '@/flame/variationRegistry'
 
-function getTransformKey(
+/**
+ * Resolve a transform reference — a stable `TransformId` or a 0-based index —
+ * against a transform record. Commands accept both; `normalizeArgs` converts
+ * indices to ids at execution time so recorded logs address transforms by
+ * identity and survive reordering (semantic-recorder-plan, M2). A missing ref
+ * means "the first transform", preserving the old index-default behavior —
+ * and missing covers `null` as well as `undefined`, because recorded args
+ * make a JSON round-trip (in `deepClone` and in `.steps.json`) that turns
+ * every `undefined` into `null`.
+ */
+function resolveTransformKey(
   transforms: Record<string, unknown>,
-  index: number,
+  ref: unknown,
 ): TransformId | undefined {
+  if (typeof ref === 'string') {
+    return ref in transforms ? (ref as TransformId) : undefined
+  }
+  const index = typeof ref === 'number' ? ref : 0
   const keys = Object.keys(transforms) as TransformId[]
   return index >= 0 && index < keys.length ? keys[index] : undefined
+}
+
+/** Same contract as {@link resolveTransformKey}, for variations. */
+function resolveVariationKey(
+  variations: Record<string, unknown>,
+  ref: unknown,
+): VariationId | undefined {
+  if (typeof ref === 'string') {
+    return ref in variations ? (ref as VariationId) : undefined
+  }
+  const index = typeof ref === 'number' ? ref : 0
+  const keys = Object.keys(variations) as VariationId[]
+  return index >= 0 && index < keys.length ? keys[index] : undefined
+}
+
+/** No reference supplied. `null` counts because recorded args make a JSON
+ *  round-trip (in `deepClone` and in `.steps.json`) that rewrites every
+ *  `undefined` to `null`. */
+function isAbsentRef(ref: unknown): boolean {
+  return ref === undefined || ref === null
+}
+
+const AFFINE_2D_KEYS = ['a', 'b', 'c', 'd', 'e', 'f']
+const AFFINE_3D_KEYS = [...AFFINE_2D_KEYS, 'g', 'h', 'i', 'j', 'k', 'l']
+
+/**
+ * Exactly the 2D (a–f) or 3D (a–l) coefficient set, every value finite.
+ *
+ * Checked by key set rather than "an object of numbers": that weaker test
+ * accepts `{}` (nothing to fail) and `NaN`/`Infinity` (both are `number`),
+ * either of which would be written straight into the document by a
+ * hand-edited `.steps.json` and produce a flame that renders as nothing.
+ */
+function isAffineLike(affine: unknown): affine is Record<string, number> {
+  if (affine === null || typeof affine !== 'object') return false
+  const keys = Object.keys(affine)
+  const expected =
+    keys.length === AFFINE_3D_KEYS.length ? AFFINE_3D_KEYS : AFFINE_2D_KEYS
+  if (keys.length !== expected.length) return false
+  return expected.every((key) =>
+    Number.isFinite((affine as Record<string, unknown>)[key]),
+  )
+}
+
+/** normalizeArgs helper: an id when the ref resolves, the original arg
+ *  otherwise (so an unresolvable ref replays as the same no-op). */
+function normalizeTransformRef(ctx: CommandContext, ref: unknown): unknown {
+  return resolveTransformKey(ctx.flameDescriptor().transforms, ref) ?? ref
+}
+
+/** normalizeArgs helper for a (transformRef, variationRef) pair. */
+function normalizeVariationRef(
+  ctx: CommandContext,
+  transformRef: unknown,
+  variationRef: unknown,
+): unknown {
+  const transforms = ctx.flameDescriptor().transforms
+  const key = resolveTransformKey(transforms, transformRef)
+  const transform = key ? transforms[key] : undefined
+  if (!transform) return variationRef
+  return resolveVariationKey(transform.variations, variationRef) ?? variationRef
 }
 
 registerCommand({
@@ -28,19 +108,63 @@ registerCommand({
   },
 })
 
+/**
+ * Ids for added entities are minted by `normalizeArgs`, never inside a store
+ * setter: normalized args are what the session recorder logs, so a replayed
+ * add creates the same `TransformId`/`VariationId` and every later
+ * id-addressed action still finds its target.
+ *
+ * These resolvers are shared by `normalizeArgs` and `execute` so the two can
+ * never drift. They are idempotent — running them on already-normalized args
+ * (the registry path) returns those args unchanged, while a direct
+ * `execute()` call still gets sane values.
+ */
+function resolveVariationType(ctx: CommandContext, variationType: unknown) {
+  const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
+  return typeof variationType === 'string'
+    ? variationType
+    : defaultLinearType(dims)
+}
+
+function resolveNewTransformId(transformId: unknown): TransformId {
+  return (
+    typeof transformId === 'string' && transformId !== ''
+      ? transformId
+      : generateTransformId()
+  ) as TransformId
+}
+
+function resolveNewVariationId(variationId: unknown): VariationId {
+  return (
+    typeof variationId === 'string' && variationId !== ''
+      ? variationId
+      : generateVariationId()
+  ) as VariationId
+}
+
 registerCommand({
   id: 'flame.addTransform',
   label: 'Add Transform',
   description: 'Add a new transform with an optional variation type',
   shortcut: 'Shift+T',
-  execute(ctx, variationType?: unknown) {
-    const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
-    const type =
-      typeof variationType === 'string'
-        ? variationType
-        : defaultLinearType(dims)
+  normalizeArgs(ctx, [variationType, transformId, variationId]) {
+    return [
+      resolveVariationType(ctx, variationType),
+      resolveNewTransformId(transformId),
+      resolveNewVariationId(variationId),
+    ]
+  },
+  execute(
+    ctx,
+    variationType?: unknown,
+    transformId?: unknown,
+    variationId?: unknown,
+  ) {
+    const type = resolveVariationType(ctx, variationType)
+    const tid = resolveNewTransformId(transformId)
+    const vid = resolveNewVariationId(variationId)
     ctx.setFlameDescriptor((draft) => {
-      draft.transforms[generateTransformId()] = {
+      draft.transforms[tid] = {
         probability: 1,
         colorSpeed: 0.4,
         color: { x: 0, y: 0 },
@@ -48,7 +172,7 @@ registerCommand({
         preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
         postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
         variations: {
-          [generateVariationId()]: getVariationDefault(type, 1),
+          [vid]: getVariationDefault(type, 1),
         },
       }
     })
@@ -58,11 +182,18 @@ registerCommand({
 registerCommand({
   id: 'flame.removeTransform',
   label: 'Remove Transform',
-  description: 'Remove a transform by index (0-based)',
-  execute(ctx, index?: unknown) {
-    const idx = typeof index === 'number' ? index : -1
+  description: 'Remove a transform by id or index (0-based)',
+  normalizeArgs(ctx, [ref]) {
+    // Deliberately no first-transform default: an absent ref stays absent
+    // (and no-ops), matching the old index-default of -1. Treating null as
+    // absent is what keeps that true after a JSON round-trip — otherwise a
+    // live no-op would replay as deleting the first transform.
+    return [isAbsentRef(ref) ? ref : normalizeTransformRef(ctx, ref)]
+  },
+  execute(ctx, ref?: unknown) {
+    if (isAbsentRef(ref)) return
     ctx.setFlameDescriptor((draft) => {
-      const key = getTransformKey(draft.transforms, idx)
+      const key = resolveTransformKey(draft.transforms, ref)
       if (key) delete draft.transforms[key]
     })
   },
@@ -72,31 +203,30 @@ registerCommand({
   id: 'flame.setVariationWeight',
   label: 'Set Variation Weight',
   description: 'Set the weight of a variation on a specific transform',
+  normalizeArgs(ctx, [transformRef, variationRef, weight]) {
+    return [
+      normalizeTransformRef(ctx, transformRef),
+      normalizeVariationRef(ctx, transformRef, variationRef),
+      weight,
+    ]
+  },
+  coalesceKey: ([transformRef, variationRef]) =>
+    `weight:${String(transformRef)}:${String(variationRef)}`,
   execute(
     ctx,
-    transformIndex?: unknown,
-    variationIndex?: unknown,
+    transformRef?: unknown,
+    variationRef?: unknown,
     weight?: unknown,
   ) {
-    const tidx = typeof transformIndex === 'number' ? transformIndex : 0
-    const vidx = typeof variationIndex === 'number' ? variationIndex : 0
     const w = typeof weight === 'number' ? weight : 1
     ctx.setFlameDescriptor((draft) => {
-      const key = getTransformKey(draft.transforms, tidx)
-      if (key) {
-        const transform = draft.transforms[key]
-        if (transform) {
-          const vKeys = Object.keys(transform.variations) as VariationId[]
-          if (vidx >= 0 && vidx < vKeys.length) {
-            const vKey = vKeys[vidx]
-            if (vKey) {
-              const variation = transform.variations[vKey]
-              if (variation) {
-                variation.weight = w
-              }
-            }
-          }
-        }
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const transform = key ? draft.transforms[key] : undefined
+      if (!transform) return
+      const vKey = resolveVariationKey(transform.variations, variationRef)
+      const variation = vKey ? transform.variations[vKey] : undefined
+      if (variation) {
+        variation.weight = w
       }
     })
   },
@@ -106,23 +236,26 @@ registerCommand({
   id: 'flame.addVariation',
   label: 'Add Variation',
   description: 'Add a variation type to a specific transform',
-  execute(ctx, transformIndex?: unknown, variationType?: unknown) {
-    const tidx = typeof transformIndex === 'number' ? transformIndex : 0
-    const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
-    const type =
-      typeof variationType === 'string'
-        ? variationType
-        : defaultLinearType(dims)
+  normalizeArgs(ctx, [transformRef, variationType, variationId]) {
+    return [
+      normalizeTransformRef(ctx, transformRef),
+      resolveVariationType(ctx, variationType),
+      resolveNewVariationId(variationId),
+    ]
+  },
+  execute(
+    ctx,
+    transformRef?: unknown,
+    variationType?: unknown,
+    variationId?: unknown,
+  ) {
+    const type = resolveVariationType(ctx, variationType)
+    const vid = resolveNewVariationId(variationId)
     ctx.setFlameDescriptor((draft) => {
-      const key = getTransformKey(draft.transforms, tidx)
-      if (key) {
-        const transform = draft.transforms[key]
-        if (transform) {
-          transform.variations[generateVariationId()] = getVariationDefault(
-            type,
-            1,
-          )
-        }
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const transform = key ? draft.transforms[key] : undefined
+      if (transform) {
+        transform.variations[vid] = getVariationDefault(type, 1)
       }
     })
   },
@@ -132,16 +265,17 @@ registerCommand({
   id: 'flame.setColorSpeed',
   label: 'Set Color Speed',
   description: 'Set the color speed of a specific transform',
-  execute(ctx, transformIndex?: unknown, speed?: unknown) {
-    const tidx = typeof transformIndex === 'number' ? transformIndex : 0
+  normalizeArgs(ctx, [transformRef, speed]) {
+    return [normalizeTransformRef(ctx, transformRef), speed]
+  },
+  coalesceKey: ([transformRef]) => `colorSpeed:${String(transformRef)}`,
+  execute(ctx, transformRef?: unknown, speed?: unknown) {
     const s = typeof speed === 'number' ? speed : 0.5
     ctx.setFlameDescriptor((draft) => {
-      const key = getTransformKey(draft.transforms, tidx)
-      if (key) {
-        const transform = draft.transforms[key]
-        if (transform) {
-          transform.colorSpeed = s
-        }
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const transform = key ? draft.transforms[key] : undefined
+      if (transform) {
+        transform.colorSpeed = s
       }
     })
   },
@@ -164,25 +298,98 @@ registerCommand({
   id: 'flame.setBlendWeight',
   label: 'Set Blend Weight',
   description: 'Set the blend weight for crossfading (0-1)',
+  // Slider-driven, so it folds per gesture.
+  coalesceKey: () => 'blendWeight',
+  // Writes the document rather than calling ctx.setBlendWeight: the weight
+  // LIVES in renderSettings (that is why a single undo reverts a blend), and
+  // the workspace's own setter now dispatches this command — going back
+  // through the context would recurse. It is not part of the
+  // setRenderSetting path vocabulary because it has no schema default.
   execute(ctx, weight?: unknown) {
     const w = typeof weight === 'number' ? Math.max(0, Math.min(1, weight)) : 0
-    ctx.setBlendWeight(w)
+    ctx.setFlameDescriptor((draft) => {
+      draft.renderSettings.blendWeight = w
+    }, 'Blend Weight')
+  },
+})
+
+registerCommand({
+  id: 'flame.setBlendFlame',
+  label: 'Set Blend Flame',
+  description: 'Set or clear the flame being blended with (null clears)',
+  // The descriptor travels in the args, like flame.load, so a session that
+  // picked a blend partner replays without needing that file again.
+  execute(ctx, flame?: unknown) {
+    const next = isAbsentRef(flame) ? undefined : tryValidateFlame(flame)
+    if (!isAbsentRef(flame) && !next) {
+      console.warn('[cmd] flame.setBlendFlame: not a valid flame', flame)
+      return
+    }
+    ctx.setFlameDescriptor(
+      (draft) => {
+        if (next === undefined) delete draft.renderSettings.blendFlame
+        else draft.renderSettings.blendFlame = next
+      },
+      next ? 'Set Blend Flame' : 'Remove Blend Flame',
+    )
+  },
+})
+
+registerCommand({
+  id: 'flame.setupMorph',
+  label: 'Morph Setup',
+  description:
+    'Make this flame the blend partner at full weight, ready for a morph animation',
+  // Only the flame half: the keyframes the editor adds afterwards live on the
+  // timeline's own undo stack, which the session format does not cover yet.
+  execute(ctx, endFlame?: unknown) {
+    const next = tryValidateFlame(endFlame)
+    if (!next) {
+      console.warn('[cmd] flame.setupMorph: not a valid flame', endFlame)
+      return
+    }
+    ctx.setFlameDescriptor((draft) => {
+      draft.renderSettings.blendFlame = next
+      draft.renderSettings.blendWeight = 1
+    }, 'Morph Setup')
+  },
+})
+
+registerCommand({
+  id: 'flame.updateRenderSettings',
+  label: 'Update Render Settings',
+  description: 'Merge a partial render-settings object into the flame',
+  // A bulk merge, used where a panel applies several settings at once. The
+  // per-key flame.setRenderSetting is the better-behaved command; this one
+  // exists because those call sites genuinely apply a batch as one edit.
+  execute(ctx, settings?: unknown) {
+    if (settings === null || typeof settings !== 'object') {
+      console.warn('[cmd] flame.updateRenderSettings: not an object', settings)
+      return
+    }
+    const patch = deepClone(settings) as Partial<
+      FlameDescriptor['renderSettings']
+    >
+    ctx.setFlameDescriptor((draft) => {
+      draft.renderSettings = { ...draft.renderSettings, ...patch }
+    }, 'Render Settings')
   },
 })
 
 registerCommand({
   id: 'flame.setProbability',
   label: 'Set Transform Probability',
-  description: 'Set the probability weight of a transform by index',
-  execute(ctx, transformIndex?: unknown, probability?: unknown) {
-    const tidx = typeof transformIndex === 'number' ? transformIndex : 0
+  description: 'Set the probability weight of a transform by id or index',
+  normalizeArgs(ctx, [transformRef, probability]) {
+    return [normalizeTransformRef(ctx, transformRef), probability]
+  },
+  coalesceKey: ([transformRef]) => `probability:${String(transformRef)}`,
+  execute(ctx, transformRef?: unknown, probability?: unknown) {
     const p = typeof probability === 'number' ? probability : 1
     ctx.setFlameDescriptor((draft) => {
-      const key = getTransformKey(draft.transforms, tidx)
-      if (key) {
-        const t = draft.transforms[key]
-        if (t) t.probability = p
-      }
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const t = key ? draft.transforms[key] : undefined
+      if (t) t.probability = p
     })
   },
 })
@@ -191,14 +398,18 @@ registerCommand({
   id: 'flame.setAffine',
   label: 'Set Affine Coefficient',
   description: 'Set a pre/post affine coefficient on a transform',
+  normalizeArgs(ctx, [transformRef, affineType, param, value]) {
+    return [normalizeTransformRef(ctx, transformRef), affineType, param, value]
+  },
+  coalesceKey: ([transformRef, affineType, param]) =>
+    `affine:${String(transformRef)}:${String(affineType)}:${String(param)}`,
   execute(
     ctx,
-    transformIndex?: unknown,
+    transformRef?: unknown,
     affineType?: unknown,
     param?: unknown,
     value?: unknown,
   ) {
-    const tidx = typeof transformIndex === 'number' ? transformIndex : 0
     const type =
       typeof affineType === 'string' && affineType === 'post'
         ? 'postAffine'
@@ -206,12 +417,10 @@ registerCommand({
     const p = typeof param === 'string' ? param : 'a'
     const v = typeof value === 'number' ? value : 1
     ctx.setFlameDescriptor((draft) => {
-      const key = getTransformKey(draft.transforms, tidx)
-      if (key) {
-        const t = draft.transforms[key]
-        if (t && p in t[type]) {
-          ;(t[type] as Record<string, number>)[p] = v
-        }
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const t = key ? draft.transforms[key] : undefined
+      if (t && p in t[type]) {
+        ;(t[type] as Record<string, number>)[p] = v
       }
     })
   },
@@ -221,16 +430,17 @@ registerCommand({
   id: 'flame.setTransformColor',
   label: 'Set Transform Color',
   description: 'Set the color x/y coordinates of a transform',
-  execute(ctx, transformIndex?: unknown, x?: unknown, y?: unknown) {
-    const tidx = typeof transformIndex === 'number' ? transformIndex : 0
+  normalizeArgs(ctx, [transformRef, x, y]) {
+    return [normalizeTransformRef(ctx, transformRef), x, y]
+  },
+  coalesceKey: ([transformRef]) => `color:${String(transformRef)}`,
+  execute(ctx, transformRef?: unknown, x?: unknown, y?: unknown) {
     const cx = typeof x === 'number' ? x : 0
     const cy = typeof y === 'number' ? y : 0
     ctx.setFlameDescriptor((draft) => {
-      const key = getTransformKey(draft.transforms, tidx)
-      if (key) {
-        const t = draft.transforms[key]
-        if (t) t.color = { x: cx, y: cy }
-      }
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const t = key ? draft.transforms[key] : undefined
+      if (t) t.color = { x: cx, y: cy }
     })
   },
 })
@@ -334,35 +544,515 @@ registerCommand({
   label: 'Set Variation Params',
   description:
     'Set a parametric variation parameter by name on a specific transform/variation',
+  normalizeArgs(ctx, [transformRef, variationRef, paramName, paramValue]) {
+    return [
+      normalizeTransformRef(ctx, transformRef),
+      normalizeVariationRef(ctx, transformRef, variationRef),
+      paramName,
+      paramValue,
+    ]
+  },
+  coalesceKey: ([transformRef, variationRef, paramName]) =>
+    `param:${String(transformRef)}:${String(variationRef)}:${String(paramName)}`,
   execute(
     ctx,
-    transformIndex?: unknown,
-    variationIndex?: unknown,
+    transformRef?: unknown,
+    variationRef?: unknown,
     paramName?: unknown,
     paramValue?: unknown,
   ) {
-    const tidx = typeof transformIndex === 'number' ? transformIndex : 0
-    const vidx = typeof variationIndex === 'number' ? variationIndex : 0
     const name = typeof paramName === 'string' ? paramName : ''
     const value = typeof paramValue === 'number' ? paramValue : 0
     if (!name) return
     ctx.setFlameDescriptor((draft) => {
-      const key = getTransformKey(draft.transforms, tidx)
-      if (key) {
-        const transform = draft.transforms[key]
-        if (transform) {
-          const vKeys = Object.keys(transform.variations) as VariationId[]
-          if (vidx >= 0 && vidx < vKeys.length) {
-            const vKey = vKeys[vidx]
-            if (vKey) {
-              const variation = transform.variations[vKey]
-              if (variation && 'params' in variation) {
-                ;(variation.params as Record<string, number>)[name] = value
-              }
-            }
-          }
-        }
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const transform = key ? draft.transforms[key] : undefined
+      if (!transform) return
+      const vKey = resolveVariationKey(transform.variations, variationRef)
+      const variation = vKey ? transform.variations[vKey] : undefined
+      if (variation && 'params' in variation) {
+        ;(variation.params as Record<string, number>)[name] = value
       }
     })
+  },
+})
+
+registerCommand({
+  id: 'flame.setTransformVisible',
+  label: 'Set Transform Visibility',
+  description: 'Show or hide a transform',
+  // An explicit target state, never a toggle: a recorded toggle would flip
+  // whatever the replayed document happened to be showing.
+  normalizeArgs(ctx, [transformRef, visible]) {
+    return [normalizeTransformRef(ctx, transformRef), visible === true]
+  },
+  execute(ctx, transformRef?: unknown, visible?: unknown) {
+    ctx.setFlameDescriptor((draft) => {
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const transform = key ? draft.transforms[key] : undefined
+      if (transform) transform.visible = visible === true
+    }, 'Toggle Transform')
+  },
+})
+
+registerCommand({
+  id: 'flame.setVariationVisible',
+  label: 'Set Variation Visibility',
+  description: 'Show or hide a variation on a transform',
+  normalizeArgs(ctx, [transformRef, variationRef, visible]) {
+    return [
+      normalizeTransformRef(ctx, transformRef),
+      normalizeVariationRef(ctx, transformRef, variationRef),
+      visible === true,
+    ]
+  },
+  execute(
+    ctx,
+    transformRef?: unknown,
+    variationRef?: unknown,
+    visible?: unknown,
+  ) {
+    ctx.setFlameDescriptor((draft) => {
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const transform = key ? draft.transforms[key] : undefined
+      if (!transform) return
+      const vKey = resolveVariationKey(transform.variations, variationRef)
+      const variation = vKey ? transform.variations[vKey] : undefined
+      if (variation) variation.visible = visible === true
+    }, 'Toggle Variation')
+  },
+})
+
+registerCommand({
+  id: 'flame.setVariation',
+  label: 'Set Variation',
+  description:
+    'Replace a variation descriptor wholesale (type, weight and params)',
+  normalizeArgs(ctx, [transformRef, variationRef, descriptor]) {
+    return [
+      normalizeTransformRef(ctx, transformRef),
+      normalizeVariationRef(ctx, transformRef, variationRef),
+      descriptor,
+    ]
+  },
+  // Also used by the parametric-params editors, which are scrub/slider
+  // driven, so repeats on one variation fold per gesture.
+  coalesceKey: ([transformRef, variationRef]) =>
+    `variation:${String(transformRef)}:${String(variationRef)}`,
+  execute(
+    ctx,
+    transformRef?: unknown,
+    variationRef?: unknown,
+    descriptor?: unknown,
+  ) {
+    // The whole descriptor rather than a diff: the variation browser and the
+    // "randomize this variation" button both compute a new one outright, and
+    // recording the result keeps replay exact without re-running their
+    // randomness.
+    if (
+      descriptor === null ||
+      typeof descriptor !== 'object' ||
+      typeof (descriptor as { type?: unknown }).type !== 'string'
+    ) {
+      console.warn('[cmd] flame.setVariation: not a variation', descriptor)
+      return
+    }
+    const next = deepClone(
+      descriptor,
+    ) as TransformFunction['variations'][VariationId]
+    ctx.setFlameDescriptor((draft) => {
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const transform = key ? draft.transforms[key] : undefined
+      if (!transform) return
+      const vKey = resolveVariationKey(transform.variations, variationRef)
+      if (vKey) transform.variations[vKey] = next
+    }, 'Set Variation')
+  },
+})
+
+registerCommand({
+  id: 'flame.deleteTransform',
+  label: 'Delete Transform',
+  description:
+    'Delete a transform, or reset it to a blank one when it is the last',
+  // The editor never leaves a flame with zero transforms: deleting the last
+  // one resets it instead. That replacement mints a variation id, so it is
+  // pre-minted here — the branch itself is state-dependent and replay takes
+  // the same one from the same document.
+  normalizeArgs(ctx, [transformRef, resetVariationId]) {
+    return [
+      normalizeTransformRef(ctx, transformRef),
+      typeof resetVariationId === 'string' && resetVariationId !== ''
+        ? resetVariationId
+        : generateVariationId(),
+    ]
+  },
+  execute(ctx, transformRef?: unknown, resetVariationId?: unknown) {
+    const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
+    const vid = resolveNewVariationId(resetVariationId)
+    ctx.setFlameDescriptor((draft) => {
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      if (!key) return
+      if (Object.keys(draft.transforms).length === 1) {
+        draft.transforms[key] = newDefaultTransform(dims, vid)
+      } else {
+        delete draft.transforms[key]
+      }
+    }, 'Delete Transform')
+  },
+})
+
+registerCommand({
+  id: 'flame.deleteVariation',
+  label: 'Delete Variation',
+  description:
+    'Delete a variation, or reset it to its type default when it is the last',
+  normalizeArgs(ctx, [transformRef, variationRef]) {
+    return [
+      normalizeTransformRef(ctx, transformRef),
+      normalizeVariationRef(ctx, transformRef, variationRef),
+    ]
+  },
+  execute(ctx, transformRef?: unknown, variationRef?: unknown) {
+    ctx.setFlameDescriptor((draft) => {
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const transform = key ? draft.transforms[key] : undefined
+      if (!transform) return
+      const vKey = resolveVariationKey(transform.variations, variationRef)
+      if (!vKey) return
+      const existing = transform.variations[vKey]
+      if (Object.keys(transform.variations).length === 1 && existing) {
+        // Same rule as transforms: a transform never ends up with none.
+        transform.variations[vKey] = deepClone(
+          getVariationDefault(existing.type, 1),
+        )
+      } else {
+        delete transform.variations[vKey]
+      }
+    }, 'Delete Variation')
+  },
+})
+
+registerCommand({
+  id: 'flame.setFinalTransform',
+  label: 'Set Final Transform',
+  description: 'Set or clear the flame-wide final affine transform',
+  execute(ctx, affine?: unknown) {
+    const next =
+      affine === null || affine === undefined
+        ? undefined
+        : (deepClone(affine) as FlameDescriptor['finalTransform'])
+    ctx.setFlameDescriptor((draft) => {
+      draft.finalTransform = next
+    }, 'Final Transform')
+  },
+})
+
+registerCommand({
+  id: 'flame.applyVariationSelection',
+  label: 'Apply Variation Selection',
+  description:
+    "Apply the variation browser's result: a transform's pre-affine and one variation, together",
+  // One command rather than setAffine + setVariation, because the browser
+  // applies both in a single setter and so is a single undo step. Two
+  // commands would replay as two, and a recorded undo would then only get
+  // half of it back.
+  normalizeArgs(ctx, [transformRef, variationRef, preAffine, variation]) {
+    return [
+      normalizeTransformRef(ctx, transformRef),
+      normalizeVariationRef(ctx, transformRef, variationRef),
+      preAffine,
+      variation,
+    ]
+  },
+  execute(
+    ctx,
+    transformRef?: unknown,
+    variationRef?: unknown,
+    preAffine?: unknown,
+    variation?: unknown,
+  ) {
+    if (
+      variation === null ||
+      typeof variation !== 'object' ||
+      typeof (variation as { type?: unknown }).type !== 'string' ||
+      !isAffineLike(preAffine)
+    ) {
+      console.warn('[cmd] flame.applyVariationSelection: rejected', {
+        preAffine,
+        variation,
+      })
+      return
+    }
+    const nextAffine = deepClone(preAffine) as TransformFunction['preAffine']
+    const nextVariation = deepClone(
+      variation,
+    ) as TransformFunction['variations'][VariationId]
+    ctx.setFlameDescriptor((draft) => {
+      const key = resolveTransformKey(draft.transforms, transformRef)
+      const transform = key ? draft.transforms[key] : undefined
+      if (!transform) return
+      transform.preAffine = nextAffine
+      const vKey = resolveVariationKey(transform.variations, variationRef)
+      if (vKey) transform.variations[vKey] = nextVariation
+    }, 'Apply Variation')
+  },
+})
+
+registerCommand({
+  id: 'flame.setTransformAffine',
+  label: 'Set Transform Affine',
+  description:
+    "Replace a transform's whole pre- or post-affine (the affine editor's drag)",
+  // A drag recomputes the entire matrix each frame, so this takes the whole
+  // affine rather than one coefficient: with the per-coefficient command a
+  // single drag would log six actions instead of one.
+  normalizeArgs(ctx, [transformRef, which, affine]) {
+    return [
+      normalizeTransformRef(ctx, transformRef),
+      which === 'post' ? 'post' : 'pre',
+      affine,
+    ]
+  },
+  coalesceKey: ([transformRef, which]) =>
+    `affineMatrix:${String(transformRef)}:${String(which)}`,
+  execute(ctx, transformRef?: unknown, which?: unknown, affine?: unknown) {
+    if (!isAffineLike(affine)) {
+      console.warn('[cmd] flame.setTransformAffine: not an affine', affine)
+      return
+    }
+    const key = which === 'post' ? 'postAffine' : 'preAffine'
+    const next = deepClone(affine) as TransformFunction['preAffine']
+    ctx.setFlameDescriptor((draft) => {
+      const tKey = resolveTransformKey(draft.transforms, transformRef)
+      const transform = tKey ? draft.transforms[tKey] : undefined
+      if (transform) transform[key] = next
+    }, 'Affine')
+  },
+})
+
+registerCommand({
+  id: 'flame.applyPalette',
+  label: 'Apply Palette',
+  description:
+    'Recolour every transform from a palette and record the palette itself',
+  // One command for both halves, because applying is one history entry: the
+  // colours AND renderSettings.palette, so a single undo fully reverts it.
+  // `applyColorMapToFlame` is index-based and deterministic, so the palette
+  // is all replay needs.
+  execute(ctx, palette?: unknown) {
+    const entries = (palette as { entries?: unknown })?.entries
+    if (
+      palette === null ||
+      typeof palette !== 'object' ||
+      !Array.isArray(entries) ||
+      entries.length === 0
+    ) {
+      console.warn('[cmd] flame.applyPalette: not a palette', palette)
+      return
+    }
+    const next = deepClone(palette) as Palette
+    ctx.setFlameDescriptor((draft) => {
+      applyColorMapToFlame(draft, {
+        id: next.id,
+        name: next.name,
+        entries: next.entries.map((entry) => ({ a: entry.a, b: entry.b })),
+      })
+      draft.renderSettings.palette = {
+        id: next.id,
+        name: next.name,
+        entries: next.entries.map(({ id, position, a, b }) => ({
+          id,
+          position,
+          a,
+          b,
+        })),
+      }
+    }, 'Apply Palette')
+  },
+})
+
+registerCommand({
+  id: 'flame.removePalette',
+  label: 'Remove Palette',
+  description:
+    'Drop the palette, restoring the colours transforms had before it',
+  // The colours to restore are passed in rather than read from the document:
+  // the editor stashes them in a signal when the palette is applied, and UI
+  // state is not something a log can replay. Without them the palette is
+  // simply dropped and the current colours stay.
+  execute(ctx, restoreColors?: unknown) {
+    const saved =
+      restoreColors !== null && typeof restoreColors === 'object'
+        ? (deepClone(restoreColors) as Record<string, { x: number; y: number }>)
+        : {}
+    ctx.setFlameDescriptor((draft) => {
+      for (const [tid, transform] of Object.entries(draft.transforms)) {
+        const color = saved[tid]
+        if (color && Number.isFinite(color.x) && Number.isFinite(color.y)) {
+          transform.color = { x: color.x, y: color.y }
+        }
+      }
+      delete draft.renderSettings.palette
+    }, 'Remove Palette')
+  },
+})
+
+registerCommand({
+  id: 'flame.load',
+  label: 'Load Flame',
+  description:
+    'Replace the whole document — opening a saved flame, an import, a bred child',
+  // Carries the descriptor itself, so a session that begins by opening a file
+  // still replays: the log never depends on what happened to be on disk.
+  // Validated through the normal migrate-on-parse path, the same one saved
+  // flames and imports go through.
+  execute(ctx, descriptor?: unknown, label?: unknown) {
+    const flame = tryValidateFlame(deepClone(descriptor))
+    if (!flame) {
+      console.warn('[cmd] flame.load: not a valid flame', descriptor)
+      return
+    }
+    ctx.setFlameDescriptor(
+      () => flame,
+      typeof label === 'string' && label !== '' ? label : 'Load Flame',
+    )
+  },
+})
+
+/** How many transforms an n-fold symmetry of this type adds. */
+function symmetryTransformCount(n: unknown, type: unknown): number {
+  const folds = typeof n === 'number' && n > 1 ? Math.floor(n) : 0
+  if (folds === 0) return type === 'dihedral' ? 1 : 0
+  return folds - 1 + (type === 'dihedral' ? 1 : 0)
+}
+
+registerCommand({
+  id: 'flame.applySymmetry',
+  label: 'Apply Symmetry',
+  description:
+    'Replace the generated symmetry transforms with an n-fold rotational or dihedral set',
+  // Every symmetry transform it creates needs an id, and minting them inside
+  // the setter would hand replay different UUIDs. normalizeArgs pre-mints one
+  // (transform, variation) pair per transform the command is about to add, so
+  // the log carries them. Re-running with the same n and type reuses them.
+  normalizeArgs(_ctx, [n, type, ids]) {
+    const count = symmetryTransformCount(n, type)
+    const existing = Array.isArray(ids) ? ids : []
+    return [
+      n,
+      type === 'dihedral' ? 'dihedral' : 'rotational',
+      Array.from({ length: count }, (_, i) => {
+        const pair = existing[i]
+        return Array.isArray(pair) &&
+          typeof pair[0] === 'string' &&
+          typeof pair[1] === 'string'
+          ? pair
+          : [generateTransformId('sym'), generateVariationId()]
+      }),
+    ]
+  },
+  execute(ctx, n?: unknown, type?: unknown, ids?: unknown) {
+    // No early return on count === 0: "1-fold rotational" means NO symmetry,
+    // and its job is then to clear the set a previous call created. Bailing
+    // out left the old mirror transforms in place.
+    const count = symmetryTransformCount(n, type)
+    const pairs = Array.isArray(ids) ? ids : []
+    const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
+    const linear = () => getVariationDefault(defaultLinearType(dims), 1)
+    const folds = typeof n === 'number' ? n : 0
+    ctx.setFlameDescriptor((draft) => {
+      // Regenerating replaces the previous set rather than stacking on it.
+      for (const tid of Object.keys(draft.transforms) as TransformId[]) {
+        if (tid.startsWith('_sym__')) delete draft.transforms[tid]
+      }
+      const totalWeight = Object.values(draft.transforms).reduce(
+        (total, t) => total + t.probability,
+        0,
+      )
+      const symWeight = Math.max(totalWeight, 1)
+      const identity = { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 }
+      const add = (
+        index: number,
+        preAffine: {
+          a: number
+          b: number
+          c: number
+          d: number
+          e: number
+          f: number
+        },
+      ) => {
+        const pair = pairs[index] as [string, string] | undefined
+        if (!pair) return
+        draft.transforms[pair[0] as TransformId] = {
+          probability: symWeight,
+          colorSpeed: 0,
+          color: { x: 0, y: 0 },
+          visible: true,
+          preAffine,
+          postAffine: identity,
+          variations: { [pair[1] as VariationId]: linear() },
+        }
+      }
+      for (let i = 1; i < folds; i++) {
+        const angle = (2 * Math.PI * i) / folds
+        const cos = Math.cos(angle)
+        const sin = Math.sin(angle)
+        add(i - 1, { a: cos, b: -sin, c: 0, d: sin, e: cos, f: 0 })
+      }
+      if (type === 'dihedral') {
+        add(count - 1, { a: -1, b: 0, c: 0, d: 0, e: 1, f: 0 })
+      }
+    }, 'Apply Symmetry')
+  },
+})
+
+registerCommand({
+  id: 'flame.setMetadata',
+  label: 'Set Flame Metadata',
+  description: 'Set the flame name, author or description',
+  coalesceKey: ([field]) => `metadata:${String(field)}`,
+  describe: ([field]) => `Set flame ${String(field)}`,
+  execute(ctx, field?: unknown, value?: unknown) {
+    if (
+      (field !== 'name' && field !== 'author' && field !== 'description') ||
+      typeof value !== 'string'
+    ) {
+      console.warn('[cmd] flame.setMetadata: rejected', field, value)
+      return
+    }
+    ctx.setFlameDescriptor((draft) => {
+      // The document may predate metadata entirely.
+      draft.metadata ??= { name: '', description: '', author: '' }
+      draft.metadata[field] = value
+    }, 'Flame Metadata')
+  },
+})
+
+registerCommand({
+  id: 'flame.setAllTransformColors',
+  label: 'Randomize All Colors',
+  description: 'Set every transform colour at once, by transform id',
+  // The colours are rolled by the caller and recorded as data, so replay
+  // reproduces them without a seed — same shape as the per-transform dice.
+  execute(ctx, colors?: unknown) {
+    if (colors === null || typeof colors !== 'object') {
+      console.warn('[cmd] flame.setAllTransformColors: not a record', colors)
+      return
+    }
+    const next = deepClone(colors) as Record<string, { x: number; y: number }>
+    ctx.setFlameDescriptor((draft) => {
+      for (const [tid, color] of Object.entries(next)) {
+        const transform = draft.transforms[tid as TransformId]
+        if (
+          transform &&
+          Number.isFinite(color?.x) &&
+          Number.isFinite(color?.y)
+        ) {
+          transform.color = { x: color.x, y: color.y }
+        }
+      }
+    }, 'Randomize All Colors')
   },
 })

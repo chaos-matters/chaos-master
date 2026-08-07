@@ -1,0 +1,132 @@
+/* Same pill material and bottom-bar flow placement as the recorder controls
+   and the replay panel — see SessionReplayPanel.module.css for why nothing
+   here is absolutely positioned. */
+.panel {
+  align-self: flex-start;
+  margin: 0 0 var(--space-2) var(--space-2);
+  width: min(30rem, calc(100vw - 2rem));
+  max-height: 40vh;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 12px;
+  background: oklch(22% 0.025 240 / 0.92);
+  border: 1px solid oklch(50% 0.08 240 / 0.6);
+  color: oklch(88% 0.04 240);
+  font-size: 0.72rem;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 12px oklch(0% 0 0 / 0.4);
+
+  [data-theme='light'] & {
+    background: oklch(96% 0.01 240 / 0.94);
+    border-color: oklch(65% 0.08 240 / 0.5);
+    color: oklch(28% 0.06 240);
+    box-shadow: 0 2px 12px oklch(50% 0.04 240 / 0.2);
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.title {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.header .button {
+  margin-left: auto;
+}
+
+.button {
+  padding: 0.1rem 0.45rem;
+  border-radius: 10px;
+  border: 1px solid oklch(50% 0.08 240 / 0.5);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+
+  &:hover {
+    background: oklch(50% 0.08 240 / 0.25);
+  }
+}
+
+.empty {
+  margin: 0.2rem 0;
+  opacity: 0.75;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0.3rem;
+  border-radius: 6px;
+
+  &:hover {
+    background: oklch(50% 0.08 240 / 0.2);
+  }
+}
+
+.entry-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+/* A button rather than a span: clicking it starts the rename, so it has to be
+   reachable by keyboard too. Styled to look like the text it replaces. */
+.entry-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: text;
+}
+
+.entry-rename {
+  width: 100%;
+  padding: 0 0.15rem;
+  border: 1px solid oklch(50% 0.08 240 / 0.6);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.entry-meta {
+  opacity: 0.7;
+  font-size: 0.66rem;
+}
+
+.warning {
+  color: oklch(75% 0.15 60);
+  cursor: help;
+}
+
+.entry-actions {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}

@@ -1,0 +1,77 @@
+/* Just the controls; the surrounding pill (material, placement, opacity,
+   dragging) belongs to SessionRecorderDock, which draws one chrome around
+   these buttons and its own. */
+.recorder {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 12px;
+  border: 1px solid oklch(50% 0.08 240 / 0.5);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+
+  &:hover {
+    background: oklch(50% 0.08 240 / 0.25);
+  }
+}
+
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* The "Open steps" control is a <label> wrapping a file input, so the input
+   itself is hidden and the label is the button. */
+.file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dot,
+.dot-recording {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: oklch(60% 0.22 25);
+}
+
+.dot-recording {
+  animation: recorder-pulse 1.2s ease-in-out infinite;
+}
+
+.unnamed {
+  padding: 0.1rem 0.45rem;
+  border-radius: 12px;
+  background: oklch(60% 0.18 60 / 0.35);
+  cursor: help;
+}
+
+@keyframes recorder-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot-recording {
+    animation: none;
+  }
+}

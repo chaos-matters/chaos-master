@@ -13,12 +13,23 @@ import { buildReadableIds } from '@/utils/readableIds'
 import { recordEntries } from '@/utils/record'
 import { sortedTransformEntries } from '@/utils/transformOrder'
 import ui from './AffineListEditor.module.css'
+import type { AffineParams } from '@/flame/affineTranform'
 import type { TransformRecord } from '@/flame/schema/flameSchema'
 import type { HistorySetter } from '@/utils/createStoreHistory'
 
 export type AffineListEditorProps = {
   transforms: TransformRecord
   setTransforms: HistorySetter<TransformRecord>
+  /**
+   * Apply an affine edit semantically, so a recording captures it as a
+   * replayable step (docs/plans/semantic-recorder-plan.md). Absent for
+   * preview copies, which fall back to the raw setter.
+   */
+  setTransformAffine?: (
+    tid: string,
+    which: 'pre' | 'post',
+    affine: AffineParams,
+  ) => void
   affineMode: 'preAffine' | 'postAffine'
   is3D?: boolean
   selectedTransformId?: () => string | null
@@ -50,6 +61,34 @@ export function AffineListEditor(props: AffineListEditorProps) {
   const timeline = useTimeline()
 
   const readableIds = createMemo(() => buildReadableIds(props.transforms))
+
+  /** Apply a whole affine for one transform: semantic dispatch when the host
+   *  provides one, raw setter otherwise. */
+  const applyAffine = (
+    tid: string,
+    next: (coefs: Record<string, number>) => void,
+  ) => {
+    const dispatch = props.setTransformAffine
+    if (dispatch) {
+      const current = props.transforms[tid as keyof TransformRecord]?.[
+        props.affineMode
+      ] as Record<string, number> | undefined
+      if (!current) return
+      const draft = { ...current }
+      next(draft)
+      // The draft is a copy of the transform's own affine with the same
+      // keys, so it satisfies the 2D/3D coefficient shape by construction.
+      dispatch(
+        tid,
+        props.affineMode === 'postAffine' ? 'post' : 'pre',
+        draft as unknown as AffineParams,
+      )
+    } else {
+      props.setTransforms((store) => {
+        next(store[tid as keyof TransformRecord]![props.affineMode])
+      })
+    }
+  }
   const activeCoefs = createMemo(() => (props.is3D ? COEFS_3D : COEFS_2D))
 
   return (
@@ -104,8 +143,8 @@ export function AffineListEditor(props: AffineListEditorProps) {
                 <DiceButton
                   title="Randomize affine coefs"
                   onClick={() => {
-                    props.setTransforms((draft) => {
-                      const coefs = draft[tid]![props.affineMode]
+                    // Rolled here so the recorded action carries the result.
+                    applyAffine(tid, (coefs) => {
                       for (const key of activeCoefs()) {
                         coefs[key] = randomizeAffineCoef(
                           coefs[key] ?? (['a', 'e', 'i'].includes(key) ? 1 : 0),
@@ -127,8 +166,7 @@ export function AffineListEditor(props: AffineListEditorProps) {
                 <ResetButton
                   title="Reset affine to identity (no scale/rotation/offset)"
                   onClick={() => {
-                    props.setTransforms((draft) => {
-                      const coefs = draft[tid]![props.affineMode]
+                    applyAffine(tid, (coefs) => {
                       for (const key of activeCoefs()) {
                         coefs[key] = ['a', 'e', 'i'].includes(key) ? 1 : 0
                       }
@@ -147,8 +185,8 @@ export function AffineListEditor(props: AffineListEditorProps) {
                       }
                       step={0.001}
                       onInput={(val) => {
-                        props.setTransforms((draft) => {
-                          draft[tid]![props.affineMode][key] = val
+                        applyAffine(tid, (coefs) => {
+                          coefs[key] = val
                         })
                       }}
                       dataParameterPath={`transform.${tid}.${props.affineMode}.${key}`}
