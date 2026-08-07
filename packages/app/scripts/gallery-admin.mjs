@@ -16,6 +16,7 @@
 //
 // Subcommands (each takes --help):
 //   list     what is in the gallery
+//   audit    read-only publication-readiness check for every published row
 //   inspect  what is inside dropped PNG/JSON files — writes nothing
 //   put      stage a flame as a gallery row (published = 0, no poster)
 //   capture  render + upload posters for rows that need one
@@ -38,7 +39,8 @@
 //   put NEVER publishes. It writes published = 0 and poster_key = NULL, so
 //   going live is always the separate, deliberate `publish` call.
 //
-//   There is no delete. `publish --published 0` is reversible and enough.
+//   delete is intentionally awkward: only an unpublished row, with its slug
+//   repeated in --yes. Unpublish is the reversible default.
 //
 // Extraction and validation are NOT reimplemented here: scripts/extract-flames.mjs
 // owns "what is inside this PNG", and capture/upload-gallery-posters.mjs own the
@@ -53,6 +55,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 import { CAPTURE_PAGE, checkoutFailure, probeCapturePage, verifyServedCheckout, } from './dev-server-checkout.mjs'
 import { inspectFlame, isPlainObject, normalizeEnvelope, readFlameChunk, toSlug, transformsHash, } from './extract-flames.mjs'
+import { GALLERY_COLLECTIONS, PROVENANCE_KINDS, publicationReadiness, } from './gallery-publication-policy.mjs'
 import { couldNotRun, couldNotRunDetail, initCommand, isMissingTable, MIGRATIONS_DIR, migrationsArgs, storageFlags, tail, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
 import { checkConfigEntry, CONFIG_KEY_LIST, CONFIG_KEYS, } from './home-config.mjs'
 
@@ -82,6 +85,8 @@ const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/
 // megabytes of JSON, and nothing reading a list needs them.
 const ROW_COLUMNS =
   'slug, title, caption, author, section, capability, dimensions, ' +
+  'collection, provenance_kind, source_url, license, license_url, ' +
+  'attribution, changes, original_id, ' +
   'transform_count, poster_key, poster_width, poster_height, poster_frame, ' +
   'sort_order, published, (animation IS NOT NULL) AS has_animation, ' +
   // Presence, not the value: a curated sequence is the largest thing in the
@@ -166,6 +171,7 @@ Usage:
 
 Commands:
   list      list every gallery row with its section, order and poster
+  audit     check every published row against the shared publication gate
   inspect   report what is inside PNG/JSON files, writing nothing
   put       stage a flame as a gallery row (published = 0, poster_key = NULL)
   capture   render and upload posters for rows that have none
@@ -185,7 +191,8 @@ Output:
   share a database name. Exit 0 on success, 1 on failure (the JSON then
   carries an \`error\` object).
 
-There is no delete: unpublish with \`publish --published 0\` instead.`,
+Prefer the reversible \`publish --published 0\`. The delete command only accepts
+an already-unpublished row and repeats its slug as confirmation.`,
 
   list: `gallery-admin list — every row in the gallery
 
@@ -200,6 +207,20 @@ totals. The flame descriptors themselves are deliberately omitted.
 
 Against --env local this also creates the gallery schema if it is not there
 yet, so a fresh checkout needs no setup step.`,
+
+  audit: `gallery-admin audit — read-only publication readiness
+
+Usage:
+  node scripts/gallery-admin.mjs audit [--env ${TARGET_LIST}] [--confirm prod]
+
+${COMMON_OPTIONS}
+
+Checks every published row against the exact same strict gate used before a
+shared dev/prod publication: poster, dimensions, creator credit, provenance,
+rights and visible attribution. It never creates a schema or changes D1/R2.
+
+Returns \`ok: false\` and exits 1 when any published row has unresolved blockers,
+while still printing every affected slug and issue for automation and review.`,
 
   inspect: `gallery-admin inspect — what is inside a file, without writing anything
 
@@ -228,14 +249,25 @@ Options:
   --slug <slug>         defaults to a kebab-case slug from the filename
   --title <text>        defaults to the flame's metadata.name, then the slug
   --caption <text>      optional one-line caption shown under the plate
+  --author <text>       public creator credit (defaults to flame metadata)
+  --collection <name>   ${GALLERY_COLLECTIONS.join(' | ')} (default original)
+  --provenance <kind>   ${PROVENANCE_KINDS.join(' | ')} (default unknown)
+  --source-url <url>    canonical page for the source work
+  --license <text>      SPDX id or exact written-permission label
+  --license-url <url>   public license or permission page, when available
+  --attribution <text>  exact credit shown on Home
+  --changes <text>      what this edition/remix changed
+  --original-id <text>  source slug, genome id, or other stable identifier
   --capability <name>   required for --section capability; rejected otherwise
                         (${CAPABILITIES.join(', ')})
 ${COMMON_OPTIONS}
 
 The row is written with published = 0 and poster_key = NULL: put STAGES, it
 never publishes. Existing rows are upserted on slug, keeping their sort_order.
-A flame referencing custom variations whose definitions are absent is refused —
-it would render wrong on Home.`,
+Third-party metadata may be staged incomplete, but shared dev/prod publication
+is blocked until credit, rights and poster requirements are complete. A flame
+referencing custom variations whose definitions are absent is refused — it
+would render wrong on Home.`,
 
   capture: `gallery-admin capture — posters for rows that need one
 
@@ -283,8 +315,9 @@ Options:
 ${COMMON_OPTIONS}
 
 Unpublishing is the reversible alternative to deleting, which this tool does
-not do. Publishing a row with no poster is allowed but warned about: visitors
-without WebGPU would see an empty plate until the flame converges.`,
+not do. Local publication reports incomplete poster/provenance as warnings so
+curation stays easy. Shared dev/prod publication blocks them, preventing an
+uncredited work or empty no-WebGPU plate from going live.`,
 
   reorder: `gallery-admin reorder — position within a section
 
@@ -841,6 +874,41 @@ function commandList(values) {
   }
 }
 
+// ── audit ───────────────────────────────────────────────────────────
+
+function commandAudit(values) {
+  const env = resolveEnv(values)
+  note(`Auditing published rows in ${targetLabel(env)} (read-only) ...`)
+  const { results } = d1(
+    env,
+    `SELECT ${ROW_COLUMNS} FROM gallery_items WHERE published = 1 ` +
+      'ORDER BY section, sort_order, slug',
+    // An audit must remain observational even against an empty local store.
+    { initialize: false },
+  )
+
+  const unresolved = results.flatMap((row) => {
+    const { blockers } = publicationReadiness(row, { remote: true })
+    return blockers.length === 0
+      ? []
+      : [{ slug: row.slug, title: row.title, blockers }]
+  })
+  note(
+    unresolved.length === 0
+      ? `${results.length} published row(s) are ready.`
+      : `${unresolved.length}/${results.length} published row(s) need attention.`,
+  )
+
+  return {
+    ok: unresolved.length === 0,
+    ...targetFields(env),
+    readOnly: true,
+    publishedCount: results.length,
+    unresolvedCount: unresolved.length,
+    items: unresolved,
+  }
+}
+
 // ── inspect ──────────────────────────────────────────────────────────
 
 function commandInspect(values) {
@@ -938,6 +1006,23 @@ function commandPut(values) {
   )
   const title = values.title ?? source.title
   const caption = values.caption ?? null
+  const author = values.author ?? source.author
+  const collection = values.collection ?? 'original'
+  const provenance = values.provenance ?? 'unknown'
+  if (!GALLERY_COLLECTIONS.includes(collection)) {
+    throw new AdminError(
+      'invalid-collection',
+      `--collection must be one of ${GALLERY_COLLECTIONS.join(', ')}`,
+      { given: collection },
+    )
+  }
+  if (!PROVENANCE_KINDS.includes(provenance)) {
+    throw new AdminError(
+      'invalid-provenance',
+      `--provenance must be one of ${PROVENANCE_KINDS.join(', ')}`,
+      { given: provenance },
+    )
+  }
 
   const existing = readRow(env, slug)
   if (existing !== null) {
@@ -978,12 +1063,18 @@ function commandPut(values) {
   // an existing row must not move it.
   const sql = `INSERT INTO gallery_items (
   slug, title, caption, author, section, capability, flame, animation,
+  collection, provenance_kind, source_url, license, license_url, attribution,
+  changes, original_id,
   dimensions, transform_count, poster_key, poster_width, poster_height,
   poster_frame, sort_order, published
 ) VALUES (
-  ${sqlStr(slug)}, ${sqlStr(title)}, ${sqlStr(caption)}, ${sqlStr(source.author)},
+  ${sqlStr(slug)}, ${sqlStr(title)}, ${sqlStr(caption)}, ${sqlStr(author)},
   ${sqlStr(section)}, ${sqlStr(capability)},
   ${sqlStr(flameJson)}, ${sqlStr(animationJson)},
+  ${sqlStr(collection)}, ${sqlStr(provenance)},
+  ${sqlStr(values['source-url'] ?? null)}, ${sqlStr(values.license ?? null)},
+  ${sqlStr(values['license-url'] ?? null)}, ${sqlStr(values.attribution ?? null)},
+  ${sqlStr(values.changes ?? null)}, ${sqlStr(values['original-id'] ?? null)},
   ${source.dimensions}, ${source.transformCount},
   NULL, NULL, NULL, NULL,
   (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM gallery_items
@@ -996,6 +1087,14 @@ ON CONFLICT(slug) DO UPDATE SET
   author = excluded.author,
   section = excluded.section,
   capability = excluded.capability,
+  collection = excluded.collection,
+  provenance_kind = excluded.provenance_kind,
+  source_url = excluded.source_url,
+  license = excluded.license,
+  license_url = excluded.license_url,
+  attribution = excluded.attribution,
+  changes = excluded.changes,
+  original_id = excluded.original_id,
   flame = excluded.flame,
   animation = excluded.animation,
   dimensions = excluded.dimensions,
@@ -1023,6 +1122,8 @@ ON CONFLICT(slug) DO UPDATE SET
   const row = requireRow(env, slug)
   note(`Staged ${slug} in section ${row.section} at order ${row.sort_order}`)
 
+  const prodConfirmation = env === 'prod' ? ' --confirm prod' : ''
+
   return {
     ...targetFields(env),
     slug,
@@ -1032,15 +1133,15 @@ ON CONFLICT(slug) DO UPDATE SET
     row,
     warnings,
     next: [
-      `node scripts/gallery-admin.mjs capture --env ${env} --slug ${slug}`,
+      `node scripts/gallery-admin.mjs capture --env ${env} --slug ${slug}${prodConfirmation}`,
       ...(existing?.has_sequence === 1
         ? [
             `node scripts/gallery-sequence.mjs ${slug} --apply ${env}${
               capability === 'genetics' ? ' --mode breed --derived 5' : ''
-            }`,
+            }${prodConfirmation}`,
           ]
         : []),
-      `node scripts/gallery-admin.mjs publish --env ${env} --slug ${slug} --published 1`,
+      `node scripts/gallery-admin.mjs publish --env ${env} --slug ${slug} --published 1${prodConfirmation}`,
     ],
   }
 }
@@ -1064,11 +1165,23 @@ function commandPublish(values) {
 
   const before = requireRow(env, slug)
   const warnings = []
-  if (published === 1 && before.poster_key === null) {
-    warnings.push(
-      `${slug} has no poster — visitors without WebGPU get an empty plate. ` +
-        `Run \`capture --env ${env} --slug ${slug}\` first.`,
-    )
+  if (published === 1) {
+    const readiness = publicationReadiness(before, {
+      remote: TARGETS[env].storage === 'remote',
+    })
+    if (readiness.blockers.length > 0) {
+      throw new AdminError(
+        'publication-blocked',
+        `${slug} is not ready for shared publication`,
+        {
+          ...targetFields(env),
+          slug,
+          blockers: readiness.blockers,
+          hint: `stage complete metadata, then run capture --env ${env} --slug ${slug}`,
+        },
+      )
+    }
+    warnings.push(...readiness.warnings.map((entry) => entry.message))
   }
   if (before.published === published) {
     warnings.push(`${slug} was already published = ${published}`)
@@ -1573,14 +1686,16 @@ async function commandCapture(values) {
   )
 
   if (captured.length > 0) {
-    uploadExit = await runScript('upload-gallery-posters.mjs', [
+    const uploadArgs = [
       '--env',
       env,
       '--slug',
       captured.map((poster) => poster.slug).join(','),
       '--in',
       outDir,
-    ])
+    ]
+    if (env === 'prod') uploadArgs.push('--confirm', 'prod')
+    uploadExit = await runScript('upload-gallery-posters.mjs', uploadArgs)
   }
 
   const { results: rows } = d1(
@@ -1860,8 +1975,24 @@ async function commandSequence(values) {
   // Fail before doing any work if the row is not there — the sibling script
   // would report it too, but the console reads THIS error.
   const row = requireRow(env, slug)
+  if (
+    values.preview !== true &&
+    TARGETS[env].storage === 'remote' &&
+    row.published === 1
+  ) {
+    throw new AdminError(
+      'published-sequence-mutation',
+      `Refusing to mutate the sequence for published row "${slug}" in ${targetLabel(env)}`,
+      {
+        ...targetFields(env),
+        slug,
+        hint: `unpublish it first with: node scripts/gallery-admin.mjs publish --env ${env} --slug ${slug} --published 0${env === 'prod' ? ' --confirm prod' : ''}`,
+      },
+    )
+  }
 
   const args = [join(scriptDir, 'gallery-sequence.mjs'), slug, '--apply', env]
+  if (env === 'prod') args.push('--confirm', 'prod')
   const appendFiles = values.file ?? []
   if (values.clear === true) {
     args.push('--clear')
@@ -2006,6 +2137,15 @@ const OPTIONS = {
   section: { type: 'string' },
   title: { type: 'string' },
   caption: { type: 'string' },
+  author: { type: 'string' },
+  collection: { type: 'string' },
+  provenance: { type: 'string' },
+  'source-url': { type: 'string' },
+  license: { type: 'string' },
+  'license-url': { type: 'string' },
+  attribution: { type: 'string' },
+  changes: { type: 'string' },
+  'original-id': { type: 'string' },
   capability: { type: 'string' },
   published: { type: 'string' },
   order: { type: 'string' },
@@ -2029,6 +2169,7 @@ const OPTIONS = {
 
 const COMMANDS = {
   list: { run: commandList, options: ['env', 'confirm'] },
+  audit: { run: commandAudit, options: ['env', 'confirm'] },
   inspect: { run: commandInspect, options: ['file'] },
   put: {
     run: commandPut,
@@ -2040,6 +2181,15 @@ const COMMANDS = {
       'section',
       'title',
       'caption',
+      'author',
+      'collection',
+      'provenance',
+      'source-url',
+      'license',
+      'license-url',
+      'attribution',
+      'changes',
+      'original-id',
       'capability',
     ],
   },

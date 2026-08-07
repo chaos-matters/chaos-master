@@ -1,11 +1,12 @@
 import { batch, createMemo, createSignal, ErrorBoundary, For, onCleanup, Show, } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
-import { ComputeGate, useComputeGate } from '@/contexts/ComputeGateContext'
+import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { useToast } from '@/contexts/ToastContext'
-import { ANIMATION_PREVIEW_POINT_COUNT, COMPUTE_GATE_CAPACITY, IS_DEV, STATIC_PREVIEW_POINT_COUNT, THUMBNAIL_PREVIEW_QUALITY, THUMBNAIL_PREVIEW_QUALITY_HOVER, } from '@/defaults'
+import { ANIMATION_PREVIEW_POINT_COUNT, COMPUTE_GATE_CAPACITY, IS_DEV, THUMBNAIL_PREVIEW_QUALITY, THUMBNAIL_PREVIEW_QUALITY_HOVER, } from '@/defaults'
 import { getAncestryNodes } from '@/flame/ancestry'
 import { examples } from '@/flame/examples'
 import { animationDefs, getAnimationFlame } from '@/flame/examples/animations'
+import { classicExamples } from '@/flame/examples/classics'
 import { Flam3 } from '@/flame/Flam3'
 import { isFlameXmlContent, parseFlameXml, registerImportedFlamePalette, } from '@/flame/flameXml'
 import { camera3DDefault } from '@/flame/schema/flameSchema'
@@ -17,19 +18,20 @@ import { Root } from '@/lib/Root'
 import { deepClone } from '@/utils/clone'
 import { applyFlameImport, parseFlameEnvelope, readFlameFiles, summarizeImport, } from '@/utils/flameImport'
 import { extractFlameFromPng } from '@/utils/flameInPng'
+import { useElementIsScrolling } from '@/utils/isScrolling'
 import { persistentSignal } from '@/utils/persistentSignal'
 import { pickFiles } from '@/utils/pickFiles'
 import { deleteRecentFlame, formatRecentDate, loadRecentFlames, } from '@/utils/recentFlames'
 import { recordEntries } from '@/utils/record'
 import { applyTracksToFlame } from '@/utils/timeline'
-import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
-import { DelayedShow } from '../DelayedShow/DelayedShow'
+import { createSharedIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import { useAlert } from '../Modal/useAlert'
+import { VariationPreview } from '../VariationSelector/VariationSelector'
 import { ConfirmDeleteRecentModal, dontAskDeleteRecent, } from './ConfirmDeleteRecentModal'
 import ui from './LoadFlameModal.module.css'
-import type { JSX } from 'solid-js'
+import type { Accessor, JSX } from 'solid-js'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { ChangeHistory } from '@/utils/createStoreHistory'
 import type { TimelineTrack } from '@/utils/timeline'
@@ -40,82 +42,29 @@ export const CANCEL = 'cancel'
 
 export type AnimationLoad = { flame: FlameDescriptor; tracks: TimelineTrack[] }
 
-function Preview(props: {
-  flameDescriptor: FlameDescriptor
-  quality?: number
-  pointCountPerBatch?: number
+/** Keep one malformed stored/generated flame from taking down the whole modal. */
+function StaticVariationPreview(props: {
+  flame: FlameDescriptor
+  name: string
+  isSelected: boolean
+  isVisible: boolean
+  scrolling: boolean
+  paused?: boolean
 }) {
-  const [container, setContainer] = createSignal<HTMLElement>()
-  const intersection = useIntersectionObserver(container)
-  const isVisible = createMemo(() => intersection()?.isIntersecting ?? false)
-  const allowed = useComputeGate(() => ({
-    isVisible: isVisible(),
-    renderStatus: 'done',
-    isSelected: false,
-  }))
-
-  const flameView = () => (
-    <Flam3
-      quality={props.quality ?? THUMBNAIL_PREVIEW_QUALITY}
-      pointCountPerBatch={
-        props.pointCountPerBatch ?? STATIC_PREVIEW_POINT_COUNT
-      }
-      adaptiveFilterEnabled={false}
-      animationEnabled={false}
-      flameDescriptor={props.flameDescriptor}
-      renderInterval={1}
-      onExportImage={undefined}
-      edgeFadeColor={vec4f(0)}
-      onAccumulatedPointCount={() => {}}
-    />
-  )
   return (
-    <div
-      ref={setContainer}
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-      }}
+    <ErrorBoundary
+      fallback={() => <div class={ui.previewError}>Failed to render</div>}
     >
-      <ErrorBoundary
-        fallback={() => <div class={ui.previewError}>Failed to render</div>}
-      >
-        <Show when={allowed() || isVisible()}>
-          <Root
-            adapterOptions={{
-              powerPreference: 'high-performance',
-            }}
-          >
-            <AutoCanvas pixelRatio={1}>
-              <Show
-                when={
-                  (props.flameDescriptor.renderSettings.dimensions ?? 2) === 3
-                }
-                fallback={
-                  <Camera2D
-                    position={vec2f(
-                      ...props.flameDescriptor.renderSettings.camera.position,
-                    )}
-                    zoom={props.flameDescriptor.renderSettings.camera.zoom}
-                  >
-                    {flameView()}
-                  </Camera2D>
-                }
-              >
-                <Default3DPreviewCamera
-                  camera3D={props.flameDescriptor.renderSettings.camera3D}
-                >
-                  {flameView()}
-                </Default3DPreviewCamera>
-              </Show>
-            </AutoCanvas>
-          </Root>
-        </Show>
-      </ErrorBoundary>
-    </div>
+      <VariationPreview
+        version={1}
+        isSelected={props.isSelected}
+        flame={props.flame}
+        name={props.name}
+        isVisible={props.isVisible}
+        scrolling={props.scrolling}
+        paused={props.paused}
+      />
+    </ErrorBoundary>
   )
 }
 
@@ -167,7 +116,8 @@ const ANIM_LOOP_MS = (ANIM_TOTAL_FRAMES / ANIM_FPS) * 1000
 /** AnimatedPreview -- renders the animation flame, plays on hover. */
 function AnimatedPreview(props: {
   anim: (typeof animationDefs)[number]
-  index: number
+  trackVisibility: ReturnType<typeof createSharedIntersectionObserver>
+  scrolling: Accessor<boolean>
   onSelect: (flame: FlameDescriptor, tracks: TimelineTrack[]) => void
 }) {
   const baseFlame = getAnimationFlame(props.anim)
@@ -177,13 +127,8 @@ function AnimatedPreview(props: {
   let startTime = 0
 
   const [container, setContainer] = createSignal<HTMLElement>()
-  const intersection = useIntersectionObserver(container)
-  const isVisible = createMemo(() => intersection()?.isIntersecting ?? false)
-  const allowed = useComputeGate(() => ({
-    isVisible: isVisible(),
-    renderStatus: 'done',
-    isSelected: hovered(),
-  }))
+  const nearViewport = props.trackVisibility(container)
+  const settledVisible = () => nearViewport() && !props.scrolling()
 
   function startAnimating() {
     startTime = performance.now()
@@ -234,16 +179,24 @@ function AnimatedPreview(props: {
       }}
       ref={setContainer}
     >
-      <Show when={allowed() || isVisible()}>
-        <Root adapterOptions={{ powerPreference: 'high-performance' }}>
-          <ErrorBoundary
-            fallback={() => <div class={ui.previewError}>Failed</div>}
-          >
+      <StaticVariationPreview
+        isSelected={hovered()}
+        flame={baseFlame}
+        name={props.anim.name}
+        isVisible={nearViewport()}
+        scrolling={props.scrolling()}
+        paused={hovered()}
+      />
+      <Show when={hovered() && settledVisible()}>
+        <ErrorBoundary
+          fallback={() => <div class={ui.previewError}>Failed</div>}
+        >
+          <div class={ui.livePreviewLayer}>
             <AutoCanvas pixelRatio={1}>
               <FlamePreviewInner flame={displayFlame()} hovered={hovered()} />
             </AutoCanvas>
-          </ErrorBoundary>
-        </Root>
+          </div>
+        </ErrorBoundary>
       </Show>
       <div class={ui.itemTitle}>
         <span class={ui.itemName}>{props.anim.name}</span>
@@ -292,7 +245,8 @@ function RecentFlameItem(props: {
     savedAt: number
     tracks?: TimelineTrack[]
   }
-  index: number
+  trackVisibility: ReturnType<typeof createSharedIntersectionObserver>
+  scrolling: Accessor<boolean>
   onSelect: (flame: FlameDescriptor, tracks?: TimelineTrack[]) => void
   onDelete: (e: MouseEvent | KeyboardEvent, id: string) => void
 }) {
@@ -304,13 +258,8 @@ function RecentFlameItem(props: {
   let startTime = 0
 
   const [container, setContainer] = createSignal<HTMLElement>()
-  const intersection = useIntersectionObserver(container)
-  const isVisible = createMemo(() => intersection()?.isIntersecting ?? false)
-  const allowed = useComputeGate(() => ({
-    isVisible: isVisible(),
-    renderStatus: 'done',
-    isSelected: hovered(),
-  }))
+  const nearViewport = props.trackVisibility(container)
+  const settledVisible = () => nearViewport() && !props.scrolling()
 
   function startAnimating() {
     startTime = performance.now()
@@ -365,17 +314,24 @@ function RecentFlameItem(props: {
       }}
       ref={setContainer}
     >
-      <Show when={allowed() || isVisible()}>
-        <Show
-          when={hasTracks()}
-          fallback={<Preview flameDescriptor={props.recent.flame} />}
+      <StaticVariationPreview
+        isSelected={hovered()}
+        flame={props.recent.flame}
+        name={props.recent.name}
+        isVisible={nearViewport()}
+        scrolling={props.scrolling()}
+        paused={hovered() && hasTracks()}
+      />
+      <Show when={hasTracks() && hovered() && settledVisible()}>
+        <ErrorBoundary
+          fallback={() => <div class={ui.previewError}>Failed</div>}
         >
-          <Root adapterOptions={{ powerPreference: 'high-performance' }}>
+          <div class={ui.livePreviewLayer}>
             <AutoCanvas pixelRatio={1}>
               <FlamePreviewInner flame={displayFlame()} hovered={hovered()} />
             </AutoCanvas>
-          </Root>
-        </Show>
+          </div>
+        </ErrorBoundary>
       </Show>
       <div class={ui.itemTitle}>
         <span class={ui.itemName}>{props.recent.name}</span>
@@ -548,19 +504,28 @@ function CollapsibleSection(props: {
 function ExampleItem(props: {
   exampleId: string
   example: FlameDescriptor
-  index: number
+  trackVisibility: ReturnType<typeof createSharedIntersectionObserver>
+  scrolling: Accessor<boolean>
   onSelect: (flame: FlameDescriptor) => void
 }) {
+  const [container, setContainer] = createSignal<HTMLElement>()
+  const nearViewport = props.trackVisibility(container)
+
   return (
     <button
+      ref={setContainer}
       class={ui.item}
       onClick={() => {
         props.onSelect(props.example)
       }}
     >
-      <DelayedShow delayMs={props.index * 50}>
-        <Preview flameDescriptor={props.example} />
-      </DelayedShow>
+      <StaticVariationPreview
+        isSelected={false}
+        flame={props.example}
+        name={props.example.metadata?.name || props.exampleId}
+        isVisible={nearViewport()}
+        scrolling={props.scrolling()}
+      />
       <div class={ui.itemTitle}>
         <span class={ui.itemName}>
           {props.example.metadata?.name || props.exampleId}
@@ -612,8 +577,22 @@ function flameTags(flame: FlameDescriptor): string[] {
   return [...types]
 }
 
+function normalizeGallerySearch(value: string) {
+  return value
+    .normalize('NFKD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+}
+
 export function LoadFlameModal(props: LoadFlameModalProps) {
   const [recentFlames, setRecentFlames] = createSignal(loadRecentFlames())
+  const [scrollBodyElement, setScrollBodyElement] =
+    createSignal<HTMLDivElement>()
+  const trackTileVisibility = createSharedIntersectionObserver(
+    scrollBodyElement,
+    { rootMargin: '300px 0px' },
+  )
+  const galleryScrolling = useElementIsScrolling(scrollBodyElement)
   const showAlert = useAlert()
   const { showToast } = useToast()
   const [isDragging, setIsDragging] = createSignal(false)
@@ -641,8 +620,11 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
     extraTags: string[] = [],
   ): boolean {
     if (!isGallery()) return true
-    const q = galleryQuery().trim().toLowerCase()
-    if (q && !name.toLowerCase().includes(q)) return false
+    const q = normalizeGallerySearch(galleryQuery().trim())
+    const searchable = normalizeGallerySearch(
+      `${name} ${flame.metadata?.description ?? ''} ${extraTags.join(' ')}`,
+    )
+    if (q && !searchable.includes(q)) return false
     const tag = activeTag()
     if (tag && !flameTags(flame).includes(tag) && !extraTags.includes(tag)) {
       return false
@@ -659,7 +641,10 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
         matchesGallery(r.name, r.flame),
     )
 
-  const allExamples = recordEntries(examples)
+  const allClassics = recordEntries(classicExamples)
+  const allExamples = recordEntries(examples).filter(
+    ([id]) => !Object.hasOwn(classicExamples, id),
+  )
   const examples2D = allExamples.filter(([, e]) => flameDimension(e) === '2d')
   const examples3D = allExamples.filter(([, e]) => flameDimension(e) === '3d')
   const animations2D = animationDefs.filter(
@@ -672,6 +657,17 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
 
   const exampleName = ([id, e]: (typeof allExamples)[number]) =>
     e.metadata?.name || id
+  const visibleClassics = () =>
+    allClassics.filter(
+      ([id, flame]) =>
+        (dimFilter() === 'all' || flameDimension(flame) === dimFilter()) &&
+        matchesGallery(flame.metadata?.name || id, flame, [
+          'classic',
+          'ifs',
+          'affine',
+          flameDimension(flame),
+        ]),
+    )
   const visibleExamples2D = () =>
     examples2D.filter((entry) => matchesGallery(exampleName(entry), entry[1]))
   const visibleExamples3D = () =>
@@ -713,6 +709,15 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
     const counts = new Map<string, number>()
     const bump = (tags: string[]) => {
       for (const t of new Set(tags)) counts.set(t, (counts.get(t) ?? 0) + 1)
+    }
+    for (const [, flame] of allClassics) {
+      bump([
+        ...flameTags(flame),
+        'classic',
+        'ifs',
+        'affine',
+        flameDimension(flame),
+      ])
     }
     for (const [, e] of allExamples) bump(flameTags(e))
     for (const a of animationDefs) {
@@ -873,7 +878,7 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
       >
         {isGallery() ? 'Flame Gallery' : 'Discover Fractal Flames'}
       </ModalTitleBar>
-      <div class={ui.scrollBody}>
+      <div ref={setScrollBodyElement} class={ui.scrollBody}>
         <p class={ui.modalSubtitle}>
           {isGallery()
             ? 'Browse everything in one place — curated examples, animations, and your bred & evolved flames. Search by name or filter by variation.'
@@ -1005,11 +1010,12 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
                 }}
               >
                 <For each={visibleBred()}>
-                  {(node, i) => (
+                  {(node) => (
                     <ExampleItem
                       exampleId={node.name}
                       example={node.flame}
-                      index={i()}
+                      trackVisibility={trackTileVisibility}
+                      scrolling={galleryScrolling}
                       onSelect={(flame) => {
                         props.respond(flame)
                       }}
@@ -1029,10 +1035,11 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
                 }}
               >
                 <For each={filteredRecents()}>
-                  {(recent, i) => (
+                  {(recent) => (
                     <RecentFlameItem
                       recent={recent}
-                      index={i()}
+                      trackVisibility={trackTileVisibility}
+                      scrolling={galleryScrolling}
                       onSelect={(flame, tracks) => {
                         if (tracks && tracks.length > 0) {
                           props.respond({ flame, tracks })
@@ -1042,6 +1049,31 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
                       }}
                       onDelete={async (e, id) => {
                         await handleDeleteRecent(e, id)
+                      }}
+                    />
+                  )}
+                </For>
+              </CollapsibleSection>
+            </Show>
+            <Show when={visibleClassics().length > 0}>
+              <CollapsibleSection
+                title="Fractal Classics"
+                count={visibleClassics().length}
+                order={1}
+                collapsed={!!collapsedSections().classics}
+                onToggle={() => {
+                  toggleSection('classics')
+                }}
+              >
+                <For each={visibleClassics()}>
+                  {([exampleId, example]) => (
+                    <ExampleItem
+                      exampleId={exampleId}
+                      example={example}
+                      trackVisibility={trackTileVisibility}
+                      scrolling={galleryScrolling}
+                      onSelect={(flame) => {
+                        props.respond(flame)
                       }}
                     />
                   )}
@@ -1059,11 +1091,12 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
                 }}
               >
                 <For each={visibleExamples2D()}>
-                  {([exampleId, example], i) => (
+                  {([exampleId, example]) => (
                     <ExampleItem
                       exampleId={exampleId}
                       example={example}
-                      index={i()}
+                      trackVisibility={trackTileVisibility}
+                      scrolling={galleryScrolling}
                       onSelect={(flame) => {
                         props.respond(flame)
                       }}
@@ -1083,11 +1116,12 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
                 }}
               >
                 <For each={visibleExamples3D()}>
-                  {([exampleId, example], i) => (
+                  {([exampleId, example]) => (
                     <ExampleItem
                       exampleId={exampleId}
                       example={example}
-                      index={i()}
+                      trackVisibility={trackTileVisibility}
+                      scrolling={galleryScrolling}
                       onSelect={(flame) => {
                         props.respond(flame)
                       }}
@@ -1107,10 +1141,11 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
                 }}
               >
                 <For each={visibleAnimations2D()}>
-                  {(anim, i) => (
+                  {(anim) => (
                     <AnimatedPreview
                       anim={anim}
-                      index={i()}
+                      trackVisibility={trackTileVisibility}
+                      scrolling={galleryScrolling}
                       onSelect={(flame, tracks) => {
                         props.respond({ flame, tracks })
                       }}
@@ -1130,10 +1165,11 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
                 }}
               >
                 <For each={visibleAnimations3D()}>
-                  {(anim, i) => (
+                  {(anim) => (
                     <AnimatedPreview
                       anim={anim}
-                      index={i()}
+                      trackVisibility={trackTileVisibility}
+                      scrolling={galleryScrolling}
                       onSelect={(flame, tracks) => {
                         props.respond({ flame, tracks })
                       }}
@@ -1168,11 +1204,13 @@ export function createLoadFlame(
     >({
       class: ui.loadFlameModal,
       content: ({ respond }) => (
-        <LoadFlameModal
-          respond={respond}
-          currentDimensions={currentDimensions?.()}
-          mode={mode}
-        />
+        <Root adapterOptions={{ powerPreference: 'high-performance' }}>
+          <LoadFlameModal
+            respond={respond}
+            currentDimensions={currentDimensions?.()}
+            mode={mode}
+          />
+        </Root>
       ),
     })
     setLoadModalIsOpen(false)
