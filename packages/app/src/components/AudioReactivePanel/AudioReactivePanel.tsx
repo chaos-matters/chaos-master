@@ -42,7 +42,9 @@ export type AudioPreset = WiringPresetId | 'custom'
 type AudioReactivePanelProps = {
   onClose: () => void
   audioBuffer: Accessor<AudioBuffer | undefined>
-  onAudioChange: (buffer: AudioBuffer | undefined) => void
+  /** `fileName` rides along so a recorded session can NAME the track it was
+   *  wired against — the buffer itself can never be part of a session. */
+  onAudioChange: (buffer: AudioBuffer | undefined, fileName?: string) => void
   audioMapping: Accessor<AudioMapping>
   onMappingChange: (mapping: AudioMapping) => void
   audioEnabled: Accessor<boolean>
@@ -433,7 +435,7 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
     setAudioFileName(file.name)
     decodeAudioFile(file)
       .then((buffer) => {
-        props.onAudioChange(buffer)
+        props.onAudioChange(buffer, file.name)
         setLoading(false)
       })
       .catch((e: unknown) => {
@@ -588,7 +590,7 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
   })
 
   return (
-    <div class={ui.container}>
+    <div class={ui.container} data-tour-target="audio-panel">
       <div class={ui.header}>
         <span class={ui.title}>Audio Reactive</span>
         <div class={ui.sourceToggle}>

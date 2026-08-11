@@ -1181,3 +1181,112 @@ describe('.steps.json serialization', () => {
     expect(sessionFilename('   ')).toBe('session.steps.json')
   })
 })
+
+/**
+ * A session is not just the flame. The timeline is a second document with its
+ * own undo stack, and the audio wiring drives the flame every frame — a
+ * recording that carried neither replayed half the work (docs/recorder-coverage.md).
+ */
+describe('session start state beyond the flame', () => {
+  const timeline = {
+    config: {
+      fps: 30,
+      timeScale: 1,
+      startFrame: 0,
+      endFrame: 90,
+      loop: true,
+    },
+    tracks: [{ parameterPath: 'gamma', keyframes: [{ frame: 0, value: 1 }] }],
+  }
+  const audio = {
+    mapping: {
+      preset: 'pulse' as const,
+      mappings: [
+        {
+          audioFeature: 'bass' as const,
+          target: { kind: 'renderSetting' as const, param: 'gamma' as const },
+          sensitivity: 1,
+          range: [0, 2] as [number, number],
+        },
+      ],
+    },
+    enabled: true,
+    source: 'file' as const,
+    trackName: 'track.mp3',
+  }
+
+  it('carries the timeline and the audio wiring through a round trip', () => {
+    startSessionRecording(examples.example1, { timeline, audio })
+    const session = stopSessionRecording()!
+    expect(session.initialTimeline).toEqual(timeline)
+    expect(session.initialAudio).toEqual(audio)
+
+    const parsed = parseSession(serializeSession(session))
+    expect(parsed?.initialTimeline).toEqual(timeline)
+    expect(parsed?.initialAudio).toEqual(audio)
+  })
+
+  it('refuses a hand-edited mapping that would write nonsense every frame', () => {
+    startSessionRecording(examples.example1, { audio })
+    const session = stopSessionRecording()!
+    expect(
+      parseSession(
+        serializeSession({
+          ...session,
+          initialAudio: {
+            ...audio,
+            mapping: {
+              ...audio.mapping,
+              // Not a render setting the flame has.
+              mappings: [
+                {
+                  ...audio.mapping.mappings[0]!,
+                  target: { kind: 'renderSetting', param: 'banana' },
+                },
+              ],
+            },
+          } as never,
+        }),
+      ),
+    ).toBeUndefined()
+  })
+
+  it('leaves an older session without them parseable', () => {
+    startSessionRecording(examples.example1)
+    const session = stopSessionRecording()!
+    expect(session.initialTimeline).toBeUndefined()
+    expect(parseSession(serializeSession(session))).toBeDefined()
+  })
+})
+
+describe('follow-cam hints', () => {
+  afterEach(() => {
+    cancelSessionRecording()
+  })
+
+  it('records what to look at alongside each step', () => {
+    createRoot((dispose) => {
+      const { ctx } = makeHeadlessWorld(examples.initExample)
+      startSessionRecording(examples.initExample)
+      executeCommand('flame.setRenderSetting', ctx, 'gamma', 2.4)
+      const session = stopSessionRecording()!
+      expect(session.actions[0]?.focus).toBe('param:gamma')
+      dispose()
+    })
+  })
+
+  it('keeps the hint pointing at the final target through a coalesced gesture', () => {
+    createRoot((dispose) => {
+      const { ctx, history } = makeHeadlessWorld(examples.initExample)
+      startSessionRecording(examples.initExample)
+      history.startPreview('drag')
+      executeCommand('flame.setRenderSetting', ctx, 'gamma', 2)
+      executeCommand('flame.setRenderSetting', ctx, 'gamma', 3)
+      history.commit()
+      const session = stopSessionRecording()!
+      expect(session.actions).toHaveLength(1)
+      expect(session.actions[0]?.focus).toBe('param:gamma')
+      dispose()
+    })
+  })
+})

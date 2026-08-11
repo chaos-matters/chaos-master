@@ -1,4 +1,6 @@
+import { AudioWiringSnapshot } from '@/flame/schema/audioWiring'
 import { tryValidateFlame } from '@/flame/schema/flameSchema'
+import { TimelineSnapshot } from '@/flame/schema/timeline'
 import * as v from '@/valibot'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
@@ -30,6 +32,26 @@ const RecordedActionSchema = v.object({
   /** Human-readable command label, resolved from the registry at record
    *  time so a log stays presentable even where the registry is absent. */
   label: v.optional(v.string()),
+  /**
+   * What to look at while this step runs — a hint like `param:gamma`, not a
+   * viewport. The follow-cam resolves it to an element at replay time, so a
+   * session recorded in one window size still directs correctly in another
+   * (docs/plans/semantic-recorder-plan.md; replay-duel-plan.md §4).
+   */
+  focus: v.optional(v.string()),
+  /**
+   * An authored caption, overriding the derived `label`. A derived label reads
+   * like a log line ("Set transforms.a.weight to 0.42"); a written one reads
+   * like narration ("shear it sideways"). Recording produces the derived one;
+   * this is what an author types over it afterwards.
+   */
+  note: v.optional(v.string()),
+  /**
+   * How long to hold on this step during playback, overriding the gap the
+   * recording measured. Pacing is authorial: a step where something dramatic
+   * happens wants a longer hold than three routine ones.
+   */
+  holdMs: v.optional(v.pipe(v.number(), v.minValue(0))),
 })
 
 export type RecordedAction = v.InferOutput<typeof RecordedActionSchema>
@@ -44,6 +66,21 @@ const RecordedSessionShellSchema = v.object({
   }),
   createdAt: v.string(),
   initial: v.unknown(),
+  /**
+   * The timeline as it stood when recording started. The timeline is a second
+   * document with its own undo stack, so replaying keyframe edits against
+   * whatever tracks the viewer happens to have would edit the wrong animation.
+   * Absent in sessions recorded before timeline coverage — replay then leaves
+   * the timeline alone rather than clearing it.
+   */
+  initialTimeline: v.optional(TimelineSnapshot),
+  /**
+   * Audio-reactive wiring at record start. The mapping is data and replays;
+   * the audio FILE does not — it never enters the session (see
+   * `audioTrackName`, which only names it so a replay can say what is
+   * missing).
+   */
+  initialAudio: v.optional(AudioWiringSnapshot),
   actions: v.array(RecordedActionSchema),
   /** Document writes during recording that did NOT arrive through a
    *  registered command. 0 is the goal state: anything above it means

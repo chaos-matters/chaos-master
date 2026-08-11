@@ -63,6 +63,46 @@ export const TimelineData = v.object({
 })
 export type TimelineData = v.InferOutput<typeof TimelineData>
 
+/**
+ * The LIVE timeline state, as `createTimelineState` actually holds it.
+ *
+ * Distinct from {@link TimelineData}, which is the persisted/share shape: this
+ * one carries `timeScale` (a playback control that never needed persisting)
+ * and leaves `easing`/`interp` genuinely optional instead of defaulting them,
+ * so a snapshot round-trips a track without inventing values it did not have.
+ *
+ * Used where the live state crosses a JSON boundary and must come back
+ * unchanged — a recorded session's starting animation, and the
+ * `timeline.loadTimeline` command that restores one.
+ */
+export const TimelineSnapshotConfig = v.object({
+  fps: v.pipe(v.number(), v.minValue(1), v.maxValue(240)),
+  timeScale: v.pipe(v.number(), v.finite(), v.minValue(0)),
+  startFrame: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  endFrame: v.pipe(v.number(), v.integer(), v.minValue(1)),
+  loop: v.boolean(),
+  autoFps: v.optional(v.boolean()),
+  loopMode: v.optional(v.picklist(['off', 'seamless', 'cycle'])),
+})
+
+export const TimelineSnapshotKeyframe = v.object({
+  frame: v.pipe(v.number(), v.finite()),
+  value: KeyframeValue,
+  easing: v.optional(EasingCurve),
+  interp: v.optional(KeyframeInterpolation),
+})
+
+export const TimelineSnapshot = v.object({
+  config: TimelineSnapshotConfig,
+  tracks: v.array(
+    v.object({
+      parameterPath: v.pipe(v.string(), v.nonEmpty()),
+      keyframes: v.array(TimelineSnapshotKeyframe),
+    }),
+  ),
+})
+export type TimelineSnapshot = v.InferOutput<typeof TimelineSnapshot>
+
 export function defaultTimelineConfig(): TimelineConfig {
   return {
     fps: 30,

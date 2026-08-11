@@ -6,6 +6,7 @@ import { downloadBlob } from '@/utils/blob'
 import { storeSession } from '@/utils/sessionsDB'
 import styles from './SessionRecorderControls.module.css'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { SessionStartExtras } from '@/recorder/recorder'
 import type { RecordedSession } from '@/recorder/schema'
 
 /**
@@ -18,6 +19,9 @@ import type { RecordedSession } from '@/recorder/schema'
  */
 export function SessionRecorderControls(props: {
   flameDescriptor: FlameDescriptor
+  /** The timeline and audio wiring to snapshot alongside the flame. Read at
+   *  the moment recording starts, not at mount. */
+  startExtras?: () => SessionStartExtras
   onOpenSession: (session: RecordedSession) => void
   /** Called after a recording is stored, so the library list refetches. */
   onSessionStored: () => void
@@ -27,8 +31,10 @@ export function SessionRecorderControls(props: {
 
   const startRecording = () => {
     // No clone here: startSessionRecording owns that (and cloning a whole
-    // flame document twice is not free on large flames).
-    startSessionRecording(props.flameDescriptor)
+    // flame document twice is not free on large flames). The timeline and
+    // audio wiring go in alongside the flame: keyframe edits mean nothing
+    // without the tracks they land on.
+    startSessionRecording(props.flameDescriptor, props.startExtras?.())
   }
 
   /**

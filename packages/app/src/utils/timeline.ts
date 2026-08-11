@@ -1,4 +1,5 @@
 import { createSignal } from 'solid-js'
+import { notifyDocumentWrite } from '@/recorder/documentWriteHook'
 import { applyEasing, catmullRom, clamp } from './easing'
 import { persistentSignal } from './persistentSignal'
 import { clearAllRedos, nextUndoSeq, registerRedoClearer } from './undoJournal'
@@ -722,6 +723,12 @@ export function createTimelineState() {
       if (undoGroupPushed) return
       undoGroupPushed = true
     }
+    // Same coverage hook the flame history uses: an entry landing on this
+    // stack while a recording runs is either accounted for by the command
+    // that caused it, or an edit the log cannot replay. Without this the
+    // timeline was invisible to the recorder — not even counted — and a
+    // session's "0 unnamed writes" was a claim about half the app.
+    notifyDocumentWrite('timeline edit')
     undoStack.push({
       tracks: tracks().map((t) => ({
         ...t,
@@ -1399,7 +1406,7 @@ export function createTimelineState() {
       if (value !== null) writes.push([path, value])
     }
     if (writes.length === 0) return
-    const key = `${writes.map(([path]) => path).join(' ')}@${frame}`
+    const key = `${writes.map(([path]) => path).join('\0')}@${frame}`
     if (!coalesce || coalesceKey !== key) {
       pushUndo() // resets coalesceKey
       coalesceKey = coalesce ? key : null

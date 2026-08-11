@@ -1,7 +1,9 @@
 import { deepClone } from '@/utils/clone'
 import { withRecordingSuppressed } from './recorder'
 import type { RecordedSession } from './schema'
+import type { AudioWiringSnapshot } from '@/flame/schema/audioWiring'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { TimelineSnapshot } from '@/flame/schema/timeline'
 
 /**
  * Where a session is replayed INTO. Deliberately not a `CommandContext`:
@@ -17,6 +19,15 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
  */
 export type ReplayTarget = {
   loadInitial: (flame: FlameDescriptor) => void
+  /**
+   * Restore the two documents that are not the flame: the timeline's tracks
+   * and config, and the audio wiring. Both are optional on the session (older
+   * recordings predate them) and optional here (a sandbox may have neither) —
+   * and when a session carries none, the target is NOT called, so replaying an
+   * old recording leaves the viewer's timeline alone rather than clearing it.
+   */
+  loadTimeline?: (timeline: TimelineSnapshot) => void
+  loadAudio?: (audio: AudioWiringSnapshot) => void
   execute: (id: string, args: unknown[]) => void
   /**
    * Bracket a run of applied actions so the whole thing lands as ONE undoable
@@ -42,9 +53,25 @@ export function replaySessionInstant(
   target: ReplayTarget,
 ): void {
   withRecordingSuppressed(() => {
-    target.loadInitial(deepClone(session.initial))
+    loadSessionStart(session, target)
     for (const action of session.actions) {
       target.execute(action.id, deepClone(action.args))
     }
   })
+}
+
+/** Put the target into the state the session was recorded from: flame, then
+ *  the timeline and audio wiring the session carries (if any). Shared with the
+ *  step-by-step player, whose every rebuild starts the same way. */
+export function loadSessionStart(
+  session: RecordedSession,
+  target: ReplayTarget,
+): void {
+  target.loadInitial(deepClone(session.initial))
+  if (session.initialTimeline && target.loadTimeline) {
+    target.loadTimeline(deepClone(session.initialTimeline))
+  }
+  if (session.initialAudio && target.loadAudio) {
+    target.loadAudio(deepClone(session.initialAudio))
+  }
 }

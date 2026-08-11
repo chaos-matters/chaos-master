@@ -99,6 +99,13 @@
   }
 }
 
+/* An always-visible toggle rather than a checkbox: it is switched mid-replay,
+   and its state has to read at a glance while filming. */
+.toggle-on {
+  background: oklch(50% 0.14 240 / 0.5);
+  border-color: oklch(65% 0.14 240 / 0.8);
+}
+
 .speed {
   margin-left: auto;
   padding: 0.1rem 0.25rem;
@@ -146,6 +153,76 @@
 .current {
   background: oklch(50% 0.12 240 / 0.45);
   opacity: 1;
+}
+
+.step-row {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.step-row .step {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-edit {
+  flex-shrink: 0;
+  padding: 0.1rem 0.3rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  opacity: 0.45;
+  cursor: pointer;
+
+  &:hover {
+    opacity: 1;
+    background: oklch(50% 0.08 240 / 0.25);
+  }
+}
+
+.step-edit-on {
+  opacity: 1;
+  border-color: oklch(50% 0.08 240 / 0.6);
+}
+
+.step-editor {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.3rem 0.35rem 2rem;
+}
+
+.note-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.1rem 0.3rem;
+  border: 1px solid oklch(50% 0.08 240 / 0.6);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.hold-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.hold-input {
+  width: 3.6rem;
+  padding: 0.1rem 0.2rem;
+  border: 1px solid oklch(50% 0.08 240 / 0.6);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
 }
 
 .step-index {

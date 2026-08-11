@@ -47,6 +47,20 @@ export const [recorderOffset, setRecorderOffset] = persistentSignal<{
   y: number
 } | null>('recorder/offset', null)
 
+/**
+ * The follow-cam: during a replay, spotlight the control each step touches and
+ * caption the action (docs/channel-content-plan.md §7).
+ *
+ * A mode, not a behaviour — nobody wants their editor dimming itself while
+ * they work, and a viewer who just wants the flame back can switch it off
+ * mid-replay. On by default because a replay nobody can follow is the problem
+ * it exists to solve.
+ */
+export const [followCamEnabled, setFollowCamEnabled] = persistentSignal(
+  'recorder/follow-cam',
+  true,
+)
+
 export const MIN_RECORDER_OPACITY = 0.2
 
 /** Opacity while the canvas is animating, when fading is on. Low enough to

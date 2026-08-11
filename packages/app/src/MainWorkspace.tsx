@@ -99,7 +99,7 @@ import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } fro
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { BoxArrowRight, Cross, Eye, EyeOff, Menu, Plus, Share, Shuffle, Terminal, } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
-import { isSessionRecording, notePreviewStarted, reportDocumentWrite, reportUnreplayable, } from './recorder/recorder'
+import { isSessionRecording, notePreviewStarted, recordSyntheticAction, reportDocumentWrite, reportUnreplayable, } from './recorder/recorder'
 import { createAnimationExport } from './utils/animationExport'
 import { createAudioAnalyzer } from './utils/audioAnalysis'
 import { autosaveIntervalMin, autosaveRecents, saveReminderDismissed, setAutosaveRecents, setSaveReminderDismissed, } from './utils/autosaveSettings'
@@ -148,7 +148,7 @@ import type { HardwareTier } from './utils/hardwareTier'
 import type { SharePayload } from './utils/jsonQueryParam'
 import type { RandomizerHistoryEntry } from './utils/randomizerHistoryDB'
 import type { SonificationConfig } from './utils/sonification'
-import type { EasingCurve, TimelineTrack } from './utils/timeline'
+import type { EasingCurve, KeyframeInterpolation, TimelineTrack, } from './utils/timeline'
 import type { CommandContext } from '@/commands/types'
 
 const EDGE_FADE_COLOR = {
@@ -614,6 +614,9 @@ export function MainWorkspace(props: AppProps) {
     ],
   })
   const [audioSource, setAudioSource] = createSignal<'file' | 'mic'>('file')
+  // Named, not carried: a recorded session can say which track it was wired
+  // against, but an AudioBuffer can never ride in a `.steps.json`.
+  const [audioTrackName, setAudioTrackName] = createSignal<string>()
   const [liveAnalyzer, setLiveAnalyzer] = createSignal<
     LiveAudioAnalyzer | undefined
   >(undefined)
@@ -3236,6 +3239,58 @@ export function MainWorkspace(props: AppProps) {
           easing as EasingCurve | undefined,
         )
       },
+      edit: {
+        removeKeyframe: timeline.removeKeyframe,
+        setKeyframeValue: (path, frame, value, easing, interp) => {
+          timeline.setKeyframeValue(
+            path,
+            frame,
+            value,
+            easing as EasingCurve | undefined,
+            interp as KeyframeInterpolation | undefined,
+          )
+        },
+        setKeyframeInterp: (path, frame, interp) => {
+          timeline.setKeyframeInterp(
+            path,
+            frame,
+            interp as KeyframeInterpolation,
+          )
+        },
+        moveKeyframe: timeline.moveKeyframe,
+        removeTrack: timeline.removeTrack,
+        clearTracks: timeline.clearAllTracks,
+        setLoopMode: timeline.setLoopMode,
+        setAutoKeyframe: (on) => {
+          timeline.setAutoKeyframe(on)
+        },
+        snapshot: () => ({
+          config: deepClone(timeline.config()),
+          tracks: deepClone(timeline.tracks()),
+        }),
+        load: (data) => {
+          timeline.loadTracks(data.tracks)
+          timeline.setConfig(data.config)
+        },
+      },
+    },
+    audio: {
+      snapshot: () => ({
+        mapping: deepClone(audioMapping()),
+        enabled: audioEnabled(),
+        source: audioSource(),
+        trackName: audioTrackName(),
+      }),
+      setMapping: setAudioMapping,
+      setEnabled: setAudioEnabled,
+      setSource: setAudioSource,
+    },
+    view: {
+      setQualityPreset,
+      setAdaptiveFilter: setAdaptiveFilterEnabled,
+      setStochasticFilter: setStochasticFilterEnabled,
+      setFlyMode,
+      setShowTimeline,
     },
     camera: {
       center: () => {
@@ -3286,6 +3341,19 @@ export function MainWorkspace(props: AppProps) {
   const replayTarget: ReplayTarget = {
     loadInitial: (flame) => {
       setFlameDescriptor(() => deepClone(flame), 'Replay: initial state')
+    },
+    // Only called when the session carries them, so replaying an older
+    // recording leaves the viewer's own animation and audio wiring alone.
+    loadTimeline: (data) => {
+      timeline.loadTracks(data.tracks)
+      timeline.setConfig(data.config)
+    },
+    loadAudio: (audio) => {
+      setAudioMapping(audio.mapping)
+      setAudioSource(audio.source)
+      // The buffer cannot ride in a session, so enabling reactivity with no
+      // audio loaded would just be a dead switch.
+      setAudioEnabled(audio.enabled && audioBuffer() !== undefined)
     },
     execute: (id, args) => {
       executeCommand(id, cmdContext, ...args)
@@ -3543,6 +3611,10 @@ export function MainWorkspace(props: AppProps) {
                 <Show when={recorderVisible() || isSessionRecording()}>
                   <SessionRecorderDock
                     flameDescriptor={flameDescriptor}
+                    startExtras={() => ({
+                      timeline: cmdContext.timeline.edit?.snapshot(),
+                      audio: cmdContext.audio?.snapshot(),
+                    })}
                     target={replayTarget}
                     session={replaySession()}
                     onSessionChange={setReplaySession}
@@ -4152,7 +4224,10 @@ export function MainWorkspace(props: AppProps) {
                                 isBusy={isRandomizing()}
                               />
                             </div>
-                            <div class={ui.transformsToolbar}>
+                            <div
+                              class={ui.transformsToolbar}
+                              data-tour-target="transform-list"
+                            >
                               <span class={ui.transformsToolbarLabel}>
                                 Transforms
                               </span>
@@ -4205,6 +4280,7 @@ export function MainWorkspace(props: AppProps) {
                               {([tid, transform]) => (
                                 <CollapsibleCard
                                   title={readableIds().transformLabel[tid]!}
+                                  data-focus-id={`tx:${tid}`}
                                   open={!collapsedTransforms().has(tid)}
                                   onToggleOpen={() => {
                                     toggleTransformCollapsed(tid)
@@ -5697,8 +5773,9 @@ export function MainWorkspace(props: AppProps) {
                             <AudioReactivePanel
                               onClose={() => setShowAudioPanel(false)}
                               audioBuffer={audioBuffer}
-                              onAudioChange={(buf) => {
+                              onAudioChange={(buf, fileName) => {
                                 setAudioBuffer(buf)
+                                setAudioTrackName(fileName)
                                 setFileAnalyzer(undefined)
                                 setAnalysisProgress(null)
                                 if (!buf) {
@@ -5737,11 +5814,32 @@ export function MainWorkspace(props: AppProps) {
                                 setSeekTarget(null)
                               }}
                               audioMapping={audioMapping}
-                              onMappingChange={setAudioMapping}
+                              // Through the registry, so wiring audio to the
+                              // flame is a recorded, replayable step rather
+                              // than an edit the log never saw.
+                              onMappingChange={(mapping) => {
+                                executeCommand(
+                                  'audio.setMapping',
+                                  cmdContext,
+                                  mapping,
+                                )
+                              }}
                               audioEnabled={audioEnabled}
-                              onEnabledChange={setAudioEnabled}
+                              onEnabledChange={(enabled) => {
+                                executeCommand(
+                                  'audio.setEnabled',
+                                  cmdContext,
+                                  enabled,
+                                )
+                              }}
                               audioSource={audioSource}
-                              onSourceChange={setAudioSource}
+                              onSourceChange={(source) => {
+                                executeCommand(
+                                  'audio.setSource',
+                                  cmdContext,
+                                  source,
+                                )
+                              }}
                               liveAnalyzer={liveAnalyzer}
                               onLiveAnalyzerChange={setLiveAnalyzer}
                               playbackPaused={playbackPaused}
@@ -5999,14 +6097,20 @@ export function MainWorkspace(props: AppProps) {
             animationEnabled={animationEnabled}
             setAnimationEnabled={(v) => {
               if (IS_DEV) console.info('[anim] floating toggle →', v)
-              setAnimationEnabled(v)
+              executeCommand('timeline.setAnimationEnabled', cmdContext, v)
             }}
             showTimeline={showTimeline}
-            setShowTimeline={setShowTimeline}
+            setShowTimeline={(v) => {
+              executeCommand('view.setShowTimeline', cmdContext, v)
+            }}
             adaptiveFilterEnabled={adaptiveFilterEnabled}
-            setAdaptiveFilterEnabled={setAdaptiveFilterEnabled}
+            setAdaptiveFilterEnabled={(v) => {
+              executeCommand('view.setAdaptiveFilter', cmdContext, v)
+            }}
             stochasticFilterEnabled={stochasticFilterEnabled}
-            setStochasticFilterEnabled={setStochasticFilterEnabled}
+            setStochasticFilterEnabled={(v) => {
+              executeCommand('view.setStochasticFilter', cmdContext, v)
+            }}
             isPlaying={() => timeline.isPlaying()}
             togglePlay={() => {
               if (!animationEnabled()) {
@@ -6023,7 +6127,7 @@ export function MainWorkspace(props: AppProps) {
                   `current=${qualityPreset()}`,
                 )
               }
-              setQualityPreset(key as QualityPreset)
+              executeCommand('view.setQualityPreset', cmdContext, key)
             }}
             accumulatedPointCount={accumulatedPointCount}
             qualityPointCountLimit={qualityPointCountLimit()}
@@ -6055,12 +6159,32 @@ export function MainWorkspace(props: AppProps) {
               // Swap the timeline to the target dimension's tracks (empty on
               // first entry — matches the starter flame).
               timeline.loadTracks(restoredTracks ?? [])
+              // The switch restores from an in-memory stash, so replaying it
+              // as "switch to 3D" would land on the VIEWER's stash, not ours.
+              // Log the descriptor and tracks it actually produced instead —
+              // those replay exactly. (The live path keeps history.replace:
+              // a dimension switch is a document boundary, not an undo step.)
+              recordSyntheticAction(
+                'flame.load',
+                [deepClone(restored), `Switch to ${v}D`],
+                `Switch to ${v}D`,
+              )
+              recordSyntheticAction(
+                'timeline.loadTimeline',
+                [
+                  {
+                    config: deepClone(timeline.config()),
+                    tracks: deepClone(restoredTracks ?? []),
+                  },
+                ],
+                `Load ${v}D animation`,
+              )
               // Mode switches restore stashed/starter state — not an edit.
               markLoadedBaseline()
             }}
             flyMode={flyMode}
             setFlyMode={(v) => {
-              setFlyMode(v)
+              executeCommand('view.setFlyMode', cmdContext, v)
               if (v) {
                 showToast(
                   'Fly mode: click to look around · WASD/arrows move · Space/C up/down · Q/E roll · Esc to release',

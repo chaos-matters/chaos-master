@@ -1,5 +1,9 @@
 import { createSignal, For, onCleanup, Show } from 'solid-js'
+import { createStore, unwrap } from 'solid-js/store'
 import { createSessionPlayer, PLAYBACK_SPEEDS } from '@/recorder/player'
+import { deepClone } from '@/utils/clone'
+import { followCamEnabled, setFollowCamEnabled } from './recorderUi'
+import { ReplaySpotlight } from './ReplaySpotlight'
 import styles from './SessionReplayPanel.module.css'
 import type { ReplayTarget } from '@/recorder/replay'
 import type { RecordedSession } from '@/recorder/schema'
@@ -19,10 +23,23 @@ export function SessionReplayPanel(props: {
    *  list is the tall part, and it is the reason the dock offers collapsing at
    *  all — but a collapsed dock that could not play would be pointless. */
   compact?: boolean
+  /** Persist the edited session (captions and holds). Absent = no editing
+   *  affordance, which is what a read-only replay surface wants. */
+  onSave?: (session: RecordedSession) => void
   onClose: () => void
 }) {
   const [speed, setSpeed] = createSignal(1)
-  const player = createSessionPlayer(props.session, props.target, {
+  const [editing, setEditing] = createSignal<number>()
+
+  /**
+   * The session is cloned into a store so captions and holds are editable
+   * here without mutating what the library holds — and the player is handed
+   * the SAME object, so a hold typed mid-replay takes effect on the next step
+   * instead of after a reload.
+   */
+  const [session, setSession] = createStore(deepClone(props.session))
+
+  const player = createSessionPlayer(session, props.target, {
     speed,
   })
   // A player left running past unmount would keep writing into the document.
@@ -31,9 +48,9 @@ export function SessionReplayPanel(props: {
   })
 
   const stepLabel = (index: number) => {
-    const action = props.session.actions[index]
+    const action = session.actions[index]
     if (!action) return ''
-    return action.label ?? action.id
+    return action.note ?? action.label ?? action.id
   }
 
   return (
@@ -41,17 +58,23 @@ export function SessionReplayPanel(props: {
       class={styles.panel}
       classList={{ [styles.compact as string]: props.compact }}
     >
+      <Show when={followCamEnabled()}>
+        <ReplaySpotlight
+          action={player.currentAction()}
+          playing={player.isPlaying()}
+        />
+      </Show>
       <div class={styles.header}>
         <span class={styles.title}>Replay</span>
         <span class={styles.count}>
           {player.stepIndex() + 1}/{player.total}
         </span>
-        <Show when={props.session.unnamedWriteCount > 0}>
+        <Show when={session.unnamedWriteCount > 0}>
           <span
             class={styles.warning}
-            title={`${props.session.unnamedWriteCount} edit(s) in this session were not captured as commands, so this replay cannot reproduce them.`}
+            title={`${session.unnamedWriteCount} edit(s) in this session were not captured as commands, so this replay cannot reproduce them.`}
           >
-            {props.session.unnamedWriteCount} not captured
+            {session.unnamedWriteCount} not captured
           </span>
         </Show>
         <button
@@ -124,6 +147,22 @@ export function SessionReplayPanel(props: {
         >
           ▶|
         </button>
+        <button
+          type="button"
+          class={styles.button}
+          classList={{ [styles.toggleOn as string]: followCamEnabled() }}
+          onClick={() => {
+            setFollowCamEnabled(!followCamEnabled())
+          }}
+          title={
+            followCamEnabled()
+              ? 'Follow-cam on — each step spotlights the control it changes'
+              : 'Follow-cam off — replay without the spotlight and captions'
+          }
+          aria-pressed={followCamEnabled()}
+        >
+          ◎
+        </button>
         <Show when={props.compact !== true}>
           <select
             class={styles.speed}
@@ -142,27 +181,102 @@ export function SessionReplayPanel(props: {
 
       <Show when={props.compact !== true}>
         <ol class={styles.steps}>
-          <For each={props.session.actions}>
-            {(_action, index) => (
+          <For each={session.actions}>
+            {(action, index) => (
               <li>
-                <button
-                  type="button"
-                  class={styles.step}
-                  classList={{
-                    [styles.current as string]: player.stepIndex() === index(),
-                    [styles.applied as string]: player.stepIndex() >= index(),
-                  }}
-                  onClick={() => {
-                    player.seek(index())
-                  }}
-                >
-                  <span class={styles.stepIndex}>{index() + 1}</span>
-                  <span class={styles.stepLabel}>{stepLabel(index())}</span>
-                </button>
+                <div class={styles.stepRow}>
+                  <button
+                    type="button"
+                    class={styles.step}
+                    classList={{
+                      [styles.current as string]:
+                        player.stepIndex() === index(),
+                      [styles.applied as string]: player.stepIndex() >= index(),
+                    }}
+                    onClick={() => {
+                      player.seek(index())
+                    }}
+                  >
+                    <span class={styles.stepIndex}>{index() + 1}</span>
+                    <span class={styles.stepLabel}>{stepLabel(index())}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class={styles.stepEdit}
+                    classList={{
+                      [styles.stepEditOn as string]: editing() === index(),
+                    }}
+                    onClick={() => {
+                      setEditing(editing() === index() ? undefined : index())
+                    }}
+                    title="Write a caption and set how long to hold this step"
+                    aria-label="Edit step caption"
+                  >
+                    ✎
+                  </button>
+                </div>
+                <Show when={editing() === index()}>
+                  <div class={styles.stepEditor}>
+                    <input
+                      class={styles.noteInput}
+                      value={action.note ?? ''}
+                      placeholder={action.label ?? action.id}
+                      onInput={(ev) => {
+                        const text = ev.currentTarget.value
+                        setSession(
+                          'actions',
+                          index(),
+                          'note',
+                          text.trim() === '' ? undefined : text,
+                        )
+                      }}
+                      title="Caption shown on screen while this step runs"
+                    />
+                    <label class={styles.holdField}>
+                      hold
+                      <input
+                        class={styles.holdInput}
+                        type="number"
+                        min={0}
+                        step={100}
+                        value={action.holdMs ?? ''}
+                        placeholder="auto"
+                        onInput={(ev) => {
+                          const raw = ev.currentTarget.value
+                          const parsed = Number(raw)
+                          setSession(
+                            'actions',
+                            index(),
+                            'holdMs',
+                            raw === '' || !Number.isFinite(parsed) || parsed < 0
+                              ? undefined
+                              : parsed,
+                          )
+                        }}
+                        title="Milliseconds to hold before the next step (blank = the pace it was recorded at)"
+                      />
+                      ms
+                    </label>
+                  </div>
+                </Show>
               </li>
             )}
           </For>
         </ol>
+        <Show when={props.onSave}>
+          {(save) => (
+            <button
+              type="button"
+              class={styles.button}
+              onClick={() => {
+                save()(deepClone(unwrap(session)))
+              }}
+              title="Save the captions and holds as a new recording"
+            >
+              Save captions
+            </button>
+          )}
+        </Show>
       </Show>
     </div>
   )

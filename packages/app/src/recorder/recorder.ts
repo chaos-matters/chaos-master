@@ -3,10 +3,14 @@ import { latestSchemaVersion } from '@/flame/schema/flameSchema'
 import { deepClone } from '@/utils/clone'
 import { currentUndoSeq } from '@/utils/undoJournal'
 import { VERSION } from '@/version'
+import { setDocumentWriteReporter } from './documentWriteHook'
+import { focusHintFor } from './focus'
 import { SESSION_FORMAT_VERSION } from './schema'
 import type { RecordedAction, RecordedSession } from './schema'
 import type { FlameCommand } from '@/commands/types'
+import type { AudioWiringSnapshot } from '@/flame/schema/audioWiring'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { TimelineSnapshot } from '@/flame/schema/timeline'
 import type { UndoTarget } from '@/utils/undoRouting'
 
 /**
@@ -43,8 +47,24 @@ type ActiveRecording = {
    *  created during this session, and only those can an undo replay against. */
   baselineSeq: number
   initial: FlameDescriptor
+  initialTimeline?: TimelineSnapshot
+  initialAudio?: AudioWiringSnapshot
   actions: RecordedAction[]
   unnamedWrites: { t: number; description?: string }[]
+}
+
+/**
+ * The editing state around the flame that a recording also starts from.
+ *
+ * The flame is the document, but it is not the whole world: keyframe edits
+ * mean nothing without the tracks they land on, and an audio mapping drives
+ * the flame every frame. Both are snapshotted so a replay edits the animation
+ * it was recorded against rather than whatever the viewer happens to have
+ * open. Optional because sandboxes (tests, the Home portal) have neither.
+ */
+export type SessionStartExtras = {
+  timeline?: TimelineSnapshot
+  audio?: AudioWiringSnapshot
 }
 
 let active: ActiveRecording | undefined
@@ -69,6 +89,15 @@ let gestureClaimed = false
  */
 let coalesceAnchors = new Map<string, number>()
 
+/** A command's own hint wins over the central table — it knows things the id
+ *  and args do not. */
+function focusFor(
+  cmd: Pick<FlameCommand, 'id' | 'focus'>,
+  args: unknown[],
+): string | undefined {
+  return cmd.focus?.(args) ?? focusHintFor(cmd.id, args)
+}
+
 function resetGestureState() {
   gestureClaimed = false
   coalesceAnchors = new Map()
@@ -85,9 +114,13 @@ function elapsedMs(rec: ActiveRecording): number {
   return Math.max(0, globalThis.performance.now() - rec.startedAt)
 }
 
-/** Begin recording. `initial` is cloned, never held — pass the full current
- *  document (NOT condensed: hidden transforms must survive into replay). */
-export function startSessionRecording(initial: FlameDescriptor): void {
+/** Begin recording. Everything passed is cloned, never held — pass the full
+ *  current document (NOT condensed: hidden transforms must survive into
+ *  replay). */
+export function startSessionRecording(
+  initial: FlameDescriptor,
+  extras: SessionStartExtras = {},
+): void {
   if (active) {
     console.warn('[recorder] A session recording is already active.')
     return
@@ -97,6 +130,10 @@ export function startSessionRecording(initial: FlameDescriptor): void {
     createdAt: new Date().toISOString(),
     baselineSeq: currentUndoSeq(),
     initial: deepClone(initial),
+    initialTimeline:
+      extras.timeline === undefined ? undefined : deepClone(extras.timeline),
+    initialAudio:
+      extras.audio === undefined ? undefined : deepClone(extras.audio),
     actions: [],
     unnamedWrites: [],
   }
@@ -125,6 +162,8 @@ export function stopSessionRecording(): RecordedSession | undefined {
     app: { version: VERSION, flameSchemaVersion: latestSchemaVersion },
     createdAt: active.createdAt,
     initial: active.initial,
+    initialTimeline: active.initialTimeline,
+    initialAudio: active.initialAudio,
     actions: active.actions,
     unnamedWriteCount: active.unnamedWrites.length,
   }
@@ -150,7 +189,10 @@ export function cancelSessionRecording(): void {
  * replay anyway and is caught by schema validation on load.
  */
 export function recordCommandExecution(
-  cmd: Pick<FlameCommand, 'id' | 'label' | 'coalesceKey' | 'describe'>,
+  cmd: Pick<
+    FlameCommand,
+    'id' | 'label' | 'coalesceKey' | 'describe' | 'focus'
+  >,
   args: readonly unknown[],
   run: () => void,
 ): void {
@@ -170,6 +212,7 @@ export function recordCommandExecution(
       const existing = rec.actions[anchor.index]
       if (existing) {
         existing.args = deepClone([...args])
+        existing.focus = focusFor(cmd, [...args])
         // The label has to move with the args. Describing commands render
         // the value into their label ("Set gamma to 2.42"), so keeping the
         // first one left the step list quoting a value the action no longer
@@ -184,6 +227,7 @@ export function recordCommandExecution(
         id: cmd.id,
         args: deepClone([...args]),
         label: cmd.describe?.([...args]) ?? cmd.label,
+        focus: focusFor(cmd, [...args]),
       })
       pendingActionIndex = rec.actions.length - 1
       if (anchorKey !== undefined) {
@@ -199,6 +243,43 @@ export function recordCommandExecution(
     commandDepth--
     if (commandDepth === 0) pendingActionIndex = undefined
   }
+}
+
+/**
+ * "I already did this myself; log it as the command that reproduces it."
+ *
+ * For effects the workspace performs through a non-command path whose live
+ * semantics must not change, but which a registered command CAN reproduce on
+ * replay. The 2D↔3D switch is the case that motivated it: it stashes the
+ * outgoing flame, restores the incoming one through `history.replace` (a
+ * document boundary that clears undo), and swaps the timeline's tracks.
+ * Routing all that through a command would make it undoable, which it
+ * deliberately is not — but a `flame.load` carrying the restored descriptor
+ * replays it exactly.
+ *
+ * Use sparingly, and only where the recorded command genuinely reproduces the
+ * effect: this bypasses the "the log matches what ran" guarantee that
+ * everything else here is built on.
+ */
+export function recordSyntheticAction(
+  id: string,
+  args: readonly unknown[],
+  label?: string,
+): void {
+  const rec = active
+  if (!rec || commandDepth > 0 || suppressDepth > 0) return
+  // A synthetic action stands for a whole effect, so it ends any coalescing
+  // run — the next edit of the same control is its own step.
+  coalesceAnchors = new Map()
+  gestureClaimed = true
+  rec.actions.push({
+    t: elapsedMs(rec),
+    id,
+    args: deepClone([...args]),
+    label,
+    focus: focusHintFor(id, [...args]),
+  })
+  setRecordedActionCount(rec.actions.length)
 }
 
 /**
@@ -265,6 +346,36 @@ export function reportDocumentWrite(
   coalesceAnchors = new Map()
   gestureClaimed = false
   if (!rec || claimed || suppressDepth > 0) return
+  noteUnnamedWrite(rec, description)
+}
+
+/**
+ * The same hook for the SECOND document — the timeline's own undo stack (see
+ * documentWriteHook.ts for why it arrives indirectly).
+ *
+ * Split from {@link reportDocumentWrite} for one reason: it must not clear the
+ * flame's coalescing anchors while a flame command is running. With
+ * auto-keyframe on, dragging a slider writes a keyframe too, and the timeline
+ * pushes its undo entry immediately rather than at gesture commit — so a
+ * shared reset would end the flame's coalescing run mid-drag and log the
+ * gesture as two steps against one undo entry, breaking the invariant the
+ * whole recorder is built on.
+ */
+export function reportTimelineWrite(description?: string): void {
+  const rec = active
+  if (commandDepth > 0) return
+  // Outside a command this IS a boundary: an uncovered timeline edit ends any
+  // run, exactly as a flame entry does.
+  coalesceAnchors = new Map()
+  gestureClaimed = false
+  if (!rec || suppressDepth > 0) return
+  noteUnnamedWrite(rec, description)
+}
+
+function noteUnnamedWrite(
+  rec: ActiveRecording,
+  description: string | undefined,
+): void {
   rec.unnamedWrites.push({ t: elapsedMs(rec), description })
   setUnnamedWriteCount(rec.unnamedWrites.length)
   console.warn(
@@ -279,6 +390,12 @@ export function reportDocumentWrite(
 export function notePreviewStarted(): void {
   resetGestureState()
 }
+
+// The timeline reaches the recorder through this leaf rather than importing
+// it: a direct import closes a cycle through the flame schema (see
+// documentWriteHook.ts). Installed on load, which is early enough — nothing
+// can be recorded before the recorder module exists.
+setDocumentWriteReporter(reportTimelineWrite)
 
 /** Run `fn` invisibly to any active recording: its commands are not logged
  *  and its document writes are not flagged. For replay, the Home portal, and

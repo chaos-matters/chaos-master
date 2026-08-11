@@ -3,6 +3,7 @@ export {
   array,
   boolean,
   brand,
+  finite,
   flatten,
   integer,
   literal,

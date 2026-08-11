@@ -1,8 +1,9 @@
 import { createSignal } from 'solid-js'
 import { deepClone } from '@/utils/clone'
 import { withRecordingSuppressed } from './recorder'
+import { loadSessionStart } from './replay'
 import type { ReplayTarget } from './replay'
-import type { RecordedSession } from './schema'
+import type { RecordedAction, RecordedSession } from './schema'
 
 /**
  * Timed playback of a recorded session (semantic-recorder-plan, M4).
@@ -41,6 +42,9 @@ export type SessionPlayer = {
   readonly stop: () => void
   /** Index of the last applied action; -1 = only the initial flame. */
   readonly stepIndex: () => number
+  /** The action just applied, or undefined at the initial flame. What the
+   *  follow-cam reads to know where to point and what to caption. */
+  readonly currentAction: () => RecordedAction | undefined
   readonly isPlaying: () => boolean
   readonly total: number
 }
@@ -102,7 +106,7 @@ export function createSessionPlayer(
 
   function rebuildTo(index: number) {
     withRecordingSuppressed(() => {
-      target.loadInitial(deepClone(session.initial))
+      loadSessionStart(session, target)
     })
     baselineLoaded = true
     setStepIndex(-1)
@@ -111,11 +115,20 @@ export function createSessionPlayer(
     }
   }
 
-  /** Wait out the gap the recording has between these two steps. */
+  /**
+   * How long to wait before applying `index`.
+   *
+   * An authored `holdMs` on the PREVIOUS step wins: pacing belongs to the step
+   * an author wants held, not to the one that follows it, and an authored hold
+   * is a deliberate choice so it is not clamped by MAX_STEP_GAP_MS. Otherwise
+   * it is the gap the recording measured, clamped so a long thinking pause
+   * does not stall playback.
+   */
   function gapBefore(index: number): number {
     const next = actions[index]
     if (!next) return 0
     const previous = index > 0 ? actions[index - 1] : undefined
+    if (previous?.holdMs !== undefined) return previous.holdMs / speed()
     const delta = previous ? next.t - previous.t : next.t
     return Math.min(MAX_STEP_GAP_MS, Math.max(0, delta) / speed())
   }
@@ -193,6 +206,7 @@ export function createSessionPlayer(
       closeBatch()
     },
     stepIndex,
+    currentAction: () => actions[stepIndex()],
     isPlaying,
     total: actions.length,
   }

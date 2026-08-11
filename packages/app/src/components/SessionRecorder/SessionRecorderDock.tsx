@@ -1,11 +1,13 @@
 import { createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { isSessionRecording } from '@/recorder/recorder'
+import { storeSession } from '@/utils/sessionsDB'
 import { clampRecorderOpacity, FADED_RECORDER_OPACITY, MIN_RECORDER_OPACITY, recorderCollapsed, recorderFadeOnPlayback, recorderOffset, recorderOpacity, setRecorderCollapsed, setRecorderFadeOnPlayback, setRecorderOffset, setRecorderOpacity, setRecorderVisible, } from './recorderUi'
 import { SessionLibraryPanel } from './SessionLibraryPanel'
 import { SessionRecorderControls } from './SessionRecorderControls'
 import styles from './SessionRecorderDock.module.css'
 import { SessionReplayPanel } from './SessionReplayPanel'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { SessionStartExtras } from '@/recorder/recorder'
 import type { ReplayTarget } from '@/recorder/replay'
 import type { RecordedSession } from '@/recorder/schema'
 
@@ -34,6 +36,8 @@ const DRAG_THRESHOLD_PX = 4
 
 export function SessionRecorderDock(props: {
   flameDescriptor: FlameDescriptor
+  /** Timeline + audio wiring to snapshot when a recording starts. */
+  startExtras?: () => SessionStartExtras
   target: ReplayTarget
   /** The session open for replay, owned by the workspace because a dropped
    *  file opens one too. */
@@ -153,6 +157,18 @@ export function SessionRecorderDock(props: {
             session={session}
             target={props.target}
             compact={recorderCollapsed()}
+            onSave={(edited) => {
+              // Saved as a NEW entry rather than overwriting: captions are an
+              // authoring pass over a take, and the raw take is what you go
+              // back to when a caption pass goes wrong.
+              const name = `${
+                edited.initial.metadata?.name?.trim() || 'Recording'
+              } (captioned)`
+              void storeSession(edited, name).then(() => {
+                setLibraryRevision((n) => n + 1)
+                setLibraryOpen(true)
+              })
+            }}
             onClose={() => {
               props.onSessionChange(undefined)
             }}
@@ -193,6 +209,7 @@ export function SessionRecorderDock(props: {
 
         <SessionRecorderControls
           flameDescriptor={props.flameDescriptor}
+          startExtras={props.startExtras}
           onOpenSession={props.onSessionChange}
           onSessionStored={() => {
             setLibraryRevision((n) => n + 1)

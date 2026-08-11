@@ -306,3 +306,55 @@ describe('createSessionPlayer', () => {
     })
   })
 })
+
+describe('authored pacing', () => {
+  it('holds a step for its authored holdMs instead of the recorded gap', () => {
+    createRoot((dispose) => {
+      const { target } = makeTarget(examples.initExample)
+      // Recorded 100ms apart, but the author wants to sit on step 0.
+      const authored = makeSession([
+        { t: 0, id: 'flame.setGamma', args: [1.5], holdMs: 3000 },
+        { t: 100, id: 'flame.setGamma', args: [2.5] },
+      ])
+      const player = createSessionPlayer(authored, target)
+      player.play()
+      vi.advanceTimersByTime(0)
+      expect(player.stepIndex()).toBe(0)
+
+      // The recorded gap would have advanced here; the authored hold does not.
+      vi.advanceTimersByTime(2999)
+      expect(player.stepIndex()).toBe(0)
+      vi.advanceTimersByTime(1)
+      expect(player.stepIndex()).toBe(1)
+      dispose()
+    })
+  })
+
+  it('scales an authored hold with playback speed', () => {
+    createRoot((dispose) => {
+      const { target } = makeTarget(examples.initExample)
+      const [speed] = createSignal(4)
+      const authored = makeSession([
+        { t: 0, id: 'flame.setGamma', args: [1.5], holdMs: 2000 },
+        { t: 100, id: 'flame.setGamma', args: [2.5] },
+      ])
+      const player = createSessionPlayer(authored, target, { speed })
+      player.play()
+      vi.advanceTimersByTime(0)
+      vi.advanceTimersByTime(500)
+      expect(player.stepIndex()).toBe(1)
+      dispose()
+    })
+  })
+
+  it('exposes the current action so the follow-cam knows where to point', () => {
+    createRoot((dispose) => {
+      const { target } = makeTarget(examples.initExample)
+      const player = createSessionPlayer(gammaSteps, target)
+      expect(player.currentAction()).toBeUndefined()
+      player.seek(1)
+      expect(player.currentAction()?.args).toEqual([2.5])
+      dispose()
+    })
+  })
+})
