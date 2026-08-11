@@ -467,7 +467,7 @@ So: **when the recorder is ON, the view follows the interaction.**
   re-executed. That is what separates this from a screen recording, and it is
   worth designing in from the start rather than bolting on.
 
-Spec this **after** the pilot in §12, not before: two weeks of actually filming
+Spec this **after** the pilot in §13, not before: two weeks of actually filming
 will tell you exactly which interactions are unreadable, and that list is a far
 better spec than a guess.
 
@@ -519,6 +519,11 @@ video file.
    blog post, the `?challenge=` param, the video description, the BesideCue
    inventory entry. Retrofitting consistent identifiers later is miserable;
    deciding it now is free.
+5. **A "keeper" flag on a recording.** One boolean and a note — _this one sounded
+   right / this one is a BesideCue candidate_ — set at the time. Without it, a
+   quarter of sonification sessions becomes forty files and no memory of which
+   three were good. The cheapest item on this list and the one most likely to be
+   skipped.
 
 **The rule to adopt from episode one:** nothing is published until its artifacts
 are saved. It takes ten minutes at the time and is unrecoverable later.
@@ -590,7 +595,111 @@ never on views.
 
 ---
 
-## 12. Where to start
+## 12. Voice, presence, and how much of you is in the video
+
+This reads like one decision and is actually three, with different answers.
+
+### Does Tier A need a voice? No — and that settles month one
+
+Beat-synced loops, Variation of the Day, Guess the Variation, sonification
+clips: all of these work on **text on screen plus music**, and a voice actively
+hurts the audio-led ones because it competes with the thing the video is about.
+Wordless abstract-visual Shorts are the norm in this genre, not a compromise.
+
+Since month one is Shorts-only (§2), **the question does not arise yet.** Defer
+it at zero cost, and let the pilot answer it instead of guessing.
+
+### Does anyone care that it's a real person? Yes — but only for one thing
+
+Split it by what you want out of the channel:
+
+| Goal                                         | Does a voice matter?                                                                                  |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Reach and discovery (Shorts, algorithm)      | **No.** The visual does the work.                                                                     |
+| Teaching — people actually learning the tool | **Yes.** Captions can't explain _why_ you chose spherical over horseshoe.                             |
+| Subscribers, Discord, Ko-fi, contributors    | **Yes, a lot.** People follow people. Relationship-driven funnels convert badly on faceless channels. |
+| Ambient / long loops                         | **No.** A voice would ruin them.                                                                      |
+
+The important distinction: **"a real person" means a voice, not a face.** Face
+cam is never required for this kind of channel and adds production cost, another
+thing to be self-conscious about, and nothing the work needs. Rule it out now
+and stop thinking about it.
+
+### Is "watch me build this thing" enough to start? Yes
+
+For the first month it is not just enough, it is _better_:
+
+- One less variable while you learn the recording workflow.
+- Voice can be added to the same footage later — and with the step recorder, a
+  session can be replayed and re-captured, so old material is not stranded.
+- Adding narration later reads as levelling up. Going the other way, voice to
+  silence, reads as giving up.
+
+**The counter-argument, honestly:** don't stay silent for a year. An audience
+built on wordless ambient loops is a different audience from one that wants
+tutorials, and switching later means partly rebuilding. Silent is a starting
+posture, not a permanent identity.
+
+### What to do about voice, concretely
+
+1. **Month 1: silent.** Text on screen and music. No exceptions.
+2. **Record a voice track during the pilot anyway** — even for videos you will
+   publish silently. You never have to use it. But listening back is the only
+   way to answer "how would that turn out"; a week of takes beats any amount of
+   speculation, including mine.
+3. **First long-form: script the voice-over after the fact.** Record the build
+   silently with no pressure to perform, watch it back, write ten lines, record
+   those. This is the highest quality per unit of skill, and it removes the real
+   difficulty — thinking and performing at the same time, which is where
+   technical people fill the track with "um, so, let me just…". Dead air and
+   hedging are what actually cost retention, not an accent or a flat delivery.
+4. **Don't use a synthetic voice as a substitute for yours.** The quality is
+   fine now; the association is not. TTS narration reads as content-farm output,
+   and on a channel about a hand-built creative tool it undercuts the premise.
+   **If voice is off the table, the fallback is silence with good captions, not
+   a synthetic voice.** The one defensible use is accessibility or translated
+   tracks later, where it is additive rather than a stand-in.
+
+### Silent does not mean captionless
+
+In a silent build video the on-screen text does the job commentary would, and it
+needs to be designed, not sprinkled:
+
+- **The rule, pinned.** `20:00 · 3 transforms · no randomizer` — the constraint
+  is the story, so it stays visible.
+- **What just happened.** `+ spherical · weight 0.4`. Recording mode's action
+  labels (§7) give you this automatically — which means **a silent video made
+  with the recorder is already half-narrated.** That is a real argument for
+  waiting for it rather than fighting the problem manually.
+- **Why, at decision points only.** One short line where you made a choice.
+  Don't caption what is already visible.
+- **The clock**, when there is one.
+
+### Score your videos with your own fractals
+
+The soundtrack matters more in a silent video, and the obvious source is the
+ambient production line (§5, C2). Using your own generated fractal ambient
+means: no licensing risk, nothing to clear, a consistent sonic identity across
+the channel, and a video about the tool that is _scored by the tool_. It also
+gives every ambient session a second job, which makes that line easier to
+justify spending time on.
+
+### The reason the series matters more than the embed
+
+The BesideCue and MercuryPitch embeds are the right destination — but they need
+material that is genuinely good, and "good" here is only reachable by iterating
+in public. The filming _is_ the iteration loop: fifty sessions of tuning flames
+by ear is what produces the three that are worth embedding.
+
+One discipline that makes this pay off: **flag the keepers as they happen.** If
+good sessions are not marked at the time, you will finish the quarter with forty
+recordings and no memory of which three sounded right. Add a "keep — candidate
+for BesideCue" flag to the recording metadata (§8) from the first session. It is
+a checkbox now and an archaeology project later.
+
+---
+
+## 13. Where to start
 
 Your instinct was: finalize the app for recording, then try a few videos, then
 adjust. **Invert the first two steps.** Filming before finalizing is what tells
@@ -666,7 +775,7 @@ absence hurt.
 
 ---
 
-## 13. Housekeeping
+## 14. Housekeeping
 
 The Discord invite **is** in the app — the Help modal's icon row links to
 `/discord`, which the Worker redirects to `DISCORD_INVITE_URL`. What's missing
