@@ -7,6 +7,14 @@
 > and safe to plan around. **Needs building** carries an effort estimate, so no
 > series is planned on a feature that does not exist.
 
+**This document is the strategy.** The three that follow are the execution:
+
+| Document                                                           | What it's for                                                                           |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| [`shorts-production-playbook.md`](./shorts-production-playbook.md) | Per-format shot lists, exact export settings, overlay specs, the two-hour batch session |
+| [`distribution-playbook.md`](./distribution-playbook.md)           | Handles, playlists, upload routine, and what can and cannot be automated                |
+| [`replay-duel-plan.md`](./replay-duel-plan.md)                     | The Claude-vs-hand replay format, and what it needs from the recorder's file schema     |
+
 ---
 
 ## 1. What we actually have to film
