@@ -34,12 +34,18 @@ is allowed, and nowhere a **handle** is:
 | Handle (all platforms) | `@lumenapeiron`                                                |
 | Display name           | `Lumen Apeiron · Chaos Master`                                 |
 | Bio line 1             | What it is, in plain words — "Fractal flames in your browser." |
-| Bio line 2             | `formerly Chaos Master`                                        |
+| Bio line 2             | A reason to click — "Free, open source, no install →"          |
 | Link                   | `lumenapeiron.com`                                             |
 | Video watermark        | `lumenapeiron.com` — the domain, not the name                  |
 
 The pattern to hold: **one handle, two names.** Someone searching either term
 finds you; everyone who clicks lands on a site whose name they've already read.
+
+**No "formerly Chaos Master" line.** It would claim a history that isn't there —
+the old name never got big enough for the rename to be news — and it spends one
+of the two or three lines anyone actually reads on housekeeping. The display
+name already puts both terms in front of search. Bio line 2 should earn a click
+instead: what makes it worth opening, in five words.
 
 Grab `@chaosmaster` variants if any turn out to be free — defensive, costs
 nothing — but don't post from them.
@@ -51,8 +57,7 @@ nothing — but don't post from them.
       variant everywhere if one is gone
 - [ ] Display name `Lumen Apeiron · Chaos Master` on all three
 - [ ] Same avatar and banner (a flame still — you have 56 to pick from)
-- [ ] Identical bio wording everywhere, including the `formerly Chaos Master`
-      line
+- [ ] Identical bio wording everywhere: what it is, then a reason to click
 - [ ] Link to `lumenapeiron.com` in all three bios
 - [ ] **Instagram: set it to Business or Creator.** Personal accounts can't be
       scheduled from Meta Business Suite.
