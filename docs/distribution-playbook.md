@@ -11,42 +11,118 @@
 
 ---
 
-## 1. Handles — one decision to make before you register anything
+## 1. Handles — decided
 
-You said you'd open TikTok and Instagram as **Chaos Master**. Worth pausing on,
-because the repo says the product is **Lumen Apeiron** (`lumenapeiron.com`), with
-Chaos Master kept as the sub-brand on the welcome screen and social cards.
+**`@lumenapeiron` is the handle on every platform. "Chaos Master" is the
+subtitle.**
 
-**The problem with `@chaosmaster`:** every video sends people to
-`lumenapeiron.com`. A viewer who sees the handle, likes the work, and later
-searches "chaos master" finds a name that doesn't match the site, and a fraction
-of them bounce. Handle–domain mismatch is a small, permanent tax on every video
-you will ever post.
+This is the right call, and it's settled by reality as much as by strategy:
+"chaos master" handles are already taken more or less everywhere, so the choice
+was never really open. The upside is that the handle now matches the domain
+every video points at, which removes the permanent small tax of a
+handle–destination mismatch.
 
-**Recommendation:** register **`@lumenapeiron`** on TikTok and Instagram, and
-rename the YouTube channel to match. If `@chaosmaster` is free, grab it too and
-point it at the same place — defensive, costs nothing.
+### Where "Chaos Master" goes
 
-**The counter-case, honestly:** "Chaos Master" is more searchable and more
-memorable than a Greek-Latin compound most people can't spell, and it has
-whatever recognition the old name accumulated. If you'd rather keep it, the fix
-is to make the _site_ carry both names visibly, so the bridge is obvious. What
-doesn't work is a handle that appears nowhere on the destination.
+The sub-brand still does work — it carries whatever recognition the old name
+accumulated, and it's far more searchable than a Greek-Latin compound most
+people can't spell. Put it everywhere a **display name** or a **line of prose**
+is allowed, and nowhere a **handle** is:
 
-Either way: **same handle on all three platforms.** Check availability on all
-three before registering any of them.
+| Slot                   | Value                                                          |
+| ---------------------- | -------------------------------------------------------------- |
+| Handle (all platforms) | `@lumenapeiron`                                                |
+| Display name           | `Lumen Apeiron · Chaos Master`                                 |
+| Bio line 1             | What it is, in plain words — "Fractal flames in your browser." |
+| Bio line 2             | `formerly Chaos Master`                                        |
+| Link                   | `lumenapeiron.com`                                             |
+| Video watermark        | `lumenapeiron.com` — the domain, not the name                  |
+
+The pattern to hold: **one handle, two names.** Someone searching either term
+finds you; everyone who clicks lands on a site whose name they've already read.
+
+Grab `@chaosmaster` variants if any turn out to be free — defensive, costs
+nothing — but don't post from them.
 
 ### Registration checklist
 
-- [ ] Same handle on YouTube, TikTok, Instagram
+- [ ] `@lumenapeiron` on YouTube, TikTok, Instagram — check all three for
+      availability before claiming any of them, and take the closest consistent
+      variant everywhere if one is gone
+- [ ] Display name `Lumen Apeiron · Chaos Master` on all three
 - [ ] Same avatar and banner (a flame still — you have 56 to pick from)
-- [ ] Bio, identical wording everywhere: what it is, one line, then the link
+- [ ] Identical bio wording everywhere, including the `formerly Chaos Master`
+      line
 - [ ] Link to `lumenapeiron.com` in all three bios
-- [ ] **Instagram: set it to a Business or Creator account.** Personal accounts
-      can't be scheduled from Meta Business Suite, and you'll want that.
+- [ ] **Instagram: set it to Business or Creator.** Personal accounts can't be
+      scheduled from Meta Business Suite.
+- [ ] **TikTok: see §1a before flipping the account type.**
 - [ ] Add YouTube, TikTok and Instagram links to the app's Help modal (which
       already has Discord at `/discord`), the landing page footer, and the README
       badge row
+
+---
+
+## 1a. TikTok — a second account under the same company
+
+**Short answer: yes, that's normal and allowed.** Running several TikTok accounts
+for several products under one company is standard practice and explicitly
+supported. What TikTok prohibits is multiple accounts used to fake engagement,
+spam, or evade a ban — none of which is what you're doing.
+
+Two practical constraints: **each account needs its own unique email or phone
+number**, and TikTok caps how many accounts you can link for fast in-app
+switching (a small number — check the current limit if you plan to run more than
+a couple).
+
+### Three different things called "business", and only one needs verification
+
+This is where the question usually gets tangled:
+
+| Thing                             | What it is                                                                                                       | Needs verification?                                  |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| **Account type: Business**        | A free self-serve toggle in Settings → Account. Changes which tools and music library you get.                   | **No.** It's a switch, per account.                  |
+| **Business Center / Ads Manager** | Where a legal entity is verified with documents, and where multiple accounts and ad assets are managed together. | **Yes** — once, per company.                         |
+| **Verified badge (blue check)**   | Authenticity badge granted by TikTok.                                                                            | Separate process entirely; not something you toggle. |
+
+So the answer to what you actually asked: **you don't re-verify anything.**
+Open the second account, flip its type to Business in its own settings — that
+toggle asks for nothing — and if you want it managed under the same legal entity
+for ads or shared access, **add it as an asset to the Business Center you already
+verified.** Holding multiple accounts under one verified entity is precisely what
+Business Center exists for.
+
+### The trade-off worth knowing before you flip the switch
+
+Business account type is not strictly better than Creator, and the difference
+matters for exactly the content you're planning:
+
+|                            | Business                   | Creator                                        |
+| -------------------------- | -------------------------- | ---------------------------------------------- |
+| Website link in bio        | **From day one**           | Historically gated behind a follower threshold |
+| Music library              | **Commercial Sounds only** | Full library, including trending audio         |
+| Analytics / business tools | Fuller                     | Fewer                                          |
+
+**The music restriction is the real cost** — a Business account can't use the
+general trending-audio library, and trending audio is a meaningful discovery
+lever on TikTok.
+
+**But in your case it's nearly free**, and this is the deciding argument: the
+content plan already concludes you need audio you own or have cleared for all
+three platforms, because TikTok-licensed audio can't be cross-posted to YouTube
+(§5). Your soundtrack is going to be your own fractal ambient or a collaborating
+musician's track either way. Giving up a library you'd already decided not to use
+costs you almost nothing — and you gain the bio link to `lumenapeiron.com` from
+your very first post, which is the entire point of the channel.
+
+**Recommendation: Business, same as your other account.** Consistent management,
+link from day one, and the restriction lands on something you weren't going to
+use.
+
+One caveat on all of the above: account-type perks and limits shift, and my
+knowledge runs to mid-2026. Confirm the current music-library and bio-link rules
+in the app before committing — the reasoning holds regardless of where the exact
+lines sit.
 
 ---
 
@@ -179,9 +255,11 @@ distribution.
 
 ## 6. What to do this week
 
-- [ ] Decide the handle question (§1) — this blocks everything else
-- [ ] Register TikTok and Instagram; set Instagram to Business/Creator
-- [ ] Rename the YouTube channel if you go with `@lumenapeiron`
+- [ ] Register `@lumenapeiron` on TikTok and Instagram; set Instagram to
+      Business/Creator and TikTok to Business (§1a)
+- [ ] Rename the YouTube channel to `@lumenapeiron`, display name
+      `Lumen Apeiron · Chaos Master`
+- [ ] Add the new TikTok account to your existing Business Center as an asset
 - [ ] Create the six empty playlists (§2)
 - [ ] Write the bio once, paste it three times
 - [ ] Add the three social links to the app's Help modal, the landing footer and
