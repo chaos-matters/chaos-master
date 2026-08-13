@@ -16,21 +16,21 @@
   },
   "dependencies": {
     "@astrojs/solid-js": "^5.1.0",
-    "@typegpu/color": "0.11.0",
-    "@typegpu/noise": "0.11.0",
-    "@typegpu/sdf": "0.11.1",
+    "@typegpu/color": "0.12.0",
+    "@typegpu/noise": "0.12.0",
+    "@typegpu/sdf": "0.12.0",
     "astro": "^5.18.2",
     "solid-js": "1.9.11",
     "structurajs": "0.12.6",
-    "tinyest-for-wgsl": "^0.3.3",
-    "typegpu": "0.11.9",
+    "tinyest-for-wgsl": "^0.4.0",
+    "typegpu": "0.12.0",
     "valibot": "1.2.0",
     "wgpu-matrix": "3.4.2"
   },
   "devDependencies": {
     "@vitejs/plugin-basic-ssl": "^2.3.0",
     "@webgpu/types": "^0.1.69",
-    "unplugin-typegpu": "^0.11.6",
+    "unplugin-typegpu": "^0.12.1",
     "vite-plugin-qrcode": "^0.4.1",
     "wrangler": "^4.103.0"
   }
