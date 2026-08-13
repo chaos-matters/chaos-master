@@ -90,22 +90,31 @@ export function useAudioReactive(
 
   createEffect(() => {
     const enabled = audioEnabled()
-    if (!enabled) {
-      fullCleanup()
-      return
-    }
-
     const source = audioSource()
     const buffer = audioBuffer()
     const mic = liveAnalyzer()
 
     if (source === 'file') {
-      if (!buffer) return
+      if (!buffer) {
+        fullCleanup()
+        return
+      }
 
-      // Use shared analyzer (built by MainWorkspace), wait if not ready yet
-      const sharedAnalyzer = fileAnalyzer()
-      if (!sharedAnalyzer) return
-      analyzer = sharedAnalyzer
+      /*
+       * TRANSPORT is not gated on `enabled`; MODULATION is.
+       *
+       * These used to be the same switch: turning live preview off ran
+       * `fullCleanup()`, which closes the AudioContext — so the track could not
+       * be played, paused or scrubbed at all, and the transport controls sat
+       * there doing nothing. "Stop driving the flame" is not "throw the audio
+       * away", and auditioning a track before wiring it up is the normal way to
+       * work.
+       *
+       * The analyzer is likewise only needed to MODULATE. Playback needs the
+       * buffer and a context, so it no longer waits on the analysis pass that
+       * an 18-minute file spends a minute on.
+       */
+      analyzer = fileAnalyzer()
 
       // Create AudioContext
       try {
@@ -127,13 +136,10 @@ export function useAudioReactive(
       interval = setInterval(() => {
         // Check for seek
         const st = seekTarget()
-        if (
-          st !== null &&
-          st !== lastSeekTarget &&
-          audioCtx &&
-          buffer &&
-          analyzer
-        ) {
+        // Scrubbing is transport: it needs a context and a buffer, NOT the
+        // analyzer. Requiring the analyzer here is what made the scrubber dead
+        // until the analysis pass finished (and forever, with modulation off).
+        if (st !== null && st !== lastSeekTarget && audioCtx && buffer) {
           lastSeekTarget = st
           createSource(buffer, st)
           if (paused) {
@@ -142,7 +148,7 @@ export function useAudioReactive(
         }
 
         const mappings = audioMapping().mappings
-        if (!audioCtx || !analyzer) {
+        if (!audioCtx) {
           // No audio context (autoplay blocked) — just tick a blind counter
           onPlaybackTime(seekBaseOffset)
           return
@@ -155,6 +161,10 @@ export function useAudioReactive(
         onPlaybackTime(displayTime)
 
         if (paused) return
+        // Everything above is transport and runs regardless. Below is
+        // modulation: it needs the toggle AND the finished analysis, and its
+        // absence must not stop the clock above from advancing.
+        if (!enabled || !analyzer) return
 
         const frame = Math.floor(currentTime * 30)
         const wrapped =
@@ -196,7 +206,11 @@ export function useAudioReactive(
     }
 
     // --- Mic mode ---
-    if (source === 'mic' && mic) {
+    // Gated on `enabled`, unlike file mode above, and deliberately so: a file
+    // has a transport worth keeping alive with modulation off, a live mic has
+    // nothing to audition — holding the capture open would be all cost and a
+    // privacy surprise.
+    if (source === 'mic' && mic && enabled) {
       const tickMs = 1000 / 30
       interval = setInterval(() => {
         const mappings = audioMapping().mappings
@@ -235,9 +249,25 @@ export function useAudioReactive(
     if (shouldPause) {
       void audioCtx.suspend()
     } else {
+      /*
+       * Resume and touch NOTHING else.
+       *
+       * There used to be a `sourceStartTime = audioCtx.currentTime -
+       * seekBaseOffset` here, "so time calculation doesn't jump". Substituting
+       * it into the position formula
+       *
+       *     position = audioCtx.currentTime - sourceStartTime + seekBaseOffset
+       *
+       * gives `ctx - (ctx - seekBaseOffset) + seekBaseOffset`, i.e. exactly
+       * `2 * seekBaseOffset` — so every resume jumped to DOUBLE the last seek
+       * position. Seek to 2:30, pause anywhere, press play: 5:00.
+       *
+       * No correction is needed in the first place: `AudioContext.currentTime`
+       * does not advance while the context is suspended, and the buffer source
+       * is suspended with it, so the mapping from context time to playback
+       * position survives a pause untouched.
+       */
       void audioCtx.resume()
-      // Adjust sourceStartTime so time calculation doesn't jump
-      sourceStartTime = audioCtx.currentTime - seekBaseOffset
     }
   })
 }

@@ -32,6 +32,61 @@ export function useIntersectionObserver(
 }
 
 /**
+ * Thresholds fine enough to follow an element across the screen, not just to
+ * hear that it appeared. An observer only reports when a threshold is crossed,
+ * so an element that is never fully visible (one taller than the root) fires
+ * once at 0 and then goes quiet — which is why anything reading a RATIO needs
+ * a ladder rather than the default single threshold at 0.
+ */
+const RATIO_THRESHOLDS = Array.from({ length: 21 }, (_, i) => i / 20)
+
+/**
+ * How much of `target` is showing, as a reactive number the caller defines.
+ *
+ * Separate from `createSharedIntersectionObserver` on purpose: that one is the
+ * page's MOUNTING gate and runs with a `rootMargin`, which inflates the root and
+ * makes `intersectionRatio` meaningless (an element 300px below the fold can
+ * report a ratio of 1). A caller that needs "how much of this is actually on
+ * screen" needs its own observer with no margin — this is it, for the one or two
+ * elements on a page that care.
+ *
+ * `measure` receives the raw entry so the caller can decide what a fraction
+ * means for its element; it is NOT called when the element leaves, which always
+ * reports 0 (`intersectionRatio` is not reliably 0 on the way out in every
+ * engine, and `isIntersecting` is the authoritative "gone" signal).
+ */
+export function createIntersectionMeasure(
+  target: Accessor<Element | null | undefined>,
+  measure: (entry: IntersectionObserverEntry) => number,
+  options?: { root?: Accessor<Element | null | undefined> },
+): Accessor<number> {
+  const [value, setValue] = createSignal(0)
+  createEffect(() => {
+    const el = target()
+    if (!el) {
+      return
+    }
+    const rootEl = options?.root?.()
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[entries.length - 1]
+        if (entry === undefined) {
+          return
+        }
+        setValue(entry.isIntersecting ? measure(entry) : 0)
+      },
+      { root: rootEl ?? null, threshold: RATIO_THRESHOLDS },
+    )
+    observer.observe(el)
+    onCleanup(() => {
+      observer.disconnect()
+      setValue(0)
+    })
+  })
+  return value
+}
+
+/**
  * A single IntersectionObserver shared across many elements — e.g. every tile in
  * a large gallery — rooted on an optional scroll container. Returns a `track`
  * function: call it (inside a reactive owner) with an element accessor and get

@@ -142,12 +142,22 @@
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  transition: background-image 150ms ease-in;
+  transition: opacity 140ms ease-out;
+}
+
+.stretch-snapshot-pending {
+  opacity: 0;
 }
 
 .stretch-done {
   outline: 1px solid var(--item-border-color-hover);
   outline-offset: -1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stretch {
+    transition: none;
+  }
 }
 .variation-selector-sidebar-options {
   grid-area: variation-options;

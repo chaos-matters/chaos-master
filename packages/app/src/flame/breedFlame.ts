@@ -586,6 +586,14 @@ export function breedFlames(
   const cfg = { ...DEFAULT_BREED_CONFIG, ...config }
   const dims = parentA.renderSettings.dimensions ?? 2
   if (cfg.count < 1) return []
+  // Mismatched dimensions cannot produce a valid child: crossover copies whole
+  // transforms between parents, and a 2D transform has no `g`..`l` affine
+  // components, so the 3D child fails schema validation and `validateFlame`
+  // THROWS. Callers render this inside a modal, where a throw means a blank
+  // screen rather than an error — so refuse up front and let the caller show an
+  // empty result. Pickers should not offer a mismatch in the first place (see
+  // BlendFlameGallery's `dimensions` prop); this is the backstop.
+  if ((parentB.renderSettings.dimensions ?? 2) !== dims) return []
 
   // Collect transform data from both parents
   const entriesA = transformEntries(parentA)

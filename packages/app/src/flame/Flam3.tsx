@@ -81,6 +81,13 @@ type RenderTickResult = {
   hadWork: boolean
 }
 
+export type CompletedPointCountInfo = {
+  /** Cumulative plotted-point count captured for this exact submission. */
+  count: number
+  /** Queue-fenced completion time from `performance.now()`. */
+  completedAtMs: number
+}
+
 type Flam3Props = {
   quality: number
   pointCountPerBatch: number
@@ -104,6 +111,16 @@ type Flam3Props = {
   palette?: () => Palette | undefined
   outputAlpha?: boolean
   onAccumulatedPointCount?: (count: number) => void
+  /**
+   * Queue-completed counterpart to `onAccumulatedPointCount`.
+   *
+   * The existing callback intentionally fires immediately after submit because
+   * interactive UI consumers need low-latency progress. Benchmark consumers
+   * need the stronger guarantee that the GPU finished the captured submission.
+   */
+  onCompletedPointCount?: (info: CompletedPointCountInfo) => void
+  /** Reports rejection of the queue fence used by onCompletedPointCount. */
+  onCompletedPointCountError?: (error: unknown) => void
   disableQualityLimit?: boolean
   blendFlame?: FlameDescriptor
   blendWeight?: number
@@ -210,8 +227,17 @@ export function Flam3(props: Flam3Props) {
     return Math.min(rawLimit, safeQualityCap())
   }
 
+  const [instanceAccumulatedPointCount, setInstanceAccumulatedPointCount] =
+    createSignal(0)
   props.setCurrentQuality?.(
-    () => 1 - sqrt(bucketProbabilityInv() / accumulatedPointCount()),
+    () =>
+      1 -
+      sqrt(
+        bucketProbabilityInv() /
+          (props.isExportRenderer
+            ? accumulatedPointCount()
+            : instanceAccumulatedPointCount()),
+      ),
   )
   props.setQualityPointCountLimit?.(qualityPointCountLimit)
 
@@ -681,6 +707,10 @@ export function Flam3(props: Flam3Props) {
     let exportIterationCount = EXPORT_INITIAL_ITERATIONS
     let lastPresentMs = 0
     let lastCountSignalMs = 0
+    // Reused by the rAF pressure limiter, export driver, timestamp reader, and
+    // benchmark completion callback. Keeping one fence per submission avoids
+    // asking the queue for several equivalent promises.
+    let latestQueueFence: Promise<void> = Promise.resolve()
     // Wakes the export driver when reactive work arrives (next frame's
     // descriptor, forced redraw). Keeps the idle wait event-driven: timers are
     // clamped to 1Hz by Chrome in hidden or occluded windows, signals are not.
@@ -813,6 +843,9 @@ export function Flam3(props: Flam3Props) {
       }
       batchIndex = 0
       accumulatedPointCount_ = 0
+      if (!props.isExportRenderer && props.setCurrentQuality !== undefined) {
+        setInstanceAccumulatedPointCount(0)
+      }
       lastExportRenderedPointCount = -1
       // Only the main workspace renderer (isExportRenderer) touches the global
       // counter; preview instances must not clobber it (it drives the debug panel,
@@ -1100,6 +1133,11 @@ export function Flam3(props: Flam3Props) {
 
       timestampQuery.write(encoder, Math.max(iterationCount, 1))
       device.queue.submit([encoder.finish()])
+      const completedCount = accumulatedPointCount_
+      if (!props.isExportRenderer && props.setCurrentQuality !== undefined) {
+        setInstanceAccumulatedPointCount(completedCount)
+      }
+      latestQueueFence = device.queue.onSubmittedWorkDone()
 
       // Signal the accumulated count only AFTER the submit. Consumers
       // (e.g. the benchmark / hardware-tier detector) may synchronously tear
@@ -1128,9 +1166,19 @@ export function Flam3(props: Flam3Props) {
         })
       }
 
-      device.queue
-        .onSubmittedWorkDone()
-        .then(() => timestampQuery.read(frameId))
+      void latestQueueFence
+        .then(
+          () => {
+            props.onCompletedPointCount?.({
+              count: completedCount,
+              completedAtMs: performance.now(),
+            })
+            return timestampQuery.read(frameId)
+          },
+          (error: unknown) => {
+            props.onCompletedPointCountError?.(error)
+          },
+        )
         .catch(() => {})
 
       batchIndex += 1
@@ -1157,7 +1205,7 @@ export function Flam3(props: Flam3Props) {
         continueRendering(accumulatedPointCount_)
           ? props.renderInterval
           : Infinity,
-      () => device.queue.onSubmittedWorkDone(),
+      () => latestQueueFence,
       // Tear the rAF loop down entirely when an export takes over OR when the
       // device is lost. The `!gpuReady()` read is reactive, so a device loss
       // disposes every preview's loop on the spot (no more requestAnimationFrame,
@@ -1304,7 +1352,7 @@ export function Flam3(props: Flam3Props) {
           }
 
           try {
-            await device.queue.onSubmittedWorkDone()
+            await latestQueueFence
           } catch {
             // Device lost — stop driving; the app-level handler takes over.
             break

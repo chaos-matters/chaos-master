@@ -1,5 +1,19 @@
+import { tgpu } from 'typegpu'
 import { describe, expect, it } from 'vitest'
 import { compileCustomVariationCode, MAX_CUSTOM_WGSL_LENGTH, } from './runtimeCompiler'
+
+describe('compileCustomVariationCode - TypeGPU metadata', () => {
+  it('resolves a candidate through the same TypeGPU boundary as a GPU pipeline', () => {
+    const result = compileCustomVariationCode(
+      'return vec2f(pos).mul(varInfo.weight)',
+    )
+
+    expect(result.valid).toBe(true)
+    if (!result.valid) return
+
+    expect(() => tgpu.resolve([result.fn], { names: 'strict' })).not.toThrow()
+  })
+})
 
 describe('compileCustomVariationCode - Arity Validation', () => {
   it('detects insufficient arguments for pow', () => {

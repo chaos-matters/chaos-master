@@ -7,6 +7,268 @@ changelog surfaced in the About panel lives in `CHANGELOG.md`.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.9] - 2026-08-02
+
+A Home tab backed by a D1 content database — live WebGPU flames rather than
+screenshots, bounded by the existing visibility/compute gating — plus the
+poster-capture pipeline and admin flow that curate it, and a `wrangler dev`
+custom-build fix that had been OOM-killing developer workstations.
+
+Also introduces the local Benchmark Studio: an isolated `/benchmarks` WebGPU
+environment for reproducible, paired comparisons of the production flame
+pipeline, reconstruction profiles, random sequences and validated variation
+implementations.
+
+### Added
+
+- **Benchmark Studio** (`pages/Benchmarks/`, `benchmarks/`): a dedicated local
+  lab that runs the production renderer without mounting the editor or its
+  unrelated GPU previews. It supports built-in, recent, uploaded and seeded
+  generated flames; renderer and Mitchell–Netravali reconstruction profiles;
+  explicit point initialization, RNG, seed and workload controls; warmups and
+  interleaved paired samples; queue-fenced completion throughput; confidence
+  intervals, stability and validity checks; immutable local result history;
+  JSON/CSV exports and a share-card PNG. The setup can also isolate one or more
+  variations and compare a built-in implementation with custom WGSL accepted
+  by the existing bounded runtime compiler. A toolbar Lab entry point, Worker
+  route fallback, keyboard-equivalent controls, reduced-motion behavior,
+  visibility-gated flame previews, branded chaos dial and fractal dividers
+  complete the browser-only workflow. Server execution remains intentionally
+  unavailable until isolated GPU workers and result attestation exist.
+- **Gallery content database** (`migrations/0001..0004`, `worker/index.ts`,
+  `lib/galleryContent.ts`): D1 holds the FlameDescriptor spec itself, not
+  images — `gallery_items` (section, slug, capability, dimensions, transform
+  count, animation tracks), `poster_key` + the timeline frame the poster was
+  captured at (so an animated row can freeze back to the exact pose), a
+  `home_config` table for the tour, and a generated-once `sequence` column for
+  the curated roll-then-steer walkthrough. `GET /api/gallery` lists rows
+  WITHOUT the descriptor; `GET /api/gallery/:slug` fetches it on demand, so
+  Home never pulls every flame up front.
+- **Home tab** (`components/Home/`): the AABAAA layout — left rail, full-bleed
+  hero, editorial-span gallery, motion row, "Made here" portal, capability
+  cards. Plates mount a live `Flam3` only once settled in view and freeze back
+  to their poster on convergence; `HomeFlame` holds the gating,
+  `homePlayback.ts` the one page-wide playback budget, `portalScript.ts` the
+  tour. Posters are the fallback wherever WebGPU is unavailable.
+- **Poster capture + gallery admin** (`scripts/`, companyReportViewer console):
+  capture runs on the local GPU and uploads the D1 row and R2 poster in one
+  click; drag-and-drop curation, local/dev/prod targets, publish/unpublish.
+- **Plate camera** (`components/Home/HomeFlame.tsx`): a selected plate swaps
+  its static preview camera for the app's own `WheelZoomCamera2D` /
+  `WheelZoomCamera3D` — pan, orbit, wheel zoom and pinch are the SAME code the
+  workspace uses, not a second implementation. Per-flame clamps (zoom
+  0.4-3x, orbit radius 0.5-1.6x, pan ±1.6 world units) keep a steered plate
+  framed; the signal bundles are rebuilt on the engage edge, so releasing
+  resets the camera without a separate reset path that could drift.
+- **Click-vs-drag disambiguation** (`components/Home/plateGesture.ts` + 20
+  tests): a plate is now a two-step control, because "the pointer went up here"
+  stopped meaning "open this" once plates carried a camera. A DOM-free state
+  machine over `{clientX, clientY}` + an injected clock decides drag (>5px) vs
+  press (>500ms) vs tap, and pairs taps into a double-click (400ms / 24px slop)
+  itself rather than listening for the browser's `dblclick`, which fires after
+  `click` and would make every open follow a select. Keyboard opens directly on
+  Enter/Space — no drag ambiguity there.
+  Two defects found by testing the wiring rather than reading it:
+  - **The camera was unreachable.** `WheelZoomCamera*` listens on the CANVAS
+    (`props.eventTarget ?? canvas`), which is `pointer-events: none` so an
+    unselected plate stays a single click target — mounted, listening, and
+    unhittable. Dragging did nothing at all. A selected plate's canvas now
+    takes pointer events, plus `touch-action: none` so a finger pans the flame
+    instead of scrolling Home out from under it.
+  - **...and then the gesture starved.** `createDragHandler` calls
+    `stopImmediatePropagation()` on pointerdown and pointerup — it must, or a
+    workspace drag would double as a click on whatever is underneath. The
+    canvas is the event target, so the tile's bubble-phase handlers never ran:
+    panning worked and double-click did nothing. The tile listens in the
+    CAPTURE phase now (document -> tile -> canvas), so it sees every sequence
+    before anything downstream can take it away.
+- **Breed sequences** (`scripts/derive-sequence.entry.ts`,
+  `scripts/gallery-sequence.mjs`): `--mode breed` derives a row's sequence with
+  the app's own `breedFlames` — the row's flame is parent A, a freshly rolled
+  flame is parent B, each entry a child of the two, cycling the crossover mode
+  per child. Parent B is emitted first: a breed sequence that never shows the
+  second parent is indistinguishable from mutation. `cap-genetics` plays a walk
+  now instead of resting on a still it could not justify. No schema or player
+  change — migration 0004 already specified that nothing knows how long a path
+  is.
+- **`gallery-admin sequence`** (`scripts/gallery-admin.mjs`): curated sequences
+  were terminal-only, because the console's wrapper always execs
+  `gallery-admin.mjs` and a sibling script is unreachable from there. The new
+  subcommand COMPOSES `gallery-sequence.mjs` (the same way `capture` composes
+  the poster pipeline) rather than duplicating the one piece of tooling that has
+  to run app TypeScript. The wrapper is a pass-through, so the console reaches
+  it with no dotfiles change — only buttons to wire.
+- **Sequence preview, then pick** (`scripts/render-flames.mjs`,
+  `scripts/sequence-pick.mjs`, `gallery-sequence.mjs --preview/--pick/--read`):
+  a derived walk was previously written sight-unseen and judged by reloading
+  Home. `--preview` now renders every candidate and returns them as base64
+  data URLs on stdout, writing nothing; `--pick 0,3,5` then commits exactly
+  those, in that order. The two agree because derivation is deterministic in
+  `--seed` and the preview reports the seed it used, so the commit re-derives
+  the identical flames — no candidate is carried between runs in a temp file
+  that could go stale. Rendering is the poster capture's own browser loop,
+  extracted to `render-flames.mjs` and taking flames directly rather than D1
+  rows (the capture page already accepted a spec carrying its own flame), so
+  preview and poster share one quality gate and one blank-canvas check.
+  `--read <env>` was added with it: `--preview` must derive from the row the
+  eventual commit will update, and reusing `--apply` for that would have made
+  a look-only command hold a write path. A failed candidate is reported in
+  place rather than failing the batch, and cannot be picked — committing one
+  would put a flame on Home that nobody saw.
+
+- **`gallery-admin delete`** (`scripts/gallery-admin.mjs`): there was no way to
+  remove a row, only to unpublish it — deliberate while rows were curated by
+  hand, but staging mistakes and test rows then accumulate as hidden clutter
+  with no exit. The one destructive command, guarded three ways: a PUBLISHED
+  row is refused (unpublish first, so deleting is never a one-step way to take
+  something off Home, where a mistyped slug would be an outage rather than an
+  inconvenience), `--yes <slug>` must repeat the slug (a fixed confirmation
+  word gets typed on reflex; retyping the name means what was confirmed is
+  what goes), and prod keeps its own `--confirm prod`. The R2 poster goes with
+  the row: the row is deleted first and the object second, so a half-failure
+  orphans an invisible object rather than leaving a row pointing at a missing
+  poster — and because the key exists nowhere else once the row is gone, a
+  failed object delete prints the exact command to finish it.
+
+- **`gallery-admin poster`** (`scripts/gallery-admin.mjs`): hands back a row's
+  captured poster as base64, for the console's preview thumbnails. Exists for
+  `local` above all — dev and prod already publish posters at
+  `GET /api/gallery/poster/<key>`, so a browser can point an `<img>` straight
+  at those and get HTTP caching for free, whereas the local bucket lives inside
+  miniflare and has no URL unless a dev server happens to be running. Reads
+  only R2: rendering a flame that has no poster is a different and far more
+  expensive operation, so a row without one is an explicit `no-poster` error
+  carrying the `capture` command that would fix it.
+
+- **Microphone blocked in production** (`worker/index.ts`): `Permissions-Policy`
+  sent `microphone=()`, an EMPTY allowlist, which denies the feature to the
+  document's own origin as well as to embedders. `getUserMedia` therefore never
+  prompted — it threw "microphone is not allowed in this document" — so live
+  input for the audio-reactive wiring and the sonification panel was dead on
+  every deployed site while working locally, where no such header is sent. Now
+  `microphone=(self)`: still refused to embedders (and `frame-ancestors 'none'`
+  means there are none), allowed for us. Covered by a test, because nothing
+  else catches this class of bug — the app builds, deploys and renders
+  perfectly, and the only symptom is a prompt that never appears.
+
+### Changed
+
+- **Home art direction** (`HomeTab.module.css`): Home now carries its own
+  scoped palette rather than following the app theme, matching the Benchmark
+  Studio language — near-black ground, hairline borders, ambient warm/cool
+  radials, ember (`#ff7448`) as the accent. A gallery is a dark room: the same
+  posters read as washed-out thumbnails on a light surface, and committing to
+  one palette keeps the full-bleed hero framed identically regardless of a
+  theme setting nobody chose for this page. The nine `[data-theme='dark']`
+  overrides are gone with it.
+
+### Fixed
+
+- **`wrangler dev` OOM-killed the workstation** (`packages/app/wrangler.jsonc`,
+  `packages/app/package.json`): both envs declared `build.command`, and
+  wrangler runs a custom build for `dev` as well as `deploy`, re-running it on
+  every change under `watch_dir` — which defaults to `./src`, the whole app.
+  The documented dev setup (`vite.config.ts`) is vite on :5173 proxying `/api`
+  and `/discord` to wrangler on :8787, so during development NOTHING reads the
+  bundle wrangler produced — vite serves the app. Every file save therefore
+  started a full `vite build --mode development` (~1.5 GB, ~1 min) whose output
+  was discarded, and wrangler neither queues nor cancels them: an editing
+  session stacked dozens concurrently until earlyoom started killing processes
+  (observed four times, once at ~60 GB RSS). Removed from both envs; deploys
+  build explicitly instead (`deploy:dev`/`deploy:prod`, and CI's existing
+  "Build app" + "Verify build output" steps). Verified: `wrangler dev` boots
+  and three source-file touches produce zero builds.
+- **Hero flashed white on scroll** (`HomeFlame.tsx`): mounting was gated on
+  _settled_ visibility per `gallery_preview_layout` §3 — correct for STARTING a
+  canvas, wrong for STOPPING one. Because the scrolling signal is global, every
+  scroll anywhere tore down the canvas of every live plate and rebuilt it
+  ~180ms later from zero. Ordinary plates had already frozen to their posters
+  so nobody saw it; the hero never freezes, so it re-accumulated from scratch
+  and showed the washed-out first batch each time. Mounting is now latched:
+  settled visibility starts a canvas, only leaving the near-window stops it.
+  Reveal is also thresholded (25% progress) and latched, so a camera pan cannot
+  drop an already-revealed plate back under the threshold and fade the poster
+  in over the render the user is steering.
+- **Audio loading reported nothing, and playback was hostage to it**
+  (`AudioReactivePanel.tsx`, `MainWorkspace.tsx`, `utils/useAudioReactive.ts`).
+  Three causes, all separate: `isAnalyzing` compared `fileAnalyzer() === null`
+  against a signal holding `undefined`, so the memo was ALWAYS false and the
+  "Analyzing audio…" overlay it gates had never once rendered; that overlay's
+  bar was hard-wired to `beatProgress`, which stays 0 for the whole analysis, so
+  it would have shown 0% anyway; and `createAudioAnalyzer` already accepted an
+  `onProgress(current, total)` that nobody passed. Now wired, throttled to whole
+  percents — the callback fires once per FRAME, ~32k times for 18 minutes at
+  30fps, so publishing every call would cost more than the analysis. Separately,
+  `useAudioReactive` ran `fullCleanup()` (closing the AudioContext) whenever
+  `audioEnabled` went false and returned early when the analyzer was missing —
+  so the transport died with live preview, and the play button was inert during
+  analysis. Transport is no longer gated on either; only the feature→parameter
+  mapping is. Mic mode stays gated, deliberately: a file has something to
+  audition, an open capture is all cost and a privacy surprise.
+- **3D flames lost most of the toolbar** (`ViewControls.tsx`,
+  `BlendFlameGallery.tsx`, `MainWorkspace.tsx`, `flame/breedFlame.ts`): a single
+  `<Show when={!props.is3D}>` wrapped Blend, Morph AND everything after them, so
+  loading a 3D flame silently removed Audio Reactive, Sonification, Breed,
+  Evolve, Simulator, Ancestry, Diff and the Gallery. Only Blend and Morph have a
+  reason — they interpolate through the blend pipeline, and `ifsPipeline3D`
+  has no blend input at all. The picker also filtered candidates with
+  `dimensions !== 3`, so a 3D flame was offered only 2D partners; every one was
+  a mismatch, and a mismatch does not degrade — crossover copies whole
+  transforms, a 2D transform's affine has no `g`..`l`, and the child fails
+  `validateFlame`, which THREW inside BreedGallery's signal initialiser. The
+  modal never rendered and the click looked ignored. The picker now matches the
+  caller's dimension (morph still asks for 2D), `breedFlames` returns `[]` on a
+  mismatch instead of throwing, and the hover preview — which IS the blend
+  mechanism — is skipped in 3D rather than changing the name while the picture
+  stays still. Two regression tests.
+- **Audio wiring presets rebuilt** (`utils/audioWiringPresets.ts` + 26 tests):
+  the old set drove `highlightPower`, `skipIters` and `gamma` — parameters that
+  barely move the image — and being static data could only ever touch render
+  settings. Now three RENDER presets restricted to the visible movers
+  (`vibrancy`, `palettePhase`, `exposure`, `zoom`, `contrast`), and three
+  FLAME-AWARE ones computed from the loaded transforms (probabilities,
+  variation weights, pre-affine scale). The computed ones are deterministic, so
+  a preset stays reproducible, and are offered disabled with a reason when a
+  flame cannot satisfy them rather than silently wiring nothing. Randomize moved
+  from inside the wiring editor to the Mappings header and is weighted ~2:1
+  toward flame structure over render settings. Generation is shared, so the
+  panel and the editor cannot disagree about what exists.
+- **Percussive sonification was silent** (`utils/sonification.ts`): `voiceIdx`
+  reset each update and the probability gate usually passed one transform, so
+  nearly every hit routed to `voices[0]` — the kick — which was white noise
+  through an 80 Hz 2nd-order lowpass, under 1% of the noise energy. Drum choice
+  now derives from the transform id (stable, so a pattern reads as one); kick
+  and tom are synthesised from a pitch-dropping sine; hits own their nodes
+  instead of sharing a pool that cut itself off. Verified by tapping the graph
+  with an AnalyserNode in real Chrome: peak RMS 0.066 against silence.
+- **Reverb mix could not mix** (`utils/sonification.ts`): orchestral and
+  percussive connected `masterGain` to `ctx.destination` directly AND through
+  `dryGain`, pinning dry at full level.
+- **Ancestry pedigree view** (`flame/ancestry.ts`, `AncestryTreeModal.tsx` + 9
+  tests): `getPedigreeTree` layers by distance from the focal flame — parents
+  above, children below — where `getLineageTree` groups by generation, which is
+  a property of the flame and so puts a late-introduced mate in Gen 0. Runs both
+  directions so a founder still shows its family; every flame drawn at most once
+  across a backcross. Also: the edge tooltip multiplied an already-percentage
+  `edgeSim` by 100, reading "8400% similar".
+- **Audio panel layout**: Live Preview moved from the footer to the transport
+  row; footers on both sound panels became status bars (flame, track, duration,
+  mapping count / model, voices, scale, volume) with switches on their own row.
+- **Re-staging left a stale sequence** (`scripts/gallery-admin.mjs`): `put`
+  upserts a row and deliberately clears `poster_key`/`poster_frame`, because
+  both describe the flame being replaced. A curated `sequence` is derived from
+  that flame too, and was never added when migration 0004 introduced the
+  column — so re-staging left the card opening on the new flame and then
+  playing a path belonging to the old one, which reads as a rendering bug
+  rather than as stale content. Cleared with the rest now, warned about
+  explicitly, and the `next` hints carry the regenerate command. `ROW_COLUMNS`
+  also reports `has_sequence` (presence, not the flames), so the console can
+  show which rows play a walk.
+- **Workspace hand-off** (`MainWorkspace.tsx`): opening a gallery flame resets
+  panels, live modulation and the timeline first, so leftover exposure/vibrancy
+  tracks stop modulating the new descriptor every frame ("too bright"), and no
+  dialog stays open across the hand-off.
+
 ## [0.9.8] - 2026-07-24
 
 iOS/macOS WebKit rendering correctness (render-loop stall recovery, spurious

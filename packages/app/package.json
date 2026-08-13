@@ -1,6 +1,6 @@
 {
   "name": "chaos-master",
-  "version": "0.9.8",
+  "version": "0.9.9",
   "description": "WebGPU based IFS Flame Generator for Artists & Explorers",
   "type": "module",
   "scripts": {
@@ -12,8 +12,8 @@
     "start": "vite",
     "test": "vitest",
     "analyze-bundle": "VITE_ANALYZE_BUNDLE=true vite build",
-    "deploy:dev": "pnpm exec wrangler deploy --env dev",
-    "deploy:prod": "pnpm exec wrangler deploy --env prod",
+    "deploy:dev": "pnpm run build:dev && pnpm exec wrangler deploy --env dev",
+    "deploy:prod": "pnpm run build && pnpm exec wrangler deploy --env prod",
     "wr-dev": "pnpm exec wrangler dev --env dev",
     "r2:create:dev": "pnpm exec wrangler r2 bucket create chaos-master-og-images-dev",
     "r2:create:prod": "pnpm exec wrangler r2 bucket create chaos-master-og-images"

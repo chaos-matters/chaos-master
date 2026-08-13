@@ -3,11 +3,11 @@ import { ModalTitleBar } from '@/components/Modal/ModalTitleBar'
 import { VariationPreview } from '@/components/VariationSelector/VariationSelector'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
-import { contentHash, ensureNode, getLineageTree } from '@/flame/ancestry'
+import { contentHash, ensureNode, getLineageTree, getPedigreeTree, } from '@/flame/ancestry'
 import { diffFlames } from '@/flame/fdiff'
 import { Lineage } from '@/icons'
 import ui from './AncestryTreeModal.module.css'
-import type { AncestryNode, LineageLayer } from '@/flame/ancestry'
+import type { AncestryNode } from '@/flame/ancestry'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { HardwareTier } from '@/utils/hardwareTier'
 
@@ -62,10 +62,57 @@ export function AncestryTreeModal(props: {
     ),
   )
 
-  const layers = createMemo<LineageLayer[]>(() => {
+  /**
+   * Two ways to read the same records.
+   *
+   * `generations` groups by how many breeding steps a flame is from a founder.
+   * That is a property of the flame itself, so a mate introduced late still
+   * sits in Gen 0 beside the original grandparents — correct, and confusing
+   * when the question was "who are this flame's parents".
+   *
+   * `pedigree` measures outward from the focal flame instead — parents above,
+   * children below — so both parents of a child are always adjacent to it and
+   * it reads top-to-bottom like a human family tree.
+   */
+  const [viewMode, setViewMode] = createSignal<'generations' | 'pedigree'>(
+    'generations',
+  )
+
+  /** Either layout, flattened to what the renderer needs. */
+  type DisplayLayer = {
+    label: string
+    nodes: AncestryNode[]
+    isFocal: boolean
+  }
+
+  const layers = createMemo<DisplayLayer[]>(() => {
     // Version signal triggers recompute when focal changes
     void version()
-    return getLineageTree(focalHash())
+    if (viewMode() === 'pedigree') {
+      // Already ordered oldest-first by getPedigreeTree.
+      return getPedigreeTree(focalHash()).map((layer) => ({
+        label: layer.isFocal
+          ? 'Current'
+          : layer.direction === 'ancestor'
+            ? layer.depth === 1
+              ? 'Parents'
+              : layer.depth === 2
+                ? 'Grandparents'
+                : `${layer.depth} back`
+            : layer.depth === 1
+              ? 'Children'
+              : layer.depth === 2
+                ? 'Grandchildren'
+                : `${layer.depth} on`,
+        nodes: layer.nodes,
+        isFocal: layer.isFocal,
+      }))
+    }
+    return getLineageTree(focalHash()).map((layer) => ({
+      label: layer.isFocal ? 'Current' : `Gen ${layer.generation}`,
+      nodes: layer.nodes,
+      isFocal: layer.isFocal,
+    }))
   })
 
   const selectedNode = createMemo<AncestryNode | undefined>(() => {
@@ -128,6 +175,32 @@ export function AncestryTreeModal(props: {
         }}
       >
         <span>Ancestry Tree</span>
+        {/* Two readings of the same records — see the `viewMode` comment. */}
+        <div class={ui.viewToggle} role="radiogroup" aria-label="Tree layout">
+          <For each={['generations', 'pedigree'] as const}>
+            {(mode) => (
+              <button
+                type="button"
+                class={ui.viewToggleBtn}
+                classList={{
+                  [ui.viewToggleBtnActive as string]: viewMode() === mode,
+                }}
+                role="radio"
+                aria-checked={viewMode() === mode}
+                onClick={() => {
+                  setViewMode(mode)
+                }}
+                title={
+                  mode === 'generations'
+                    ? 'Group by breeding depth from a founder'
+                    : "This flame's parents and theirs, drawn as a family tree"
+                }
+              >
+                {mode === 'generations' ? 'Generations' : 'Pedigree'}
+              </button>
+            )}
+          </For>
+        </div>
       </ModalTitleBar>
 
       <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
@@ -148,7 +221,12 @@ export function AncestryTreeModal(props: {
             </div>
           }
         >
-          <div class={ui.tree}>
+          <div
+            class={ui.tree}
+            classList={{
+              [ui.treeVertical as string]: viewMode() === 'pedigree',
+            }}
+          >
             <For each={layers()}>
               {(layer, layerIdx) => (
                 <>
@@ -186,6 +264,9 @@ export function AncestryTreeModal(props: {
                             if (edgeSim >= 60) return '#ffc107'
                             return '#f44336'
                           }
+                          // Already a percentage — the thresholds above compare
+                          // it against 85 and 60. The tooltip used to multiply
+                          // by 100 on top, so a 84% edge read "8400% similar".
                           return (
                             <Show when={edgeSim !== undefined}>
                               <span
@@ -195,7 +276,7 @@ export function AncestryTreeModal(props: {
                                   background: `${esColor()}18`,
                                   'border-color': `${esColor()}33`,
                                 }}
-                                title={`${(edgeSim! * 100).toFixed(0)}% similar to ${parent!.name}`}
+                                title={`${edgeSim!.toFixed(0)}% similar to ${parent!.name}`}
                               >
                                 {edgeSim!.toFixed(0)}%
                               </span>
@@ -206,9 +287,7 @@ export function AncestryTreeModal(props: {
                     </div>
                   </Show>
                   <div class={ui.layer}>
-                    <span class={ui.layerLabel}>
-                      {layer.isFocal ? 'Current' : `Gen ${layer.generation}`}
-                    </span>
+                    <span class={ui.layerLabel}>{layer.label}</span>
                     <div class={ui.layerNodes}>
                       <For each={layer.nodes}>
                         {(node) => (

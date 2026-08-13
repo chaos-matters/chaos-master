@@ -1,5 +1,6 @@
 import { batch, createEffect, createResource, createSignal, ErrorBoundary, onCleanup, onMount, Show, Suspense, } from 'solid-js'
 import { AppCrashed, WebgpuNotSupported, } from './components/ErrorHandling/ErrorHandling'
+import { HomeTab } from './components/Home/HomeTab'
 import { Modal } from './components/Modal/Modal'
 import { ToastHost } from './components/Toast/Toast'
 import { WelcomeScreen } from './components/WelcomeScreen/WelcomeScreen'
@@ -11,42 +12,18 @@ import { ToastProvider, useToast } from './contexts/ToastContext'
 import { IS_DEV } from './defaults'
 import { initAncestry } from './flame/ancestry'
 import { importSharedVariations, loadCustomVariations, remapFlameCustomVariations, } from './flame/variations/custom'
+import { activeTab, setActiveTab } from './lib/activeTab'
 import { Root } from './lib/Root'
 import { MainWorkspace } from './MainWorkspace'
-import { appTour } from './tours/appTour'
-import { example1CreationTour } from './tours/example1CreationTour'
-import { example2CreationTour } from './tours/example2CreationTour'
-import { flameCreationTour } from './tours/flameCreationTour'
-import { sidebarTour } from './tours/sidebarTour'
-import { timelineTour } from './tours/timelineTour'
+import { getTour } from './tours/registry'
 import { isBenchmarkAuto, isBenchmarkRequested } from './utils/benchmarkRequest'
 import { decodeSharePayload, decodeVariationShare, } from './utils/jsonQueryParam'
 import { persistentSignal } from './utils/persistentSignal'
 import { recordKeys } from './utils/record'
 import { dismissWelcome, hasWelcomeBeenDismissed, } from './utils/welcomeDismissed'
-import type { TourGuide } from './components/SpotlightTour/tourTypes'
 import type { FlameDescriptor } from './flame/schema/flameSchema'
 import type { HardwareTier } from './utils/hardwareTier'
 import type { TimelineTrack } from './utils/timeline'
-
-function getTour(id: string): TourGuide | undefined {
-  switch (id) {
-    case 'app':
-      return appTour
-    case 'flame-creation':
-      return flameCreationTour
-    case 'sidebar':
-      return sidebarTour
-    case 'timeline':
-      return timelineTour
-    case 'example1-creation':
-      return example1CreationTour
-    case 'example2-creation':
-      return example2CreationTour
-    default:
-      return undefined
-  }
-}
 
 export type ExportImageInfo = {
   /** True when the canvas holds a final color-graded image at the requested
@@ -101,6 +78,13 @@ export function Wrappers() {
   const [selectedWelcomeTracks, setSelectedWelcomeTracks] = createSignal<
     TimelineTrack[] | undefined
   >()
+  /**
+   * Set only by Home's "Explore" cards: the capability the chosen flame was
+   * curated to demonstrate. Rides the same one-shot hand-off as the flame and
+   * its tracks — MainWorkspace reads all three in one effect and calls
+   * `resetFlameFromWelcome`, which clears the lot.
+   */
+  const [selectedCapability, setSelectedCapability] = createSignal<string>()
   const [queryError, setQueryError] = createSignal<string | null>(null)
 
   const [flameFromQuery] = createResource(async () => {
@@ -285,6 +269,7 @@ export function Wrappers() {
                         sharedVariationFromQuery={sharedVariationFromQuery()}
                         flameFromWelcome={selectedFlame}
                         welcomeTracks={selectedWelcomeTracks}
+                        capabilityFromHome={selectedCapability}
                         autoOpenBenchmark={benchmarkRequested}
                         autoStartBenchmark={benchmarkAuto}
                         hardwareTier={
@@ -296,8 +281,27 @@ export function Wrappers() {
                         resetFlameFromWelcome={() => {
                           setSelectedFlame(undefined)
                           setSelectedWelcomeTracks(undefined)
+                          setSelectedCapability(undefined)
                         }}
                       />
+                      {/* Home overlays the workspace, which stays mounted so
+                          the editor keeps its state and its canvas size. It is
+                          suppressed while the welcome screen is up so first-run
+                          still has a single entry point. */}
+                      <Show when={activeTab() === 'home' && !showWelcome()}>
+                        <HomeTab
+                          onOpenFlame={(flame, tracks, capability) => {
+                            // Reuses the welcome screen's hand-off path rather
+                            // than adding a second way to seed the workspace.
+                            batch(() => {
+                              setSelectedFlame(() => flame)
+                              setSelectedWelcomeTracks(() => tracks)
+                              setSelectedCapability(capability)
+                              setActiveTab('workspace')
+                            })
+                          }}
+                        />
+                      </Show>
                     </Suspense>
                     <Show when={showWelcome()}>
                       <WelcomeScreen
@@ -309,10 +313,25 @@ export function Wrappers() {
                           }
                         }}
                         onEnter={() => setShowWelcome(false)}
+                        onBrowseGallery={() => {
+                          // Both flips are required: Home is suppressed while
+                          // the welcome screen is showing (see the Show above),
+                          // so dismissing without switching lands in the editor
+                          // and switching without dismissing shows nothing.
+                          batch(() => {
+                            setActiveTab('home')
+                            setShowWelcome(false)
+                          })
+                        }}
                         onSelectFlame={(flame, tracks) => {
                           batch(() => {
                             setSelectedFlame(() => flame)
                             setSelectedWelcomeTracks(() => tracks)
+                            // Picking a flame means "take me to the editor".
+                            // Force the workspace tab so a stray #home in the
+                            // URL can't leave Home overlaying the flame the
+                            // user just chose.
+                            setActiveTab('workspace')
                           })
                         }}
                         onStartTour={handleStartTour}

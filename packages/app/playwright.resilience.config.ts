@@ -16,6 +16,8 @@ import { defineConfig, devices } from '@playwright/test'
  * Start the HTTPS dev server on :5173 first (cd packages/app && pnpm start), then:
  *   pnpm exec playwright test -c playwright.resilience.config.ts
  *   pnpm exec playwright test -c playwright.resilience.config.ts --project chromium-gpu variation-gallery
+ * If Vite selects a later free port, pass its printed origin through
+ * PLAYWRIGHT_BASE_URL.
  */
 export default defineConfig({
   testDir: './e2e',
@@ -27,7 +29,7 @@ export default defineConfig({
   reporter: [['list']],
   timeout: 90_000,
   use: {
-    baseURL: 'https://localhost:5173',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'https://localhost:5173',
     ignoreHTTPSErrors: true,
     trace: 'off',
     video: 'off',

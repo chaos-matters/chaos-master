@@ -1,0 +1,1257 @@
+<title>Home tab — layout options</title>
+
+<style>
+  :root {
+    --ground: oklch(15% 0.012 250);
+    --surface: oklch(20% 0.014 250);
+    --surface-2: oklch(24% 0.016 250);
+    --line: oklch(31% 0.02 250);
+    --line-soft: oklch(26% 0.018 250);
+    --ink: oklch(93% 0.01 250);
+    --muted: oklch(63% 0.015 250);
+    --faint: oklch(48% 0.015 250);
+    --accent: oklch(72% 0.13 225);
+    --accent-dim: oklch(72% 0.13 225 / 0.14);
+    --plate: oklch(30% 0.045 55);
+    --plate-2: oklch(36% 0.06 30);
+    --bar: oklch(38% 0.018 250);
+
+    --step--1: 0.75rem;
+    --step-0: 0.9375rem;
+    --step-1: 1.15rem;
+    --step-2: 1.5rem;
+    --step-3: 2.1rem;
+
+    --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --ground: oklch(97% 0.004 250);
+      --surface: oklch(100% 0 0);
+      --surface-2: oklch(94% 0.006 250);
+      --line: oklch(84% 0.012 250);
+      --line-soft: oklch(90% 0.008 250);
+      --ink: oklch(24% 0.02 250);
+      --muted: oklch(48% 0.018 250);
+      --faint: oklch(62% 0.015 250);
+      --accent: oklch(52% 0.15 235);
+      --accent-dim: oklch(52% 0.15 235 / 0.1);
+      --plate: oklch(84% 0.06 55);
+      --plate-2: oklch(80% 0.08 30);
+      --bar: oklch(86% 0.01 250);
+    }
+  }
+
+  :root[data-theme='dark'] {
+    --ground: oklch(15% 0.012 250);
+    --surface: oklch(20% 0.014 250);
+    --surface-2: oklch(24% 0.016 250);
+    --line: oklch(31% 0.02 250);
+    --line-soft: oklch(26% 0.018 250);
+    --ink: oklch(93% 0.01 250);
+    --muted: oklch(63% 0.015 250);
+    --faint: oklch(48% 0.015 250);
+    --accent: oklch(72% 0.13 225);
+    --accent-dim: oklch(72% 0.13 225 / 0.14);
+    --plate: oklch(30% 0.045 55);
+    --plate-2: oklch(36% 0.06 30);
+    --bar: oklch(38% 0.018 250);
+  }
+
+  :root[data-theme='light'] {
+    --ground: oklch(97% 0.004 250);
+    --surface: oklch(100% 0 0);
+    --surface-2: oklch(94% 0.006 250);
+    --line: oklch(84% 0.012 250);
+    --line-soft: oklch(90% 0.008 250);
+    --ink: oklch(24% 0.02 250);
+    --muted: oklch(48% 0.018 250);
+    --faint: oklch(62% 0.015 250);
+    --accent: oklch(52% 0.15 235);
+    --accent-dim: oklch(52% 0.15 235 / 0.1);
+    --plate: oklch(84% 0.06 55);
+    --plate-2: oklch(80% 0.08 30);
+    --bar: oklch(86% 0.01 250);
+  }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: var(--step-0);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: clamp(1.5rem, 4vw, 3.5rem) clamp(1rem, 3vw, 2rem) 5rem;
+  }
+
+  header.masthead {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 1.75rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .kicker {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 0 0 0.6rem;
+  }
+
+  h1 {
+    font-size: var(--step-3);
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.75rem;
+    text-wrap: balance;
+    font-weight: 600;
+  }
+
+  .lede {
+    color: var(--muted);
+    max-width: 62ch;
+    margin: 0;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 190px 1fr;
+    gap: clamp(1.5rem, 4vw, 3rem);
+    align-items: start;
+  }
+
+  @media (max-width: 860px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+    .rail {
+      position: static !important;
+    }
+  }
+
+  .rail {
+    position: sticky;
+    top: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .rail-title {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--faint);
+    padding: 0 0 0.5rem;
+  }
+
+  .rail a {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+    text-decoration: none;
+    color: var(--muted);
+    padding: 0.4rem 0.5rem;
+    border-radius: 5px;
+    border-left: 2px solid transparent;
+    font-size: var(--step--1);
+  }
+
+  .rail a:hover {
+    color: var(--ink);
+    background: var(--surface);
+  }
+  .rail a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .rail .pick {
+    font-family: var(--mono);
+    color: var(--accent);
+    font-size: var(--step--1);
+  }
+
+  section.block {
+    margin-bottom: 3.5rem;
+    scroll-margin-top: 1.5rem;
+  }
+
+  .block-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-bottom: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  .block-code {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    color: var(--accent);
+    letter-spacing: 0.04em;
+  }
+
+  h2 {
+    font-size: var(--step-2);
+    letter-spacing: -0.015em;
+    margin: 0;
+    font-weight: 600;
+  }
+
+  .block-note {
+    color: var(--muted);
+    font-size: var(--step--1);
+    max-width: 66ch;
+    margin: 0 0 1.25rem;
+  }
+
+  .options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
+    gap: 1rem;
+  }
+
+  .opt {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.85rem;
+    text-align: left;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+    transition:
+      border-color 0.15s,
+      background 0.15s,
+      transform 0.15s;
+  }
+
+  .opt:hover {
+    border-color: var(--faint);
+    transform: translateY(-2px);
+  }
+  .opt:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .opt[aria-pressed='true'] {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  .opt-label {
+    display: flex;
+    align-items: baseline;
+    gap: 0.45rem;
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    color: var(--faint);
+  }
+
+  .opt[aria-pressed='true'] .opt-label {
+    color: var(--accent);
+  }
+  .opt-name {
+    font-family: var(--sans);
+    font-weight: 600;
+    color: var(--ink);
+    font-size: var(--step-0);
+  }
+  .opt-why {
+    font-size: var(--step--1);
+    color: var(--muted);
+    margin: 0;
+  }
+
+  /* ---- wireframe primitives ---------------------------------------- */
+  .wf {
+    background: var(--surface-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 6px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+  }
+
+  .wf.tall {
+    aspect-ratio: 3 / 4;
+  }
+  .wf.free {
+    aspect-ratio: auto;
+  }
+
+  .plate {
+    background: linear-gradient(135deg, var(--plate), var(--plate-2));
+    border-radius: 3px;
+    flex: 1;
+    min-height: 14px;
+  }
+
+  .bar {
+    background: var(--bar);
+    border-radius: 2px;
+    height: 5px;
+  }
+  .bar.sm {
+    height: 4px;
+  }
+  .bar.w70 {
+    width: 70%;
+  }
+  .bar.w50 {
+    width: 50%;
+  }
+  .bar.w40 {
+    width: 40%;
+  }
+  .bar.w30 {
+    width: 30%;
+  }
+  .bar.w25 {
+    width: 25%;
+  }
+
+  .btn-wf {
+    height: 9px;
+    width: 34px;
+    border: 1px solid var(--faint);
+    border-radius: 20px;
+    flex: none;
+  }
+
+  .row {
+    display: flex;
+    gap: 6px;
+  }
+  .row.mid {
+    align-items: center;
+  }
+  .col {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .fill {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+  }
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    flex: 1;
+  }
+  .grid3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    flex: 1;
+  }
+  .grid-ed {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-auto-rows: 1fr;
+    gap: 6px;
+    flex: 1;
+  }
+  .sp2 {
+    grid-column: span 2;
+  }
+  .sp3 {
+    grid-column: span 3;
+  }
+  .sp4 {
+    grid-column: span 4;
+  }
+  .rw2 {
+    grid-row: span 2;
+  }
+
+  .railbox {
+    width: 26px;
+    background: var(--surface);
+    border: 1px solid var(--line-soft);
+    border-radius: 3px;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 5px 4px;
+  }
+  .topbar {
+    height: 13px;
+    background: var(--surface);
+    border: 1px solid var(--line-soft);
+    border-radius: 3px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 5px;
+  }
+
+  .caption-wf {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: none;
+  }
+
+  /* ---- assembled preview ------------------------------------------- */
+  .assembled {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 1rem;
+  }
+
+  .assembled .wf {
+    aspect-ratio: auto;
+  }
+  .stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .stack-item {
+    border-top: 1px dashed var(--line);
+    padding-top: 10px;
+  }
+  .stack-item:first-child {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .stack-tag {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--faint);
+    margin-bottom: 5px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .summary {
+    margin-top: 1.25rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    padding: 1rem 1.1rem;
+  }
+
+  .summary h3 {
+    margin: 0 0 0.6rem;
+    font-size: var(--step-1);
+    font-weight: 600;
+  }
+
+  .summary dl {
+    margin: 0;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.3rem 1rem;
+    font-size: var(--step--1);
+  }
+
+  .summary dt {
+    font-family: var(--mono);
+    color: var(--faint);
+  }
+  .summary dd {
+    margin: 0;
+    color: var(--ink);
+  }
+
+  .legend {
+    display: flex;
+    gap: 1.25rem;
+    flex-wrap: wrap;
+    font-size: var(--step--1);
+    color: var(--muted);
+    margin-bottom: 2.5rem;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid var(--line-soft);
+    border-radius: 8px;
+    background: var(--surface);
+  }
+
+  .legend span {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+  .swatch {
+    width: 22px;
+    height: 11px;
+    border-radius: 3px;
+    flex: none;
+  }
+  .swatch.p {
+    background: linear-gradient(135deg, var(--plate), var(--plate-2));
+  }
+  .swatch.t {
+    background: var(--bar);
+    height: 5px;
+  }
+  .swatch.c {
+    border: 1px solid var(--faint);
+    height: 9px;
+    border-radius: 20px;
+  }
+
+  footer.note {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: var(--step--1);
+    max-width: 68ch;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .opt {
+      transition: none;
+    }
+    .opt:hover {
+      transform: none;
+    }
+  }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="kicker">Lumen Apeiron · Home tab · Phase 1</p>
+    <h1>Layout options, before any styling</h1>
+    <p class="lede">
+      Structure only — every flame is a warm block, every line of text is a grey
+      bar. Pick one option per section; the assembled page at the bottom updates
+      as you go. Nothing here commits to type, colour or motion yet.
+    </p>
+  </header>
+
+  <div class="legend">
+    <span><i class="swatch p"></i> flame (live or poster)</span>
+    <span><i class="swatch t"></i> text</span>
+    <span><i class="swatch c"></i> control</span>
+  </div>
+
+  <div class="layout">
+    <nav class="rail" aria-label="Sections">
+      <p class="rail-title">Sections</p>
+      <a href="#shell">Shell <span class="pick" data-pick="shell">A</span></a>
+      <a href="#hero">Hero <span class="pick" data-pick="hero">A</span></a>
+      <a href="#gallery"
+        >Gallery <span class="pick" data-pick="gallery">B</span></a
+      >
+      <a href="#motion"
+        >In motion <span class="pick" data-pick="motion">A</span></a
+      >
+      <a href="#explore"
+        >Explore <span class="pick" data-pick="explore">A</span></a
+      >
+      <a href="#portal"
+        >Made here <span class="pick" data-pick="portal">A</span></a
+      >
+      <a href="#assembled">Assembled →</a>
+    </nav>
+
+    <main>
+      <!-- SHELL -->
+      <section class="block" id="shell">
+        <div class="block-head">
+          <span class="block-code">01</span>
+          <h2>Shell &amp; navigation</h2>
+        </div>
+        <p class="block-note">
+          How Home sits inside the app and how you move between sections. This
+          is the only choice that touches the app chrome, so it is worth
+          settling first.
+        </p>
+        <div class="options" data-group="shell">
+          <button class="opt" data-opt="A" aria-pressed="true">
+            <span class="opt-label"
+              >A <span class="opt-name">Left rail</span></span
+            >
+            <div class="wf">
+              <div class="row fill">
+                <div class="railbox">
+                  <div class="bar sm"></div>
+                  <div class="bar sm"></div>
+                  <div class="bar sm"></div>
+                  <div class="bar sm"></div>
+                </div>
+                <div class="col fill">
+                  <div class="plate"></div>
+                  <div class="bar w50"></div>
+                  <div class="grid3" style="flex: 0 0 34px">
+                    <div class="plate"></div>
+                    <div class="plate"></div>
+                    <div class="plate"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p class="opt-why">
+              Persistent section list, always know where you are. Costs
+              horizontal room — the flames get narrower.
+            </p>
+          </button>
+
+          <button class="opt" data-opt="B" aria-pressed="false">
+            <span class="opt-label"
+              >B <span class="opt-name">Top bar</span></span
+            >
+            <div class="wf">
+              <div class="topbar">
+                <div class="bar sm w25"></div>
+                <div class="bar sm w25"></div>
+                <div class="bar sm w25"></div>
+              </div>
+              <div class="col fill">
+                <div class="plate"></div>
+                <div class="bar w50"></div>
+                <div class="grid3" style="flex: 0 0 34px">
+                  <div class="plate"></div>
+                  <div class="plate"></div>
+                  <div class="plate"></div>
+                </div>
+              </div>
+            </div>
+            <p class="opt-why">
+              Full width for the work, anchors stay reachable. Familiar,
+              slightly more generic.
+            </p>
+          </button>
+
+          <button class="opt" data-opt="C" aria-pressed="false">
+            <span class="opt-label"
+              >C <span class="opt-name">Chromeless</span></span
+            >
+            <div class="wf">
+              <div class="col fill">
+                <div class="plate" style="flex: 2"></div>
+                <div class="bar w40"></div>
+                <div class="plate" style="flex: 1.4"></div>
+                <div class="bar w30"></div>
+              </div>
+            </div>
+            <p class="opt-why">
+              Pure scroll, no nav furniture — most immersive, most gallery-like.
+              Weakest wayfinding on a long page.
+            </p>
+          </button>
+        </div>
+      </section>
+
+      <!-- HERO -->
+      <section class="block" id="hero">
+        <div class="block-head">
+          <span class="block-code">02</span>
+          <h2>Hero</h2>
+        </div>
+        <p class="block-note">
+          One always-live flame plus the single sentence that says what this is.
+          The first thing a new user sees after the welcome screen.
+        </p>
+        <div class="options" data-group="hero">
+          <button class="opt" data-opt="A" aria-pressed="true">
+            <span class="opt-label"
+              >A <span class="opt-name">Full-bleed, text over</span></span
+            >
+            <div class="wf">
+              <div class="fill" style="position: relative; display: flex">
+                <div class="plate fill"></div>
+                <div
+                  class="col"
+                  style="
+                    position: absolute;
+                    left: 8px;
+                    bottom: 8px;
+                    right: 35%;
+                    gap: 5px;
+                  "
+                >
+                  <div class="bar" style="height: 8px"></div>
+                  <div class="bar w70"></div>
+                  <div class="btn-wf"></div>
+                </div>
+              </div>
+            </div>
+            <p class="opt-why">
+              Most cinematic. Legibility depends on the flame behind it — needs
+              a scrim, which slightly dulls the art.
+            </p>
+          </button>
+
+          <button class="opt" data-opt="B" aria-pressed="false">
+            <span class="opt-label">B <span class="opt-name">Split</span></span>
+            <div class="wf">
+              <div class="row fill">
+                <div class="col fill" style="justify-content: center">
+                  <div class="bar" style="height: 8px"></div>
+                  <div class="bar w70"></div>
+                  <div class="bar w50"></div>
+                  <div class="btn-wf"></div>
+                </div>
+                <div class="plate" style="flex: 1.4"></div>
+              </div>
+            </div>
+            <p class="opt-why">
+              Text always legible, reads editorial. The flame is smaller and
+              shares the stage.
+            </p>
+          </button>
+
+          <button class="opt" data-opt="C" aria-pressed="false">
+            <span class="opt-label"
+              >C <span class="opt-name">Centred plate</span></span
+            >
+            <div class="wf">
+              <div
+                class="col fill"
+                style="align-items: center; text-align: center"
+              >
+                <div class="bar w40" style="height: 8px"></div>
+                <div class="bar w30"></div>
+                <div class="plate" style="width: 78%"></div>
+                <div class="btn-wf"></div>
+              </div>
+            </div>
+            <p class="opt-why">
+              Museum "first plate": generous margins, the flame framed rather
+              than bled. Quietest, least web-hero.
+            </p>
+          </button>
+        </div>
+      </section>
+
+      <!-- GALLERY -->
+      <section class="block" id="gallery">
+        <div class="block-head">
+          <span class="block-code">03</span>
+          <h2>The flames</h2>
+        </div>
+        <p class="block-note">
+          The core of the page. Poster until scrolled into view, then live.
+          Option B is what <code>packages/landing</code> already implements, so
+          it is the cheapest to reuse.
+        </p>
+        <div class="options" data-group="gallery">
+          <button class="opt" data-opt="A" aria-pressed="false">
+            <span class="opt-label"
+              >A <span class="opt-name">Uniform grid</span></span
+            >
+            <div class="wf">
+              <div class="grid3">
+                <div class="col">
+                  <div class="plate"></div>
+                  <div class="bar sm w70"></div>
+                </div>
+                <div class="col">
+                  <div class="plate"></div>
+                  <div class="bar sm w70"></div>
+                </div>
+                <div class="col">
+                  <div class="plate"></div>
+                  <div class="bar sm w70"></div>
+                </div>
+                <div class="col">
+                  <div class="plate"></div>
+                  <div class="bar sm w70"></div>
+                </div>
+                <div class="col">
+                  <div class="plate"></div>
+                  <div class="bar sm w70"></div>
+                </div>
+                <div class="col">
+                  <div class="plate"></div>
+                  <div class="bar sm w70"></div>
+                </div>
+              </div>
+            </div>
+            <p class="opt-why">
+              Calm and predictable, scales to any number of flames. Risks
+              reading as a stock card grid.
+            </p>
+          </button>
+
+          <button class="opt" data-opt="B" aria-pressed="true">
+            <span class="opt-label"
+              >B <span class="opt-name">Editorial spans</span></span
+            >
+            <div class="wf">
+              <div class="grid-ed">
+                <div class="plate sp3"></div>
+                <div class="plate rw2"></div>
+                <div class="plate sp2"></div>
+                <div class="plate"></div>
+                <div class="plate sp2"></div>
+                <div class="plate sp2"></div>
+              </div>
+            </div>
+            <p class="opt-why">
+              Mixed spans give each flame a different weight — closest to a
+              curated wall. Already built on the landing.
+            </p>
+          </button>
+
+          <button class="opt" data-opt="C" aria-pressed="false">
+            <span class="opt-label"
+              >C <span class="opt-name">Full-bleed alternating</span></span
+            >
+            <div class="wf">
+              <div class="col fill">
+                <div class="row fill">
+                  <div class="plate" style="flex: 2"></div>
+                  <div class="col fill" style="justify-content: center">
+                    <div class="bar w70"></div>
+                    <div class="bar w50"></div>
+                  </div>
+                </div>
+                <div class="row fill">
+                  <div class="col fill" style="justify-content: center">
+                    <div class="bar w70"></div>
+                    <div class="bar w50"></div>
+                  </div>
+                  <div class="plate" style="flex: 2"></div>
+                </div>
+              </div>
+            </div>
+            <p class="opt-why">
+              Biggest possible flame, one at a time, with room for real
+              captions. Longest scroll — best with 5–6 pieces, not 20.
+            </p>
+          </button>
+
+          <button class="opt" data-opt="D" aria-pressed="false">
+            <span class="opt-label"
+              >D <span class="opt-name">Dense wall</span></span
+            >
+            <div class="wf">
+              <div class="grid-ed" style="gap: 4px">
+                <div class="plate sp2"></div>
+                <div class="plate"></div>
+                <div class="plate"></div>
+                <div class="plate"></div>
+                <div class="plate sp2"></div>
+                <div class="plate"></div>
+                <div class="plate"></div>
+                <div class="plate"></div>
+                <div class="plate sp2"></div>
+              </div>
+            </div>
+            <p class="opt-why">
+              Salon hang — tight, immersive, captions on hover only. Most GPU
+              pressure if many go live at once.
+            </p>
+          </button>
+        </div>
+      </section>
+
+      <!-- MOTION -->
+      <section class="block" id="motion">
+        <div class="block-head">
+          <span class="block-code">04</span>
+          <h2>In motion</h2>
+        </div>
+        <p class="block-note">
+          Animated 2D/3D pieces. One or two auto-play briefly on arrival, then
+          settle; the rest wake on hover.
+        </p>
+        <div class="options" data-group="motion">
+          <button class="opt" data-opt="A" aria-pressed="true">
+            <span class="opt-label"
+              >A <span class="opt-name">Row of tiles</span></span
+            >
+            <div class="wf">
+              <div class="col fill">
+                <div class="bar w30"></div>
+                <div class="grid3">
+                  <div class="plate"></div>
+                  <div class="plate"></div>
+                  <div class="plate"></div>
+                </div>
+                <div class="row">
+                  <div class="bar sm w25"></div>
+                  <div class="bar sm w25"></div>
+                  <div class="bar sm w25"></div>
+                </div>
+              </div>
+            </div>
+            <p class="opt-why">
+              Shows range at a glance. Several animated canvases at once is the
+              heaviest case for the GPU budget.
+            </p>
+          </button>
+
+          <button class="opt" data-opt="B" aria-pressed="false">
+            <span class="opt-label"
+              >B <span class="opt-name">Stage + strip</span></span
+            >
+            <div class="wf">
+              <div class="col fill">
+                <div class="plate" style="flex: 3"></div>
+                <div class="grid-ed" style="flex: 0 0 22px">
+                  <div class="plate"></div>
+                  <div class="plate"></div>
+                  <div class="plate"></div>
+                  <div class="plate"></div>
+                </div>
+              </div>
+            </div>
+            <p class="opt-why">
+              One animating at a time, thumbnails to switch. Cheapest and most
+              controlled; less immediate wow.
+            </p>
+          </button>
+        </div>
+      </section>
+
+      <!-- EXPLORE -->
+      <section class="block" id="explore">
+        <div class="block-head">
+          <span class="block-code">05</span>
+          <h2>Explore the capabilities</h2>
+        </div>
+        <p class="block-note">
+          Animation, randomiser, mutation &amp; genetics, audio-reactive,
+          sonification — each opening a curated flame that demonstrates it,
+          ready to play with.
+        </p>
+        <div class="options" data-group="explore">
+          <button class="opt" data-opt="A" aria-pressed="true">
+            <span class="opt-label"
+              >A <span class="opt-name">Card grid</span></span
+            >
+            <div class="wf">
+              <div class="grid3">
+                <div class="col">
+                  <div class="plate" style="flex: 0 0 18px"></div>
+                  <div class="bar sm w70"></div>
+                  <div class="bar sm w50"></div>
+                </div>
+                <div class="col">
+                  <div class="plate" style="flex: 0 0 18px"></div>
+                  <div class="bar sm w70"></div>
+                  <div class="bar sm w50"></div>
+                </div>
+                <div class="col">
+                  <div class="plate" style="flex: 0 0 18px"></div>
+                  <div class="bar sm w70"></div>
+                  <div class="bar sm w50"></div>
+                </div>
+                <div class="col">
+                  <div class="plate" style="flex: 0 0 18px"></div>
+                  <div class="bar sm w70"></div>
+                  <div class="bar sm w50"></div>
+                </div>
+                <div class="col">
+                  <div class="plate" style="flex: 0 0 18px"></div>
+                  <div class="bar sm w70"></div>
+                  <div class="bar sm w50"></div>
+                </div>
+                <div class="col">
+                  <div class="plate" style="flex: 0 0 18px"></div>
+                  <div class="bar sm w70"></div>
+                  <div class="bar sm w50"></div>
+                </div>
+              </div>
+            </div>
+            <p class="opt-why">
+              Mirrors the landing's feature grid, so copy transfers directly.
+              Familiar, and the section that most risks looking templated.
+            </p>
+          </button>
+
+          <button class="opt" data-opt="B" aria-pressed="false">
+            <span class="opt-label"
+              >B <span class="opt-name">Wide rows</span></span
+            >
+            <div class="wf">
+              <div class="col fill">
+                <div class="row mid fill">
+                  <div class="plate" style="flex: 0 0 40px"></div>
+                  <div class="col fill">
+                    <div class="bar w50"></div>
+                    <div class="bar sm w70"></div>
+                  </div>
+                  <div class="btn-wf"></div>
+                </div>
+                <div class="row mid fill">
+                  <div class="plate" style="flex: 0 0 40px"></div>
+                  <div class="col fill">
+                    <div class="bar w50"></div>
+                    <div class="bar sm w70"></div>
+                  </div>
+                  <div class="btn-wf"></div>
+                </div>
+                <div class="row mid fill">
+                  <div class="plate" style="flex: 0 0 40px"></div>
+                  <div class="col fill">
+                    <div class="bar w50"></div>
+                    <div class="bar sm w70"></div>
+                  </div>
+                  <div class="btn-wf"></div>
+                </div>
+              </div>
+            </div>
+            <p class="opt-why">
+              Room for a real sentence per capability and a visible action.
+              Reads as a list rather than a showcase.
+            </p>
+          </button>
+
+          <button class="opt" data-opt="C" aria-pressed="false">
+            <span class="opt-label"
+              >C <span class="opt-name">Tabbed panel</span></span
+            >
+            <div class="wf">
+              <div class="col fill">
+                <div class="row">
+                  <div class="bar sm w25"></div>
+                  <div class="bar sm w25"></div>
+                  <div class="bar sm w25"></div>
+                </div>
+                <div class="row fill">
+                  <div class="plate" style="flex: 2"></div>
+                  <div class="col fill" style="justify-content: center">
+                    <div class="bar w70"></div>
+                    <div class="bar sm w50"></div>
+                    <div class="btn-wf"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p class="opt-why">
+              One capability at a time, each with a large preview. Best per-item
+              treatment; the others are hidden behind a click.
+            </p>
+          </button>
+        </div>
+      </section>
+
+      <!-- PORTAL -->
+      <section class="block" id="portal">
+        <div class="block-head">
+          <span class="block-code">06</span>
+          <h2>Made here</h2>
+        </div>
+        <p class="block-note">
+          The live app-in-app portal, driven by the existing tour definitions.
+          Heaviest section — built last, but its layout affects the page rhythm
+          now.
+        </p>
+        <div class="options" data-group="portal">
+          <button class="opt" data-opt="A" aria-pressed="true">
+            <span class="opt-label"
+              >A <span class="opt-name">Framed window</span></span
+            >
+            <div class="wf">
+              <div class="col fill" style="align-items: center">
+                <div class="bar w30"></div>
+                <div class="wf free" style="width: 88%; flex: 1; padding: 5px">
+                  <div class="topbar" style="height: 8px"></div>
+                  <div class="row fill">
+                    <div class="railbox" style="width: 16px"></div>
+                    <div class="plate fill"></div>
+                  </div>
+                </div>
+                <div class="btn-wf"></div>
+              </div>
+            </div>
+            <p class="opt-why">
+              The app framed as an exhibit, replay control below. Simple, and
+              the portal keeps its own proportions.
+            </p>
+          </button>
+
+          <button class="opt" data-opt="B" aria-pressed="false">
+            <span class="opt-label"
+              >B <span class="opt-name">Portal + step list</span></span
+            >
+            <div class="wf">
+              <div class="row fill">
+                <div class="wf free" style="flex: 2; padding: 5px">
+                  <div class="topbar" style="height: 8px"></div>
+                  <div class="plate fill"></div>
+                </div>
+                <div class="col fill">
+                  <div class="bar sm w70"></div>
+                  <div class="bar sm w50"></div>
+                  <div class="bar sm w70"></div>
+                  <div class="bar sm w40"></div>
+                </div>
+              </div>
+            </div>
+            <p class="opt-why">
+              Steps highlight as the tour plays, so the viewer reads what is
+              happening. Narrower portal, more to build.
+            </p>
+          </button>
+        </div>
+      </section>
+
+      <!-- ASSEMBLED -->
+      <section class="block" id="assembled">
+        <div class="block-head">
+          <span class="block-code">07</span>
+          <h2>Assembled</h2>
+        </div>
+        <p class="block-note">
+          Your current picks stacked in scroll order, to check the page rhythm —
+          how density and breathing room alternate as you move down.
+        </p>
+        <div class="assembled">
+          <div class="stack" id="stack"></div>
+        </div>
+
+        <div class="summary">
+          <h3>Current combination</h3>
+          <dl id="summary-list"></dl>
+        </div>
+      </section>
+
+      <footer class="note">
+        Once a combination feels right, the next step is Phase 0 — choosing
+        which flames fill it — then styling the chosen structure for real.
+        Nothing here is load-bearing code; it exists only to make the layout
+        decision something you can look at.
+      </footer>
+    </main>
+  </div>
+</div>
+
+<script>
+  const NAMES = {
+    shell: { A: 'Left rail', B: 'Top bar', C: 'Chromeless' },
+    hero: { A: 'Full-bleed, text over', B: 'Split', C: 'Centred plate' },
+    gallery: {
+      A: 'Uniform grid',
+      B: 'Editorial spans',
+      C: 'Full-bleed alternating',
+      D: 'Dense wall',
+    },
+    motion: { A: 'Row of tiles', B: 'Stage + strip' },
+    explore: { A: 'Card grid', B: 'Wide rows', C: 'Tabbed panel' },
+    portal: { A: 'Framed window', B: 'Portal + step list' },
+  }
+
+  const ORDER = ['hero', 'gallery', 'motion', 'portal', 'explore']
+  const LABEL = {
+    shell: 'Shell',
+    hero: 'Hero',
+    gallery: 'The flames',
+    motion: 'In motion',
+    portal: 'Made here',
+    explore: 'Explore',
+  }
+
+  const picks = {
+    shell: 'A',
+    hero: 'A',
+    gallery: 'B',
+    motion: 'A',
+    explore: 'A',
+    portal: 'A',
+  }
+
+  function miniature(group, opt) {
+    const p = '<div class="plate"></div>'
+    const bar = (w) => `<div class="bar ${w}"></div>`
+    if (group === 'hero') {
+      if (opt === 'A')
+        return `<div class="wf free" style="height:74px"><div class="fill" style="position:relative;display:flex">${p}<div class="col" style="position:absolute;left:8px;bottom:8px;right:40%;gap:4px">${bar('')}${bar('w50')}</div></div></div>`
+      if (opt === 'B')
+        return `<div class="wf free" style="height:74px"><div class="row fill"><div class="col fill" style="justify-content:center">${bar('')}${bar('w70')}</div><div class="plate" style="flex:1.4"></div></div></div>`
+      return `<div class="wf free" style="height:74px"><div class="col fill" style="align-items:center">${bar('w30')}<div class="plate" style="width:76%;flex:1"></div></div></div>`
+    }
+    if (group === 'gallery') {
+      if (opt === 'A')
+        return `<div class="wf free" style="height:80px"><div class="grid3">${p.repeat(6)}</div></div>`
+      if (opt === 'B')
+        return `<div class="wf free" style="height:80px"><div class="grid-ed"><div class="plate sp3"></div><div class="plate rw2"></div><div class="plate sp2"></div><div class="plate"></div><div class="plate sp2"></div><div class="plate sp2"></div></div></div>`
+      if (opt === 'C')
+        return `<div class="wf free" style="height:90px"><div class="col fill"><div class="row fill"><div class="plate" style="flex:2"></div><div class="col fill" style="justify-content:center">${bar('w70')}${bar('w50')}</div></div><div class="row fill"><div class="col fill" style="justify-content:center">${bar('w70')}${bar('w50')}</div><div class="plate" style="flex:2"></div></div></div></div>`
+      return `<div class="wf free" style="height:80px"><div class="grid-ed" style="gap:4px"><div class="plate sp2"></div>${p}${p}${p}<div class="plate sp2"></div>${p}${p}${p}<div class="plate sp2"></div></div></div>`
+    }
+    if (group === 'motion') {
+      if (opt === 'A')
+        return `<div class="wf free" style="height:62px"><div class="col fill">${bar('w30')}<div class="grid3">${p.repeat(3)}</div></div></div>`
+      return `<div class="wf free" style="height:62px"><div class="col fill"><div class="plate" style="flex:3"></div><div class="grid-ed" style="flex:0 0 16px">${p.repeat(4)}</div></div></div>`
+    }
+    if (group === 'explore') {
+      if (opt === 'A')
+        return `<div class="wf free" style="height:66px"><div class="grid3">${`<div class="col"><div class="plate" style="flex:0 0 14px"></div>${bar('sm w70')}</div>`.repeat(6)}</div></div>`
+      if (opt === 'B')
+        return `<div class="wf free" style="height:66px"><div class="col fill">${`<div class="row mid fill"><div class="plate" style="flex:0 0 34px"></div><div class="col fill">${bar('w50')}${bar('sm w70')}</div></div>`.repeat(3)}</div></div>`
+      return `<div class="wf free" style="height:66px"><div class="col fill"><div class="row">${bar('sm w25')}${bar('sm w25')}${bar('sm w25')}</div><div class="row fill"><div class="plate" style="flex:2"></div><div class="col fill" style="justify-content:center">${bar('w70')}${bar('sm w50')}</div></div></div></div>`
+    }
+    if (group === 'portal') {
+      if (opt === 'A')
+        return `<div class="wf free" style="height:76px"><div class="col fill" style="align-items:center"><div class="wf free" style="width:86%;flex:1;padding:4px"><div class="topbar" style="height:7px"></div><div class="plate fill"></div></div></div></div>`
+      return `<div class="wf free" style="height:76px"><div class="row fill"><div class="wf free" style="flex:2;padding:4px"><div class="topbar" style="height:7px"></div><div class="plate fill"></div></div><div class="col fill">${bar('sm w70')}${bar('sm w50')}${bar('sm w70')}</div></div></div>`
+    }
+    return ''
+  }
+
+  function render() {
+    for (const [group, opt] of Object.entries(picks)) {
+      const el = document.querySelector(`[data-pick="${group}"]`)
+      if (el) el.textContent = opt
+    }
+
+    const shellNote = { A: 'left rail', B: 'top bar', C: 'no chrome' }[
+      picks.shell
+    ]
+    const stack = ORDER.map(
+      (g) => `
+      <div class="stack-item">
+        <div class="stack-tag"><span>${LABEL[g]}</span><span>${picks[g]} · ${NAMES[g][picks[g]]}</span></div>
+        ${miniature(g, picks[g])}
+      </div>`,
+    ).join('')
+
+    document.getElementById('stack').innerHTML = `
+      <div class="stack-tag" style="margin:0"><span>Shell</span><span>${picks.shell} · ${shellNote}</span></div>
+      ${stack}`
+
+    document.getElementById('summary-list').innerHTML = Object.entries(picks)
+      .map(([g, o]) => `<dt>${LABEL[g]}</dt><dd>${o} — ${NAMES[g][o]}</dd>`)
+      .join('')
+  }
+
+  document.querySelectorAll('[data-group]').forEach((grp) => {
+    const group = grp.dataset.group
+    grp.querySelectorAll('.opt').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        picks[group] = btn.dataset.opt
+        grp
+          .querySelectorAll('.opt')
+          .forEach((b) => b.setAttribute('aria-pressed', String(b === btn)))
+        render()
+      })
+    })
+  })
+
+  render()
+</script>

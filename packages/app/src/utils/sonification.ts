@@ -131,8 +131,11 @@ function triggerVoice(
 function createOrchestralEngine(ctx: AudioContext, config: SonificationConfig) {
   const masterGain = ctx.createGain()
   masterGain.gain.value = config.volume
-  masterGain.connect(ctx.destination)
 
+  /* Dry and wet are the ONLY paths to the destination. masterGain used to also
+     connect straight there, so the dry signal stayed at full level however far
+     the reverb was turned up — the mix control could only ever add wet on top,
+     never cross-fade. Same bug in all three engines. */
   const reverb = createReverb(ctx)
   const dryGain = ctx.createGain()
   const wetGain = ctx.createGain()
@@ -282,8 +285,8 @@ function createDroneVoice(ctx: AudioContext, destination: AudioNode): DroneOsc {
 function createAmbientEngine(ctx: AudioContext, config: SonificationConfig) {
   const masterGain = ctx.createGain()
   masterGain.gain.value = config.volume * 0.5
-  masterGain.connect(ctx.destination)
 
+  // Dry + wet only — see createOrchestralEngine.
   const reverb = createReverb(ctx)
   const dryGain = ctx.createGain()
   const wetGain = ctx.createGain()
@@ -422,16 +425,10 @@ function createAmbientEngine(ctx: AudioContext, config: SonificationConfig) {
 
 // --- Percussive model ---
 
-type PercVoice = {
-  noiseBuffer: AudioBuffer
-  filter: BiquadFilterNode
-  gain: GainNode
-  panner: StereoPannerNode
-  type: 'kick' | 'snare' | 'hihat' | 'tom'
-}
+type DrumType = 'kick' | 'snare' | 'hihat' | 'tom'
 
 function createNoiseBuffer(ctx: AudioContext): AudioBuffer {
-  const length = ctx.sampleRate * 0.3 // 300ms covers max duration (kick: 200ms)
+  const length = Math.floor(ctx.sampleRate * 0.4)
   const buffer = ctx.createBuffer(1, length, ctx.sampleRate)
   const data = buffer.getChannelData(0)
   for (let i = 0; i < length; i++) {
@@ -440,56 +437,120 @@ function createNoiseBuffer(ctx: AudioContext): AudioBuffer {
   return buffer
 }
 
-function createPercVoice(
+/**
+ * Which drum a transform plays.
+ *
+ * Derived from the transform id so it is STABLE: the same transform is always
+ * the same instrument, which is what makes a repeating pattern audible as a
+ * pattern. It used to be `voices[voiceIdx++]` with `voiceIdx` reset on every
+ * update — and since the probability gate usually lets exactly one transform
+ * through per call, nearly every hit landed on voices[0], the kick.
+ */
+function drumTypeFor(tid: string): DrumType {
+  let h = 0
+  for (let i = 0; i < tid.length; i++) {
+    h = (Math.imul(h, 31) + tid.charCodeAt(i)) | 0
+  }
+  return DRUM_TYPES[Math.abs(h) % DRUM_TYPES.length]!
+}
+
+/**
+ * Fire one drum hit, building its nodes and letting them fall away when done.
+ *
+ * Per-hit nodes rather than a pool of persistent "voices": one-shots are what
+ * the Web Audio API is built around, and a shared voice retriggered before its
+ * envelope finished used to cut itself off.
+ *
+ * Kick and tom are SYNTHESISED, not filtered noise. The old versions ran white
+ * noise through a lowpass at 80 Hz (kick) and a Q=3 bandpass at 200 Hz (tom),
+ * which keep well under 1% of the noise's energy — inaudible on anything but
+ * headphones with the volume up. A drum with a body needs a pitched sine whose
+ * frequency drops fast; that is what makes a kick sound like a kick.
+ */
+function triggerDrum(
   ctx: AudioContext,
   destination: AudioNode,
   noiseBuffer: AudioBuffer,
-  type: PercVoice['type'],
-): PercVoice {
-  const filter = ctx.createBiquadFilter()
-  const gain = ctx.createGain()
+  type: DrumType,
+  when: number,
+  velocity: number,
+  pan: number,
+  /** 0-1, from the transform's colour — nudges pitch/brightness per hit. */
+  tone: number,
+): void {
   const panner = ctx.createStereoPanner()
-
-  gain.gain.value = 0
-  panner.pan.value = 0
-
-  switch (type) {
-    case 'kick':
-      filter.type = 'lowpass'
-      filter.frequency.value = 80
-      filter.Q.value = 2
-      break
-    case 'snare':
-      filter.type = 'bandpass'
-      filter.frequency.value = 800
-      filter.Q.value = 1.5
-      break
-    case 'hihat':
-      filter.type = 'highpass'
-      filter.frequency.value = 6000
-      filter.Q.value = 0.5
-      break
-    case 'tom':
-      filter.type = 'bandpass'
-      filter.frequency.value = 200
-      filter.Q.value = 3
-      break
-  }
-
-  filter.connect(gain)
-  gain.connect(panner)
+  panner.pan.value = clamp(pan, -1, 1)
   panner.connect(destination)
 
-  return { noiseBuffer, filter, gain, panner, type }
+  const gain = ctx.createGain()
+  gain.connect(panner)
+
+  const decay =
+    type === 'kick'
+      ? 0.34
+      : type === 'tom'
+        ? 0.26
+        : type === 'snare'
+          ? 0.16
+          : 0.06
+
+  gain.gain.setValueAtTime(Math.max(0.0001, velocity), when)
+  gain.gain.exponentialRampToValueAtTime(0.001, when + decay)
+
+  const stopAt = when + decay + 0.02
+
+  if (type === 'kick' || type === 'tom') {
+    const osc = ctx.createOscillator()
+    osc.type = 'sine'
+    const start = type === 'kick' ? 150 : 260 + tone * 140
+    const end = type === 'kick' ? 45 : 95 + tone * 45
+    osc.frequency.setValueAtTime(start, when)
+    osc.frequency.exponentialRampToValueAtTime(end, when + decay * 0.35)
+    osc.connect(gain)
+    osc.start(when)
+    osc.stop(stopAt)
+    osc.onended = () => {
+      osc.disconnect()
+      gain.disconnect()
+      panner.disconnect()
+    }
+    return
+  }
+
+  const src = ctx.createBufferSource()
+  src.buffer = noiseBuffer
+  const filter = ctx.createBiquadFilter()
+  if (type === 'hihat') {
+    filter.type = 'highpass'
+    filter.frequency.value = 7000 + tone * 2000
+    filter.Q.value = 0.7
+  } else {
+    filter.type = 'bandpass'
+    filter.frequency.value = 1400 + tone * 900
+    filter.Q.value = 0.9
+  }
+  src.connect(filter)
+  filter.connect(gain)
+  src.start(when)
+  src.stop(stopAt)
+  src.onended = () => {
+    src.disconnect()
+    filter.disconnect()
+    gain.disconnect()
+    panner.disconnect()
+  }
 }
 
-const DRUM_TYPES: PercVoice['type'][] = ['kick', 'snare', 'hihat', 'tom']
+const DRUM_TYPES: DrumType[] = ['kick', 'snare', 'hihat', 'tom']
 
 function createPercussiveEngine(ctx: AudioContext, config: SonificationConfig) {
   const masterGain = ctx.createGain()
   masterGain.gain.value = config.volume
-  masterGain.connect(ctx.destination)
 
+  /* Dry and wet BOTH hang off masterGain and nothing else reaches the
+     destination. masterGain used to also connect straight to ctx.destination
+     on top of the dry path, so the dry signal was always at full level and
+     turning the reverb up only ever added — the mix control could not mix. */
   const reverb = createReverb(ctx)
   const dryGain = ctx.createGain()
   const wetGain = ctx.createGain()
@@ -503,14 +564,6 @@ function createPercussiveEngine(ctx: AudioContext, config: SonificationConfig) {
 
   const noiseBuffer = createNoiseBuffer(ctx)
 
-  const maxVoices = 8
-  const voices: PercVoice[] = []
-  for (let i = 0; i < maxVoices; i++) {
-    voices.push(
-      createPercVoice(ctx, masterGain, noiseBuffer, DRUM_TYPES[i % 4]!),
-    )
-  }
-
   // Track last trigger time per transform to enforce rate limit
   const lastTrigger = new Map<string, number>()
 
@@ -521,64 +574,40 @@ function createPercussiveEngine(ctx: AudioContext, config: SonificationConfig) {
     )
     if (transforms.length === 0) return
 
-    let voiceIdx = 0
-
     for (const [tid, t] of transforms) {
       const probability = t.probability ?? 1 / transforms.length
       const last = lastTrigger.get(tid) ?? 0
-      const minInterval = 1 / (config.triggerRate * probability)
+      // Rate scales with the transform's own weight, but a rare transform must
+      // still be heard occasionally rather than effectively never: clamp the
+      // gap instead of letting 1/(rate*p) run away as p approaches 0.
+      const minInterval = clamp(
+        1 / (config.triggerRate * Math.max(probability, 0.05)),
+        0.08,
+        4,
+      )
 
-      // Should this transform fire now?
       if (now - last < minInterval) continue
-      if (Math.random() > probability * 1.2) continue
-
+      // A weight is how OFTEN it fires (the interval above), not an extra coin
+      // flip on top — the old `Math.random() > p * 1.2` skipped ~70% of the
+      // hits a typical 4-transform flame had already earned.
       lastTrigger.set(tid, now)
 
-      const voice = voices[voiceIdx % voices.length]!
-      voiceIdx++
-
-      // Velocity from weight
-      const velocity = clamp(probability * 1.5, 0.2, 1)
-
-      // Pan from color.x
+      // Loud enough to hear across the range of weights; a 0.25-weight
+      // transform used to land at 0.225 after the extra 0.6 factor.
+      const velocity = clamp(0.35 + probability * 0.8, 0.35, 1)
       const pan = clamp(t.color.x * config.spatialSpread * 2, -1, 1)
+      const tone = clamp(t.color.y, 0, 1)
 
-      // Filter tweak from color.y
-      switch (voice.type) {
-        case 'kick':
-          voice.filter.frequency.value = 60 + t.color.y * 40
-          break
-        case 'snare':
-          voice.filter.frequency.value = 600 + t.color.y * 400
-          break
-        case 'hihat':
-          voice.filter.frequency.value = 5000 + t.color.y * 3000
-          break
-        case 'tom':
-          voice.filter.frequency.value = 150 + t.color.y * 100
-          break
-      }
-
-      voice.panner.pan.linearRampToValueAtTime(pan, now + 0.005)
-
-      // Trigger: create noise burst through the filter
-      const src = ctx.createBufferSource()
-      src.buffer = noiseBuffer
-
-      const duration =
-        voice.type === 'hihat' ? 0.05 : voice.type === 'kick' ? 0.2 : 0.12
-
-      src.connect(voice.filter)
-      voice.gain.gain.cancelScheduledValues(now)
-      voice.gain.gain.setValueAtTime(velocity * 0.6, now)
-      voice.gain.gain.exponentialRampToValueAtTime(0.001, now + duration)
-
-      src.start(now)
-      src.stop(now + duration)
-
-      src.onended = () => {
-        src.disconnect()
-      }
+      triggerDrum(
+        ctx,
+        masterGain,
+        noiseBuffer,
+        drumTypeFor(tid),
+        now,
+        velocity,
+        pan,
+        tone,
+      )
     }
   }
 
@@ -592,11 +621,9 @@ function createPercussiveEngine(ctx: AudioContext, config: SonificationConfig) {
   }
 
   function dispose(): void {
-    for (const voice of voices) {
-      voice.filter.disconnect()
-      voice.gain.disconnect()
-      voice.panner.disconnect()
-    }
+    // Hits own their own nodes and disconnect themselves in `onended`; there is
+    // no persistent voice pool left to tear down. Dropping masterGain also
+    // orphans anything still ringing.
     masterGain.disconnect()
     dryGain.disconnect()
     wetGain.disconnect()

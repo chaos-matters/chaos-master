@@ -3,6 +3,53 @@
 What's new in Lumen Apeiron (formerly Chaos Master). Concise highlights for
 each release; the full developer history lives in `dev.changelog.md`.
 
+## [0.9.9] - 2026-08-02
+
+### Added
+
+- **Benchmark Studio.** Open the Lab from the bottom toolbar or visit
+  `/benchmarks` to compare the real WebGPU flame pipeline with repeatable,
+  paired A/B runs. Choose example, recent, uploaded, or freshly generated
+  flames; control the renderer, reconstruction filter, random sequence,
+  initialization and workload; then inspect confidence intervals and raw
+  samples or export JSON, CSV, and a shareable result card. Variation authors
+  can also compare the built-in implementation with validated custom WGSL.
+- **Home.** A front page for the app: a curated wall of flames, a row of
+  animated pieces, a walkthrough of one flame being built step by step, and
+  cards that open the tool each piece shows off. Nothing here is a screenshot —
+  every flame renders live on your GPU, and falls back to a captured image when
+  it can't. Click a flame to take its camera (drag to pan, scroll or pinch to
+  zoom), double-click to open it in the editor. Reach it any time from the
+  welcome screen, and reload straight back into it — Home has its own address.
+  The Explore cards demonstrate what they describe rather than sitting still:
+  the randomizer rolls a flame and steers it, and breeding crosses two flames
+  and plays through their children, one for each crossover mode.
+
+- **Audio presets that do something.** The wiring presets now drive the
+  settings that visibly change the picture, and three of them are built from
+  the flame you have loaded — re-weighting its own transforms, variation
+  weights and affines, which is what actually makes a fractal move. A
+  Randomize button sits with the mappings for a fresh wiring any time.
+- **Ancestry as a family tree.** A Pedigree view puts a flame's parents above
+  it and its children below, alongside the existing generations view.
+
+### Fixed
+
+- **The microphone works on the site.** Live mic input for audio-reactive
+  flames and sonification was blocked outright on lumenapeiron.com — the
+  browser never even asked for permission. It worked locally, which is why it
+  went unnoticed.
+- **Sonification's drums.** The percussive model was silent on every flame.
+- **Sound stops when you close its panel**, unless you ask it to keep playing.
+- **Loading a song tells you what it's doing.** The progress bar now reflects
+  the real analysis pass instead of sitting at nothing, and a track can be
+  played and scrubbed as soon as it decodes — you no longer wait for the whole
+  analysis, or have to leave live preview switched on, just to hear it.
+- **3D flames keep their tools.** Breeding, evolution, the population
+  simulator, ancestry, diff, audio-reactive, sonification and the gallery were
+  all hidden whenever a 3D flame was loaded. Breeding a 3D flame also found no
+  partners to offer, so picking a second parent did nothing at all.
+
 ## [0.9.8] - 2026-07-24
 
 ### Added

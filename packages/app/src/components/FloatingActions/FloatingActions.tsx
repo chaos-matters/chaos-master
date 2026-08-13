@@ -1,5 +1,6 @@
 import { createEffect, createSignal, Show } from 'solid-js'
-import { Bookmark, CameraIcon, Discord, Eye, FolderOpen, Pause, Plus, Share, Shuffle, Zap, } from '@/icons'
+import { Bookmark, CameraIcon, Discord, Eye, FolderOpen, Home, Pause, Plus, Share, Shuffle, Zap, } from '@/icons'
+import { setActiveTab } from '@/lib/activeTab'
 import { defaultPills, QualityPresets } from '../Quality/QualityPresets'
 import ui from './FloatingActions.module.css'
 
@@ -197,6 +198,16 @@ export function FloatingActions(props: Props) {
         <div class={ui.rows}>
           {/* Row 1: Action buttons */}
           <div class={ui.buttons}>
+            <button
+              class={ui.button}
+              onClick={() => {
+                setActiveTab('home')
+              }}
+              aria-label="Home"
+              title="Home — gallery and what the app can do"
+            >
+              <Home />
+            </button>
             <button
               class={ui.button}
               onClick={props.onNewFlame}

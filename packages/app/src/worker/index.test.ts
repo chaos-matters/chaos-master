@@ -178,6 +178,32 @@ describe('worker — S-3 security headers', () => {
     expect(csp).toContain("default-src 'self'")
     expect(csp).toContain("'unsafe-eval'")
   })
+
+  /*
+   * The mic is a FEATURE here — audio-reactive wiring and sonification both
+   * take live input. `microphone=()` is an empty allowlist, which blocks our
+   * own origin too: getUserMedia never prompts, it throws "microphone is not
+   * allowed in this document", and the panel looks broken rather than denied.
+   *
+   * Worth a test because nothing else catches it: the app builds, deploys and
+   * renders perfectly, and the only symptom is a permission prompt that never
+   * appears on a page nobody tests headlessly.
+   */
+  it('allows the microphone for this origin, and nothing else it does not use', async () => {
+    const res = await worker.fetch(
+      post('https://x.test/api/shorten', { payload: 'abc' }),
+      makeEnv(),
+      ctx,
+    )
+    const pp = res.headers.get('Permissions-Policy') ?? ''
+    expect(pp).toContain('microphone=(self)')
+    // Still denied to embedders — `self` is not `*`.
+    expect(pp).not.toContain('microphone=*')
+    // Features the app genuinely never uses stay fully locked.
+    for (const denied of ['camera', 'geolocation', 'payment', 'usb']) {
+      expect(pp).toContain(`${denied}=()`)
+    }
+  })
 })
 
 describe('worker OG meta injection — XSS escaping guard', () => {
@@ -201,5 +227,404 @@ describe('worker OG meta injection — XSS escaping guard', () => {
     const html = await res.text()
     expect(html).not.toContain('<script>alert(1)</script>')
     expect(html).toContain('&lt;script&gt;')
+  })
+})
+
+// ── Home gallery content (D1) ───────────────────────────────────────────────
+// A minimal stand-in for the D1 binding: records the SQL and bound params so a
+// test can assert the query shape without a real database.
+function makeD1(rows: Record<string, unknown>[]) {
+  const calls: { sql: string; params: unknown[] }[] = []
+  return {
+    calls,
+    prepare(sql: string) {
+      const call = { sql, params: [] as unknown[] }
+      calls.push(call)
+      const stmt = {
+        bind(...params: unknown[]) {
+          call.params = params
+          return stmt
+        },
+        all: () => Promise.resolve({ results: rows }),
+        first: () => Promise.resolve(rows[0] ?? null),
+      }
+      return stmt
+    },
+  }
+}
+
+const galleryRow = {
+  slug: 'first-light',
+  title: 'First Light',
+  caption: null,
+  author: 'unknown',
+  section: 'hero',
+  capability: null,
+  flame: JSON.stringify({ transforms: { t1: {} } }),
+  animation: null,
+  dimensions: 2,
+  transform_count: 4,
+  poster_key: null,
+  poster_width: null,
+  poster_height: null,
+  poster_frame: null,
+}
+
+describe('worker /api/gallery', () => {
+  it('returns 503 when no content database is bound', async () => {
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery'),
+      makeEnv(),
+      ctx,
+    )
+    expect(res.status).toBe(503)
+  })
+
+  it('lists published items and omits the flame descriptors', async () => {
+    const db = makeD1([galleryRow])
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { items: Record<string, unknown>[] }
+    expect(body.items).toHaveLength(1)
+    // The list endpoint must stay small — descriptors are fetched per item.
+    expect(db.calls[0]?.sql).not.toContain('flame,')
+    expect(db.calls[0]?.sql).toContain('published = 1')
+    expect(res.headers.get('Cache-Control')).toContain('max-age=')
+  })
+
+  it('filters by section and rejects an unknown one', async () => {
+    const db = makeD1([galleryRow])
+    const ok = await worker.fetch(
+      new Request('https://x.test/api/gallery?section=motion'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+    expect(ok.status).toBe(200)
+    expect(db.calls[0]?.params).toEqual(['motion'])
+
+    const bad = await worker.fetch(
+      new Request('https://x.test/api/gallery?section=; DROP TABLE'),
+      makeEnv({ CONTENT_DB: makeD1([]) }),
+      ctx,
+    )
+    expect(bad.status).toBe(400)
+  })
+
+  it('parses the stored JSON when returning a single item', async () => {
+    const db = makeD1([
+      { ...galleryRow, animation: JSON.stringify({ tracks: [] }) },
+    ])
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/first-light'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as {
+      flame: { transforms: Record<string, unknown> }
+      animation: { tracks: unknown[] }
+    }
+    // Clients must receive objects, not strings needing a second decode.
+    expect(body.flame.transforms).toHaveProperty('t1')
+    expect(body.animation.tracks).toEqual([])
+    expect(db.calls[0]?.params).toEqual(['first-light'])
+  })
+
+  // Home renders an animated row live at the frame its poster was captured at,
+  // so both endpoints have to carry that frame. Dropped from either SELECT, the
+  // client sees "frame unknown" and silently falls back to the poster.
+  it('carries poster_frame through both gallery endpoints', async () => {
+    const row = {
+      ...galleryRow,
+      animation: JSON.stringify({ tracks: [] }),
+      poster_key: 'first-light-abcd1234.webp',
+      poster_frame: 31,
+    }
+    const list = await worker.fetch(
+      new Request('https://x.test/api/gallery'),
+      makeEnv({ CONTENT_DB: makeD1([row]) }),
+      ctx,
+    )
+    const listBody = (await list.json()) as {
+      items: { poster_frame: number | null }[]
+    }
+    expect(listBody.items[0]?.poster_frame).toBe(31)
+
+    const item = await worker.fetch(
+      new Request('https://x.test/api/gallery/first-light'),
+      makeEnv({ CONTENT_DB: makeD1([row]) }),
+      ctx,
+    )
+    const itemBody = (await item.json()) as { poster_frame: number | null }
+    expect(itemBody.poster_frame).toBe(31)
+  })
+
+  // A row may carry a curated ORDERED list of extra descriptors, which is what
+  // makes `cap-randomizer` play a path rather than rest on one still.
+  it('parses a curated sequence for the single item, and keeps it out of the list', async () => {
+    const row = {
+      ...galleryRow,
+      sequence: JSON.stringify([{ transforms: { a: {} } }, { transforms: {} }]),
+    }
+    const itemDb = makeD1([row])
+    const item = await worker.fetch(
+      new Request('https://x.test/api/gallery/first-light'),
+      makeEnv({ CONTENT_DB: itemDb }),
+      ctx,
+    )
+    const body = (await item.json()) as { sequence: unknown[] | null }
+    expect(Array.isArray(body.sequence)).toBe(true)
+    expect(body.sequence).toHaveLength(2)
+    expect(itemDb.calls[0]?.sql).toContain('sequence')
+
+    // The list stays small for the same reason it omits `flame`: these are the
+    // largest values in the table and nothing in a list view reads them.
+    const listDb = makeD1([row])
+    await worker.fetch(
+      new Request('https://x.test/api/gallery'),
+      makeEnv({ CONTENT_DB: listDb }),
+      ctx,
+    )
+    expect(listDb.calls[0]?.sql).not.toContain('sequence')
+  })
+
+  it('reports no sequence for the rows that have none', async () => {
+    for (const stored of [null, undefined, '']) {
+      const res = await worker.fetch(
+        new Request('https://x.test/api/gallery/first-light'),
+        makeEnv({ CONTENT_DB: makeD1([{ ...galleryRow, sequence: stored }]) }),
+        ctx,
+      )
+      const body = (await res.json()) as { sequence: unknown }
+      expect(body.sequence).toBeNull()
+    }
+  })
+
+  it('serves the row anyway when its sequence is unreadable', async () => {
+    // A stale deploy or a bad hand edit costs the row its walk, not its place
+    // on Home — unlike `flame`, which the row cannot be shown without.
+    for (const stored of ['{not json', JSON.stringify({ nope: true })]) {
+      const res = await worker.fetch(
+        new Request('https://x.test/api/gallery/first-light'),
+        makeEnv({ CONTENT_DB: makeD1([{ ...galleryRow, sequence: stored }]) }),
+        ctx,
+      )
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as {
+        sequence: unknown
+        flame: Record<string, unknown>
+      }
+      expect(body.sequence).toBeNull()
+      expect(body.flame).toHaveProperty('transforms')
+    }
+  })
+
+  it('rejects a malformed slug before it reaches the query', async () => {
+    const db = makeD1([galleryRow])
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/Bad_Slug!'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+    expect(res.status).toBe(400)
+    expect(db.calls).toHaveLength(0)
+  })
+
+  it('404s an unpublished or unknown slug', async () => {
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/nope'),
+      makeEnv({ CONTENT_DB: makeD1([]) }),
+      ctx,
+    )
+    expect(res.status).toBe(404)
+  })
+})
+
+// ── Home settings (D1) ──────────────────────────────────────────────────────
+describe('worker /api/gallery/config', () => {
+  it('returns 503 when no content database is bound', async () => {
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/config'),
+      makeEnv(),
+      ctx,
+    )
+    expect(res.status).toBe(503)
+  })
+
+  it('returns the rows as one object, cached like the gallery reads', async () => {
+    const db = makeD1([
+      { key: 'portal_tour_id', value: 'example2-creation' },
+      { key: 'future_key', value: 'ignored by this build' },
+    ])
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/config'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({
+      config: {
+        portal_tour_id: 'example2-creation',
+        future_key: 'ignored by this build',
+      },
+    })
+    expect(db.calls[0]?.sql).toContain('home_config')
+    expect(res.headers.get('Cache-Control')).toContain('max-age=')
+  })
+
+  it('returns an empty map when nothing is configured', async () => {
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/config'),
+      makeEnv({ CONTENT_DB: makeD1([]) }),
+      ctx,
+    )
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ config: {} })
+  })
+
+  // 'config' is a valid slug shape, so route order is the whole guard here: put
+  // the per-slug route first and this becomes a 404 from gallery_items.
+  it('is matched before the per-slug route', async () => {
+    const db = makeD1([{ key: 'portal_tour_id', value: 'app' }])
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/config'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+    expect(res.status).toBe(200)
+    expect(db.calls[0]?.sql).not.toContain('gallery_items')
+  })
+
+  // A database whose migrations have not been applied has no settings — which
+  // is what an empty config means. Reporting it as a server fault made every
+  // Home visit on a fresh deploy log a 500 and told the client its perfectly
+  // healthy backend was broken.
+  it('serves an empty config when home_config does not exist', async () => {
+    const db = {
+      prepare() {
+        throw new Error('no such table: home_config')
+      },
+    }
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/config'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ config: {} })
+    // Cached like the real thing: an unconfigured deploy must not be asked
+    // again on every request either.
+    expect(res.headers.get('Cache-Control')).toContain('max-age=')
+  })
+
+  // D1 raises the missing table from the statement, not from prepare(), and
+  // decorates it — the qualified name and the SQLITE_ERROR suffix are what a
+  // real deploy actually threw.
+  it('serves an empty config for D1’s own missing-table wording', async () => {
+    const db = {
+      prepare() {
+        return {
+          all: () =>
+            Promise.reject(
+              new Error(
+                'D1_ERROR: no such table: main.home_config: SQLITE_ERROR',
+              ),
+            ),
+        }
+      },
+    }
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/config'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ config: {} })
+  })
+
+  // The whole point of naming the table: a genuine failure must still be one.
+  it('500s on a real SQL or D1 error', async () => {
+    const db = {
+      prepare() {
+        throw new Error('D1_ERROR: no such column: value: SQLITE_ERROR')
+      },
+    }
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/config'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+    expect(res.status).toBe(500)
+    expect(await res.json()).toEqual({ error: 'Server error' })
+  })
+
+  it('500s rather than leaking the error text of a failure', async () => {
+    const db = {
+      prepare() {
+        throw new Error('connection to 10.0.0.7 refused (secret-host)')
+      },
+    }
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/config'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+    expect(res.status).toBe(500)
+    expect(await res.json()).toEqual({ error: 'Server error' })
+  })
+})
+
+describe('worker frontend routing', () => {
+  it('redirects the trailing-slash benchmark route to its canonical URL', async () => {
+    const res = await worker.fetch(
+      new Request('https://x.test/benchmarks/?suite=renderer'),
+      makeEnv(),
+      ctx,
+    )
+
+    expect(res.status).toBe(308)
+    expect(res.headers.get('location')).toBe(
+      'https://x.test/benchmarks?suite=renderer',
+    )
+  })
+
+  it.each(['/api', '/api/not-a-real-route'])(
+    'keeps unknown API route %s as a JSON 404 response',
+    async (pathname) => {
+      const res = await worker.fetch(
+        new Request(`https://x.test${pathname}`),
+        makeEnv(),
+        ctx,
+      )
+
+      expect(res.status).toBe(404)
+      expect(res.headers.get('content-type')).toContain('application/json')
+      expect(await res.json()).toEqual({ error: 'Not found' })
+    },
+  )
+
+  it('delegates the canonical benchmark route to the asset binding', async () => {
+    const assetFetch = vi.fn(() =>
+      Promise.resolve(
+        new Response('<html><body>benchmark app</body></html>', {
+          headers: { 'Content-Type': 'text/html' },
+        }),
+      ),
+    )
+    const request = new Request('https://x.test/benchmarks')
+
+    const res = await worker.fetch(
+      request,
+      makeEnv({ ASSETS: { fetch: assetFetch } }),
+      ctx,
+    )
+
+    expect(res.status).toBe(200)
+    expect(assetFetch).toHaveBeenCalledOnce()
+    expect(assetFetch).toHaveBeenCalledWith(request)
   })
 })

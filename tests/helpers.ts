@@ -1,5 +1,5 @@
 import { test as base } from '@playwright/test'
-import type { ConsoleMessage, Page  } from '@playwright/test'
+import type { ConsoleMessage, Page } from '@playwright/test'
 
 export type ConsoleError = {
   type: string
@@ -8,20 +8,26 @@ export type ConsoleError = {
   args: unknown[]
 }
 
-export async function dismissWelcomeIfPresent(page: Page) {
-  // The welcome backdrop has z-index: 200, dismiss it if visible
-  // Try clicking the backdrop (which also dismisses) or the Enter button
+export async function dismissWelcomeIfPresent(page: Page, timeout = 2000) {
+  // Hardware detection can delay the welcome screen in software-WebGPU CI.
+  // Prefer its explicit action when it appears, then fall back to the backdrop.
   try {
+    const startBtn = page
+      .getByRole('button', { name: /^(Start|Enter)$/ })
+      .first()
+    const welcomeAppeared = await startBtn
+      .waitFor({ state: 'visible', timeout })
+      .then(() => true)
+      .catch(() => false)
+    if (welcomeAppeared) {
+      await startBtn.click()
+      await page.waitForTimeout(500)
+      return
+    }
+
     const backdrop = page.locator('[class*="backdrop"]').first()
-    if (await backdrop.isVisible({ timeout: 2000 })) {
-      // Try Enter button first
-      const enterBtn = page.locator('button:has-text("Enter")').first()
-      if (await enterBtn.isVisible({ timeout: 500 }).catch(() => false)) {
-        await enterBtn.click()
-      } else {
-        // Click backdrop to dismiss
-        await backdrop.click({ position: { x: 5, y: 5 } })
-      }
+    if (await backdrop.isVisible({ timeout: 500 })) {
+      await backdrop.click({ position: { x: 5, y: 5 } })
       await page.waitForTimeout(500)
     }
   } catch {

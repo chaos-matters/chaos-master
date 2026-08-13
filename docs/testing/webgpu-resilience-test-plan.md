@@ -18,6 +18,7 @@ hardware path must be checked by hand.
 
 ```bash
 # dev server must be running on https://localhost:5173 (pnpm --filter chaos-master start)
+# if Vite falls forward, set PLAYWRIGHT_BASE_URL to the printed origin
 pnpm exec playwright test -c playwright.resilience.config.ts                       # both projects
 pnpm exec playwright test -c playwright.resilience.config.ts --project chromium-gpu       # headed, real GPU
 pnpm exec playwright test -c playwright.resilience.config.ts --project chromium-degraded  # headless, no WebGPU

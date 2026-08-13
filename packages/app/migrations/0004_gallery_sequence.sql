@@ -1,0 +1,27 @@
+-- A row that is a SEQUENCE of flames rather than one flame.
+--
+-- `cap-randomizer` advertises "roll a whole flame, then steer it", and a single
+-- still cannot show that: what makes the randomizer worth a card is the path
+-- from a roll of the dice to something deliberate. This column holds that path
+-- as an ordered JSON ARRAY of FlameDescriptors — the flames DERIVED from the
+-- row's own `flame`, which stays the starting roll and the frame the poster was
+-- captured from. The player walks `[flame, ...sequence]` and wraps.
+--
+-- Flat and ordered on purpose. A future row wanting to replay two different
+-- curated paths simply stores twice as many entries; nothing in the player,
+-- the API or this schema knows how long a "path" is, so nothing has to change.
+--
+-- Generated once and stored, never generated live: scripts/gallery-sequence.mjs
+-- derives the entries with the app's own src/flame/randomize.ts and writes them
+-- here. That makes the card deterministic (every visitor sees the same path),
+-- curatable (a bad roll is fixed by regenerating with another seed rather than
+-- by hoping), and free of any randomiser code on the render path.
+--
+-- NULL — which is every other row, and every row that existed before this
+-- column — means "one flame", exactly as before. Consumers must treat NULL and
+-- an empty array identically; see `sequenceFlames` in src/lib/galleryContent.ts.
+--
+-- Served only by the single-item route. The list endpoint omits it for the same
+-- reason it omits `flame`: a list of rows is rendered from metadata, and these
+-- are the largest values in the table.
+ALTER TABLE gallery_items ADD COLUMN sequence TEXT;

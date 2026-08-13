@@ -50,6 +50,13 @@ export function BreedGallery(props: {
   parentA: FlameDescriptor
   parentB: FlameDescriptor
   parentInfo: BreedGalleryParentInfo
+  /**
+   * The child that was previewed on hover, if the user got here by hovering a
+   * candidate. Shown FIRST, so clicking the flame you were looking at opens a
+   * gallery that still contains it — otherwise the one that made you click
+   * would be the one flame missing, since every child is freshly randomised.
+   */
+  seedChild?: FlameDescriptor
   hardwareTier?: HardwareTier | null
   onApply: (flame: FlameDescriptor) => void
   onChangeParent: () => void
@@ -69,18 +76,25 @@ export function BreedGallery(props: {
     mutationStrength: 0.1,
   })
 
-  const breedWithRecord = () => {
-    const children = breedFlames(props.parentA, props.parentB, {
-      count: count(),
+  const breedWithRecord = (seed?: FlameDescriptor) => {
+    // One fewer generated when a previewed child leads the row, so the count
+    // the user picked stays the number of cells on screen.
+    const generated = breedFlames(props.parentA, props.parentB, {
+      count: seed === undefined ? count() : Math.max(0, count() - 1),
       crossoverMode: crossoverMode(),
       mutationStrength: 0.1,
     })
+    const children = seed === undefined ? generated : [seed, ...generated]
     recordBreed(props.parentA, props.parentB, children, breedConfig())
     return children
   }
 
-  const [children, setChildren] =
-    createSignal<FlameDescriptor[]>(breedWithRecord())
+  // The seed only leads the FIRST render: re-breeding or changing the
+  // crossover mode is an explicit ask for new children, and keeping a stale
+  // preview pinned at the front would quietly ignore it.
+  const [children, setChildren] = createSignal<FlameDescriptor[]>(
+    breedWithRecord(props.seedChild),
+  )
 
   const smartMatchInfo = createMemo<SmartBreedMatchInfo | null>(() => {
     if (crossoverMode() !== 'smart') return null
