@@ -1,5 +1,5 @@
 import { f32, struct, vec2f } from 'typegpu/data'
-import { abs, round, select } from 'typegpu/std'
+import { abs, lt, round, select } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
 import { random } from '@/shaders/random'
@@ -63,7 +63,7 @@ export const grid = parametricVariation(
       .mul(2 * D)
     const rounded = round(pos.mul(divs)).div(divs)
     const diff = abs(pos.sub(rounded))
-    const jittered = select(pos, pos.add(jitter), diff < vec2f(D))
+    const jittered = select(pos, pos.add(jitter), lt(diff, vec2f(D)))
     return select(
       vec2f(rounded.x, jittered.y),
       vec2f(jittered.x, rounded.y),
