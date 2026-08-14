@@ -1,9 +1,10 @@
-import { createEffect, createResource, createSignal, For, onCleanup, Show, } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, For, onCleanup, Show, } from 'solid-js'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { setActiveTab } from '@/lib/activeTab'
-import { bySection, fetchGallery, fetchGalleryItem, needsPosterFrame, posterUrl, } from '@/lib/galleryContent'
+import { byCollection, bySection, fetchGallery, fetchGalleryItem, GALLERY_COLLECTIONS, galleryCredit, galleryExternalUrl, galleryResourceItems, needsPosterFrame, posterUrl, } from '@/lib/galleryContent'
 import { createSharedIntersectionObserver } from '@/utils/useIntersectionObserver'
+import { installHomeEscapeBoundary } from './homeEscape'
 import { HomeFlame } from './HomeFlame'
 import { createPlaybackCoordinator } from './homePlayback'
 import { HomePortal } from './HomePortal'
@@ -92,6 +93,8 @@ function usePlateInteraction(props: {
   slug: string
   /** The tile element the gesture is recognised on. */
   el: Accessor<HTMLElement | undefined>
+  /** Only a still-selected plate may complete the second half of an open. */
+  selected: Accessor<boolean>
   onSelect: (slug: string) => void
   onOpen: (slug: string) => void
 }) {
@@ -133,7 +136,7 @@ function usePlateInteraction(props: {
       recogniser.move(event, event.timeStamp)
     }
     const onUp = (event: PointerEvent) => {
-      const gesture = recogniser.up(event, event.timeStamp)
+      const gesture = recogniser.up(event, event.timeStamp, props.selected())
       if (gesture === 'select') {
         props.onSelect(props.slug)
       } else if (gesture === 'open') {
@@ -161,13 +164,15 @@ function usePlateInteraction(props: {
     cancel: () => {
       recogniser.cancel()
     },
+    leave: (pointerType: string) => {
+      recogniser.leave(pointerType)
+    },
     handlers: {
-      /* Keyboard carries no drag ambiguity, so Enter/Space opens directly
-         rather than making keyboard users "double-press". preventDefault stops
-         Space from also scrolling the page. */
-      onKeyDown(event: KeyboardEvent) {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault()
+      /* Pointer clicks are resolved above because they may be pans, zooms, or
+         the second half of a double-click. Native keyboard and assistive-tech
+         activation emits a click with detail 0 and can open directly. */
+      onClick(event: MouseEvent) {
+        if (event.detail === 0) {
           props.onOpen(props.slug)
         }
       },
@@ -206,66 +211,134 @@ function Plate(props: {
   const interaction = usePlateInteraction({
     slug: props.item.slug,
     el: tileEl,
+    selected: () => props.selected,
     onSelect: props.onSelect,
     onOpen: props.onOpen,
   })
   const engaged = () => props.selected
+  const creditId = `home-plate-credit-${props.item.slug}`
+  const credit = () => galleryCredit(props.item)
+  const sourceUrl = () => galleryExternalUrl(props.item.source_url)
+  const licenseUrl = () => galleryExternalUrl(props.item.license_url)
   return (
-    <button
-      ref={setTileEl}
-      type="button"
-      class={`${ui.plate} ${props.class ?? ''}`}
-      classList={{ [ui.isSelected!]: props.selected }}
-      /* Reflects HomeFlame's own playback state, so "how many plates are moving
-         right now" is answerable from the DOM — by the reader, and by the
-         Playwright run that has to prove the cap holds. */
-      data-home-playing={playing() ? 'true' : undefined}
-      data-home-selected={props.selected ? 'true' : undefined}
-      aria-pressed={props.selected}
-      {...interaction.handlers}
-      onPointerEnter={() => {
-        setHovered(true)
-      }}
-      onPointerLeave={() => {
-        setHovered(false)
-        // Leaving mid-sequence is the camera being used elsewhere, or the
-        // pointer moving to another plate — either way this plate's gesture is
-        // over and must not pair with a later tap.
-        interaction.cancel()
-      }}
-      title={
-        props.selected
-          ? `Double-click to open ${props.item.title} in the workspace`
-          : `Select ${props.item.title}`
-      }
-    >
-      <HomeFlame
-        slug={props.item.slug}
-        poster={posterUrl(props.item)}
-        placement={props.placement}
-        near={near}
-        hovered={hovered}
-        engaged={engaged}
-        posterOnly={needsPosterFrame(props.item)}
-        playback={props.playback}
-        autoPlay={props.autoPlay}
-        onPlayingChange={setPlaying}
-        freezeWhenConverged
-      />
-      <Show when={props.selected}>
-        <PlateHint coarse={interaction.coarse()} />
-      </Show>
-      <Show when={posterUrl(props.item) === undefined}>
-        <span class={ui.plateEmpty}>No poster yet</span>
-      </Show>
-      <span class={ui.plateCaption}>
-        <span class={ui.plateTitle}>{props.item.title}</span>
-        <span class={ui.plateMeta}>
-          {props.item.dimensions}D · {props.item.transform_count} transforms
-          <Show when={props.item.has_animation}> · animated</Show>
+    <article class={`${ui.plateShell} ${props.class ?? ''}`}>
+      <button
+        ref={setTileEl}
+        type="button"
+        class={ui.plate}
+        classList={{ [ui.isSelected!]: props.selected }}
+        /* Reflects HomeFlame's own playback state, so "how many plates are moving
+           right now" is answerable from the DOM — by the reader, and by the
+           Playwright run that has to prove the cap holds. */
+        data-home-playing={playing() ? 'true' : undefined}
+        data-home-selected={props.selected ? 'true' : undefined}
+        aria-label={`Open ${props.item.title}`}
+        aria-describedby={credit() === undefined ? undefined : creditId}
+        {...interaction.handlers}
+        onPointerEnter={() => {
+          setHovered(true)
+        }}
+        onPointerLeave={(event) => {
+          setHovered(false)
+          // Leaving mid-sequence is the camera being used elsewhere, or the
+          // pointer moving to another plate — either way this plate's gesture is
+          // over and must not pair with a later tap. A post-release touch or pen
+          // leave is the exception: browsers emit it after releasing implicit
+          // capture, between the two halves of a legitimate double-tap.
+          interaction.leave(event.pointerType)
+        }}
+        title={
+          props.selected
+            ? `Double-click to open ${props.item.title} in the workspace`
+            : `Select ${props.item.title}`
+        }
+      >
+        <HomeFlame
+          slug={props.item.slug}
+          poster={posterUrl(props.item)}
+          placement={props.placement}
+          near={near}
+          hovered={hovered}
+          engaged={engaged}
+          posterOnly={needsPosterFrame(props.item)}
+          playback={props.playback}
+          autoPlay={props.autoPlay}
+          onPlayingChange={setPlaying}
+          freezeWhenConverged
+        />
+        <Show when={props.selected}>
+          <PlateHint coarse={interaction.coarse()} />
+        </Show>
+        <Show when={posterUrl(props.item) === undefined}>
+          <span class={ui.plateEmpty}>No poster yet</span>
+        </Show>
+        <span class={ui.plateCaption}>
+          <span class={ui.plateTitle}>{props.item.title}</span>
+          <Show when={props.item.caption}>
+            {(caption) => <span class={ui.plateDescription}>{caption()}</span>}
+          </Show>
+          <Show when={credit()}>
+            {(text) => (
+              <span class={ui.plateCredit} id={creditId}>
+                {text()}
+              </span>
+            )}
+          </Show>
+          <span class={ui.plateMeta}>
+            {props.item.dimensions}D · {props.item.transform_count} transforms
+            <Show when={props.item.has_animation}> · animated</Show>
+          </span>
         </span>
-      </span>
-    </button>
+      </button>
+      <Show
+        when={
+          !props.selected &&
+          (sourceUrl() !== undefined || props.item.license?.trim())
+        }
+      >
+        <span
+          class={ui.plateLinks}
+          aria-label={`Credits for ${props.item.title}`}
+        >
+          <Show when={sourceUrl()}>
+            {(href) => (
+              <a
+                href={href()}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Source for ${props.item.title}`}
+              >
+                Source
+              </a>
+            )}
+          </Show>
+          <Show when={props.item.license?.trim()}>
+            {(license) => (
+              <Show
+                when={licenseUrl()}
+                fallback={
+                  <span class={ui.plateLicense} title={license()}>
+                    {license()}
+                  </span>
+                }
+              >
+                {(href) => (
+                  <a
+                    href={href()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`${license()} license for ${props.item.title}`}
+                    title={license()}
+                  >
+                    {license()}
+                  </a>
+                )}
+              </Show>
+            )}
+          </Show>
+        </span>
+      </Show>
+    </article>
   )
 }
 
@@ -290,6 +363,7 @@ function CapabilityCard(props: {
   const interaction = usePlateInteraction({
     slug: props.item.slug,
     el: cardEl,
+    selected: () => props.selected,
     onSelect: props.onSelect,
     onOpen: props.onOpen,
   })
@@ -302,14 +376,14 @@ function CapabilityCard(props: {
       classList={{ [ui.isSelected!]: props.selected }}
       data-home-playing={playing() ? 'true' : undefined}
       data-home-selected={props.selected ? 'true' : undefined}
-      aria-pressed={props.selected}
+      aria-label={`Open ${props.item.title}`}
       {...interaction.handlers}
       onPointerEnter={() => {
         setHovered(true)
       }}
-      onPointerLeave={() => {
+      onPointerLeave={(event) => {
         setHovered(false)
-        interaction.cancel()
+        interaction.leave(event.pointerType)
       }}
     >
       <span class={ui.cardThumb} ref={setThumbEl}>
@@ -381,7 +455,12 @@ export function HomeTab(props: HomeTabProps) {
   // Wrapped rather than passed directly: createResource hands the fetcher its
   // source value, which would arrive as the section filter.
   const [content] = createResource(() => fetchGallery())
-  const sections = () => bySection(content() ?? [])
+  // A rejected Solid resource rethrows when its accessor is read. Check the
+  // error first so the explicit unavailable state below remains in control.
+  const sections = createMemo(() =>
+    bySection(galleryResourceItems(content, content.error)),
+  )
+  const collections = createMemo(() => byCollection(sections().gallery))
 
   // ONE observer for every plate on the page, rooted on Home's scroll container.
   // A viewport root cannot preload rows past the fold, because the inner scroll
@@ -411,20 +490,28 @@ export function HomeTab(props: HomeTabProps) {
    */
   const [selectedSlug, setSelectedSlug] = createSignal<string>()
 
+  function exitHome() {
+    setActiveTab('workspace')
+  }
+
   function select(slug: string) {
     setSelectedSlug((current) => (current === slug ? undefined : slug))
   }
 
-  // Escape, or a press anywhere that is not the selected plate, hands the
-  // camera back. Listeners only exist while something is selected.
+  // Home is a full-screen layer over a still-mounted workspace. Escape leaves
+  // it in one step, including while a plate owns the camera; an open modal is
+  // the nearer layer and keeps Escape first. The boundary also prevents the
+  // hidden workspace from acting on the same key.
+  createEffect(() => {
+    const remove = installHomeEscapeBoundary(exitHome)
+    onCleanup(remove)
+  })
+
+  // A press anywhere that is not the selected plate hands its camera back.
+  // This listener only exists while something is selected.
   createEffect(() => {
     if (selectedSlug() === undefined) {
       return
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setSelectedSlug(undefined)
-      }
     }
     // Capture phase, so this runs BEFORE the plate that was pressed: pressing a
     // different plate clears the old selection first, then that plate's own
@@ -438,10 +525,8 @@ export function HomeTab(props: HomeTabProps) {
         setSelectedSlug(undefined)
       }
     }
-    document.addEventListener('keydown', onKeyDown)
     document.addEventListener('pointerdown', onPointerDown, true)
     onCleanup(() => {
-      document.removeEventListener('keydown', onKeyDown)
       document.removeEventListener('pointerdown', onPointerDown, true)
     })
   })
@@ -484,9 +569,7 @@ export function HomeTab(props: HomeTabProps) {
         <button
           type="button"
           class={`${ui.railLink} ${ui.railBack}`}
-          onClick={() => {
-            setActiveTab('workspace')
-          }}
+          onClick={exitHome}
         >
           Back to the editor
         </button>
@@ -525,19 +608,54 @@ export function HomeTab(props: HomeTabProps) {
                   A curated wall. Each plate opens in the workspace exactly as
                   it is here.
                 </p>
-                <div class={ui.galleryGrid}>
-                  <For each={sections().gallery}>
-                    {(item, i) => (
-                      <Plate
-                        item={item}
-                        class={SPANS[i() % SPANS.length]}
-                        placement="plate"
-                        track={track}
-                        onOpen={open}
-                        selected={selectedSlug() === item.slug}
-                        onSelect={select}
-                        playback={playback}
-                      />
+                <div class={ui.collectionStack}>
+                  <For each={GALLERY_COLLECTIONS}>
+                    {(collection) => (
+                      <Show when={collections()[collection.id].length > 0}>
+                        <section
+                          class={ui.collection}
+                          aria-labelledby={`home-collection-${collection.id}`}
+                        >
+                          <header class={ui.collectionHead}>
+                            <span class={ui.collectionIndex} aria-hidden="true">
+                              {collection.index}
+                            </span>
+                            <div class={ui.collectionCopy}>
+                              <h3
+                                class={ui.collectionTitle}
+                                id={`home-collection-${collection.id}`}
+                              >
+                                {collection.label}
+                              </h3>
+                              <span class={ui.collectionNote}>
+                                {collection.note}
+                              </span>
+                            </div>
+                            <span class={ui.collectionCount}>
+                              {collections()[collection.id].length}{' '}
+                              {collections()[collection.id].length === 1
+                                ? 'work'
+                                : 'works'}
+                            </span>
+                          </header>
+                          <div class={ui.galleryGrid}>
+                            <For each={collections()[collection.id]}>
+                              {(item, i) => (
+                                <Plate
+                                  item={item}
+                                  class={SPANS[i() % SPANS.length]}
+                                  placement="plate"
+                                  track={track}
+                                  onOpen={open}
+                                  selected={selectedSlug() === item.slug}
+                                  onSelect={select}
+                                  playback={playback}
+                                />
+                              )}
+                            </For>
+                          </div>
+                        </section>
+                      </Show>
                     )}
                   </For>
                 </div>

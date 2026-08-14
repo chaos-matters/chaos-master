@@ -3,6 +3,23 @@
 What's new in Lumen Apeiron (formerly Chaos Master). Concise highlights for
 each release; the full developer history lives in `dev.changelog.md`.
 
+## [Unreleased]
+
+### Added
+
+- **Fractal Classics.** Open eight exact affine constructions—including the
+  Sierpiński triangle and carpet, Koch curve, Barnsley fern, Heighway dragon,
+  Cantor dust, Sierpiński tetrahedron, and Menger sponge—as editable 2D or 3D
+  flames from the Gallery.
+
+### Changed
+
+- **Home has a keyboard exit.** Press Escape anywhere in the Home gallery to
+  return to the editor; an open dialog still closes first.
+- **Gallery previews stay lightweight while scrolling.** Tiles wait for the
+  gallery itself to settle, keep a static snapshot, and release their live GPU
+  canvas; animated tiles only return to a live render while hovered.
+
 ## [0.9.9] - 2026-08-02
 
 ### Added

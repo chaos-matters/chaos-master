@@ -9,6 +9,39 @@ import type { TimelineTrack } from '@/utils/timeline'
  */
 
 export type GallerySection = 'hero' | 'gallery' | 'motion' | 'capability'
+export type GalleryCollection = 'foundation' | 'original' | 'remix' | 'artist'
+
+export const GALLERY_COLLECTIONS: {
+  id: GalleryCollection
+  index: string
+  label: string
+  note: string
+}[] = [
+  {
+    id: 'foundation',
+    index: '01',
+    label: 'Fractal Foundations',
+    note: 'Canonical constructions, rebuilt as exact editable systems.',
+  },
+  {
+    id: 'original',
+    index: '02',
+    label: 'Lumen Originals',
+    note: 'Native flames composed to explore the medium on its own terms.',
+  },
+  {
+    id: 'remix',
+    index: '03',
+    label: 'Flame Remixes',
+    note: 'Known structures pushed through color, motion, and nonlinear maps.',
+  },
+  {
+    id: 'artist',
+    index: '04',
+    label: 'Artist Editions',
+    note: 'Invited works with visible credit, source, and reuse terms.',
+  },
+]
 
 /** Row as returned by the list endpoint — deliberately without the flame. */
 export interface GalleryListItem {
@@ -16,6 +49,20 @@ export interface GalleryListItem {
   title: string
   caption: string | null
   author: string | null
+  collection?: GalleryCollection | null
+  provenance_kind?:
+    | 'unknown'
+    | 'project-original'
+    | 'public-domain'
+    | 'licensed'
+    | 'permission'
+    | null
+  source_url?: string | null
+  license?: string | null
+  license_url?: string | null
+  attribution?: string | null
+  changes?: string | null
+  original_id?: string | null
   section: GallerySection
   capability: string | null
   dimensions: number
@@ -134,6 +181,18 @@ export async function fetchGalleryItem(slug: string): Promise<GalleryItem> {
   return (await res.json()) as GalleryItem
 }
 
+/**
+ * Read a Solid resource only while it is usable. A rejected resource accessor
+ * rethrows its error when called; testing the error first lets Home render its
+ * local unavailable state instead of escalating to the app error boundary.
+ */
+export function galleryResourceItems(
+  read: () => GalleryListItem[] | undefined,
+  error: unknown,
+): GalleryListItem[] {
+  return error === undefined ? (read() ?? []) : []
+}
+
 /** Group a flat list into its sections, preserving the API's ordering. */
 export function bySection(
   items: GalleryListItem[],
@@ -150,4 +209,64 @@ export function bySection(
     if (item.section in empty) empty[item.section].push(item)
   }
   return empty
+}
+
+/** Stable fallback for rows served while migration 0005 is being applied. */
+export function galleryCollection(item: GalleryListItem): GalleryCollection {
+  if (GALLERY_COLLECTIONS.some((entry) => entry.id === item.collection)) {
+    return item.collection as GalleryCollection
+  }
+  return item.slug.startsWith('classic-') ? 'foundation' : 'original'
+}
+
+/** Group the wall into editorial chapters without reordering or cloning rows. */
+export function byCollection(
+  items: GalleryListItem[],
+): Record<GalleryCollection, GalleryListItem[]> {
+  const grouped: Record<GalleryCollection, GalleryListItem[]> = {
+    foundation: [],
+    original: [],
+    remix: [],
+    artist: [],
+  }
+  for (const item of items) grouped[galleryCollection(item)].push(item)
+  return grouped
+}
+
+/**
+ * Human-facing credit line. Legacy rows with unresolved authorship stay quiet
+ * until curation records a real credit; never publish the descriptor sentinel
+ * `unknown` or expose an editorial placeholder on the public wall.
+ */
+export function galleryCredit(item: GalleryListItem): string | undefined {
+  const attribution = item.attribution?.trim()
+  if (attribution) return attribution
+
+  const author = item.author?.trim()
+  const credited = author && author.toLowerCase() !== 'unknown' ? author : null
+  switch (galleryCollection(item)) {
+    case 'foundation':
+      return credited
+        ? `Canonical construction · encoded by ${credited}`
+        : undefined
+    case 'remix':
+      return credited ? `Remix by ${credited}` : undefined
+    case 'artist':
+      return credited ? `By ${credited}` : undefined
+    case 'original':
+      return credited ? `By ${credited}` : undefined
+  }
+}
+
+/** Only expose curation URLs that are safe to use as external links. */
+export function galleryExternalUrl(value: string | null | undefined) {
+  if (!value) return undefined
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' || url.protocol === 'http:'
+      ? url.toString()
+      : undefined
+  } catch {
+    return undefined
+  }
 }

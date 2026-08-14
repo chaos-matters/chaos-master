@@ -140,6 +140,58 @@ describe('select then open', () => {
     expect(g.up(at(0, 0), 210)).toBe('select')
   })
 
+  it.each(['touch', 'pen'])(
+    'keeps the first tap across the post-release %s pointerleave',
+    (pointerType) => {
+      const g = createPlateGestureRecogniser()
+      g.down(at(100, 100), 0)
+      expect(g.up(at(100, 100), 30)).toBe('select')
+
+      // Touch browsers release implicit pointer capture after pointerup and
+      // dispatch pointerleave before the next tap.
+      g.leave(pointerType)
+
+      g.down(at(102, 101), 120)
+      expect(g.up(at(102, 101), 150)).toBe('open')
+    },
+  )
+
+  it.each(['touch', 'pen'])(
+    'breaks the tap chain when a %s pointer leaves before release',
+    (pointerType) => {
+      const g = createPlateGestureRecogniser()
+      g.down(at(100, 100), 0)
+      expect(g.up(at(100, 100), 30)).toBe('select')
+
+      g.down(at(102, 101), 120)
+      g.leave(pointerType)
+      expect(g.up(at(102, 101), 150)).toBe('none')
+
+      g.down(at(102, 101), 200)
+      expect(g.up(at(102, 101), 230)).toBe('select')
+    },
+  )
+
+  it('does not open a stale touch pair after another plate takes selection', () => {
+    const g = createPlateGestureRecogniser()
+    g.down(at(100, 100), 0)
+    expect(g.up(at(100, 100), 30, false)).toBe('select')
+    g.leave('touch')
+
+    // The page cleared this plate's selection when another plate was pressed.
+    g.down(at(102, 101), 120)
+    expect(g.up(at(102, 101), 150, false)).toBe('select')
+  })
+
+  it('breaks the double-click chain when a mouse pointer leaves the plate', () => {
+    const g = createPlateGestureRecogniser()
+    g.down(at(100, 100), 0)
+    expect(g.up(at(100, 100), 30)).toBe('select')
+    g.leave('mouse')
+    g.down(at(102, 101), 120)
+    expect(g.up(at(102, 101), 150)).toBe('select')
+  })
+
   it('ignores a release that never went down here', () => {
     const g = createPlateGestureRecogniser()
     expect(g.up(at(0, 0), 10)).toBe('none')

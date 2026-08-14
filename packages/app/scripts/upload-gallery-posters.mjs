@@ -25,15 +25,17 @@
 //   --in <dir>       captured posters + manifest.json
 //                    (default assets/local/gallery-posters)
 //   --slug a,b,c     only publish these slugs
+//   --confirm prod    required with --env prod
 //   --dry-run        print exactly what would be uploaded and executed
 //   --help
 
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { assertPosterManifestTarget, assertPosterMatchesRow, } from './gallery-poster-manifest.mjs'
 import { storageFlags, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -42,13 +44,21 @@ const repoRoot = resolve(appDir, '../..')
 
 /** Object keys are public URL path segments — the Worker rejects anything else. */
 const KEY_PATTERN = /^[a-z0-9][a-z0-9./-]{0,127}$/
+const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/
+const POSTER_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
 const DEFAULT_IN = join(repoRoot, 'assets/local/gallery-posters')
 
 function parseArgs(argv) {
   // Local by default, like gallery-admin: uploading a poster is a write, and a
   // write should never reach a deployed environment unless it was asked for.
-  const args = { env: 'local', in: DEFAULT_IN, slugs: null, dryRun: false }
+  const args = {
+    env: 'local',
+    in: DEFAULT_IN,
+    slugs: null,
+    confirm: null,
+    dryRun: false,
+  }
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]
     if (arg === '--help' || arg === '-h') args.help = true
@@ -59,6 +69,7 @@ function parseArgs(argv) {
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean)
+    else if (arg === '--confirm') args.confirm = argv[++i]
     else if (arg === '--dry-run') args.dryRun = true
     else {
       console.error(`Unknown argument: ${arg}`)
@@ -100,7 +111,39 @@ const sqlInt = (v) => (v === null ? 'NULL' : String(Math.trunc(v)))
  */
 function posterFrame(poster) {
   if (poster.animated !== true) return null
-  return Number.isFinite(poster.frame) ? poster.frame : null
+  if (!Number.isInteger(poster.frame) || poster.frame < 0) {
+    throw new Error(
+      `Animated poster ${poster.slug} must record a non-negative integer frame`,
+    )
+  }
+  return poster.frame
+}
+
+function readGalleryRows(env, slugs) {
+  const target = TARGETS[env]
+  const sql = `SELECT slug, flame, animation FROM gallery_items WHERE slug IN (${slugs.map((slug) => sqlStr(slug)).join(', ')})`
+  const stdout = execFileSync(
+    'pnpm',
+    [
+      'exec',
+      'wrangler',
+      'd1',
+      'execute',
+      target.database,
+      ...storageFlags(env),
+      '--json',
+      `--command=${sql}`,
+    ],
+    {
+      cwd: appDir,
+      maxBuffer: 64 * 1024 * 1024,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  )
+  const start = stdout.indexOf('[')
+  if (start < 0) throw new Error('wrangler returned no JSON')
+  return JSON.parse(stdout.slice(start))[0]?.results ?? []
 }
 
 function run(command, commandArgs, dryRun) {
@@ -123,6 +166,10 @@ function main() {
     console.error(`Unknown --env "${args.env}" — expected ${TARGET_LIST}.`)
     process.exit(1)
   }
+  if (args.env === 'prod' && args.confirm !== 'prod') {
+    console.error('Writing prod requires the explicit flag --confirm prod.')
+    process.exit(1)
+  }
   // Both halves of a poster — the object and the row that points at it — have
   // to land in the same storage, or a local row would reference an object only
   // the deployed bucket has.
@@ -136,6 +183,10 @@ function main() {
     process.exit(1)
   }
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+  assertPosterManifestTarget(manifest, {
+    env: args.env,
+    storage: target.storage,
+  })
   let posters = manifest.posters ?? []
   if (args.slugs) {
     const wanted = new Set(args.slugs)
@@ -154,6 +205,33 @@ function main() {
   // Resolve every poster to its final key first, so a bad filename or a missing
   // file fails the whole run before anything is written anywhere.
   const uploads = posters.map((poster) => {
+    if (!SLUG_PATTERN.test(poster.slug ?? '')) {
+      throw new Error(`Refusing unsafe poster slug "${String(poster.slug)}"`)
+    }
+    if (
+      typeof poster.file !== 'string' ||
+      poster.file !== basename(poster.file)
+    ) {
+      throw new Error(
+        `Refusing unsafe poster filename "${String(poster.file)}"`,
+      )
+    }
+    if (!POSTER_MIME_TYPES.has(poster.mimeType)) {
+      throw new Error(
+        `Poster ${poster.slug} has unsupported MIME type "${String(poster.mimeType)}"`,
+      )
+    }
+    if (
+      !Number.isInteger(poster.width) ||
+      poster.width <= 0 ||
+      !Number.isInteger(poster.height) ||
+      poster.height <= 0
+    ) {
+      throw new Error(
+        `Poster ${poster.slug} width and height must be positive integers`,
+      )
+    }
+    const frame = posterFrame(poster)
     const file = join(args.in, poster.file)
     if (!existsSync(file)) {
       throw new Error(
@@ -170,16 +248,31 @@ function main() {
     if (!KEY_PATTERN.test(posterKey)) {
       throw new Error(`Refusing to upload unsafe poster key "${posterKey}"`)
     }
-    return { poster, file, bytes, posterKey }
+    return { poster, file, bytes, frame, posterKey }
   })
+
+  // The manifest is only a capture receipt. Re-read the selected target and
+  // bind every receipt to the canonical descriptor + animation currently in
+  // D1 before the first R2 object or D1 pointer is written.
+  const rows = readGalleryRows(
+    args.env,
+    uploads.map(({ poster }) => poster.slug),
+  )
+  const rowsBySlug = new Map(rows.map((row) => [row.slug, row]))
+  for (const { poster } of uploads) {
+    const row = rowsBySlug.get(poster.slug)
+    if (!row) {
+      throw new Error(`No gallery row exists for poster ${poster.slug}`)
+    }
+    assertPosterMatchesRow(poster, row)
+  }
 
   console.log(
     `${args.dryRun ? '[dry run] ' : ''}Publishing ${uploads.length} poster(s) ` +
       `to ${target.bucket} and ${targetLabel(args.env)}`,
   )
 
-  for (const { poster, file, bytes, posterKey } of uploads) {
-    const frame = posterFrame(poster)
+  for (const { poster, file, bytes, frame, posterKey } of uploads) {
     console.log(
       `${poster.slug} -> gallery/${posterKey} ` +
         `(${(bytes.length / 1024).toFixed(0)} KiB, ${poster.width}x${poster.height}` +
@@ -211,13 +304,13 @@ function main() {
     '-- Generated by scripts/upload-gallery-posters.mjs — do not edit by hand.',
     '',
     ...uploads.map(
-      ({ poster, posterKey }) =>
+      ({ poster, frame, posterKey }) =>
         `UPDATE gallery_items SET poster_key = ${sqlStr(posterKey)}, ` +
         `poster_width = ${poster.width}, poster_height = ${poster.height}, ` +
         // Written in the same statement as the key on purpose: the frame
         // describes THAT poster, so a row must never carry one without the
         // other, in either direction.
-        `poster_frame = ${sqlInt(posterFrame(poster))} ` +
+        `poster_frame = ${sqlInt(frame)} ` +
         `WHERE slug = ${sqlStr(poster.slug)};`,
     ),
     '',
@@ -231,20 +324,24 @@ function main() {
 
   const dir = mkdtempSync(join(tmpdir(), 'gallery-posters-'))
   const sqlFile = join(dir, 'posters.sql')
-  writeFileSync(sqlFile, sql)
-  run(
-    'pnpm',
-    [
-      'exec',
-      'wrangler',
-      'd1',
-      'execute',
-      target.database,
-      ...where,
-      `--file=${sqlFile}`,
-    ],
-    false,
-  )
+  try {
+    writeFileSync(sqlFile, sql)
+    run(
+      'pnpm',
+      [
+        'exec',
+        'wrangler',
+        'd1',
+        'execute',
+        target.database,
+        ...where,
+        `--file=${sqlFile}`,
+      ],
+      false,
+    )
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
   console.log(
     `\nPublished ${uploads.length} poster(s) to ${args.env} ` +
       `(${target.storage} storage).`,

@@ -67,6 +67,7 @@ import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { CAPTURE_PAGE, checkoutFailure, verifyServedCheckout, } from './dev-server-checkout.mjs'
+import { galleryContentDigest, mergePosterManifestEntries, POSTER_MANIFEST_VERSION, } from './gallery-poster-manifest.mjs'
 import { couldNotRun, couldNotRunLines, initCommand, isMissingTable, storageFlags, TARGET_LIST, targetLabel, TARGETS, } from './gallery-targets.mjs'
 
 const require = createRequire(import.meta.url)
@@ -160,18 +161,17 @@ function printHelp() {
 }
 
 /**
- * Merge this run's entries into any manifest already in `out`, keyed on slug.
- * Re-capturing a few rows with --slug must not drop the rest of the gallery
- * from the manifest the upload script reads.
+ * Merge this run's entries into a same-version, same-target manifest in `out`,
+ * keyed on slug. Re-capturing a few rows with --slug must not drop the rest of
+ * that gallery; entries from another env/storage must never be relabelled as
+ * belonging to this run.
  */
-function mergeManifest(out, entries) {
+function mergeManifest(out, entries, target) {
   const path = join(out, 'manifest.json')
-  const previous = existsSync(path)
-    ? (JSON.parse(readFileSync(path, 'utf8')).posters ?? [])
-    : []
-  const bySlug = new Map(previous.map((p) => [p.slug, p]))
-  for (const entry of entries) bySlug.set(entry.slug, entry)
-  return [...bySlug.values()].sort((a, b) => a.slug.localeCompare(b.slug))
+  const existing = existsSync(path)
+    ? JSON.parse(readFileSync(path, 'utf8'))
+    : null
+  return mergePosterManifestEntries(existing, entries, target)
 }
 
 /** Resolve `--size` + `--aspect` to exact even pixel dimensions. */
@@ -361,6 +361,7 @@ async function main() {
     process.stdout.write(`capturing ${row.slug} ... `)
     const startedAt = Date.now()
     try {
+      const contentDigest = galleryContentDigest(row.flame, row.animation)
       const spec = {
         slug: row.slug,
         flame: JSON.parse(row.flame),
@@ -421,6 +422,7 @@ async function main() {
         // this number exists to make visible.
         saturation: Number(result.saturation.toFixed(3)),
         quality: args.quality,
+        contentDigest,
         capturedAt: new Date().toISOString(),
       }
       manifest.push(entry)
@@ -446,6 +448,7 @@ async function main() {
       join(args.out, 'manifest.json'),
       `${JSON.stringify(
         {
+          manifestVersion: POSTER_MANIFEST_VERSION,
           env: args.env,
           // local and dev name the same database, so the manifest has to say
           // which storage these posters were rendered from.
@@ -453,7 +456,10 @@ async function main() {
           format: args.format,
           dimensions,
           capturedAt: new Date().toISOString(),
-          posters: mergeManifest(args.out, manifest),
+          posters: mergeManifest(args.out, manifest, {
+            env: args.env,
+            storage: TARGETS[args.env].storage,
+          }),
         },
         null,
         2,

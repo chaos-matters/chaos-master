@@ -233,8 +233,12 @@ describe('worker OG meta injection — XSS escaping guard', () => {
 // ── Home gallery content (D1) ───────────────────────────────────────────────
 // A minimal stand-in for the D1 binding: records the SQL and bound params so a
 // test can assert the query shape without a real database.
-function makeD1(rows: Record<string, unknown>[]) {
+function makeD1(
+  rows: Record<string, unknown>[],
+  options: { failOnce?: string } = {},
+) {
   const calls: { sql: string; params: unknown[] }[] = []
+  let failure = options.failOnce
   return {
     calls,
     prepare(sql: string) {
@@ -245,8 +249,22 @@ function makeD1(rows: Record<string, unknown>[]) {
           call.params = params
           return stmt
         },
-        all: () => Promise.resolve({ results: rows }),
-        first: () => Promise.resolve(rows[0] ?? null),
+        all: () => {
+          if (failure !== undefined) {
+            const message = failure
+            failure = undefined
+            return Promise.reject(new Error(message))
+          }
+          return Promise.resolve({ results: rows })
+        },
+        first: () => {
+          if (failure !== undefined) {
+            const message = failure
+            failure = undefined
+            return Promise.reject(new Error(message))
+          }
+          return Promise.resolve(rows[0] ?? null)
+        },
       }
       return stmt
     },
@@ -258,6 +276,14 @@ const galleryRow = {
   title: 'First Light',
   caption: null,
   author: 'unknown',
+  collection: 'original',
+  provenance_kind: 'project-original',
+  source_url: null,
+  license: 'AGPL-3.0-only',
+  license_url: null,
+  attribution: 'Created by Lumen Apeiron',
+  changes: null,
+  original_id: null,
   section: 'hero',
   capability: null,
   flame: JSON.stringify({ transforms: { t1: {} } }),
@@ -293,7 +319,23 @@ describe('worker /api/gallery', () => {
     // The list endpoint must stay small — descriptors are fetched per item.
     expect(db.calls[0]?.sql).not.toContain('flame,')
     expect(db.calls[0]?.sql).toContain('published = 1')
+    expect(db.calls[0]?.sql).toContain('provenance_kind')
     expect(res.headers.get('Cache-Control')).toContain('max-age=')
+  })
+
+  it('keeps serving while the provenance migration is pending', async () => {
+    const db = makeD1([galleryRow], {
+      failOnce: 'D1_ERROR: no such column: collection',
+    })
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+
+    expect(res.status).toBe(200)
+    expect(db.calls).toHaveLength(2)
+    expect(db.calls[1]?.sql).toContain("'unknown' AS provenance_kind")
   })
 
   it('filters by section and rejects an unknown one', async () => {
@@ -332,6 +374,52 @@ describe('worker /api/gallery', () => {
     expect(body.flame.transforms).toHaveProperty('t1')
     expect(body.animation.tracks).toEqual([])
     expect(db.calls[0]?.params).toEqual(['first-light'])
+    expect(db.calls[0]?.sql).toContain('attribution')
+  })
+
+  it('uses the provenance compatibility projection for a single item too', async () => {
+    const legacyRow = {
+      ...galleryRow,
+      collection: 'foundation',
+      provenance_kind: 'unknown',
+      source_url: null,
+      license: null,
+      license_url: null,
+      attribution: null,
+      changes: null,
+      original_id: null,
+    }
+    const db = makeD1([legacyRow], {
+      failOnce: 'D1_ERROR: no such column: provenance_kind',
+    })
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery/first-light'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+
+    expect(res.status).toBe(200)
+    expect(db.calls).toHaveLength(2)
+    expect(db.calls[1]?.params).toEqual(['first-light'])
+    for (const alias of [
+      'AS collection',
+      'AS provenance_kind',
+      'AS source_url',
+      'NULL AS license,',
+      'AS license_url',
+      'AS attribution',
+      'AS changes',
+      'AS original_id',
+    ]) {
+      expect(db.calls[1]?.sql).toContain(alias)
+    }
+    const body = (await res.json()) as Record<string, unknown>
+    expect(body).toMatchObject({
+      collection: 'foundation',
+      provenance_kind: 'unknown',
+      source_url: null,
+      license: null,
+    })
   })
 
   // Home renders an animated row live at the frame its poster was captured at,
