@@ -1,0 +1,167 @@
+/* The dock stacks its panels above the pill so the pill stays put as panels
+   open and close. Docked it lives in the bottom bar's column flow (see
+   SessionRecorderControls.module.css for why nothing floats by default);
+   dragged, it becomes fixed so the bar does not keep a hole where it was. */
+.dock {
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  max-width: 100%;
+
+  opacity: var(--recorder-opacity, 1);
+  transition: opacity 150ms ease;
+
+  /* Whatever the resting opacity, reaching for the dock brings it back —
+     otherwise a faded dock is one the user cannot aim at. */
+  &:hover,
+  &:focus-within {
+    opacity: 1;
+  }
+}
+
+.floating {
+  position: fixed;
+  /* Above the bottom bar (5) and the timeline, below the FloatingActions
+     widget (200) so parking the dock can never bury the main toolbar. */
+  z-index: 150;
+  margin: 0;
+  max-width: calc(100vw - 1rem);
+}
+
+.dragging {
+  user-select: none;
+  cursor: grabbing;
+}
+
+/* Same translucent pill as the controls used to draw themselves; the dock owns
+   the chrome now so the grip and the chrome buttons share it. */
+.bar {
+  margin: 0 0 var(--space-2) var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.28rem 0.5rem;
+  border-radius: 20px;
+  background: oklch(22% 0.025 240 / 0.88);
+  border: 1px solid oklch(50% 0.08 240 / 0.6);
+  color: oklch(88% 0.04 240);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 12px oklch(0% 0 0 / 0.4);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  [data-theme='light'] & {
+    background: oklch(96% 0.01 240 / 0.92);
+    border-color: oklch(65% 0.08 240 / 0.5);
+    color: oklch(28% 0.06 240);
+    box-shadow: 0 2px 12px oklch(50% 0.04 240 / 0.2);
+  }
+}
+
+.floating .bar {
+  margin: 0;
+}
+
+.grip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.1rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: grab;
+  touch-action: none;
+  flex-shrink: 0;
+}
+
+/* Three stacked dot rows, drawn with a gradient so the grip needs no markup
+   of its own. */
+.grip-dots {
+  width: 0.5rem;
+  height: 0.85rem;
+  background-image: radial-gradient(currentColor 40%, transparent 45%);
+  background-size: 0.25rem 0.28rem;
+  opacity: 0.55;
+}
+
+.grip:hover .grip-dots {
+  opacity: 1;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.4;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &:hover:not(:disabled) {
+    background: oklch(50% 0.08 240 / 0.25);
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+}
+
+.icon {
+  display: block;
+  width: 0.86rem;
+  height: 0.86rem;
+  transition: transform 140ms ease;
+}
+
+.chevron-up {
+  transform: rotate(180deg);
+}
+
+.icon-button-active {
+  border-color: oklch(50% 0.08 240 / 0.5);
+  background: oklch(50% 0.08 240 / 0.2);
+}
+
+.opacity-slider {
+  width: 4.5rem;
+  flex-shrink: 0;
+  accent-color: oklch(60% 0.12 240);
+}
+
+.fade-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  cursor: pointer;
+  opacity: 0.8;
+  flex-shrink: 0;
+
+  & input {
+    margin: 0;
+    accent-color: oklch(60% 0.12 240);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon {
+    transition: none;
+  }
+}

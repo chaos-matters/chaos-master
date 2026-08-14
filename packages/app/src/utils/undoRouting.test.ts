@@ -152,4 +152,47 @@ describe('undo routing across flame history and timeline', () => {
     expect(flame.exposure).toBe(0)
     expect(router.undoLast()).toBe(false)
   })
+
+  // The session recorder decides whether an undo is replayable from these
+  // peeks, so "what would undo do?" must never disagree with what it does.
+  describe('peeking the next target', () => {
+    it('reports the system each undo/redo will act on', () => {
+      editFlame(1)
+      addKeyframe(10, 0.5)
+      editFlame(2)
+
+      expect(router.peekUndoTarget()?.system).toBe('flame')
+      router.undoLast()
+      expect(router.peekUndoTarget()?.system).toBe('timeline')
+      expect(router.peekRedoTarget()?.system).toBe('flame')
+      router.undoLast()
+      expect(router.peekUndoTarget()?.system).toBe('flame')
+      // Redo replays forward in original order: the timeline edit is next.
+      expect(router.peekRedoTarget()?.system).toBe('timeline')
+    })
+
+    it('reports undefined exactly when there is nothing left to do', () => {
+      expect(router.peekUndoTarget()).toBeUndefined()
+      expect(router.peekRedoTarget()).toBeUndefined()
+      expect(router.undoLast()).toBe(false)
+
+      editFlame(1)
+      expect(router.peekUndoTarget()).toBeDefined()
+      expect(router.peekRedoTarget()).toBeUndefined()
+      router.undoLast()
+      expect(router.peekUndoTarget()).toBeUndefined()
+      expect(router.peekRedoTarget()).toBeDefined()
+    })
+
+    it('carries the journal stamp of the entry it would apply', () => {
+      editFlame(1)
+      const first = router.peekUndoTarget()?.seq
+      editFlame(2)
+      const second = router.peekUndoTarget()?.seq
+      expect(first).toEqual(expect.any(Number))
+      // Monotonic: a later edit stamps higher, which is what lets the
+      // recorder tell in-session edits from ones predating the recording.
+      expect(second as number).toBeGreaterThan(first as number)
+    })
+  })
 })

@@ -181,6 +181,33 @@ describe('createStoreHistory', () => {
     })
   })
 
+  describe('replacement-style setters (setFn returns a whole new state)', () => {
+    it('replaces the store and round-trips undo/redo', () => {
+      const { store, set, history } = makeHistory()
+      const replacement: TestState = {
+        name: 'replaced',
+        items: { z: { value: 99 } },
+      }
+      set(() => structuredClone(replacement), 'Load')
+      expect(snapshot(store)).toEqual(replacement)
+      history.undo()
+      expect(snapshot(store)).toEqual(initialState())
+      history.redo()
+      expect(snapshot(store)).toEqual(replacement)
+    })
+
+    it('reports the entry to onEntryPushed like any other edit', () => {
+      const pushed: (string | undefined)[] = []
+      const [store, set] = createStoreHistory(
+        createStore<TestState>(initialState()),
+        { onEntryPushed: (d) => pushed.push(d) },
+      )
+      set(() => ({ name: 'swap', items: {} }), 'Replace All')
+      expect(store.name).toBe('swap')
+      expect(pushed).toEqual(['Replace All'])
+    })
+  })
+
   describe('preview batching (drag gestures)', () => {
     it('collapses startPreview → many sets → commit into one undo step', () => {
       const { store, set, history } = makeHistory()
@@ -235,6 +262,52 @@ describe('createStoreHistory', () => {
       history.undo()
       expect(store.items.a!.value).toBe(3) // unchanged — undo refused
       history.commit()
+    })
+
+    it('commits replay side state atomically with the preview', () => {
+      const { store, set, history } = makeHistory()
+      let sideState = 'before'
+      history.startPreview('Replay')
+      set((draft) => {
+        draft.items.a!.value = 9
+      })
+      sideState = 'after'
+      history.commit({
+        undoEffect: () => {
+          sideState = 'before'
+        },
+        redoEffect: () => {
+          sideState = 'after'
+        },
+      })
+
+      history.undo()
+      expect(store.items.a!.value).toBe(1)
+      expect(sideState).toBe('before')
+      history.redo()
+      expect(store.items.a!.value).toBe(9)
+      expect(sideState).toBe('after')
+    })
+
+    it('can keep a side-state-only replay as one undo entry', () => {
+      const { history } = makeHistory()
+      let sideState = 'after'
+      history.startPreview('Replay')
+      history.commit({
+        force: true,
+        undoEffect: () => {
+          sideState = 'before'
+        },
+        redoEffect: () => {
+          sideState = 'after'
+        },
+      })
+
+      expect(history.hasUndo()).toBe(true)
+      history.undo()
+      expect(sideState).toBe('before')
+      history.redo()
+      expect(sideState).toBe('after')
     })
   })
 

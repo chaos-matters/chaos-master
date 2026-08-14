@@ -12,8 +12,10 @@ import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
+import { lastFinishedSession } from '@/recorder/recorder'
 import { deepClone } from '@/utils/clone'
 import { computeExportDimensions, DEFAULT_EXPORT_ASPECT, DEFAULT_EXPORT_RESOLUTION, } from '@/utils/exportDimensions'
+import { embedStepsInExports, sessionForExport, setEmbedStepsInExports, } from '@/utils/exportPreferences'
 import { addFlameDataToPng } from '@/utils/flameInPng'
 import { compressJsonQueryParam } from '@/utils/jsonQueryParam'
 import { persistentSignal } from '@/utils/persistentSignal'
@@ -50,6 +52,10 @@ type RenderDialogProps = {
   viewportAspect: number
   quality: number
   embedFlame: boolean
+  /** Whether a recorded session exists to offer at all. */
+  hasSession: boolean
+  embedSteps: boolean
+  onEmbedStepsChange: (v: boolean) => void
   embedAnimation: boolean
   condenseHidden: boolean
   hasAnimation: boolean
@@ -679,6 +685,20 @@ function RenderDialog(props: RenderDialogProps) {
               <span>Embed flame data</span>
             </label>
 
+            <Show when={props.hasSession}>
+              <label class={ui.checkboxField}>
+                <Checkbox
+                  checked={props.embedSteps}
+                  onChange={(checked) => {
+                    props.onEmbedStepsChange(checked)
+                  }}
+                />
+                <span title="Embeds the recorded steps so the PNG can replay how this flame was made. It describes your whole editing session, so turn it off if you would rather not share that.">
+                  Embed recorded steps
+                </span>
+              </label>
+            </Show>
+
             <label
               class={ui.checkboxField}
               classList={{ [ui.disabled as string]: !props.hasAnimation }}
@@ -981,8 +1001,19 @@ export function createExportPngDialog(
               }
             : flameDescriptor
           const encoded = await compressJsonQueryParam(payload)
+          // If a session was recorded for this flame, it rides along in a
+          // second chunk, so a dropped PNG can offer to replay how it was
+          // made (docs/plans/semantic-recorder-plan.md, M5).
+          const session = sessionForExport()
+          const encodedSteps = session
+            ? await compressJsonQueryParam(session)
+            : undefined
           pngBytes = new Uint8Array(
-            await addFlameDataToPng(encoded, pngBytes).arrayBuffer(),
+            await addFlameDataToPng(
+              encoded,
+              pngBytes,
+              encodedSteps,
+            ).arrayBuffer(),
           )
           saveRecentFlame(flameDescriptor, undefined, currentTracks)
           const fileUrlExt = URL.createObjectURL(
@@ -1154,6 +1185,7 @@ export function createExportPngDialog(
         condenseHidden: condenseHidden(),
         tracks: timeline?.tracks() ?? [],
         config: timeline?.config() ?? defaultTimelineConfig(),
+        session: sessionForExport(),
       })
     }
 
@@ -1232,6 +1264,9 @@ export function createExportPngDialog(
           viewportAspect={viewportAspect}
           quality={quality()}
           embedFlame={embedFlame()}
+          hasSession={lastFinishedSession() !== undefined}
+          embedSteps={embedStepsInExports()}
+          onEmbedStepsChange={setEmbedStepsInExports}
           embedAnimation={embedAnimation()}
           condenseHidden={condenseHidden()}
           hasAnimation={hasAnimation}

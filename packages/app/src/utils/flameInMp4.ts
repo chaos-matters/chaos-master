@@ -1,7 +1,9 @@
+import { validateSession } from '@/recorder/schema'
 import { asciiBytes, readAscii, readUint32BE, writeUint32BE, } from './binaryReader'
-import { compressJsonQueryParam, concatBuffers, decompressJsonPayload, } from './jsonQueryParam'
+import { coerceFlamePayload, compressJsonQueryParam, concatBuffers, decompressJsonValue, MAX_COMPRESSED_JSON_BYTES, } from './jsonQueryParam'
 import type { SharePayload } from './jsonQueryParam'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { RecordedSession } from '@/recorder/schema'
 import type { TimelineConfig, TimelineTrack } from '@/utils/timeline'
 
 const BOX_HEADER_SIZE = 8 // 4 bytes size + 4 bytes type
@@ -58,14 +60,33 @@ export function createMetadataPayload(
   flame: FlameDescriptor,
   tracks: TimelineTrack[],
   config: TimelineConfig,
+  /** The session that produced this flame, when one was recorded (M5). */
+  session?: RecordedSession,
 ): Promise<Uint8Array> {
+  // Carried as a field of the existing payload rather than a second box:
+  // the JSON object is already extensible, and a new box would mean another
+  // round of chunk-offset patching for no benefit.
   const payload: SharePayload & {
     animation: NonNullable<SharePayload['animation']>
+    session?: RecordedSession
   } = {
     flame,
     animation: { tracks, config },
+    ...(session ? { session } : {}),
   }
   return compressJsonQueryParam(payload)
+}
+
+/** Decode a flm3 payload: the flame (validated) plus the recorded session
+ *  when the export carried one. An unreadable session is dropped rather than
+ *  failing the load — the video still holds a perfectly good flame. */
+async function decodeFlm3Payload(payload: Uint8Array<ArrayBuffer>) {
+  const raw = await decompressJsonValue(payload)
+  const result = coerceFlamePayload(raw)
+  const session = validateSession(
+    (raw as { session?: unknown } | null)?.session,
+  )
+  return session ? { ...result, session } : result
 }
 
 /** Walk boxes within [rangeStart, rangeStart+rangeSize) and increment
@@ -159,6 +180,7 @@ export function injectMetadataIntoMp4(
 export function extractMetadataFromMp4(mp4Buffer: ArrayBuffer): Promise<{
   flame: FlameDescriptor
   animation?: SharePayload['animation']
+  session?: RecordedSession
 } | null> {
   const moov = findBox(mp4Buffer, 'moov')
   if (!moov) {
@@ -195,10 +217,19 @@ export function extractMetadataFromMp4(mp4Buffer: ArrayBuffer): Promise<{
         if (udtaChildType === 'flm3') {
           const payloadOffset = udtaChildOffset + BOX_HEADER_SIZE
           const payloadLength = udtaChildSize - BOX_HEADER_SIZE
+          if (payloadLength > MAX_COMPRESSED_JSON_BYTES) {
+            throw new Error(
+              `Compressed JSON exceeds ${MAX_COMPRESSED_JSON_BYTES} bytes`,
+            )
+          }
+          // View the already-loaded MP4 only after bounding the metadata box;
+          // do not duplicate a hostile payload before validation.
           const payload = new Uint8Array(
-            mp4Buffer.slice(payloadOffset, payloadOffset + payloadLength),
+            mp4Buffer,
+            payloadOffset,
+            payloadLength,
           )
-          return decompressJsonPayload(payload)
+          return decodeFlm3Payload(payload)
         }
 
         udtaChildOffset += udtaChildSize

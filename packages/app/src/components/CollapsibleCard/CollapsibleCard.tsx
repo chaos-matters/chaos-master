@@ -21,6 +21,10 @@ export function CollapsibleCard(
     headerActions?: JSX.Element
     /** Tour anchor on the card root (present even while collapsed). */
     'data-tour-target'?: string
+    /** Follow-cam anchor — what a recorded step's `focus:<id>` hint resolves
+     *  to (see recorder/focus.ts). Per-instance, unlike the tour target, so a
+     *  replay can point at the transform that actually changed. */
+    'data-focus-id'?: string
     /** Bumping this number collapses the card (drives "Collapse all"). The
      *  initial value is ignored; only later changes collapse the card. Ignored
      *  when `open` is provided (controlled mode). */
@@ -55,6 +59,7 @@ export function CollapsibleCard(
     <div
       class={ui.card}
       data-tour-target={props['data-tour-target']}
+      data-focus-id={props['data-focus-id']}
       style={
         props.accentColor ? { '--accent-color': props.accentColor } : undefined
       }

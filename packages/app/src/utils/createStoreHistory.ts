@@ -19,9 +19,21 @@ type HistoryItem = {
   description?: string
   forwardPatches: Patch[]
   backwardPatches: Patch[]
+  /** Optional workspace state that travels with this entry. Replay uses this
+   *  to keep timeline/audio/view restoration atomic with the flame patches. */
+  undoEffect?: () => void
+  redoEffect?: () => void
+  /** Keep an entry whose flame patches are empty when its side effects still
+   *  represent a real workspace change. */
+  force?: boolean
   /** Journal stamp for cross-system chronological undo (journaled mode). */
   seq?: number
 }
+
+export type HistoryCommitOptions = Pick<
+  HistoryItem,
+  'undoEffect' | 'redoEffect' | 'force'
+>
 
 export type HistorySetter<T extends object> = (
   // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
@@ -38,7 +50,7 @@ export type ChangeHistory<T> = {
   readonly startPreview: (description?: string) => void
   readonly isPreviewing: () => boolean
   readonly isUndoingOrRedoing: () => boolean
-  readonly commit: () => void
+  readonly commit: (options?: HistoryCommitOptions) => void
   /** Journal stamp of the entry the next undo/redo would apply (null: none).
    *  Used by the cross-system undo router; always null when not journaled. */
   readonly peekUndoSeq: () => number | null
@@ -57,11 +69,29 @@ type CreateStoreHistoryOptions = {
    *  timeline) invalidates redo everywhere. Leave OFF for throwaway preview
    *  histories (e.g. the variation browser) so they stay isolated. */
   journal?: boolean
+  /** Called whenever a NEW entry lands on the stack (set, commit, replace) —
+   *  exactly once per undoable edit, after no-op elision, and never for
+   *  undo/redo/setSilently. `fromPreview` marks the entry a gesture produced,
+   *  whose writes arrived during the preview rather than under the call that
+   *  pushes it. The session recorder hooks the main flame history here to
+   *  detect writes that did not arrive through a registered command (see
+   *  recorder/recorder.ts). */
+  onEntryPushed?: (
+    description: string | undefined,
+    fromPreview: boolean,
+  ) => void
+  /** Called when a gesture opens (`startPreview`). Bounds the window in which
+   *  the recorder coalesces a drag's repeated commands into one action. */
+  onPreviewStarted?: () => void
 }
 
 export function createStoreHistory<T extends object>(
   [store, setStore]: [Store<T>, SetStoreFunction<T>],
-  { journal = false }: CreateStoreHistoryOptions = {},
+  {
+    journal = false,
+    onEntryPushed,
+    onPreviewStarted,
+  }: CreateStoreHistoryOptions = {},
 ) {
   const [stackIndex, setStackIndex] = createSignal(-1)
   const [isUndoingOrRedoing, setIsUndoingOrRedoing] =
@@ -90,13 +120,24 @@ export function createStoreHistory<T extends object>(
     })
   }
 
-  function addToStack(item: HistoryItem) {
+  function addToStack(item: HistoryItem, fromPreview = false) {
     const forwardPatches = compressPatches(item.forwardPatches)
     const backwardPatches = compressPatches(item.backwardPatches)
-    if (forwardPatches.length === 0 && backwardPatches.length === 0) {
+    const hasEffect =
+      item.force === true ||
+      item.undoEffect !== undefined ||
+      item.redoEffect !== undefined
+    if (
+      !hasEffect &&
+      forwardPatches.length === 0 &&
+      backwardPatches.length === 0
+    ) {
       return
     }
-    if (forwardBackwardPatchPairDoesNothing(forwardPatches, backwardPatches)) {
+    if (
+      !hasEffect &&
+      forwardBackwardPatchPairDoesNothing(forwardPatches, backwardPatches)
+    ) {
       return
     }
     // Deep-clone the payloads going into the stack: patch values otherwise
@@ -107,6 +148,9 @@ export function createStoreHistory<T extends object>(
       forwardPatches: deepClone(forwardPatches),
       backwardPatches: deepClone(backwardPatches),
       description: item.description,
+      undoEffect: item.undoEffect,
+      redoEffect: item.redoEffect,
+      force: item.force,
       seq: journal ? nextUndoSeq() : undefined,
     }
     // A journaled edit invalidates redo EVERYWHERE (timeline included) — the
@@ -117,6 +161,7 @@ export function createStoreHistory<T extends object>(
       setStackIndex(p.length - 1)
       return p
     })
+    onEntryPushed?.(compressedItem.description, fromPreview)
   }
 
   function undo() {
@@ -140,8 +185,11 @@ export function createStoreHistory<T extends object>(
     // reconcile would adopt them into the live store by reference.
     const plain = deepClone(store)
     const result = applyPatchesMutatively(plain, backwardPatches)
-    setStore(reconcile(deepClone(result ?? plain) as T))
-    setStackIndex(i - 1)
+    batch(() => {
+      setStore(reconcile(deepClone(result ?? plain) as T))
+      item.undoEffect?.()
+      setStackIndex(i - 1)
+    })
   }
 
   function redo() {
@@ -158,8 +206,11 @@ export function createStoreHistory<T extends object>(
     const { forwardPatches } = item
     const plain = deepClone(store)
     const result = applyPatchesMutatively(plain, forwardPatches)
-    setStore(reconcile(deepClone(result ?? plain) as T))
-    setStackIndex(i)
+    batch(() => {
+      setStore(reconcile(deepClone(result ?? plain) as T))
+      item.redoEffect?.()
+      setStackIndex(i)
+    })
   }
 
   const setSilently = (setFn: (draft: T) => void) => {
@@ -179,11 +230,16 @@ export function createStoreHistory<T extends object>(
     // another, so undo of "New transform" silently did nothing and redo
     // duplicated it. Unchanged subtrees keep their identity through
     // produceWithPatches, so reconcile still yields fine-grained updates.
+    // The recipe passes setFn's return through: a replacement-style setter
+    // (`() => newFlame` — flame.reset, flame.loadPreset, seeded generate)
+    // replaces the document wholesale, exactly like replace() below, whose
+    // `() => value` recipe is what proves structurajs supports recipe
+    // returns. A mutation-style setter returns undefined and behaves as
+    // before. (Previously the braces swallowed the return, silently turning
+    // every replacement-style command into a no-op.)
     const [result, forwardPatchesRaw, backwardPatchesRaw] = produceWithPatches(
       unwrap(store),
-      (draft) => {
-        setFn(draft as T)
-      },
+      (draft) => setFn(draft as T),
     )
     // Isolate patch payloads BEFORE reconcile touches the store: object-valued
     // patches reference the store's existing raw nodes, and reconcile mutates
@@ -217,9 +273,10 @@ export function createStoreHistory<T extends object>(
       commit()
     }
     setPreview({ forwardPatches: [], backwardPatches: [], description })
+    onPreviewStarted?.()
   }
 
-  function commit() {
+  function commit(options: HistoryCommitOptions = {}) {
     const item = preview()
     if (!item) {
       // No preview active -- this is expected when pointerUp/pointerCancel
@@ -228,7 +285,7 @@ export function createStoreHistory<T extends object>(
       return
     }
     batch(() => {
-      addToStack(item)
+      addToStack({ ...item, ...options }, true)
       setPreview(undefined)
     })
   }

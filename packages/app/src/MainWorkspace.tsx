@@ -4,7 +4,7 @@ import { createStore, unwrap } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { vec2f, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
-import { executeCommand } from '@/commands/registry'
+import { executeCommand, executeReplayCommand, preflightReplayCommand, } from '@/commands/registry'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useToast } from '@/contexts/ToastContext'
 import { workspaceIsVisible } from '@/lib/activeTab'
@@ -57,6 +57,8 @@ import { PopulationSimulator } from './components/PopulationSimulator/Population
 import { ProgressBar } from './components/ProgressBar/ProgressBar'
 import { getPresetFromQuality, qualityPresets, } from './components/Quality/QualityPresets'
 import { QuickVariationPicker } from './components/QuickVariationPicker/QuickVariationPicker'
+import { recorderVisible } from './components/SessionRecorder/recorderUi'
+import { SessionRecorderDock } from './components/SessionRecorder/SessionRecorderDock'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
 import { createShareVariationLinkModal, createShareVariationLoadModal, } from './components/ShareVariationModal/ShareVariationModal'
 import { AngleEditor } from './components/Sliders/ParametricEditors/AngleEditor'
@@ -77,7 +79,6 @@ import { TimelineContextProvider } from './contexts/TimelineContext'
 import { DEFAULT_POINT_COUNT, DEFAULT_QUALITY, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_RESOLUTION, IS_DEV, } from './defaults'
 import { breedFlames } from './flame/breedFlame'
 import { colorInitModeToImplFn } from './flame/colorInitMode'
-import { applyColorMapToFlame } from './flame/colorMap'
 import { drawModeToImplFn } from './flame/drawMode'
 import { example1 } from './flame/examples/example1'
 import { example34 } from './flame/examples/example34'
@@ -85,19 +86,21 @@ import { initExample } from './flame/examples/initExample'
 import { initExample3D } from './flame/examples/initExample3D'
 import { tid as toTransformId, vid as toVariationId, } from './flame/examples/util'
 import { Flam3 } from './flame/Flam3'
+import { newDefaultTransform } from './flame/newTransform'
 import { pointInitModeToImplFn } from './flame/pointInitMode'
 import { pointInitMode3DToImplFn } from './flame/pointInitMode3D'
 import { generateRandomFlame, mutateFlame, random01, randomizeAllColors, randomizeVariationParams, randomRange, } from './flame/randomize'
 import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, cameraDuringExportEnabled, exportQuality, qualityPointCountLimit, setCurrentQuality, setExportQuality, setForceAnimationExportNow, setQualityPointCountLimit, } from './flame/renderStats'
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, tryValidateFlame, } from './flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from './flame/transformFunction'
-import { defaultLinearType } from './flame/variationRegistry'
 import { allTransformVariations, isAnyParametricVariationType, isVariationType, } from './flame/variations'
 import { deleteCustomVariation, duplicateCustomVariation, getCustomVariations, isCustomVariationRegistered, loadCustomVariations, persistSharedVariations, restoreCustomVariation, } from './flame/variations/custom'
 import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } from './flame/variations/utils'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { BoxArrowRight, Cross, Eye, EyeOff, Menu, Plus, Share, Shuffle, Terminal, } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
+import { invalidateLastFinishedSession, isSessionRecording, notePreviewStarted, recordSyntheticAction, reportDocumentWrite, reportUnreplayable, reportUnreplayableOnce, withRecordingSuppressed, } from './recorder/recorder'
+import { applyReplayAudioWiring } from './recorder/replay'
 import { createAnimationExport } from './utils/animationExport'
 import { createAudioAnalyzer } from './utils/audioAnalysis'
 import { autosaveIntervalMin, autosaveRecents, saveReminderDismissed, setAutosaveRecents, setSaveReminderDismissed, } from './utils/autosaveSettings'
@@ -129,14 +132,18 @@ import type { AudioMapping } from './components/AudioReactivePanel/AudioReactive
 import type { QualityPreset } from './components/Quality/QualityPresets'
 import type { QuickPickerMode } from './components/QuickVariationPicker/QuickVariationPicker'
 import type { TourContext } from './components/SpotlightTour/tourTypes'
-import type { ColorMap, Palette } from './flame/colorMap'
+import type { Palette } from './flame/colorMap'
 import type { PointInitMode } from './flame/pointInitMode'
 import type { GenerateRandomFlameConfig, MutateFlameOptions, } from './flame/randomize'
-import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from './flame/schema/flameSchema'
+import type { AudioWiringSnapshot } from './flame/schema/audioWiring'
+import type { FlameDescriptor, TransformId, VariationId, } from './flame/schema/flameSchema'
+import type { TimelineSnapshot } from './flame/schema/timeline'
 import type { Dims } from './flame/variationRegistry'
 import type { TransformVariationType } from './flame/variations'
 import type { CustomVariationDef } from './flame/variations/custom/types'
 import type { TransformVariationType3D } from './flame/variations3D'
+import type { ReplayTarget } from './recorder/replay'
+import type { RecordedSession, SessionViewSnapshot } from './recorder/schema'
 import type { AnimationExportConfig } from './utils/animationExport'
 import type { AudioAnalyzer, LiveAudioAnalyzer } from './utils/audioAnalysis'
 import type { ExportDimensions } from './utils/exportDimensions'
@@ -144,7 +151,7 @@ import type { HardwareTier } from './utils/hardwareTier'
 import type { SharePayload } from './utils/jsonQueryParam'
 import type { RandomizerHistoryEntry } from './utils/randomizerHistoryDB'
 import type { SonificationConfig } from './utils/sonification'
-import type { EasingCurve, TimelineTrack } from './utils/timeline'
+import type { EasingCurve, KeyframeInterpolation, TimelineTrack, } from './utils/timeline'
 import type { CommandContext } from '@/commands/types'
 
 const EDGE_FADE_COLOR = {
@@ -157,40 +164,6 @@ function formatPercent(x: number) {
     return `100 %`
   }
   return `${(x * 100).toFixed(1)} %`
-}
-
-function newDefaultTransform(dims: Dims = 2): TransformFunction {
-  const is3D = dims === 3
-  const identity = is3D
-    ? {
-        a: 1,
-        b: 0,
-        c: 0,
-        d: 0,
-        e: 0,
-        f: 1,
-        g: 0,
-        h: 0,
-        i: 0,
-        j: 0,
-        k: 1,
-        l: 0,
-      }
-    : { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 }
-  return {
-    probability: 1,
-    colorSpeed: 0.4,
-    color: { x: 0, y: 0 },
-    preAffine: identity,
-    postAffine: identity,
-    visible: true,
-    variations: {
-      [generateVariationId()]: getVariationDefault(
-        defaultLinearType(dims),
-        1.0,
-      ),
-    },
-  }
 }
 
 export type ExportImageInfo = {
@@ -273,20 +246,6 @@ const isWideLayout = () => window.innerWidth >= WIDE_LAYOUT_MIN_WIDTH
  * opened from Home second must land in the state it would have landed in first.
  */
 const DEFAULT_ANIMATION_ENABLED = true
-
-function addTransformWithVariation(draft: FlameDescriptor, type: string) {
-  const t = deepClone(
-    newDefaultTransform((draft.renderSettings.dimensions ?? 2) as Dims),
-  )
-  t.variations = {
-    [generateVariationId()]: {
-      type,
-      weight: 1,
-      visible: true,
-    },
-  }
-  draft.transforms[generateTransformId()] = t
-}
 
 export function MainWorkspace(props: AppProps) {
   const { theme, setTheme } = useTheme()
@@ -447,6 +406,16 @@ export function MainWorkspace(props: AppProps) {
   })
   // Hide timeline by default on mobile -- users can toggle it back on
   const [showTimeline, setShowTimeline] = createSignal(isWideLayout())
+  // The session currently open for replay (M4), if any. Lives here rather than
+  // in the dock because dropping a .steps.json opens one too.
+  const [replaySession, setReplaySession] = createSignal<RecordedSession>()
+  const openReplaySession = (session: RecordedSession | undefined) => {
+    if (session !== undefined && isSessionRecording()) {
+      showToast('Stop or discard the current recording before opening a replay')
+      return
+    }
+    setReplaySession(session)
+  }
   // Colors as they were before the first palette apply — lets Unselect
   // restore the "natural" colors. UI stash only; undo handles the rest.
   const [prePaletteColors, setPrePaletteColors] = createSignal<
@@ -459,8 +428,15 @@ export function MainWorkspace(props: AppProps) {
       ),
     ),
     // The main flame history joins the app-wide undo journal so Ctrl+Z can
-    // arbitrate chronologically against the timeline's undo stack.
-    { journal: true },
+    // arbitrate chronologically against the timeline's undo stack. The
+    // session recorder listens to every pushed entry to flag edits that
+    // bypassed the command registry (its coverage ratchet), and to the
+    // gesture boundary so a drag records as one step rather than hundreds.
+    {
+      journal: true,
+      onEntryPushed: reportDocumentWrite,
+      onPreviewStarted: notePreviewStarted,
+    },
   )
   // Palette selection is part of the flame document (renderSettings.palette):
   // applying/removing one is a single undoable history entry, and the palette
@@ -489,18 +465,10 @@ export function MainWorkspace(props: AppProps) {
   })
   const blendWeight = () => flameDescriptor.renderSettings.blendWeight ?? 0
   const setBlendFlame = (flame: FlameDescriptor | undefined) => {
-    setFlameDescriptor(
-      (draft) => {
-        if (flame === undefined) delete draft.renderSettings.blendFlame
-        else draft.renderSettings.blendFlame = deepClone(flame)
-      },
-      flame ? 'Set Blend Flame' : 'Remove Blend Flame',
-    )
+    executeCommand('flame.setBlendFlame', cmdContext, flame ?? null)
   }
   const setBlendWeight = (weight: number) => {
-    setFlameDescriptor((draft) => {
-      draft.renderSettings.blendWeight = weight
-    }, 'Blend Weight')
+    executeCommand('flame.setBlendWeight', cmdContext, weight)
   }
   if (IS_DEV) {
     console.info('[share:app] store initialized', {
@@ -597,59 +565,7 @@ export function MainWorkspace(props: AppProps) {
   })
 
   const applySymmetry = (n: number, type: 'rotational' | 'dihedral') => {
-    setFlameDescriptor((draft) => {
-      for (const tid of recordKeys(draft.transforms)) {
-        if (tid.startsWith('_sym__')) {
-          delete draft.transforms[tid]
-        }
-      }
-
-      const totalWeight = sum(
-        Object.values(draft.transforms).map((t) => t.probability),
-      )
-      const symWeight = Math.max(totalWeight, 1)
-
-      for (let i = 1; i < n; i++) {
-        const angle = (2 * Math.PI * i) / n
-        const cos = Math.cos(angle)
-        const sin = Math.sin(angle)
-        draft.transforms[generateTransformId('sym')] = {
-          probability: symWeight,
-          colorSpeed: 0,
-          color: { x: 0, y: 0 },
-          visible: true,
-          preAffine: { a: cos, b: -sin, c: 0, d: sin, e: cos, f: 0 },
-          postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-          variations: {
-            [generateVariationId()]: getVariationDefault(
-              defaultLinearType(
-                (flameDescriptor.renderSettings.dimensions ?? 2) as Dims,
-              ),
-              1,
-            ),
-          },
-        }
-      }
-
-      if (type === 'dihedral') {
-        draft.transforms[generateTransformId('sym')] = {
-          probability: symWeight,
-          colorSpeed: 0,
-          color: { x: 0, y: 0 },
-          visible: true,
-          preAffine: { a: -1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-          postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
-          variations: {
-            [generateVariationId()]: getVariationDefault(
-              defaultLinearType(
-                (flameDescriptor.renderSettings.dimensions ?? 2) as Dims,
-              ),
-              1,
-            ),
-          },
-        }
-      }
-    })
+    executeCommand('flame.applySymmetry', cmdContext, n, type)
   }
 
   const totalProbability = createMemo(() =>
@@ -708,6 +624,9 @@ export function MainWorkspace(props: AppProps) {
     ],
   })
   const [audioSource, setAudioSource] = createSignal<'file' | 'mic'>('file')
+  // Named, not carried: a recorded session can say which track it was wired
+  // against, but an AudioBuffer can never ride in a `.steps.json`.
+  const [audioTrackName, setAudioTrackName] = createSignal<string>()
   const [liveAnalyzer, setLiveAnalyzer] = createSignal<
     LiveAudioAnalyzer | undefined
   >(undefined)
@@ -880,7 +799,7 @@ export function MainWorkspace(props: AppProps) {
                 'Blend is still active — the loaded flame will look mixed',
                 4000,
               )
-            history.replace(deepClone(flame))
+            executeCommand('flame.load', cmdContext, flame)
           }}
           respond={respond}
         />
@@ -900,7 +819,7 @@ export function MainWorkspace(props: AppProps) {
                 'Blend is still active — the loaded flame will look mixed',
                 4000,
               )
-            history.replace(deepClone(flame))
+            executeCommand('flame.load', cmdContext, flame)
           }}
           onCompare={openDiffAsModal}
           respond={respond}
@@ -917,10 +836,7 @@ export function MainWorkspace(props: AppProps) {
    */
   function setupMorph(endFlame: FlameDescriptor) {
     // One flame-history entry for the composition (blend flame + weight)...
-    setFlameDescriptor((draft) => {
-      draft.renderSettings.blendFlame = deepClone(endFlame)
-      draft.renderSettings.blendWeight = 1
-    }, 'Morph Setup')
+    executeCommand('flame.setupMorph', cmdContext, endFlame)
     const cfg = timeline.config()
     // ...and one timeline undo step for the keyframes (remove + both adds).
     timeline.runWithSingleUndo(() => {
@@ -1212,43 +1128,19 @@ export function MainWorkspace(props: AppProps) {
       setPrePaletteColors(colors)
     }
 
-    // Convert palette entries to color map entries and apply
-    const entries = palette.entries.map((entry) => ({ a: entry.a, b: entry.b }))
-    const colorMap: ColorMap = {
-      id: palette.id,
-      name: palette.name,
-      entries,
-    }
     // ONE history entry: transform colors AND the palette itself (it lives in
     // renderSettings.palette), so a single undo fully reverts the apply —
     // previously the palette identity sat in signals and undo half-reverted
-    // (colors back, palette grading still on).
-    setFlameDescriptor((draft) => {
-      applyColorMapToFlame(draft, colorMap)
-      draft.renderSettings.palette = {
-        id: palette.id,
-        name: palette.name,
-        entries: palette.entries.map(({ id, position, a, b }) => ({
-          id,
-          position,
-          a,
-          b,
-        })),
-      }
-    }, 'Apply Palette')
+    // (colors back, palette grading still on). The command keeps both halves
+    // together for the same reason.
+    executeCommand('flame.applyPalette', cmdContext, palette)
   }
 
   const handlePaletteUnselect = () => {
-    // One undoable entry: restore pre-palette colors + drop the palette.
-    setFlameDescriptor((draft) => {
-      const saved = prePaletteColors()
-      for (const [tid, t] of recordEntries(draft.transforms)) {
-        if (saved[tid]) {
-          t.color = { x: saved[tid].x, y: saved[tid].y }
-        }
-      }
-      delete draft.renderSettings.palette
-    }, 'Remove Palette')
+    // One undoable entry: restore pre-palette colors + drop the palette. The
+    // colors come from a UI signal, so they are passed as an argument —
+    // nothing outside the document can be reconstructed on replay.
+    executeCommand('flame.removePalette', cmdContext, prePaletteColors())
     setPrePaletteColors({})
   }
 
@@ -1260,6 +1152,16 @@ export function MainWorkspace(props: AppProps) {
   })
 
   onMount(() => {
+    // A recording is module-global and outlives this component, so one that
+    // is already running belongs to a PREVIOUS workspace instance — this
+    // mount brought a fresh store and a fresh document with it. Anything
+    // recorded from here on would replay against the wrong initial flame, so
+    // say so instead of letting the log claim fidelity it lost.
+    if (isSessionRecording()) {
+      reportUnreplayable(
+        'Workspace remounted — the recording started against a different document',
+      )
+    }
     trackAppInit(Boolean(window.navigator?.gpu))
     loadCustomVariations()
     setCustomVarsVersion((v) => v + 1)
@@ -1289,41 +1191,30 @@ export function MainWorkspace(props: AppProps) {
     })
   })
 
+  // The camera setters keep Solid's Setter contract (a value OR an updater),
+  // but resolve it against the CURRENT state before dispatching, so the
+  // command — and therefore the recorded action — carries a concrete value.
+  // Every camera gesture is bracketed by startPreview/commit in
+  // WheelZoomCamera2D/3D, so a whole pan or orbit folds into one recorded
+  // step, matching the single undo entry it already produced.
   const setFlameZoom: Setter<number> = (value) => {
     // Editing the base camera detaches the held-frame preview (Blender-like).
     timeline.setPreviewHeld(false)
-    if (typeof value === 'function') {
-      setFlameDescriptor((draft) => {
-        draft.renderSettings.camera.zoom = clamp(
-          value(draft.renderSettings.camera.zoom),
-          MIN_CAMERA_ZOOM_VALUE,
-          MAX_CAMERA_ZOOM_VALUE,
-        )
-      })
-    } else {
-      setFlameDescriptor((draft) => {
-        draft.renderSettings.camera.zoom = clamp(
-          value,
-          MIN_CAMERA_ZOOM_VALUE,
-          MAX_CAMERA_ZOOM_VALUE,
-        )
-      })
-    }
+    const current = flameDescriptor.renderSettings.camera.zoom
+    const next = clamp(
+      typeof value === 'function' ? value(current) : value,
+      MIN_CAMERA_ZOOM_VALUE,
+      MAX_CAMERA_ZOOM_VALUE,
+    )
+    setRenderSetting('camera.zoom', next)
     return flameDescriptor.renderSettings.camera.zoom
   }
   const setFlamePosition: Setter<v2f> = (value) => {
     // Editing the base camera detaches the held-frame preview (Blender-like).
     timeline.setPreviewHeld(false)
-    if (typeof value === 'function') {
-      setFlameDescriptor((draft) => {
-        const newPos = value(vec2f(...draft.renderSettings.camera.position))
-        draft.renderSettings.camera.position = [newPos.x, newPos.y]
-      })
-    } else {
-      setFlameDescriptor((draft) => {
-        draft.renderSettings.camera.position = [value.x, value.y]
-      })
-    }
+    const current = vec2f(...flameDescriptor.renderSettings.camera.position)
+    const next = typeof value === 'function' ? value(current) : value
+    setRenderSetting('camera.position', [next.x, next.y])
     return flameDescriptor.renderSettings.camera.position
   }
 
@@ -1332,41 +1223,22 @@ export function MainWorkspace(props: AppProps) {
   // result. theta/phi/radius/fov/roll were byte-for-byte identical modulo the
   // field; zoom (clamped), position (vec2) and target3D (vec3) stay bespoke.
   function makeCamera3DSetter(
-    read: (c: FlameDescriptor['renderSettings']['camera3D']) => number,
-    write: (draft: FlameDescriptor, next: number) => void,
+    field: 'theta' | 'phi' | 'radius' | 'fov' | 'roll',
   ): Setter<number> {
     return (value) => {
       timeline.setPreviewHeld(false)
-      setFlameDescriptor((draft) => {
-        const prev = read(draft.renderSettings.camera3D)
-        write(
-          draft,
-          typeof value === 'function'
-            ? (value as (p: number) => number)(prev)
-            : value,
-        )
-      })
-      return read(flameDescriptor.renderSettings.camera3D)
+      const current = flameDescriptor.renderSettings.camera3D[field]
+      const next =
+        typeof value === 'function'
+          ? (value as (p: number) => number)(current)
+          : value
+      setRenderSetting(`camera3D.${field}`, next)
+      return flameDescriptor.renderSettings.camera3D[field]
     }
   }
-  const setFlameTheta = makeCamera3DSetter(
-    (c) => c.theta,
-    (d, v) => {
-      d.renderSettings.camera3D.theta = v
-    },
-  )
-  const setFlamePhi = makeCamera3DSetter(
-    (c) => c.phi,
-    (d, v) => {
-      d.renderSettings.camera3D.phi = v
-    },
-  )
-  const setFlameRadius = makeCamera3DSetter(
-    (c) => c.radius,
-    (d, v) => {
-      d.renderSettings.camera3D.radius = v
-    },
-  )
+  const setFlameTheta = makeCamera3DSetter('theta')
+  const setFlamePhi = makeCamera3DSetter('phi')
+  const setFlameRadius = makeCamera3DSetter('radius')
   // 3D auto-exposure: drive the real Exposure value from the camera zoom so the
   // slider visibly tracks it. exposure = base + strength*log(radius/refRadius),
   // neutral at the radius where the toggle was enabled. The exposure read is
@@ -1399,31 +1271,19 @@ export function MainWorkspace(props: AppProps) {
     }
   })
   const setFlameTarget3D = (value: Vec3 | ((prev: Vec3) => Vec3)) => {
-    setFlameDescriptor((draft) => {
-      const newTarget =
-        typeof value === 'function'
-          ? value(new Float32Array(draft.renderSettings.camera3D.target))
-          : value
-      draft.renderSettings.camera3D.target = [
-        newTarget[0] ?? 0,
-        newTarget[1] ?? 0,
-        newTarget[2] ?? 0,
-      ]
-    })
+    const current = new Float32Array(
+      flameDescriptor.renderSettings.camera3D.target,
+    )
+    const newTarget = typeof value === 'function' ? value(current) : value
+    setRenderSetting('camera3D.target', [
+      newTarget[0] ?? 0,
+      newTarget[1] ?? 0,
+      newTarget[2] ?? 0,
+    ])
     return new Float32Array(flameDescriptor.renderSettings.camera3D.target)
   }
-  const setFlameFov = makeCamera3DSetter(
-    (c) => c.fov,
-    (d, v) => {
-      d.renderSettings.camera3D.fov = v
-    },
-  )
-  const setFlameRoll = makeCamera3DSetter(
-    (c) => c.roll,
-    (d, v) => {
-      d.renderSettings.camera3D.roll = v
-    },
-  )
+  const setFlameFov = makeCamera3DSetter('fov')
+  const setFlameRoll = makeCamera3DSetter('roll')
 
   // First-person "fly" navigation for 3D flames. Session-only (you don't want
   // to reopen the app mid-flight); the movement speed is remembered.
@@ -1505,7 +1365,11 @@ export function MainWorkspace(props: AppProps) {
     }
   })
 
-  const onDrop = useAppDragAndDrop(history, setLoadedAnimation)
+  const onDrop = useAppDragAndDrop(
+    history,
+    setLoadedAnimation,
+    openReplaySession,
+  )
 
   const timeline = createTimelineState()
   // One chronological undo across flame history + timeline snapshots —
@@ -1518,7 +1382,14 @@ export function MainWorkspace(props: AppProps) {
     audioEnabled,
     audioBuffer,
     audioMapping,
-    setFlameDescriptor,
+    (write) => {
+      invalidateLastFinishedSession()
+      reportUnreplayableOnce(
+        'live-audio-modulation',
+        'Live audio modulation changed the flame without embedding the audio source',
+      )
+      history.setSilently(write)
+    },
     liveAnalyzer,
     audioSource,
     playbackPaused,
@@ -1937,7 +1808,12 @@ export function MainWorkspace(props: AppProps) {
     applyRandomizeSettings(rs, randomizeSettings)
 
     newFlame.renderSettings = rs
-    history.replace(newFlame, 'Randomize Flame')
+    // Recorded as a load carrying the finished flame. The seeded
+    // flame.randomize command would read better in a log, but this handler
+    // also runs applyRandomizeSettings over the render settings with ambient
+    // randomness; carrying the result keeps replay exact until that is
+    // seeded too.
+    executeCommand('flame.load', cmdContext, newFlame, 'Randomize Flame')
   }
 
   const runMutateFlame = async (
@@ -1971,7 +1847,8 @@ export function MainWorkspace(props: AppProps) {
     applyRandomizeSettings(rs, randomizeSettings)
 
     mutatedFlame.renderSettings = rs
-    history.replace(mutatedFlame, 'Mutate Flame')
+    // Same reasoning as Randomize above.
+    executeCommand('flame.load', cmdContext, mutatedFlame, 'Mutate Flame')
   }
 
   // Keep the randomizer card visually fixed across a flame swap. Changing the
@@ -2212,12 +2089,7 @@ export function MainWorkspace(props: AppProps) {
   const handleUpdateRenderSettings = (
     settings: Partial<FlameDescriptor['renderSettings']>,
   ) => {
-    setFlameDescriptor((draft) => {
-      draft.renderSettings = {
-        ...draft.renderSettings,
-        ...settings,
-      }
-    })
+    executeCommand('flame.updateRenderSettings', cmdContext, settings)
   }
 
   // Deleting a custom variation the CURRENT flame uses breaks its rendering,
@@ -2260,7 +2132,7 @@ export function MainWorkspace(props: AppProps) {
     // Loading a history entry is a fresh starting point: keep unsaved work
     // recoverable and don't autosave the untouched loaded flame.
     flushDirtyToRecents()
-    history.replace(deepClone(entry.flame), 'Load History Flame')
+    executeCommand('flame.load', cmdContext, entry.flame, 'Load History Flame')
     markLoadedBaseline()
   }
 
@@ -3273,13 +3145,24 @@ export function MainWorkspace(props: AppProps) {
       if (ev.metaKey || ev.ctrlKey) {
         // Chronological across flame history + timeline (see undoRouting.ts);
         // the toolbar Undo/Redo buttons route through the same arbiter.
-        return ev.shiftKey ? undoRouter.redoLast() : undoRouter.undoLast()
+        // Routed through the command registry so a session recording sees
+        // the undo; guarded so a no-op never lands in the log.
+        if (ev.shiftKey ? !undoRouter.canRedo() : !undoRouter.canUndo()) {
+          return false
+        }
+        executeCommand(
+          ev.shiftKey ? 'history.redo' : 'history.undo',
+          cmdContext,
+        )
+        return true
       }
     },
     KeyY: (ev) => {
       if (animationExportRunning()) return false
       if (ev.metaKey || ev.ctrlKey) {
-        return undoRouter.redoLast()
+        if (!undoRouter.canRedo()) return false
+        executeCommand('history.redo', cmdContext)
+        return true
       }
     },
     KeyD: (ev) => {
@@ -3357,7 +3240,12 @@ export function MainWorkspace(props: AppProps) {
       duration: timelineDuration,
       setDuration: setTimelineDuration,
       currentFrame: timeline.currentFrame,
-      setCurrentFrame: timeline.setCurrentFrame,
+      setCurrentFrame: (value) => {
+        const frame =
+          typeof value === 'function' ? value(timeline.currentFrame()) : value
+        timeline.goToFrame(frame)
+        return timeline.currentFrame()
+      },
       play: timeline.play,
       setLoop: (loop) => {
         timeline.updateConfigUndoable({ loop })
@@ -3373,6 +3261,74 @@ export function MainWorkspace(props: AppProps) {
           easing as EasingCurve | undefined,
         )
       },
+      edit: {
+        removeKeyframe: timeline.removeKeyframe,
+        setKeyframeValue: (path, frame, value, easing, interp) => {
+          timeline.setKeyframeValue(
+            path,
+            frame,
+            value,
+            easing as EasingCurve | undefined,
+            interp as KeyframeInterpolation | undefined,
+          )
+        },
+        setKeyframeInterp: (path, frame, interp) => {
+          timeline.setKeyframeInterp(
+            path,
+            frame,
+            interp as KeyframeInterpolation,
+          )
+        },
+        moveKeyframe: timeline.moveKeyframe,
+        removeTrack: timeline.removeTrack,
+        clearTracks: timeline.clearAllTracks,
+        setLoopMode: timeline.setLoopMode,
+        setAutoKeyframe: (on) => {
+          timeline.setAutoKeyframe(on)
+        },
+        snapshot: () => ({
+          config: deepClone(timeline.config()),
+          currentFrame: timeline.currentFrame(),
+          animationEnabled: animationEnabled(),
+          autoKeyframe: timeline.autoKeyframe(),
+          previewHeld: timeline.previewHeld(),
+          tracks: deepClone(timeline.tracks()),
+        }),
+        load: (data) => {
+          timeline.loadTracks(data.tracks)
+          timeline.setConfig(data.config)
+          if (data.currentFrame !== undefined) {
+            timeline.setCurrentFrame(data.currentFrame)
+          }
+          if (data.animationEnabled !== undefined) {
+            setAnimationEnabled(data.animationEnabled)
+          }
+          if (data.autoKeyframe !== undefined) {
+            timeline.setAutoKeyframe(data.autoKeyframe)
+          }
+          if (data.previewHeld !== undefined) {
+            timeline.setPreviewHeld(data.previewHeld)
+          }
+        },
+      },
+    },
+    audio: {
+      snapshot: () => ({
+        mapping: deepClone(audioMapping()),
+        enabled: audioEnabled(),
+        source: audioSource(),
+        trackName: audioTrackName(),
+      }),
+      setMapping: setAudioMapping,
+      setEnabled: setAudioEnabled,
+      setSource: setAudioSource,
+    },
+    view: {
+      setQualityPreset,
+      setAdaptiveFilter: setAdaptiveFilterEnabled,
+      setStochasticFilter: setStochasticFilterEnabled,
+      setFlyMode,
+      setShowTimeline,
     },
     camera: {
       center: () => {
@@ -3386,8 +3342,198 @@ export function MainWorkspace(props: AppProps) {
         if (name === 'exportAnimation') void showExportPngDialog('animation')
       },
     },
+    history: {
+      undo: undoRouter.undoLast,
+      redo: undoRouter.redoLast,
+      peekUndoTarget: undoRouter.peekUndoTarget,
+      peekRedoTarget: undoRouter.peekRedoTarget,
+    },
   }
   useShortcutManager(cmdContext)
+
+  /**
+   * Every render-settings control goes through the registry, so a recording
+   * captures it as a replayable step (semantic-recorder-plan, M3). The path
+   * is the same one the control already declares as `dataParameterPath` and
+   * the timeline uses for keyframes.
+   */
+  const setRenderSetting = (path: string, value: unknown) => {
+    executeCommand('flame.setRenderSetting', cmdContext, path, value)
+  }
+
+  /** Several render settings applied as one edit — used where a control
+   *  derives a small batch (the auto-exposure re-base) rather than moving a
+   *  single parameter. */
+  const setRenderSettings = (
+    patch: Partial<FlameDescriptor['renderSettings']>,
+  ) => {
+    executeCommand('flame.updateRenderSettings', cmdContext, patch)
+  }
+
+  /**
+   * Where a replayed session writes (M4). `loadInitial` goes through the
+   * SETTER rather than `history.replace`, because replace pushes its own
+   * entry and would escape the batch — the batch is what makes a whole
+   * replayed run a single undo step the viewer can take back in one go.
+   */
+  type ReplaySideState = {
+    timeline: TimelineSnapshot
+    audio: AudioWiringSnapshot
+    view: SessionViewSnapshot
+  }
+
+  const captureReplaySideState = (): ReplaySideState => ({
+    timeline: {
+      config: deepClone(timeline.config()),
+      currentFrame: timeline.currentFrame(),
+      animationEnabled: animationEnabled(),
+      autoKeyframe: timeline.autoKeyframe(),
+      previewHeld: timeline.previewHeld(),
+      tracks: deepClone(timeline.tracks()),
+    },
+    audio: {
+      mapping: deepClone(audioMapping()),
+      enabled: audioEnabled(),
+      source: audioSource(),
+      trackName: audioTrackName(),
+    },
+    view: {
+      qualityPreset: qualityPreset(),
+      adaptiveFilter: adaptiveFilterEnabled(),
+      stochasticFilter: stochasticFilterEnabled(),
+      flyMode: flyMode(),
+      showTimeline: showTimeline(),
+      sidebarOpen: showSidebar(),
+    },
+  })
+
+  const applyReplayAudioState = (audio: AudioWiringSnapshot) => {
+    // A session records wiring, never file bytes or microphone permission.
+    // Keep the workspace's actual resource identity and only re-enable the
+    // wiring when that same resource is still present. In particular, redo
+    // must not relabel B.wav as the A.wav captured by an earlier replay.
+    applyReplayAudioWiring(
+      audio,
+      {
+        hasFileBuffer: audioBuffer() !== undefined,
+        currentTrackName: audioTrackName(),
+        hasLiveAnalyzer: liveAnalyzer() !== undefined,
+      },
+      {
+        setMapping: setAudioMapping,
+        setSource: setAudioSource,
+        setEnabled: setAudioEnabled,
+      },
+    )
+  }
+
+  const restoreReplaySideState = (state: ReplaySideState) => {
+    timeline.setTracks(() => deepClone(state.timeline.tracks))
+    timeline.setConfig(deepClone(state.timeline.config))
+    if (state.timeline.currentFrame !== undefined) {
+      timeline.setCurrentFrame(state.timeline.currentFrame)
+    }
+    if (state.timeline.animationEnabled !== undefined) {
+      setAnimationEnabled(state.timeline.animationEnabled)
+    }
+    if (state.timeline.autoKeyframe !== undefined) {
+      timeline.setAutoKeyframe(state.timeline.autoKeyframe)
+    }
+    if (state.timeline.previewHeld !== undefined) {
+      timeline.setPreviewHeld(state.timeline.previewHeld)
+    }
+    applyReplayAudioState(state.audio)
+    if (state.view.qualityPreset in qualityPresets) {
+      setQualityPreset(state.view.qualityPreset as QualityPreset)
+    }
+    setAdaptiveFilterEnabled(state.view.adaptiveFilter)
+    setStochasticFilterEnabled(state.view.stochasticFilter)
+    setFlyMode(state.view.flyMode)
+    setShowTimeline(state.view.showTimeline)
+    setShowSidebar(state.view.sidebarOpen)
+  }
+
+  let replayBatchStart: ReplaySideState | undefined
+
+  const replayTarget: ReplayTarget = {
+    loadInitial: (flame) => {
+      setFlameDescriptor(() => deepClone(flame), 'Replay: initial state')
+    },
+    // Only called when the session carries them, so replaying an older
+    // recording leaves the viewer's own animation and audio wiring alone.
+    loadTimeline: (data) => {
+      timeline.loadTracks(data.tracks)
+      timeline.setConfig(data.config)
+      if (data.currentFrame !== undefined) {
+        timeline.setCurrentFrame(data.currentFrame)
+      }
+      if (data.animationEnabled !== undefined) {
+        setAnimationEnabled(data.animationEnabled)
+      }
+      if (data.autoKeyframe !== undefined) {
+        timeline.setAutoKeyframe(data.autoKeyframe)
+      }
+      if (data.previewHeld !== undefined) {
+        timeline.setPreviewHeld(data.previewHeld)
+      }
+    },
+    loadAudio: (audio) => {
+      // `audioTrackName` describes the resource actually loaded in this
+      // workspace. A session cannot supply bytes, so never relabel B.wav as
+      // the A.wav it requires or run the wrong track under the saved mapping.
+      applyReplayAudioState(audio)
+    },
+    loadView: (view) => {
+      if (view.qualityPreset in qualityPresets) {
+        setQualityPreset(view.qualityPreset as QualityPreset)
+      }
+      setAdaptiveFilterEnabled(view.adaptiveFilter)
+      setStochasticFilterEnabled(view.stochasticFilter)
+      setFlyMode(view.flyMode)
+      setShowTimeline(view.showTimeline)
+      setShowSidebar(view.sidebarOpen)
+    },
+    execute: (id, args) => {
+      return executeReplayCommand(id, cmdContext, ...args)
+    },
+    preflight: preflightReplayCommand,
+    beginBatch: () => {
+      invalidateLastFinishedSession()
+      replayBatchStart = captureReplaySideState()
+      // Transport is wall-clock state, not authored replay state. Freeze it
+      // before loading the session so frames cannot advance underneath the
+      // deterministic action sequence; undo never restarts playback.
+      if (timeline.isPlaying()) timeline.pause()
+      timeline.beginTransientHistory()
+      history.startPreview('Replay')
+    },
+    endBatch: () => {
+      const before = replayBatchStart
+      const after = before ? captureReplaySideState() : undefined
+      replayBatchStart = undefined
+      timeline.endTransientHistory()
+      if (!history.isPreviewing()) return
+      const sideStateChanged =
+        before !== undefined &&
+        after !== undefined &&
+        JSON.stringify(before) !== JSON.stringify(after)
+      withRecordingSuppressed(() => {
+        if (sideStateChanged && before && after) {
+          history.commit({
+            force: true,
+            undoEffect: () => {
+              restoreReplaySideState(before)
+            },
+            redoEffect: () => {
+              restoreReplaySideState(after)
+            },
+          })
+        } else {
+          history.commit()
+        }
+      })
+    },
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   runTourCommand.fn = (id, ...args: any[]) => {
@@ -3621,6 +3767,43 @@ export function MainWorkspace(props: AppProps) {
               <ExportJobHost />
               <ExportJobTracker />
               <div class={ui.bottomBar}>
+                {/* In the bottom bar's normal flow rather than floating over
+                    the canvas — the draggable FloatingActions widget is fixed
+                    at z-index 200 and would sit on top of it, swallowing its
+                    clicks. Was dev-gated while replay did not exist; now that
+                    it does, and a log states its own fidelity via the
+                    unnamed-write count, there is nothing to hide behind a
+                    build flag. */}
+                {/* Stays mounted while a recording is running whatever the
+                    toolbar toggle says — hiding the only Stop button mid-take
+                    would strand the recording. */}
+                <Show when={recorderVisible() || isSessionRecording()}>
+                  <SessionRecorderDock
+                    flameDescriptor={flameDescriptor}
+                    startExtras={() => {
+                      // Wall-clock playback is not authored session state.
+                      // Freeze it before taking the start snapshot so the
+                      // playhead cannot advance underneath a new recording.
+                      if (timeline.isPlaying()) timeline.pause()
+                      return {
+                        timeline: cmdContext.timeline.edit?.snapshot(),
+                        audio: cmdContext.audio?.snapshot(),
+                        view: {
+                          qualityPreset: qualityPreset(),
+                          adaptiveFilter: adaptiveFilterEnabled(),
+                          stochasticFilter: stochasticFilterEnabled(),
+                          flyMode: flyMode(),
+                          showTimeline: showTimeline(),
+                          sidebarOpen: showSidebar(),
+                        },
+                      }
+                    }}
+                    target={replayTarget}
+                    session={replaySession()}
+                    onSessionChange={openReplaySession}
+                    busy={animationExportRunning() || timeline.isPlaying()}
+                  />
+                </Show>
                 <Show when={effectiveFlame().renderSettings.dimensions === 3}>
                   <OrientationGizmo
                     theta={[effectiveTheta, setFlameTheta]}
@@ -3649,8 +3832,12 @@ export function MainWorkspace(props: AppProps) {
                     pixelRatio={pixelRatio()}
                     setPixelRatio={setPixelRatio}
                     controlsDisabled={timeline.isPlaying()}
-                    onUndo={undoRouter.undoLast}
-                    onRedo={undoRouter.redoLast}
+                    onUndo={() => {
+                      executeCommand('history.undo', cmdContext)
+                    }}
+                    onRedo={() => {
+                      executeCommand('history.redo', cmdContext)
+                    }}
                     canUndo={undoRouter.canUndo}
                     canRedo={undoRouter.canRedo}
                     blendFlame={blendFlame()}
@@ -3746,6 +3933,13 @@ export function MainWorkspace(props: AppProps) {
                       formatTrackLabel={readableIds().formatTrackPath}
                       flameDescriptor={flameDescriptor}
                       onOpenAnimationGenerator={openAnimationGenerator}
+                      onSetAutoKeyframe={(enabled) => {
+                        executeCommand(
+                          'timeline.setAutoKeyframe',
+                          cmdContext,
+                          enabled,
+                        )
+                      }}
                     />
                   </div>
                 </Show>
@@ -3862,22 +4056,25 @@ export function MainWorkspace(props: AppProps) {
                                   flameDescriptor.renderSettings.pointInitMode
                                 }
                                 onSelect={(newType) => {
-                                  setFlameDescriptor((draft) => {
-                                    const existingVar =
-                                      draft.transforms[state.tid]?.variations[
-                                        state.vid
-                                      ]
-                                    if (existingVar) {
-                                      draft.transforms[state.tid]!.variations[
-                                        state.vid
-                                      ] = deepClone(
-                                        getVariationDefault(
-                                          newType,
-                                          existingVar.weight,
-                                        ),
-                                      )
-                                    }
-                                  })
+                                  // The new descriptor is built here and
+                                  // recorded whole, so replay lands on the
+                                  // same variation without re-deriving it.
+                                  const existingVar =
+                                    flameDescriptor.transforms[state.tid]
+                                      ?.variations[state.vid]
+                                  if (!existingVar) return
+                                  executeCommand(
+                                    'flame.setVariation',
+                                    cmdContext,
+                                    state.tid,
+                                    state.vid,
+                                    deepClone(
+                                      getVariationDefault(
+                                        newType,
+                                        existingVar.weight,
+                                      ),
+                                    ),
+                                  )
                                 }}
                                 onClose={() => {
                                   // Save scroll position before the Show block unmounts
@@ -3935,16 +4132,14 @@ export function MainWorkspace(props: AppProps) {
                                         ) {
                                           return
                                         }
-                                        setFlameDescriptor((draft) => {
-                                          draft.transforms[
-                                            state.tid
-                                          ]!.preAffine =
-                                            newValue.transform.preAffine
-                                          draft.transforms[
-                                            state.tid
-                                          ]!.variations[state.vid] =
-                                            newValue.variation
-                                        })
+                                        executeCommand(
+                                          'flame.applyVariationSelection',
+                                          cmdContext,
+                                          state.tid,
+                                          state.vid,
+                                          newValue.transform.preAffine,
+                                          newValue.variation,
+                                        )
                                       })
                                       .catch((err: unknown) => {
                                         console.warn(
@@ -3966,6 +4161,15 @@ export function MainWorkspace(props: AppProps) {
                                   setFlameDescriptor((draft) => {
                                     setFn(draft.transforms)
                                   })
+                                }}
+                                setTransformAffine={(tid, which, affine) => {
+                                  executeCommand(
+                                    'flame.setTransformAffine',
+                                    cmdContext,
+                                    tid,
+                                    which,
+                                    affine,
+                                  )
                                 }}
                                 finalTransform={
                                   flameDescriptor.finalTransform ??
@@ -3990,9 +4194,11 @@ export function MainWorkspace(props: AppProps) {
                                     : { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 })
                                 }
                                 setFinalTransform={(affine) => {
-                                  setFlameDescriptor((draft) => {
-                                    draft.finalTransform = affine
-                                  })
+                                  executeCommand(
+                                    'flame.setFinalTransform',
+                                    cmdContext,
+                                    affine,
+                                  )
                                 }}
                                 is3D={
                                   (flameDescriptor.renderSettings.dimensions ??
@@ -4011,6 +4217,15 @@ export function MainWorkspace(props: AppProps) {
                                     setFlameDescriptor((draft) => {
                                       setFn(draft.transforms)
                                     })
+                                  }}
+                                  setTransformColor={(tid, x, y) => {
+                                    executeCommand(
+                                      'flame.setTransformColor',
+                                      cmdContext,
+                                      tid,
+                                      x,
+                                      y,
+                                    )
                                   }}
                                   selectedTransformId={selectedTransformId}
                                   setSelectedTransformId={
@@ -4064,12 +4279,11 @@ export function MainWorkspace(props: AppProps) {
                                           def,
                                         ).then((addedDef) => {
                                           if (addedDef) {
-                                            setFlameDescriptor((draft) => {
-                                              addTransformWithVariation(
-                                                draft,
-                                                addedDef.id,
-                                              )
-                                            })
+                                            executeCommand(
+                                              'flame.addTransform',
+                                              cmdContext,
+                                              addedDef.id,
+                                            )
                                           }
                                           setCustomVarsVersion((v) => v + 1)
                                         })
@@ -4088,12 +4302,11 @@ export function MainWorkspace(props: AppProps) {
                                           onClick={(e) => {
                                             e.stopPropagation()
                                             setHoveredCustomVarDef(null)
-                                            setFlameDescriptor((draft) => {
-                                              addTransformWithVariation(
-                                                draft,
-                                                def.id,
-                                              )
-                                            })
+                                            executeCommand(
+                                              'flame.addTransform',
+                                              cmdContext,
+                                              def.id,
+                                            )
                                           }}
                                         >
                                           <BoxArrowRight />
@@ -4147,12 +4360,11 @@ export function MainWorkspace(props: AppProps) {
                                     const addedDef =
                                       await showCustomVariationEditor()
                                     if (addedDef) {
-                                      setFlameDescriptor((draft) => {
-                                        addTransformWithVariation(
-                                          draft,
-                                          addedDef.id,
-                                        )
-                                      })
+                                      executeCommand(
+                                        'flame.addTransform',
+                                        cmdContext,
+                                        addedDef.id,
+                                      )
                                     }
                                     setCustomVarsVersion((v) => v + 1)
                                   }}
@@ -4191,8 +4403,10 @@ export function MainWorkspace(props: AppProps) {
                                       'Blend is still active — the loaded flame will look mixed',
                                       4000,
                                     )
-                                  history.replace(
-                                    deepClone(flame),
+                                  executeCommand(
+                                    'flame.load',
+                                    cmdContext,
+                                    flame,
                                     'Apply Random Flame',
                                   )
                                 }}
@@ -4200,7 +4414,10 @@ export function MainWorkspace(props: AppProps) {
                                 isBusy={isRandomizing()}
                               />
                             </div>
-                            <div class={ui.transformsToolbar}>
+                            <div
+                              class={ui.transformsToolbar}
+                              data-tour-target="transform-list"
+                            >
                               <span class={ui.transformsToolbarLabel}>
                                 Transforms
                               </span>
@@ -4253,6 +4470,7 @@ export function MainWorkspace(props: AppProps) {
                               {([tid, transform]) => (
                                 <CollapsibleCard
                                   title={readableIds().transformLabel[tid]!}
+                                  data-focus-id={`tx:${tid}`}
                                   open={!collapsedTransforms().has(tid)}
                                   onToggleOpen={() => {
                                     toggleTransformCollapsed(tid)
@@ -4285,12 +4503,16 @@ export function MainWorkspace(props: AppProps) {
                                             const hue = random01() * 2 * Math.PI
                                             const chroma =
                                               0.25 + random01() * 0.15
-                                            setFlameDescriptor((draft) => {
-                                              draft.transforms[tid]!.color.x =
-                                                chroma * Math.cos(hue)
-                                              draft.transforms[tid]!.color.y =
-                                                chroma * Math.sin(hue)
-                                            })
+                                            // The randomness lands in the
+                                            // recorded args, so the log needs
+                                            // no seed to replay this exactly.
+                                            executeCommand(
+                                              'flame.setTransformColor',
+                                              cmdContext,
+                                              tid,
+                                              chroma * Math.cos(hue),
+                                              chroma * Math.sin(hue),
+                                            )
                                           }}
                                         >
                                           <Shuffle />
@@ -4307,10 +4529,12 @@ export function MainWorkspace(props: AppProps) {
                                         }
                                         onClick={(e) => {
                                           e.stopPropagation()
-                                          setFlameDescriptor((draft) => {
-                                            draft.transforms[tid]!.visible =
-                                              !draft.transforms[tid]!.visible
-                                          })
+                                          executeCommand(
+                                            'flame.setTransformVisible',
+                                            cmdContext,
+                                            tid,
+                                            !transform.visible,
+                                          )
                                         }}
                                       >
                                         {transform.visible ? (
@@ -4326,18 +4550,11 @@ export function MainWorkspace(props: AppProps) {
                                         title="Delete transform"
                                         onClick={(e) => {
                                           e.stopPropagation()
-                                          setFlameDescriptor((draft) => {
-                                            if (
-                                              recordKeys(draft.transforms)
-                                                .length === 1
-                                            ) {
-                                              draft.transforms[tid] = deepClone(
-                                                newDefaultTransform(),
-                                              )
-                                            } else {
-                                              delete draft.transforms[tid]
-                                            }
-                                          })
+                                          executeCommand(
+                                            'flame.deleteTransform',
+                                            cmdContext,
+                                            tid,
+                                          )
                                         }}
                                       >
                                         <Cross />
@@ -4366,10 +4583,12 @@ export function MainWorkspace(props: AppProps) {
                                         max={1}
                                         step={0.001}
                                         onInput={(probability) => {
-                                          setFlameDescriptor((draft) => {
-                                            draft.transforms[tid]!.probability =
-                                              probability
-                                          })
+                                          executeCommand(
+                                            'flame.setProbability',
+                                            cmdContext,
+                                            tid,
+                                            probability,
+                                          )
                                         }}
                                         formatValue={(value) =>
                                           formatPercent(
@@ -4397,10 +4616,12 @@ export function MainWorkspace(props: AppProps) {
                                         max={1}
                                         step={0.01}
                                         onInput={(val) => {
-                                          setFlameDescriptor((draft) => {
-                                            draft.transforms[tid]!.colorSpeed =
-                                              val
-                                          })
+                                          executeCommand(
+                                            'flame.setColorSpeed',
+                                            cmdContext,
+                                            tid,
+                                            val,
+                                          )
                                         }}
                                         dataParameterPath={`transform.${tid}.colorSpeed`}
                                         data-tour-target="colorSpeed-slider"
@@ -4462,17 +4683,14 @@ export function MainWorkspace(props: AppProps) {
                                                     ) {
                                                       return
                                                     }
-                                                    setFlameDescriptor(
-                                                      (draft) => {
-                                                        draft.transforms[
-                                                          tid
-                                                        ]!.preAffine =
-                                                          newValue.transform.preAffine
-                                                        draft.transforms[
-                                                          tid
-                                                        ]!.variations[vid] =
-                                                          newValue.variation
-                                                      },
+                                                    executeCommand(
+                                                      'flame.applyVariationSelection',
+                                                      cmdContext,
+                                                      tid,
+                                                      vid,
+                                                      newValue.transform
+                                                        .preAffine,
+                                                      newValue.variation,
                                                     )
                                                   })
                                                   .catch((err: unknown) => {
@@ -4548,14 +4766,12 @@ export function MainWorkspace(props: AppProps) {
                                                 step={0.001}
                                                 dataParameterPath={`${tid}.${vid}`}
                                                 onInput={(weight) => {
-                                                  setFlameDescriptor(
-                                                    (draft) => {
-                                                      draft.transforms[
-                                                        tid
-                                                      ]!.variations[
-                                                        vid
-                                                      ]!.weight = weight
-                                                    },
+                                                  executeCommand(
+                                                    'flame.setVariationWeight',
+                                                    cmdContext,
+                                                    tid,
+                                                    vid,
+                                                    weight,
                                                   )
                                                 }}
                                                 formatValue={formatPercent}
@@ -4564,26 +4780,25 @@ export function MainWorkspace(props: AppProps) {
                                             <Show when={!hideDiceButtons()}>
                                               <DiceButton
                                                 onClick={() => {
-                                                  setFlameDescriptor(
-                                                    (draft) => {
-                                                      const v =
-                                                        draft.transforms[tid]!
-                                                          .variations[vid]!
-                                                      v.weight = random01()
-                                                      const params =
-                                                        randomizeVariationParams(
-                                                          v.type,
-                                                        )
-                                                      if (params) {
-                                                        ;(
-                                                          v as {
-                                                            params?: Record<
-                                                              string,
-                                                              number
-                                                            >
-                                                          }
-                                                        ).params = params
-                                                      }
+                                                  // Rolled here, recorded as
+                                                  // the resulting descriptor:
+                                                  // replay reproduces it
+                                                  // without re-rolling.
+                                                  const params =
+                                                    randomizeVariationParams(
+                                                      variation.type,
+                                                    )
+                                                  executeCommand(
+                                                    'flame.setVariation',
+                                                    cmdContext,
+                                                    tid,
+                                                    vid,
+                                                    {
+                                                      ...deepClone(variation),
+                                                      weight: random01(),
+                                                      ...(params
+                                                        ? { params }
+                                                        : {}),
                                                     },
                                                   )
                                                 }}
@@ -4598,12 +4813,13 @@ export function MainWorkspace(props: AppProps) {
                                                   : 'Show variation'
                                               }
                                               onClick={() => {
-                                                setFlameDescriptor((draft) => {
-                                                  const v =
-                                                    draft.transforms[tid]!
-                                                      .variations[vid]!
-                                                  v.visible = !v.visible
-                                                })
+                                                executeCommand(
+                                                  'flame.setVariationVisible',
+                                                  cmdContext,
+                                                  tid,
+                                                  vid,
+                                                  !variation.visible,
+                                                )
                                               }}
                                             >
                                               {variation.visible ? (
@@ -4615,28 +4831,12 @@ export function MainWorkspace(props: AppProps) {
                                             <button
                                               class={ui.deleteVariationButton}
                                               onClick={() => {
-                                                setFlameDescriptor((draft) => {
-                                                  if (
-                                                    recordKeys(
-                                                      draft.transforms[tid]!
-                                                        .variations,
-                                                    ).length === 1
-                                                  ) {
-                                                    draft.transforms[
-                                                      tid
-                                                    ]!.variations[vid] =
-                                                      deepClone(
-                                                        getVariationDefault(
-                                                          variation.type,
-                                                          1,
-                                                        ),
-                                                      )
-                                                  } else {
-                                                    delete draft.transforms[
-                                                      tid
-                                                    ]!.variations[vid]
-                                                  }
-                                                })
+                                                executeCommand(
+                                                  'flame.deleteVariation',
+                                                  cmdContext,
+                                                  tid,
+                                                  vid,
+                                                )
                                               }}
                                             >
                                               <Cross />
@@ -4669,34 +4869,14 @@ export function MainWorkspace(props: AppProps) {
                                                   )}
                                                   dataParameterPath={`${tid}.${vid}`}
                                                   setValue={(value) => {
-                                                    setFlameDescriptor(
-                                                      (draft) => {
-                                                        const variationDraft =
-                                                          draft.transforms[tid]
-                                                            ?.variations[vid]
-                                                        if (
-                                                          variationDraft ===
-                                                            undefined ||
-                                                          !isAnyParametricVariationType(
-                                                            variationDraft.type,
-                                                          )
-                                                        ) {
-                                                          throw new Error(
-                                                            `Unreachable code`,
-                                                          )
-                                                        }
-                                                        ;(
-                                                          variationDraft as {
-                                                            params: Record<
-                                                              string,
-                                                              number
-                                                            >
-                                                          }
-                                                        ).params =
-                                                          value as Record<
-                                                            string,
-                                                            number
-                                                          >
+                                                    executeCommand(
+                                                      'flame.setVariation',
+                                                      cmdContext,
+                                                      tid,
+                                                      vid,
+                                                      {
+                                                        ...deepClone(variation),
+                                                        params: value,
                                                       },
                                                     )
                                                   }}
@@ -4711,19 +4891,11 @@ export function MainWorkspace(props: AppProps) {
                                     <button
                                       class={ui.addTransformVariationButton}
                                       onClick={() => {
-                                        setFlameDescriptor((draft) => {
-                                          draft.transforms[tid]!.variations[
-                                            generateVariationId()
-                                          ] = deepClone(
-                                            getVariationDefault(
-                                              defaultLinearType(
-                                                (flameDescriptor.renderSettings
-                                                  .dimensions ?? 2) as Dims,
-                                              ),
-                                              1,
-                                            ),
-                                          )
-                                        })
+                                        executeCommand(
+                                          'flame.addVariation',
+                                          cmdContext,
+                                          tid,
+                                        )
                                       }}
                                     >
                                       <Plus />
@@ -4857,20 +5029,18 @@ export function MainWorkspace(props: AppProps) {
                                                       Math.cos(newAngle)
                                                     const sin =
                                                       Math.sin(newAngle)
-                                                    setFlameDescriptor(
-                                                      (draft) => {
-                                                        const t =
-                                                          draft.transforms[tid]
-                                                        if (t) {
-                                                          t.preAffine = {
-                                                            a: cos,
-                                                            b: -sin,
-                                                            c: 0,
-                                                            d: sin,
-                                                            e: cos,
-                                                            f: 0,
-                                                          }
-                                                        }
+                                                    executeCommand(
+                                                      'flame.setTransformAffine',
+                                                      cmdContext,
+                                                      tid,
+                                                      'pre',
+                                                      {
+                                                        a: cos,
+                                                        b: -sin,
+                                                        c: 0,
+                                                        d: sin,
+                                                        e: cos,
+                                                        f: 0,
                                                       },
                                                     )
                                                   }}
@@ -4886,14 +5056,11 @@ export function MainWorkspace(props: AppProps) {
                                                     : 'Show'
                                                 }
                                                 onClick={() => {
-                                                  setFlameDescriptor(
-                                                    (draft) => {
-                                                      draft.transforms[
-                                                        tid
-                                                      ]!.visible =
-                                                        !draft.transforms[tid]!
-                                                          .visible
-                                                    },
+                                                  executeCommand(
+                                                    'flame.setTransformVisible',
+                                                    cmdContext,
+                                                    tid,
+                                                    !transform().visible,
                                                   )
                                                 }}
                                               >
@@ -4907,12 +5074,10 @@ export function MainWorkspace(props: AppProps) {
                                                 class={ui.symActionBtn}
                                                 title="Remove"
                                                 onClick={() => {
-                                                  setFlameDescriptor(
-                                                    (draft) => {
-                                                      delete draft.transforms[
-                                                        tid
-                                                      ]
-                                                    },
+                                                  executeCommand(
+                                                    'flame.removeTransform',
+                                                    cmdContext,
+                                                    tid,
                                                   )
                                                 }}
                                               >
@@ -4931,10 +5096,10 @@ export function MainWorkspace(props: AppProps) {
                               <button
                                 class={ui.addFlameButton}
                                 onClick={() => {
-                                  setFlameDescriptor((draft) => {
-                                    draft.transforms[generateTransformId()] =
-                                      deepClone(newDefaultTransform())
-                                  })
+                                  executeCommand(
+                                    'flame.addTransform',
+                                    cmdContext,
+                                  )
                                 }}
                               >
                                 New transform
@@ -4991,10 +5156,10 @@ export function MainWorkspace(props: AppProps) {
                                       max={30}
                                       step={1}
                                       onInput={(newSkipIters) => {
-                                        setFlameDescriptor((draft) => {
-                                          draft.renderSettings.skipIters =
-                                            newSkipIters
-                                        })
+                                        setRenderSetting(
+                                          'skipIters',
+                                          newSkipIters,
+                                        )
                                       }}
                                       formatValue={(value) => value.toString()}
                                       dataParameterPath="skipIters"
@@ -5018,10 +5183,10 @@ export function MainWorkspace(props: AppProps) {
                                       max={32}
                                       step={1}
                                       onInput={(plotsPerChain) => {
-                                        setFlameDescriptor((draft) => {
-                                          draft.renderSettings.plotsPerChain =
-                                            plotsPerChain
-                                        })
+                                        setRenderSetting(
+                                          'plotsPerChain',
+                                          plotsPerChain,
+                                        )
                                       }}
                                       formatValue={(value) => value.toString()}
                                       dataParameterPath="plotsPerChain"
@@ -5042,25 +5207,29 @@ export function MainWorkspace(props: AppProps) {
                                       max={8}
                                       step={0.001}
                                       onInput={(newExp) => {
-                                        setFlameDescriptor((draft) => {
-                                          draft.renderSettings.exposure = newExp
-                                          // With auto-exposure on, a manual change
-                                          // re-bases it: this value becomes the
-                                          // baseline at the current zoom, and zoom
-                                          // scales from here.
-                                          if (
-                                            draft.renderSettings
-                                              .autoExposure3D &&
-                                            (draft.renderSettings.dimensions ??
-                                              2) === 3
-                                          ) {
-                                            draft.renderSettings.autoExposure3DBase =
-                                              newExp
-                                            draft.renderSettings.autoExposure3DRefRadius =
-                                              draft.renderSettings.camera3D
-                                                ?.radius ?? 5
-                                          }
-                                        })
+                                        {
+                                          // With auto-exposure on, a manual
+                                          // change re-bases it: this value
+                                          // becomes the baseline at the
+                                          // current zoom. Computed here so
+                                          // the whole re-base records as one
+                                          // merge.
+                                          const rs =
+                                            flameDescriptor.renderSettings
+                                          const rebasing =
+                                            rs.autoExposure3D &&
+                                            (rs.dimensions ?? 2) === 3
+                                          setRenderSettings(
+                                            rebasing
+                                              ? {
+                                                  exposure: newExp,
+                                                  autoExposure3DBase: newExp,
+                                                  autoExposure3DRefRadius:
+                                                    rs.camera3D?.radius ?? 5,
+                                                }
+                                              : { exposure: newExp },
+                                          )
+                                        }
                                       }}
                                       formatValue={(value) => value.toFixed(2)}
                                       dataParameterPath="exposure"
@@ -5093,17 +5262,21 @@ export function MainWorkspace(props: AppProps) {
                                             .autoExposure3D
                                         }
                                         onChange={(checked) => {
-                                          setFlameDescriptor((draft) => {
-                                            draft.renderSettings.autoExposure3D =
+                                          {
+                                            const rs =
+                                              flameDescriptor.renderSettings
+                                            setRenderSettings(
                                               checked
-                                            if (checked) {
-                                              draft.renderSettings.autoExposure3DRefRadius =
-                                                draft.renderSettings.camera3D
-                                                  ?.radius ?? 5
-                                              draft.renderSettings.autoExposure3DBase =
-                                                draft.renderSettings.exposure
-                                            }
-                                          })
+                                                ? {
+                                                    autoExposure3D: true,
+                                                    autoExposure3DRefRadius:
+                                                      rs.camera3D?.radius ?? 5,
+                                                    autoExposure3DBase:
+                                                      rs.exposure,
+                                                  }
+                                                : { autoExposure3D: false },
+                                            )
+                                          }
                                         }}
                                       />
                                       <span>Auto exposure on zoom</span>
@@ -5125,10 +5298,10 @@ export function MainWorkspace(props: AppProps) {
                                           max={3}
                                           step={0.05}
                                           onInput={(strength) => {
-                                            setFlameDescriptor((draft) => {
-                                              draft.renderSettings.autoExposure3DStrength =
-                                                strength
-                                            })
+                                            setRenderSetting(
+                                              'autoExposure3DStrength',
+                                              strength,
+                                            )
                                           }}
                                           formatValue={(value) =>
                                             value.toFixed(2)
@@ -5152,9 +5325,7 @@ export function MainWorkspace(props: AppProps) {
                                       max={8}
                                       step={0.01}
                                       onInput={(newVal) => {
-                                        setFlameDescriptor((draft) => {
-                                          draft.renderSettings.gamma = newVal
-                                        })
+                                        setRenderSetting('gamma', newVal)
                                       }}
                                       formatValue={(value) => value.toFixed(2)}
                                       dataParameterPath="gamma"
@@ -5176,9 +5347,7 @@ export function MainWorkspace(props: AppProps) {
                                       max={20}
                                       step={0.01}
                                       onInput={(newVal) => {
-                                        setFlameDescriptor((draft) => {
-                                          draft.renderSettings.contrast = newVal
-                                        })
+                                        setRenderSetting('contrast', newVal)
                                       }}
                                       formatValue={(value) => value.toFixed(2)}
                                       dataParameterPath="contrast"
@@ -5200,10 +5369,10 @@ export function MainWorkspace(props: AppProps) {
                                       max={3}
                                       step={0.05}
                                       onInput={(newVibrancy) => {
-                                        setFlameDescriptor((draft) => {
-                                          draft.renderSettings.vibrancy =
-                                            newVibrancy
-                                        })
+                                        setRenderSetting(
+                                          'vibrancy',
+                                          newVibrancy,
+                                        )
                                       }}
                                       formatValue={(value) => value.toFixed(2)}
                                       dataParameterPath="vibrancy"
@@ -5226,10 +5395,10 @@ export function MainWorkspace(props: AppProps) {
                                       max={2}
                                       step={0.01}
                                       onInput={(newVal) => {
-                                        setFlameDescriptor((draft) => {
-                                          draft.renderSettings.highlightPower =
-                                            newVal
-                                        })
+                                        setRenderSetting(
+                                          'highlightPower',
+                                          newVal,
+                                        )
                                       }}
                                       formatValue={(value) => value.toFixed(2)}
                                       dataParameterPath="highlightPower"
@@ -5258,10 +5427,10 @@ export function MainWorkspace(props: AppProps) {
                                         max={5}
                                         step={0.05}
                                         onInput={(newVal) => {
-                                          setFlameDescriptor((draft) => {
-                                            draft.renderSettings.depthColorPower =
-                                              newVal
-                                          })
+                                          setRenderSetting(
+                                            'depthColorPower',
+                                            newVal,
+                                          )
                                         }}
                                         formatValue={(value) =>
                                           value.toFixed(2)
@@ -5286,10 +5455,7 @@ export function MainWorkspace(props: AppProps) {
                                         max={1.5}
                                         step={0.01}
                                         onInput={(newVal) => {
-                                          setFlameDescriptor((draft) => {
-                                            draft.renderSettings.lightPower =
-                                              newVal
-                                          })
+                                          setRenderSetting('lightPower', newVal)
                                         }}
                                         formatValue={(value) =>
                                           value.toFixed(2)
@@ -5317,10 +5483,10 @@ export function MainWorkspace(props: AppProps) {
                                       max={1}
                                       step={0.01}
                                       onInput={(newVal) => {
-                                        setFlameDescriptor((draft) => {
-                                          draft.renderSettings.densityEstimationQuality =
-                                            newVal
-                                        })
+                                        setRenderSetting(
+                                          'densityEstimationQuality',
+                                          newVal,
+                                        )
                                       }}
                                       formatValue={(value) => value.toFixed(2)}
                                       dataParameterPath="densityEstimationQuality"
@@ -5343,10 +5509,10 @@ export function MainWorkspace(props: AppProps) {
                                       max={1}
                                       step={0.05}
                                       onInput={(newVal) => {
-                                        setFlameDescriptor((draft) => {
-                                          draft.renderSettings.estimatorCurve =
-                                            newVal
-                                        })
+                                        setRenderSetting(
+                                          'estimatorCurve',
+                                          newVal,
+                                        )
                                       }}
                                       formatValue={(value) => value.toFixed(2)}
                                       dataParameterPath="estimatorCurve"
@@ -5385,10 +5551,7 @@ export function MainWorkspace(props: AppProps) {
                                         onChange={(ev) => {
                                           const mode = ev.currentTarget.value
                                           const update = () => {
-                                            setFlameDescriptor((draft) => {
-                                              draft.renderSettings.drawMode =
-                                                mode as 'light' | 'paint'
-                                            })
+                                            setRenderSetting('drawMode', mode)
                                           }
                                           if (
                                             'startViewTransition' in document
@@ -5435,12 +5598,10 @@ export function MainWorkspace(props: AppProps) {
                                         onChange={(ev) => {
                                           const mode = ev.currentTarget.value
                                           const update = () => {
-                                            setFlameDescriptor((draft) => {
-                                              draft.renderSettings.colorInitMode =
-                                                mode as
-                                                  | 'colorInitZero'
-                                                  | 'colorInitPosition'
-                                            })
+                                            setRenderSetting(
+                                              'colorInitMode',
+                                              mode,
+                                            )
                                           }
                                           if (
                                             'startViewTransition' in document
@@ -5489,10 +5650,10 @@ export function MainWorkspace(props: AppProps) {
                                         onChange={(ev) => {
                                           const mode = ev.currentTarget.value
                                           const update = () => {
-                                            setFlameDescriptor((draft) => {
-                                              draft.renderSettings.pointInitMode =
-                                                mode as PointInitMode
-                                            })
+                                            setRenderSetting(
+                                              'pointInitMode',
+                                              mode,
+                                            )
                                           }
                                           if (
                                             'startViewTransition' in document
@@ -5547,10 +5708,10 @@ export function MainWorkspace(props: AppProps) {
                                             : undefined
                                         }
                                         setValue={(newBgColor) => {
-                                          setFlameDescriptor((draft) => {
-                                            draft.renderSettings.backgroundColor =
-                                              newBgColor
-                                          })
+                                          setRenderSetting(
+                                            'backgroundColor',
+                                            newBgColor,
+                                          )
                                         }}
                                       />
                                     </label>
@@ -5564,10 +5725,10 @@ export function MainWorkspace(props: AppProps) {
                                   >
                                     <Button
                                       onClick={() => {
-                                        setFlameDescriptor((draft) => {
-                                          delete draft.renderSettings
-                                            .backgroundColor
-                                        })
+                                        setRenderSetting(
+                                          'backgroundColor',
+                                          null,
+                                        )
                                       }}
                                     >
                                       Auto
@@ -5614,10 +5775,10 @@ export function MainWorkspace(props: AppProps) {
                                         max={10}
                                         step={0.1}
                                         onInput={(newVal) => {
-                                          setFlameDescriptor((draft) => {
-                                            draft.renderSettings.paletteSpeed =
-                                              newVal
-                                          })
+                                          setRenderSetting(
+                                            'paletteSpeed',
+                                            newVal,
+                                          )
                                         }}
                                         formatValue={(value) =>
                                           value.toFixed(1)
@@ -5647,10 +5808,10 @@ export function MainWorkspace(props: AppProps) {
                                             const mode = parseInt(
                                               ev.currentTarget.value,
                                             ) as 0 | 1
-                                            setFlameDescriptor((draft) => {
-                                              draft.renderSettings.paletteMode =
-                                                mode
-                                            })
+                                            setRenderSetting(
+                                              'paletteMode',
+                                              mode,
+                                            )
                                           }}
                                         >
                                           <option value={0}>
@@ -5679,10 +5840,10 @@ export function MainWorkspace(props: AppProps) {
                                         max={1}
                                         step={0.05}
                                         onInput={(newVal) => {
-                                          setFlameDescriptor((draft) => {
-                                            draft.renderSettings.palettePhase =
-                                              newVal
-                                          })
+                                          setRenderSetting(
+                                            'palettePhase',
+                                            newVal,
+                                          )
                                         }}
                                         formatValue={(value) =>
                                           value.toFixed(2)
@@ -5720,17 +5881,12 @@ export function MainWorkspace(props: AppProps) {
                                         flameDescriptor.metadata?.name ?? ''
                                       }
                                       onInput={(e) => {
-                                        setFlameDescriptor((draft) => {
-                                          if (!draft.metadata) {
-                                            draft.metadata = {
-                                              name: '',
-                                              description: '',
-                                              author: '',
-                                            }
-                                          }
-                                          draft.metadata.name =
-                                            e.currentTarget.value
-                                        })
+                                        executeCommand(
+                                          'flame.setMetadata',
+                                          cmdContext,
+                                          'name',
+                                          e.currentTarget.value,
+                                        )
                                       }}
                                     />
                                   </div>
@@ -5746,17 +5902,12 @@ export function MainWorkspace(props: AppProps) {
                                         ''
                                       }
                                       onInput={(e) => {
-                                        setFlameDescriptor((draft) => {
-                                          if (!draft.metadata) {
-                                            draft.metadata = {
-                                              name: '',
-                                              description: '',
-                                              author: '',
-                                            }
-                                          }
-                                          draft.metadata.description =
-                                            e.currentTarget.value
-                                        })
+                                        executeCommand(
+                                          'flame.setMetadata',
+                                          cmdContext,
+                                          'description',
+                                          e.currentTarget.value,
+                                        )
                                       }}
                                     />
                                   </div>
@@ -5772,17 +5923,12 @@ export function MainWorkspace(props: AppProps) {
                                         flameDescriptor.metadata?.author ?? ''
                                       }
                                       onInput={(e) => {
-                                        setFlameDescriptor((draft) => {
-                                          if (!draft.metadata) {
-                                            draft.metadata = {
-                                              name: '',
-                                              description: '',
-                                              author: '',
-                                            }
-                                          }
-                                          draft.metadata.author =
-                                            e.currentTarget.value
-                                        })
+                                        executeCommand(
+                                          'flame.setMetadata',
+                                          cmdContext,
+                                          'author',
+                                          e.currentTarget.value,
+                                        )
                                       }}
                                     />
                                   </div>
@@ -5817,8 +5963,9 @@ export function MainWorkspace(props: AppProps) {
                             <AudioReactivePanel
                               onClose={() => setShowAudioPanel(false)}
                               audioBuffer={audioBuffer}
-                              onAudioChange={(buf) => {
+                              onAudioChange={(buf, fileName) => {
                                 setAudioBuffer(buf)
+                                setAudioTrackName(fileName)
                                 setFileAnalyzer(undefined)
                                 setAnalysisProgress(null)
                                 if (!buf) {
@@ -5857,11 +6004,32 @@ export function MainWorkspace(props: AppProps) {
                                 setSeekTarget(null)
                               }}
                               audioMapping={audioMapping}
-                              onMappingChange={setAudioMapping}
+                              // Through the registry, so wiring audio to the
+                              // flame is a recorded, replayable step rather
+                              // than an edit the log never saw.
+                              onMappingChange={(mapping) => {
+                                executeCommand(
+                                  'audio.setMapping',
+                                  cmdContext,
+                                  mapping,
+                                )
+                              }}
                               audioEnabled={audioEnabled}
-                              onEnabledChange={setAudioEnabled}
+                              onEnabledChange={(enabled) => {
+                                executeCommand(
+                                  'audio.setEnabled',
+                                  cmdContext,
+                                  enabled,
+                                )
+                              }}
                               audioSource={audioSource}
-                              onSourceChange={setAudioSource}
+                              onSourceChange={(source) => {
+                                executeCommand(
+                                  'audio.setSource',
+                                  cmdContext,
+                                  source,
+                                )
+                              }}
                               liveAnalyzer={liveAnalyzer}
                               onLiveAnalyzerChange={setLiveAnalyzer}
                               playbackPaused={playbackPaused}
@@ -5935,7 +6103,12 @@ export function MainWorkspace(props: AppProps) {
                                           'Blend is still active — the loaded flame will look mixed',
                                           4000,
                                         )
-                                      history.replace(deepClone(child))
+                                      executeCommand(
+                                        'flame.load',
+                                        cmdContext,
+                                        child,
+                                        'Load Bred Flame',
+                                      )
                                     }}
                                     onChangeParent={() => {
                                       respond()
@@ -5965,7 +6138,12 @@ export function MainWorkspace(props: AppProps) {
                                           'Blend is still active — the loaded flame will look mixed',
                                           4000,
                                         )
-                                      history.replace(deepClone(child))
+                                      executeCommand(
+                                        'flame.load',
+                                        cmdContext,
+                                        child,
+                                        'Load Bred Flame',
+                                      )
                                     }}
                                     onChangeParent={() => {
                                       respond()
@@ -6032,7 +6210,7 @@ export function MainWorkspace(props: AppProps) {
               const is3D =
                 (flameDescriptor.renderSettings.dimensions ?? 2) === 3
               const flame = deepClone(is3D ? initExample3D : initExample)
-              history.replace(flame, 'New Flame')
+              executeCommand('flame.load', cmdContext, flame, 'New Flame')
               setLoadedAnimation({ flame, tracks: [] })
               showToast('Fresh flame loaded — undo restores the previous one')
             }}
@@ -6094,23 +6272,35 @@ export function MainWorkspace(props: AppProps) {
             onShareDiscord={shareToDiscord}
             onLogoFavicon={showLogoFaviconGenerator}
             onRandomizeColors={() => {
-              setFlameDescriptor((draft) => {
-                draft.transforms = randomizeAllColors(draft.transforms)
-              })
+              executeCommand(
+                'flame.setAllTransformColors',
+                cmdContext,
+                Object.fromEntries(
+                  recordEntries(
+                    randomizeAllColors(deepClone(flameDescriptor.transforms)),
+                  ).map(([tid, t]) => [tid, { x: t.color.x, y: t.color.y }]),
+                ),
+              )
             }}
             hideDiceButtons={hideDiceButtons}
             setHideDiceButtons={setHideDiceButtons}
             animationEnabled={animationEnabled}
             setAnimationEnabled={(v) => {
               if (IS_DEV) console.info('[anim] floating toggle →', v)
-              setAnimationEnabled(v)
+              executeCommand('timeline.setAnimationEnabled', cmdContext, v)
             }}
             showTimeline={showTimeline}
-            setShowTimeline={setShowTimeline}
+            setShowTimeline={(v) => {
+              executeCommand('view.setShowTimeline', cmdContext, v)
+            }}
             adaptiveFilterEnabled={adaptiveFilterEnabled}
-            setAdaptiveFilterEnabled={setAdaptiveFilterEnabled}
+            setAdaptiveFilterEnabled={(v) => {
+              executeCommand('view.setAdaptiveFilter', cmdContext, v)
+            }}
             stochasticFilterEnabled={stochasticFilterEnabled}
-            setStochasticFilterEnabled={setStochasticFilterEnabled}
+            setStochasticFilterEnabled={(v) => {
+              executeCommand('view.setStochasticFilter', cmdContext, v)
+            }}
             isPlaying={() => timeline.isPlaying()}
             togglePlay={() => {
               if (!animationEnabled()) {
@@ -6127,7 +6317,7 @@ export function MainWorkspace(props: AppProps) {
                   `current=${qualityPreset()}`,
                 )
               }
-              setQualityPreset(key as QualityPreset)
+              executeCommand('view.setQualityPreset', cmdContext, key)
             }}
             accumulatedPointCount={accumulatedPointCount}
             qualityPointCountLimit={qualityPointCountLimit()}
@@ -6155,16 +6345,42 @@ export function MainWorkspace(props: AppProps) {
                   ? (stashedFlame3D ?? example34)
                   : (stashedFlame2D ?? initExample)
               const restoredTracks = v === 3 ? stashedTracks3D : stashedTracks2D
-              history.replace(deepClone(restored))
-              // Swap the timeline to the target dimension's tracks (empty on
-              // first entry — matches the starter flame).
-              timeline.loadTracks(restoredTracks ?? [])
+              // These document-boundary writes are represented by the two
+              // synthetic actions below. Suppress their coverage hooks so the
+              // recorder does not also flag the same, faithfully represented
+              // switch as an unnamed write.
+              withRecordingSuppressed(() => {
+                history.replace(deepClone(restored))
+                // Swap the timeline to the target dimension's tracks (empty
+                // on first entry — matches the starter flame).
+                timeline.loadTracks(restoredTracks ?? [])
+              })
+              // The switch restores from an in-memory stash, so replaying it
+              // as "switch to 3D" would land on the VIEWER's stash, not ours.
+              // Log the descriptor and tracks it actually produced instead —
+              // those replay exactly. (The live path keeps history.replace:
+              // a dimension switch is a document boundary, not an undo step.)
+              recordSyntheticAction(
+                'flame.load',
+                [deepClone(restored), `Switch to ${v}D`],
+                `Switch to ${v}D`,
+              )
+              recordSyntheticAction(
+                'timeline.loadTimeline',
+                [
+                  {
+                    config: deepClone(timeline.config()),
+                    tracks: deepClone(restoredTracks ?? []),
+                  },
+                ],
+                `Load ${v}D animation`,
+              )
               // Mode switches restore stashed/starter state — not an edit.
               markLoadedBaseline()
             }}
             flyMode={flyMode}
             setFlyMode={(v) => {
-              setFlyMode(v)
+              executeCommand('view.setFlyMode', cmdContext, v)
               if (v) {
                 showToast(
                   'Fly mode: click to look around · WASD/arrows move · Space/C up/down · Q/E roll · Esc to release',

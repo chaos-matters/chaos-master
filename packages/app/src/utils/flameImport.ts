@@ -360,7 +360,7 @@ function stableStringify(value: unknown): string {
  * back from a backup (validation fills the default on both).
  */
 export function flameSignature(flame: FlameDescriptor, name = ''): string {
-  return `${name} ${stableStringify(tryValidateFlame(flame) ?? flame)}`
+  return `${name}\0${stableStringify(tryValidateFlame(flame) ?? flame)}`
 }
 
 /**

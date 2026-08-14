@@ -17,6 +17,19 @@ import type { TimelineState } from './timeline'
  * history. Every entry point routes through here now, so button and shortcut
  * always agree.
  */
+/**
+ * Which system the next undo/redo would act on, and the journal stamp of the
+ * entry it would apply (`null` when that history isn't journaled).
+ *
+ * Exposed because callers need to reason about the target BEFORE acting: the
+ * session recorder only considers an undo replayable when it lands on a flame
+ * entry created during the recording (see recorder/recorder.ts).
+ */
+export type UndoTarget = {
+  system: 'flame' | 'timeline'
+  seq: number | null
+}
+
 export function createUndoRouter(
   history: Pick<
     ChangeHistory<unknown>,
@@ -32,40 +45,58 @@ export function createUndoRouter(
     | 'peekRedoSeq'
   >,
 ) {
-  const undoLast = (): boolean => {
+  // The arbitration lives ONLY in these two peeks; undoLast/redoLast just act
+  // on what they report, so "what would undo do?" can never disagree with
+  // "what did undo do?".
+  const peekUndoTarget = (): UndoTarget | undefined => {
     const t = timeline.peekUndoSeq()
     const f = history.peekUndoSeq()
-    if (t === null && f === null && !history.hasUndo()) return false
-    if (t !== null && (f === null || t > f)) {
+    if (t !== null && (f === null || t > f))
+      return { system: 'timeline', seq: t }
+    if (history.hasUndo()) return { system: 'flame', seq: f }
+    return undefined
+  }
+
+  const peekRedoTarget = (): UndoTarget | undefined => {
+    const t = timeline.peekRedoSeq()
+    const f = history.peekRedoSeq()
+    if (t !== null && (f === null || t < f))
+      return { system: 'timeline', seq: t }
+    if (history.hasRedo()) return { system: 'flame', seq: f }
+    return undefined
+  }
+
+  const undoLast = (): boolean => {
+    const target = peekUndoTarget()
+    if (!target) return false
+    if (target.system === 'timeline') {
       timeline.timelineUndo()
-      return true
-    }
-    if (history.hasUndo()) {
+    } else {
       history.undo()
-      return true
     }
-    // Timeline has entries but no flame history (t non-null, f null already
-    // handled above) — nothing left.
-    return false
+    return true
   }
 
   const redoLast = (): boolean => {
-    const t = timeline.peekRedoSeq()
-    const f = history.peekRedoSeq()
-    if (t === null && f === null && !history.hasRedo()) return false
-    if (t !== null && (f === null || t < f)) {
+    const target = peekRedoTarget()
+    if (!target) return false
+    if (target.system === 'timeline') {
       timeline.timelineRedo()
-      return true
-    }
-    if (history.hasRedo()) {
+    } else {
       history.redo()
-      return true
     }
-    return false
+    return true
   }
 
   const canUndo = () => timeline.hasTimelineUndo() || history.hasUndo()
   const canRedo = () => timeline.hasTimelineRedo() || history.hasRedo()
 
-  return { undoLast, redoLast, canUndo, canRedo }
+  return {
+    undoLast,
+    redoLast,
+    canUndo,
+    canRedo,
+    peekUndoTarget,
+    peekRedoTarget,
+  }
 }

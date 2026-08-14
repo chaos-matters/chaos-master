@@ -10,6 +10,7 @@ import { applyAudioMappingsToFlame, createAudioAnalyzer, } from '@/utils/audioAn
 import { createAudioVideoEncoder } from '@/utils/audioExport'
 import { deepClone } from '@/utils/clone'
 import { dismissJob, jobExists, setAnimationJobPoints, setAnimationJobProgress, setJobError, setJobResult, } from '@/utils/exportJobs'
+import { sessionForExport } from '@/utils/exportPreferences'
 import { createMetadataPayload, injectMetadataIntoMp4, } from '@/utils/flameInMp4'
 import { applyTracksToFlame, loopOptsFromConfig, resolveLoopValue, } from '@/utils/timeline'
 import { createVideoEncoder } from '@/utils/videoEncoder'
@@ -165,6 +166,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
           job.flame,
           job.tracks,
           job.config,
+          sessionForExport(),
         )
         blob = new Blob([injectMetadataIntoMp4(mp4Buffer, payload)], {
           type: result.mimeType,

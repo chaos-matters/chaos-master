@@ -2,6 +2,7 @@ import { createEffect, createSignal, Show } from 'solid-js'
 import { Bookmark, CameraIcon, Discord, Eye, FolderOpen, Home, Pause, Plus, Share, Shuffle, Zap, } from '@/icons'
 import { setActiveTab } from '@/lib/activeTab'
 import { defaultPills, QualityPresets } from '../Quality/QualityPresets'
+import { recorderVisible, setRecorderVisible, } from '../SessionRecorder/recorderUi'
 import ui from './FloatingActions.module.css'
 
 type Props = {
@@ -462,6 +463,45 @@ export function FloatingActions(props: Props) {
               >
                 <rect x="2" y="2.5" width="12" height="11" rx="1.5" />
                 <line x1="6.2" y1="2.5" x2="6.2" y2="13.5" />
+              </svg>
+            </button>
+
+            {/* Step recorder dock. Grouped with the other show/hide toggles;
+                the dock's own × sets the same signal, so the two agree. */}
+            <button
+              class={ui.toggle}
+              classList={{
+                [ui.toggleActive as string]: recorderVisible(),
+              }}
+              onClick={() => {
+                setRecorderVisible(!recorderVisible())
+              }}
+              title={
+                recorderVisible()
+                  ? 'Hide the step recorder'
+                  : 'Show the step recorder'
+              }
+            >
+              {/* A record dot next to a step list — what the dock does. */}
+              <svg
+                viewBox="0 0 16 16"
+                width="13"
+                height="13"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.3"
+                stroke-linecap="round"
+              >
+                <circle
+                  cx="4.5"
+                  cy="8"
+                  r="2.6"
+                  fill="currentColor"
+                  stroke="none"
+                />
+                <line x1="9.5" y1="5.5" x2="14" y2="5.5" />
+                <line x1="9.5" y1="8" x2="14" y2="8" />
+                <line x1="9.5" y1="10.5" x2="12" y2="10.5" />
               </svg>
             </button>
 

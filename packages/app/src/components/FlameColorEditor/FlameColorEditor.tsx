@@ -270,6 +270,12 @@ function FlameColorHandle(props: {
 export function FlameColorEditor(props: {
   transforms: TransformRecord
   setTransforms: HistorySetter<TransformRecord>
+  /**
+   * Apply a colour edit semantically, so a recording captures it as a
+   * replayable step (docs/plans/semantic-recorder-plan.md). Absent for
+   * preview copies, which fall back to the raw setter.
+   */
+  setTransformColor?: (tid: string, x: number, y: number) => void
   selectedTransformId?: () => string | null
   setSelectedTransformId?: (tid: string | null) => void
   /** Enables the track-changes diamond + drag keyframing (real flame only). */
@@ -323,9 +329,14 @@ export function FlameColorEditor(props: {
                 <FlameColorHandle
                   color={vec2f(transform.color.x, transform.color.y)}
                   setColor={(color) => {
-                    props.setTransforms((draft) => {
-                      draft[tid]!.color = { x: color.x, y: color.y }
-                    })
+                    const applySemantically = props.setTransformColor
+                    if (applySemantically) {
+                      applySemantically(tid, color.x, color.y)
+                    } else {
+                      props.setTransforms((draft) => {
+                        draft[tid]!.color = { x: color.x, y: color.y }
+                      })
+                    }
                   }}
                   selected={props.selectedTransformId?.() === tid}
                   dimmed={

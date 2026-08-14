@@ -3,6 +3,7 @@ export {
   array,
   boolean,
   brand,
+  finite,
   flatten,
   integer,
   literal,
@@ -26,6 +27,7 @@ export {
 } from 'valibot'
 export type {
   BooleanSchema,
+  GenericSchema,
   InferInput,
   InferOutput,
   LiteralSchema,

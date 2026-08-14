@@ -53,6 +53,34 @@ describe('timeline undo/redo', () => {
     })
   })
 
+  describe('transient replay history', () => {
+    it('restores the viewer stacks after replay loads and edits', () => {
+      timeline.addKeyframe('exposure', 10, 0.5, 'linear')
+      const viewerUndoSeq = timeline.peekUndoSeq()
+
+      timeline.beginTransientHistory()
+      timeline.loadTracks([])
+      timeline.addKeyframe('t.a', 20, 2, 'linear')
+      expect(timeline.peekUndoSeq()).not.toBe(viewerUndoSeq)
+      timeline.endTransientHistory()
+
+      expect(timeline.peekUndoSeq()).toBe(viewerUndoSeq)
+      expect(trackFor('t.a')?.keyframes[0]?.value).toBe(2)
+    })
+
+    it('does not let temporary edits erase the viewer redo stack', () => {
+      timeline.addKeyframe('exposure', 10, 0.5, 'linear')
+      timeline.timelineUndo()
+      expect(timeline.hasTimelineRedo()).toBe(true)
+
+      timeline.beginTransientHistory()
+      timeline.addKeyframe('t.a', 20, 2, 'linear')
+      timeline.endTransientHistory()
+
+      expect(timeline.hasTimelineRedo()).toBe(true)
+    })
+  })
+
   describe('no-op guards (a Ctrl+Z must never "do nothing")', () => {
     it('removeKeyframe on a missing keyframe records no undo entry', () => {
       timeline.removeKeyframe('exposure', 10)

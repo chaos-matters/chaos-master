@@ -8,6 +8,7 @@ import { createStore, produce, reconcile } from 'solid-js/store'
 import { vec2f } from 'typegpu/data'
 import { executeCommand } from '@/commands/registry'
 import { DEFAULT_ANIMATION_DURATION_MS } from '@/components/SpotlightTour/tourTypes'
+import { withRecordingSuppressed } from '@/recorder/recorder'
 import { deepClone } from '@/utils/clone'
 import type { CommandContext } from '@/commands/types'
 import type { TourContext, TourGuide, TourStep, } from '@/components/SpotlightTour/tourTypes'
@@ -240,7 +241,12 @@ export function createPortalDriver(start: FlameDescriptor): PortalDriver {
     // scroll the user's sidebar — the one way a step could reach outside.
     scrollToTarget: () => {},
     executeCommand: (id, ...args) => {
-      executeCommand(id, commandContext, ...args)
+      // The portal loops its script ambiently; if a session recording is
+      // active (module-global, so it survives leaving the workspace), the
+      // portal's commands must not leak into the user's log.
+      withRecordingSuppressed(() => {
+        executeCommand(id, commandContext, ...args)
+      })
     },
     animateValue: (start_, end, durationMs, onUpdate) => {
       const scaled = Math.max(0, durationMs * PORTAL_TIME_SCALE)

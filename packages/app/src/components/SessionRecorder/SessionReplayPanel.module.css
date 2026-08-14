@@ -1,0 +1,278 @@
+/* Sits in the bottom bar's flow next to the recorder pill — nothing here is
+   absolutely positioned, so it cannot end up under the fixed FloatingActions
+   widget the way an overlay would. */
+.panel {
+  align-self: flex-start;
+  margin: 0 0 var(--space-2) var(--space-2);
+  width: min(22rem, calc(100vw - 2rem));
+  max-height: 40vh;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 12px;
+  background: oklch(22% 0.025 240 / 0.92);
+  border: 1px solid oklch(50% 0.08 240 / 0.6);
+  color: oklch(88% 0.04 240);
+  font-size: 0.72rem;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 12px oklch(0% 0 0 / 0.4);
+
+  [data-theme='light'] & {
+    background: oklch(96% 0.01 240 / 0.94);
+    border-color: oklch(65% 0.08 240 / 0.5);
+    color: oklch(28% 0.06 240);
+    box-shadow: 0 2px 12px oklch(50% 0.04 240 / 0.2);
+  }
+}
+
+/* Collapsed dock: transport only, so the panel shrinks to its content instead
+   of holding a step list's worth of width. */
+.compact {
+  width: auto;
+  max-height: none;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.title {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.count {
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+
+.warning {
+  margin-left: auto;
+  padding: 0.05rem 0.4rem;
+  border-radius: 10px;
+  background: oklch(60% 0.18 60 / 0.35);
+  cursor: help;
+}
+
+.close {
+  margin-left: auto;
+  padding: 0.1rem 0.45rem;
+  border-radius: 10px;
+  border: 1px solid oklch(50% 0.08 240 / 0.5);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* When the warning is present it already took the auto margin. */
+.warning + .close {
+  margin-left: 0;
+}
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.replay-error {
+  padding: 0.3rem 0.45rem;
+  border: 1px solid oklch(66% 0.15 30 / 0.7);
+  border-radius: 8px;
+  background: oklch(48% 0.14 30 / 0.25);
+  color: oklch(90% 0.06 35);
+  line-height: 1.35;
+
+  [data-theme='light'] & {
+    color: oklch(40% 0.12 30);
+  }
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
+  min-height: 1.65rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 10px;
+  border: 1px solid oklch(50% 0.08 240 / 0.5);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: oklch(50% 0.08 240 / 0.25);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+}
+
+.transport-icon-button {
+  width: 1.65rem;
+  padding-inline: 0;
+}
+
+.button-icon {
+  display: block;
+  width: 0.88rem;
+  height: 0.88rem;
+  flex: none;
+}
+
+/* An always-visible toggle rather than a checkbox: it is switched mid-replay,
+   and its state has to read at a glance while filming. */
+.toggle-on {
+  background: oklch(50% 0.14 240 / 0.5);
+  border-color: oklch(65% 0.14 240 / 0.8);
+}
+
+.speed {
+  margin-left: auto;
+  padding: 0.1rem 0.25rem;
+  border-radius: 8px;
+  border: 1px solid oklch(50% 0.08 240 / 0.5);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.step {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.15rem 0.3rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  opacity: 0.55;
+
+  &:hover {
+    background: oklch(50% 0.08 240 / 0.25);
+  }
+}
+
+.applied {
+  opacity: 1;
+}
+
+.current {
+  background: oklch(50% 0.12 240 / 0.45);
+  opacity: 1;
+}
+
+.step-row {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.step-row .step {
+  flex: 1;
+  min-width: 0;
+}
+
+.step-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0.1rem 0.3rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  opacity: 0.45;
+  cursor: pointer;
+
+  &:hover {
+    opacity: 1;
+    background: oklch(50% 0.08 240 / 0.25);
+  }
+}
+
+.step-edit-icon {
+  display: block;
+  width: 0.78rem;
+  height: 0.78rem;
+}
+
+.step-edit-on {
+  opacity: 1;
+  border-color: oklch(50% 0.08 240 / 0.6);
+}
+
+.step-editor {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.3rem 0.35rem 2rem;
+}
+
+.note-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.1rem 0.3rem;
+  border: 1px solid oklch(50% 0.08 240 / 0.6);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.hold-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.hold-input {
+  width: 3.6rem;
+  padding: 0.1rem 0.2rem;
+  border: 1px solid oklch(50% 0.08 240 / 0.6);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.step-index {
+  min-width: 1.6rem;
+  text-align: right;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
+.step-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
