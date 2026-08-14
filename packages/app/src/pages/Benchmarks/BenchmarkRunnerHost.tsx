@@ -7,6 +7,7 @@ import { Camera2D } from '@/lib/Camera2D'
 import { Default3DPreviewCamera } from '@/lib/Camera3D'
 import type { CompletedThroughput } from '@/benchmarks/completedThroughput'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { RendererRandomImplementationId } from '@/shaders/random'
 
 export type BenchmarkHostResult = CompletedThroughput & {
   /** Small deterministic readback of the last presented frame, for A/B smoke checks. */
@@ -22,6 +23,7 @@ type BenchmarkRunnerHostProps = {
   minimumElapsedMs: number
   maximumElapsedMs: number
   stochasticFilterEnabled: boolean
+  randomImplementationId: RendererRandomImplementationId
   persistChains: boolean
   onProgress: (result: CompletedThroughput) => void
   onComplete: (result: BenchmarkHostResult) => void
@@ -108,6 +110,7 @@ export function BenchmarkRunnerHost(props: BenchmarkRunnerHostProps) {
       renderInterval={0}
       adaptiveFilterEnabled={false}
       stochasticFilterEnabled={props.stochasticFilterEnabled}
+      randomImplementationId={props.randomImplementationId}
       animationEnabled={false}
       flameDescriptor={props.flame}
       edgeFadeColor={vec4f(0)}

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { DEFAULT_RENDERER_RANDOM_IMPLEMENTATION_ID, RENDERER_RANDOM_IMPLEMENTATION_IDS, } from '@/shaders/random'
 import { cpuRngState32, cpuRngState64, createCpuRngReference, createRngBenchmarkImplementation, deriveCpuRngInitialState, isAllZeroCpuRngState, RNG_BENCHMARK_SETTINGS_SCHEMA_VERSION, RNG_IMPLEMENTATION_IDS, RNG_IMPLEMENTATION_LIST, RNG_IMPLEMENTATIONS, RNG_SEED_POLICIES, RNG_SEED_POLICY_IDS, stepCpuRng, u32ToUnitFloat, } from './rng'
 import type { CpuRngState } from './rng'
 
@@ -14,33 +15,50 @@ function takeU32(
 describe('RNG benchmark registry', () => {
   it('keeps stable, versioned IDs and honest execution metadata', () => {
     expect(RNG_IMPLEMENTATION_LIST.map(({ id }) => id)).toEqual([
-      'legacy-xoroshiro64-state-x-v1',
       'xoroshiro64ss-canonical-v1',
+      'legacy-xoroshiro64-state-x-v1',
       'lcg32-numerical-recipes-v1',
     ])
-    expect(RNG_IMPLEMENTATIONS[RNG_IMPLEMENTATION_IDS.legacy]).toMatchObject({
-      lifecycleStatus: 'current',
-      stateBytes: 8,
-      stateLayout: 'vec2u',
-    })
+    expect(DEFAULT_RENDERER_RANDOM_IMPLEMENTATION_ID).toBe(
+      RENDERER_RANDOM_IMPLEMENTATION_IDS.canonical,
+    )
+    expect(RNG_IMPLEMENTATION_IDS.legacy).toBe(
+      RENDERER_RANDOM_IMPLEMENTATION_IDS.legacy,
+    )
+    expect(RNG_IMPLEMENTATION_IDS.xoroshiro64ss).toBe(
+      RENDERER_RANDOM_IMPLEMENTATION_IDS.canonical,
+    )
     expect(
       RNG_IMPLEMENTATIONS[RNG_IMPLEMENTATION_IDS.xoroshiro64ss],
     ).toMatchObject({
+      lifecycleStatus: 'current',
+      stateBytes: 8,
+      stateLayout: 'vec2u',
+      recommendedSeedPolicyId: RNG_SEED_POLICY_IDS.legacyPersisted,
+      execution: {
+        executable: true,
+        status: 'renderer-wired',
+      },
+    })
+    expect(RNG_IMPLEMENTATIONS[RNG_IMPLEMENTATION_IDS.legacy]).toMatchObject({
       lifecycleStatus: 'experimental',
       stateBytes: 8,
       stateLayout: 'vec2u',
+      recommendedSeedPolicyId: RNG_SEED_POLICY_IDS.legacyPersisted,
+      execution: {
+        executable: true,
+        status: 'renderer-wired',
+      },
     })
     expect(RNG_IMPLEMENTATIONS[RNG_IMPLEMENTATION_IDS.lcg32]).toMatchObject({
       lifecycleStatus: 'experimental',
       stateBytes: 4,
       stateLayout: 'u32',
+      execution: {
+        executable: false,
+        status: 'not-wired',
+      },
     })
-    expect(
-      RNG_IMPLEMENTATION_LIST.every(
-        ({ execution }) =>
-          execution.status === 'not-wired' && !execution.executable,
-      ),
-    ).toBe(true)
   })
 
   it('serializes the selected implementation and seed policy into manifest settings', () => {
@@ -48,27 +66,27 @@ describe('RNG benchmark registry', () => {
       createRngBenchmarkImplementation({
         schemaVersion: RNG_BENCHMARK_SETTINGS_SCHEMA_VERSION,
         implementationId: RNG_IMPLEMENTATION_IDS.xoroshiro64ss,
-        seedPolicyId: RNG_SEED_POLICY_IDS.saltedDeterministic,
+        seedPolicyId: RNG_SEED_POLICY_IDS.legacyPersisted,
       }),
     ).toEqual({
       kind: 'rng',
       id: RNG_IMPLEMENTATION_IDS.xoroshiro64ss,
-      label: 'Canonical xoroshiro64**',
+      label: 'TypeGPU noise xoroshiro64**',
       settings: {
         schemaVersion: RNG_BENCHMARK_SETTINGS_SCHEMA_VERSION,
         implementationId: RNG_IMPLEMENTATION_IDS.xoroshiro64ss,
-        lifecycleStatus: 'experimental',
+        lifecycleStatus: 'current',
         stateBytes: 8,
         stateLayout: 'vec2u',
         execution: {
-          executable: false,
-          status: 'not-wired',
-          reason: expect.stringContaining('do not consume RNG implementation'),
+          executable: true,
+          status: 'renderer-wired',
+          reason: expect.stringContaining('Implemented by the renderer'),
         },
         seedPolicy: {
-          id: RNG_SEED_POLICY_IDS.saltedDeterministic,
-          allZeroProtection: 'guaranteed',
-          application: 'initialization',
+          id: RNG_SEED_POLICY_IDS.legacyPersisted,
+          allZeroProtection: 'none',
+          application: 'each-dispatch',
         },
       },
     })

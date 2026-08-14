@@ -23,22 +23,24 @@ function mockRoot(capture: (compute: any) => void) {
     destroy: () => {},
     buffer: {},
   }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const createComputePipeline = ({ compute }: { compute: any }) => {
+    capture(compute)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const p: any = {
+      with: () => p,
+      $name: () => p,
+      dispatchWorkgroups: () => {},
+    }
+    return p
+  }
   return {
     fakeBuffer,
     root: {
       createBuffer: () => fakeBuffer,
       createBindGroup: () => ({}),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      createComputePipeline: ({ compute }: { compute: any }) => {
-        capture(compute)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const p: any = {
-          with: () => p,
-          $name: () => p,
-          dispatchWorkgroups: () => {},
-        }
-        return p
-      },
+      createComputePipeline,
+      with: () => ({ createComputePipeline }),
     },
   }
 }

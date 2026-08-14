@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show, } from 'solid-js'
-import { BENCHMARK_COMPARISON_VERDICT_LABELS, BENCHMARK_MANIFEST_SCHEMA_VERSION, BENCHMARK_RESULT_SCHEMA_VERSION, BENCHMARK_SAMPLE_SCHEMA_VERSION, benchmarkFlameDigest, benchmarkSourceDigest, clearBenchmarkResultHistory, createBalancedComparisonSchedule, createBenchmarkCsvExport, createBenchmarkJsonExport, createSeededSurpriseFlame, createSingleCandidateSchedule, deleteBenchmarkResult, deriveBenchmarkCandidateSummaries, deriveBenchmarkComparison, listAncestryBenchmarkFlames, listBuiltinBenchmarkFlames, listRecentBenchmarkFlames, loadBenchmarkResultHistory, parseBenchmarkFlameUpload, RNG_IMPLEMENTATION_IDS, RNG_IMPLEMENTATION_LIST, RNG_SEED_POLICY_IDS, saveBenchmarkResult, toBenchmarkFlameV1, validateBenchmarkManifest, validateBenchmarkResult, } from '@/benchmarks'
+import { BENCHMARK_COMPARISON_VERDICT_LABELS, BENCHMARK_MANIFEST_SCHEMA_VERSION, BENCHMARK_RESULT_SCHEMA_VERSION, BENCHMARK_SAMPLE_SCHEMA_VERSION, benchmarkFlameDigest, benchmarkSourceDigest, clearBenchmarkResultHistory, createBalancedComparisonSchedule, createBenchmarkCsvExport, createBenchmarkJsonExport, createRngBenchmarkImplementation, createSeededSurpriseFlame, createSingleCandidateSchedule, deleteBenchmarkResult, deriveBenchmarkCandidateSummaries, deriveBenchmarkComparison, listAncestryBenchmarkFlames, listBuiltinBenchmarkFlames, listRecentBenchmarkFlames, loadBenchmarkResultHistory, parseBenchmarkFlameUpload, RNG_BENCHMARK_SETTINGS_SCHEMA_VERSION, RNG_IMPLEMENTATION_IDS, RNG_IMPLEMENTATION_LIST, RNG_SEED_POLICY_IDS, saveBenchmarkResult, toBenchmarkFlameV1, validateBenchmarkManifest, validateBenchmarkResult, } from '@/benchmarks'
 import { createShowBenchmark } from '@/components/BenchmarkModal/BenchmarkModal'
 import { VariationPreview } from '@/components/VariationSelector/VariationSelector'
 import { WgslEditor } from '@/components/WgslEditor'
@@ -22,9 +22,10 @@ import { ChaosDial } from './ChaosDial'
 import { FractalDivider } from './FractalDivider'
 import type { BenchmarkHostResult } from './BenchmarkRunnerHost'
 import type { BenchmarkAlgorithm } from './ChaosDial'
-import type { BenchmarkCandidateV1, BenchmarkCompilationV1, BenchmarkCorrectnessStatus, BenchmarkFlameSourceDescriptor, BenchmarkImplementationV1, BenchmarkManifestV1, BenchmarkResultHistoryEntry, BenchmarkResultV1, BenchmarkSampleV1, BenchmarkScheduleEntryV1, BenchmarkTextExport, } from '@/benchmarks'
+import type { BenchmarkCandidateV1, BenchmarkCompilationV1, BenchmarkCorrectnessStatus, BenchmarkFlameSourceDescriptor, BenchmarkImplementationV1, BenchmarkManifestV1, BenchmarkResultHistoryEntry, BenchmarkResultV1, BenchmarkSampleV1, BenchmarkScheduleEntryV1, BenchmarkTextExport, RngImplementationId, } from '@/benchmarks'
 import type { PointInitMode } from '@/flame/pointInitMode'
 import type { FlameDescriptor, VariationId } from '@/flame/schema/flameSchema'
+import type { RendererRandomImplementationId } from '@/shaders/random'
 
 /*
 THESIS: A precise creative-performance instrument, not a generic gaming dashboard.
@@ -60,12 +61,14 @@ type CandidateRuntime = {
   candidate: BenchmarkCandidateV1
   flame: FlameDescriptor
   stochasticFilterEnabled: boolean
+  randomImplementationId: RendererRandomImplementationId
 }
 
 type ActiveSample = {
   key: string
   flame: FlameDescriptor
   stochasticFilterEnabled: boolean
+  randomImplementationId: RendererRandomImplementationId
   minimumCompletedPoints: number
   minimumElapsedMs: number
   maximumElapsedMs: number
@@ -141,6 +144,14 @@ const PROTOCOLS: Readonly<
 }
 
 const CUSTOM_VARIATION_COMPILER_ID = 'safe-custom-variation/v1'
+const RNG_COMPARISON_SELECTION_ID = 'compare-legacy-vs-typegpu-noise' as const
+type RngSelectionId = RngImplementationId | typeof RNG_COMPARISON_SELECTION_ID
+const EXECUTABLE_RNG_IMPLEMENTATIONS = RNG_IMPLEMENTATION_LIST.filter(
+  (implementation) => implementation.execution.executable,
+)
+const PLANNED_RNG_IMPLEMENTATIONS = RNG_IMPLEMENTATION_LIST.filter(
+  (implementation) => !implementation.execution.executable,
+)
 
 const POINT_INIT_OPTIONS: readonly {
   value: PointInitMode
@@ -352,15 +363,10 @@ function drawShareCard(run: CompletedLabRun): void {
   context.fillStyle = '#929aa7'
   context.font = '400 18px Inter, system-ui, sans-serif'
   context.fillText(
-    algorithmLabel(
-      run.manifest.mode === 'comparison'
-        ? 'compare'
-        : run.manifest.candidates[0].id.includes('mitchell')
-          ? 'mitchell'
-          : 'current',
-    ),
+    run.manifest.candidates.map((candidate) => candidate.label).join(' ↔ '),
     610,
     230,
+    500,
   )
 
   const lines = comparison
@@ -535,6 +541,9 @@ export function BenchmarksPage() {
   const showClassicBenchmark = createShowBenchmark()
 
   const [algorithm, setAlgorithm] = createSignal<BenchmarkAlgorithm>('compare')
+  const [rngSelection, setRngSelection] = createSignal<RngSelectionId>(
+    RNG_IMPLEMENTATION_IDS.xoroshiro64ss,
+  )
   const [protocolId, setProtocolId] = createSignal<ProtocolId>('quick')
   const [settings, setSettings] = createSignal<LabSettings>({
     pointInitMode: 'pointInitUnitDisk',
@@ -644,9 +653,32 @@ export function BenchmarksPage() {
       selectedSources().length > 0 &&
       selectedSources().every((source) => source.dimensions === 2),
   )
-  const isComparison = createMemo(
-    () => customLabEnabled() || algorithm() === 'compare',
+  const rngComparison = createMemo(
+    () => rngSelection() === RNG_COMPARISON_SELECTION_ID,
   )
+  const selectedRngId = createMemo<RendererRandomImplementationId>(() =>
+    rngSelection() === RNG_IMPLEMENTATION_IDS.legacy
+      ? RNG_IMPLEMENTATION_IDS.legacy
+      : RNG_IMPLEMENTATION_IDS.xoroshiro64ss,
+  )
+  const selectedRng = createMemo(
+    () =>
+      RNG_IMPLEMENTATION_LIST.find(
+        (implementation) => implementation.id === selectedRngId(),
+      )!,
+  )
+  const isComparison = createMemo(
+    () => customLabEnabled() || rngComparison() || algorithm() === 'compare',
+  )
+  const runProfileLabel = createMemo(() => {
+    if (customLabEnabled()) {
+      return `${selectedTemplate().label} variation A/B`
+    }
+    if (rngComparison()) {
+      return `${algorithmLabel(algorithm())} · legacy ↔ TypeGPU noise RNG`
+    }
+    return algorithmLabel(algorithm())
+  })
   const scheduleLengthPerFlame = createMemo(() => {
     const p = protocol()
     return (p.warmupPairs + p.measuredPairs) * (isComparison() ? 2 : 1)
@@ -666,10 +698,6 @@ export function BenchmarksPage() {
     const vendor = adapter?.info.vendor
     return description || vendor || 'Browser-selected adapter'
   })
-  const currentRng = RNG_IMPLEMENTATION_LIST.find(
-    (entry) => entry.id === RNG_IMPLEMENTATION_IDS.legacy,
-  )!
-
   onMount(() => {
     const previousTitle = document.title
     document.title = 'Benchmark Lab — Lumen Apeiron'
@@ -720,6 +748,42 @@ export function BenchmarksPage() {
     value: LabSettings[K],
   ): void {
     setSettings((current) => ({ ...current, [key]: value }))
+  }
+
+  function changeAlgorithm(next: BenchmarkAlgorithm): void {
+    if (next === 'compare' && rngComparison()) {
+      setRngSelection(RNG_IMPLEMENTATION_IDS.xoroshiro64ss)
+    }
+    if (next === 'compare' && customLabEnabled()) {
+      setCustomLabEnabled(false)
+    }
+    setAlgorithm(next)
+  }
+
+  function changeRngSelection(next: string): void {
+    if (next === RNG_COMPARISON_SELECTION_ID) {
+      if (customLabEnabled()) return
+      if (algorithm() === 'compare') setAlgorithm('current')
+      setRngSelection(next)
+      return
+    }
+    if (
+      next === RNG_IMPLEMENTATION_IDS.legacy ||
+      next === RNG_IMPLEMENTATION_IDS.xoroshiro64ss
+    ) {
+      setRngSelection(next)
+    }
+  }
+
+  function toggleCustomLab(): void {
+    const next = !customLabEnabled()
+    if (next && rngComparison()) {
+      setRngSelection(RNG_IMPLEMENTATION_IDS.xoroshiro64ss)
+    }
+    if (next && algorithm() === 'compare') {
+      setAlgorithm('current')
+    }
+    setCustomLabEnabled(next)
   }
 
   async function openClassicBenchmark(): Promise<void> {
@@ -862,6 +926,7 @@ export function BenchmarksPage() {
       key: globalThis.crypto.randomUUID(),
       flame: runtime.flame,
       stochasticFilterEnabled: runtime.stochasticFilterEnabled,
+      randomImplementationId: runtime.randomImplementationId,
       minimumCompletedPoints: p.minimumCompletedPoints,
       minimumElapsedMs: p.minimumElapsedMs,
       maximumElapsedMs: p.maximumElapsedMs,
@@ -898,21 +963,30 @@ export function BenchmarksPage() {
     flame: FlameDescriptor,
     transientVariationId?: string,
   ): readonly CandidateRuntime[] {
-    const fixedRngImplementation: BenchmarkImplementationV1 = {
-      kind: 'rng',
-      id: currentRng.id,
-      label: currentRng.label,
-      settings: {
-        stateBytes: currentRng.stateBytes,
-        stateLayout: currentRng.stateLayout,
+    const runtimeRngId = selectedRngId()
+    const rngImplementation = (implementationId: RngImplementationId) =>
+      createRngBenchmarkImplementation({
+        schemaVersion: RNG_BENCHMARK_SETTINGS_SCHEMA_VERSION,
+        implementationId,
         seedPolicyId: RNG_SEED_POLICY_IDS.legacyPersisted,
-        deterministicSeedUsage: 'ignored',
-        selectionControl: 'fixed-in-current-renderer',
-        registryExecutionStatus: currentRng.execution.status,
-      },
-    }
+      })
+    const fixedRngImplementation = rngImplementation(runtimeRngId)
 
     if (transientVariationId) {
+      const mitchell = algorithm() === 'mitchell'
+      const reconstructionImplementation: BenchmarkImplementationV1 = {
+        kind: 'reconstruction',
+        id: mitchell
+          ? 'mitchell-netravali-stochastic-v1'
+          : 'point-accumulation-v1',
+        label: mitchell
+          ? 'Mitchell–Netravali stochastic reconstruction'
+          : 'Direct point accumulation',
+        settings: {
+          stochasticFilterEnabled: mitchell,
+          ...(mitchell ? { B: 0.3333333333333333, C: 0.3333333333333333 } : {}),
+        },
+      }
       const template = selectedTemplate()
       const sourceDigest = benchmarkSourceDigest(
         candidateCode(),
@@ -933,6 +1007,7 @@ export function BenchmarksPage() {
             label: `${template.label} built-in`,
             role: 'baseline',
             implementations: [
+              reconstructionImplementation,
               {
                 kind: 'variation',
                 id: template.variationType,
@@ -947,7 +1022,8 @@ export function BenchmarksPage() {
             },
           },
           flame: baselineFlame,
-          stochasticFilterEnabled: algorithm() === 'mitchell',
+          stochasticFilterEnabled: mitchell,
+          randomImplementationId: runtimeRngId,
         },
         {
           candidate: {
@@ -955,6 +1031,7 @@ export function BenchmarksPage() {
             label: `${template.label} candidate`,
             role: 'candidate',
             implementations: [
+              reconstructionImplementation,
               {
                 kind: 'variation',
                 id: `${template.variationType}:custom`,
@@ -974,7 +1051,57 @@ export function BenchmarksPage() {
             },
           },
           flame: candidateFlame,
-          stochasticFilterEnabled: algorithm() === 'mitchell',
+          stochasticFilterEnabled: mitchell,
+          randomImplementationId: runtimeRngId,
+        },
+      ]
+    }
+
+    if (rngComparison()) {
+      const mitchell = algorithm() === 'mitchell'
+      const reconstructionImplementation: BenchmarkImplementationV1 = {
+        kind: 'reconstruction',
+        id: mitchell
+          ? 'mitchell-netravali-stochastic-v1'
+          : 'point-accumulation-v1',
+        label: mitchell
+          ? 'Mitchell–Netravali stochastic reconstruction'
+          : 'Direct point accumulation',
+        settings: {
+          stochasticFilterEnabled: mitchell,
+          ...(mitchell ? { B: 0.3333333333333333, C: 0.3333333333333333 } : {}),
+        },
+      }
+      return [
+        {
+          candidate: {
+            id: `rng:${RNG_IMPLEMENTATION_IDS.legacy}:${mitchell ? 'mitchell' : 'current'}`,
+            label: 'Legacy state-word RNG',
+            role: 'baseline',
+            implementations: [
+              reconstructionImplementation,
+              rngImplementation(RNG_IMPLEMENTATION_IDS.legacy),
+            ],
+            metadata: { lane: 'reference', comparisonAxis: 'rng-output' },
+          },
+          flame,
+          stochasticFilterEnabled: mitchell,
+          randomImplementationId: RNG_IMPLEMENTATION_IDS.legacy,
+        },
+        {
+          candidate: {
+            id: `rng:${RNG_IMPLEMENTATION_IDS.xoroshiro64ss}:${mitchell ? 'mitchell' : 'current'}`,
+            label: 'TypeGPU noise xoroshiro64**',
+            role: 'candidate',
+            implementations: [
+              reconstructionImplementation,
+              rngImplementation(RNG_IMPLEMENTATION_IDS.xoroshiro64ss),
+            ],
+            metadata: { lane: 'candidate', comparisonAxis: 'rng-output' },
+          },
+          flame,
+          stochasticFilterEnabled: mitchell,
+          randomImplementationId: RNG_IMPLEMENTATION_IDS.xoroshiro64ss,
         },
       ]
     }
@@ -999,6 +1126,7 @@ export function BenchmarksPage() {
           },
           flame,
           stochasticFilterEnabled: false,
+          randomImplementationId: runtimeRngId,
         },
         {
           candidate: {
@@ -1022,6 +1150,7 @@ export function BenchmarksPage() {
           },
           flame,
           stochasticFilterEnabled: true,
+          randomImplementationId: runtimeRngId,
         },
       ]
     }
@@ -1052,6 +1181,7 @@ export function BenchmarksPage() {
         },
         flame,
         stochasticFilterEnabled: mitchell,
+        randomImplementationId: runtimeRngId,
       },
     ]
   }
@@ -1118,7 +1248,7 @@ export function BenchmarksPage() {
           persistChains: settings().persistChains,
           minimumElapsedMs: p.minimumElapsedMs,
           maximumElapsedMs: p.maximumElapsedMs,
-          deterministicSeedUsage: 'ignored-by-current-legacy-rng',
+          deterministicSeedUsage: 'ignored-by-persisted-renderer-rng',
         },
       },
       schedule,
@@ -1560,7 +1690,7 @@ export function BenchmarksPage() {
                   </div>
                   <ChaosDial
                     value={algorithm()}
-                    onChange={setAlgorithm}
+                    onChange={changeAlgorithm}
                     disabled={running()}
                   />
                 </div>
@@ -1599,27 +1729,42 @@ export function BenchmarksPage() {
                         <label class={ui.fieldLabel} for="benchmark-rng">
                           Random implementation
                         </label>
-                        <span class={ui.fieldHint}>Current path is fixed</span>
+                        <span class={ui.fieldHint}>
+                          {customLabEnabled()
+                            ? 'Variation A/B owns both lanes'
+                            : 'Paired A/B available'}
+                        </span>
                       </div>
                       <select
                         id="benchmark-rng"
                         class={ui.select}
-                        disabled
-                        title="The current renderer owns this RNG implementation; comparison adapters are not wired yet."
+                        value={rngSelection()}
+                        disabled={running()}
+                        title="Choose one renderer output rule or compare the legacy and current TypeGPU-noise paths with the same state layout and initialization policy."
+                        onChange={(event) => {
+                          changeRngSelection(event.currentTarget.value)
+                        }}
                       >
-                        <For each={RNG_IMPLEMENTATION_LIST}>
+                        <For each={EXECUTABLE_RNG_IMPLEMENTATIONS}>
                           {(implementation) => (
-                            <option
-                              value={implementation.id}
-                              disabled={
-                                implementation.id !==
-                                RNG_IMPLEMENTATION_IDS.legacy
-                              }
-                            >
+                            <option value={implementation.id}>
                               {implementation.label}
-                              {implementation.lifecycleStatus === 'experimental'
-                                ? ' · adapter pending'
-                                : ' · renderer fixed'}
+                              {implementation.lifecycleStatus === 'current'
+                                ? ' · current'
+                                : ' · compatibility path'}
+                            </option>
+                          )}
+                        </For>
+                        <option
+                          value={RNG_COMPARISON_SELECTION_ID}
+                          disabled={customLabEnabled()}
+                        >
+                          Legacy ↔ TypeGPU noise · paired A/B
+                        </option>
+                        <For each={PLANNED_RNG_IMPLEMENTATIONS}>
+                          {(implementation) => (
+                            <option value={implementation.id} disabled>
+                              {implementation.label} · adapter pending
                             </option>
                           )}
                         </For>
@@ -1818,7 +1963,7 @@ export function BenchmarksPage() {
                 <dl class={ui.manifestRows}>
                   <div class={ui.manifestRow}>
                     <dt>Profile</dt>
-                    <dd>{algorithmLabel(algorithm())}</dd>
+                    <dd>{runProfileLabel()}</dd>
                   </div>
                   <div class={ui.manifestRow}>
                     <dt>Corpus</dt>
@@ -2161,7 +2306,7 @@ export function BenchmarksPage() {
                     class={ui.toggle}
                     classList={{ [ui.toggleOn!]: customLabEnabled() }}
                     disabled={running() || !customCompatible()}
-                    onClick={() => setCustomLabEnabled(!customLabEnabled())}
+                    onClick={toggleCustomLab}
                   />
                 </div>
               </aside>
@@ -2202,11 +2347,7 @@ export function BenchmarksPage() {
                     <PulseIcon />
                   </span>
                   <div>
-                    <h3>
-                      {customLabEnabled()
-                        ? `${selectedTemplate().label} variation A/B`
-                        : algorithmLabel(algorithm())}
-                    </h3>
+                    <h3>{runProfileLabel()}</h3>
                     <p>
                       {selectedSources().length} workload
                       {selectedSources().length === 1 ? '' : 's'} ·{' '}
@@ -2225,7 +2366,7 @@ export function BenchmarksPage() {
                     <strong>{settings().plotsPerChain}</strong> plots/chain
                   </span>
                   <span class={ui.runFact}>
-                    <strong>{currentRng.stateBytes} B</strong> RNG state
+                    <strong>{selectedRng().stateBytes} B</strong> RNG state
                   </span>
                 </div>
               </div>
@@ -2685,10 +2826,11 @@ export function BenchmarksPage() {
           <footer class={ui.footer}>
             <span>
               Local results stay in this browser until you export or clear them.
-              The TypeGPU noise/RNG preview is represented as a registry
-              boundary only; canonical xoroshiro64** and LCG32 are deliberately
-              disabled until application-owned load/sample/store adapters are
-              wired and release-gated.
+              Current TypeGPU-noise xoroshiro64** and the former state-word
+              output share the same vec2u layout and initialization policy; the
+              paired run measures their end-to-end renderer throughput impact.
+              LCG32 remains disabled until its u32 load/sample/store adapter is
+              release-gated.
             </span>
             <button
               type="button"
@@ -2713,6 +2855,7 @@ export function BenchmarksPage() {
             minimumElapsedMs={sample.minimumElapsedMs}
             maximumElapsedMs={sample.maximumElapsedMs}
             stochasticFilterEnabled={sample.stochasticFilterEnabled}
+            randomImplementationId={sample.randomImplementationId}
             persistChains={sample.persistChains}
             onProgress={sample.onProgress}
             onComplete={sample.onComplete}

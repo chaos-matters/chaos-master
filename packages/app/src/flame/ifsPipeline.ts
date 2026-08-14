@@ -4,7 +4,7 @@ import { tgpu } from 'typegpu'
 import { arrayOf, builtin, f32, i32, struct, u32, vec2f, vec2i, vec2u, vec4f, } from 'typegpu/data'
 import { add, arrayLength, atomicAdd, atomicLoad, div, max, mul, sub, } from 'typegpu/std'
 import { camera2DWorldToClip } from '@/lib/Camera2D'
-import { random, randomState, setSeed } from '@/shaders/random'
+import { DEFAULT_RENDERER_RANDOM_IMPLEMENTATION_ID, legacyRandomOutputSlot, random, randomState, RENDERER_RANDOM_IMPLEMENTATION_IDS, setSeed, } from '@/shaders/random'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { vramLog } from '@/utils/vramLog'
 import { AffineParams, transformAffine } from './affineTranform'
@@ -20,6 +20,7 @@ import type { PointInitMode, PointInitMode2D } from './pointInitMode'
 import type { FlameDescriptor, TransformRecord } from './schema/flameSchema'
 import type { Bucket } from './types'
 import type { CameraContext } from '@/lib/CameraContext'
+import type { RendererRandomImplementationId } from '@/shaders/random'
 
 const { ceil } = Math
 const IFS_GROUP_SIZE = 64
@@ -91,6 +92,7 @@ export function createIFSPipeline(
   // many points per chain amortizes the warmup cost — the key throughput lever.
   // Baked as a compile-time loop bound so the shader compiler can unroll it.
   plotsPerChain: number = 1,
+  randomImplementationId: RendererRandomImplementationId = DEFAULT_RENDERER_RANDOM_IMPLEMENTATION_ID,
 ) {
   // Flames switched to 2D (or loaded 3D presets previewed without a 3D
   // camera) can carry a 3D init mode — fall back instead of resolving an
@@ -99,7 +101,11 @@ export function createIFSPipeline(
     ? pointInitType
     : 'pointInitUnitDisk'
   const isBlending = blendTransforms !== undefined
-  let globId = `IFS-PIP-${recordKeys(transforms).join('')}`
+  const legacyRandomOutput =
+    randomImplementationId === RENDERER_RANDOM_IMPLEMENTATION_IDS.legacy
+  let globId = `IFS-PIP-${recordKeys(transforms).join('')}-${
+    legacyRandomOutput ? 'legacy-rng' : 'canonical-rng'
+  }`
   if (isBlending) globId += recordKeys(blendTransforms).join('')
   // Cache key contains only what is baked into the generated WGSL: transform
   // ids (struct member names), variation ids/types, loop count and init modes.
@@ -127,6 +133,9 @@ export function createIFSPipeline(
       })),
     }),
   })
+  // Slot values are baked into the compiled WGSL. The unresolved TypeGPU
+  // definition above can be shared, but the compiled pipeline cannot.
+  const compiledSig = `${sig}|random:${randomImplementationId}`
 
   let cached = pipelineCache.get(sig)
   vramLog(
@@ -692,15 +701,17 @@ export function createIFSPipeline(
     rootCache = new Map()
     basePipelineByRoot.set(root, rootCache)
   }
-  let basePipeline = rootCache.get(sig)
+  let basePipeline = rootCache.get(compiledSig)
   if (!basePipeline) {
     pipelineCompiles += 1
     vramLog(
       `[ifsPipeline] createComputePipeline (shader-module COMPILE) ${globId} compiles=${pipelineCompiles} rootCache=${rootCache.size}`,
     )
-    basePipeline = root.createComputePipeline({ compute: ifsCompute })
+    basePipeline = root
+      .with(legacyRandomOutputSlot, legacyRandomOutput)
+      .createComputePipeline({ compute: ifsCompute })
     basePipeline.$name(globId)
-    rootCache.set(sig, basePipeline)
+    rootCache.set(compiledSig, basePipeline)
   } else {
     vramLog(`[ifsPipeline] compiled-pipeline cache HIT ${globId}`)
   }

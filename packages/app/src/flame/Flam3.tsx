@@ -5,6 +5,7 @@ import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useTimeline } from '@/contexts/TimelineContext'
 import { DEBUG_MODE, PERSIST_RESEED_INTERVAL, PLOTS_PER_CHAIN, } from '@/defaults'
 import { accumulatedPointCount, animationExportProgress, animationExportRunning, exportQuality, setAccumulatedPointCountGlobal, setRenderTimings, } from '@/flame/renderStats'
+import { DEFAULT_RENDERER_RANDOM_IMPLEMENTATION_ID } from '@/shaders/random'
 import { deepClone } from '@/utils/clone'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
 import { formatPointCount } from '@/utils/formatPointCount'
@@ -30,6 +31,7 @@ import type { v4f } from 'typegpu/data'
 import type { Palette } from './colorMap'
 import type { FlameDescriptor } from './schema/flameSchema'
 import type { ExportImageType } from '@/App'
+import type { RendererRandomImplementationId } from '@/shaders/random'
 
 const { sqrt } = Math
 const { performance } = globalThis
@@ -94,6 +96,8 @@ type Flam3Props = {
   renderInterval: number
   adaptiveFilterEnabled: boolean
   stochasticFilterEnabled?: boolean
+  /** Compile-time renderer RNG selection. Defaults to canonical xoroshiro64**. */
+  randomImplementationId?: RendererRandomImplementationId
   animationEnabled: boolean
   flameDescriptor: FlameDescriptor
   edgeFadeColor: v4f
@@ -524,6 +528,9 @@ export function Flam3(props: Flam3Props) {
       plotsPerChain: Math.floor(
         flame.renderSettings.plotsPerChain ?? PLOTS_PER_CHAIN,
       ),
+      randomImplementationId:
+        props.randomImplementationId ??
+        DEFAULT_RENDERER_RANDOM_IMPLEMENTATION_ID,
     })
   })
 
@@ -663,6 +670,8 @@ export function Flam3(props: Flam3Props) {
         flame.renderSettings.colorInitMode,
         flame.renderSettings.pointInitMode,
         plotsPerChainValue,
+        props.randomImplementationId ??
+          DEFAULT_RENDERER_RANDOM_IMPLEMENTATION_ID,
       )
     } else {
       ifsPipeline = createIFSPipeline(
@@ -679,6 +688,8 @@ export function Flam3(props: Flam3Props) {
         flame.renderSettings.pointInitMode,
         props.blendFlame?.transforms,
         plotsPerChainValue,
+        props.randomImplementationId ??
+          DEFAULT_RENDERER_RANDOM_IMPLEMENTATION_ID,
       )
     }
 
