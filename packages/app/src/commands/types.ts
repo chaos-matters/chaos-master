@@ -119,10 +119,27 @@ export interface CommandContext {
   }
 }
 
+export type ReplayArgsValidator = (
+  args: readonly unknown[],
+) => string | undefined
+
 export interface FlameCommand {
   id: string
   label: string
   description: string
+  /** False for wall-clock/device transport that cannot be serialized. */
+  recordable?: boolean
+  /**
+   * False when a command must never be accepted from an untrusted session.
+   * Every other command is still denied unless it declares
+   * `validateReplayArgs` or the registry owns an explicit safe signature for
+   * its id.
+   */
+  replayable?: boolean
+  /** This command only opens export UI and must not detach the most recently
+   *  recorded steps from the document they describe. All other commands are
+   *  conservatively treated as replay-state changes. */
+  preservesFinishedSession?: boolean
   shortcut?: string
   /**
    * Resolve args to their canonical, replayable form BEFORE recording and
@@ -134,6 +151,13 @@ export interface FlameCommand {
    * the exact entities and randomness of the original run.
    */
   normalizeArgs?: (ctx: CommandContext, args: unknown[]) => unknown[]
+  /**
+   * Validate untrusted session-file arguments before `normalizeArgs` runs.
+   * This seam is intentionally separate from execution validation: a
+   * normalizer may allocate ids or arrays, so hostile sizes must be rejected
+   * before it gets control. Return a short reason, or undefined when valid.
+   */
+  validateReplayArgs?: ReplayArgsValidator
   /**
    * Identifies "the same control being set again" for value-setting commands,
    * computed from normalized args (e.g. the parameter path, or

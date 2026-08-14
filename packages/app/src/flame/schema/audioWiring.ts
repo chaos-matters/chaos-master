@@ -103,7 +103,7 @@ export const AudioPreset = v.picklist([
 
 export const AudioMapping = v.object({
   preset: AudioPreset,
-  mappings: v.array(AudioMappingEntry),
+  mappings: v.pipe(v.array(AudioMappingEntry), v.maxLength(512)),
 })
 export type AudioMapping = v.InferOutput<typeof AudioMapping>
 

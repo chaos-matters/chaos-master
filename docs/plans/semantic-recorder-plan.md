@@ -1,16 +1,12 @@
 # Semantic action recorder — every step as a named, replayable command
 
-Status: **in progress**. M1 (recorder core, coverage ratchet, `.steps.json`),
-M2 (determinism: `normalizeArgs`, id addressing, pre-minted ids, seeded
-generate/mutate), M4 (replay: transport, step list, jump-to-step,
-fork-from-step) and M5 (sessions embedded in exported PNGs and MP4s; dropping either
-offers its replay) are implemented. The recorder is no longer dev-gated. M3 is largely done: gesture handling
-landed, and the render settings, transform card, affine editor, colour
-editors, palette, camera, symmetry, randomize/mutate and document loads are
-converted. Blend, morph, the render-settings merge and the
-quick variation picker are converted too; about twenty direct writes remain
-in `MainWorkspace.tsx` — breeding wiring, audio wiring, custom variation
-code, the tour/share/hand-off loads and the affine list editor. Captured 2026-08-06.
+Status: **in progress**. M1 (recorder core and `.steps.json`), M2
+(deterministic command args), M4 (transport, step list, seeking and one-step
+undo) and M5 (sessions embedded in PNG/MP4 exports) are implemented. M3 now
+covers the main flame, camera, timeline, audio-wiring, viewport and undo/redo
+surfaces. The remaining authored-edit gaps are narrow: committed custom
+variation code, curve-handle drags and a few startup/tour hand-off paths.
+Captured 2026-08-14.
 
 ## The ask
 
@@ -38,7 +34,7 @@ recipe.
 events.** Three systems in the codebase already cover most of the ground, and
 the design is about closing one gap between them:
 
-- `packages/app/src/commands/` is a working command registry — 33 commands
+- `packages/app/src/commands/` is a working command registry
   (`flame.addTransform`, `flame.setVariationWeight`, `camera.zoomTo`, …),
   each `execute(ctx, ...args)` taking its `CommandContext` **as an argument**,
   so the same command can run against the live workspace or a sandbox.
@@ -69,7 +65,7 @@ The patches still matter — as a **coverage detector**, not as the recording
 
 | Need                          | Already there                                                                        | Where                                                 |
 | ----------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------- |
-| Command vocabulary + dispatch | 33 commands, `executeCommand(id, ctx, ...args)`                                      | `src/commands/registry.ts`, `builtins/`               |
+| Command vocabulary + dispatch | `executeCommand(id, ctx, ...args)` plus guarded `executeReplayCommand`               | `src/commands/registry.ts`, `builtins/`               |
 | Headless replay precedent     | `createPortalDriver`, isolated `CommandContext`, DOM/GPU-free                        | `src/components/Home/portalScript.ts`                 |
 | Declarative step sequences    | Tour system emits commands, has `snapshotFlame`/`restoreFlame`                       | `src/tours/`, `components/SpotlightTour/tourTypes.ts` |
 | Mutation choke point          | `HistorySetter` with `description`, patch pairs, journal `seq`                       | `src/utils/createStoreHistory.ts`                     |
@@ -90,10 +86,12 @@ type RecordedSession = {
   version: 1
   app: { version: string; flameSchemaVersion: string }
   createdAt: string
-  seed?: number // session RNG seed, when any random command ran
-  initial: FlameDescriptor // condensed starting document
-  initialTracks?: TimelineTrack[] // timeline starting state, when non-default
+  initial: FlameDescriptor // complete starting document
+  initialTimeline?: TimelineSnapshot
+  initialAudio?: AudioWiringSnapshot
+  initialView?: SessionViewSnapshot
   actions: RecordedAction[]
+  unnamedWriteCount: number
 }
 
 type RecordedAction = {
@@ -107,21 +105,20 @@ type RecordedAction = {
 Decisions baked into this shape:
 
 - **Initial state is embedded, not referenced.** A log that replays from
-  "whatever was open" is not reproducible. `condenseFlameDescriptor` keeps it
-  small.
+  "whatever was open" is not reproducible. The complete descriptor is cloned
+  so hidden transforms and document metadata survive the round trip.
 - **Commit-level granularity.** A slider drag records one action with the
   final value (piggybacking on the existing `startPreview`/`commit`
   coalescing), not 200 intermediate values. The `t` timestamp of the commit
   preserves video-sync fidelity well enough; per-frame gesture curves are a
   non-goal for v1.
-- **Undo/redo are recorded as actions** (`history.undo` / `history.redo`).
-  The raw log is the faithful journey — that's what syncs to a video and what
-  a model should learn from. A derived, _condensed_ log (undos cancelled
-  against their targets, no-ops elided — same spirit as `compressPatches`) is
-  a pure function over the raw log and becomes the "recipe" view. Store raw,
-  derive condensed.
+- **Undo/redo are recorded as resulting data snapshots.** Live history still
+  routes through `history.undo` / `history.redo`, but the recorder replaces
+  that transient command with `flame.load` or
+  `recorder.restoreWorkspaceSnapshot`. Replays never inspect or mutate the
+  viewer's private flame/timeline stacks.
 - Schema + serialization live in a new `packages/app/src/recorder/` module
-  (`schema.ts`, `recorder.ts`, `replay.ts`, `condense.ts`), unit-testable
+  (`schema.ts`, `recorder.ts`, `player.ts`, `replay.ts`), unit-testable
   without DOM or GPU, following `portalScript.ts`'s discipline.
 
 ### Recording
@@ -138,8 +135,8 @@ Decisions baked into this shape:
 
 A third path exists for things the log cannot reproduce even though no
 anonymous write happened — an undo reverting an edit made before recording
-started or one held on the timeline's own stack, or a workspace remount that
-swapped the document underneath an active recording. These retract the action
+started, wall-clock transport, live audio modulation, or a workspace remount
+that swapped the document underneath an active recording. These retract the action
 just logged (if any) and count an unnamed write instead, so the marker rises
 rather than the log asserting a fidelity it lost.
 
@@ -161,30 +158,29 @@ What recording explicitly ignores:
   writes silently during scrubbing/playback; recorded sessions capture
   timeline _edits_ (already commands: `timeline.addKeyframe`,
   `timeline.setCurrentFrame`, …), never playback frames.
-- **Audio-reactive modulation.** `useAudioReactive` writes continuously; the
-  recorder captures the _wiring configuration_ changes, not the per-frame
-  modulation. (Replaying a session with audio wiring reproduces the setup;
-  reproducing the exact audio-driven frames is the animation exporter's job.)
+- **Audio-reactive modulation.** `useAudioReactive` writes continuously via
+  `history.setSilently`, so it does not flood undo. The recorder captures the
+  wiring and records one deduplicated fidelity warning per take when live
+  modulation runs, because the audio bytes and playback position are external.
 
 ### Replay
 
-`createSessionReplayer(session, ctx)` — the `portalScript.ts` pattern,
+`createSessionPlayer(session, target)` — the `portalScript.ts` pattern,
 generalized:
 
-- **Into the live workspace:** `MainWorkspace` already wires a full
-  `CommandContext` (`cmdContext`, see the `runTourCommand.fn` wiring at
-  `MainWorkspace.tsx:2459`). Replay = load `session.initial` via the existing
-  history `replace`, then `executeCommand(a.id, cmdContext, ...a.args)` per
-  action — either timed (original `t` offsets, or scaled) for watch-me mode,
-  or instant for jump-to-step (state replay is cheap; the progressive
-  renderer catches up on its own).
+- **Into the live workspace:** replay first preflights every action through
+  `preflightReplayCommand`, then loads the captured flame/timeline/audio/view
+  state and calls `executeReplayCommand` with canonical args. It never reruns
+  live normalizers, which may mint IDs. The full run is one atomic history
+  entry with side-state undo/redo effects; a rejected action stops the run and
+  later steps never execute.
 - **Step list UI:** a panel listing `label`s with the current position;
   clicking step _N_ replays `initial → N` instantly. Scrub-back is replay
   from the start, not undo — the log is the source of truth.
-- **Guards:** replay must set an `isReplaying` flag that (a) suspends the
-  recorder (no re-recording), and (b) routes writes through the normal
-  history so the user can take over at any step and keep undo — "fork from
-  step 12" is a feature, not an edge case.
+- **Guards:** recording and replay are mutually exclusive at both UI and
+  player boundaries. Replay suppresses recording hooks, pauses live timeline
+  transport, isolates temporary timeline history, and commits only the final
+  combined state so the user can take over at any step.
 - **Sandboxed replay** (thumbnails, gallery previews) reuses the isolated-
   context recipe and its hazard checklist from the `portalScript.ts` header
   comment (module-global `registerRedoClearer`, `persistentSignal`
@@ -194,7 +190,7 @@ generalized:
 
 ### Determinism
 
-Three known blockers, all with established fix patterns in-repo:
+Three determinism blockers shaped the implementation:
 
 1. **Positional transform addressing.** `builtins/flame.ts` resolves
    transforms by index (`getTransformKey(transforms, index)`). Recorded args
@@ -255,18 +251,10 @@ labeled-but-anonymous and fully anonymous mutations in `MainWorkspace.tsx`
 need promoting, roughly in order of how often they appear in an editing
 session (**render settings, item 6, are done**):
 
-1. **Prop-adapter mutations** — ~~the affine editor~~ **done** (it takes a
-   `setTransformAffine` dispatch; preview copies keep the raw setter). Still
-   open: `AffineListEditor` only — `ColorEditor`, `FlameColorEditor` and
-   `ColorListEditor` now take a `setTransformColor` dispatch on the same
-   pattern (optional, so preview copies keep the raw setter).
-2. **Named handlers** — palette apply/remove are done (`flame.applyPalette`
-   / `flame.removePalette`; removal takes the restore colours as an argument,
-   since the editor keeps them in a signal and no log can reconstruct UI
-   state). Still open: `applySymmetry`,
-   `setupMorph`, `runGenerateFlame`, `runMutateFlame`, breeding apply,
-   `applyRandomizeSettings`, `handleUpdateRenderSettings`,
-   `handleLoadHistory`, `handleRandomizeAnimation`, `handleSmartAnimation`.
+1. **Prop-adapter mutations** — affine and colour editors are routed through
+   stable transform/variation IDs; preview-only copies retain raw setters.
+2. **Named handlers** — palette, symmetry, morph, seeded generate/mutate,
+   breeding loads, randomizer settings and whole-document loads are covered.
 3. **Camera writes** — **done**. `setFlameZoom`, `setFlamePosition` and the
    `makeCamera3DSetter` family keep Solid's Setter contract but resolve the
    updater against current state and dispatch a concrete value, so the
@@ -280,8 +268,9 @@ session (**render settings, item 6, are done**):
    shared-URL apply) still use `history.replace` directly; they run before a
    recording can be under way, and the workspace-remount flag covers the case
    where one is.
-5. **Blend, audio wiring, custom variation code edits** — later; each is a
-   self-contained vocabulary addition.
+5. **Blend and audio wiring** — covered. Committed custom variation code is
+   still open and should become one `variation.setCode` action, not a stream
+   of keystrokes.
 6. **Render settings** — ~~the sliders and mode pickers writing
    `renderSettings.*`~~ **done**: 18 controls route through
    `flame.setRenderSetting`. `blendWeight` deliberately stays on its own
@@ -301,13 +290,12 @@ apply palette, symmetry — which gain `data-command` as they are rewired. That
 serves Playwright, the recorder's dev overlay, and any future model-driven
 operation without inventing a parallel naming scheme.
 
-**The ratchet is not yet enforceable in CI.** Coverage is a property of the
-UI, not of the command layer: a unit test cannot notice a control that still
-writes directly. Making it enforceable needs the recorder reachable from a
-production build under test (the record pill is dev-gated), so the honest
-statement today is that the unnamed-write count is observable in dev, the
-mechanism that makes zero reachable is in place and unit-tested, and the
-e2e ratchet lands once the remaining surfaces above are converted.
+**The whole-UI ratchet is not yet enforceable in CI.** The recorder is
+production-visible and command round trips are unit-tested, but a unit test
+cannot notice a newly-added control that writes directly. A focused
+Playwright journey should eventually record representative edits and assert
+`unnamedWriteCount === 0`; until then the live counter and saved marker remain
+the honest coverage signal.
 
 ### Persistence and sharing
 
@@ -331,14 +319,13 @@ e2e ratchet lands once the remaining surfaces above are converted.
 Recording sits _above_ the undo systems, so the usual hazards don't apply,
 but two rules keep them honest:
 
-- Replay into the live workspace goes through the normal history (`replace`
-  for `initial`, commands thereafter), so `undoJournal` seq ordering and
-  `createUndoRouter` arbitration keep working — a replayed-then-edited
-  session undoes correctly across flame and timeline stacks.
-- Timeline commands mutate the timeline's own snapshot-based history
-  (`utils/timeline.ts`); the recorder treats both stores uniformly because it
-  records commands, not store writes. The `unnamed`-write detector needs a
-  sibling hook on the timeline's push path for the same coverage guarantee.
+- Replay mutates the flame inside one preview and captures timeline/audio/view
+  state as that entry's undo/redo side effects. One undo therefore restores
+  the entire pre-replay workspace, not only the flame.
+- Timeline replay runs against transient stacks. The viewer's previous
+  timeline history is restored before the combined flame entry commits, then
+  the normal global redo invalidation happens once. The timeline push path
+  also feeds the same unnamed-write detector as flame history.
 
 ## Milestones
 
@@ -346,14 +333,14 @@ Each ships independently; nothing blocks the app in a half-migrated state
 because unrecorded mutations still work — they're just visible as `unnamed`
 diagnostics.
 
-| #   | Deliverable                                                                                                                                                                                                                             | Effort                 |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| M1  | `src/recorder/` module: session schema, recorder hooked into `executeCommand` + history push, `unnamed` coverage diagnostics, record/stop UI stub, `.steps.json` export. Round-trip vitest for the already-command-routed vocabulary.   | ~1 week                |
-| M2  | Determinism: id-based addressing in `builtins/flame.ts`, pre-minted ids on add-commands, exported seeded-RNG wrappers, seeded `randomize`/`mutate` commands. Round-trip test extended to random commands.                               | 3–5 days               |
-| M3  | Command coverage of the core editing surface (prop adapters, named handlers, camera) + `data-command` attributes as controls are rewired. Coverage ratchet test in Playwright.                                                          | 1–2 weeks, incremental |
-| M4  | ~~Replay~~ **done**: `createSessionPlayer` transport, step-list panel, timed playback with speed control, jump-to-step, fork-from-step. A run or a seek is ONE undo step, so watching a session does not bury the viewer's own history. | shipped                |
-| M5  | Sharing: PNG `FlameSteps` chunk, MP4 metadata, export-dialog bundle, recent-flames `session?` field.                                                                                                                                    | 3–5 days               |
-| —   | Later: sandboxed replay for gallery previews, scripting/MCP surface over the registry, condensed-recipe editor, gallery publishing.                                                                                                     | separate plans         |
+| #   | Deliverable                                                                                                                                                                                                                             | Effort         |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| M1  | `src/recorder/` module: session schema, recorder hooked into command/history seams, fidelity diagnostics, production UI and `.steps.json` persistence.                                                                                  | shipped        |
+| M2  | Determinism: id-based addressing, pre-minted ids, seeded generate/mutate and round-trip tests.                                                                                                                                          | shipped        |
+| M3  | Core editing-surface coverage is largely shipped; committed custom-code/curve gestures and a representative Playwright coverage-ratchet journey remain.                                                                                 | incremental    |
+| M4  | ~~Replay~~ **done**: `createSessionPlayer` transport, step-list panel, timed playback with speed control, jump-to-step, fork-from-step. A run or a seek is ONE undo step, so watching a session does not bury the viewer's own history. | shipped        |
+| M5  | Sharing: PNG `FlameSteps` chunk, MP4 metadata and export-dialog integration.                                                                                                                                                            | shipped        |
+| —   | Later: sandboxed replay for gallery previews, scripting/MCP surface over the registry, condensed-recipe editor, gallery publishing.                                                                                                     | separate plans |
 
 M1 + M2 is the demoable core (record a session using existing commands +
 randomize, replay it deterministically). M3 is the long tail and can proceed
@@ -361,22 +348,23 @@ one control at a time forever after.
 
 ## Risks and open questions
 
-- **`MainWorkspace.tsx` is 6217 lines.** M3 touches it heavily. The
+- **`MainWorkspace.tsx` is large.** M3 touches it heavily. The
   refactor-plan (2026-07) context applies; promoting handlers to
   `builtins/` files is _also_ an extraction mechanism, so the two efforts
   compound rather than conflict — but sequencing against any active refactor
   work needs a check before M3 starts.
-- **Command arg schemas.** `FlameCommand` currently types `execute(ctx,
-...args: any[])`. Recorded args crossing a serialization boundary need
-  per-command valibot schemas (validated on replay, like `tryValidateFlame`
-  on load). Add to the `FlameCommand` shape in M1 while the surface is small.
+- **Command arg schemas.** `FlameCommand.validateReplayArgs` now provides the
+  untrusted-file seam. A generic finite-JSON budget runs for every command,
+  and allocation-sensitive structural commands have exact validators. The
+  remaining scalar commands still validate in their execute path; adding
+  schemas as they evolve keeps rejection messages earlier and clearer.
 - **Schema migration of logs.** A session recorded on app v0.9.9 replayed on
   v1.2 must either migrate (command vocabulary is more stable than the
   document schema — a point in favor of recording intents) or clearly refuse.
   `migrateFlameTypes.ts` handles the embedded `initial`; command-level
   versioning starts as "same major vocabulary version or refuse."
 - **Custom variation code edits** (CodeMirror sessions) don't decompose into
-  small commands. v1 records the committed code blob as one
+  small commands. The planned command records the committed code blob as one
   `variation.setCode` action; keystroke-level capture is out of scope.
 - **Gesture fidelity for video.** Commit-level coalescing loses the visual
   journey of a long drag. If step-synced videos feel jumpy, a later additive

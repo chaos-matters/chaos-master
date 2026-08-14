@@ -7,6 +7,8 @@ import type { CustomVariationDef } from '@/flame/variations/custom'
 import type { TimelineConfig, TimelineTrack } from '@/utils/timeline'
 
 const format: CompressionFormat = 'deflate'
+export const MAX_COMPRESSED_JSON_BYTES = 8 * 1024 * 1024
+const DECOMPRESSION_TIMEOUT_MS = 5000
 
 // Verbose share encode/decode/decompress tracing — dev builds only. Vite
 // statically replaces `import.meta.env.DEV` with `false` in production and
@@ -108,8 +110,9 @@ export async function decodeJsonQueryParam(param: string) {
  */
 export async function decompressJsonValue(
   compressedBytes: Uint8Array<ArrayBuffer>,
+  maxOutputBytes = 32 * 1024 * 1024,
 ): Promise<unknown> {
-  const rawBytes = await decompressJsonQueryRaw(compressedBytes)
+  const rawBytes = await decompressJsonQueryRaw(compressedBytes, maxOutputBytes)
   return JSON.parse(new TextDecoder().decode(rawBytes))
 }
 
@@ -292,40 +295,85 @@ export async function decodeVariationShare(
 
 async function decompressJsonQueryRaw(
   compressedBytes: Uint8Array<ArrayBuffer>,
+  maxOutputBytes = 32 * 1024 * 1024,
 ): Promise<Uint8Array> {
+  if (compressedBytes.byteLength > MAX_COMPRESSED_JSON_BYTES) {
+    throw new Error(
+      `Compressed JSON exceeds ${MAX_COMPRESSED_JSON_BYTES} bytes`,
+    )
+  }
   shareLog('[share:decompress] starting, byte length:', compressedBytes.length)
   const decompress = new DecompressionStream(format)
   shareLog('[share:decompress] DecompressionStream created, format:', format)
 
   const chunks: Uint8Array[] = []
-  const pipePromise = decompress.readable.pipeTo(
-    new WritableStream<Uint8Array>({
-      write(chunk) {
-        shareLog('[share:decompress] got chunk, size:', chunk.length)
-        chunks.push(chunk)
-      },
-    }),
-  )
+  let totalBytes = 0
+  const abortController = new AbortController()
+  const pipeResult = decompress.readable
+    .pipeTo(
+      new WritableStream<Uint8Array>({
+        write(chunk) {
+          shareLog('[share:decompress] got chunk, size:', chunk.length)
+          totalBytes += chunk.byteLength
+          if (totalBytes > maxOutputBytes) {
+            throw new Error(`Decompressed JSON exceeds ${maxOutputBytes} bytes`)
+          }
+          chunks.push(chunk)
+        },
+      }),
+      { signal: abortController.signal },
+    )
+    // Observe the pipe immediately. If the output limit aborts the stream,
+    // `writer.write()` and `pipeTo()` can reject in the same turn; waiting to
+    // attach a handler until after the writer settles leaves a transient
+    // unhandled rejection in browsers and in Vitest.
+    .then(
+      () => ({ ok: true as const }),
+      (error: unknown) => ({ ok: false as const, error }),
+    )
 
+  type StreamResult = Awaited<typeof pipeResult>
   const writer = decompress.writable.getWriter()
-  await writer.write(compressedBytes)
-  shareLog('[share:decompress] wrote', compressedBytes.length, 'bytes')
-  await writer.close()
-  shareLog('[share:decompress] writer closed')
-
-  await Promise.race([
-    pipePromise,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => {
-        reject(new Error('Decompression timed out after 5s'))
-      }, 5000),
-    ),
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+  const timeoutError = new Error(
+    `Decompression timed out after ${DECOMPRESSION_TIMEOUT_MS / 1000}s`,
+  )
+  const timeoutResult = new Promise<StreamResult>((resolve) => {
+    timeoutId = setTimeout(() => {
+      abortController.abort(timeoutError)
+      void writer.abort(timeoutError).catch(() => undefined)
+      resolve({ ok: false, error: timeoutError })
+    }, DECOMPRESSION_TIMEOUT_MS)
+  })
+  const writeResult = (async (): Promise<StreamResult> => {
+    try {
+      await writer.write(compressedBytes)
+      shareLog('[share:decompress] wrote', compressedBytes.length, 'bytes')
+      await writer.close()
+      shareLog('[share:decompress] writer closed')
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error }
+    }
+  })()
+  // Fail as soon as either half fails, but only report success once BOTH the
+  // input writer and decompressed output pipe have completed.
+  const streamResult = Promise.race([
+    pipeResult.then((result) => (result.ok ? writeResult : result)),
+    writeResult.then((result) => (result.ok ? pipeResult : result)),
   ])
+  const result = await Promise.race([streamResult, timeoutResult])
+  if (timeoutId !== undefined) clearTimeout(timeoutId)
+  if (!result.ok) {
+    abortController.abort(result.error)
+    void writer.abort(result.error).catch(() => undefined)
+    throw result.error
+  }
   shareLog(
     '[share:decompress] decompression success, chunks:',
     chunks.length,
     'total bytes:',
-    chunks.reduce((s, c) => s + c.length, 0),
+    totalBytes,
   )
   return concatBuffers(chunks)
 }

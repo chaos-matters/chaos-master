@@ -1,6 +1,6 @@
 import { asciiBytes, readAsciiBytes, writeUint32BE } from './binaryReader'
 import { calculateCRC32 } from './crc32'
-import { coerceFlamePayload, concatBuffers, decompressJsonValue, } from './jsonQueryParam'
+import { coerceFlamePayload, concatBuffers, decompressJsonValue, MAX_COMPRESSED_JSON_BYTES, } from './jsonQueryParam'
 import type { SharePayload } from './jsonQueryParam'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
@@ -10,6 +10,7 @@ const CHUNK_KEY_STRING = 'FlameJson'
  *  dropped PNG can offer "replay this creation" as well as "load this flame"
  *  (docs/plans/semantic-recorder-plan.md, M5). */
 export const STEPS_CHUNK_KEY_STRING = 'FlameSteps'
+const MAX_EMBEDDED_STEPS_BYTES = 8 * 1024 * 1024
 const CHUNK_TYPE_SIZE_IN_BYTES = 4
 const CHUNK_LENGTH_SIZE_IN_BYTES = 4
 const CHUNK_CRC_SIZE_IN_BYTES = 4
@@ -82,8 +83,17 @@ async function readZtxtChunk(
   chunkPos: number,
   chunkLength: number,
   imageData: Uint8Array,
+  maxOutputBytes?: number,
 ) {
   const chunkTypePos = chunkPos + CHUNK_LENGTH_SIZE_IN_BYTES
+  const chunkEnd =
+    chunkTypePos +
+    CHUNK_TYPE_SIZE_IN_BYTES +
+    chunkLength +
+    CHUNK_CRC_SIZE_IN_BYTES
+  if (chunkEnd > imageData.byteLength) {
+    throw new Error('PNG chunk is truncated')
+  }
   const chunkData = imageData.subarray(
     chunkTypePos,
     chunkTypePos + CHUNK_TYPE_SIZE_IN_BYTES + chunkLength,
@@ -91,14 +101,6 @@ async function readZtxtChunk(
   const chunkDataPos = chunkTypePos + CHUNK_TYPE_SIZE_IN_BYTES
   // index of \0, keyword should not have 0 value according to spec
   const separatorByteIdx = chunkData.indexOf(0)
-  const crcIdx = chunkDataPos + chunkLength
-  const crcData = imageData.slice(crcIdx, crcIdx + CHUNK_CRC_SIZE_IN_BYTES)
-  const readCrc = new DataView(crcData.buffer).getUint32(0)
-  // crc is calculated on all chunk segments except for length (first one)
-  const calculatedCrc = calculateCRC32(chunkData)
-  if (readCrc !== calculatedCrc) {
-    throw new Error(`CRC mismatch: PNG: [${readCrc}] ::  [${calculatedCrc}]`)
-  }
   if (
     separatorByteIdx === -1 ||
     chunkData[separatorByteIdx + 1] !== CHUNK_COMPRESSION_DEFLATE
@@ -111,14 +113,31 @@ async function readZtxtChunk(
   // Sliced from the separator the spec guarantees, not from a fixed keyword
   // length: 'FlameJson' and 'FlameSteps' differ in length, and a constant
   // here would read one chunk's payload at the other's offset.
-  const compressedData = chunkData.slice(
+  const payloadOffset =
     separatorByteIdx +
-      CHUNK_KEY_END_SIZE_IN_BYTES +
-      CHUNK_COMPRESSION_SIZE_IN_BYTES,
-  )
+    CHUNK_KEY_END_SIZE_IN_BYTES +
+    CHUNK_COMPRESSION_SIZE_IN_BYTES
+  const compressedLength = chunkData.byteLength - payloadOffset
+  if (compressedLength > MAX_COMPRESSED_JSON_BYTES) {
+    throw new Error(
+      `Compressed JSON exceeds ${MAX_COMPRESSED_JSON_BYTES} bytes`,
+    )
+  }
+
+  const crcIdx = chunkDataPos + chunkLength
+  const crcData = imageData.slice(crcIdx, crcIdx + CHUNK_CRC_SIZE_IN_BYTES)
+  const readCrc = new DataView(crcData.buffer).getUint32(0)
+  // crc is calculated on all chunk segments except for length (first one)
+  const calculatedCrc = calculateCRC32(chunkData)
+  if (readCrc !== calculatedCrc) {
+    throw new Error(`CRC mismatch: PNG: [${readCrc}] ::  [${calculatedCrc}]`)
+  }
+  // Copy only after the input budget has bounded the allocation. This also
+  // guarantees an ArrayBuffer-backed view for DecompressionStream.
+  const compressedData = chunkData.slice(payloadOffset)
   // Raw here: what the payload MEANS depends on the keyword, so the
   // caller validates (a flame for FlameJson, a session for FlameSteps).
-  return await decompressJsonValue(compressedData)
+  return await decompressJsonValue(compressedData, maxOutputBytes)
 }
 
 /**
@@ -150,7 +169,14 @@ async function findZtxtPayload(
       const terminatorPos =
         imagePos + CHUNK_HEADER_SIZE_IN_BYTES + keyword.length
       if (chunkKeyword === keyword && imageData[terminatorPos] === 0) {
-        return await readZtxtChunk(imagePos, chunkLength, imageData)
+        return await readZtxtChunk(
+          imagePos,
+          chunkLength,
+          imageData,
+          keyword === STEPS_CHUNK_KEY_STRING
+            ? MAX_EMBEDDED_STEPS_BYTES
+            : undefined,
+        )
       }
     }
 

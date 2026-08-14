@@ -4,7 +4,7 @@ import { createStore, unwrap } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { vec2f, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
-import { executeCommand } from '@/commands/registry'
+import { executeCommand, executeReplayCommand, preflightReplayCommand, } from '@/commands/registry'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useToast } from '@/contexts/ToastContext'
 import { workspaceIsVisible } from '@/lib/activeTab'
@@ -99,7 +99,8 @@ import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } fro
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { BoxArrowRight, Cross, Eye, EyeOff, Menu, Plus, Share, Shuffle, Terminal, } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
-import { isSessionRecording, notePreviewStarted, recordSyntheticAction, reportDocumentWrite, reportUnreplayable, } from './recorder/recorder'
+import { invalidateLastFinishedSession, isSessionRecording, notePreviewStarted, recordSyntheticAction, reportDocumentWrite, reportUnreplayable, reportUnreplayableOnce, withRecordingSuppressed, } from './recorder/recorder'
+import { applyReplayAudioWiring } from './recorder/replay'
 import { createAnimationExport } from './utils/animationExport'
 import { createAudioAnalyzer } from './utils/audioAnalysis'
 import { autosaveIntervalMin, autosaveRecents, saveReminderDismissed, setAutosaveRecents, setSaveReminderDismissed, } from './utils/autosaveSettings'
@@ -134,13 +135,15 @@ import type { TourContext } from './components/SpotlightTour/tourTypes'
 import type { Palette } from './flame/colorMap'
 import type { PointInitMode } from './flame/pointInitMode'
 import type { GenerateRandomFlameConfig, MutateFlameOptions, } from './flame/randomize'
+import type { AudioWiringSnapshot } from './flame/schema/audioWiring'
 import type { FlameDescriptor, TransformId, VariationId, } from './flame/schema/flameSchema'
+import type { TimelineSnapshot } from './flame/schema/timeline'
 import type { Dims } from './flame/variationRegistry'
 import type { TransformVariationType } from './flame/variations'
 import type { CustomVariationDef } from './flame/variations/custom/types'
 import type { TransformVariationType3D } from './flame/variations3D'
 import type { ReplayTarget } from './recorder/replay'
-import type { RecordedSession } from './recorder/schema'
+import type { RecordedSession, SessionViewSnapshot } from './recorder/schema'
 import type { AnimationExportConfig } from './utils/animationExport'
 import type { AudioAnalyzer, LiveAudioAnalyzer } from './utils/audioAnalysis'
 import type { ExportDimensions } from './utils/exportDimensions'
@@ -406,6 +409,13 @@ export function MainWorkspace(props: AppProps) {
   // The session currently open for replay (M4), if any. Lives here rather than
   // in the dock because dropping a .steps.json opens one too.
   const [replaySession, setReplaySession] = createSignal<RecordedSession>()
+  const openReplaySession = (session: RecordedSession | undefined) => {
+    if (session !== undefined && isSessionRecording()) {
+      showToast('Stop or discard the current recording before opening a replay')
+      return
+    }
+    setReplaySession(session)
+  }
   // Colors as they were before the first palette apply — lets Unselect
   // restore the "natural" colors. UI stash only; undo handles the rest.
   const [prePaletteColors, setPrePaletteColors] = createSignal<
@@ -1358,7 +1368,7 @@ export function MainWorkspace(props: AppProps) {
   const onDrop = useAppDragAndDrop(
     history,
     setLoadedAnimation,
-    setReplaySession,
+    openReplaySession,
   )
 
   const timeline = createTimelineState()
@@ -1372,7 +1382,14 @@ export function MainWorkspace(props: AppProps) {
     audioEnabled,
     audioBuffer,
     audioMapping,
-    setFlameDescriptor,
+    (write) => {
+      invalidateLastFinishedSession()
+      reportUnreplayableOnce(
+        'live-audio-modulation',
+        'Live audio modulation changed the flame without embedding the audio source',
+      )
+      history.setSilently(write)
+    },
     liveAnalyzer,
     audioSource,
     playbackPaused,
@@ -3223,7 +3240,12 @@ export function MainWorkspace(props: AppProps) {
       duration: timelineDuration,
       setDuration: setTimelineDuration,
       currentFrame: timeline.currentFrame,
-      setCurrentFrame: timeline.setCurrentFrame,
+      setCurrentFrame: (value) => {
+        const frame =
+          typeof value === 'function' ? value(timeline.currentFrame()) : value
+        timeline.goToFrame(frame)
+        return timeline.currentFrame()
+      },
       play: timeline.play,
       setLoop: (loop) => {
         timeline.updateConfigUndoable({ loop })
@@ -3266,11 +3288,27 @@ export function MainWorkspace(props: AppProps) {
         },
         snapshot: () => ({
           config: deepClone(timeline.config()),
+          currentFrame: timeline.currentFrame(),
+          animationEnabled: animationEnabled(),
+          autoKeyframe: timeline.autoKeyframe(),
+          previewHeld: timeline.previewHeld(),
           tracks: deepClone(timeline.tracks()),
         }),
         load: (data) => {
           timeline.loadTracks(data.tracks)
           timeline.setConfig(data.config)
+          if (data.currentFrame !== undefined) {
+            timeline.setCurrentFrame(data.currentFrame)
+          }
+          if (data.animationEnabled !== undefined) {
+            setAnimationEnabled(data.animationEnabled)
+          }
+          if (data.autoKeyframe !== undefined) {
+            timeline.setAutoKeyframe(data.autoKeyframe)
+          }
+          if (data.previewHeld !== undefined) {
+            timeline.setPreviewHeld(data.previewHeld)
+          }
         },
       },
     },
@@ -3338,6 +3376,85 @@ export function MainWorkspace(props: AppProps) {
    * entry and would escape the batch — the batch is what makes a whole
    * replayed run a single undo step the viewer can take back in one go.
    */
+  type ReplaySideState = {
+    timeline: TimelineSnapshot
+    audio: AudioWiringSnapshot
+    view: SessionViewSnapshot
+  }
+
+  const captureReplaySideState = (): ReplaySideState => ({
+    timeline: {
+      config: deepClone(timeline.config()),
+      currentFrame: timeline.currentFrame(),
+      animationEnabled: animationEnabled(),
+      autoKeyframe: timeline.autoKeyframe(),
+      previewHeld: timeline.previewHeld(),
+      tracks: deepClone(timeline.tracks()),
+    },
+    audio: {
+      mapping: deepClone(audioMapping()),
+      enabled: audioEnabled(),
+      source: audioSource(),
+      trackName: audioTrackName(),
+    },
+    view: {
+      qualityPreset: qualityPreset(),
+      adaptiveFilter: adaptiveFilterEnabled(),
+      stochasticFilter: stochasticFilterEnabled(),
+      flyMode: flyMode(),
+      showTimeline: showTimeline(),
+      sidebarOpen: showSidebar(),
+    },
+  })
+
+  const applyReplayAudioState = (audio: AudioWiringSnapshot) => {
+    // A session records wiring, never file bytes or microphone permission.
+    // Keep the workspace's actual resource identity and only re-enable the
+    // wiring when that same resource is still present. In particular, redo
+    // must not relabel B.wav as the A.wav captured by an earlier replay.
+    applyReplayAudioWiring(
+      audio,
+      {
+        hasFileBuffer: audioBuffer() !== undefined,
+        currentTrackName: audioTrackName(),
+        hasLiveAnalyzer: liveAnalyzer() !== undefined,
+      },
+      {
+        setMapping: setAudioMapping,
+        setSource: setAudioSource,
+        setEnabled: setAudioEnabled,
+      },
+    )
+  }
+
+  const restoreReplaySideState = (state: ReplaySideState) => {
+    timeline.setTracks(() => deepClone(state.timeline.tracks))
+    timeline.setConfig(deepClone(state.timeline.config))
+    if (state.timeline.currentFrame !== undefined) {
+      timeline.setCurrentFrame(state.timeline.currentFrame)
+    }
+    if (state.timeline.animationEnabled !== undefined) {
+      setAnimationEnabled(state.timeline.animationEnabled)
+    }
+    if (state.timeline.autoKeyframe !== undefined) {
+      timeline.setAutoKeyframe(state.timeline.autoKeyframe)
+    }
+    if (state.timeline.previewHeld !== undefined) {
+      timeline.setPreviewHeld(state.timeline.previewHeld)
+    }
+    applyReplayAudioState(state.audio)
+    if (state.view.qualityPreset in qualityPresets) {
+      setQualityPreset(state.view.qualityPreset as QualityPreset)
+    }
+    setAdaptiveFilterEnabled(state.view.adaptiveFilter)
+    setStochasticFilterEnabled(state.view.stochasticFilter)
+    setFlyMode(state.view.flyMode)
+    setShowTimeline(state.view.showTimeline)
+    setShowSidebar(state.view.sidebarOpen)
+  }
+
+  let replayBatchStart: ReplaySideState | undefined
+
   const replayTarget: ReplayTarget = {
     loadInitial: (flame) => {
       setFlameDescriptor(() => deepClone(flame), 'Replay: initial state')
@@ -3347,22 +3464,74 @@ export function MainWorkspace(props: AppProps) {
     loadTimeline: (data) => {
       timeline.loadTracks(data.tracks)
       timeline.setConfig(data.config)
+      if (data.currentFrame !== undefined) {
+        timeline.setCurrentFrame(data.currentFrame)
+      }
+      if (data.animationEnabled !== undefined) {
+        setAnimationEnabled(data.animationEnabled)
+      }
+      if (data.autoKeyframe !== undefined) {
+        timeline.setAutoKeyframe(data.autoKeyframe)
+      }
+      if (data.previewHeld !== undefined) {
+        timeline.setPreviewHeld(data.previewHeld)
+      }
     },
     loadAudio: (audio) => {
-      setAudioMapping(audio.mapping)
-      setAudioSource(audio.source)
-      // The buffer cannot ride in a session, so enabling reactivity with no
-      // audio loaded would just be a dead switch.
-      setAudioEnabled(audio.enabled && audioBuffer() !== undefined)
+      // `audioTrackName` describes the resource actually loaded in this
+      // workspace. A session cannot supply bytes, so never relabel B.wav as
+      // the A.wav it requires or run the wrong track under the saved mapping.
+      applyReplayAudioState(audio)
+    },
+    loadView: (view) => {
+      if (view.qualityPreset in qualityPresets) {
+        setQualityPreset(view.qualityPreset as QualityPreset)
+      }
+      setAdaptiveFilterEnabled(view.adaptiveFilter)
+      setStochasticFilterEnabled(view.stochasticFilter)
+      setFlyMode(view.flyMode)
+      setShowTimeline(view.showTimeline)
+      setShowSidebar(view.sidebarOpen)
     },
     execute: (id, args) => {
-      executeCommand(id, cmdContext, ...args)
+      return executeReplayCommand(id, cmdContext, ...args)
     },
+    preflight: preflightReplayCommand,
     beginBatch: () => {
+      invalidateLastFinishedSession()
+      replayBatchStart = captureReplaySideState()
+      // Transport is wall-clock state, not authored replay state. Freeze it
+      // before loading the session so frames cannot advance underneath the
+      // deterministic action sequence; undo never restarts playback.
+      if (timeline.isPlaying()) timeline.pause()
+      timeline.beginTransientHistory()
       history.startPreview('Replay')
     },
     endBatch: () => {
-      if (history.isPreviewing()) history.commit()
+      const before = replayBatchStart
+      const after = before ? captureReplaySideState() : undefined
+      replayBatchStart = undefined
+      timeline.endTransientHistory()
+      if (!history.isPreviewing()) return
+      const sideStateChanged =
+        before !== undefined &&
+        after !== undefined &&
+        JSON.stringify(before) !== JSON.stringify(after)
+      withRecordingSuppressed(() => {
+        if (sideStateChanged && before && after) {
+          history.commit({
+            force: true,
+            undoEffect: () => {
+              restoreReplaySideState(before)
+            },
+            redoEffect: () => {
+              restoreReplaySideState(after)
+            },
+          })
+        } else {
+          history.commit()
+        }
+      })
     },
   }
 
@@ -3611,13 +3780,27 @@ export function MainWorkspace(props: AppProps) {
                 <Show when={recorderVisible() || isSessionRecording()}>
                   <SessionRecorderDock
                     flameDescriptor={flameDescriptor}
-                    startExtras={() => ({
-                      timeline: cmdContext.timeline.edit?.snapshot(),
-                      audio: cmdContext.audio?.snapshot(),
-                    })}
+                    startExtras={() => {
+                      // Wall-clock playback is not authored session state.
+                      // Freeze it before taking the start snapshot so the
+                      // playhead cannot advance underneath a new recording.
+                      if (timeline.isPlaying()) timeline.pause()
+                      return {
+                        timeline: cmdContext.timeline.edit?.snapshot(),
+                        audio: cmdContext.audio?.snapshot(),
+                        view: {
+                          qualityPreset: qualityPreset(),
+                          adaptiveFilter: adaptiveFilterEnabled(),
+                          stochasticFilter: stochasticFilterEnabled(),
+                          flyMode: flyMode(),
+                          showTimeline: showTimeline(),
+                          sidebarOpen: showSidebar(),
+                        },
+                      }
+                    }}
                     target={replayTarget}
                     session={replaySession()}
-                    onSessionChange={setReplaySession}
+                    onSessionChange={openReplaySession}
                     busy={animationExportRunning() || timeline.isPlaying()}
                   />
                 </Show>
@@ -3750,6 +3933,13 @@ export function MainWorkspace(props: AppProps) {
                       formatTrackLabel={readableIds().formatTrackPath}
                       flameDescriptor={flameDescriptor}
                       onOpenAnimationGenerator={openAnimationGenerator}
+                      onSetAutoKeyframe={(enabled) => {
+                        executeCommand(
+                          'timeline.setAutoKeyframe',
+                          cmdContext,
+                          enabled,
+                        )
+                      }}
                     />
                   </div>
                 </Show>
@@ -6155,10 +6345,16 @@ export function MainWorkspace(props: AppProps) {
                   ? (stashedFlame3D ?? example34)
                   : (stashedFlame2D ?? initExample)
               const restoredTracks = v === 3 ? stashedTracks3D : stashedTracks2D
-              history.replace(deepClone(restored))
-              // Swap the timeline to the target dimension's tracks (empty on
-              // first entry — matches the starter flame).
-              timeline.loadTracks(restoredTracks ?? [])
+              // These document-boundary writes are represented by the two
+              // synthetic actions below. Suppress their coverage hooks so the
+              // recorder does not also flag the same, faithfully represented
+              // switch as an unnamed write.
+              withRecordingSuppressed(() => {
+                history.replace(deepClone(restored))
+                // Swap the timeline to the target dimension's tracks (empty
+                // on first entry — matches the starter flame).
+                timeline.loadTracks(restoredTracks ?? [])
+              })
               // The switch restores from an in-memory stash, so replaying it
               // as "switch to 3D" would land on the VIEWER's stash, not ours.
               // Log the descriptor and tracks it actually produced instead —

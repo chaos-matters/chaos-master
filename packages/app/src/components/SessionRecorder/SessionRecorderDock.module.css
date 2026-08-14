@@ -99,7 +99,12 @@
 }
 
 .icon-button {
-  padding: 0.05rem 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  padding: 0;
   border-radius: 10px;
   border: 1px solid transparent;
   background: transparent;
@@ -117,6 +122,17 @@
     opacity: 0.35;
     cursor: default;
   }
+}
+
+.icon {
+  display: block;
+  width: 0.86rem;
+  height: 0.86rem;
+  transition: transform 140ms ease;
+}
+
+.chevron-up {
+  transform: rotate(180deg);
 }
 
 .icon-button-active {
@@ -141,5 +157,11 @@
   & input {
     margin: 0;
     accent-color: oklch(60% 0.12 240);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon {
+    transition: none;
   }
 }

@@ -80,7 +80,25 @@
   gap: 0.3rem;
 }
 
+.replay-error {
+  padding: 0.3rem 0.45rem;
+  border: 1px solid oklch(66% 0.15 30 / 0.7);
+  border-radius: 8px;
+  background: oklch(48% 0.14 30 / 0.25);
+  color: oklch(90% 0.06 35);
+  line-height: 1.35;
+
+  [data-theme='light'] & {
+    color: oklch(40% 0.12 30);
+  }
+}
+
 .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
+  min-height: 1.65rem;
   padding: 0.1rem 0.45rem;
   border-radius: 10px;
   border: 1px solid oklch(50% 0.08 240 / 0.5);
@@ -97,6 +115,18 @@
     opacity: 0.4;
     cursor: default;
   }
+}
+
+.transport-icon-button {
+  width: 1.65rem;
+  padding-inline: 0;
+}
+
+.button-icon {
+  display: block;
+  width: 0.88rem;
+  height: 0.88rem;
+  flex: none;
 }
 
 /* An always-visible toggle rather than a checkbox: it is switched mid-replay,
@@ -167,6 +197,9 @@
 }
 
 .step-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   padding: 0.1rem 0.3rem;
   border: 1px solid transparent;
@@ -181,6 +214,12 @@
     opacity: 1;
     background: oklch(50% 0.08 240 / 0.25);
   }
+}
+
+.step-edit-icon {
+  display: block;
+  width: 0.78rem;
+  height: 0.78rem;
 }
 
 .step-edit-on {

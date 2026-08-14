@@ -76,6 +76,156 @@ export const renderSettingsDefault: RenderSettings = {
 export const latestSchemaVersion = '1.0'
 const MAX_LENGTH_AUTHOR_STRING = 255
 const MAX_LENGTH_VERSION_STRING = 10
+
+// These limits are a renderer boundary, not merely an import convenience.
+// Every transform and variation becomes TypeGPU/WGSL structure, so accepting
+// an unbounded descriptor lets a small session file trigger a very large
+// shader compile. Keep one shared budget for imports, replay and incremental
+// editor commands.
+export const MAX_FLAME_TRANSFORMS = 128
+export const MAX_VARIATIONS_PER_TRANSFORM = 32
+export const MAX_FLAME_VARIATIONS = 512
+export const MAX_FLAME_ENTITY_ID_LENGTH = 128
+
+const FORBIDDEN_ENTITY_IDS = new Set(['__proto__', 'constructor', 'prototype'])
+
+/**
+ * Entity ids are interpolated into generated TypeGPU/WGSL member names and
+ * used as plain-object keys. Restrict them to the format produced by the app
+ * (UUIDs with underscores, including the reserved `_sym__` prefix) so neither
+ * prototype keys nor source punctuation can cross that boundary.
+ */
+export type SafeFlameEntityId = string & {
+  readonly __safeFlameEntityId: true
+}
+
+export function isSafeFlameEntityId(
+  value: unknown,
+): value is SafeFlameEntityId {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.length > MAX_FLAME_ENTITY_ID_LENGTH ||
+    FORBIDDEN_ENTITY_IDS.has(value)
+  ) {
+    return false
+  }
+
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i)
+    const isDigit = code >= 48 && code <= 57
+    const isUpper = code >= 65 && code <= 90
+    const isUnderscore = code === 95
+    const isLower = code >= 97 && code <= 122
+    if (!isDigit && !isUpper && !isUnderscore && !isLower) return false
+  }
+  return true
+}
+
+export function isFlameGraphWithinLimits(
+  transformCount: number,
+  totalVariationCount: number,
+  largestVariationCount: number,
+): boolean {
+  return (
+    Number.isInteger(transformCount) &&
+    Number.isInteger(totalVariationCount) &&
+    Number.isInteger(largestVariationCount) &&
+    transformCount >= 0 &&
+    transformCount <= MAX_FLAME_TRANSFORMS &&
+    totalVariationCount >= 0 &&
+    totalVariationCount <= MAX_FLAME_VARIATIONS &&
+    largestVariationCount >= 0 &&
+    largestVariationCount <= MAX_VARIATIONS_PER_TRANSFORM
+  )
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false
+  }
+  const prototype = Object.getPrototypeOf(value)
+  return prototype === Object.prototype || prototype === null
+}
+
+/** Fast, allocation-light preflight before migration or schema parsing. */
+export function flameComplexityError(data: unknown): string | undefined {
+  if (!isPlainRecord(data)) {
+    return typeof data === 'object' && data !== null && !Array.isArray(data)
+      ? 'flame descriptors must be plain objects'
+      : undefined
+  }
+  const transforms = data.transforms
+  if (!isPlainRecord(transforms)) {
+    return typeof transforms === 'object' && transforms !== null
+      ? 'transform records must be plain objects'
+      : undefined
+  }
+
+  let transformCount = 0
+  let totalVariationCount = 0
+  let largestVariationCount = 0
+
+  for (const transformId in transforms) {
+    if (!Object.hasOwn(transforms, transformId)) continue
+    transformCount++
+    if (transformCount > MAX_FLAME_TRANSFORMS) {
+      return `a flame may contain at most ${MAX_FLAME_TRANSFORMS} transforms`
+    }
+    if (!isSafeFlameEntityId(transformId)) {
+      return `unsafe transform id "${transformId.slice(0, 64)}"`
+    }
+
+    const transform = transforms[transformId]
+    if (!isPlainRecord(transform)) {
+      if (typeof transform === 'object' && transform !== null) {
+        return 'transform descriptors must be plain objects'
+      }
+      continue
+    }
+    const variations = transform.variations
+    if (!isPlainRecord(variations)) {
+      if (typeof variations === 'object' && variations !== null) {
+        return 'variation records must be plain objects'
+      }
+      continue
+    }
+
+    let variationCount = 0
+    for (const variationId in variations) {
+      if (!Object.hasOwn(variations, variationId)) continue
+      variationCount++
+      totalVariationCount++
+      if (variationCount > MAX_VARIATIONS_PER_TRANSFORM) {
+        return `a transform may contain at most ${MAX_VARIATIONS_PER_TRANSFORM} variations`
+      }
+      if (totalVariationCount > MAX_FLAME_VARIATIONS) {
+        return `a flame may contain at most ${MAX_FLAME_VARIATIONS} variations`
+      }
+      if (!isSafeFlameEntityId(variationId)) {
+        return `unsafe variation id "${variationId.slice(0, 64)}"`
+      }
+      const variation = variations[variationId]
+      if (
+        !isPlainRecord(variation) &&
+        typeof variation === 'object' &&
+        variation !== null
+      ) {
+        return 'variation descriptors must be plain objects'
+      }
+    }
+    largestVariationCount = Math.max(largestVariationCount, variationCount)
+  }
+
+  return isFlameGraphWithinLimits(
+    transformCount,
+    totalVariationCount,
+    largestVariationCount,
+  )
+    ? undefined
+    : 'flame graph exceeds renderer limits'
+}
+
 const metadataDefault = {
   version: latestSchemaVersion,
   author: 'unknown',
@@ -317,6 +467,8 @@ function parseFlame<TSchema extends Parameters<typeof v.safeParse>[0]>(
  * through both the 2D and 3D pipelines.
  */
 export function validateFlame(data: unknown): FlameDescriptor {
+  const complexityError = flameComplexityError(data)
+  if (complexityError) throw new Error(complexityError)
   migrateFlameVariationTypes(data)
   const dimensions = (data as { renderSettings?: { dimensions?: number } })
     ?.renderSettings?.dimensions
@@ -335,6 +487,11 @@ export function validateFlameWithErrors(
   data: unknown,
   errorCallback: (err: string) => void,
 ): FlameDescriptor | undefined {
+  const complexityError = flameComplexityError(data)
+  if (complexityError) {
+    errorCallback(complexityError)
+    return undefined
+  }
   migrateFlameVariationTypes(data)
   const dimensions = (data as { renderSettings?: { dimensions?: number } })
     ?.renderSettings?.dimensions
@@ -349,6 +506,8 @@ export function validateFlameWithErrors(
 }
 
 export function validateFlame3D(data: unknown): FlameDescriptor3D {
+  const complexityError = flameComplexityError(data)
+  if (complexityError) throw new Error(complexityError)
   migrateFlameVariationTypes(data)
   return parseFlame(schema3D.FlameDescriptor, data)
 }
@@ -358,6 +517,7 @@ export function tryValidateFlame(data: unknown): FlameDescriptor | undefined {
   // renamed variation types so older saves still parse, and dispatch to the 3D
   // schema for 3D flames so their a–l affines survive instead of being dropped
   // or stripped to 2D. Failure still returns undefined (caller drops the entry).
+  if (flameComplexityError(data)) return undefined
   migrateFlameVariationTypes(data)
   const dimensions = (data as { renderSettings?: { dimensions?: number } })
     ?.renderSettings?.dimensions

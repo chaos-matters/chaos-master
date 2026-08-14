@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js'
-import { notifyDocumentWrite } from '@/recorder/documentWriteHook'
+import { notifyDocumentWrite, notifyTimelineTransport, } from '@/recorder/documentWriteHook'
 import { applyEasing, catmullRom, clamp } from './easing'
 import { persistentSignal } from './persistentSignal'
 import { clearAllRedos, nextUndoSeq, registerRedoClearer } from './undoJournal'
@@ -712,6 +712,49 @@ export function createTimelineState() {
   // become a single undo step instead of one per keyframe.
   let undoGroupDepth = 0
   let undoGroupPushed = false
+  type TransientHistory = {
+    undo: UndoEntry[]
+    redo: UndoEntry[]
+    coalesceKey: string | null
+    undoGroupDepth: number
+    undoGroupPushed: boolean
+  }
+  let transientHistory: TransientHistory | undefined
+
+  /**
+   * Isolate replay's temporary timeline edits from the viewer's undo stacks.
+   * `loadTracks` is a document boundary and deliberately clears the active
+   * stacks; saving them here first means a replay can use that normal path and
+   * then hand the viewer's history back untouched when the batch commits.
+   */
+  function beginTransientHistory() {
+    if (transientHistory) return
+    transientHistory = {
+      undo: [...undoStack],
+      redo: [...redoStack],
+      coalesceKey,
+      undoGroupDepth,
+      undoGroupPushed,
+    }
+    undoStack.length = 0
+    redoStack.length = 0
+    coalesceKey = null
+    undoGroupDepth = 0
+    undoGroupPushed = false
+    touchStacks()
+  }
+
+  function endTransientHistory() {
+    const saved = transientHistory
+    if (!saved) return
+    transientHistory = undefined
+    undoStack.splice(0, Infinity, ...saved.undo)
+    redoStack.splice(0, Infinity, ...saved.redo)
+    coalesceKey = saved.coalesceKey
+    undoGroupDepth = saved.undoGroupDepth
+    undoGroupPushed = saved.undoGroupPushed
+    touchStacks()
+  }
 
   function breakUndoCoalescing() {
     coalesceKey = null
@@ -738,8 +781,16 @@ export function createTimelineState() {
       seq: nextUndoSeq(),
     })
     if (undoStack.length > MAX_TIMELINE_UNDO) undoStack.shift()
-    // Invalidates redo everywhere (this stack's own clearer included).
-    clearAllRedos()
+    // A replay runs against temporary stacks. Clearing the global journal here
+    // would destroy the viewer's flame redo before the replay is committed;
+    // the final combined flame entry invalidates restored redos once instead.
+    if (transientHistory) {
+      redoStack.length = 0
+      touchStacks()
+    } else {
+      // Invalidates redo everywhere (this stack's own clearer included).
+      clearAllRedos()
+    }
     touchStacks()
   }
 
@@ -1258,6 +1309,7 @@ export function createTimelineState() {
   }
 
   function advanceFrame() {
+    notifyTimelineTransport('Timeline frame transport')
     const cfg = config()
     // Sample the achieved rate between auto-FPS advances (each advance fires
     // when a frame hits target quality). Skip manual stepping (not playing).
@@ -1290,6 +1342,7 @@ export function createTimelineState() {
   }
 
   function goBackFrame() {
+    notifyTimelineTransport('Timeline frame transport')
     const cfg = config()
     const prev = currentFrame() - 1
     if (prev < cfg.startFrame) {
@@ -1301,11 +1354,13 @@ export function createTimelineState() {
   }
 
   function goToFrame(frame: number) {
+    notifyTimelineTransport('Timeline frame transport')
     setCurrentFrame(clamp(frame, config().startFrame, config().endFrame))
     setPreviewHeld(true)
   }
 
   function play() {
+    notifyTimelineTransport('Timeline playback transport')
     const cfg = config()
     if (!cfg.loop && currentFrame() >= cfg.endFrame) {
       setCurrentFrame(cfg.startFrame)
@@ -1316,11 +1371,13 @@ export function createTimelineState() {
   }
 
   function pause() {
+    notifyTimelineTransport('Timeline playback transport')
     setIsPlaying(false)
     resetFpsMeter()
   }
 
   function togglePlay() {
+    notifyTimelineTransport('Timeline playback transport')
     setIsPlaying(!isPlaying())
     resetFpsMeter()
   }
@@ -1613,6 +1670,8 @@ export function createTimelineState() {
     peekUndoSeq,
     peekRedoSeq,
     runWithSingleUndo,
+    beginTransientHistory,
+    endTransientHistory,
     breakUndoCoalescing,
     updateConfigUndoable,
   }

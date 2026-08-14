@@ -13,6 +13,8 @@ export interface TimelineSectionProps {
   flameDescriptor?: FlameDescriptor
   /** Reveals the sidebar's animation generator (Flame Randomizer card). */
   onOpenAnimationGenerator?: () => void
+  /** Routed through the command registry so recorder sessions see the edit. */
+  onSetAutoKeyframe?: (enabled: boolean) => void
 }
 
 import { TimelineSettings } from './TimelineSettings'
@@ -141,7 +143,12 @@ export function TimelineSection(props: TimelineSectionProps) {
               data-tour-target="auto-keyframe"
               onClick={(e) => {
                 e.stopPropagation()
-                timeline.setAutoKeyframe(!autoKeyframe())
+                const enabled = !autoKeyframe()
+                if (props.onSetAutoKeyframe) {
+                  props.onSetAutoKeyframe(enabled)
+                } else {
+                  timeline.setAutoKeyframe(enabled)
+                }
               }}
               title="Auto-keyframe: re-record animated parameters as you edit them"
             >

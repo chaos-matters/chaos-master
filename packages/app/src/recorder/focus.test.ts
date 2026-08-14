@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { focusHintFor, focusSelectors, resolveFocusElement } from './focus'
+import { describe, expect, it, vi } from 'vitest'
+import { focusHintFor, focusSelectors, resolveFocusElement, revealFocusElement, } from './focus'
 
 /**
  * The follow-cam's contract (docs/channel-content-plan.md §7): a recording
@@ -75,5 +75,20 @@ describe('resolveFocusElement', () => {
   it('resolves to null when nothing matches, so the overlay shows the canvas', () => {
     document.body.innerHTML = ''
     expect(resolveFocusElement('param:nothing-here')).toBeNull()
+  })
+
+  it('reveals an off-screen target through its nearest scroll containers', () => {
+    const element = document.createElement('button')
+    const scrollIntoView = vi.fn()
+    element.scrollIntoView = scrollIntoView
+
+    revealFocusElement(element)
+
+    expect(scrollIntoView).toHaveBeenCalledOnce()
+    expect(scrollIntoView).toHaveBeenCalledWith({
+      behavior: 'auto',
+      block: 'nearest',
+      inline: 'nearest',
+    })
   })
 })

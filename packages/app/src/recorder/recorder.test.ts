@@ -4,14 +4,15 @@ import '@/commands/builtins'
 import { createRoot, createSignal } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { vec2f } from 'typegpu/data'
-import { afterEach, describe, expect, it } from 'vitest'
-import { executeCommand } from '@/commands/registry'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { executeCommand, executeReplayCommand } from '@/commands/registry'
 import { examples } from '@/flame/examples'
 import { deepClone } from '@/utils/clone'
 import { createStoreHistory } from '@/utils/createStoreHistory'
-import { cancelSessionRecording, notePreviewStarted, recordedActionCount, reportDocumentWrite, startSessionRecording, stopSessionRecording, unnamedWriteCount, withRecordingSuppressed, } from './recorder'
+import { createTimelineState } from '@/utils/timeline'
+import { cancelSessionRecording, lastFinishedSession, notePreviewStarted, recordedActionCount, recordSyntheticAction, reportDocumentWrite, reportTimelineWrite, reportUnreplayableOnce, startSessionRecording, stopSessionRecording, unnamedWriteCount, withRecordingSuppressed, } from './recorder'
 import { replaySessionInstant } from './replay'
-import { parseSession, serializeSession, sessionFilename } from './schema'
+import { MAX_ACTION_ARGS, MAX_ACTION_TIMESTAMP_MS, MAX_SESSION_ACTIONS, MAX_SESSION_JSON_CHARS, parseSession, serializeSession, sessionFilename, validateSession, } from './schema'
 import type { RecordedSession } from './schema'
 import type { CommandContext } from '@/commands/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -116,7 +117,7 @@ function replayIntoWorld(
   session: RecordedSession,
   world: ReturnType<typeof makeHeadlessWorld>,
 ) {
-  replaySessionInstant(session, {
+  return replaySessionInstant(session, {
     loadInitial: (f) => {
       world.history.replace(f, 'Replay: initial state')
     },
@@ -134,6 +135,7 @@ function stopOrThrow(): RecordedSession {
 
 afterEach(() => {
   cancelSessionRecording()
+  vi.restoreAllMocks()
 })
 
 describe('record → replay round-trip', () => {
@@ -293,7 +295,7 @@ describe('record → replay round-trip', () => {
     })
   })
 
-  it('records and replays undo as a command', () => {
+  it('records undo as the resulting snapshot so batched replay stays faithful', () => {
     createRoot((dispose) => {
       const a = makeHeadlessWorld(examples.example1)
       const originalGamma = a.flame.renderSettings.gamma
@@ -305,8 +307,11 @@ describe('record → replay round-trip', () => {
       expect(a.flame.renderSettings.gamma).toBe(originalGamma)
       expect(session.actions.map((x) => x.id)).toEqual([
         'flame.setGamma',
-        'history.undo',
+        'flame.load',
       ])
+      expect(
+        (session.actions[1]?.args[0] as FlameDescriptor).renderSettings.gamma,
+      ).toBe(originalGamma)
       // Undo/redo move the stacks without pushing entries — they must NOT
       // show up as unnamed writes.
       expect(session.unnamedWriteCount).toBe(0)
@@ -979,6 +984,17 @@ describe('palette and document-load commands', () => {
       dispose()
     })
   })
+
+  it('refuses hostile bulk render settings and final transforms', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      const before = deepClone(world.flame)
+      executeCommand('flame.updateRenderSettings', world.ctx, { camera: null })
+      executeCommand('flame.setFinalTransform', world.ctx, {})
+      expect(deepClone(world.flame)).toEqual(before)
+      dispose()
+    })
+  })
 })
 
 describe('undo that reaches outside the recorded session', () => {
@@ -1000,19 +1016,44 @@ describe('undo that reaches outside the recorded session', () => {
     })
   })
 
-  it('flags an undo routed to the timeline (not part of the document)', () => {
+  it('captures the resulting workspace when undo is routed to the timeline', () => {
     createRoot((dispose) => {
       const world = makeHeadlessWorld(examples.example1)
       let undone = false
+      const timelineSnapshot = {
+        config: {
+          fps: 30,
+          timeScale: 1,
+          startFrame: 0,
+          endFrame: 90,
+          loop: true,
+        },
+        tracks: [],
+      }
       const ctx: CommandContext = {
         ...world.ctx,
+        timeline: {
+          ...world.ctx.timeline,
+          edit: {
+            removeKeyframe: () => {},
+            setKeyframeValue: () => {},
+            setKeyframeInterp: () => {},
+            moveKeyframe: () => {},
+            removeTrack: () => {},
+            clearTracks: () => {},
+            setLoopMode: () => {},
+            setAutoKeyframe: () => {},
+            snapshot: () => timelineSnapshot,
+            load: () => {},
+          },
+        },
         history: {
           undo: () => {
             undone = true
           },
           redo: () => {},
           // What the router reports after, say, a keyframe drag.
-          peekUndoTarget: () => ({ system: 'timeline', seq: 9999 }),
+          peekUndoTarget: () => ({ system: 'timeline', seq: 1_000_000 }),
         },
       }
       startSessionRecording(world.flame)
@@ -1020,8 +1061,11 @@ describe('undo that reaches outside the recorded session', () => {
       const session = stopOrThrow()
 
       expect(undone).toBe(true)
-      expect(session.actions).toEqual([])
-      expect(session.unnamedWriteCount).toBe(1)
+      expect(session.actions.map((action) => action.id)).toEqual([
+        'recorder.restoreWorkspaceSnapshot',
+      ])
+      expect(session.actions[0]?.args[1]).toEqual(timelineSnapshot)
+      expect(session.unnamedWriteCount).toBe(0)
       dispose()
     })
   })
@@ -1042,6 +1086,28 @@ describe('undo that reaches outside the recorded session', () => {
 })
 
 describe('coverage ratchet — unnamed writes', () => {
+  it('reports a high-rate unreplayable effect only once per take', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      startSessionRecording(world.flame)
+
+      for (let frame = 0; frame < 300; frame++) {
+        reportUnreplayableOnce(
+          'live-audio-modulation',
+          'Live audio modulation is not embedded',
+        )
+        world.history.setSilently((draft) => {
+          draft.renderSettings.exposure = frame / 300
+        })
+      }
+
+      expect(world.history.hasUndo()).toBe(false)
+      expect(unnamedWriteCount()).toBe(1)
+      expect(stopOrThrow().unnamedWriteCount).toBe(1)
+      dispose()
+    })
+  })
+
   it('attributes command writes, counts direct writes as unnamed', () => {
     createRoot((dispose) => {
       const world = makeHeadlessWorld(examples.example1)
@@ -1074,6 +1140,121 @@ describe('coverage ratchet — unnamed writes', () => {
   })
 })
 
+describe('untrusted replay command preflight', () => {
+  it('marks wall-clock timeline transport unreplayable', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      startSessionRecording(world.flame)
+      executeCommand('timeline.play', world.ctx)
+      const session = stopOrThrow()
+
+      expect(session.actions).toEqual([])
+      expect(session.unnamedWriteCount).toBe(1)
+      expect(executeReplayCommand('timeline.play', world.ctx)).toBe(false)
+      dispose()
+    })
+  })
+
+  it('rejects unknown commands and attacker-sized symmetry before normalize', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      expect(executeReplayCommand('future.command', world.ctx)).toBe(false)
+      expect(
+        executeReplayCommand(
+          'flame.applySymmetry',
+          world.ctx,
+          1_000_000_000,
+          'rotational',
+        ),
+      ).toBe(false)
+      expect(Object.keys(world.flame.transforms)).toEqual(
+        Object.keys(examples.example1.transforms),
+      )
+      expect(
+        executeReplayCommand(
+          'flame.applySymmetry',
+          world.ctx,
+          3,
+          'rotational',
+          [
+            ['duplicate-transform', 'variation-a'],
+            ['duplicate-transform', 'variation-b'],
+          ],
+        ),
+      ).toBe(false)
+      dispose()
+    })
+  })
+
+  it('accepts bounded symmetry edges and rejects imported history commands', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      expect(
+        executeReplayCommand(
+          'flame.applySymmetry',
+          world.ctx,
+          64,
+          'rotational',
+          Array.from({ length: 63 }, (_, index) => [
+            `_sym__${index}`,
+            `variation_${index}`,
+          ]),
+        ),
+      ).toBe(true)
+      expect(Object.keys(world.flame.transforms)).toHaveLength(
+        Object.keys(examples.example1.transforms).length + 63,
+      )
+      expect(executeReplayCommand('history.undo', world.ctx)).toBe(false)
+      dispose()
+    })
+  })
+
+  it('rejects oversized generator configs before entering generator loops', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      expect(
+        executeReplayCommand('flame.randomize', world.ctx, 42, {
+          strength: 0.5,
+          minTransforms: 1,
+          maxTransforms: 1_000_000_000,
+          minVariations: 1,
+          maxVariations: 2,
+          allowedVariations: [],
+          dimensions: 2,
+        }),
+      ).toBe(false)
+      expect(deepClone(world.flame)).toEqual(deepClone(examples.example1))
+      expect(
+        executeReplayCommand('flame.randomize', world.ctx, 42.5, {
+          strength: 0.5,
+          minTransforms: 1,
+          maxTransforms: 2,
+          minVariations: 1,
+          maxVariations: 2,
+          allowedVariations: [],
+          dimensions: 2,
+        }),
+      ).toBe(false)
+      dispose()
+    })
+  })
+
+  it('preflights structural load commands instead of accepting a silent no-op', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      expect(executeReplayCommand('flame.load', world.ctx, {})).toBe(false)
+      expect(
+        executeReplayCommand('timeline.loadTimeline', world.ctx, {
+          config: { fps: 30 },
+          tracks: [],
+        }),
+      ).toBe(false)
+      expect(deepClone(world.flame)).toEqual(deepClone(examples.example1))
+      dispose()
+    })
+  })
+})
+
 describe('suppression', () => {
   it('ignores commands and writes inside withRecordingSuppressed', () => {
     createRoot((dispose) => {
@@ -1094,7 +1275,7 @@ describe('suppression', () => {
     })
   })
 
-  it('does not re-record a replay running during an active recording', () => {
+  it('refuses to replay while a recording is active', () => {
     createRoot((dispose) => {
       const a = makeHeadlessWorld(examples.example1)
       startSessionRecording(a.flame)
@@ -1103,13 +1284,71 @@ describe('suppression', () => {
 
       const b = makeHeadlessWorld(examples.initExample)
       startSessionRecording(b.flame)
-      replayIntoWorld(session, b)
+      expect(replayIntoWorld(session, b)).toBe(false)
       const second = stopOrThrow()
       expect(second.actions).toEqual([])
       expect(second.unnamedWriteCount).toBe(0)
-      expect(b.flame.renderSettings.gamma).toBe(3.7)
+      expect(deepClone(b.flame)).toEqual(deepClone(examples.initExample))
       dispose()
     })
+  })
+})
+
+describe('live recording persistence budgets', () => {
+  it('keeps at most the schema action limit and reports one fidelity marker', () => {
+    startSessionRecording(examples.example1)
+    for (let index = 0; index < MAX_SESSION_ACTIONS + 3; index++) {
+      recordSyntheticAction('flame.setGamma', [index])
+    }
+
+    const session = stopOrThrow()
+    expect(session.actions).toHaveLength(MAX_SESSION_ACTIONS)
+    expect(session.unnamedWriteCount).toBe(1)
+    expect(validateSession(session)).toBeDefined()
+  })
+
+  it('drops schema-oversized actions without letting repeated events flood markers', () => {
+    startSessionRecording(examples.example1)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      recordSyntheticAction(
+        'flame.setGamma',
+        Array(MAX_ACTION_ARGS + 1).fill(attempt),
+      )
+    }
+
+    const session = stopOrThrow()
+    expect(session.actions).toEqual([])
+    expect(session.unnamedWriteCount).toBe(1)
+    expect(validateSession(session)).toBeDefined()
+  })
+
+  it('drops actions after the timestamp limit with one fidelity marker', () => {
+    const now = vi.spyOn(globalThis.performance, 'now').mockReturnValue(1000)
+    startSessionRecording(examples.example1)
+    now.mockReturnValue(1000 + MAX_ACTION_TIMESTAMP_MS + 1)
+
+    recordSyntheticAction('flame.setGamma', [2])
+    recordSyntheticAction('flame.setExposure', [0.5])
+
+    const session = stopOrThrow()
+    expect(session.actions).toEqual([])
+    expect(session.unnamedWriteCount).toBe(1)
+    expect(validateSession(session)).toBeDefined()
+  })
+
+  it('rejects an action that would exceed the whole-session JSON budget', () => {
+    startSessionRecording(examples.example1)
+    recordSyntheticAction('flame.setGamma', [
+      'x'.repeat(MAX_SESSION_JSON_CHARS),
+    ])
+
+    const session = stopOrThrow()
+    expect(session.actions).toEqual([])
+    expect(session.unnamedWriteCount).toBe(1)
+    expect(serializeSession(session).length).toBeLessThanOrEqual(
+      MAX_SESSION_JSON_CHARS,
+    )
+    expect(validateSession(session)).toBeDefined()
   })
 })
 
@@ -1173,6 +1412,34 @@ describe('.steps.json serialization', () => {
         }),
       ),
     ).toBeUndefined()
+    expect(
+      parseSession(
+        serializeSession({
+          ...session,
+          actions: [{ t: 0, id: 'history.undo', args: [] }],
+        }),
+      ),
+    ).toBeUndefined()
+    expect(
+      parseSession(
+        serializeSession({
+          ...session,
+          actions: [{ t: 0, id: 'flame.setGamma', args: Array(65).fill(1) }],
+        }),
+      ),
+    ).toBeUndefined()
+    expect(
+      parseSession(
+        serializeSession({
+          ...session,
+          actions: Array.from({ length: 2001 }, () => ({
+            t: 0,
+            id: 'flame.setGamma',
+            args: [2],
+          })),
+        }),
+      ),
+    ).toBeUndefined()
   })
 
   it('derives safe filenames', () => {
@@ -1214,16 +1481,26 @@ describe('session start state beyond the flame', () => {
     source: 'file' as const,
     trackName: 'track.mp3',
   }
+  const view = {
+    qualityPreset: 'high',
+    adaptiveFilter: true,
+    stochasticFilter: false,
+    flyMode: false,
+    showTimeline: true,
+    sidebarOpen: true,
+  }
 
-  it('carries the timeline and the audio wiring through a round trip', () => {
-    startSessionRecording(examples.example1, { timeline, audio })
+  it('carries timeline, audio, and view state through a round trip', () => {
+    startSessionRecording(examples.example1, { timeline, audio, view })
     const session = stopSessionRecording()!
     expect(session.initialTimeline).toEqual(timeline)
     expect(session.initialAudio).toEqual(audio)
+    expect(session.initialView).toEqual(view)
 
     const parsed = parseSession(serializeSession(session))
     expect(parsed?.initialTimeline).toEqual(timeline)
     expect(parsed?.initialAudio).toEqual(audio)
+    expect(parsed?.initialView).toEqual(view)
   })
 
   it('refuses a hand-edited mapping that would write nonsense every frame', () => {
@@ -1256,6 +1533,55 @@ describe('session start state beyond the flame', () => {
     const session = stopSessionRecording()!
     expect(session.initialTimeline).toBeUndefined()
     expect(parseSession(serializeSession(session))).toBeDefined()
+  })
+})
+
+describe('finished-session export association', () => {
+  const finishSession = () => {
+    startSessionRecording(examples.example1)
+    return stopSessionRecording()!
+  }
+
+  it('clears after a later flame or timeline document write', () => {
+    finishSession()
+    expect(lastFinishedSession()).toBeDefined()
+    reportDocumentWrite('later flame edit')
+    expect(lastFinishedSession()).toBeUndefined()
+
+    finishSession()
+    reportTimelineWrite('later timeline edit')
+    expect(lastFinishedSession()).toBeUndefined()
+  })
+
+  it('clears after a later command, but not when opening export', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      finishSession()
+      executeCommand('export.png', world.ctx)
+      expect(lastFinishedSession()).toBeDefined()
+
+      executeCommand('sidebar.open', world.ctx, true)
+      expect(lastFinishedSession()).toBeUndefined()
+      dispose()
+    })
+  })
+
+  it('tracks direct timeline transport without flooding the recording', () => {
+    const timeline = createTimelineState()
+
+    finishSession()
+    timeline.goToFrame(12)
+    expect(lastFinishedSession()).toBeUndefined()
+
+    startSessionRecording(examples.example1)
+    timeline.goToFrame(20)
+    timeline.togglePlay()
+    timeline.advanceFrame()
+    timeline.pause()
+
+    const session = stopOrThrow()
+    expect(session.actions).toEqual([])
+    expect(session.unnamedWriteCount).toBe(1)
   })
 })
 

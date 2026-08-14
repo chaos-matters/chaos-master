@@ -29,6 +29,12 @@ registerCommand({
     const count = parsed.output.mappings.length
     return `Wire audio: ${parsed.output.preset} (${count} target${count === 1 ? '' : 's'})`
   },
+  validateReplayArgs(args) {
+    if (args.length !== 1) return 'audio wiring expects one mapping'
+    return v.safeParse(AudioMapping, args[0]).success
+      ? undefined
+      : 'audio mapping is invalid'
+  },
   execute(ctx, mapping?: unknown) {
     // Validated here rather than trusted: a mapping drives writes into the
     // descriptor by transform index and key on every audio frame, so a

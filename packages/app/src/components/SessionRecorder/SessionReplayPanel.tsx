@@ -1,6 +1,8 @@
 import { createSignal, For, onCleanup, Show } from 'solid-js'
 import { createStore, unwrap } from 'solid-js/store'
+import { ChevronLeft, ChevronRight, Focus, Pause, Pencil, PlayPause, SkipBack, } from '@/icons'
 import { createSessionPlayer, PLAYBACK_SPEEDS } from '@/recorder/player'
+import { MAX_ACTION_HOLD_MS, MAX_ACTION_NOTE_CHARS, validateSession, } from '@/recorder/schema'
 import { deepClone } from '@/utils/clone'
 import { followCamEnabled, setFollowCamEnabled } from './recorderUi'
 import { ReplaySpotlight } from './ReplaySpotlight'
@@ -61,7 +63,7 @@ export function SessionReplayPanel(props: {
       <Show when={followCamEnabled()}>
         <ReplaySpotlight
           action={player.currentAction()}
-          playing={player.isPlaying()}
+          finished={player.isFinished()}
         />
       </Show>
       <div class={styles.header}>
@@ -95,22 +97,27 @@ export function SessionReplayPanel(props: {
         <button
           type="button"
           class={styles.button}
+          classList={{ [styles.transportIconButton as string]: true }}
           onClick={() => {
             player.seek(-1)
           }}
           title="Back to the starting flame"
+          aria-label="Back to the starting flame"
         >
-          ⏮
+          <SkipBack class={styles.buttonIcon} aria-hidden="true" />
         </button>
         <button
           type="button"
           class={styles.button}
+          classList={{ [styles.transportIconButton as string]: true }}
           onClick={() => {
             player.seek(player.stepIndex() - 1)
           }}
           disabled={player.stepIndex() < 0}
+          title="Previous step"
+          aria-label="Previous step"
         >
-          ◀
+          <ChevronLeft class={styles.buttonIcon} aria-hidden="true" />
         </button>
         <Show
           when={player.isPlaying()}
@@ -122,8 +129,10 @@ export function SessionReplayPanel(props: {
                 player.play()
               }}
               disabled={player.total === 0}
+              title="Play replay"
             >
-              ▶ Play
+              <PlayPause class={styles.buttonIcon} aria-hidden="true" />
+              <span>Play</span>
             </button>
           }
         >
@@ -133,19 +142,24 @@ export function SessionReplayPanel(props: {
             onClick={() => {
               player.pause()
             }}
+            title="Pause replay"
           >
-            ⏸ Pause
+            <Pause class={styles.buttonIcon} aria-hidden="true" />
+            <span>Pause</span>
           </button>
         </Show>
         <button
           type="button"
           class={styles.button}
+          classList={{ [styles.transportIconButton as string]: true }}
           onClick={() => {
             player.seek(player.stepIndex() + 1)
           }}
           disabled={player.stepIndex() >= player.total - 1}
+          title="Next step"
+          aria-label="Next step"
         >
-          ▶|
+          <ChevronRight class={styles.buttonIcon} aria-hidden="true" />
         </button>
         <button
           type="button"
@@ -160,8 +174,13 @@ export function SessionReplayPanel(props: {
               : 'Follow-cam off — replay without the spotlight and captions'
           }
           aria-pressed={followCamEnabled()}
+          aria-label={
+            followCamEnabled()
+              ? 'Disable replay follow-cam'
+              : 'Enable replay follow-cam'
+          }
         >
-          ◎
+          <Focus class={styles.buttonIcon} aria-hidden="true" />
         </button>
         <Show when={props.compact !== true}>
           <select
@@ -178,6 +197,14 @@ export function SessionReplayPanel(props: {
           </select>
         </Show>
       </div>
+
+      <Show when={player.lastError()}>
+        {(message) => (
+          <div class={styles.replayError} role="alert">
+            {message()}. The replay stopped before applying this step.
+          </div>
+        )}
+      </Show>
 
       <Show when={props.compact !== true}>
         <ol class={styles.steps}>
@@ -212,7 +239,7 @@ export function SessionReplayPanel(props: {
                     title="Write a caption and set how long to hold this step"
                     aria-label="Edit step caption"
                   >
-                    ✎
+                    <Pencil class={styles.stepEditIcon} aria-hidden="true" />
                   </button>
                 </div>
                 <Show when={editing() === index()}>
@@ -220,9 +247,15 @@ export function SessionReplayPanel(props: {
                     <input
                       class={styles.noteInput}
                       value={action.note ?? ''}
+                      maxLength={MAX_ACTION_NOTE_CHARS}
                       placeholder={action.label ?? action.id}
                       onInput={(ev) => {
-                        const text = ev.currentTarget.value
+                        // `maxLength` covers ordinary typing; slicing also
+                        // covers paste/programmatic input consistently.
+                        const text = ev.currentTarget.value.slice(
+                          0,
+                          MAX_ACTION_NOTE_CHARS,
+                        )
                         setSession(
                           'actions',
                           index(),
@@ -238,6 +271,7 @@ export function SessionReplayPanel(props: {
                         class={styles.holdInput}
                         type="number"
                         min={0}
+                        max={MAX_ACTION_HOLD_MS}
                         step={100}
                         value={action.holdMs ?? ''}
                         placeholder="auto"
@@ -248,9 +282,12 @@ export function SessionReplayPanel(props: {
                             'actions',
                             index(),
                             'holdMs',
-                            raw === '' || !Number.isFinite(parsed) || parsed < 0
+                            raw === '' || !Number.isFinite(parsed)
                               ? undefined
-                              : parsed,
+                              : Math.min(
+                                  MAX_ACTION_HOLD_MS,
+                                  Math.max(0, parsed),
+                                ),
                           )
                         }}
                         title="Milliseconds to hold before the next step (blank = the pace it was recorded at)"
@@ -269,7 +306,11 @@ export function SessionReplayPanel(props: {
               type="button"
               class={styles.button}
               onClick={() => {
-                save()(deepClone(unwrap(session)))
+                // The controls above constrain authored fields, and this
+                // store-boundary check makes the guarantee explicit even if a
+                // future editor adds another field without matching limits.
+                const validated = validateSession(deepClone(unwrap(session)))
+                if (validated !== undefined) save()(validated)
               }}
               title="Save the captions and holds as a new recording"
             >

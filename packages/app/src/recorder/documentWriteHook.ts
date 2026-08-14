@@ -15,8 +15,10 @@
  */
 
 type DocumentWriteReporter = (description?: string) => void
+type TimelineTransportReporter = (description: string) => void
 
 let reporter: DocumentWriteReporter | undefined
+let transportReporter: TimelineTransportReporter | undefined
 
 export function setDocumentWriteReporter(fn: DocumentWriteReporter): void {
   reporter = fn
@@ -24,4 +26,16 @@ export function setDocumentWriteReporter(fn: DocumentWriteReporter): void {
 
 export function notifyDocumentWrite(description?: string): void {
   reporter?.(description)
+}
+
+/** Timeline transport does not push an undo entry, but it still changes the
+ * visible workspace and therefore the fidelity/ownership of a recording. */
+export function setTimelineTransportReporter(
+  fn: TimelineTransportReporter,
+): void {
+  transportReporter = fn
+}
+
+export function notifyTimelineTransport(description: string): void {
+  transportReporter?.(description)
 }

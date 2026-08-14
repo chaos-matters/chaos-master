@@ -4,12 +4,10 @@ Companion to `docs/plans/semantic-recorder-plan.md`. That plan says how the
 recorder works; this says **which controls it actually captures today**, and
 what a recording still misses.
 
-Scanned across the whole app: every `setFlameDescriptor` / `history.replace`
-call site in `MainWorkspace.tsx`, every component holding a `HistorySetter`
-or `useChangeHistory`, plus the audio, animation-export and timeline paths.
-Counts as of this revision: **4 direct `setFlameDescriptor` + 5
-`history.replace`** remain in `MainWorkspace.tsx`, all of them deliberate
-(see the second table).
+Coverage includes the flame document, the timeline's separate history, audio
+wiring, viewport state and cross-system undo/redo. Direct setters still exist
+for derived animation/export writes and preview copies; those are deliberately
+not user actions.
 
 ## How to read it
 
@@ -37,9 +35,9 @@ editor behaves; it only changes whether a session can replay it.
 | Blend / morph   | pick partner, clear partner, blend weight, morph setup                                                                                                                                                                                                                                                                                         | `flame.setBlendFlame`, `flame.setBlendWeight`, `flame.setupMorph`                                                                                                   |
 | Symmetry        | rotational and dihedral, n-fold; per-transform angle, show/hide and remove in the symmetry list                                                                                                                                                                                                                                                | `flame.applySymmetry`                                                                                                                                               |
 | Document        | new flame, open saved flame, load from history, load a bred child, randomise, mutate, apply a random gallery flame; flame name / author / description                                                                                                                                                                                          | `flame.load`                                                                                                                                                        |
-| Undo / redo     | toolbar buttons and Ctrl+Z / Ctrl+Y                                                                                                                                                                                                                                                                                                            | `history.undo`, `history.redo`                                                                                                                                      |
+| Undo / redo     | toolbar buttons and Ctrl+Z / Ctrl+Y                                                                                                                                                                                                                                                                                                            | captured as the resulting `flame.load` or `recorder.restoreWorkspaceSnapshot`, so replay never depends on the viewer's private history stacks                       |
 | Final transform | set / clear                                                                                                                                                                                                                                                                                                                                    | `flame.setFinalTransform`                                                                                                                                           |
-| Timeline        | animation on/off, play, current frame, duration, fps, loop, loop mode, auto-keyframe, add / remove / move keyframe, keyframe value, keyframe interpolation, remove track, clear all, whole-animation load                                                                                                                                      | `timeline.*` (13 commands)                                                                                                                                          |
+| Timeline        | animation on/off, current frame, duration, fps, loop, loop mode, auto-keyframe, add / remove / move keyframe, keyframe value, keyframe interpolation, remove track, clear all, whole-animation load                                                                                                                                            | `timeline.*`; wall-clock Play/Pause transport is intentionally excluded                                                                                             |
 | Audio wiring    | preset choice, every per-target row (feature, target, sensitivity, range, attack/release), reactivity on/off, file vs microphone                                                                                                                                                                                                               | `audio.setMapping`, `audio.setEnabled`, `audio.setSource`                                                                                                           |
 | Viewport        | quality preset, adaptive filter, stochastic filter, fly mode, timeline panel show/hide                                                                                                                                                                                                                                                         | `view.*`                                                                                                                                                            |
 | 2D ↔ 3D switch  | the toolbar toggle                                                                                                                                                                                                                                                                                                                             | recorded as `flame.load` + `timeline.loadTimeline` carrying the restored state                                                                                      |
@@ -48,20 +46,15 @@ editor behaves; it only changes whether a session can replay it.
 
 Each of these raises the unnamed-write count when used during a recording.
 
-| Area              | Control                                         | Why it is still open                                                                                                                                                                                                                                  |
-| ----------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Startup           | Home hand-off, shared-URL apply, backup restore | Run before or around a recording rather than during one; the workspace-remount flag already marks a recording that spans one. Low priority.                                                                                                           |
-| Tours             | `tour:restore` snapshot                         | Deliberate — tour machinery, not a user edit.                                                                                                                                                                                                         |
-| Audio             | the audio **file** itself                       | A buffer cannot ride in a JSON session. The wiring replays; the session records the track's NAME (`initialAudio.trackName`) so a replay can say which file to supply. Replay does not switch reactivity on unless audio is already loaded.            |
-| Audio             | per-frame modulation writes                     | See finding 1 below — an undo bug in its own right, not a recorder gap.                                                                                                                                                                               |
-| Custom variations | the WGSL/maths **code editor**                  | Plan defers this: a code edit does not decompose into small commands. Intended shape is one `variation.setCode` action per committed edit.                                                                                                            |
-| Timeline          | undo/redo _of_ a timeline edit                  | Timeline edits now record and replay, and the session carries `initialTimeline`. What is still refused is a recorded UNDO that lands on the timeline's separate stack: it is detected and reported as unreplayable rather than silently mis-replayed. |
-| Curve editor      | bezier handle drags                             | The handles write through the timeline's own path rather than `timeline.setKeyframeValue`; they now RAISE the unnamed-write count (before this pass they were invisible), so a recording says so honestly.                                            |
-
-Four `setFlameDescriptor` and five `history.replace` calls remain in
-`MainWorkspace.tsx`, all in the rows above — two of them being the raw
-fallback setters the editors keep for preview copies, which never fire in the
-workspace itself.
+| Area              | Control                                         | Why it is still open                                                                                                                                                                                                   |
+| ----------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Startup           | Home hand-off, shared-URL apply, backup restore | Run before or around a recording rather than during one; the workspace-remount flag already marks a recording that spans one. Low priority.                                                                            |
+| Tours             | `tour:restore` snapshot                         | Deliberate — tour machinery, not a user edit.                                                                                                                                                                          |
+| Audio             | the audio **file** itself                       | A buffer cannot ride in a JSON session. The wiring and required track name replay, but reactivity only enables when the matching file is already loaded (or an existing live microphone analyser is available).        |
+| Audio             | per-frame modulation writes                     | Derived writes use the silent history path, so they no longer flood undo. A recording that uses live modulation receives one deduplicated fidelity warning because audio bytes and playback position are not embedded. |
+| Custom variations | the WGSL/maths **code editor**                  | Plan defers this: a code edit does not decompose into small commands. Intended shape is one `variation.setCode` action per committed edit.                                                                             |
+| Timeline          | wall-clock Play/Pause transport                 | Playback timing is hardware-driven state, not an authored edit. Replay pauses a running timeline before applying steps, records timeline data and playhead state, and never restarts wall-clock playback during undo.  |
+| Curve editor      | bezier handle drags                             | The handles write through the timeline's own path rather than `timeline.setKeyframeValue`; they now RAISE the unnamed-write count (before this pass they were invisible), so a recording says so honestly.             |
 
 **The timeline is now watched.** Its `pushUndo` reports to the recorder the
 same way the flame history's `onEntryPushed` does, so an uncovered timeline
@@ -69,15 +62,12 @@ edit raises the unnamed-write count instead of being invisible. Before this
 pass a session could claim "0 unnamed writes" while half the app went
 unrecorded — the count was a statement about the flame document only.
 
-## Two findings worth acting on
+## Resolved performance and fidelity findings
 
-**1. Audio-reactive modulation writes per frame through the real setter.**
-`utils/useAudioReactive.ts` calls `setFlameDescriptor` on every audio tick.
-That pushes a history entry per frame, so it floods undo _and_ would flood a
-recording with unnamed writes. `history.setSilently` exists for exactly this
-case (its own doc comment names derived, non-user writes) and is what the
-animation exporter uses. Recommend switching it — this is an undo bug in its
-own right, independent of recording.
+**1. Audio-reactive modulation no longer writes 30 history entries per
+second.** It now uses `history.setSilently`, invalidates stale export-session
+metadata, and raises at most one unreplayable marker per take. Long audio runs
+therefore keep undo and recorder memory bounded.
 
 **2. ~~Wheel zoom logs one action per tick.~~ Fixed.** The original diagnosis
 here was wrong: `WheelZoomCamera2D`/`3D` do bracket a whole gesture in one
@@ -104,11 +94,13 @@ Three ways to bring a session back:
   offers the session against whatever is open. Dropping one of our PNGs or
   MP4s loads the flame _and_ offers its session.
 
-Everything that arrives from outside goes through the same validation: an
-unknown format version or an initial flame that fails the schema is refused,
-and each command validates its own arguments (paths against the schema
-vocabulary, affines by exact key set and finiteness). A hostile file can at
-worst produce an odd-looking flame; nothing in a session is executable.
+Everything that arrives from outside is data, never code. The loader caps raw
+and decompressed session sizes, action/argument counts, nesting and string
+budgets, validates the initial flame/timeline/audio schemas, and preflights all
+commands before loading the session's starting state. Unknown, wall-clock or
+invalid actions abort without touching the workspace. High-risk structural
+commands (load, symmetry, randomize/mutate and timeline/audio snapshots) add
+their own exact shape and allocation bounds.
 
 ## The follow-cam
 
@@ -134,8 +126,10 @@ A hint that resolves to nothing — a collapsed card, a closed panel, or a
 camera move whose payoff IS the picture — clears the overlay and shows the
 whole canvas.
 
-Toggle it with `◎` in the replay transport. It is a mode, not a behaviour:
-the editor never dims itself while you work, only during a replay.
+When a resolved control is outside a scrollable sidebar, follow-cam reveals it
+with `scrollIntoView({ block: 'nearest' })` before positioning the spotlight.
+The focus button in the replay transport toggles this mode; the editor never
+dims itself while you work, only during a replay.
 
 ## Authored captions and pacing
 
@@ -145,11 +139,11 @@ All three are in:
 | Field     | What it does                                                                                        |
 | --------- | --------------------------------------------------------------------------------------------------- |
 | `note`    | An authored caption that overrides the derived label. "shear it sideways", not "Set gamma to 2.42". |
-| `holdMs`  | How long to hold the step, overriding the measured gap. Pacing is authorial, so it is not clamped.  |
+| `holdMs`  | How long to hold the step, overriding the measured gap (validated up to ten minutes).               |
 | `focus`   | The follow-cam hint above.                                                                          |
 | `initial` | Already present — the defined starting state both sides of a duel need.                             |
 
-Edit them with the `✎` on any step in the replay list; **Save captions**
+Edit them with the pencil button on any step in the replay list; **Save captions**
 writes the result to the library as a new entry, leaving the raw take alone.
 
 ## The dock (recorder UI)
@@ -158,12 +152,12 @@ Everything lives in one dock in the bottom-left: the record pill, and above it
 the replay and library panels it opens.
 
 - **Show/hide** — the record-dot toggle in the FloatingActions toolbar, or the
-  dock's own `×`. Hiding is refused while a recording is running, so the Stop
+  dock's close button. Hiding is refused while a recording is running, so the Stop
   button can never disappear mid-take.
-- **Collapse (`▾`/`▴`)** — drops the step list and the library, keeping the pill
+- **Collapse** — the chevron button drops the step list and the library, keeping the pill
   and the replay transport. This is the answer to a loaded session covering a
   third of the canvas; playback still works collapsed.
-- **Transparency (`◐`)** — a resting-opacity slider plus a "fade" checkbox that
+- **Transparency** — the half-circle button opens a resting-opacity slider plus a "fade" checkbox that
   dims the dock while the canvas is animating or an export is running, so it
   stays out of a screen recording. Hovering or focusing the dock always brings
   it back to full opacity, whatever the slider says.
@@ -178,8 +172,9 @@ the replay and library panels it opens.
   the document as it was at that moment.
 - To embed steps in an export, stop the recording first — the export picks up
   the **last finished** session.
-- `unnamedWriteCount` in the saved file is the honest measure of that
-  session's fidelity. Zero means the replay is exact.
+- `unnamedWriteCount` in the saved file is the honest measure of untracked
+  editor writes. Zero means all editor actions were represented; a matching
+  external audio source is still required when the take used one.
 
 ## Housekeeping worth knowing about
 

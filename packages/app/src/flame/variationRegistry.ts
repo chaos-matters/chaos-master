@@ -28,7 +28,7 @@ export function variationTypesFor(
  */
 export function isVariationTypeFor(dims: Dims, t: string): boolean {
   const reg = getVariationRegistry(dims)
-  return t in reg
+  return Object.hasOwn(reg, t)
 }
 
 /**

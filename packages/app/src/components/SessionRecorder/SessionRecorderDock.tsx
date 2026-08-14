@@ -1,4 +1,5 @@
 import { createSignal, onCleanup, onMount, Show } from 'solid-js'
+import { ChevronDown, CircleHalf, Cross } from '@/icons'
 import { isSessionRecording } from '@/recorder/recorder'
 import { storeSession } from '@/utils/sessionsDB'
 import { clampRecorderOpacity, FADED_RECORDER_OPACITY, MIN_RECORDER_OPACITY, recorderCollapsed, recorderFadeOnPlayback, recorderOffset, recorderOpacity, setRecorderCollapsed, setRecorderFadeOnPlayback, setRecorderOffset, setRecorderOpacity, setRecorderVisible, } from './recorderUi'
@@ -176,7 +177,9 @@ export function SessionRecorderDock(props: {
         )}
       </Show>
 
-      <Show when={libraryOpen() && !recorderCollapsed()}>
+      <Show
+        when={libraryOpen() && !recorderCollapsed() && !isSessionRecording()}
+      >
         <SessionLibraryPanel
           revision={libraryRevision()}
           onReplay={(session) => {
@@ -207,20 +210,22 @@ export function SessionRecorderDock(props: {
           <span class={styles.gripDots} />
         </button>
 
-        <SessionRecorderControls
-          flameDescriptor={props.flameDescriptor}
-          startExtras={props.startExtras}
-          onOpenSession={props.onSessionChange}
-          onSessionStored={() => {
-            setLibraryRevision((n) => n + 1)
-            setLibraryOpen(true)
-            setRecorderCollapsed(false)
-          }}
-          onToggleLibrary={() => {
-            setLibraryOpen((open) => !open)
-            setRecorderCollapsed(false)
-          }}
-        />
+        <Show when={props.session === undefined}>
+          <SessionRecorderControls
+            flameDescriptor={props.flameDescriptor}
+            startExtras={props.startExtras}
+            onOpenSession={props.onSessionChange}
+            onSessionStored={() => {
+              setLibraryRevision((n) => n + 1)
+              setLibraryOpen(true)
+              setRecorderCollapsed(false)
+            }}
+            onToggleLibrary={() => {
+              setLibraryOpen((open) => !open)
+              setRecorderCollapsed(false)
+            }}
+          />
+        </Show>
 
         <Show when={showOpacitySlider()}>
           <input
@@ -263,7 +268,7 @@ export function SessionRecorderDock(props: {
           title="Transparency"
           aria-label="Transparency"
         >
-          ◐
+          <CircleHalf class={styles.icon} aria-hidden="true" />
         </button>
 
         <button
@@ -281,7 +286,11 @@ export function SessionRecorderDock(props: {
             recorderCollapsed() ? 'Expand recorder' : 'Collapse recorder'
           }
         >
-          {recorderCollapsed() ? '▴' : '▾'}
+          <ChevronDown
+            class={styles.icon}
+            classList={{ [styles.chevronUp as string]: recorderCollapsed() }}
+            aria-hidden="true"
+          />
         </button>
 
         <button
@@ -298,7 +307,7 @@ export function SessionRecorderDock(props: {
           }
           aria-label="Hide recorder"
         >
-          ×
+          <Cross class={styles.icon} aria-hidden="true" />
         </button>
       </div>
     </div>

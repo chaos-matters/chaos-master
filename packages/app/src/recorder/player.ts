@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js'
 import { deepClone } from '@/utils/clone'
-import { withRecordingSuppressed } from './recorder'
+import { isSessionRecording, withRecordingSuppressed } from './recorder'
 import { loadSessionStart } from './replay'
 import type { ReplayTarget } from './replay'
 import type { RecordedAction, RecordedSession } from './schema'
@@ -46,6 +46,9 @@ export type SessionPlayer = {
    *  follow-cam reads to know where to point and what to caption. */
   readonly currentAction: () => RecordedAction | undefined
   readonly isPlaying: () => boolean
+  readonly isFinished: () => boolean
+  /** Human-readable reason the last action was rejected, if any. */
+  readonly lastError: () => string | undefined
   readonly total: number
 }
 
@@ -57,6 +60,7 @@ export type SessionPlayerOptions = {
    */
   speed?: () => number
   onFinished?: () => void
+  onError?: (message: string) => void
 }
 
 export function createSessionPlayer(
@@ -67,6 +71,8 @@ export function createSessionPlayer(
   const actions = session.actions
   const [stepIndex, setStepIndex] = createSignal(-1)
   const [isPlaying, setIsPlaying] = createSignal(false)
+  const [isFinished, setIsFinished] = createSignal(false)
+  const [lastError, setLastError] = createSignal<string>()
   let timer: ReturnType<typeof setTimeout> | undefined
   let batchOpen = false
   /**
@@ -94,25 +100,82 @@ export function createSessionPlayer(
     target.endBatch?.()
   }
 
-  /** Apply one action. Suppressed so an active recording never absorbs it. */
-  function applyAction(index: number) {
-    const action = actions[index]
-    if (!action) return
-    withRecordingSuppressed(() => {
-      target.execute(action.id, deepClone(action.args))
-    })
-    setStepIndex(index)
+  function rejectAction(index: number, error?: unknown): false {
+    const detail = error instanceof Error ? `: ${error.message}` : ''
+    const message = `Step ${index + 1} could not be replayed${detail}`
+    console.warn(`[recorder] ${message}`, error)
+    setLastError(message)
+    setIsPlaying(false)
+    setIsFinished(false)
+    clearTimer()
+    closeBatch()
+    options.onError?.(message)
+    return false
   }
 
-  function rebuildTo(index: number) {
-    withRecordingSuppressed(() => {
-      loadSessionStart(session, target)
-    })
+  function rejectBeforeStart(index: number, reason: string): false {
+    const step = index >= 0 ? `Step ${index + 1}: ` : ''
+    const message = `${step}${reason}`
+    setLastError(message)
+    setIsPlaying(false)
+    setIsFinished(false)
+    clearTimer()
+    closeBatch()
+    options.onError?.(message)
+    return false
+  }
+
+  function preflight(): boolean {
+    if (isSessionRecording()) {
+      return rejectBeforeStart(
+        -1,
+        'Stop the active recording before starting a replay',
+      )
+    }
+    for (let index = 0; index < actions.length; index++) {
+      const action = actions[index]!
+      const reason = target.preflight?.(action.id, action.args)
+      if (reason !== undefined) return rejectBeforeStart(index, reason)
+    }
+    return true
+  }
+
+  /** Apply one action. Suppressed so an active recording never absorbs it. */
+  function applyAction(index: number): boolean {
+    const action = actions[index]
+    if (!action) return false
+    if (isSessionRecording()) {
+      return rejectAction(
+        index,
+        new Error('Stop the active recording before continuing replay'),
+      )
+    }
+    try {
+      const accepted = withRecordingSuppressed(
+        () => target.execute(action.id, deepClone(action.args)) !== false,
+      )
+      if (!accepted) return rejectAction(index)
+    } catch (error) {
+      return rejectAction(index, error)
+    }
+    setStepIndex(index)
+    return true
+  }
+
+  function rebuildTo(index: number): boolean {
+    try {
+      withRecordingSuppressed(() => {
+        loadSessionStart(session, target)
+      })
+    } catch (error) {
+      return rejectAction(Math.max(0, index), error)
+    }
     baselineLoaded = true
     setStepIndex(-1)
     for (let i = 0; i <= index; i++) {
-      applyAction(i)
+      if (!applyAction(i)) return false
     }
+    return true
   }
 
   /**
@@ -137,13 +200,14 @@ export function createSessionPlayer(
     const next = stepIndex() + 1
     if (next >= actions.length) {
       setIsPlaying(false)
+      setIsFinished(true)
       closeBatch()
       options.onFinished?.()
       return
     }
     timer = setTimeout(() => {
       if (!isPlaying()) return
-      applyAction(next)
+      if (!applyAction(next)) return
       scheduleNext()
     }, gapBefore(next))
   }
@@ -156,13 +220,16 @@ export function createSessionPlayer(
   return {
     play() {
       if (isPlaying() || actions.length === 0) return
+      setIsFinished(false)
+      setLastError(undefined)
+      if (!preflight()) return
       // Load the flame the session was recorded against before the first step
       // (otherwise the steps land on the viewer's own document), and start
       // over when Play is pressed on the last step — so the button always does
       // something rather than sitting dead at the end.
       if (!baselineLoaded || stepIndex() >= actions.length - 1) {
         openBatch()
-        rebuildTo(-1)
+        if (!rebuildTo(-1)) return
       }
       openBatch()
       setIsPlaying(true)
@@ -171,6 +238,7 @@ export function createSessionPlayer(
     pause() {
       if (!isPlaying()) return
       setIsPlaying(false)
+      setIsFinished(false)
       clearTimer()
       // Commit what has been applied: undo becomes available again, and the
       // user can edit on from here (the "fork from step N" case).
@@ -178,6 +246,9 @@ export function createSessionPlayer(
     },
     seek(index) {
       clearTimer()
+      setIsFinished(false)
+      setLastError(undefined)
+      if (!preflight()) return
       const clamped = Math.min(
         actions.length - 1,
         Math.max(-1, Math.floor(index)),
@@ -188,11 +259,13 @@ export function createSessionPlayer(
         // Rebuilding from `initial` here would make stepping through a
         // 200-step session quadratic — and visibly flicker, since each step
         // would reload the initial flame before replaying up to it.
-        for (let i = stepIndex() + 1; i <= clamped; i++) applyAction(i)
+        for (let i = stepIndex() + 1; i <= clamped; i++) {
+          if (!applyAction(i)) return
+        }
       } else {
         // Backwards, or re-seeking the step we are on — which is how the user
         // discards their own edits and gets the recorded state back.
-        rebuildTo(clamped)
+        if (!rebuildTo(clamped)) return
       }
       if (isPlaying()) {
         scheduleNext()
@@ -202,12 +275,15 @@ export function createSessionPlayer(
     },
     stop() {
       setIsPlaying(false)
+      setIsFinished(false)
       clearTimer()
       closeBatch()
     },
     stepIndex,
     currentAction: () => actions[stepIndex()],
     isPlaying,
+    isFinished,
+    lastError,
     total: actions.length,
   }
 }

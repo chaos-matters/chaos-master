@@ -1,6 +1,6 @@
 import { validateSession } from '@/recorder/schema'
 import { asciiBytes, readAscii, readUint32BE, writeUint32BE, } from './binaryReader'
-import { coerceFlamePayload, compressJsonQueryParam, concatBuffers, decompressJsonValue, } from './jsonQueryParam'
+import { coerceFlamePayload, compressJsonQueryParam, concatBuffers, decompressJsonValue, MAX_COMPRESSED_JSON_BYTES, } from './jsonQueryParam'
 import type { SharePayload } from './jsonQueryParam'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { RecordedSession } from '@/recorder/schema'
@@ -217,8 +217,17 @@ export function extractMetadataFromMp4(mp4Buffer: ArrayBuffer): Promise<{
         if (udtaChildType === 'flm3') {
           const payloadOffset = udtaChildOffset + BOX_HEADER_SIZE
           const payloadLength = udtaChildSize - BOX_HEADER_SIZE
+          if (payloadLength > MAX_COMPRESSED_JSON_BYTES) {
+            throw new Error(
+              `Compressed JSON exceeds ${MAX_COMPRESSED_JSON_BYTES} bytes`,
+            )
+          }
+          // View the already-loaded MP4 only after bounding the metadata box;
+          // do not duplicate a hostile payload before validation.
           const payload = new Uint8Array(
-            mp4Buffer.slice(payloadOffset, payloadOffset + payloadLength),
+            mp4Buffer,
+            payloadOffset,
+            payloadLength,
           )
           return decodeFlm3Payload(payload)
         }

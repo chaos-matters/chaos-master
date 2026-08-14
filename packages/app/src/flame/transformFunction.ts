@@ -63,7 +63,7 @@ export function createFlameWgsl({
   // accepts 3D type names, which have no 2D implementation to resolve.
   const validVariations = Object.fromEntries(
     Object.entries(variations).filter(([, v]) => {
-      if (v.type in transformVariations) return true
+      if (Object.hasOwn(transformVariations, v.type)) return true
       if (!isVariationType3D(v.type)) {
         console.warn(
           `[createFlameWgsl] skipping unsupported variation type "${v.type}"`,
@@ -168,7 +168,10 @@ export function extractFlameUniforms({
                     | undefined
                   // Must mirror the createFlameWgsl filter — the uniform
                   // buffer layout has to match the generated struct.
-                  return vtype !== undefined && vtype in transformVariations
+                  return (
+                    vtype !== undefined &&
+                    Object.hasOwn(transformVariations, vtype)
+                  )
                 })
                 .map(([vid, variation]) => {
                   const {
@@ -213,9 +216,7 @@ export function extractFlameUniforms({
                   } else {
                     if (rest.params) {
                       typed.params = { ...rest.params }
-                    } else if (
-                      'params' in (variation as Record<string, unknown>)
-                    ) {
+                    } else if (Object.hasOwn(variation, 'params')) {
                       console.warn(
                         `[extractFlameUniforms] ${variationType} has params but NOT recognized as parametric. rest.params:`,
                         rest.params,

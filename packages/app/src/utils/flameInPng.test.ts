@@ -1,8 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { parseFlameXml } from '@/flame/flameXml'
 import { calculateCRC32 } from './crc32'
 import { addFlameDataToPng, extractFlameFromPng, extractStepsFromPng, } from './flameInPng'
-import { compressJsonQueryParam } from './jsonQueryParam'
+import { compressJsonQueryParam, decompressJsonValue, MAX_COMPRESSED_JSON_BYTES, } from './jsonQueryParam'
 
 const SIMPLE_FLAME_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <flame name="Simple Test" version="Apophysis 7X" size="800 600"
@@ -33,6 +33,53 @@ function concat(parts: Uint8Array[]): Uint8Array {
 }
 
 describe('flameInPng', () => {
+  it('aborts decompression before an embedded JSON payload can expand unbounded', async () => {
+    const compressed = await compressJsonQueryParam({
+      text: 'highly-compressible'.repeat(100),
+    })
+    await expect(decompressJsonValue(compressed, 32)).rejects.toThrow(
+      /exceeds 32 bytes/i,
+    )
+  })
+
+  it('rejects an oversized compressed payload before opening a decompressor', async () => {
+    const createStream = vi.fn()
+    vi.stubGlobal('DecompressionStream', createStream)
+    try {
+      await expect(
+        decompressJsonValue(new Uint8Array(MAX_COMPRESSED_JSON_BYTES + 1)),
+      ).rejects.toThrow(/compressed JSON exceeds/i)
+      expect(createStream).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('actively aborts a decompressor that stops making progress', async () => {
+    vi.useFakeTimers()
+    const abortSpy = vi.spyOn(AbortController.prototype, 'abort')
+    class StalledDecompressionStream {
+      readonly readable = new ReadableStream<Uint8Array>({})
+      readonly writable = new WritableStream<Uint8Array>({
+        write: () => new Promise<void>(() => undefined),
+      })
+    }
+    vi.stubGlobal('DecompressionStream', StalledDecompressionStream)
+    try {
+      const result = decompressJsonValue(new Uint8Array([1]))
+      const rejection = expect(result).rejects.toThrow(
+        /decompression timed out after 5s/i,
+      )
+      await vi.advanceTimersByTimeAsync(5000)
+      await rejection
+      expect(abortSpy).toHaveBeenCalled()
+    } finally {
+      abortSpy.mockRestore()
+      vi.unstubAllGlobals()
+      vi.useRealTimers()
+    }
+  })
+
   it('round-trips flame data embedded in a PNG', async () => {
     const flame = parseFlameXml(SIMPLE_FLAME_XML)
     const encoded = await compressJsonQueryParam(flame)

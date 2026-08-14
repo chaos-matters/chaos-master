@@ -3,6 +3,7 @@ import { examples } from '@/flame/examples'
 import { asciiBytes } from './binaryReader'
 import { deepClone } from './clone'
 import { createMetadataPayload, extractMetadataFromMp4, injectMetadataIntoMp4, } from './flameInMp4'
+import { MAX_COMPRESSED_JSON_BYTES } from './jsonQueryParam'
 import { defaultConfig } from './timeline'
 import type { RecordedSession } from '@/recorder/schema'
 
@@ -82,5 +83,17 @@ describe('flameInMp4 — embedded session (M5)', () => {
     // still there, and there is simply nothing to replay.
     expect(extracted?.flame).toBeDefined()
     expect(extracted?.session).toBeUndefined()
+  })
+
+  it('rejects oversized metadata before copying or decompressing it', () => {
+    const oversized = box('flm3', new Uint8Array(MAX_COMPRESSED_JSON_BYTES + 1))
+    const mp4 = concat([
+      box('ftyp', new Uint8Array(8)),
+      box('moov', box('udta', oversized)),
+    ])
+
+    expect(() =>
+      extractMetadataFromMp4(mp4.buffer.slice(0) as ArrayBuffer),
+    ).toThrow(/compressed JSON exceeds/i)
   })
 })

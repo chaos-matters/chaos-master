@@ -25,6 +25,13 @@
   }
 }
 
+.button-icon {
+  display: block;
+  width: 0.9rem;
+  height: 0.9rem;
+  flex: none;
+}
+
 .live {
   display: inline-flex;
   align-items: center;

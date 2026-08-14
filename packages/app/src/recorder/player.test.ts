@@ -7,6 +7,7 @@ import { examples } from '@/flame/examples'
 import { deepClone } from '@/utils/clone'
 import { createStoreHistory } from '@/utils/createStoreHistory'
 import { createSessionPlayer, MAX_STEP_GAP_MS } from './player'
+import { cancelSessionRecording, startSessionRecording } from './recorder'
 import { SESSION_FORMAT_VERSION } from './schema'
 import type { RecordedAction, RecordedSession } from './schema'
 import type { CommandContext } from '@/commands/types'
@@ -85,6 +86,7 @@ beforeEach(() => {
   vi.useFakeTimers()
 })
 afterEach(() => {
+  cancelSessionRecording()
   vi.useRealTimers()
 })
 
@@ -302,6 +304,113 @@ describe('createSessionPlayer', () => {
       expect(flame.renderSettings.gamma).toBeCloseTo(2.5, 5)
       history.undo()
       expect(deepClone(flame)).toEqual(deepClone(examples.initExample))
+      dispose()
+    })
+  })
+
+  it('stops and closes the undo batch when an action is rejected', () => {
+    createRoot((dispose) => {
+      const world = makeTarget(examples.initExample)
+      const execute = world.target.execute
+      let calls = 0
+      const target = {
+        ...world.target,
+        execute: (id: string, args: unknown[]) => {
+          calls++
+          if (calls === 2) return false
+          execute(id, args)
+        },
+      }
+      const player = createSessionPlayer(gammaSteps, target)
+
+      player.play()
+      vi.advanceTimersByTime(1000)
+
+      expect(player.isPlaying()).toBe(false)
+      expect(player.stepIndex()).toBe(0)
+      expect(player.lastError()).toContain('Step 2')
+      expect(world.history.isPreviewing()).toBe(false)
+      dispose()
+    })
+  })
+
+  it('does not touch the target while a recording is active', () => {
+    createRoot((dispose) => {
+      const world = makeTarget(examples.initExample)
+      startSessionRecording(examples.example1)
+      const player = createSessionPlayer(gammaSteps, world.target)
+
+      player.play()
+      player.seek(1)
+
+      expect(world.loaded()).toBe(0)
+      expect(world.history.isPreviewing()).toBe(false)
+      expect(player.lastError()).toContain('Stop the active recording')
+      dispose()
+    })
+  })
+
+  it('aborts safely if a recording starts between timed replay steps', () => {
+    createRoot((dispose) => {
+      const world = makeTarget(examples.initExample)
+      const player = createSessionPlayer(gammaSteps, world.target)
+
+      player.play()
+      vi.advanceTimersByTime(0)
+      expect(player.stepIndex()).toBe(0)
+
+      startSessionRecording(world.flame)
+      vi.advanceTimersByTime(100)
+
+      expect(player.isPlaying()).toBe(false)
+      expect(player.stepIndex()).toBe(0)
+      expect(player.lastError()).toContain('Stop the active recording')
+      expect(world.history.isPreviewing()).toBe(false)
+      dispose()
+    })
+  })
+
+  it('closes an open replay batch when a recording blocks a seek', () => {
+    createRoot((dispose) => {
+      const world = makeTarget(examples.initExample)
+      const player = createSessionPlayer(gammaSteps, world.target)
+
+      player.play()
+      vi.advanceTimersByTime(0)
+      expect(world.history.isPreviewing()).toBe(true)
+      expect(player.stepIndex()).toBe(0)
+
+      startSessionRecording(world.flame)
+      player.seek(2)
+
+      expect(player.isPlaying()).toBe(false)
+      expect(player.stepIndex()).toBe(0)
+      expect(player.lastError()).toContain('Stop the active recording')
+      expect(world.history.isPreviewing()).toBe(false)
+
+      vi.advanceTimersByTime(10_000)
+      expect(player.stepIndex()).toBe(0)
+      dispose()
+    })
+  })
+
+  it('preflights every action before opening a batch or loading state', () => {
+    createRoot((dispose) => {
+      const world = makeTarget(examples.initExample)
+      const target = {
+        ...world.target,
+        preflight: (_id: string, args: readonly unknown[]) =>
+          args[0] === 2.5 ? 'test rejection' : undefined,
+      }
+      const player = createSessionPlayer(gammaSteps, target)
+
+      player.seek(2)
+
+      expect(world.loaded()).toBe(0)
+      expect(world.history.isPreviewing()).toBe(false)
+      expect(world.committed()).toBe(0)
+      expect(player.stepIndex()).toBe(-1)
+      expect(player.lastError()).toContain('Step 2: test rejection')
       dispose()
     })
   })

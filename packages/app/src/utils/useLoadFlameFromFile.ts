@@ -1,5 +1,5 @@
 import { useAlert } from '@/components/Modal/useAlert'
-import { parseSession, validateSession } from '@/recorder/schema'
+import { MAX_SESSION_JSON_CHARS, parseSession, validateSession, } from '@/recorder/schema'
 import { extractMetadataFromMp4 } from './flameInMp4'
 import { extractFlameFromPng, extractStepsFromPng } from './flameInPng'
 import type { SharePayload } from './jsonQueryParam'
@@ -27,6 +27,12 @@ export function useLoadFlameFromFile() {
   async function loadFromFile(
     file: File,
   ): Promise<FlameLoadResult | undefined> {
+    const isJson =
+      file.type === 'application/json' || file.name.endsWith('.json')
+    if (isJson && file.size > MAX_SESSION_JSON_CHARS) {
+      await alert(`'${file.name}' is too large to load as a steps session.`)
+      return
+    }
     if (file.size > MAX_DROPPED_FILE_SIZE) {
       await alert(`'${file.name}' is too large to load.`)
       return
@@ -42,7 +48,7 @@ export function useLoadFlameFromFile() {
     // the caller gets one to replay against whatever is open. Validated the
     // same way as a session from a PNG: unknown format versions and initial
     // flames that fail the schema are refused.
-    if (file.type === 'application/json' || file.name.endsWith('.json')) {
+    if (isJson) {
       const session = parseSession(new TextDecoder().decode(arrBuf))
       if (session) return { session }
       await alert(`No valid flame or steps found in '${file.name}'.`)

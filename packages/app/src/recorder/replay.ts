@@ -1,9 +1,52 @@
 import { deepClone } from '@/utils/clone'
-import { withRecordingSuppressed } from './recorder'
-import type { RecordedSession } from './schema'
+import { isSessionRecording, withRecordingSuppressed } from './recorder'
+import type { RecordedSession, SessionViewSnapshot } from './schema'
 import type { AudioWiringSnapshot } from '@/flame/schema/audioWiring'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineSnapshot } from '@/flame/schema/timeline'
+
+export type ReplayAudioResources = {
+  hasFileBuffer: boolean
+  currentTrackName?: string
+  hasLiveAnalyzer: boolean
+}
+
+/**
+ * A session stores audio wiring, not audio bytes or microphone permission.
+ * Never relabel and reuse an unrelated file merely because some buffer is
+ * loaded; only enable the wiring when the required resource is truly present.
+ */
+export function canEnableReplayAudio(
+  audio: AudioWiringSnapshot,
+  resources: ReplayAudioResources,
+): boolean {
+  if (!audio.enabled) return false
+  if (audio.source === 'mic') return resources.hasLiveAnalyzer
+  return (
+    resources.hasFileBuffer &&
+    (audio.trackName === undefined ||
+      audio.trackName === resources.currentTrackName)
+  )
+}
+
+export type ReplayAudioTarget = {
+  setMapping: (mapping: AudioWiringSnapshot['mapping']) => void
+  setSource: (source: AudioWiringSnapshot['source']) => void
+  setEnabled: (enabled: boolean) => void
+}
+
+/** Apply only serializable wiring. Resource identity is intentionally absent
+ * from the target: replay cannot rename or replace the file/microphone that
+ * the viewer actually loaded. */
+export function applyReplayAudioWiring(
+  audio: AudioWiringSnapshot,
+  resources: ReplayAudioResources,
+  target: ReplayAudioTarget,
+): void {
+  target.setMapping(deepClone(audio.mapping))
+  target.setSource(audio.source)
+  target.setEnabled(canEnableReplayAudio(audio, resources))
+}
 
 /**
  * Where a session is replayed INTO. Deliberately not a `CommandContext`:
@@ -28,7 +71,11 @@ export type ReplayTarget = {
    */
   loadTimeline?: (timeline: TimelineSnapshot) => void
   loadAudio?: (audio: AudioWiringSnapshot) => void
-  execute: (id: string, args: unknown[]) => void
+  loadView?: (view: SessionViewSnapshot) => void
+  /** False rejects an untrusted action and aborts the replay. */
+  execute: (id: string, args: unknown[]) => unknown
+  /** Validate canonical action args without touching workspace state. */
+  preflight?: (id: string, args: readonly unknown[]) => string | undefined
   /**
    * Bracket a run of applied actions so the whole thing lands as ONE undoable
    * step. The workspace maps these to the history's `startPreview`/`commit`;
@@ -51,13 +98,25 @@ export type ReplayTarget = {
 export function replaySessionInstant(
   session: RecordedSession,
   target: ReplayTarget,
-): void {
-  withRecordingSuppressed(() => {
-    loadSessionStart(session, target)
-    for (const action of session.actions) {
-      target.execute(action.id, deepClone(action.args))
-    }
-  })
+): boolean {
+  if (isSessionRecording()) return false
+  for (const action of session.actions) {
+    if (target.preflight?.(action.id, action.args) !== undefined) return false
+  }
+  target.beginBatch?.()
+  try {
+    return withRecordingSuppressed(() => {
+      loadSessionStart(session, target)
+      for (const action of session.actions) {
+        if (target.execute(action.id, deepClone(action.args)) === false) {
+          return false
+        }
+      }
+      return true
+    })
+  } finally {
+    target.endBatch?.()
+  }
 }
 
 /** Put the target into the state the session was recorded from: flame, then
@@ -73,5 +132,8 @@ export function loadSessionStart(
   }
   if (session.initialAudio && target.loadAudio) {
     target.loadAudio(deepClone(session.initialAudio))
+  }
+  if (session.initialView && target.loadView) {
+    target.loadView(deepClone(session.initialView))
   }
 }

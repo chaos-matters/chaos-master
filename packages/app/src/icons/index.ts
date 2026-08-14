@@ -5,12 +5,16 @@ import BoxArrowRight from './box-arrow-right.svg'
 import CameraIcon from './camera.svg'
 import Changelog from './changelog.svg'
 import ChevronDown from './chevron-down.svg'
+import ChevronLeft from './chevron-left.svg'
+import ChevronRight from './chevron-right.svg'
+import CircleHalf from './circle-half.svg'
 import Copy from './copy.svg'
 import Cross from './cross.svg'
 import Discord from './discord.svg'
 import Download from './download.svg'
 import Eye from './eye.svg'
 import EyeOff from './eye-off.svg'
+import Focus from './focus.svg'
 import FolderOpen from './folder-open.svg'
 import GitHub from './github.svg'
 import Globe from './globe.svg'
@@ -25,6 +29,7 @@ import Menu from './menu.svg'
 import Minus from './minus.svg'
 import MusicNote from './music-note.svg'
 import Pause from './pause.svg'
+import Pencil from './pencil.svg'
 import PlayPause from './play-pause.svg'
 import Plus from './plus.svg'
 import Redo from './redo.svg'
@@ -48,6 +53,9 @@ export {
   CameraIcon,
   Changelog,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  CircleHalf,
   Copy,
   Cross,
   Discord,
@@ -55,6 +63,7 @@ export {
   Eye,
   EyeOff,
   FolderOpen,
+  Focus,
   GitHub,
   Globe,
   GridIcon,
@@ -68,6 +77,7 @@ export {
   Minus,
   MusicNote,
   Pause,
+  Pencil,
   PlayPause,
   Plus,
   Redo,

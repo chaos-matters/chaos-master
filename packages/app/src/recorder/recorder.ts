@@ -3,10 +3,10 @@ import { latestSchemaVersion } from '@/flame/schema/flameSchema'
 import { deepClone } from '@/utils/clone'
 import { currentUndoSeq } from '@/utils/undoJournal'
 import { VERSION } from '@/version'
-import { setDocumentWriteReporter } from './documentWriteHook'
+import { setDocumentWriteReporter, setTimelineTransportReporter, } from './documentWriteHook'
 import { focusHintFor } from './focus'
-import { SESSION_FORMAT_VERSION } from './schema'
-import type { RecordedAction, RecordedSession } from './schema'
+import { MAX_ACTION_TIMESTAMP_MS, MAX_SESSION_ACTIONS, MAX_SESSION_FILE_BYTES, MAX_SESSION_JSON_CHARS, serializeSession, SESSION_FORMAT_VERSION, validateRecordedAction, validateSession, } from './schema'
+import type { RecordedAction, RecordedSession, SessionViewSnapshot, } from './schema'
 import type { FlameCommand } from '@/commands/types'
 import type { AudioWiringSnapshot } from '@/flame/schema/audioWiring'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -49,8 +49,18 @@ type ActiveRecording = {
   initial: FlameDescriptor
   initialTimeline?: TimelineSnapshot
   initialAudio?: AudioWiringSnapshot
+  initialView?: SessionViewSnapshot
   actions: RecordedAction[]
+  /** Compact encoded lengths let the hot recording path enforce the 8 MiB
+   * session budget without serializing the initial flame after every click. */
+  actionJsonChars: number[]
+  actionJsonCharsTotal: number
+  /** Compact size of this session with an empty action list and zero unnamed
+   * writes. Action and counter deltas are added to this baseline. */
+  baseJsonChars: number
   unnamedWrites: { t: number; description?: string }[]
+  /** High-frequency effects report once per take instead of once per frame. */
+  unreplayableKeys: Set<string>
 }
 
 /**
@@ -65,6 +75,7 @@ type ActiveRecording = {
 export type SessionStartExtras = {
   timeline?: TimelineSnapshot
   audio?: AudioWiringSnapshot
+  view?: SessionViewSnapshot
 }
 
 let active: ActiveRecording | undefined
@@ -114,6 +125,144 @@ function elapsedMs(rec: ActiveRecording): number {
   return Math.max(0, globalThis.performance.now() - rec.startedAt)
 }
 
+function sessionFrom(rec: ActiveRecording): RecordedSession {
+  return {
+    version: SESSION_FORMAT_VERSION,
+    app: { version: VERSION, flameSchemaVersion: latestSchemaVersion },
+    createdAt: rec.createdAt,
+    initial: rec.initial,
+    initialTimeline: rec.initialTimeline,
+    initialAudio: rec.initialAudio,
+    initialView: rec.initialView,
+    actions: rec.actions,
+    unnamedWriteCount: rec.unnamedWrites.length,
+  }
+}
+
+/** Size of the compact JSON validated by schema.ts. `baseJsonChars` already
+ * includes the `[]` brackets around an empty action list; adding actions only
+ * adds their bodies and the commas between them. */
+function compactSessionChars(rec: ActiveRecording): number {
+  return (
+    rec.baseJsonChars +
+    rec.actionJsonCharsTotal +
+    Math.max(0, rec.actions.length - 1) +
+    String(rec.unnamedWrites.length).length -
+    1
+  )
+}
+
+function candidateCompactSessionChars(
+  rec: ActiveRecording,
+  actionChars: number,
+  replacingIndex?: number,
+): number {
+  if (replacingIndex === undefined) {
+    return (
+      compactSessionChars(rec) +
+      actionChars +
+      (rec.actions.length === 0 ? 0 : 1)
+    )
+  }
+  return (
+    compactSessionChars(rec) -
+    (rec.actionJsonChars[replacingIndex] ?? 0) +
+    actionChars
+  )
+}
+
+/** A cap can be hit by many subsequent events. One honesty marker per take is
+ * enough to tell the author replay is incomplete without turning a held key
+ * or runaway effect into thousands of identical warnings. */
+function noteSessionBudgetExceeded(rec: ActiveRecording, reason: string): void {
+  const key = 'session-persistence-budget'
+  if (rec.unreplayableKeys.has(key)) return
+  rec.unreplayableKeys.add(key)
+  noteUnnamedWrite(rec, reason)
+}
+
+type ActionSnapshot = { action: RecordedAction; jsonChars: number }
+
+function snapshotAction(
+  rec: ActiveRecording,
+  action: Omit<RecordedAction, 'args'> & { args: readonly unknown[] },
+  replacingIndex?: number,
+): ActionSnapshot | undefined {
+  const observedTime = elapsedMs(rec)
+  if (
+    !Number.isFinite(observedTime) ||
+    observedTime > MAX_ACTION_TIMESTAMP_MS
+  ) {
+    noteSessionBudgetExceeded(
+      rec,
+      'Recording exceeded the 24-hour session timestamp limit',
+    )
+    return undefined
+  }
+  if (
+    replacingIndex === undefined &&
+    rec.actions.length >= MAX_SESSION_ACTIONS
+  ) {
+    noteSessionBudgetExceeded(
+      rec,
+      `Recording exceeded the ${MAX_SESSION_ACTIONS}-step session limit`,
+    )
+    return undefined
+  }
+
+  let candidate: RecordedAction | undefined
+  try {
+    candidate = validateRecordedAction({
+      ...action,
+      args: deepClone([...action.args]),
+    })
+  } catch {
+    candidate = undefined
+  }
+  if (candidate === undefined) {
+    noteSessionBudgetExceeded(
+      rec,
+      'An action exceeded the session schema limits and was not recorded',
+    )
+    return undefined
+  }
+
+  const encoded = JSON.stringify(candidate)
+  if (
+    candidateCompactSessionChars(rec, encoded.length, replacingIndex) >
+    MAX_SESSION_JSON_CHARS
+  ) {
+    noteSessionBudgetExceeded(
+      rec,
+      'Recording reached the session file-size limit',
+    )
+    return undefined
+  }
+  return { action: candidate, jsonChars: encoded.length }
+}
+
+function removeAction(rec: ActiveRecording, index: number): void {
+  rec.actions.splice(index, 1)
+  const [removedChars = 0] = rec.actionJsonChars.splice(index, 1)
+  rec.actionJsonCharsTotal -= removedChars
+  setRecordedActionCount(rec.actions.length)
+}
+
+function persistedSession(
+  session: RecordedSession,
+): RecordedSession | undefined {
+  const validated = validateSession(session)
+  if (validated === undefined) return undefined
+  const serialized = serializeSession(validated)
+  if (serialized.length > MAX_SESSION_JSON_CHARS) return undefined
+  if (
+    new TextEncoder().encode(serialized).byteLength > MAX_SESSION_FILE_BYTES
+  ) {
+    return undefined
+  }
+  return validated
+}
+
 /** Begin recording. Everything passed is cloned, never held — pass the full
  *  current document (NOT condensed: hidden transforms must survive into
  *  replay). */
@@ -125,18 +274,38 @@ export function startSessionRecording(
     console.warn('[recorder] A session recording is already active.')
     return
   }
-  active = {
-    startedAt: globalThis.performance.now(),
-    createdAt: new Date().toISOString(),
-    baselineSeq: currentUndoSeq(),
-    initial: deepClone(initial),
-    initialTimeline:
-      extras.timeline === undefined ? undefined : deepClone(extras.timeline),
-    initialAudio:
-      extras.audio === undefined ? undefined : deepClone(extras.audio),
-    actions: [],
-    unnamedWrites: [],
+  let next: ActiveRecording
+  try {
+    next = {
+      startedAt: globalThis.performance.now(),
+      createdAt: new Date().toISOString(),
+      baselineSeq: currentUndoSeq(),
+      initial: deepClone(initial),
+      initialTimeline:
+        extras.timeline === undefined ? undefined : deepClone(extras.timeline),
+      initialAudio:
+        extras.audio === undefined ? undefined : deepClone(extras.audio),
+      initialView:
+        extras.view === undefined ? undefined : deepClone(extras.view),
+      actions: [],
+      actionJsonChars: [],
+      actionJsonCharsTotal: 0,
+      baseJsonChars: 0,
+      unnamedWrites: [],
+      unreplayableKeys: new Set(),
+    }
+  } catch {
+    console.warn('[recorder] The current workspace cannot be serialized.')
+    return
   }
+  next.baseJsonChars = JSON.stringify(sessionFrom(next)).length
+  if (persistedSession(sessionFrom(next)) === undefined) {
+    console.warn(
+      '[recorder] The current workspace exceeds the recording session limits.',
+    )
+    return
+  }
+  active = next
   resetGestureState()
   setRecordedActionCount(0)
   setUnnamedWriteCount(0)
@@ -155,22 +324,36 @@ export function lastFinishedSession(): RecordedSession | undefined {
   return lastSession()
 }
 
+/** Detach export metadata as soon as the workspace no longer matches it. */
+export function invalidateLastFinishedSession(): void {
+  if (lastSession() !== undefined) setLastSession(undefined)
+}
+
 export function stopSessionRecording(): RecordedSession | undefined {
   if (!active) return undefined
-  const session: RecordedSession = {
-    version: SESSION_FORMAT_VERSION,
-    app: { version: VERSION, flameSchemaVersion: latestSchemaVersion },
-    createdAt: active.createdAt,
-    initial: active.initial,
-    initialTimeline: active.initialTimeline,
-    initialAudio: active.initialAudio,
-    actions: active.actions,
-    unnamedWriteCount: active.unnamedWrites.length,
+  // Compact validation is enforced while recording. Pretty-printed downloads
+  // and UTF-8 can be slightly larger, so trim only the newest actions until
+  // the exact persisted form also fits. Earlier steps remain a valid prefix,
+  // and the single fidelity marker says the tail was omitted.
+  let session = persistedSession(sessionFrom(active))
+  while (session === undefined && active.actions.length > 0) {
+    removeAction(active, active.actions.length - 1)
+    noteSessionBudgetExceeded(
+      active,
+      'Recording reached the persisted session size or schema limit',
+    )
+    session = persistedSession(sessionFrom(active))
   }
+  const finished = session
   active = undefined
   setIsSessionRecording(false)
-  setLastSession(session)
-  return session
+  if (finished === undefined) {
+    setLastSession(undefined)
+    console.error('[recorder] Could not produce a valid bounded session.')
+    return undefined
+  }
+  setLastSession(finished)
+  return finished
 }
 
 export function cancelSessionRecording(): void {
@@ -191,49 +374,94 @@ export function cancelSessionRecording(): void {
 export function recordCommandExecution(
   cmd: Pick<
     FlameCommand,
-    'id' | 'label' | 'coalesceKey' | 'describe' | 'focus'
+    | 'id'
+    | 'label'
+    | 'coalesceKey'
+    | 'describe'
+    | 'focus'
+    | 'preservesFinishedSession'
+    | 'recordable'
   >,
   args: readonly unknown[],
   run: () => void,
 ): void {
   const rec = active
-  if (rec && commandDepth === 0 && suppressDepth === 0) {
+  if (
+    !rec &&
+    commandDepth === 0 &&
+    suppressDepth === 0 &&
+    cmd.preservesFinishedSession !== true
+  ) {
+    invalidateLastFinishedSession()
+  }
+  if (
+    rec &&
+    commandDepth === 0 &&
+    suppressDepth === 0 &&
+    cmd.recordable === false
+  ) {
+    coalesceAnchors = new Map()
+    gestureClaimed = false
+    noteUnnamedWrite(rec, `${cmd.label} is wall-clock transport`)
+  } else if (rec && commandDepth === 0 && suppressDepth === 0) {
     // Any command during a gesture accounts for the entry that gesture will
     // push, so the commit is not reported as an anonymous write.
     gestureClaimed = true
-    const key = cmd.coalesceKey?.([...args])
-    const anchorKey = key === undefined ? undefined : `${cmd.id} ${key}`
-    const anchorIndex =
-      anchorKey === undefined ? undefined : coalesceAnchors.get(anchorKey)
-    if (anchorIndex !== undefined) {
-      const anchor = { index: anchorIndex }
-      // A drag re-sets the same target dozens of times inside ONE undo step;
-      // the log keeps the last value and the timestamp the gesture began.
-      const existing = rec.actions[anchor.index]
-      if (existing) {
-        existing.args = deepClone([...args])
-        existing.focus = focusFor(cmd, [...args])
-        // The label has to move with the args. Describing commands render
-        // the value into their label ("Set gamma to 2.42"), so keeping the
-        // first one left the step list quoting a value the action no longer
-        // carried — visible in real recordings as a label that disagreed
-        // with its own args.
-        existing.label = cmd.describe?.([...args]) ?? cmd.label
+    try {
+      const key = cmd.coalesceKey?.([...args])
+      const anchorKey = key === undefined ? undefined : `${cmd.id} ${key}`
+      const anchorIndex =
+        anchorKey === undefined ? undefined : coalesceAnchors.get(anchorKey)
+      const existing =
+        anchorIndex === undefined ? undefined : rec.actions[anchorIndex]
+      if (existing !== undefined && anchorIndex !== undefined) {
+        // A drag re-sets the same target dozens of times inside ONE undo step;
+        // the log keeps the last value and the timestamp the gesture began.
+        const snapshot = snapshotAction(
+          rec,
+          {
+            ...existing,
+            args,
+            focus: focusFor(cmd, [...args]),
+            // The label has to move with the args. Describing commands render
+            // the value into their label ("Set gamma to 2.42"), so keeping the
+            // first one left the step list quoting a value the action no longer
+            // carried.
+            label: cmd.describe?.([...args]) ?? cmd.label,
+          },
+          anchorIndex,
+        )
+        if (snapshot !== undefined) {
+          rec.actionJsonCharsTotal +=
+            snapshot.jsonChars - (rec.actionJsonChars[anchorIndex] ?? 0)
+          rec.actionJsonChars[anchorIndex] = snapshot.jsonChars
+          rec.actions[anchorIndex] = snapshot.action
+          pendingActionIndex = anchorIndex
+        }
+      } else {
+        const snapshot = snapshotAction(rec, {
+          t: elapsedMs(rec),
+          id: cmd.id,
+          args,
+          label: cmd.describe?.([...args]) ?? cmd.label,
+          focus: focusFor(cmd, [...args]),
+        })
+        if (snapshot !== undefined) {
+          rec.actions.push(snapshot.action)
+          rec.actionJsonChars.push(snapshot.jsonChars)
+          rec.actionJsonCharsTotal += snapshot.jsonChars
+          pendingActionIndex = rec.actions.length - 1
+          if (anchorKey !== undefined) {
+            coalesceAnchors.set(anchorKey, pendingActionIndex)
+          }
+          setRecordedActionCount(rec.actions.length)
+        }
       }
-      pendingActionIndex = anchor.index
-    } else {
-      rec.actions.push({
-        t: elapsedMs(rec),
-        id: cmd.id,
-        args: deepClone([...args]),
-        label: cmd.describe?.([...args]) ?? cmd.label,
-        focus: focusFor(cmd, [...args]),
-      })
-      pendingActionIndex = rec.actions.length - 1
-      if (anchorKey !== undefined) {
-        coalesceAnchors.set(anchorKey, pendingActionIndex)
-      }
-      setRecordedActionCount(rec.actions.length)
+    } catch {
+      noteSessionBudgetExceeded(
+        rec,
+        'An action could not be serialized and was not recorded',
+      )
     }
   }
   commandDepth++
@@ -272,14 +500,65 @@ export function recordSyntheticAction(
   // run — the next edit of the same control is its own step.
   coalesceAnchors = new Map()
   gestureClaimed = true
-  rec.actions.push({
+  const snapshot = snapshotAction(rec, {
     t: elapsedMs(rec),
     id,
-    args: deepClone([...args]),
+    args,
     label,
     focus: focusHintFor(id, [...args]),
   })
+  if (snapshot === undefined) return
+  rec.actions.push(snapshot.action)
+  rec.actionJsonChars.push(snapshot.jsonChars)
+  rec.actionJsonCharsTotal += snapshot.jsonChars
   setRecordedActionCount(rec.actions.length)
+}
+
+/**
+ * Replace the command currently being recorded with an equivalent snapshot
+ * action after it has run.
+ *
+ * Undo/redo need this special case: a replay is intentionally accumulated as
+ * one preview entry, so dispatching the live history command inside that
+ * preview has no intermediate stack to operate on. Recording the resulting
+ * flame as `flame.load` preserves the visible undo/redo step while making it
+ * independent of the viewer's history layout.
+ */
+export function replaceCurrentRecordedAction(
+  id: string,
+  args: readonly unknown[],
+  label?: string,
+): void {
+  const rec = active
+  const index = pendingActionIndex
+  if (!rec || index === undefined || suppressDepth > 0) return
+  const previous = rec.actions[index]
+  if (!previous) return
+  const snapshot = snapshotAction(
+    rec,
+    {
+      ...previous,
+      id,
+      args,
+      label,
+      focus: focusHintFor(id, [...args]),
+    },
+    index,
+  )
+  if (snapshot === undefined) {
+    removeAction(rec, index)
+    pendingActionIndex = undefined
+    coalesceAnchors = new Map()
+    return
+  }
+  rec.actionJsonCharsTotal +=
+    snapshot.jsonChars - (rec.actionJsonChars[index] ?? 0)
+  rec.actionJsonChars[index] = snapshot.jsonChars
+  rec.actions[index] = {
+    ...previous,
+    ...snapshot.action,
+  }
+  coalesceAnchors = new Map()
 }
 
 /**
@@ -298,9 +577,8 @@ export function reportUnreplayable(reason: string): void {
   const rec = active
   if (!rec || suppressDepth > 0) return
   if (pendingActionIndex !== undefined) {
-    rec.actions.splice(pendingActionIndex, 1)
+    removeAction(rec, pendingActionIndex)
     pendingActionIndex = undefined
-    setRecordedActionCount(rec.actions.length)
   }
   coalesceAnchors = new Map()
   rec.unnamedWrites.push({ t: elapsedMs(rec), description: reason })
@@ -309,21 +587,39 @@ export function reportUnreplayable(reason: string): void {
 }
 
 /**
+ * Mark a continuously-running effect as unreplayable once per recording.
+ *
+ * Audio modulation can write at 30 fps, but 300 identical fidelity warnings
+ * are no more useful than one. The key is internal to the active take and is
+ * deliberately not serialized.
+ */
+export function reportUnreplayableOnce(key: string, reason: string): void {
+  const rec = active
+  if (!rec || suppressDepth > 0 || rec.unreplayableKeys.has(key)) return
+  rec.unreplayableKeys.add(key)
+  reportUnreplayable(reason)
+}
+
+/**
  * Can an undo/redo of `target` be reproduced by replaying this log?
  *
- * Only if it lands on a FLAME entry created after recording started. A
- * timeline entry is outside the recorded document entirely; an older flame
- * entry predates `initial` and, on replay, the undo would instead revert the
- * replayer's own load of `initial`. True when nothing is being recorded —
- * there is no log to keep faithful.
+ * Only if it lands on an entry created after recording started. The history
+ * command snapshots the resulting flame (and timeline, for timeline entries)
+ * into the log, so replay never depends on reconstructing the viewer's undo
+ * stacks. An older entry predates `initial` and cannot be represented by the
+ * session. True when nothing is being recorded — there is no log to keep
+ * faithful.
  */
 export function isUndoTargetWithinRecording(
   target: UndoTarget | undefined,
 ): boolean {
   const rec = active
   if (!rec) return true
-  if (target?.system !== 'flame') return false
-  return target.seq !== null && target.seq > rec.baselineSeq
+  return (
+    target?.seq !== null &&
+    target?.seq !== undefined &&
+    target.seq > rec.baselineSeq
+  )
 }
 
 /**
@@ -345,7 +641,11 @@ export function reportDocumentWrite(
   const claimed = commandDepth > 0 || (fromPreview && gestureClaimed)
   coalesceAnchors = new Map()
   gestureClaimed = false
-  if (!rec || claimed || suppressDepth > 0) return
+  if (!rec) {
+    invalidateLastFinishedSession()
+    return
+  }
+  if (claimed || suppressDepth > 0) return
   noteUnnamedWrite(rec, description)
 }
 
@@ -368,8 +668,26 @@ export function reportTimelineWrite(description?: string): void {
   // run, exactly as a flame entry does.
   coalesceAnchors = new Map()
   gestureClaimed = false
-  if (!rec || suppressDepth > 0) return
+  if (!rec) {
+    invalidateLastFinishedSession()
+    return
+  }
+  if (suppressDepth > 0) return
   noteUnnamedWrite(rec, description)
+}
+
+/** Direct scrub/play/step controls are transport, not timeline document
+ * entries. They still detach stale export metadata, and while recording they
+ * receive one honest fidelity marker per take because wall-clock transport is
+ * deliberately not replayed. Command-routed seeks are already represented in
+ * the log and therefore skip this hook while `commandDepth > 0`. */
+export function reportTimelineTransport(description: string): void {
+  if (commandDepth > 0 || suppressDepth > 0) return
+  if (!active) {
+    invalidateLastFinishedSession()
+    return
+  }
+  reportUnreplayableOnce('timeline-transport', description)
 }
 
 function noteUnnamedWrite(
@@ -396,6 +714,7 @@ export function notePreviewStarted(): void {
 // documentWriteHook.ts). Installed on load, which is early enough — nothing
 // can be recorded before the recorder module exists.
 setDocumentWriteReporter(reportTimelineWrite)
+setTimelineTransportReporter(reportTimelineTransport)
 
 /** Run `fn` invisibly to any active recording: its commands are not logged
  *  and its document writes are not flagged. For replay, the Home portal, and

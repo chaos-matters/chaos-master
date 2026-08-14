@@ -1,6 +1,6 @@
 import { createEffect, createSignal, onCleanup, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
-import { resolveFocusElement } from '@/recorder/focus'
+import { resolveFocusElement, revealFocusElement } from '@/recorder/focus'
 import styles from './ReplaySpotlight.module.css'
 import type { RecordedAction } from '@/recorder/schema'
 
@@ -40,9 +40,8 @@ const TAIL_MS = 900
 export function ReplaySpotlight(props: {
   /** The step being shown, or undefined at the initial flame. */
   action: RecordedAction | undefined
-  /** Playback is running — a paused replay keeps the spotlight up so the
-   *  viewer can look at what is highlighted for as long as they like. */
-  playing: boolean
+  /** The transport reached the natural end (as opposed to pausing/seeking). */
+  finished: boolean
 }) {
   const [rect, setRect] = createSignal<Rect>()
   const [caption, setCaption] = createSignal<string>()
@@ -60,6 +59,7 @@ export function ReplaySpotlight(props: {
   }
 
   const track = (hint: string) => {
+    let revealedElement: HTMLElement | undefined
     const measure = () => {
       const element = resolveFocusElement(hint)
       if (!element) {
@@ -67,12 +67,32 @@ export function ReplaySpotlight(props: {
         // Show the canvas rather than a hole over nothing.
         setRect(undefined)
       } else {
+        // A resolved target can still be clipped by the sidebar or another
+        // nested scrollport. Reveal it once for this step; the rAF loop below
+        // then follows the element as the container settles without fighting
+        // any manual scrolling for the rest of the hold.
+        if (element !== revealedElement) {
+          revealFocusElement(element)
+          revealedElement = element
+        }
         const box = element.getBoundingClientRect()
-        setRect({
+        const next = {
           x: box.left - HOLE_PADDING,
           y: box.top - HOLE_PADDING,
           width: box.width + HOLE_PADDING * 2,
           height: box.height + HOLE_PADDING * 2,
+        }
+        setRect((previous) => {
+          if (
+            previous &&
+            previous.x === next.x &&
+            previous.y === next.y &&
+            previous.width === next.width &&
+            previous.height === next.height
+          ) {
+            return previous
+          }
+          return next
         })
       }
       frame = requestAnimationFrame(measure)
@@ -101,7 +121,7 @@ export function ReplaySpotlight(props: {
 
     // Once playback has stopped, the last step's caption is the video's
     // closing line; clear it after a beat so the final image stands alone.
-    if (!props.playing) {
+    if (props.finished) {
       tailTimer = setTimeout(() => {
         setCaption(undefined)
         setRect(undefined)

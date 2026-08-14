@@ -1,4 +1,5 @@
 import Dexie from 'dexie'
+import { validateSession } from '@/recorder/schema'
 import type { RecordedSession } from '@/recorder/schema'
 
 /**
@@ -38,31 +39,51 @@ class SessionsDatabase extends Dexie {
 const db = new SessionsDatabase()
 
 /** Newest first. */
-export function loadStoredSessions(): Promise<StoredSession[]> {
-  return db.sessions
+export async function loadStoredSessions(): Promise<StoredSession[]> {
+  const rows = await db.sessions
     .orderBy('timestamp')
     .reverse()
     .limit(MAX_STORED_SESSIONS)
     .toArray()
+  return rows.flatMap((row) => {
+    const session = validateSession(row.session)
+    return session === undefined
+      ? []
+      : [
+          {
+            ...row,
+            actionCount: session.actions.length,
+            unnamedWriteCount: session.unnamedWriteCount,
+            session,
+          },
+        ]
+  })
 }
 
 export async function storeSession(
   session: RecordedSession,
   name: string,
 ): Promise<StoredSession[]> {
+  // IndexedDB is a persistence boundary, not a trusted in-memory cache. Do
+  // not retain a forged/oversized object that the app could never import or
+  // replay after reload.
+  const validated = validateSession(session)
+  if (validated === undefined) {
+    throw new Error('Cannot store an invalid recording session')
+  }
   await db.sessions.add({
     name,
     timestamp: Date.now(),
-    actionCount: session.actions.length,
-    unnamedWriteCount: session.unnamedWriteCount,
-    session,
+    actionCount: validated.actions.length,
+    unnamedWriteCount: validated.unnamedWriteCount,
+    session: validated,
   })
   const all = await db.sessions.orderBy('timestamp').reverse().toArray()
   const surplus = all.slice(MAX_STORED_SESSIONS)
   if (surplus.length > 0) {
     await db.sessions.bulkDelete(surplus.flatMap((e) => (e.id ? [e.id] : [])))
   }
-  return all.slice(0, MAX_STORED_SESSIONS)
+  return loadStoredSessions()
 }
 
 export async function deleteStoredSession(

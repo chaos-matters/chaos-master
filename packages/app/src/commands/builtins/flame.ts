@@ -1,9 +1,9 @@
 import { applyColorMapToFlame } from '@/flame/colorMap'
 import { examples } from '@/flame/examples'
 import { newDefaultTransform } from '@/flame/newTransform'
-import { tryValidateFlame } from '@/flame/schema/flameSchema'
+import { isFlameGraphWithinLimits, isSafeFlameEntityId, tryValidateFlame, } from '@/flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from '@/flame/transformFunction'
-import { defaultLinearType } from '@/flame/variationRegistry'
+import { defaultLinearType, isVariationTypeFor, } from '@/flame/variationRegistry'
 import { getVariationDefault } from '@/flame/variations/utils'
 import { deepClone } from '@/utils/clone'
 import { registerCommand } from '../registry'
@@ -27,7 +27,7 @@ function resolveTransformKey(
   ref: unknown,
 ): TransformId | undefined {
   if (typeof ref === 'string') {
-    return ref in transforms ? (ref as TransformId) : undefined
+    return Object.hasOwn(transforms, ref) ? (ref as TransformId) : undefined
   }
   const index = typeof ref === 'number' ? ref : 0
   const keys = Object.keys(transforms) as TransformId[]
@@ -40,7 +40,7 @@ function resolveVariationKey(
   ref: unknown,
 ): VariationId | undefined {
   if (typeof ref === 'string') {
-    return ref in variations ? (ref as VariationId) : undefined
+    return Object.hasOwn(variations, ref) ? (ref as VariationId) : undefined
   }
   const index = typeof ref === 'number' ? ref : 0
   const keys = Object.keys(variations) as VariationId[]
@@ -56,6 +56,91 @@ function isAbsentRef(ref: unknown): boolean {
 
 const AFFINE_2D_KEYS = ['a', 'b', 'c', 'd', 'e', 'f']
 const AFFINE_3D_KEYS = [...AFFINE_2D_KEYS, 'g', 'h', 'i', 'j', 'k', 'l']
+const MAX_PALETTE_ENTRIES = 1024
+const MAX_PALETTE_TEXT_LENGTH = 256
+const MAX_PALETTE_CHANNEL_MAGNITUDE = 4
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return false
+  }
+  const prototype = Object.getPrototypeOf(value)
+  return prototype === Object.prototype || prototype === null
+}
+
+/**
+ * Turn an imported palette argument into a small canonical value. Palettes
+ * cross the untrusted session boundary and are written into render settings,
+ * so checking only that `entries` is a non-empty array is not enough.
+ */
+function tryValidatePalette(value: unknown): Palette | undefined {
+  if (!isPlainRecord(value)) return undefined
+  const { id, name, source, createdAt, entries } = value
+  if (
+    createdAt !== undefined &&
+    (typeof createdAt !== 'number' ||
+      !Number.isSafeInteger(createdAt) ||
+      createdAt < 0)
+  ) {
+    return undefined
+  }
+  if (
+    typeof id !== 'string' ||
+    id.length === 0 ||
+    id.length > MAX_PALETTE_TEXT_LENGTH ||
+    typeof name !== 'string' ||
+    name.length > MAX_PALETTE_TEXT_LENGTH ||
+    (source !== undefined &&
+      source !== 'builtin' &&
+      source !== 'custom' &&
+      source !== 'imported' &&
+      source !== 'official') ||
+    !Array.isArray(entries) ||
+    entries.length === 0 ||
+    entries.length > MAX_PALETTE_ENTRIES
+  ) {
+    return undefined
+  }
+
+  const ids = new Set<string>()
+  const validatedEntries: Palette['entries'] = []
+  for (const entry of entries) {
+    if (!isPlainRecord(entry)) return undefined
+    const { id: entryId, position, a, b } = entry
+    if (
+      Object.keys(entry).some(
+        (key) =>
+          key !== 'id' && key !== 'position' && key !== 'a' && key !== 'b',
+      ) ||
+      typeof entryId !== 'string' ||
+      entryId.length === 0 ||
+      entryId.length > MAX_PALETTE_TEXT_LENGTH ||
+      ids.has(entryId) ||
+      typeof position !== 'number' ||
+      !Number.isFinite(position) ||
+      position < 0 ||
+      position > 1 ||
+      typeof a !== 'number' ||
+      !Number.isFinite(a) ||
+      Math.abs(a) > MAX_PALETTE_CHANNEL_MAGNITUDE ||
+      typeof b !== 'number' ||
+      !Number.isFinite(b) ||
+      Math.abs(b) > MAX_PALETTE_CHANNEL_MAGNITUDE
+    ) {
+      return undefined
+    }
+    ids.add(entryId)
+    validatedEntries.push({ id: entryId, position, a, b })
+  }
+
+  return {
+    id,
+    name,
+    source: source ?? 'custom',
+    entries: validatedEntries,
+    ...(createdAt === undefined ? {} : { createdAt }),
+  }
+}
 
 /**
  * Exactly the 2D (a–f) or 3D (a–l) coefficient set, every value finite.
@@ -126,6 +211,116 @@ function resolveVariationType(ctx: CommandContext, variationType: unknown) {
     : defaultLinearType(dims)
 }
 
+function variationTypeMatchesCurrentFlame(
+  ctx: CommandContext,
+  variationType: unknown,
+): variationType is string {
+  const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
+  return (
+    typeof variationType === 'string' && isVariationTypeFor(dims, variationType)
+  )
+}
+
+function isKnownVariationType(variationType: unknown): variationType is string {
+  return (
+    typeof variationType === 'string' &&
+    (isVariationTypeFor(2, variationType) ||
+      isVariationTypeFor(3, variationType))
+  )
+}
+
+function variationDescriptorType(descriptor: unknown): string | undefined {
+  if (
+    descriptor === null ||
+    typeof descriptor !== 'object' ||
+    Array.isArray(descriptor)
+  ) {
+    return undefined
+  }
+  const type = (descriptor as { type?: unknown }).type
+  return typeof type === 'string' ? type : undefined
+}
+
+function validatedVariationUpdate(
+  ctx: CommandContext,
+  transformRef: unknown,
+  variationRef: unknown,
+  descriptor: unknown,
+  preAffine?: unknown,
+) {
+  const type = variationDescriptorType(descriptor)
+  if (!type || !variationTypeMatchesCurrentFlame(ctx, type)) return undefined
+  if (preAffine !== undefined && !isAffineLike(preAffine)) return undefined
+
+  const candidate = deepClone(ctx.flameDescriptor())
+  const transformId = resolveTransformKey(candidate.transforms, transformRef)
+  if (!transformId) return undefined
+  const transform = candidate.transforms[transformId]
+  if (!transform) return undefined
+  const variationId = resolveVariationKey(transform.variations, variationRef)
+  if (!variationId) return undefined
+
+  transform.variations[variationId] = deepClone(
+    descriptor,
+  ) as TransformFunction['variations'][VariationId]
+  if (preAffine !== undefined) {
+    transform.preAffine = deepClone(preAffine) as TransformFunction['preAffine']
+  }
+
+  const validated = tryValidateFlame(candidate)
+  const validatedTransform = validated?.transforms[transformId]
+  const validatedVariation = validatedTransform?.variations[variationId]
+  if (!validatedTransform || !validatedVariation) return undefined
+  return {
+    transformId,
+    variationId,
+    variation: deepClone(validatedVariation),
+    preAffine:
+      preAffine === undefined
+        ? undefined
+        : deepClone(validatedTransform.preAffine),
+  }
+}
+
+function graphCounts(
+  flame: FlameDescriptor,
+  includeTransform: (transformId: string) => boolean = () => true,
+) {
+  let transformCount = 0
+  let totalVariationCount = 0
+  let largestVariationCount = 0
+  for (const [transformId, transform] of Object.entries(flame.transforms)) {
+    if (!includeTransform(transformId)) continue
+    transformCount++
+    const variationCount = Object.keys(transform.variations).length
+    totalVariationCount += variationCount
+    largestVariationCount = Math.max(largestVariationCount, variationCount)
+  }
+  return { transformCount, totalVariationCount, largestVariationCount }
+}
+
+function canAddTransform(flame: FlameDescriptor): boolean {
+  const counts = graphCounts(flame)
+  return isFlameGraphWithinLimits(
+    counts.transformCount + 1,
+    counts.totalVariationCount + 1,
+    Math.max(counts.largestVariationCount, 1),
+  )
+}
+
+function canAddVariation(
+  flame: FlameDescriptor,
+  transform: TransformFunction,
+): boolean {
+  const counts = graphCounts(flame)
+  const variationCount = Object.keys(transform.variations).length
+  return isFlameGraphWithinLimits(
+    counts.transformCount,
+    counts.totalVariationCount + 1,
+    Math.max(counts.largestVariationCount, variationCount + 1),
+  )
+}
+
 function resolveNewTransformId(transformId: unknown): TransformId {
   return (
     typeof transformId === 'string' && transformId !== ''
@@ -147,6 +342,20 @@ registerCommand({
   label: 'Add Transform',
   description: 'Add a new transform with an optional variation type',
   shortcut: 'Shift+T',
+  validateReplayArgs(args) {
+    if (args.length !== 3) {
+      return 'addTransform expects a type, transform id and variation id'
+    }
+    const [variationType, transformId, variationId] = args
+    if (!isKnownVariationType(variationType)) {
+      return 'variation type is not registered'
+    }
+    if (!isSafeFlameEntityId(transformId) || transformId.startsWith('_sym__')) {
+      return 'transform id is unsafe or reserved'
+    }
+    if (!isSafeFlameEntityId(variationId)) return 'variation id is unsafe'
+    return undefined
+  },
   normalizeArgs(ctx, [variationType, transformId, variationId]) {
     return [
       resolveVariationType(ctx, variationType),
@@ -163,6 +372,18 @@ registerCommand({
     const type = resolveVariationType(ctx, variationType)
     const tid = resolveNewTransformId(transformId)
     const vid = resolveNewVariationId(variationId)
+    const flame = ctx.flameDescriptor()
+    if (
+      !variationTypeMatchesCurrentFlame(ctx, type) ||
+      !isSafeFlameEntityId(tid) ||
+      tid.startsWith('_sym__') ||
+      !isSafeFlameEntityId(vid) ||
+      Object.hasOwn(flame.transforms, tid) ||
+      !canAddTransform(flame)
+    ) {
+      console.warn('[cmd] flame.addTransform: rejected unsafe or oversized add')
+      return
+    }
     ctx.setFlameDescriptor((draft) => {
       draft.transforms[tid] = {
         probability: 1,
@@ -236,6 +457,18 @@ registerCommand({
   id: 'flame.addVariation',
   label: 'Add Variation',
   description: 'Add a variation type to a specific transform',
+  validateReplayArgs(args) {
+    if (args.length !== 3) {
+      return 'addVariation expects a transform id, type and variation id'
+    }
+    const [transformId, variationType, variationId] = args
+    if (!isSafeFlameEntityId(transformId)) return 'transform id is unsafe'
+    if (!isKnownVariationType(variationType)) {
+      return 'variation type is not registered'
+    }
+    if (!isSafeFlameEntityId(variationId)) return 'variation id is unsafe'
+    return undefined
+  },
   normalizeArgs(ctx, [transformRef, variationType, variationId]) {
     return [
       normalizeTransformRef(ctx, transformRef),
@@ -251,6 +484,19 @@ registerCommand({
   ) {
     const type = resolveVariationType(ctx, variationType)
     const vid = resolveNewVariationId(variationId)
+    const flame = ctx.flameDescriptor()
+    const key = resolveTransformKey(flame.transforms, transformRef)
+    const transform = key ? flame.transforms[key] : undefined
+    if (
+      !transform ||
+      !variationTypeMatchesCurrentFlame(ctx, type) ||
+      !isSafeFlameEntityId(vid) ||
+      Object.hasOwn(transform.variations, vid) ||
+      !canAddVariation(flame, transform)
+    ) {
+      console.warn('[cmd] flame.addVariation: rejected unsafe or oversized add')
+      return
+    }
     ctx.setFlameDescriptor((draft) => {
       const key = resolveTransformKey(draft.transforms, transformRef)
       const transform = key ? draft.transforms[key] : undefined
@@ -370,8 +616,18 @@ registerCommand({
     const patch = deepClone(settings) as Partial<
       FlameDescriptor['renderSettings']
     >
+    const candidate = deepClone(ctx.flameDescriptor())
+    candidate.renderSettings = { ...candidate.renderSettings, ...patch }
+    const validated = tryValidateFlame(candidate)
+    if (!validated) {
+      console.warn(
+        '[cmd] flame.updateRenderSettings: invalid render settings',
+        settings,
+      )
+      return
+    }
     ctx.setFlameDescriptor((draft) => {
-      draft.renderSettings = { ...draft.renderSettings, ...patch }
+      draft.renderSettings = deepClone(validated.renderSettings)
     }, 'Render Settings')
   },
 })
@@ -628,6 +884,17 @@ registerCommand({
   label: 'Set Variation',
   description:
     'Replace a variation descriptor wholesale (type, weight and params)',
+  validateReplayArgs(args) {
+    if (args.length !== 3) {
+      return 'setVariation expects two entity ids and a descriptor'
+    }
+    if (!isSafeFlameEntityId(args[0])) return 'transform id is unsafe'
+    if (!isSafeFlameEntityId(args[1])) return 'variation id is unsafe'
+    if (!isKnownVariationType(variationDescriptorType(args[2]))) {
+      return 'variation descriptor type is not registered'
+    }
+    return undefined
+  },
   normalizeArgs(ctx, [transformRef, variationRef, descriptor]) {
     return [
       normalizeTransformRef(ctx, transformRef),
@@ -649,23 +916,24 @@ registerCommand({
     // "randomize this variation" button both compute a new one outright, and
     // recording the result keeps replay exact without re-running their
     // randomness.
-    if (
-      descriptor === null ||
-      typeof descriptor !== 'object' ||
-      typeof (descriptor as { type?: unknown }).type !== 'string'
-    ) {
+    const update = validatedVariationUpdate(
+      ctx,
+      transformRef,
+      variationRef,
+      descriptor,
+    )
+    if (!update) {
       console.warn('[cmd] flame.setVariation: not a variation', descriptor)
       return
     }
-    const next = deepClone(
-      descriptor,
-    ) as TransformFunction['variations'][VariationId]
     ctx.setFlameDescriptor((draft) => {
-      const key = resolveTransformKey(draft.transforms, transformRef)
-      const transform = key ? draft.transforms[key] : undefined
-      if (!transform) return
-      const vKey = resolveVariationKey(transform.variations, variationRef)
-      if (vKey) transform.variations[vKey] = next
+      const transform = draft.transforms[update.transformId]
+      if (
+        transform &&
+        Object.hasOwn(transform.variations, update.variationId)
+      ) {
+        transform.variations[update.variationId] = update.variation
+      }
     }, 'Set Variation')
   },
 })
@@ -679,6 +947,14 @@ registerCommand({
   // one resets it instead. That replacement mints a variation id, so it is
   // pre-minted here — the branch itself is state-dependent and replay takes
   // the same one from the same document.
+  validateReplayArgs(args) {
+    if (args.length !== 2) {
+      return 'deleteTransform expects a transform id and reset variation id'
+    }
+    if (!isSafeFlameEntityId(args[0])) return 'transform id is unsafe'
+    if (!isSafeFlameEntityId(args[1])) return 'reset variation id is unsafe'
+    return undefined
+  },
   normalizeArgs(ctx, [transformRef, resetVariationId]) {
     return [
       normalizeTransformRef(ctx, transformRef),
@@ -690,6 +966,10 @@ registerCommand({
   execute(ctx, transformRef?: unknown, resetVariationId?: unknown) {
     const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
     const vid = resolveNewVariationId(resetVariationId)
+    if (!isSafeFlameEntityId(vid)) {
+      console.warn('[cmd] flame.deleteTransform: unsafe reset variation id')
+      return
+    }
     ctx.setFlameDescriptor((draft) => {
       const key = resolveTransformKey(draft.transforms, transformRef)
       if (!key) return
@@ -738,12 +1018,22 @@ registerCommand({
   label: 'Set Final Transform',
   description: 'Set or clear the flame-wide final affine transform',
   execute(ctx, affine?: unknown) {
-    const next =
-      affine === null || affine === undefined
-        ? undefined
-        : (deepClone(affine) as FlameDescriptor['finalTransform'])
+    if (affine !== null && affine !== undefined && !isAffineLike(affine)) {
+      console.warn('[cmd] flame.setFinalTransform: invalid affine', affine)
+      return
+    }
+    const next = isAbsentRef(affine)
+      ? undefined
+      : (deepClone(affine) as FlameDescriptor['finalTransform'])
+    const candidate = deepClone(ctx.flameDescriptor())
+    candidate.finalTransform = next
+    const validated = tryValidateFlame(candidate)
+    if (!validated) {
+      console.warn('[cmd] flame.setFinalTransform: invalid for flame', affine)
+      return
+    }
     ctx.setFlameDescriptor((draft) => {
-      draft.finalTransform = next
+      draft.finalTransform = deepClone(validated.finalTransform)
     }, 'Final Transform')
   },
 })
@@ -757,6 +1047,18 @@ registerCommand({
   // applies both in a single setter and so is a single undo step. Two
   // commands would replay as two, and a recorded undo would then only get
   // half of it back.
+  validateReplayArgs(args) {
+    if (args.length !== 4) {
+      return 'applyVariationSelection expects two ids, an affine and a variation'
+    }
+    if (!isSafeFlameEntityId(args[0])) return 'transform id is unsafe'
+    if (!isSafeFlameEntityId(args[1])) return 'variation id is unsafe'
+    if (!isAffineLike(args[2])) return 'pre-affine is invalid'
+    if (!isKnownVariationType(variationDescriptorType(args[3]))) {
+      return 'variation descriptor type is not registered'
+    }
+    return undefined
+  },
   normalizeArgs(ctx, [transformRef, variationRef, preAffine, variation]) {
     return [
       normalizeTransformRef(ctx, transformRef),
@@ -772,29 +1074,27 @@ registerCommand({
     preAffine?: unknown,
     variation?: unknown,
   ) {
-    if (
-      variation === null ||
-      typeof variation !== 'object' ||
-      typeof (variation as { type?: unknown }).type !== 'string' ||
-      !isAffineLike(preAffine)
-    ) {
+    const update = validatedVariationUpdate(
+      ctx,
+      transformRef,
+      variationRef,
+      variation,
+      preAffine,
+    )
+    if (!update || !update.preAffine) {
       console.warn('[cmd] flame.applyVariationSelection: rejected', {
         preAffine,
         variation,
       })
       return
     }
-    const nextAffine = deepClone(preAffine) as TransformFunction['preAffine']
-    const nextVariation = deepClone(
-      variation,
-    ) as TransformFunction['variations'][VariationId]
+    const validatedPreAffine = update.preAffine
     ctx.setFlameDescriptor((draft) => {
-      const key = resolveTransformKey(draft.transforms, transformRef)
-      const transform = key ? draft.transforms[key] : undefined
+      const transform = draft.transforms[update.transformId]
       if (!transform) return
-      transform.preAffine = nextAffine
-      const vKey = resolveVariationKey(transform.variations, variationRef)
-      if (vKey) transform.variations[vKey] = nextVariation
+      if (!Object.hasOwn(transform.variations, update.variationId)) return
+      transform.preAffine = validatedPreAffine
+      transform.variations[update.variationId] = update.variation
     }, 'Apply Variation')
   },
 })
@@ -840,18 +1140,17 @@ registerCommand({
   // colours AND renderSettings.palette, so a single undo fully reverts it.
   // `applyColorMapToFlame` is index-based and deterministic, so the palette
   // is all replay needs.
+  validateReplayArgs(args) {
+    return args.length === 1 && tryValidatePalette(args[0])
+      ? undefined
+      : 'apply palette expects one bounded palette'
+  },
   execute(ctx, palette?: unknown) {
-    const entries = (palette as { entries?: unknown })?.entries
-    if (
-      palette === null ||
-      typeof palette !== 'object' ||
-      !Array.isArray(entries) ||
-      entries.length === 0
-    ) {
+    const next = tryValidatePalette(palette)
+    if (!next) {
       console.warn('[cmd] flame.applyPalette: not a palette', palette)
       return
     }
-    const next = deepClone(palette) as Palette
     ctx.setFlameDescriptor((draft) => {
       applyColorMapToFlame(draft, {
         id: next.id,
@@ -907,6 +1206,21 @@ registerCommand({
   // still replays: the log never depends on what happened to be on disk.
   // Validated through the normal migrate-on-parse path, the same one saved
   // flames and imports go through.
+  validateReplayArgs(args) {
+    if (args.length < 1 || args.length > 2) {
+      return 'load expects a flame and an optional label'
+    }
+    if (!tryValidateFlame(deepClone(args[0]))) {
+      return 'flame descriptor is invalid'
+    }
+    if (
+      args[1] !== undefined &&
+      (typeof args[1] !== 'string' || args[1].length > 512)
+    ) {
+      return 'load label must be a short string'
+    }
+    return undefined
+  },
   execute(ctx, descriptor?: unknown, label?: unknown) {
     const flame = tryValidateFlame(deepClone(descriptor))
     if (!flame) {
@@ -921,10 +1235,68 @@ registerCommand({
 })
 
 /** How many transforms an n-fold symmetry of this type adds. */
+const MAX_SYMMETRY_FOLDS = 64
+
 function symmetryTransformCount(n: unknown, type: unknown): number {
-  const folds = typeof n === 'number' && n > 1 ? Math.floor(n) : 0
+  const folds =
+    typeof n === 'number' &&
+    Number.isInteger(n) &&
+    n >= 1 &&
+    n <= MAX_SYMMETRY_FOLDS
+      ? n
+      : 0
   if (folds === 0) return type === 'dihedral' ? 1 : 0
   return folds - 1 + (type === 'dihedral' ? 1 : 0)
+}
+
+function symmetryArgsError(args: readonly unknown[]): string | undefined {
+  if (args.length !== 3) return 'symmetry expects exactly three arguments'
+  const [n, type, ids] = args
+  if (
+    typeof n !== 'number' ||
+    !Number.isInteger(n) ||
+    n < 1 ||
+    n > MAX_SYMMETRY_FOLDS
+  ) {
+    return `fold count must be an integer from 1 to ${MAX_SYMMETRY_FOLDS}`
+  }
+  if (type !== 'rotational' && type !== 'dihedral') {
+    return 'symmetry type must be rotational or dihedral'
+  }
+
+  const count = symmetryTransformCount(n, type)
+  if (!Array.isArray(ids) || ids.length !== count) {
+    return 'symmetry transform ids do not match the fold count'
+  }
+
+  const transformIds: string[] = []
+  const variationIds: string[] = []
+  for (const pair of ids) {
+    if (!Array.isArray(pair) || pair.length !== 2) {
+      return 'each symmetry id pair must contain exactly two ids'
+    }
+    const [transformId, variationId] = pair
+    if (
+      !isSafeFlameEntityId(transformId) ||
+      !transformId.startsWith('_sym__') ||
+      transformId.length === '_sym__'.length
+    ) {
+      return 'symmetry transform ids must use the reserved _sym__ prefix'
+    }
+    if (!isSafeFlameEntityId(variationId)) {
+      return 'symmetry variation ids are unsafe'
+    }
+    transformIds.push(transformId)
+    variationIds.push(variationId)
+  }
+
+  if (
+    new Set(transformIds).size !== transformIds.length ||
+    new Set(variationIds).size !== variationIds.length
+  ) {
+    return 'symmetry transform and variation ids must be unique'
+  }
+  return undefined
 }
 
 registerCommand({
@@ -932,6 +1304,9 @@ registerCommand({
   label: 'Apply Symmetry',
   description:
     'Replace the generated symmetry transforms with an n-fold rotational or dihedral set',
+  validateReplayArgs(args) {
+    return symmetryArgsError(args)
+  },
   // Every symmetry transform it creates needs an id, and minting them inside
   // the setter would hand replay different UUIDs. normalizeArgs pre-mints one
   // (transform, variation) pair per transform the command is about to add, so
@@ -953,14 +1328,34 @@ registerCommand({
     ]
   },
   execute(ctx, n?: unknown, type?: unknown, ids?: unknown) {
+    const args = [n, type, ids] as const
+    const argsError = symmetryArgsError(args)
+    if (argsError) {
+      console.warn(`[cmd] flame.applySymmetry: ${argsError}`)
+      return
+    }
     // No early return on count === 0: "1-fold rotational" means NO symmetry,
     // and its job is then to clear the set a previous call created. Bailing
     // out left the old mirror transforms in place.
     const count = symmetryTransformCount(n, type)
-    const pairs = Array.isArray(ids) ? ids : []
+    const pairs = ids as [string, string][]
     const dims = (ctx.flameDescriptor().renderSettings.dimensions ?? 2) as Dims
     const linear = () => getVariationDefault(defaultLinearType(dims), 1)
-    const folds = typeof n === 'number' ? n : 0
+    const folds = n as number
+    const retainedCounts = graphCounts(
+      ctx.flameDescriptor(),
+      (transformId) => !transformId.startsWith('_sym__'),
+    )
+    if (
+      !isFlameGraphWithinLimits(
+        retainedCounts.transformCount + count,
+        retainedCounts.totalVariationCount + count,
+        Math.max(retainedCounts.largestVariationCount, count > 0 ? 1 : 0),
+      )
+    ) {
+      console.warn('[cmd] flame.applySymmetry: renderer graph limit exceeded')
+      return
+    }
     ctx.setFlameDescriptor((draft) => {
       // Regenerating replaces the previous set rather than stacking on it.
       for (const tid of Object.keys(draft.transforms) as TransformId[]) {
@@ -983,7 +1378,7 @@ registerCommand({
           f: number
         },
       ) => {
-        const pair = pairs[index] as [string, string] | undefined
+        const pair = pairs[index]
         if (!pair) return
         draft.transforms[pair[0] as TransformId] = {
           probability: symWeight,

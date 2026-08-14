@@ -27,6 +27,7 @@ registerCommand({
   id: 'export.png',
   label: 'Export PNG',
   description: 'Open the PNG export options',
+  preservesFinishedSession: true,
   shortcut: 'Ctrl+E',
   execute(ctx) {
     ctx.modal.open('exportPng')
@@ -37,6 +38,7 @@ registerCommand({
   id: 'export.animation',
   label: 'Export Animation',
   description: 'Open the animation export modal',
+  preservesFinishedSession: true,
   shortcut: 'Ctrl+Shift+A',
   execute(ctx) {
     ctx.modal.open('exportAnimation')

@@ -1,7 +1,8 @@
 import { Show } from 'solid-js'
 import { useToast } from '@/contexts/ToastContext'
+import { Book } from '@/icons'
 import { cancelSessionRecording, isSessionRecording, recordedActionCount, startSessionRecording, stopSessionRecording, unnamedWriteCount, } from '@/recorder/recorder'
-import { parseSession, serializeSession, sessionFilename, } from '@/recorder/schema'
+import { MAX_SESSION_FILE_BYTES, parseSession, serializeSession, sessionFilename, } from '@/recorder/schema'
 import { downloadBlob } from '@/utils/blob'
 import { storeSession } from '@/utils/sessionsDB'
 import styles from './SessionRecorderControls.module.css'
@@ -68,6 +69,13 @@ export function SessionRecorderControls(props: {
 
   const openSessionFile = async (file: File | undefined) => {
     if (!file) return
+    // Check the browser-provided byte count before allocating and decoding an
+    // attacker-controlled file. parseSession applies the decoded-char and
+    // schema limits after this cheap boundary check.
+    if (file.size > MAX_SESSION_FILE_BYTES) {
+      showToast('That .steps.json file is too large to open safely', 4000)
+      return
+    }
     const session = parseSession(await file.text())
     if (!session) {
       showToast('That file is not a readable .steps.json session', 4000)
@@ -96,7 +104,8 @@ export function SessionRecorderControls(props: {
               onClick={props.onToggleLibrary}
               title="Saved recordings — replay, download or delete"
             >
-              ⛁ Recordings
+              <Book class={styles.buttonIcon} aria-hidden="true" />
+              <span>Recordings</span>
             </button>
             <label class={styles.button} title="Replay a saved .steps.json">
               Open steps

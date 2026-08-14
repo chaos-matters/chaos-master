@@ -78,6 +78,23 @@ export function resolveFocusElement(hint: string): HTMLElement | null {
   return null
 }
 
+/**
+ * Reveal a resolved follow-cam target in every scrollable ancestor.
+ *
+ * `nearest` is important for the editor: a render control may sit inside a
+ * scrolled sidebar, while the recorder dock and canvas should not jump. The
+ * browser scrolls only the container(s) that actually clip the target and
+ * leaves already-visible controls untouched. `auto` also respects each
+ * container's own scroll-behavior and reduced-motion policy.
+ */
+export function revealFocusElement(element: HTMLElement): void {
+  element.scrollIntoView({
+    behavior: 'auto',
+    block: 'nearest',
+    inline: 'nearest',
+  })
+}
+
 /** Escape a hint value for use inside an attribute selector. Hints come from
  *  session files, which are user data — `CSS.escape` is not enough on its own
  *  because the value goes inside quotes. */
