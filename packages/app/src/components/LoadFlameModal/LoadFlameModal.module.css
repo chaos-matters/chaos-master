@@ -313,34 +313,58 @@
 }
 
 .section-header {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  cursor: pointer;
-  user-select: none;
-  font-size: 0.9rem;
   /* Top margin moved to padding so the sticky background covers the gap above. */
   margin: 0 0 var(--space-2);
-  padding: var(--space-3) 0 var(--space-1);
+  padding: 0;
   /* Stick to the top of the scrollport so the current group's label is always
      visible; the next group's header pushes it out as you scroll past. */
   position: sticky;
   top: 0;
   z-index: 2;
   background: var(--bg-color);
+}
+
+.section-header-button {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  border: 0;
+  padding: var(--space-3) 0 var(--space-1);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
 
   &:hover {
     background: rgb(from var(--neutral-500) r g b / 12%);
   }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent-color, #6366f1);
+    outline-offset: -2px;
+  }
 }
 
 .chevron {
-  display: inline-block;
-  width: 1em;
-  font-family: monospace;
-  font-size: 0.7em;
-  text-align: center;
+  width: 0.9rem;
+  height: 0.9rem;
+  flex: none;
   opacity: 0.6;
+  transition: transform 140ms ease;
+}
+
+.chevron-collapsed {
+  transform: rotate(-90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
 }
 
 .section-count {

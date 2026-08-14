@@ -10,7 +10,7 @@ import { classicExamples } from '@/flame/examples/classics'
 import { Flam3 } from '@/flame/Flam3'
 import { isFlameXmlContent, parseFlameXml, registerImportedFlamePalette, } from '@/flame/flameXml'
 import { camera3DDefault } from '@/flame/schema/flameSchema'
-import { Cross } from '@/icons'
+import { ChevronDown, Cross } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
 import { Default3DPreviewCamera } from '@/lib/Camera3D'
@@ -489,10 +489,21 @@ function CollapsibleSection(props: {
   }
   return (
     <div style={{ order: String(props.order) }}>
-      <h2 ref={headerRef} class={ui.sectionHeader} onClick={handleToggle}>
-        <span class={ui.chevron}>{props.collapsed ? '▶' : '▼'}</span>
-        <span>{props.title}</span>
-        <span class={ui.sectionCount}>{props.count}</span>
+      <h2 ref={headerRef} class={ui.sectionHeader}>
+        <button
+          type="button"
+          class={ui.sectionHeaderButton}
+          onClick={handleToggle}
+          aria-expanded={!props.collapsed}
+        >
+          <ChevronDown
+            class={ui.chevron}
+            classList={{ [ui.chevronCollapsed!]: props.collapsed }}
+            aria-hidden="true"
+          />
+          <span>{props.title}</span>
+          <span class={ui.sectionCount}>{props.count}</span>
+        </button>
       </h2>
       <Show when={!props.collapsed}>
         <section class={ui.gallery}>{props.children}</section>

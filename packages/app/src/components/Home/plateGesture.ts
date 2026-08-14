@@ -69,8 +69,18 @@ export interface PlateGestureRecogniser {
   down: (point: GesturePoint, now: number) => void
   /** The pointer moved while down. Safe to call when nothing is in progress. */
   move: (point: GesturePoint, now: number) => void
-  /** The pointer came up. Returns what the whole sequence meant. */
-  up: (point: GesturePoint, now: number) => PlateGesture
+  /**
+   * The pointer came up. Returns what the whole sequence meant. `allowOpen`
+   * prevents a stale first tap from opening after another plate took selection.
+   */
+  up: (point: GesturePoint, now: number, allowOpen?: boolean) => PlateGesture
+  /**
+   * The pointer left the plate. Mouse leave and an in-progress direct-pointer
+   * leave end the gesture and double-click chain. A post-release touch/pen leave
+   * is ignored because browsers emit it after releasing implicit capture,
+   * between the two halves of a valid double-tap.
+   */
+  leave: (pointerType: string) => void
   /**
    * The sequence was taken away (`pointercancel`, the plate unmounting, the
    * pointer leaving for another plate). Ends the sequence AND breaks the
@@ -133,7 +143,7 @@ export function createPlateGestureRecogniser(
         dragged = true
       }
     },
-    up(point, now) {
+    up(point, now, allowOpen = true) {
       const began = start
       const wasDrag = dragged
       endSequence()
@@ -154,6 +164,7 @@ export function createPlateGestureRecogniser(
       }
       const previous = pendingTap
       if (
+        allowOpen &&
         previous !== undefined &&
         now - previous.at <= doubleClickMs &&
         pointerDistance(previous.point, point) <= doubleClickSlopPx
@@ -167,6 +178,16 @@ export function createPlateGestureRecogniser(
         at: now,
       }
       return 'select'
+    },
+    leave(pointerType) {
+      const isPostReleaseDirectPointerLeave =
+        (pointerType === 'touch' || pointerType === 'pen') &&
+        start === undefined
+      if (isPostReleaseDirectPointerLeave) {
+        return
+      }
+      endSequence()
+      pendingTap = undefined
     },
     cancel() {
       endSequence()

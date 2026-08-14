@@ -93,6 +93,8 @@ function usePlateInteraction(props: {
   slug: string
   /** The tile element the gesture is recognised on. */
   el: Accessor<HTMLElement | undefined>
+  /** Only a still-selected plate may complete the second half of an open. */
+  selected: Accessor<boolean>
   onSelect: (slug: string) => void
   onOpen: (slug: string) => void
 }) {
@@ -134,7 +136,7 @@ function usePlateInteraction(props: {
       recogniser.move(event, event.timeStamp)
     }
     const onUp = (event: PointerEvent) => {
-      const gesture = recogniser.up(event, event.timeStamp)
+      const gesture = recogniser.up(event, event.timeStamp, props.selected())
       if (gesture === 'select') {
         props.onSelect(props.slug)
       } else if (gesture === 'open') {
@@ -161,6 +163,9 @@ function usePlateInteraction(props: {
     coarse,
     cancel: () => {
       recogniser.cancel()
+    },
+    leave: (pointerType: string) => {
+      recogniser.leave(pointerType)
     },
     handlers: {
       /* Pointer clicks are resolved above because they may be pans, zooms, or
@@ -206,6 +211,7 @@ function Plate(props: {
   const interaction = usePlateInteraction({
     slug: props.item.slug,
     el: tileEl,
+    selected: () => props.selected,
     onSelect: props.onSelect,
     onOpen: props.onOpen,
   })
@@ -232,12 +238,14 @@ function Plate(props: {
         onPointerEnter={() => {
           setHovered(true)
         }}
-        onPointerLeave={() => {
+        onPointerLeave={(event) => {
           setHovered(false)
           // Leaving mid-sequence is the camera being used elsewhere, or the
           // pointer moving to another plate — either way this plate's gesture is
-          // over and must not pair with a later tap.
-          interaction.cancel()
+          // over and must not pair with a later tap. A post-release touch or pen
+          // leave is the exception: browsers emit it after releasing implicit
+          // capture, between the two halves of a legitimate double-tap.
+          interaction.leave(event.pointerType)
         }}
         title={
           props.selected
@@ -355,6 +363,7 @@ function CapabilityCard(props: {
   const interaction = usePlateInteraction({
     slug: props.item.slug,
     el: cardEl,
+    selected: () => props.selected,
     onSelect: props.onSelect,
     onOpen: props.onOpen,
   })
@@ -372,9 +381,9 @@ function CapabilityCard(props: {
       onPointerEnter={() => {
         setHovered(true)
       }}
-      onPointerLeave={() => {
+      onPointerLeave={(event) => {
         setHovered(false)
-        interaction.cancel()
+        interaction.leave(event.pointerType)
       }}
     >
       <span class={ui.cardThumb} ref={setThumbEl}>
@@ -611,7 +620,7 @@ export function HomeTab(props: HomeTabProps) {
                             <span class={ui.collectionIndex} aria-hidden="true">
                               {collection.index}
                             </span>
-                            <span class={ui.collectionCopy}>
+                            <div class={ui.collectionCopy}>
                               <h3
                                 class={ui.collectionTitle}
                                 id={`home-collection-${collection.id}`}
@@ -621,7 +630,7 @@ export function HomeTab(props: HomeTabProps) {
                               <span class={ui.collectionNote}>
                                 {collection.note}
                               </span>
-                            </span>
+                            </div>
                             <span class={ui.collectionCount}>
                               {collections()[collection.id].length}{' '}
                               {collections()[collection.id].length === 1
