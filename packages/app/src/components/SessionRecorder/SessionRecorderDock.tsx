@@ -1,8 +1,9 @@
 import { createSignal, onCleanup, onMount, Show } from 'solid-js'
+import { useToast } from '@/contexts/ToastContext'
 import { ChevronDown, CircleHalf, Cross } from '@/icons'
 import { isSessionRecording } from '@/recorder/recorder'
 import { storeSession } from '@/utils/sessionsDB'
-import { clampRecorderOpacity, FADED_RECORDER_OPACITY, MIN_RECORDER_OPACITY, recorderCollapsed, recorderFadeOnPlayback, recorderOffset, recorderOpacity, setRecorderCollapsed, setRecorderFadeOnPlayback, setRecorderOffset, setRecorderOpacity, setRecorderVisible, } from './recorderUi'
+import { clampRecorderOpacity, FADED_RECORDER_OPACITY, MIN_RECORDER_OPACITY, recorderCollapsed, recorderFadeOnPlayback, recorderOffset, recorderOpacity, recorderSavePending, setRecorderCollapsed, setRecorderFadeOnPlayback, setRecorderOffset, setRecorderOpacity, setRecorderSavePending, setRecorderVisible, } from './recorderUi'
 import { SessionLibraryPanel } from './SessionLibraryPanel'
 import { SessionRecorderControls } from './SessionRecorderControls'
 import styles from './SessionRecorderDock.module.css'
@@ -39,6 +40,8 @@ export function SessionRecorderDock(props: {
   flameDescriptor: FlameDescriptor
   /** Timeline + audio wiring to snapshot when a recording starts. */
   startExtras?: () => SessionStartExtras
+  /** Runs only after the recorder accepts the captured workspace. */
+  onRecordingStarted?: () => void
   target: ReplayTarget
   /** The session open for replay, owned by the workspace because a dropped
    *  file opens one too. */
@@ -47,6 +50,7 @@ export function SessionRecorderDock(props: {
   /** True while the canvas is animating or exporting — the cue to fade. */
   busy: boolean
 }) {
+  const { showToast } = useToast()
   const [libraryOpen, setLibraryOpen] = createSignal(false)
   const [libraryRevision, setLibraryRevision] = createSignal(0)
   const [showOpacitySlider, setShowOpacitySlider] = createSignal(false)
@@ -158,17 +162,32 @@ export function SessionRecorderDock(props: {
             session={session}
             target={props.target}
             compact={recorderCollapsed()}
-            onSave={(edited) => {
+            onSave={async (edited) => {
               // Saved as a NEW entry rather than overwriting: captions are an
               // authoring pass over a take, and the raw take is what you go
               // back to when a caption pass goes wrong.
               const name = `${
                 edited.initial.metadata?.name?.trim() || 'Recording'
               } (captioned)`
-              void storeSession(edited, name).then(() => {
+              setRecorderSavePending(true)
+              try {
+                await storeSession(edited, name)
                 setLibraryRevision((n) => n + 1)
                 setLibraryOpen(true)
-              })
+                showToast(`Saved "${name}" to Recordings`, 3500)
+              } catch (error: unknown) {
+                console.warn(
+                  '[recorder] could not save captioned session',
+                  error,
+                )
+                showToast(
+                  'Could not save captions locally — your caption edits are still open',
+                  5000,
+                )
+                throw error
+              } finally {
+                setRecorderSavePending(false)
+              }
             }}
             onClose={() => {
               props.onSessionChange(undefined)
@@ -214,6 +233,7 @@ export function SessionRecorderDock(props: {
           <SessionRecorderControls
             flameDescriptor={props.flameDescriptor}
             startExtras={props.startExtras}
+            onRecordingStarted={props.onRecordingStarted}
             onOpenSession={props.onSessionChange}
             onSessionStored={() => {
               setLibraryRevision((n) => n + 1)
@@ -299,11 +319,13 @@ export function SessionRecorderDock(props: {
           onClick={() => {
             setRecorderVisible(false)
           }}
-          disabled={isSessionRecording()}
+          disabled={isSessionRecording() || recorderSavePending()}
           title={
             isSessionRecording()
               ? 'Stop or discard the recording first'
-              : 'Hide the recorder (bring it back from the toolbar)'
+              : recorderSavePending()
+                ? 'Wait for the caption save to finish'
+                : 'Hide the recorder (bring it back from the toolbar)'
           }
           aria-label="Hide recorder"
         >

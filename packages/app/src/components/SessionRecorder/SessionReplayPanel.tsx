@@ -27,11 +27,12 @@ export function SessionReplayPanel(props: {
   compact?: boolean
   /** Persist the edited session (captions and holds). Absent = no editing
    *  affordance, which is what a read-only replay surface wants. */
-  onSave?: (session: RecordedSession) => void
+  onSave?: (session: RecordedSession) => Promise<void>
   onClose: () => void
 }) {
   const [speed, setSpeed] = createSignal(1)
   const [editing, setEditing] = createSignal<number>()
+  const [saving, setSaving] = createSignal(false)
 
   /**
    * The session is cloned into a store so captions and holds are editable
@@ -82,12 +83,17 @@ export function SessionReplayPanel(props: {
         <button
           type="button"
           class={styles.close}
+          disabled={saving()}
           onClick={() => {
             // Commit wherever we are, then hand the document back.
             player.stop()
             props.onClose()
           }}
-          title="Stop replaying and keep this step as the current flame"
+          title={
+            saving()
+              ? 'Wait for the caption save to finish before closing'
+              : 'Stop replaying and keep this step as the current flame'
+          }
         >
           Close
         </button>
@@ -305,16 +311,32 @@ export function SessionReplayPanel(props: {
             <button
               type="button"
               class={styles.button}
+              disabled={saving()}
+              aria-busy={saving()}
               onClick={() => {
                 // The controls above constrain authored fields, and this
                 // store-boundary check makes the guarantee explicit even if a
                 // future editor adds another field without matching limits.
                 const validated = validateSession(deepClone(unwrap(session)))
-                if (validated !== undefined) save()(validated)
+                if (validated === undefined || saving()) return
+
+                setSaving(true)
+                void save()(validated)
+                  .catch(() => {
+                    // The owner reports the storage error. Keeping the panel
+                    // mounted and editable is the recovery path here.
+                  })
+                  .finally(() => {
+                    setSaving(false)
+                  })
               }}
-              title="Save the captions and holds as a new recording"
+              title={
+                saving()
+                  ? 'Saving captions locally'
+                  : 'Save the captions and holds as a new recording'
+              }
             >
-              Save captions
+              {saving() ? 'Saving captions…' : 'Save captions'}
             </button>
           )}
         </Show>

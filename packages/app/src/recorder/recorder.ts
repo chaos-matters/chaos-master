@@ -78,6 +78,15 @@ export type SessionStartExtras = {
   view?: SessionViewSnapshot
 }
 
+export type SessionRecordingStartFailureReason =
+  | 'already-recording'
+  | 'workspace-not-serializable'
+  | 'workspace-not-recordable'
+
+export type SessionRecordingStartResult =
+  | { ok: true }
+  | { ok: false; reason: SessionRecordingStartFailureReason }
+
 let active: ActiveRecording | undefined
 let commandDepth = 0
 let suppressDepth = 0
@@ -269,10 +278,10 @@ function persistedSession(
 export function startSessionRecording(
   initial: FlameDescriptor,
   extras: SessionStartExtras = {},
-): void {
+): SessionRecordingStartResult {
   if (active) {
     console.warn('[recorder] A session recording is already active.')
-    return
+    return { ok: false, reason: 'already-recording' }
   }
   let next: ActiveRecording
   try {
@@ -296,14 +305,12 @@ export function startSessionRecording(
     }
   } catch {
     console.warn('[recorder] The current workspace cannot be serialized.')
-    return
+    return { ok: false, reason: 'workspace-not-serializable' }
   }
   next.baseJsonChars = JSON.stringify(sessionFrom(next)).length
   if (persistedSession(sessionFrom(next)) === undefined) {
-    console.warn(
-      '[recorder] The current workspace exceeds the recording session limits.',
-    )
-    return
+    console.warn('[recorder] The current workspace cannot be recorded safely.')
+    return { ok: false, reason: 'workspace-not-recordable' }
   }
   active = next
   resetGestureState()
@@ -313,6 +320,7 @@ export function startSessionRecording(
   // new recording starts it must not be embedded into anything.
   setLastSession(undefined)
   setIsSessionRecording(true)
+  return { ok: true }
 }
 
 /**

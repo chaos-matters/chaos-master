@@ -1,6 +1,6 @@
 import { createEffect, createSignal, onCleanup, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
-import { resolveFocusElement, revealFocusElement } from '@/recorder/focus'
+import { focusSelectors, resolveFocusElement, revealFocusElement, } from '@/recorder/focus'
 import styles from './ReplaySpotlight.module.css'
 import type { RecordedAction } from '@/recorder/schema'
 
@@ -37,6 +37,10 @@ const HOLE_PADDING = 10
  *  clears itself for the final image. */
 const TAIL_MS = 900
 
+/** Follow layout transitions briefly after each step. Long authored holds are
+ * event-driven after this window instead of polling the DOM every frame. */
+const LAYOUT_SETTLE_MS = 400
+
 export function ReplaySpotlight(props: {
   /** The step being shown, or undefined at the initial flame. */
   action: RecordedAction | undefined
@@ -47,57 +51,192 @@ export function ReplaySpotlight(props: {
   const [caption, setCaption] = createSignal<string>()
 
   // The element can move while a step is on screen: a sidebar scrolls, a card
-  // expands, the window resizes. Re-measuring on a frame loop is simpler than
-  // wiring a ResizeObserver plus a scroll listener per target, and it only
-  // runs while a hint is actually resolved.
+  // expands, the window resizes. Scroll/resize observers keep the hole aligned
+  // after a short settling window, avoiding a permanent frame loop during
+  // long captions or a paused replay.
   let frame: number | undefined
   let tailTimer: ReturnType<typeof setTimeout> | undefined
+  let trackingHint: string | undefined
+  let trackedElement: HTMLElement | undefined
+  let revealedElement: HTMLElement | undefined
+  let settleUntil = 0
+  let resizeObserver: ResizeObserver | undefined
+  let mutationObserver: MutationObserver | undefined
+  let listenersAttached = false
+  const mutationRoots = new Set<Node>()
+  const layoutPeers = new Set<Node>()
+
+  const elementContainsHint = (element: Element, hint: string) => {
+    for (const selector of focusSelectors(hint)) {
+      try {
+        if (element.matches(selector) || element.querySelector(selector)) {
+          return true
+        }
+      } catch {
+        // A malformed imported hint must not break replay tracking.
+      }
+    }
+    return false
+  }
+
+  const mutationTouchesFocus = (records: MutationRecord[]) => {
+    const hint = trackingHint
+    if (hint === undefined) return false
+
+    const element = trackedElement
+    if (element) {
+      // The target and its ancestors can move the spotlight. Descendant style
+      // changes cannot move the target's box without ResizeObserver firing,
+      // and accepting them here would turn animated playheads/meters inside a
+      // broad focus target back into permanent per-frame layout reads. Sibling
+      // boxes are observed separately because their layout can move the target
+      // without resizing it.
+      return records.some(
+        (record) =>
+          mutationRoots.has(record.target) || layoutPeers.has(record.target),
+      )
+    }
+
+    return records.some((record) => {
+      const target = record.target
+      if (target instanceof Element && elementContainsHint(target, hint)) {
+        return true
+      }
+      return [...record.addedNodes].some(
+        (node) => node instanceof Element && elementContainsHint(node, hint),
+      )
+    })
+  }
+
+  const measure = () => {
+    const hint = trackingHint
+    if (hint === undefined) return
+
+    const element = resolveFocusElement(hint) ?? undefined
+    if (!element) {
+      trackedElement = undefined
+      mutationRoots.clear()
+      layoutPeers.clear()
+      resizeObserver?.disconnect()
+      setRect(undefined)
+      return
+    }
+
+    if (element !== trackedElement) {
+      trackedElement = element
+      mutationRoots.clear()
+      layoutPeers.clear()
+      resizeObserver?.disconnect()
+      for (
+        let current: HTMLElement | null = element;
+        current !== null;
+        current = current.parentElement
+      ) {
+        mutationRoots.add(current)
+        resizeObserver?.observe(current)
+        const parent: HTMLElement | null = current.parentElement
+        if (parent) {
+          for (const sibling of Array.from(parent.children)) {
+            if (sibling === current || !(sibling instanceof HTMLElement)) {
+              continue
+            }
+            layoutPeers.add(sibling)
+            resizeObserver?.observe(sibling)
+          }
+        }
+      }
+    }
+
+    // A resolved target can still be clipped by the sidebar or another nested
+    // scrollport. Reveal it once for this step, then respect manual scrolling.
+    if (element !== revealedElement) {
+      revealFocusElement(element)
+      revealedElement = element
+    }
+
+    const box = element.getBoundingClientRect()
+    const next = {
+      x: box.left - HOLE_PADDING,
+      y: box.top - HOLE_PADDING,
+      width: box.width + HOLE_PADDING * 2,
+      height: box.height + HOLE_PADDING * 2,
+    }
+    setRect((previous) => {
+      if (
+        previous &&
+        previous.x === next.x &&
+        previous.y === next.y &&
+        previous.width === next.width &&
+        previous.height === next.height
+      ) {
+        return previous
+      }
+      return next
+    })
+  }
+
+  const scheduleMeasure = () => {
+    if (frame !== undefined || trackingHint === undefined) return
+    frame = requestAnimationFrame((now) => {
+      frame = undefined
+      measure()
+      if (now < settleUntil) scheduleMeasure()
+    })
+  }
 
   const stopTracking = () => {
     if (frame !== undefined) cancelAnimationFrame(frame)
     frame = undefined
+    trackingHint = undefined
+    trackedElement = undefined
+    revealedElement = undefined
+    mutationRoots.clear()
+    layoutPeers.clear()
+    resizeObserver?.disconnect()
+    resizeObserver = undefined
+    mutationObserver?.disconnect()
+    mutationObserver = undefined
+    if (listenersAttached) {
+      document.removeEventListener('scroll', scheduleMeasure, true)
+      window.removeEventListener('resize', scheduleMeasure)
+      listenersAttached = false
+    }
   }
 
   const track = (hint: string) => {
-    let revealedElement: HTMLElement | undefined
-    const measure = () => {
-      const element = resolveFocusElement(hint)
-      if (!element) {
-        // The control is not on screen — a collapsed card, a closed panel.
-        // Show the canvas rather than a hole over nothing.
-        setRect(undefined)
-      } else {
-        // A resolved target can still be clipped by the sidebar or another
-        // nested scrollport. Reveal it once for this step; the rAF loop below
-        // then follows the element as the container settles without fighting
-        // any manual scrolling for the rest of the hold.
-        if (element !== revealedElement) {
-          revealFocusElement(element)
-          revealedElement = element
-        }
-        const box = element.getBoundingClientRect()
-        const next = {
-          x: box.left - HOLE_PADDING,
-          y: box.top - HOLE_PADDING,
-          width: box.width + HOLE_PADDING * 2,
-          height: box.height + HOLE_PADDING * 2,
-        }
-        setRect((previous) => {
-          if (
-            previous &&
-            previous.x === next.x &&
-            previous.y === next.y &&
-            previous.width === next.width &&
-            previous.height === next.height
-          ) {
-            return previous
-          }
-          return next
-        })
-      }
-      frame = requestAnimationFrame(measure)
+    trackingHint = hint
+    settleUntil = globalThis.performance.now() + LAYOUT_SETTLE_MS
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(scheduleMeasure)
     }
+    if (typeof MutationObserver !== 'undefined') {
+      mutationObserver = new MutationObserver((records) => {
+        if (mutationTouchesFocus(records)) scheduleMeasure()
+      })
+      mutationObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: [
+          'class',
+          'style',
+          'hidden',
+          'open',
+          'data-focus-id',
+          'data-tour-target',
+          'data-parameter-path',
+        ],
+      })
+    }
+    document.addEventListener('scroll', scheduleMeasure, {
+      capture: true,
+      passive: true,
+    })
+    window.addEventListener('resize', scheduleMeasure)
+    listenersAttached = true
+
     measure()
+    scheduleMeasure()
   }
 
   createEffect(() => {

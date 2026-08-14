@@ -10,7 +10,7 @@ import { examples } from '@/flame/examples'
 import { deepClone } from '@/utils/clone'
 import { createStoreHistory } from '@/utils/createStoreHistory'
 import { createTimelineState } from '@/utils/timeline'
-import { cancelSessionRecording, lastFinishedSession, notePreviewStarted, recordedActionCount, recordSyntheticAction, reportDocumentWrite, reportTimelineWrite, reportUnreplayableOnce, startSessionRecording, stopSessionRecording, unnamedWriteCount, withRecordingSuppressed, } from './recorder'
+import { cancelSessionRecording, isSessionRecording, lastFinishedSession, notePreviewStarted, recordedActionCount, recordSyntheticAction, reportDocumentWrite, reportTimelineWrite, reportUnreplayableOnce, startSessionRecording, stopSessionRecording, unnamedWriteCount, withRecordingSuppressed, } from './recorder'
 import { replaySessionInstant } from './replay'
 import { MAX_ACTION_ARGS, MAX_ACTION_TIMESTAMP_MS, MAX_SESSION_ACTIONS, MAX_SESSION_JSON_CHARS, parseSession, serializeSession, sessionFilename, validateSession, } from './schema'
 import type { RecordedSession } from './schema'
@@ -136,6 +136,41 @@ function stopOrThrow(): RecordedSession {
 afterEach(() => {
   cancelSessionRecording()
   vi.restoreAllMocks()
+})
+
+describe('recording start feedback', () => {
+  it('reports a successful start and an already-active race', () => {
+    expect(startSessionRecording(examples.example1)).toEqual({ ok: true })
+    expect(startSessionRecording(examples.example1)).toEqual({
+      ok: false,
+      reason: 'already-recording',
+    })
+    expect(isSessionRecording()).toBe(true)
+  })
+
+  it('reports a workspace that cannot be serialized', () => {
+    const circular = deepClone(examples.example1) as FlameDescriptor & {
+      circular?: unknown
+    }
+    circular.circular = circular
+
+    expect(startSessionRecording(circular)).toEqual({
+      ok: false,
+      reason: 'workspace-not-serializable',
+    })
+    expect(isSessionRecording()).toBe(false)
+  })
+
+  it('reports a workspace outside the bounded session schema', () => {
+    const invalid = deepClone(examples.example1)
+    invalid.renderSettings.gamma = Number.NaN
+
+    expect(startSessionRecording(invalid)).toEqual({
+      ok: false,
+      reason: 'workspace-not-recordable',
+    })
+    expect(isSessionRecording()).toBe(false)
+  })
 })
 
 describe('record → replay round-trip', () => {

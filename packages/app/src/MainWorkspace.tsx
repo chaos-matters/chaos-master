@@ -57,7 +57,7 @@ import { PopulationSimulator } from './components/PopulationSimulator/Population
 import { ProgressBar } from './components/ProgressBar/ProgressBar'
 import { getPresetFromQuality, qualityPresets, } from './components/Quality/QualityPresets'
 import { QuickVariationPicker } from './components/QuickVariationPicker/QuickVariationPicker'
-import { recorderVisible } from './components/SessionRecorder/recorderUi'
+import { recorderSavePending, recorderVisible, } from './components/SessionRecorder/recorderUi'
 import { SessionRecorderDock } from './components/SessionRecorder/SessionRecorderDock'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
 import { createShareVariationLinkModal, createShareVariationLoadModal, } from './components/ShareVariationModal/ShareVariationModal'
@@ -410,6 +410,10 @@ export function MainWorkspace(props: AppProps) {
   // in the dock because dropping a .steps.json opens one too.
   const [replaySession, setReplaySession] = createSignal<RecordedSession>()
   const openReplaySession = (session: RecordedSession | undefined) => {
+    if (recorderSavePending()) {
+      showToast('Wait for the caption save to finish before changing replays')
+      return
+    }
     if (session !== undefined && isSessionRecording()) {
       showToast('Stop or discard the current recording before opening a replay')
       return
@@ -3782,9 +3786,6 @@ export function MainWorkspace(props: AppProps) {
                     flameDescriptor={flameDescriptor}
                     startExtras={() => {
                       // Wall-clock playback is not authored session state.
-                      // Freeze it before taking the start snapshot so the
-                      // playhead cannot advance underneath a new recording.
-                      if (timeline.isPlaying()) timeline.pause()
                       return {
                         timeline: cmdContext.timeline.edit?.snapshot(),
                         audio: cmdContext.audio?.snapshot(),
@@ -3796,6 +3797,17 @@ export function MainWorkspace(props: AppProps) {
                           showTimeline: showTimeline(),
                           sidebarOpen: showSidebar(),
                         },
+                      }
+                    }}
+                    onRecordingStarted={() => {
+                      // Freeze wall-clock playback only after the recorder
+                      // accepts the snapshot. A rejected start must leave the
+                      // viewer exactly as it was. This is recorder plumbing,
+                      // not an authored transport step in the new take.
+                      if (timeline.isPlaying()) {
+                        withRecordingSuppressed(() => {
+                          timeline.pause()
+                        })
                       }
                     }}
                     target={replayTarget}

@@ -7,8 +7,21 @@ import { downloadBlob } from '@/utils/blob'
 import { storeSession } from '@/utils/sessionsDB'
 import styles from './SessionRecorderControls.module.css'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
-import type { SessionStartExtras } from '@/recorder/recorder'
+import type { SessionRecordingStartFailureReason, SessionStartExtras, } from '@/recorder/recorder'
 import type { RecordedSession } from '@/recorder/schema'
+
+function recordingStartFailureMessage(
+  reason: SessionRecordingStartFailureReason,
+): string {
+  switch (reason) {
+    case 'already-recording':
+      return 'A step recording is already in progress'
+    case 'workspace-not-serializable':
+      return 'Recording could not start — this workspace cannot be serialized'
+    case 'workspace-not-recordable':
+      return 'Recording could not start — this workspace cannot be recorded safely'
+  }
+}
 
 /**
  * Record/stop controls for the session recorder
@@ -23,6 +36,8 @@ export function SessionRecorderControls(props: {
   /** The timeline and audio wiring to snapshot alongside the flame. Read at
    *  the moment recording starts, not at mount. */
   startExtras?: () => SessionStartExtras
+  /** Runs only after the recorder accepts the captured workspace. */
+  onRecordingStarted?: () => void
   onOpenSession: (session: RecordedSession) => void
   /** Called after a recording is stored, so the library list refetches. */
   onSessionStored: () => void
@@ -35,7 +50,23 @@ export function SessionRecorderControls(props: {
     // flame document twice is not free on large flames). The timeline and
     // audio wiring go in alongside the flame: keyframe edits mean nothing
     // without the tracks they land on.
-    startSessionRecording(props.flameDescriptor, props.startExtras?.())
+    let extras: SessionStartExtras | undefined
+    try {
+      extras = props.startExtras?.()
+    } catch (error) {
+      console.warn('[recorder] could not capture the workspace state', error)
+      showToast(
+        'Recording could not start — the workspace state could not be captured',
+        5000,
+      )
+      return
+    }
+    const result = startSessionRecording(props.flameDescriptor, extras)
+    if (!result.ok) {
+      showToast(recordingStartFailureMessage(result.reason), 5000)
+      return
+    }
+    props.onRecordingStarted?.()
   }
 
   /**

@@ -1,0 +1,103 @@
+import { fireEvent, render, screen } from '@solidjs/testing-library'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ToastHost } from '@/components/Toast/Toast'
+import { ToastProvider } from '@/contexts/ToastContext'
+import { examples } from '@/flame/examples'
+import { cancelSessionRecording, isSessionRecording } from '@/recorder/recorder'
+import { deepClone } from '@/utils/clone'
+import { SessionRecorderControls } from './SessionRecorderControls'
+
+describe('SessionRecorderControls start feedback', () => {
+  afterEach(() => {
+    cancelSessionRecording()
+    vi.restoreAllMocks()
+  })
+
+  it('reports a workspace snapshot failure instead of throwing', () => {
+    const error = new Error('timeline snapshot failed')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const onRecordingStarted = vi.fn()
+    const { unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderControls
+          flameDescriptor={examples.example1}
+          startExtras={() => {
+            throw error
+          }}
+          onRecordingStarted={onRecordingStarted}
+          onOpenSession={() => {}}
+          onSessionStored={() => {}}
+          onToggleLibrary={() => {}}
+        />
+        <ToastHost />
+      </ToastProvider>
+    ))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Record steps' }))
+
+    expect(
+      screen.getByText(
+        'Recording could not start — the workspace state could not be captured',
+      ),
+    ).toBeTruthy()
+    expect(warn).toHaveBeenCalledWith(
+      '[recorder] could not capture the workspace state',
+      error,
+    )
+    expect(isSessionRecording()).toBe(false)
+    expect(onRecordingStarted).not.toHaveBeenCalled()
+    unmount()
+  })
+
+  it('uses a truthful message for bounded-schema rejection', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const onRecordingStarted = vi.fn()
+    const invalid = deepClone(examples.example1)
+    invalid.renderSettings.gamma = Number.NaN
+    const { unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderControls
+          flameDescriptor={invalid}
+          onRecordingStarted={onRecordingStarted}
+          onOpenSession={() => {}}
+          onSessionStored={() => {}}
+          onToggleLibrary={() => {}}
+        />
+        <ToastHost />
+      </ToastProvider>
+    ))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Record steps' }))
+
+    expect(
+      screen.getByText(
+        'Recording could not start — this workspace cannot be recorded safely',
+      ),
+    ).toBeTruthy()
+    expect(isSessionRecording()).toBe(false)
+    expect(onRecordingStarted).not.toHaveBeenCalled()
+    unmount()
+  })
+
+  it('runs start side effects only after recording begins', () => {
+    const onRecordingStarted = vi.fn()
+    const { unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderControls
+          flameDescriptor={examples.example1}
+          onRecordingStarted={onRecordingStarted}
+          onOpenSession={() => {}}
+          onSessionStored={() => {}}
+          onToggleLibrary={() => {}}
+        />
+        <ToastHost />
+      </ToastProvider>
+    ))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Record steps' }))
+
+    expect(isSessionRecording()).toBe(true)
+    expect(onRecordingStarted).toHaveBeenCalledTimes(1)
+    unmount()
+  })
+})

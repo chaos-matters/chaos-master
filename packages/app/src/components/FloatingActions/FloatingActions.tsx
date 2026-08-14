@@ -2,7 +2,7 @@ import { createEffect, createSignal, Show } from 'solid-js'
 import { Bookmark, CameraIcon, Discord, Eye, FolderOpen, Home, Pause, Plus, Share, Shuffle, Zap, } from '@/icons'
 import { setActiveTab } from '@/lib/activeTab'
 import { defaultPills, QualityPresets } from '../Quality/QualityPresets'
-import { recorderVisible, setRecorderVisible, } from '../SessionRecorder/recorderUi'
+import { recorderSavePending, recorderVisible, setRecorderVisible, } from '../SessionRecorder/recorderUi'
 import ui from './FloatingActions.module.css'
 
 type Props = {
@@ -473,13 +473,16 @@ export function FloatingActions(props: Props) {
               classList={{
                 [ui.toggleActive as string]: recorderVisible(),
               }}
+              disabled={recorderSavePending()}
               onClick={() => {
                 setRecorderVisible(!recorderVisible())
               }}
               title={
-                recorderVisible()
-                  ? 'Hide the step recorder'
-                  : 'Show the step recorder'
+                recorderSavePending()
+                  ? 'Wait for the caption save to finish'
+                  : recorderVisible()
+                    ? 'Hide the step recorder'
+                    : 'Show the step recorder'
               }
             >
               {/* A record dot next to a step list — what the dock does. */}
