@@ -102,7 +102,7 @@ import { AutoCanvas } from './lib/AutoCanvas'
 import { transformFocusId, variationParamsFocusId, variationRandomizeFocusId, variationTypeFocusId, variationVisibilityFocusId, } from './recorder/focusIds'
 import { breakRecordingCoalescing, invalidateLastFinishedSession, isSessionRecording, notePreviewStarted, recordSyntheticAction, reportDerivedWorkspaceWrite, reportDocumentWrite, reportUnreplayable, reportUnreplayableOnce, withRecordingSuppressed, } from './recorder/recorder'
 import { applyReplayAudioWiring, canEnableReplayAudio } from './recorder/replay'
-import { captureTransformColors, paletteRestoreColorsAfterReplayCommand, } from './recorder/replayPaletteState'
+import { captureTransformColors, paletteRestoreColorsAfterReplayCommand, runPaletteRestoreTransition, } from './recorder/replayPaletteState'
 import { normalizeReplayPresentation, replaySideStateChanged, } from './recorder/replaySideState'
 import { createRecorderAwareTimeline } from './recorder/timelineActions'
 import { createAnimationExport } from './utils/animationExport'
@@ -469,20 +469,38 @@ export function MainWorkspace(props: AppProps) {
     },
   )
 
+  const withPaletteRestoreTransition = (
+    after: Record<string, { x: number; y: number }>,
+    description: string,
+    writeDocument: () => void,
+  ) => {
+    runPaletteRestoreTransition(
+      history,
+      prePaletteColors(),
+      after,
+      (colors) => setPrePaletteColors(colors),
+      description,
+      writeDocument,
+    )
+  }
+
   /**
    * File/gallery loads are document boundaries in the live editor, but a
    * recorder still needs a self-contained action that can reproduce the
-   * resulting document. Keep `history.replace` semantics and log the exact
-   * descriptor it produced, mirroring the 2D/3D switch path below.
+   * resulting document. Keep one replacement-style history entry and log the
+   * exact descriptor it produced, mirroring the 2D/3D switch path below.
    */
   const replaceLoadedFlame = (next: FlameDescriptor, label = 'Load flame') => {
     const flame = deepClone(next)
     // A different document cannot inherit another flame's pre-palette stash.
     // If the loaded flame already carries a palette, its earlier natural
-    // colours are unknowable; Unselect safely keeps its current colours.
-    setPrePaletteColors({})
+    // colours are unknowable; Unselect safely keeps its current colours. The
+    // history side effects restore the outgoing provenance if this load is
+    // undone and clear it again on redo.
     withRecordingSuppressed(() => {
-      history.replace(flame, label)
+      withPaletteRestoreTransition({}, label, () => {
+        setFlameDescriptor(() => flame, label)
+      })
     })
     recordSyntheticAction('flame.load', [deepClone(flame), label], label)
   }
@@ -544,6 +562,7 @@ export function MainWorkspace(props: AppProps) {
   createEffect(() => {
     const newFlame = props.flameFromWelcome?.()
     if (newFlame !== undefined) {
+      const outgoingPaletteRestoreColors = deepClone(prePaletteColors())
       // Order is load-bearing. `flushDirtyToRecents` reads the OUTGOING flame
       // and its tracks, so it has to run before the reset drops them —
       // otherwise a hand-off would silently destroy unsaved work.
@@ -553,7 +572,18 @@ export function MainWorkspace(props: AppProps) {
       // exactly like the first one would have. See resetWorkspaceForHandoff for
       // what was leaking and why.
       resetWorkspaceForHandoff()
-      history.replace(deepClone(newFlame))
+      runPaletteRestoreTransition(
+        history,
+        outgoingPaletteRestoreColors,
+        {},
+        (colors) => {
+          setPrePaletteColors(colors)
+        },
+        'Load Home flame',
+        () => {
+          setFlameDescriptor(() => deepClone(newFlame), 'Load Home flame')
+        },
+      )
       // Read BEFORE resetFlameFromWelcome() clears the whole hand-off.
       const capability = props.capabilityFromHome?.()
       if (capability !== undefined) {
@@ -852,7 +882,7 @@ export function MainWorkspace(props: AppProps) {
                 'Blend is still active — the loaded flame will look mixed',
                 4000,
               )
-            executeCommand('flame.load', cmdContext, flame)
+            executeFlameLoad(flame)
           }}
           respond={respond}
         />
@@ -872,7 +902,7 @@ export function MainWorkspace(props: AppProps) {
                 'Blend is still active — the loaded flame will look mixed',
                 4000,
               )
-            executeCommand('flame.load', cmdContext, flame)
+            executeFlameLoad(flame)
           }}
           onCompare={openDiffAsModal}
           respond={respond}
@@ -1172,25 +1202,32 @@ export function MainWorkspace(props: AppProps) {
   })
 
   const handlePaletteSelect = (palette: Palette) => {
-    // If no palette was selected before, save the current "natural" colors
-    if (selectedPaletteId() === '') {
-      setPrePaletteColors(captureTransformColors(flameDescriptor))
-    }
+    // If no palette was selected before, save the current "natural" colors.
+    // Switching palettes preserves that first snapshot.
+    const nextRestoreColors =
+      selectedPaletteId() === ''
+        ? captureTransformColors(flameDescriptor)
+        : prePaletteColors()
 
     // ONE history entry: transform colors AND the palette itself (it lives in
     // renderSettings.palette), so a single undo fully reverts the apply —
     // previously the palette identity sat in signals and undo half-reverted
-    // (colors back, palette grading still on). The command keeps both halves
-    // together for the same reason.
-    executeCommand('flame.applyPalette', cmdContext, palette)
+    // (colors back, palette grading still on). Palette provenance travels in
+    // the same entry's undo/redo effects, so Unselect remains correct after
+    // either history direction.
+    withPaletteRestoreTransition(nextRestoreColors, 'Apply Palette', () => {
+      executeCommand('flame.applyPalette', cmdContext, palette)
+    })
   }
 
   const handlePaletteUnselect = () => {
     // One undoable entry: restore pre-palette colors + drop the palette. The
     // colors come from a UI signal, so they are passed as an argument —
     // nothing outside the document can be reconstructed on replay.
-    executeCommand('flame.removePalette', cmdContext, prePaletteColors())
-    setPrePaletteColors({})
+    const restoreColors = prePaletteColors()
+    withPaletteRestoreTransition({}, 'Remove Palette', () => {
+      executeCommand('flame.removePalette', cmdContext, restoreColors)
+    })
   }
 
   // Shared by the toolbar Benchmark button and the `?benchmark` auto-open.
@@ -1872,7 +1909,7 @@ export function MainWorkspace(props: AppProps) {
     // also runs applyRandomizeSettings over the render settings with ambient
     // randomness; carrying the result keeps replay exact until that is
     // seeded too.
-    executeCommand('flame.load', cmdContext, newFlame, 'Randomize Flame')
+    executeFlameLoad(newFlame, 'Randomize Flame')
   }
 
   const runMutateFlame = async (
@@ -1907,7 +1944,7 @@ export function MainWorkspace(props: AppProps) {
 
     mutatedFlame.renderSettings = rs
     // Same reasoning as Randomize above.
-    executeCommand('flame.load', cmdContext, mutatedFlame, 'Mutate Flame')
+    executeFlameLoad(mutatedFlame, 'Mutate Flame')
   }
 
   // Keep the randomizer card visually fixed across a flame swap. Changing the
@@ -2196,7 +2233,7 @@ export function MainWorkspace(props: AppProps) {
     // Loading a history entry is a fresh starting point: keep unsaved work
     // recoverable and don't autosave the untouched loaded flame.
     flushDirtyToRecents()
-    executeCommand('flame.load', cmdContext, entry.flame, 'Load History Flame')
+    executeFlameLoad(entry.flame, 'Load History Flame')
     markLoadedBaseline()
   }
 
@@ -3326,6 +3363,7 @@ export function MainWorkspace(props: AppProps) {
     },
     flameDescriptor: () => flameDescriptor,
     setFlameDescriptor,
+    paletteRestoreColors: prePaletteColors,
     blendFlame,
     setBlendFlame,
     blendWeight,
@@ -3473,6 +3511,24 @@ export function MainWorkspace(props: AppProps) {
       peekRedoTarget: undoRouter.peekRedoTarget,
     },
   }
+
+  /**
+   * Whole-document command loads are undoable edits (randomize, genetics,
+   * history, New Flame). A loaded document has no trustworthy pre-palette
+   * provenance, so clear it atomically with the flame and restore the
+   * outgoing provenance only when this same history entry is undone.
+   */
+  const executeFlameLoad = (flame: FlameDescriptor, label?: string) => {
+    const description = label ?? 'Load Flame'
+    withPaletteRestoreTransition({}, description, () => {
+      if (label === undefined) {
+        executeCommand('flame.load', cmdContext, flame)
+      } else {
+        executeCommand('flame.load', cmdContext, flame, label)
+      }
+    })
+  }
+
   const recorderTimeline = createRecorderAwareTimeline(
     timeline,
     (id, ...args) => {
@@ -3790,6 +3846,7 @@ export function MainWorkspace(props: AppProps) {
       setFlyMode(view.flyMode)
       setShowTimeline(view.showTimeline)
       setShowSidebar(view.sidebarOpen)
+      setPrePaletteColors(deepClone(view.paletteRestoreColors ?? {}))
     },
     execute: (id, args) => {
       const currentPaletteColors = prePaletteColors()
@@ -3797,6 +3854,7 @@ export function MainWorkspace(props: AppProps) {
       // exact values the later live Unselect action must restore.
       const nextPaletteColors = paletteRestoreColorsAfterReplayCommand(
         id,
+        args,
         flameDescriptor,
         currentPaletteColors,
       )
@@ -4122,6 +4180,7 @@ export function MainWorkspace(props: AppProps) {
                           flyMode: flyMode(),
                           showTimeline: showTimeline(),
                           sidebarOpen: showSidebar(),
+                          paletteRestoreColors: deepClone(prePaletteColors()),
                         },
                       }
                     }}
@@ -4829,12 +4888,7 @@ export function MainWorkspace(props: AppProps) {
                                       'Blend is still active — the loaded flame will look mixed',
                                       4000,
                                     )
-                                  executeCommand(
-                                    'flame.load',
-                                    cmdContext,
-                                    flame,
-                                    'Apply Random Flame',
-                                  )
+                                  executeFlameLoad(flame, 'Apply Random Flame')
                                 }}
                                 hardwareTier={props.hardwareTier}
                                 isBusy={isRandomizing()}
@@ -6602,12 +6656,7 @@ export function MainWorkspace(props: AppProps) {
                                           'Blend is still active — the loaded flame will look mixed',
                                           4000,
                                         )
-                                      executeCommand(
-                                        'flame.load',
-                                        cmdContext,
-                                        child,
-                                        'Load Bred Flame',
-                                      )
+                                      executeFlameLoad(child, 'Load Bred Flame')
                                     }}
                                     onChangeParent={() => {
                                       respond()
@@ -6637,12 +6686,7 @@ export function MainWorkspace(props: AppProps) {
                                           'Blend is still active — the loaded flame will look mixed',
                                           4000,
                                         )
-                                      executeCommand(
-                                        'flame.load',
-                                        cmdContext,
-                                        child,
-                                        'Load Bred Flame',
-                                      )
+                                      executeFlameLoad(child, 'Load Bred Flame')
                                     }}
                                     onChangeParent={() => {
                                       respond()
@@ -6709,7 +6753,7 @@ export function MainWorkspace(props: AppProps) {
               const is3D =
                 (flameDescriptor.renderSettings.dimensions ?? 2) === 3
               const flame = deepClone(is3D ? initExample3D : initExample)
-              executeCommand('flame.load', cmdContext, flame, 'New Flame')
+              executeFlameLoad(flame, 'New Flame')
               setLoadedAnimation({ flame, tracks: [] })
               showToast('Fresh flame loaded — undo restores the previous one')
             }}
@@ -6853,7 +6897,12 @@ export function MainWorkspace(props: AppProps) {
               // recorder does not also flag the same, faithfully represented
               // switch as an unnamed write.
               withRecordingSuppressed(() => {
-                history.replace(deepClone(restored))
+                withPaletteRestoreTransition({}, `Switch to ${v}D`, () => {
+                  setFlameDescriptor(
+                    () => deepClone(restored),
+                    `Switch to ${v}D`,
+                  )
+                })
                 // Swap the timeline to the target dimension's tracks (empty
                 // on first entry — matches the starter flame).
                 timeline.loadTracks(restoredTracks ?? [])
@@ -6861,8 +6910,8 @@ export function MainWorkspace(props: AppProps) {
               // The switch restores from an in-memory stash, so replaying it
               // as "switch to 3D" would land on the VIEWER's stash, not ours.
               // Log the descriptor and tracks it actually produced instead —
-              // those replay exactly. (The live path keeps history.replace:
-              // a dimension switch is a document boundary, not an undo step.)
+              // those replay exactly. The live path keeps one replacement-
+              // style history entry, including its palette provenance.)
               recordSyntheticAction(
                 'flame.load',
                 [deepClone(restored), `Switch to ${v}D`],

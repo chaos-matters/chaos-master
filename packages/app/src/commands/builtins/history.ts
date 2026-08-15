@@ -1,6 +1,7 @@
 import { tryValidateFlame } from '@/flame/schema/flameSchema'
 import { tryValidateTimelineSnapshot } from '@/flame/schema/timeline'
 import { isUndoTargetWithinRecording, replaceCurrentRecordedAction, reportUnreplayable, } from '@/recorder/recorder'
+import { tryValidateTransformColorSnapshot } from '@/recorder/schema'
 import { deepClone } from '@/utils/clone'
 import { registerCommand } from '../registry'
 import type { CommandContext } from '../types'
@@ -11,14 +12,17 @@ registerCommand({
   label: 'Restore Recorded Workspace State',
   description: 'Restore the flame and timeline captured after undo or redo',
   validateReplayArgs(args) {
-    if (args.length !== 2) {
-      return 'workspace restore expects a flame and timeline snapshot'
+    if (args.length < 2 || args.length > 3) {
+      return 'workspace restore expects flame, timeline, and optional palette snapshots'
     }
     if (!tryValidateFlame(deepClone(args[0]))) {
       return 'workspace restore flame is invalid'
     }
     if (!tryValidateTimelineSnapshot(args[1])) {
       return 'workspace restore timeline is invalid'
+    }
+    if (args.length === 3 && !tryValidateTransformColorSnapshot(args[2])) {
+      return 'workspace restore palette provenance is invalid'
     }
     return undefined
   },
@@ -43,22 +47,27 @@ function replaceRecordedHistoryAction(
   system: 'flame' | 'timeline',
   label: 'Undo' | 'Redo',
 ) {
+  const paletteRestoreColors = ctx.paletteRestoreColors?.()
   if (system === 'timeline') {
     const timeline = ctx.timeline.edit?.snapshot()
     if (timeline) {
+      const args: unknown[] = [deepClone(ctx.flameDescriptor()), timeline]
+      if (paletteRestoreColors !== undefined) {
+        args.push(deepClone(paletteRestoreColors))
+      }
       replaceCurrentRecordedAction(
         'recorder.restoreWorkspaceSnapshot',
-        [deepClone(ctx.flameDescriptor()), timeline],
+        args,
         label,
       )
       return
     }
   }
-  replaceCurrentRecordedAction(
-    'flame.load',
-    [deepClone(ctx.flameDescriptor()), label],
-    label,
-  )
+  const args: unknown[] = [deepClone(ctx.flameDescriptor()), label]
+  if (paletteRestoreColors !== undefined) {
+    args.push(deepClone(paletteRestoreColors))
+  }
+  replaceCurrentRecordedAction('flame.load', args, label)
 }
 
 // Undo/redo move the history stacks without pushing new entries, so they are

@@ -259,5 +259,38 @@ describe('timeline snapshot budgets', () => {
         unsafePath,
       ]),
     ).toBeDefined()
+    expect(
+      preflightReplayCommand('recorder.restoreWorkspaceSnapshot', [
+        examples.example1,
+        timelineSnapshot(),
+        { constructor: { x: 0, y: 0 } },
+      ]),
+    ).toBeDefined()
+    expect(
+      preflightReplayCommand('flame.load', [
+        examples.example1,
+        'Redo',
+        { safe_transform: { x: Number.POSITIVE_INFINITY, y: 0 } },
+      ]),
+    ).toBeDefined()
+    expect(
+      preflightReplayCommand('flame.removePalette', [
+        { safe_transform: { x: 1e308, y: 0 } },
+      ]),
+    ).toBeDefined()
+    expect(
+      preflightReplayCommand('flame.load', [
+        examples.example1,
+        'Redo',
+        undefined,
+      ]),
+    ).toBeDefined()
+    expect(
+      preflightReplayCommand('recorder.restoreWorkspaceSnapshot', [
+        examples.example1,
+        timelineSnapshot(),
+        undefined,
+      ]),
+    ).toBeDefined()
   })
 })

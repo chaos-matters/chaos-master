@@ -5,6 +5,7 @@ import { isFlameGraphWithinLimits, isSafeFlameEntityId, tryValidateFlame, } from
 import { generateTransformId, generateVariationId, } from '@/flame/transformFunction'
 import { defaultLinearType, isVariationTypeFor, } from '@/flame/variationRegistry'
 import { getVariationDefault } from '@/flame/variations/utils'
+import { tryValidateTransformColorSnapshot } from '@/recorder/schema'
 import { deepClone } from '@/utils/clone'
 import { registerCommand } from '../registry'
 import type { CommandContext } from '../types'
@@ -1243,11 +1244,17 @@ registerCommand({
   // the editor stashes them in a signal when the palette is applied, and UI
   // state is not something a log can replay. Without them the palette is
   // simply dropped and the current colours stay.
+  validateReplayArgs(args) {
+    return args.length === 1 && tryValidateTransformColorSnapshot(args[0])
+      ? undefined
+      : 'remove palette expects one bounded transform-colour snapshot'
+  },
   execute(ctx, restoreColors?: unknown) {
-    const saved =
-      restoreColors !== null && typeof restoreColors === 'object'
-        ? (deepClone(restoreColors) as Record<string, { x: number; y: number }>)
-        : {}
+    const saved = tryValidateTransformColorSnapshot(restoreColors)
+    if (!saved) {
+      console.warn('[cmd] flame.removePalette: invalid restore colours')
+      return
+    }
     ctx.setFlameDescriptor((draft) => {
       for (const [tid, transform] of Object.entries(draft.transforms)) {
         const color = saved[tid]
@@ -1270,8 +1277,8 @@ registerCommand({
   // Validated through the normal migrate-on-parse path, the same one saved
   // flames and imports go through.
   validateReplayArgs(args) {
-    if (args.length < 1 || args.length > 2) {
-      return 'load expects a flame and an optional label'
+    if (args.length < 1 || args.length > 3) {
+      return 'load expects a flame, optional label, and optional palette snapshot'
     }
     if (!tryValidateFlame(deepClone(args[0]))) {
       return 'flame descriptor is invalid'
@@ -1281,6 +1288,9 @@ registerCommand({
       (typeof args[1] !== 'string' || args[1].length > 512)
     ) {
       return 'load label must be a short string'
+    }
+    if (args.length === 3 && !tryValidateTransformColorSnapshot(args[2])) {
+      return 'load palette provenance is invalid'
     }
     return undefined
   },

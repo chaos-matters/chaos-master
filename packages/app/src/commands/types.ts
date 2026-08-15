@@ -3,6 +3,7 @@ import type { v2f } from 'typegpu/data'
 import type { AudioMapping, AudioWiringSnapshot, } from '@/flame/schema/audioWiring'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineSnapshot } from '@/flame/schema/timeline'
+import type { TransformColorSnapshot } from '@/recorder/schema'
 import type { HistorySetter } from '@/utils/createStoreHistory'
 import type { TimelineTrack } from '@/utils/timeline'
 import type { UndoTarget } from '@/utils/undoRouting'
@@ -24,6 +25,8 @@ export interface CommandContext {
   beforeCommand?: () => void
   flameDescriptor: Accessor<FlameDescriptor>
   setFlameDescriptor: HistorySetter<FlameDescriptor>
+  /** Editor-only palette provenance serialized beside replay snapshots. */
+  paletteRestoreColors?: Accessor<TransformColorSnapshot>
   blendFlame: Accessor<FlameDescriptor | undefined>
   setBlendFlame: (flame: FlameDescriptor | undefined) => void
   blendWeight: Accessor<number>

@@ -7,11 +7,13 @@ import { vec2f } from 'typegpu/data'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { executeCommand, executeReplayCommand } from '@/commands/registry'
 import { examples } from '@/flame/examples'
+import { MAX_FLAME_TRANSFORMS } from '@/flame/schema/flameSchema'
 import { deepClone } from '@/utils/clone'
 import { createStoreHistory } from '@/utils/createStoreHistory'
 import { createTimelineState } from '@/utils/timeline'
 import { cancelSessionRecording, getLiveWorkspaceMutationGeneration, isSessionRecording, lastFinishedSession, notePreviewStarted, recordedActionCount, recordSyntheticAction, reportDerivedWorkspaceWrite, reportDocumentWrite, reportTimelineWrite, reportUnreplayableOnce, startSessionRecording, stopSessionRecording, unnamedWriteCount, withRecordingSuppressed, } from './recorder'
 import { replaySessionInstant } from './replay'
+import { captureTransformColors, paletteRestoreColorsAfterReplayCommand, runPaletteRestoreTransition, } from './replayPaletteState'
 import { MAX_ACTION_ARGS, MAX_ACTION_TIMESTAMP_MS, MAX_SESSION_ACTIONS, MAX_SESSION_JSON_CHARS, parseSession, serializeSession, sessionFilename, validateSession, } from './schema'
 import type { RecordedSession } from './schema'
 import type { CommandContext } from '@/commands/types'
@@ -343,9 +345,16 @@ describe('record → replay round-trip', () => {
     createRoot((dispose) => {
       const a = makeHeadlessWorld(examples.example1)
       const originalGamma = a.flame.renderSettings.gamma
+      const paletteRestoreColors = {
+        transform_one: { x: 0.17, y: -0.24 },
+      }
+      const ctx: CommandContext = {
+        ...a.ctx,
+        paletteRestoreColors: () => paletteRestoreColors,
+      }
       startSessionRecording(a.flame)
-      executeCommand('flame.setGamma', a.ctx, 9)
-      executeCommand('history.undo', a.ctx)
+      executeCommand('flame.setGamma', ctx, 9)
+      executeCommand('history.undo', ctx)
       const session = stopOrThrow()
 
       expect(a.flame.renderSettings.gamma).toBe(originalGamma)
@@ -356,6 +365,7 @@ describe('record → replay round-trip', () => {
       expect(
         (session.actions[1]?.args[0] as FlameDescriptor).renderSettings.gamma,
       ).toBe(originalGamma)
+      expect(session.actions[1]?.args[2]).toEqual(paletteRestoreColors)
       // Undo/redo move the stacks without pushing entries — they must NOT
       // show up as unnamed writes.
       expect(session.unnamedWriteCount).toBe(0)
@@ -1117,6 +1127,70 @@ describe('palette and document-load commands', () => {
     })
   })
 
+  it('preserves palette provenance through recorded undo, redo, and a replay fork', () => {
+    createRoot((dispose) => {
+      const a = makeHeadlessWorld(examples.example1)
+      const [restoreColors, setRestoreColors] = createSignal<
+        Record<string, { x: number; y: number }>
+      >({})
+      const ctx: CommandContext = {
+        ...a.ctx,
+        paletteRestoreColors: restoreColors,
+      }
+      const naturalColors = captureTransformColors(a.flame)
+
+      startSessionRecording(a.flame)
+      runPaletteRestoreTransition(
+        a.history,
+        restoreColors(),
+        naturalColors,
+        setRestoreColors,
+        'Apply Palette',
+        () => {
+          executeCommand('flame.applyPalette', ctx, palette)
+        },
+      )
+      executeCommand('history.undo', ctx)
+      executeCommand('history.redo', ctx)
+      const session = stopOrThrow()
+
+      expect(session.actions.map(({ id }) => id)).toEqual([
+        'flame.applyPalette',
+        'flame.load',
+        'flame.load',
+      ])
+      expect(session.actions[1]?.args[2]).toEqual({})
+      expect(session.actions[2]?.args[2]).toEqual(naturalColors)
+
+      const b = makeHeadlessWorld(examples.initExample)
+      let replayRestoreColors: Record<string, { x: number; y: number }> = {}
+      expect(
+        replaySessionInstant(session, {
+          loadInitial: (flame) => {
+            b.history.replace(flame, 'Replay: initial state')
+            replayRestoreColors = {}
+          },
+          execute: (id, args) => {
+            const next = paletteRestoreColorsAfterReplayCommand(
+              id,
+              args,
+              b.flame,
+              replayRestoreColors,
+            )
+            const accepted = executeReplayCommand(id, b.ctx, ...args)
+            if (accepted) replayRestoreColors = next
+            return accepted
+          },
+        }),
+      ).toBe(true)
+      expect(replayRestoreColors).toEqual(naturalColors)
+
+      executeCommand('flame.removePalette', b.ctx, replayRestoreColors)
+      expect(deepClone(b.flame)).toEqual(deepClone(examples.example1))
+      dispose()
+    })
+  })
+
   it('embeds the document in a load, so an import still replays', () => {
     createRoot((dispose) => {
       const a = makeHeadlessWorld(examples.example1)
@@ -1668,6 +1742,9 @@ describe('session start state beyond the flame', () => {
     flyMode: false,
     showTimeline: true,
     sidebarOpen: true,
+    paletteRestoreColors: {
+      transform_one: { x: 0.17, y: -0.24 },
+    },
   }
 
   it('carries timeline, audio, and view state through a round trip', () => {
@@ -1713,6 +1790,46 @@ describe('session start state beyond the flame', () => {
     const session = stopSessionRecording()!
     expect(session.initialTimeline).toBeUndefined()
     expect(parseSession(serializeSession(session))).toBeDefined()
+  })
+
+  it('rejects unsafe or oversized palette provenance', () => {
+    startSessionRecording(examples.example1, { view })
+    const session = stopSessionRecording()!
+    const oversized = Object.fromEntries(
+      Array.from({ length: MAX_FLAME_TRANSFORMS + 1 }, (_, index) => [
+        `transform_${index}`,
+        { x: 0, y: 0 },
+      ]),
+    )
+
+    expect(
+      validateSession({
+        ...session,
+        initialView: {
+          ...view,
+          paletteRestoreColors: {
+            constructor: { x: 0, y: 0 },
+          },
+        },
+      }),
+    ).toBeUndefined()
+    expect(
+      validateSession({
+        ...session,
+        initialView: {
+          ...view,
+          paletteRestoreColors: {
+            safe_transform: { x: 1e308, y: 0 },
+          },
+        },
+      }),
+    ).toBeUndefined()
+    expect(
+      validateSession({
+        ...session,
+        initialView: { ...view, paletteRestoreColors: oversized },
+      }),
+    ).toBeUndefined()
   })
 })
 

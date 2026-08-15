@@ -1,7 +1,9 @@
+import { createStore } from 'solid-js/store'
 import { describe, expect, it } from 'vitest'
 import { examples } from '@/flame/examples'
 import { deepClone } from '@/utils/clone'
-import { captureTransformColors, paletteRestoreColorsAfterReplayCommand, } from './replayPaletteState'
+import { createStoreHistory } from '@/utils/createStoreHistory'
+import { captureTransformColors, paletteRestoreColorsAfterReplayCommand, runPaletteRestoreTransition, } from './replayPaletteState'
 import type { TransformColorSnapshot } from './replayPaletteState'
 
 describe('replay palette restore state', () => {
@@ -11,6 +13,7 @@ describe('replay palette restore state', () => {
 
     let stash = paletteRestoreColorsAfterReplayCommand(
       'flame.applyPalette',
+      [],
       flame,
       {},
     )
@@ -22,6 +25,7 @@ describe('replay palette restore state', () => {
 
     stash = paletteRestoreColorsAfterReplayCommand(
       'flame.applyPalette',
+      [],
       flame,
       stash,
     )
@@ -35,6 +39,7 @@ describe('replay palette restore state', () => {
 
     const afterLoad = paletteRestoreColorsAfterReplayCommand(
       'flame.load',
+      [],
       examples.example1,
       stale,
     )
@@ -42,6 +47,7 @@ describe('replay palette restore state', () => {
 
     const seeded = paletteRestoreColorsAfterReplayCommand(
       'flame.applyPalette',
+      [],
       examples.example1,
       afterLoad,
     )
@@ -50,9 +56,145 @@ describe('replay palette restore state', () => {
     expect(
       paletteRestoreColorsAfterReplayCommand(
         'flame.removePalette',
+        [],
         examples.example1,
         seeded,
       ),
     ).toEqual({})
+  })
+
+  it('restores serialized provenance for history-compressed replay actions', () => {
+    const persisted = captureTransformColors(examples.example1)
+    const stale: TransformColorSnapshot = {
+      old_transform: { x: 0.2, y: -0.4 },
+    }
+
+    expect(
+      paletteRestoreColorsAfterReplayCommand(
+        'flame.load',
+        [examples.example1, 'Redo', persisted],
+        examples.example2,
+        stale,
+      ),
+    ).toEqual(persisted)
+    expect(
+      paletteRestoreColorsAfterReplayCommand(
+        'recorder.restoreWorkspaceSnapshot',
+        [examples.example1, { config: {}, tracks: [] }, persisted],
+        examples.example2,
+        stale,
+      ),
+    ).toEqual(persisted)
+  })
+
+  it('keeps legacy workspace restores but clears legacy document loads', () => {
+    const current = captureTransformColors(examples.example1)
+
+    expect(
+      paletteRestoreColorsAfterReplayCommand(
+        'recorder.restoreWorkspaceSnapshot',
+        [examples.example1, { config: {}, tracks: [] }],
+        examples.example1,
+        current,
+      ),
+    ).toBe(current)
+    expect(
+      paletteRestoreColorsAfterReplayCommand(
+        'flame.load',
+        [examples.example2, 'Load'],
+        examples.example1,
+        current,
+      ),
+    ).toEqual({})
+  })
+
+  it('moves load provenance with the replaced document through undo and redo', () => {
+    const initial = deepClone(examples.example1)
+    const loaded = deepClone(examples.example2)
+    const [flame, setFlame, history] = createStoreHistory(
+      createStore(deepClone(initial)),
+    )
+    let stash = captureTransformColors(initial)
+
+    runPaletteRestoreTransition(
+      history,
+      stash,
+      {},
+      (colors) => {
+        stash = colors
+      },
+      'Load Flame',
+      () => {
+        setFlame(() => deepClone(loaded), 'Load Flame')
+      },
+    )
+
+    expect(deepClone(flame)).toEqual(loaded)
+    expect(stash).toEqual({})
+
+    history.undo()
+    expect(deepClone(flame)).toEqual(initial)
+    expect(stash).toEqual(captureTransformColors(initial))
+
+    history.redo()
+    expect(deepClone(flame)).toEqual(loaded)
+    expect(stash).toEqual({})
+  })
+
+  it('moves palette apply/remove provenance through ordinary undo and redo', () => {
+    const initial = deepClone(examples.example1)
+    const [flame, setFlame, history] = createStoreHistory(
+      createStore(deepClone(initial)),
+    )
+    const naturalColors = captureTransformColors(initial)
+    let stash: TransformColorSnapshot = {}
+
+    runPaletteRestoreTransition(
+      history,
+      stash,
+      naturalColors,
+      (colors) => {
+        stash = colors
+      },
+      'Apply Palette',
+      () => {
+        setFlame((draft) => {
+          draft.renderSettings.exposure += 0.1
+        }, 'Apply Palette')
+      },
+    )
+    expect(stash).toEqual(naturalColors)
+
+    runPaletteRestoreTransition(
+      history,
+      stash,
+      {},
+      (colors) => {
+        stash = colors
+      },
+      'Remove Palette',
+      () => {
+        setFlame((draft) => {
+          draft.renderSettings.exposure += 0.1
+        }, 'Remove Palette')
+      },
+    )
+    expect(stash).toEqual({})
+
+    history.undo()
+    expect(stash).toEqual(naturalColors)
+
+    history.undo()
+    expect(stash).toEqual({})
+    expect(flame.renderSettings.exposure).toBe(initial.renderSettings.exposure)
+
+    history.redo()
+    expect(stash).toEqual(naturalColors)
+
+    history.redo()
+    expect(stash).toEqual({})
+    expect(flame.renderSettings.exposure).toBeCloseTo(
+      initial.renderSettings.exposure + 0.2,
+    )
   })
 })
