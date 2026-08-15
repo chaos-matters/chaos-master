@@ -30,6 +30,22 @@ type HistoryItem = {
   seq?: number
 }
 
+/**
+ * Opaque lease for a long-lived preview transaction.
+ *
+ * Ordinary pointer gestures do not need one. Timed replay does: it leaves a
+ * preview open while waiting between steps, so an unrelated user gesture must
+ * be able to take the document back without accidentally appending its writes
+ * to replay's undo entry (or letting later replay steps append to the user's
+ * gesture).
+ */
+export type HistoryPreviewOwner = symbol
+
+type PreviewHistoryItem = HistoryItem & {
+  owner?: HistoryPreviewOwner
+  onTakeover?: () => void
+}
+
 export type HistoryCommitOptions = Pick<
   HistoryItem,
   'undoEffect' | 'redoEffect' | 'force'
@@ -48,9 +64,30 @@ export type ChangeHistory<T> = {
   readonly hasUndo: () => boolean
   readonly hasRedo: () => boolean
   readonly startPreview: (description?: string) => void
+  /**
+   * Open a preview that only writes made through `withPreviewOwner` may join.
+   * The first ordinary write or gesture synchronously invokes `onTakeover`;
+   * the owner should stop its producer and commit the preview there.
+   */
+  readonly startOwnedPreview: (
+    description: string | undefined,
+    onTakeover: () => void,
+  ) => HistoryPreviewOwner
+  /** Run one owned producer write. Throws after that owner has relinquished. */
+  readonly withPreviewOwner: <R>(owner: HistoryPreviewOwner, fn: () => R) => R
+  /** Relinquish an owned preview before a non-flame command mutates UI state. */
+  readonly takeOverOwnedPreview: () => boolean
+  /** True for any preview, including one exclusively owned by replay. */
+  readonly hasOpenPreview: () => boolean
+  /** True when the current/ordinary producer owns the open preview. */
   readonly isPreviewing: () => boolean
   readonly isUndoingOrRedoing: () => boolean
   readonly commit: (options?: HistoryCommitOptions) => void
+  /** Commit only when `owner` still owns the active preview. */
+  readonly commitOwnedPreview: (
+    owner: HistoryPreviewOwner,
+    options?: HistoryCommitOptions,
+  ) => boolean
   /** Journal stamp of the entry the next undo/redo would apply (null: none).
    *  Used by the cross-system undo router; always null when not journaled. */
   readonly peekUndoSeq: () => number | null
@@ -61,6 +98,9 @@ export type ChangeHistory<T> = {
    *  like 3D auto-exposure (whose reactive write after an undo would inject
    *  a fresh entry and destroy redo). */
   readonly setSilently: (setFn: (draft: T) => void) => void
+  /** Replace the store WITHOUT recording history. Used by undo side effects
+   *  that must restore writes which were intentionally silent at source. */
+  readonly replaceSilently: (value: T) => void
 }
 
 type CreateStoreHistoryOptions = {
@@ -97,16 +137,28 @@ export function createStoreHistory<T extends object>(
   const [isUndoingOrRedoing, setIsUndoingOrRedoing] =
     createSignal<boolean>(false)
   const [stack, setStack] = createSignal<HistoryItem[]>([], { equals: false })
-  const [preview, setPreview] = createSignal<HistoryItem | undefined>(
+  const [preview, setPreview] = createSignal<PreviewHistoryItem | undefined>(
     undefined,
     {
       equals: false,
     },
   )
+  let activePreviewOwner: HistoryPreviewOwner | undefined
+  let takeoverInProgress: HistoryPreviewOwner | undefined
 
   const hasUndo = () => stackIndex() >= 0
   const hasRedo = () => stackIndex() < stack().length - 1
-  const isPreviewing = () => Boolean(preview())
+  // Ordinary gesture code commonly does
+  // `if (!history.isPreviewing()) history.startPreview(...)`. An exclusive
+  // replay preview belongs to a different producer, so it must look closed to
+  // that caller; starting the gesture then takes replay over atomically.
+  const isPreviewing = () => {
+    const item = preview()
+    return Boolean(
+      item && (item.owner === undefined || item.owner === activePreviewOwner),
+    )
+  }
+  const hasOpenPreview = () => preview() !== undefined
   const peekUndoSeq = () => stack()[stackIndex()]?.seq ?? null
   const peekRedoSeq = () => stack()[stackIndex() + 1]?.seq ?? null
 
@@ -220,7 +272,47 @@ export function createStoreHistory<T extends object>(
     setStore(reconcile((result ?? unwrap(store)) as T))
   }
 
+  const replaceSilently = (value: T) => {
+    setStore(reconcile(deepClone(value)))
+  }
+
+  /**
+   * Hand an owned preview back before an unrelated producer writes.
+   *
+   * `onTakeover` is deliberately synchronous: the timed player clears its
+   * pending timer and closes the replay transaction before this user write is
+   * evaluated, so there is never a mixed preview. The defensive fallback
+   * keeps the store writable if a future owner forgets to close its lease.
+   */
+  function relinquishOwnedPreview(): boolean {
+    const item = preview()
+    if (
+      item?.owner === undefined ||
+      item.owner === activePreviewOwner ||
+      item.owner === takeoverInProgress
+    ) {
+      return false
+    }
+
+    takeoverInProgress = item.owner
+    try {
+      item.onTakeover?.()
+    } finally {
+      takeoverInProgress = undefined
+    }
+
+    const stillOwned = preview()
+    if (stillOwned?.owner === item.owner) {
+      console.warn(
+        `Preview owner did not close "${stillOwned.description}" during takeover; committing it defensively`,
+      )
+      commitOwnedPreview(item.owner)
+    }
+    return true
+  }
+
   const set: HistorySetter<T> = (setFn, description) => {
+    relinquishOwnedPreview()
     // Run the mutation callback exactly ONCE. produceWithPatches yields both
     // the resulting state and the patches; the store is then updated by
     // reconciling that result. Re-running setFn against the store (the old
@@ -262,7 +354,12 @@ export function createStoreHistory<T extends object>(
     })
   }
 
-  function startPreview(description?: string) {
+  function openPreview(
+    description?: string,
+    owner?: HistoryPreviewOwner,
+    onTakeover?: () => void,
+  ) {
+    relinquishOwnedPreview()
     const preview_ = preview()
     if (preview_) {
       // Auto-commit the stale preview (e.g. orphaned by wheel debounce or
@@ -272,8 +369,47 @@ export function createStoreHistory<T extends object>(
       )
       commit()
     }
-    setPreview({ forwardPatches: [], backwardPatches: [], description })
+    setPreview({
+      forwardPatches: [],
+      backwardPatches: [],
+      description,
+      owner,
+      onTakeover,
+    })
     onPreviewStarted?.()
+  }
+
+  function startPreview(description?: string) {
+    openPreview(description)
+  }
+
+  function startOwnedPreview(
+    description: string | undefined,
+    onTakeover: () => void,
+  ): HistoryPreviewOwner {
+    const owner = Symbol(description ?? 'history-preview')
+    openPreview(description, owner, onTakeover)
+    return owner
+  }
+
+  function withPreviewOwner<R>(owner: HistoryPreviewOwner, fn: () => R): R {
+    if (preview()?.owner !== owner) {
+      throw new Error('History preview owner no longer owns the active preview')
+    }
+    const previousOwner = activePreviewOwner
+    activePreviewOwner = owner
+    try {
+      return fn()
+    } finally {
+      activePreviewOwner = previousOwner
+    }
+  }
+
+  function commitItem(item: PreviewHistoryItem, options: HistoryCommitOptions) {
+    batch(() => {
+      addToStack({ ...item, ...options }, true)
+      setPreview(undefined)
+    })
   }
 
   function commit(options: HistoryCommitOptions = {}) {
@@ -284,13 +420,27 @@ export function createStoreHistory<T extends object>(
       // browser-initiated cancel, or component unmount). Safe to ignore.
       return
     }
-    batch(() => {
-      addToStack({ ...item, ...options }, true)
-      setPreview(undefined)
-    })
+    if (item.owner !== undefined) {
+      // A pointer-up from a gesture that never started must not accidentally
+      // close a replay transaction that happens to be open at the time.
+      console.warn("Can't commit a preview owned by another producer.")
+      return
+    }
+    commitItem(item, options)
+  }
+
+  function commitOwnedPreview(
+    owner: HistoryPreviewOwner,
+    options: HistoryCommitOptions = {},
+  ): boolean {
+    const item = preview()
+    if (item?.owner !== owner) return false
+    commitItem(item, options)
+    return true
   }
 
   function replace(value: T, description?: string) {
+    relinquishOwnedPreview()
     batch(() => {
       const [_, forwardPatches, backwardPatches] = produceWithPatches(
         deepClone(store),
@@ -322,12 +472,18 @@ export function createStoreHistory<T extends object>(
       hasRedo,
       isUndoingOrRedoing,
       startPreview,
+      startOwnedPreview,
+      withPreviewOwner,
+      takeOverOwnedPreview: relinquishOwnedPreview,
+      hasOpenPreview,
       isPreviewing,
       commit,
+      commitOwnedPreview,
       replace,
       peekUndoSeq,
       peekRedoSeq,
       setSilently,
+      replaceSilently,
     } satisfies ChangeHistory<T>,
   ] as const
 }

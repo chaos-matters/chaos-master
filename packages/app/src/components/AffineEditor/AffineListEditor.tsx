@@ -8,6 +8,7 @@ import { TrackChangesDiamond } from '@/components/Timeline/TrackChangesDiamond'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useTimeline } from '@/contexts/TimelineContext'
 import { randomizeAffineCoef } from '@/flame/randomize'
+import { affineFocusId, affineRandomizeFocusId, affineResetFocusId, } from '@/recorder/focusIds'
 import { keyframeChangedParams } from '@/utils/keyframeOnChange'
 import { buildReadableIds } from '@/utils/readableIds'
 import { recordEntries } from '@/utils/record'
@@ -29,6 +30,14 @@ export type AffineListEditorProps = {
     tid: string,
     which: 'pre' | 'post',
     affine: AffineParams,
+    origin?: 'grid' | 'randomize' | 'reset',
+  ) => void
+  /** Keep coefficient scrubs addressable as their own semantic action. */
+  setAffineCoefficient?: (
+    tid: string,
+    which: 'pre' | 'post',
+    key: string,
+    value: number,
   ) => void
   affineMode: 'preAffine' | 'postAffine'
   is3D?: boolean
@@ -67,6 +76,7 @@ export function AffineListEditor(props: AffineListEditorProps) {
   const applyAffine = (
     tid: string,
     next: (coefs: Record<string, number>) => void,
+    origin: 'grid' | 'randomize' | 'reset' = 'grid',
   ) => {
     const dispatch = props.setTransformAffine
     if (dispatch) {
@@ -82,6 +92,7 @@ export function AffineListEditor(props: AffineListEditorProps) {
         tid,
         props.affineMode === 'postAffine' ? 'post' : 'pre',
         draft as unknown as AffineParams,
+        origin,
       )
     } else {
       props.setTransforms((store) => {
@@ -108,6 +119,7 @@ export function AffineListEditor(props: AffineListEditorProps) {
           return (
             <div
               class={ui.transformCard}
+              data-focus-id={affineFocusId(tid)}
               classList={{
                 [ui.selected as string]: isSelected(),
                 [ui.dimmed as string]: isDimmed(),
@@ -142,16 +154,22 @@ export function AffineListEditor(props: AffineListEditorProps) {
                 </Show>
                 <DiceButton
                   title="Randomize affine coefs"
+                  focusId={affineRandomizeFocusId(tid)}
                   onClick={() => {
                     // Rolled here so the recorded action carries the result.
-                    applyAffine(tid, (coefs) => {
-                      for (const key of activeCoefs()) {
-                        coefs[key] = randomizeAffineCoef(
-                          coefs[key] ?? (['a', 'e', 'i'].includes(key) ? 1 : 0),
-                          key,
-                        )
-                      }
-                    })
+                    applyAffine(
+                      tid,
+                      (coefs) => {
+                        for (const key of activeCoefs()) {
+                          coefs[key] = randomizeAffineCoef(
+                            coefs[key] ??
+                              (['a', 'e', 'i'].includes(key) ? 1 : 0),
+                            key,
+                          )
+                        }
+                      },
+                      'randomize',
+                    )
                     if (props.enableChangeTracking) {
                       keyframeChangedParams(
                         timeline,
@@ -165,12 +183,17 @@ export function AffineListEditor(props: AffineListEditorProps) {
                 />
                 <ResetButton
                   title="Reset affine to identity (no scale/rotation/offset)"
+                  focusId={affineResetFocusId(tid)}
                   onClick={() => {
-                    applyAffine(tid, (coefs) => {
-                      for (const key of activeCoefs()) {
-                        coefs[key] = ['a', 'e', 'i'].includes(key) ? 1 : 0
-                      }
-                    })
+                    applyAffine(
+                      tid,
+                      (coefs) => {
+                        for (const key of activeCoefs()) {
+                          coefs[key] = ['a', 'e', 'i'].includes(key) ? 1 : 0
+                        }
+                      },
+                      'reset',
+                    )
                   }}
                 />
               </div>
@@ -185,9 +208,15 @@ export function AffineListEditor(props: AffineListEditorProps) {
                       }
                       step={0.001}
                       onInput={(val) => {
-                        applyAffine(tid, (coefs) => {
-                          coefs[key] = val
-                        })
+                        const which =
+                          props.affineMode === 'postAffine' ? 'post' : 'pre'
+                        if (props.setAffineCoefficient) {
+                          props.setAffineCoefficient(tid, which, key, val)
+                        } else {
+                          applyAffine(tid, (coefs) => {
+                            coefs[key] = val
+                          })
+                        }
                       }}
                       dataParameterPath={`transform.${tid}.${props.affineMode}.${key}`}
                     />

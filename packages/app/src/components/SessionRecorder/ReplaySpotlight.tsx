@@ -1,64 +1,90 @@
-import { createEffect, createSignal, onCleanup, Show } from 'solid-js'
+import { createEffect, createSignal, createUniqueId, For, onCleanup, Show, } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { focusSelectors, resolveFocusElement, revealFocusElement, } from '@/recorder/focus'
 import styles from './ReplaySpotlight.module.css'
 import type { RecordedAction } from '@/recorder/schema'
 
 /**
- * The follow-cam (docs/channel-content-plan.md §7).
+ * Replay follow-cam: keep the generated flame pristine, quiet the editor
+ * chrome, reveal the exact control being changed, and caption the step.
  *
- * A dense UI at full size while something small changes in a corner is the
- * number one reason tool videos lose people — nobody can see which slider
- * moved. During a replay this dims everything, cuts a hole around the control
- * the current step touches, and captions it with the step's label.
- *
- * Three deliberate properties:
- *
- *  - **It eases rather than cuts.** The hole animates from wherever it was, so
- *    the viewer keeps their bearings between steps. Transitions are CSS, so a
- *    reduced-motion preference disables them without touching this code.
- *  - **It returns to the canvas for the result.** A step whose hint does not
- *    resolve — or a step that IS the picture, like a camera move — fades the
- *    overlay out entirely rather than spotlighting nothing. The payoff of
- *    every step is the image, and it should be shown whole.
- *  - **It never eats a click.** The whole overlay is `pointer-events: none`;
- *    the viewer can pause, scrub or take over mid-replay with it up.
- *
- * The hint comes from the recording, not from this component — that is what
- * makes a viewer's replay *directed* rather than merely re-executed.
+ * The scrim is an SVG mask rather than the old single giant box-shadow. A
+ * mask can preserve both the flame canvas and the current control, while
+ * deliberately dimming sidebar/timeline chrome that overlaps the canvas.
  */
 
 type Rect = { x: number; y: number; width: number; height: number }
+type Viewport = { width: number; height: number }
 
-/** Breathing room around the spotlit control. */
-const HOLE_PADDING = 10
-
-/** How long the caption stays up after the last step, before the overlay
- *  clears itself for the final image. */
+const TARGET_PADDING = 10
+const TRANSPORT_PADDING = 6
 const TAIL_MS = 900
-
-/** Follow layout transitions briefly after each step. Long authored holds are
- * event-driven after this window instead of polling the DOM every frame. */
 const LAYOUT_SETTLE_MS = 400
+const REGION_SELECTOR = '[data-replay-region]'
+
+function sameRect(a: Rect | undefined, b: Rect | undefined): boolean {
+  return (
+    a === b ||
+    (a !== undefined &&
+      b !== undefined &&
+      a.x === b.x &&
+      a.y === b.y &&
+      a.width === b.width &&
+      a.height === b.height)
+  )
+}
+
+function sameRects(a: readonly Rect[], b: readonly Rect[]): boolean {
+  return (
+    a.length === b.length && a.every((rect, index) => sameRect(rect, b[index]))
+  )
+}
+
+function clippedRect(element: Element, padding = 0): Rect | undefined {
+  const box = element.getBoundingClientRect()
+  const left = Math.max(0, box.left - padding)
+  const top = Math.max(0, box.top - padding)
+  const right = Math.min(window.innerWidth, box.right + padding)
+  const bottom = Math.min(window.innerHeight, box.bottom + padding)
+  if (right <= left || bottom <= top) return undefined
+  return { x: left, y: top, width: right - left, height: bottom - top }
+}
+
+function sameElements(a: readonly Element[], b: readonly Element[]): boolean {
+  return (
+    a.length === b.length && a.every((element, index) => element === b[index])
+  )
+}
+
+function containsReplayRegion(element: Element): boolean {
+  return (
+    element.matches(REGION_SELECTOR) ||
+    element.querySelector(REGION_SELECTOR) !== null
+  )
+}
 
 export function ReplaySpotlight(props: {
-  /** The step being shown, or undefined at the initial flame. */
   action: RecordedAction | undefined
-  /** The transport reached the natural end (as opposed to pausing/seeking). */
   finished: boolean
 }) {
-  const [rect, setRect] = createSignal<Rect>()
+  const maskId = `replay-mask-${createUniqueId()}`
+  const [targetRect, setTargetRect] = createSignal<Rect>()
+  const [canvasRect, setCanvasRect] = createSignal<Rect>()
+  const [dimRects, setDimRects] = createSignal<Rect[]>([])
+  const [transportRects, setTransportRects] = createSignal<Rect[]>([])
+  const [viewport, setViewport] = createSignal<Viewport>({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  })
   const [caption, setCaption] = createSignal<string>()
 
-  // The element can move while a step is on screen: a sidebar scrolls, a card
-  // expands, the window resizes. Scroll/resize observers keep the hole aligned
-  // after a short settling window, avoiding a permanent frame loop during
-  // long captions or a paused replay.
   let frame: number | undefined
   let tailTimer: ReturnType<typeof setTimeout> | undefined
+  let tracking = false
   let trackingHint: string | undefined
-  let trackedElement: HTMLElement | undefined
-  let revealedElement: HTMLElement | undefined
+  let trackedElement: Element | undefined
+  let revealedElement: Element | undefined
+  let trackedLayoutElements: Element[] = []
   let settleUntil = 0
   let resizeObserver: ResizeObserver | undefined
   let mutationObserver: MutationObserver | undefined
@@ -73,110 +99,138 @@ export function ReplaySpotlight(props: {
           return true
         }
       } catch {
-        // A malformed imported hint must not break replay tracking.
+        // Imported hints are user data; a malformed one must not stop replay.
       }
     }
     return false
   }
 
-  const mutationTouchesFocus = (records: MutationRecord[]) => {
-    const hint = trackingHint
-    if (hint === undefined) return false
-
-    const element = trackedElement
-    if (element) {
-      // The target and its ancestors can move the spotlight. Descendant style
-      // changes cannot move the target's box without ResizeObserver firing,
-      // and accepting them here would turn animated playheads/meters inside a
-      // broad focus target back into permanent per-frame layout reads. Sibling
-      // boxes are observed separately because their layout can move the target
-      // without resizing it.
-      return records.some(
-        (record) =>
-          mutationRoots.has(record.target) || layoutPeers.has(record.target),
-      )
-    }
-
+  const mutationTouchesLayout = (records: MutationRecord[]) => {
     return records.some((record) => {
-      const target = record.target
-      if (target instanceof Element && elementContainsHint(target, hint)) {
+      if (mutationRoots.has(record.target) || layoutPeers.has(record.target)) {
         return true
       }
-      return [...record.addedNodes].some(
-        (node) => node instanceof Element && elementContainsHint(node, hint),
-      )
+
+      const nodes = [...record.addedNodes, ...record.removedNodes]
+      if (
+        nodes.some(
+          (node) => node instanceof Element && containsReplayRegion(node),
+        )
+      ) {
+        return true
+      }
+
+      const hint = trackingHint
+      if (trackedElement === undefined && hint !== undefined) {
+        const target = record.target
+        if (target instanceof Element && elementContainsHint(target, hint)) {
+          return true
+        }
+        return [...record.addedNodes].some(
+          (node) => node instanceof Element && elementContainsHint(node, hint),
+        )
+      }
+      return false
     })
   }
 
-  const measure = () => {
-    const hint = trackingHint
-    if (hint === undefined) return
+  const rebuildLayoutObservers = (elements: Element[]) => {
+    if (sameElements(trackedLayoutElements, elements)) return
+    trackedLayoutElements = elements
+    mutationRoots.clear()
+    layoutPeers.clear()
+    resizeObserver?.disconnect()
 
-    const element = resolveFocusElement(hint) ?? undefined
-    if (!element) {
-      trackedElement = undefined
-      mutationRoots.clear()
-      layoutPeers.clear()
-      resizeObserver?.disconnect()
-      setRect(undefined)
-      return
-    }
-
-    if (element !== trackedElement) {
-      trackedElement = element
-      mutationRoots.clear()
-      layoutPeers.clear()
-      resizeObserver?.disconnect()
+    for (const element of elements) {
       for (
-        let current: HTMLElement | null = element;
+        let current: Element | null = element;
         current !== null;
         current = current.parentElement
       ) {
         mutationRoots.add(current)
         resizeObserver?.observe(current)
-        const parent: HTMLElement | null = current.parentElement
-        if (parent) {
-          for (const sibling of Array.from(parent.children)) {
-            if (sibling === current || !(sibling instanceof HTMLElement)) {
-              continue
-            }
-            layoutPeers.add(sibling)
-            resizeObserver?.observe(sibling)
-          }
+        const parent: Element | null = current.parentElement
+        if (!parent) continue
+        for (const sibling of Array.from(parent.children)) {
+          if (sibling === current) continue
+          layoutPeers.add(sibling)
+          resizeObserver?.observe(sibling)
         }
       }
     }
+  }
 
-    // A resolved target can still be clipped by the sidebar or another nested
-    // scrollport. Reveal it once for this step, then respect manual scrolling.
+  const measure = () => {
+    if (!tracking) return
+
+    setViewport({ width: window.innerWidth, height: window.innerHeight })
+
+    const regions = Array.from(document.querySelectorAll(REGION_SELECTOR))
+    const canvasElements = regions.filter(
+      (element) => element.getAttribute('data-replay-region') === 'canvas',
+    )
+    const dimElements = regions.filter(
+      (element) => element.getAttribute('data-replay-region') === 'dim',
+    )
+    const transportElements = regions.filter(
+      (element) => element.getAttribute('data-replay-region') === 'transport',
+    )
+
+    const nextCanvas = canvasElements
+      .map((element) => clippedRect(element))
+      .find((rect) => rect !== undefined)
+    setCanvasRect((previous) =>
+      sameRect(previous, nextCanvas) ? previous : nextCanvas,
+    )
+
+    const nextDimRects = dimElements.flatMap((element) => {
+      const rect = clippedRect(element)
+      return rect ? [rect] : []
+    })
+    setDimRects((previous) =>
+      sameRects(previous, nextDimRects) ? previous : nextDimRects,
+    )
+
+    const nextTransportRects = transportElements.flatMap((element) => {
+      const rect = clippedRect(element, TRANSPORT_PADDING)
+      return rect ? [rect] : []
+    })
+    setTransportRects((previous) =>
+      sameRects(previous, nextTransportRects) ? previous : nextTransportRects,
+    )
+
+    const hint = trackingHint
+    const element = hint ? (resolveFocusElement(hint) ?? undefined) : undefined
+    if (element !== trackedElement) {
+      trackedElement = element
+      revealedElement = undefined
+    }
+
+    rebuildLayoutObservers([
+      ...canvasElements,
+      ...dimElements,
+      ...transportElements,
+      ...(element ? [element] : []),
+    ])
+
+    if (!element) {
+      setTargetRect(undefined)
+      return
+    }
+
     if (element !== revealedElement) {
       revealFocusElement(element)
       revealedElement = element
     }
 
-    const box = element.getBoundingClientRect()
-    const next = {
-      x: box.left - HOLE_PADDING,
-      y: box.top - HOLE_PADDING,
-      width: box.width + HOLE_PADDING * 2,
-      height: box.height + HOLE_PADDING * 2,
-    }
-    setRect((previous) => {
-      if (
-        previous &&
-        previous.x === next.x &&
-        previous.y === next.y &&
-        previous.width === next.width &&
-        previous.height === next.height
-      ) {
-        return previous
-      }
-      return next
-    })
+    const nextTarget = clippedRect(element, TARGET_PADDING)
+    setTargetRect((previous) =>
+      sameRect(previous, nextTarget) ? previous : nextTarget,
+    )
   }
 
   const scheduleMeasure = () => {
-    if (frame !== undefined || trackingHint === undefined) return
+    if (frame !== undefined || !tracking) return
     frame = requestAnimationFrame((now) => {
       frame = undefined
       measure()
@@ -187,9 +241,11 @@ export function ReplaySpotlight(props: {
   const stopTracking = () => {
     if (frame !== undefined) cancelAnimationFrame(frame)
     frame = undefined
+    tracking = false
     trackingHint = undefined
     trackedElement = undefined
     revealedElement = undefined
+    trackedLayoutElements = []
     mutationRoots.clear()
     layoutPeers.clear()
     resizeObserver?.disconnect()
@@ -203,7 +259,8 @@ export function ReplaySpotlight(props: {
     }
   }
 
-  const track = (hint: string) => {
+  const track = (hint: string | undefined) => {
+    tracking = true
     trackingHint = hint
     settleUntil = globalThis.performance.now() + LAYOUT_SETTLE_MS
     if (typeof ResizeObserver !== 'undefined') {
@@ -211,7 +268,7 @@ export function ReplaySpotlight(props: {
     }
     if (typeof MutationObserver !== 'undefined') {
       mutationObserver = new MutationObserver((records) => {
-        if (mutationTouchesFocus(records)) scheduleMeasure()
+        if (mutationTouchesLayout(records)) scheduleMeasure()
       })
       mutationObserver.observe(document.body, {
         childList: true,
@@ -225,6 +282,7 @@ export function ReplaySpotlight(props: {
           'data-focus-id',
           'data-tour-target',
           'data-parameter-path',
+          'data-replay-region',
         ],
       })
     }
@@ -246,24 +304,24 @@ export function ReplaySpotlight(props: {
     tailTimer = undefined
 
     if (!action) {
-      setRect(undefined)
+      setTargetRect(undefined)
+      setCanvasRect(undefined)
+      setDimRects([])
+      setTransportRects([])
       setCaption(undefined)
       return
     }
-    setCaption(action.note ?? action.label ?? action.id)
-    const hint = action.focus
-    if (hint === undefined) {
-      setRect(undefined)
-    } else {
-      track(hint)
-    }
 
-    // Once playback has stopped, the last step's caption is the video's
-    // closing line; clear it after a beat so the final image stands alone.
+    setCaption(action.note ?? action.label ?? action.id)
+    track(action.focus)
+
     if (props.finished) {
       tailTimer = setTimeout(() => {
         setCaption(undefined)
-        setRect(undefined)
+        setTargetRect(undefined)
+        setCanvasRect(undefined)
+        setDimRects([])
+        setTransportRects([])
         stopTracking()
       }, TAIL_MS)
     }
@@ -277,19 +335,118 @@ export function ReplaySpotlight(props: {
   return (
     <Portal>
       <div class={styles.overlay} aria-hidden="true">
-        <Show when={rect()}>
-          {(hole) => (
+        <Show when={caption()}>
+          <svg
+            class={styles.scrim}
+            viewBox={`0 0 ${viewport().width} ${viewport().height}`}
+            preserveAspectRatio="none"
+          >
+            <defs>
+              <mask
+                id={maskId}
+                maskUnits="userSpaceOnUse"
+                x="0"
+                y="0"
+                width={viewport().width}
+                height={viewport().height}
+              >
+                <rect
+                  data-replay-mask-role="base"
+                  class={styles.maskDim}
+                  width={viewport().width}
+                  height={viewport().height}
+                />
+                <Show when={canvasRect()}>
+                  {(canvas) => (
+                    <rect
+                      data-replay-mask-role="canvas"
+                      class={styles.maskCutout}
+                      x={canvas().x}
+                      y={canvas().y}
+                      width={canvas().width}
+                      height={canvas().height}
+                      rx="8"
+                    />
+                  )}
+                </Show>
+                <For each={dimRects()}>
+                  {(rect) => (
+                    <rect
+                      data-replay-mask-role="chrome"
+                      class={styles.maskDim}
+                      x={rect.x}
+                      y={rect.y}
+                      width={rect.width}
+                      height={rect.height}
+                    />
+                  )}
+                </For>
+                <For each={transportRects()}>
+                  {(rect) => (
+                    <rect
+                      data-replay-mask-role="transport"
+                      class={styles.maskCutout}
+                      x={rect.x}
+                      y={rect.y}
+                      width={rect.width}
+                      height={rect.height}
+                      rx="14"
+                    />
+                  )}
+                </For>
+                <Show when={targetRect()}>
+                  {(target) => (
+                    <rect
+                      data-replay-mask-role="target"
+                      class={styles.maskCutout}
+                      x={target().x}
+                      y={target().y}
+                      width={target().width}
+                      height={target().height}
+                      rx="10"
+                    />
+                  )}
+                </Show>
+              </mask>
+            </defs>
+            <rect
+              class={styles.scrimFill}
+              width={viewport().width}
+              height={viewport().height}
+              mask={`url(#${maskId})`}
+            />
+          </svg>
+        </Show>
+
+        <Show when={canvasRect()}>
+          {(canvas) => (
             <div
-              class={styles.hole}
+              class={styles.canvasFrame}
               style={{
-                left: `${hole().x}px`,
-                top: `${hole().y}px`,
-                width: `${hole().width}px`,
-                height: `${hole().height}px`,
+                left: `${canvas().x}px`,
+                top: `${canvas().y}px`,
+                width: `${canvas().width}px`,
+                height: `${canvas().height}px`,
               }}
             />
           )}
         </Show>
+
+        <Show when={targetRect()}>
+          {(target) => (
+            <div
+              data-replay-target-frame
+              class={styles.targetFrame}
+              style={{
+                left: `${target().x}px`,
+                top: `${target().y}px`,
+                width: `${target().width}px`,
+                height: `${target().height}px`,
+              }}
+            />
+          )}
+        </Show>
+
         <Show when={caption()}>
           {(text) => <div class={styles.caption}>{text()}</div>}
         </Show>

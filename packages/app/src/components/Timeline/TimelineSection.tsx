@@ -11,6 +11,9 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 export interface TimelineSectionProps {
   formatTrackLabel?: (path: string) => string
   flameDescriptor?: FlameDescriptor
+  /** Controlled collapse state, used by replay follow-cam to reveal the dope sheet. */
+  collapsed?: () => boolean
+  setCollapsed?: (collapsed: boolean) => void
   /** Reveals the sidebar's animation generator (Flame Randomizer card). */
   onOpenAnimationGenerator?: () => void
   /** Routed through the command registry so recorder sessions see the edit. */
@@ -22,7 +25,12 @@ import { TransportBar } from './TransportBar'
 
 export function TimelineSection(props: TimelineSectionProps) {
   const timeline = useTimeline()!
-  const [collapsed, setCollapsed] = createSignal(false)
+  const [localCollapsed, setLocalCollapsed] = createSignal(false)
+  const collapsed = () => props.collapsed?.() ?? localCollapsed()
+  const setCollapsed = (next: boolean) => {
+    if (props.setCollapsed) props.setCollapsed(next)
+    else setLocalCollapsed(next)
+  }
   const [presetsExpanded, setPresetsExpanded] = createSignal(false)
   const autoKeyframe = () => timeline.autoKeyframe()
   const removeMode = () => timeline.removeMode()

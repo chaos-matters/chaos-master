@@ -5,6 +5,7 @@ export function ResetButton(props: {
   onClick: () => void
   title?: string
   class?: string
+  focusId?: string
 }) {
   return (
     <button
@@ -12,6 +13,7 @@ export function ResetButton(props: {
       classList={{ [props.class ?? '']: true }}
       onClick={props.onClick}
       title={props.title ?? 'Reset'}
+      data-focus-id={props.focusId}
     >
       <Reset />
     </button>

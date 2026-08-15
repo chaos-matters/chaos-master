@@ -2,16 +2,20 @@ import '@/commands/builtins'
 import { createRoot, createSignal } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { executeCommand } from '@/commands/registry'
+import { executeCommand, executeReplayCommand } from '@/commands/registry'
 import { examples } from '@/flame/examples'
 import { deepClone } from '@/utils/clone'
 import { createStoreHistory } from '@/utils/createStoreHistory'
+import { createTimelineState } from '@/utils/timeline'
 import { createSessionPlayer, MAX_STEP_GAP_MS } from './player'
-import { cancelSessionRecording, startSessionRecording } from './recorder'
+import { cancelSessionRecording, recordSyntheticAction, startSessionRecording, stopSessionRecording, } from './recorder'
 import { SESSION_FORMAT_VERSION } from './schema'
+import { createRecorderAwareTimeline } from './timelineActions'
 import type { RecordedAction, RecordedSession } from './schema'
 import type { CommandContext } from '@/commands/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { TimelineSnapshot } from '@/flame/schema/timeline'
+import type { HistoryPreviewOwner } from '@/utils/createStoreHistory'
 
 /**
  * The replay transport (semantic-recorder-plan, M4). Two properties matter
@@ -44,14 +48,21 @@ function makeTarget(start: FlameDescriptor) {
     { journal: true },
   )
   const [zoom, setZoom] = createSignal(1)
+  const [pixelRatio, setPixelRatio] = createSignal(1)
   const ctx = {
+    beforeCommand: () => {
+      history.takeOverOwnedPreview()
+    },
     flameDescriptor: () => flame,
     setFlameDescriptor,
     zoom,
     setZoom,
+    pixelRatio,
+    setPixelRatio,
   } as unknown as CommandContext
   let entries = 0
   let loads = 0
+  let replayOwner: HistoryPreviewOwner | undefined
   const target = {
     loadInitial: (next: FlameDescriptor) => {
       loads++
@@ -60,14 +71,20 @@ function makeTarget(start: FlameDescriptor) {
       setFlameDescriptor(() => deepClone(next), 'Replay: initial state')
     },
     execute: (id: string, args: unknown[]) => {
-      executeCommand(id, ctx, ...args)
+      return executeReplayCommand(id, ctx, ...args)
     },
-    beginBatch: () => {
-      history.startPreview('Replay')
+    beginBatch: (onTakeover: () => void) => {
+      replayOwner = history.startOwnedPreview('Replay', onTakeover)
+    },
+    withBatchWrite: <R>(fn: () => R): R => {
+      const owner = replayOwner
+      if (owner === undefined) return fn()
+      return history.withPreviewOwner(owner, fn)
     },
     endBatch: () => {
-      if (history.isPreviewing()) {
-        history.commit()
+      const owner = replayOwner
+      replayOwner = undefined
+      if (owner !== undefined && history.commitOwnedPreview(owner)) {
         entries++
       }
     },
@@ -79,7 +96,103 @@ function makeTarget(start: FlameDescriptor) {
     target,
     committed: () => entries,
     loaded: () => loads,
+    pixelRatio,
   }
+}
+
+/** Production-shaped replay target for timeline write-through atomicity. */
+function makeTimelineTarget(start: FlameDescriptor) {
+  const [flame, setFlameDescriptor, history] = createStoreHistory(
+    createStore<FlameDescriptor>(deepClone(start)),
+  )
+  const timeline = createTimelineState()
+  timeline.setValueWriter((path, value) => {
+    if (path !== 'gamma' || typeof value !== 'number') return
+    // This is the same ownership split as MainWorkspace's timeline writer:
+    // current-frame values intentionally bypass flame patches.
+    history.setSilently((draft) => {
+      draft.renderSettings.gamma = value
+    })
+  })
+  const ctx = {
+    beforeCommand: () => {
+      history.takeOverOwnedPreview()
+    },
+    flameDescriptor: () => flame,
+    setFlameDescriptor,
+    timeline: {
+      currentFrame: timeline.currentFrame,
+      setCurrentFrame: timeline.setCurrentFrame,
+      edit: {
+        setKeyframeValue: timeline.setKeyframeValue,
+      },
+    },
+  } as unknown as CommandContext
+
+  type ReplaySnapshot = {
+    flame: FlameDescriptor
+    timeline: TimelineSnapshot
+  }
+  const snapshot = (): ReplaySnapshot => ({
+    flame: deepClone(flame),
+    timeline: {
+      config: deepClone(timeline.config()),
+      currentFrame: timeline.currentFrame(),
+      animationEnabled: timeline.animationEnabled(),
+      autoKeyframe: timeline.autoKeyframe(),
+      previewHeld: timeline.previewHeld(),
+      tracks: deepClone(timeline.tracks()),
+    },
+  })
+  const restore = (state: ReplaySnapshot) => {
+    timeline.setTracks(() => deepClone(state.timeline.tracks))
+    timeline.setConfig(deepClone(state.timeline.config))
+    timeline.setCurrentFrame(state.timeline.currentFrame ?? 0)
+    history.replaceSilently(state.flame)
+  }
+
+  let owner: HistoryPreviewOwner | undefined
+  let before: ReplaySnapshot | undefined
+  const target = {
+    loadInitial: (next: FlameDescriptor) => {
+      setFlameDescriptor(() => deepClone(next), 'Replay: initial state')
+    },
+    loadTimeline: (state: TimelineSnapshot) => {
+      timeline.loadTracks(state.tracks)
+      timeline.setConfig(state.config)
+      timeline.setCurrentFrame(state.currentFrame ?? 0)
+    },
+    execute: (id: string, args: unknown[]) =>
+      executeReplayCommand(id, ctx, ...args),
+    beginBatch: (onTakeover: () => void) => {
+      before = snapshot()
+      timeline.beginTransientHistory()
+      owner = history.startOwnedPreview('Replay', onTakeover)
+    },
+    withBatchWrite: <R>(fn: () => R): R => {
+      if (owner === undefined) return fn()
+      return history.withPreviewOwner(owner, fn)
+    },
+    endBatch: () => {
+      const batchOwner = owner
+      const batchBefore = before
+      const after = snapshot()
+      owner = undefined
+      before = undefined
+      timeline.endTransientHistory()
+      if (batchOwner === undefined || batchBefore === undefined) return
+      history.commitOwnedPreview(batchOwner, {
+        force: JSON.stringify(batchBefore) !== JSON.stringify(after),
+        undoEffect: () => {
+          restore(batchBefore)
+        },
+        redoEffect: () => {
+          restore(after)
+        },
+      })
+    },
+  }
+  return { flame, history, timeline, target, snapshot }
 }
 
 beforeEach(() => {
@@ -91,6 +204,59 @@ afterEach(() => {
 })
 
 describe('createSessionPlayer', () => {
+  it('clears transient UI before opening the replay batch and loading the baseline', () => {
+    createRoot((dispose) => {
+      const events: string[] = []
+      const player = createSessionPlayer(gammaSteps, {
+        prepare: () => events.push('prepare'),
+        beginBatch: () => events.push('begin'),
+        loadInitial: () => events.push('load'),
+        execute: () => {
+          events.push('execute')
+          return true
+        },
+        endBatch: () => events.push('end'),
+      })
+
+      player.seek(0)
+
+      expect(events).toEqual(['prepare', 'begin', 'load', 'execute', 'end'])
+      dispose()
+    })
+  })
+
+  it('prepares the matching UI before executing each replay action', () => {
+    createRoot((dispose) => {
+      const { target } = makeTarget(examples.initExample)
+      const events: string[] = []
+      const execute = target.execute
+      const player = createSessionPlayer(
+        gammaSteps,
+        {
+          ...target,
+          execute: (id, args) => {
+            events.push(`execute:${id}`)
+            execute(id, args)
+            return true
+          },
+        },
+        {
+          beforeAction: (action) => {
+            events.push(`prepare:${action.id}`)
+          },
+        },
+      )
+
+      player.seek(0)
+
+      expect(events).toEqual([
+        'prepare:flame.setGamma',
+        'execute:flame.setGamma',
+      ])
+      dispose()
+    })
+  })
+
   it('plays through every step, paced by the recorded gaps', () => {
     createRoot((dispose) => {
       const { flame, target } = makeTarget(examples.initExample)
@@ -203,9 +369,235 @@ describe('createSessionPlayer', () => {
       player.pause()
 
       expect(committed()).toBe(1)
+      expect(player.currentAction()?.args).toEqual([1.5])
       vi.advanceTimersByTime(10_000)
       expect(player.stepIndex()).toBe(0)
       expect(flame.renderSettings.gamma).toBeCloseTo(1.5, 5)
+      dispose()
+    })
+  })
+
+  it('resumes a paused prefix without reloading when no live edit occurred', () => {
+    createRoot((dispose) => {
+      const { flame, target, loaded } = makeTarget(examples.initExample)
+      const twoSteps = makeSession([
+        { t: 0, id: 'flame.setGamma', args: [1.5] },
+        { t: 100, id: 'flame.setGamma', args: [2.5] },
+      ])
+      const player = createSessionPlayer(twoSteps, target)
+
+      player.play()
+      vi.advanceTimersByTime(0)
+      player.pause()
+      expect(loaded()).toBe(1)
+
+      player.play()
+      expect(loaded()).toBe(1)
+      expect(player.stepIndex()).toBe(0)
+      vi.advanceTimersByTime(100)
+      expect(player.stepIndex()).toBe(1)
+      expect(flame.renderSettings.gamma).toBeCloseTo(2.5, 5)
+      dispose()
+    })
+  })
+
+  it('rebuilds a paused prefix after a live command edits the workspace', () => {
+    createRoot((dispose) => {
+      const { flame, ctx, target, loaded } = makeTarget(examples.initExample)
+      const twoSteps = makeSession([
+        { t: 0, id: 'flame.setGamma', args: [1.5] },
+        { t: 100, id: 'flame.setGamma', args: [2.5] },
+      ])
+      const player = createSessionPlayer(twoSteps, target)
+
+      player.play()
+      vi.advanceTimersByTime(0)
+      player.pause()
+      executeCommand('flame.setGamma', ctx, 9)
+      expect(flame.renderSettings.gamma).toBeCloseTo(9, 5)
+
+      player.play()
+      expect(loaded()).toBe(2)
+      expect(player.stepIndex()).toBe(-1)
+      vi.advanceTimersByTime(0)
+      expect(player.stepIndex()).toBe(0)
+      expect(flame.renderSettings.gamma).toBeCloseTo(1.5, 5)
+      vi.advanceTimersByTime(100)
+      expect(player.stepIndex()).toBe(1)
+      expect(flame.renderSettings.gamma).toBeCloseTo(2.5, 5)
+      dispose()
+    })
+  })
+
+  it('hands an in-flight replay to a manual preview before the gesture writes', () => {
+    createRoot((dispose) => {
+      const { flame, history, ctx, target } = makeTarget(examples.initExample)
+      const before = deepClone(flame)
+      const twoSteps = makeSession([
+        { t: 0, id: 'flame.setGamma', args: [1.5] },
+        { t: 100, id: 'flame.setGamma', args: [2.5] },
+      ])
+      const player = createSessionPlayer(twoSteps, target)
+
+      player.play()
+      vi.advanceTimersByTime(0)
+      expect(player.stepIndex()).toBe(0)
+      expect(player.isPlaying()).toBe(true)
+      expect(history.hasOpenPreview()).toBe(true)
+      expect(history.isPreviewing()).toBe(false)
+
+      // Starting a real editor gesture takes ownership synchronously: replay
+      // pauses and commits its prefix before this preview is opened.
+      if (!history.isPreviewing()) history.startPreview('Manual gamma scrub')
+      expect(player.isPlaying()).toBe(false)
+      expect(player.currentAction()).toBeUndefined()
+      executeCommand('flame.setGamma', ctx, 7)
+      executeCommand('flame.setGamma', ctx, 8)
+      executeCommand('flame.setGamma', ctx, 9)
+      history.commit()
+
+      // The pending replay timer was cancelled; step 2 can neither overwrite
+      // the manual value nor append itself to the user's preview.
+      vi.advanceTimersByTime(10_000)
+      expect(player.stepIndex()).toBe(0)
+      expect(flame.renderSettings.gamma).toBeCloseTo(9, 5)
+
+      // The gesture and replay prefix remain two coherent undo steps.
+      history.undo()
+      expect(flame.renderSettings.gamma).toBeCloseTo(1.5, 5)
+      history.undo()
+      expect(deepClone(flame)).toEqual(before)
+      dispose()
+    })
+  })
+
+  it('rebuilds from the recorded baseline after a user takeover before resuming', () => {
+    createRoot((dispose) => {
+      const { flame, history, ctx, target, loaded } = makeTarget(
+        examples.initExample,
+      )
+      const twoSteps = makeSession([
+        { t: 0, id: 'flame.setGamma', args: [1.5] },
+        { t: 100, id: 'flame.setGamma', args: [2.5] },
+      ])
+      const player = createSessionPlayer(twoSteps, target)
+
+      player.play()
+      vi.advanceTimersByTime(0)
+      expect(player.stepIndex()).toBe(0)
+      expect(loaded()).toBe(1)
+
+      if (!history.isPreviewing()) history.startPreview('Manual gamma scrub')
+      executeCommand('flame.setGamma', ctx, 9)
+      history.commit()
+      expect(player.isPlaying()).toBe(false)
+      expect(flame.renderSettings.gamma).toBeCloseTo(9, 5)
+
+      player.play()
+      expect(loaded()).toBe(2)
+      expect(player.stepIndex()).toBe(-1)
+      vi.advanceTimersByTime(0)
+      expect(player.stepIndex()).toBe(0)
+      expect(flame.renderSettings.gamma).toBeCloseTo(1.5, 5)
+      vi.advanceTimersByTime(100)
+      expect(player.stepIndex()).toBe(1)
+      expect(flame.renderSettings.gamma).toBeCloseTo(2.5, 5)
+      dispose()
+    })
+  })
+
+  it('hands replay over before a live view-only command runs', () => {
+    createRoot((dispose) => {
+      const world = makeTarget(examples.initExample)
+      const twoSteps = makeSession([
+        { t: 0, id: 'flame.setGamma', args: [1.5] },
+        { t: 100, id: 'flame.setGamma', args: [2.5] },
+      ])
+      const player = createSessionPlayer(twoSteps, world.target)
+
+      player.play()
+      vi.advanceTimersByTime(0)
+      executeCommand('view.setPixelRatio', world.ctx, 0.5)
+
+      expect(player.isPlaying()).toBe(false)
+      expect(player.stepIndex()).toBe(0)
+      expect(world.committed()).toBe(1)
+      expect(world.history.hasOpenPreview()).toBe(false)
+      expect(world.pixelRatio()).toBe(0.5)
+      vi.advanceTimersByTime(10_000)
+      expect(world.flame.renderSettings.gamma).toBeCloseTo(1.5, 5)
+      expect(world.pixelRatio()).toBe(0.5)
+      dispose()
+    })
+  })
+
+  it('hands replay over before a live timeline-only command runs', () => {
+    createRoot((dispose) => {
+      const world = makeTarget(examples.initExample)
+      const [duration, setDuration] = createSignal(120)
+      Object.assign(world.ctx, {
+        timeline: {
+          duration,
+          setDuration: (value: number) => {
+            setDuration(value)
+          },
+        },
+      })
+      const twoSteps = makeSession([
+        { t: 0, id: 'flame.setGamma', args: [1.5] },
+        { t: 100, id: 'flame.setGamma', args: [2.5] },
+      ])
+      const player = createSessionPlayer(twoSteps, world.target)
+
+      player.play()
+      vi.advanceTimersByTime(0)
+      executeCommand('timeline.setDuration', world.ctx, 240)
+
+      expect(player.isPlaying()).toBe(false)
+      expect(player.stepIndex()).toBe(0)
+      expect(world.committed()).toBe(1)
+      expect(world.history.hasOpenPreview()).toBe(false)
+      expect(duration()).toBe(240)
+      vi.advanceTimersByTime(10_000)
+      expect(world.flame.renderSettings.gamma).toBeCloseTo(1.5, 5)
+      expect(duration()).toBe(240)
+      dispose()
+    })
+  })
+
+  it('hands replay over before wall-clock timeline playback starts', () => {
+    createRoot((dispose) => {
+      const world = makeTarget(examples.initExample)
+      const raw = createTimelineState()
+      raw.setAnimationEnabled(true)
+      const timeline = createRecorderAwareTimeline(
+        raw,
+        () => {
+          throw new Error('wall-clock transport is not a replay command')
+        },
+        () => {
+          world.history.takeOverOwnedPreview()
+        },
+      )
+      const twoSteps = makeSession([
+        { t: 0, id: 'flame.setGamma', args: [1.5] },
+        { t: 100, id: 'flame.setGamma', args: [2.5] },
+      ])
+      const player = createSessionPlayer(twoSteps, world.target)
+
+      player.play()
+      vi.advanceTimersByTime(0)
+      timeline.togglePlay()
+
+      expect(player.isPlaying()).toBe(false)
+      expect(player.stepIndex()).toBe(0)
+      expect(world.committed()).toBe(1)
+      expect(world.history.hasOpenPreview()).toBe(false)
+      expect(raw.isPlaying()).toBe(true)
+
+      vi.advanceTimersByTime(10_000)
+      expect(player.stepIndex()).toBe(0)
+      expect(world.flame.renderSettings.gamma).toBeCloseTo(1.5, 5)
       dispose()
     })
   })
@@ -226,6 +618,81 @@ describe('createSessionPlayer', () => {
       player.seek(-1)
       expect(deepClone(flame)).toEqual(deepClone(examples.example1))
       expect(player.stepIndex()).toBe(-1)
+      dispose()
+    })
+  })
+
+  it('silently rebuilds a seek prefix and prepares only the destination', () => {
+    createRoot((dispose) => {
+      const world = makeTarget(examples.initExample)
+      const execute = world.target.execute
+      const executed: number[] = []
+      const prepared: number[] = []
+      const leakedActions: number[] = []
+      const player = createSessionPlayer(
+        gammaSteps,
+        {
+          ...world.target,
+          execute: (id, args) => {
+            executed.push(args[0] as number)
+
+            // Replay execution is invisible to the recorder, including the
+            // prefix that is rebuilt without publishing intermediate steps.
+            expect(startSessionRecording(examples.example1).ok).toBe(true)
+            recordSyntheticAction(id, args)
+            leakedActions.push(stopSessionRecording()?.actions.length ?? -1)
+
+            execute(id, args)
+            return true
+          },
+        },
+        {
+          beforeAction: (action) => {
+            prepared.push(action.args[0] as number)
+          },
+        },
+      )
+
+      player.seek(2)
+
+      expect(executed).toEqual([1.5, 2.5, 3.5])
+      expect(prepared).toEqual([3.5])
+      expect(leakedActions).toEqual([0, 0, 0])
+      expect(player.stepIndex()).toBe(2)
+      expect(world.flame.renderSettings.gamma).toBeCloseTo(3.5, 5)
+      dispose()
+    })
+  })
+
+  it('reports the exact failed prefix step and publishes the rebuilt state', () => {
+    createRoot((dispose) => {
+      const world = makeTarget(examples.initExample)
+      const execute = world.target.execute
+      const prepared: number[] = []
+      const player = createSessionPlayer(
+        gammaSteps,
+        {
+          ...world.target,
+          execute: (id, args) => {
+            if (args[0] === 2.5) return false
+            execute(id, args)
+            return true
+          },
+        },
+        {
+          beforeAction: (action) => {
+            prepared.push(action.args[0] as number)
+          },
+        },
+      )
+
+      player.seek(2)
+
+      expect(player.lastError()).toContain('Step 2')
+      expect(player.stepIndex()).toBe(0)
+      expect(world.flame.renderSettings.gamma).toBeCloseTo(1.5, 5)
+      expect(world.history.hasOpenPreview()).toBe(false)
+      expect(prepared).toEqual([])
       dispose()
     })
   })
@@ -269,6 +736,52 @@ describe('createSessionPlayer', () => {
     })
   })
 
+  it('undoes a forward replay batch that wrote the flame through timeline setSilently', () => {
+    createRoot((dispose) => {
+      const initial = deepClone(examples.example1)
+      initial.renderSettings.gamma = 1
+      const world = makeTimelineTarget(initial)
+      const initialTimeline = world.snapshot().timeline
+      initialTimeline.currentFrame = 0
+      initialTimeline.tracks = [
+        {
+          parameterPath: 'gamma',
+          keyframes: [{ frame: 0, value: 1 }],
+        },
+      ]
+      const session: RecordedSession = {
+        ...makeSession([
+          { t: 0, id: 'timeline.setCurrentFrame', args: [0] },
+          {
+            t: 100,
+            id: 'timeline.setKeyframeValue',
+            args: ['gamma', 0, 2],
+          },
+        ]),
+        initial: deepClone(initial),
+        initialTimeline,
+      }
+      const player = createSessionPlayer(session, world.target)
+
+      // First seek commits the loaded baseline. The second is forward-only,
+      // so it has no root replacement patch to incidentally cover the silent
+      // current-frame write.
+      player.seek(0)
+      expect(world.flame.renderSettings.gamma).toBe(1)
+      player.seek(1)
+      expect(world.flame.renderSettings.gamma).toBe(2)
+      expect(world.timeline.tracks()[0]?.keyframes[0]?.value).toBe(2)
+
+      world.history.undo()
+      expect(world.flame.renderSettings.gamma).toBe(1)
+      expect(world.timeline.tracks()[0]?.keyframes[0]?.value).toBe(1)
+      world.history.redo()
+      expect(world.flame.renderSettings.gamma).toBe(2)
+      expect(world.timeline.tracks()[0]?.keyframes[0]?.value).toBe(2)
+      dispose()
+    })
+  })
+
   it('replaying past the end starts over rather than sitting dead', () => {
     createRoot((dispose) => {
       const { flame, target } = makeTarget(examples.initExample)
@@ -292,7 +805,7 @@ describe('createSessionPlayer', () => {
       player.stop()
 
       // No preview left open, so ordinary editing and undo work again.
-      expect(history.isPreviewing()).toBe(false)
+      expect(history.hasOpenPreview()).toBe(false)
       expect(flame.renderSettings.gamma).toBeCloseTo(2.5, 5)
 
       // Carry on from step 1 with an edit of the viewer's own...
@@ -329,7 +842,7 @@ describe('createSessionPlayer', () => {
       expect(player.isPlaying()).toBe(false)
       expect(player.stepIndex()).toBe(0)
       expect(player.lastError()).toContain('Step 2')
-      expect(world.history.isPreviewing()).toBe(false)
+      expect(world.history.hasOpenPreview()).toBe(false)
       dispose()
     })
   })
@@ -344,7 +857,7 @@ describe('createSessionPlayer', () => {
       player.seek(1)
 
       expect(world.loaded()).toBe(0)
-      expect(world.history.isPreviewing()).toBe(false)
+      expect(world.history.hasOpenPreview()).toBe(false)
       expect(player.lastError()).toContain('Stop the active recording')
       dispose()
     })
@@ -365,7 +878,7 @@ describe('createSessionPlayer', () => {
       expect(player.isPlaying()).toBe(false)
       expect(player.stepIndex()).toBe(0)
       expect(player.lastError()).toContain('Stop the active recording')
-      expect(world.history.isPreviewing()).toBe(false)
+      expect(world.history.hasOpenPreview()).toBe(false)
       dispose()
     })
   })
@@ -377,7 +890,8 @@ describe('createSessionPlayer', () => {
 
       player.play()
       vi.advanceTimersByTime(0)
-      expect(world.history.isPreviewing()).toBe(true)
+      expect(world.history.hasOpenPreview()).toBe(true)
+      expect(world.history.isPreviewing()).toBe(false)
       expect(player.stepIndex()).toBe(0)
 
       startSessionRecording(world.flame)
@@ -386,7 +900,7 @@ describe('createSessionPlayer', () => {
       expect(player.isPlaying()).toBe(false)
       expect(player.stepIndex()).toBe(0)
       expect(player.lastError()).toContain('Stop the active recording')
-      expect(world.history.isPreviewing()).toBe(false)
+      expect(world.history.hasOpenPreview()).toBe(false)
 
       vi.advanceTimersByTime(10_000)
       expect(player.stepIndex()).toBe(0)
@@ -407,7 +921,7 @@ describe('createSessionPlayer', () => {
       player.seek(2)
 
       expect(world.loaded()).toBe(0)
-      expect(world.history.isPreviewing()).toBe(false)
+      expect(world.history.hasOpenPreview()).toBe(false)
       expect(world.committed()).toBe(0)
       expect(player.stepIndex()).toBe(-1)
       expect(player.lastError()).toContain('Step 2: test rejection')

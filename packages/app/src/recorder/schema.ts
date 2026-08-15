@@ -118,6 +118,8 @@ export function validateRecordedAction(
  * in the flame descriptor itself. */
 export const SessionViewSnapshot = v.object({
   qualityPreset: v.pipe(v.string(), v.nonEmpty()),
+  /** Optional so pre-resolution recorder sessions remain importable. */
+  pixelRatio: v.optional(v.picklist([1, 0.5, 0.25])),
   adaptiveFilter: v.boolean(),
   stochasticFilter: v.boolean(),
   flyMode: v.boolean(),

@@ -1197,7 +1197,7 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
 }
 
 export function createLoadFlame(
-  history: ChangeHistory<FlameDescriptor>,
+  history: Pick<ChangeHistory<FlameDescriptor>, 'replace'>,
   currentDimensions?: () => number,
 ) {
   const requestModal = useRequestModal()
@@ -1237,7 +1237,7 @@ export function createLoadFlame(
         if (!flame.renderSettings.camera3D) {
           flame.renderSettings.camera3D = deepClone(camera3DDefault)
         }
-        history.replace(flame)
+        history.replace(flame, 'Load animation flame')
         setLoadedAnimation({
           flame,
           tracks: result.tracks.map((t) => ({
@@ -1258,7 +1258,7 @@ export function createLoadFlame(
       if (!flame.renderSettings.camera3D) {
         flame.renderSettings.camera3D = deepClone(camera3DDefault)
       }
-      history.replace(flame)
+      history.replace(flame, 'Load flame')
       setLoadedAnimation({ flame, tracks: [] })
     })
     return result

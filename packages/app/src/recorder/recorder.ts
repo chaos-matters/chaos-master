@@ -90,6 +90,18 @@ export type SessionRecordingStartResult =
 let active: ActiveRecording | undefined
 let commandDepth = 0
 let suppressDepth = 0
+/**
+ * Monotonic stamp for live workspace mutations.
+ *
+ * A paused replay has committed its current prefix and therefore no longer
+ * owns a history preview that can notify the player about user takeover. The
+ * player samples this stamp when it settles; if a live command/raw write moves
+ * it before Resume or a forward seek, the recorded baseline must be rebuilt
+ * instead of applying the remaining steps to the user's divergent document.
+ * Replay execution is wrapped in `withRecordingSuppressed`, so it never moves
+ * this stamp itself.
+ */
+let liveWorkspaceMutationGeneration = 0
 /** Index of the action logged for the top-level command currently running,
  *  so that command can retract it (see {@link reportUnreplayable}). */
 let pendingActionIndex: number | undefined
@@ -129,6 +141,14 @@ const [unnamedWriteCount, setUnnamedWriteCount] = createSignal(0)
 const [lastSession, setLastSession] = createSignal<RecordedSession>()
 
 export { isSessionRecording, recordedActionCount, unnamedWriteCount }
+
+export function getLiveWorkspaceMutationGeneration(): number {
+  return liveWorkspaceMutationGeneration
+}
+
+function noteLiveWorkspaceMutation(): void {
+  liveWorkspaceMutationGeneration++
+}
 
 function elapsedMs(rec: ActiveRecording): number {
   return Math.max(0, globalThis.performance.now() - rec.startedAt)
@@ -337,6 +357,18 @@ export function invalidateLastFinishedSession(): void {
   if (lastSession() !== undefined) setLastSession(undefined)
 }
 
+/**
+ * Report an output mutation that intentionally bypasses undo/history, such as
+ * a sampled live-audio modulation tick. It must invalidate a paused replay's
+ * known prefix, but it must not create 30 unnamed-write entries per second —
+ * the caller owns the one deduplicated fidelity warning for the take.
+ */
+export function reportDerivedWorkspaceWrite(): void {
+  if (suppressDepth > 0) return
+  noteLiveWorkspaceMutation()
+  invalidateLastFinishedSession()
+}
+
 export function stopSessionRecording(): RecordedSession | undefined {
   if (!active) return undefined
   // Compact validation is enforced while recording. Pretty-printed downloads
@@ -384,6 +416,7 @@ export function recordCommandExecution(
     FlameCommand,
     | 'id'
     | 'label'
+    | 'coalesceArgs'
     | 'coalesceKey'
     | 'describe'
     | 'focus'
@@ -394,6 +427,13 @@ export function recordCommandExecution(
   run: () => void,
 ): void {
   const rec = active
+  if (
+    commandDepth === 0 &&
+    suppressDepth === 0 &&
+    cmd.preservesFinishedSession !== true
+  ) {
+    noteLiveWorkspaceMutation()
+  }
   if (
     !rec &&
     commandDepth === 0 &&
@@ -425,17 +465,20 @@ export function recordCommandExecution(
       if (existing !== undefined && anchorIndex !== undefined) {
         // A drag re-sets the same target dozens of times inside ONE undo step;
         // the log keeps the last value and the timestamp the gesture began.
+        const coalescedArgs = cmd.coalesceArgs
+          ? cmd.coalesceArgs(existing.args, args)
+          : args
         const snapshot = snapshotAction(
           rec,
           {
             ...existing,
-            args,
-            focus: focusFor(cmd, [...args]),
+            args: coalescedArgs,
+            focus: focusFor(cmd, [...coalescedArgs]),
             // The label has to move with the args. Describing commands render
             // the value into their label ("Set gamma to 2.42"), so keeping the
             // first one left the step list quoting a value the action no longer
             // carried.
-            label: cmd.describe?.([...args]) ?? cmd.label,
+            label: cmd.describe?.([...coalescedArgs]) ?? cmd.label,
           },
           anchorIndex,
         )
@@ -502,8 +545,19 @@ export function recordSyntheticAction(
   args: readonly unknown[],
   label?: string,
 ): void {
+  if (commandDepth === 0 && suppressDepth === 0) {
+    noteLiveWorkspaceMutation()
+  }
   const rec = active
-  if (!rec || commandDepth > 0 || suppressDepth > 0) return
+  if (!rec) {
+    // Synthetic actions stand in for real document/timeline mutations whose
+    // implementation intentionally ran under suppression. Even without an
+    // active take, that mutation detaches the last finished session from the
+    // now-different workspace just like a normal command or history write.
+    invalidateLastFinishedSession()
+    return
+  }
+  if (commandDepth > 0 || suppressDepth > 0) return
   // A synthetic action stands for a whole effect, so it ends any coalescing
   // run — the next edit of the same control is its own step.
   coalesceAnchors = new Map()
@@ -647,6 +701,7 @@ export function reportDocumentWrite(
 ): void {
   const rec = active
   const claimed = commandDepth > 0 || (fromPreview && gestureClaimed)
+  if (!claimed && suppressDepth === 0) noteLiveWorkspaceMutation()
   coalesceAnchors = new Map()
   gestureClaimed = false
   if (!rec) {
@@ -671,7 +726,11 @@ export function reportDocumentWrite(
  */
 export function reportTimelineWrite(description?: string): void {
   const rec = active
-  if (commandDepth > 0) return
+  // A suppressed compound edit records one synthetic snapshot after it has
+  // finished. Its internal undo pushes must not break an unrelated command's
+  // coalescing window or relinquish ownership of an in-flight flame preview.
+  if (commandDepth > 0 || suppressDepth > 0) return
+  noteLiveWorkspaceMutation()
   // Outside a command this IS a boundary: an uncovered timeline edit ends any
   // run, exactly as a flame entry does.
   coalesceAnchors = new Map()
@@ -680,7 +739,6 @@ export function reportTimelineWrite(description?: string): void {
     invalidateLastFinishedSession()
     return
   }
-  if (suppressDepth > 0) return
   noteUnnamedWrite(rec, description)
 }
 
@@ -691,6 +749,7 @@ export function reportTimelineWrite(description?: string): void {
  * the log and therefore skip this hook while `commandDepth > 0`. */
 export function reportTimelineTransport(description: string): void {
   if (commandDepth > 0 || suppressDepth > 0) return
+  noteLiveWorkspaceMutation()
   if (!active) {
     invalidateLastFinishedSession()
     return
@@ -715,6 +774,17 @@ function noteUnnamedWrite(
  *  same control starts its own. */
 export function notePreviewStarted(): void {
   resetGestureState()
+}
+
+/** End only the action-folding window for a completed UI gesture.
+ *
+ * Timeline controls call this after their undo coalescing ends. Keeping
+ * `gestureClaimed` intact matters when the same gesture also owns a pending
+ * flame-history preview: its later commit must remain attributed to the
+ * commands that ran during the drag.
+ */
+export function breakRecordingCoalescing(): void {
+  coalesceAnchors = new Map()
 }
 
 // The timeline reaches the recorder through this leaf rather than importing

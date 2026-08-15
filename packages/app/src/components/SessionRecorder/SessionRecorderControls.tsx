@@ -42,10 +42,19 @@ export function SessionRecorderControls(props: {
   /** Called after a recording is stored, so the library list refetches. */
   onSessionStored: () => void
   onToggleLibrary: () => void
+  /** A legacy main-canvas export temporarily owns and restores the document. */
+  blocked?: boolean
 }) {
   const { showToast } = useToast()
 
   const startRecording = () => {
+    if (props.blocked) {
+      showToast(
+        'Wait for the animation export to finish before recording',
+        4000,
+      )
+      return
+    }
     // No clone here: startSessionRecording owns that (and cloning a whole
     // flame document twice is not free on large flames). The timeline and
     // audio wiring go in alongside the flame: keyframe edits mean nothing
@@ -125,6 +134,7 @@ export function SessionRecorderControls(props: {
               type="button"
               class={styles.button}
               onClick={startRecording}
+              disabled={props.blocked}
               title="Record every action as a replayable step log"
             >
               <span class={styles.dot} /> Record steps

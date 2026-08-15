@@ -44,6 +44,10 @@ type Props = {
   setQualityPreset: (key: string) => void
   accumulatedPointCount: () => number
   qualityPointCountLimit: () => number
+  /** Controlled so replay follow-cam can reveal a target and Undo can restore
+   * the user's collapsed presentation exactly. */
+  collapsed: () => boolean
+  setCollapsed: (collapsed: boolean) => void
 }
 
 export function FloatingActions(props: Props) {
@@ -54,6 +58,27 @@ export function FloatingActions(props: Props) {
   const [top, setTop] = createSignal(isMobileWidget() ? 8 : props.initialTop)
   const [dragging, setDragging] = createSignal(false)
   const [userMoved, setUserMoved] = createSignal(false)
+  const collapsed = props.collapsed
+
+  // Position saved before collapsing so both user and replay-driven expansion
+  // return the widget to the same place.
+  let savedLeft = 60
+  let savedTop = 8
+  let lastTapTime = 0
+  let previousCollapsed = collapsed()
+
+  createEffect(() => {
+    const next = collapsed()
+    if (next === previousCollapsed) return
+    if (next) {
+      setLeft(window.innerWidth - 28)
+      setTop(8)
+    } else {
+      setLeft(savedLeft)
+      setTop(savedTop)
+    }
+    previousCollapsed = next
+  })
 
   // Keep position in sync with prop changes (e.g. sidebar resize)
   // but only when the user hasn't manually dragged the widget.
@@ -136,19 +161,13 @@ export function FloatingActions(props: Props) {
     window.addEventListener('pointercancel', onCancel)
   }
 
-  const [collapsed, setCollapsed] = createSignal(false)
-  // Position saved before collapsing so we can restore on expand
-  let savedLeft = 60
-  let savedTop = 8
-  let lastTapTime = 0
-
   function handleTap() {
     const now = Date.now()
     if (collapsed()) {
       // Single tap on collapsed handle -> expand
       setLeft(savedLeft)
       setTop(savedTop)
-      setCollapsed(false)
+      props.setCollapsed(false)
       return
     }
     // Double-tap detection (< 400ms between taps)
@@ -158,7 +177,7 @@ export function FloatingActions(props: Props) {
       savedTop = top()
       setLeft(window.innerWidth - 28)
       setTop(8)
-      setCollapsed(true)
+      props.setCollapsed(true)
       lastTapTime = 0
     } else {
       lastTapTime = now
@@ -169,6 +188,7 @@ export function FloatingActions(props: Props) {
     <div
       ref={widgetRef}
       class={ui.widget}
+      data-replay-region="dim"
       classList={{
         [ui.isDragging as string]: dragging(),
         [ui.disabled as string]: props.disabled,

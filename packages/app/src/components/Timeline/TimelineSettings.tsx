@@ -1,4 +1,4 @@
-import { createMemo, Show } from 'solid-js'
+import { createMemo, onCleanup, Show } from 'solid-js'
 import { useTimeline } from '@/contexts/TimelineContext'
 import ui from './TimelineSection.module.css'
 import type { LoopMode } from '@/utils/timeline'
@@ -12,14 +12,22 @@ function createSettingScrubber(
   onGestureEnd?: () => void,
 ) {
   let scrubbing = false
+  let finishActive: (() => void) | undefined
+
+  onCleanup(() => {
+    finishActive?.()
+  })
+
   return function onPointerDown(e: PointerEvent) {
     const target = e.target as HTMLElement
     if (target.tagName === 'INPUT' || target.tagName === 'BUTTON') return
 
+    finishActive?.()
     scrubbing = true
     const startX = e.clientX
     const startValue = getValue()
-    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    const captureTarget = e.currentTarget as HTMLElement
+    captureTarget.setPointerCapture(e.pointerId)
 
     function onMove(ev: PointerEvent) {
       if (!scrubbing) return
@@ -30,14 +38,21 @@ function createSettingScrubber(
       setValue(newValue)
     }
 
-    function onUp() {
+    function finish() {
+      if (finishActive !== finish) return
+      finishActive = undefined
       scrubbing = false
       window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointerup', finish)
+      window.removeEventListener('pointercancel', finish)
+      captureTarget.removeEventListener('lostpointercapture', finish)
       onGestureEnd?.()
     }
+    finishActive = finish
     window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointerup', finish)
+    window.addEventListener('pointercancel', finish)
+    captureTarget.addEventListener('lostpointercapture', finish)
   }
 }
 

@@ -1,12 +1,14 @@
-import { createSignal, Show } from 'solid-js'
+import { createEffect, createSignal, Show } from 'solid-js'
 import { GridIcon, ListIcon } from '@/icons'
 import ui from './ColorEditor.module.css'
 import { ColorListEditor } from './ColorListEditor'
 import { FlameColorEditor } from './FlameColorEditor'
+import type { ColorEditOrigin } from './FlameColorEditor'
 import type { TransformRecord } from '@/flame/schema/flameSchema'
+import type { ReplayColorView } from '@/recorder/focusPreparation'
 import type { HistorySetter } from '@/utils/createStoreHistory'
 
-type ColorView = 'grid' | 'list'
+type ColorView = ReplayColorView
 
 /**
  * Color editor with a grid/list toggle (mirrors the affine editor):
@@ -22,13 +24,36 @@ export function ColorEditor(props: {
    * replayable step (docs/plans/semantic-recorder-plan.md). Absent for
    * preview copies, which fall back to the raw setter.
    */
-  setTransformColor?: (tid: string, x: number, y: number) => void
+  setTransformColor?: (
+    tid: string,
+    x: number,
+    y: number,
+    origin?: ColorEditOrigin,
+  ) => void
   selectedTransformId?: () => string | null
   setSelectedTransformId?: (tid: string | null) => void
   /** Enables the track-changes diamond + drag keyframing (real flame only). */
   enableChangeTracking?: boolean
+  /** One-way follow-cam request; epoch makes repeated views observable. */
+  replayViewRequest?: () => { view: ColorView; epoch: number } | undefined
+  /** Mirrors the actual user-selected surface back to the workspace so a
+   * replay transaction can restore it exactly on Undo. */
+  onViewChange?: (view: ColorView) => void
 }) {
-  const [view, setView] = createSignal<ColorView>('grid')
+  const [view, setView] = createSignal<ColorView>(
+    props.replayViewRequest?.()?.view ?? 'grid',
+  )
+
+  createEffect(() => {
+    const request = props.replayViewRequest?.()
+    if (!request) return
+    void request.epoch
+    setView(request.view)
+  })
+
+  createEffect(() => {
+    props.onViewChange?.(view())
+  })
 
   return (
     <div class={ui.root}>

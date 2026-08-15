@@ -1462,6 +1462,28 @@ export function createTimelineState() {
       const value = valueResolverFn ? valueResolverFn(path) : null
       if (value !== null) writes.push([path, value])
     }
+    addKeyframeValuesAtFrame(writes, frame, { coalesce })
+  }
+
+  /**
+   * Add already-resolved values as one authored edit. Unlike
+   * `addKeyframesAtCurrentFrame`, this pins the values in the call so a
+   * recorded command can replay them without consulting the viewer's current
+   * flame. The undo/coalescing semantics intentionally match that helper.
+   */
+  function addKeyframeValuesAtFrame(
+    writes: readonly (readonly [
+      string,
+      (
+        | number
+        | string
+        | [number, number, number]
+        | [number, number, number, number]
+      ),
+    ])[],
+    frame: number,
+    { coalesce = true }: { coalesce?: boolean } = {},
+  ) {
     if (writes.length === 0) return
     const key = `${writes.map(([path]) => path).join('\0')}@${frame}`
     if (!coalesce || coalesceKey !== key) {
@@ -1651,6 +1673,7 @@ export function createTimelineState() {
     getResolvedValue,
     addKeyframeAtCurrentFrame,
     addKeyframesAtCurrentFrame,
+    addKeyframeValuesAtFrame,
     toggleKeyframeAtCurrentFrame,
     moveKeyframe,
     relocateKeyframe,

@@ -9,6 +9,7 @@ import { SessionRecorderControls } from './SessionRecorderControls'
 import styles from './SessionRecorderDock.module.css'
 import { SessionReplayPanel } from './SessionReplayPanel'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { ReplayFocusPreparationHandler } from '@/recorder/focusPreparation'
 import type { SessionStartExtras } from '@/recorder/recorder'
 import type { ReplayTarget } from '@/recorder/replay'
 import type { RecordedSession } from '@/recorder/schema'
@@ -49,12 +50,17 @@ export function SessionRecorderDock(props: {
   onSessionChange: (session: RecordedSession | undefined) => void
   /** True while the canvas is animating or exporting — the cue to fade. */
   busy: boolean
+  /** True while an export temporarily owns and restores the main document. */
+  replayBlocked?: boolean
+  /** Makes the exact control visible before a replay step changes it. */
+  onPrepareAction?: ReplayFocusPreparationHandler
 }) {
   const { showToast } = useToast()
   const [libraryOpen, setLibraryOpen] = createSignal(false)
   const [libraryRevision, setLibraryRevision] = createSignal(0)
   const [showOpacitySlider, setShowOpacitySlider] = createSignal(false)
   const [dragging, setDragging] = createSignal(false)
+  const [replayPlaying, setReplayPlaying] = createSignal(false)
 
   let dockRef: HTMLDivElement | undefined
 
@@ -64,7 +70,7 @@ export function SessionRecorderDock(props: {
     const resting = clampRecorderOpacity(recorderOpacity())
     // Never fade what the user is currently moving.
     if (dragging()) return 1
-    return props.busy && recorderFadeOnPlayback()
+    return (props.busy || replayPlaying()) && recorderFadeOnPlayback()
       ? Math.min(resting, FADED_RECORDER_OPACITY)
       : resting
   }
@@ -142,6 +148,7 @@ export function SessionRecorderDock(props: {
     <div
       ref={dockRef}
       class={styles.dock}
+      data-replay-region="transport"
       classList={{
         [styles.floating as string]: floating(),
         [styles.dragging as string]: dragging(),
@@ -192,6 +199,9 @@ export function SessionRecorderDock(props: {
             onClose={() => {
               props.onSessionChange(undefined)
             }}
+            onPlaybackChange={setReplayPlaying}
+            onPrepareAction={props.onPrepareAction}
+            blocked={props.replayBlocked}
           />
         )}
       </Show>
@@ -244,6 +254,7 @@ export function SessionRecorderDock(props: {
               setLibraryOpen((open) => !open)
               setRecorderCollapsed(false)
             }}
+            blocked={props.replayBlocked}
           />
         </Show>
 

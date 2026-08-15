@@ -111,6 +111,10 @@ registerCommand({
     // recorded action needs a way to say that. (undefined arrives as null
     // through the JSON round-trip, so this is the same case.)
     if (value === null) {
+      if (path !== 'backgroundColor') {
+        console.warn('[cmd] flame.setRenderSetting: rejected clear', path)
+        return
+      }
       const segments = (path as string).split('.')
       const leaf = segments.pop()
       if (leaf === undefined) return
@@ -131,6 +135,17 @@ registerCommand({
     if (!matchesDefaultShape(path as string, expected, value)) {
       console.warn('[cmd] flame.setRenderSetting: rejected', path, value)
       return
+    }
+    // Camera edits take ownership from a held timeline frame. Keep this
+    // semantic inside the replayed command rather than only in the live UI
+    // setters; otherwise the same recorded pan/zoom can remain hidden behind
+    // timeline.previewHeld when played back.
+    if (
+      path === 'camera.zoom' ||
+      path === 'camera.position' ||
+      (typeof path === 'string' && path.startsWith('camera3D.'))
+    ) {
+      ctx.timeline.setPreviewHeld?.(false)
     }
     const segments = (path as string).split('.')
     const leaf = segments.pop()

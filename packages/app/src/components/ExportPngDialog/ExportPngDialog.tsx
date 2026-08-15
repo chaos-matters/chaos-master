@@ -30,9 +30,11 @@ import { defaultPills, getNearestPresetKey, QualityPresets, qualityPresets, } fr
 import { ExportFormatCard } from './ExportFormatCard'
 import ui from './ExportPngDialog.module.css'
 import { FramePreviewGallery } from './FramePreviewGallery'
+import { commitChangedExportMetadata } from './metadataCommit'
 import type { Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
 import type { Vec3 } from 'wgpu-matrix'
+import type { ExportMetadataPatch } from './metadataCommit'
 import type { ExportImageType } from '@/App'
 import type { Palette } from '@/flame/colorMap'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -960,7 +962,7 @@ export function createExportPngDialog(
   getPixelRatio: () => number,
   setPixelRatio: Setter<number>,
   setOnExportImage: Setter<ExportImageType | undefined>,
-  setFlameDescriptor: (updater: (draft: FlameDescriptor) => void) => void,
+  setMetadata: (patch: ExportMetadataPatch) => void,
   selectedPalette: () => Palette | undefined,
   getViewportAspect: () => number,
   enqueueImageJob: (spec: ImageJobSpec) => void,
@@ -1158,15 +1160,11 @@ export function createExportPngDialog(
       // Persist the dialog's metadata edits back to the workspace flame (the
       // render-setting edits stay scoped to the export — they go into the job
       // snapshot below, not the workspace flame).
-      setFlameDescriptor((draft) => {
-        if (!draft.metadata) {
-          draft.metadata = { name: '', description: '', author: 'unknown' }
-        }
-        draft.metadata.name = previewDescriptor.metadata?.name ?? ''
-        draft.metadata.description =
-          previewDescriptor.metadata?.description ?? ''
-        draft.metadata.author = previewDescriptor.metadata?.author ?? 'unknown'
-      })
+      commitChangedExportMetadata(
+        flameDescriptor.metadata,
+        previewDescriptor.metadata,
+        setMetadata,
+      )
 
       // Enqueue an offscreen background render job. The job owns a deep-cloned
       // snapshot of the dialog's edited flame, so workspace edits after this
@@ -1190,16 +1188,12 @@ export function createExportPngDialog(
     }
 
     function handleRenderAnimation() {
-      // Sync metadata back to workspace flame descriptor
-      setFlameDescriptor((draft) => {
-        if (!draft.metadata) {
-          draft.metadata = { name: '', description: '', author: 'unknown' }
-        }
-        draft.metadata.name = previewDescriptor.metadata?.name ?? ''
-        draft.metadata.description =
-          previewDescriptor.metadata?.description ?? ''
-        draft.metadata.author = previewDescriptor.metadata?.author ?? 'unknown'
-      })
+      // Sync only changed metadata through semantic workspace commands.
+      commitChangedExportMetadata(
+        flameDescriptor.metadata,
+        previewDescriptor.metadata,
+        setMetadata,
+      )
       const dimensions = computeExportDimensions(
         resolution(),
         aspect(),

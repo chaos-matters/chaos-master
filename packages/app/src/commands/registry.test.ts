@@ -1,8 +1,9 @@
 import '@/commands/builtins'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { examples } from '@/flame/examples'
 import { isTimelineParameterPath, MAX_TIMELINE_FRAME, MAX_TIMELINE_KEYFRAMES, MAX_TIMELINE_PARAMETER_PATH_LENGTH, MAX_TIMELINE_PLAYBACK_FPS, MAX_TIMELINE_TIME_SCALE, tryValidateTimelineSnapshot, } from '@/flame/schema/timeline'
-import { getAllCommands, hasExplicitReplayPolicy, preflightReplayCommand, registerCommand, } from './registry'
+import { executeCommand, getAllCommands, hasExplicitReplayPolicy, preflightReplayCommand, registerCommand, } from './registry'
+import type { CommandContext } from './types'
 
 function timelineSnapshot(
   overrides: Record<string, unknown> = {},
@@ -34,6 +35,30 @@ describe('replay command policy', () => {
     expect(preflightReplayCommand('flame.setGamma', [2.2, 3])).toBeDefined()
     expect(preflightReplayCommand('flame.setGamma', [2.2])).toBeUndefined()
     expect(preflightReplayCommand('future.command', [])).toBeDefined()
+  })
+
+  it('only allows null to clear the optional automatic background colour', () => {
+    expect(
+      preflightReplayCommand('flame.setRenderSetting', [
+        'backgroundColor',
+        null,
+      ]),
+    ).toBeUndefined()
+    expect(
+      preflightReplayCommand('flame.setRenderSetting', ['gamma', null]),
+    ).toBeDefined()
+    expect(
+      preflightReplayCommand('flame.setRenderSetting', ['camera.zoom', null]),
+    ).toBeDefined()
+
+    const setFlameDescriptor = vi.fn()
+    executeCommand(
+      'flame.setRenderSetting',
+      { setFlameDescriptor } as unknown as CommandContext,
+      'gamma',
+      null,
+    )
+    expect(setFlameDescriptor).not.toHaveBeenCalled()
   })
 
   it('denies a newly registered command until it opts into replay', () => {

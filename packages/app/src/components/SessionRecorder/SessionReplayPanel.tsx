@@ -1,12 +1,14 @@
-import { createSignal, For, onCleanup, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
 import { createStore, unwrap } from 'solid-js/store'
 import { ChevronLeft, ChevronRight, Focus, Pause, Pencil, PlayPause, SkipBack, } from '@/icons'
+import { deriveReplayFocusPreparation } from '@/recorder/focusPreparation'
 import { createSessionPlayer, PLAYBACK_SPEEDS } from '@/recorder/player'
 import { MAX_ACTION_HOLD_MS, MAX_ACTION_NOTE_CHARS, validateSession, } from '@/recorder/schema'
 import { deepClone } from '@/utils/clone'
 import { followCamEnabled, setFollowCamEnabled } from './recorderUi'
 import { ReplaySpotlight } from './ReplaySpotlight'
 import styles from './SessionReplayPanel.module.css'
+import type { ReplayFocusPreparationHandler } from '@/recorder/focusPreparation'
 import type { ReplayTarget } from '@/recorder/replay'
 import type { RecordedSession } from '@/recorder/schema'
 
@@ -29,6 +31,12 @@ export function SessionReplayPanel(props: {
    *  affordance, which is what a read-only replay surface wants. */
   onSave?: (session: RecordedSession) => Promise<void>
   onClose: () => void
+  /** Lets the owning dock recede while timed replay is advancing. */
+  onPlaybackChange?: (playing: boolean) => void
+  /** Makes the exact control visible before a replay step changes it. */
+  onPrepareAction?: ReplayFocusPreparationHandler
+  /** True while another process temporarily owns and restores the document. */
+  blocked?: boolean
 }) {
   const [speed, setSpeed] = createSignal(1)
   const [editing, setEditing] = createSignal<number>()
@@ -44,10 +52,28 @@ export function SessionReplayPanel(props: {
 
   const player = createSessionPlayer(session, props.target, {
     speed,
+    beforeAction: (action) => {
+      if (followCamEnabled()) {
+        props.onPrepareAction?.(deriveReplayFocusPreparation(action))
+      }
+    },
+  })
+  const spotlightAction = createMemo(() => {
+    const action = player.currentAction()
+    if (!action) return undefined
+    const focus = deriveReplayFocusPreparation(action).spotlightFocus
+    return focus === action.focus ? action : { ...action, focus }
+  })
+  createEffect(() => {
+    props.onPlaybackChange?.(player.isPlaying())
+  })
+  createEffect(() => {
+    if (props.blocked && player.isPlaying()) player.pause()
   })
   // A player left running past unmount would keep writing into the document.
   onCleanup(() => {
     player.stop()
+    props.onPlaybackChange?.(false)
   })
 
   const stepLabel = (index: number) => {
@@ -63,7 +89,7 @@ export function SessionReplayPanel(props: {
     >
       <Show when={followCamEnabled()}>
         <ReplaySpotlight
-          action={player.currentAction()}
+          action={spotlightAction()}
           finished={player.isFinished()}
         />
       </Show>
@@ -107,6 +133,7 @@ export function SessionReplayPanel(props: {
           onClick={() => {
             player.seek(-1)
           }}
+          disabled={props.blocked}
           title="Back to the starting flame"
           aria-label="Back to the starting flame"
         >
@@ -119,7 +146,7 @@ export function SessionReplayPanel(props: {
           onClick={() => {
             player.seek(player.stepIndex() - 1)
           }}
-          disabled={player.stepIndex() < 0}
+          disabled={props.blocked || player.stepIndex() < 0}
           title="Previous step"
           aria-label="Previous step"
         >
@@ -134,7 +161,7 @@ export function SessionReplayPanel(props: {
               onClick={() => {
                 player.play()
               }}
-              disabled={player.total === 0}
+              disabled={props.blocked || player.total === 0}
               title="Play replay"
             >
               <PlayPause class={styles.buttonIcon} aria-hidden="true" />
@@ -161,7 +188,7 @@ export function SessionReplayPanel(props: {
           onClick={() => {
             player.seek(player.stepIndex() + 1)
           }}
-          disabled={player.stepIndex() >= player.total - 1}
+          disabled={props.blocked || player.stepIndex() >= player.total - 1}
           title="Next step"
           aria-label="Next step"
         >
@@ -172,7 +199,17 @@ export function SessionReplayPanel(props: {
           class={styles.button}
           classList={{ [styles.toggleOn as string]: followCamEnabled() }}
           onClick={() => {
-            setFollowCamEnabled(!followCamEnabled())
+            const enable = !followCamEnabled()
+            if (enable) {
+              const action = player.currentAction()
+              if (action) {
+                // Prepare while the spotlight is still unmounted. Resolving
+                // first would frame whichever stale editor surface happened
+                // to be visible while follow-cam was off.
+                props.onPrepareAction?.(deriveReplayFocusPreparation(action))
+              }
+            }
+            setFollowCamEnabled(enable)
           }}
           title={
             followCamEnabled()
@@ -229,6 +266,7 @@ export function SessionReplayPanel(props: {
                     onClick={() => {
                       player.seek(index())
                     }}
+                    disabled={props.blocked}
                   >
                     <span class={styles.stepIndex}>{index() + 1}</span>
                     <span class={styles.stepLabel}>{stepLabel(index())}</span>

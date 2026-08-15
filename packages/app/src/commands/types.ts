@@ -15,6 +15,13 @@ type KeyframeValue =
   | [number, number, number, number]
 
 export interface CommandContext {
+  /**
+   * Live-dispatch boundary invoked before an in-app command mutates any
+   * subsystem. The workspace uses it to hand an in-flight timed replay back
+   * to the user even for commands that touch only timeline/audio/view state.
+   * Replay dispatch deliberately bypasses this hook.
+   */
+  beforeCommand?: () => void
   flameDescriptor: Accessor<FlameDescriptor>
   setFlameDescriptor: HistorySetter<FlameDescriptor>
   blendFlame: Accessor<FlameDescriptor | undefined>
@@ -37,17 +44,22 @@ export interface CommandContext {
     animationEnabled: Accessor<boolean>
     setAnimationEnabled: Setter<boolean>
     duration: Accessor<number>
-    setDuration: Setter<number>
+    setDuration: (duration: number, coalesceId?: string) => void
     currentFrame: Accessor<number>
     setCurrentFrame: Setter<number>
+    /** Detach a held timeline frame when a replayed camera edit takes over. */
+    setPreviewHeld?: Setter<boolean>
     play: () => void
     setLoop: (loop: boolean) => void
-    setFps: (fps: number) => void
+    setFps: (fps: number, coalesceId?: string) => void
+    setAutoFps?: (enabled: boolean) => void
+    setTimeScale?: (scale: number, coalesceId?: string) => void
     addKeyframe: (
       path: string,
       frame: number,
       value: KeyframeValue,
       easing?: string,
+      interp?: string,
     ) => void
     /**
      * The rest of the keyframe verbs. Optional as a group because sandboxed
@@ -66,6 +78,14 @@ export interface CommandContext {
       ) => void
       setKeyframeInterp: (path: string, frame: number, interp: string) => void
       moveKeyframe: (path: string, from: number, to: number) => void
+      /** Move without opening another timeline undo entry. Curve dragging
+       *  opens its entry at pointer-down and then uses this for each retime. */
+      relocateKeyframe?: (path: string, from: number, to: number) => void
+      addKeyframeValuesAtFrame?: (
+        writes: readonly (readonly [string, KeyframeValue])[],
+        frame: number,
+        options?: { coalesce?: boolean },
+      ) => void
       removeTrack: (path: string) => void
       clearTracks: () => void
       setLoopMode: (mode: 'off' | 'seamless' | 'cycle') => void
@@ -79,10 +99,19 @@ export interface CommandContext {
   /**
    * Audio-reactive wiring. Optional for the same reason as `timeline.edit`.
    * The audio BUFFER is deliberately absent: it cannot be recorded into a
-   * session, so no command may depend on it.
+   * session. Commands see only the serializable wiring and a yes/no resource
+   * authorization supplied by the workspace.
    */
   audio?: {
     snapshot: () => AudioWiringSnapshot
+    /**
+     * Resource authorization is deliberately supplied by the workspace: the
+     * command layer can serialize wiring and a file identity, but it cannot
+     * inspect an AudioBuffer or acquire microphone permission. Replayed
+     * wiring may become enabled only when this confirms that the matching
+     * file (or an already-authorized live analyzer) exists here.
+     */
+    canEnable: (required: AudioWiringSnapshot) => boolean
     setMapping: (mapping: AudioMapping) => void
     setEnabled: (enabled: boolean) => void
     setSource: (source: 'file' | 'mic') => void
@@ -167,6 +196,16 @@ export interface FlameCommand {
    * for commands whose repeats are each meaningful.
    */
   coalesceKey?: (args: unknown[]) => string | undefined
+  /**
+   * Merge a later invocation into the already-recorded gesture action.
+   * Most setters simply keep the latest args. Stateful operations such as a
+   * keyframe retime need to preserve the gesture's original source frame
+   * while updating only its final destination.
+   */
+  coalesceArgs?: (
+    existingArgs: readonly unknown[],
+    nextArgs: readonly unknown[],
+  ) => unknown[]
   /**
    * A label for THIS invocation, from its normalized args, used by the
    * recorder in place of the static `label`. Generic commands need it:

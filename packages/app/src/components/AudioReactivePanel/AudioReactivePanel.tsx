@@ -5,6 +5,7 @@ import { buildFlamePreset, buildPreset, FLAME_PRESET_IDS, PRESET_DESCRIPTIONS, P
 import { AudioWiringModal } from '../AudioWiringModal/AudioWiringModal'
 import ui from './AudioReactivePanel.module.css'
 import { computeBeatFrames, drawWaveform } from './audioWaveform'
+import { createMappingGestureBoundary } from './mappingGesture'
 import type { Accessor } from 'solid-js'
 import type { AffineKey, AudioAnalyzer, AudioFeature, FlameTarget, LiveAudioAnalyzer, RenderSettingKey, TransformInfo, TransformPropertyKey, } from '@/utils/audioAnalysis'
 import type { WiringPresetId } from '@/utils/audioWiringPresets'
@@ -47,6 +48,10 @@ type AudioReactivePanelProps = {
   onAudioChange: (buffer: AudioBuffer | undefined, fileName?: string) => void
   audioMapping: Accessor<AudioMapping>
   onMappingChange: (mapping: AudioMapping) => void
+  /** End/start the recorder's coalescing window around a continuous wiring
+   *  slider. Audio wiring has no flame-history preview to provide this
+   *  boundary automatically. */
+  onMappingGestureBoundary?: () => void
   audioEnabled: Accessor<boolean>
   onEnabledChange: (enabled: boolean) => void
   audioSource: Accessor<'file' | 'mic'>
@@ -261,6 +266,9 @@ function VariationWeightPills(props: {
 // --- Component ---
 
 export function AudioReactivePanel(props: AudioReactivePanelProps) {
+  const mappingGesture = createMappingGestureBoundary(() => {
+    props.onMappingGestureBoundary?.()
+  })
   const [dragOver, setDragOver] = createSignal(false)
   const [loading, setLoading] = createSignal(false)
   const [error, setError] = createSignal<string | null>(null)
@@ -582,6 +590,7 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
 
   window.addEventListener('keydown', handleKey)
   onCleanup(() => {
+    mappingGesture.endAll()
     window.removeEventListener('keydown', handleKey)
   })
 
@@ -1111,10 +1120,32 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
                         max="2"
                         step="0.1"
                         value={mapping().sensitivity}
+                        onPointerDown={(e) => {
+                          mappingGesture.begin(e.currentTarget)
+                        }}
+                        onPointerUp={(e) => {
+                          mappingGesture.end(e.currentTarget)
+                        }}
+                        onPointerCancel={(e) => {
+                          mappingGesture.end(e.currentTarget)
+                        }}
+                        onKeyDown={(e) => {
+                          mappingGesture.begin(e.currentTarget)
+                        }}
+                        onKeyUp={(e) => {
+                          mappingGesture.end(e.currentTarget)
+                        }}
                         onInput={(e) => {
+                          mappingGesture.begin(e.currentTarget)
                           updateMapping(index, {
                             sensitivity: parseFloat(e.currentTarget.value),
                           })
+                        }}
+                        onChange={(e) => {
+                          mappingGesture.end(e.currentTarget)
+                        }}
+                        onBlur={(e) => {
+                          mappingGesture.end(e.currentTarget)
                         }}
                         aria-label="Sensitivity"
                       />
@@ -1216,6 +1247,7 @@ export function AudioReactivePanel(props: AudioReactivePanelProps) {
               mappings,
             })
           }}
+          onMappingGestureBoundary={props.onMappingGestureBoundary}
           onClose={() => setShowWiringModal(false)}
         />
       </Show>

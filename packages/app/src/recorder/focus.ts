@@ -24,6 +24,8 @@
  * pointing at in a tour.
  */
 
+import { affineFocusId, affineRandomizeFocusId, affineResetFocusId, colorFocusId, colorRandomizeFocusId, colorResetFocusId, FINAL_AFFINE_FOCUS_ID, FINAL_AFFINE_RANDOMIZE_FOCUS_ID, transformFocusId, variationParamsFocusId, variationRandomizeFocusId, variationTypeFocusId, variationVisibilityFocusId, } from './focusIds'
+
 /** Elements the follow-cam can be asked to look at, most specific first. */
 export function focusSelectors(hint: string): string[] {
   const separator = hint.indexOf(':')
@@ -46,8 +48,17 @@ export function focusSelectors(hint: string): string[] {
       ]
     case 'ui':
       return [`[data-tour-target=${quoted}]`]
-    case 'focus':
-      return [`[data-focus-id=${quoted}]`]
+    case 'focus': {
+      const selectors = [`[data-focus-id=${quoted}]`]
+      // Nested transform controls are unmounted when their card is collapsed.
+      // Retain transform identity in that state instead of falling back to the
+      // first global tour anchor (or clearing the spotlight altogether).
+      const owner = transformOwnerFocusId(value)
+      if (owner !== undefined && owner !== value) {
+        selectors.push(`[data-focus-id=${cssQuote(owner)}]`)
+      }
+      return selectors
+    }
     default:
       return []
   }
@@ -61,7 +72,7 @@ export function focusSelectors(hint: string): string[] {
  * rectangle, and the next selector in the list is usually a container that
  * IS visible.
  */
-export function resolveFocusElement(hint: string): HTMLElement | null {
+export function resolveFocusElement(hint: string): Element | null {
   for (const selector of focusSelectors(hint)) {
     let matches: NodeListOf<Element>
     try {
@@ -70,7 +81,6 @@ export function resolveFocusElement(hint: string): HTMLElement | null {
       continue
     }
     for (const element of matches) {
-      if (!(element instanceof HTMLElement)) continue
       const rect = element.getBoundingClientRect()
       if (rect.width > 0 && rect.height > 0) return element
     }
@@ -87,7 +97,7 @@ export function resolveFocusElement(hint: string): HTMLElement | null {
  * leaves already-visible controls untouched. `auto` also respects each
  * container's own scroll-behavior and reduced-motion policy.
  */
-export function revealFocusElement(element: HTMLElement): void {
+export function revealFocusElement(element: Element): void {
   element.scrollIntoView({
     behavior: 'auto',
     block: 'nearest',
@@ -100,6 +110,11 @@ export function revealFocusElement(element: HTMLElement): void {
  *  because the value goes inside quotes. */
 function cssQuote(value: string): string {
   return `"${value.replace(/["\\]/g, '\\$&')}"`
+}
+
+function transformOwnerFocusId(value: string): string | undefined {
+  const match = /^tx:([^:]+)(?::|$)/.exec(value)
+  return match?.[1] ? transformFocusId(match[1]) : undefined
 }
 
 /**
@@ -122,6 +137,19 @@ export function focusHintFor(
     // ---- render settings: the path is the hint -------------------------
     case 'flame.setRenderSetting':
       return asString === undefined ? undefined : `param:${asString}`
+    case 'flame.updateRenderSettings': {
+      if (args[1] === 'randomizer') return 'ui:randomizer-card'
+      const patch = first
+      if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) {
+        return undefined
+      }
+      if (Object.hasOwn(patch, 'exposure')) return 'param:exposure'
+      if (Object.hasOwn(patch, 'autoExposure3D')) {
+        return 'param:autoExposure3D'
+      }
+      const [firstPath] = Object.keys(patch)
+      return firstPath === undefined ? undefined : `param:${firstPath}`
+    }
     case 'flame.setGamma':
       return 'param:gamma'
     case 'flame.setExposure':
@@ -131,7 +159,9 @@ export function focusHintFor(
     case 'flame.setVibrancy':
       return 'param:vibrancy'
     case 'flame.setColorSpeed':
-      return 'param:colorSpeed'
+      return asString === undefined
+        ? 'ui:transform-list'
+        : `param:transform.${asString}.colorSpeed`
     case 'flame.setSkipIters':
       return 'param:skipIters'
     case 'flame.setDrawMode':
@@ -145,46 +175,117 @@ export function focusHintFor(
     case 'flame.addTransform':
     case 'flame.clearTransforms':
       return 'ui:transform-list'
-    case 'flame.deleteTransform':
     case 'flame.removeTransform':
+    case 'flame.deleteTransform':
+      // The row is gone before follow-cam measures the action.
+      return 'ui:transform-list'
     case 'flame.setTransformVisible':
+      return asString === undefined
+        ? 'ui:transform-list'
+        : `focus:${transformFocusId(asString)}`
     case 'flame.setProbability':
       return asString === undefined
         ? 'ui:transform-list'
-        : `focus:tx:${asString}`
+        : `param:transform.${asString}.probability`
     case 'flame.setTransformColor':
+      if (asString === undefined) return 'ui:transform-list'
+      if (args[3] === 'x' || args[3] === 'y') {
+        return `param:transform.${asString}.color.${args[3]}`
+      }
+      if (args[3] === 'randomize') {
+        return `focus:${colorRandomizeFocusId(asString)}`
+      }
+      if (args[3] === 'reset') {
+        return `focus:${colorResetFocusId(asString)}`
+      }
+      return `focus:${colorFocusId(asString)}`
+    case 'flame.setTransformAffine':
+      if (asString === undefined) return 'ui:affine-editor'
+      if (args[3] === 'randomize') {
+        return `focus:${affineRandomizeFocusId(asString)}`
+      }
+      if (args[3] === 'reset') {
+        return `focus:${affineResetFocusId(asString)}`
+      }
+      return `focus:${affineFocusId(asString)}`
+    case 'flame.setAffine': {
+      if (
+        asString === undefined ||
+        (args[1] !== 'pre' && args[1] !== 'post') ||
+        typeof args[2] !== 'string'
+      ) {
+        return 'ui:affine-editor'
+      }
+      const affine = args[1] === 'post' ? 'postAffine' : 'preAffine'
+      return `param:transform.${asString}.${affine}.${args[2]}`
+    }
+    case 'flame.setFinalTransform':
+      return first === null || first === undefined
+        ? 'ui:affine-editor'
+        : args[1] === 'randomize'
+          ? `focus:${FINAL_AFFINE_RANDOMIZE_FOCUS_ID}`
+          : `focus:${FINAL_AFFINE_FOCUS_ID}`
+    case 'flame.setFinalAffine':
+      return typeof first === 'string'
+        ? `param:finalTransform.${first}`
+        : `focus:${FINAL_AFFINE_FOCUS_ID}`
+    case 'flame.setVariation':
+    case 'flame.applyVariationSelection': {
+      const variationId = args[1]
+      if (asString === undefined || typeof variationId !== 'string') {
+        return 'ui:variation-type'
+      }
+      if (commandId === 'flame.setVariation') {
+        if (args[3] === 'randomize') {
+          return `focus:${variationRandomizeFocusId(asString, variationId)}`
+        }
+        if (args[3] === 'params') {
+          return `focus:${variationParamsFocusId(asString, variationId)}`
+        }
+      }
+      return `focus:${variationTypeFocusId(asString, variationId)}`
+    }
+    case 'flame.addVariation': {
+      const variationId = args[2]
+      return asString !== undefined && typeof variationId === 'string'
+        ? `focus:${variationTypeFocusId(asString, variationId)}`
+        : 'ui:variation-type'
+    }
+    case 'flame.deleteVariation':
+      // The deleted row is gone by the time follow-cam measures it. Keep the
+      // correct transform in view instead of pointing at another variation.
       return asString === undefined
         ? 'ui:transform-list'
-        : `focus:tx:${asString}`
-    case 'flame.setTransformAffine':
-    case 'flame.setAffine':
-      return 'ui:affine-editor'
-    case 'flame.setFinalTransform':
-      return 'ui:affine-editor'
-    case 'flame.addVariation':
-    case 'flame.setVariation':
-    case 'flame.deleteVariation':
-    case 'flame.setVariationVisible':
-    case 'flame.applyVariationSelection':
-      return 'ui:variation-type'
+        : `focus:${transformFocusId(asString)}`
+    case 'flame.setVariationVisible': {
+      const variationId = args[1]
+      return asString !== undefined && typeof variationId === 'string'
+        ? `focus:${variationVisibilityFocusId(asString, variationId)}`
+        : 'ui:variation-type'
+    }
     case 'flame.setVariationWeight':
-      return 'ui:variation-weight'
+      return asString !== undefined && typeof args[1] === 'string'
+        ? `param:${asString}.${args[1]}`
+        : 'ui:variation-weight'
     case 'flame.setVariationParams':
       return typeof args[2] === 'string' && typeof first === 'string'
-        ? `param:transforms.${first}.variations.${String(args[1])}.${args[2]}`
+        ? `param:${first}.${String(args[1])}.${args[2]}`
         : 'ui:variation-type'
     case 'flame.applySymmetry':
       return 'ui:add-symmetry'
     case 'flame.applyPalette':
     case 'flame.removePalette':
+      return 'ui:palette-selector'
     case 'flame.setAllTransformColors':
-      return 'ui:paletteMode-select'
+      return 'ui:randomize-colors'
     case 'flame.randomize':
     case 'flame.mutate':
     case 'flame.setupMorph':
       return 'ui:randomizer-card'
     case 'flame.setMetadata':
-      return 'ui:metadata-card'
+      return typeof first === 'string'
+        ? `param:metadata.${first}`
+        : 'ui:metadata-card'
 
     // ---- view, timeline, audio -----------------------------------------
     case 'camera.zoomTo':
@@ -196,17 +297,22 @@ export function focusHintFor(
     case 'timeline.goToFrame':
       return 'ui:seek-ruler'
     case 'timeline.addKeyframe':
+    case 'timeline.addKeyframes':
     case 'timeline.removeKeyframe':
     case 'timeline.setKeyframeValue':
     case 'timeline.setKeyframeInterp':
     case 'timeline.moveKeyframe':
+    case 'timeline.relocateKeyframe':
     case 'timeline.removeTrack':
     case 'timeline.clearTracks':
       return 'ui:dope-sheet'
     case 'timeline.setFps':
+    case 'timeline.setAutoFps':
+    case 'timeline.setTimeScale':
     case 'timeline.setLoop':
     case 'timeline.setDuration':
     case 'timeline.setLoopMode':
+    case 'timeline.loadTimeline':
       return 'ui:timeline-section'
     case 'timeline.setAutoKeyframe':
       return 'ui:auto-keyframe'
@@ -215,6 +321,7 @@ export function focusHintFor(
     case 'audio.setMapping':
     case 'audio.setEnabled':
     case 'audio.setSource':
+    case 'audio.applySnapshot':
       return 'ui:audio-panel'
 
     // ---- app chrome ------------------------------------------------------
@@ -228,6 +335,8 @@ export function focusHintFor(
       return 'ui:view-controls'
     case 'view.setPixelRatio':
       return 'ui:pixelRatio-buttons'
+    case 'view.setShowTimeline':
+      return 'ui:animation-toggle'
     case 'sidebar.open':
     case 'sidebar.close':
       return 'ui:sidebar'

@@ -34,6 +34,7 @@ export function CheckboxEditor(props: CheckboxEditorProps) {
       </span>
 
       <Checkbox
+        dataParameterPath={props.dataParameterPath}
         checked={props.value === 1 ? true : false}
         onChange={(checked, _) => {
           props.setValue(checked ? 1 : 0)

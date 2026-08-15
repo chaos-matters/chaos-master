@@ -26,7 +26,6 @@ import type { Palette } from '@/flame/colorMap'
 import type { GenerateRandomFlameConfig } from '@/flame/randomize'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TransformVariationType } from '@/flame/variations'
-import type { ChangeHistory } from '@/utils/createStoreHistory'
 
 function randomRange(min: number, max: number) {
   return Math.random() * (max - min) + min
@@ -836,7 +835,7 @@ const DEFAULT_MAX_VARIATIONS = 3
 export function createLogoFaviconGenerator(
   _flameDescriptor: FlameDescriptor,
   _selectedPalette: () => Palette | undefined,
-  history: ChangeHistory<FlameDescriptor>,
+  loadIntoMainView: (flame: FlameDescriptor) => void,
 ) {
   const requestModal = useRequestModal()
 
@@ -1164,7 +1163,7 @@ export function createLogoFaviconGenerator(
           isGenerating={isGenerating()}
           onGenerate={handleGenerate}
           onLoadIntoMainView={() => {
-            history.replace(deepClone(flame))
+            loadIntoMainView(deepClone(flame))
             respond()
           }}
           onDownloadPng={handleDownloadPng}

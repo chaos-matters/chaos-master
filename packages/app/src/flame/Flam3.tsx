@@ -143,7 +143,7 @@ export function Flam3(props: Flam3Props) {
   const timeline = useTimeline()
   const changeHistory = useChangeHistory()
   const isInteractive = () =>
-    changeHistory.isPreviewing() || (timeline?.isPlaying() ?? false)
+    changeHistory.hasOpenPreview() || (timeline?.isPlaying() ?? false)
 
   // Persisting chains across dispatches collapses single-map dynamics onto their
   // attractor — a 1-transform flame visibly contracts as it accumulates. So we

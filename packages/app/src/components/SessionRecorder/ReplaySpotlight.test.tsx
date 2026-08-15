@@ -141,8 +141,9 @@ describe('ReplaySpotlight tracking', () => {
     flushFrame(1000)
     expect(frameCallbacks.size).toBe(0)
 
-    const overlay = document.body.querySelector('[aria-hidden="true"]')
-    const hole = overlay?.firstElementChild as HTMLElement | undefined
+    const hole = document.body.querySelector<HTMLElement>(
+      '[data-replay-target-frame]',
+    )
     expect(hole?.style.left).toBe('70px')
 
     const unrelatedContainer = document.createElement('div')
@@ -210,5 +211,72 @@ describe('ReplaySpotlight tracking', () => {
     expect(FakeMutationObserver.instances[0]?.disconnect).toHaveBeenCalled()
     window.dispatchEvent(new Event('resize'))
     expect(frameCallbacks.size).toBe(0)
+  })
+
+  it('keeps the flame and transport clear while re-dimming overlapping chrome', () => {
+    const setBox = (
+      element: Element,
+      left: number,
+      top: number,
+      width: number,
+      height: number,
+    ) => {
+      element.getBoundingClientRect = () => ({
+        left,
+        top,
+        width,
+        height,
+        right: left + width,
+        bottom: top + height,
+        x: left,
+        y: top,
+        toJSON: () => ({}),
+      })
+    }
+
+    const canvas = document.createElement('canvas')
+    canvas.dataset.replayRegion = 'canvas'
+    setBox(canvas, 0, 0, 800, 600)
+
+    const sidebar = document.createElement('aside')
+    sidebar.dataset.replayRegion = 'dim'
+    setBox(sidebar, 600, 0, 200, 600)
+
+    const target = document.createElement('button')
+    const scrollIntoView = vi.fn()
+    target.dataset.focusId = 'tx:t3:variation:v1:type'
+    target.scrollIntoView = scrollIntoView
+    setBox(target, 650, 100, 80, 30)
+    sidebar.append(target)
+
+    const transport = document.createElement('div')
+    transport.dataset.replayRegion = 'transport'
+    setBox(transport, 20, 520, 220, 50)
+    document.body.append(canvas, sidebar, transport)
+
+    const action: RecordedAction = {
+      t: 0,
+      id: 'flame.setVariation',
+      args: ['t3', 'v1', { type: 'linearVar' }],
+      focus: 'focus:tx:t3:variation:v1:type',
+    }
+    const { unmount } = render(() => (
+      <ReplaySpotlight action={action} finished={false} />
+    ))
+
+    const roles = Array.from(
+      document.querySelectorAll('[data-replay-mask-role]'),
+      (element) => element.getAttribute('data-replay-mask-role'),
+    )
+    expect(roles).toEqual(['base', 'canvas', 'chrome', 'transport', 'target'])
+
+    const targetCutout = document.querySelector(
+      '[data-replay-mask-role="target"]',
+    )
+    expect(targetCutout?.getAttribute('x')).toBe('640')
+    expect(targetCutout?.getAttribute('width')).toBe('100')
+    expect(scrollIntoView).toHaveBeenCalledOnce()
+
+    unmount()
   })
 })

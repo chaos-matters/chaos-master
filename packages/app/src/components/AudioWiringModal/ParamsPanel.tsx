@@ -1,5 +1,6 @@
-import { Show } from 'solid-js'
+import { onCleanup, Show } from 'solid-js'
 import { flameTargetKey } from '../../utils/audioAnalysis'
+import { createMappingGestureBoundary } from '../AudioReactivePanel/mappingGesture'
 import styles from './AudioWiringModal.module.css'
 import type { AudioFeature, AudioMappingEntry } from '../../utils/audioAnalysis'
 import type { SourceNodeData } from './SourceNode'
@@ -12,7 +13,45 @@ export function ParamsPanel(props: {
   sourceByFeature: Map<AudioFeature, SourceNodeData>
   onUpdate: (updates: Partial<AudioMappingEntry>) => void
   onDelete: () => void
+  onMappingGestureBoundary?: () => void
 }) {
+  const mappingGesture = createMappingGestureBoundary(() => {
+    props.onMappingGestureBoundary?.()
+  })
+  onCleanup(() => {
+    mappingGesture.endAll()
+  })
+
+  const gestureProps = {
+    onPointerDown: (
+      event: PointerEvent & { currentTarget: HTMLInputElement },
+    ) => {
+      mappingGesture.begin(event.currentTarget)
+    },
+    onPointerUp: (
+      event: PointerEvent & { currentTarget: HTMLInputElement },
+    ) => {
+      mappingGesture.end(event.currentTarget)
+    },
+    onPointerCancel: (
+      event: PointerEvent & { currentTarget: HTMLInputElement },
+    ) => {
+      mappingGesture.end(event.currentTarget)
+    },
+    onKeyDown: (event: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
+      mappingGesture.begin(event.currentTarget)
+    },
+    onKeyUp: (event: KeyboardEvent & { currentTarget: HTMLInputElement }) => {
+      mappingGesture.end(event.currentTarget)
+    },
+    onChange: (event: Event & { currentTarget: HTMLInputElement }) => {
+      mappingGesture.end(event.currentTarget)
+    },
+    onBlur: (event: FocusEvent & { currentTarget: HTMLInputElement }) => {
+      mappingGesture.end(event.currentTarget)
+    },
+  }
+
   return (
     <div
       class={styles.paramsPanel}
@@ -47,6 +86,7 @@ export function ParamsPanel(props: {
                 <div class={styles.paramsField}>
                   <span class={styles.paramsLabel}>Sensitivity</span>
                   <input
+                    {...gestureProps}
                     type="range"
                     class={styles.paramsSlider}
                     min={0}
@@ -54,6 +94,7 @@ export function ParamsPanel(props: {
                     step={0.01}
                     value={entry().sensitivity}
                     onInput={(e) => {
+                      mappingGesture.begin(e.currentTarget)
                       props.onUpdate({
                         sensitivity: parseFloat(e.currentTarget.value),
                       })
@@ -74,12 +115,14 @@ export function ParamsPanel(props: {
                       step={0.01}
                       value={entry().range[0]}
                       onChange={(e) => {
+                        props.onMappingGestureBoundary?.()
                         props.onUpdate({
                           range: [
                             parseFloat(e.currentTarget.value),
                             entry().range[1],
                           ],
                         })
+                        props.onMappingGestureBoundary?.()
                       }}
                     />
                     <span class={styles.paramsRangeDash}>–</span>
@@ -89,12 +132,14 @@ export function ParamsPanel(props: {
                       step={0.01}
                       value={entry().range[1]}
                       onChange={(e) => {
+                        props.onMappingGestureBoundary?.()
                         props.onUpdate({
                           range: [
                             entry().range[0],
                             parseFloat(e.currentTarget.value),
                           ],
                         })
+                        props.onMappingGestureBoundary?.()
                       }}
                     />
                   </div>
@@ -104,6 +149,7 @@ export function ParamsPanel(props: {
                 <div class={styles.paramsField}>
                   <span class={styles.paramsLabel}>Attack</span>
                   <input
+                    {...gestureProps}
                     type="range"
                     class={styles.paramsSlider}
                     min={0}
@@ -111,6 +157,7 @@ export function ParamsPanel(props: {
                     step={1}
                     value={entry().attackMs ?? DEFAULT_ATTACK}
                     onInput={(e) => {
+                      mappingGesture.begin(e.currentTarget)
                       props.onUpdate({
                         attackMs: parseInt(e.currentTarget.value, 10),
                       })
@@ -125,6 +172,7 @@ export function ParamsPanel(props: {
                 <div class={styles.paramsField}>
                   <span class={styles.paramsLabel}>Release</span>
                   <input
+                    {...gestureProps}
                     type="range"
                     class={styles.paramsSlider}
                     min={0}
@@ -132,6 +180,7 @@ export function ParamsPanel(props: {
                     step={1}
                     value={entry().releaseMs ?? DEFAULT_RELEASE}
                     onInput={(e) => {
+                      mappingGesture.begin(e.currentTarget)
                       props.onUpdate({
                         releaseMs: parseInt(e.currentTarget.value, 10),
                       })

@@ -18,6 +18,13 @@ recorder counts as an _unnamed write_ and reports in the pill and in the
 saved file's `unnamedWriteCount`. A log with a non-zero count is telling you
 it cannot fully reproduce that session.
 
+This inventory is about authored workspace/output changes. Navigation-only
+gestures — scrolling, hover, selecting or collapsing a card, switching an
+editor tab, and opening a picker without choosing anything — are presentation,
+not session steps. Follow-cam reconstructs the presentation it needs before
+each authored action, including mobile sidebar visibility and the owning
+transform, affine, colour, timeline, or audio surface.
+
 **Not recorded is not the same as broken.** Nothing below changes how the
 editor behaves; it only changes whether a session can replay it.
 
@@ -29,17 +36,17 @@ editor behaves; it only changes whether a session can replay it.
 | Camera          | pan, zoom, pinch, orbit, look, fly, 3D theta/phi/radius/fov/roll/target                                                                                                                                                                                                                                                                        | `flame.setRenderSetting` on `camera.*` / `camera3D.*`                                                                                                               |
 | Transform card  | probability, colour speed, add ("+" and custom-variation "Add to flame"), show/hide, delete (incl. last-one-resets), randomise colour                                                                                                                                                                                                          | `flame.setProbability`, `flame.setColorSpeed`, `flame.setTransformVisible`, `flame.deleteTransform`, `flame.setTransformColor`                                      |
 | Variations      | weight, parametric params (whole-object editors too), add ("+"), show/hide, delete (incl. last-one-resets), dice randomise, quick-picker type change, variation-browser apply                                                                                                                                                                  | `flame.setVariationWeight`, `flame.setVariationParams`, `flame.setVariationVisible`, `flame.deleteVariation`, `flame.setVariation`, `flame.applyVariationSelection` |
-| Affine editor   | handle drags (translate, rotate, scale), pre/post, 2D and 3D; the affine LIST editor's coefficient scrubs, dice and reset                                                                                                                                                                                                                      | `flame.setTransformAffine`                                                                                                                                          |
+| Affine editor   | handle drags (translate, rotate, scale), pre/post, 2D and 3D; the affine LIST editor's coefficient scrubs, dice and reset                                                                                                                                                                                                                      | `flame.setAffine`, `flame.setTransformAffine`                                                                                                                       |
 | Colour editors  | colour wheel drag, colour scrub inputs, dice, reset, randomise ALL colours                                                                                                                                                                                                                                                                     | `flame.setTransformColor`                                                                                                                                           |
 | Palette         | apply, remove                                                                                                                                                                                                                                                                                                                                  | `flame.applyPalette`, `flame.removePalette`                                                                                                                         |
 | Blend / morph   | pick partner, clear partner, blend weight, morph setup                                                                                                                                                                                                                                                                                         | `flame.setBlendFlame`, `flame.setBlendWeight`, `flame.setupMorph`                                                                                                   |
 | Symmetry        | rotational and dihedral, n-fold; per-transform angle, show/hide and remove in the symmetry list                                                                                                                                                                                                                                                | `flame.applySymmetry`                                                                                                                                               |
 | Document        | new flame, open saved flame, load from history, load a bred child, randomise, mutate, apply a random gallery flame; flame name / author / description                                                                                                                                                                                          | `flame.load`                                                                                                                                                        |
 | Undo / redo     | toolbar buttons and Ctrl+Z / Ctrl+Y                                                                                                                                                                                                                                                                                                            | captured as the resulting `flame.load` or `recorder.restoreWorkspaceSnapshot`, so replay never depends on the viewer's private history stacks                       |
-| Final transform | set / clear                                                                                                                                                                                                                                                                                                                                    | `flame.setFinalTransform`                                                                                                                                           |
-| Timeline        | animation on/off, current frame, duration, fps, loop, loop mode, auto-keyframe, add / remove / move keyframe, keyframe value, keyframe interpolation, remove track, clear all, whole-animation load                                                                                                                                            | `timeline.*`; wall-clock Play/Pause transport is intentionally excluded                                                                                             |
-| Audio wiring    | preset choice, every per-target row (feature, target, sensitivity, range, attack/release), reactivity on/off, file vs microphone                                                                                                                                                                                                               | `audio.setMapping`, `audio.setEnabled`, `audio.setSource`                                                                                                           |
-| Viewport        | quality preset, adaptive filter, stochastic filter, fly mode, timeline panel show/hide                                                                                                                                                                                                                                                         | `view.*`                                                                                                                                                            |
+| Final transform | set / clear, handle drags, LIST coefficient scrubs and dice                                                                                                                                                                                                                                                                                    | `flame.setFinalTransform`, `flame.setFinalAffine`                                                                                                                   |
+| Timeline        | animation on/off, current frame, duration, fps/auto-fps, playback scale, loop/mode, auto-keyframe, add/remove/move/retime keyframes, values/interpolation, remove/clear tracks, curve edits, presets, random/smart animation, morph tracks and whole-animation loads                                                                           | atomic `timeline.*` commands; compound and randomized edits become one value-pinned `timeline.loadTimeline` snapshot                                                |
+| Audio wiring    | preset choice, every per-target row (feature, target, sensitivity, range, attack/release), reactivity on/off, file vs microphone, upload/clear resource identity                                                                                                                                                                               | identity-aware full snapshots carried by `audio.setMapping`, `audio.setEnabled`, `audio.setSource`, and `audio.applySnapshot`                                       |
+| Viewport        | quality preset, live canvas resolution, adaptive filter, stochastic filter, fly mode, timeline panel show/hide                                                                                                                                                                                                                                 | `view.*`                                                                                                                                                            |
 | 2D ↔ 3D switch  | the toolbar toggle                                                                                                                                                                                                                                                                                                                             | recorded as `flame.load` + `timeline.loadTimeline` carrying the restored state                                                                                      |
 
 ## Not covered yet
@@ -54,7 +61,6 @@ Each of these raises the unnamed-write count when used during a recording.
 | Audio             | per-frame modulation writes                     | Derived writes use the silent history path, so they no longer flood undo. A recording that uses live modulation receives one deduplicated fidelity warning because audio bytes and playback position are not embedded. |
 | Custom variations | the WGSL/maths **code editor**                  | Plan defers this: a code edit does not decompose into small commands. Intended shape is one `variation.setCode` action per committed edit.                                                                             |
 | Timeline          | wall-clock Play/Pause transport                 | Playback timing is hardware-driven state, not an authored edit. Replay pauses a running timeline before applying steps, records timeline data and playhead state, and never restarts wall-clock playback during undo.  |
-| Curve editor      | bezier handle drags                             | The handles write through the timeline's own path rather than `timeline.setKeyframeValue`; they now RAISE the unnamed-write count (before this pass they were invisible), so a recording says so honestly.             |
 
 **The timeline is now watched.** Its `pushUndo` reports to the recorder the
 same way the flame history's `onEntryPushed` does, so an uncovered timeline
@@ -110,21 +116,24 @@ changes in a corner is the number one reason tool videos lose people.
 
 **Each recorded step carries a hint** — `param:gamma`, `ui:dope-sheet`,
 `focus:tx:<id>` — saying _what to look at_, never where. Replay resolves the
-hint to an element, dims the rest of the screen, and captions the step. Two
-consequences worth stating:
+hint to an element, keeps the IFS canvas fully luminous, quiets the surrounding
+chrome, and captions the step. Two consequences worth stating:
 
 - A session recorded in one window size directs correctly in another, and a
   hint whose control has moved in the markup can be fixed in
   `recorder/focus.ts` rather than being stale in every file ever recorded.
+- Stable transform and variation identities keep repeated controls distinct;
+  replay opens the relevant sidebar/timeline, expands the owning transform,
+  selects it, and switches the affine or colour surface and mode before
+  resolving the exact target.
 - Because the hint lives in the recording, **a viewer's replay is directed
   too**, not just re-executed. That is the difference from a screen capture.
 
 Hints are derived centrally from the command id and args (`focusHintFor`),
 reusing the `data-tour-target` vocabulary the tours already keep honest; a
 command can declare its own `focus` when the args do not say what changed.
-A hint that resolves to nothing — a collapsed card, a closed panel, or a
-camera move whose payoff IS the picture — clears the overlay and shows the
-whole canvas.
+A hint that resolves to nothing still leaves the flame unobscured; camera
+moves therefore show their payoff directly rather than dimming the artwork.
 
 When a resolved control is outside a scrollable sidebar, follow-cam reveals it
 with `scrollIntoView({ block: 'nearest' })` before positioning the spotlight.
@@ -158,7 +167,7 @@ the replay and library panels it opens.
   and the replay transport. This is the answer to a loaded session covering a
   third of the canvas; playback still works collapsed.
 - **Transparency** — the half-circle button opens a resting-opacity slider plus a "fade" checkbox that
-  dims the dock while the canvas is animating or an export is running, so it
+  dims the dock while the canvas is animating, exporting, or replaying, so it
   stays out of a screen recording. Hovering or focusing the dock always brings
   it back to full opacity, whatever the slider says.
 - **Drag** — grab the dots at the left of the pill. Docked (the default) it

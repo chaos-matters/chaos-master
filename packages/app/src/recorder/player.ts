@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js'
 import { deepClone } from '@/utils/clone'
-import { isSessionRecording, withRecordingSuppressed } from './recorder'
+import { getLiveWorkspaceMutationGeneration, isSessionRecording, withRecordingSuppressed, } from './recorder'
 import { loadSessionStart } from './replay'
 import type { ReplayTarget } from './replay'
 import type { RecordedAction, RecordedSession } from './schema'
@@ -59,6 +59,8 @@ export type SessionPlayerOptions = {
    * on the step after it — at most one gap late, which MAX_STEP_GAP_MS bounds.
    */
   speed?: () => number
+  /** Reveal/prepare the UI immediately before the matching command runs. */
+  beforeAction?: (action: RecordedAction) => void
   onFinished?: () => void
   onError?: (message: string) => void
 }
@@ -73,8 +75,13 @@ export function createSessionPlayer(
   const [isPlaying, setIsPlaying] = createSignal(false)
   const [isFinished, setIsFinished] = createSignal(false)
   const [lastError, setLastError] = createSignal<string>()
+  const [actionPublished, setActionPublished] = createSignal(false)
   let timer: ReturnType<typeof setTimeout> | undefined
   let batchOpen = false
+  /** Mutation stamp at the last player-controlled settled prefix. While a
+   *  timed batch is open, history ownership handles takeover synchronously;
+   *  after Pause/seek/stop, this detects edits made with no owner to notify. */
+  let settledMutationGeneration = getLiveWorkspaceMutationGeneration()
   /**
    * Has `session.initial` been loaded into the target yet? Until it has, the
    * document is whatever the viewer was editing, and applying actions to that
@@ -88,9 +95,38 @@ export function createSessionPlayer(
     return value > 0 ? value : 1
   }
 
+  const withBatchWrite = <R>(fn: () => R): R => {
+    if (target.withBatchWrite) return target.withBatchWrite(fn)
+    return fn()
+  }
+
+  /**
+   * A user edit owns the document from this point onward. Stop the timer and
+   * commit the replay prefix synchronously, before history evaluates that
+   * edit. This is intentionally separate from `pause()` because ownership can
+   * be relinquished from inside history while the player is between steps.
+   */
+  function takeOverByUser(
+    preservePublishedAction = false,
+    preserveBaseline = false,
+  ) {
+    setIsPlaying(false)
+    setIsFinished(false)
+    if (!preservePublishedAction) setActionPublished(false)
+    // A live edit forks away from the known recorded prefix. The next Play
+    // must rebuild from `session.initial`; otherwise it would apply the
+    // remaining recorded actions on top of the user's divergent document.
+    // An intentional Pause is different: no external mutation occurred, so
+    // Resume may continue from the already-known prefix without flicker.
+    if (!preserveBaseline) baselineLoaded = false
+    clearTimer()
+    closeBatch()
+  }
+
   function openBatch() {
     if (batchOpen) return
-    target.beginBatch?.()
+    withRecordingSuppressed(() => target.prepare?.())
+    target.beginBatch?.(takeOverByUser)
     batchOpen = true
   }
 
@@ -98,6 +134,16 @@ export function createSessionPlayer(
     if (!batchOpen) return
     batchOpen = false
     target.endBatch?.()
+    settledMutationGeneration = getLiveWorkspaceMutationGeneration()
+  }
+
+  function invalidateEditedBaseline(): void {
+    if (
+      baselineLoaded &&
+      getLiveWorkspaceMutationGeneration() !== settledMutationGeneration
+    ) {
+      baselineLoaded = false
+    }
   }
 
   function rejectAction(index: number, error?: unknown): false {
@@ -140,41 +186,84 @@ export function createSessionPlayer(
     return true
   }
 
-  /** Apply one action. Suppressed so an active recording never absorbs it. */
+  type ActionExecution = { ok: true } | { ok: false; error: unknown }
+
+  /** Execute without publishing transport state. Replay stays unrecorded. */
+  function executeAction(
+    action: RecordedAction,
+    prepareUi: boolean,
+  ): ActionExecution {
+    if (isSessionRecording()) {
+      return {
+        ok: false,
+        error: new Error('Stop the active recording before continuing replay'),
+      }
+    }
+    try {
+      const accepted = withRecordingSuppressed(() =>
+        withBatchWrite(() => {
+          if (prepareUi) options.beforeAction?.(action)
+          return target.execute(action.id, deepClone(action.args)) !== false
+        }),
+      )
+      return accepted ? { ok: true } : { ok: false, error: undefined }
+    } catch (error) {
+      return { ok: false, error }
+    }
+  }
+
+  /** Apply one visible action, including follow-cam preparation/publication. */
   function applyAction(index: number): boolean {
     const action = actions[index]
     if (!action) return false
-    if (isSessionRecording()) {
-      return rejectAction(
-        index,
-        new Error('Stop the active recording before continuing replay'),
-      )
-    }
-    try {
-      const accepted = withRecordingSuppressed(
-        () => target.execute(action.id, deepClone(action.args)) !== false,
-      )
-      if (!accepted) return rejectAction(index)
-    } catch (error) {
-      return rejectAction(index, error)
-    }
+    const result = executeAction(action, true)
+    if (!result.ok) return rejectAction(index, result.error)
     setStepIndex(index)
+    setActionPublished(true)
     return true
   }
 
   function rebuildTo(index: number): boolean {
     try {
       withRecordingSuppressed(() => {
-        loadSessionStart(session, target)
+        withBatchWrite(() => {
+          loadSessionStart(session, target)
+        })
       })
     } catch (error) {
       return rejectAction(Math.max(0, index), error)
     }
     baselineLoaded = true
     setStepIndex(-1)
-    for (let i = 0; i <= index; i++) {
-      if (!applyAction(i)) return false
+    setActionPublished(false)
+
+    // Rebuild the historical prefix silently. Preparing and publishing every
+    // intermediate action made a seek through N steps scroll/focus the UI N
+    // times and re-render the transport N times, even though only the state at
+    // the destination is visible. If a prefix action fails, publish the last
+    // state that did apply before reporting the exact attempted step.
+    for (let i = 0; i < index; i++) {
+      const action = actions[i]
+      if (!action) return false
+      const result = executeAction(action, false)
+      if (!result.ok) {
+        setStepIndex(i - 1)
+        return rejectAction(i, result.error)
+      }
     }
+
+    // The terminal action is the only seek step the viewer sees, so it alone
+    // receives follow-cam preparation and becomes the published current step.
+    if (index < 0) return true
+    const action = actions[index]
+    if (!action) return false
+    const result = executeAction(action, true)
+    if (!result.ok) {
+      setStepIndex(index - 1)
+      return rejectAction(index, result.error)
+    }
+    setStepIndex(index)
+    setActionPublished(true)
     return true
   }
 
@@ -223,6 +312,7 @@ export function createSessionPlayer(
       setIsFinished(false)
       setLastError(undefined)
       if (!preflight()) return
+      invalidateEditedBaseline()
       // Load the flame the session was recorded against before the first step
       // (otherwise the steps land on the viewer's own document), and start
       // over when Play is pressed on the last step — so the button always does
@@ -237,18 +327,16 @@ export function createSessionPlayer(
     },
     pause() {
       if (!isPlaying()) return
-      setIsPlaying(false)
-      setIsFinished(false)
-      clearTimer()
       // Commit what has been applied: undo becomes available again, and the
       // user can edit on from here (the "fork from step N" case).
-      closeBatch()
+      takeOverByUser(true, true)
     },
     seek(index) {
       clearTimer()
       setIsFinished(false)
       setLastError(undefined)
       if (!preflight()) return
+      invalidateEditedBaseline()
       const clamped = Math.min(
         actions.length - 1,
         Math.max(-1, Math.floor(index)),
@@ -280,7 +368,7 @@ export function createSessionPlayer(
       closeBatch()
     },
     stepIndex,
-    currentAction: () => actions[stepIndex()],
+    currentAction: () => (actionPublished() ? actions[stepIndex()] : undefined),
     isPlaying,
     isFinished,
     lastError,

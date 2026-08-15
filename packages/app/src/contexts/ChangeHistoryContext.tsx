@@ -19,12 +19,18 @@ const noopHistory: ChangeHistory<FlameDescriptor> = {
   hasUndo: () => false,
   hasRedo: () => false,
   startPreview: () => {},
+  startOwnedPreview: (description) => Symbol(description),
+  withPreviewOwner: (_owner, fn) => fn(),
+  takeOverOwnedPreview: () => false,
+  hasOpenPreview: () => false,
   isPreviewing: () => false,
   isUndoingOrRedoing: () => false,
   commit: () => {},
+  commitOwnedPreview: () => false,
   peekUndoSeq: () => null,
   peekRedoSeq: () => null,
   setSilently: () => {},
+  replaceSilently: () => {},
 }
 
 export function useChangeHistory() {
