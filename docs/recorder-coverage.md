@@ -29,8 +29,9 @@ This inventory is about authored workspace/output changes. Navigation-only
 gestures — scrolling, hover, selecting or collapsing a card, switching an
 editor tab, and opening a picker without choosing anything — are presentation,
 not session steps. Follow-cam reconstructs the owning transform, affine,
-colour, timeline, or audio surface where an exact target is available; the
-remaining generic targets and mobile-sidebar mismatch are listed below.
+colour, timeline, or audio surface. Stable controls use exact anchors; result
+snapshots and broader workflows carry a validated semantic origin that points
+to their safe owning surface when no single persistent control exists.
 
 **Not recorded is not the same as broken.** Nothing below changes how the
 editor behaves; it only changes whether a session can replay it.
@@ -54,6 +55,7 @@ editor behaves; it only changes whether a session can replay it.
 | Final transform       | set/replace, handle drags, LIST coefficient scrubs and dice                                                                                                                                                                                                                                                                                    | `flame.setFinalTransform`, `flame.setFinalAffine`                                                                                                                   |
 | Timeline              | animation on/off, current frame, duration, fps/auto-fps, playback scale, loop/mode, auto-keyframe, add/remove/move/retime keyframes, values/interpolation, remove/clear tracks, curve edits, presets, random/smart animation, morph tracks and whole-animation loads                                                                           | atomic `timeline.*` commands; compound and randomized edits become one value-pinned `timeline.loadTimeline` snapshot                                                |
 | Audio wiring          | preset choice, every per-target row (feature, target, sensitivity, range, attack/release), reactivity on/off, file vs microphone, upload/clear resource identity                                                                                                                                                                               | identity-aware full snapshots carried by `audio.setMapping`, `audio.setEnabled`, `audio.setSource`, and `audio.applySnapshot`                                       |
+| Sonification          | enabled state, model, scale, voices, timing, spatial and effects controls                                                                                                                                                                                                                                                                      | `sonification.setEnabled`, `sonification.setConfig`, and a bounded versioned snapshot                                                                               |
 | Viewport              | quality preset, live canvas resolution, adaptive filter, stochastic filter, fly mode, timeline panel show/hide                                                                                                                                                                                                                                 | `view.*`                                                                                                                                                            |
 | 2D ↔ 3D switch        | the toolbar toggle                                                                                                                                                                                                                                                                                                                             | `flame.load` + `timeline.loadTimeline` carrying the restored state                                                                                                  |
 
@@ -62,34 +64,55 @@ editor behaves; it only changes whether a session can replay it.
 Several rich workflows deliberately record their **finished value**, not every
 internal choice that produced it:
 
-- **Randomise, Mutate, history/candidate apply and whole-document loads** carry
-  the complete resulting flame in `flame.load`. Replay never rerolls them.
+- **Randomise, Mutate, history/candidate apply and originated file/gallery
+  loads** carry the complete resulting flame in `flame.load`, plus a bounded
+  origin that restores the initiating button or picker. Migration and generated
+  logo loads remain exact value-pinned actions with their existing labels, but
+  do not yet carry a dedicated source origin. Replay never rerolls any of them.
 - **Breed, Evolve, Population Simulator and Ancestry** carry the chosen child
-  in `flame.load`. Browsing generations, changing genetics settings and
-  comparing candidates inside those tools are not represented as recipe
-  steps.
+  in `flame.load` and focus the genetics entry point. Browsing generations,
+  changing genetics settings and comparing candidates inside those tools are
+  not represented as recipe steps.
 - **Random Animate, Smart Animate, Colors and timeline presets** carry the
   completed tracks in one `timeline.loadTimeline` snapshot. Replay never
-  repeats `Math.random`, but the chosen preset ids and originating button are
-  not preserved as separate semantic actions.
+  repeats `Math.random`; the validated origin preserves the initiating button,
+  and Random Animate also carries its chosen preset ids as bounded caption
+  detail.
+- **Sonification** carries a bounded, independently versioned snapshot of the
+  enabled state plus model, scale, voices, timing, space and effects. Each
+  authored panel control is a semantic command; replay Undo/Redo restores the
+  complete snapshot. AudioContext/device lifetime and the local “keep playing
+  when closed” preference remain runtime-only.
 
-This is output-exact and compact, but it is not yet a complete narrated recipe
-of the generator/genetics process. That semantic-origin work is listed in the
-follow-up audit below.
+An explicit recorded **Enable** is output intent, so replay reveals the
+Sonification panel with its stop control; otherwise the app's hidden-audio
+safety effect would immediately silence it. Replay Undo/Redo restores the
+captured panel presentation and authored snapshot. With keep-playing off, a
+user panel close or panel switch records **Disable** before hiding the panel;
+with it on, the authored output remains enabled and only presentation changes.
+If the user later changes that unrecorded preference, the current local safety
+preference still wins when restoring a hidden panel. Closing the full editor
+sidebar (including its mobile drawer) follows the same rule: the user-owned
+hide records **Disable** first, while replay-owned presentation changes defer
+the audio engine until their final authored state is known.
+
+This is output-exact and compact, but it intentionally does not become a full
+clickstream of generator/genetics exploration before a result is applied.
 
 ## Authored state not represented yet
 
 The **Signal** column says whether the current recorder can warn about the gap.
+Selecting a Home flame while a take is active is blocked with a toast; the
+handoff is never allowed to replace the document underneath that recording.
 
-| Area              | State / action                                     | Signal                           | Why it is still open                                                                                                                                                                                        |
-| ----------------- | -------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Sonification      | enabled state and model/scale/voice/effects config | none today                       | This is authored audio-output state held in local signals, outside the flame, timeline and audio-reactive snapshots. It needs a validated sonification snapshot plus semantic commands.                     |
-| Custom variations | committed WGSL/maths code                          | none for the code blob           | A code edit should not decompose into keystrokes. Intended shape is one `variation.setCode` action per committed edit, with the definition embedded so another browser can replay it.                       |
-| Startup           | Home hand-off, shared-URL apply, backup restore    | unnamed-write or remount warning | These normally run before a recording. A recording that crosses one is marked rather than pretending continuity.                                                                                            |
-| Tours             | `tour:restore` snapshot                            | unreplayable marker              | Deliberate — tour machinery, not a user-authored edit.                                                                                                                                                      |
-| Audio             | the audio **file** itself                          | required-track metadata          | A buffer cannot ride in a JSON session. Wiring and required track name replay, but reactivity only enables when the matching file is already loaded (or an existing live microphone analyser is available). |
-| Audio             | playback clock and per-frame modulation            | one deduplicated warning         | Play/pause/seek and derived 30 fps writes are external runtime state. They stay out of undo and do not flood the log; audio bytes and playback position are not embedded.                                   |
-| Timeline          | wall-clock Play/Pause transport                    | unreplayable transport marker    | Playback timing is hardware-driven state, not an authored edit. Replay pauses a running timeline, records timeline data and playhead state, and never restarts wall-clock playback during undo.             |
+| Area              | State / action                                      | Signal                           | Why it is still open                                                                                                                                                                                        |
+| ----------------- | --------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Custom variations | committed WGSL/maths code                           | none for the code blob           | A code edit should not decompose into keystrokes. Intended shape is one `variation.setCode` action per committed edit, with the definition embedded so another browser can replay it.                       |
+| Startup           | shared-URL apply, backup restore                    | unnamed-write or remount warning | These normally run before a recording. A recording that crosses one is marked rather than pretending continuity.                                                                                            |
+| Tours             | `tour:restore` snapshot                             | unreplayable marker              | Deliberate — tour machinery, not a user-authored edit.                                                                                                                                                      |
+| Audio             | the audio **file** itself                           | required-track metadata          | A buffer cannot ride in a JSON session. Wiring and required track name replay, but reactivity only enables when the matching file is already loaded (or an existing live microphone analyser is available). |
+| Audio             | playback clock and per-frame modulation             | one deduplicated warning         | Play/pause/seek and derived 30 fps writes are external runtime state. They stay out of undo and do not flood the log; audio bytes and playback position are not embedded.                                   |
+| Timeline          | wall-clock Play/Pause and loaded-animation autoplay | unreplayable transport marker    | Playback timing is hardware-driven state, not an authored edit. Replay pauses a running timeline, records timeline data and playhead state, and never restarts wall-clock playback during undo.             |
 
 **The timeline is now watched.** Its `pushUndo` reports to the recorder the
 same way the flame history's `onEntryPushed` does, so an uncovered timeline
@@ -111,33 +134,28 @@ artifact:
   permission/resource acquisition;
 - export, download, clipboard, share and queue side effects. Metadata committed
   back to the flame and generated artwork loaded back into the editor are
-  recorded.
+  recorded. Opening Export is the deliberate modal exception: toolbar and
+  keyboard both dispatch `export.png`; the external export remains excluded.
 
 ## Follow-up completeness audit
 
-The 2026-08-15 full UI pass found no missing flame/render/timeline mutations,
-but it left a bounded follow-up PR:
+The 2026-08-15 follow-up landed bounded semantic origins for pinned flame and
+timeline results; exact anchors and preparation for generator, timeline,
+view, blend/morph, symmetry and transform-visibility controls; audio-panel
+preparation; toolbar Render parity with the keyboard command; pointer-id
+filtering for timeline drags; and a GPU-free static UI wiring ratchet. Replay
+preparation reveals the Randomizer without authoring a sonification stop, and
+reopens a collapsed symmetry card before targeting its controls.
 
-1. Add a versioned sonification snapshot and commands, and embed committed
-   custom-variation source.
-2. Preserve semantic origin for value-pinned workflows: Randomise, Mutate,
-   gallery/history/load, Breed/Evolve/Simulator/Ancestry, Random Animate,
-   Smart Animate, Colors and animation presets. Their output is exact today;
-   captions and spotlight targets are generic.
-3. Add exact anchors/preparation for timeline settings and generator buttons,
-   audio controls, Show Timeline, stochastic filter, fly mode, 2D/3D,
-   blend/morph, symmetry-row controls and transform visibility. Also make
-   mobile sidebar reveal match the desktop sidebar command.
-4. Decide one export-modal policy: the keyboard command is recordable while
-   the toolbar Render button opens the same modal directly. The external
-   export itself should remain outside replay.
-5. Collapse companion presentation commands from one-click workflows where
-   they currently produce redundant adjacent captions.
-6. Add a representative Playwright recording journey that clicks the real UI
-   and asserts `unnamedWriteCount === 0`. Unit command tests cannot detect a
-   newly added control that bypasses the registry.
-7. Harden the remaining timeline drag handlers against a second simultaneous
-   pointer by filtering window events to the initiating `pointerId`.
+The deliberate remaining work is:
+
+1. Embed committed custom-variation source as one bounded semantic action.
+2. Add dedicated semantic origins for migration and generated-logo loads.
+3. Collapse companion presentation commands from one-click workflows where
+   they produce redundant adjacent captions.
+4. Add a representative Playwright recording journey that clicks the real UI
+   and asserts `unnamedWriteCount === 0`. The static ratchet protects known
+   architecture, but cannot prove every new runtime control.
 
 ## Resolved performance and fidelity findings
 

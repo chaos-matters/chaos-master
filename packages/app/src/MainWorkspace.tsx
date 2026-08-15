@@ -1,5 +1,5 @@
 import '@/commands/builtins'
-import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, onMount, Show, Suspense, untrack, } from 'solid-js'
+import { batch, createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, onMount, Show, Suspense, untrack, } from 'solid-js'
 import { createStore, unwrap } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { vec2f, vec3f, vec4f } from 'typegpu/data'
@@ -99,12 +99,14 @@ import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } fro
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { BoxArrowRight, Cross, Eye, EyeOff, Menu, Plus, Share, Shuffle, Terminal, } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
-import { transformFocusId, variationParamsFocusId, variationRandomizeFocusId, variationTypeFocusId, variationVisibilityFocusId, } from './recorder/focusIds'
-import { breakRecordingCoalescing, invalidateLastFinishedSession, isSessionRecording, notePreviewStarted, recordSyntheticAction, reportDerivedWorkspaceWrite, reportDocumentWrite, reportUnreplayable, reportUnreplayableOnce, withRecordingSuppressed, } from './recorder/recorder'
-import { applyReplayAudioWiring, canEnableReplayAudio } from './recorder/replay'
+import { affineFocusId, transformColorRandomizeFocusId, transformFocusId, transformVisibilityFocusId, variationParamsFocusId, variationRandomizeFocusId, variationTypeFocusId, variationVisibilityFocusId, } from './recorder/focusIds'
+import { breakRecordingCoalescing, invalidateLastFinishedSession, isSessionRecording, notePreviewStarted, recordSyntheticAction, reportDerivedWorkspaceWrite, reportDocumentWrite, reportTimelineTransport, reportUnreplayable, reportUnreplayableOnce, withRecordingSuppressed, } from './recorder/recorder'
+import { applyReplayAudioWiring, canEnableReplayAudio, sessionMayEnableSonification, } from './recorder/replay'
 import { captureTransformColors, paletteRestoreColorsAfterReplayCommand, runPaletteRestoreTransition, } from './recorder/replayPaletteState'
 import { normalizeReplayPresentation, replaySideStateChanged, } from './recorder/replaySideState'
-import { createRecorderAwareTimeline } from './recorder/timelineActions'
+import { snapshotOrigin, snapshotOriginLabel } from './recorder/snapshotOrigin'
+import { applySonificationSnapshot, closeAuthoredSonificationPanel, shouldRevealSonificationAfterReplay, shouldStopHiddenSonification, SONIFICATION_SNAPSHOT_VERSION, } from './recorder/sonificationState'
+import { createRecorderAwareTimeline, runTimelineSnapshotMutation, } from './recorder/timelineActions'
 import { createAnimationExport } from './utils/animationExport'
 import { createAudioAnalyzer } from './utils/audioAnalysis'
 import { autosaveIntervalMin, autosaveRecents, saveReminderDismissed, setAutosaveRecents, setSaveReminderDismissed, } from './utils/autosaveSettings'
@@ -150,6 +152,8 @@ import type { ReplayAffineMode, ReplayAffineTab, ReplayColorView, ReplayFocusPre
 import type { ReplayTarget } from './recorder/replay'
 import type { ReplayNonFlameSideState, ReplayPresentationSnapshot, } from './recorder/replaySideState'
 import type { RecordedSession } from './recorder/schema'
+import type { SnapshotOrigin } from './recorder/snapshotOrigin'
+import type { SonificationSnapshot } from './recorder/sonificationState'
 import type { AnimationExportConfig } from './utils/animationExport'
 import type { AudioAnalyzer, LiveAudioAnalyzer } from './utils/audioAnalysis'
 import type { HistoryPreviewOwner } from './utils/createStoreHistory'
@@ -420,8 +424,13 @@ export function MainWorkspace(props: AppProps) {
     const handler = (e: MediaQueryListEvent) => {
       setIsMobile(e.matches)
       if (e.matches) setCompact(true)
-      // Auto-hide sidebar when switching to mobile layout
-      if (e.matches) setSidebarHidden(true)
+      // A responsive layout change is authored only while recording. During
+      // replay it is presentation, so let the replay-preservation policy keep
+      // generated audio stable instead of injecting a live Disable action.
+      if (e.matches) {
+        if (isSessionRecording()) hideMobileSidebarAsAuthoredAction()
+        else setSidebarHidden(true)
+      }
     }
     mq.addEventListener('change', handler)
     return () => {
@@ -490,19 +499,30 @@ export function MainWorkspace(props: AppProps) {
    * resulting document. Keep one replacement-style history entry and log the
    * exact descriptor it produced, mirroring the 2D/3D switch path below.
    */
-  const replaceLoadedFlame = (next: FlameDescriptor, label = 'Load flame') => {
+  const replaceLoadedFlame = (
+    next: FlameDescriptor,
+    label = 'Load flame',
+    origin?: SnapshotOrigin,
+  ) => {
     const flame = deepClone(next)
+    const description = snapshotOriginLabel(origin) ?? label
     // A different document cannot inherit another flame's pre-palette stash.
     // If the loaded flame already carries a palette, its earlier natural
     // colours are unknowable; Unselect safely keeps its current colours. The
     // history side effects restore the outgoing provenance if this load is
     // undone and clear it again on redo.
     withRecordingSuppressed(() => {
-      withPaletteRestoreTransition({}, label, () => {
-        setFlameDescriptor(() => flame, label)
+      withPaletteRestoreTransition({}, description, () => {
+        setFlameDescriptor(() => flame, description)
       })
     })
-    recordSyntheticAction('flame.load', [deepClone(flame), label], label)
+    recordSyntheticAction(
+      'flame.load',
+      origin === undefined
+        ? [deepClone(flame), description]
+        : [deepClone(flame), description, {}, origin],
+      description,
+    )
   }
   // Palette selection is part of the flame document (renderSettings.palette):
   // applying/removing one is a single undoable history entry, and the palette
@@ -562,6 +582,15 @@ export function MainWorkspace(props: AppProps) {
   createEffect(() => {
     const newFlame = props.flameFromWelcome?.()
     if (newFlame !== undefined) {
+      // Home overlays this still-mounted workspace. Replacing its document
+      // mid-take would be an unbounded workspace hand-off rather than a
+      // semantic editor step, so fail closed and keep the recorded session
+      // internally replayable.
+      if (isSessionRecording()) {
+        props.resetFlameFromWelcome?.()
+        showToast('Stop or discard the recording before opening a Home flame')
+        return
+      }
       const outgoingPaletteRestoreColors = deepClone(prePaletteColors())
       // Order is load-bearing. `flushDirtyToRecents` reads the OUTGOING flame
       // and its tracks, so it has to run before the reset drops them —
@@ -622,6 +651,10 @@ export function MainWorkspace(props: AppProps) {
   // Stable ID list for <For> -- only changes when transforms are added/removed,
   // not when their values change, so dragging angle editors stays fluid.
   const symTransformIds = createMemo(() => symTransforms().map(([tid]) => tid))
+  const [symmetryCardOpen, setSymmetryCardOpen] = createSignal(true)
+  createEffect(() => {
+    if (symTransforms().length === 0) setSymmetryCardOpen(true)
+  })
 
   const currentSymType = createMemo(() => {
     const syms = symTransforms() || []
@@ -642,23 +675,52 @@ export function MainWorkspace(props: AppProps) {
     return isDihedral ? syms.length : syms.length + 1
   })
 
-  const applySymmetry = (n: number, type: 'rotational' | 'dihedral') => {
-    executeCommand('flame.applySymmetry', cmdContext, n, type)
+  const applySymmetry = (
+    n: number,
+    type: 'rotational' | 'dihedral',
+    origin: 'add' | 'type' | 'folds' = 'add',
+  ) => {
+    executeCommand(
+      'flame.applySymmetry',
+      cmdContext,
+      n,
+      type,
+      undefined,
+      origin,
+    )
   }
 
   const totalProbability = createMemo(() =>
     sum(Object.values(flameDescriptor.transforms).map((f) => f.probability)),
   )
+  let loadModalOrigin: SnapshotOrigin | undefined
   const {
     loadModalIsOpen,
-    showLoadFlameModal,
+    showLoadFlameModal: showLoadFlameModalBase,
     loadedAnimation,
     setLoadedAnimation,
     clearLoadedAnimation,
   } = createLoadFlame(
-    { replace: replaceLoadedFlame },
+    {
+      replace: (next, label) => {
+        replaceLoadedFlame(next, label, loadModalOrigin)
+      },
+    },
     () => flameDescriptor.renderSettings.dimensions ?? 2,
   )
+
+  /** Attach a stable source to value-pinned modal loads without coupling the
+   * generic load dialog to recorder internals. The modal stack is serialized,
+   * so this provenance slot is owned by one request until it settles. */
+  const showLoadFlameModal = (mode: 'load' | 'gallery' = 'load') => {
+    const origin = snapshotOrigin(
+      mode === 'gallery' ? 'flame.gallery' : 'flame.file',
+    )
+    loadModalOrigin = origin
+    return showLoadFlameModalBase(mode).finally(() => {
+      if (loadModalOrigin === origin) loadModalOrigin = undefined
+    })
+  }
 
   const [showBlendGallery, setShowBlendGallery] = createSignal(false)
   // Whether the blend-flame gallery is being used to set a static blend or to
@@ -716,6 +778,31 @@ export function MainWorkspace(props: AppProps) {
   // transaction or leave silent writes behind after Undo.
   const [replaySuspendsAudioModulation, setReplaySuspendsAudioModulation] =
     createSignal(false)
+  const [replayDefersReactiveEffects, setReplayDefersReactiveEffects] =
+    createSignal(false)
+  let replayDeferredEffectsDepth = 0
+  const withReplayDeferredEffects = <T,>(fn: () => T): T => {
+    replayDeferredEffectsDepth++
+    if (replayDeferredEffectsDepth === 1) {
+      setReplayDefersReactiveEffects(true)
+    }
+    try {
+      return fn()
+    } finally {
+      replayDeferredEffectsDepth--
+      if (replayDeferredEffectsDepth === 0) {
+        setReplayDefersReactiveEffects(false)
+      }
+    }
+  }
+  // Follow-cam may temporarily replace the Sonification panel with the UI
+  // owned by the current replay step. That is presentation, not an authored
+  // stop, so the hidden-panel safety effect must wait for the replay batch to
+  // settle before deciding whether to silence the output.
+  const [
+    replayPreservesSonificationOutput,
+    setReplayPreservesSonificationOutput,
+  ] = createSignal(false)
   const [fileAnalyzer, setFileAnalyzer] = createSignal<
     AudioAnalyzer | undefined
   >(undefined)
@@ -761,6 +848,12 @@ export function MainWorkspace(props: AppProps) {
   // Sonification state
   const [showSonificationPanel, setShowSonificationPanel] = createSignal(false)
   const [sonificationEnabled, setSonificationEnabled] = createSignal(false)
+  const audioPanelVisible = () =>
+    showAudioPanel() && showSidebar() && (!isMobile() || !sidebarHidden())
+  const sonificationPanelVisible = () =>
+    showSonificationPanel() &&
+    showSidebar() &&
+    (!isMobile() || !sidebarHidden())
 
   /*
    * Closing a sound panel silences it, unless the user opted out.
@@ -777,7 +870,7 @@ export function MainWorkspace(props: AppProps) {
    * survive, so reopening resumes instead of reloading.
    */
   createEffect(() => {
-    if (showAudioPanel() || keepAudioPlayingWhenClosed()) {
+    if (audioPanelVisible() || keepAudioPlayingWhenClosed()) {
       return
     }
     if (!untrack(playbackPaused)) {
@@ -785,10 +878,14 @@ export function MainWorkspace(props: AppProps) {
     }
   })
   createEffect(() => {
-    if (showSonificationPanel() || keepAudioPlayingWhenClosed()) {
-      return
-    }
-    if (untrack(sonificationEnabled)) {
+    if (
+      shouldStopHiddenSonification({
+        enabled: sonificationEnabled(),
+        panelVisible: sonificationPanelVisible(),
+        keepPlayingWhenClosed: keepAudioPlayingWhenClosed(),
+        replayPreservesOutput: replayPreservesSonificationOutput(),
+      })
+    ) {
       setSonificationEnabled(false)
     }
   })
@@ -805,10 +902,99 @@ export function MainWorkspace(props: AppProps) {
       reverbMix: 0.3,
     })
 
+  const captureSonificationSnapshot = (): SonificationSnapshot => ({
+    version: SONIFICATION_SNAPSHOT_VERSION,
+    enabled: sonificationEnabled(),
+    config: deepClone(sonificationConfig()),
+  })
+
+  const revealSonificationPanel = () => {
+    setShowSidebar(true)
+    setSidebarHidden(false)
+    setSidebarDiffView(null)
+    setShowBlendGallery(false)
+    setShowAudioPanel(false)
+    setShowSonificationPanel(true)
+  }
+
+  /** Explicitly enabling generated audio is authored intent. Keep its stop
+   *  control visible even for instant replay, which has no follow-cam pass. */
+  const setAuthoredSonificationEnabled = (enabled: boolean) => {
+    batch(() => {
+      if (enabled) revealSonificationPanel()
+      setSonificationEnabled(enabled)
+    })
+  }
+
+  const loadSonificationSnapshot = (
+    snapshot: SonificationSnapshot,
+    revealEnabled = true,
+  ) => {
+    batch(() => {
+      applySonificationSnapshot(snapshot, {
+        setConfig: setSonificationConfig,
+        setEnabled: setSonificationEnabled,
+      })
+      // The panel-close safety effect intentionally silences hidden audio.
+      // Reveal a recorded live output so loading the session does not
+      // immediately turn its authored enabled state back off.
+      if (snapshot.enabled && revealEnabled) {
+        revealSonificationPanel()
+      }
+    })
+  }
+
+  /** User-driven panel hand-offs are authored output changes. Dispatch the
+   *  stop before hiding so the visibility safety effect remains only a
+   *  fallback for system/reset paths and cannot make recording miss it. */
+  function closeSonificationPanelAsAuthoredAction() {
+    closeAuthoredSonificationPanel({
+      shouldDisable: () =>
+        sonificationEnabled() && !keepAudioPlayingWhenClosed(),
+      disable: () => {
+        executeCommand('sonification.setEnabled', cmdContext, false)
+      },
+      hide: () => setShowSonificationPanel(false),
+    })
+  }
+
+  /** Turning Keep Playing off can itself hide the only live sonification
+   * output. Record that user-authored stop before changing the preference so
+   * the visibility safety effect remains a raw/system fallback only. */
+  function setKeepPlayingWhenClosedAsAuthoredAction(keep: boolean) {
+    if (!keep && sonificationEnabled() && !sonificationPanelVisible()) {
+      executeCommand('sonification.setEnabled', cmdContext, false)
+    }
+    setKeepAudioPlayingWhenClosed(keep)
+  }
+
+  function toggleSidebarAsAuthoredAction() {
+    if (showSidebar()) {
+      closeSonificationPanelAsAuthoredAction()
+      executeCommand('sidebar.close', cmdContext)
+    } else {
+      executeCommand('sidebar.open', cmdContext)
+    }
+  }
+
+  function hideMobileSidebarAsAuthoredAction() {
+    if (sidebarHidden()) return
+    closeSonificationPanelAsAuthoredAction()
+    setSidebarHidden(true)
+  }
+
+  function toggleMobileSidebarAsAuthoredAction() {
+    if (sidebarHidden()) {
+      setSidebarHidden(false)
+    } else {
+      hideMobileSidebarAsAuthoredAction()
+    }
+  }
+
   function pickBlendFlame() {
     setBlendIntent('blend')
     setShowAudioPanel(false)
-    setShowSonificationPanel(false)
+    closeSonificationPanelAsAuthoredAction()
     setShowSidebar(true)
     setShowBlendGallery(true)
   }
@@ -816,30 +1002,37 @@ export function MainWorkspace(props: AppProps) {
   function pickMorphFlame() {
     setBlendIntent('morph')
     setShowAudioPanel(false)
-    setShowSonificationPanel(false)
+    closeSonificationPanelAsAuthoredAction()
     setShowSidebar(true)
     setShowBlendGallery(true)
   }
 
   function pickBreedFlame() {
     setBlendIntent('breed')
+    setShowAudioPanel(false)
+    closeSonificationPanelAsAuthoredAction()
     setShowSidebar(true)
     setShowBlendGallery(true)
   }
 
   function pickEvolveFlame() {
     setBlendIntent('evolve')
+    setShowAudioPanel(false)
+    closeSonificationPanelAsAuthoredAction()
     setShowSidebar(true)
     setShowBlendGallery(true)
   }
 
   function pickDiffFlame() {
     setBlendIntent('diff')
+    setShowAudioPanel(false)
+    closeSonificationPanelAsAuthoredAction()
     setShowSidebar(true)
     setShowBlendGallery(true)
   }
 
   function openDiffView(flameA: FlameDescriptor, flameB: FlameDescriptor) {
+    closeSonificationPanelAsAuthoredAction()
     setSidebarDiffView({ flameA: deepClone(flameA), flameB: deepClone(flameB) })
     setShowSidebar(true)
   }
@@ -882,7 +1075,11 @@ export function MainWorkspace(props: AppProps) {
                 'Blend is still active — the loaded flame will look mixed',
                 4000,
               )
-            executeFlameLoad(flame)
+            executeFlameLoad(
+              flame,
+              undefined,
+              snapshotOrigin('flame.simulator'),
+            )
           }}
           respond={respond}
         />
@@ -902,7 +1099,7 @@ export function MainWorkspace(props: AppProps) {
                 'Blend is still active — the loaded flame will look mixed',
                 4000,
               )
-            executeFlameLoad(flame)
+            executeFlameLoad(flame, undefined, snapshotOrigin('flame.ancestry'))
           }}
           onCompare={openDiffAsModal}
           respond={respond}
@@ -922,11 +1119,15 @@ export function MainWorkspace(props: AppProps) {
     executeCommand('flame.setupMorph', cmdContext, endFlame)
     const cfg = timeline.config()
     // ...and one timeline undo step for the keyframes (remove + both adds).
-    recorderTimeline.runWithSingleUndo(() => {
-      timeline.removeAllKeyframesForPath('blendWeight')
-      timeline.addKeyframe('blendWeight', cfg.startFrame, 1, 'easeInOut')
-      timeline.setKeyframeValue('blendWeight', cfg.endFrame, 0, 'easeInOut')
-    })
+    runTimelineSnapshotMutation(
+      recorderTimeline,
+      snapshotOrigin('timeline.morph'),
+      () => {
+        timeline.removeAllKeyframesForPath('blendWeight')
+        timeline.addKeyframe('blendWeight', cfg.startFrame, 1, 'easeInOut')
+        timeline.setKeyframeValue('blendWeight', cfg.endFrame, 0, 'easeInOut')
+      },
+    )
     executeCommand('timeline.setAnimationEnabled', cmdContext, true)
     executeCommand('view.setShowTimeline', cmdContext, true)
     recorderTimeline.goToFrame(cfg.startFrame)
@@ -1447,7 +1648,11 @@ export function MainWorkspace(props: AppProps) {
   })
 
   const onDrop = useAppDragAndDrop(
-    { replace: replaceLoadedFlame },
+    {
+      replace: (next, label) => {
+        replaceLoadedFlame(next, label, snapshotOrigin('flame.file'))
+      },
+    },
     setLoadedAnimation,
     openReplaySession,
   )
@@ -1489,7 +1694,12 @@ export function MainWorkspace(props: AppProps) {
   )
 
   // Sonification loop: synthesizes audio in real-time from flame structure.
-  useSonification(sonificationEnabled, sonificationConfig, flameDescriptor)
+  const sonificationLifecycle = useSonification(
+    sonificationEnabled,
+    sonificationConfig,
+    flameDescriptor,
+    replayDefersReactiveEffects,
+  )
 
   /**
    * Capture the current flame as a downscaled PNG for OG link previews.
@@ -1909,7 +2119,11 @@ export function MainWorkspace(props: AppProps) {
     // also runs applyRandomizeSettings over the render settings with ambient
     // randomness; carrying the result keeps replay exact until that is
     // seeded too.
-    executeFlameLoad(newFlame, 'Randomize Flame')
+    executeFlameLoad(
+      newFlame,
+      'Randomize Flame',
+      snapshotOrigin('flame.randomize'),
+    )
   }
 
   const runMutateFlame = async (
@@ -1944,7 +2158,11 @@ export function MainWorkspace(props: AppProps) {
 
     mutatedFlame.renderSettings = rs
     // Same reasoning as Randomize above.
-    executeFlameLoad(mutatedFlame, 'Mutate Flame')
+    executeFlameLoad(
+      mutatedFlame,
+      'Mutate Flame',
+      snapshotOrigin('flame.mutate'),
+    )
   }
 
   // Keep the randomizer card visually fixed across a flame swap. Changing the
@@ -1975,11 +2193,20 @@ export function MainWorkspace(props: AppProps) {
    * swallows the current epoch as its initial value, so a bump-then-mount order
    * would lose the expansion.
    */
-  const openRandomizerCard = ({ expandAnimation = false } = {}) => {
+  const openRandomizerCard = ({
+    expandAnimation = false,
+    preserveSonificationOutput = false,
+  } = {}) => {
     setShowSidebar(true)
     setSidebarHidden(false)
     setSidebarDiffView(null)
     setShowBlendGallery(false)
+    setShowAudioPanel(false)
+    if (preserveSonificationOutput) {
+      setShowSonificationPanel(false)
+    } else {
+      closeSonificationPanelAsAuthoredAction()
+    }
     setQuickPickState(null)
     setRandomizerOpen(true)
     if (expandAnimation) {
@@ -2233,7 +2460,11 @@ export function MainWorkspace(props: AppProps) {
     // Loading a history entry is a fresh starting point: keep unsaved work
     // recoverable and don't autosave the untouched loaded flame.
     flushDirtyToRecents()
-    executeFlameLoad(entry.flame, 'Load History Flame')
+    executeFlameLoad(
+      entry.flame,
+      'Load History Flame',
+      snapshotOrigin('flame.history'),
+    )
     markLoadedBaseline()
   }
 
@@ -2249,9 +2480,13 @@ export function MainWorkspace(props: AppProps) {
       // selected presets write (previously each addKeyframe pushed its own
       // snapshot — dozens of Ctrl+Z to revert, and enough to overflow the
       // undo cap and lose the pre-click animation entirely).
-      recorderTimeline.runWithSingleUndo(() => {
-        randomizeAnimationTracks(presetIds, clearFirst)
-      })
+      runTimelineSnapshotMutation(
+        recorderTimeline,
+        snapshotOrigin('timeline.random', presetIds.join(', ')),
+        () => {
+          randomizeAnimationTracks(presetIds, clearFirst)
+        },
+      )
       executeCommand('view.setShowTimeline', cmdContext, true)
     } finally {
       setTimeout(() => {
@@ -2389,12 +2624,16 @@ export function MainWorkspace(props: AppProps) {
     isRandomizingAnimation = true
     try {
       // One click = one undo step (see handleRandomizeAnimation).
-      recorderTimeline.runWithSingleUndo(() => {
-        if (clearFirst) timeline.clearAllTracks()
-        smartRandomAnimation(flameDescriptor, timeline)
-        timeline.setAnimationEnabled(true)
-        setAnimationEnabled(true)
-      })
+      runTimelineSnapshotMutation(
+        recorderTimeline,
+        snapshotOrigin('timeline.smart'),
+        () => {
+          if (clearFirst) timeline.clearAllTracks()
+          smartRandomAnimation(flameDescriptor, timeline)
+          timeline.setAnimationEnabled(true)
+          setAnimationEnabled(true)
+        },
+      )
       executeCommand('view.setShowTimeline', cmdContext, true)
     } finally {
       setTimeout(() => {
@@ -2553,12 +2792,22 @@ export function MainWorkspace(props: AppProps) {
       }
     })
 
+    if (anim.tracks.length > 0) {
+      reportTimelineTransport(
+        'Loaded animation autoplay is wall-clock transport and is not replayed',
+      )
+    }
+
     const afterTimeline = captureTimelineSnapshot()
     if (JSON.stringify(afterTimeline) !== beforeTimeline) {
+      const origin =
+        anim.tracks.length > 0
+          ? snapshotOrigin('timeline.load')
+          : snapshotOrigin('timeline.clear')
       recordSyntheticAction(
         'timeline.loadTimeline',
-        [afterTimeline],
-        anim.tracks.length > 0 ? 'Load animation' : 'Clear animation',
+        [afterTimeline, origin],
+        snapshotOriginLabel(origin) ?? 'Update animation',
       )
     }
     if (showTimelineAfterLoad !== beforeShowTimeline) {
@@ -3266,16 +3515,10 @@ export function MainWorkspace(props: AppProps) {
       // Let browser/dialog handle Escape when no sidebar diff is open
     },
     KeyF: () => {
-      const toggle = () => {
-        executeCommand(
-          showSidebar() ? 'sidebar.close' : 'sidebar.open',
-          cmdContext,
-        )
-      }
       if ('startViewTransition' in document) {
-        document.startViewTransition(toggle)
+        document.startViewTransition(toggleSidebarAsAuthoredAction)
       } else {
-        toggle()
+        toggleSidebarAsAuthoredAction()
       }
       return true
     },
@@ -3485,6 +3728,11 @@ export function MainWorkspace(props: AppProps) {
           hasLiveAnalyzer: liveAnalyzer() !== undefined,
         }),
     },
+    sonification: {
+      snapshot: captureSonificationSnapshot,
+      setConfig: setSonificationConfig,
+      setEnabled: setAuthoredSonificationEnabled,
+    },
     view: {
       setQualityPreset,
       setAdaptiveFilter: setAdaptiveFilterEnabled,
@@ -3518,10 +3766,16 @@ export function MainWorkspace(props: AppProps) {
    * provenance, so clear it atomically with the flame and restore the
    * outgoing provenance only when this same history entry is undone.
    */
-  const executeFlameLoad = (flame: FlameDescriptor, label?: string) => {
-    const description = label ?? 'Load Flame'
+  const executeFlameLoad = (
+    flame: FlameDescriptor,
+    label?: string,
+    origin?: SnapshotOrigin,
+  ) => {
+    const description = snapshotOriginLabel(origin) ?? label ?? 'Load Flame'
     withPaletteRestoreTransition({}, description, () => {
-      if (label === undefined) {
+      if (origin !== undefined) {
+        executeCommand('flame.load', cmdContext, flame, description, {}, origin)
+      } else if (label === undefined) {
         executeCommand('flame.load', cmdContext, flame)
       } else {
         executeCommand('flame.load', cmdContext, flame, label)
@@ -3619,6 +3873,7 @@ export function MainWorkspace(props: AppProps) {
       source: audioSource(),
       trackName: audioTrackName(),
     },
+    sonification: captureSonificationSnapshot(),
     view: {
       qualityPreset: qualityPreset(),
       pixelRatio: pixelRatio() as 1 | 0.5 | 0.25,
@@ -3732,6 +3987,7 @@ export function MainWorkspace(props: AppProps) {
       view: presentation.colorView,
       epoch: previous.epoch + 1,
     }))
+    loadSonificationSnapshot(state.sonification, false)
   }
 
   let replayBatchStart: ReplaySideState | undefined
@@ -3748,6 +4004,9 @@ export function MainWorkspace(props: AppProps) {
       setQuickPickState(null)
       setHoveredVariationType(null)
       if (preparation.audioPanel) setShowAudioPanel(true)
+      if (preparation.sonificationPanel) {
+        revealSonificationPanel()
+      }
     }
 
     if (preparation.clearTransformSelection) {
@@ -3773,6 +4032,23 @@ export function MainWorkspace(props: AppProps) {
       setPaletteCardOpen(true)
     } else if (preparation.editorSurface === 'render') {
       setRenderCardOpen(true)
+    } else if (preparation.editorSurface === 'randomizer') {
+      const expandAnimation = [
+        'ui:random-animation',
+        'ui:smart-animation',
+        'ui:animation-colors',
+        'ui:animation-presets',
+        'ui:animation-clear',
+      ].includes(preparation.spotlightFocus ?? '')
+      openRandomizerCard({
+        expandAnimation,
+        // Replay preparation may reveal controls, but must never author a
+        // sonification-disable command or take ownership from replay.
+        preserveSonificationOutput: true,
+      })
+    }
+    if (preparation.symmetryCard) {
+      setSymmetryCardOpen(true)
     }
     if (preparation.floatingActions) setFloatingActionsCollapsed(false)
 
@@ -3793,6 +4069,11 @@ export function MainWorkspace(props: AppProps) {
   }
 
   const replayTarget: ReplayTarget = {
+    primeEffects: (session) => {
+      if (sessionMayEnableSonification(session)) {
+        sonificationLifecycle.prime()
+      }
+    },
     prepare: () => {
       // Keep the presentation from before gallery cleanup. A hover may have
       // installed a temporary document preview, so the flame baseline itself
@@ -3836,6 +4117,7 @@ export function MainWorkspace(props: AppProps) {
       // the A.wav it requires or run the wrong track under the saved mapping.
       applyReplayAudioState(audio)
     },
+    loadSonification: loadSonificationSnapshot,
     loadView: (view) => {
       if (view.qualityPreset in qualityPresets) {
         setQualityPreset(view.qualityPreset as QualityPreset)
@@ -3868,6 +4150,7 @@ export function MainWorkspace(props: AppProps) {
     beginBatch: (onTakeover) => {
       invalidateLastFinishedSession()
       setReplaySuspendsAudioModulation(true)
+      setReplayPreservesSonificationOutput(true)
       replayBatchStart = captureReplaySideState(replayPresentationBeforePrepare)
       replayPresentationBeforePrepare = undefined
       // Transport is wall-clock state, not authored replay state. Freeze it
@@ -3882,10 +4165,24 @@ export function MainWorkspace(props: AppProps) {
       if (owner === undefined) return fn()
       return history.withPreviewOwner(owner, fn)
     },
+    withDeferredEffects: withReplayDeferredEffects,
     endBatch: () => {
       const owner = replayPreviewOwner
       replayPreviewOwner = undefined
       const before = replayBatchStart
+      // A presentation-only follow-cam hide must not become an authored stop.
+      // Once the batch settles, make enabled output reachable again unless
+      // the local keep-playing preference explicitly permits hidden sound.
+      if (
+        shouldRevealSonificationAfterReplay({
+          enabled: sonificationEnabled(),
+          panelVisible: sonificationPanelVisible(),
+          keepPlayingWhenClosed: keepAudioPlayingWhenClosed(),
+        })
+      ) {
+        revealSonificationPanel()
+      }
+      setReplayPreservesSonificationOutput(false)
       const afterSideState = before
         ? captureReplayNonFlameSideState()
         : undefined
@@ -3970,7 +4267,7 @@ export function MainWorkspace(props: AppProps) {
               classList={{ [ui.fullscreen as string]: !showSidebar() }}
               onClick={() => {
                 // Tap canvas to close sidebar on mobile
-                if (isMobile() && !sidebarHidden()) setSidebarHidden(true)
+                if (isMobile()) hideMobileSidebarAsAuthoredAction()
               }}
             >
               <Show when={isMobile()}>
@@ -3979,7 +4276,7 @@ export function MainWorkspace(props: AppProps) {
                   data-replay-region="dim"
                   onClick={(e) => {
                     e.stopPropagation()
-                    setSidebarHidden((p) => !p)
+                    toggleMobileSidebarAsAuthoredAction()
                   }}
                   aria-label="Toggle sidebar"
                 >
@@ -4172,6 +4469,7 @@ export function MainWorkspace(props: AppProps) {
                       return {
                         timeline: cmdContext.timeline.edit?.snapshot(),
                         audio: cmdContext.audio?.snapshot(),
+                        sonification: captureSonificationSnapshot(),
                         view: {
                           qualityPreset: qualityPreset(),
                           pixelRatio: pixelRatio() as 1 | 0.5 | 0.25,
@@ -4276,7 +4574,7 @@ export function MainWorkspace(props: AppProps) {
                     setFlySpeed={flySpeed[1]}
                     onAudioReactive={() => {
                       setShowBlendGallery(false)
-                      setShowSonificationPanel(false)
+                      closeSonificationPanelAsAuthoredAction()
                       setShowAudioPanel(true)
                     }}
                     onSonification={() => {
@@ -4428,7 +4726,7 @@ export function MainWorkspace(props: AppProps) {
                 <div class={ui.sidebarCloseRow}>
                   <button
                     class={ui.sidebarCloseBtn}
-                    onClick={() => setSidebarHidden(true)}
+                    onClick={hideMobileSidebarAsAuthoredAction}
                     aria-label="Collapse sidebar"
                   >
                     <svg viewBox="0 0 24 24" width="18" height="18">
@@ -4888,7 +5186,11 @@ export function MainWorkspace(props: AppProps) {
                                       'Blend is still active — the loaded flame will look mixed',
                                       4000,
                                     )
-                                  executeFlameLoad(flame, 'Apply Random Flame')
+                                  executeFlameLoad(
+                                    flame,
+                                    'Apply Random Flame',
+                                    snapshotOrigin('flame.random-gallery'),
+                                  )
                                 }}
                                 hardwareTier={props.hardwareTier}
                                 isBusy={isRandomizing()}
@@ -4972,6 +5274,9 @@ export function MainWorkspace(props: AppProps) {
                                       <Show when={!hideDiceButtons()}>
                                         <span
                                           class={ui.transformHeaderAction}
+                                          data-focus-id={transformColorRandomizeFocusId(
+                                            tid,
+                                          )}
                                           role="button"
                                           tabindex={0}
                                           title="Randomize transform color"
@@ -4992,6 +5297,7 @@ export function MainWorkspace(props: AppProps) {
                                               tid,
                                               chroma * Math.cos(hue),
                                               chroma * Math.sin(hue),
+                                              'card-randomize',
                                             )
                                           }}
                                         >
@@ -5000,6 +5306,9 @@ export function MainWorkspace(props: AppProps) {
                                       </Show>
                                       <span
                                         class={ui.transformHeaderAction}
+                                        data-focus-id={transformVisibilityFocusId(
+                                          tid,
+                                        )}
                                         role="button"
                                         tabindex={0}
                                         title={
@@ -5423,7 +5732,11 @@ export function MainWorkspace(props: AppProps) {
                             >
                               <CollapsibleCard
                                 title={`Symmetry (${recordEntries(flameDescriptor.transforms).filter(([tid]) => tid.startsWith('_sym__')).length})`}
-                                defaultOpen={true}
+                                data-tour-target="symmetry-card"
+                                open={symmetryCardOpen()}
+                                onToggleOpen={() =>
+                                  setSymmetryCardOpen((open) => !open)
+                                }
                               >
                                 <div class={ui.symPanel}>
                                   <div class={ui.symControls}>
@@ -5432,6 +5745,7 @@ export function MainWorkspace(props: AppProps) {
                                     </span>
                                     <select
                                       class={ui.select}
+                                      data-tour-target="symmetry-type"
                                       value={currentSymType()}
                                       onChange={(e) => {
                                         applySymmetry(
@@ -5439,6 +5753,7 @@ export function MainWorkspace(props: AppProps) {
                                           e.currentTarget.value as
                                             | 'rotational'
                                             | 'dihedral',
+                                          'type',
                                         )
                                       }}
                                     >
@@ -5452,6 +5767,7 @@ export function MainWorkspace(props: AppProps) {
                                     </span>
                                     <ScrubInput
                                       label=""
+                                      data-tour-target="symmetry-folds"
                                       value={currentSymFolds()}
                                       step={1}
                                       onInput={(val: number) => {
@@ -5460,7 +5776,11 @@ export function MainWorkspace(props: AppProps) {
                                           Math.round(val),
                                         )
                                         if (newN !== currentSymFolds()) {
-                                          applySymmetry(newN, currentSymType())
+                                          applySymmetry(
+                                            newN,
+                                            currentSymType(),
+                                            'folds',
+                                          )
                                         }
                                       }}
                                     />
@@ -5509,7 +5829,10 @@ export function MainWorkspace(props: AppProps) {
                                                 ]
                                               }
                                             </span>
-                                            <div class={ui.symAngle}>
+                                            <div
+                                              class={ui.symAngle}
+                                              data-focus-id={affineFocusId(tid)}
+                                            >
                                               <Show
                                                 when={!isReflection()}
                                                 fallback={
@@ -5561,6 +5884,9 @@ export function MainWorkspace(props: AppProps) {
                                             <div class={ui.symActions}>
                                               <button
                                                 class={ui.symActionBtn}
+                                                data-focus-id={transformVisibilityFocusId(
+                                                  tid,
+                                                )}
                                                 title={
                                                   transform().visible
                                                     ? 'Hide'
@@ -5625,7 +5951,7 @@ export function MainWorkspace(props: AppProps) {
                                     : 'Add 3-fold rotational symmetry'
                                 }
                                 onClick={() => {
-                                  applySymmetry(3, 'rotational')
+                                  applySymmetry(3, 'rotational', 'add')
                                 }}
                               >
                                 Add symmetry
@@ -6470,16 +6796,32 @@ export function MainWorkspace(props: AppProps) {
                             when={showAudioPanel()}
                             fallback={
                               <SonificationPanel
-                                onClose={() => setShowSonificationPanel(false)}
+                                onClose={closeSonificationPanelAsAuthoredAction}
                                 enabled={sonificationEnabled}
-                                onEnabledChange={setSonificationEnabled}
+                                onEnabledChange={(enabled) => {
+                                  executeCommand(
+                                    'sonification.setEnabled',
+                                    cmdContext,
+                                    enabled,
+                                  )
+                                }}
                                 config={sonificationConfig}
-                                onConfigChange={setSonificationConfig}
+                                onConfigChange={(config, key) => {
+                                  executeCommand(
+                                    'sonification.setConfig',
+                                    cmdContext,
+                                    config,
+                                    key,
+                                  )
+                                }}
+                                onConfigGestureBoundary={
+                                  breakRecordingCoalescing
+                                }
                                 keepPlayingWhenClosed={
                                   keepAudioPlayingWhenClosed
                                 }
                                 onKeepPlayingChange={
-                                  setKeepAudioPlayingWhenClosed
+                                  setKeepPlayingWhenClosedAsAuthoredAction
                                 }
                               />
                             }
@@ -6594,7 +6936,7 @@ export function MainWorkspace(props: AppProps) {
                               flameName={flameDescriptor.metadata?.name}
                               keepPlayingWhenClosed={keepAudioPlayingWhenClosed}
                               onKeepPlayingChange={
-                                setKeepAudioPlayingWhenClosed
+                                setKeepPlayingWhenClosedAsAuthoredAction
                               }
                               transforms={transformInfos()}
                             />
@@ -6656,7 +6998,11 @@ export function MainWorkspace(props: AppProps) {
                                           'Blend is still active — the loaded flame will look mixed',
                                           4000,
                                         )
-                                      executeFlameLoad(child, 'Load Bred Flame')
+                                      executeFlameLoad(
+                                        child,
+                                        'Load Bred Flame',
+                                        snapshotOrigin('flame.breed'),
+                                      )
                                     }}
                                     onChangeParent={() => {
                                       respond()
@@ -6686,7 +7032,11 @@ export function MainWorkspace(props: AppProps) {
                                           'Blend is still active — the loaded flame will look mixed',
                                           4000,
                                         )
-                                      executeFlameLoad(child, 'Load Bred Flame')
+                                      executeFlameLoad(
+                                        child,
+                                        'Load Evolved Flame',
+                                        snapshotOrigin('flame.evolve'),
+                                      )
                                     }}
                                     onChangeParent={() => {
                                       respond()
@@ -6753,7 +7103,7 @@ export function MainWorkspace(props: AppProps) {
               const is3D =
                 (flameDescriptor.renderSettings.dimensions ?? 2) === 3
               const flame = deepClone(is3D ? initExample3D : initExample)
-              executeFlameLoad(flame, 'New Flame')
+              executeFlameLoad(flame, 'New Flame', snapshotOrigin('flame.new'))
               setLoadedAnimation({ flame, tracks: [] })
               showToast('Fresh flame loaded — undo restores the previous one')
             }}
@@ -6803,8 +7153,7 @@ export function MainWorkspace(props: AppProps) {
             }}
             onRender={() => {
               if (timeline.isPlaying()) timeline.pause()
-
-              void showExportPngDialog()
+              executeCommand('export.png', cmdContext)
             }}
             onQuickExport={quickExport}
             onShareLink={() => {
@@ -6912,10 +7261,15 @@ export function MainWorkspace(props: AppProps) {
               // Log the descriptor and tracks it actually produced instead —
               // those replay exactly. The live path keeps one replacement-
               // style history entry, including its palette provenance.)
+              const flameOrigin = snapshotOrigin('flame.dimension', `${v}D`)
               recordSyntheticAction(
                 'flame.load',
-                [deepClone(restored), `Switch to ${v}D`],
-                `Switch to ${v}D`,
+                [deepClone(restored), `Switch to ${v}D`, {}, flameOrigin],
+                snapshotOriginLabel(flameOrigin) ?? `Switch to ${v}D`,
+              )
+              const timelineOrigin = snapshotOrigin(
+                'timeline.dimension',
+                `${v}D`,
               )
               recordSyntheticAction(
                 'timeline.loadTimeline',
@@ -6924,8 +7278,9 @@ export function MainWorkspace(props: AppProps) {
                     config: deepClone(timeline.config()),
                     tracks: deepClone(restoredTracks ?? []),
                   },
+                  timelineOrigin,
                 ],
-                `Load ${v}D animation`,
+                snapshotOriginLabel(timelineOrigin) ?? `Load ${v}D animation`,
               )
               // Mode switches restore stashed/starter state — not an edit.
               markLoadedBaseline()
@@ -6942,16 +7297,10 @@ export function MainWorkspace(props: AppProps) {
             sidebarOpen={showSidebar}
             onToggleSidebar={() => {
               // Same as the 'F' shortcut, so it works without a keyboard.
-              const toggle = () => {
-                executeCommand(
-                  showSidebar() ? 'sidebar.close' : 'sidebar.open',
-                  cmdContext,
-                )
-              }
               if ('startViewTransition' in document) {
-                document.startViewTransition(toggle)
+                document.startViewTransition(toggleSidebarAsAuthoredAction)
               } else {
-                toggle()
+                toggleSidebarAsAuthoredAction()
               }
             }}
           />

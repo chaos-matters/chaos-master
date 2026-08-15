@@ -10,6 +10,7 @@ export type ReplayEditorSurface =
   | 'color'
   | 'metadata'
   | 'palette'
+  | 'randomizer'
   | 'render'
 export type ReplayColorView = 'grid' | 'list'
 
@@ -42,12 +43,16 @@ export type ReplayFocusPreparation = {
   affineTab?: ReplayAffineTab
   /** Expand an editor card whose contents otherwise unmount while closed. */
   editorSurface?: ReplayEditorSurface
+  /** Expand the dedicated symmetry card for generated `_sym__` rows. */
+  symmetryCard?: { expand: true }
   /** Color handles live in Grid; component scrubs and actions live in List. */
   colorView?: ReplayColorView
   /** Reveal timeline controls before a timeline authoring action runs. */
   timeline?: { show: true; expand?: true }
   /** Reveal the audio wiring panel for audio actions. */
   audioPanel?: { show: true }
+  /** Reveal the generated-audio panel for sonification actions. */
+  sonificationPanel?: { show: true }
   /** Expand the floating actions instrument before resolving its controls. */
   floatingActions?: { expand: true }
 }
@@ -68,6 +73,7 @@ type FocusTarget = {
     | 'affine'
     | 'timeline'
     | 'audio'
+    | 'sonification'
     | 'floating-actions'
   transformId?: string
   variationId?: string
@@ -88,17 +94,29 @@ const SIDEBAR_UI_TARGETS = new Set([
   'metadata-card',
   'palette-selector',
   'randomizer-card',
+  'symmetry-card',
+  'symmetry-folds',
+  'symmetry-type',
   'transform-list',
   'variation-type',
   'variation-weight',
 ])
 
 const TIMELINE_UI_TARGETS = new Set([
+  'animation-clear',
+  'animation-colors',
+  'animation-presets',
   'auto-keyframe',
   'dope-sheet',
   'play-button',
   'seek-ruler',
+  'timeline-auto-fps',
+  'timeline-duration',
+  'timeline-fps',
+  'timeline-loop',
+  'timeline-loop-mode',
   'timeline-section',
+  'timeline-speed',
 ])
 
 const COLLAPSE_HIDDEN_TIMELINE_FOCUS = new Set([
@@ -109,9 +127,23 @@ const COLLAPSE_HIDDEN_TIMELINE_FOCUS = new Set([
 const FLOATING_ACTION_UI_TARGETS = new Set([
   'adaptive-filter',
   'animation-toggle',
+  'dimension-toggle',
   'export-png',
+  'fly-mode',
+  'load-flame',
+  'new-flame',
   'quality-presets',
   'randomize-colors',
+  'show-timeline',
+  'stochastic-filter',
+])
+
+const RANDOMIZER_UI_TARGETS = new Set([
+  'randomizer-card',
+  'randomizer-generate',
+  'randomizer-mutate',
+  'random-animation',
+  'smart-animation',
 ])
 
 const REMOVES_TRANSFORM_TARGET = new Set([
@@ -155,6 +187,12 @@ function targetFromFocusHint(
     if (parts.length === 2) {
       return { kind: 'transform', transformId, focus: hint }
     }
+    if (parts.length >= 3 && parts[2] === 'visibility') {
+      return { kind: 'transform', transformId, focus: hint }
+    }
+    if (parts.length >= 3 && parts[2] === 'header-color-randomize') {
+      return { kind: 'transform', transformId, focus: hint }
+    }
     if (parts.length >= 3 && parts[2] === 'affine') {
       return affineTarget(transformId, undefined, hint)
     }
@@ -193,6 +231,9 @@ function targetFromFocusHint(
         focus: hint,
         editorSurface: 'metadata',
       }
+    }
+    if (parts[0] === 'sonification') {
+      return { kind: 'sonification', focus: hint }
     }
     if (parts[0] === 'finalTransform') {
       return affineTarget(undefined, 'final', hint)
@@ -244,11 +285,21 @@ function targetFromFocusHint(
     if (target === 'audio-panel') {
       return { kind: 'audio', focus: hint }
     }
+    if (target === 'sonification-panel') {
+      return { kind: 'sonification', focus: hint }
+    }
     if (target === 'palette-selector') {
       return {
         kind: 'sidebar',
         focus: hint,
         editorSurface: 'palette',
+      }
+    }
+    if (RANDOMIZER_UI_TARGETS.has(target)) {
+      return {
+        kind: 'sidebar',
+        focus: hint,
+        editorSurface: 'randomizer',
       }
     }
     if (FLOATING_ACTION_UI_TARGETS.has(target)) {
@@ -301,6 +352,7 @@ function colorViewFromAction(
   action: RecordedAction,
 ): ReplayColorView | undefined {
   if (action.id !== 'flame.setTransformColor') return undefined
+  if (action.args[3] === 'card-randomize') return undefined
   return action.args[3] === 'x' ||
     action.args[3] === 'y' ||
     action.args[3] === 'randomize' ||
@@ -320,8 +372,14 @@ export function deriveReplayFocusPreparation(
   action: RecordedAction,
 ): ReplayFocusPreparation {
   const removesTransform = REMOVES_TRANSFORM_TARGET.has(action.id)
+  const removesSymmetryTransform =
+    removesTransform &&
+    typeof action.args[0] === 'string' &&
+    action.args[0].startsWith('_sym__')
   const semanticFocus = removesTransform
-    ? 'ui:transform-list'
+    ? removesSymmetryTransform
+      ? 'ui:symmetry-card'
+      : 'ui:transform-list'
     : focusHintFor(action.id, action.args)
   const spotlightFocus = semanticFocus ?? action.focus
   const target = targetFromFocusHint(spotlightFocus)
@@ -330,6 +388,8 @@ export function deriveReplayFocusPreparation(
   const preparation: ReplayFocusPreparation = {
     spotlightFocus: target.focus,
   }
+  const targetsSymmetryTransform =
+    target.transformId?.startsWith('_sym__') === true
   if (target.kind === 'timeline') {
     preparation.timeline = COLLAPSE_HIDDEN_TIMELINE_FOCUS.has(target.focus)
       ? { show: true, expand: true }
@@ -339,9 +399,14 @@ export function deriveReplayFocusPreparation(
   } else {
     preparation.sidebar = EDITOR_SIDEBAR
     if (target.kind === 'audio') preparation.audioPanel = { show: true }
+    if (target.kind === 'sonification') {
+      preparation.sonificationPanel = { show: true }
+    }
   }
 
-  if (target.transformId !== undefined) {
+  if (targetsSymmetryTransform) {
+    preparation.symmetryCard = { expand: true }
+  } else if (target.transformId !== undefined) {
     preparation.transform = {
       id: target.transformId,
       select: true,
@@ -351,11 +416,22 @@ export function deriveReplayFocusPreparation(
   if (removesTransform) preparation.clearTransformSelection = true
 
   const affineMode = target.affineMode ?? affineModeFromAction(action)
-  if (affineMode !== undefined) preparation.affineMode = affineMode
+  if (!targetsSymmetryTransform && affineMode !== undefined) {
+    preparation.affineMode = affineMode
+  }
   const affineTab = affineTabFromAction(action)
-  if (affineTab !== undefined) preparation.affineTab = affineTab
-  if (target.editorSurface !== undefined) {
+  if (!targetsSymmetryTransform && affineTab !== undefined) {
+    preparation.affineTab = affineTab
+  }
+  if (!targetsSymmetryTransform && target.editorSurface !== undefined) {
     preparation.editorSurface = target.editorSurface
+  }
+  if (
+    target.focus === 'ui:symmetry-type' ||
+    target.focus === 'ui:symmetry-folds' ||
+    target.focus === 'ui:symmetry-card'
+  ) {
+    preparation.symmetryCard = { expand: true }
   }
   if (action.id === 'flame.setMetadata' && target.kind === 'sidebar') {
     preparation.editorSurface = 'metadata'

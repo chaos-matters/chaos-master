@@ -9,7 +9,8 @@ import { deepClone } from '@/utils/clone'
 import { createStoreHistory } from '@/utils/createStoreHistory'
 import { createTimelineState } from '@/utils/timeline'
 import { cancelSessionRecording, reportDocumentWrite, startSessionRecording, stopSessionRecording, withRecordingSuppressed, } from './recorder'
-import { createRecorderAwareTimeline, snapshotTimeline, } from './timelineActions'
+import { snapshotOrigin } from './snapshotOrigin'
+import { createRecorderAwareTimeline, runTimelineSnapshotMutation, snapshotTimeline, } from './timelineActions'
 import type { CommandContext } from '@/commands/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineSnapshot } from '@/flame/schema/timeline'
@@ -69,11 +70,15 @@ function makeTimelineWorld() {
         return frame
       },
       play: raw.play,
-      setLoop: (loop) => { raw.updateConfigUndoable({ loop }); },
+      setLoop: (loop) => {
+        raw.updateConfigUndoable({ loop })
+      },
       setFps: (fps, coalesceId) => {
         raw.updateConfigUndoable({ fps }, coalesceId)
       },
-      setAutoFps: (autoFps) => { raw.updateConfigUndoable({ autoFps }); },
+      setAutoFps: (autoFps) => {
+        raw.updateConfigUndoable({ autoFps })
+      },
       setTimeScale: (timeScale, coalesceId) => {
         raw.updateConfigUndoable({ timeScale }, coalesceId)
       },
@@ -271,6 +276,32 @@ describe('recorder-aware timeline actions', () => {
 
       world.raw.timelineUndo()
       expect(world.raw.tracks()).toEqual([])
+      dispose()
+    })
+  })
+
+  it('keeps the semantic origin of a value-pinned compound edit', () => {
+    createRoot((dispose) => {
+      const world = makeTimelineWorld()
+      startSessionRecording(world.flame, {
+        timeline: snapshotTimeline(world.raw),
+      })
+
+      const origin = snapshotOrigin('timeline.preset', 'Slow Orbit')
+      runTimelineSnapshotMutation(world.facade, origin, () => {
+        world.facade.addKeyframe('camera3D.theta', 0, 0)
+        world.facade.addKeyframe('camera3D.theta', 90, Math.PI * 2)
+      })
+
+      const session = stopOrThrow()
+      expect(session.unnamedWriteCount).toBe(0)
+      expect(session.actions).toHaveLength(1)
+      expect(session.actions[0]).toMatchObject({
+        id: 'timeline.loadTimeline',
+        label: 'Apply Animation Preset: Slow Orbit',
+        focus: 'ui:animation-presets',
+      })
+      expect(session.actions[0]?.args[1]).toEqual(origin)
       dispose()
     })
   })

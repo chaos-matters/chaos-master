@@ -4,11 +4,13 @@ Status: **in progress**. M1 (recorder core and `.steps.json`), M2
 (deterministic command args), M4 (transport, step list, seeking and one-step
 undo) and M5 (sessions embedded in PNG/MP4 exports) are implemented. M3 now
 covers the main flame, camera, timeline (including curve edits), audio-reactive
-wiring, viewport and undo/redo surfaces. The remaining authored-state gaps are
-committed custom-variation code and sonification; semantic-origin/follow-cam
-precision and a representative whole-UI coverage ratchet remain incremental
-work. Captured 2026-08-15; see `docs/recorder-coverage.md` for the audited
-matrix and follow-up list.
+wiring, sonification, viewport and undo/redo surfaces. The remaining authored-
+state gap is committed custom-variation code. Value-pinned workflows now keep
+a validated semantic origin and safe owning-surface focus, with exact anchors
+for stable controls. A GPU-free static UI coverage ratchet protects the main
+call paths; a representative browser journey remains incremental work. Captured
+2026-08-15; see
+`docs/recorder-coverage.md` for the audited matrix and follow-up list.
 
 ## The ask
 
@@ -266,10 +268,11 @@ session (**render settings, item 6, are done**):
    orbit folds into one recorded step.
 4. **Document lifecycle** — **mostly done**: `flame.load` carries the
    descriptor itself, so a mid-session open, history load or bred child
-   replays without looking anything up. The mount-time paths (Home hand-off,
-   shared-URL apply) still use `history.replace` directly; they run before a
-   recording can be under way, and the workspace-remount flag covers the case
-   where one is.
+   replays without looking anything up. A Home hand-off is rejected while a
+   take is active, so it cannot replace the recorded workspace underneath the
+   recorder. Mount-time shared-URL/restore paths still use direct replacement;
+   the unnamed-write or workspace-remount marker covers a recording that
+   somehow crosses one.
 5. **Blend and audio wiring** — covered. Committed custom variation code is
    still open and should become one `variation.setCode` action, not a stream
    of keystrokes.
@@ -292,12 +295,12 @@ apply palette, symmetry — which gain `data-command` as they are rewired. That
 serves Playwright, the recorder's dev overlay, and any future model-driven
 operation without inventing a parallel naming scheme.
 
-**The whole-UI ratchet is not yet enforceable in CI.** The recorder is
-production-visible and command round trips are unit-tested, but a unit test
-cannot notice a newly-added control that writes directly. A focused
-Playwright journey should eventually record representative edits and assert
-`unnamedWriteCount === 0`; until then the live counter and saved marker remain
-the honest coverage signal.
+**The main UI wiring now has a GPU-free CI ratchet.** It statically checks the
+representative workspace call paths that must dispatch commands or pinned
+snapshots. It cannot prove runtime behavior or notice every novel control, so
+a focused Playwright journey should still record representative edits and
+assert `unnamedWriteCount === 0`; until then the live counter and saved marker
+remain the honest runtime coverage signal.
 
 ### Persistence and sharing
 
@@ -335,14 +338,14 @@ Each ships independently; nothing blocks the app in a half-migrated state
 because unrecorded mutations still work — they're just visible as `unnamed`
 diagnostics.
 
-| #   | Deliverable                                                                                                                                                                                                                             | Effort         |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
-| M1  | `src/recorder/` module: session schema, recorder hooked into command/history seams, fidelity diagnostics, production UI and `.steps.json` persistence.                                                                                  | shipped        |
-| M2  | Determinism: id-based addressing, pre-minted ids, seeded generate/mutate and round-trip tests.                                                                                                                                          | shipped        |
-| M3  | Core editing-surface coverage is largely shipped; sonification, committed custom code, semantic-origin/follow-cam precision and a representative Playwright coverage-ratchet journey remain.                                            | incremental    |
-| M4  | ~~Replay~~ **done**: `createSessionPlayer` transport, step-list panel, timed playback with speed control, jump-to-step, fork-from-step. A run or a seek is ONE undo step, so watching a session does not bury the viewer's own history. | shipped        |
-| M5  | Sharing: PNG `FlameSteps` chunk, MP4 metadata and export-dialog integration.                                                                                                                                                            | shipped        |
-| —   | Later: sandboxed replay for gallery previews, scripting/MCP surface over the registry, condensed-recipe editor, gallery publishing.                                                                                                     | separate plans |
+| #   | Deliverable                                                                                                                                                                                                                                         | Effort         |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| M1  | `src/recorder/` module: session schema, recorder hooked into command/history seams, fidelity diagnostics, production UI and `.steps.json` persistence.                                                                                              | shipped        |
+| M2  | Determinism: id-based addressing, pre-minted ids, seeded generate/mutate and round-trip tests.                                                                                                                                                      | shipped        |
+| M3  | Core editing-surface coverage, sonification state/commands and semantic-origin follow-cam coverage are shipped, including exact anchors for stable controls; committed custom code and a representative Playwright coverage-ratchet journey remain. | incremental    |
+| M4  | ~~Replay~~ **done**: `createSessionPlayer` transport, step-list panel, timed playback with speed control, jump-to-step, fork-from-step. A run or a seek is ONE undo step, so watching a session does not bury the viewer's own history.             | shipped        |
+| M5  | Sharing: PNG `FlameSteps` chunk, MP4 metadata and export-dialog integration.                                                                                                                                                                        | shipped        |
+| —   | Later: sandboxed replay for gallery previews, scripting/MCP surface over the registry, condensed-recipe editor, gallery publishing.                                                                                                                 | separate plans |
 
 M1 + M2 is the demoable core (record a session using existing commands +
 randomize, replay it deterministically). M3 is the long tail and can proceed

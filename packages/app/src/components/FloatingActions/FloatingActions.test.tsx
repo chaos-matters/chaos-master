@@ -55,6 +55,18 @@ describe('FloatingActions controlled collapse', () => {
     expect(
       document.querySelector('[data-tour-target="quality-presets"]'),
     ).not.toBeNull()
+    for (const target of [
+      'new-flame',
+      'load-flame',
+      'show-timeline',
+      'stochastic-filter',
+      'adaptive-filter',
+      'dimension-toggle',
+    ]) {
+      expect(
+        document.querySelector(`[data-tour-target="${target}"]`),
+      ).not.toBeNull()
+    }
 
     unmount()
   })

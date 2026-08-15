@@ -225,6 +225,39 @@ describe('createSessionPlayer', () => {
     })
   })
 
+  it('defers target side effects across an entire seek rebuild', () => {
+    createRoot((dispose) => {
+      const events: string[] = []
+      const player = createSessionPlayer(gammaSteps, {
+        loadInitial: () => events.push('load'),
+        execute: () => {
+          events.push('execute')
+          return true
+        },
+        withDeferredEffects: (run) => {
+          events.push('defer:start')
+          try {
+            return run()
+          } finally {
+            events.push('defer:end')
+          }
+        },
+      })
+
+      player.seek(2)
+
+      expect(events).toEqual([
+        'defer:start',
+        'load',
+        'execute',
+        'execute',
+        'execute',
+        'defer:end',
+      ])
+      dispose()
+    })
+  })
+
   it('prepares the matching UI before executing each replay action', () => {
     createRoot((dispose) => {
       const { target } = makeTarget(examples.initExample)
@@ -276,6 +309,26 @@ describe('createSessionPlayer', () => {
       vi.advanceTimersByTime(150)
       expect(flame.renderSettings.gamma).toBeCloseTo(3.5, 5)
       expect(player.isPlaying()).toBe(false)
+      dispose()
+    })
+  })
+
+  it('primes gated effects inside Play before the first timer task', () => {
+    createRoot((dispose) => {
+      const events: string[] = []
+      const player = createSessionPlayer(gammaSteps, {
+        loadInitial: () => events.push('load'),
+        primeEffects: () => events.push('prime'),
+        execute: () => {
+          events.push('execute')
+          return true
+        },
+      })
+
+      player.play()
+      expect(events).toEqual(['load', 'prime'])
+      vi.advanceTimersByTime(0)
+      expect(events).toEqual(['load', 'prime', 'execute'])
       dispose()
     })
   })

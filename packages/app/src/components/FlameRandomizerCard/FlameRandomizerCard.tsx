@@ -1175,6 +1175,7 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
               class={ui.primaryButton}
               onClick={handleGenerate}
               disabled={props.isBusy}
+              data-tour-target="randomizer-generate"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -1195,6 +1196,7 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
               class={ui.secondaryButton}
               onClick={handleMutate}
               disabled={props.isBusy}
+              data-tour-target="randomizer-mutate"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -1210,6 +1212,7 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
             <Button
               class={ui.secondaryButton}
               onClick={handleRandomizeAnimation}
+              data-tour-target="random-animation"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -1222,7 +1225,11 @@ export function FlameRandomizerCard(props: FlameRandomizerCardProps) {
               </svg>
               Randomize Animation
             </Button>
-            <Button class={ui.secondaryButton} onClick={handleSmartAnimation}>
+            <Button
+              class={ui.secondaryButton}
+              onClick={handleSmartAnimation}
+              data-tour-target="smart-animation"
+            >
               <svg
                 viewBox="0 0 24 24"
                 stroke="currentColor"

@@ -220,7 +220,12 @@ function createOrchestralEngine(ctx: AudioContext, config: SonificationConfig) {
     }
   }
 
-  function setVolume(v: number): void {
+  function setVolume(v: number, immediate = false): void {
+    if (immediate) {
+      masterGain.gain.cancelScheduledValues(ctx.currentTime)
+      masterGain.gain.setValueAtTime(v, ctx.currentTime)
+      return
+    }
     masterGain.gain.linearRampToValueAtTime(v, ctx.currentTime + 0.05)
   }
 
@@ -389,8 +394,14 @@ function createAmbientEngine(ctx: AudioContext, config: SonificationConfig) {
     wetGain.gain.linearRampToValueAtTime(reverbTarget, ctx.currentTime + 0.1)
   }
 
-  function setVolume(v: number): void {
-    masterGain.gain.linearRampToValueAtTime(v * 0.5, ctx.currentTime + 0.05)
+  function setVolume(v: number, immediate = false): void {
+    const target = v * 0.5
+    if (immediate) {
+      masterGain.gain.cancelScheduledValues(ctx.currentTime)
+      masterGain.gain.setValueAtTime(target, ctx.currentTime)
+      return
+    }
+    masterGain.gain.linearRampToValueAtTime(target, ctx.currentTime + 0.05)
   }
 
   function setReverbMix(_mix: number): void {
@@ -543,6 +554,14 @@ function triggerDrum(
 
 const DRUM_TYPES: DrumType[] = ['kick', 'snare', 'hihat', 'tom']
 
+// A session is untrusted data. Even with bounded transforms and triggerRate,
+// independently scheduling every transform can multiply into thousands of
+// short-lived Web Audio nodes per second. Keep ordinary weighted flames
+// unchanged while placing a hard global ceiling on allocation rate and burst
+// size for pathological or hand-edited descriptors.
+export const MAX_PERCUSSIVE_HITS_PER_SECOND = 32
+export const MAX_PERCUSSIVE_HIT_BURST = 4
+
 function createPercussiveEngine(ctx: AudioContext, config: SonificationConfig) {
   const masterGain = ctx.createGain()
   masterGain.gain.value = config.volume
@@ -566,6 +585,9 @@ function createPercussiveEngine(ctx: AudioContext, config: SonificationConfig) {
 
   // Track last trigger time per transform to enforce rate limit
   const lastTrigger = new Map<string, number>()
+  let triggerTokens = MAX_PERCUSSIVE_HIT_BURST
+  let lastBudgetTime = ctx.currentTime
+  let nextTransformIndex = 0
 
   function update(flame: FlameDescriptor): void {
     const now = ctx.currentTime
@@ -574,8 +596,35 @@ function createPercussiveEngine(ctx: AudioContext, config: SonificationConfig) {
     )
     if (transforms.length === 0) return
 
-    for (const [tid, t] of transforms) {
-      const probability = t.probability ?? 1 / transforms.length
+    const elapsed = Math.max(0, now - lastBudgetTime)
+    triggerTokens = Math.min(
+      MAX_PERCUSSIVE_HIT_BURST,
+      triggerTokens + elapsed * MAX_PERCUSSIVE_HITS_PER_SECOND,
+    )
+    lastBudgetTime = now
+    if (triggerTokens < 1) return
+
+    const totalWeight = transforms.reduce((sum, [, transform]) => {
+      const weight = transform.probability
+      return (
+        sum +
+        (typeof weight === 'number' && Number.isFinite(weight) && weight > 0
+          ? weight
+          : 0)
+      )
+    }, 0)
+
+    for (let offset = 0; offset < transforms.length; offset++) {
+      const index = (nextTransformIndex + offset) % transforms.length
+      const [tid, t] = transforms[index]!
+      const rawWeight =
+        typeof t.probability === 'number' &&
+        Number.isFinite(t.probability) &&
+        t.probability > 0
+          ? t.probability
+          : 0
+      const probability =
+        totalWeight > 0 ? rawWeight / totalWeight : 1 / transforms.length
       const last = lastTrigger.get(tid) ?? 0
       // Rate scales with the transform's own weight, but a rare transform must
       // still be heard occasionally rather than effectively never: clamp the
@@ -591,6 +640,8 @@ function createPercussiveEngine(ctx: AudioContext, config: SonificationConfig) {
       // flip on top — the old `Math.random() > p * 1.2` skipped ~70% of the
       // hits a typical 4-transform flame had already earned.
       lastTrigger.set(tid, now)
+      triggerTokens -= 1
+      nextTransformIndex = (index + 1) % transforms.length
 
       // Loud enough to hear across the range of weights; a 0.25-weight
       // transform used to land at 0.225 after the extra 0.6 factor.
@@ -608,10 +659,16 @@ function createPercussiveEngine(ctx: AudioContext, config: SonificationConfig) {
         pan,
         tone,
       )
+      if (triggerTokens < 1) break
     }
   }
 
-  function setVolume(v: number): void {
+  function setVolume(v: number, immediate = false): void {
+    if (immediate) {
+      masterGain.gain.cancelScheduledValues(ctx.currentTime)
+      masterGain.gain.setValueAtTime(v, ctx.currentTime)
+      return
+    }
     masterGain.gain.linearRampToValueAtTime(v, ctx.currentTime + 0.05)
   }
 
@@ -666,6 +723,9 @@ export type SonificationEngine = {
   update: (flame: FlameDescriptor) => void
   setVolume: (v: number) => void
   setConfig: (partial: Partial<SonificationConfig>) => void
+  /** Resume the browser-gated AudioContext while keeping output hard-muted. */
+  prime: () => void
+  setActive: (active: boolean) => void
   dispose: () => void
 }
 
@@ -680,11 +740,10 @@ export function createSonificationEngine(
     | typeof createAmbientEngine
     | typeof createPercussiveEngine
   >
+  let primedMuted = false
 
   function buildEngine(): void {
-    // Dispose old engine nodes
     engine?.dispose()
-
     switch (fullConfig.model) {
       case 'orchestral':
         engine = createOrchestralEngine(ctx, fullConfig)
@@ -696,6 +755,7 @@ export function createSonificationEngine(
         engine = createPercussiveEngine(ctx, fullConfig)
         break
     }
+    if (primedMuted) engine.setVolume(0, true)
   }
 
   buildEngine()
@@ -703,12 +763,13 @@ export function createSonificationEngine(
   return {
     update(flame: FlameDescriptor): void {
       if (ctx.state === 'suspended') {
-        void ctx.resume()
+        void ctx.resume().catch(() => undefined)
       }
       engine.update(flame)
     },
     setVolume(v: number): void {
-      engine.setVolume(v)
+      fullConfig.volume = v
+      if (!primedMuted) engine.setVolume(v)
     },
     setConfig(partial: Partial<SonificationConfig>): void {
       const oldModel = fullConfig.model
@@ -716,12 +777,30 @@ export function createSonificationEngine(
       if (partial.model !== undefined && partial.model !== oldModel) {
         buildEngine()
       }
-      engine.setVolume(fullConfig.volume)
+      if (!primedMuted) engine.setVolume(fullConfig.volume)
       engine.setReverbMix?.(fullConfig.reverbMix)
+    },
+    prime(): void {
+      // Muting before resume is important when this engine has already
+      // sounded: strict autoplay engines require the resume to happen in the
+      // Play click, but the authored Enable step may intentionally be later.
+      if (!primedMuted) {
+        primedMuted = true
+        engine.setVolume(0, true)
+      }
+      void ctx.resume().catch(() => undefined)
+    },
+    setActive(active: boolean): void {
+      if (active && primedMuted) {
+        primedMuted = false
+        engine.setVolume(fullConfig.volume, true)
+      }
+      const transition = active ? ctx.resume() : ctx.suspend()
+      void transition.catch(() => undefined)
     },
     dispose(): void {
       engine.dispose()
-      void ctx.close()
+      void ctx.close().catch(() => undefined)
     },
   }
 }

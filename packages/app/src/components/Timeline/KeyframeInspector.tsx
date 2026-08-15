@@ -3,6 +3,7 @@ import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useTimeline } from '@/contexts/TimelineContext'
 import ui from './DopeSheet.module.css'
+import { startPointerGesture } from './hooks/pointerGesture'
 import type { EasingCurve, KeyframeInterpolation } from '@/utils/timeline'
 
 interface KeyframeInspectorProps {
@@ -69,23 +70,13 @@ export function KeyframeInspector(props: KeyframeInspectorProps) {
   let finishInspectorScrub: (() => void) | undefined
 
   function startInspectorScrub(e: PointerEvent, currentValue: number) {
-    if (inspectorEditing()) return
+    if (e.button !== 0 || inspectorEditing()) return
     const sel = props.selectedKeyframe!
     const kf = timeline.getKeyframeAtFrame(sel.path, sel.frame)
     const easing = kf?.easing
     const startX = e.clientX
     const startValue = currentValue
-    const captureTarget = e.currentTarget as HTMLElement
     finishInspectorScrub?.()
-    timeline.breakUndoCoalescing()
-    captureTarget.setPointerCapture(e.pointerId)
-    setTargetedParameter(sel.path)
-
-    if (!changeHistory.isPreviewing()) {
-      changeHistory.startPreview('Keyframe scrub')
-    }
-    // Push undo once at start of scrub drag
-    timeline.addKeyframe(sel.path, sel.frame, startValue, easing)
 
     let step = 0.01
     let min: number | undefined = undefined
@@ -116,23 +107,28 @@ export function KeyframeInspector(props: KeyframeInspectorProps) {
       timeline.setKeyframeValue(sel.path, sel.frame, newValue, easing)
     }
 
-    function finish() {
-      if (finishInspectorScrub !== finish) return
-      finishInspectorScrub = undefined
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', finish)
-      window.removeEventListener('pointercancel', finish)
-      captureTarget.removeEventListener('lostpointercapture', finish)
-      if (changeHistory.isPreviewing()) {
-        changeHistory.commit()
-      }
-      timeline.breakUndoCoalescing()
+    const stopGesture = startPointerGesture({
+      pointerDownEvent: e,
+      onMove,
+      onEnd: () => {
+        if (finishInspectorScrub === stopGesture) {
+          finishInspectorScrub = undefined
+        }
+        if (changeHistory.isPreviewing()) {
+          changeHistory.commit()
+        }
+        timeline.breakUndoCoalescing()
+      },
+    })
+    finishInspectorScrub = stopGesture
+
+    timeline.breakUndoCoalescing()
+    setTargetedParameter(sel.path)
+    if (!changeHistory.isPreviewing()) {
+      changeHistory.startPreview('Keyframe scrub')
     }
-    finishInspectorScrub = finish
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', finish)
-    window.addEventListener('pointercancel', finish)
-    captureTarget.addEventListener('lostpointercapture', finish)
+    // Push undo once at start of scrub drag.
+    timeline.addKeyframe(sel.path, sel.frame, startValue, easing)
   }
 
   onCleanup(() => finishInspectorScrub?.())

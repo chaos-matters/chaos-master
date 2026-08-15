@@ -14,8 +14,10 @@ import { createTimelineState } from '@/utils/timeline'
 import { cancelSessionRecording, getLiveWorkspaceMutationGeneration, isSessionRecording, lastFinishedSession, notePreviewStarted, recordedActionCount, recordSyntheticAction, reportDerivedWorkspaceWrite, reportDocumentWrite, reportTimelineWrite, reportUnreplayableOnce, startSessionRecording, stopSessionRecording, unnamedWriteCount, withRecordingSuppressed, } from './recorder'
 import { replaySessionInstant } from './replay'
 import { captureTransformColors, paletteRestoreColorsAfterReplayCommand, runPaletteRestoreTransition, } from './replayPaletteState'
-import { MAX_ACTION_ARGS, MAX_ACTION_TIMESTAMP_MS, MAX_SESSION_ACTIONS, MAX_SESSION_JSON_CHARS, parseSession, serializeSession, sessionFilename, validateSession, } from './schema'
+import { MAX_ACTION_ARGS, MAX_ACTION_TIMESTAMP_MS, MAX_SESSION_ACTIONS, MAX_SESSION_JSON_CHARS, MAX_SONIFICATION_MODEL_TRANSITIONS, parseSession, serializeSession, sessionFilename, validateSession, } from './schema'
+import { SONIFICATION_SNAPSHOT_VERSION } from './sonificationState'
 import type { RecordedSession } from './schema'
+import type { SonificationSnapshot } from './sonificationState'
 import type { CommandContext } from '@/commands/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineTrack } from '@/utils/timeline'
@@ -362,6 +364,7 @@ describe('record → replay round-trip', () => {
         'flame.setGamma',
         'flame.load',
       ])
+      expect(session.actions[1]?.focus).toBe('ui:undoRedo-controls')
       expect(
         (session.actions[1]?.args[0] as FlameDescriptor).renderSettings.gamma,
       ).toBe(originalGamma)
@@ -1704,8 +1707,8 @@ describe('.steps.json serialization', () => {
 
 /**
  * A session is not just the flame. The timeline is a second document with its
- * own undo stack, and the audio wiring drives the flame every frame — a
- * recording that carried neither replayed half the work (docs/recorder-coverage.md).
+ * own undo stack, while audio wiring and sonification live outside both
+ * documents — a recording that carried none of them replayed half the work.
  */
 describe('session start state beyond the flame', () => {
   const timeline = {
@@ -1734,6 +1737,21 @@ describe('session start state beyond the flame', () => {
     source: 'file' as const,
     trackName: 'track.mp3',
   }
+  const sonification: SonificationSnapshot = {
+    version: SONIFICATION_SNAPSHOT_VERSION,
+    enabled: true,
+    config: {
+      model: 'ambient' as const,
+      volume: 0.45,
+      updateRate: 24,
+      scale: 'pentatonicMinor' as const,
+      voiceCount: 10,
+      harmonicDensity: 1.4,
+      triggerRate: 6,
+      spatialSpread: 0.8,
+      reverbMix: 0.4,
+    },
+  }
   const view = {
     qualityPreset: 'high',
     pixelRatio: 0.5 as const,
@@ -1747,17 +1765,87 @@ describe('session start state beyond the flame', () => {
     },
   }
 
-  it('carries timeline, audio, and view state through a round trip', () => {
-    startSessionRecording(examples.example1, { timeline, audio, view })
+  it('carries timeline, audio, sonification, and view state through a round trip', () => {
+    startSessionRecording(examples.example1, {
+      timeline,
+      audio,
+      sonification,
+      view,
+    })
     const session = stopSessionRecording()!
     expect(session.initialTimeline).toEqual(timeline)
     expect(session.initialAudio).toEqual(audio)
+    expect(session.initialSonification).toEqual(sonification)
     expect(session.initialView).toEqual(view)
 
     const parsed = parseSession(serializeSession(session))
     expect(parsed?.initialTimeline).toEqual(timeline)
     expect(parsed?.initialAudio).toEqual(audio)
+    expect(parsed?.initialSonification).toEqual(sonification)
     expect(parsed?.initialView).toEqual(view)
+  })
+
+  it('rejects unknown or out-of-range sonification snapshots', () => {
+    startSessionRecording(examples.example1, { sonification })
+    const session = stopSessionRecording()!
+
+    expect(
+      validateSession({
+        ...session,
+        initialSonification: { ...sonification, version: 2 },
+      }),
+    ).toBeUndefined()
+    expect(
+      validateSession({
+        ...session,
+        initialSonification: {
+          ...sonification,
+          config: { ...sonification.config, volume: 1.01 },
+        },
+      }),
+    ).toBeUndefined()
+    expect(
+      validateSession({
+        ...session,
+        initialSonification: {
+          ...sonification,
+          config: { ...sonification.config, voiceCount: 10.5 },
+        },
+      }),
+    ).toBeUndefined()
+  })
+
+  it('bounds synchronous sonification model graph transitions', () => {
+    startSessionRecording(examples.example1, { sonification })
+    const session = stopSessionRecording()!
+    const modelActions = (count: number) =>
+      Array.from({ length: count }, (_, index) => {
+        const model = index % 2 === 0 ? 'orchestral' : 'ambient'
+        return {
+          t: index,
+          id: 'sonification.setConfig',
+          args: [
+            {
+              ...sonification,
+              config: { ...sonification.config, model },
+            },
+            'model',
+          ],
+        }
+      })
+
+    expect(
+      validateSession({
+        ...session,
+        actions: modelActions(MAX_SONIFICATION_MODEL_TRANSITIONS),
+      }),
+    ).toBeDefined()
+    expect(
+      validateSession({
+        ...session,
+        actions: modelActions(MAX_SONIFICATION_MODEL_TRANSITIONS + 1),
+      }),
+    ).toBeUndefined()
   })
 
   it('refuses a hand-edited mapping that would write nonsense every frame', () => {
@@ -1789,6 +1877,7 @@ describe('session start state beyond the flame', () => {
     startSessionRecording(examples.example1)
     const session = stopSessionRecording()!
     expect(session.initialTimeline).toBeUndefined()
+    expect(session.initialSonification).toBeUndefined()
     expect(parseSession(serializeSession(session))).toBeDefined()
   })
 

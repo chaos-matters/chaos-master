@@ -1,5 +1,6 @@
 import { createMemo, onCleanup, Show } from 'solid-js'
 import { useTimeline } from '@/contexts/TimelineContext'
+import { startPointerGesture } from './hooks/pointerGesture'
 import ui from './TimelineSection.module.css'
 import type { LoopMode } from '@/utils/timeline'
 
@@ -11,7 +12,6 @@ function createSettingScrubber(
   max: number,
   onGestureEnd?: () => void,
 ) {
-  let scrubbing = false
   let finishActive: (() => void) | undefined
 
   onCleanup(() => {
@@ -20,17 +20,18 @@ function createSettingScrubber(
 
   return function onPointerDown(e: PointerEvent) {
     const target = e.target as HTMLElement
-    if (target.tagName === 'INPUT' || target.tagName === 'BUTTON') return
+    if (
+      e.button !== 0 ||
+      target.tagName === 'INPUT' ||
+      target.tagName === 'BUTTON'
+    )
+      return
 
     finishActive?.()
-    scrubbing = true
     const startX = e.clientX
     const startValue = getValue()
-    const captureTarget = e.currentTarget as HTMLElement
-    captureTarget.setPointerCapture(e.pointerId)
 
     function onMove(ev: PointerEvent) {
-      if (!scrubbing) return
       const dx = ev.clientX - startX
       const sensitivity = ev.shiftKey ? 0.1 : 1
       let newValue = startValue + dx * step * sensitivity
@@ -38,21 +39,15 @@ function createSettingScrubber(
       setValue(newValue)
     }
 
-    function finish() {
-      if (finishActive !== finish) return
-      finishActive = undefined
-      scrubbing = false
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', finish)
-      window.removeEventListener('pointercancel', finish)
-      captureTarget.removeEventListener('lostpointercapture', finish)
-      onGestureEnd?.()
-    }
-    finishActive = finish
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', finish)
-    window.addEventListener('pointercancel', finish)
-    captureTarget.addEventListener('lostpointercapture', finish)
+    const stopGesture = startPointerGesture({
+      pointerDownEvent: e,
+      onMove,
+      onEnd: () => {
+        if (finishActive === stopGesture) finishActive = undefined
+        onGestureEnd?.()
+      },
+    })
+    finishActive = stopGesture
   }
 }
 
@@ -64,6 +59,7 @@ export function TimelineSettings() {
     <div class={ui.settingsBar}>
       <label
         class={ui.settingItem}
+        data-tour-target="timeline-fps"
         onPointerDown={createSettingScrubber(
           () => config().fps,
           (v) => {
@@ -92,7 +88,7 @@ export function TimelineSettings() {
           }}
         />
       </label>
-      <label class={ui.settingItem}>
+      <label class={ui.settingItem} data-tour-target="timeline-auto-fps">
         <span class={ui.settingLabel}>Auto FPS</span>
         <input
           type="checkbox"
@@ -127,6 +123,7 @@ export function TimelineSettings() {
       </Show>
       <label
         class={ui.settingItem}
+        data-tour-target="timeline-duration"
         onPointerDown={createSettingScrubber(
           () => config().endFrame,
           (v) => {
@@ -156,6 +153,7 @@ export function TimelineSettings() {
       </label>
       <label
         class={ui.settingItem}
+        data-tour-target="timeline-speed"
         onPointerDown={createSettingScrubber(
           () => config().timeScale,
           (v) => {
@@ -184,7 +182,7 @@ export function TimelineSettings() {
           }}
         />
       </label>
-      <label class={ui.settingItem}>
+      <label class={ui.settingItem} data-tour-target="timeline-loop">
         <span class={ui.settingLabel}>Loop</span>
         <input
           type="checkbox"
@@ -201,6 +199,7 @@ export function TimelineSettings() {
       <Show when={timeline.tracks().length > 0}>
         <label
           class={ui.settingItem}
+          data-tour-target="timeline-loop-mode"
           title={
             'Loop style (adds no keyframes):\n' +
             '• Seamless — there-and-back: play A→B then a synthesized B→A return.\n' +

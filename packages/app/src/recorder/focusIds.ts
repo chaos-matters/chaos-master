@@ -8,6 +8,12 @@
  */
 export const transformFocusId = (transformId: string) => `tx:${transformId}`
 
+export const transformVisibilityFocusId = (transformId: string) =>
+  `${transformFocusId(transformId)}:visibility`
+
+export const transformColorRandomizeFocusId = (transformId: string) =>
+  `${transformFocusId(transformId)}:header-color-randomize`
+
 export const variationTypeFocusId = (
   transformId: string,
   variationId: string,

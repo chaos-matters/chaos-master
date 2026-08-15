@@ -268,6 +268,7 @@ export function ViewControls(props: ViewControlProps) {
               active
               onClick={props.onPickBlendFlame}
               title="Change blend flame"
+              data-tour-target="blend-picker"
             >
               Blend
             </Button>
@@ -290,19 +291,25 @@ export function ViewControls(props: ViewControlProps) {
               aria-label="Remove blend flame"
               onClick={props.onClearBlendFlame}
               title="Remove blend flame"
+              data-tour-target="blend-clear"
             >
               <Cross width="1rem" />
             </button>
           </div>
         </Show>
         <Show when={!props.blendFlame}>
-          <Button onClick={props.onPickBlendFlame} title="Pick blend flame">
+          <Button
+            onClick={props.onPickBlendFlame}
+            title="Pick blend flame"
+            data-tour-target="blend-picker"
+          >
             Blend...
           </Button>
         </Show>
         <Button
           onClick={props.onMorphFlame}
           title="Morph: animate this flame into another (animated blend)"
+          data-tour-target="morph-picker"
         >
           Morph...
         </Button>
@@ -338,6 +345,7 @@ export function ViewControls(props: ViewControlProps) {
       <PullUpMenu
         label="Genetics"
         title="Breeding features — crossover, evolution, lineage"
+        data-tour-target="genetics-menu"
         items={[
           {
             label: 'Breed…',
@@ -371,6 +379,7 @@ export function ViewControls(props: ViewControlProps) {
       <Button
         onClick={props.onGalleryFlame}
         title="Flame Gallery: curated collection of classic flame fractals"
+        data-tour-target="gallery-picker"
       >
         Gallery…
       </Button>

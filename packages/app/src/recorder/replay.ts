@@ -1,7 +1,9 @@
 import { batch } from 'solid-js'
 import { deepClone } from '@/utils/clone'
 import { isSessionRecording, withRecordingSuppressed } from './recorder'
+import { tryValidateSonificationSnapshot } from './sonificationState'
 import type { RecordedSession, SessionViewSnapshot } from './schema'
+import type { SonificationSnapshot } from './sonificationState'
 import type { AudioWiringSnapshot } from '@/flame/schema/audioWiring'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineSnapshot } from '@/flame/schema/timeline'
@@ -10,6 +12,22 @@ export type ReplayAudioResources = {
   hasFileBuffer: boolean
   currentTrackName?: string
   hasLiveAnalyzer: boolean
+}
+
+/** Whether replay may need browser user activation for generated audio. */
+export function sessionMayEnableSonification(
+  session: RecordedSession,
+): boolean {
+  if (session.initialSonification?.enabled) return true
+  return session.actions.some((action) => {
+    if (
+      action.id !== 'sonification.setEnabled' &&
+      action.id !== 'sonification.setConfig'
+    ) {
+      return false
+    }
+    return tryValidateSonificationSnapshot(action.args[0])?.enabled === true
+  })
 }
 
 /**
@@ -79,6 +97,8 @@ export type ReplayTarget = {
    * transient UI can leave this unset.
    */
   prepare?: () => void
+  /** Prime user-activation-gated resources synchronously from replay controls. */
+  primeEffects?: (session: RecordedSession) => void
   loadInitial: (flame: FlameDescriptor) => void
   /**
    * Restore the two documents that are not the flame: the timeline's tracks
@@ -89,6 +109,7 @@ export type ReplayTarget = {
    */
   loadTimeline?: (timeline: TimelineSnapshot) => void
   loadAudio?: (audio: AudioWiringSnapshot) => void
+  loadSonification?: (sonification: SonificationSnapshot) => void
   loadView?: (view: SessionViewSnapshot) => void
   /** False rejects an untrusted action and aborts the replay. */
   execute: (id: string, args: unknown[]) => unknown
@@ -112,6 +133,14 @@ export type ReplayTarget = {
    * commands from an intervening user edit; simple sandboxes can omit it.
    */
   withBatchWrite?: <R>(fn: () => R) => R
+  /**
+   * Defer target-owned reactive side effects while a whole session or seek
+   * prefix is rebuilt synchronously. The authored signals still reach their
+   * final values; a live workspace can use this to avoid repeatedly creating
+   * heavyweight resources (for example AudioContexts) for intermediate
+   * states that are never presented to the viewer.
+   */
+  withDeferredEffects?: <R>(fn: () => R) => R
   endBatch?: () => void
 }
 
@@ -135,6 +164,7 @@ export function replaySessionInstant(
   let batchOpen = false
   try {
     return withRecordingSuppressed(() => {
+      target.primeEffects?.(session)
       target.prepare?.()
       target.beginBatch?.(() => {})
       batchOpen = true
@@ -147,7 +177,8 @@ export function replaySessionInstant(
         }
         return true
       }
-      return target.withBatchWrite?.(apply) ?? apply()
+      const applyInBatch = () => target.withBatchWrite?.(apply) ?? apply()
+      return target.withDeferredEffects?.(applyInBatch) ?? applyInBatch()
     })
   } finally {
     if (batchOpen) target.endBatch?.()
@@ -168,7 +199,13 @@ export function loadSessionStart(
   if (session.initialAudio && target.loadAudio) {
     target.loadAudio(deepClone(session.initialAudio))
   }
+  // Presentation loads first: an enabled sonification baseline deliberately
+  // reveals its reachable stop control, so a saved closed sidebar must not be
+  // allowed to hide it again immediately afterwards.
   if (session.initialView && target.loadView) {
     target.loadView(deepClone(session.initialView))
+  }
+  if (session.initialSonification && target.loadSonification) {
+    target.loadSonification(deepClone(session.initialSonification))
   }
 }

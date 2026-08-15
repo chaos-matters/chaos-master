@@ -7,6 +7,7 @@ import { setDocumentWriteReporter, setTimelineTransportReporter, } from './docum
 import { focusHintFor } from './focus'
 import { MAX_ACTION_TIMESTAMP_MS, MAX_SESSION_ACTIONS, MAX_SESSION_FILE_BYTES, MAX_SESSION_JSON_CHARS, serializeSession, SESSION_FORMAT_VERSION, validateRecordedAction, validateSession, } from './schema'
 import type { RecordedAction, RecordedSession, SessionViewSnapshot, } from './schema'
+import type { SonificationSnapshot } from './sonificationState'
 import type { FlameCommand } from '@/commands/types'
 import type { AudioWiringSnapshot } from '@/flame/schema/audioWiring'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -49,6 +50,7 @@ type ActiveRecording = {
   initial: FlameDescriptor
   initialTimeline?: TimelineSnapshot
   initialAudio?: AudioWiringSnapshot
+  initialSonification?: SonificationSnapshot
   initialView?: SessionViewSnapshot
   actions: RecordedAction[]
   /** Compact encoded lengths let the hot recording path enforce the 8 MiB
@@ -75,6 +77,7 @@ type ActiveRecording = {
 export type SessionStartExtras = {
   timeline?: TimelineSnapshot
   audio?: AudioWiringSnapshot
+  sonification?: SonificationSnapshot
   view?: SessionViewSnapshot
 }
 
@@ -162,6 +165,7 @@ function sessionFrom(rec: ActiveRecording): RecordedSession {
     initial: rec.initial,
     initialTimeline: rec.initialTimeline,
     initialAudio: rec.initialAudio,
+    initialSonification: rec.initialSonification,
     initialView: rec.initialView,
     actions: rec.actions,
     unnamedWriteCount: rec.unnamedWrites.length,
@@ -314,6 +318,10 @@ export function startSessionRecording(
         extras.timeline === undefined ? undefined : deepClone(extras.timeline),
       initialAudio:
         extras.audio === undefined ? undefined : deepClone(extras.audio),
+      initialSonification:
+        extras.sonification === undefined
+          ? undefined
+          : deepClone(extras.sonification),
       initialView:
         extras.view === undefined ? undefined : deepClone(extras.view),
       actions: [],
@@ -603,7 +611,7 @@ export function replaceCurrentRecordedAction(
       id,
       args,
       label,
-      focus: focusHintFor(id, [...args]),
+      focus: focusHintFor(id, [...args]) ?? previous.focus,
     },
     index,
   )

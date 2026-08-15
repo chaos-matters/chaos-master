@@ -24,7 +24,8 @@
  * pointing at in a tour.
  */
 
-import { affineFocusId, affineRandomizeFocusId, affineResetFocusId, colorFocusId, colorRandomizeFocusId, colorResetFocusId, FINAL_AFFINE_FOCUS_ID, FINAL_AFFINE_RANDOMIZE_FOCUS_ID, transformFocusId, variationParamsFocusId, variationRandomizeFocusId, variationTypeFocusId, variationVisibilityFocusId, } from './focusIds'
+import { affineFocusId, affineRandomizeFocusId, affineResetFocusId, colorFocusId, colorRandomizeFocusId, colorResetFocusId, FINAL_AFFINE_FOCUS_ID, FINAL_AFFINE_RANDOMIZE_FOCUS_ID, transformColorRandomizeFocusId, transformFocusId, transformVisibilityFocusId, variationParamsFocusId, variationRandomizeFocusId, variationTypeFocusId, variationVisibilityFocusId, } from './focusIds'
+import { snapshotOriginFocus, snapshotOriginForCommand } from './snapshotOrigin'
 
 /** Elements the follow-cam can be asked to look at, most specific first. */
 export function focusSelectors(hint: string): string[] {
@@ -170,6 +171,8 @@ export function focusHintFor(
       return 'ui:backgroundColor-picker'
     case 'flame.setBlendWeight':
       return 'ui:blendWeight-slider'
+    case 'flame.setBlendFlame':
+      return 'ui:blend-picker'
 
     // ---- structure: point at the row that changed -----------------------
     case 'flame.addTransform':
@@ -182,13 +185,16 @@ export function focusHintFor(
     case 'flame.setTransformVisible':
       return asString === undefined
         ? 'ui:transform-list'
-        : `focus:${transformFocusId(asString)}`
+        : `focus:${transformVisibilityFocusId(asString)}`
     case 'flame.setProbability':
       return asString === undefined
         ? 'ui:transform-list'
         : `param:transform.${asString}.probability`
     case 'flame.setTransformColor':
       if (asString === undefined) return 'ui:transform-list'
+      if (args[3] === 'card-randomize') {
+        return `focus:${transformColorRandomizeFocusId(asString)}`
+      }
       if (args[3] === 'x' || args[3] === 'y') {
         return `param:transform.${asString}.color.${args[3]}`
       }
@@ -272,16 +278,24 @@ export function focusHintFor(
         ? `param:${first}.${String(args[1])}.${args[2]}`
         : 'ui:variation-type'
     case 'flame.applySymmetry':
-      return 'ui:add-symmetry'
+      return args[3] === 'type'
+        ? 'ui:symmetry-type'
+        : args[3] === 'folds'
+          ? 'ui:symmetry-folds'
+          : 'ui:add-symmetry'
     case 'flame.applyPalette':
     case 'flame.removePalette':
       return 'ui:palette-selector'
     case 'flame.setAllTransformColors':
       return 'ui:randomize-colors'
     case 'flame.randomize':
+      return 'ui:randomizer-generate'
     case 'flame.mutate':
+      return 'ui:randomizer-mutate'
     case 'flame.setupMorph':
-      return 'ui:randomizer-card'
+      return 'ui:morph-picker'
+    case 'flame.load':
+      return snapshotOriginFocus(snapshotOriginForCommand(commandId, args))
     case 'flame.setMetadata':
       return typeof first === 'string'
         ? `param:metadata.${first}`
@@ -304,16 +318,26 @@ export function focusHintFor(
     case 'timeline.moveKeyframe':
     case 'timeline.relocateKeyframe':
     case 'timeline.removeTrack':
-    case 'timeline.clearTracks':
       return 'ui:dope-sheet'
+    case 'timeline.clearTracks':
+      return 'ui:animation-clear'
     case 'timeline.setFps':
+      return 'ui:timeline-fps'
     case 'timeline.setAutoFps':
+      return 'ui:timeline-auto-fps'
     case 'timeline.setTimeScale':
+      return 'ui:timeline-speed'
     case 'timeline.setLoop':
+      return 'ui:timeline-loop'
     case 'timeline.setDuration':
+      return 'ui:timeline-duration'
     case 'timeline.setLoopMode':
+      return 'ui:timeline-loop-mode'
     case 'timeline.loadTimeline':
-      return 'ui:timeline-section'
+      return (
+        snapshotOriginFocus(snapshotOriginForCommand(commandId, args)) ??
+        'ui:timeline-section'
+      )
     case 'timeline.setAutoKeyframe':
       return 'ui:auto-keyframe'
     case 'timeline.setAnimationEnabled':
@@ -323,6 +347,12 @@ export function focusHintFor(
     case 'audio.setSource':
     case 'audio.applySnapshot':
       return 'ui:audio-panel'
+    case 'sonification.setConfig':
+      return typeof args[1] === 'string'
+        ? `param:sonification.${args[1]}`
+        : 'ui:sonification-panel'
+    case 'sonification.setEnabled':
+      return 'param:sonification.enabled'
 
     // ---- app chrome ------------------------------------------------------
     case 'view.setQualityPreset':
@@ -330,13 +360,15 @@ export function focusHintFor(
     case 'view.setAdaptiveFilter':
       return 'ui:adaptive-filter'
     case 'view.setDimensions':
+      return 'ui:dimension-toggle'
     case 'view.setStochasticFilter':
+      return 'ui:stochastic-filter'
     case 'view.setFlyMode':
-      return 'ui:view-controls'
+      return 'ui:fly-mode'
     case 'view.setPixelRatio':
       return 'ui:pixelRatio-buttons'
     case 'view.setShowTimeline':
-      return 'ui:animation-toggle'
+      return 'ui:show-timeline'
     case 'sidebar.open':
     case 'sidebar.close':
       return 'ui:sidebar'

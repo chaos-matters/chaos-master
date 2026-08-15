@@ -1,6 +1,7 @@
 import type { ReplayAffineMode, ReplayAffineTab, ReplayColorView, } from './focusPreparation'
 import type { TransformColorSnapshot } from './replayPaletteState'
 import type { SessionViewSnapshot } from './schema'
+import type { SonificationSnapshot } from './sonificationState'
 import type { AudioWiringSnapshot } from '@/flame/schema/audioWiring'
 import type { FlameDescriptor, TransformId } from '@/flame/schema/flameSchema'
 import type { TimelineSnapshot } from '@/flame/schema/timeline'
@@ -39,6 +40,7 @@ export type ReplayPresentationSnapshot = {
 export type ReplayNonFlameSideState = {
   timeline: TimelineSnapshot
   audio: AudioWiringSnapshot
+  sonification: SonificationSnapshot
   view: SessionViewSnapshot
   presentation: ReplayPresentationSnapshot
 }
@@ -93,12 +95,14 @@ export function replaySideStateChanged(
     JSON.stringify([
       before.timeline,
       before.audio,
+      before.sonification,
       before.view,
       before.presentation,
     ]) !==
     JSON.stringify([
       after.timeline,
       after.audio,
+      after.sonification,
       after.view,
       after.presentation,
     ])

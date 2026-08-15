@@ -274,6 +274,7 @@ const REPLAY_ARG_POLICIES: Readonly<Record<string, ReplayArgsValidator>> = {
         value === 'x' ||
         value === 'y' ||
         value === 'randomize' ||
+        value === 'card-randomize' ||
         value === 'reset',
     ),
   ),

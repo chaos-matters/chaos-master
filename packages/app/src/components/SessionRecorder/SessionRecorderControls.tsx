@@ -33,8 +33,8 @@ function recordingStartFailureMessage(
  */
 export function SessionRecorderControls(props: {
   flameDescriptor: FlameDescriptor
-  /** The timeline and audio wiring to snapshot alongside the flame. Read at
-   *  the moment recording starts, not at mount. */
+  /** Timeline, audio and editor side state to snapshot alongside the flame.
+   *  Read at the moment recording starts, not at mount. */
   startExtras?: () => SessionStartExtras
   /** Runs only after the recorder accepts the captured workspace. */
   onRecordingStarted?: () => void
@@ -59,9 +59,9 @@ export function SessionRecorderControls(props: {
       return
     }
     // No clone here: startSessionRecording owns that (and cloning a whole
-    // flame document twice is not free on large flames). The timeline and
-    // audio wiring go in alongside the flame: keyframe edits mean nothing
-    // without the tracks they land on.
+    // flame document twice is not free on large flames). Timeline, audio and
+    // sonification state go in alongside it: their commands edit state that
+    // does not live in the flame descriptor.
     let extras: SessionStartExtras | undefined
     try {
       extras = props.startExtras?.()

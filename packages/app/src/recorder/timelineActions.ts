@@ -1,9 +1,37 @@
 import { deepClone } from '@/utils/clone'
 import { breakRecordingCoalescing, invalidateLastFinishedSession, recordSyntheticAction, withRecordingSuppressed, } from './recorder'
+import { snapshotOriginLabel } from './snapshotOrigin'
+import type { SnapshotOrigin } from './snapshotOrigin'
 import type { TimelineSnapshot } from '@/flame/schema/timeline'
 import type { EasingCurve, KeyframeInterpolation, TimelineConfig, TimelineState, } from '@/utils/timeline'
 
 type TimelineCommandDispatcher = (id: string, ...args: unknown[]) => void
+
+const RECORDER_SNAPSHOT_MUTATION = Symbol('recorderSnapshotMutation')
+
+type RecorderAwareTimeline = TimelineState & {
+  [RECORDER_SNAPSHOT_MUTATION]: <R>(
+    origin: SnapshotOrigin,
+    mutate: () => R,
+  ) => R
+}
+
+/**
+ * Give a compound timeline edit a stable semantic origin when the supplied
+ * timeline is recorder-aware. Sandboxed/plain timelines retain their normal
+ * one-undo behavior, so reusable UI components do not need a second path.
+ */
+export function runTimelineSnapshotMutation<R>(
+  timeline: TimelineState,
+  origin: SnapshotOrigin,
+  mutate: () => R,
+): R {
+  const recorderAware = timeline as Partial<RecorderAwareTimeline>
+  const run = recorderAware[RECORDER_SNAPSHOT_MUTATION]
+  return run === undefined
+    ? timeline.runWithSingleUndo(mutate)
+    : run(origin, mutate)
+}
 
 type KeyframeValue =
   | number
@@ -50,7 +78,11 @@ export function createRecorderAwareTimeline(
 ): TimelineState {
   let compoundDepth = 0
 
-  function recordSnapshotMutation<R>(label: string, mutate: () => R): R {
+  function recordSnapshotMutation<R>(
+    label: string,
+    mutate: () => R,
+    origin?: SnapshotOrigin,
+  ): R {
     if (compoundDepth > 0) return raw.runWithSingleUndo(mutate)
 
     // Compound helpers mutate the raw timeline first and only emit their
@@ -69,9 +101,24 @@ export function createRecorderAwareTimeline(
       // guarded/no-op bulk operation.
       if (JSON.stringify(after) !== before) {
         invalidateLastFinishedSession()
-        recordSyntheticAction('timeline.loadTimeline', [after], label)
+        recordSyntheticAction(
+          'timeline.loadTimeline',
+          origin === undefined ? [after] : [after, origin],
+          label,
+        )
       }
     }
+  }
+
+  function recordOriginSnapshotMutation<R>(
+    origin: SnapshotOrigin,
+    mutate: () => R,
+  ): R {
+    return recordSnapshotMutation(
+      snapshotOriginLabel(origin) ?? 'Update animation',
+      mutate,
+      origin,
+    )
   }
 
   function dispatchScalar(command: string, value: number, coalesceId?: string) {
@@ -91,8 +138,9 @@ export function createRecorderAwareTimeline(
     return writes
   }
 
-  const facade: TimelineState = {
+  const facade: RecorderAwareTimeline = {
     ...raw,
+    [RECORDER_SNAPSHOT_MUTATION]: recordOriginSnapshotMutation,
 
     play() {
       beforeMutation?.()
