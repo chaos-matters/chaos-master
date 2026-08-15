@@ -238,21 +238,25 @@ describe('ReplaySpotlight tracking', () => {
     canvas.dataset.replayRegion = 'canvas'
     setBox(canvas, 0, 0, 800, 600)
 
-    const sidebar = document.createElement('aside')
-    sidebar.dataset.replayRegion = 'dim'
-    setBox(sidebar, 600, 0, 200, 600)
+    const bottomBar = document.createElement('div')
+    bottomBar.dataset.replayRegion = 'dim'
+    setBox(bottomBar, 0, 400, 800, 200)
+
+    const timeline = document.createElement('section')
+    timeline.dataset.replayRegion = 'recessed'
+    setBox(timeline, 0, 400, 800, 160)
 
     const target = document.createElement('button')
     const scrollIntoView = vi.fn()
     target.dataset.focusId = 'tx:t3:variation:v1:type'
     target.scrollIntoView = scrollIntoView
-    setBox(target, 650, 100, 80, 30)
-    sidebar.append(target)
+    setBox(target, 650, 450, 80, 30)
 
     const transport = document.createElement('div')
     transport.dataset.replayRegion = 'transport'
     setBox(transport, 20, 520, 220, 50)
-    document.body.append(canvas, sidebar, transport)
+    bottomBar.append(timeline, target, transport)
+    document.body.append(canvas, bottomBar)
 
     const action: RecordedAction = {
       t: 0,
@@ -268,7 +272,20 @@ describe('ReplaySpotlight tracking', () => {
       document.querySelectorAll('[data-replay-mask-role]'),
       (element) => element.getAttribute('data-replay-mask-role'),
     )
-    expect(roles).toEqual(['base', 'canvas', 'chrome', 'transport', 'target'])
+    expect(roles).toEqual([
+      'base',
+      'canvas',
+      'chrome',
+      'recessed',
+      'transport',
+      'target',
+    ])
+
+    const timelineCutout = document.querySelector(
+      '[data-replay-mask-role="recessed"]',
+    )
+    expect(timelineCutout?.getAttribute('y')).toBe('400')
+    expect(timelineCutout?.getAttribute('height')).toBe('160')
 
     const targetCutout = document.querySelector(
       '[data-replay-mask-role="target"]',

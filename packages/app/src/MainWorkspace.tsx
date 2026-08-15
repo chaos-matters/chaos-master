@@ -4600,6 +4600,12 @@ export function MainWorkspace(props: AppProps) {
                         ? 'true'
                         : undefined
                     }
+                    data-replay-region={
+                      recorderReplayPresentation().playing &&
+                      !recorderReplayPresentation().timelineTargeted
+                        ? 'recessed'
+                        : undefined
+                    }
                     style={{
                       'pointer-events':
                         animationExportRunning() || timeline.isPlaying()
