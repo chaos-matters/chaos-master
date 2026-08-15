@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { examples } from '@/flame/examples'
 import { normalizeReplayPresentation, replaySideStateChanged, } from './replaySideState'
+import { SONIFICATION_SNAPSHOT_VERSION } from './sonificationState'
 import type { ReplayNonFlameSideState } from './replaySideState'
 import type { TransformId } from '@/flame/schema/flameSchema'
 
@@ -21,6 +22,21 @@ const sideState = (): ReplayNonFlameSideState => ({
     mapping: { preset: 'custom', mappings: [] },
     enabled: false,
     source: 'file',
+  },
+  sonification: {
+    version: SONIFICATION_SNAPSHOT_VERSION,
+    enabled: false,
+    config: {
+      model: 'orchestral',
+      volume: 0.3,
+      updateRate: 20,
+      scale: 'pentatonicMajor',
+      voiceCount: 8,
+      harmonicDensity: 1,
+      triggerRate: 4,
+      spatialSpread: 0.7,
+      reverbMix: 0.3,
+    },
   },
   view: {
     qualityPreset: 'medium',
@@ -138,6 +154,14 @@ describe('replay side-state snapshots', () => {
     after.presentation.prePaletteColors = {
       transform1: { x: 0.125, y: -0.375 },
     }
+
+    expect(replaySideStateChanged(sideState(), after)).toBe(true)
+  })
+
+  it('retains authored sonification state for replay Undo and Redo', () => {
+    const after = sideState()
+    after.sonification.enabled = true
+    after.sonification.config.model = 'ambient'
 
     expect(replaySideStateChanged(sideState(), after)).toBe(true)
   })

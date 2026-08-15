@@ -1,8 +1,14 @@
 import { createEffect, onCleanup, untrack } from 'solid-js'
 import { createSonificationEngine } from './sonification'
 import type { Accessor } from 'solid-js'
-import type { SonificationConfig } from './sonification'
+import type { SonificationConfig, SonificationEngine } from './sonification'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+
+export type SonificationLifecycle = {
+  /** Create/resume the silent engine synchronously from a user gesture so a
+   * later timed replay step can enable it without violating autoplay policy. */
+  prime: () => void
+}
 
 /**
  * Sonification effect hook: creates a Web Audio engine that reads flame
@@ -14,34 +20,61 @@ export function useSonification(
   sonificationEnabled: Accessor<boolean>,
   sonificationConfig: Accessor<SonificationConfig>,
   flameDescriptor: FlameDescriptor,
-): void {
+  effectsDeferred: Accessor<boolean> = () => false,
+): SonificationLifecycle {
+  let engine: SonificationEngine | undefined
+  let interval: ReturnType<typeof setInterval> | undefined
+  let lastUpdateRate: number | undefined
+
+  const stopUpdates = () => {
+    clearInterval(interval)
+    interval = undefined
+  }
+
+  const ensureEngine = (config: SonificationConfig): SonificationEngine => {
+    if (engine) {
+      engine.setConfig(config)
+    } else {
+      engine = createSonificationEngine(config)
+    }
+    return engine
+  }
+
   createEffect(() => {
-    const enabled = sonificationEnabled()
-    if (!enabled) return
+    const enabled = sonificationEnabled() && !effectsDeferred()
+    const cfg = enabled ? sonificationConfig() : untrack(sonificationConfig)
+    if (!enabled) {
+      stopUpdates()
+      engine?.setActive(false)
+      return
+    }
 
-    const cfg = untrack(sonificationConfig)
-    const engine = createSonificationEngine(cfg)
+    ensureEngine(cfg).setActive(true)
 
-    let interval = setInterval(() => {
-      engine.update(flameDescriptor)
-    }, 1000 / cfg.updateRate)
-
-    let lastUpdateRate = cfg.updateRate
-    createEffect(() => {
-      const newCfg = sonificationConfig()
-      if (newCfg.updateRate !== lastUpdateRate) {
-        clearInterval(interval)
-        interval = setInterval(() => {
-          engine.update(flameDescriptor)
-        }, 1000 / newCfg.updateRate)
-        lastUpdateRate = newCfg.updateRate
-      }
-      engine.setConfig(newCfg)
-    })
-
-    onCleanup(() => {
-      clearInterval(interval)
-      engine.dispose()
-    })
+    if (interval === undefined || cfg.updateRate !== lastUpdateRate) {
+      stopUpdates()
+      interval = setInterval(() => {
+        engine?.update(flameDescriptor)
+      }, 1000 / cfg.updateRate)
+      lastUpdateRate = cfg.updateRate
+    }
   })
+
+  onCleanup(() => {
+    stopUpdates()
+    engine?.dispose()
+    engine = undefined
+  })
+
+  return {
+    prime: () => {
+      const config = untrack(sonificationConfig)
+      const currentEngine = ensureEngine(config)
+      if (untrack(sonificationEnabled) && !untrack(effectsDeferred)) {
+        currentEngine.setActive(true)
+      } else {
+        currentEngine.prime()
+      }
+    },
+  }
 }

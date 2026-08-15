@@ -4,6 +4,7 @@ import type { AudioMapping, AudioWiringSnapshot, } from '@/flame/schema/audioWir
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineSnapshot } from '@/flame/schema/timeline'
 import type { TransformColorSnapshot } from '@/recorder/schema'
+import type { SonificationSnapshot } from '@/recorder/sonificationState'
 import type { HistorySetter } from '@/utils/createStoreHistory'
 import type { TimelineTrack } from '@/utils/timeline'
 import type { UndoTarget } from '@/utils/undoRouting'
@@ -118,6 +119,15 @@ export interface CommandContext {
     setMapping: (mapping: AudioMapping) => void
     setEnabled: (enabled: boolean) => void
     setSource: (source: 'file' | 'mic') => void
+  }
+  /**
+   * Reproducible Sonification-panel state. AudioContext/device lifetime and
+   * the keep-playing preference stay in the workspace, outside session data.
+   */
+  sonification?: {
+    snapshot: () => SonificationSnapshot
+    setConfig: (config: SonificationSnapshot['config']) => void
+    setEnabled: (enabled: boolean) => void
   }
   /**
    * Viewport and render-pipeline switches — the things in the actions toolbar

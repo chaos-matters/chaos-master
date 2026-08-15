@@ -6,6 +6,7 @@ import { generateTransformId, generateVariationId, } from '@/flame/transformFunc
 import { defaultLinearType, isVariationTypeFor, } from '@/flame/variationRegistry'
 import { getVariationDefault } from '@/flame/variations/utils'
 import { tryValidateTransformColorSnapshot } from '@/recorder/schema'
+import { snapshotOriginForCommand, snapshotOriginLabel, tryValidateSnapshotOrigin, } from '@/recorder/snapshotOrigin'
 import { deepClone } from '@/utils/clone'
 import { registerCommand } from '../registry'
 import type { CommandContext } from '../types'
@@ -697,6 +698,7 @@ registerCommand({
       origin === 'x' ||
       origin === 'y' ||
       origin === 'randomize' ||
+      origin === 'card-randomize' ||
       origin === 'reset'
       ? [...normalized, origin]
       : normalized
@@ -1272,13 +1274,16 @@ registerCommand({
   label: 'Load Flame',
   description:
     'Replace the whole document — opening a saved flame, an import, a bred child',
+  describe: (args) =>
+    snapshotOriginLabel(snapshotOriginForCommand('flame.load', args)) ??
+    (typeof args[1] === 'string' && args[1] !== '' ? args[1] : undefined),
   // Carries the descriptor itself, so a session that begins by opening a file
   // still replays: the log never depends on what happened to be on disk.
   // Validated through the normal migrate-on-parse path, the same one saved
   // flames and imports go through.
   validateReplayArgs(args) {
-    if (args.length < 1 || args.length > 3) {
-      return 'load expects a flame, optional label, and optional palette snapshot'
+    if (args.length < 1 || args.length > 4) {
+      return 'load expects a flame, optional label, palette snapshot, and semantic origin'
     }
     if (!tryValidateFlame(deepClone(args[0]))) {
       return 'flame descriptor is invalid'
@@ -1289,8 +1294,11 @@ registerCommand({
     ) {
       return 'load label must be a short string'
     }
-    if (args.length === 3 && !tryValidateTransformColorSnapshot(args[2])) {
+    if (args.length >= 3 && !tryValidateTransformColorSnapshot(args[2])) {
       return 'load palette provenance is invalid'
+    }
+    if (args.length === 4 && !tryValidateSnapshotOrigin(args[3])) {
+      return 'load semantic origin is invalid'
     }
     return undefined
   },
@@ -1309,6 +1317,13 @@ registerCommand({
 
 /** How many transforms an n-fold symmetry of this type adds. */
 const MAX_SYMMETRY_FOLDS = 64
+type SymmetryControlOrigin = 'add' | 'type' | 'folds'
+
+function isSymmetryControlOrigin(
+  value: unknown,
+): value is SymmetryControlOrigin {
+  return value === 'add' || value === 'type' || value === 'folds'
+}
 
 function symmetryTransformCount(n: unknown, type: unknown): number {
   const folds =
@@ -1323,8 +1338,10 @@ function symmetryTransformCount(n: unknown, type: unknown): number {
 }
 
 function symmetryArgsError(args: readonly unknown[]): string | undefined {
-  if (args.length !== 3) return 'symmetry expects exactly three arguments'
-  const [n, type, ids] = args
+  if (args.length !== 3 && args.length !== 4) {
+    return 'symmetry expects three arguments and an optional control origin'
+  }
+  const [n, type, ids, origin] = args
   if (
     typeof n !== 'number' ||
     !Number.isInteger(n) ||
@@ -1335,6 +1352,9 @@ function symmetryArgsError(args: readonly unknown[]): string | undefined {
   }
   if (type !== 'rotational' && type !== 'dihedral') {
     return 'symmetry type must be rotational or dihedral'
+  }
+  if (args.length === 4 && !isSymmetryControlOrigin(origin)) {
+    return 'symmetry control origin must be add, type, or folds'
   }
 
   const count = symmetryTransformCount(n, type)
@@ -1384,10 +1404,10 @@ registerCommand({
   // the setter would hand replay different UUIDs. normalizeArgs pre-mints one
   // (transform, variation) pair per transform the command is about to add, so
   // the log carries them. Re-running with the same n and type reuses them.
-  normalizeArgs(_ctx, [n, type, ids]) {
+  normalizeArgs(_ctx, [n, type, ids, origin]) {
     const count = symmetryTransformCount(n, type)
     const existing = Array.isArray(ids) ? ids : []
-    return [
+    const normalized = [
       n,
       type === 'dihedral' ? 'dihedral' : 'rotational',
       Array.from({ length: count }, (_, i) => {
@@ -1399,6 +1419,9 @@ registerCommand({
           : [generateTransformId('sym'), generateVariationId()]
       }),
     ]
+    return isSymmetryControlOrigin(origin)
+      ? [...normalized, origin]
+      : normalized
   },
   execute(ctx, n?: unknown, type?: unknown, ids?: unknown) {
     const args = [n, type, ids] as const

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { deriveReplayFocusPreparation } from './focusPreparation'
+import { snapshotOrigin } from './snapshotOrigin'
 import type { RecordedAction } from './schema'
 
 const action = (
@@ -218,6 +219,15 @@ describe('deriveReplayFocusPreparation', () => {
   it('opens exact color components and list actions in the list editor', () => {
     expect(
       deriveReplayFocusPreparation(
+        action('flame.setTransformColor', ['t3', 0.1, -0.2, 'card-randomize']),
+      ),
+    ).toEqual({
+      spotlightFocus: 'focus:tx:t3:header-color-randomize',
+      sidebar: editorSidebar,
+      transform: { id: 't3', select: true, expand: true },
+    })
+    expect(
+      deriveReplayFocusPreparation(
         action('flame.setTransformColor', ['t3', 0.1, -0.2, 'x']),
       ),
     ).toEqual({
@@ -243,7 +253,7 @@ describe('deriveReplayFocusPreparation', () => {
         action('timeline.setFps', [30], 'ui:timeline-section'),
       ),
     ).toEqual({
-      spotlightFocus: 'ui:timeline-section',
+      spotlightFocus: 'ui:timeline-fps',
       timeline: { show: true },
     })
   })
@@ -270,6 +280,124 @@ describe('deriveReplayFocusPreparation', () => {
     })
   })
 
+  it('opens the randomizer for an exact value-pinned generator action', () => {
+    expect(
+      deriveReplayFocusPreparation(
+        action('flame.load', [
+          {},
+          'Randomize Flame',
+          {},
+          snapshotOrigin('flame.randomize'),
+        ]),
+      ),
+    ).toEqual({
+      spotlightFocus: 'ui:randomizer-generate',
+      sidebar: editorSidebar,
+      editorSurface: 'randomizer',
+    })
+  })
+
+  it('reveals exact timeline settings and generator controls', () => {
+    expect(
+      deriveReplayFocusPreparation(action('timeline.setFps', [30])),
+    ).toEqual({
+      spotlightFocus: 'ui:timeline-fps',
+      timeline: { show: true },
+    })
+    expect(
+      deriveReplayFocusPreparation(
+        action('timeline.loadTimeline', [
+          {},
+          snapshotOrigin('timeline.colors'),
+        ]),
+      ),
+    ).toEqual({
+      spotlightFocus: 'ui:animation-colors',
+      timeline: { show: true },
+    })
+  })
+
+  it('expands floating actions for exact viewport toggles', () => {
+    expect(
+      deriveReplayFocusPreparation(action('view.setStochasticFilter', [true])),
+    ).toEqual({
+      spotlightFocus: 'ui:stochastic-filter',
+      floatingActions: { expand: true },
+    })
+    expect(
+      deriveReplayFocusPreparation(action('view.setShowTimeline', [false])),
+    ).toEqual({
+      spotlightFocus: 'ui:show-timeline',
+      floatingActions: { expand: true },
+    })
+  })
+
+  it('selects and expands a transform before spotlighting visibility', () => {
+    expect(
+      deriveReplayFocusPreparation(
+        action('flame.setTransformVisible', ['t3', false]),
+      ),
+    ).toEqual({
+      spotlightFocus: 'focus:tx:t3:visibility',
+      sidebar: editorSidebar,
+      transform: { id: 't3', select: true, expand: true },
+    })
+  })
+
+  it('reveals the sidebar before focusing exact symmetry controls', () => {
+    expect(
+      deriveReplayFocusPreparation(
+        action('flame.applySymmetry', [
+          2,
+          'rotational',
+          [['_sym__t1', 'v1']],
+          'folds',
+        ]),
+      ),
+    ).toEqual({
+      spotlightFocus: 'ui:symmetry-folds',
+      sidebar: editorSidebar,
+      symmetryCard: { expand: true },
+    })
+  })
+
+  it('opens the dedicated symmetry row instead of the ordinary transform editor', () => {
+    expect(
+      deriveReplayFocusPreparation(
+        action('flame.setTransformAffine', [
+          '_sym__t3',
+          'pre',
+          { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+        ]),
+      ),
+    ).toEqual({
+      spotlightFocus: 'focus:tx:_sym__t3:affine',
+      sidebar: editorSidebar,
+      symmetryCard: { expand: true },
+    })
+
+    expect(
+      deriveReplayFocusPreparation(
+        action('flame.setTransformVisible', ['_sym__t3', false]),
+      ),
+    ).toEqual({
+      spotlightFocus: 'focus:tx:_sym__t3:visibility',
+      sidebar: editorSidebar,
+      symmetryCard: { expand: true },
+    })
+
+    expect(
+      deriveReplayFocusPreparation(
+        action('flame.removeTransform', ['_sym__t3']),
+      ),
+    ).toEqual({
+      spotlightFocus: 'ui:symmetry-card',
+      sidebar: editorSidebar,
+      clearTransformSelection: true,
+      symmetryCard: { expand: true },
+    })
+  })
+
   it('reveals the audio panel for resource-safe audio wiring actions', () => {
     expect(
       deriveReplayFocusPreparation(action('audio.applySnapshot', [])),
@@ -277,6 +405,18 @@ describe('deriveReplayFocusPreparation', () => {
       spotlightFocus: 'ui:audio-panel',
       sidebar: editorSidebar,
       audioPanel: { show: true },
+    })
+  })
+
+  it('reveals the sonification panel and its exact authored control', () => {
+    expect(
+      deriveReplayFocusPreparation(
+        action('sonification.setConfig', [{}, 'harmonicDensity']),
+      ),
+    ).toEqual({
+      spotlightFocus: 'param:sonification.harmonicDensity',
+      sidebar: editorSidebar,
+      sonificationPanel: { show: true },
     })
   })
 
@@ -332,6 +472,7 @@ describe('deriveReplayFocusPreparation', () => {
     ).toEqual({
       spotlightFocus: 'ui:randomizer-card',
       sidebar: editorSidebar,
+      editorSurface: 'randomizer',
     })
   })
 

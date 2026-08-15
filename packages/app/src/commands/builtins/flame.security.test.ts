@@ -263,6 +263,22 @@ describe('bounded flame entity commands', () => {
       symmetry.validateReplayArgs?.([
         2,
         'rotational',
+        [['_sym__safe', 'safe_v']],
+        'folds',
+      ]),
+    ).toBeUndefined()
+    expect(
+      symmetry.validateReplayArgs?.([
+        2,
+        'rotational',
+        [['_sym__safe', 'safe_v']],
+        'ui:recorder-dock',
+      ]),
+    ).toMatch(/control origin/)
+    expect(
+      symmetry.validateReplayArgs?.([
+        2,
+        'rotational',
         [['ordinary_id', 'safe_v']],
       ]),
     ).toMatch(/reserved/)

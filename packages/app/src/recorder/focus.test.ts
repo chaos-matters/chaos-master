@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { focusHintFor, focusSelectors, resolveFocusElement, revealFocusElement, } from './focus'
+import { snapshotOrigin } from './snapshotOrigin'
 
 /**
  * The follow-cam's contract (docs/channel-content-plan.md §7): a recording
@@ -22,6 +23,12 @@ describe('focusHintFor', () => {
   it('points at the transform that changed, not the list', () => {
     expect(focusHintFor('flame.setProbability', ['t1', 0.5])).toBe(
       'param:transform.t1.probability',
+    )
+  })
+
+  it('targets the exact transform visibility action', () => {
+    expect(focusHintFor('flame.setTransformVisible', ['t3', false])).toBe(
+      'focus:tx:t3:visibility',
     )
   })
 
@@ -92,6 +99,14 @@ describe('focusHintFor', () => {
 
   it('distinguishes color-wheel, component, and list-button origins', () => {
     expect(
+      focusHintFor('flame.setTransformColor', [
+        't3',
+        0.1,
+        -0.2,
+        'card-randomize',
+      ]),
+    ).toBe('focus:tx:t3:header-color-randomize')
+    expect(
       focusHintFor('flame.setTransformColor', ['t3', 0.1, -0.2, 'grid']),
     ).toBe('focus:tx:t3:color')
     expect(
@@ -107,6 +122,64 @@ describe('focusHintFor', () => {
 
   it('falls back to the list when the target is not identified', () => {
     expect(focusHintFor('flame.setProbability', [])).toBe('ui:transform-list')
+  })
+
+  it('recovers exact generator focus from value-pinned snapshot origins', () => {
+    expect(
+      focusHintFor('flame.load', [
+        {},
+        'Randomize Flame',
+        {},
+        snapshotOrigin('flame.randomize'),
+      ]),
+    ).toBe('ui:randomizer-generate')
+    expect(
+      focusHintFor('timeline.loadTimeline', [
+        {},
+        snapshotOrigin('timeline.smart'),
+      ]),
+    ).toBe('ui:smart-animation')
+  })
+
+  it('uses exact stable anchors for view and timeline controls', () => {
+    expect(focusHintFor('view.setShowTimeline', [true])).toBe(
+      'ui:show-timeline',
+    )
+    expect(focusHintFor('view.setStochasticFilter', [true])).toBe(
+      'ui:stochastic-filter',
+    )
+    expect(focusHintFor('view.setFlyMode', [true])).toBe('ui:fly-mode')
+    expect(focusHintFor('timeline.setFps', [30])).toBe('ui:timeline-fps')
+    expect(focusHintFor('timeline.setLoopMode', ['cycle'])).toBe(
+      'ui:timeline-loop-mode',
+    )
+  })
+
+  it('distinguishes blend selection and morph setup', () => {
+    expect(focusHintFor('flame.setBlendFlame', [{}])).toBe('ui:blend-picker')
+    expect(focusHintFor('flame.setupMorph', [{}])).toBe('ui:morph-picker')
+  })
+
+  it('distinguishes symmetry type and fold edits from the add action', () => {
+    const ids = [['_sym__t1', 'v1']]
+    expect(
+      focusHintFor('flame.applySymmetry', [2, 'rotational', ids, 'type']),
+    ).toBe('ui:symmetry-type')
+    expect(
+      focusHintFor('flame.applySymmetry', [2, 'rotational', ids, 'folds']),
+    ).toBe('ui:symmetry-folds')
+    expect(focusHintFor('flame.applySymmetry', [2, 'rotational', ids])).toBe(
+      'ui:add-symmetry',
+    )
+  })
+
+  it('targets the exact authored sonification control', () => {
+    expect(
+      focusHintFor('sonification.setConfig', [{}, 'harmonicDensity']),
+    ).toBe('param:sonification.harmonicDensity')
+    expect(focusHintFor('sonification.setEnabled', [{}])).toBe(
+      'param:sonification.enabled',
+    )
   })
 
   it('has nothing to say about an unknown command', () => {

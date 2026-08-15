@@ -22,6 +22,8 @@ export function PullUpMenu(props: {
   label: string
   title?: string
   items: PullUpMenuItem[]
+  /** Stable replay/tour anchor on the trigger (the portaled menu is transient). */
+  'data-tour-target'?: string
 }) {
   const [open, setOpen] = createSignal(false)
   const [anchor, setAnchor] = createSignal({ left: 0, bottom: 0, width: 0 })
@@ -77,6 +79,7 @@ export function PullUpMenu(props: {
         aria-haspopup="menu"
         aria-expanded={open()}
         onClick={toggle}
+        data-tour-target={props['data-tour-target']}
       >
         {props.label}
         <span class={ui.caret} classList={{ [ui.caretOpen!]: open() }} />

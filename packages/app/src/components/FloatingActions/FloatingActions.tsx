@@ -234,6 +234,7 @@ export function FloatingActions(props: Props) {
               onClick={props.onNewFlame}
               aria-label="New Flame"
               title="New Flame (fresh starter — undo brings the current one back)"
+              data-tour-target="new-flame"
             >
               <Plus />
             </button>
@@ -542,6 +543,7 @@ export function FloatingActions(props: Props) {
                 )
               }}
               title="Mitchell-Netravali stochastic resampling filter (sharper edges)"
+              data-tour-target="stochastic-filter"
             >
               {/* MN reconstruction kernel: a central lobe with the two small
                   negative side-lobes that give the filter its sharpness. */}
@@ -586,6 +588,7 @@ export function FloatingActions(props: Props) {
                 props.setDimensions(props.dimensions() === 3 ? 2 : 3)
               }}
               title={props.dimensions() === 3 ? 'Switch to 2D' : 'Switch to 3D'}
+              data-tour-target="dimension-toggle"
             >
               <svg
                 viewBox="0 0 16 16"
@@ -620,6 +623,7 @@ export function FloatingActions(props: Props) {
                     ? 'Exit fly mode'
                     : 'Fly mode — click to look around (Esc to release), WASD/arrows to move, Q/E up/down, scroll for speed'
                 }
+                data-tour-target="fly-mode"
               >
                 {/* Paper-plane icon */}
                 <svg

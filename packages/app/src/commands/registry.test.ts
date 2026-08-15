@@ -2,6 +2,7 @@ import '@/commands/builtins'
 import { describe, expect, it, vi } from 'vitest'
 import { examples } from '@/flame/examples'
 import { isTimelineParameterPath, MAX_TIMELINE_FRAME, MAX_TIMELINE_KEYFRAMES, MAX_TIMELINE_PARAMETER_PATH_LENGTH, MAX_TIMELINE_PLAYBACK_FPS, MAX_TIMELINE_TIME_SCALE, tryValidateTimelineSnapshot, } from '@/flame/schema/timeline'
+import { snapshotOrigin } from '@/recorder/snapshotOrigin'
 import { executeCommand, getAllCommands, hasExplicitReplayPolicy, preflightReplayCommand, registerCommand, } from './registry'
 import type { CommandContext } from './types'
 
@@ -81,6 +82,48 @@ describe('replay command policy', () => {
     expect(preflightReplayCommand('timeline.play', [])).toBeDefined()
     expect(preflightReplayCommand('history.undo', [])).toBeDefined()
     expect(preflightReplayCommand('history.redo', [])).toBeDefined()
+  })
+
+  it('accepts only the bounded semantic origin on value-pinned snapshots', () => {
+    expect(
+      preflightReplayCommand('flame.load', [
+        examples.example1,
+        'Apply Evolved Flame',
+        {},
+        snapshotOrigin('flame.evolve'),
+      ]),
+    ).toBeUndefined()
+    expect(
+      preflightReplayCommand('timeline.loadTimeline', [
+        timelineSnapshot(),
+        snapshotOrigin('timeline.preset', 'Slow Orbit'),
+      ]),
+    ).toBeUndefined()
+    expect(
+      preflightReplayCommand('timeline.loadTimeline', [
+        timelineSnapshot(),
+        { kind: 'timeline.preset', focus: 'ui:recorder-dock' },
+      ]),
+    ).toBeDefined()
+  })
+
+  it('accepts the stable transform-card color-randomize origin', () => {
+    expect(
+      preflightReplayCommand('flame.setTransformColor', [
+        'transform_one',
+        0.2,
+        -0.1,
+        'card-randomize',
+      ]),
+    ).toBeUndefined()
+    expect(
+      preflightReplayCommand('flame.setTransformColor', [
+        'transform_one',
+        0.2,
+        -0.1,
+        'invented-origin',
+      ]),
+    ).toBeDefined()
   })
 
   it('bounds every scalar timeline command before execution', () => {

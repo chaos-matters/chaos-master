@@ -2,6 +2,7 @@ import { AudioWiringSnapshot } from '@/flame/schema/audioWiring'
 import { isSafeFlameEntityId, MAX_FLAME_TRANSFORMS, tryValidateFlame, } from '@/flame/schema/flameSchema'
 import { TimelineSnapshot, tryValidateTimelineSnapshot, } from '@/flame/schema/timeline'
 import * as v from '@/valibot'
+import { SonificationSnapshotSchema, tryValidateSonificationSnapshot, } from './sonificationState'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 /**
@@ -14,9 +15,9 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
  * replayed, edited, parameterized, and survive document-schema migrations
  * (the embedded `initial` goes through the normal migrate-on-parse path).
  *
- * Optional fields planned for later milestones (a session RNG `seed`,
- * `initialTracks` for the timeline) are added as optionals when the code
- * that populates them lands — absent fields keep old logs parseable.
+ * New side-state fields are added as optionals when their command coverage
+ * lands — absent fields keep older logs parseable. Engine-specific payloads,
+ * such as sonification, also carry their own nested format version.
  */
 
 export const SESSION_FORMAT_VERSION = 1
@@ -26,6 +27,10 @@ export const MAX_SESSION_JSON_CHARS = 8 * 1024 * 1024
  * aligned with the decoded JSON budget. */
 export const MAX_SESSION_FILE_BYTES = MAX_SESSION_JSON_CHARS
 export const MAX_SESSION_ACTIONS = 2000
+/** Each model transition rebuilds a bounded Web Audio graph. Keep a hostile
+ * zero-gap session from forcing hundreds of synchronous graph/IR allocations
+ * while leaving ample room for a real authored comparison. */
+export const MAX_SONIFICATION_MODEL_TRANSITIONS = 16
 export const MAX_ACTION_TIMESTAMP_MS = 86_400_000
 export const MAX_ACTION_ARGS = 16
 export const MAX_ACTION_LABEL_CHARS = 4096
@@ -208,6 +213,12 @@ const RecordedSessionShellSchema = v.object({
    * missing).
    */
   initialAudio: v.optional(AudioWiringSnapshot),
+  /**
+   * Authored Sonification-panel state at Record. Optional keeps sessions from
+   * before sonification coverage importable; the nested version evolves this
+   * engine-specific contract independently of the recorder format.
+   */
+  initialSonification: v.optional(SonificationSnapshotSchema),
   /** View state at Record. Optional keeps older session files parseable. */
   initialView: v.optional(SessionViewSnapshot),
   actions: v.pipe(
@@ -293,9 +304,29 @@ export function validateSession(data: unknown): RecordedSession | undefined {
     return undefined
   }
   let previousTime = -1
+  let sonificationModel = shell.output.initialSonification?.config.model
+  let sonificationModelTransitions = 0
   for (const action of shell.output.actions) {
     if (action.t < previousTime) return undefined
     previousTime = action.t
+    if (
+      action.id !== 'sonification.setConfig' &&
+      action.id !== 'sonification.setEnabled'
+    ) {
+      continue
+    }
+    const snapshot = tryValidateSonificationSnapshot(action.args[0])
+    if (!snapshot) continue
+    if (
+      sonificationModel === undefined ||
+      snapshot.config.model !== sonificationModel
+    ) {
+      sonificationModelTransitions++
+      if (sonificationModelTransitions > MAX_SONIFICATION_MODEL_TRANSITIONS) {
+        return undefined
+      }
+    }
+    sonificationModel = snapshot.config.model
   }
   const initial = tryValidateFlame(shell.output.initial)
   if (initial === undefined) return undefined

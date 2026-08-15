@@ -8,7 +8,13 @@ type SonificationPanelProps = {
   enabled: () => boolean
   onEnabledChange: (enabled: boolean) => void
   config: () => SonificationConfig
-  onConfigChange: (config: SonificationConfig) => void
+  onConfigChange: (
+    config: SonificationConfig,
+    key: keyof SonificationConfig,
+  ) => void
+  /** Sonification sliders do not write flame history, so explicitly bracket
+   *  their recorder coalescing window. */
+  onConfigGestureBoundary?: () => void
   /**
    * Whether the sound should survive this panel being closed. Default OFF:
    * sonification generates continuously from the flame, so a panel you cannot
@@ -62,12 +68,27 @@ export function SonificationPanel(props: SonificationPanelProps) {
     window.removeEventListener('keydown', handleKey)
   })
 
-  function updateConfig(patch: Partial<SonificationConfig>) {
-    props.onConfigChange({ ...props.config(), ...patch })
+  function updateConfig<Key extends keyof SonificationConfig>(
+    key: Key,
+    value: SonificationConfig[Key],
+  ) {
+    props.onConfigChange({ ...props.config(), [key]: value }, key)
+  }
+
+  const continuousGestureHandlers = {
+    onPointerDown: () => props.onConfigGestureBoundary?.(),
+    onPointerUp: () => props.onConfigGestureBoundary?.(),
+    onPointerCancel: () => props.onConfigGestureBoundary?.(),
+    onKeyDown: (event: KeyboardEvent) => {
+      if (!event.repeat) props.onConfigGestureBoundary?.()
+    },
+    onKeyUp: () => props.onConfigGestureBoundary?.(),
+    onChange: () => props.onConfigGestureBoundary?.(),
+    onBlur: () => props.onConfigGestureBoundary?.(),
   }
 
   return (
-    <div class={ui.container}>
+    <div class={ui.container} data-tour-target="sonification-panel">
       <div class={ui.header}>
         <span class={ui.title}>Sonification</span>
         <button class={ui.closeBtn} onClick={props.onClose} title="Close (Esc)">
@@ -84,7 +105,7 @@ export function SonificationPanel(props: SonificationPanelProps) {
         {/* Model selector */}
         <div>
           <div class={ui.sectionLabel}>Model</div>
-          <div class={ui.modelRow}>
+          <div class={ui.modelRow} data-parameter-path="sonification.model">
             {MODELS.map((model) => (
               <button
                 class={
@@ -94,7 +115,7 @@ export function SonificationPanel(props: SonificationPanelProps) {
                     : '')
                 }
                 onClick={() => {
-                  updateConfig({ model })
+                  updateConfig('model', model)
                 }}
               >
                 <span class={ui.modelLabel}>{MODEL_LABELS[model].label}</span>
@@ -110,7 +131,7 @@ export function SonificationPanel(props: SonificationPanelProps) {
         {/* Scale selector */}
         <div>
           <div class={ui.sectionLabel}>Scale</div>
-          <div class={ui.scaleRow}>
+          <div class={ui.scaleRow} data-parameter-path="sonification.scale">
             {SCALES.map((scale) => (
               <button
                 class={
@@ -120,9 +141,7 @@ export function SonificationPanel(props: SonificationPanelProps) {
                     : '')
                 }
                 onClick={() => {
-                  updateConfig({
-                    scale: scale as SonificationConfig['scale'],
-                  })
+                  updateConfig('scale', scale as SonificationConfig['scale'])
                 }}
               >
                 {SCALE_LABELS[scale] ?? scale}
@@ -140,14 +159,16 @@ export function SonificationPanel(props: SonificationPanelProps) {
             </span>
           </div>
           <input
+            {...continuousGestureHandlers}
             type="range"
             class={ui.sliderInput}
+            data-parameter-path="sonification.volume"
             min="0"
             max="1"
             step="0.05"
             value={props.config().volume}
             onInput={(e) => {
-              updateConfig({ volume: parseFloat(e.currentTarget.value) })
+              updateConfig('volume', parseFloat(e.currentTarget.value))
             }}
           />
         </div>
@@ -161,16 +182,16 @@ export function SonificationPanel(props: SonificationPanelProps) {
             </span>
           </div>
           <input
+            {...continuousGestureHandlers}
             type="range"
             class={ui.sliderInput}
+            data-parameter-path="sonification.spatialSpread"
             min="0"
             max="1"
             step="0.05"
             value={props.config().spatialSpread}
             onInput={(e) => {
-              updateConfig({
-                spatialSpread: parseFloat(e.currentTarget.value),
-              })
+              updateConfig('spatialSpread', parseFloat(e.currentTarget.value))
             }}
           />
         </div>
@@ -184,14 +205,16 @@ export function SonificationPanel(props: SonificationPanelProps) {
             </span>
           </div>
           <input
+            {...continuousGestureHandlers}
             type="range"
             class={ui.sliderInput}
+            data-parameter-path="sonification.reverbMix"
             min="0"
             max="1"
             step="0.05"
             value={props.config().reverbMix}
             onInput={(e) => {
-              updateConfig({ reverbMix: parseFloat(e.currentTarget.value) })
+              updateConfig('reverbMix', parseFloat(e.currentTarget.value))
             }}
           />
         </div>
@@ -204,14 +227,16 @@ export function SonificationPanel(props: SonificationPanelProps) {
               <span class={ui.sliderValue}>{props.config().voiceCount}</span>
             </div>
             <input
+              {...continuousGestureHandlers}
               type="range"
               class={ui.sliderInput}
+              data-parameter-path="sonification.voiceCount"
               min="2"
               max="16"
               step="1"
               value={props.config().voiceCount}
               onInput={(e) => {
-                updateConfig({ voiceCount: parseInt(e.currentTarget.value) })
+                updateConfig('voiceCount', parseInt(e.currentTarget.value))
               }}
             />
           </div>
@@ -226,16 +251,19 @@ export function SonificationPanel(props: SonificationPanelProps) {
               </span>
             </div>
             <input
+              {...continuousGestureHandlers}
               type="range"
               class={ui.sliderInput}
+              data-parameter-path="sonification.harmonicDensity"
               min="0.2"
               max="3"
               step="0.1"
               value={props.config().harmonicDensity}
               onInput={(e) => {
-                updateConfig({
-                  harmonicDensity: parseFloat(e.currentTarget.value),
-                })
+                updateConfig(
+                  'harmonicDensity',
+                  parseFloat(e.currentTarget.value),
+                )
               }}
             />
           </div>
@@ -250,16 +278,16 @@ export function SonificationPanel(props: SonificationPanelProps) {
               </span>
             </div>
             <input
+              {...continuousGestureHandlers}
               type="range"
               class={ui.sliderInput}
+              data-parameter-path="sonification.triggerRate"
               min="1"
               max="16"
               step="1"
               value={props.config().triggerRate}
               onInput={(e) => {
-                updateConfig({
-                  triggerRate: parseInt(e.currentTarget.value),
-                })
+                updateConfig('triggerRate', parseInt(e.currentTarget.value))
               }}
             />
           </div>
@@ -278,6 +306,7 @@ export function SonificationPanel(props: SonificationPanelProps) {
                 ui.toggleSwitch +
                 (props.enabled() ? ` ${ui.toggleSwitchOn}` : '')
               }
+              data-parameter-path="sonification.enabled"
               onClick={() => {
                 props.onEnabledChange(!props.enabled())
               }}

@@ -1,4 +1,5 @@
 import { isTimelineParameterPath, MAX_TIMELINE_FRAME, MAX_TIMELINE_KEYFRAME_NUMBER_MAGNITUDE, MAX_TIMELINE_KEYFRAME_STRING_LENGTH, MAX_TIMELINE_PLAYBACK_FPS, MAX_TIMELINE_TIME_SCALE, MAX_TIMELINE_TRACKS, tryValidateTimelineSnapshot, } from '@/flame/schema/timeline'
+import { snapshotOriginForCommand, snapshotOriginLabel, tryValidateSnapshotOrigin, } from '@/recorder/snapshotOrigin'
 import { registerCommand } from '../registry'
 
 type ReplayArgGuard = (value: unknown) => boolean
@@ -548,14 +549,24 @@ registerCommand({
   id: 'timeline.loadTimeline',
   label: 'Load Animation',
   description: 'Replace every track and the timeline config wholesale',
+  describe: (args) =>
+    snapshotOriginLabel(
+      snapshotOriginForCommand('timeline.loadTimeline', args),
+    ),
   // Carries the tracks themselves, like flame.load carries the descriptor, so
   // a session that swaps animations still replays without depending on what
   // the viewer happened to have.
   validateReplayArgs(args) {
-    if (args.length !== 1) return 'timeline load expects one snapshot'
-    return tryValidateTimelineSnapshot(args[0])
-      ? undefined
-      : 'timeline snapshot is invalid'
+    if (args.length < 1 || args.length > 2) {
+      return 'timeline load expects a snapshot and optional semantic origin'
+    }
+    if (!tryValidateTimelineSnapshot(args[0])) {
+      return 'timeline snapshot is invalid'
+    }
+    if (args.length === 2 && !tryValidateSnapshotOrigin(args[1])) {
+      return 'timeline semantic origin is invalid'
+    }
+    return undefined
   },
   execute(ctx, data?: unknown) {
     const parsed = tryValidateTimelineSnapshot(data)

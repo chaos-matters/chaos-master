@@ -100,6 +100,11 @@ export function createSessionPlayer(
     return fn()
   }
 
+  const withDeferredEffects = <R>(fn: () => R): R => {
+    if (target.withDeferredEffects) return target.withDeferredEffects(fn)
+    return fn()
+  }
+
   /**
    * A user edit owns the document from this point onward. Stop the timer and
    * commit the replay prefix synchronously, before history evaluates that
@@ -223,7 +228,7 @@ export function createSessionPlayer(
     return true
   }
 
-  function rebuildTo(index: number): boolean {
+  function rebuildToNow(index: number): boolean {
     try {
       withRecordingSuppressed(() => {
         withBatchWrite(() => {
@@ -265,6 +270,12 @@ export function createSessionPlayer(
     setStepIndex(index)
     setActionPublished(true)
     return true
+  }
+
+  /** Rebuilds are synchronous state reconstruction, not visible playback.
+   *  Defer target-owned resources until the destination state is known. */
+  function rebuildTo(index: number): boolean {
+    return withDeferredEffects(() => rebuildToNow(index))
   }
 
   /**
@@ -322,6 +333,10 @@ export function createSessionPlayer(
         if (!rebuildTo(-1)) return
       }
       openBatch()
+      // This is still inside the Play click. Prime browser-gated resources
+      // now; the first timed action runs in a later task after transient user
+      // activation has expired on strict autoplay engines.
+      target.primeEffects?.(session)
       setIsPlaying(true)
       scheduleNext()
     },
@@ -355,6 +370,7 @@ export function createSessionPlayer(
         // discards their own edits and gets the recorded state back.
         if (!rebuildTo(clamped)) return
       }
+      target.primeEffects?.(session)
       if (isPlaying()) {
         scheduleNext()
       } else {

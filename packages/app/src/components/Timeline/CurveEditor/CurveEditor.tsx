@@ -2,6 +2,7 @@ import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 's
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useTimeline } from '@/contexts/TimelineContext'
 import { resolveKeyframeValue } from '@/utils/timeline'
+import { startPointerGesture } from '../hooks/pointerGesture'
 import ui from './CurveEditor.module.css'
 import { autoValueRange, createCurveViewport } from './useCurveViewport'
 import type { KeyframeData } from '@/utils/timeline'
@@ -171,6 +172,7 @@ export function CurveEditor(props: CurveEditorProps) {
     e: PointerEvent,
     kf: KeyframeData & { value: number },
   ) {
+    if (e.button !== 0) return
     e.stopPropagation()
     const p = props.path
     if (!p) return
@@ -183,17 +185,7 @@ export function CurveEditor(props: CurveEditorProps) {
     const startValue = kf.value
     const startFrame = kf.frame
     let currentFrame = startFrame
-    const captureTarget = e.currentTarget as Element
     finishNodeDrag?.()
-    timeline.breakUndoCoalescing()
-    captureTarget.setPointerCapture(e.pointerId)
-
-    props.onSelectKeyframe?.(path, startFrame)
-    // Pin the axis (sticky — kept after release so the node doesn't jump) and
-    // open a single undo/preview step for the whole drag.
-    setStickyRange({ min: vp.minValue, max: vp.maxValue })
-    if (!changeHistory.isPreviewing()) changeHistory.startPreview('Curve edit')
-    timeline.addKeyframe(path, startFrame, startValue, kf.easing, kf.interp)
 
     const valuePerPx =
       (vp.maxValue - vp.minValue) / Math.max(1, vp.height - 2 * vp.padY)
@@ -237,22 +229,25 @@ export function CurveEditor(props: CurveEditorProps) {
       )
     }
 
-    function finish() {
-      if (finishNodeDrag !== finish) return
-      finishNodeDrag = undefined
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', finish)
-      window.removeEventListener('pointercancel', finish)
-      captureTarget.removeEventListener('lostpointercapture', finish)
-      if (changeHistory.isPreviewing()) changeHistory.commit()
-      timeline.breakUndoCoalescing()
-      // Keep the sticky range so the node stays where it was dragged.
-    }
-    finishNodeDrag = finish
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', finish)
-    window.addEventListener('pointercancel', finish)
-    captureTarget.addEventListener('lostpointercapture', finish)
+    const stopGesture = startPointerGesture({
+      pointerDownEvent: e,
+      onMove,
+      onEnd: () => {
+        if (finishNodeDrag === stopGesture) finishNodeDrag = undefined
+        if (changeHistory.isPreviewing()) changeHistory.commit()
+        timeline.breakUndoCoalescing()
+        // Keep the sticky range so the node stays where it was dragged.
+      },
+    })
+    finishNodeDrag = stopGesture
+
+    timeline.breakUndoCoalescing()
+    props.onSelectKeyframe?.(path, startFrame)
+    // Pin the axis (sticky — kept after release so the node doesn't jump) and
+    // open a single undo/preview step for the whole drag.
+    setStickyRange({ min: vp.minValue, max: vp.maxValue })
+    if (!changeHistory.isPreviewing()) changeHistory.startPreview('Curve edit')
+    timeline.addKeyframe(path, startFrame, startValue, kf.easing, kf.interp)
   }
 
   onCleanup(() => {

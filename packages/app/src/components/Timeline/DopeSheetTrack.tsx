@@ -2,6 +2,7 @@ import { For, onCleanup } from 'solid-js'
 import { useTimeline } from '@/contexts/TimelineContext'
 import { TriangleAlert } from '@/icons'
 import ui from './DopeSheet.module.css'
+import { startPointerGesture } from './hooks/pointerGesture'
 import type { KeyframeData } from '@/utils/timeline'
 
 type DopeSheetTrackProps = {
@@ -54,7 +55,6 @@ export function DopeSheetTrack(props: DopeSheetTrackProps) {
 
     const target = e.currentTarget as HTMLElement
     cancelActiveDrag?.()
-    target.setPointerCapture(e.pointerId)
 
     dragStartFrame = frame
     didDrag = false
@@ -74,22 +74,7 @@ export function DopeSheetTrack(props: DopeSheetTrackProps) {
       }
     }
 
-    function cleanup() {
-      if (cancelActiveDrag !== cleanup) return false
-      cancelActiveDrag = undefined
-      if (target.hasPointerCapture(e.pointerId)) {
-        target.releasePointerCapture(e.pointerId)
-      }
-      window.removeEventListener('pointermove', handleMove)
-      window.removeEventListener('pointerup', handleUp)
-      window.removeEventListener('pointercancel', handleCancel)
-      target.removeEventListener('lostpointercapture', handleCancel)
-      return true
-    }
-
     function finishDrag(ev: PointerEvent) {
-      if (!cleanup()) return
-
       const lane = target.closest(`.${ui.lane}`)
       if (!lane) {
         didDrag = false
@@ -108,21 +93,19 @@ export function DopeSheetTrack(props: DopeSheetTrackProps) {
       didDrag = false
     }
 
-    function handleUp(ev: PointerEvent) {
-      finishDrag(ev)
-    }
-
-    function handleCancel(ev: PointerEvent) {
-      void ev
-      if (!cleanup()) return
-      didDrag = false
-    }
-
-    cancelActiveDrag = cleanup
-    window.addEventListener('pointermove', handleMove)
-    window.addEventListener('pointerup', handleUp)
-    window.addEventListener('pointercancel', handleCancel)
-    target.addEventListener('lostpointercapture', handleCancel)
+    const stopGesture = startPointerGesture({
+      pointerDownEvent: e,
+      onMove: handleMove,
+      onEnd: (reason, event) => {
+        if (cancelActiveDrag === stopGesture) cancelActiveDrag = undefined
+        if (reason === 'pointerup' && event) {
+          finishDrag(event)
+        } else {
+          didDrag = false
+        }
+      },
+    })
+    cancelActiveDrag = stopGesture
   }
 
   onCleanup(() => cancelActiveDrag?.())

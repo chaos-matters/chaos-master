@@ -1,5 +1,7 @@
 import { createSignal, For, Show } from 'solid-js'
 import { Sparkle } from '@/icons'
+import { snapshotOrigin } from '@/recorder/snapshotOrigin'
+import { runTimelineSnapshotMutation } from '@/recorder/timelineActions'
 import ui from './AnimationGenerator.module.css'
 import { buildPresets, randomizeColorsParams } from './presets'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -23,6 +25,7 @@ export function AnimationControls(props: AnimationControlsProps) {
         class={ui.genBtn}
         onClick={() => props.onOpenAnimationGenerator?.()}
         title="Open the animation generator (randomize or smart-animate this flame)"
+        data-tour-target="animation-generator"
       >
         <Sparkle class={ui.genBtnIcon} />
         Animate
@@ -31,11 +34,16 @@ export function AnimationControls(props: AnimationControlsProps) {
         class={ui.genBtn}
         onClick={() => {
           // One click = one undo step, however many keyframes it writes.
-          props.timeline.runWithSingleUndo(() => {
-            randomizeColorsParams(props.flameDescriptor, props.timeline)
-          })
+          runTimelineSnapshotMutation(
+            props.timeline,
+            snapshotOrigin('timeline.colors'),
+            () => {
+              randomizeColorsParams(props.flameDescriptor, props.timeline)
+            },
+          )
         }}
         title="Generate random color keyframes for transforms and palette"
+        data-tour-target="animation-colors"
       >
         Colors
       </button>
@@ -45,6 +53,7 @@ export function AnimationControls(props: AnimationControlsProps) {
           props.timeline.clearAllTracks()
         }}
         title="Clear all keyframes (undoable)"
+        data-tour-target="animation-clear"
       >
         Clear
       </button>
@@ -55,6 +64,7 @@ export function AnimationControls(props: AnimationControlsProps) {
         }}
         onClick={props.onTogglePresets}
         title="Animation presets"
+        data-tour-target="animation-presets"
       >
         Presets
       </button>
@@ -112,9 +122,13 @@ export function AnimationGenerator(props: AnimationGeneratorProps) {
                 class={ui.pill}
                 onClick={() => {
                   // One preset = one undo step.
-                  props.timeline.runWithSingleUndo(() => {
-                    preset.apply(props.flameDescriptor, props.timeline)
-                  })
+                  runTimelineSnapshotMutation(
+                    props.timeline,
+                    snapshotOrigin('timeline.preset', preset.label),
+                    () => {
+                      preset.apply(props.flameDescriptor, props.timeline)
+                    },
+                  )
                 }}
                 title={preset.label}
               >
