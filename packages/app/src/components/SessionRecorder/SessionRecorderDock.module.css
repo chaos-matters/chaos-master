@@ -3,6 +3,11 @@
    SessionRecorderControls.module.css for why nothing floats by default);
    dragged, it becomes fixed so the bar does not keep a hole where it was. */
 .dock {
+  /* The recorder is a compact floating instrument rather than a page-level
+     toolbar. On coarse pointers, 2.25rem keeps controls comfortably above the
+     24px WCAG minimum without turning the pill into a 44px button bar. */
+  --recorder-coarse-target: 2.25rem;
+
   position: relative;
   align-self: flex-start;
   display: flex;
@@ -112,15 +117,20 @@
 }
 
 @media (pointer: coarse) {
+  .bar {
+    gap: 0.3rem;
+    padding: 0.24rem 0.4rem;
+  }
+
   .grip,
   .icon-button {
-    min-width: 2.75rem;
-    min-height: 2.75rem;
+    min-width: var(--recorder-coarse-target);
+    min-height: var(--recorder-coarse-target);
   }
 
   .opacity-slider,
   .fade-toggle {
-    min-height: 2.75rem;
+    min-height: var(--recorder-coarse-target);
   }
 
   .fade-toggle input {
@@ -202,6 +212,15 @@
   & input {
     margin: 0;
     accent-color: oklch(60% 0.12 240);
+  }
+}
+
+/* Keep the glyph visually confident while the surrounding touch target stays
+   compact. This must follow the base icon rule above in the cascade. */
+@media (pointer: coarse) {
+  .icon {
+    width: 1rem;
+    height: 1rem;
   }
 }
 

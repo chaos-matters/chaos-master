@@ -152,16 +152,23 @@
   .button,
   .entry-name,
   .entry-rename {
-    min-height: 2.75rem;
+    min-height: var(--recorder-coarse-target, 2.25rem);
   }
+}
 
+/* Phones need the action cluster below the recording title; tablets keep the
+   compact single-row layout instead of paying this height on every entry. */
+@media (pointer: coarse) and (max-width: 28rem) {
   .entry {
     align-items: flex-start;
     flex-wrap: wrap;
   }
 
+  .entry-main {
+    flex-basis: 100%;
+  }
+
   .entry-actions {
-    width: 100%;
-    flex-wrap: wrap;
+    margin-left: auto;
   }
 }
