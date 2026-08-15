@@ -75,6 +75,8 @@
 }
 
 .transport {
+  --replay-transport-target: 1.55rem;
+
   display: flex;
   align-items: center;
   gap: 0.3rem;
@@ -98,7 +100,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.28rem;
-  min-height: 1.65rem;
+  min-height: var(--replay-transport-target);
   padding: 0.1rem 0.45rem;
   border-radius: 10px;
   border: 1px solid oklch(50% 0.08 240 / 0.5);
@@ -118,7 +120,8 @@
 }
 
 .transport-icon-button {
-  width: 1.65rem;
+  width: var(--replay-transport-target);
+  min-width: var(--replay-transport-target);
   padding-inline: 0;
 }
 
@@ -278,8 +281,11 @@
 }
 
 @media (pointer: coarse) {
+  .transport {
+    --replay-transport-target: 2rem;
+  }
+
   .close,
-  .button,
   .speed,
   .step,
   .step-edit,
@@ -288,7 +294,6 @@
     min-height: var(--recorder-coarse-target, 2.25rem);
   }
 
-  .transport-icon-button,
   .step-edit {
     min-width: var(--recorder-coarse-target, 2.25rem);
   }

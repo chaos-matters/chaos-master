@@ -71,6 +71,7 @@ export function ReplaySpotlight(props: {
   const [targetRect, setTargetRect] = createSignal<Rect>()
   const [canvasRect, setCanvasRect] = createSignal<Rect>()
   const [dimRects, setDimRects] = createSignal<Rect[]>([])
+  const [recessedRects, setRecessedRects] = createSignal<Rect[]>([])
   const [transportRects, setTransportRects] = createSignal<Rect[]>([])
   const [viewport, setViewport] = createSignal<Viewport>({
     width: window.innerWidth,
@@ -172,6 +173,9 @@ export function ReplaySpotlight(props: {
     const dimElements = regions.filter(
       (element) => element.getAttribute('data-replay-region') === 'dim',
     )
+    const recessedElements = regions.filter(
+      (element) => element.getAttribute('data-replay-region') === 'recessed',
+    )
     const transportElements = regions.filter(
       (element) => element.getAttribute('data-replay-region') === 'transport',
     )
@@ -189,6 +193,14 @@ export function ReplaySpotlight(props: {
     })
     setDimRects((previous) =>
       sameRects(previous, nextDimRects) ? previous : nextDimRects,
+    )
+
+    const nextRecessedRects = recessedElements.flatMap((element) => {
+      const rect = clippedRect(element)
+      return rect ? [rect] : []
+    })
+    setRecessedRects((previous) =>
+      sameRects(previous, nextRecessedRects) ? previous : nextRecessedRects,
     )
 
     const nextTransportRects = transportElements.flatMap((element) => {
@@ -209,6 +221,7 @@ export function ReplaySpotlight(props: {
     rebuildLayoutObservers([
       ...canvasElements,
       ...dimElements,
+      ...recessedElements,
       ...transportElements,
       ...(element ? [element] : []),
     ])
@@ -307,6 +320,7 @@ export function ReplaySpotlight(props: {
       setTargetRect(undefined)
       setCanvasRect(undefined)
       setDimRects([])
+      setRecessedRects([])
       setTransportRects([])
       setCaption(undefined)
       return
@@ -321,6 +335,7 @@ export function ReplaySpotlight(props: {
         setTargetRect(undefined)
         setCanvasRect(undefined)
         setDimRects([])
+        setRecessedRects([])
         setTransportRects([])
         stopTracking()
       }, TAIL_MS)
@@ -374,6 +389,18 @@ export function ReplaySpotlight(props: {
                     <rect
                       data-replay-mask-role="chrome"
                       class={styles.maskDim}
+                      x={rect.x}
+                      y={rect.y}
+                      width={rect.width}
+                      height={rect.height}
+                    />
+                  )}
+                </For>
+                <For each={recessedRects()}>
+                  {(rect) => (
+                    <rect
+                      data-replay-mask-role="recessed"
+                      class={styles.maskCutout}
                       x={rect.x}
                       y={rect.y}
                       width={rect.width}

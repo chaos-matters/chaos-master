@@ -69,6 +69,28 @@ describe('recorder responsive density', () => {
     )
   })
 
+  it('keeps replay transport denser than replay forms and lists', () => {
+    expect(extractBlock(replayCss, '\n.transport {')).toContain(
+      '--replay-transport-target: 1.55rem',
+    )
+    expect(extractBlock(replayCss, '\n.button {')).toContain(
+      'min-height: var(--replay-transport-target)',
+    )
+    expect(extractBlock(replayCss, '\n.transport-icon-button {')).toContain(
+      'width: var(--replay-transport-target)',
+    )
+    expect(extractBlock(replayCss, '\n.transport-icon-button {')).toContain(
+      'min-width: var(--replay-transport-target)',
+    )
+
+    const coarse = extractBlock(replayCss, '@media (pointer: coarse)')
+    expect(extractBlock(coarse, '.transport {')).toContain(
+      '--replay-transport-target: 2rem',
+    )
+    expect(coarse).not.toMatch(/\.close,\s*\.button,/)
+    expect(coarse).toContain('var(--recorder-coarse-target, 2.25rem)')
+  })
+
   it('wraps recording actions only on narrow coarse-pointer screens', () => {
     const tabletBlock = extractBlock(libraryCss, '@media (pointer: coarse) {')
     const phoneBlock = extractBlock(
