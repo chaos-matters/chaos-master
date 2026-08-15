@@ -108,9 +108,18 @@
 }
 
 @media (pointer: coarse) {
+  .recorder {
+    gap: 0.3rem;
+  }
+
   .icon-button,
   .button {
-    min-width: 2.75rem;
-    min-height: 2.75rem;
+    min-width: var(--recorder-coarse-target, 2.25rem);
+    min-height: var(--recorder-coarse-target, 2.25rem);
+  }
+
+  .icon {
+    width: 1rem;
+    height: 1rem;
   }
 }
