@@ -276,3 +276,21 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+@media (pointer: coarse) {
+  .close,
+  .button,
+  .speed,
+  .step,
+  .step-edit,
+  .note-input,
+  .hold-input {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+
+  .transport-icon-button,
+  .step-edit {
+    min-width: 2.75rem;
+  }
+}

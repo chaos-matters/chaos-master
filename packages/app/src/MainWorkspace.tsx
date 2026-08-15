@@ -433,6 +433,8 @@ export function MainWorkspace(props: AppProps) {
   // The session currently open for replay (M4), if any. Lives here rather than
   // in the dock because dropping a .steps.json opens one too.
   const [replaySession, setReplaySession] = createSignal<RecordedSession>()
+  const [recorderReplayPresentation, setRecorderReplayPresentation] =
+    createSignal({ playing: false, timelineTargeted: false })
   const openReplaySession = (session: RecordedSession | undefined) => {
     if (recorderSavePending()) {
       showToast('Wait for the caption save to finish before changing replays')
@@ -4138,6 +4140,7 @@ export function MainWorkspace(props: AppProps) {
                     onPrepareAction={prepareReplayFocus}
                     session={replaySession()}
                     onSessionChange={openReplaySession}
+                    onReplayPresentationChange={setRecorderReplayPresentation}
                     busy={animationExportRunning() || timeline.isPlaying()}
                     replayBlocked={animationExportRunning()}
                   />
@@ -4248,7 +4251,10 @@ export function MainWorkspace(props: AppProps) {
                       opacity:
                         animationExportRunning() || timeline.isPlaying()
                           ? 0.5
-                          : 1,
+                          : recorderReplayPresentation().playing &&
+                              !recorderReplayPresentation().timelineTargeted
+                            ? 0.1
+                            : 1,
                     }}
                     onWheel={(ev) => {
                       if (!ev.ctrlKey && !ev.metaKey) return

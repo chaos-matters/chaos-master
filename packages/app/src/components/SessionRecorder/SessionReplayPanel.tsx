@@ -8,7 +8,7 @@ import { deepClone } from '@/utils/clone'
 import { followCamEnabled, setFollowCamEnabled } from './recorderUi'
 import { ReplaySpotlight } from './ReplaySpotlight'
 import styles from './SessionReplayPanel.module.css'
-import type { ReplayFocusPreparationHandler } from '@/recorder/focusPreparation'
+import type { ReplayFocusPreparation, ReplayFocusPreparationHandler, } from '@/recorder/focusPreparation'
 import type { ReplayTarget } from '@/recorder/replay'
 import type { RecordedSession } from '@/recorder/schema'
 
@@ -33,6 +33,10 @@ export function SessionReplayPanel(props: {
   onClose: () => void
   /** Lets the owning dock recede while timed replay is advancing. */
   onPlaybackChange?: (playing: boolean) => void
+  /** Reports the semantic surface owned by the current replay step. */
+  onCurrentPreparationChange?: (
+    preparation: ReplayFocusPreparation | undefined,
+  ) => void
   /** Makes the exact control visible before a replay step changes it. */
   onPrepareAction?: ReplayFocusPreparationHandler
   /** True while another process temporarily owns and restores the document. */
@@ -58,14 +62,22 @@ export function SessionReplayPanel(props: {
       }
     },
   })
+  const currentPreparation = createMemo(() => {
+    const action = player.currentAction()
+    if (!action) return undefined
+    return deriveReplayFocusPreparation(action)
+  })
   const spotlightAction = createMemo(() => {
     const action = player.currentAction()
     if (!action) return undefined
-    const focus = deriveReplayFocusPreparation(action).spotlightFocus
+    const focus = currentPreparation()?.spotlightFocus
     return focus === action.focus ? action : { ...action, focus }
   })
   createEffect(() => {
     props.onPlaybackChange?.(player.isPlaying())
+  })
+  createEffect(() => {
+    props.onCurrentPreparationChange?.(currentPreparation())
   })
   createEffect(() => {
     if (props.blocked && player.isPlaying()) player.pause()
@@ -74,6 +86,7 @@ export function SessionReplayPanel(props: {
   onCleanup(() => {
     player.stop()
     props.onPlaybackChange?.(false)
+    props.onCurrentPreparationChange?.(undefined)
   })
 
   const stepLabel = (index: number) => {
@@ -107,6 +120,7 @@ export function SessionReplayPanel(props: {
           </span>
         </Show>
         <button
+          data-recorder-replay-close
           type="button"
           class={styles.close}
           disabled={saving()}
@@ -156,6 +170,7 @@ export function SessionReplayPanel(props: {
           when={player.isPlaying()}
           fallback={
             <button
+              data-recorder-replay-primary
               type="button"
               class={styles.button}
               onClick={() => {
@@ -170,6 +185,7 @@ export function SessionReplayPanel(props: {
           }
         >
           <button
+            data-recorder-replay-primary
             type="button"
             class={styles.button}
             onClick={() => {

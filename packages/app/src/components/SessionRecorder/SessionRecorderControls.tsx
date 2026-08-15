@@ -1,6 +1,6 @@
 import { Show } from 'solid-js'
 import { useToast } from '@/contexts/ToastContext'
-import { Book } from '@/icons'
+import { Book, FolderOpen, Record } from '@/icons'
 import { cancelSessionRecording, isSessionRecording, recordedActionCount, startSessionRecording, stopSessionRecording, unnamedWriteCount, } from '@/recorder/recorder'
 import { MAX_SESSION_FILE_BYTES, parseSession, serializeSession, sessionFilename, } from '@/recorder/schema'
 import { downloadBlob } from '@/utils/blob'
@@ -42,10 +42,13 @@ export function SessionRecorderControls(props: {
   /** Called after a recording is stored, so the library list refetches. */
   onSessionStored: () => void
   onToggleLibrary: () => void
+  libraryOpen?: boolean
+  recordingsButtonRef?: (element: HTMLButtonElement) => void
   /** A legacy main-canvas export temporarily owns and restores the document. */
   blocked?: boolean
 }) {
   const { showToast } = useToast()
+  let fileInputRef: HTMLInputElement | undefined
 
   const startRecording = () => {
     if (props.blocked) {
@@ -132,37 +135,52 @@ export function SessionRecorderControls(props: {
           <>
             <button
               type="button"
-              class={styles.button}
+              class={`${styles.iconButton} ${styles.recordButton}`}
               onClick={startRecording}
               disabled={props.blocked}
+              aria-label="Record steps"
               title="Record every action as a replayable step log"
             >
-              <span class={styles.dot} /> Record steps
+              <Record class={styles.icon} aria-hidden="true" />
+            </button>
+            <button
+              ref={props.recordingsButtonRef}
+              type="button"
+              class={styles.iconButton}
+              onClick={props.onToggleLibrary}
+              aria-label="Recordings"
+              aria-expanded={props.libraryOpen}
+              aria-controls="session-recording-library"
+              title={
+                props.libraryOpen
+                  ? 'Close saved recordings'
+                  : 'Saved recordings — replay, download or delete'
+              }
+            >
+              <Book class={styles.icon} aria-hidden="true" />
             </button>
             <button
               type="button"
-              class={styles.button}
-              onClick={props.onToggleLibrary}
-              title="Saved recordings — replay, download or delete"
+              class={styles.iconButton}
+              onClick={() => fileInputRef?.click()}
+              aria-label="Open steps"
+              title="Replay a saved .steps.json"
             >
-              <Book class={styles.buttonIcon} aria-hidden="true" />
-              <span>Recordings</span>
+              <FolderOpen class={styles.icon} aria-hidden="true" />
             </button>
-            <label class={styles.button} title="Replay a saved .steps.json">
-              Open steps
-              <input
-                type="file"
-                accept=".json,application/json"
-                class={styles.fileInput}
-                onChange={(ev) => {
-                  const input = ev.currentTarget
-                  void openSessionFile(input.files?.[0]).finally(() => {
-                    // Clear it so re-picking the same file fires again.
-                    input.value = ''
-                  })
-                }}
-              />
-            </label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              class={styles.fileInput}
+              onChange={(ev) => {
+                const input = ev.currentTarget
+                void openSessionFile(input.files?.[0]).finally(() => {
+                  // Clear it so re-picking the same file fires again.
+                  input.value = ''
+                })
+              }}
+            />
           </>
         }
       >

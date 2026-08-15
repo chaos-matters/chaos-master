@@ -3,6 +3,7 @@
    SessionRecorderControls.module.css for why nothing floats by default);
    dragged, it becomes fixed so the bar does not keep a hole where it was. */
 .dock {
+  position: relative;
   align-self: flex-start;
   display: flex;
   flex-direction: column;
@@ -21,6 +22,14 @@
   }
 }
 
+.panels {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .floating {
   position: fixed;
   /* Above the bottom bar (5) and the timeline, below the FloatingActions
@@ -28,6 +37,24 @@
   z-index: 150;
   margin: 0;
   max-width: calc(100vw - 1rem);
+}
+
+/* Once detached, the persisted top/left belongs to the recorder bar. Panels
+   open upward outside its layout box, so loading a long recordings list can
+   never move the grip away from the user's hand. */
+.floating .panels {
+  position: absolute;
+  left: var(--recorder-panels-x, 0);
+  bottom: 100%;
+  max-width: calc(100vw - 1rem);
+  max-height: var(--recorder-panels-max-height, calc(100vh - 4rem));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.floating .panels-below {
+  top: calc(100% + var(--space-2));
+  bottom: auto;
 }
 
 .dragging {
@@ -82,6 +109,24 @@
   cursor: grab;
   touch-action: none;
   flex-shrink: 0;
+}
+
+@media (pointer: coarse) {
+  .grip,
+  .icon-button {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+
+  .opacity-slider,
+  .fade-toggle {
+    min-height: 2.75rem;
+  }
+
+  .fade-toggle input {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
 }
 
 /* Three stacked dot rows, drawn with a gradient so the grip needs no markup

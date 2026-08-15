@@ -32,6 +32,7 @@ import Pause from './pause.svg'
 import Pencil from './pencil.svg'
 import PlayPause from './play-pause.svg'
 import Plus from './plus.svg'
+import Record from './record.svg'
 import Redo from './redo.svg'
 import Reset from './reset.svg'
 import Share from './share.svg'
@@ -80,6 +81,7 @@ export {
   Pencil,
   PlayPause,
   Plus,
+  Record,
   Redo,
   Reset,
   Share,

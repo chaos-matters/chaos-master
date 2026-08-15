@@ -25,10 +25,43 @@
   }
 }
 
-.button-icon {
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  flex: none;
+
+  &:hover:not(:disabled) {
+    background: oklch(50% 0.08 240 / 0.25);
+  }
+
+  &:focus-visible {
+    outline: 2px solid oklch(72% 0.14 240 / 0.9);
+    outline-offset: 1px;
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+}
+
+.record-button:not(:disabled) {
+  color: oklch(70% 0.18 28);
+}
+
+.icon {
   display: block;
-  width: 0.9rem;
-  height: 0.9rem;
+  width: 0.94rem;
+  height: 0.94rem;
   flex: none;
 }
 
@@ -38,25 +71,16 @@
   gap: 0.35rem;
 }
 
-/* The "Open steps" control is a <label> wrapping a file input, so the input
-   itself is hidden and the label is the button. */
+/* The file picker is activated by the adjacent keyboard-accessible button. */
 .file-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
+  display: none;
 }
 
-.dot,
 .dot-recording {
   width: 0.55rem;
   height: 0.55rem;
   border-radius: 50%;
   background: oklch(60% 0.22 25);
-}
-
-.dot-recording {
   animation: recorder-pulse 1.2s ease-in-out infinite;
 }
 
@@ -80,5 +104,13 @@
 @media (prefers-reduced-motion: reduce) {
   .dot-recording {
     animation: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .icon-button,
+  .button {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
   }
 }

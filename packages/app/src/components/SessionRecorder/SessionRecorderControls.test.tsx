@@ -13,6 +13,61 @@ describe('SessionRecorderControls start feedback', () => {
     vi.restoreAllMocks()
   })
 
+  it('renders the idle actions as accessible icon buttons', () => {
+    const onToggleLibrary = vi.fn()
+    const { container, unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderControls
+          flameDescriptor={examples.example1}
+          onOpenSession={() => {}}
+          onSessionStored={() => {}}
+          onToggleLibrary={onToggleLibrary}
+        />
+      </ToastProvider>
+    ))
+
+    const record = screen.getByRole('button', { name: 'Record steps' })
+    const recordings = screen.getByRole('button', { name: 'Recordings' })
+    const open = screen.getByRole('button', { name: 'Open steps' })
+
+    expect(record.textContent?.trim()).toBe('')
+    expect(record.querySelector('svg')).toBeTruthy()
+    expect(record.getAttribute('title')).toBe(
+      'Record every action as a replayable step log',
+    )
+    expect(recordings.textContent?.trim()).toBe('')
+    expect(recordings.querySelector('svg')).toBeTruthy()
+    expect(open.textContent?.trim()).toBe('')
+    expect(open.querySelector('svg')).toBeTruthy()
+    expect(container.querySelector('label')).toBeNull()
+
+    fireEvent.click(recordings)
+    expect(onToggleLibrary).toHaveBeenCalledTimes(1)
+    unmount()
+  })
+
+  it('opens the hidden file input from a real button', () => {
+    const { container, unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderControls
+          flameDescriptor={examples.example1}
+          onOpenSession={() => {}}
+          onSessionStored={() => {}}
+          onToggleLibrary={() => {}}
+        />
+      </ToastProvider>
+    ))
+    const input =
+      container.querySelector<HTMLInputElement>('input[type="file"]')
+    expect(input).toBeTruthy()
+    const click = vi.spyOn(input!, 'click').mockImplementation(() => {})
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open steps' }))
+
+    expect(click).toHaveBeenCalledTimes(1)
+    unmount()
+  })
+
   it('reports a workspace snapshot failure instead of throwing', () => {
     const error = new Error('timeline snapshot failed')
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})

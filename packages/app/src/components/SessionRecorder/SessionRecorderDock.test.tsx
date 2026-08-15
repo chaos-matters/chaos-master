@@ -1,22 +1,26 @@
 import { fireEvent, render, screen, waitFor } from '@solidjs/testing-library'
-import { createSignal } from 'solid-js'
+import { createSignal, Suspense } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ToastHost } from '@/components/Toast/Toast'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { examples } from '@/flame/examples'
 import { cancelSessionRecording, startSessionRecording, stopSessionRecording, } from '@/recorder/recorder'
-import { recorderSavePending, recorderVisible, setFollowCamEnabled, setRecorderCollapsed, setRecorderFadeOnPlayback, setRecorderOffset, setRecorderOpacity, setRecorderSavePending, setRecorderVisible, } from './recorderUi'
-import { SessionRecorderDock } from './SessionRecorderDock'
+import { recorderOffset, recorderSavePending, recorderVisible, setFollowCamEnabled, setRecorderCollapsed, setRecorderFadeOnPlayback, setRecorderOffset, setRecorderOpacity, setRecorderSavePending, setRecorderVisible, } from './recorderUi'
+import { calculateFloatingPanelPlacement, SessionRecorderDock, } from './SessionRecorderDock'
 import type { ReplayTarget } from '@/recorder/replay'
+import type { RecordedSession } from '@/recorder/schema'
 
-const { storeSessionMock } = vi.hoisted(() => ({
-  storeSessionMock: vi.fn(),
-}))
+const { loadStoredSessionsMock, renameStoredSessionMock, storeSessionMock } =
+  vi.hoisted(() => ({
+    loadStoredSessionsMock: vi.fn().mockResolvedValue([]),
+    renameStoredSessionMock: vi.fn().mockResolvedValue([]),
+    storeSessionMock: vi.fn(),
+  }))
 
 vi.mock('@/utils/sessionsDB', () => ({
   deleteStoredSession: vi.fn().mockResolvedValue([]),
-  loadStoredSessions: vi.fn().mockResolvedValue([]),
-  renameStoredSession: vi.fn().mockResolvedValue([]),
+  loadStoredSessions: loadStoredSessionsMock,
+  renameStoredSession: renameStoredSessionMock,
   storeSession: storeSessionMock,
 }))
 
@@ -28,6 +32,8 @@ const target: ReplayTarget = {
 describe('SessionRecorderDock caption persistence', () => {
   beforeEach(() => {
     cancelSessionRecording()
+    loadStoredSessionsMock.mockReset().mockResolvedValue([])
+    renameStoredSessionMock.mockReset().mockResolvedValue([])
     setRecorderSavePending(false)
     setRecorderVisible(true)
     setRecorderCollapsed(false)
@@ -40,8 +46,8 @@ describe('SessionRecorderDock caption persistence', () => {
   afterEach(() => {
     cancelSessionRecording()
     storeSessionMock.mockReset()
-    vi.restoreAllMocks()
-    vi.useRealTimers()
+    loadStoredSessionsMock.mockReset()
+    renameStoredSessionMock.mockReset()
     setRecorderSavePending(false)
     setRecorderVisible(true)
     setRecorderCollapsed(false)
@@ -49,6 +55,8 @@ describe('SessionRecorderDock caption persistence', () => {
     setRecorderOffset(null)
     setRecorderOpacity(1)
     setFollowCamEnabled(true)
+    vi.restoreAllMocks()
+    vi.useRealTimers()
   })
 
   it('reports a failed caption save without losing the original take', async () => {
@@ -166,6 +174,466 @@ describe('SessionRecorderDock caption persistence', () => {
     )
     await waitFor(() => {
       expect(dock?.style.getPropertyValue('--recorder-opacity')).toBe('1')
+    })
+
+    unmount()
+  })
+
+  it('keeps the workspace mounted while recordings load and reuses the loaded library', async () => {
+    let resolveSessions: ((value: []) => void) | undefined
+    loadStoredSessionsMock.mockImplementationOnce(
+      () =>
+        new Promise<[]>((resolve) => {
+          resolveSessions = resolve
+        }),
+    )
+
+    const { unmount } = render(() => (
+      <Suspense fallback={<span>Workspace suspended</span>}>
+        <div data-testid="workspace">
+          <ToastProvider>
+            <SessionRecorderDock
+              flameDescriptor={examples.example1}
+              target={target}
+              session={undefined}
+              onSessionChange={() => {}}
+              busy={false}
+            />
+          </ToastProvider>
+        </div>
+      </Suspense>
+    ))
+
+    const recordingsButton = screen.getByRole<HTMLButtonElement>('button', {
+      name: 'Recordings',
+    })
+    expect(recordingsButton.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(recordingsButton)
+
+    expect(screen.getByTestId('workspace')).toBeTruthy()
+    expect(screen.queryByText('Workspace suspended')).toBeNull()
+    expect(screen.getByRole('status').textContent).toContain(
+      'Loading recordings',
+    )
+    expect(loadStoredSessionsMock).toHaveBeenCalledTimes(1)
+    expect(recordingsButton.getAttribute('aria-expanded')).toBe('true')
+
+    resolveSessions?.([])
+    await waitFor(() => {
+      expect(screen.getByText(/No saved recordings yet/)).toBeTruthy()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(recordingsButton.getAttribute('aria-expanded')).toBe('false')
+    await waitFor(() => {
+      expect(document.activeElement).toBe(recordingsButton)
+    })
+    fireEvent.click(recordingsButton)
+    expect(loadStoredSessionsMock).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(
+      screen.getByRole<HTMLButtonElement>('button', {
+        name: 'Collapse recorder',
+      }),
+    )
+    const library = document.getElementById('session-recording-library')
+    expect(library?.hidden).toBe(true)
+    expect(recordingsButton.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(recordingsButton)
+    expect(library?.hidden).toBe(false)
+    expect(recordingsButton.getAttribute('aria-expanded')).toBe('true')
+
+    unmount()
+  })
+
+  it('recovers a failed library read with an explicit retry', async () => {
+    let resolveRetry: ((value: []) => void) | undefined
+    loadStoredSessionsMock
+      .mockRejectedValueOnce(new Error('indexeddb unavailable'))
+      .mockImplementationOnce(
+        () =>
+          new Promise<[]>((resolve) => {
+            resolveRetry = resolve
+          }),
+      )
+
+    const { unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderDock
+          flameDescriptor={examples.example1}
+          target={target}
+          session={undefined}
+          onSessionChange={() => {}}
+          busy={false}
+        />
+      </ToastProvider>
+    ))
+
+    fireEvent.click(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Recordings' }),
+    )
+    const retry = await screen.findByRole<HTMLButtonElement>('button', {
+      name: 'Retry',
+    })
+    retry.focus()
+    fireEvent.click(retry)
+    const retrying = screen.getByRole<HTMLButtonElement>('button', {
+      name: 'Retrying…',
+    })
+    expect(retrying).toBe(retry)
+    expect(retrying.disabled).toBe(true)
+    expect(document.activeElement).toBe(retry)
+
+    resolveRetry?.([])
+
+    await waitFor(() => {
+      expect(screen.getByText(/No saved recordings yet/)).toBeTruthy()
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Close' }),
+      )
+    })
+    expect(loadStoredSessionsMock).toHaveBeenCalledTimes(2)
+
+    unmount()
+  })
+
+  it('names the rename field and returns focus when rename is cancelled', async () => {
+    startSessionRecording(examples.example1)
+    const recorded = stopSessionRecording()
+    if (!recorded) throw new Error('expected a recorded session')
+    loadStoredSessionsMock.mockResolvedValueOnce([
+      {
+        id: 7,
+        name: 'Palette pass',
+        timestamp: Date.now(),
+        actionCount: recorded.actions.length,
+        unnamedWriteCount: recorded.unnamedWriteCount,
+        session: recorded,
+      },
+    ])
+
+    const { unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderDock
+          flameDescriptor={examples.example1}
+          target={target}
+          session={undefined}
+          onSessionChange={() => {}}
+          busy={false}
+        />
+      </ToastProvider>
+    ))
+
+    fireEvent.click(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Recordings' }),
+    )
+    fireEvent.click(
+      await screen.findByRole<HTMLButtonElement>('button', {
+        name: 'Palette pass',
+      }),
+    )
+    const input = screen.getByRole<HTMLInputElement>('textbox', {
+      name: 'Rename recording Palette pass',
+    })
+    fireEvent.keyDown(input, { key: 'Escape' })
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Palette pass' }),
+      )
+    })
+
+    unmount()
+  })
+
+  it('restores rename focus after the stored list refreshes', async () => {
+    startSessionRecording(examples.example1)
+    const recorded = stopSessionRecording()
+    if (!recorded) throw new Error('expected a recorded session')
+    const original = {
+      id: 9,
+      name: 'Geometry pass',
+      timestamp: Date.now(),
+      actionCount: recorded.actions.length,
+      unnamedWriteCount: recorded.unnamedWriteCount,
+      session: recorded,
+    }
+    let resolveRename: ((value: (typeof original)[]) => void) | undefined
+    loadStoredSessionsMock.mockResolvedValueOnce([original])
+    renameStoredSessionMock.mockImplementationOnce(
+      () =>
+        new Promise<(typeof original)[]>((resolve) => {
+          resolveRename = resolve
+        }),
+    )
+
+    const { unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderDock
+          flameDescriptor={examples.example1}
+          target={target}
+          session={undefined}
+          onSessionChange={() => {}}
+          busy={false}
+        />
+      </ToastProvider>
+    ))
+
+    fireEvent.click(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Recordings' }),
+    )
+    fireEvent.click(
+      await screen.findByRole<HTMLButtonElement>('button', {
+        name: original.name,
+      }),
+    )
+    const input = screen.getByRole<HTMLInputElement>('textbox', {
+      name: `Rename recording ${original.name}`,
+    })
+    input.focus()
+    fireEvent.input(input, { target: { value: 'Final geometry' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(renameStoredSessionMock).toHaveBeenCalledWith(9, 'Final geometry')
+    expect(document.activeElement).toBe(input)
+    expect(input.readOnly).toBe(true)
+
+    resolveRename?.([{ ...original, name: 'Final geometry' }])
+    await waitFor(() => {
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Final geometry' }),
+      )
+    })
+
+    unmount()
+  })
+
+  it('moves focus from a library replay action to replay transport', async () => {
+    startSessionRecording(examples.example1)
+    const recorded = stopSessionRecording()
+    if (!recorded) throw new Error('expected a recorded session')
+    const replaySession = {
+      ...recorded,
+      actions: [
+        {
+          t: 0,
+          id: 'flame.setGamma',
+          args: [2.4],
+          label: 'Set gamma',
+        },
+      ],
+    }
+    loadStoredSessionsMock.mockResolvedValueOnce([
+      {
+        id: 11,
+        name: 'Replay focus',
+        timestamp: Date.now(),
+        actionCount: replaySession.actions.length,
+        unnamedWriteCount: recorded.unnamedWriteCount,
+        session: replaySession,
+      },
+    ])
+    const [session, setSession] = createSignal<RecordedSession>()
+
+    const { unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderDock
+          flameDescriptor={examples.example1}
+          target={target}
+          session={session()}
+          onSessionChange={setSession}
+          busy={false}
+        />
+      </ToastProvider>
+    ))
+
+    fireEvent.click(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Recordings' }),
+    )
+    fireEvent.click(
+      await screen.findByRole<HTMLButtonElement>('button', { name: 'Replay' }),
+    )
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Play' }),
+      )
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    await waitFor(() => {
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Recordings' }),
+      )
+    })
+
+    unmount()
+  })
+
+  it('places floating panels on the visible side of a top-right bar', () => {
+    expect(
+      calculateFloatingPanelPlacement({
+        bar: { top: 8, right: 312, bottom: 52, left: 280 },
+        panelWidth: 300,
+        panelHeight: 160,
+        viewportWidth: 320,
+        viewportHeight: 480,
+      }),
+    ).toEqual({ below: true, maxHeight: 420, offsetX: -268 })
+
+    expect(
+      calculateFloatingPanelPlacement({
+        bar: { top: 420, right: 312, bottom: 464, left: 280 },
+        panelWidth: 300,
+        panelHeight: 160,
+        viewportWidth: 320,
+        viewportHeight: 480,
+      }),
+    ).toEqual({ below: false, maxHeight: 412, offsetX: -268 })
+  })
+
+  it('clamps the complete floating recorder bar inside the viewport', () => {
+    vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(320)
+    vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(200)
+    setRecorderOffset({ x: 900, y: 700 })
+
+    const { unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderDock
+          flameDescriptor={examples.example1}
+          target={target}
+          session={undefined}
+          onSessionChange={() => {}}
+          busy={false}
+        />
+      </ToastProvider>
+    ))
+
+    const grip = screen.getByRole<HTMLButtonElement>('button', {
+      name: 'Move the recorder',
+    })
+    const bar = grip.parentElement
+    if (!(bar instanceof HTMLDivElement))
+      throw new Error('missing recorder bar')
+    Object.defineProperties(bar, {
+      offsetWidth: { configurable: true, value: 300 },
+      offsetHeight: { configurable: true, value: 44 },
+    })
+
+    window.dispatchEvent(new Event('resize'))
+
+    expect(recorderOffset()).toEqual({ x: 12, y: 148 })
+    expect(bar.parentElement?.style.left).toBe('12px')
+    expect(bar.parentElement?.style.top).toBe('148px')
+
+    fireEvent.keyDown(grip, { key: 'Home' })
+    expect(recorderOffset()).toBeNull()
+
+    unmount()
+  })
+
+  it('ignores unrelated pointers during a recorder drag', () => {
+    const { unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderDock
+          flameDescriptor={examples.example1}
+          target={target}
+          session={undefined}
+          onSessionChange={() => {}}
+          busy={false}
+        />
+      </ToastProvider>
+    ))
+    const grip = screen.getByRole<HTMLButtonElement>('button', {
+      name: 'Move the recorder',
+    })
+    const bar = grip.parentElement
+    if (!(bar instanceof HTMLDivElement))
+      throw new Error('missing recorder bar')
+    vi.spyOn(bar, 'getBoundingClientRect').mockReturnValue({
+      top: 100,
+      right: 300,
+      bottom: 144,
+      left: 100,
+      width: 200,
+      height: 44,
+      x: 100,
+      y: 100,
+      toJSON: () => ({}),
+    })
+    Object.defineProperties(grip, {
+      setPointerCapture: { configurable: true, value: vi.fn() },
+      hasPointerCapture: {
+        configurable: true,
+        value: vi.fn().mockReturnValue(false),
+      },
+    })
+
+    fireEvent.pointerDown(grip, {
+      pointerId: 7,
+      pointerType: 'touch',
+      clientX: 110,
+      clientY: 110,
+    })
+    fireEvent.pointerMove(window, {
+      pointerId: 8,
+      clientX: 260,
+      clientY: 180,
+    })
+    fireEvent.pointerUp(window, { pointerId: 8 })
+    expect(recorderOffset()).toBeNull()
+
+    fireEvent.pointerMove(window, {
+      pointerId: 7,
+      clientX: 150,
+      clientY: 150,
+    })
+    expect(recorderOffset()).not.toBeNull()
+    fireEvent.pointerUp(window, { pointerId: 7 })
+
+    unmount()
+  })
+
+  it('reports whether the active replay step owns the timeline surface', async () => {
+    vi.useFakeTimers()
+    startSessionRecording(examples.example1)
+    const recorded = stopSessionRecording()
+    if (!recorded) throw new Error('expected a recorded session')
+    const onPresentationChange = vi.fn()
+    const session = {
+      ...recorded,
+      actions: [
+        {
+          t: 0,
+          id: 'timeline.setFps',
+          args: [30],
+          label: 'Set timeline FPS',
+        },
+      ],
+    }
+
+    const { unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderDock
+          flameDescriptor={examples.example1}
+          target={target}
+          session={session}
+          onSessionChange={() => {}}
+          onReplayPresentationChange={onPresentationChange}
+          busy={false}
+        />
+      </ToastProvider>
+    ))
+
+    fireEvent.click(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Play' }),
+    )
+    vi.advanceTimersByTime(0)
+    await Promise.resolve()
+
+    expect(onPresentationChange).toHaveBeenCalledWith({
+      playing: true,
+      timelineTargeted: true,
     })
 
     unmount()
