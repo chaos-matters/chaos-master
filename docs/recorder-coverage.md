@@ -11,62 +11,133 @@ not user actions.
 
 ## How to read it
 
-A control is **covered** when it dispatches a registered command, which means
-the recorder logs it and a replay reproduces it. An **uncovered** control
-still works normally — it just writes the document anonymously, which the
-recorder counts as an _unnamed write_ and reports in the pill and in the
-saved file's `unnamedWriteCount`. A log with a non-zero count is telling you
-it cannot fully reproduce that session.
+A control is **covered** when it dispatches a registered command or emits a
+validated result snapshot, which means the recorder logs it and a replay
+reproduces its authored workspace output. An **uncovered document or timeline
+write** still works normally — it writes anonymously, which the recorder
+counts as an _unnamed write_ and reports in the pill and in the saved file's
+`unnamedWriteCount`. A log with a non-zero count is telling you it cannot fully
+reproduce that session.
+
+Some state lives outside both histories, so the unnamed-write detector cannot
+see it. Those gaps are called out explicitly below rather than being hidden
+behind a misleading zero. The recorder also does not try to be a clickstream:
+opening a modal, changing a search filter, or browsing candidates is not a
+step unless it changes authored workspace/output state.
 
 This inventory is about authored workspace/output changes. Navigation-only
 gestures — scrolling, hover, selecting or collapsing a card, switching an
 editor tab, and opening a picker without choosing anything — are presentation,
-not session steps. Follow-cam reconstructs the presentation it needs before
-each authored action, including mobile sidebar visibility and the owning
-transform, affine, colour, timeline, or audio surface.
+not session steps. Follow-cam reconstructs the owning transform, affine,
+colour, timeline, or audio surface where an exact target is available; the
+remaining generic targets and mobile-sidebar mismatch are listed below.
 
 **Not recorded is not the same as broken.** Nothing below changes how the
 editor behaves; it only changes whether a session can replay it.
 
 ## Covered
 
-| Area            | Controls                                                                                                                                                                                                                                                                                                                                       | Command                                                                                                                                                             |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Render settings | 3D auto-exposure toggle and manual re-base, clearing background colour back to Auto, gamma, exposure, contrast, vibrancy, highlight power, skip iters, point batch, density estimation, estimator curve, palette mode/phase/speed, background colour, draw mode, colour-init, point-init, depth colour, light power, 3D auto-exposure strength | `flame.setRenderSetting` (dotted path vocabulary)                                                                                                                   |
-| Camera          | pan, zoom, pinch, orbit, look, fly, 3D theta/phi/radius/fov/roll/target                                                                                                                                                                                                                                                                        | `flame.setRenderSetting` on `camera.*` / `camera3D.*`                                                                                                               |
-| Transform card  | probability, colour speed, add ("+" and custom-variation "Add to flame"), show/hide, delete (incl. last-one-resets), randomise colour                                                                                                                                                                                                          | `flame.setProbability`, `flame.setColorSpeed`, `flame.setTransformVisible`, `flame.deleteTransform`, `flame.setTransformColor`                                      |
-| Variations      | weight, parametric params (whole-object editors too), add ("+"), show/hide, delete (incl. last-one-resets), dice randomise, quick-picker type change, variation-browser apply                                                                                                                                                                  | `flame.setVariationWeight`, `flame.setVariationParams`, `flame.setVariationVisible`, `flame.deleteVariation`, `flame.setVariation`, `flame.applyVariationSelection` |
-| Affine editor   | handle drags (translate, rotate, scale), pre/post, 2D and 3D; the affine LIST editor's coefficient scrubs, dice and reset                                                                                                                                                                                                                      | `flame.setAffine`, `flame.setTransformAffine`                                                                                                                       |
-| Colour editors  | colour wheel drag, colour scrub inputs, dice, reset, randomise ALL colours                                                                                                                                                                                                                                                                     | `flame.setTransformColor`                                                                                                                                           |
-| Palette         | apply, remove                                                                                                                                                                                                                                                                                                                                  | `flame.applyPalette`, `flame.removePalette`                                                                                                                         |
-| Blend / morph   | pick partner, clear partner, blend weight, morph setup                                                                                                                                                                                                                                                                                         | `flame.setBlendFlame`, `flame.setBlendWeight`, `flame.setupMorph`                                                                                                   |
-| Symmetry        | rotational and dihedral, n-fold; per-transform angle, show/hide and remove in the symmetry list                                                                                                                                                                                                                                                | `flame.applySymmetry`                                                                                                                                               |
-| Document        | new flame, open saved flame, load from history, load a bred child, randomise, mutate, apply a random gallery flame; flame name / author / description                                                                                                                                                                                          | `flame.load`                                                                                                                                                        |
-| Undo / redo     | toolbar buttons and Ctrl+Z / Ctrl+Y                                                                                                                                                                                                                                                                                                            | captured as the resulting `flame.load` or `recorder.restoreWorkspaceSnapshot`, so replay never depends on the viewer's private history stacks                       |
-| Final transform | set / clear, handle drags, LIST coefficient scrubs and dice                                                                                                                                                                                                                                                                                    | `flame.setFinalTransform`, `flame.setFinalAffine`                                                                                                                   |
-| Timeline        | animation on/off, current frame, duration, fps/auto-fps, playback scale, loop/mode, auto-keyframe, add/remove/move/retime keyframes, values/interpolation, remove/clear tracks, curve edits, presets, random/smart animation, morph tracks and whole-animation loads                                                                           | atomic `timeline.*` commands; compound and randomized edits become one value-pinned `timeline.loadTimeline` snapshot                                                |
-| Audio wiring    | preset choice, every per-target row (feature, target, sensitivity, range, attack/release), reactivity on/off, file vs microphone, upload/clear resource identity                                                                                                                                                                               | identity-aware full snapshots carried by `audio.setMapping`, `audio.setEnabled`, `audio.setSource`, and `audio.applySnapshot`                                       |
-| Viewport        | quality preset, live canvas resolution, adaptive filter, stochastic filter, fly mode, timeline panel show/hide                                                                                                                                                                                                                                 | `view.*`                                                                                                                                                            |
-| 2D ↔ 3D switch  | the toolbar toggle                                                                                                                                                                                                                                                                                                                             | recorded as `flame.load` + `timeline.loadTimeline` carrying the restored state                                                                                      |
+| Area                  | Controls                                                                                                                                                                                                                                                                                                                                       | Command / replay value                                                                                                                                              |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Render settings       | 3D auto-exposure toggle and manual re-base, clearing background colour back to Auto, gamma, exposure, contrast, vibrancy, highlight power, skip iters, point batch, density estimation, estimator curve, palette mode/phase/speed, background colour, draw mode, colour-init, point-init, depth colour, light power, 3D auto-exposure strength | `flame.setRenderSetting` (dotted path vocabulary)                                                                                                                   |
+| Camera                | pan, zoom, pinch, orbit, look, fly, 3D theta/phi/radius/fov/roll/target                                                                                                                                                                                                                                                                        | `flame.setRenderSetting` on `camera.*` / `camera3D.*`                                                                                                               |
+| Transform card        | probability, colour speed, add ("+" and custom-variation "Add to flame"), show/hide, delete (including last-one-resets), randomise colour                                                                                                                                                                                                      | `flame.setProbability`, `flame.setColorSpeed`, `flame.setTransformVisible`, `flame.deleteTransform`, `flame.setTransformColor`                                      |
+| Variations            | weight, parametric params (whole-object editors too), add ("+"), show/hide, delete (including last-one-resets), dice randomise, quick-picker type change, variation-browser apply                                                                                                                                                              | `flame.setVariationWeight`, `flame.setVariationParams`, `flame.setVariationVisible`, `flame.deleteVariation`, `flame.setVariation`, `flame.applyVariationSelection` |
+| Affine editor         | handle drags (translate, rotate, scale), pre/post, 2D and 3D; LIST coefficient scrubs, dice and reset                                                                                                                                                                                                                                          | `flame.setAffine`, `flame.setTransformAffine`                                                                                                                       |
+| Colour editors        | colour wheel drag, colour scrub inputs, dice, reset, randomise ALL colours                                                                                                                                                                                                                                                                     | `flame.setTransformColor`, `flame.setAllTransformColors`                                                                                                            |
+| Palette               | apply, remove; natural-colour restore provenance across load, undo/redo and replay forks                                                                                                                                                                                                                                                       | `flame.applyPalette`, `flame.removePalette`, plus the bounded optional session/history snapshot                                                                     |
+| Blend / morph         | pick partner, clear partner, blend weight, morph setup                                                                                                                                                                                                                                                                                         | `flame.setBlendFlame`, `flame.setBlendWeight`, `flame.setupMorph`                                                                                                   |
+| Symmetry              | rotational and dihedral, n-fold; per-transform angle, show/hide and remove in the symmetry list                                                                                                                                                                                                                                                | `flame.applySymmetry`, `flame.setTransformAffine`, `flame.setTransformVisible`, `flame.removeTransform`                                                             |
+| Document / generators | new flame; gallery, file, history, FLAM3, migration and logo-generator loads; randomise, mutate and random-gallery apply; chosen breed, evolve, simulator and ancestry results                                                                                                                                                                 | the exact resulting descriptor in `flame.load`                                                                                                                      |
+| Metadata              | flame name, author and description, including the atomic patch committed from Export                                                                                                                                                                                                                                                           | `flame.setMetadata`                                                                                                                                                 |
+| Undo / redo           | toolbar buttons and Ctrl+Z / Ctrl+Y                                                                                                                                                                                                                                                                                                            | the resulting `flame.load` or `recorder.restoreWorkspaceSnapshot`, so replay never depends on the viewer's private history stacks                                   |
+| Final transform       | set/replace, handle drags, LIST coefficient scrubs and dice                                                                                                                                                                                                                                                                                    | `flame.setFinalTransform`, `flame.setFinalAffine`                                                                                                                   |
+| Timeline              | animation on/off, current frame, duration, fps/auto-fps, playback scale, loop/mode, auto-keyframe, add/remove/move/retime keyframes, values/interpolation, remove/clear tracks, curve edits, presets, random/smart animation, morph tracks and whole-animation loads                                                                           | atomic `timeline.*` commands; compound and randomized edits become one value-pinned `timeline.loadTimeline` snapshot                                                |
+| Audio wiring          | preset choice, every per-target row (feature, target, sensitivity, range, attack/release), reactivity on/off, file vs microphone, upload/clear resource identity                                                                                                                                                                               | identity-aware full snapshots carried by `audio.setMapping`, `audio.setEnabled`, `audio.setSource`, and `audio.applySnapshot`                                       |
+| Viewport              | quality preset, live canvas resolution, adaptive filter, stochastic filter, fly mode, timeline panel show/hide                                                                                                                                                                                                                                 | `view.*`                                                                                                                                                            |
+| 2D ↔ 3D switch        | the toolbar toggle                                                                                                                                                                                                                                                                                                                             | `flame.load` + `timeline.loadTimeline` carrying the restored state                                                                                                  |
 
-## Not covered yet
+### Exact output, condensed intent
 
-Each of these raises the unnamed-write count when used during a recording.
+Several rich workflows deliberately record their **finished value**, not every
+internal choice that produced it:
 
-| Area              | Control                                         | Why it is still open                                                                                                                                                                                                   |
-| ----------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Startup           | Home hand-off, shared-URL apply, backup restore | Run before or around a recording rather than during one; the workspace-remount flag already marks a recording that spans one. Low priority.                                                                            |
-| Tours             | `tour:restore` snapshot                         | Deliberate — tour machinery, not a user edit.                                                                                                                                                                          |
-| Audio             | the audio **file** itself                       | A buffer cannot ride in a JSON session. The wiring and required track name replay, but reactivity only enables when the matching file is already loaded (or an existing live microphone analyser is available).        |
-| Audio             | per-frame modulation writes                     | Derived writes use the silent history path, so they no longer flood undo. A recording that uses live modulation receives one deduplicated fidelity warning because audio bytes and playback position are not embedded. |
-| Custom variations | the WGSL/maths **code editor**                  | Plan defers this: a code edit does not decompose into small commands. Intended shape is one `variation.setCode` action per committed edit.                                                                             |
-| Timeline          | wall-clock Play/Pause transport                 | Playback timing is hardware-driven state, not an authored edit. Replay pauses a running timeline before applying steps, records timeline data and playhead state, and never restarts wall-clock playback during undo.  |
+- **Randomise, Mutate, history/candidate apply and whole-document loads** carry
+  the complete resulting flame in `flame.load`. Replay never rerolls them.
+- **Breed, Evolve, Population Simulator and Ancestry** carry the chosen child
+  in `flame.load`. Browsing generations, changing genetics settings and
+  comparing candidates inside those tools are not represented as recipe
+  steps.
+- **Random Animate, Smart Animate, Colors and timeline presets** carry the
+  completed tracks in one `timeline.loadTimeline` snapshot. Replay never
+  repeats `Math.random`, but the chosen preset ids and originating button are
+  not preserved as separate semantic actions.
+
+This is output-exact and compact, but it is not yet a complete narrated recipe
+of the generator/genetics process. That semantic-origin work is listed in the
+follow-up audit below.
+
+## Authored state not represented yet
+
+The **Signal** column says whether the current recorder can warn about the gap.
+
+| Area              | State / action                                     | Signal                           | Why it is still open                                                                                                                                                                                        |
+| ----------------- | -------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sonification      | enabled state and model/scale/voice/effects config | none today                       | This is authored audio-output state held in local signals, outside the flame, timeline and audio-reactive snapshots. It needs a validated sonification snapshot plus semantic commands.                     |
+| Custom variations | committed WGSL/maths code                          | none for the code blob           | A code edit should not decompose into keystrokes. Intended shape is one `variation.setCode` action per committed edit, with the definition embedded so another browser can replay it.                       |
+| Startup           | Home hand-off, shared-URL apply, backup restore    | unnamed-write or remount warning | These normally run before a recording. A recording that crosses one is marked rather than pretending continuity.                                                                                            |
+| Tours             | `tour:restore` snapshot                            | unreplayable marker              | Deliberate — tour machinery, not a user-authored edit.                                                                                                                                                      |
+| Audio             | the audio **file** itself                          | required-track metadata          | A buffer cannot ride in a JSON session. Wiring and required track name replay, but reactivity only enables when the matching file is already loaded (or an existing live microphone analyser is available). |
+| Audio             | playback clock and per-frame modulation            | one deduplicated warning         | Play/pause/seek and derived 30 fps writes are external runtime state. They stay out of undo and do not flood the log; audio bytes and playback position are not embedded.                                   |
+| Timeline          | wall-clock Play/Pause transport                    | unreplayable transport marker    | Playback timing is hardware-driven state, not an authored edit. Replay pauses a running timeline, records timeline data and playhead state, and never restarts wall-clock playback during undo.             |
 
 **The timeline is now watched.** Its `pushUndo` reports to the recorder the
 same way the flame history's `onEntryPushed` does, so an uncovered timeline
 edit raises the unnamed-write count instead of being invisible. Before this
 pass a session could claim "0 unnamed writes" while half the app went
 unrecorded — the count was a statement about the flame document only.
+
+## Deliberate session boundaries
+
+These are not missing output mutations and are intentionally outside the v1
+artifact:
+
+- modal open/close, hover previews, card/tab selection, searches and filters;
+- randomizer ranges/preferences and genetics exploration before a result is
+  applied (the applied result itself is exact);
+- custom-palette-library create/edit/delete (the applied palette data is
+  embedded in the flame action);
+- timeline/audio transport clocks, analyzer progress and microphone
+  permission/resource acquisition;
+- export, download, clipboard, share and queue side effects. Metadata committed
+  back to the flame and generated artwork loaded back into the editor are
+  recorded.
+
+## Follow-up completeness audit
+
+The 2026-08-15 full UI pass found no missing flame/render/timeline mutations,
+but it left a bounded follow-up PR:
+
+1. Add a versioned sonification snapshot and commands, and embed committed
+   custom-variation source.
+2. Preserve semantic origin for value-pinned workflows: Randomise, Mutate,
+   gallery/history/load, Breed/Evolve/Simulator/Ancestry, Random Animate,
+   Smart Animate, Colors and animation presets. Their output is exact today;
+   captions and spotlight targets are generic.
+3. Add exact anchors/preparation for timeline settings and generator buttons,
+   audio controls, Show Timeline, stochastic filter, fly mode, 2D/3D,
+   blend/morph, symmetry-row controls and transform visibility. Also make
+   mobile sidebar reveal match the desktop sidebar command.
+4. Decide one export-modal policy: the keyboard command is recordable while
+   the toolbar Render button opens the same modal directly. The external
+   export itself should remain outside replay.
+5. Collapse companion presentation commands from one-click workflows where
+   they currently produce redundant adjacent captions.
+6. Add a representative Playwright recording journey that clicks the real UI
+   and asserts `unnamedWriteCount === 0`. Unit command tests cannot detect a
+   newly added control that bypasses the registry.
+7. Harden the remaining timeline drag handlers against a second simultaneous
+   pointer by filtering window events to the initiating `pointerId`.
 
 ## Resolved performance and fidelity findings
 
@@ -182,8 +253,10 @@ the replay and library panels it opens.
 - To embed steps in an export, stop the recording first — the export picks up
   the **last finished** session.
 - `unnamedWriteCount` in the saved file is the honest measure of untracked
-  editor writes. Zero means all editor actions were represented; a matching
-  external audio source is still required when the take used one.
+  flame/timeline writes. Zero means every watched document edit was
+  represented; state explicitly listed under “Authored state not represented
+  yet” remains outside that detector, and a matching external audio source is
+  still required when the take used one.
 
 ## Housekeeping worth knowing about
 
