@@ -1,14 +1,27 @@
 import { Show } from 'solid-js'
 import { useToast } from '@/contexts/ToastContext'
-import { Book } from '@/icons'
+import { Book, FolderOpen, Record } from '@/icons'
 import { cancelSessionRecording, isSessionRecording, recordedActionCount, startSessionRecording, stopSessionRecording, unnamedWriteCount, } from '@/recorder/recorder'
 import { MAX_SESSION_FILE_BYTES, parseSession, serializeSession, sessionFilename, } from '@/recorder/schema'
 import { downloadBlob } from '@/utils/blob'
 import { storeSession } from '@/utils/sessionsDB'
 import styles from './SessionRecorderControls.module.css'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
-import type { SessionStartExtras } from '@/recorder/recorder'
+import type { SessionRecordingStartFailureReason, SessionStartExtras, } from '@/recorder/recorder'
 import type { RecordedSession } from '@/recorder/schema'
+
+function recordingStartFailureMessage(
+  reason: SessionRecordingStartFailureReason,
+): string {
+  switch (reason) {
+    case 'already-recording':
+      return 'A step recording is already in progress'
+    case 'workspace-not-serializable':
+      return 'Recording could not start — this workspace cannot be serialized'
+    case 'workspace-not-recordable':
+      return 'Recording could not start — this workspace cannot be recorded safely'
+  }
+}
 
 /**
  * Record/stop controls for the session recorder
@@ -23,19 +36,49 @@ export function SessionRecorderControls(props: {
   /** The timeline and audio wiring to snapshot alongside the flame. Read at
    *  the moment recording starts, not at mount. */
   startExtras?: () => SessionStartExtras
+  /** Runs only after the recorder accepts the captured workspace. */
+  onRecordingStarted?: () => void
   onOpenSession: (session: RecordedSession) => void
   /** Called after a recording is stored, so the library list refetches. */
   onSessionStored: () => void
   onToggleLibrary: () => void
+  libraryOpen?: boolean
+  recordingsButtonRef?: (element: HTMLButtonElement) => void
+  /** A legacy main-canvas export temporarily owns and restores the document. */
+  blocked?: boolean
 }) {
   const { showToast } = useToast()
+  let fileInputRef: HTMLInputElement | undefined
 
   const startRecording = () => {
+    if (props.blocked) {
+      showToast(
+        'Wait for the animation export to finish before recording',
+        4000,
+      )
+      return
+    }
     // No clone here: startSessionRecording owns that (and cloning a whole
     // flame document twice is not free on large flames). The timeline and
     // audio wiring go in alongside the flame: keyframe edits mean nothing
     // without the tracks they land on.
-    startSessionRecording(props.flameDescriptor, props.startExtras?.())
+    let extras: SessionStartExtras | undefined
+    try {
+      extras = props.startExtras?.()
+    } catch (error) {
+      console.warn('[recorder] could not capture the workspace state', error)
+      showToast(
+        'Recording could not start — the workspace state could not be captured',
+        5000,
+      )
+      return
+    }
+    const result = startSessionRecording(props.flameDescriptor, extras)
+    if (!result.ok) {
+      showToast(recordingStartFailureMessage(result.reason), 5000)
+      return
+    }
+    props.onRecordingStarted?.()
   }
 
   /**
@@ -92,36 +135,52 @@ export function SessionRecorderControls(props: {
           <>
             <button
               type="button"
-              class={styles.button}
+              class={`${styles.iconButton} ${styles.recordButton}`}
               onClick={startRecording}
+              disabled={props.blocked}
+              aria-label="Record steps"
               title="Record every action as a replayable step log"
             >
-              <span class={styles.dot} /> Record steps
+              <Record class={styles.icon} aria-hidden="true" />
+            </button>
+            <button
+              ref={props.recordingsButtonRef}
+              type="button"
+              class={styles.iconButton}
+              onClick={props.onToggleLibrary}
+              aria-label="Recordings"
+              aria-expanded={props.libraryOpen}
+              aria-controls="session-recording-library"
+              title={
+                props.libraryOpen
+                  ? 'Close saved recordings'
+                  : 'Saved recordings — replay, download or delete'
+              }
+            >
+              <Book class={styles.icon} aria-hidden="true" />
             </button>
             <button
               type="button"
-              class={styles.button}
-              onClick={props.onToggleLibrary}
-              title="Saved recordings — replay, download or delete"
+              class={styles.iconButton}
+              onClick={() => fileInputRef?.click()}
+              aria-label="Open steps"
+              title="Replay a saved .steps.json"
             >
-              <Book class={styles.buttonIcon} aria-hidden="true" />
-              <span>Recordings</span>
+              <FolderOpen class={styles.icon} aria-hidden="true" />
             </button>
-            <label class={styles.button} title="Replay a saved .steps.json">
-              Open steps
-              <input
-                type="file"
-                accept=".json,application/json"
-                class={styles.fileInput}
-                onChange={(ev) => {
-                  const input = ev.currentTarget
-                  void openSessionFile(input.files?.[0]).finally(() => {
-                    // Clear it so re-picking the same file fires again.
-                    input.value = ''
-                  })
-                }}
-              />
-            </label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              class={styles.fileInput}
+              onChange={(ev) => {
+                const input = ev.currentTarget
+                void openSessionFile(input.files?.[0]).finally(() => {
+                  // Clear it so re-picking the same file fires again.
+                  input.value = ''
+                })
+              }}
+            />
           </>
         }
       >

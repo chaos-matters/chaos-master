@@ -133,6 +133,18 @@ function isReplaySettingValue(value: unknown): boolean {
   )
 }
 
+function renderSettingArgs(args: readonly unknown[]): string | undefined {
+  if (args.length !== 2 || !isSafePath(args[0])) {
+    return 'render setting expects a safe path and value'
+  }
+  if (args[1] === null && args[0] !== 'backgroundColor') {
+    return 'only automatic background colour may be cleared'
+  }
+  return isReplaySettingValue(args[1])
+    ? undefined
+    : 'render setting value is invalid'
+}
+
 function isAffine(value: unknown): boolean {
   if (!isPlainRecord(value)) return false
   const keys = Object.keys(value)
@@ -159,6 +171,20 @@ const oneBoolean = signature(isBoolean)
 const oneNumber = signature(isBoundedNumber)
 const oneRecord = signature(isPlainRecord)
 
+function isMetadataPatch(value: unknown): boolean {
+  if (!isPlainRecord(value)) return false
+  const keys = Object.keys(value)
+  return (
+    keys.length > 0 &&
+    keys.every(
+      (key) =>
+        (key === 'name' || key === 'author' || key === 'description') &&
+        typeof value[key] === 'string' &&
+        value[key].length <= MAX_REPLAY_METADATA_LENGTH,
+    )
+  )
+}
+
 /**
  * Explicit signatures for commands whose arguments are small scalar/data
  * shapes. Complex document payloads own a validator next to their command.
@@ -175,6 +201,9 @@ const REPLAY_ARG_POLICIES: Readonly<Record<string, ReplayArgsValidator>> = {
       value === 'high' ||
       value === 'ultra',
   ),
+  'view.setPixelRatio': signature(
+    (value) => value === 1 || value === 0.5 || value === 0.25,
+  ),
   'view.setAdaptiveFilter': oneBoolean,
   'view.setStochasticFilter': oneBoolean,
   'view.setFlyMode': oneBoolean,
@@ -188,7 +217,7 @@ const REPLAY_ARG_POLICIES: Readonly<Record<string, ReplayArgsValidator>> = {
   'audio.setEnabled': oneBoolean,
   'audio.setSource': signature((value) => value === 'file' || value === 'mic'),
 
-  'flame.setRenderSetting': signature(isSafePath, isReplaySettingValue),
+  'flame.setRenderSetting': renderSettingArgs,
   'flame.setSkipIters': oneOfSignatures(
     noArgs,
     signature(
@@ -216,7 +245,13 @@ const REPLAY_ARG_POLICIES: Readonly<Record<string, ReplayArgsValidator>> = {
     (value) => value === null || isPlainRecord(value),
   ),
   'flame.setupMorph': oneRecord,
-  'flame.updateRenderSettings': oneRecord,
+  'flame.updateRenderSettings': oneOfSignatures(
+    oneRecord,
+    signature(
+      isPlainRecord,
+      (value) => value === 'render' || value === 'randomizer',
+    ),
+  ),
   'flame.setProbability': signature(isEntityRef, isBoundedNumber),
   'flame.setAffine': signature(
     isEntityRef,
@@ -228,10 +263,19 @@ const REPLAY_ARG_POLICIES: Readonly<Record<string, ReplayArgsValidator>> = {
       value <= 'l',
     isBoundedNumber,
   ),
-  'flame.setTransformColor': signature(
-    isEntityRef,
-    isBoundedNumber,
-    isBoundedNumber,
+  'flame.setTransformColor': oneOfSignatures(
+    signature(isEntityRef, isBoundedNumber, isBoundedNumber),
+    signature(
+      isEntityRef,
+      isBoundedNumber,
+      isBoundedNumber,
+      (value) =>
+        value === 'grid' ||
+        value === 'x' ||
+        value === 'y' ||
+        value === 'randomize' ||
+        value === 'reset',
+    ),
   ),
   'flame.setExposure': oneNumber,
   'flame.setVibrancy': oneNumber,
@@ -262,8 +306,20 @@ const REPLAY_ARG_POLICIES: Readonly<Record<string, ReplayArgsValidator>> = {
   ),
   'flame.deleteTransform': signature(isEntityRef, isEntityId),
   'flame.deleteVariation': signature(isEntityRef, isEntityRef),
-  'flame.setFinalTransform': signature(
-    (value) => value === null || isAffine(value),
+  'flame.setFinalTransform': oneOfSignatures(
+    signature((value) => value === null || isAffine(value)),
+    signature(
+      (value) => value === null || isAffine(value),
+      (value) => value === 'grid' || value === 'randomize',
+    ),
+  ),
+  'flame.setFinalAffine': signature(
+    (value) =>
+      typeof value === 'string' &&
+      value.length === 1 &&
+      value >= 'a' &&
+      value <= 'l',
+    isBoundedNumber,
   ),
   'flame.applyVariationSelection': signature(
     isEntityRef,
@@ -271,17 +327,28 @@ const REPLAY_ARG_POLICIES: Readonly<Record<string, ReplayArgsValidator>> = {
     isAffine,
     isVariationDescriptor,
   ),
-  'flame.setTransformAffine': signature(
-    isEntityRef,
-    (value) => value === 'pre' || value === 'post',
-    isAffine,
+  'flame.setTransformAffine': oneOfSignatures(
+    signature(
+      isEntityRef,
+      (value) => value === 'pre' || value === 'post',
+      isAffine,
+    ),
+    signature(
+      isEntityRef,
+      (value) => value === 'pre' || value === 'post',
+      isAffine,
+      (value) => value === 'grid' || value === 'randomize' || value === 'reset',
+    ),
   ),
   'flame.removePalette': oneRecord,
-  'flame.setMetadata': signature(
-    (value) =>
-      value === 'name' || value === 'author' || value === 'description',
-    (value) =>
-      typeof value === 'string' && value.length <= MAX_REPLAY_METADATA_LENGTH,
+  'flame.setMetadata': oneOfSignatures(
+    signature(
+      (value) =>
+        value === 'name' || value === 'author' || value === 'description',
+      (value) =>
+        typeof value === 'string' && value.length <= MAX_REPLAY_METADATA_LENGTH,
+    ),
+    signature(isMetadataPatch),
   ),
   'flame.setAllTransformColors': oneRecord,
 }
@@ -372,6 +439,11 @@ export function executeCommand(
     if (IS_DEV) console.warn(`Command "${id}" not found in registry`)
     return
   }
+  // Timed replay can own a long-lived undo preview while it waits between
+  // steps. Every live command — including timeline/audio/view-only commands
+  // that never touch flame history — takes the workspace back before it runs.
+  // `executeReplayCommand` intentionally skips this live-dispatch hook.
+  ctx.beforeCommand?.()
   if (IS_DEV) console.info('[cmd:execute]', id, 'args:', ...args)
   runCommand(cmd, ctx, args)
 }

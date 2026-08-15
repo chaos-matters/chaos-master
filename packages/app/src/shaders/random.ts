@@ -14,6 +14,26 @@ import { acos, cos, mul, pow, sin, sqrt } from 'typegpu/std'
 import { PI } from '@/flame/constants'
 import type { v2u } from 'typegpu/data'
 
+export const RENDERER_RANDOM_IMPLEMENTATION_IDS = {
+  canonical: 'xoroshiro64ss-canonical-v1',
+  legacy: 'legacy-xoroshiro64-state-x-v1',
+} as const
+
+export type RendererRandomImplementationId =
+  (typeof RENDERER_RANDOM_IMPLEMENTATION_IDS)[keyof typeof RENDERER_RANDOM_IMPLEMENTATION_IDS]
+
+export const DEFAULT_RENDERER_RANDOM_IMPLEMENTATION_ID =
+  RENDERER_RANDOM_IMPLEMENTATION_IDS.canonical
+
+/**
+ * Selects the renderer's historical post-transition output rule.
+ *
+ * TypeGPU slots are resolved while the pipeline is compiled, so this does not
+ * add a runtime branch to the random hot path. The default preserves the
+ * current canonical xoroshiro64** sequence for every non-benchmark renderer.
+ */
+export const legacyRandomOutputSlot = tgpu.slot(false)
+
 export const randomState = tgpu.privateVar(vec2u, vec2u(0, 0))
 
 export function setSeed(seed: v2u) {
@@ -25,13 +45,14 @@ export function next() {
   'use gpu'
   const s0 = randomState.$[0]
   let s1 = randomState.$[1]
-  const result = rotl(s0 * 0x9e3779bb, 5) * 5
 
   s1 ^= s0
   randomState.$[0] = rotl(s0, 26) ^ s1 ^ (s1 << 9) // a, b
   randomState.$[1] = rotl(s1, 13) // c
 
-  return result
+  return legacyRandomOutputSlot.$
+    ? randomState.$[0]
+    : rotl(s0 * 0x9e3779bb, 5) * 5
 }
 
 export function random() {

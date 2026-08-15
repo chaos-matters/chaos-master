@@ -14,6 +14,7 @@ import { useCamera } from '@/lib/CameraContext'
 import { useCanvas } from '@/lib/CanvasContext'
 import { useLiveRootContext } from '@/lib/RootContext'
 import { createPosition, createZoom, WheelZoomCamera2D, } from '@/lib/WheelZoomCamera2D'
+import { colorFocusId } from '@/recorder/focusIds'
 import { createAnimationFrame } from '@/utils/createAnimationFrame'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'
@@ -26,6 +27,8 @@ import type { v2f } from 'typegpu/data'
 import type { Theme } from '@/contexts/ThemeContext'
 import type { TransformRecord } from '@/flame/schema/flameSchema'
 import type { HistorySetter } from '@/utils/createStoreHistory'
+
+export type ColorEditOrigin = 'grid' | 'x' | 'y' | 'randomize' | 'reset'
 
 const HANDLE_LIGHTNESS = {
   light: 0.8,
@@ -153,6 +156,8 @@ function FlameColorHandle(props: {
    *  x/y live (track-changes diamond, or Auto mode on already-animated
    *  colours). */
   keyframePathBase?: string
+  /** Exact replay follow-cam identity for this transform's colour handle. */
+  focusId?: string
 }) {
   const { theme } = useTheme()
   const { canvas } = useCanvas()
@@ -229,6 +234,7 @@ function FlameColorHandle(props: {
   )
   return (
     <g
+      data-focus-id={props.focusId}
       class={ui.handle}
       classList={{
         [ui.selected as string]: props.selected,
@@ -275,7 +281,12 @@ export function FlameColorEditor(props: {
    * replayable step (docs/plans/semantic-recorder-plan.md). Absent for
    * preview copies, which fall back to the raw setter.
    */
-  setTransformColor?: (tid: string, x: number, y: number) => void
+  setTransformColor?: (
+    tid: string,
+    x: number,
+    y: number,
+    origin?: ColorEditOrigin,
+  ) => void
   selectedTransformId?: () => string | null
   setSelectedTransformId?: (tid: string | null) => void
   /** Enables the track-changes diamond + drag keyframing (real flame only). */
@@ -331,7 +342,7 @@ export function FlameColorEditor(props: {
                   setColor={(color) => {
                     const applySemantically = props.setTransformColor
                     if (applySemantically) {
-                      applySemantically(tid, color.x, color.y)
+                      applySemantically(tid, color.x, color.y, 'grid')
                     } else {
                       props.setTransforms((draft) => {
                         draft[tid]!.color = { x: color.x, y: color.y }
@@ -351,6 +362,7 @@ export function FlameColorEditor(props: {
                       ? `transform.${tid}.color`
                       : undefined
                   }
+                  focusId={colorFocusId(tid)}
                 />
               )}
             </For>

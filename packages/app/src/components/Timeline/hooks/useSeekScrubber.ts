@@ -8,6 +8,14 @@ export function useSeekScrubber(frameWidth: Accessor<number>) {
   let seekDragStartX = 0
   let controller: AbortController | null = null
 
+  function finishSeek() {
+    if (!seekDragging && controller === null) return
+    seekDragging = false
+    timeline.setIsScrubbing(false)
+    controller?.abort()
+    controller = null
+  }
+
   function seekToPosition(e: PointerEvent) {
     const lane = e.currentTarget as HTMLElement
     if (!lane) return
@@ -22,6 +30,7 @@ export function useSeekScrubber(frameWidth: Accessor<number>) {
   }
 
   function handleSeekPointerDown(e: PointerEvent) {
+    finishSeek()
     seekDragging = true
     seekDragStartX = e.clientX
     timeline.setIsScrubbing(true)
@@ -47,24 +56,19 @@ export function useSeekScrubber(frameWidth: Accessor<number>) {
       seekToPosition(ev)
     }
 
-    function onEnd() {
-      seekDragging = false
-      timeline.setIsScrubbing(false)
-      controller?.abort()
-      controller = null
-    }
-
     window.addEventListener('pointermove', onMove, {
       signal: controller.signal,
     })
-    window.addEventListener('pointerup', onEnd, { signal: controller.signal })
-    window.addEventListener('pointercancel', onEnd, {
+    window.addEventListener('pointerup', finishSeek, {
+      signal: controller.signal,
+    })
+    window.addEventListener('pointercancel', finishSeek, {
       signal: controller.signal,
     })
   }
 
   onCleanup(() => {
-    if (controller) controller.abort()
+    finishSeek()
   })
 
   return { handleSeekPointerDown }

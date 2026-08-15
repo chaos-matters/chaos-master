@@ -1,3 +1,4 @@
+import { batch } from 'solid-js'
 import { deepClone } from '@/utils/clone'
 import { isSessionRecording, withRecordingSuppressed } from './recorder'
 import type { RecordedSession, SessionViewSnapshot } from './schema'
@@ -24,8 +25,9 @@ export function canEnableReplayAudio(
   if (audio.source === 'mic') return resources.hasLiveAnalyzer
   return (
     resources.hasFileBuffer &&
-    (audio.trackName === undefined ||
-      audio.trackName === resources.currentTrackName)
+    typeof audio.trackName === 'string' &&
+    audio.trackName.length > 0 &&
+    audio.trackName === resources.currentTrackName
   )
 }
 
@@ -43,9 +45,16 @@ export function applyReplayAudioWiring(
   resources: ReplayAudioResources,
   target: ReplayAudioTarget,
 ): void {
-  target.setMapping(deepClone(audio.mapping))
-  target.setSource(audio.source)
-  target.setEnabled(canEnableReplayAudio(audio, resources))
+  const mayEnable = canEnableReplayAudio(audio, resources)
+  batch(() => {
+    // Never leave the previously selected resource live while its wiring is
+    // replaced. Solid targets publish only the final batched state; generic
+    // targets still see the safety-first disable before any replacement.
+    target.setEnabled(false)
+    target.setMapping(deepClone(audio.mapping))
+    target.setSource(audio.source)
+    if (mayEnable) target.setEnabled(true)
+  })
 }
 
 /**
@@ -61,6 +70,15 @@ export function applyReplayAudioWiring(
  * The timed step-by-step player (milestone M4) builds on this same target.
  */
 export type ReplayTarget = {
+  /**
+   * Clear transient presentation state before the replay transaction starts.
+   *
+   * This intentionally runs before `beginBatch`: hover previews may have
+   * temporarily replaced the visible document, and restoring them after the
+   * session baseline loads would overwrite that baseline. A sandbox with no
+   * transient UI can leave this unset.
+   */
+  prepare?: () => void
   loadInitial: (flame: FlameDescriptor) => void
   /**
    * Restore the two documents that are not the flame: the timeline's tracks
@@ -82,7 +100,18 @@ export type ReplayTarget = {
    * a sandbox with no history can leave them unset. Without it, replaying a
    * long session buries the user's own undo stack under one entry per step.
    */
-  beginBatch?: () => void
+  /**
+   * `onTakeover` is called when a user edit tries to write while a timed
+   * replay is waiting between steps. The player uses it to stop its clock and
+   * commit the replay prefix before the user gesture begins.
+   */
+  beginBatch?: (onTakeover: () => void) => void
+  /**
+   * Attribute synchronous flame-history writes to the open replay batch.
+   * Workspaces with an ownership-aware history use this to distinguish replay
+   * commands from an intervening user edit; simple sandboxes can omit it.
+   */
+  withBatchWrite?: <R>(fn: () => R) => R
   endBatch?: () => void
 }
 
@@ -103,19 +132,25 @@ export function replaySessionInstant(
   for (const action of session.actions) {
     if (target.preflight?.(action.id, action.args) !== undefined) return false
   }
-  target.beginBatch?.()
+  let batchOpen = false
   try {
     return withRecordingSuppressed(() => {
-      loadSessionStart(session, target)
-      for (const action of session.actions) {
-        if (target.execute(action.id, deepClone(action.args)) === false) {
-          return false
+      target.prepare?.()
+      target.beginBatch?.(() => {})
+      batchOpen = true
+      const apply = () => {
+        loadSessionStart(session, target)
+        for (const action of session.actions) {
+          if (target.execute(action.id, deepClone(action.args)) === false) {
+            return false
+          }
         }
+        return true
       }
-      return true
+      return target.withBatchWrite?.(apply) ?? apply()
     })
   } finally {
-    target.endBatch?.()
+    if (batchOpen) target.endBatch?.()
   }
 }
 

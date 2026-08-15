@@ -1,4 +1,4 @@
-import { isTimelineParameterPath, MAX_TIMELINE_FRAME, MAX_TIMELINE_KEYFRAME_NUMBER_MAGNITUDE, MAX_TIMELINE_KEYFRAME_STRING_LENGTH, MAX_TIMELINE_PLAYBACK_FPS, tryValidateTimelineSnapshot, } from '@/flame/schema/timeline'
+import { isTimelineParameterPath, MAX_TIMELINE_FRAME, MAX_TIMELINE_KEYFRAME_NUMBER_MAGNITUDE, MAX_TIMELINE_KEYFRAME_STRING_LENGTH, MAX_TIMELINE_PLAYBACK_FPS, MAX_TIMELINE_TIME_SCALE, MAX_TIMELINE_TRACKS, tryValidateTimelineSnapshot, } from '@/flame/schema/timeline'
 import { registerCommand } from '../registry'
 
 type ReplayArgGuard = (value: unknown) => boolean
@@ -92,18 +92,62 @@ function validateOptionalBoolean(args: readonly unknown[]): string | undefined {
 }
 
 function validateAddKeyframeArgs(args: readonly unknown[]): string | undefined {
-  if (args.length !== 3 && args.length !== 4) {
-    return 'add keyframe expects path, value, frame, and optional easing'
+  if (args.length < 3 || args.length > 5) {
+    return 'add keyframe expects path, value, frame, optional easing and optional interpolation'
   }
   if (
     !isTimelineParameterPath(args[0]) ||
     !isKeyframeValue(args[1]) ||
     !isFrame(args[2]) ||
-    (args.length === 4 && !isOptionalReplayValue(args[3], isEasing))
+    (args.length >= 4 && !isOptionalReplayValue(args[3], isEasing)) ||
+    (args.length === 5 && !isOptionalReplayValue(args[4], isInterpolation))
   ) {
     return 'add keyframe arguments are invalid'
   }
   return undefined
+}
+
+function validateScalarWithOptionalCoalescing(
+  args: readonly unknown[],
+  guard: ReplayArgGuard,
+): string | undefined {
+  if (args.length !== 1 && args.length !== 2) {
+    return 'expected a value and optional gesture-coalescing flag'
+  }
+  return guard(args[0]) && (args.length === 1 || isBoolean(args[1]))
+    ? undefined
+    : 'arguments do not match signature'
+}
+
+type KeyframeWrite = readonly [
+  string,
+  number | string | [number, number, number] | [number, number, number, number],
+]
+
+function asKeyframeWrites(value: unknown): KeyframeWrite[] | undefined {
+  if (
+    !Array.isArray(value) ||
+    value.length === 0 ||
+    value.length > MAX_TIMELINE_TRACKS
+  ) {
+    return undefined
+  }
+  const writes: KeyframeWrite[] = []
+  const paths = new Set<string>()
+  for (const entry of value) {
+    if (
+      !Array.isArray(entry) ||
+      entry.length !== 2 ||
+      !isTimelineParameterPath(entry[0]) ||
+      !isKeyframeValue(entry[1]) ||
+      paths.has(entry[0])
+    ) {
+      return undefined
+    }
+    paths.add(entry[0])
+    writes.push([entry[0], entry[1]])
+  }
+  return writes
 }
 
 function validateSetKeyframeValueArgs(
@@ -143,10 +187,15 @@ registerCommand({
   id: 'timeline.setDuration',
   label: 'Set Animation Duration',
   description: 'Set the animation duration in frames',
-  validateReplayArgs: (args) => exactReplayArgs(args, [isPositiveFrame]),
-  execute(ctx, duration?: unknown) {
+  coalesceKey: ([, coalesce]) => (coalesce === true ? 'duration' : undefined),
+  validateReplayArgs: (args) =>
+    validateScalarWithOptionalCoalescing(args, isPositiveFrame),
+  execute(ctx, duration?: unknown, coalesce?: unknown) {
     if (isPositiveFrame(duration)) {
-      ctx.timeline.setDuration(duration)
+      ctx.timeline.setDuration(
+        duration,
+        coalesce === true ? 'endFrame' : undefined,
+      )
     }
   },
 })
@@ -167,10 +216,51 @@ registerCommand({
   id: 'timeline.setFps',
   label: 'Set Animation FPS',
   description: 'Set the frames per second for timeline playback',
-  validateReplayArgs: (args) => exactReplayArgs(args, [isFps]),
-  execute(ctx, fps?: unknown) {
+  coalesceKey: ([, coalesce]) => (coalesce === true ? 'fps' : undefined),
+  validateReplayArgs: (args) =>
+    validateScalarWithOptionalCoalescing(args, isFps),
+  execute(ctx, fps?: unknown, coalesce?: unknown) {
     if (isFps(fps)) {
-      ctx.timeline.setFps(fps)
+      ctx.timeline.setFps(fps, coalesce === true ? 'fps' : undefined)
+    }
+  },
+})
+
+registerCommand({
+  id: 'timeline.setAutoFps',
+  label: 'Set Auto FPS',
+  description: 'Wait for render quality before advancing each frame',
+  validateReplayArgs: (args) => exactReplayArgs(args, [isBoolean]),
+  execute(ctx, enabled?: unknown) {
+    if (typeof enabled === 'boolean') ctx.timeline.setAutoFps?.(enabled)
+  },
+})
+
+registerCommand({
+  id: 'timeline.setTimeScale',
+  label: 'Set Playback Speed',
+  description: 'Set the timeline playback speed multiplier',
+  coalesceKey: ([, coalesce]) => (coalesce === true ? 'time-scale' : undefined),
+  validateReplayArgs: (args) =>
+    validateScalarWithOptionalCoalescing(
+      args,
+      (value) =>
+        typeof value === 'number' &&
+        Number.isFinite(value) &&
+        value >= 0 &&
+        value <= MAX_TIMELINE_TIME_SCALE,
+    ),
+  execute(ctx, scale?: unknown, coalesce?: unknown) {
+    if (
+      typeof scale === 'number' &&
+      Number.isFinite(scale) &&
+      scale >= 0 &&
+      scale <= MAX_TIMELINE_TIME_SCALE
+    ) {
+      ctx.timeline.setTimeScale?.(
+        scale,
+        coalesce === true ? 'timeScale' : undefined,
+      )
     }
   },
 })
@@ -179,7 +269,9 @@ registerCommand({
   id: 'timeline.setCurrentFrame',
   label: 'Set Current Frame',
   description: 'Jump to a specific frame in the timeline',
-  validateReplayArgs: (args) => exactReplayArgs(args, [isFrame]),
+  coalesceKey: ([, coalesce]) => (coalesce === true ? 'playhead' : undefined),
+  validateReplayArgs: (args) =>
+    validateScalarWithOptionalCoalescing(args, isFrame),
   execute(ctx, frame?: unknown) {
     if (isFrame(frame)) {
       ctx.timeline.setCurrentFrame(frame)
@@ -198,13 +290,45 @@ registerCommand({
     value?: unknown,
     frame?: unknown,
     easing?: unknown,
+    interp?: unknown,
   ) {
     const path = isTimelineParameterPath(parameterPath) ? parameterPath : ''
     if (!path) return
     const val = isKeyframeValue(value) ? value : 0
     const f = isFrame(frame) ? frame : ctx.timeline.currentFrame()
     const e = isEasing(easing) ? easing : undefined
-    ctx.timeline.addKeyframe(path, f, val, e)
+    ctx.timeline.addKeyframe(
+      path,
+      f,
+      val,
+      e,
+      isInterpolation(interp) ? interp : undefined,
+    )
+  },
+})
+
+registerCommand({
+  id: 'timeline.addKeyframes',
+  label: 'Add Keyframes',
+  description: 'Keyframe multiple parameter values as one authored edit',
+  coalesceKey: ([writes, frame, coalesce]) => {
+    const parsed = asKeyframeWrites(writes)
+    return coalesce === true && parsed
+      ? `${parsed.map(([path]) => path).join('\0')}@${String(frame)}`
+      : undefined
+  },
+  validateReplayArgs(args) {
+    if (args.length !== 3) {
+      return 'add keyframes expects writes, frame and coalescing flag'
+    }
+    return asKeyframeWrites(args[0]) && isFrame(args[1]) && isBoolean(args[2])
+      ? undefined
+      : 'add keyframes arguments are invalid'
+  },
+  execute(ctx, entries?: unknown, frame?: unknown, coalesce?: unknown) {
+    const writes = asKeyframeWrites(entries)
+    if (!writes || !isFrame(frame) || typeof coalesce !== 'boolean') return
+    ctx.timeline.edit?.addKeyframeValuesAtFrame?.(writes, frame, { coalesce })
   },
 })
 
@@ -274,9 +398,9 @@ registerCommand({
   description:
     'Change the value (and optionally easing/interpolation) of a keyframe',
   // Dragging a keyframe's value in the curve editor re-fires per pointer-move
-  // and is one timeline undo entry; it is one recorded step too.
-  coalesceKey: ([path, frame]) =>
-    typeof path === 'string' ? `${path}@${String(frame)}` : undefined,
+  // and may move through several frames. Gesture boundaries are supplied by
+  // the editors, so one path becomes one final recorded value per drag.
+  coalesceKey: ([path]) => (typeof path === 'string' ? path : undefined),
   describe: ([path, frame]) =>
     typeof path === 'string'
       ? `Set keyframe ${path} @${String(frame)}`
@@ -329,10 +453,8 @@ registerCommand({
   id: 'timeline.moveKeyframe',
   label: 'Move Keyframe',
   description: 'Drag a keyframe to a different frame',
-  // A dope-sheet drag is one undo entry however many frames it crosses. The
-  // key is the ORIGIN frame, which is what stays constant through the drag.
-  coalesceKey: ([path, from]) =>
-    typeof path === 'string' ? `${path}@${String(from)}` : undefined,
+  // Dope-sheet dragging dispatches once on pointer-up. Repeated moves are
+  // separate authored gestures and must remain chronological.
   describe: ([path, , to]) =>
     typeof path === 'string'
       ? `Move ${path} keyframe to ${String(to)}`
@@ -351,6 +473,33 @@ registerCommand({
       return
     }
     ctx.timeline.edit?.moveKeyframe(path, fromFrame, toFrame)
+  },
+})
+
+registerCommand({
+  id: 'timeline.relocateKeyframe',
+  label: 'Retime Keyframe',
+  description: 'Move a keyframe inside an already-open edit gesture',
+  coalesceKey: ([path]) => (typeof path === 'string' ? path : undefined),
+  coalesceArgs: (existing, next) => [existing[0], existing[1], next[2]],
+  describe: ([path, , to]) =>
+    typeof path === 'string'
+      ? `Retime ${path} keyframe to ${String(to)}`
+      : undefined,
+  validateReplayArgs: (args) =>
+    exactReplayArgs(args, [isTimelineParameterPath, isFrame, isFrame]),
+  execute(ctx, parameterPath?: unknown, from?: unknown, to?: unknown) {
+    const path = asPath(parameterPath)
+    const fromFrame = asFrame(from)
+    const toFrame = asFrame(to)
+    if (
+      path === undefined ||
+      fromFrame === undefined ||
+      toFrame === undefined
+    ) {
+      return
+    }
+    ctx.timeline.edit?.relocateKeyframe?.(path, fromFrame, toFrame)
   },
 })
 

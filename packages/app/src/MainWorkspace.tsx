@@ -57,7 +57,7 @@ import { PopulationSimulator } from './components/PopulationSimulator/Population
 import { ProgressBar } from './components/ProgressBar/ProgressBar'
 import { getPresetFromQuality, qualityPresets, } from './components/Quality/QualityPresets'
 import { QuickVariationPicker } from './components/QuickVariationPicker/QuickVariationPicker'
-import { recorderVisible } from './components/SessionRecorder/recorderUi'
+import { recorderSavePending, recorderVisible, } from './components/SessionRecorder/recorderUi'
 import { SessionRecorderDock } from './components/SessionRecorder/SessionRecorderDock'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
 import { createShareVariationLinkModal, createShareVariationLoadModal, } from './components/ShareVariationModal/ShareVariationModal'
@@ -99,8 +99,12 @@ import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } fro
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { BoxArrowRight, Cross, Eye, EyeOff, Menu, Plus, Share, Shuffle, Terminal, } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
-import { invalidateLastFinishedSession, isSessionRecording, notePreviewStarted, recordSyntheticAction, reportDocumentWrite, reportUnreplayable, reportUnreplayableOnce, withRecordingSuppressed, } from './recorder/recorder'
-import { applyReplayAudioWiring } from './recorder/replay'
+import { transformFocusId, variationParamsFocusId, variationRandomizeFocusId, variationTypeFocusId, variationVisibilityFocusId, } from './recorder/focusIds'
+import { breakRecordingCoalescing, invalidateLastFinishedSession, isSessionRecording, notePreviewStarted, recordSyntheticAction, reportDerivedWorkspaceWrite, reportDocumentWrite, reportUnreplayable, reportUnreplayableOnce, withRecordingSuppressed, } from './recorder/recorder'
+import { applyReplayAudioWiring, canEnableReplayAudio } from './recorder/replay'
+import { captureTransformColors, paletteRestoreColorsAfterReplayCommand, runPaletteRestoreTransition, } from './recorder/replayPaletteState'
+import { normalizeReplayPresentation, replaySideStateChanged, } from './recorder/replaySideState'
+import { createRecorderAwareTimeline } from './recorder/timelineActions'
 import { createAnimationExport } from './utils/animationExport'
 import { createAudioAnalyzer } from './utils/audioAnalysis'
 import { autosaveIntervalMin, autosaveRecents, saveReminderDismissed, setAutosaveRecents, setSaveReminderDismissed, } from './utils/autosaveSettings'
@@ -142,10 +146,13 @@ import type { Dims } from './flame/variationRegistry'
 import type { TransformVariationType } from './flame/variations'
 import type { CustomVariationDef } from './flame/variations/custom/types'
 import type { TransformVariationType3D } from './flame/variations3D'
+import type { ReplayAffineMode, ReplayAffineTab, ReplayColorView, ReplayFocusPreparationHandler, } from './recorder/focusPreparation'
 import type { ReplayTarget } from './recorder/replay'
-import type { RecordedSession, SessionViewSnapshot } from './recorder/schema'
+import type { ReplayNonFlameSideState, ReplayPresentationSnapshot, } from './recorder/replaySideState'
+import type { RecordedSession } from './recorder/schema'
 import type { AnimationExportConfig } from './utils/animationExport'
 import type { AudioAnalyzer, LiveAudioAnalyzer } from './utils/audioAnalysis'
+import type { HistoryPreviewOwner } from './utils/createStoreHistory'
 import type { ExportDimensions } from './utils/exportDimensions'
 import type { HardwareTier } from './utils/hardwareTier'
 import type { SharePayload } from './utils/jsonQueryParam'
@@ -302,6 +309,23 @@ export function MainWorkspace(props: AppProps) {
   const [selectedTransformId, setSelectedTransformId] = createSignal<
     string | null
   >(null)
+  const [replayAffineModeRequest, setReplayAffineModeRequest] = createSignal<{
+    mode: ReplayAffineMode
+    tab: ReplayAffineTab
+    epoch: number
+  }>({ mode: 'preAffine', tab: 'grid', epoch: 0 })
+  const [replayColorViewRequest, setReplayColorViewRequest] = createSignal<{
+    view: ReplayColorView
+    epoch: number
+  }>({ view: 'grid', epoch: 0 })
+  const [affineCardOpen, setAffineCardOpen] = createSignal(true)
+  const [colorCardOpen, setColorCardOpen] = createSignal(true)
+  const [metadataCardOpen, setMetadataCardOpen] = createSignal(false)
+  const [paletteCardOpen, setPaletteCardOpen] = createSignal(false)
+  const [renderCardOpen, setRenderCardOpen] = createSignal(true)
+  const [floatingActionsCollapsed, setFloatingActionsCollapsed] =
+    createSignal(false)
+  const [timelineCollapsed, setTimelineCollapsed] = createSignal(false)
   // Toggle: clicking the already-selected transform clears the selection
   // (deselect-all → nothing dimmed). Canvas handles only ever *set* (drag-safe).
   const toggleSelectedTransform = (tid: string) =>
@@ -409,7 +433,13 @@ export function MainWorkspace(props: AppProps) {
   // The session currently open for replay (M4), if any. Lives here rather than
   // in the dock because dropping a .steps.json opens one too.
   const [replaySession, setReplaySession] = createSignal<RecordedSession>()
+  const [recorderReplayPresentation, setRecorderReplayPresentation] =
+    createSignal({ playing: false, timelineTargeted: false })
   const openReplaySession = (session: RecordedSession | undefined) => {
+    if (recorderSavePending()) {
+      showToast('Wait for the caption save to finish before changing replays')
+      return
+    }
     if (session !== undefined && isSessionRecording()) {
       showToast('Stop or discard the current recording before opening a replay')
       return
@@ -438,6 +468,42 @@ export function MainWorkspace(props: AppProps) {
       onPreviewStarted: notePreviewStarted,
     },
   )
+
+  const withPaletteRestoreTransition = (
+    after: Record<string, { x: number; y: number }>,
+    description: string,
+    writeDocument: () => void,
+  ) => {
+    runPaletteRestoreTransition(
+      history,
+      prePaletteColors(),
+      after,
+      (colors) => setPrePaletteColors(colors),
+      description,
+      writeDocument,
+    )
+  }
+
+  /**
+   * File/gallery loads are document boundaries in the live editor, but a
+   * recorder still needs a self-contained action that can reproduce the
+   * resulting document. Keep one replacement-style history entry and log the
+   * exact descriptor it produced, mirroring the 2D/3D switch path below.
+   */
+  const replaceLoadedFlame = (next: FlameDescriptor, label = 'Load flame') => {
+    const flame = deepClone(next)
+    // A different document cannot inherit another flame's pre-palette stash.
+    // If the loaded flame already carries a palette, its earlier natural
+    // colours are unknowable; Unselect safely keeps its current colours. The
+    // history side effects restore the outgoing provenance if this load is
+    // undone and clear it again on redo.
+    withRecordingSuppressed(() => {
+      withPaletteRestoreTransition({}, label, () => {
+        setFlameDescriptor(() => flame, label)
+      })
+    })
+    recordSyntheticAction('flame.load', [deepClone(flame), label], label)
+  }
   // Palette selection is part of the flame document (renderSettings.palette):
   // applying/removing one is a single undoable history entry, and the palette
   // travels with saves/shares. These accessors derive the UI/render views.
@@ -496,6 +562,7 @@ export function MainWorkspace(props: AppProps) {
   createEffect(() => {
     const newFlame = props.flameFromWelcome?.()
     if (newFlame !== undefined) {
+      const outgoingPaletteRestoreColors = deepClone(prePaletteColors())
       // Order is load-bearing. `flushDirtyToRecents` reads the OUTGOING flame
       // and its tracks, so it has to run before the reset drops them —
       // otherwise a hand-off would silently destroy unsaved work.
@@ -505,7 +572,18 @@ export function MainWorkspace(props: AppProps) {
       // exactly like the first one would have. See resetWorkspaceForHandoff for
       // what was leaking and why.
       resetWorkspaceForHandoff()
-      history.replace(deepClone(newFlame))
+      runPaletteRestoreTransition(
+        history,
+        outgoingPaletteRestoreColors,
+        {},
+        (colors) => {
+          setPrePaletteColors(colors)
+        },
+        'Load Home flame',
+        () => {
+          setFlameDescriptor(() => deepClone(newFlame), 'Load Home flame')
+        },
+      )
       // Read BEFORE resetFlameFromWelcome() clears the whole hand-off.
       const capability = props.capabilityFromHome?.()
       if (capability !== undefined) {
@@ -578,7 +656,7 @@ export function MainWorkspace(props: AppProps) {
     setLoadedAnimation,
     clearLoadedAnimation,
   } = createLoadFlame(
-    history,
+    { replace: replaceLoadedFlame },
     () => flameDescriptor.renderSettings.dimensions ?? 2,
   )
 
@@ -633,6 +711,11 @@ export function MainWorkspace(props: AppProps) {
   const [playbackPaused, setPlaybackPaused] = createSignal(false)
   const [seekTarget, setSeekTarget] = createSignal<number | null>(null)
   const [playbackTime, setPlaybackTime] = createSignal(0)
+  // Replay owns a deterministic document transaction. File and microphone
+  // clocks may keep running, but neither may write 30fps modulation into that
+  // transaction or leave silent writes behind after Undo.
+  const [replaySuspendsAudioModulation, setReplaySuspendsAudioModulation] =
+    createSignal(false)
   const [fileAnalyzer, setFileAnalyzer] = createSignal<
     AudioAnalyzer | undefined
   >(undefined)
@@ -799,7 +882,7 @@ export function MainWorkspace(props: AppProps) {
                 'Blend is still active — the loaded flame will look mixed',
                 4000,
               )
-            executeCommand('flame.load', cmdContext, flame)
+            executeFlameLoad(flame)
           }}
           respond={respond}
         />
@@ -819,7 +902,7 @@ export function MainWorkspace(props: AppProps) {
                 'Blend is still active — the loaded flame will look mixed',
                 4000,
               )
-            executeCommand('flame.load', cmdContext, flame)
+            executeFlameLoad(flame)
           }}
           onCompare={openDiffAsModal}
           respond={respond}
@@ -839,14 +922,14 @@ export function MainWorkspace(props: AppProps) {
     executeCommand('flame.setupMorph', cmdContext, endFlame)
     const cfg = timeline.config()
     // ...and one timeline undo step for the keyframes (remove + both adds).
-    timeline.runWithSingleUndo(() => {
+    recorderTimeline.runWithSingleUndo(() => {
       timeline.removeAllKeyframesForPath('blendWeight')
       timeline.addKeyframe('blendWeight', cfg.startFrame, 1, 'easeInOut')
       timeline.setKeyframeValue('blendWeight', cfg.endFrame, 0, 'easeInOut')
     })
-    setAnimationEnabled(true)
-    setShowTimeline(true)
-    timeline.goToFrame(cfg.startFrame)
+    executeCommand('timeline.setAnimationEnabled', cmdContext, true)
+    executeCommand('view.setShowTimeline', cmdContext, true)
+    recorderTimeline.goToFrame(cfg.startFrame)
     showToast('Morph ready — press Play to animate A → B', 3500)
   }
 
@@ -1119,29 +1202,32 @@ export function MainWorkspace(props: AppProps) {
   })
 
   const handlePaletteSelect = (palette: Palette) => {
-    // If no palette was selected before, save the current "natural" colors
-    if (selectedPaletteId() === '') {
-      const colors: Record<string, { x: number; y: number }> = {}
-      for (const [tid, t] of recordEntries(flameDescriptor.transforms)) {
-        colors[tid] = { x: t.color.x, y: t.color.y }
-      }
-      setPrePaletteColors(colors)
-    }
+    // If no palette was selected before, save the current "natural" colors.
+    // Switching palettes preserves that first snapshot.
+    const nextRestoreColors =
+      selectedPaletteId() === ''
+        ? captureTransformColors(flameDescriptor)
+        : prePaletteColors()
 
     // ONE history entry: transform colors AND the palette itself (it lives in
     // renderSettings.palette), so a single undo fully reverts the apply —
     // previously the palette identity sat in signals and undo half-reverted
-    // (colors back, palette grading still on). The command keeps both halves
-    // together for the same reason.
-    executeCommand('flame.applyPalette', cmdContext, palette)
+    // (colors back, palette grading still on). Palette provenance travels in
+    // the same entry's undo/redo effects, so Unselect remains correct after
+    // either history direction.
+    withPaletteRestoreTransition(nextRestoreColors, 'Apply Palette', () => {
+      executeCommand('flame.applyPalette', cmdContext, palette)
+    })
   }
 
   const handlePaletteUnselect = () => {
     // One undoable entry: restore pre-palette colors + drop the palette. The
     // colors come from a UI signal, so they are passed as an argument —
     // nothing outside the document can be reconstructed on replay.
-    executeCommand('flame.removePalette', cmdContext, prePaletteColors())
-    setPrePaletteColors({})
+    const restoreColors = prePaletteColors()
+    withPaletteRestoreTransition({}, 'Remove Palette', () => {
+      executeCommand('flame.removePalette', cmdContext, restoreColors)
+    })
   }
 
   // Shared by the toolbar Benchmark button and the `?benchmark` auto-open.
@@ -1198,8 +1284,6 @@ export function MainWorkspace(props: AppProps) {
   // WheelZoomCamera2D/3D, so a whole pan or orbit folds into one recorded
   // step, matching the single undo entry it already produced.
   const setFlameZoom: Setter<number> = (value) => {
-    // Editing the base camera detaches the held-frame preview (Blender-like).
-    timeline.setPreviewHeld(false)
     const current = flameDescriptor.renderSettings.camera.zoom
     const next = clamp(
       typeof value === 'function' ? value(current) : value,
@@ -1210,8 +1294,6 @@ export function MainWorkspace(props: AppProps) {
     return flameDescriptor.renderSettings.camera.zoom
   }
   const setFlamePosition: Setter<v2f> = (value) => {
-    // Editing the base camera detaches the held-frame preview (Blender-like).
-    timeline.setPreviewHeld(false)
     const current = vec2f(...flameDescriptor.renderSettings.camera.position)
     const next = typeof value === 'function' ? value(current) : value
     setRenderSetting('camera.position', [next.x, next.y])
@@ -1226,7 +1308,6 @@ export function MainWorkspace(props: AppProps) {
     field: 'theta' | 'phi' | 'radius' | 'fov' | 'roll',
   ): Setter<number> {
     return (value) => {
-      timeline.setPreviewHeld(false)
       const current = flameDescriptor.renderSettings.camera3D[field]
       const next =
         typeof value === 'function'
@@ -1366,12 +1447,20 @@ export function MainWorkspace(props: AppProps) {
   })
 
   const onDrop = useAppDragAndDrop(
-    history,
+    { replace: replaceLoadedFlame },
     setLoadedAnimation,
     openReplaySession,
   )
 
   const timeline = createTimelineState()
+  const captureTimelineSnapshot = (): TimelineSnapshot => ({
+    config: deepClone(timeline.config()),
+    currentFrame: timeline.currentFrame(),
+    animationEnabled: animationEnabled(),
+    autoKeyframe: timeline.autoKeyframe(),
+    previewHeld: timeline.previewHeld(),
+    tracks: deepClone(timeline.tracks()),
+  })
   // One chronological undo across flame history + timeline snapshots —
   // Ctrl+Z/Ctrl+Y and the toolbar buttons all route through this.
   const undoRouter = createUndoRouter(history, timeline)
@@ -1383,7 +1472,7 @@ export function MainWorkspace(props: AppProps) {
     audioBuffer,
     audioMapping,
     (write) => {
-      invalidateLastFinishedSession()
+      reportDerivedWorkspaceWrite()
       reportUnreplayableOnce(
         'live-audio-modulation',
         'Live audio modulation changed the flame without embedding the audio source',
@@ -1396,6 +1485,7 @@ export function MainWorkspace(props: AppProps) {
     seekTarget,
     setPlaybackTime,
     fileAnalyzer,
+    replaySuspendsAudioModulation,
   )
 
   // Sonification loop: synthesizes audio in real-time from flame structure.
@@ -1504,7 +1594,9 @@ export function MainWorkspace(props: AppProps) {
 
   const { showShareVariationLoadModal } = createShareVariationLoadModal()
 
-  const { showMigrationModal } = createMigrationModal(history)
+  const { showMigrationModal } = createMigrationModal((flame) => {
+    replaceLoadedFlame(flame, 'Load migrated flame')
+  })
 
   /** Waits until the canvas backing-store size stops changing (the resize is
    *  reactive and may be debounced) so export dimensions read a settled size. */
@@ -1585,7 +1677,9 @@ export function MainWorkspace(props: AppProps) {
       pixelRatio,
       setPixelRatio,
       setOnExportImage,
-      setFlameDescriptor,
+      (patch) => {
+        executeCommand('flame.setMetadata', cmdContext, patch)
+      },
       () => selectedPalette(),
       () => {
         const canvas = document.querySelector<HTMLCanvasElement>(
@@ -1688,7 +1782,9 @@ export function MainWorkspace(props: AppProps) {
   const { showLogoFaviconGenerator } = createLogoFaviconGenerator(
     flameDescriptor,
     () => selectedPalette(),
-    history,
+    (flame) => {
+      replaceLoadedFlame(flame, 'Load generated logo')
+    },
   )
 
   const [randomizerHistory, setRandomizerHistory] = createSignal<
@@ -1813,7 +1909,7 @@ export function MainWorkspace(props: AppProps) {
     // also runs applyRandomizeSettings over the render settings with ambient
     // randomness; carrying the result keeps replay exact until that is
     // seeded too.
-    executeCommand('flame.load', cmdContext, newFlame, 'Randomize Flame')
+    executeFlameLoad(newFlame, 'Randomize Flame')
   }
 
   const runMutateFlame = async (
@@ -1848,7 +1944,7 @@ export function MainWorkspace(props: AppProps) {
 
     mutatedFlame.renderSettings = rs
     // Same reasoning as Randomize above.
-    executeCommand('flame.load', cmdContext, mutatedFlame, 'Mutate Flame')
+    executeFlameLoad(mutatedFlame, 'Mutate Flame')
   }
 
   // Keep the randomizer card visually fixed across a flame swap. Changing the
@@ -2089,7 +2185,12 @@ export function MainWorkspace(props: AppProps) {
   const handleUpdateRenderSettings = (
     settings: Partial<FlameDescriptor['renderSettings']>,
   ) => {
-    executeCommand('flame.updateRenderSettings', cmdContext, settings)
+    executeCommand(
+      'flame.updateRenderSettings',
+      cmdContext,
+      settings,
+      'randomizer',
+    )
   }
 
   // Deleting a custom variation the CURRENT flame uses breaks its rendering,
@@ -2132,7 +2233,7 @@ export function MainWorkspace(props: AppProps) {
     // Loading a history entry is a fresh starting point: keep unsaved work
     // recoverable and don't autosave the untouched loaded flame.
     flushDirtyToRecents()
-    executeCommand('flame.load', cmdContext, entry.flame, 'Load History Flame')
+    executeFlameLoad(entry.flame, 'Load History Flame')
     markLoadedBaseline()
   }
 
@@ -2148,10 +2249,10 @@ export function MainWorkspace(props: AppProps) {
       // selected presets write (previously each addKeyframe pushed its own
       // snapshot — dozens of Ctrl+Z to revert, and enough to overflow the
       // undo cap and lose the pre-click animation entirely).
-      timeline.runWithSingleUndo(() => {
+      recorderTimeline.runWithSingleUndo(() => {
         randomizeAnimationTracks(presetIds, clearFirst)
       })
-      setShowTimeline(true)
+      executeCommand('view.setShowTimeline', cmdContext, true)
     } finally {
       setTimeout(() => {
         isRandomizingAnimation = false
@@ -2273,7 +2374,11 @@ export function MainWorkspace(props: AppProps) {
         }
       }
 
+      // The workspace signal drives rendering/FloatingActions; the raw
+      // timeline signal is captured by the deterministic result snapshot.
+      // Keep both coherent before runWithSingleUndo takes that snapshot.
       timeline.setAnimationEnabled(true)
+      setAnimationEnabled(true)
     }
   }
 
@@ -2284,11 +2389,13 @@ export function MainWorkspace(props: AppProps) {
     isRandomizingAnimation = true
     try {
       // One click = one undo step (see handleRandomizeAnimation).
-      timeline.runWithSingleUndo(() => {
+      recorderTimeline.runWithSingleUndo(() => {
         if (clearFirst) timeline.clearAllTracks()
         smartRandomAnimation(flameDescriptor, timeline)
+        timeline.setAnimationEnabled(true)
+        setAnimationEnabled(true)
       })
-      setShowTimeline(true)
+      executeCommand('view.setShowTimeline', cmdContext, true)
     } finally {
       setTimeout(() => {
         isRandomizingAnimation = false
@@ -2411,30 +2518,58 @@ export function MainWorkspace(props: AppProps) {
   createEffect(() => {
     const anim = loadedAnimation()
     if (!anim) return
-    if (anim.tracks.length === 0) {
-      // Plain flame loaded — clear animation state
-      if (IS_DEV) console.info('[anim] clearing tracks — plain flame loaded')
-      timeline.loadTracks([])
-      timeline.setIsPlaying(false)
-      timeline.setAnimationEnabled(false)
-      setAnimationEnabled(false)
-      setShowTimeline(false)
-    } else {
-      if (IS_DEV) {
-        console.info(
-          '[anim] loading animation with',
-          anim.tracks.length,
-          'tracks:',
-          anim.tracks.map((t) => t.parameterPath),
-        )
+    const beforeTimeline = JSON.stringify(captureTimelineSnapshot())
+    const beforeShowTimeline = showTimeline()
+    const showTimelineAfterLoad = anim.tracks.length > 0
+
+    // Keep live load-boundary semantics, then log one deterministic result
+    // snapshot instead of the raw setter sequence (and instead of rerunning
+    // any generator that may have produced these tracks).
+    withRecordingSuppressed(() => {
+      if (anim.tracks.length === 0) {
+        // Plain flame loaded — clear animation state
+        if (IS_DEV) console.info('[anim] clearing tracks — plain flame loaded')
+        timeline.loadTracks([])
+        timeline.setIsPlaying(false)
+        timeline.setAnimationEnabled(false)
+        setAnimationEnabled(false)
+        setShowTimeline(false)
+      } else {
+        if (IS_DEV) {
+          console.info(
+            '[anim] loading animation with',
+            anim.tracks.length,
+            'tracks:',
+            anim.tracks.map((t) => t.parameterPath),
+          )
+        }
+        timeline.loadTracks(anim.tracks)
+        timeline.setAnimationEnabled(true)
+        setAnimationEnabled(true)
+        setShowTimeline(true)
+        timeline.setConfig({ ...timeline.config(), loop: true })
+        timeline.goToFrame(0)
+        timeline.play()
       }
-      timeline.loadTracks(anim.tracks)
-      timeline.setAnimationEnabled(true)
-      setAnimationEnabled(true)
-      setShowTimeline(true)
-      timeline.setConfig({ ...timeline.config(), loop: true })
-      timeline.goToFrame(0)
-      timeline.play()
+    })
+
+    const afterTimeline = captureTimelineSnapshot()
+    if (JSON.stringify(afterTimeline) !== beforeTimeline) {
+      recordSyntheticAction(
+        'timeline.loadTimeline',
+        [afterTimeline],
+        anim.tracks.length > 0 ? 'Load animation' : 'Clear animation',
+      )
+    }
+    if (showTimelineAfterLoad !== beforeShowTimeline) {
+      recordSyntheticAction(
+        'view.setShowTimeline',
+        [showTimelineAfterLoad],
+        showTimelineAfterLoad ? 'Show timeline' : 'Hide timeline',
+      )
+    }
+
+    if (anim.tracks.length > 0) {
       showToast(
         `Animation loaded: ${anim.tracks.length} track${anim.tracks.length !== 1 ? 's' : ''} — ${anim.tracks.length * 2} keyframes`,
         3500,
@@ -3131,12 +3266,16 @@ export function MainWorkspace(props: AppProps) {
       // Let browser/dialog handle Escape when no sidebar diff is open
     },
     KeyF: () => {
+      const toggle = () => {
+        executeCommand(
+          showSidebar() ? 'sidebar.close' : 'sidebar.open',
+          cmdContext,
+        )
+      }
       if ('startViewTransition' in document) {
-        document.startViewTransition(() => {
-          setShowSidebar((p) => !p)
-        })
+        document.startViewTransition(toggle)
       } else {
-        setShowSidebar((p) => !p)
+        toggle()
       }
       return true
     },
@@ -3185,12 +3324,12 @@ export function MainWorkspace(props: AppProps) {
       if (ev.altKey) {
         const path = targetedParameter()
         if (path) {
-          timeline.removeKeyframe(path, timeline.currentFrame())
+          recorderTimeline.removeKeyframe(path, timeline.currentFrame())
         }
       } else {
         const path = targetedParameter()
         if (path) {
-          timeline.addKeyframeAtCurrentFrame(path)
+          recorderTimeline.addKeyframeAtCurrentFrame(path)
         }
       }
       return true
@@ -3199,25 +3338,32 @@ export function MainWorkspace(props: AppProps) {
       if (animationExportRunning()) return false
       if (!showTimeline()) return
       if (!animationEnabled()) {
-        setAnimationEnabled(true)
+        executeCommand('timeline.setAnimationEnabled', cmdContext, true)
       }
-      timeline.togglePlay()
+      recorderTimeline.togglePlay()
       return true
     },
   })
 
   const timelineDuration = () => timeline.config().endFrame
-  const setTimelineDuration: Setter<number> = (value) => {
+  const setTimelineDuration = (
+    value: number | ((previous: number) => number),
+    coalesceId?: string,
+  ): number => {
     const newDuration =
       typeof value === 'function' ? value(timeline.config().endFrame) : value
-    timeline.updateConfigUndoable({ endFrame: newDuration })
+    timeline.updateConfigUndoable({ endFrame: newDuration }, coalesceId)
     return newDuration
   }
 
   // Command context: bridges registered commands to app signals
   const cmdContext: CommandContext = {
+    beforeCommand: () => {
+      history.takeOverOwnedPreview()
+    },
     flameDescriptor: () => flameDescriptor,
     setFlameDescriptor,
+    paletteRestoreColors: prePaletteColors,
     blendFlame,
     setBlendFlame,
     blendWeight,
@@ -3246,19 +3392,27 @@ export function MainWorkspace(props: AppProps) {
         timeline.goToFrame(frame)
         return timeline.currentFrame()
       },
+      setPreviewHeld: timeline.setPreviewHeld,
       play: timeline.play,
       setLoop: (loop) => {
         timeline.updateConfigUndoable({ loop })
       },
-      setFps: (fps) => {
-        timeline.updateConfigUndoable({ fps })
+      setFps: (fps, coalesceId) => {
+        timeline.updateConfigUndoable({ fps }, coalesceId)
       },
-      addKeyframe: (path, frame, value, easing) => {
+      setAutoFps: (autoFps) => {
+        timeline.updateConfigUndoable({ autoFps })
+      },
+      setTimeScale: (timeScale, coalesceId) => {
+        timeline.updateConfigUndoable({ timeScale }, coalesceId)
+      },
+      addKeyframe: (path, frame, value, easing, interp) => {
         timeline.addKeyframe(
           path,
           frame,
           value,
           easing as EasingCurve | undefined,
+          interp as KeyframeInterpolation | undefined,
         )
       },
       edit: {
@@ -3280,6 +3434,8 @@ export function MainWorkspace(props: AppProps) {
           )
         },
         moveKeyframe: timeline.moveKeyframe,
+        relocateKeyframe: timeline.relocateKeyframe,
+        addKeyframeValuesAtFrame: timeline.addKeyframeValuesAtFrame,
         removeTrack: timeline.removeTrack,
         clearTracks: timeline.clearAllTracks,
         setLoopMode: timeline.setLoopMode,
@@ -3322,6 +3478,12 @@ export function MainWorkspace(props: AppProps) {
       setMapping: setAudioMapping,
       setEnabled: setAudioEnabled,
       setSource: setAudioSource,
+      canEnable: (required) =>
+        canEnableReplayAudio(required, {
+          hasFileBuffer: audioBuffer() !== undefined,
+          currentTrackName: audioTrackName(),
+          hasLiveAnalyzer: liveAnalyzer() !== undefined,
+        }),
     },
     view: {
       setQualityPreset,
@@ -3349,6 +3511,33 @@ export function MainWorkspace(props: AppProps) {
       peekRedoTarget: undoRouter.peekRedoTarget,
     },
   }
+
+  /**
+   * Whole-document command loads are undoable edits (randomize, genetics,
+   * history, New Flame). A loaded document has no trustworthy pre-palette
+   * provenance, so clear it atomically with the flame and restore the
+   * outgoing provenance only when this same history entry is undone.
+   */
+  const executeFlameLoad = (flame: FlameDescriptor, label?: string) => {
+    const description = label ?? 'Load Flame'
+    withPaletteRestoreTransition({}, description, () => {
+      if (label === undefined) {
+        executeCommand('flame.load', cmdContext, flame)
+      } else {
+        executeCommand('flame.load', cmdContext, flame, label)
+      }
+    })
+  }
+
+  const recorderTimeline = createRecorderAwareTimeline(
+    timeline,
+    (id, ...args) => {
+      executeCommand(id, cmdContext, ...args)
+    },
+    () => {
+      history.takeOverOwnedPreview()
+    },
+  )
   useShortcutManager(cmdContext)
 
   /**
@@ -3367,7 +3556,7 @@ export function MainWorkspace(props: AppProps) {
   const setRenderSettings = (
     patch: Partial<FlameDescriptor['renderSettings']>,
   ) => {
-    executeCommand('flame.updateRenderSettings', cmdContext, patch)
+    executeCommand('flame.updateRenderSettings', cmdContext, patch, 'render')
   }
 
   /**
@@ -3376,13 +3565,46 @@ export function MainWorkspace(props: AppProps) {
    * entry and would escape the batch — the batch is what makes a whole
    * replayed run a single undo step the viewer can take back in one go.
    */
-  type ReplaySideState = {
-    timeline: TimelineSnapshot
-    audio: AudioWiringSnapshot
-    view: SessionViewSnapshot
+  type ReplaySideState = ReplayNonFlameSideState & {
+    /**
+     * Timeline keyframe commands intentionally write their current-frame
+     * value into the flame through `history.setSilently`. Patches cannot see
+     * those writes, so replay's undo side effect carries an exact document
+     * snapshot alongside the timeline/audio/view state.
+     */
+    flame: FlameDescriptor
   }
 
-  const captureReplaySideState = (): ReplaySideState => ({
+  const captureReplayPresentation = (): ReplayPresentationSnapshot => {
+    const affine = replayAffineModeRequest()
+    const diffView = sidebarDiffView()
+    return {
+      sidebarHidden: sidebarHidden(),
+      selectedTransformId: selectedTransformId(),
+      collapsedTransformIds: Array.from(collapsedTransforms()).sort(),
+      timelineCollapsed: timelineCollapsed(),
+      sidebarDiffView: diffView === null ? null : deepClone(diffView),
+      showBlendGallery: showBlendGallery(),
+      showAudioPanel: showAudioPanel(),
+      showSonificationPanel: showSonificationPanel(),
+      quickPickState: quickPickState(),
+      hoveredVariationType: hoveredVariationType(),
+      affineCardOpen: affineCardOpen(),
+      colorCardOpen: colorCardOpen(),
+      metadataCardOpen: metadataCardOpen(),
+      paletteCardOpen: paletteCardOpen(),
+      prePaletteColors: deepClone(prePaletteColors()),
+      renderCardOpen: renderCardOpen(),
+      floatingActionsCollapsed: floatingActionsCollapsed(),
+      affineMode: affine.mode,
+      affineTab: affine.tab,
+      colorView: replayColorViewRequest().view,
+    }
+  }
+
+  const captureReplayNonFlameSideState = (
+    presentation = captureReplayPresentation(),
+  ): ReplayNonFlameSideState => ({
     timeline: {
       config: deepClone(timeline.config()),
       currentFrame: timeline.currentFrame(),
@@ -3399,12 +3621,21 @@ export function MainWorkspace(props: AppProps) {
     },
     view: {
       qualityPreset: qualityPreset(),
+      pixelRatio: pixelRatio() as 1 | 0.5 | 0.25,
       adaptiveFilter: adaptiveFilterEnabled(),
       stochasticFilter: stochasticFilterEnabled(),
       flyMode: flyMode(),
       showTimeline: showTimeline(),
       sidebarOpen: showSidebar(),
     },
+    presentation,
+  })
+
+  const captureReplaySideState = (
+    presentation = captureReplayPresentation(),
+  ): ReplaySideState => ({
+    flame: deepClone(flameDescriptor),
+    ...captureReplayNonFlameSideState(presentation),
   })
 
   const applyReplayAudioState = (audio: AudioWiringSnapshot) => {
@@ -3446,17 +3677,139 @@ export function MainWorkspace(props: AppProps) {
     if (state.view.qualityPreset in qualityPresets) {
       setQualityPreset(state.view.qualityPreset as QualityPreset)
     }
+    if (state.view.pixelRatio !== undefined) {
+      setPixelRatio(state.view.pixelRatio)
+    }
     setAdaptiveFilterEnabled(state.view.adaptiveFilter)
     setStochasticFilterEnabled(state.view.stochasticFilter)
     setFlyMode(state.view.flyMode)
     setShowTimeline(state.view.showTimeline)
     setShowSidebar(state.view.sidebarOpen)
+    // Last writer wins: restoring the exact snapshot after timeline/view
+    // signals prevents their derived silent writers from leaving a replayed
+    // current-frame value behind after undo.
+    history.replaceSilently(state.flame)
+
+    const presentation = normalizeReplayPresentation(
+      state.presentation,
+      state.flame,
+    )
+    setSidebarHidden(presentation.sidebarHidden)
+    setSelectedTransformId(presentation.selectedTransformId)
+    setCollapsedTransforms(new Set(presentation.collapsedTransformIds))
+    setTimelineCollapsed(presentation.timelineCollapsed)
+    setSidebarDiffView(
+      presentation.sidebarDiffView === null
+        ? null
+        : deepClone(presentation.sidebarDiffView),
+    )
+    setShowBlendGallery(presentation.showBlendGallery)
+    setShowAudioPanel(presentation.showAudioPanel)
+    setShowSonificationPanel(presentation.showSonificationPanel)
+    setQuickPickState(
+      presentation.quickPickState === null
+        ? null
+        : {
+            tid: presentation.quickPickState.tid as TransformId,
+            vid: presentation.quickPickState.vid as VariationId,
+            type: presentation.quickPickState.type,
+          },
+    )
+    setHoveredVariationType(presentation.hoveredVariationType)
+    setAffineCardOpen(presentation.affineCardOpen)
+    setColorCardOpen(presentation.colorCardOpen)
+    setMetadataCardOpen(presentation.metadataCardOpen)
+    setPaletteCardOpen(presentation.paletteCardOpen)
+    setPrePaletteColors(deepClone(presentation.prePaletteColors))
+    setRenderCardOpen(presentation.renderCardOpen)
+    setFloatingActionsCollapsed(presentation.floatingActionsCollapsed)
+    setReplayAffineModeRequest((previous) => ({
+      mode: presentation.affineMode,
+      tab: presentation.affineTab,
+      epoch: previous.epoch + 1,
+    }))
+    setReplayColorViewRequest((previous) => ({
+      view: presentation.colorView,
+      epoch: previous.epoch + 1,
+    }))
   }
 
   let replayBatchStart: ReplaySideState | undefined
+  let replayPreviewOwner: HistoryPreviewOwner | undefined
+  let replayPresentationBeforePrepare: ReplayPresentationSnapshot | undefined
+
+  const prepareReplayFocus: ReplayFocusPreparationHandler = (preparation) => {
+    if (preparation.timeline) {
+      setShowTimeline(true)
+      if (preparation.timeline.expand) setTimelineCollapsed(false)
+    }
+    if (preparation.sidebar) {
+      revealSidebar()
+      setQuickPickState(null)
+      setHoveredVariationType(null)
+      if (preparation.audioPanel) setShowAudioPanel(true)
+    }
+
+    if (preparation.clearTransformSelection) {
+      setSelectedTransformId(null)
+    } else if (preparation.transform) {
+      const transformId = preparation.transform.id
+      setSelectedTransformId(transformId)
+      setCollapsedTransforms((previous) => {
+        if (!previous.has(transformId)) return previous
+        const next = new Set(previous)
+        next.delete(transformId)
+        return next
+      })
+    }
+
+    if (preparation.editorSurface === 'affine') {
+      setAffineCardOpen(true)
+    } else if (preparation.editorSurface === 'color') {
+      setColorCardOpen(true)
+    } else if (preparation.editorSurface === 'metadata') {
+      setMetadataCardOpen(true)
+    } else if (preparation.editorSurface === 'palette') {
+      setPaletteCardOpen(true)
+    } else if (preparation.editorSurface === 'render') {
+      setRenderCardOpen(true)
+    }
+    if (preparation.floatingActions) setFloatingActionsCollapsed(false)
+
+    if (preparation.colorView) {
+      setReplayColorViewRequest((previous) => ({
+        view: preparation.colorView!,
+        epoch: previous.epoch + 1,
+      }))
+    }
+
+    if (preparation.affineMode || preparation.affineTab) {
+      setReplayAffineModeRequest((previous) => ({
+        mode: preparation.affineMode ?? previous.mode,
+        tab: preparation.affineTab ?? 'grid',
+        epoch: previous.epoch + 1,
+      }))
+    }
+  }
 
   const replayTarget: ReplayTarget = {
+    prepare: () => {
+      // Keep the presentation from before gallery cleanup. A hover may have
+      // installed a temporary document preview, so the flame baseline itself
+      // is captured later, after that preview has been cleared.
+      replayPresentationBeforePrepare = captureReplayPresentation()
+      // Gallery hover previews are intentionally silent document swaps. End
+      // them before the replay transaction captures its undo baseline; if the
+      // gallery were closed later by `prepareReplayFocus`, its restore snapshot
+      // could overwrite the session's freshly loaded initial flame.
+      handlePreviewBlend(null)
+      setHoveredBlendName(null)
+      setShowBlendGallery(false)
+    },
     loadInitial: (flame) => {
+      // The session's initial document is a hard provenance boundary. Never
+      // let Unselect restore colours stashed for the viewer's previous flame.
+      setPrePaletteColors({})
       setFlameDescriptor(() => deepClone(flame), 'Replay: initial state')
     },
     // Only called when the session carries them, so replaying an older
@@ -3487,39 +3840,71 @@ export function MainWorkspace(props: AppProps) {
       if (view.qualityPreset in qualityPresets) {
         setQualityPreset(view.qualityPreset as QualityPreset)
       }
+      if (view.pixelRatio !== undefined) setPixelRatio(view.pixelRatio)
       setAdaptiveFilterEnabled(view.adaptiveFilter)
       setStochasticFilterEnabled(view.stochasticFilter)
       setFlyMode(view.flyMode)
       setShowTimeline(view.showTimeline)
       setShowSidebar(view.sidebarOpen)
+      setPrePaletteColors(deepClone(view.paletteRestoreColors ?? {}))
     },
     execute: (id, args) => {
-      return executeReplayCommand(id, cmdContext, ...args)
+      const currentPaletteColors = prePaletteColors()
+      // Derive this before executing: applyPalette replaces the colours whose
+      // exact values the later live Unselect action must restore.
+      const nextPaletteColors = paletteRestoreColorsAfterReplayCommand(
+        id,
+        args,
+        flameDescriptor,
+        currentPaletteColors,
+      )
+      const accepted = executeReplayCommand(id, cmdContext, ...args)
+      if (accepted && nextPaletteColors !== currentPaletteColors) {
+        setPrePaletteColors(nextPaletteColors)
+      }
+      return accepted
     },
     preflight: preflightReplayCommand,
-    beginBatch: () => {
+    beginBatch: (onTakeover) => {
       invalidateLastFinishedSession()
-      replayBatchStart = captureReplaySideState()
+      setReplaySuspendsAudioModulation(true)
+      replayBatchStart = captureReplaySideState(replayPresentationBeforePrepare)
+      replayPresentationBeforePrepare = undefined
       // Transport is wall-clock state, not authored replay state. Freeze it
       // before loading the session so frames cannot advance underneath the
       // deterministic action sequence; undo never restarts playback.
       if (timeline.isPlaying()) timeline.pause()
       timeline.beginTransientHistory()
-      history.startPreview('Replay')
+      replayPreviewOwner = history.startOwnedPreview('Replay', onTakeover)
+    },
+    withBatchWrite: (fn) => {
+      const owner = replayPreviewOwner
+      if (owner === undefined) return fn()
+      return history.withPreviewOwner(owner, fn)
     },
     endBatch: () => {
+      const owner = replayPreviewOwner
+      replayPreviewOwner = undefined
       const before = replayBatchStart
-      const after = before ? captureReplaySideState() : undefined
+      const afterSideState = before
+        ? captureReplayNonFlameSideState()
+        : undefined
       replayBatchStart = undefined
+      replayPresentationBeforePrepare = undefined
       timeline.endTransientHistory()
-      if (!history.isPreviewing()) return
+      setReplaySuspendsAudioModulation(false)
+      if (owner === undefined) return
       const sideStateChanged =
         before !== undefined &&
-        after !== undefined &&
-        JSON.stringify(before) !== JSON.stringify(after)
+        afterSideState !== undefined &&
+        replaySideStateChanged(before, afterSideState)
       withRecordingSuppressed(() => {
-        if (sideStateChanged && before && after) {
-          history.commit({
+        if (sideStateChanged && before && afterSideState) {
+          const after: ReplaySideState = {
+            flame: deepClone(flameDescriptor),
+            ...afterSideState,
+          }
+          history.commitOwnedPreview(owner, {
             force: true,
             undoEffect: () => {
               restoreReplaySideState(before)
@@ -3529,7 +3914,7 @@ export function MainWorkspace(props: AppProps) {
             },
           })
         } else {
-          history.commit()
+          history.commitOwnedPreview(owner)
         }
       })
     },
@@ -3576,7 +3961,7 @@ export function MainWorkspace(props: AppProps) {
 
   return (
     <ChangeHistoryContextProvider value={history}>
-      <TimelineContextProvider value={timeline}>
+      <TimelineContextProvider value={recorderTimeline}>
         <Dropzone class={ui.layout} onDrop={onDrop}>
           <>
             <div
@@ -3591,6 +3976,7 @@ export function MainWorkspace(props: AppProps) {
               <Show when={isMobile()}>
                 <button
                   class={ui.sidebarToggle}
+                  data-replay-region="dim"
                   onClick={(e) => {
                     e.stopPropagation()
                     setSidebarHidden((p) => !p)
@@ -3619,6 +4005,7 @@ export function MainWorkspace(props: AppProps) {
               </p>
               <AutoCanvas
                 class={ui.canvas}
+                data-replay-region="canvas"
                 role="img"
                 ariaLabel="Fractal flame preview"
                 ariaDescribedby="flame-canvas-desc"
@@ -3766,7 +4153,7 @@ export function MainWorkspace(props: AppProps) {
               <ProgressBar />
               <ExportJobHost />
               <ExportJobTracker />
-              <div class={ui.bottomBar}>
+              <div class={ui.bottomBar} data-replay-region="dim">
                 {/* In the bottom bar's normal flow rather than floating over
                     the canvas — the draggable FloatingActions widget is fixed
                     at z-index 200 and would sit on top of it, swallowing its
@@ -3782,26 +4169,39 @@ export function MainWorkspace(props: AppProps) {
                     flameDescriptor={flameDescriptor}
                     startExtras={() => {
                       // Wall-clock playback is not authored session state.
-                      // Freeze it before taking the start snapshot so the
-                      // playhead cannot advance underneath a new recording.
-                      if (timeline.isPlaying()) timeline.pause()
                       return {
                         timeline: cmdContext.timeline.edit?.snapshot(),
                         audio: cmdContext.audio?.snapshot(),
                         view: {
                           qualityPreset: qualityPreset(),
+                          pixelRatio: pixelRatio() as 1 | 0.5 | 0.25,
                           adaptiveFilter: adaptiveFilterEnabled(),
                           stochasticFilter: stochasticFilterEnabled(),
                           flyMode: flyMode(),
                           showTimeline: showTimeline(),
                           sidebarOpen: showSidebar(),
+                          paletteRestoreColors: deepClone(prePaletteColors()),
                         },
                       }
                     }}
+                    onRecordingStarted={() => {
+                      // Freeze wall-clock playback only after the recorder
+                      // accepts the snapshot. A rejected start must leave the
+                      // viewer exactly as it was. This is recorder plumbing,
+                      // not an authored transport step in the new take.
+                      if (timeline.isPlaying()) {
+                        withRecordingSuppressed(() => {
+                          timeline.pause()
+                        })
+                      }
+                    }}
                     target={replayTarget}
+                    onPrepareAction={prepareReplayFocus}
                     session={replaySession()}
                     onSessionChange={openReplaySession}
+                    onReplayPresentationChange={setRecorderReplayPresentation}
                     busy={animationExportRunning() || timeline.isPlaying()}
+                    replayBlocked={animationExportRunning()}
                   />
                 </Show>
                 <Show when={effectiveFlame().renderSettings.dimensions === 3}>
@@ -3830,7 +4230,14 @@ export function MainWorkspace(props: AppProps) {
                     position={effectivePosition()}
                     setPosition={setFlamePosition}
                     pixelRatio={pixelRatio()}
-                    setPixelRatio={setPixelRatio}
+                    setPixelRatio={(ratio) => {
+                      const next =
+                        typeof ratio === 'function'
+                          ? ratio(pixelRatio())
+                          : ratio
+                      executeCommand('view.setPixelRatio', cmdContext, next)
+                      return next
+                    }}
                     controlsDisabled={timeline.isPlaying()}
                     onUndo={() => {
                       executeCommand('history.undo', cmdContext)
@@ -3903,7 +4310,10 @@ export function MainWorkspace(props: AppProps) {
                       opacity:
                         animationExportRunning() || timeline.isPlaying()
                           ? 0.5
-                          : 1,
+                          : recorderReplayPresentation().playing &&
+                              !recorderReplayPresentation().timelineTargeted
+                            ? 0.1
+                            : 1,
                     }}
                     onWheel={(ev) => {
                       if (!ev.ctrlKey && !ev.metaKey) return
@@ -3932,6 +4342,8 @@ export function MainWorkspace(props: AppProps) {
                     <TimelineSection
                       formatTrackLabel={readableIds().formatTrackPath}
                       flameDescriptor={flameDescriptor}
+                      collapsed={timelineCollapsed}
+                      setCollapsed={setTimelineCollapsed}
                       onOpenAnimationGenerator={openAnimationGenerator}
                       onSetAutoKeyframe={(enabled) => {
                         executeCommand(
@@ -3954,6 +4366,7 @@ export function MainWorkspace(props: AppProps) {
           <Show when={showSidebar()}>
             <div
               class={ui.sidebar}
+              data-replay-region="dim"
               classList={{
                 [ui.sidebarLocked as string]: timeline.isPlaying(),
                 [ui.sidebarHidden as string]: sidebarHidden(),
@@ -3979,7 +4392,7 @@ export function MainWorkspace(props: AppProps) {
                   }}
                   onClick={() => {
                     if (timeline.isPlaying()) {
-                      timeline.togglePlay()
+                      recorderTimeline.togglePlay()
                     }
                   }}
                 >
@@ -4074,6 +4487,7 @@ export function MainWorkspace(props: AppProps) {
                                         existingVar.weight,
                                       ),
                                     ),
+                                    'type',
                                   )
                                 }}
                                 onClose={() => {
@@ -4153,7 +4567,13 @@ export function MainWorkspace(props: AppProps) {
                             )}
                           </Show>
                           <Show when={!quickPickState()}>
-                            <CollapsibleCard title="Affine">
+                            <CollapsibleCard
+                              title="Affine"
+                              open={affineCardOpen()}
+                              onToggleOpen={() => {
+                                setAffineCardOpen((open) => !open)
+                              }}
+                            >
                               <AffineEditor
                                 class={ui.affineEditor}
                                 transforms={flameDescriptor.transforms}
@@ -4162,13 +4582,34 @@ export function MainWorkspace(props: AppProps) {
                                     setFn(draft.transforms)
                                   })
                                 }}
-                                setTransformAffine={(tid, which, affine) => {
+                                setTransformAffine={(
+                                  tid,
+                                  which,
+                                  affine,
+                                  origin,
+                                ) => {
                                   executeCommand(
                                     'flame.setTransformAffine',
                                     cmdContext,
                                     tid,
                                     which,
                                     affine,
+                                    origin,
+                                  )
+                                }}
+                                setAffineCoefficient={(
+                                  tid,
+                                  which,
+                                  key,
+                                  value,
+                                ) => {
+                                  executeCommand(
+                                    'flame.setAffine',
+                                    cmdContext,
+                                    tid,
+                                    which,
+                                    key,
+                                    value,
                                   )
                                 }}
                                 finalTransform={
@@ -4193,11 +4634,20 @@ export function MainWorkspace(props: AppProps) {
                                       }
                                     : { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 })
                                 }
-                                setFinalTransform={(affine) => {
+                                setFinalTransform={(affine, origin) => {
                                   executeCommand(
                                     'flame.setFinalTransform',
                                     cmdContext,
                                     affine,
+                                    origin,
+                                  )
+                                }}
+                                setFinalAffineCoefficient={(key, value) => {
+                                  executeCommand(
+                                    'flame.setFinalAffine',
+                                    cmdContext,
+                                    key,
+                                    value,
                                   )
                                 }}
                                 is3D={
@@ -4207,9 +4657,27 @@ export function MainWorkspace(props: AppProps) {
                                 selectedTransformId={selectedTransformId}
                                 setSelectedTransformId={setSelectedTransformId}
                                 enableChangeTracking
+                                replayModeRequest={replayAffineModeRequest}
+                                onEditorStateChange={(state) => {
+                                  setReplayAffineModeRequest((previous) =>
+                                    previous.mode === state.mode &&
+                                    previous.tab === state.tab
+                                      ? previous
+                                      : {
+                                          ...state,
+                                          epoch: previous.epoch + 1,
+                                        },
+                                  )
+                                }}
                               />
                             </CollapsibleCard>
-                            <CollapsibleCard title="Color">
+                            <CollapsibleCard
+                              title="Color"
+                              open={colorCardOpen()}
+                              onToggleOpen={() => {
+                                setColorCardOpen((open) => !open)
+                              }}
+                            >
                               <div>
                                 <ColorEditor
                                   transforms={flameDescriptor.transforms}
@@ -4218,13 +4686,14 @@ export function MainWorkspace(props: AppProps) {
                                       setFn(draft.transforms)
                                     })
                                   }}
-                                  setTransformColor={(tid, x, y) => {
+                                  setTransformColor={(tid, x, y, origin) => {
                                     executeCommand(
                                       'flame.setTransformColor',
                                       cmdContext,
                                       tid,
                                       x,
                                       y,
+                                      origin,
                                     )
                                   }}
                                   selectedTransformId={selectedTransformId}
@@ -4232,18 +4701,34 @@ export function MainWorkspace(props: AppProps) {
                                     setSelectedTransformId
                                   }
                                   enableChangeTracking
+                                  replayViewRequest={replayColorViewRequest}
+                                  onViewChange={(view) => {
+                                    setReplayColorViewRequest((previous) =>
+                                      previous.view === view
+                                        ? previous
+                                        : {
+                                            view,
+                                            epoch: previous.epoch + 1,
+                                          },
+                                    )
+                                  }}
                                 />
                               </div>
                             </CollapsibleCard>
                             <CollapsibleCard
                               title="Palette"
-                              defaultOpen={false}
+                              open={paletteCardOpen()}
+                              onToggleOpen={() => {
+                                setPaletteCardOpen((open) => !open)
+                              }}
                             >
-                              <PaletteSelector
-                                selectedPaletteId={selectedPaletteId()}
-                                onSelect={handlePaletteSelect}
-                                onUnselect={handlePaletteUnselect}
-                              />
+                              <div data-tour-target="palette-selector">
+                                <PaletteSelector
+                                  selectedPaletteId={selectedPaletteId()}
+                                  onSelect={handlePaletteSelect}
+                                  onUnselect={handlePaletteUnselect}
+                                />
+                              </div>
                             </CollapsibleCard>
                             <Show
                               when={
@@ -4403,12 +4888,7 @@ export function MainWorkspace(props: AppProps) {
                                       'Blend is still active — the loaded flame will look mixed',
                                       4000,
                                     )
-                                  executeCommand(
-                                    'flame.load',
-                                    cmdContext,
-                                    flame,
-                                    'Apply Random Flame',
-                                  )
+                                  executeFlameLoad(flame, 'Apply Random Flame')
                                 }}
                                 hardwareTier={props.hardwareTier}
                                 isBusy={isRandomizing()}
@@ -4470,7 +4950,7 @@ export function MainWorkspace(props: AppProps) {
                               {([tid, transform]) => (
                                 <CollapsibleCard
                                   title={readableIds().transformLabel[tid]!}
-                                  data-focus-id={`tx:${tid}`}
+                                  data-focus-id={transformFocusId(tid)}
                                   open={!collapsedTransforms().has(tid)}
                                   onToggleOpen={() => {
                                     toggleTransformCollapsed(tid)
@@ -4636,6 +5116,10 @@ export function MainWorkspace(props: AppProps) {
                                             <button
                                               class={ui.variationButton}
                                               data-tour-target="variation-type"
+                                              data-focus-id={variationTypeFocusId(
+                                                tid,
+                                                vid,
+                                              )}
                                               value={variation.type}
                                               title={
                                                 customStatus(variation.type) ===
@@ -4779,6 +5263,10 @@ export function MainWorkspace(props: AppProps) {
                                             </div>
                                             <Show when={!hideDiceButtons()}>
                                               <DiceButton
+                                                focusId={variationRandomizeFocusId(
+                                                  tid,
+                                                  vid,
+                                                )}
                                                 onClick={() => {
                                                   // Rolled here, recorded as
                                                   // the resulting descriptor:
@@ -4800,6 +5288,7 @@ export function MainWorkspace(props: AppProps) {
                                                         ? { params }
                                                         : {}),
                                                     },
+                                                    'randomize',
                                                   )
                                                 }}
                                                 title="Randomize variation"
@@ -4807,6 +5296,10 @@ export function MainWorkspace(props: AppProps) {
                                             </Show>
                                             <button
                                               class={ui.visibilityButton}
+                                              data-focus-id={variationVisibilityFocusId(
+                                                tid,
+                                                vid,
+                                              )}
                                               title={
                                                 variation.visible
                                                   ? 'Hide variation'
@@ -4852,6 +5345,10 @@ export function MainWorkspace(props: AppProps) {
                                           >
                                             {(variation) => (
                                               <div
+                                                data-focus-id={variationParamsFocusId(
+                                                  tid,
+                                                  vid,
+                                                )}
                                                 classList={{
                                                   [ui.transformGridRow as string]: true,
                                                   [ui.variationParamsRow as string]: true,
@@ -4878,6 +5375,20 @@ export function MainWorkspace(props: AppProps) {
                                                         ...deepClone(variation),
                                                         params: value,
                                                       },
+                                                      'params',
+                                                    )
+                                                  }}
+                                                  setParamValue={(
+                                                    paramName,
+                                                    value,
+                                                  ) => {
+                                                    executeCommand(
+                                                      'flame.setVariationParams',
+                                                      cmdContext,
+                                                      tid,
+                                                      vid,
+                                                      paramName,
+                                                      value,
                                                     )
                                                   }}
                                                 />
@@ -5134,7 +5645,13 @@ export function MainWorkspace(props: AppProps) {
                                 Migration
                               </button>
                             </Card>
-                            <CollapsibleCard title="Render">
+                            <CollapsibleCard
+                              title="Render"
+                              open={renderCardOpen()}
+                              onToggleOpen={() => {
+                                setRenderCardOpen((open) => !open)
+                              }}
+                            >
                               <Card>
                                 {/* -- Tone Mapping -- */}
                                 <div class={ui.settingsGroup}>
@@ -5243,6 +5760,7 @@ export function MainWorkspace(props: AppProps) {
                                     }
                                   >
                                     <label
+                                      data-parameter-path="autoExposure3D"
                                       style={{
                                         // Span both grid columns so the checkbox row
                                         // doesn't consume a value-column cell and
@@ -5858,7 +6376,10 @@ export function MainWorkspace(props: AppProps) {
                             </CollapsibleCard>
                             <CollapsibleCard
                               title="Metadata"
-                              defaultOpen={false}
+                              open={metadataCardOpen()}
+                              onToggleOpen={() => {
+                                setMetadataCardOpen((open) => !open)
+                              }}
                               data-tour-target="metadata-card"
                             >
                               <Card>
@@ -5875,6 +6396,7 @@ export function MainWorkspace(props: AppProps) {
                                     <label class={ui.metadataLabel}>Name</label>
                                     <input
                                       class={ui.metadataInput}
+                                      data-parameter-path="metadata.name"
                                       type="text"
                                       placeholder="Flame Name"
                                       value={
@@ -5896,6 +6418,7 @@ export function MainWorkspace(props: AppProps) {
                                     </label>
                                     <textarea
                                       class={ui.metadataTextarea}
+                                      data-parameter-path="metadata.description"
                                       placeholder="Description"
                                       value={
                                         flameDescriptor.metadata?.description ??
@@ -5917,6 +6440,7 @@ export function MainWorkspace(props: AppProps) {
                                     </label>
                                     <input
                                       class={ui.metadataInput}
+                                      data-parameter-path="metadata.author"
                                       type="text"
                                       placeholder="Author"
                                       value={
@@ -5964,6 +6488,11 @@ export function MainWorkspace(props: AppProps) {
                               onClose={() => setShowAudioPanel(false)}
                               audioBuffer={audioBuffer}
                               onAudioChange={(buf, fileName) => {
+                                // File resource signals change before the
+                                // synthetic audio snapshot command is emitted.
+                                // Take a timed replay over first so its undo
+                                // side-state cannot absorb the user's file.
+                                history.takeOverOwnedPreview()
                                 setAudioBuffer(buf)
                                 setAudioTrackName(fileName)
                                 setFileAnalyzer(undefined)
@@ -6002,6 +6531,14 @@ export function MainWorkspace(props: AppProps) {
                                 setPlaybackPaused(false)
                                 setPlaybackTime(0)
                                 setSeekTarget(null)
+                                // The file bytes stay local, but the recorder
+                                // needs the resulting wiring + resource name
+                                // to prevent replay from enabling a different
+                                // track that happens to be loaded later.
+                                executeCommand(
+                                  'audio.applySnapshot',
+                                  cmdContext,
+                                )
                               }}
                               audioMapping={audioMapping}
                               // Through the registry, so wiring audio to the
@@ -6014,6 +6551,9 @@ export function MainWorkspace(props: AppProps) {
                                   mapping,
                                 )
                               }}
+                              onMappingGestureBoundary={
+                                breakRecordingCoalescing
+                              }
                               audioEnabled={audioEnabled}
                               onEnabledChange={(enabled) => {
                                 executeCommand(
@@ -6031,11 +6571,24 @@ export function MainWorkspace(props: AppProps) {
                                 )
                               }}
                               liveAnalyzer={liveAnalyzer}
-                              onLiveAnalyzerChange={setLiveAnalyzer}
+                              onLiveAnalyzerChange={(analyzer) => {
+                                // Microphone permission resolves
+                                // asynchronously and publishes the raw
+                                // resource before its source command. Keep
+                                // that late write out of replay side state.
+                                history.takeOverOwnedPreview()
+                                setLiveAnalyzer(analyzer)
+                              }}
                               playbackPaused={playbackPaused}
-                              onPausedChange={setPlaybackPaused}
+                              onPausedChange={(paused) => {
+                                history.takeOverOwnedPreview()
+                                setPlaybackPaused(paused)
+                              }}
                               playbackTime={playbackTime}
-                              onSeek={setSeekTarget}
+                              onSeek={(seconds) => {
+                                history.takeOverOwnedPreview()
+                                setSeekTarget(seconds)
+                              }}
                               fileAnalyzer={fileAnalyzer}
                               analysisProgress={analysisProgress}
                               flameName={flameDescriptor.metadata?.name}
@@ -6103,12 +6656,7 @@ export function MainWorkspace(props: AppProps) {
                                           'Blend is still active — the loaded flame will look mixed',
                                           4000,
                                         )
-                                      executeCommand(
-                                        'flame.load',
-                                        cmdContext,
-                                        child,
-                                        'Load Bred Flame',
-                                      )
+                                      executeFlameLoad(child, 'Load Bred Flame')
                                     }}
                                     onChangeParent={() => {
                                       respond()
@@ -6138,12 +6686,7 @@ export function MainWorkspace(props: AppProps) {
                                           'Blend is still active — the loaded flame will look mixed',
                                           4000,
                                         )
-                                      executeCommand(
-                                        'flame.load',
-                                        cmdContext,
-                                        child,
-                                        'Load Bred Flame',
-                                      )
+                                      executeFlameLoad(child, 'Load Bred Flame')
                                     }}
                                     onChangeParent={() => {
                                       respond()
@@ -6210,7 +6753,7 @@ export function MainWorkspace(props: AppProps) {
               const is3D =
                 (flameDescriptor.renderSettings.dimensions ?? 2) === 3
               const flame = deepClone(is3D ? initExample3D : initExample)
-              executeCommand('flame.load', cmdContext, flame, 'New Flame')
+              executeFlameLoad(flame, 'New Flame')
               setLoadedAnimation({ flame, tracks: [] })
               showToast('Fresh flame loaded — undo restores the previous one')
             }}
@@ -6304,9 +6847,9 @@ export function MainWorkspace(props: AppProps) {
             isPlaying={() => timeline.isPlaying()}
             togglePlay={() => {
               if (!animationEnabled()) {
-                setAnimationEnabled(true)
+                executeCommand('timeline.setAnimationEnabled', cmdContext, true)
               }
-              timeline.togglePlay()
+              recorderTimeline.togglePlay()
             }}
             qualityPreset={qualityPreset}
             setQualityPreset={(key) => {
@@ -6321,6 +6864,8 @@ export function MainWorkspace(props: AppProps) {
             }}
             accumulatedPointCount={accumulatedPointCount}
             qualityPointCountLimit={qualityPointCountLimit()}
+            collapsed={floatingActionsCollapsed}
+            setCollapsed={setFloatingActionsCollapsed}
             dimensions={() => flameDescriptor.renderSettings.dimensions ?? 2}
             setDimensions={(v) => {
               const current = flameDescriptor.renderSettings.dimensions ?? 2
@@ -6339,7 +6884,9 @@ export function MainWorkspace(props: AppProps) {
                 stashedTracks2D = deepClone(timeline.tracks())
               }
               // Fly mode only makes sense in 3D.
-              if (v !== 3) setFlyMode(false)
+              if (v !== 3 && flyMode()) {
+                executeCommand('view.setFlyMode', cmdContext, false)
+              }
               const restored =
                 v === 3
                   ? (stashedFlame3D ?? example34)
@@ -6350,7 +6897,12 @@ export function MainWorkspace(props: AppProps) {
               // recorder does not also flag the same, faithfully represented
               // switch as an unnamed write.
               withRecordingSuppressed(() => {
-                history.replace(deepClone(restored))
+                withPaletteRestoreTransition({}, `Switch to ${v}D`, () => {
+                  setFlameDescriptor(
+                    () => deepClone(restored),
+                    `Switch to ${v}D`,
+                  )
+                })
                 // Swap the timeline to the target dimension's tracks (empty
                 // on first entry — matches the starter flame).
                 timeline.loadTracks(restoredTracks ?? [])
@@ -6358,8 +6910,8 @@ export function MainWorkspace(props: AppProps) {
               // The switch restores from an in-memory stash, so replaying it
               // as "switch to 3D" would land on the VIEWER's stash, not ours.
               // Log the descriptor and tracks it actually produced instead —
-              // those replay exactly. (The live path keeps history.replace:
-              // a dimension switch is a document boundary, not an undo step.)
+              // those replay exactly. The live path keeps one replacement-
+              // style history entry, including its palette provenance.)
               recordSyntheticAction(
                 'flame.load',
                 [deepClone(restored), `Switch to ${v}D`],
@@ -6390,12 +6942,16 @@ export function MainWorkspace(props: AppProps) {
             sidebarOpen={showSidebar}
             onToggleSidebar={() => {
               // Same as the 'F' shortcut, so it works without a keyboard.
+              const toggle = () => {
+                executeCommand(
+                  showSidebar() ? 'sidebar.close' : 'sidebar.open',
+                  cmdContext,
+                )
+              }
               if ('startViewTransition' in document) {
-                document.startViewTransition(() => {
-                  setShowSidebar((p) => !p)
-                })
+                document.startViewTransition(toggle)
               } else {
-                setShowSidebar((p) => !p)
+                toggle()
               }
             }}
           />

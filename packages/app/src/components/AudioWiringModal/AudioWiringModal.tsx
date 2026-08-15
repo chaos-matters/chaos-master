@@ -476,6 +476,7 @@ export function AudioWiringModal(props: {
   mappings: AudioMappingEntry[]
   transforms: TransformInfo[]
   onMappingsChange: (mappings: AudioMappingEntry[]) => void
+  onMappingGestureBoundary?: () => void
   presets?: Record<string, AudioMappingEntry[]>
   featureLevels?: Record<string, number>
   liveAnalyzer?: LiveAudioAnalyzer | undefined
@@ -1551,6 +1552,7 @@ export function AudioWiringModal(props: {
         sourceByFeature={SOURCE_BY_FEATURE}
         onUpdate={updateSelectedEntry}
         onDelete={deleteSelectedEntry}
+        onMappingGestureBoundary={props.onMappingGestureBoundary}
       />
 
       {/* ── Wiring JSON import panel (in-modal replacement for prompt()) ── */}

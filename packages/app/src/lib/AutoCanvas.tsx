@@ -25,6 +25,9 @@ type AutoCanvasProps = {
   role?: JSX.HTMLAttributes<HTMLCanvasElement>['role']
   ariaLabel?: string
   ariaDescribedby?: string
+  /** Replay follow-cam region semantics. The main flame canvas is preserved
+   *  while surrounding editor chrome is dimmed. */
+  'data-replay-region'?: 'canvas'
 }
 
 export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
@@ -141,6 +144,7 @@ export function AutoCanvas(props: ParentProps<AutoCanvasProps>) {
         role={props.role}
         aria-label={props.ariaLabel}
         aria-describedby={props.ariaDescribedby}
+        data-replay-region={props['data-replay-region']}
         style={{
           width: '100%',
           height: '100%',

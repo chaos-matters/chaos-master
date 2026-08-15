@@ -27,7 +27,6 @@ import ui from './Migration.module.css'
 import type { Diagnostic } from '@codemirror/lint'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TransformVariationType } from '@/flame/variations'
-import type { ChangeHistory } from '@/utils/createStoreHistory'
 
 const CANCEL = 'cancel'
 
@@ -737,7 +736,9 @@ function Migration(props: MigrationFlameModalProps) {
 
 // ── Modal Factory ─────────────────────────────────────────────────────────
 
-export function createMigrationModal(history: ChangeHistory<FlameDescriptor>) {
+export function createMigrationModal(
+  loadIntoMainView: (flame: FlameDescriptor) => void,
+) {
   const requestModal = useRequestModal()
   const [loadModalIsOpen, setLoadModalIsOpen] = createSignal(false)
 
@@ -750,7 +751,7 @@ export function createMigrationModal(history: ChangeHistory<FlameDescriptor>) {
     })
     setLoadModalIsOpen(false)
     if (result === CANCEL) return
-    history.replace(structuredClone(unwrap(result)))
+    loadIntoMainView(structuredClone(unwrap(result)))
   }
 
   return {

@@ -6,7 +6,7 @@ import type { RecordedSession } from '@/recorder/schema'
 import type { TimelineTrack } from '@/utils/timeline'
 
 export function useAppDragAndDrop(
-  history: { replace: (v: FlameDescriptor) => void },
+  history: { replace: (v: FlameDescriptor, label?: string) => void },
   setLoadedAnimation: (state: {
     flame: FlameDescriptor
     tracks: TimelineTrack[]
@@ -27,7 +27,7 @@ export function useAppDragAndDrop(
     }
     const flame = result.flame
     batch(() => {
-      history.replace(deepClone(flame))
+      history.replace(deepClone(flame), 'Drop flame')
       if (result.animation && result.animation.tracks.length > 0) {
         setLoadedAnimation({
           flame: deepClone(flame),

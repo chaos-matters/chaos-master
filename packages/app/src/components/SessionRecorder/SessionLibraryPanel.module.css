@@ -26,6 +26,10 @@
   }
 }
 
+.panel[hidden] {
+  display: none;
+}
+
 .header {
   display: flex;
   align-items: center;
@@ -59,6 +63,19 @@
 .empty {
   margin: 0.2rem 0;
   opacity: 0.75;
+}
+
+.error {
+  margin: 0.2rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: oklch(78% 0.14 30);
+
+  [data-theme='light'] & {
+    color: oklch(42% 0.14 30);
+  }
 }
 
 .list {
@@ -129,4 +146,22 @@
   display: flex;
   gap: 0.25rem;
   flex-shrink: 0;
+}
+
+@media (pointer: coarse) {
+  .button,
+  .entry-name,
+  .entry-rename {
+    min-height: 2.75rem;
+  }
+
+  .entry {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .entry-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
 }

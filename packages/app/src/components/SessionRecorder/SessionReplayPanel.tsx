@@ -1,12 +1,14 @@
-import { createSignal, For, onCleanup, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
 import { createStore, unwrap } from 'solid-js/store'
 import { ChevronLeft, ChevronRight, Focus, Pause, Pencil, PlayPause, SkipBack, } from '@/icons'
+import { deriveReplayFocusPreparation } from '@/recorder/focusPreparation'
 import { createSessionPlayer, PLAYBACK_SPEEDS } from '@/recorder/player'
 import { MAX_ACTION_HOLD_MS, MAX_ACTION_NOTE_CHARS, validateSession, } from '@/recorder/schema'
 import { deepClone } from '@/utils/clone'
 import { followCamEnabled, setFollowCamEnabled } from './recorderUi'
 import { ReplaySpotlight } from './ReplaySpotlight'
 import styles from './SessionReplayPanel.module.css'
+import type { ReplayFocusPreparation, ReplayFocusPreparationHandler, } from '@/recorder/focusPreparation'
 import type { ReplayTarget } from '@/recorder/replay'
 import type { RecordedSession } from '@/recorder/schema'
 
@@ -27,11 +29,22 @@ export function SessionReplayPanel(props: {
   compact?: boolean
   /** Persist the edited session (captions and holds). Absent = no editing
    *  affordance, which is what a read-only replay surface wants. */
-  onSave?: (session: RecordedSession) => void
+  onSave?: (session: RecordedSession) => Promise<void>
   onClose: () => void
+  /** Lets the owning dock recede while timed replay is advancing. */
+  onPlaybackChange?: (playing: boolean) => void
+  /** Reports the semantic surface owned by the current replay step. */
+  onCurrentPreparationChange?: (
+    preparation: ReplayFocusPreparation | undefined,
+  ) => void
+  /** Makes the exact control visible before a replay step changes it. */
+  onPrepareAction?: ReplayFocusPreparationHandler
+  /** True while another process temporarily owns and restores the document. */
+  blocked?: boolean
 }) {
   const [speed, setSpeed] = createSignal(1)
   const [editing, setEditing] = createSignal<number>()
+  const [saving, setSaving] = createSignal(false)
 
   /**
    * The session is cloned into a store so captions and holds are editable
@@ -43,10 +56,37 @@ export function SessionReplayPanel(props: {
 
   const player = createSessionPlayer(session, props.target, {
     speed,
+    beforeAction: (action) => {
+      if (followCamEnabled()) {
+        props.onPrepareAction?.(deriveReplayFocusPreparation(action))
+      }
+    },
+  })
+  const currentPreparation = createMemo(() => {
+    const action = player.currentAction()
+    if (!action) return undefined
+    return deriveReplayFocusPreparation(action)
+  })
+  const spotlightAction = createMemo(() => {
+    const action = player.currentAction()
+    if (!action) return undefined
+    const focus = currentPreparation()?.spotlightFocus
+    return focus === action.focus ? action : { ...action, focus }
+  })
+  createEffect(() => {
+    props.onPlaybackChange?.(player.isPlaying())
+  })
+  createEffect(() => {
+    props.onCurrentPreparationChange?.(currentPreparation())
+  })
+  createEffect(() => {
+    if (props.blocked && player.isPlaying()) player.pause()
   })
   // A player left running past unmount would keep writing into the document.
   onCleanup(() => {
     player.stop()
+    props.onPlaybackChange?.(false)
+    props.onCurrentPreparationChange?.(undefined)
   })
 
   const stepLabel = (index: number) => {
@@ -62,7 +102,7 @@ export function SessionReplayPanel(props: {
     >
       <Show when={followCamEnabled()}>
         <ReplaySpotlight
-          action={player.currentAction()}
+          action={spotlightAction()}
           finished={player.isFinished()}
         />
       </Show>
@@ -80,14 +120,20 @@ export function SessionReplayPanel(props: {
           </span>
         </Show>
         <button
+          data-recorder-replay-close
           type="button"
           class={styles.close}
+          disabled={saving()}
           onClick={() => {
             // Commit wherever we are, then hand the document back.
             player.stop()
             props.onClose()
           }}
-          title="Stop replaying and keep this step as the current flame"
+          title={
+            saving()
+              ? 'Wait for the caption save to finish before closing'
+              : 'Stop replaying and keep this step as the current flame'
+          }
         >
           Close
         </button>
@@ -101,6 +147,7 @@ export function SessionReplayPanel(props: {
           onClick={() => {
             player.seek(-1)
           }}
+          disabled={props.blocked}
           title="Back to the starting flame"
           aria-label="Back to the starting flame"
         >
@@ -113,7 +160,7 @@ export function SessionReplayPanel(props: {
           onClick={() => {
             player.seek(player.stepIndex() - 1)
           }}
-          disabled={player.stepIndex() < 0}
+          disabled={props.blocked || player.stepIndex() < 0}
           title="Previous step"
           aria-label="Previous step"
         >
@@ -123,12 +170,13 @@ export function SessionReplayPanel(props: {
           when={player.isPlaying()}
           fallback={
             <button
+              data-recorder-replay-primary
               type="button"
               class={styles.button}
               onClick={() => {
                 player.play()
               }}
-              disabled={player.total === 0}
+              disabled={props.blocked || player.total === 0}
               title="Play replay"
             >
               <PlayPause class={styles.buttonIcon} aria-hidden="true" />
@@ -137,6 +185,7 @@ export function SessionReplayPanel(props: {
           }
         >
           <button
+            data-recorder-replay-primary
             type="button"
             class={styles.button}
             onClick={() => {
@@ -155,7 +204,7 @@ export function SessionReplayPanel(props: {
           onClick={() => {
             player.seek(player.stepIndex() + 1)
           }}
-          disabled={player.stepIndex() >= player.total - 1}
+          disabled={props.blocked || player.stepIndex() >= player.total - 1}
           title="Next step"
           aria-label="Next step"
         >
@@ -166,7 +215,17 @@ export function SessionReplayPanel(props: {
           class={styles.button}
           classList={{ [styles.toggleOn as string]: followCamEnabled() }}
           onClick={() => {
-            setFollowCamEnabled(!followCamEnabled())
+            const enable = !followCamEnabled()
+            if (enable) {
+              const action = player.currentAction()
+              if (action) {
+                // Prepare while the spotlight is still unmounted. Resolving
+                // first would frame whichever stale editor surface happened
+                // to be visible while follow-cam was off.
+                props.onPrepareAction?.(deriveReplayFocusPreparation(action))
+              }
+            }
+            setFollowCamEnabled(enable)
           }}
           title={
             followCamEnabled()
@@ -223,6 +282,7 @@ export function SessionReplayPanel(props: {
                     onClick={() => {
                       player.seek(index())
                     }}
+                    disabled={props.blocked}
                   >
                     <span class={styles.stepIndex}>{index() + 1}</span>
                     <span class={styles.stepLabel}>{stepLabel(index())}</span>
@@ -305,16 +365,32 @@ export function SessionReplayPanel(props: {
             <button
               type="button"
               class={styles.button}
+              disabled={saving()}
+              aria-busy={saving()}
               onClick={() => {
                 // The controls above constrain authored fields, and this
                 // store-boundary check makes the guarantee explicit even if a
                 // future editor adds another field without matching limits.
                 const validated = validateSession(deepClone(unwrap(session)))
-                if (validated !== undefined) save()(validated)
+                if (validated === undefined || saving()) return
+
+                setSaving(true)
+                void save()(validated)
+                  .catch(() => {
+                    // The owner reports the storage error. Keeping the panel
+                    // mounted and editable is the recovery path here.
+                  })
+                  .finally(() => {
+                    setSaving(false)
+                  })
               }}
-              title="Save the captions and holds as a new recording"
+              title={
+                saving()
+                  ? 'Saving captions locally'
+                  : 'Save the captions and holds as a new recording'
+              }
             >
-              Save captions
+              {saving() ? 'Saving captions…' : 'Save captions'}
             </button>
           )}
         </Show>

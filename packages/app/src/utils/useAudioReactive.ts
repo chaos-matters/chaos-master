@@ -34,6 +34,7 @@ export function useAudioReactive(
   seekTarget: Accessor<number | null>,
   onPlaybackTime: (seconds: number) => void,
   fileAnalyzer: Accessor<AudioAnalyzer | undefined>,
+  modulationSuspended: Accessor<boolean> = () => false,
 ): void {
   // --- Closure-scope mutable state (persists across effect re-runs) ---
   let audioCtx: AudioContext | undefined
@@ -164,6 +165,10 @@ export function useAudioReactive(
         // Everything above is transport and runs regardless. Below is
         // modulation: it needs the toggle AND the finished analysis, and its
         // absence must not stop the clock above from advancing.
+        if (modulationSuspended()) {
+          lastTickTime = undefined
+          return
+        }
         if (!enabled || !analyzer) return
 
         const frame = Math.floor(currentTime * 30)
@@ -213,6 +218,10 @@ export function useAudioReactive(
     if (source === 'mic' && mic && enabled) {
       const tickMs = 1000 / 30
       interval = setInterval(() => {
+        if (modulationSuspended()) {
+          lastTickTime = undefined
+          return
+        }
         const mappings = audioMapping().mappings
         if (mappings.length === 0) return
         const now = globalThis.performance.now()

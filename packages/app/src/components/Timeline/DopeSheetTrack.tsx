@@ -1,4 +1,4 @@
-import { For } from 'solid-js'
+import { For, onCleanup } from 'solid-js'
 import { useTimeline } from '@/contexts/TimelineContext'
 import { TriangleAlert } from '@/icons'
 import ui from './DopeSheet.module.css'
@@ -44,6 +44,7 @@ export function DopeSheetTrack(props: DopeSheetTrackProps) {
 
   let dragStartFrame = 0
   let didDrag = false
+  let cancelActiveDrag: (() => void) | undefined
 
   function handleDragStart(e: PointerEvent, frame: number) {
     if (e.button !== 0) return
@@ -52,6 +53,7 @@ export function DopeSheetTrack(props: DopeSheetTrackProps) {
     e.stopPropagation()
 
     const target = e.currentTarget as HTMLElement
+    cancelActiveDrag?.()
     target.setPointerCapture(e.pointerId)
 
     dragStartFrame = frame
@@ -72,11 +74,21 @@ export function DopeSheetTrack(props: DopeSheetTrackProps) {
       }
     }
 
-    function finishDrag(ev: PointerEvent) {
-      target.releasePointerCapture(e.pointerId)
+    function cleanup() {
+      if (cancelActiveDrag !== cleanup) return false
+      cancelActiveDrag = undefined
+      if (target.hasPointerCapture(e.pointerId)) {
+        target.releasePointerCapture(e.pointerId)
+      }
       window.removeEventListener('pointermove', handleMove)
       window.removeEventListener('pointerup', handleUp)
       window.removeEventListener('pointercancel', handleCancel)
+      target.removeEventListener('lostpointercapture', handleCancel)
+      return true
+    }
+
+    function finishDrag(ev: PointerEvent) {
+      if (!cleanup()) return
 
       const lane = target.closest(`.${ui.lane}`)
       if (!lane) {
@@ -101,13 +113,19 @@ export function DopeSheetTrack(props: DopeSheetTrackProps) {
     }
 
     function handleCancel(ev: PointerEvent) {
-      finishDrag(ev)
+      void ev
+      if (!cleanup()) return
+      didDrag = false
     }
 
+    cancelActiveDrag = cleanup
     window.addEventListener('pointermove', handleMove)
     window.addEventListener('pointerup', handleUp)
     window.addEventListener('pointercancel', handleCancel)
+    target.addEventListener('lostpointercapture', handleCancel)
   }
+
+  onCleanup(() => cancelActiveDrag?.())
 
   function handleLaneClick(e: MouseEvent) {
     const lane = (e.target as HTMLElement).closest(`.${ui.lane}`)

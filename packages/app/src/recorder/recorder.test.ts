@@ -7,11 +7,13 @@ import { vec2f } from 'typegpu/data'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { executeCommand, executeReplayCommand } from '@/commands/registry'
 import { examples } from '@/flame/examples'
+import { MAX_FLAME_TRANSFORMS } from '@/flame/schema/flameSchema'
 import { deepClone } from '@/utils/clone'
 import { createStoreHistory } from '@/utils/createStoreHistory'
 import { createTimelineState } from '@/utils/timeline'
-import { cancelSessionRecording, lastFinishedSession, notePreviewStarted, recordedActionCount, recordSyntheticAction, reportDocumentWrite, reportTimelineWrite, reportUnreplayableOnce, startSessionRecording, stopSessionRecording, unnamedWriteCount, withRecordingSuppressed, } from './recorder'
+import { cancelSessionRecording, getLiveWorkspaceMutationGeneration, isSessionRecording, lastFinishedSession, notePreviewStarted, recordedActionCount, recordSyntheticAction, reportDerivedWorkspaceWrite, reportDocumentWrite, reportTimelineWrite, reportUnreplayableOnce, startSessionRecording, stopSessionRecording, unnamedWriteCount, withRecordingSuppressed, } from './recorder'
 import { replaySessionInstant } from './replay'
+import { captureTransformColors, paletteRestoreColorsAfterReplayCommand, runPaletteRestoreTransition, } from './replayPaletteState'
 import { MAX_ACTION_ARGS, MAX_ACTION_TIMESTAMP_MS, MAX_SESSION_ACTIONS, MAX_SESSION_JSON_CHARS, parseSession, serializeSession, sessionFilename, validateSession, } from './schema'
 import type { RecordedSession } from './schema'
 import type { CommandContext } from '@/commands/types'
@@ -53,6 +55,7 @@ function makeHeadlessWorld(start: FlameDescriptor) {
   const [tracks, setTracks] = createSignal<TimelineTrack[]>([])
   const [duration, setDuration] = createSignal(0)
   const [currentFrame, setCurrentFrame] = createSignal(0)
+  const [previewHeld, setPreviewHeld] = createSignal(false)
   const [blendFlame, setBlendFlame] = createSignal<FlameDescriptor>()
   const [blendWeight, setBlendWeight] = createSignal(0)
 
@@ -81,6 +84,7 @@ function makeHeadlessWorld(start: FlameDescriptor) {
       setDuration,
       currentFrame,
       setCurrentFrame,
+      setPreviewHeld,
       play: () => {},
       setLoop: () => {},
       setFps: () => {},
@@ -108,7 +112,14 @@ function makeHeadlessWorld(start: FlameDescriptor) {
           : undefined,
     },
   }
-  return { flame, setFlameDescriptor, history, ctx }
+  return {
+    flame,
+    setFlameDescriptor,
+    history,
+    ctx,
+    previewHeld,
+    setPreviewHeld,
+  }
 }
 
 /** Replay into a world the way MainWorkspace will: history.replace for the
@@ -136,6 +147,41 @@ function stopOrThrow(): RecordedSession {
 afterEach(() => {
   cancelSessionRecording()
   vi.restoreAllMocks()
+})
+
+describe('recording start feedback', () => {
+  it('reports a successful start and an already-active race', () => {
+    expect(startSessionRecording(examples.example1)).toEqual({ ok: true })
+    expect(startSessionRecording(examples.example1)).toEqual({
+      ok: false,
+      reason: 'already-recording',
+    })
+    expect(isSessionRecording()).toBe(true)
+  })
+
+  it('reports a workspace that cannot be serialized', () => {
+    const circular = deepClone(examples.example1) as FlameDescriptor & {
+      circular?: unknown
+    }
+    circular.circular = circular
+
+    expect(startSessionRecording(circular)).toEqual({
+      ok: false,
+      reason: 'workspace-not-serializable',
+    })
+    expect(isSessionRecording()).toBe(false)
+  })
+
+  it('reports a workspace outside the bounded session schema', () => {
+    const invalid = deepClone(examples.example1)
+    invalid.renderSettings.gamma = Number.NaN
+
+    expect(startSessionRecording(invalid)).toEqual({
+      ok: false,
+      reason: 'workspace-not-recordable',
+    })
+    expect(isSessionRecording()).toBe(false)
+  })
 })
 
 describe('record → replay round-trip', () => {
@@ -299,9 +345,16 @@ describe('record → replay round-trip', () => {
     createRoot((dispose) => {
       const a = makeHeadlessWorld(examples.example1)
       const originalGamma = a.flame.renderSettings.gamma
+      const paletteRestoreColors = {
+        transform_one: { x: 0.17, y: -0.24 },
+      }
+      const ctx: CommandContext = {
+        ...a.ctx,
+        paletteRestoreColors: () => paletteRestoreColors,
+      }
       startSessionRecording(a.flame)
-      executeCommand('flame.setGamma', a.ctx, 9)
-      executeCommand('history.undo', a.ctx)
+      executeCommand('flame.setGamma', ctx, 9)
+      executeCommand('history.undo', ctx)
       const session = stopOrThrow()
 
       expect(a.flame.renderSettings.gamma).toBe(originalGamma)
@@ -312,6 +365,7 @@ describe('record → replay round-trip', () => {
       expect(
         (session.actions[1]?.args[0] as FlameDescriptor).renderSettings.gamma,
       ).toBe(originalGamma)
+      expect(session.actions[1]?.args[2]).toEqual(paletteRestoreColors)
       // Undo/redo move the stacks without pushing entries — they must NOT
       // show up as unnamed writes.
       expect(session.unnamedWriteCount).toBe(0)
@@ -552,18 +606,61 @@ describe('transform-card commands', () => {
       startSessionRecording(a.flame)
       // The dice button rolls in the handler and passes the result, so the
       // log carries the outcome rather than an intent to randomize.
-      executeCommand('flame.setVariation', a.ctx, tid, vid, {
-        type: 'linearVar',
-        weight: 0.731,
-        visible: true,
-      })
+      executeCommand(
+        'flame.setVariation',
+        a.ctx,
+        tid,
+        vid,
+        {
+          type: 'linearVar',
+          weight: 0.731,
+          visible: true,
+        },
+        'randomize',
+      )
       const session = stopOrThrow()
+
+      expect(session.actions[0]?.focus).toBe(
+        `focus:tx:${tid}:variation:${vid}:randomize`,
+      )
 
       const b = makeHeadlessWorld(examples.initExample)
       replayIntoWorld(session, b)
       expect(deepClone(b.flame.transforms)).toEqual(
         deepClone(a.flame.transforms),
       )
+      dispose()
+    })
+  })
+
+  it('keeps each variation action paired with its exact follow-cam identity', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      const transformIds = Object.keys(world.flame.transforms)
+      const firstTid = transformIds[0]!
+      const laterTid = transformIds.at(-1)!
+      const firstVid = firstVariationId(world.flame, firstTid)
+      const laterVid = firstVariationId(world.flame, laterTid)
+
+      startSessionRecording(world.flame)
+      executeCommand('flame.setVariation', world.ctx, firstTid, firstVid, {
+        type: 'linearVar',
+        weight: 0.6,
+        visible: true,
+      })
+      executeCommand('flame.setVariation', world.ctx, laterTid, laterVid, {
+        type: 'swirlVar',
+        weight: 0.8,
+        visible: true,
+      })
+      const session = stopOrThrow()
+
+      expect(
+        session.actions.map(({ args, focus }) => [args[0], args[1], focus]),
+      ).toEqual([
+        [firstTid, firstVid, `focus:tx:${firstTid}:variation:${firstVid}:type`],
+        [laterTid, laterVid, `focus:tx:${laterTid}:variation:${laterVid}:type`],
+      ])
       dispose()
     })
   })
@@ -686,6 +783,33 @@ describe('camera and symmetry commands', () => {
       const b = makeHeadlessWorld(examples.initExample)
       replayIntoWorld(session, b)
       expect(deepClone(b.flame)).toEqual(deepClone(a.flame))
+      dispose()
+    })
+  })
+
+  it('detaches a held timeline frame for live and replayed camera edits', () => {
+    createRoot((dispose) => {
+      const live = makeHeadlessWorld(examples.example1)
+      live.setPreviewHeld(true)
+      startSessionRecording(live.flame)
+      executeCommand(
+        'flame.setRenderSetting',
+        live.ctx,
+        'camera3D.target',
+        [0.5, -0.25, 1],
+      )
+      const session = stopOrThrow()
+
+      expect(live.previewHeld()).toBe(false)
+
+      const replay = makeHeadlessWorld(examples.initExample)
+      replay.setPreviewHeld(true)
+      replayIntoWorld(session, replay)
+
+      expect(replay.previewHeld()).toBe(false)
+      expect(replay.flame.renderSettings.camera3D.target).toEqual([
+        0.5, -0.25, 1,
+      ])
       dispose()
     })
   })
@@ -888,6 +1012,60 @@ describe('blend and morph commands', () => {
       dispose()
     })
   })
+
+  it('folds one compound exposure drag but keeps separate drags distinct', () => {
+    createRoot((dispose) => {
+      const world = makeHeadlessWorld(examples.example1)
+      startSessionRecording(world.flame)
+
+      world.history.startPreview('Exposure')
+      for (const exposure of [0.4, 0.8, 1.2]) {
+        executeCommand(
+          'flame.updateRenderSettings',
+          world.ctx,
+          {
+            exposure,
+            autoExposure3DBase: exposure,
+            autoExposure3DRefRadius: 5,
+          },
+          'render',
+        )
+      }
+      world.history.commit()
+      world.history.startPreview('Exposure')
+      executeCommand(
+        'flame.updateRenderSettings',
+        world.ctx,
+        {
+          exposure: 1.6,
+          autoExposure3DBase: 1.6,
+          autoExposure3DRefRadius: 5,
+        },
+        'render',
+      )
+      world.history.commit()
+
+      const session = stopOrThrow()
+      expect(session.actions).toHaveLength(2)
+      expect(session.actions[0]?.args).toEqual([
+        {
+          exposure: 1.2,
+          autoExposure3DBase: 1.2,
+          autoExposure3DRefRadius: 5,
+        },
+        'render',
+      ])
+      expect(session.actions[1]?.args).toEqual([
+        {
+          exposure: 1.6,
+          autoExposure3DBase: 1.6,
+          autoExposure3DRefRadius: 5,
+        },
+        'render',
+      ])
+      dispose()
+    })
+  })
 })
 
 describe('palette and document-load commands', () => {
@@ -945,6 +1123,70 @@ describe('palette and document-load commands', () => {
       const b = makeHeadlessWorld(examples.initExample)
       replayIntoWorld(session, b)
       expect(deepClone(b.flame)).toEqual(deepClone(a.flame))
+      dispose()
+    })
+  })
+
+  it('preserves palette provenance through recorded undo, redo, and a replay fork', () => {
+    createRoot((dispose) => {
+      const a = makeHeadlessWorld(examples.example1)
+      const [restoreColors, setRestoreColors] = createSignal<
+        Record<string, { x: number; y: number }>
+      >({})
+      const ctx: CommandContext = {
+        ...a.ctx,
+        paletteRestoreColors: restoreColors,
+      }
+      const naturalColors = captureTransformColors(a.flame)
+
+      startSessionRecording(a.flame)
+      runPaletteRestoreTransition(
+        a.history,
+        restoreColors(),
+        naturalColors,
+        setRestoreColors,
+        'Apply Palette',
+        () => {
+          executeCommand('flame.applyPalette', ctx, palette)
+        },
+      )
+      executeCommand('history.undo', ctx)
+      executeCommand('history.redo', ctx)
+      const session = stopOrThrow()
+
+      expect(session.actions.map(({ id }) => id)).toEqual([
+        'flame.applyPalette',
+        'flame.load',
+        'flame.load',
+      ])
+      expect(session.actions[1]?.args[2]).toEqual({})
+      expect(session.actions[2]?.args[2]).toEqual(naturalColors)
+
+      const b = makeHeadlessWorld(examples.initExample)
+      let replayRestoreColors: Record<string, { x: number; y: number }> = {}
+      expect(
+        replaySessionInstant(session, {
+          loadInitial: (flame) => {
+            b.history.replace(flame, 'Replay: initial state')
+            replayRestoreColors = {}
+          },
+          execute: (id, args) => {
+            const next = paletteRestoreColorsAfterReplayCommand(
+              id,
+              args,
+              b.flame,
+              replayRestoreColors,
+            )
+            const accepted = executeReplayCommand(id, b.ctx, ...args)
+            if (accepted) replayRestoreColors = next
+            return accepted
+          },
+        }),
+      ).toBe(true)
+      expect(replayRestoreColors).toEqual(naturalColors)
+
+      executeCommand('flame.removePalette', b.ctx, replayRestoreColors)
+      expect(deepClone(b.flame)).toEqual(deepClone(examples.example1))
       dispose()
     })
   })
@@ -1256,6 +1498,17 @@ describe('untrusted replay command preflight', () => {
 })
 
 describe('suppression', () => {
+  it('tracks silent derived writes unless replay suppression owns them', () => {
+    const before = getLiveWorkspaceMutationGeneration()
+    reportDerivedWorkspaceWrite()
+    expect(getLiveWorkspaceMutationGeneration()).toBe(before + 1)
+
+    withRecordingSuppressed(() => {
+      reportDerivedWorkspaceWrite()
+    })
+    expect(getLiveWorkspaceMutationGeneration()).toBe(before + 1)
+  })
+
   it('ignores commands and writes inside withRecordingSuppressed', () => {
     createRoot((dispose) => {
       const world = makeHeadlessWorld(examples.example1)
@@ -1483,11 +1736,15 @@ describe('session start state beyond the flame', () => {
   }
   const view = {
     qualityPreset: 'high',
+    pixelRatio: 0.5 as const,
     adaptiveFilter: true,
     stochasticFilter: false,
     flyMode: false,
     showTimeline: true,
     sidebarOpen: true,
+    paletteRestoreColors: {
+      transform_one: { x: 0.17, y: -0.24 },
+    },
   }
 
   it('carries timeline, audio, and view state through a round trip', () => {
@@ -1534,6 +1791,46 @@ describe('session start state beyond the flame', () => {
     expect(session.initialTimeline).toBeUndefined()
     expect(parseSession(serializeSession(session))).toBeDefined()
   })
+
+  it('rejects unsafe or oversized palette provenance', () => {
+    startSessionRecording(examples.example1, { view })
+    const session = stopSessionRecording()!
+    const oversized = Object.fromEntries(
+      Array.from({ length: MAX_FLAME_TRANSFORMS + 1 }, (_, index) => [
+        `transform_${index}`,
+        { x: 0, y: 0 },
+      ]),
+    )
+
+    expect(
+      validateSession({
+        ...session,
+        initialView: {
+          ...view,
+          paletteRestoreColors: {
+            constructor: { x: 0, y: 0 },
+          },
+        },
+      }),
+    ).toBeUndefined()
+    expect(
+      validateSession({
+        ...session,
+        initialView: {
+          ...view,
+          paletteRestoreColors: {
+            safe_transform: { x: 1e308, y: 0 },
+          },
+        },
+      }),
+    ).toBeUndefined()
+    expect(
+      validateSession({
+        ...session,
+        initialView: { ...view, paletteRestoreColors: oversized },
+      }),
+    ).toBeUndefined()
+  })
 })
 
 describe('finished-session export association', () => {
@@ -1564,6 +1861,20 @@ describe('finished-session export association', () => {
       expect(lastFinishedSession()).toBeUndefined()
       dispose()
     })
+  })
+
+  it('clears after a suppressed document boundary represented synthetically', () => {
+    finishSession()
+    expect(lastFinishedSession()).toBeDefined()
+
+    withRecordingSuppressed(() => {
+      // The live load/switch runs here; its exact result is announced after
+      // suppression so an active recorder would capture one deterministic
+      // action instead of the internal writes.
+    })
+    recordSyntheticAction('flame.load', [examples.initExample, 'Load flame'])
+
+    expect(lastFinishedSession()).toBeUndefined()
   })
 
   it('tracks direct timeline transport without flooding the recording', () => {

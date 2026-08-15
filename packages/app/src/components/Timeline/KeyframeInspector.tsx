@@ -1,4 +1,4 @@
-import { createMemo, createSignal, Show } from 'solid-js'
+import { createMemo, createSignal, onCleanup, Show } from 'solid-js'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useTimeline } from '@/contexts/TimelineContext'
@@ -66,6 +66,7 @@ export function KeyframeInspector(props: KeyframeInspectorProps) {
   const [inspectorEditing, setInspectorEditing] = createSignal(false)
   const [inspectorEditValue, setInspectorEditValue] = createSignal('')
   let inspectorInputRef: HTMLInputElement | undefined
+  let finishInspectorScrub: (() => void) | undefined
 
   function startInspectorScrub(e: PointerEvent, currentValue: number) {
     if (inspectorEditing()) return
@@ -74,7 +75,10 @@ export function KeyframeInspector(props: KeyframeInspectorProps) {
     const easing = kf?.easing
     const startX = e.clientX
     const startValue = currentValue
-    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    const captureTarget = e.currentTarget as HTMLElement
+    finishInspectorScrub?.()
+    timeline.breakUndoCoalescing()
+    captureTarget.setPointerCapture(e.pointerId)
     setTargetedParameter(sel.path)
 
     if (!changeHistory.isPreviewing()) {
@@ -112,16 +116,26 @@ export function KeyframeInspector(props: KeyframeInspectorProps) {
       timeline.setKeyframeValue(sel.path, sel.frame, newValue, easing)
     }
 
-    function onUp() {
+    function finish() {
+      if (finishInspectorScrub !== finish) return
+      finishInspectorScrub = undefined
       window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointerup', finish)
+      window.removeEventListener('pointercancel', finish)
+      captureTarget.removeEventListener('lostpointercapture', finish)
       if (changeHistory.isPreviewing()) {
         changeHistory.commit()
       }
+      timeline.breakUndoCoalescing()
     }
+    finishInspectorScrub = finish
     window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointerup', finish)
+    window.addEventListener('pointercancel', finish)
+    captureTarget.addEventListener('lostpointercapture', finish)
   }
+
+  onCleanup(() => finishInspectorScrub?.())
 
   function startInspectorEdit(currentValue: number) {
     setInspectorEditValue(String(currentValue))

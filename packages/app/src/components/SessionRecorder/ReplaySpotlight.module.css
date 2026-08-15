@@ -1,5 +1,5 @@
-/* Follow-cam overlay. Fixed, above everything, and click-through: the viewer
-   must be able to pause, scrub or take over while it is up. */
+/* Fixed above editor chrome and click-through: pause, seek, and takeover remain
+   available while follow-cam is directing the viewer. */
 .overlay {
   position: fixed;
   inset: 0;
@@ -7,37 +7,65 @@
   pointer-events: none;
 }
 
-/* The dim is the hole's own shadow, spread far enough to cover any viewport.
-   One element means one thing to animate, so moving between two controls is a
-   single eased transition instead of four rectangles being kept in sync. */
-.hole {
+.scrim {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.mask-dim {
+  fill: white;
+}
+
+.mask-cutout {
+  fill: black;
+}
+
+.scrim-fill {
+  fill: oklch(12% 0.02 240 / 0.62);
+
+  [data-theme='light'] & {
+    fill: oklch(30% 0.02 240 / 0.45);
+  }
+}
+
+/* A restrained ember edge marks the result surface without tinting the flame
+   itself. The canvas remains fully undimmed throughout every replay step. */
+.canvas-frame {
+  position: absolute;
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px oklch(72% 0.12 52 / 0.24) inset;
+}
+
+/* The current UI target gets the stronger cool edge used by the editor. The
+   SVG mask cuts the matching opening; this frame supplies continuity as the
+   follow-cam moves between controls. */
+.target-frame {
   position: absolute;
   border-radius: 10px;
   box-shadow:
-    0 0 0 100vmax oklch(12% 0.02 240 / 0.62),
-    0 0 0 1px oklch(85% 0.12 240 / 0.75) inset;
+    0 0 0 1px oklch(85% 0.12 240 / 0.75) inset,
+    0 5px 20px oklch(25% 0.08 240 / 0.22);
   outline: 2px solid oklch(72% 0.16 240 / 0.9);
   outline-offset: 0;
 
   transition:
-    left 420ms cubic-bezier(0.4, 0, 0.2, 1),
-    top 420ms cubic-bezier(0.4, 0, 0.2, 1),
-    width 420ms cubic-bezier(0.4, 0, 0.2, 1),
-    height 420ms cubic-bezier(0.4, 0, 0.2, 1);
+    left 420ms cubic-bezier(0.16, 1, 0.3, 1),
+    top 420ms cubic-bezier(0.16, 1, 0.3, 1),
+    width 420ms cubic-bezier(0.16, 1, 0.3, 1),
+    height 420ms cubic-bezier(0.16, 1, 0.3, 1);
 
   [data-theme='light'] & {
     box-shadow:
-      0 0 0 100vmax oklch(30% 0.02 240 / 0.45),
-      0 0 0 1px oklch(45% 0.14 240 / 0.75) inset;
+      0 0 0 1px oklch(45% 0.14 240 / 0.75) inset,
+      0 5px 20px oklch(35% 0.08 240 / 0.16);
     outline-color: oklch(50% 0.18 240 / 0.9);
   }
 }
 
-/* Fixed near the bottom rather than tethered to the hole: a caption that
-   jumps around with the spotlight is harder to read than one that stays put,
-   and this is subtitle furniture — the line that makes a silent clip
-   half-narrated. Sits inside the vertical safe area so a 9:16 crop keeps it
-   clear of the platform's own UI. */
+/* Stable subtitle furniture: unlike a target-attached bubble, it does not
+   jump around and remains inside vertical-video safe areas. */
 .caption {
   position: absolute;
   left: 50%;
@@ -56,12 +84,12 @@
   text-wrap: balance;
   backdrop-filter: blur(8px);
   box-shadow: 0 4px 20px oklch(0% 0 0 / 0.45);
-  animation: caption-in 220ms ease-out;
+  animation: caption-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes caption-in {
   from {
-    opacity: 0;
+    opacity: 0.35;
     transform: translateX(-50%) translateY(4px);
   }
   to {
@@ -71,9 +99,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hole {
+  .target-frame {
     transition: none;
   }
+
   .caption {
     animation: none;
   }

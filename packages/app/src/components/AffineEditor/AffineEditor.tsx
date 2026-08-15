@@ -16,6 +16,7 @@ import { useCamera } from '@/lib/CameraContext'
 import { useCanvas } from '@/lib/CanvasContext'
 import { useLiveRootContext } from '@/lib/RootContext'
 import { createPosition, createZoom, WheelZoomCamera2D, } from '@/lib/WheelZoomCamera2D'
+import { affineFocusId, FINAL_AFFINE_FOCUS_ID, FINAL_AFFINE_RANDOMIZE_FOCUS_ID, } from '@/recorder/focusIds'
 import { createAnimationFrame } from '@/utils/createAnimationFrame'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { eventToClip } from '@/utils/eventToClip'
@@ -30,6 +31,7 @@ import listUi from './AffineListEditor.module.css'
 import type { v2f } from 'typegpu/data'
 import type { AffineParams } from '@/flame/affineTranform'
 import type { TransformRecord } from '@/flame/schema/flameSchema'
+import type { ReplayAffineMode, ReplayAffineTab, } from '@/recorder/focusPreparation'
 import type { HistorySetter } from '@/utils/createStoreHistory'
 
 const BACKGROUND_COLOR = {
@@ -204,6 +206,8 @@ function AffineHandle(props: {
    *  centre dots — one transform's edges can then never cover another's
    *  centre. Omitted (final transform) renders both. */
   part?: 'box' | 'center'
+  /** Exact replay follow-cam identity for this transform's draggable centre. */
+  focusId?: string
 }) {
   const { theme } = useTheme()
   const {
@@ -555,6 +559,13 @@ function AffineHandle(props: {
       }
     })
 
+  const selectBeforeDrag =
+    (start: (event: PointerEvent) => void) => (event: PointerEvent) => {
+      if (event.button === 2) return
+      props.onSelect?.()
+      start(event)
+    }
+
   return (
     <Show when={!props.hidden}>
       <Show
@@ -572,30 +583,30 @@ function AffineHandle(props: {
                   <path
                     class={ui.handleBoxGrabArea}
                     d={corners}
-                    on:pointerdown={scaleBoth}
+                    on:pointerdown={selectBeforeDrag(scaleBoth)}
                   />
                   <path d="M 0,0 V 1" marker-end="url(#arrow)" />
                   <path
                     class={ui.handleBoxGrabArea}
                     d="M 0,0 V 1"
-                    on:pointerdown={scaleY}
+                    on:pointerdown={selectBeforeDrag(scaleY)}
                   />
                   <path d="M 0,0 L 1,0" marker-end="url(#arrow)" />
                   <path
                     class={ui.handleBoxGrabArea}
                     d="M 0,0 L 1,0"
-                    on:pointerdown={scaleX}
+                    on:pointerdown={selectBeforeDrag(scaleX)}
                   />
                   <path class={ui.dashed} d="M 0,0 V -1 M 0,0 L -1,0" />
                   <path
                     class={ui.handleBoxGrabArea}
                     d="M 0,0 V -1"
-                    on:pointerdown={scaleNegY}
+                    on:pointerdown={selectBeforeDrag(scaleNegY)}
                   />
                   <path
                     class={ui.handleBoxGrabArea}
                     d="M 0,0 L -1,0"
-                    on:pointerdown={scaleNegX}
+                    on:pointerdown={selectBeforeDrag(scaleNegX)}
                   />
                 </g>
               </svg>
@@ -603,6 +614,7 @@ function AffineHandle(props: {
             <Show when={props.part !== 'box'}>
               <g
                 class={ui.handle}
+                data-focus-id={props.focusId}
                 classList={{
                   [ui.selected as string]: props.selected,
                   [ui.dimmed as string]: props.dimmed,
@@ -708,7 +720,7 @@ function AffineHandle(props: {
               stroke="white"
               stroke-width="1.5"
               style={{ cursor: 'nesw-resize' }}
-              on:pointerdown={startScalingRotating3D('X', 1)}
+              on:pointerdown={selectBeforeDrag(startScalingRotating3D('X', 1))}
             />
             <circle
               cx={`${projNegLocalX().x}%`}
@@ -719,7 +731,7 @@ function AffineHandle(props: {
               stroke-width="1"
               opacity="0.8"
               style={{ cursor: 'nesw-resize' }}
-              on:pointerdown={startScalingRotating3D('X', -1)}
+              on:pointerdown={selectBeforeDrag(startScalingRotating3D('X', -1))}
             />
 
             {/* Local Y scale/rotate end-handles */}
@@ -731,7 +743,7 @@ function AffineHandle(props: {
               stroke="white"
               stroke-width="1.5"
               style={{ cursor: 'nesw-resize' }}
-              on:pointerdown={startScalingRotating3D('Y', 1)}
+              on:pointerdown={selectBeforeDrag(startScalingRotating3D('Y', 1))}
             />
             <circle
               cx={`${projNegLocalY().x}%`}
@@ -742,7 +754,7 @@ function AffineHandle(props: {
               stroke-width="1"
               opacity="0.8"
               style={{ cursor: 'nesw-resize' }}
-              on:pointerdown={startScalingRotating3D('Y', -1)}
+              on:pointerdown={selectBeforeDrag(startScalingRotating3D('Y', -1))}
             />
 
             {/* Local Z scale/rotate end-handles */}
@@ -754,7 +766,7 @@ function AffineHandle(props: {
               stroke="white"
               stroke-width="1.5"
               style={{ cursor: 'nesw-resize' }}
-              on:pointerdown={startScalingRotating3D('Z', 1)}
+              on:pointerdown={selectBeforeDrag(startScalingRotating3D('Z', 1))}
             />
             <circle
               cx={`${projNegLocalZ().x}%`}
@@ -765,7 +777,7 @@ function AffineHandle(props: {
               stroke-width="1"
               opacity="0.8"
               style={{ cursor: 'nesw-resize' }}
-              on:pointerdown={startScalingRotating3D('Z', -1)}
+              on:pointerdown={selectBeforeDrag(startScalingRotating3D('Z', -1))}
             />
           </g>
         </Show>
@@ -777,6 +789,7 @@ function AffineHandle(props: {
             {/* Center free-translation handle */}
             <g
               class={ui.handle}
+              data-focus-id={props.focusId}
               classList={{
                 [ui.selected as string]: props.selected,
                 [ui.dimmed as string]: props.dimmed,
@@ -825,7 +838,10 @@ export function AffineEditor(props: {
   transforms: TransformRecord
   setTransforms: HistorySetter<TransformRecord>
   finalTransform?: AffineParams
-  setFinalTransform?: (affine: AffineParams) => void
+  setFinalTransform?: (
+    affine: AffineParams,
+    origin?: 'grid' | 'randomize',
+  ) => void
   /**
    * Apply a handle drag semantically. The workspace passes a command
    * dispatch, so a recording captures the drag as one replayable step
@@ -837,13 +853,31 @@ export function AffineEditor(props: {
     tid: string,
     which: 'pre' | 'post',
     affine: AffineParams,
+    origin?: 'grid' | 'randomize' | 'reset',
   ) => void
+  setAffineCoefficient?: (
+    tid: string,
+    which: 'pre' | 'post',
+    key: string,
+    value: number,
+  ) => void
+  setFinalAffineCoefficient?: (key: string, value: number) => void
   is3D?: boolean
   selectedTransformId?: () => string | null
   setSelectedTransformId?: (tid: string | null) => void
   /** Enables the track-changes diamond + drag keyframing. Only for editors
    *  bound to the real flame (not preview copies like the variation modal). */
   enableChangeTracking?: boolean
+  /** One-way follow-cam request; the epoch makes repeated modes observable. */
+  replayModeRequest?: () =>
+    | { mode?: ReplayAffineMode; tab: ReplayAffineTab; epoch: number }
+    | undefined
+  /** Mirrors the actual user-selected surface back to the workspace so a
+   * replay transaction can restore it exactly on Undo. */
+  onEditorStateChange?: (state: {
+    mode: ReplayAffineMode
+    tab: ReplayAffineTab
+  }) => void
 }) {
   const timeline = useTimeline()
   const [div, setDiv] = createSignal<HTMLDivElement>()
@@ -852,6 +886,19 @@ export function AffineEditor(props: {
   const [tab, setTab] = createSignal<Tab>('grid')
   const [affineMode, setAffineMode] = createSignal<AffineMode>('preAffine')
   const [isVisible, setIsVisible] = createSignal(true)
+
+  createEffect(() => {
+    const request = props.replayModeRequest?.()
+    if (!request) return
+    // Reading the epoch deliberately retriggers same-mode replay actions.
+    void request.epoch
+    setTab(request.tab)
+    if (request.mode !== undefined) setAffineMode(request.mode)
+  })
+
+  createEffect(() => {
+    props.onEditorStateChange?.({ mode: affineMode(), tab: tab() })
+  })
 
   useIntersectionObserver(div, (visible) => setIsVisible(visible))
 
@@ -879,7 +926,12 @@ export function AffineEditor(props: {
         const mode = affineMode() as 'preAffine' | 'postAffine'
         const applySemantically = props.setTransformAffine
         if (applySemantically) {
-          applySemantically(tid, mode === 'postAffine' ? 'post' : 'pre', affine)
+          applySemantically(
+            tid,
+            mode === 'postAffine' ? 'post' : 'pre',
+            affine,
+            'grid',
+          )
         } else {
           props.setTransforms((draft) => {
             draft[tid]![mode] = affine
@@ -899,6 +951,7 @@ export function AffineEditor(props: {
           ? `transform.${tid}.${affineMode() as 'preAffine' | 'postAffine'}`
           : undefined
       }
+      focusId={affineFocusId(tid)}
     />
   )
 
@@ -1020,9 +1073,10 @@ export function AffineEditor(props: {
                   transform={props.finalTransform!}
                   color={vec2f(0, 0)}
                   setTransform={(affine) => {
-                    props.setFinalTransform?.(affine)
+                    props.setFinalTransform?.(affine, 'grid')
                   }}
                   is3D={props.is3D}
+                  focusId={FINAL_AFFINE_FOCUS_ID}
                   keyframePathBase={
                     props.enableChangeTracking ? 'finalTransform' : undefined
                   }
@@ -1038,6 +1092,7 @@ export function AffineEditor(props: {
           transforms={props.transforms}
           setTransforms={props.setTransforms}
           setTransformAffine={props.setTransformAffine}
+          setAffineCoefficient={props.setAffineCoefficient}
           affineMode={affineMode() as 'preAffine' | 'postAffine'}
           is3D={props.is3D}
           selectedTransformId={props.selectedTransformId}
@@ -1051,11 +1106,15 @@ export function AffineEditor(props: {
         }
       >
         <div class={listUi.container}>
-          <div class={listUi.transformCard}>
+          <div
+            class={listUi.transformCard}
+            data-focus-id={FINAL_AFFINE_FOCUS_ID}
+          >
             <div class={listUi.transformHeader}>
               <span class={listUi.transformLabel}>Final Transform</span>
               <DiceButton
                 title="Randomize affine coefs"
+                focusId={FINAL_AFFINE_RANDOMIZE_FOCUS_ID}
                 onClick={() => {
                   if (props.setFinalTransform && props.finalTransform) {
                     const next = { ...props.finalTransform }
@@ -1081,7 +1140,7 @@ export function AffineEditor(props: {
                         key,
                       )
                     }
-                    props.setFinalTransform(next)
+                    props.setFinalTransform(next, 'randomize')
                   }
                 }}
               />
@@ -1116,7 +1175,12 @@ export function AffineEditor(props: {
                     }
                     step={0.001}
                     onInput={(val) => {
-                      if (props.setFinalTransform && props.finalTransform) {
+                      if (props.setFinalAffineCoefficient) {
+                        props.setFinalAffineCoefficient(key, val)
+                      } else if (
+                        props.setFinalTransform &&
+                        props.finalTransform
+                      ) {
                         props.setFinalTransform({
                           ...props.finalTransform,
                           [key]: val,

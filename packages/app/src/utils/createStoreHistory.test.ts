@@ -253,6 +253,49 @@ describe('createStoreHistory', () => {
       expect(store.items.a!.value).toBe(1)
     })
 
+    it('commits an owned producer before an ordinary write takes over', () => {
+      const { store, set, history } = makeHistory()
+      let sideState = 'before'
+      let takeoverCount = 0
+      const owner = history.startOwnedPreview('Replay', () => {
+        takeoverCount++
+        history.commitOwnedPreview(owner, {
+          undoEffect: () => {
+            sideState = 'before'
+          },
+          redoEffect: () => {
+            sideState = 'replayed'
+          },
+        })
+      })
+      history.withPreviewOwner(owner, () => {
+        set((draft) => {
+          draft.items.a!.value = 2
+        })
+      })
+      sideState = 'replayed'
+
+      // This write is not attributed to replay. It first invokes the owner's
+      // synchronous takeover callback, then lands as its own history entry.
+      set((draft) => {
+        draft.name = 'user edit'
+      })
+
+      expect(takeoverCount).toBe(1)
+      expect(store.items.a!.value).toBe(2)
+      expect(store.name).toBe('user edit')
+      history.undo()
+      expect(store.name).toBe('base')
+      expect(store.items.a!.value).toBe(2)
+      expect(sideState).toBe('replayed')
+      history.undo()
+      expect(store.items.a!.value).toBe(1)
+      expect(sideState).toBe('before')
+      history.redo()
+      expect(store.items.a!.value).toBe(2)
+      expect(sideState).toBe('replayed')
+    })
+
     it('blocks undo/redo while previewing', () => {
       const { store, set, history } = makeHistory()
       set((draft) => {

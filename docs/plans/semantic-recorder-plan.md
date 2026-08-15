@@ -3,10 +3,12 @@
 Status: **in progress**. M1 (recorder core and `.steps.json`), M2
 (deterministic command args), M4 (transport, step list, seeking and one-step
 undo) and M5 (sessions embedded in PNG/MP4 exports) are implemented. M3 now
-covers the main flame, camera, timeline, audio-wiring, viewport and undo/redo
-surfaces. The remaining authored-edit gaps are narrow: committed custom
-variation code, curve-handle drags and a few startup/tour hand-off paths.
-Captured 2026-08-14.
+covers the main flame, camera, timeline (including curve edits), audio-reactive
+wiring, viewport and undo/redo surfaces. The remaining authored-state gaps are
+committed custom-variation code and sonification; semantic-origin/follow-cam
+precision and a representative whole-UI coverage ratchet remain incremental
+work. Captured 2026-08-15; see `docs/recorder-coverage.md` for the audited
+matrix and follow-up list.
 
 ## The ask
 
@@ -337,7 +339,7 @@ diagnostics.
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
 | M1  | `src/recorder/` module: session schema, recorder hooked into command/history seams, fidelity diagnostics, production UI and `.steps.json` persistence.                                                                                  | shipped        |
 | M2  | Determinism: id-based addressing, pre-minted ids, seeded generate/mutate and round-trip tests.                                                                                                                                          | shipped        |
-| M3  | Core editing-surface coverage is largely shipped; committed custom-code/curve gestures and a representative Playwright coverage-ratchet journey remain.                                                                                 | incremental    |
+| M3  | Core editing-surface coverage is largely shipped; sonification, committed custom code, semantic-origin/follow-cam precision and a representative Playwright coverage-ratchet journey remain.                                            | incremental    |
 | M4  | ~~Replay~~ **done**: `createSessionPlayer` transport, step-list panel, timed playback with speed control, jump-to-step, fork-from-step. A run or a seek is ONE undo step, so watching a session does not bury the viewer's own history. | shipped        |
 | M5  | Sharing: PNG `FlameSteps` chunk, MP4 metadata and export-dialog integration.                                                                                                                                                            | shipped        |
 | —   | Later: sandboxed replay for gallery previews, scripting/MCP surface over the registry, condensed-recipe editor, gallery publishing.                                                                                                     | separate plans |

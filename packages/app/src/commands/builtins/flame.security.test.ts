@@ -91,6 +91,29 @@ afterEach(() => {
 })
 
 describe('bounded flame entity commands', () => {
+  it('applies an export metadata patch as one semantic document write', () => {
+    const world = makeContext(deepClone(examples.initExample))
+    const setMetadata = command('flame.setMetadata')
+
+    expect(
+      preflightReplayCommand('flame.setMetadata', [
+        { name: 'New name', author: 'Grace' },
+      ]),
+    ).toBeUndefined()
+    setMetadata.execute(world.ctx, { name: 'New name', author: 'Grace' })
+
+    expect(world.writes()).toBe(1)
+    expect(world.flame().metadata).toMatchObject({
+      name: 'New name',
+      author: 'Grace',
+    })
+    expect(
+      preflightReplayCommand('flame.setMetadata', [
+        { name: 'Valid', constructor: 'hostile' },
+      ]),
+    ).toBeDefined()
+  })
+
   it('allows repeated transform adds through the boundary, then stops', () => {
     const world = makeContext(makeFlame(0))
     const add = command('flame.addTransform')
@@ -192,6 +215,22 @@ describe('bounded flame entity commands', () => {
         { type: 'constructor', weight: 1 },
       ]),
     ).toBeDefined()
+    expect(
+      setVariation.validateReplayArgs?.([
+        transformId,
+        variationId,
+        { type: 'linearVar', weight: 1 },
+        'randomize',
+      ]),
+    ).toBeUndefined()
+    expect(
+      setVariation.validateReplayArgs?.([
+        transformId,
+        variationId,
+        { type: 'linearVar', weight: 1 },
+        'hostile-origin',
+      ]),
+    ).toBeDefined()
 
     setVariation.execute(world.ctx, transformId, variationId, {
       type: 'swirlVar',
@@ -200,6 +239,22 @@ describe('bounded flame entity commands', () => {
     expect(
       world.flame().transforms[transformId]!.variations[variationId]!.type,
     ).toBe('swirlVar')
+  })
+
+  it('applies one final-affine coefficient and rejects malformed replay data', () => {
+    const world = makeContext(deepClone(examples.initExample))
+    command('flame.setFinalTransform').execute(world.ctx, identity)
+
+    expect(
+      executeReplayCommand('flame.setFinalAffine', world.ctx, 'e', 0.25),
+    ).toBe(true)
+    expect(world.flame().finalTransform?.e).toBe(0.25)
+
+    const before = deepClone(world.flame())
+    expect(
+      executeReplayCommand('flame.setFinalAffine', world.ctx, '__proto__', 1),
+    ).toBe(false)
+    expect(world.flame()).toEqual(before)
   })
 
   it('requires symmetry ids to be safe, reserved and unique', () => {

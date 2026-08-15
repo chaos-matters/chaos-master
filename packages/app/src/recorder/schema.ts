@@ -1,5 +1,5 @@
 import { AudioWiringSnapshot } from '@/flame/schema/audioWiring'
-import { tryValidateFlame } from '@/flame/schema/flameSchema'
+import { isSafeFlameEntityId, MAX_FLAME_TRANSFORMS, tryValidateFlame, } from '@/flame/schema/flameSchema'
 import { TimelineSnapshot, tryValidateTimelineSnapshot, } from '@/flame/schema/timeline'
 import * as v from '@/valibot'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -20,6 +20,7 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
  */
 
 export const SESSION_FORMAT_VERSION = 1
+export const MAX_PALETTE_COLOR_MAGNITUDE = 1_000_000
 export const MAX_SESSION_JSON_CHARS = 8 * 1024 * 1024
 /** The direct file picker rejects before decoding, so keep its byte budget
  * aligned with the decoded JSON budget. */
@@ -114,15 +115,71 @@ export function validateRecordedAction(
   return result.success ? result.output : undefined
 }
 
+/**
+ * The transform colours retained by the Palette card so “Unselect” can
+ * restore the document as it looked before the first palette application.
+ * It is editor state rather than part of the flame descriptor, but it affects
+ * the next authored document action and therefore belongs in replay state.
+ */
+export const TransformColorSnapshotSchema = v.pipe(
+  v.record(
+    v.string(),
+    v.object({
+      x: v.pipe(
+        v.number(),
+        v.finite(),
+        v.minValue(-MAX_PALETTE_COLOR_MAGNITUDE),
+        v.maxValue(MAX_PALETTE_COLOR_MAGNITUDE),
+      ),
+      y: v.pipe(
+        v.number(),
+        v.finite(),
+        v.minValue(-MAX_PALETTE_COLOR_MAGNITUDE),
+        v.maxValue(MAX_PALETTE_COLOR_MAGNITUDE),
+      ),
+    }),
+  ),
+  v.maxEntries(MAX_FLAME_TRANSFORMS),
+  v.check((colors) => Object.keys(colors).every(isSafeFlameEntityId)),
+)
+export type TransformColorSnapshot = v.InferOutput<
+  typeof TransformColorSnapshotSchema
+>
+
+export function tryValidateTransformColorSnapshot(
+  data: unknown,
+): TransformColorSnapshot | undefined {
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) {
+    return undefined
+  }
+  const entries = Object.entries(data)
+  // Check the raw object before Valibot materializes a safe record. Special
+  // prototype keys are intentionally omitted from record outputs; silently
+  // turning a hostile snapshot into an empty, valid one would make preflight
+  // accept a different action than the file authored.
+  if (
+    entries.length > MAX_FLAME_TRANSFORMS ||
+    entries.some(([id]) => !isSafeFlameEntityId(id))
+  ) {
+    return undefined
+  }
+  const parsed = v.safeParse(TransformColorSnapshotSchema, data)
+  return parsed.success ? parsed.output : undefined
+}
+
 /** Renderer/editor state that affects what a replay shows but is not stored
  * in the flame descriptor itself. */
 export const SessionViewSnapshot = v.object({
   qualityPreset: v.pipe(v.string(), v.nonEmpty()),
+  /** Optional so pre-resolution recorder sessions remain importable. */
+  pixelRatio: v.optional(v.picklist([1, 0.5, 0.25])),
   adaptiveFilter: v.boolean(),
   stochasticFilter: v.boolean(),
   flyMode: v.boolean(),
   showTimeline: v.boolean(),
   sidebarOpen: v.boolean(),
+  /** Optional keeps sessions recorded before palette provenance importable. */
+  paletteRestoreColors: v.optional(TransformColorSnapshotSchema),
 })
 export type SessionViewSnapshot = v.InferOutput<typeof SessionViewSnapshot>
 
@@ -192,6 +249,24 @@ export function validateSession(data: unknown): RecordedSession | undefined {
     const encoded = JSON.stringify(data)
     if (encoded === undefined || encoded.length > MAX_SESSION_JSON_CHARS) {
       return undefined
+    }
+  } catch {
+    return undefined
+  }
+  try {
+    if (data !== null && typeof data === 'object') {
+      const initialView = (data as { initialView?: unknown }).initialView
+      if (initialView !== null && typeof initialView === 'object') {
+        const paletteRestoreColors = (
+          initialView as { paletteRestoreColors?: unknown }
+        ).paletteRestoreColors
+        if (
+          paletteRestoreColors !== undefined &&
+          tryValidateTransformColorSnapshot(paletteRestoreColors) === undefined
+        ) {
+          return undefined
+        }
+      }
     }
   } catch {
     return undefined

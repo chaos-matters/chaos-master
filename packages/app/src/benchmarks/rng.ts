@@ -1,16 +1,19 @@
+import { DEFAULT_RENDERER_RANDOM_IMPLEMENTATION_ID, RENDERER_RANDOM_IMPLEMENTATION_IDS, } from '@/shaders/random'
 import type { BenchmarkImplementationV1, JsonObject } from './model'
+import type { RendererRandomImplementationId } from '@/shaders/random'
 
 export const RNG_BENCHMARK_SETTINGS_SCHEMA_VERSION =
   'chaos-benchmark-rng-settings/v1' as const
 
 export const RNG_IMPLEMENTATION_IDS = {
-  legacy: 'legacy-xoroshiro64-state-x-v1',
-  xoroshiro64ss: 'xoroshiro64ss-canonical-v1',
+  legacy: RENDERER_RANDOM_IMPLEMENTATION_IDS.legacy,
+  xoroshiro64ss: RENDERER_RANDOM_IMPLEMENTATION_IDS.canonical,
   lcg32: 'lcg32-numerical-recipes-v1',
 } as const
 
 export type RngImplementationId =
-  (typeof RNG_IMPLEMENTATION_IDS)[keyof typeof RNG_IMPLEMENTATION_IDS]
+  | RendererRandomImplementationId
+  | typeof RNG_IMPLEMENTATION_IDS.lcg32
 
 export const RNG_SEED_POLICY_IDS = {
   legacyPersisted: 'legacy-persisted-plus-point-index-hash-v1',
@@ -21,8 +24,20 @@ export type RngSeedPolicyId =
   (typeof RNG_SEED_POLICY_IDS)[keyof typeof RNG_SEED_POLICY_IDS]
 
 export type RngLifecycleStatus = 'current' | 'experimental'
-export type RngExecutionStatus = 'not-wired'
+export type RngExecutionStatus = 'not-wired' | 'renderer-wired'
 export type RngStateLayout = 'u32' | 'vec2u'
+
+export type RngExecution =
+  | {
+      readonly executable: true
+      readonly status: 'renderer-wired'
+      readonly reason: string
+    }
+  | {
+      readonly executable: false
+      readonly status: 'not-wired'
+      readonly reason: string
+    }
 
 export interface RngImplementationDefinition {
   readonly id: RngImplementationId
@@ -34,11 +49,7 @@ export interface RngImplementationDefinition {
   readonly stateWords: 1 | 2
   readonly stateBytes: 4 | 8
   readonly recommendedSeedPolicyId: RngSeedPolicyId
-  readonly execution: {
-    readonly executable: false
-    readonly status: RngExecutionStatus
-    readonly reason: string
-  }
+  readonly execution: RngExecution
   readonly metadata: JsonObject
 }
 
@@ -53,14 +64,16 @@ export interface RngSeedPolicyDefinition {
 }
 
 const NOT_WIRED_REASON =
-  'Registry-only candidate; the benchmark runner and shader hot path do not consume RNG implementation IDs yet.'
+  'Registry-only candidate; the renderer does not implement this RNG state layout yet.'
+const RENDERER_WIRED_REASON =
+  'Implemented by the renderer with persisted per-chain state and compile-time implementation selection.'
 
 export const RNG_IMPLEMENTATIONS = {
-  [RNG_IMPLEMENTATION_IDS.legacy]: {
-    id: RNG_IMPLEMENTATION_IDS.legacy,
-    label: 'Current legacy RNG',
+  [RNG_IMPLEMENTATION_IDS.xoroshiro64ss]: {
+    id: RNG_IMPLEMENTATION_IDS.xoroshiro64ss,
+    label: 'TypeGPU noise xoroshiro64**',
     description:
-      'Exact current output rule: advance the xoroshiro64 transition, then expose the low 23 bits of the updated first state word.',
+      'Current renderer output rule: canonical xoroshiro64** assembled from @typegpu/noise primitives while retaining application-owned persisted state.',
     family: 'xoroshiro64',
     lifecycleStatus: 'current',
     stateLayout: 'vec2u',
@@ -68,39 +81,40 @@ export const RNG_IMPLEMENTATIONS = {
     stateBytes: 8,
     recommendedSeedPolicyId: RNG_SEED_POLICY_IDS.legacyPersisted,
     execution: {
-      executable: false,
-      status: 'not-wired',
-      reason: NOT_WIRED_REASON,
-    },
-    metadata: {
-      canonical: false,
-      outputWord: 'post-transition-state-word-zero',
-      sequenceCompatibility: 'chaos-master-main-a782388',
-      statePersistence: 'storage-buffer-across-dispatches',
-    },
-  },
-  [RNG_IMPLEMENTATION_IDS.xoroshiro64ss]: {
-    id: RNG_IMPLEMENTATION_IDS.xoroshiro64ss,
-    label: 'Canonical xoroshiro64**',
-    description:
-      'Canonical xoroshiro64** output computed from the pre-transition first state word.',
-    family: 'xoroshiro64',
-    lifecycleStatus: 'experimental',
-    stateLayout: 'vec2u',
-    stateWords: 2,
-    stateBytes: 8,
-    recommendedSeedPolicyId: RNG_SEED_POLICY_IDS.saltedDeterministic,
-    execution: {
-      executable: false,
-      status: 'not-wired',
-      reason: NOT_WIRED_REASON,
+      executable: true,
+      status: 'renderer-wired',
+      reason: RENDERER_WIRED_REASON,
     },
     metadata: {
       canonical: true,
       outputWord: 'pre-transition-xoroshiro64-star-star',
       reference: 'https://prng.di.unimi.it/xoroshiro64starstar.c',
-      sourceWorktreeCommit: '629008ffd55c91d2c5f78b1b529ab0bb279f0f01',
-      statePersistence: 'adapter-required',
+      rendererDefault: true,
+      statePersistence: 'storage-buffer-across-dispatches',
+    },
+  },
+  [RNG_IMPLEMENTATION_IDS.legacy]: {
+    id: RNG_IMPLEMENTATION_IDS.legacy,
+    label: 'Legacy xoroshiro64 state output',
+    description:
+      'Compatibility renderer output rule: advance the xoroshiro64 transition, then expose the low 23 bits of the updated first state word.',
+    family: 'xoroshiro64',
+    lifecycleStatus: 'experimental',
+    stateLayout: 'vec2u',
+    stateWords: 2,
+    stateBytes: 8,
+    recommendedSeedPolicyId: RNG_SEED_POLICY_IDS.legacyPersisted,
+    execution: {
+      executable: true,
+      status: 'renderer-wired',
+      reason: RENDERER_WIRED_REASON,
+    },
+    metadata: {
+      canonical: false,
+      outputWord: 'post-transition-state-word-zero',
+      rendererDefault: false,
+      sequenceCompatibility: 'chaos-master-main-a782388',
+      statePersistence: 'storage-buffer-across-dispatches',
     },
   },
   [RNG_IMPLEMENTATION_IDS.lcg32]: {
@@ -131,8 +145,8 @@ export const RNG_IMPLEMENTATIONS = {
 >
 
 export const RNG_IMPLEMENTATION_LIST = [
+  RNG_IMPLEMENTATIONS[DEFAULT_RENDERER_RANDOM_IMPLEMENTATION_ID],
   RNG_IMPLEMENTATIONS[RNG_IMPLEMENTATION_IDS.legacy],
-  RNG_IMPLEMENTATIONS[RNG_IMPLEMENTATION_IDS.xoroshiro64ss],
   RNG_IMPLEMENTATIONS[RNG_IMPLEMENTATION_IDS.lcg32],
 ] as const
 

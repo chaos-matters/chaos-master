@@ -5,6 +5,7 @@ import { isFlameGraphWithinLimits, isSafeFlameEntityId, tryValidateFlame, } from
 import { generateTransformId, generateVariationId, } from '@/flame/transformFunction'
 import { defaultLinearType, isVariationTypeFor, } from '@/flame/variationRegistry'
 import { getVariationDefault } from '@/flame/variations/utils'
+import { tryValidateTransformColorSnapshot } from '@/recorder/schema'
 import { deepClone } from '@/utils/clone'
 import { registerCommand } from '../registry'
 import type { CommandContext } from '../types'
@@ -605,6 +606,10 @@ registerCommand({
   id: 'flame.updateRenderSettings',
   label: 'Update Render Settings',
   description: 'Merge a partial render-settings object into the flame',
+  coalesceKey: ([settings, origin]) =>
+    isPlainRecord(settings)
+      ? `${typeof origin === 'string' ? origin : 'legacy'}:${Object.keys(settings).sort().join(',')}`
+      : undefined,
   // A bulk merge, used where a panel applies several settings at once. The
   // per-key flame.setRenderSetting is the better-behaved command; this one
   // exists because those call sites genuinely apply a batch as one edit.
@@ -686,10 +691,18 @@ registerCommand({
   id: 'flame.setTransformColor',
   label: 'Set Transform Color',
   description: 'Set the color x/y coordinates of a transform',
-  normalizeArgs(ctx, [transformRef, x, y]) {
-    return [normalizeTransformRef(ctx, transformRef), x, y]
+  normalizeArgs(ctx, [transformRef, x, y, origin]) {
+    const normalized = [normalizeTransformRef(ctx, transformRef), x, y]
+    return origin === 'grid' ||
+      origin === 'x' ||
+      origin === 'y' ||
+      origin === 'randomize' ||
+      origin === 'reset'
+      ? [...normalized, origin]
+      : normalized
   },
-  coalesceKey: ([transformRef]) => `color:${String(transformRef)}`,
+  coalesceKey: ([transformRef, , , origin]) =>
+    `color:${String(transformRef)}:${typeof origin === 'string' ? origin : 'grid'}`,
   execute(ctx, transformRef?: unknown, x?: unknown, y?: unknown) {
     const cx = typeof x === 'number' ? x : 0
     const cy = typeof y === 'number' ? y : 0
@@ -885,22 +898,38 @@ registerCommand({
   description:
     'Replace a variation descriptor wholesale (type, weight and params)',
   validateReplayArgs(args) {
-    if (args.length !== 3) {
-      return 'setVariation expects two entity ids and a descriptor'
+    if (args.length !== 3 && args.length !== 4) {
+      return 'setVariation expects two entity ids, a descriptor and optional UI origin'
     }
     if (!isSafeFlameEntityId(args[0])) return 'transform id is unsafe'
     if (!isSafeFlameEntityId(args[1])) return 'variation id is unsafe'
     if (!isKnownVariationType(variationDescriptorType(args[2]))) {
       return 'variation descriptor type is not registered'
     }
+    if (
+      args.length === 4 &&
+      args[3] !== 'type' &&
+      args[3] !== 'randomize' &&
+      args[3] !== 'params'
+    ) {
+      return 'setVariation UI origin is invalid'
+    }
     return undefined
   },
-  normalizeArgs(ctx, [transformRef, variationRef, descriptor]) {
-    return [
+  normalizeArgs(ctx, [transformRef, variationRef, descriptor, focusOrigin]) {
+    const normalized = [
       normalizeTransformRef(ctx, transformRef),
       normalizeVariationRef(ctx, transformRef, variationRef),
       descriptor,
     ]
+    if (
+      focusOrigin === 'type' ||
+      focusOrigin === 'randomize' ||
+      focusOrigin === 'params'
+    ) {
+      normalized.push(focusOrigin)
+    }
+    return normalized
   },
   // Also used by the parametric-params editors, which are scrub/slider
   // driven, so repeats on one variation fold per gesture.
@@ -1017,6 +1046,13 @@ registerCommand({
   id: 'flame.setFinalTransform',
   label: 'Set Final Transform',
   description: 'Set or clear the flame-wide final affine transform',
+  normalizeArgs(_ctx, [affine, origin]) {
+    return origin === 'grid' || origin === 'randomize'
+      ? [affine, origin]
+      : [affine]
+  },
+  coalesceKey: ([, origin]) =>
+    `final-affine-matrix:${typeof origin === 'string' ? origin : 'grid'}`,
   execute(ctx, affine?: unknown) {
     if (affine !== null && affine !== undefined && !isAffineLike(affine)) {
       console.warn('[cmd] flame.setFinalTransform: invalid affine', affine)
@@ -1034,6 +1070,31 @@ registerCommand({
     }
     ctx.setFlameDescriptor((draft) => {
       draft.finalTransform = deepClone(validated.finalTransform)
+    }, 'Final Transform')
+  },
+})
+
+registerCommand({
+  id: 'flame.setFinalAffine',
+  label: 'Set Final Affine Coefficient',
+  description: 'Set one coefficient on the flame-wide final transform',
+  coalesceKey: ([param]) => `final-affine:${String(param)}`,
+  execute(ctx, param?: unknown, value?: unknown) {
+    if (
+      typeof param !== 'string' ||
+      !AFFINE_3D_KEYS.includes(param) ||
+      typeof value !== 'number' ||
+      !Number.isFinite(value)
+    ) {
+      console.warn('[cmd] flame.setFinalAffine: invalid coefficient', {
+        param,
+        value,
+      })
+      return
+    }
+    ctx.setFlameDescriptor((draft) => {
+      const affine = draft.finalTransform as Record<string, number> | undefined
+      if (affine && Object.hasOwn(affine, param)) affine[param] = value
     }, 'Final Transform')
   },
 })
@@ -1107,15 +1168,18 @@ registerCommand({
   // A drag recomputes the entire matrix each frame, so this takes the whole
   // affine rather than one coefficient: with the per-coefficient command a
   // single drag would log six actions instead of one.
-  normalizeArgs(ctx, [transformRef, which, affine]) {
-    return [
+  normalizeArgs(ctx, [transformRef, which, affine, origin]) {
+    const normalized = [
       normalizeTransformRef(ctx, transformRef),
       which === 'post' ? 'post' : 'pre',
       affine,
     ]
+    return origin === 'grid' || origin === 'randomize' || origin === 'reset'
+      ? [...normalized, origin]
+      : normalized
   },
-  coalesceKey: ([transformRef, which]) =>
-    `affineMatrix:${String(transformRef)}:${String(which)}`,
+  coalesceKey: ([transformRef, which, , origin]) =>
+    `affineMatrix:${String(transformRef)}:${String(which)}:${typeof origin === 'string' ? origin : 'grid'}`,
   execute(ctx, transformRef?: unknown, which?: unknown, affine?: unknown) {
     if (!isAffineLike(affine)) {
       console.warn('[cmd] flame.setTransformAffine: not an affine', affine)
@@ -1180,11 +1244,17 @@ registerCommand({
   // the editor stashes them in a signal when the palette is applied, and UI
   // state is not something a log can replay. Without them the palette is
   // simply dropped and the current colours stay.
+  validateReplayArgs(args) {
+    return args.length === 1 && tryValidateTransformColorSnapshot(args[0])
+      ? undefined
+      : 'remove palette expects one bounded transform-colour snapshot'
+  },
   execute(ctx, restoreColors?: unknown) {
-    const saved =
-      restoreColors !== null && typeof restoreColors === 'object'
-        ? (deepClone(restoreColors) as Record<string, { x: number; y: number }>)
-        : {}
+    const saved = tryValidateTransformColorSnapshot(restoreColors)
+    if (!saved) {
+      console.warn('[cmd] flame.removePalette: invalid restore colours')
+      return
+    }
     ctx.setFlameDescriptor((draft) => {
       for (const [tid, transform] of Object.entries(draft.transforms)) {
         const color = saved[tid]
@@ -1207,8 +1277,8 @@ registerCommand({
   // Validated through the normal migrate-on-parse path, the same one saved
   // flames and imports go through.
   validateReplayArgs(args) {
-    if (args.length < 1 || args.length > 2) {
-      return 'load expects a flame and an optional label'
+    if (args.length < 1 || args.length > 3) {
+      return 'load expects a flame, optional label, and optional palette snapshot'
     }
     if (!tryValidateFlame(deepClone(args[0]))) {
       return 'flame descriptor is invalid'
@@ -1218,6 +1288,9 @@ registerCommand({
       (typeof args[1] !== 'string' || args[1].length > 512)
     ) {
       return 'load label must be a short string'
+    }
+    if (args.length === 3 && !tryValidateTransformColorSnapshot(args[2])) {
+      return 'load palette provenance is invalid'
     }
     return undefined
   },
@@ -1407,9 +1480,35 @@ registerCommand({
   id: 'flame.setMetadata',
   label: 'Set Flame Metadata',
   description: 'Set the flame name, author or description',
-  coalesceKey: ([field]) => `metadata:${String(field)}`,
-  describe: ([field]) => `Set flame ${String(field)}`,
+  coalesceKey: ([field]) =>
+    typeof field === 'string' ? `metadata:${field}` : undefined,
+  describe: ([field]) =>
+    typeof field === 'string' ? `Set flame ${field}` : 'Set flame metadata',
   execute(ctx, field?: unknown, value?: unknown) {
+    if (isPlainRecord(field) && value === undefined) {
+      const keys = Object.keys(field)
+      if (
+        keys.length === 0 ||
+        !keys.every(
+          (key) =>
+            (key === 'name' || key === 'author' || key === 'description') &&
+            typeof field[key] === 'string' &&
+            field[key].length <= 16_384,
+        )
+      ) {
+        console.warn('[cmd] flame.setMetadata: rejected patch', field)
+        return
+      }
+      ctx.setFlameDescriptor((draft) => {
+        draft.metadata ??= { name: '', description: '', author: '' }
+        for (const key of keys) {
+          draft.metadata[key as 'name' | 'author' | 'description'] = field[
+            key
+          ] as string
+        }
+      }, 'Flame Metadata')
+      return
+    }
     if (
       (field !== 'name' && field !== 'author' && field !== 'description') ||
       typeof value !== 'string'

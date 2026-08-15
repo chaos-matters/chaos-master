@@ -4,6 +4,13 @@ export type EditorProps<T> = {
   name?: string
   value: T
   setValue: (val: T) => void
+  /**
+   * Optional root-object fast path for edits that change one numeric field.
+   *
+   * Variation params use this to preserve the field key in the command log;
+   * callers without a scalar command keep the existing whole-object update.
+   */
+  setParamValue?: (key: string, value: number) => void
   dataParameterPath?: string
   /** Struct field key — lets the docs param-meta capture map ranges to params. */
   paramKey?: string
@@ -29,6 +36,10 @@ export function editorProps<
       return props.value[key]
     },
     setValue(value) {
+      if (typeof value === 'number' && props.setParamValue) {
+        props.setParamValue(String(key), value)
+        return
+      }
       props.setValue({ ...props.value, [key]: value })
     },
   }

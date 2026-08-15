@@ -81,7 +81,9 @@
   height: var(--timeline-height, 220px);
   min-height: 120px;
   max-height: 55vh;
-  transition: height 0.05s;
+  transition:
+    height 0.05s,
+    opacity 150ms ease;
 
   [data-theme='dark'] & {
     background-color: var(--neutral-950);

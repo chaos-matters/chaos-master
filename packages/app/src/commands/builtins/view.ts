@@ -29,6 +29,16 @@ registerCommand({
 })
 
 registerCommand({
+  id: 'view.setPixelRatio',
+  label: 'Set Canvas Resolution',
+  description: 'Choose the live canvas resolution scale',
+  execute(ctx, ratio?: unknown) {
+    if (ratio !== 1 && ratio !== 0.5 && ratio !== 0.25) return
+    ctx.setPixelRatio(ratio)
+  },
+})
+
+registerCommand({
   id: 'view.setAdaptiveFilter',
   label: 'Toggle Adaptive Filter',
   description: 'Adaptive density-estimation blur',

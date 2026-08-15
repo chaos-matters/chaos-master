@@ -1,3 +1,4 @@
+import { createSignal } from 'solid-js'
 import { persistentSignal } from '@/utils/persistentSignal'
 
 /**
@@ -10,11 +11,23 @@ import { persistentSignal } from '@/utils/persistentSignal'
  * a reload. Same shape as the rest of the app's UI preferences.
  */
 
+/** Caption persistence is transient UI state, never a saved preference. It is
+ * shared because both the dock and the floating toolbar can hide the panel. */
+export const [recorderSavePending, setRecorderSavePending] = createSignal(false)
+
 /** Whether the dock is mounted at all. The toolbar's recorder toggle. */
-export const [recorderVisible, setRecorderVisible] = persistentSignal(
+const [recorderVisibleValue, setRecorderVisibleValue] = persistentSignal(
   'recorder/visible',
   true,
 )
+
+export const recorderVisible = recorderVisibleValue
+
+/** Keep the local caption draft mounted until its store attempt settles. */
+export function setRecorderVisible(visible: boolean): void {
+  if (!visible && recorderSavePending()) return
+  setRecorderVisibleValue(visible)
+}
 
 /**
  * Collapsed = the pill only, without the replay step list and the library.

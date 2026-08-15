@@ -42,6 +42,7 @@ export function CurveEditor(props: CurveEditorProps) {
   const changeHistory = useChangeHistory()
 
   let laneRef: HTMLDivElement | undefined
+  let finishNodeDrag: (() => void) | undefined
   const [laneHeight, setLaneHeight] = createSignal(0)
 
   // Attach the size observer via the lane's ref so it binds when the lane is
@@ -182,7 +183,10 @@ export function CurveEditor(props: CurveEditorProps) {
     const startValue = kf.value
     const startFrame = kf.frame
     let currentFrame = startFrame
-    ;(e.target as Element).setPointerCapture(e.pointerId)
+    const captureTarget = e.currentTarget as Element
+    finishNodeDrag?.()
+    timeline.breakUndoCoalescing()
+    captureTarget.setPointerCapture(e.pointerId)
 
     props.onSelectKeyframe?.(path, startFrame)
     // Pin the axis (sticky — kept after release so the node doesn't jump) and
@@ -233,15 +237,27 @@ export function CurveEditor(props: CurveEditorProps) {
       )
     }
 
-    function onUp() {
+    function finish() {
+      if (finishNodeDrag !== finish) return
+      finishNodeDrag = undefined
       window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointerup', finish)
+      window.removeEventListener('pointercancel', finish)
+      captureTarget.removeEventListener('lostpointercapture', finish)
       if (changeHistory.isPreviewing()) changeHistory.commit()
+      timeline.breakUndoCoalescing()
       // Keep the sticky range so the node stays where it was dragged.
     }
+    finishNodeDrag = finish
     window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointerup', finish)
+    window.addEventListener('pointercancel', finish)
+    captureTarget.addEventListener('lostpointercapture', finish)
   }
+
+  onCleanup(() => {
+    finishNodeDrag?.()
+  })
 
   function addKeyframeAtPoint(e: MouseEvent) {
     const p = props.path
