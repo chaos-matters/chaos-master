@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { examples } from '@/flame/examples'
+import { SONIFICATION_SNAPSHOT_VERSION } from '@/recorder/sonificationState'
 import { asciiBytes } from './binaryReader'
 import { deepClone } from './clone'
 import { createMetadataPayload, extractMetadataFromMp4, injectMetadataIntoMp4, } from './flameInMp4'
@@ -48,7 +49,44 @@ const session: RecordedSession = {
   app: { version: 'test', flameSchemaVersion: '1.0' },
   createdAt: '1970-01-01T00:00:00.000Z',
   initial: deepClone(examples.example1),
-  actions: [{ t: 0, id: 'flame.setGamma', args: [2.4], label: 'Set Gamma' }],
+  initialSonification: {
+    version: SONIFICATION_SNAPSHOT_VERSION,
+    enabled: true,
+    config: {
+      model: 'ambient',
+      volume: 0.45,
+      updateRate: 24,
+      scale: 'pentatonicMinor',
+      voiceCount: 10,
+      harmonicDensity: 1.4,
+      triggerRate: 6,
+      spatialSpread: 0.8,
+      reverbMix: 0.4,
+    },
+  },
+  initialView: {
+    qualityPreset: 'high',
+    pixelRatio: 0.5,
+    adaptiveFilter: true,
+    stochasticFilter: false,
+    flyMode: false,
+    showTimeline: true,
+    sidebarOpen: true,
+    paletteRestoreColors: {
+      transform_one: { x: 0.17, y: -0.24 },
+    },
+  },
+  actions: [
+    {
+      t: 0,
+      id: 'flame.setGamma',
+      args: [2.4],
+      label: 'Set Gamma',
+      focus: 'param:gamma',
+      note: 'Lift the gamma gently',
+      holdMs: 1200,
+    },
+  ],
   unnamedWriteCount: 0,
 }
 
@@ -66,8 +104,7 @@ describe('flameInMp4 — embedded session (M5)', () => {
     expect(Object.keys(extracted?.flame.transforms ?? {})).toEqual(
       Object.keys(examples.example1.transforms),
     )
-    expect(extracted?.session?.actions).toEqual(session.actions)
-    expect(extracted?.session?.initial).toEqual(deepClone(examples.example1))
+    expect(extracted?.session).toEqual(session)
   })
 
   it('reports no session when the export carried none', async () => {

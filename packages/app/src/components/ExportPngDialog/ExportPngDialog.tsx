@@ -15,7 +15,7 @@ import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
 import { lastFinishedSession } from '@/recorder/recorder'
 import { deepClone } from '@/utils/clone'
 import { computeExportDimensions, DEFAULT_EXPORT_ASPECT, DEFAULT_EXPORT_RESOLUTION, } from '@/utils/exportDimensions'
-import { embedStepsInExports, sessionForExport, setEmbedStepsInExports, } from '@/utils/exportPreferences'
+import { embedStepsInExports, sessionForExport, setEmbedStepsInExports, snapshotExportSession, } from '@/utils/exportPreferences'
 import { addFlameDataToPng } from '@/utils/flameInPng'
 import { compressJsonQueryParam } from '@/utils/jsonQueryParam'
 import { persistentSignal } from '@/utils/persistentSignal'
@@ -985,6 +985,7 @@ export function createExportPngDialog(
     const config = timeline?.config() ?? defaultTimelineConfig()
     const hasAnimation = tracks.some((track) => track.keyframes.length > 0)
     const currentRatio = getPixelRatio()
+    const sessionSnapshot = snapshotExportSession(sessionForExport())
 
     setPixelRatio(currentRatio)
     setOnExportImage(() => (canvas: HTMLCanvasElement) => {
@@ -1006,9 +1007,8 @@ export function createExportPngDialog(
           // If a session was recorded for this flame, it rides along in a
           // second chunk, so a dropped PNG can offer to replay how it was
           // made (docs/plans/semantic-recorder-plan.md, M5).
-          const session = sessionForExport()
-          const encodedSteps = session
-            ? await compressJsonQueryParam(session)
+          const encodedSteps = sessionSnapshot
+            ? await compressJsonQueryParam(sessionSnapshot)
             : undefined
           pngBytes = new Uint8Array(
             await addFlameDataToPng(
@@ -1183,7 +1183,7 @@ export function createExportPngDialog(
         condenseHidden: condenseHidden(),
         tracks: timeline?.tracks() ?? [],
         config: timeline?.config() ?? defaultTimelineConfig(),
-        session: sessionForExport(),
+        session: snapshotExportSession(sessionForExport()),
       })
     }
 
@@ -1199,6 +1199,7 @@ export function createExportPngDialog(
         aspect(),
         viewportAspect,
       )
+      const sessionSnapshot = snapshotExportSession(sessionForExport())
 
       // Offscreen: enqueue a background job (workspace stays usable). Renders the
       // RAW workspace flame; the job applies the timeline per frame.
@@ -1219,6 +1220,7 @@ export function createExportPngDialog(
           blendWeight: getBlendWeight?.() ?? 0,
           tracks: timeline?.tracks() ?? [],
           config: timeline?.config() ?? defaultTimelineConfig(),
+          session: sessionSnapshot,
           audioBuffer: getAudioBuffer?.(),
           audioMapping: getAudioMapping?.(),
         })
@@ -1240,6 +1242,7 @@ export function createExportPngDialog(
         playCount: playCount(),
         codec: codec(),
         embedMetadata: embedMetadata(),
+        session: sessionSnapshot,
         audioBuffer: audioBuf,
         audioMapping: getAudioMapping?.(),
       }

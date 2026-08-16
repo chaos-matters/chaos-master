@@ -3,7 +3,6 @@ import { accumulatedPointCount, forceAnimationExportNow, qualityPointCountLimit,
 import { applyAudioMappingsToFlame, createAudioAnalyzer } from './audioAnalysis'
 import { createAudioVideoEncoder } from './audioExport'
 import { deepClone } from './clone'
-import { sessionForExport } from './exportPreferences'
 import { createMetadataPayload, injectMetadataIntoMp4 } from './flameInMp4'
 import { formatPointCount } from './formatPointCount'
 import { logTime } from './logTime'
@@ -12,6 +11,7 @@ import { createVideoEncoder } from './videoEncoder'
 import type { AudioMappingEntry } from './audioAnalysis'
 import type { FlameDescriptor, TimelineState } from './timeline'
 import type { VideoEncoderConfig } from './videoEncoder'
+import type { RecordedSession } from '@/recorder/schema'
 
 const { performance } = globalThis
 
@@ -27,6 +27,8 @@ export type AnimationExportConfig = {
   playCount: number
   codec: VideoEncoderConfig['codec']
   embedMetadata: boolean
+  /** Recording association captured when the export was initiated. */
+  session: RecordedSession | undefined
   /** When set, produce an MP4 with a synced AAC audio track (WebCodecs AudioEncoder). */
   audioBuffer?: AudioBuffer
   /** Audio-reactive mappings applied per frame (requires audioBuffer). */
@@ -317,7 +319,7 @@ export function createAnimationExport(
               baseFlame,
               timeline.tracks(),
               timeline.config(),
-              sessionForExport(),
+              config.session,
             )
             const patchedBuffer = injectMetadataIntoMp4(mp4Buffer, payload)
             resolve(new Blob([patchedBuffer], { type: result.mimeType }))
