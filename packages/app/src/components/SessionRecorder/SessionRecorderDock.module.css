@@ -201,6 +201,17 @@
   accent-color: oklch(60% 0.12 240);
 }
 
+.opacity-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.opacity-controls[hidden] {
+  display: none;
+}
+
 .fade-toggle {
   display: inline-flex;
   align-items: center;

@@ -65,6 +65,7 @@
   flex: none;
 }
 
+.status,
 .live {
   display: inline-flex;
   align-items: center;

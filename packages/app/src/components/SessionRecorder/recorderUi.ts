@@ -1,4 +1,5 @@
 import { createSignal } from 'solid-js'
+import { isSessionRecording } from '@/recorder/recorder'
 import { persistentSignal } from '@/utils/persistentSignal'
 
 /**
@@ -23,9 +24,13 @@ const [recorderVisibleValue, setRecorderVisibleValue] = persistentSignal(
 
 export const recorderVisible = recorderVisibleValue
 
-/** Keep the local caption draft mounted until its store attempt settles. */
+/**
+ * Keep the controls that can finish the active operation mounted. Callers
+ * outside the dock use this setter too, so the invariant belongs here rather
+ * than only on the dock's close button.
+ */
 export function setRecorderVisible(visible: boolean): void {
-  if (!visible && recorderSavePending()) return
+  if (!visible && (isSessionRecording() || recorderSavePending())) return
   setRecorderVisibleValue(visible)
 }
 

@@ -68,6 +68,8 @@ export type AnimationJobSpec = {
   blendWeight: number
   tracks: TimelineTrack[]
   config: TimelineConfig
+  /** Recording association captured when the job was enqueued. */
+  session: RecordedSession | undefined
   audioBuffer?: AudioBuffer
   audioMapping?: AudioMappingEntry[]
 }

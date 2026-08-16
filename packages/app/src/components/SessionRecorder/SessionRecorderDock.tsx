@@ -111,7 +111,10 @@ export function SessionRecorderDock(props: {
 
   let barRef: HTMLDivElement | undefined
   let panelsRef: HTMLDivElement | undefined
+  let libraryPanelRef: HTMLDivElement | undefined
   let recordingsButtonRef: HTMLButtonElement | undefined
+  let opacitySliderRef: HTMLInputElement | undefined
+  let transparencyButtonRef: HTMLButtonElement | undefined
   let resizeObserver: ResizeObserver | undefined
   let cleanupDrag: (() => void) | undefined
 
@@ -298,10 +301,32 @@ export function SessionRecorderDock(props: {
   const showLibrary = () =>
     libraryOpen() && !recorderCollapsed() && !isSessionRecording()
 
+  const focusLibraryPanel = () => {
+    queueMicrotask(() => {
+      if (showLibrary()) libraryPanelRef?.focus()
+    })
+  }
+
   const openLibrary = () => {
     setLibraryMounted(true)
     setLibraryOpen(true)
     setRecorderCollapsed(false)
+    focusLibraryPanel()
+  }
+
+  const setTransparencyOpen = (open: boolean) => {
+    setShowOpacitySlider(open)
+    if (open) {
+      // The compact visual order keeps these controls before their trigger.
+      // Move keyboard focus into the revealed group so Tab continues through
+      // the controls and back to the Transparency button in DOM order.
+      queueMicrotask(() => opacitySliderRef?.focus())
+    }
+  }
+
+  const closeTransparency = () => {
+    setShowOpacitySlider(false)
+    queueMicrotask(() => transparencyButtonRef?.focus())
   }
 
   const replayFocusTarget = () => {
@@ -340,6 +365,8 @@ export function SessionRecorderDock(props: {
     <div
       class={styles.dock}
       data-replay-region="transport"
+      role="region"
+      aria-label="Step recorder"
       classList={{
         [styles.floating as string]: floating(),
         [styles.dragging as string]: dragging(),
@@ -414,6 +441,9 @@ export function SessionRecorderDock(props: {
           <SessionLibraryPanel
             revision={libraryRevision()}
             hidden={!showLibrary()}
+            panelRef={(element) => {
+              libraryPanelRef = element
+            }}
             onReplay={openReplay}
             onClose={() => {
               setLibraryOpen(false)
@@ -467,8 +497,20 @@ export function SessionRecorderDock(props: {
           />
         </Show>
 
-        <Show when={showOpacitySlider()}>
+        <div
+          id="session-recorder-transparency-controls"
+          class={styles.opacityControls}
+          hidden={!showOpacitySlider()}
+          role="group"
+          aria-label="Transparency settings"
+          onKeyDown={(event) => {
+            if (event.key !== 'Escape') return
+            event.preventDefault()
+            closeTransparency()
+          }}
+        >
           <input
+            ref={opacitySliderRef}
             class={styles.opacitySlider}
             type="range"
             min={MIN_RECORDER_OPACITY}
@@ -494,19 +536,22 @@ export function SessionRecorderDock(props: {
             />
             fade
           </label>
-        </Show>
+        </div>
 
         <button
+          ref={transparencyButtonRef}
           type="button"
           class={styles.iconButton}
           classList={{
             [styles.iconButtonActive as string]: showOpacitySlider(),
           }}
           onClick={() => {
-            setShowOpacitySlider((shown) => !shown)
+            setTransparencyOpen(!showOpacitySlider())
           }}
           title="Transparency"
           aria-label="Transparency"
+          aria-expanded={showOpacitySlider()}
+          aria-controls="session-recorder-transparency-controls"
         >
           <CircleHalf class={styles.icon} aria-hidden="true" />
         </button>

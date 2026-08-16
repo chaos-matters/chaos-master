@@ -1,6 +1,7 @@
 import { createEffect, createSignal, Show } from 'solid-js'
 import { Bookmark, CameraIcon, Discord, Eye, FolderOpen, Home, Pause, Plus, Share, Shuffle, Zap, } from '@/icons'
 import { setActiveTab } from '@/lib/activeTab'
+import { isSessionRecording } from '@/recorder/recorder'
 import { defaultPills, QualityPresets } from '../Quality/QualityPresets'
 import { recorderSavePending, recorderVisible, setRecorderVisible, } from '../SessionRecorder/recorderUi'
 import ui from './FloatingActions.module.css'
@@ -59,6 +60,17 @@ export function FloatingActions(props: Props) {
   const [dragging, setDragging] = createSignal(false)
   const [userMoved, setUserMoved] = createSignal(false)
   const collapsed = props.collapsed
+
+  const recorderToggleDisabled = () =>
+    isSessionRecording() || recorderSavePending()
+  const recorderToggleLabel = () =>
+    isSessionRecording()
+      ? 'Stop or discard the recording first'
+      : recorderSavePending()
+        ? 'Wait for the caption save to finish'
+        : recorderVisible()
+          ? 'Hide the step recorder'
+          : 'Show the step recorder'
 
   // Position saved before collapsing so both user and replay-driven expansion
   // return the widget to the same place.
@@ -490,21 +502,17 @@ export function FloatingActions(props: Props) {
             {/* Step recorder dock. Grouped with the other show/hide toggles;
                 the dock's own × sets the same signal, so the two agree. */}
             <button
+              type="button"
               class={ui.toggle}
               classList={{
                 [ui.toggleActive as string]: recorderVisible(),
               }}
-              disabled={recorderSavePending()}
+              disabled={recorderToggleDisabled()}
               onClick={() => {
                 setRecorderVisible(!recorderVisible())
               }}
-              title={
-                recorderSavePending()
-                  ? 'Wait for the caption save to finish'
-                  : recorderVisible()
-                    ? 'Hide the step recorder'
-                    : 'Show the step recorder'
-              }
+              title={recorderToggleLabel()}
+              aria-label={recorderToggleLabel()}
             >
               {/* A record dot next to a step list — what the dock does. */}
               <svg

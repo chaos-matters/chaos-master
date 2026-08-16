@@ -33,7 +33,7 @@ describe('SessionRecorderControls start feedback', () => {
     expect(record.textContent?.trim()).toBe('')
     expect(record.querySelector('svg')).toBeTruthy()
     expect(record.getAttribute('title')).toBe(
-      'Record every action as a replayable step log',
+      'Record authored workspace changes as replayable steps',
     )
     expect(recordings.textContent?.trim()).toBe('')
     expect(recordings.querySelector('svg')).toBeTruthy()
@@ -153,6 +153,10 @@ describe('SessionRecorderControls start feedback', () => {
 
     expect(isSessionRecording()).toBe(true)
     expect(onRecordingStarted).toHaveBeenCalledTimes(1)
+    const status = screen.getByRole('status')
+    expect(status.getAttribute('aria-live')).toBe('polite')
+    expect(status.getAttribute('aria-atomic')).toBe('true')
+    expect(status.textContent).toContain('0 replayable steps')
     unmount()
   })
 })

@@ -1,4 +1,5 @@
 import { createResource, createSignal, For, Show } from 'solid-js'
+import { useToast } from '@/contexts/ToastContext'
 import { serializeSession, sessionFilename } from '@/recorder/schema'
 import { downloadBlob } from '@/utils/blob'
 import { deleteStoredSession, loadStoredSessions, renameStoredSession, } from '@/utils/sessionsDB'
@@ -16,15 +17,19 @@ export function SessionLibraryPanel(props: {
   revision: number
   onReplay: (session: RecordedSession) => void
   onClose: () => void
+  panelRef?: (element: HTMLDivElement) => void
   /** Keep the loaded resource alive between openings without leaving its
    * panel in the layout or accessibility tree. */
   hidden?: boolean
 }) {
+  const { showToast } = useToast()
   const [sessions, { mutate, refetch }] = createResource(
     () => props.revision,
     loadStoredSessions,
   )
   const [retrying, setRetrying] = createSignal(false)
+  const [deletingId, setDeletingId] = createSignal<number>()
+  let panelRef: HTMLDivElement | undefined
   let closeButtonRef: HTMLButtonElement | undefined
   let retryButtonRef: HTMLButtonElement | undefined
 
@@ -37,9 +42,54 @@ export function SessionLibraryPanel(props: {
     )
   }
 
-  const remove = (entry: StoredSession) => {
-    if (entry.id === undefined) return
-    void deleteStoredSession(entry.id).then(mutate)
+  const remove = async (entry: StoredSession, trigger: HTMLButtonElement) => {
+    if (entry.id === undefined || deletingId() !== undefined) return
+    const restoreFocus = document.activeElement === trigger
+    const index = sessions()?.findIndex(
+      (candidate) => candidate.id === entry.id,
+    )
+    let remaining: StoredSession[] | undefined
+    let failed = false
+
+    setDeletingId(entry.id)
+    try {
+      remaining = await deleteStoredSession(entry.id)
+    } catch (error: unknown) {
+      failed = true
+      console.warn('[recorder] could not delete recording', error)
+      showToast(
+        `Could not delete "${entry.name}" — it is still in Recordings`,
+        5000,
+      )
+    }
+
+    // A slow IndexedDB write must not pull focus away from whatever the user
+    // moved to while it was pending. Capture ownership before a successful
+    // mutation removes the focused row from the DOM.
+    const focusStillOwned = restoreFocus && document.activeElement === trigger
+    if (!failed && remaining !== undefined) mutate(remaining)
+    setDeletingId(undefined)
+    if (!focusStillOwned) return
+    queueMicrotask(() => {
+      if (props.hidden) return
+      if (failed) {
+        if (trigger.isConnected) trigger.focus()
+        return
+      }
+      const focusIndex = Math.max(
+        0,
+        Math.min(index ?? 0, (remaining?.length ?? 0) - 1),
+      )
+      const nextId = remaining?.[focusIndex]?.id
+      const nextDelete =
+        nextId === undefined
+          ? undefined
+          : panelRef?.querySelector<HTMLButtonElement>(
+              `[data-recording-delete="${nextId}"]`,
+            )
+      const focusTarget = nextDelete ?? closeButtonRef
+      focusTarget?.focus()
+    })
   }
 
   // Recordings are named from the flame's title, or a timestamp when it has
@@ -48,21 +98,30 @@ export function SessionLibraryPanel(props: {
   const [editingId, setEditingId] = createSignal<number>()
   const [renamingId, setRenamingId] = createSignal<number>()
 
-  const commitRename = async (entry: StoredSession, name: string) => {
-    if (entry.id !== undefined && renamingId() === entry.id) return
+  const commitRename = async (
+    entry: StoredSession,
+    name: string,
+  ): Promise<boolean> => {
+    if (entry.id !== undefined && renamingId() === entry.id) return false
     const trimmed = name.trim()
     if (entry.id === undefined || trimmed === '' || trimmed === entry.name) {
       setEditingId(undefined)
-      return
+      return true
     }
     setRenamingId(entry.id)
     try {
       mutate(await renameStoredSession(entry.id, trimmed))
+      setEditingId(undefined)
+      return true
     } catch (error: unknown) {
       console.warn('[recorder] could not rename recording', error)
+      showToast(
+        `Could not rename "${entry.name}" — your edit is still open`,
+        5000,
+      )
+      return false
     } finally {
       setRenamingId(undefined)
-      setEditingId(undefined)
     }
   }
 
@@ -102,12 +161,22 @@ export function SessionLibraryPanel(props: {
 
   return (
     <div
+      ref={(element) => {
+        panelRef = element
+        props.panelRef?.(element)
+      }}
       id="session-recording-library"
       class={styles.panel}
       hidden={props.hidden}
+      role="region"
+      aria-labelledby="session-recording-library-title"
+      aria-busy={sessions.loading || retrying()}
+      tabIndex={-1}
     >
       <div class={styles.header}>
-        <span class={styles.title}>Recordings</span>
+        <h2 id="session-recording-library-title" class={styles.title}>
+          Recordings
+        </h2>
         <button
           ref={closeButtonRef}
           type="button"
@@ -155,7 +224,7 @@ export function SessionLibraryPanel(props: {
               </p>
             }
           >
-            <ul class={styles.list}>
+            <ul class={styles.list} aria-label="Saved recordings">
               <For each={sessions()}>
                 {(entry) => (
                   <li class={styles.entry}>
@@ -173,6 +242,7 @@ export function SessionLibraryPanel(props: {
                               setEditingId(entry.id)
                             }}
                             title="Rename this recording"
+                            aria-label={`Rename recording ${entry.name}`}
                           >
                             {entry.name}
                           </button>
@@ -192,12 +262,21 @@ export function SessionLibraryPanel(props: {
                             if (renamingId() === entry.id) return
                             if (ev.key === 'Enter') {
                               ev.preventDefault()
-                              void commitRename(
-                                entry,
-                                ev.currentTarget.value,
-                              ).then(() => {
-                                restoreRenameFocus(entry.id)
-                              })
+                              const input = ev.currentTarget
+                              void commitRename(entry, input.value).then(
+                                (saved) => {
+                                  if (saved) {
+                                    restoreRenameFocus(entry.id)
+                                    return
+                                  }
+                                  queueMicrotask(() => {
+                                    if (!props.hidden && input.isConnected) {
+                                      input.focus()
+                                      input.select()
+                                    }
+                                  })
+                                },
+                              )
                             }
                             if (ev.key === 'Escape') {
                               ev.preventDefault()
@@ -229,6 +308,7 @@ export function SessionLibraryPanel(props: {
                           props.onReplay(entry.session)
                         }}
                         title="Replay this recording"
+                        aria-label={`Replay recording ${entry.name}`}
                       >
                         Replay
                       </button>
@@ -239,18 +319,23 @@ export function SessionLibraryPanel(props: {
                           download(entry)
                         }}
                         title="Download as .steps.json"
+                        aria-label={`Download recording ${entry.name}`}
                       >
                         Download
                       </button>
                       <button
                         type="button"
                         class={styles.button}
-                        onClick={() => {
-                          remove(entry)
+                        data-recording-delete={entry.id}
+                        disabled={deletingId() !== undefined}
+                        aria-busy={deletingId() === entry.id}
+                        onClick={(event) => {
+                          void remove(entry, event.currentTarget)
                         }}
                         title="Delete this recording"
+                        aria-label={`Delete recording ${entry.name}`}
                       >
-                        Delete
+                        {deletingId() === entry.id ? 'Deleting…' : 'Delete'}
                       </button>
                     </div>
                   </li>
