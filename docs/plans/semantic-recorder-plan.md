@@ -5,11 +5,15 @@ Status: **in progress**. M1 (recorder core and `.steps.json`), M2
 undo) and M5 (sessions embedded in PNG/MP4 exports) are implemented. M3 now
 covers the main flame, camera, timeline (including curve edits), audio-reactive
 wiring, sonification, viewport and undo/redo surfaces. The remaining authored-
-state gap is committed custom-variation code. Value-pinned workflows now keep
+state gap is committed custom-variation code. That gap requires bounded
+starting definitions plus committed changes, transient session-owned
+registration and an explicit compiled-code trust boundary; a single edit
+action would not be enough for a take that starts with a custom variation.
+Value-pinned workflows now keep
 a validated semantic origin and safe owning-surface focus, with exact anchors
 for stable controls. A GPU-free static UI coverage ratchet protects the main
-call paths; a representative browser journey remains incremental work. Captured
-2026-08-15; see
+call paths; a representative browser journey remains incremental work. Audited
+2026-08-16; see
 `docs/recorder-coverage.md` for the audited matrix and follow-up list.
 
 ## The ask
@@ -93,6 +97,7 @@ type RecordedSession = {
   initial: FlameDescriptor // complete starting document
   initialTimeline?: TimelineSnapshot
   initialAudio?: AudioWiringSnapshot
+  initialSonification?: SonificationSnapshot
   initialView?: SessionViewSnapshot
   actions: RecordedAction[]
   unnamedWriteCount: number
@@ -103,6 +108,9 @@ type RecordedAction = {
   id: string // registered command id, e.g. "flame.setVariationWeight"
   args: unknown[] // JSON-serializable, validated per-command
   label?: string // human-readable, derived from command metadata at record time
+  focus?: string // semantic follow-cam target
+  note?: string // authored caption override
+  holdMs?: number // authored playback pacing override
 }
 ```
 
@@ -258,7 +266,9 @@ session (**render settings, item 6, are done**):
 1. **Prop-adapter mutations** — affine and colour editors are routed through
    stable transform/variation IDs; preview-only copies retain raw setters.
 2. **Named handlers** — palette, symmetry, morph, seeded generate/mutate,
-   breeding loads, randomizer settings and whole-document loads are covered.
+   breeding loads, applied randomizer results, document render-setting
+   controls and whole-document loads are covered. Randomizer ranges and
+   browsing preferences remain deliberately outside the recipe.
 3. **Camera writes** — **done**. `setFlameZoom`, `setFlamePosition` and the
    `makeCamera3DSetter` family keep Solid's Setter contract but resolve the
    updater against current state and dispatch a concrete value, so the
@@ -274,8 +284,11 @@ session (**render settings, item 6, are done**):
    the unnamed-write or workspace-remount marker covers a recording that
    somehow crosses one.
 5. **Blend and audio wiring** — covered. Committed custom variation code is
-   still open and should become one `variation.setCode` action, not a stream
-   of keystrokes.
+   still open. It should capture bounded starting definitions and one semantic
+   source-revision action per commit, never a stream of keystrokes. Imported
+   definitions need preflight compilation, transient/session-owned registry
+   state, collision handling and replay Undo/Redo restoration before this can
+   ship safely.
 6. **Render settings** — ~~the sliders and mode pickers writing
    `renderSettings.*`~~ **done**: 18 controls route through
    `flame.setRenderSetting`. `blendWeight` deliberately stays on its own
@@ -360,17 +373,18 @@ one control at a time forever after.
   work needs a check before M3 starts.
 - **Command arg schemas.** `FlameCommand.validateReplayArgs` now provides the
   untrusted-file seam. A generic finite-JSON budget runs for every command,
-  and allocation-sensitive structural commands have exact validators. The
-  remaining scalar commands still validate in their execute path; adding
-  schemas as they evolve keeps rejection messages earlier and clearer.
+  allocation-sensitive structural commands have exact validators, and replay
+  is deny-by-default when a command has no declared policy. A registry ratchet
+  keeps every registered command explicit as the vocabulary evolves.
 - **Schema migration of logs.** A session recorded on app v0.9.9 replayed on
   v1.2 must either migrate (command vocabulary is more stable than the
   document schema — a point in favor of recording intents) or clearly refuse.
   `migrateFlameTypes.ts` handles the embedded `initial`; command-level
   versioning starts as "same major vocabulary version or refuse."
 - **Custom variation code edits** (CodeMirror sessions) don't decompose into
-  small commands. The planned command records the committed code blob as one
-  `variation.setCode` action; keystroke-level capture is out of scope.
+  small commands. Portable replay needs bounded starting definitions as well
+  as one semantic source revision per commit, with preflight compilation and
+  session-owned registration; keystroke-level capture remains out of scope.
 - **Gesture fidelity for video.** Commit-level coalescing loses the visual
   journey of a long drag. If step-synced videos feel jumpy, a later additive
   `gesture` sample stream (preview values between `startPreview` and

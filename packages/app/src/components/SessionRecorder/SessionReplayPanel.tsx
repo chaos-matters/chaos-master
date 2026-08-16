@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
+import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, Show, untrack, } from 'solid-js'
 import { createStore, unwrap } from 'solid-js/store'
 import { ChevronLeft, ChevronRight, Focus, Pause, Pencil, PlayPause, SkipBack, } from '@/icons'
 import { deriveReplayFocusPreparation } from '@/recorder/focusPreparation'
@@ -45,6 +45,7 @@ export function SessionReplayPanel(props: {
   const [speed, setSpeed] = createSignal(1)
   const [editing, setEditing] = createSignal<number>()
   const [saving, setSaving] = createSignal(false)
+  const panelId = createUniqueId()
 
   /**
    * The session is cloned into a store so captions and holds are editable
@@ -94,6 +95,18 @@ export function SessionReplayPanel(props: {
     if (!action) return ''
     return action.note ?? action.label ?? action.id
   }
+  const replayStatus = createMemo(() => {
+    const index = player.stepIndex()
+    const finished = player.isFinished()
+    if (player.total === 0) return 'Replay has no steps.'
+    if (index < 0) return `Replay ready. ${player.total} steps.`
+
+    // Announce captions when transport advances, not on every keystroke while
+    // the current caption is being edited.
+    const caption = untrack(() => stepLabel(index))
+    const prefix = finished ? 'Replay complete. ' : ''
+    return `${prefix}Step ${index + 1} of ${player.total}: ${caption}.`
+  })
 
   return (
     <div
@@ -111,6 +124,9 @@ export function SessionReplayPanel(props: {
         <span class={styles.count}>
           {player.stepIndex() + 1}/{player.total}
         </span>
+        <p class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {replayStatus()}
+        </p>
         <Show when={session.unnamedWriteCount > 0}>
           <span
             class={styles.warning}
@@ -242,7 +258,11 @@ export function SessionReplayPanel(props: {
           <Focus class={styles.buttonIcon} aria-hidden="true" />
         </button>
         <Show when={props.compact !== true}>
+          <label class="sr-only" for={`${panelId}-playback-speed`}>
+            Playback speed
+          </label>
           <select
+            id={`${panelId}-playback-speed`}
             class={styles.speed}
             value={speed()}
             onChange={(ev) => {
@@ -268,96 +288,126 @@ export function SessionReplayPanel(props: {
       <Show when={props.compact !== true}>
         <ol class={styles.steps}>
           <For each={session.actions}>
-            {(action, index) => (
-              <li>
-                <div class={styles.stepRow}>
-                  <button
-                    type="button"
-                    class={styles.step}
-                    classList={{
-                      [styles.current as string]:
-                        player.stepIndex() === index(),
-                      [styles.applied as string]: player.stepIndex() >= index(),
-                    }}
-                    onClick={() => {
-                      player.seek(index())
-                    }}
-                    disabled={props.blocked}
-                  >
-                    <span class={styles.stepIndex}>{index() + 1}</span>
-                    <span class={styles.stepLabel}>{stepLabel(index())}</span>
-                  </button>
-                  <button
-                    type="button"
-                    class={styles.stepEdit}
-                    classList={{
-                      [styles.stepEditOn as string]: editing() === index(),
-                    }}
-                    onClick={() => {
-                      setEditing(editing() === index() ? undefined : index())
-                    }}
-                    title="Write a caption and set how long to hold this step"
-                    aria-label="Edit step caption"
-                  >
-                    <Pencil class={styles.stepEditIcon} aria-hidden="true" />
-                  </button>
-                </div>
-                <Show when={editing() === index()}>
-                  <div class={styles.stepEditor}>
-                    <input
-                      class={styles.noteInput}
-                      value={action.note ?? ''}
-                      maxLength={MAX_ACTION_NOTE_CHARS}
-                      placeholder={action.label ?? action.id}
-                      onInput={(ev) => {
-                        // `maxLength` covers ordinary typing; slicing also
-                        // covers paste/programmatic input consistently.
-                        const text = ev.currentTarget.value.slice(
-                          0,
-                          MAX_ACTION_NOTE_CHARS,
-                        )
-                        setSession(
-                          'actions',
-                          index(),
-                          'note',
-                          text.trim() === '' ? undefined : text,
-                        )
+            {(action, index) => {
+              const editorId = `${panelId}-step-${index()}-editor`
+              const captionId = `${panelId}-step-${index()}-caption`
+              let captionInput: HTMLInputElement | undefined
+
+              return (
+                <li>
+                  <div class={styles.stepRow}>
+                    <button
+                      type="button"
+                      class={styles.step}
+                      classList={{
+                        [styles.current as string]:
+                          player.stepIndex() === index(),
+                        [styles.applied as string]:
+                          player.stepIndex() >= index(),
                       }}
-                      title="Caption shown on screen while this step runs"
-                    />
-                    <label class={styles.holdField}>
-                      hold
+                      onClick={() => {
+                        player.seek(index())
+                      }}
+                      disabled={props.blocked}
+                      aria-current={
+                        player.stepIndex() === index() ? 'step' : undefined
+                      }
+                    >
+                      <span class={styles.stepIndex}>{index() + 1}</span>
+                      <span class={styles.stepLabel}>{stepLabel(index())}</span>
+                    </button>
+                    <button
+                      type="button"
+                      class={styles.stepEdit}
+                      classList={{
+                        [styles.stepEditOn as string]: editing() === index(),
+                      }}
+                      onClick={() => {
+                        const opening = editing() !== index()
+                        setEditing(opening ? index() : undefined)
+                        if (opening) {
+                          queueMicrotask(() => captionInput?.focus())
+                        }
+                      }}
+                      title="Write a caption and set how long to hold this step"
+                      aria-label={
+                        editing() === index()
+                          ? `Close editor for step ${index() + 1}`
+                          : `Edit caption for step ${index() + 1}`
+                      }
+                      aria-expanded={editing() === index()}
+                      aria-controls={editorId}
+                    >
+                      <Pencil class={styles.stepEditIcon} aria-hidden="true" />
+                    </button>
+                  </div>
+                  <Show when={editing() === index()}>
+                    <div
+                      id={editorId}
+                      class={styles.stepEditor}
+                      role="group"
+                      aria-label={`Step ${index() + 1} caption settings`}
+                    >
+                      <label class="sr-only" for={captionId}>
+                        Caption for step {index() + 1}
+                      </label>
                       <input
-                        class={styles.holdInput}
-                        type="number"
-                        min={0}
-                        max={MAX_ACTION_HOLD_MS}
-                        step={100}
-                        value={action.holdMs ?? ''}
-                        placeholder="auto"
+                        ref={captionInput}
+                        id={captionId}
+                        class={styles.noteInput}
+                        value={action.note ?? ''}
+                        maxLength={MAX_ACTION_NOTE_CHARS}
+                        placeholder={action.label ?? action.id}
                         onInput={(ev) => {
-                          const raw = ev.currentTarget.value
-                          const parsed = Number(raw)
+                          // `maxLength` covers ordinary typing; slicing also
+                          // covers paste/programmatic input consistently.
+                          const text = ev.currentTarget.value.slice(
+                            0,
+                            MAX_ACTION_NOTE_CHARS,
+                          )
                           setSession(
                             'actions',
                             index(),
-                            'holdMs',
-                            raw === '' || !Number.isFinite(parsed)
-                              ? undefined
-                              : Math.min(
-                                  MAX_ACTION_HOLD_MS,
-                                  Math.max(0, parsed),
-                                ),
+                            'note',
+                            text.trim() === '' ? undefined : text,
                           )
                         }}
-                        title="Milliseconds to hold before the next step (blank = the pace it was recorded at)"
+                        title="Caption shown on screen while this step runs"
                       />
-                      ms
-                    </label>
-                  </div>
-                </Show>
-              </li>
-            )}
+                      <label class={styles.holdField}>
+                        hold
+                        <input
+                          class={styles.holdInput}
+                          type="number"
+                          min={0}
+                          max={MAX_ACTION_HOLD_MS}
+                          step={100}
+                          value={action.holdMs ?? ''}
+                          placeholder="auto"
+                          onInput={(ev) => {
+                            const raw = ev.currentTarget.value
+                            const parsed = Number(raw)
+                            setSession(
+                              'actions',
+                              index(),
+                              'holdMs',
+                              raw === '' || !Number.isFinite(parsed)
+                                ? undefined
+                                : Math.min(
+                                    MAX_ACTION_HOLD_MS,
+                                    Math.max(0, parsed),
+                                  ),
+                            )
+                          }}
+                          title="Milliseconds to hold before the next step (blank = the pace it was recorded at)"
+                        />
+                        ms
+                      </label>
+                    </div>
+                  </Show>
+                </li>
+              )
+            }}
           </For>
         </ol>
         <Show when={props.onSave}>

@@ -2,6 +2,8 @@
    absolutely positioned, so it cannot end up under the fixed FloatingActions
    widget the way an overlay would. */
 .panel {
+  --replay-control-target: 1.55rem;
+
   align-self: flex-start;
   margin: 0 0 var(--space-2) var(--space-2);
   width: min(22rem, calc(100vw - 2rem));
@@ -75,7 +77,7 @@
 }
 
 .transport {
-  --replay-transport-target: 1.55rem;
+  --replay-transport-target: var(--replay-control-target);
 
   display: flex;
   align-items: center;
@@ -100,7 +102,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.28rem;
-  min-height: var(--replay-transport-target);
+  min-height: var(--replay-transport-target, var(--replay-control-target));
   padding: 0.1rem 0.45rem;
   border-radius: 10px;
   border: 1px solid oklch(50% 0.08 240 / 0.5);
@@ -281,6 +283,10 @@
 }
 
 @media (pointer: coarse) {
+  .panel {
+    --replay-control-target: var(--recorder-coarse-target, 2.25rem);
+  }
+
   .transport {
     --replay-transport-target: 2rem;
   }

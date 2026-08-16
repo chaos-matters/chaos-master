@@ -70,11 +70,14 @@ describe('recorder responsive density', () => {
   })
 
   it('keeps replay transport denser than replay forms and lists', () => {
+    expect(extractBlock(replayCss, '\n.panel {')).toContain(
+      '--replay-control-target: 1.55rem',
+    )
     expect(extractBlock(replayCss, '\n.transport {')).toContain(
-      '--replay-transport-target: 1.55rem',
+      '--replay-transport-target: var(--replay-control-target)',
     )
     expect(extractBlock(replayCss, '\n.button {')).toContain(
-      'min-height: var(--replay-transport-target)',
+      'min-height: var(--replay-transport-target, var(--replay-control-target))',
     )
     expect(extractBlock(replayCss, '\n.transport-icon-button {')).toContain(
       'width: var(--replay-transport-target)',
@@ -84,6 +87,9 @@ describe('recorder responsive density', () => {
     )
 
     const coarse = extractBlock(replayCss, '@media (pointer: coarse)')
+    expect(extractBlock(coarse, '.panel {')).toContain(
+      '--replay-control-target: var(--recorder-coarse-target, 2.25rem)',
+    )
     expect(extractBlock(coarse, '.transport {')).toContain(
       '--replay-transport-target: 2rem',
     )

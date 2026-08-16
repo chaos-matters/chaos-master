@@ -139,7 +139,7 @@ export function SessionRecorderControls(props: {
               onClick={startRecording}
               disabled={props.blocked}
               aria-label="Record steps"
-              title="Record every action as a replayable step log"
+              title="Record authored workspace changes as replayable steps"
             >
               <Record class={styles.icon} aria-hidden="true" />
             </button>
@@ -184,17 +184,25 @@ export function SessionRecorderControls(props: {
           </>
         }
       >
-        <span class={styles.live}>
-          <span class={styles.dotRecording} /> {recordedActionCount()} steps
-        </span>
-        <Show when={unnamedWriteCount() > 0}>
-          <span
-            class={styles.unnamed}
-            title="Edits not yet routed through a registered command — replay will not reproduce them"
-          >
-            {unnamedWriteCount()} unnamed
+        <span
+          class={styles.status}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <span class={styles.live}>
+            <span class={styles.dotRecording} aria-hidden="true" />{' '}
+            {recordedActionCount()} replayable steps
           </span>
-        </Show>
+          <Show when={unnamedWriteCount() > 0}>
+            <span
+              class={styles.unnamed}
+              title="Edits not yet routed through a registered command — replay will not reproduce them"
+            >
+              {unnamedWriteCount()} not captured
+            </span>
+          </Show>
+        </span>
         <button type="button" class={styles.button} onClick={stopAndSave}>
           Stop &amp; save
         </button>

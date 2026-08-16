@@ -105,14 +105,14 @@ The **Signal** column says whether the current recorder can warn about the gap.
 Selecting a Home flame while a take is active is blocked with a toast; the
 handoff is never allowed to replace the document underneath that recording.
 
-| Area              | State / action                                      | Signal                           | Why it is still open                                                                                                                                                                                        |
-| ----------------- | --------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Custom variations | committed WGSL/maths code                           | none for the code blob           | A code edit should not decompose into keystrokes. Intended shape is one `variation.setCode` action per committed edit, with the definition embedded so another browser can replay it.                       |
-| Startup           | shared-URL apply, backup restore                    | unnamed-write or remount warning | These normally run before a recording. A recording that crosses one is marked rather than pretending continuity.                                                                                            |
-| Tours             | `tour:restore` snapshot                             | unreplayable marker              | Deliberate — tour machinery, not a user-authored edit.                                                                                                                                                      |
-| Audio             | the audio **file** itself                           | required-track metadata          | A buffer cannot ride in a JSON session. Wiring and required track name replay, but reactivity only enables when the matching file is already loaded (or an existing live microphone analyser is available). |
-| Audio             | playback clock and per-frame modulation             | one deduplicated warning         | Play/pause/seek and derived 30 fps writes are external runtime state. They stay out of undo and do not flood the log; audio bytes and playback position are not embedded.                                   |
-| Timeline          | wall-clock Play/Pause and loaded-animation autoplay | unreplayable transport marker    | Playback timing is hardware-driven state, not an authored edit. Replay pauses a running timeline, records timeline data and playhead state, and never restarts wall-clock playback during undo.             |
+| Area              | State / action                                      | Signal                           | Why it is still open                                                                                                                                                                                                                                |
+| ----------------- | --------------------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Custom variations | committed WGSL/maths code                           | none for the code blob           | A code edit should not decompose into keystrokes. A portable take needs bounded starting definitions as well as semantic committed revisions, preflight compilation, transient registry state, collision handling and replay Undo/Redo restoration. |
+| Startup           | shared-URL apply, backup restore                    | unnamed-write or remount warning | These normally run before a recording. A recording that crosses one is marked rather than pretending continuity.                                                                                                                                    |
+| Tours             | `tour:restore` snapshot                             | unreplayable marker              | Deliberate — tour machinery, not a user-authored edit.                                                                                                                                                                                              |
+| Audio             | the audio **file** itself                           | required-track metadata          | A buffer cannot ride in a JSON session. Wiring and required track name replay, but reactivity only enables when the matching file is already loaded (or an existing live microphone analyser is available).                                         |
+| Audio             | playback clock and per-frame modulation             | one deduplicated warning         | Play/pause/seek and derived 30 fps writes are external runtime state. They stay out of undo and do not flood the log; audio bytes and playback position are not embedded.                                                                           |
+| Timeline          | wall-clock Play/Pause and loaded-animation autoplay | unreplayable transport marker    | Playback timing is hardware-driven state, not an authored edit. Replay pauses a running timeline, records timeline data and playhead state, and never restarts wall-clock playback during undo.                                                     |
 
 **The timeline is now watched.** Its `pushUndo` reports to the recorder the
 same way the flame history's `onEntryPushed` does, so an uncovered timeline
@@ -149,13 +149,54 @@ reopens a collapsed symmetry card before targeting its controls.
 
 The deliberate remaining work is:
 
-1. Embed committed custom-variation source as one bounded semantic action.
+1. Design portable custom-variation capture as a separate trust-boundary
+   project: bounded starting definitions, semantic committed revisions,
+   preflight compilation, transient registration/collision handling and
+   replay Undo/Redo restoration. A single `variation.setCode` action is not
+   sufficient when a take starts with an existing custom variation.
 2. Add dedicated semantic origins for migration and generated-logo loads.
 3. Collapse companion presentation commands from one-click workflows where
    they produce redundant adjacent captions.
 4. Add a representative Playwright recording journey that clicks the real UI
    and asserts `unnamedWriteCount === 0`. The static ratchet protects known
    architecture, but cannot prove every new runtime control.
+
+### Recommended sequence after recorder accessibility polish
+
+This order is intentionally saved here rather than in a personal dotfile so
+the reasoning travels with the recorder implementation:
+
+1. **Runtime confidence:** add the representative Playwright journey above.
+   Prefer GPU-independent controls in CI and keep the fuller WebGPU journey as
+   a documented local test if the software-GPU runner remains unreliable.
+2. **Library scale:** split IndexedDB summary metadata from session payloads.
+   Listing Recordings should not hydrate and validate up to 100 payloads of up
+   to 8 MiB each; load one payload only for Replay or Download and migrate the
+   current rows in place.
+3. **Replay narrative:** combine redundant companion presentation commands
+   from Random/Smart Animate, Morph, animation loads and dimension switches;
+   add the small migration/generated-logo origins in the same semantic-polish
+   pass.
+4. **Custom variations:** complete the trust-boundary design above before
+   putting executable WGSL into a portable session. Until then, the loader's
+   “external sessions are data, never code” guarantee remains true.
+5. **Architecture, protected by the browser journey:** extract typed
+   capture/apply ports for flame, timeline, audio, sonification, view and
+   replay presentation, then move the live replay transaction out of
+   `MainWorkspace` into a workspace replay controller. Preserve the current
+   restoration ordering rather than attempting one large rewrite.
+6. **Before format v2:** add golden released `.steps.json` fixtures and a
+   session/action migration dispatcher. The current v1 schema is intentionally
+   strict; the migration seam should land before the first breaking command
+   or artifact change.
+
+Smaller hardening can ride with the nearest item: reject duplicate command ids
+in development/tests, bound unnamed-write diagnostics to a counter plus a
+small ring, cache immutable replay preflight results for repeated seeks, guard
+unsaved caption drafts on Close, and make recording discard/library deletion
+recoverable rather than immediate. The next recorder-chrome edit should also
+centralize the repeated panel material, button and responsive target tokens so
+one surface cannot silently miss a density or accessibility fix.
 
 ## Resolved performance and fidelity findings
 

@@ -10,15 +10,20 @@ import { calculateFloatingPanelPlacement, SessionRecorderDock, } from './Session
 import type { ReplayTarget } from '@/recorder/replay'
 import type { RecordedSession } from '@/recorder/schema'
 
-const { loadStoredSessionsMock, renameStoredSessionMock, storeSessionMock } =
-  vi.hoisted(() => ({
-    loadStoredSessionsMock: vi.fn().mockResolvedValue([]),
-    renameStoredSessionMock: vi.fn().mockResolvedValue([]),
-    storeSessionMock: vi.fn(),
-  }))
+const {
+  deleteStoredSessionMock,
+  loadStoredSessionsMock,
+  renameStoredSessionMock,
+  storeSessionMock,
+} = vi.hoisted(() => ({
+  deleteStoredSessionMock: vi.fn().mockResolvedValue([]),
+  loadStoredSessionsMock: vi.fn().mockResolvedValue([]),
+  renameStoredSessionMock: vi.fn().mockResolvedValue([]),
+  storeSessionMock: vi.fn(),
+}))
 
 vi.mock('@/utils/sessionsDB', () => ({
-  deleteStoredSession: vi.fn().mockResolvedValue([]),
+  deleteStoredSession: deleteStoredSessionMock,
   loadStoredSessions: loadStoredSessionsMock,
   renameStoredSession: renameStoredSessionMock,
   storeSession: storeSessionMock,
@@ -32,6 +37,7 @@ const target: ReplayTarget = {
 describe('SessionRecorderDock caption persistence', () => {
   beforeEach(() => {
     cancelSessionRecording()
+    deleteStoredSessionMock.mockReset().mockResolvedValue([])
     loadStoredSessionsMock.mockReset().mockResolvedValue([])
     renameStoredSessionMock.mockReset().mockResolvedValue([])
     setRecorderSavePending(false)
@@ -45,6 +51,7 @@ describe('SessionRecorderDock caption persistence', () => {
 
   afterEach(() => {
     cancelSessionRecording()
+    deleteStoredSessionMock.mockReset()
     storeSessionMock.mockReset()
     loadStoredSessionsMock.mockReset()
     renameStoredSessionMock.mockReset()
@@ -217,6 +224,10 @@ describe('SessionRecorderDock caption persistence', () => {
     )
     expect(loadStoredSessionsMock).toHaveBeenCalledTimes(1)
     expect(recordingsButton.getAttribute('aria-expanded')).toBe('true')
+    const library = screen.getByRole('region', { name: 'Recordings' })
+    await waitFor(() => {
+      expect(document.activeElement).toBe(library)
+    })
 
     resolveSessions?.([])
     await waitFor(() => {
@@ -236,12 +247,56 @@ describe('SessionRecorderDock caption persistence', () => {
         name: 'Collapse recorder',
       }),
     )
-    const library = document.getElementById('session-recording-library')
     expect(library?.hidden).toBe(true)
     expect(recordingsButton.getAttribute('aria-expanded')).toBe('false')
     fireEvent.click(recordingsButton)
     expect(library?.hidden).toBe(false)
     expect(recordingsButton.getAttribute('aria-expanded')).toBe('true')
+    await waitFor(() => {
+      expect(document.activeElement).toBe(library)
+    })
+
+    unmount()
+  })
+
+  it('exposes transparency as a disclosure and preserves keyboard focus flow', async () => {
+    const { unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderDock
+          flameDescriptor={examples.example1}
+          target={target}
+          session={undefined}
+          onSessionChange={() => {}}
+          busy={false}
+        />
+      </ToastProvider>
+    ))
+
+    const trigger = screen.getByRole<HTMLButtonElement>('button', {
+      name: 'Transparency',
+    })
+    const controlsId = trigger.getAttribute('aria-controls')
+    const controls = document.getElementById(controlsId ?? '')
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    expect(controls?.hidden).toBe(true)
+
+    fireEvent.click(trigger)
+
+    const slider = screen.getByRole<HTMLInputElement>('slider', {
+      name: 'Recorder opacity',
+    })
+    expect(trigger.getAttribute('aria-expanded')).toBe('true')
+    expect(controls?.hidden).toBe(false)
+    await waitFor(() => {
+      expect(document.activeElement).toBe(slider)
+    })
+
+    fireEvent.keyDown(slider, { key: 'Escape' })
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    expect(controls?.hidden).toBe(true)
+    await waitFor(() => {
+      expect(document.activeElement).toBe(trigger)
+    })
 
     unmount()
   })
@@ -329,7 +384,7 @@ describe('SessionRecorderDock caption persistence', () => {
     )
     fireEvent.click(
       await screen.findByRole<HTMLButtonElement>('button', {
-        name: 'Palette pass',
+        name: 'Rename recording Palette pass',
       }),
     )
     const input = screen.getByRole<HTMLInputElement>('textbox', {
@@ -339,7 +394,7 @@ describe('SessionRecorderDock caption persistence', () => {
 
     await waitFor(() => {
       expect(document.activeElement).toBe(
-        screen.getByRole('button', { name: 'Palette pass' }),
+        screen.getByRole('button', { name: 'Rename recording Palette pass' }),
       )
     })
 
@@ -384,7 +439,7 @@ describe('SessionRecorderDock caption persistence', () => {
     )
     fireEvent.click(
       await screen.findByRole<HTMLButtonElement>('button', {
-        name: original.name,
+        name: `Rename recording ${original.name}`,
       }),
     )
     const input = screen.getByRole<HTMLInputElement>('textbox', {
@@ -401,8 +456,243 @@ describe('SessionRecorderDock caption persistence', () => {
     resolveRename?.([{ ...original, name: 'Final geometry' }])
     await waitFor(() => {
       expect(document.activeElement).toBe(
-        screen.getByRole('button', { name: 'Final geometry' }),
+        screen.getByRole('button', {
+          name: 'Rename recording Final geometry',
+        }),
       )
+    })
+
+    unmount()
+  })
+
+  it('keeps a failed rename editable and announces the persistence failure', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    startSessionRecording(examples.example1)
+    const recorded = stopSessionRecording()
+    if (!recorded) throw new Error('expected a recorded session')
+    const original = {
+      id: 10,
+      name: 'Color pass',
+      timestamp: Date.now(),
+      actionCount: recorded.actions.length,
+      unnamedWriteCount: recorded.unnamedWriteCount,
+      session: recorded,
+    }
+    loadStoredSessionsMock.mockResolvedValueOnce([original])
+    const renameError = new Error('indexeddb write failed')
+    renameStoredSessionMock.mockRejectedValueOnce(renameError)
+
+    const { unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderDock
+          flameDescriptor={examples.example1}
+          target={target}
+          session={undefined}
+          onSessionChange={() => {}}
+          busy={false}
+        />
+        <ToastHost />
+      </ToastProvider>
+    ))
+
+    fireEvent.click(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Recordings' }),
+    )
+    fireEvent.click(
+      await screen.findByRole<HTMLButtonElement>('button', {
+        name: `Rename recording ${original.name}`,
+      }),
+    )
+    const input = screen.getByRole<HTMLInputElement>('textbox', {
+      name: `Rename recording ${original.name}`,
+    })
+    fireEvent.input(input, { target: { value: 'Final colors' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          `Could not rename "${original.name}" — your edit is still open`,
+        ),
+      ).toBeTruthy()
+      expect(document.activeElement).toBe(input)
+      expect(input.readOnly).toBe(false)
+      expect(input.value).toBe('Final colors')
+    })
+    expect(warn).toHaveBeenCalledWith(
+      '[recorder] could not rename recording',
+      renameError,
+    )
+
+    unmount()
+  })
+
+  it('announces a failed delete and returns focus to the retained action', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    startSessionRecording(examples.example1)
+    const recorded = stopSessionRecording()
+    if (!recorded) throw new Error('expected a recorded session')
+    const original = {
+      id: 12,
+      name: 'Keep this take',
+      timestamp: Date.now(),
+      actionCount: recorded.actions.length,
+      unnamedWriteCount: recorded.unnamedWriteCount,
+      session: recorded,
+    }
+    loadStoredSessionsMock.mockResolvedValueOnce([original])
+    const deleteError = new Error('indexeddb delete failed')
+    deleteStoredSessionMock.mockRejectedValueOnce(deleteError)
+
+    const { unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderDock
+          flameDescriptor={examples.example1}
+          target={target}
+          session={undefined}
+          onSessionChange={() => {}}
+          busy={false}
+        />
+        <ToastHost />
+      </ToastProvider>
+    ))
+
+    fireEvent.click(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Recordings' }),
+    )
+    const deleteButton = await screen.findByRole<HTMLButtonElement>('button', {
+      name: `Delete recording ${original.name}`,
+    })
+    deleteButton.focus()
+    fireEvent.click(deleteButton)
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          `Could not delete "${original.name}" — it is still in Recordings`,
+        ),
+      ).toBeTruthy()
+      expect(document.activeElement).toBe(deleteButton)
+      expect(deleteButton.disabled).toBe(false)
+    })
+    expect(warn).toHaveBeenCalledWith(
+      '[recorder] could not delete recording',
+      deleteError,
+    )
+
+    unmount()
+  })
+
+  it('moves focus to the next recording after a keyboard delete', async () => {
+    startSessionRecording(examples.example1)
+    const recorded = stopSessionRecording()
+    if (!recorded) throw new Error('expected a recorded session')
+    const first = {
+      id: 13,
+      name: 'First take',
+      timestamp: Date.now(),
+      actionCount: recorded.actions.length,
+      unnamedWriteCount: recorded.unnamedWriteCount,
+      session: recorded,
+    }
+    const second = { ...first, id: 14, name: 'Second take' }
+    loadStoredSessionsMock.mockResolvedValueOnce([first, second])
+    deleteStoredSessionMock.mockResolvedValueOnce([second])
+
+    const { unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderDock
+          flameDescriptor={examples.example1}
+          target={target}
+          session={undefined}
+          onSessionChange={() => {}}
+          busy={false}
+        />
+      </ToastProvider>
+    ))
+
+    fireEvent.click(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Recordings' }),
+    )
+    const firstDelete = await screen.findByRole<HTMLButtonElement>('button', {
+      name: `Delete recording ${first.name}`,
+    })
+    firstDelete.focus()
+    fireEvent.click(firstDelete)
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('button', {
+          name: `Delete recording ${first.name}`,
+        }),
+      ).toBeNull()
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', {
+          name: `Delete recording ${second.name}`,
+        }),
+      )
+    })
+
+    unmount()
+  })
+
+  it('does not steal focus when a slow delete settles after the user moves on', async () => {
+    startSessionRecording(examples.example1)
+    const recorded = stopSessionRecording()
+    if (!recorded) throw new Error('expected a recorded session')
+    const first = {
+      id: 15,
+      name: 'Slow delete',
+      timestamp: Date.now(),
+      actionCount: recorded.actions.length,
+      unnamedWriteCount: recorded.unnamedWriteCount,
+      session: recorded,
+    }
+    const second = { ...first, id: 16, name: 'Keep focus here' }
+    loadStoredSessionsMock.mockResolvedValueOnce([first, second])
+    let resolveDelete: ((sessions: (typeof second)[]) => void) | undefined
+    deleteStoredSessionMock.mockImplementationOnce(
+      () =>
+        new Promise<(typeof second)[]>((resolve) => {
+          resolveDelete = resolve
+        }),
+    )
+
+    const { unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderDock
+          flameDescriptor={examples.example1}
+          target={target}
+          session={undefined}
+          onSessionChange={() => {}}
+          busy={false}
+        />
+      </ToastProvider>
+    ))
+
+    fireEvent.click(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Recordings' }),
+    )
+    const firstDelete = await screen.findByRole<HTMLButtonElement>('button', {
+      name: `Delete recording ${first.name}`,
+    })
+    firstDelete.focus()
+    fireEvent.click(firstDelete)
+
+    const secondDownload = screen.getByRole<HTMLButtonElement>('button', {
+      name: `Download recording ${second.name}`,
+    })
+    secondDownload.focus()
+    expect(document.activeElement).toBe(secondDownload)
+
+    resolveDelete?.([second])
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('button', {
+          name: `Delete recording ${first.name}`,
+        }),
+      ).toBeNull()
+      expect(document.activeElement).toBe(secondDownload)
     })
 
     unmount()
@@ -451,7 +741,9 @@ describe('SessionRecorderDock caption persistence', () => {
       screen.getByRole<HTMLButtonElement>('button', { name: 'Recordings' }),
     )
     fireEvent.click(
-      await screen.findByRole<HTMLButtonElement>('button', { name: 'Replay' }),
+      await screen.findByRole<HTMLButtonElement>('button', {
+        name: 'Replay recording Replay focus',
+      }),
     )
 
     await waitFor(() => {
