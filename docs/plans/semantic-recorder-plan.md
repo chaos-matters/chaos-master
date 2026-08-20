@@ -325,8 +325,10 @@ remain the honest runtime coverage signal.
 
 ### Persistence and sharing
 
-- `.steps.json` download/upload alongside the existing export surfaces, and a
-  bundle option in `ExportPngDialog` (flame + PNG + steps).
+- `.steps.json` download/upload alongside the existing export surfaces, with
+  validated external takes imported into the capped Recordings library and
+  exact re-imports deduplicated; plus a bundle option in `ExportPngDialog`
+  (flame + PNG + steps).
 - **Embed the session in exported PNGs** as a second `zTXt` chunk
   (`FlameSteps`) next to `FlameJson` — `flameInPng.ts` already has the chunk
   machinery. A dropped PNG then offers "Load flame" _and_ "Replay creation".

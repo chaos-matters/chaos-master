@@ -1,10 +1,10 @@
-import { Show } from 'solid-js'
+import { createSignal, Show } from 'solid-js'
 import { useToast } from '@/contexts/ToastContext'
 import { Book, FolderOpen, Record } from '@/icons'
 import { cancelSessionRecording, isSessionRecording, recordedActionCount, startSessionRecording, stopSessionRecording, unnamedWriteCount, } from '@/recorder/recorder'
 import { MAX_SESSION_FILE_BYTES, parseSession, serializeSession, sessionFilename, } from '@/recorder/schema'
 import { downloadBlob } from '@/utils/blob'
-import { storeSession } from '@/utils/sessionsDB'
+import { storeImportedSession, storeSession } from '@/utils/sessionsDB'
 import styles from './SessionRecorderControls.module.css'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { SessionRecordingStartFailureReason, SessionStartExtras, } from '@/recorder/recorder'
@@ -40,7 +40,7 @@ export function SessionRecorderControls(props: {
   onRecordingStarted?: () => void
   onOpenSession: (session: RecordedSession) => void
   /** Called after a recording is stored, so the library list refetches. */
-  onSessionStored: () => void
+  onSessionStored: (options?: { openLibrary?: boolean }) => void
   onToggleLibrary: () => void
   libraryOpen?: boolean
   recordingsButtonRef?: (element: HTMLButtonElement) => void
@@ -48,6 +48,7 @@ export function SessionRecorderControls(props: {
   blocked?: boolean
 }) {
   const { showToast } = useToast()
+  const [importingSession, setImportingSession] = createSignal(false)
   let fileInputRef: HTMLInputElement | undefined
 
   const startRecording = () => {
@@ -111,7 +112,7 @@ export function SessionRecorderControls(props: {
   }
 
   const openSessionFile = async (file: File | undefined) => {
-    if (!file) return
+    if (!file || importingSession()) return
     // Check the browser-provided byte count before allocating and decoding an
     // attacker-controlled file. parseSession applies the decoded-char and
     // schema limits after this cheap boundary check.
@@ -119,12 +120,38 @@ export function SessionRecorderControls(props: {
       showToast('That .steps.json file is too large to open safely', 4000)
       return
     }
-    const session = parseSession(await file.text())
-    if (!session) {
-      showToast('That file is not a readable .steps.json session', 4000)
-      return
+    setImportingSession(true)
+    try {
+      const session = parseSession(await file.text())
+      if (!session) {
+        showToast('That file is not a readable .steps.json session', 4000)
+        return
+      }
+
+      try {
+        const result = await storeImportedSession(session, file.name)
+        if (result.added) {
+          props.onSessionStored({ openLibrary: false })
+          showToast(`Imported "${result.name}" to Recordings`, 3500)
+        } else {
+          showToast(`"${result.name}" is already in Recordings`, 3500)
+        }
+      } catch (error: unknown) {
+        // Opening the validated take is still useful when IndexedDB is
+        // unavailable (private browsing, quota, or transient browser error).
+        console.warn('[recorder] could not store imported session', error)
+        showToast(
+          'Replay opened, but it could not be saved to Recordings',
+          5000,
+        )
+      }
+      props.onOpenSession(session)
+    } catch (error: unknown) {
+      console.warn('[recorder] could not read imported session', error)
+      showToast('That .steps.json file could not be read', 4000)
+    } finally {
+      setImportingSession(false)
     }
-    props.onOpenSession(session)
   }
 
   return (
@@ -163,8 +190,14 @@ export function SessionRecorderControls(props: {
               type="button"
               class={styles.iconButton}
               onClick={() => fileInputRef?.click()}
+              disabled={importingSession()}
+              aria-busy={importingSession()}
               aria-label="Open steps"
-              title="Replay a saved .steps.json"
+              title={
+                importingSession()
+                  ? 'Importing steps…'
+                  : 'Import a .steps.json into Recordings and replay it'
+              }
             >
               <FolderOpen class={styles.icon} aria-hidden="true" />
             </button>
@@ -173,6 +206,7 @@ export function SessionRecorderControls(props: {
               type="file"
               accept=".json,application/json"
               class={styles.fileInput}
+              disabled={importingSession()}
               onChange={(ev) => {
                 const input = ev.currentTarget
                 void openSessionFile(input.files?.[0]).finally(() => {

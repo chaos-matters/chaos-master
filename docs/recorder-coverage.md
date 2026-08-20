@@ -230,6 +230,11 @@ Three ways to bring a session back:
   offers the session against whatever is open. Dropping one of our PNGs or
   MP4s loads the flame _and_ offers its session.
 
+Opening or dropping an external take imports it into **Recordings** before
+replay, so closing the replay never loses the file from the browser library.
+Opening the exact same session again reuses its existing entry; edited caption
+or hold variants remain separate recordings.
+
 Everything that arrives from outside is data, never code. The loader caps raw
 and decompressed session sizes, action/argument counts, nesting and string
 budgets, validates the initial flame/timeline/audio schemas, and preflights all

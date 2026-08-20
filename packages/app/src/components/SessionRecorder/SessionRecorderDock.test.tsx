@@ -261,6 +261,36 @@ describe('SessionRecorderDock caption persistence', () => {
     unmount()
   })
 
+  it('refreshes a retained library after an external recording import', async () => {
+    const [libraryRevision, setLibraryRevision] = createSignal(0)
+    const { unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderDock
+          flameDescriptor={examples.example1}
+          target={target}
+          session={undefined}
+          onSessionChange={() => {}}
+          libraryRevision={libraryRevision()}
+          busy={false}
+        />
+      </ToastProvider>
+    ))
+
+    fireEvent.click(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Recordings' }),
+    )
+    await waitFor(() => {
+      expect(loadStoredSessionsMock).toHaveBeenCalledTimes(1)
+    })
+
+    setLibraryRevision(1)
+
+    await waitFor(() => {
+      expect(loadStoredSessionsMock).toHaveBeenCalledTimes(2)
+    })
+    unmount()
+  })
+
   it('exposes transparency as a disclosure and preserves keyboard focus flow', async () => {
     const { unmount } = render(() => (
       <ToastProvider>

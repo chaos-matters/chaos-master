@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { examples } from '@/flame/examples'
 import { MAX_ACTION_NOTE_CHARS, SESSION_FORMAT_VERSION, } from '@/recorder/schema'
 import { deepClone } from './clone'
-import { loadStoredSessions, storeSession } from './sessionsDB'
+import { loadStoredSessions, storeImportedSession, storeSession, } from './sessionsDB'
 import type { RecordedSession } from '@/recorder/schema'
 
 function validSession(): RecordedSession {
@@ -38,6 +38,39 @@ describe('recording session persistence boundary', () => {
     expect(stored[0]?.name).toBe('Bounded recording')
     expect(stored[0]?.actionCount).toBe(1)
     expect(stored[0]?.session.actions[0]?.id).toBe('flame.setGamma')
+  })
+
+  it('imports the same take once and derives a readable name from its file', async () => {
+    const session = validSession()
+
+    const [first, second] = await Promise.all([
+      storeImportedSession(session, 'Flame creation.steps.json'),
+      storeImportedSession(deepClone(session), 'Renamed copy.steps.json'),
+    ])
+
+    expect([first.added, second.added].sort()).toEqual([false, true])
+    expect(first.name).toBe(second.name)
+    expect(['Flame creation', 'Renamed copy']).toContain(first.name)
+    await expect(loadStoredSessions()).resolves.toHaveLength(1)
+  })
+
+  it('keeps an edited import as a distinct recording', async () => {
+    const original = validSession()
+    const edited = deepClone(original)
+    edited.actions[0] = {
+      ...edited.actions[0]!,
+      note: 'Hold on the final color',
+    }
+
+    await storeImportedSession(original, 'Original.steps.json')
+    const result = await storeImportedSession(edited, 'Captioned.steps.json')
+
+    expect(result.added).toBe(true)
+    await expect(
+      loadStoredSessions().then((sessions) =>
+        sessions.map((entry) => entry.name).sort(),
+      ),
+    ).resolves.toEqual(['Captioned', 'Original'])
   })
 
   it('rejects an invalid session before writing to IndexedDB', async () => {

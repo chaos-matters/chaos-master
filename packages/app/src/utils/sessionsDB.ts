@@ -27,6 +27,12 @@ export type StoredSession = {
  *  cannot grow without bound across a long project. */
 export const MAX_STORED_SESSIONS = 100
 
+export type ImportedSessionResult = {
+  added: boolean
+  /** The existing entry's name when an identical take was already stored. */
+  name: string
+}
+
 class SessionsDatabase extends Dexie {
   sessions!: Dexie.Table<StoredSession, number>
 
@@ -38,13 +44,7 @@ class SessionsDatabase extends Dexie {
 
 const db = new SessionsDatabase()
 
-/** Newest first. */
-export async function loadStoredSessions(): Promise<StoredSession[]> {
-  const rows = await db.sessions
-    .orderBy('timestamp')
-    .reverse()
-    .limit(MAX_STORED_SESSIONS)
-    .toArray()
+function validatedStoredSessions(rows: StoredSession[]): StoredSession[] {
   return rows.flatMap((row) => {
     const session = validateSession(row.session)
     return session === undefined
@@ -60,6 +60,35 @@ export async function loadStoredSessions(): Promise<StoredSession[]> {
   })
 }
 
+async function pruneStoredSessions() {
+  const all = await db.sessions.orderBy('timestamp').reverse().toArray()
+  const surplus = all.slice(MAX_STORED_SESSIONS)
+  if (surplus.length > 0) {
+    await db.sessions.bulkDelete(surplus.flatMap((e) => (e.id ? [e.id] : [])))
+  }
+}
+
+async function addStoredSession(session: RecordedSession, name: string) {
+  await db.sessions.add({
+    name,
+    timestamp: Date.now(),
+    actionCount: session.actions.length,
+    unnamedWriteCount: session.unnamedWriteCount,
+    session,
+  })
+  await pruneStoredSessions()
+}
+
+/** Newest first. */
+export async function loadStoredSessions(): Promise<StoredSession[]> {
+  const rows = await db.sessions
+    .orderBy('timestamp')
+    .reverse()
+    .limit(MAX_STORED_SESSIONS)
+    .toArray()
+  return validatedStoredSessions(rows)
+}
+
 export async function storeSession(
   session: RecordedSession,
   name: string,
@@ -71,19 +100,81 @@ export async function storeSession(
   if (validated === undefined) {
     throw new Error('Cannot store an invalid recording session')
   }
-  await db.sessions.add({
-    name,
-    timestamp: Date.now(),
-    actionCount: validated.actions.length,
-    unnamedWriteCount: validated.unnamedWriteCount,
-    session: validated,
+  await db.transaction('rw', db.sessions, async () => {
+    await addStoredSession(validated, name)
   })
-  const all = await db.sessions.orderBy('timestamp').reverse().toArray()
-  const surplus = all.slice(MAX_STORED_SESSIONS)
-  if (surplus.length > 0) {
-    await db.sessions.bulkDelete(surplus.flatMap((e) => (e.id ? [e.id] : [])))
-  }
   return loadStoredSessions()
+}
+
+/**
+ * Imports a recording without filling the library with duplicates when the
+ * same file is opened more than once. The comparison uses the fully validated
+ * session value, so caption edits and other authored changes remain distinct
+ * recordings even when they share the same creation timestamp.
+ */
+export async function storeImportedSession(
+  session: RecordedSession,
+  sourceFileName: string,
+): Promise<ImportedSessionResult> {
+  const validated = validateSession(session)
+  if (validated === undefined) {
+    throw new Error('Cannot import an invalid recording session')
+  }
+
+  const encoded = JSON.stringify(validated)
+  const importedName = importedSessionName(sourceFileName, validated)
+  let added = false
+  let resolvedName = importedName
+
+  // The read and conditional add share one IndexedDB transaction, so two
+  // simultaneous drops of the same take cannot race into duplicate rows.
+  await db.transaction('rw', db.sessions, async () => {
+    const rows = await db.sessions
+      .orderBy('timestamp')
+      .reverse()
+      .limit(MAX_STORED_SESSIONS)
+      .toArray()
+    // Creation time and the cheap denormalised counters reduce an exact
+    // compare to the handful of plausible matches. Avoid serialising every
+    // potentially multi-megabyte take in a full library on each import.
+    const existing = validatedStoredSessions(rows)
+      .filter(
+        (entry) =>
+          entry.session.createdAt === validated.createdAt &&
+          entry.actionCount === validated.actions.length &&
+          entry.unnamedWriteCount === validated.unnamedWriteCount,
+      )
+      .find((entry) => JSON.stringify(entry.session) === encoded)
+    if (existing) {
+      resolvedName = existing.name
+      return
+    }
+
+    await addStoredSession(validated, importedName)
+    added = true
+  })
+
+  return {
+    added,
+    name: resolvedName,
+  }
+}
+
+export function importedSessionName(
+  sourceFileName: string,
+  session: RecordedSession,
+): string {
+  const stem = sourceFileName
+    .trim()
+    .replace(/\.steps\.json$/i, '')
+    .replace(/\.(?:json|png|mp4)$/i, '')
+    .trim()
+  if (stem !== '') return stem
+
+  const flameName = session.initial.metadata?.name?.trim()
+  if (flameName) return flameName
+
+  return `Recording ${session.createdAt.slice(0, 16).replace('T', ' ')}`
 }
 
 export async function deleteStoredSession(

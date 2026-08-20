@@ -124,6 +124,7 @@ import { persistentSignal } from './utils/persistentSignal'
 import { addRandomizerHistoryEntry, clearRandomizerHistory, loadRandomizerHistoryEntries, MAX_RANDOMIZER_HISTORY_LIMIT, } from './utils/randomizerHistoryDB'
 import { buildReadableIds } from './utils/readableIds'
 import { getOldestRecentFlame, saveRecentFlame, upsertRecentFlame, } from './utils/recentFlames'
+import { storeImportedSession } from './utils/sessionsDB'
 import { createShareLink, deriveOgMeta, uploadOgPreview, } from './utils/shareLink'
 import { sum } from './utils/sum'
 import { createTimelineState, defaultConfig as defaultTimelineConfig, resolveKeyframeValue, } from './utils/timeline'
@@ -445,6 +446,8 @@ export function MainWorkspace(props: AppProps) {
   // The session currently open for replay (M4), if any. Lives here rather than
   // in the dock because dropping a .steps.json opens one too.
   const [replaySession, setReplaySession] = createSignal<RecordedSession>()
+  const [externalSessionLibraryRevision, setExternalSessionLibraryRevision] =
+    createSignal(0)
   const [recorderReplayPresentation, setRecorderReplayPresentation] =
     createSignal({ playing: false, timelineTargeted: false })
   const openReplaySession = (session: RecordedSession | undefined) => {
@@ -461,6 +464,24 @@ export function MainWorkspace(props: AppProps) {
       return
     }
     setReplaySession(session)
+  }
+  const importReplaySession = async (
+    session: RecordedSession,
+    sourceFile: File,
+  ) => {
+    try {
+      const result = await storeImportedSession(session, sourceFile.name)
+      if (result.added) {
+        setExternalSessionLibraryRevision((revision) => revision + 1)
+        showToast(`Imported "${result.name}" to Recordings`, 3500)
+      } else {
+        showToast(`"${result.name}" is already in Recordings`, 3500)
+      }
+    } catch (error: unknown) {
+      console.warn('[recorder] could not store dropped session', error)
+      showToast('Could not save the imported replay to Recordings', 5000)
+    }
+    openReplaySession(session)
   }
   // Colors as they were before the first palette apply — lets Unselect
   // restore the "natural" colors. UI stash only; undo handles the rest.
@@ -1661,7 +1682,7 @@ export function MainWorkspace(props: AppProps) {
       },
     },
     setLoadedAnimation,
-    openReplaySession,
+    importReplaySession,
   )
 
   const timeline = createTimelineState()
@@ -4533,6 +4554,7 @@ export function MainWorkspace(props: AppProps) {
                     onPrepareAction={prepareReplayFocus}
                     session={replaySession()}
                     onSessionChange={openReplaySession}
+                    libraryRevision={externalSessionLibraryRevision()}
                     onExportVideo={exportReplayVideo}
                     onReplayPresentationChange={setRecorderReplayPresentation}
                     busy={animationExportRunning() || timeline.isPlaying()}

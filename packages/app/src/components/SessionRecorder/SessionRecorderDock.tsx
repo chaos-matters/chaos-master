@@ -82,6 +82,8 @@ export function SessionRecorderDock(props: {
    *  file opens one too. */
   session: RecordedSession | undefined
   onSessionChange: (session: RecordedSession | undefined) => void
+  /** Bumped when an external drop imports a take into Recordings. */
+  libraryRevision?: number
   /** Export a publishable artwork or full-interface video from the edited take. */
   onExportVideo?: (request: ReplayVideoExportRequest) => Promise<void> | void
   /** True while the canvas is animating or exporting — the cue to fade. */
@@ -443,7 +445,7 @@ export function SessionRecorderDock(props: {
 
         <Show when={libraryMounted()}>
           <SessionLibraryPanel
-            revision={libraryRevision()}
+            revision={libraryRevision() + (props.libraryRevision ?? 0)}
             hidden={!showLibrary()}
             panelRef={(element) => {
               libraryPanelRef = element
@@ -482,9 +484,9 @@ export function SessionRecorderDock(props: {
             startExtras={props.startExtras}
             onRecordingStarted={props.onRecordingStarted}
             onOpenSession={openReplay}
-            onSessionStored={() => {
+            onSessionStored={(options) => {
               setLibraryRevision((n) => n + 1)
-              openLibrary()
+              if (options?.openLibrary !== false) openLibrary()
             }}
             libraryOpen={showLibrary()}
             recordingsButtonRef={(element) => {
