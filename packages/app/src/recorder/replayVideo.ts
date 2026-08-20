@@ -23,7 +23,17 @@ import type { HistorySetter } from '@/utils/createStoreHistory'
 import type { AnimationJobSpec } from '@/utils/exportJobs'
 
 export const REPLAY_VIDEO_FPS = 24
-export const REPLAY_VIDEO_SIZE = 1080
+/**
+ * Artwork replays use the same landscape framing the editor is authored in.
+ * Camera2D fixes the vertical world extent and widens horizontally with the
+ * canvas aspect, so rendering onto a square plate crops the left and right of
+ * an otherwise unchanged flame. Keep this explicit until composition presets
+ * can offer deliberate fit/crop controls for square and portrait exports.
+ */
+export const REPLAY_VIDEO_DIMENSIONS = {
+  width: 1920,
+  height: 1080,
+} as const
 export const REPLAY_VIDEO_LEAD_IN_MS = 650
 export const REPLAY_VIDEO_TAIL_MS = 1400
 export const MAX_REPLAY_VIDEO_DURATION_MS = 120_000
@@ -863,7 +873,7 @@ export function createReplayVideoJobSpec(
     name: replayVideoFileName(session),
     flame: deepClone(session.initial),
     quality: 0.9,
-    dimensions: { width: REPLAY_VIDEO_SIZE, height: REPLAY_VIDEO_SIZE },
+    dimensions: { ...REPLAY_VIDEO_DIMENSIONS },
     fps: schedule.fps,
     frameStart: 0,
     frameEnd: schedule.totalFrames - 1,

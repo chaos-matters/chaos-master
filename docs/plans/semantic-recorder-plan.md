@@ -17,7 +17,7 @@ call paths; a representative browser journey remains incremental work. Audited
 `docs/recorder-coverage.md` for the audited matrix and follow-up list.
 
 M6 turns a finished take into publishable replay video. M6a is a deterministic,
-square artwork MP4 rendered from the semantic session with captions, step
+landscape artwork MP4 rendered from the semantic session with captions, step
 progress and Lumen Apeiron identity burned into the frames. M6b adds a second,
 real-time Full interface mode that records the actual app replay, including the
 flame, panels, timeline and follow-cam spotlight. These are separate from
@@ -347,7 +347,7 @@ browser-interface recording have fundamentally different guarantees.
 
 #### M6a — Artwork composition
 
-The replay panel can queue a **1080 × 1080, 24 fps MP4** from the edited take.
+The replay panel can queue a **1920 × 1080, 24 fps MP4** from the edited take.
 It uses the same clamped timestamps, authored `holdMs` values and selected
 playback speed as interactive replay. Each step is applied in an isolated
 command world, so exporting never moves the live editor or borrows its current
@@ -384,16 +384,17 @@ does not claim embedded-session portability.
 
 The two modes therefore answer different publishing needs:
 
-- **Artwork:** deterministic, square, branded, clean, background export.
+- **Artwork:** deterministic, landscape, branded, clean, background export.
 - **Full interface:** faithful app tutorial, spotlight and live workspace,
   foreground capture with explicit browser permission.
 
 #### Next phases, in order
 
-1. **M6c — Composition presets:** 9:16 stories/reels, 16:9 video and square,
-   with per-network safe areas, fit/crop controls and a preview of the chosen
-   framing. Apply these first to Artwork; Full interface can use a guided
-   viewport preset rather than distorting captured UI.
+1. **M6c — Composition presets:** keep 16:9 as the uncropped default, then add
+   9:16 stories/reels, 1:1 square and 4:5 feed plates with per-network safe
+   areas, explicit fit/crop controls and a preview of the chosen framing. Apply
+   these first to Artwork; Full interface can use a guided viewport preset
+   rather than distorting captured UI.
 2. **M6d — Identity and explanation:** reusable brand templates,
    author/project/tags, optional intro/outro cards, and semantic focus callouts
    or leader lines. Keep the default quiet so the flame remains the subject.
@@ -434,7 +435,7 @@ diagnostics.
 | M3    | Core editing-surface coverage, sonification state/commands and semantic-origin follow-cam coverage are shipped, including exact anchors for stable controls; committed custom code and a representative Playwright coverage-ratchet journey remain. | incremental    |
 | M4    | ~~Replay~~ **done**: `createSessionPlayer` transport, step-list panel, timed playback with speed control, jump-to-step, fork-from-step. A run or a seek is ONE undo step, so watching a session does not bury the viewer's own history.             | shipped        |
 | M5    | Sharing: PNG `FlameSteps` chunk, MP4 metadata and export-dialog integration.                                                                                                                                                                        | shipped        |
-| M6a   | Artwork replay video: deterministic square MP4, burned captions/identity/progress, isolated command replay and background export queue.                                                                                                             | shipped        |
+| M6a   | Artwork replay video: deterministic landscape MP4, burned captions/identity/progress, isolated command replay and background export queue.                                                                                                          | shipped        |
 | M6b   | Full-interface replay video: current-tab capture of the actual replay, panels, timeline, spotlight, captions and WebGPU flame.                                                                                                                      | in progress    |
 | M6c–g | Framing presets; identity/callouts; explicit soundtrack mixing; publishing integrations; optional sampled gesture motion.                                                                                                                           | planned        |
 | —     | Later: sandboxed replay for gallery previews, scripting/MCP surface over the registry, condensed-recipe editor, gallery publishing.                                                                                                                 | separate plans |

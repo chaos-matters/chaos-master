@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { examples } from '@/flame/examples'
 import { deepClone } from '@/utils/clone'
-import { createReplayVideoDriver, createReplayVideoJobSpec, createReplayVideoSchedule, drawReplayVideoOverlay, MAX_REPLAY_VIDEO_DURATION_MS, REPLAY_VIDEO_FPS, REPLAY_VIDEO_SIZE, replayActionIndexAtFrame, replayFramesInStateRun, replayVideoFileName, replayVideoVisualFingerprint, } from './replayVideo'
+import { createReplayVideoDriver, createReplayVideoJobSpec, createReplayVideoSchedule, drawReplayVideoOverlay, MAX_REPLAY_VIDEO_DURATION_MS, REPLAY_VIDEO_DIMENSIONS, REPLAY_VIDEO_FPS, replayActionIndexAtFrame, replayFramesInStateRun, replayVideoFileName, replayVideoVisualFingerprint, } from './replayVideo'
 import { SESSION_FORMAT_VERSION } from './schema'
 import type { RecordedAction, RecordedSession } from './schema'
 
@@ -177,7 +177,7 @@ describe('createReplayVideoDriver', () => {
 })
 
 describe('createReplayVideoJobSpec', () => {
-  it('builds a detached square MP4 job from the edited take', () => {
+  it('builds a detached landscape MP4 without cropping the editor framing', () => {
     const session = makeSession([
       {
         t: 250,
@@ -197,10 +197,8 @@ describe('createReplayVideoJobSpec', () => {
     expect(replayVideoFileName(session, 'interface')).toBe(
       'Aurora-Study-interface-replay',
     )
-    expect(job.dimensions).toEqual({
-      width: REPLAY_VIDEO_SIZE,
-      height: REPLAY_VIDEO_SIZE,
-    })
+    expect(job.dimensions).toEqual(REPLAY_VIDEO_DIMENSIONS)
+    expect(job.dimensions.width / job.dimensions.height).toBeCloseTo(16 / 9)
     expect(job.fps).toBe(REPLAY_VIDEO_FPS)
     expect(job.codec).toBe('avc')
     expect(job.embedMetadata).toBe(true)

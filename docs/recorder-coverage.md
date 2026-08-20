@@ -292,7 +292,10 @@ the panel's current caption and hold edits at the selected replay speed without
 requiring a separate save, and both refuse takes whose `unnamedWriteCount` says
 the authored result is incomplete.
 
-**Artwork** queues a square MP4 in the normal Exports tracker. The exporter
+**Artwork** queues a 1920 × 1080 landscape MP4 in the normal Exports tracker.
+That frame matches the editor camera's landscape composition: the 2D camera
+holds its vertical extent and reveals more of the flame horizontally, whereas
+a square render would crop the authored view. The exporter
 reconstructs the take in a private command context, so it never drives the open
 workspace or borrows its current flame. Non-visual steps reuse the last artwork
 frame instead of waiting for a renderer change that cannot occur. The MP4 burns

@@ -550,7 +550,7 @@ export function SessionReplayPanel(props: {
                   </div>
                   <p id={`${panelId}-video-mode-help`} class={styles.videoHelp}>
                     {exportMode() === 'artwork'
-                      ? 'Square branded MP4 · flame and captions · renders in the background.'
+                      ? 'Widescreen 1080p MP4 · full flame and captions · renders in the background.'
                       : 'Live capture · actual panels, timeline and spotlight. Choose This Tab when asked and keep it visible.'}
                   </p>
                   <button
@@ -636,7 +636,7 @@ export function SessionReplayPanel(props: {
                               : 'Adding artwork video to Exports'
                             : exportMode() === 'interface'
                               ? 'Share this tab, replay the take and download the visible interface'
-                              : 'Render a square, captioned artwork replay as MP4'
+                              : 'Render a widescreen, captioned artwork replay as MP4'
                     }
                   >
                     <Download class={styles.buttonIcon} aria-hidden="true" />
