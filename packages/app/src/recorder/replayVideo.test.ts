@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { examples } from '@/flame/examples'
 import { deepClone } from '@/utils/clone'
-import { createReplayVideoDriver, createReplayVideoJobSpec, createReplayVideoSchedule, drawReplayVideoOverlay, MAX_REPLAY_VIDEO_DURATION_MS, REPLAY_VIDEO_FPS, REPLAY_VIDEO_SIZE, replayActionIndexAtFrame, replayFramesInStateRun, replayVideoVisualFingerprint, } from './replayVideo'
+import { createReplayVideoDriver, createReplayVideoJobSpec, createReplayVideoSchedule, drawReplayVideoOverlay, MAX_REPLAY_VIDEO_DURATION_MS, REPLAY_VIDEO_FPS, REPLAY_VIDEO_SIZE, replayActionIndexAtFrame, replayFramesInStateRun, replayVideoFileName, replayVideoVisualFingerprint, } from './replayVideo'
 import { SESSION_FORMAT_VERSION } from './schema'
 import type { RecordedAction, RecordedSession } from './schema'
 
@@ -194,6 +194,9 @@ describe('createReplayVideoJobSpec', () => {
     const job = createReplayVideoJobSpec(session, 2)
 
     expect(job.name).toBe('Aurora-Study-creation-replay')
+    expect(replayVideoFileName(session, 'interface')).toBe(
+      'Aurora-Study-interface-replay',
+    )
     expect(job.dimensions).toEqual({
       width: REPLAY_VIDEO_SIZE,
       height: REPLAY_VIDEO_SIZE,

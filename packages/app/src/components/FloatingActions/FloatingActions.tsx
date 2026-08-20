@@ -3,7 +3,7 @@ import { Bookmark, CameraIcon, Discord, Eye, FolderOpen, Home, Pause, Plus, Shar
 import { setActiveTab } from '@/lib/activeTab'
 import { isSessionRecording } from '@/recorder/recorder'
 import { defaultPills, QualityPresets } from '../Quality/QualityPresets'
-import { recorderSavePending, recorderVisible, setRecorderVisible, } from '../SessionRecorder/recorderUi'
+import { recorderExportPending, recorderSavePending, recorderTaskPending, recorderVisible, setRecorderVisible, } from '../SessionRecorder/recorderUi'
 import ui from './FloatingActions.module.css'
 
 type Props = {
@@ -62,15 +62,17 @@ export function FloatingActions(props: Props) {
   const collapsed = props.collapsed
 
   const recorderToggleDisabled = () =>
-    isSessionRecording() || recorderSavePending()
+    isSessionRecording() || recorderTaskPending()
   const recorderToggleLabel = () =>
     isSessionRecording()
       ? 'Stop or discard the recording first'
-      : recorderSavePending()
-        ? 'Wait for the caption save to finish'
-        : recorderVisible()
-          ? 'Hide the step recorder'
-          : 'Show the step recorder'
+      : recorderExportPending()
+        ? 'Wait for the replay video recording to finish'
+        : recorderSavePending()
+          ? 'Wait for the caption save to finish'
+          : recorderVisible()
+            ? 'Hide the step recorder'
+            : 'Show the step recorder'
 
   // Position saved before collapsing so both user and replay-driven expansion
   // return the widget to the same place.

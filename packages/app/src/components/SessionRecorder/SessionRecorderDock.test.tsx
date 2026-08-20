@@ -5,7 +5,7 @@ import { ToastHost } from '@/components/Toast/Toast'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { examples } from '@/flame/examples'
 import { cancelSessionRecording, startSessionRecording, stopSessionRecording, } from '@/recorder/recorder'
-import { recorderOffset, recorderSavePending, recorderVisible, setFollowCamEnabled, setRecorderCollapsed, setRecorderFadeOnPlayback, setRecorderOffset, setRecorderOpacity, setRecorderSavePending, setRecorderVisible, } from './recorderUi'
+import { recorderOffset, recorderSavePending, recorderVisible, setFollowCamEnabled, setRecorderCollapsed, setRecorderExportPending, setRecorderFadeOnPlayback, setRecorderOffset, setRecorderOpacity, setRecorderSavePending, setRecorderVisible, } from './recorderUi'
 import { calculateFloatingPanelPlacement, SessionRecorderDock, } from './SessionRecorderDock'
 import type { ReplayTarget } from '@/recorder/replay'
 import type { RecordedSession } from '@/recorder/schema'
@@ -40,6 +40,7 @@ describe('SessionRecorderDock caption persistence', () => {
     deleteStoredSessionMock.mockReset().mockResolvedValue([])
     loadStoredSessionsMock.mockReset().mockResolvedValue([])
     renameStoredSessionMock.mockReset().mockResolvedValue([])
+    setRecorderExportPending(false)
     setRecorderSavePending(false)
     setRecorderVisible(true)
     setRecorderCollapsed(false)
@@ -55,6 +56,7 @@ describe('SessionRecorderDock caption persistence', () => {
     storeSessionMock.mockReset()
     loadStoredSessionsMock.mockReset()
     renameStoredSessionMock.mockReset()
+    setRecorderExportPending(false)
     setRecorderSavePending(false)
     setRecorderVisible(true)
     setRecorderCollapsed(false)

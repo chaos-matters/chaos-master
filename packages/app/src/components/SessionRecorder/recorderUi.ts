@@ -16,6 +16,14 @@ import { persistentSignal } from '@/utils/persistentSignal'
  * shared because both the dock and the floating toolbar can hide the panel. */
 export const [recorderSavePending, setRecorderSavePending] = createSignal(false)
 
+/** A full-interface replay export records the mounted editor in real time, so
+ * the recorder and active replay must remain mounted until capture settles. */
+export const [recorderExportPending, setRecorderExportPending] =
+  createSignal(false)
+
+export const recorderTaskPending = () =>
+  recorderSavePending() || recorderExportPending()
+
 /** Whether the dock is mounted at all. The toolbar's recorder toggle. */
 const [recorderVisibleValue, setRecorderVisibleValue] = persistentSignal(
   'recorder/visible',
@@ -30,7 +38,7 @@ export const recorderVisible = recorderVisibleValue
  * than only on the dock's close button.
  */
 export function setRecorderVisible(visible: boolean): void {
-  if (!visible && (isSessionRecording() || recorderSavePending())) return
+  if (!visible && (isSessionRecording() || recorderTaskPending())) return
   setRecorderVisibleValue(visible)
 }
 

@@ -287,35 +287,53 @@ writes the result to the library as a new entry, leaving the raw take alone.
 
 ## Publishable replay video
 
-**Export video** in the replay panel queues a square MP4 in the normal Exports
-tracker. It exports the panel's current caption and hold edits at the selected
-replay speed without requiring a separate save, and it refuses takes whose
-`unnamedWriteCount` says the authored result is incomplete.
+The replay panel offers two deliberately different publication modes. Both use
+the panel's current caption and hold edits at the selected replay speed without
+requiring a separate save, and both refuse takes whose `unnamedWriteCount` says
+the authored result is incomplete.
 
-The exporter reconstructs the take in a private command context. It never
-drives the open workspace, and non-visual steps reuse the last artwork frame
-instead of waiting for a renderer change that cannot occur. The MP4 burns in
-the Lumen Apeiron replay tag, current caption, step count and progress line;
+**Artwork** queues a square MP4 in the normal Exports tracker. The exporter
+reconstructs the take in a private command context, so it never drives the open
+workspace or borrows its current flame. Non-visual steps reuse the last artwork
+frame instead of waiting for a renderer change that cannot occur. The MP4 burns
+in the Lumen Apeiron replay tag, current caption, step count and progress line;
 the complete `.steps` session is also embedded as metadata for round-trip
 loading.
 
-Replay video is silent in this first version. Sessions intentionally contain
+**Full interface** records the ordinary in-app replay in real time: the actual
+flame, panels, timeline, follow-cam spotlight and captions visible in the
+current viewport. The browser must ask which surface to share on every export;
+choose **This Tab** and keep it visible until the replay finishes. The recorder
+cannot select a tab or retain capture permission on the user's behalf. This
+mode preserves the viewport aspect ratio and caps capture at a 1920-pixel long
+edge and a 1080p pixel budget. It downloads an MP4 with embedded session data
+when the browser's offline encoder is available, or a WebM without embedded
+session metadata through the browser recorder fallback.
+
+These are complementary outputs, not quality levels. Artwork is deterministic,
+backgroundable and purpose-composed for a social post. Full interface is a
+faithful recording of the app and therefore runs in the foreground at real
+replay speed under the browser's screen-capture permission.
+
+Replay video is silent in these first modes. Sessions intentionally contain
 no audio bytes, and the exporter will not substitute an unrelated file or live
 microphone from the current workspace. Aspect presets, explicit soundtrack
 mixing, richer brand templates and semantic focus/gesture callout lines are
 tracked in the plan's M6 follow-ups.
 
-The exporter also refuses a take that renders a custom variation. Recorder v1
-does not package executable WGSL definitions, so accepting that take would make
-the pixels depend on the exporting browser's local variation library rather
-than the saved session.
+Artwork also refuses a take that renders a custom variation. Recorder v1 does
+not package executable WGSL definitions, so accepting that take would make the
+pixels depend on the exporting browser's local variation library rather than
+the saved session. Full-interface capture can record what a locally configured
+editor visibly renders, but it does not make the embedded session portable to a
+browser that lacks those custom definitions.
 
-Replay video also requires the browser's offline video encoder. The ordinary
-animation exporter can fall back to real-time capture, but that fallback cannot
-preserve semantic step timing or embedded session metadata, so replay export
-fails clearly instead of producing a misleading file. Empty takes and videos
-longer than the current two-minute safety limit are likewise rejected before a
-render job is queued.
+Artwork requires the browser's offline video encoder and fails clearly instead
+of substituting a non-deterministic real-time render. Full interface can fall
+back to the browser recorder because real-time capture is its explicit
+contract. Empty takes and videos longer than the current two-minute safety
+limit are rejected before either expensive render or privacy-sensitive share
+prompt begins.
 
 ## The dock (recorder UI)
 
@@ -343,7 +361,7 @@ the replay and library panels it opens.
   the document as it was at that moment.
 - To embed steps in an ordinary export, stop the recording first — the export
   picks up the **last finished** session. To publish the steps themselves as a
-  video, open that take in Replay and choose **Export video**.
+  video, open that take in Replay and choose **Artwork** or **Full interface**.
 - `unnamedWriteCount` in the saved file is the honest measure of untracked
   flame/timeline writes. Zero means every watched document edit was
   represented; state explicitly listed under “Authored state not represented

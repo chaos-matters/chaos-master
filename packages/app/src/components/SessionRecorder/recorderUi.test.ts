@@ -1,17 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { examples } from '@/flame/examples'
 import { cancelSessionRecording, startSessionRecording, } from '@/recorder/recorder'
-import { recorderSavePending, recorderVisible, setRecorderSavePending, setRecorderVisible, } from './recorderUi'
+import { recorderExportPending, recorderSavePending, recorderVisible, setRecorderExportPending, setRecorderSavePending, setRecorderVisible, } from './recorderUi'
 
 describe('recorder visibility guard', () => {
   beforeEach(() => {
     cancelSessionRecording()
+    setRecorderExportPending(false)
     setRecorderSavePending(false)
     setRecorderVisible(true)
   })
 
   afterEach(() => {
     cancelSessionRecording()
+    setRecorderExportPending(false)
     setRecorderSavePending(false)
     setRecorderVisible(true)
   })
@@ -35,6 +37,18 @@ describe('recorder visibility guard', () => {
     expect(recorderVisible()).toBe(true)
 
     setRecorderSavePending(false)
+    setRecorderVisible(false)
+    expect(recorderVisible()).toBe(false)
+  })
+
+  it('keeps the recorder visible until a live interface export settles', () => {
+    setRecorderExportPending(true)
+    expect(recorderExportPending()).toBe(true)
+
+    setRecorderVisible(false)
+    expect(recorderVisible()).toBe(true)
+
+    setRecorderExportPending(false)
     setRecorderVisible(false)
     expect(recorderVisible()).toBe(false)
   })

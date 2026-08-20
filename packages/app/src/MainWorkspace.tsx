@@ -57,7 +57,7 @@ import { PopulationSimulator } from './components/PopulationSimulator/Population
 import { ProgressBar } from './components/ProgressBar/ProgressBar'
 import { getPresetFromQuality, qualityPresets, } from './components/Quality/QualityPresets'
 import { QuickVariationPicker } from './components/QuickVariationPicker/QuickVariationPicker'
-import { recorderSavePending, recorderVisible, } from './components/SessionRecorder/recorderUi'
+import { recorderExportPending, recorderTaskPending, recorderVisible, } from './components/SessionRecorder/recorderUi'
 import { SessionRecorderDock } from './components/SessionRecorder/SessionRecorderDock'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
 import { createShareVariationLinkModal, createShareVariationLoadModal, } from './components/ShareVariationModal/ShareVariationModal'
@@ -102,9 +102,10 @@ import { AutoCanvas } from './lib/AutoCanvas'
 import { affineFocusId, transformColorRandomizeFocusId, transformFocusId, transformVisibilityFocusId, variationParamsFocusId, variationRandomizeFocusId, variationTypeFocusId, variationVisibilityFocusId, } from './recorder/focusIds'
 import { breakRecordingCoalescing, invalidateLastFinishedSession, isSessionRecording, notePreviewStarted, recordSyntheticAction, reportDerivedWorkspaceWrite, reportDocumentWrite, reportTimelineTransport, reportUnreplayable, reportUnreplayableOnce, withRecordingSuppressed, } from './recorder/recorder'
 import { applyReplayAudioWiring, canEnableReplayAudio, sessionMayEnableSonification, } from './recorder/replay'
+import { captureReplayInterfaceVideo } from './recorder/replayInterfaceVideo'
 import { captureTransformColors, paletteRestoreColorsAfterReplayCommand, runPaletteRestoreTransition, } from './recorder/replayPaletteState'
 import { normalizeReplayPresentation, replaySideStateChanged, } from './recorder/replaySideState'
-import { createReplayVideoJobSpec } from './recorder/replayVideo'
+import { createReplayVideoJobSpec, replayVideoFileName, } from './recorder/replayVideo'
 import { snapshotOrigin, snapshotOriginLabel } from './recorder/snapshotOrigin'
 import { applySonificationSnapshot, closeAuthoredSonificationPanel, shouldRevealSonificationAfterReplay, shouldStopHiddenSonification, SONIFICATION_SNAPSHOT_VERSION, } from './recorder/sonificationState'
 import { createRecorderAwareTimeline, runTimelineSnapshotMutation, } from './recorder/timelineActions'
@@ -151,6 +152,7 @@ import type { CustomVariationDef } from './flame/variations/custom/types'
 import type { TransformVariationType3D } from './flame/variations3D'
 import type { ReplayAffineMode, ReplayAffineTab, ReplayColorView, ReplayFocusPreparationHandler, } from './recorder/focusPreparation'
 import type { ReplayTarget } from './recorder/replay'
+import type { ReplayVideoExportRequest } from './recorder/replayInterfaceVideo'
 import type { ReplayNonFlameSideState, ReplayPresentationSnapshot, } from './recorder/replaySideState'
 import type { RecordedSession } from './recorder/schema'
 import type { SnapshotOrigin } from './recorder/snapshotOrigin'
@@ -446,8 +448,12 @@ export function MainWorkspace(props: AppProps) {
   const [recorderReplayPresentation, setRecorderReplayPresentation] =
     createSignal({ playing: false, timelineTargeted: false })
   const openReplaySession = (session: RecordedSession | undefined) => {
-    if (recorderSavePending()) {
-      showToast('Wait for the caption save to finish before changing replays')
+    if (recorderTaskPending()) {
+      showToast(
+        recorderExportPending()
+          ? 'Wait for the replay video recording to finish before changing replays'
+          : 'Wait for the caption save to finish before changing replays',
+      )
       return
     }
     if (session !== undefined && isSessionRecording()) {
@@ -4218,13 +4224,27 @@ export function MainWorkspace(props: AppProps) {
     },
   }
 
-  const exportReplayVideo = (
-    session: RecordedSession,
-    playbackSpeed: number,
-  ) => {
+  const exportReplayVideo = async (request: ReplayVideoExportRequest) => {
     try {
-      enqueueAnimationJob(createReplayVideoJobSpec(session, playbackSpeed))
-      showToast('Replay video added to Exports', 3500)
+      if (request.mode === 'artwork') {
+        enqueueAnimationJob(
+          createReplayVideoJobSpec(request.session, request.playbackSpeed),
+        )
+        showToast('Artwork replay added to Exports', 3500)
+        return
+      }
+
+      const result = await captureReplayInterfaceVideo(request)
+      downloadBlob(
+        result.blob,
+        `${replayVideoFileName(request.session, 'interface')}.${result.extension}`,
+      )
+      showToast(
+        result.extension === 'mp4'
+          ? 'Full-interface replay downloaded'
+          : 'Full-interface replay downloaded as WebM (MP4 encoding is unavailable in this browser)',
+        5000,
+      )
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : 'Could not export replay video'

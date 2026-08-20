@@ -97,7 +97,9 @@ function nextSetterValue<T>(current: T, next: T | ((value: T) => T)): T {
   return typeof next === 'function' ? (next as (value: T) => T)(current) : next
 }
 
-function initialTimelineSnapshot(session: RecordedSession): TimelineSnapshot {
+export function replayVideoInitialTimelineSnapshot(
+  session: RecordedSession,
+): TimelineSnapshot {
   if (session.initialTimeline) return deepClone(session.initialTimeline)
   return {
     config: { ...defaultTimelineConfig(), timeScale: 1 },
@@ -466,7 +468,7 @@ export function createReplayVideoDriver(
 
   let flame = deepClone(session.initial)
   const timeline: MutableTimeline = {
-    snapshot: initialTimelineSnapshot(session),
+    snapshot: replayVideoInitialTimelineSnapshot(session),
   }
   let view = initialViewSnapshot(session)
   let audio = initialAudioSnapshot(session)
@@ -774,7 +776,7 @@ export function createReplayVideoDriver(
 
   function reset(): ReplayVideoFrameState {
     flame = deepClone(session.initial)
-    timeline.snapshot = initialTimelineSnapshot(session)
+    timeline.snapshot = replayVideoInitialTimelineSnapshot(session)
     view = initialViewSnapshot(session)
     audio = initialAudioSnapshot(session)
     sonification =
@@ -856,7 +858,7 @@ export function createReplayVideoJobSpec(
   const driver = createReplayVideoDriver(session)
   const initial = driver.reset()
   assertReplayVideoStatePortable(initial, -1)
-  const timeline = initialTimelineSnapshot(session)
+  const timeline = replayVideoInitialTimelineSnapshot(session)
   return {
     name: replayVideoFileName(session),
     flame: deepClone(session.initial),
@@ -1026,8 +1028,11 @@ export function drawReplayVideoOverlay(
   context.restore()
 }
 
-export function replayVideoFileName(session: RecordedSession): string {
+export function replayVideoFileName(
+  session: RecordedSession,
+  mode: 'artwork' | 'interface' = 'artwork',
+): string {
   const raw = session.initial.metadata?.name?.trim() || 'flame'
   const safe = raw.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '')
-  return `${safe || 'flame'}-creation-replay`
+  return `${safe || 'flame'}-${mode === 'interface' ? 'interface' : 'creation'}-replay`
 }
