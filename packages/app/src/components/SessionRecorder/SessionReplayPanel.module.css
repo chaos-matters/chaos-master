@@ -282,6 +282,12 @@
   white-space: nowrap;
 }
 
+.footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.3rem;
+}
+
 @media (pointer: coarse) {
   .panel {
     --replay-control-target: var(--recorder-coarse-target, 2.25rem);

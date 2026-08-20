@@ -104,6 +104,7 @@ import { breakRecordingCoalescing, invalidateLastFinishedSession, isSessionRecor
 import { applyReplayAudioWiring, canEnableReplayAudio, sessionMayEnableSonification, } from './recorder/replay'
 import { captureTransformColors, paletteRestoreColorsAfterReplayCommand, runPaletteRestoreTransition, } from './recorder/replayPaletteState'
 import { normalizeReplayPresentation, replaySideStateChanged, } from './recorder/replaySideState'
+import { createReplayVideoJobSpec } from './recorder/replayVideo'
 import { snapshotOrigin, snapshotOriginLabel } from './recorder/snapshotOrigin'
 import { applySonificationSnapshot, closeAuthoredSonificationPanel, shouldRevealSonificationAfterReplay, shouldStopHiddenSonification, SONIFICATION_SNAPSHOT_VERSION, } from './recorder/sonificationState'
 import { createRecorderAwareTimeline, runTimelineSnapshotMutation, } from './recorder/timelineActions'
@@ -4217,6 +4218,21 @@ export function MainWorkspace(props: AppProps) {
     },
   }
 
+  const exportReplayVideo = (
+    session: RecordedSession,
+    playbackSpeed: number,
+  ) => {
+    try {
+      enqueueAnimationJob(createReplayVideoJobSpec(session, playbackSpeed))
+      showToast('Replay video added to Exports', 3500)
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Could not export replay video'
+      showToast(message, 5000)
+      throw error
+    }
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   runTourCommand.fn = (id, ...args: any[]) => {
     executeCommand(id, cmdContext, ...args)
@@ -4497,6 +4513,7 @@ export function MainWorkspace(props: AppProps) {
                     onPrepareAction={prepareReplayFocus}
                     session={replaySession()}
                     onSessionChange={openReplaySession}
+                    onExportVideo={exportReplayVideo}
                     onReplayPresentationChange={setRecorderReplayPresentation}
                     busy={animationExportRunning() || timeline.isPlaying()}
                     replayBlocked={animationExportRunning()}

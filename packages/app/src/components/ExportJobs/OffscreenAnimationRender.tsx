@@ -6,6 +6,7 @@ import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
+import { assertReplayVideoStatePortable, createReplayVideoDriver, createReplayVideoSchedule, drawReplayVideoOverlay, replayActionIndexAtFrame, replayFramesInStateRun, replayVideoVisualFingerprint, } from '@/recorder/replayVideo'
 import { applyAudioMappingsToFlame, createAudioAnalyzer, } from '@/utils/audioAnalysis'
 import { createAudioVideoEncoder } from '@/utils/audioExport'
 import { deepClone } from '@/utils/clone'
@@ -37,7 +38,27 @@ function readonlySignal<T>(get: () => T): Signal<T> {
  */
 export function OffscreenAnimationRender(props: { job: AnimationJob }) {
   const { job } = props
-  const is3D = (job.flame.renderSettings.dimensions ?? 2) === 3
+  const replaySchedule =
+    job.replayVideo && job.session
+      ? createReplayVideoSchedule(
+          job.session,
+          job.replayVideo.playbackSpeed,
+          job.fps,
+          job.replayVideo.leadInMs,
+          job.replayVideo.tailMs,
+        )
+      : undefined
+  const replayDriver =
+    replaySchedule && job.session
+      ? createReplayVideoDriver(job.session)
+      : undefined
+  const initialReplayActionIndex = replaySchedule
+    ? replayActionIndexAtFrame(replaySchedule, 0)
+    : -1
+  let replayState = replayDriver?.advanceTo(initialReplayActionIndex)
+  let replayVisualKey = replayState
+    ? replayVideoVisualFingerprint(replayState)
+    : undefined
 
   const totalFrames = job.frameEnd - job.frameStart + 1
   const totalRenders = totalFrames * Math.max(1, job.playCount)
@@ -48,7 +69,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
 
   const [audioAnalyzer] = createResource(
     () =>
-      job.audioBuffer && job.audioMapping?.length
+      !replaySchedule && job.audioBuffer && job.audioMapping?.length
         ? ({ buf: job.audioBuffer, fps: job.fps } as const)
         : null,
     async (src) => {
@@ -83,11 +104,24 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
   }
 
   const [perFrameFlame, setPerFrameFlame] = createSignal<FlameDescriptor>(
-    frameFlame(job.frameStart),
+    replayState?.flame ?? frameFlame(job.frameStart),
   )
   const [perFrameBlendWeight, setPerFrameBlendWeight] = createSignal(
-    blendWeightAtFrame(job.frameStart),
+    replayState?.blendWeight ?? blendWeightAtFrame(job.frameStart),
   )
+  const [perFrameBlendFlame, setPerFrameBlendFlame] = createSignal(
+    replayState?.blendFlame ?? job.blendFlame,
+  )
+  const [perFramePalette, setPerFramePalette] = createSignal(
+    replayState?.palette ?? job.palette,
+  )
+  const [perFrameAdaptiveFilter, setPerFrameAdaptiveFilter] = createSignal(
+    replayState?.adaptiveFilter ?? true,
+  )
+  const [perFrameStochasticFilter, setPerFrameStochasticFilter] = createSignal(
+    replayState?.stochasticFilter ?? false,
+  )
+  const is3D = () => (perFrameFlame().renderSettings.dimensions ?? 2) === 3
 
   // Camera accessors follow the per-frame flame so animated camera moves bake in.
   const cam = () => perFrameFlame().renderSettings.camera
@@ -120,6 +154,8 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
   let limitAccessor: () => number = () => 0
   let posterUrl: string | undefined
   let encoder: Awaited<ReturnType<typeof createVideoEncoder>> | undefined
+  let compositeCanvas: HTMLCanvasElement | undefined
+  let compositeContext: CanvasRenderingContext2D | undefined
 
   onCleanup(() => {
     disposed = true
@@ -128,23 +164,35 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
 
   void (async () => {
     try {
-      encoder = job.audioBuffer
-        ? await createAudioVideoEncoder(
-            {
+      const nextEncoder =
+        job.audioBuffer && !replaySchedule
+          ? await createAudioVideoEncoder(
+              {
+                codec: job.codec,
+                width: resizeWidth,
+                height: resizeHeight,
+                fps: job.fps,
+              },
+              job.audioBuffer,
+              job.fps,
+            )
+          : await createVideoEncoder({
               codec: job.codec,
               width: resizeWidth,
               height: resizeHeight,
               fps: job.fps,
-            },
-            job.audioBuffer,
-            job.fps,
-          )
-        : await createVideoEncoder({
-            codec: job.codec,
-            width: resizeWidth,
-            height: resizeHeight,
-            fps: job.fps,
-          })
+            })
+      // MediaRecorder's captureStream fallback advances in wall-clock time,
+      // while a semantic replay deliberately renders frames off-line and may
+      // reuse one accumulated artwork frame many times. Accepting that fallback
+      // would produce the wrong pacing and no embedded session metadata.
+      if (replaySchedule && nextEncoder.usedFallback) {
+        nextEncoder.cancel()
+        throw new Error(
+          'Replay video export needs browser support for offline video encoding',
+        )
+      }
+      encoder = nextEncoder
       if (disposed) encoder.cancel()
     } catch (err) {
       setJobError(job.id, err instanceof Error ? err.message : String(err))
@@ -184,31 +232,130 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
     }
   }
 
-  async function captureAndAdvance(canvas: HTMLCanvasElement) {
-    if (!encoder) {
-      capturing = false
-      return
+  function queuePoster(canvas: HTMLCanvasElement) {
+    if (frameIndex !== 0) return
+    // A poster-less <video> often shows a blank/green undecoded frame.
+    canvas.toBlob((blob) => {
+      if (blob && !disposed) posterUrl = URL.createObjectURL(blob)
+    }, 'image/png')
+  }
+
+  function updateReplayState(actionIndex: number): boolean {
+    if (!replayDriver) return false
+    const next = replayDriver.advanceTo(actionIndex)
+    assertReplayVideoStatePortable(next, actionIndex)
+    const nextVisualKey = replayVideoVisualFingerprint(next)
+    const visualChanged = nextVisualKey !== replayVisualKey
+    replayState = next
+    replayVisualKey = nextVisualKey
+    if (!visualChanged) return false
+
+    setPerFrameFlame(next.flame)
+    setPerFrameBlendFlame(() => next.blendFlame)
+    setPerFrameBlendWeight(next.blendWeight)
+    setPerFramePalette(() => next.palette)
+    setPerFrameAdaptiveFilter(next.adaptiveFilter)
+    setPerFrameStochasticFilter(next.stochasticFilter)
+    return true
+  }
+
+  function getCompositeSurface(): {
+    canvas: HTMLCanvasElement
+    context: CanvasRenderingContext2D
+  } {
+    compositeCanvas ??= document.createElement('canvas')
+    compositeCanvas.width = resizeWidth
+    compositeCanvas.height = resizeHeight
+    compositeContext ??=
+      compositeCanvas.getContext('2d', { alpha: false }) ?? undefined
+    if (!compositeContext) {
+      throw new Error('Could not create the replay-video composition canvas')
     }
-    if (frameIndex === 0) {
-      // Poster of the first rendered frame for the tracker thumbnail — a
-      // poster-less <video> shows a blank/green undecoded frame. Best-effort
-      // and async; if it isn't ready by finish() the video just has no poster.
-      canvas.toBlob((blob) => {
-        if (blob && !disposed) posterUrl = URL.createObjectURL(blob)
-      }, 'image/png')
-    }
-    const bitmap = await globalThis.createImageBitmap(canvas, {
+    return { canvas: compositeCanvas, context: compositeContext }
+  }
+
+  async function captureReplayStateRuns(canvas: HTMLCanvasElement) {
+    if (!encoder || !replaySchedule || !job.session) return
+    const rendered = await globalThis.createImageBitmap(canvas, {
       resizeWidth,
       resizeHeight,
       resizeQuality: 'high',
     })
     if (disposed) {
-      bitmap.close()
+      rendered.close()
       return
     }
-    // encodeFrame applies backpressure and closes the bitmap.
-    await encoder.encodeFrame(bitmap, frameIndex)
-    frameIndex++
+    const composite = getCompositeSurface()
+    try {
+      while (frameIndex < totalRenders) {
+        const runFrames = replayFramesInStateRun(replaySchedule, frameIndex)
+        for (let offset = 0; offset < runFrames; offset++) {
+          if (disposed || (props.job.forceExport && frameIndex > 0)) return
+          const actionIndex = replayActionIndexAtFrame(
+            replaySchedule,
+            frameIndex,
+          )
+          composite.context.clearRect(0, 0, resizeWidth, resizeHeight)
+          composite.context.drawImage(rendered, 0, 0, resizeWidth, resizeHeight)
+          drawReplayVideoOverlay(composite.context, resizeWidth, resizeHeight, {
+            action:
+              actionIndex < 0 ? undefined : job.session.actions[actionIndex],
+            actionIndex,
+            totalActions: job.session.actions.length,
+            progress: totalRenders <= 1 ? 1 : frameIndex / (totalRenders - 1),
+            flameName: job.session.initial.metadata?.name,
+          })
+          queuePoster(composite.canvas)
+          const bitmap = await globalThis.createImageBitmap(composite.canvas)
+          if (disposed) {
+            bitmap.close()
+            return
+          }
+          await encoder.encodeFrame(bitmap, frameIndex)
+          frameIndex++
+          setAnimationJobProgress(job.id, frameIndex, totalRenders, 'rendering')
+        }
+
+        if (
+          frameIndex >= totalRenders ||
+          props.job.forceExport ||
+          updateReplayState(
+            replayActionIndexAtFrame(replaySchedule, frameIndex),
+          )
+        ) {
+          return
+        }
+        // The next step changed only non-rendered state. Keep using this exact
+        // artwork frame while advancing its caption/progress run rather than
+        // waiting for a GPU reset that will (correctly) never happen.
+      }
+    } finally {
+      rendered.close()
+    }
+  }
+
+  async function captureAndAdvance(canvas: HTMLCanvasElement) {
+    if (!encoder) {
+      capturing = false
+      return
+    }
+    if (replaySchedule) {
+      await captureReplayStateRuns(canvas)
+    } else {
+      queuePoster(canvas)
+      const bitmap = await globalThis.createImageBitmap(canvas, {
+        resizeWidth,
+        resizeHeight,
+        resizeQuality: 'high',
+      })
+      if (disposed) {
+        bitmap.close()
+        return
+      }
+      // encodeFrame applies backpressure and closes the bitmap.
+      await encoder.encodeFrame(bitmap, frameIndex)
+      frameIndex++
+    }
     capturing = false
     if (disposed) return
     setAnimationJobProgress(job.id, frameIndex, totalRenders, 'rendering')
@@ -218,9 +365,11 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
     }
     // Advancing the flame changes Flam3's accumulationFingerprint, which resets
     // accumulation so the next frame renders fresh.
-    const frame = job.frameStart + (frameIndex % totalFrames)
-    setPerFrameFlame(frameFlame(frame))
-    setPerFrameBlendWeight(blendWeightAtFrame(frame))
+    if (!replaySchedule) {
+      const frame = job.frameStart + (frameIndex % totalFrames)
+      setPerFrameFlame(frameFlame(frame))
+      setPerFrameBlendWeight(blendWeightAtFrame(frame))
+    }
   }
 
   const handleExport: ExportImageType = (canvas, info) => {
@@ -255,7 +404,7 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
     <Root adapterOptions={{ powerPreference: 'high-performance' }}>
       <AutoCanvas fixedResolution={job.dimensions} alphaMode="opaque">
         <Show
-          when={is3D}
+          when={is3D()}
           fallback={
             <WheelZoomCamera2D
               zoom={zoom}
@@ -265,15 +414,16 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
               <Flam3
                 quality={job.quality}
                 pointCountPerBatch={DEFAULT_POINT_COUNT}
-                adaptiveFilterEnabled={true}
+                adaptiveFilterEnabled={perFrameAdaptiveFilter()}
+                stochasticFilterEnabled={perFrameStochasticFilter()}
                 animationEnabled={false}
                 exportDriver
                 flameDescriptor={perFrameFlame()}
-                blendFlame={job.blendFlame}
+                blendFlame={perFrameBlendFlame()}
                 blendWeight={perFrameBlendWeight()}
                 renderInterval={0}
                 edgeFadeColor={vec4f(0)}
-                palette={() => job.palette}
+                palette={perFramePalette}
                 onExportImage={handleExport}
                 onAccumulatedPointCount={(c) => {
                   accumulated = c
@@ -297,15 +447,16 @@ export function OffscreenAnimationRender(props: { job: AnimationJob }) {
             <Flam3
               quality={job.quality}
               pointCountPerBatch={DEFAULT_POINT_COUNT}
-              adaptiveFilterEnabled={true}
+              adaptiveFilterEnabled={perFrameAdaptiveFilter()}
+              stochasticFilterEnabled={perFrameStochasticFilter()}
               animationEnabled={false}
               exportDriver
               flameDescriptor={perFrameFlame()}
-              blendFlame={job.blendFlame}
+              blendFlame={perFrameBlendFlame()}
               blendWeight={perFrameBlendWeight()}
               renderInterval={0}
               edgeFadeColor={vec4f(0)}
-              palette={() => job.palette}
+              palette={perFramePalette}
               onExportImage={handleExport}
               onAccumulatedPointCount={(c) => {
                 accumulated = c

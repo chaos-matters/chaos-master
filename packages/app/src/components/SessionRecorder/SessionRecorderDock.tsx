@@ -81,6 +81,11 @@ export function SessionRecorderDock(props: {
    *  file opens one too. */
   session: RecordedSession | undefined
   onSessionChange: (session: RecordedSession | undefined) => void
+  /** Queue a detached, publishable replay video from the edited take. */
+  onExportVideo?: (
+    session: RecordedSession,
+    playbackSpeed: number,
+  ) => Promise<void> | void
   /** True while the canvas is animating or exporting — the cue to fade. */
   busy: boolean
   /** True while an export temporarily owns and restores the main document. */
@@ -398,6 +403,7 @@ export function SessionRecorderDock(props: {
               session={session}
               target={props.target}
               compact={recorderCollapsed()}
+              onExportVideo={props.onExportVideo}
               onSave={async (edited) => {
                 // Saved as a NEW entry rather than overwriting: captions are an
                 // authoring pass over a take, and the raw take is what you go

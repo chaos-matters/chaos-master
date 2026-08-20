@@ -16,6 +16,12 @@ call paths; a representative browser journey remains incremental work. Audited
 2026-08-16; see
 `docs/recorder-coverage.md` for the audited matrix and follow-up list.
 
+M6 turns a finished take into a publishable replay video: a deterministic,
+square MP4 rendered from the semantic session with captions, step progress and
+Lumen Apeiron identity burned into the frames. This is separate from embedding
+the session inside an ordinary animation export; the resulting video visibly
+shows the creation sequence.
+
 ## The ask
 
 Press **Record** in the app, create a flame, press **Stop** — and get, alongside
@@ -332,6 +338,44 @@ remain the honest runtime coverage signal.
 - Gallery/endpoint publishing is out of scope here — it composes on top
   (the gallery-admin plan's D1/R2 pipeline gains one more file per item).
 
+### Publishable replay video
+
+The replay panel can queue a **1080 × 1080, 24 fps MP4** from the edited take.
+It uses the same clamped timestamps, authored `holdMs` values and selected
+playback speed as interactive replay. Each step is applied in an isolated
+command world, so exporting never moves the live editor or borrows its current
+flame. Captions, step count, brand tag and progress line are composited into
+the video, and the source session remains embedded in MP4 metadata.
+
+This is intentionally a semantic render, not a screen recording. The artwork
+gets the full frame and presentation-only actions reuse the previous artwork
+while still receiving their own caption and timing. Consecutive frames with an
+unchanged semantic state reuse one accumulated GPU render, keeping export cost
+proportional to meaningful visual changes rather than video duration.
+
+The first version is silent. A `.steps.json` contains audio wiring and resource
+identity, but never copyrighted/source audio bytes; silently borrowing whatever
+track happens to be open in the exporting workspace would make the artifact
+non-deterministic.
+
+It also fails closed when any rendered state references a custom variation.
+The current session format deliberately does not carry executable WGSL, so a
+portable video cannot yet prove that the exporter has the same custom code.
+That changes only with the trust-boundary work already tracked below.
+
+Next direction, deliberately deferred from the first useful slice:
+
+1. aspect presets for 9:16 stories/reels and 16:9 video, with per-network safe
+   areas;
+2. brand templates, author/project tags and optional outro cards;
+3. an explicit soundtrack upload/mix step with trim, gain and ducking, stored
+   as export input rather than recorder session state;
+4. focus callouts and gesture-path lines derived from semantic focus metadata;
+5. publishing integrations only after the local artifact and consent flow are
+   proven;
+6. sampled gesture motion if real exported videos show that commit-level slider
+   jumps are too abrupt.
+
 ### Undo-journal interplay
 
 Recording sits _above_ the undo systems, so the usual hazards don't apply,
@@ -358,6 +402,7 @@ diagnostics.
 | M3  | Core editing-surface coverage, sonification state/commands and semantic-origin follow-cam coverage are shipped, including exact anchors for stable controls; committed custom code and a representative Playwright coverage-ratchet journey remain. | incremental    |
 | M4  | ~~Replay~~ **done**: `createSessionPlayer` transport, step-list panel, timed playback with speed control, jump-to-step, fork-from-step. A run or a seek is ONE undo step, so watching a session does not bury the viewer's own history.             | shipped        |
 | M5  | Sharing: PNG `FlameSteps` chunk, MP4 metadata and export-dialog integration.                                                                                                                                                                        | shipped        |
+| M6  | Publishable replay video: deterministic square MP4, burned captions/identity/progress, isolated command replay and background export queue.                                                                                                         | shipped        |
 | —   | Later: sandboxed replay for gallery previews, scripting/MCP surface over the registry, condensed-recipe editor, gallery publishing.                                                                                                                 | separate plans |
 
 M1 + M2 is the demoable core (record a session using existing commands +

@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, Show, untrack, } from 'solid-js'
 import { createStore, unwrap } from 'solid-js/store'
-import { ChevronLeft, ChevronRight, Focus, Pause, Pencil, PlayPause, SkipBack, } from '@/icons'
+import { ChevronLeft, ChevronRight, Download, Focus, Pause, Pencil, PlayPause, SkipBack, } from '@/icons'
 import { deriveReplayFocusPreparation } from '@/recorder/focusPreparation'
 import { createSessionPlayer, PLAYBACK_SPEEDS } from '@/recorder/player'
 import { MAX_ACTION_HOLD_MS, MAX_ACTION_NOTE_CHARS, validateSession, } from '@/recorder/schema'
@@ -30,6 +30,12 @@ export function SessionReplayPanel(props: {
   /** Persist the edited session (captions and holds). Absent = no editing
    *  affordance, which is what a read-only replay surface wants. */
   onSave?: (session: RecordedSession) => Promise<void>
+  /** Queue a publishable video using the currently edited captions, holds and
+   *  selected replay speed. */
+  onExportVideo?: (
+    session: RecordedSession,
+    playbackSpeed: number,
+  ) => Promise<void> | void
   onClose: () => void
   /** Lets the owning dock recede while timed replay is advancing. */
   onPlaybackChange?: (playing: boolean) => void
@@ -45,6 +51,7 @@ export function SessionReplayPanel(props: {
   const [speed, setSpeed] = createSignal(1)
   const [editing, setEditing] = createSignal<number>()
   const [saving, setSaving] = createSignal(false)
+  const [exporting, setExporting] = createSignal(false)
   const panelId = createUniqueId()
 
   /**
@@ -139,15 +146,15 @@ export function SessionReplayPanel(props: {
           data-recorder-replay-close
           type="button"
           class={styles.close}
-          disabled={saving()}
+          disabled={saving() || exporting()}
           onClick={() => {
             // Commit wherever we are, then hand the document back.
             player.stop()
             props.onClose()
           }}
           title={
-            saving()
-              ? 'Wait for the caption save to finish before closing'
+            saving() || exporting()
+              ? 'Wait for the recorder task to finish before closing'
               : 'Stop replaying and keep this step as the current flame'
           }
         >
@@ -410,39 +417,92 @@ export function SessionReplayPanel(props: {
             }}
           </For>
         </ol>
-        <Show when={props.onSave}>
-          {(save) => (
-            <button
-              type="button"
-              class={styles.button}
-              disabled={saving()}
-              aria-busy={saving()}
-              onClick={() => {
-                // The controls above constrain authored fields, and this
-                // store-boundary check makes the guarantee explicit even if a
-                // future editor adds another field without matching limits.
-                const validated = validateSession(deepClone(unwrap(session)))
-                if (validated === undefined || saving()) return
+        <Show when={props.onSave || props.onExportVideo}>
+          <div class={styles.footerActions}>
+            <Show when={props.onExportVideo}>
+              {(exportVideo) => (
+                <button
+                  type="button"
+                  class={styles.button}
+                  disabled={
+                    saving() ||
+                    exporting() ||
+                    session.unnamedWriteCount > 0 ||
+                    player.total === 0
+                  }
+                  aria-busy={exporting()}
+                  onClick={() => {
+                    const validated = validateSession(
+                      deepClone(unwrap(session)),
+                    )
+                    if (validated === undefined || saving() || exporting()) {
+                      return
+                    }
 
-                setSaving(true)
-                void save()(validated)
-                  .catch(() => {
-                    // The owner reports the storage error. Keeping the panel
-                    // mounted and editable is the recovery path here.
-                  })
-                  .finally(() => {
-                    setSaving(false)
-                  })
-              }}
-              title={
-                saving()
-                  ? 'Saving captions locally'
-                  : 'Save the captions and holds as a new recording'
-              }
-            >
-              {saving() ? 'Saving captions…' : 'Save captions'}
-            </button>
-          )}
+                    setExporting(true)
+                    void Promise.resolve()
+                      .then(() => exportVideo()(validated, speed()))
+                      .catch(() => {
+                        // The workspace owns the queue and reports the error.
+                      })
+                      .finally(() => {
+                        setExporting(false)
+                      })
+                  }}
+                  title={
+                    session.unnamedWriteCount > 0
+                      ? 'Record a clean take before publishing a replay video'
+                      : player.total === 0
+                        ? 'Record at least one authored step before publishing a replay video'
+                        : exporting()
+                          ? 'Adding replay video to Exports'
+                          : 'Render a square, captioned creation replay as MP4'
+                  }
+                >
+                  <Download class={styles.buttonIcon} aria-hidden="true" />
+                  <span>{exporting() ? 'Queuing video…' : 'Export video'}</span>
+                </button>
+              )}
+            </Show>
+            <Show when={props.onSave}>
+              {(save) => (
+                <button
+                  type="button"
+                  class={styles.button}
+                  disabled={saving() || exporting()}
+                  aria-busy={saving()}
+                  onClick={() => {
+                    // The controls above constrain authored fields, and this
+                    // store-boundary check makes the guarantee explicit even
+                    // if a future editor adds a field without matching limits.
+                    const validated = validateSession(
+                      deepClone(unwrap(session)),
+                    )
+                    if (validated === undefined || saving() || exporting()) {
+                      return
+                    }
+
+                    setSaving(true)
+                    void save()(validated)
+                      .catch(() => {
+                        // The owner reports the storage error. Keeping the
+                        // panel mounted and editable is the recovery path.
+                      })
+                      .finally(() => {
+                        setSaving(false)
+                      })
+                  }}
+                  title={
+                    saving()
+                      ? 'Saving captions locally'
+                      : 'Save the captions and holds as a new recording'
+                  }
+                >
+                  {saving() ? 'Saving captions…' : 'Save captions'}
+                </button>
+              )}
+            </Show>
+          </div>
         </Show>
       </Show>
     </div>

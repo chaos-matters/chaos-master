@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@solidjs/testing-library'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { examples } from '@/flame/examples'
 import { cancelSessionRecording } from '@/recorder/recorder'
 import { SESSION_FORMAT_VERSION } from '@/recorder/schema'
@@ -120,5 +120,83 @@ describe('SessionReplayPanel accessibility', () => {
       screen.getByRole('button', { name: 'Close editor for step 1' }),
     ).toBe(edit)
     unmount()
+  })
+
+  it('exports the edited take at the selected replay speed without mutating the source', async () => {
+    const source = makeSession()
+    const exportVideo = vi.fn().mockResolvedValue(undefined)
+    const { unmount } = render(() => (
+      <SessionReplayPanel
+        session={source}
+        target={makeTarget()}
+        onExportVideo={exportVideo}
+        onClose={() => {}}
+      />
+    ))
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Edit caption for step 1' }),
+    )
+    fireEvent.input(
+      screen.getByRole('textbox', { name: 'Caption for step 1' }),
+      { target: { value: 'Reveal the first transform' } },
+    )
+    fireEvent.input(screen.getByRole('spinbutton', { name: /hold/i }), {
+      target: { value: '900' },
+    })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Playback speed' }), {
+      target: { value: '2' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Export video' }))
+
+    await waitFor(() => {
+      expect(exportVideo).toHaveBeenCalledTimes(1)
+    })
+    const [exported, playbackSpeed] = exportVideo.mock.calls[0] as [
+      RecordedSession,
+      number,
+    ]
+    expect(exported.actions[0]?.note).toBe('Reveal the first transform')
+    expect(exported.actions[0]?.holdMs).toBe(900)
+    expect(playbackSpeed).toBe(2)
+    expect(source.actions[0]?.note).toBe('Shape the first transform')
+    expect(source.actions[0]?.holdMs).toBeUndefined()
+    unmount()
+  })
+
+  it('disables publishing when the take has no trustworthy creation sequence', () => {
+    const empty = makeSession()
+    empty.actions = []
+    const first = render(() => (
+      <SessionReplayPanel
+        session={empty}
+        target={makeTarget()}
+        onExportVideo={() => {}}
+        onClose={() => {}}
+      />
+    ))
+
+    const emptyExport = screen.getByRole('button', { name: 'Export video' })
+    expect((emptyExport as HTMLButtonElement).disabled).toBe(true)
+    expect(emptyExport.title).toMatch(/at least one authored step/)
+    first.unmount()
+
+    const incomplete = makeSession()
+    incomplete.unnamedWriteCount = 1
+    const second = render(() => (
+      <SessionReplayPanel
+        session={incomplete}
+        target={makeTarget()}
+        onExportVideo={() => {}}
+        onClose={() => {}}
+      />
+    ))
+
+    const incompleteExport = screen.getByRole('button', {
+      name: 'Export video',
+    })
+    expect((incompleteExport as HTMLButtonElement).disabled).toBe(true)
+    expect(incompleteExport.title).toMatch(/clean take/)
+    second.unmount()
   })
 })
