@@ -3,7 +3,7 @@ import { createSignal } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { examples } from '@/flame/examples'
 import { cancelSessionRecording, startSessionRecording, } from '@/recorder/recorder'
-import { recorderVisible, setRecorderSavePending, setRecorderVisible, } from '../SessionRecorder/recorderUi'
+import { recorderVisible, setRecorderExportPending, setRecorderSavePending, setRecorderVisible, } from '../SessionRecorder/recorderUi'
 import { FloatingActions } from './FloatingActions'
 
 function renderFloatingActions(initiallyCollapsed = false) {
@@ -83,12 +83,14 @@ describe('FloatingActions controlled collapse', () => {
 describe('FloatingActions recorder toggle', () => {
   beforeEach(() => {
     cancelSessionRecording()
+    setRecorderExportPending(false)
     setRecorderSavePending(false)
     setRecorderVisible(true)
   })
 
   afterEach(() => {
     cancelSessionRecording()
+    setRecorderExportPending(false)
     setRecorderSavePending(false)
     setRecorderVisible(true)
   })
@@ -117,6 +119,24 @@ describe('FloatingActions recorder toggle', () => {
 
     fireEvent.click(toggle)
     expect(recorderVisible()).toBe(false)
+    unmount()
+  })
+
+  it('cannot hide the recorder while a full-interface export is active', () => {
+    const { unmount } = renderFloatingActions()
+    const toggle = screen.getByRole<HTMLButtonElement>('button', {
+      name: 'Hide the step recorder',
+    })
+
+    setRecorderExportPending(true)
+
+    expect(toggle.disabled).toBe(true)
+    expect(toggle.title).toBe('Wait for the replay video recording to finish')
+    fireEvent.click(toggle)
+    expect(recorderVisible()).toBe(true)
+
+    setRecorderExportPending(false)
+    expect(toggle.disabled).toBe(false)
     unmount()
   })
 })

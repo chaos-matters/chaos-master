@@ -57,7 +57,7 @@ import { PopulationSimulator } from './components/PopulationSimulator/Population
 import { ProgressBar } from './components/ProgressBar/ProgressBar'
 import { getPresetFromQuality, qualityPresets, } from './components/Quality/QualityPresets'
 import { QuickVariationPicker } from './components/QuickVariationPicker/QuickVariationPicker'
-import { recorderSavePending, recorderVisible, } from './components/SessionRecorder/recorderUi'
+import { recorderExportPending, recorderTaskPending, recorderVisible, } from './components/SessionRecorder/recorderUi'
 import { SessionRecorderDock } from './components/SessionRecorder/SessionRecorderDock'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
 import { createShareVariationLinkModal, createShareVariationLoadModal, } from './components/ShareVariationModal/ShareVariationModal'
@@ -102,8 +102,10 @@ import { AutoCanvas } from './lib/AutoCanvas'
 import { affineFocusId, transformColorRandomizeFocusId, transformFocusId, transformVisibilityFocusId, variationParamsFocusId, variationRandomizeFocusId, variationTypeFocusId, variationVisibilityFocusId, } from './recorder/focusIds'
 import { breakRecordingCoalescing, invalidateLastFinishedSession, isSessionRecording, notePreviewStarted, recordSyntheticAction, reportDerivedWorkspaceWrite, reportDocumentWrite, reportTimelineTransport, reportUnreplayable, reportUnreplayableOnce, withRecordingSuppressed, } from './recorder/recorder'
 import { applyReplayAudioWiring, canEnableReplayAudio, sessionMayEnableSonification, } from './recorder/replay'
+import { captureReplayInterfaceVideo } from './recorder/replayInterfaceVideo'
 import { captureTransformColors, paletteRestoreColorsAfterReplayCommand, runPaletteRestoreTransition, } from './recorder/replayPaletteState'
 import { normalizeReplayPresentation, replaySideStateChanged, } from './recorder/replaySideState'
+import { createReplayVideoJobSpec, replayVideoFileName, } from './recorder/replayVideo'
 import { snapshotOrigin, snapshotOriginLabel } from './recorder/snapshotOrigin'
 import { applySonificationSnapshot, closeAuthoredSonificationPanel, shouldRevealSonificationAfterReplay, shouldStopHiddenSonification, SONIFICATION_SNAPSHOT_VERSION, } from './recorder/sonificationState'
 import { createRecorderAwareTimeline, runTimelineSnapshotMutation, } from './recorder/timelineActions'
@@ -122,6 +124,7 @@ import { persistentSignal } from './utils/persistentSignal'
 import { addRandomizerHistoryEntry, clearRandomizerHistory, loadRandomizerHistoryEntries, MAX_RANDOMIZER_HISTORY_LIMIT, } from './utils/randomizerHistoryDB'
 import { buildReadableIds } from './utils/readableIds'
 import { getOldestRecentFlame, saveRecentFlame, upsertRecentFlame, } from './utils/recentFlames'
+import { storeImportedSession } from './utils/sessionsDB'
 import { createShareLink, deriveOgMeta, uploadOgPreview, } from './utils/shareLink'
 import { sum } from './utils/sum'
 import { createTimelineState, defaultConfig as defaultTimelineConfig, resolveKeyframeValue, } from './utils/timeline'
@@ -150,6 +153,7 @@ import type { CustomVariationDef } from './flame/variations/custom/types'
 import type { TransformVariationType3D } from './flame/variations3D'
 import type { ReplayAffineMode, ReplayAffineTab, ReplayColorView, ReplayFocusPreparationHandler, } from './recorder/focusPreparation'
 import type { ReplayTarget } from './recorder/replay'
+import type { ReplayVideoExportRequest } from './recorder/replayInterfaceVideo'
 import type { ReplayNonFlameSideState, ReplayPresentationSnapshot, } from './recorder/replaySideState'
 import type { RecordedSession } from './recorder/schema'
 import type { SnapshotOrigin } from './recorder/snapshotOrigin'
@@ -442,11 +446,17 @@ export function MainWorkspace(props: AppProps) {
   // The session currently open for replay (M4), if any. Lives here rather than
   // in the dock because dropping a .steps.json opens one too.
   const [replaySession, setReplaySession] = createSignal<RecordedSession>()
+  const [externalSessionLibraryRevision, setExternalSessionLibraryRevision] =
+    createSignal(0)
   const [recorderReplayPresentation, setRecorderReplayPresentation] =
     createSignal({ playing: false, timelineTargeted: false })
   const openReplaySession = (session: RecordedSession | undefined) => {
-    if (recorderSavePending()) {
-      showToast('Wait for the caption save to finish before changing replays')
+    if (recorderTaskPending()) {
+      showToast(
+        recorderExportPending()
+          ? 'Wait for the replay video recording to finish before changing replays'
+          : 'Wait for the caption save to finish before changing replays',
+      )
       return
     }
     if (session !== undefined && isSessionRecording()) {
@@ -454,6 +464,24 @@ export function MainWorkspace(props: AppProps) {
       return
     }
     setReplaySession(session)
+  }
+  const importReplaySession = async (
+    session: RecordedSession,
+    sourceFile: File,
+  ) => {
+    try {
+      const result = await storeImportedSession(session, sourceFile.name)
+      if (result.added) {
+        setExternalSessionLibraryRevision((revision) => revision + 1)
+        showToast(`Imported "${result.name}" to Recordings`, 3500)
+      } else {
+        showToast(`"${result.name}" is already in Recordings`, 3500)
+      }
+    } catch (error: unknown) {
+      console.warn('[recorder] could not store dropped session', error)
+      showToast('Could not save the imported replay to Recordings', 5000)
+    }
+    openReplaySession(session)
   }
   // Colors as they were before the first palette apply — lets Unselect
   // restore the "natural" colors. UI stash only; undo handles the rest.
@@ -1654,7 +1682,7 @@ export function MainWorkspace(props: AppProps) {
       },
     },
     setLoadedAnimation,
-    openReplaySession,
+    importReplaySession,
   )
 
   const timeline = createTimelineState()
@@ -4217,6 +4245,35 @@ export function MainWorkspace(props: AppProps) {
     },
   }
 
+  const exportReplayVideo = async (request: ReplayVideoExportRequest) => {
+    try {
+      if (request.mode === 'artwork') {
+        enqueueAnimationJob(
+          createReplayVideoJobSpec(request.session, request.playbackSpeed),
+        )
+        showToast('Artwork replay added to Exports', 3500)
+        return
+      }
+
+      const result = await captureReplayInterfaceVideo(request)
+      downloadBlob(
+        result.blob,
+        `${replayVideoFileName(request.session, 'interface')}.${result.extension}`,
+      )
+      showToast(
+        result.extension === 'mp4'
+          ? 'Full-interface replay downloaded'
+          : 'Full-interface replay downloaded as WebM (MP4 encoding is unavailable in this browser)',
+        5000,
+      )
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Could not export replay video'
+      showToast(message, 5000)
+      throw error
+    }
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   runTourCommand.fn = (id, ...args: any[]) => {
     executeCommand(id, cmdContext, ...args)
@@ -4497,6 +4554,8 @@ export function MainWorkspace(props: AppProps) {
                     onPrepareAction={prepareReplayFocus}
                     session={replaySession()}
                     onSessionChange={openReplaySession}
+                    libraryRevision={externalSessionLibraryRevision()}
+                    onExportVideo={exportReplayVideo}
                     onReplayPresentationChange={setRecorderReplayPresentation}
                     busy={animationExportRunning() || timeline.isPlaying()}
                     replayBlocked={animationExportRunning()}

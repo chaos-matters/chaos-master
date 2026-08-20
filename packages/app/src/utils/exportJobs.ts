@@ -4,6 +4,7 @@ import type { TimelineConfig, TimelineTrack } from './timeline'
 import type { VideoEncoderConfig } from './videoEncoder'
 import type { Palette } from '@/flame/colorMap'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { ReplayVideoSpec } from '@/recorder/replayVideo'
 import type { RecordedSession } from '@/recorder/schema'
 
 /**
@@ -70,6 +71,8 @@ export type AnimationJobSpec = {
   config: TimelineConfig
   /** Recording association captured when the job was enqueued. */
   session: RecordedSession | undefined
+  /** Present for a branded creation replay rather than a timeline render. */
+  replayVideo?: ReplayVideoSpec
   audioBuffer?: AudioBuffer
   audioMapping?: AudioMappingEntry[]
 }

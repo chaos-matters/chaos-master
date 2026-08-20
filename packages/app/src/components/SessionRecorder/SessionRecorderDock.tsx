@@ -3,7 +3,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { ChevronDown, CircleHalf, Cross } from '@/icons'
 import { isSessionRecording } from '@/recorder/recorder'
 import { storeSession } from '@/utils/sessionsDB'
-import { clampRecorderOpacity, FADED_RECORDER_OPACITY, followCamEnabled, MIN_RECORDER_OPACITY, recorderCollapsed, recorderFadeOnPlayback, recorderOffset, recorderOpacity, recorderSavePending, setRecorderCollapsed, setRecorderFadeOnPlayback, setRecorderOffset, setRecorderOpacity, setRecorderSavePending, setRecorderVisible, } from './recorderUi'
+import { clampRecorderOpacity, FADED_RECORDER_OPACITY, followCamEnabled, MIN_RECORDER_OPACITY, recorderCollapsed, recorderExportPending, recorderFadeOnPlayback, recorderOffset, recorderOpacity, recorderSavePending, recorderTaskPending, setRecorderCollapsed, setRecorderFadeOnPlayback, setRecorderOffset, setRecorderOpacity, setRecorderSavePending, setRecorderVisible, } from './recorderUi'
 import { SessionLibraryPanel } from './SessionLibraryPanel'
 import { SessionRecorderControls } from './SessionRecorderControls'
 import styles from './SessionRecorderDock.module.css'
@@ -12,6 +12,7 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { ReplayFocusPreparation, ReplayFocusPreparationHandler, } from '@/recorder/focusPreparation'
 import type { SessionStartExtras } from '@/recorder/recorder'
 import type { ReplayTarget } from '@/recorder/replay'
+import type { ReplayVideoExportRequest } from '@/recorder/replayInterfaceVideo'
 import type { RecordedSession } from '@/recorder/schema'
 
 /**
@@ -81,6 +82,10 @@ export function SessionRecorderDock(props: {
    *  file opens one too. */
   session: RecordedSession | undefined
   onSessionChange: (session: RecordedSession | undefined) => void
+  /** Bumped when an external drop imports a take into Recordings. */
+  libraryRevision?: number
+  /** Export a publishable artwork or full-interface video from the edited take. */
+  onExportVideo?: (request: ReplayVideoExportRequest) => Promise<void> | void
   /** True while the canvas is animating or exporting — the cue to fade. */
   busy: boolean
   /** True while an export temporarily owns and restores the main document. */
@@ -398,6 +403,7 @@ export function SessionRecorderDock(props: {
               session={session}
               target={props.target}
               compact={recorderCollapsed()}
+              onExportVideo={props.onExportVideo}
               onSave={async (edited) => {
                 // Saved as a NEW entry rather than overwriting: captions are an
                 // authoring pass over a take, and the raw take is what you go
@@ -439,7 +445,7 @@ export function SessionRecorderDock(props: {
 
         <Show when={libraryMounted()}>
           <SessionLibraryPanel
-            revision={libraryRevision()}
+            revision={libraryRevision() + (props.libraryRevision ?? 0)}
             hidden={!showLibrary()}
             panelRef={(element) => {
               libraryPanelRef = element
@@ -478,9 +484,9 @@ export function SessionRecorderDock(props: {
             startExtras={props.startExtras}
             onRecordingStarted={props.onRecordingStarted}
             onOpenSession={openReplay}
-            onSessionStored={() => {
+            onSessionStored={(options) => {
               setLibraryRevision((n) => n + 1)
-              openLibrary()
+              if (options?.openLibrary !== false) openLibrary()
             }}
             libraryOpen={showLibrary()}
             recordingsButtonRef={(element) => {
@@ -562,10 +568,13 @@ export function SessionRecorderDock(props: {
           onClick={() => {
             setRecorderCollapsed((collapsed) => !collapsed)
           }}
+          disabled={recorderExportPending()}
           title={
-            recorderCollapsed()
-              ? 'Show the replay steps and the recordings list'
-              : 'Collapse to the pill (keeps the transport)'
+            recorderExportPending()
+              ? 'Keep the replay panel visible while recording the interface'
+              : recorderCollapsed()
+                ? 'Show the replay steps and the recordings list'
+                : 'Collapse to the pill (keeps the transport)'
           }
           aria-label={
             recorderCollapsed() ? 'Expand recorder' : 'Collapse recorder'
@@ -584,13 +593,15 @@ export function SessionRecorderDock(props: {
           onClick={() => {
             setRecorderVisible(false)
           }}
-          disabled={isSessionRecording() || recorderSavePending()}
+          disabled={isSessionRecording() || recorderTaskPending()}
           title={
             isSessionRecording()
               ? 'Stop or discard the recording first'
-              : recorderSavePending()
-                ? 'Wait for the caption save to finish'
-                : 'Hide the recorder (bring it back from the toolbar)'
+              : recorderExportPending()
+                ? 'Wait for the replay video recording to finish'
+                : recorderSavePending()
+                  ? 'Wait for the caption save to finish'
+                  : 'Hide the recorder (bring it back from the toolbar)'
           }
           aria-label="Hide recorder"
         >

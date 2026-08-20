@@ -1,13 +1,41 @@
-import { fireEvent, render, screen } from '@solidjs/testing-library'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@solidjs/testing-library'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ToastHost } from '@/components/Toast/Toast'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { examples } from '@/flame/examples'
 import { cancelSessionRecording, isSessionRecording } from '@/recorder/recorder'
+import { serializeSession, SESSION_FORMAT_VERSION } from '@/recorder/schema'
 import { deepClone } from '@/utils/clone'
 import { SessionRecorderControls } from './SessionRecorderControls'
+import type { RecordedSession } from '@/recorder/schema'
+
+const { storeImportedSessionMock, storeSessionMock } = vi.hoisted(() => ({
+  storeImportedSessionMock: vi.fn(),
+  storeSessionMock: vi.fn(),
+}))
+
+vi.mock('@/utils/sessionsDB', () => ({
+  storeImportedSession: storeImportedSessionMock,
+  storeSession: storeSessionMock,
+}))
+
+function validSession(): RecordedSession {
+  return {
+    version: SESSION_FORMAT_VERSION,
+    app: { version: 'test', flameSchemaVersion: 'test' },
+    createdAt: '2026-08-21T12:00:00.000Z',
+    initial: deepClone(examples.example1),
+    actions: [{ t: 0, id: 'flame.setGamma', args: [2] }],
+    unnamedWriteCount: 0,
+  }
+}
 
 describe('SessionRecorderControls start feedback', () => {
+  beforeEach(() => {
+    storeImportedSessionMock.mockReset()
+    storeSessionMock.mockReset()
+  })
+
   afterEach(() => {
     cancelSessionRecording()
     vi.restoreAllMocks()
@@ -65,6 +93,92 @@ describe('SessionRecorderControls start feedback', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open steps' }))
 
     expect(click).toHaveBeenCalledTimes(1)
+    unmount()
+  })
+
+  it('imports a selected steps file before opening its replay', async () => {
+    const session = validSession()
+    const file = new File(['session'], 'Imported take.steps.json', {
+      type: 'application/json',
+    })
+    Object.defineProperty(file, 'text', {
+      value: () => Promise.resolve(serializeSession(session)),
+    })
+    storeImportedSessionMock.mockResolvedValue({
+      added: true,
+      name: 'Imported take',
+    })
+    const onOpenSession = vi.fn()
+    const onSessionStored = vi.fn()
+    const { container, unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderControls
+          flameDescriptor={examples.example1}
+          onOpenSession={onOpenSession}
+          onSessionStored={onSessionStored}
+          onToggleLibrary={() => {}}
+        />
+        <ToastHost />
+      </ToastProvider>
+    ))
+    const input =
+      container.querySelector<HTMLInputElement>('input[type="file"]')
+
+    fireEvent.change(input!, { target: { files: [file] } })
+
+    await waitFor(() => {
+      expect(storeImportedSessionMock).toHaveBeenCalledWith(session, file.name)
+    })
+    expect(onSessionStored).toHaveBeenCalledWith({ openLibrary: false })
+    expect(onOpenSession).toHaveBeenCalledWith(session)
+    expect(
+      screen.getByText('Imported "Imported take" to Recordings'),
+    ).toBeTruthy()
+    unmount()
+  })
+
+  it('still opens a validated replay when local import storage fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const storageError = new Error('quota exceeded')
+    const session = validSession()
+    const file = new File(['session'], 'Portable take.steps.json', {
+      type: 'application/json',
+    })
+    Object.defineProperty(file, 'text', {
+      value: () => Promise.resolve(serializeSession(session)),
+    })
+    storeImportedSessionMock.mockRejectedValue(storageError)
+    const onOpenSession = vi.fn()
+    const onSessionStored = vi.fn()
+    const { container, unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderControls
+          flameDescriptor={examples.example1}
+          onOpenSession={onOpenSession}
+          onSessionStored={onSessionStored}
+          onToggleLibrary={() => {}}
+        />
+        <ToastHost />
+      </ToastProvider>
+    ))
+    const input =
+      container.querySelector<HTMLInputElement>('input[type="file"]')
+
+    fireEvent.change(input!, { target: { files: [file] } })
+
+    await waitFor(() => {
+      expect(onOpenSession).toHaveBeenCalledWith(session)
+    })
+    expect(onSessionStored).not.toHaveBeenCalled()
+    expect(
+      screen.getByText(
+        'Replay opened, but it could not be saved to Recordings',
+      ),
+    ).toBeTruthy()
+    expect(warn).toHaveBeenCalledWith(
+      '[recorder] could not store imported session',
+      storageError,
+    )
     unmount()
   })
 

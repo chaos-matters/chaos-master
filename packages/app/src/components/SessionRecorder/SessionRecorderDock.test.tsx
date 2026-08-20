@@ -5,7 +5,7 @@ import { ToastHost } from '@/components/Toast/Toast'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { examples } from '@/flame/examples'
 import { cancelSessionRecording, startSessionRecording, stopSessionRecording, } from '@/recorder/recorder'
-import { recorderOffset, recorderSavePending, recorderVisible, setFollowCamEnabled, setRecorderCollapsed, setRecorderFadeOnPlayback, setRecorderOffset, setRecorderOpacity, setRecorderSavePending, setRecorderVisible, } from './recorderUi'
+import { recorderOffset, recorderSavePending, recorderVisible, setFollowCamEnabled, setRecorderCollapsed, setRecorderExportPending, setRecorderFadeOnPlayback, setRecorderOffset, setRecorderOpacity, setRecorderSavePending, setRecorderVisible, } from './recorderUi'
 import { calculateFloatingPanelPlacement, SessionRecorderDock, } from './SessionRecorderDock'
 import type { ReplayTarget } from '@/recorder/replay'
 import type { RecordedSession } from '@/recorder/schema'
@@ -40,6 +40,7 @@ describe('SessionRecorderDock caption persistence', () => {
     deleteStoredSessionMock.mockReset().mockResolvedValue([])
     loadStoredSessionsMock.mockReset().mockResolvedValue([])
     renameStoredSessionMock.mockReset().mockResolvedValue([])
+    setRecorderExportPending(false)
     setRecorderSavePending(false)
     setRecorderVisible(true)
     setRecorderCollapsed(false)
@@ -55,6 +56,7 @@ describe('SessionRecorderDock caption persistence', () => {
     storeSessionMock.mockReset()
     loadStoredSessionsMock.mockReset()
     renameStoredSessionMock.mockReset()
+    setRecorderExportPending(false)
     setRecorderSavePending(false)
     setRecorderVisible(true)
     setRecorderCollapsed(false)
@@ -256,6 +258,36 @@ describe('SessionRecorderDock caption persistence', () => {
       expect(document.activeElement).toBe(library)
     })
 
+    unmount()
+  })
+
+  it('refreshes a retained library after an external recording import', async () => {
+    const [libraryRevision, setLibraryRevision] = createSignal(0)
+    const { unmount } = render(() => (
+      <ToastProvider>
+        <SessionRecorderDock
+          flameDescriptor={examples.example1}
+          target={target}
+          session={undefined}
+          onSessionChange={() => {}}
+          libraryRevision={libraryRevision()}
+          busy={false}
+        />
+      </ToastProvider>
+    ))
+
+    fireEvent.click(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Recordings' }),
+    )
+    await waitFor(() => {
+      expect(loadStoredSessionsMock).toHaveBeenCalledTimes(1)
+    })
+
+    setLibraryRevision(1)
+
+    await waitFor(() => {
+      expect(loadStoredSessionsMock).toHaveBeenCalledTimes(2)
+    })
     unmount()
   })
 

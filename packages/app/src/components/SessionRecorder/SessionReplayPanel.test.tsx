@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@solidjs/testing-library'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { examples } from '@/flame/examples'
 import { cancelSessionRecording } from '@/recorder/recorder'
 import { SESSION_FORMAT_VERSION } from '@/recorder/schema'
@@ -7,7 +7,12 @@ import { deepClone } from '@/utils/clone'
 import { setFollowCamEnabled } from './recorderUi'
 import { SessionReplayPanel } from './SessionReplayPanel'
 import type { ReplayTarget } from '@/recorder/replay'
+import type { ReplayVideoExportRequest } from '@/recorder/replayInterfaceVideo'
 import type { RecordedSession } from '@/recorder/schema'
+
+vi.mock('@/recorder/replayInterfaceVideo', () => ({
+  replayInterfaceCaptureSupported: () => true,
+}))
 
 function makeSession(): RecordedSession {
   return {
@@ -120,5 +125,114 @@ describe('SessionReplayPanel accessibility', () => {
       screen.getByRole('button', { name: 'Close editor for step 1' }),
     ).toBe(edit)
     unmount()
+  })
+
+  it('exports the edited take at the selected replay speed without mutating the source', async () => {
+    const source = makeSession()
+    const exportVideo = vi.fn().mockResolvedValue(undefined)
+    const { unmount } = render(() => (
+      <SessionReplayPanel
+        session={source}
+        target={makeTarget()}
+        onExportVideo={exportVideo}
+        onClose={() => {}}
+      />
+    ))
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Edit caption for step 1' }),
+    )
+    fireEvent.input(
+      screen.getByRole('textbox', { name: 'Caption for step 1' }),
+      { target: { value: 'Reveal the first transform' } },
+    )
+    fireEvent.input(screen.getByRole('spinbutton', { name: /hold/i }), {
+      target: { value: '900' },
+    })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Playback speed' }), {
+      target: { value: '2' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Export artwork' }))
+
+    await waitFor(() => {
+      expect(exportVideo).toHaveBeenCalledTimes(1)
+    })
+    const [request] = exportVideo.mock.calls[0] as [ReplayVideoExportRequest]
+    expect(request.mode).toBe('artwork')
+    expect(request.session.actions[0]?.note).toBe('Reveal the first transform')
+    expect(request.session.actions[0]?.holdMs).toBe(900)
+    expect(request.playbackSpeed).toBe(2)
+    expect(source.actions[0]?.note).toBe('Shape the first transform')
+    expect(source.actions[0]?.holdMs).toBeUndefined()
+    unmount()
+  })
+
+  it('starts full-interface capture directly from the export click', () => {
+    const exportVideo = vi.fn().mockResolvedValue(undefined)
+    const { unmount } = render(() => (
+      <SessionReplayPanel
+        session={makeSession()}
+        target={makeTarget()}
+        onExportVideo={exportVideo}
+        onClose={() => {}}
+      />
+    ))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Full interface' }))
+    expect(screen.getByText(/Choose This Tab/)).toBeTruthy()
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Record full interface' }),
+    )
+
+    // getDisplayMedia requires transient activation. The owner callback must
+    // therefore run synchronously on this same trusted click, not after an
+    // awaited validation or queued microtask.
+    expect(exportVideo).toHaveBeenCalledTimes(1)
+    const [request] = exportVideo.mock.calls[0] as [ReplayVideoExportRequest]
+    expect(request.mode).toBe('interface')
+    if (request.mode !== 'interface') {
+      throw new Error('expected a full-interface export request')
+    }
+    expect(request.playbackSpeed).toBe(1)
+    expect(request.prepareReplay).toEqual(expect.any(Function))
+    expect(request.playReplay).toEqual(expect.any(Function))
+    unmount()
+  })
+
+  it('disables publishing when the take has no trustworthy creation sequence', () => {
+    const empty = makeSession()
+    empty.actions = []
+    const first = render(() => (
+      <SessionReplayPanel
+        session={empty}
+        target={makeTarget()}
+        onExportVideo={() => {}}
+        onClose={() => {}}
+      />
+    ))
+
+    const emptyExport = screen.getByRole('button', { name: 'Export artwork' })
+    expect((emptyExport as HTMLButtonElement).disabled).toBe(true)
+    expect(emptyExport.title).toMatch(/at least one authored step/)
+    first.unmount()
+
+    const incomplete = makeSession()
+    incomplete.unnamedWriteCount = 1
+    const second = render(() => (
+      <SessionReplayPanel
+        session={incomplete}
+        target={makeTarget()}
+        onExportVideo={() => {}}
+        onClose={() => {}}
+      />
+    ))
+
+    const incompleteExport = screen.getByRole('button', {
+      name: 'Export artwork',
+    })
+    expect((incompleteExport as HTMLButtonElement).disabled).toBe(true)
+    expect(incompleteExport.title).toMatch(/clean take/)
+    second.unmount()
   })
 })

@@ -282,6 +282,83 @@
   white-space: nowrap;
 }
 
+.footer-actions {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 0.3rem;
+}
+
+.video-export {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.35rem;
+}
+
+.video-modes {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 8px;
+  background: oklch(12% 0.02 240 / 0.45);
+
+  [data-theme='light'] & {
+    background: oklch(88% 0.02 240 / 0.75);
+  }
+}
+
+.video-mode {
+  padding: 0.12rem 0.4rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  opacity: 0.62;
+
+  &:hover:not(:disabled) {
+    opacity: 1;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.32;
+  }
+}
+
+.video-mode-active {
+  background: oklch(54% 0.12 240 / 0.48);
+  box-shadow: 0 1px 3px oklch(0% 0 0 / 0.22);
+  opacity: 1;
+}
+
+.video-help {
+  flex-basis: 100%;
+  order: 3;
+  margin: 0;
+  color: oklch(79% 0.035 240);
+  font-size: 0.65rem;
+  line-height: 1.3;
+
+  [data-theme='light'] & {
+    color: oklch(43% 0.035 240);
+  }
+}
+
+.export-error {
+  flex-basis: 100%;
+  order: 4;
+  color: oklch(84% 0.12 30);
+  line-height: 1.3;
+
+  [data-theme='light'] & {
+    color: oklch(40% 0.12 30);
+  }
+}
+
 @media (pointer: coarse) {
   .panel {
     --replay-control-target: var(--recorder-coarse-target, 2.25rem);
@@ -297,6 +374,10 @@
   .step-edit,
   .note-input,
   .hold-input {
+    min-height: var(--recorder-coarse-target, 2.25rem);
+  }
+
+  .video-mode {
     min-height: var(--recorder-coarse-target, 2.25rem);
   }
 

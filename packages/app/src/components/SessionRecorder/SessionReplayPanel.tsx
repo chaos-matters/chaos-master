@@ -1,15 +1,17 @@
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, Show, untrack, } from 'solid-js'
 import { createStore, unwrap } from 'solid-js/store'
-import { ChevronLeft, ChevronRight, Focus, Pause, Pencil, PlayPause, SkipBack, } from '@/icons'
+import { ChevronLeft, ChevronRight, Download, Focus, Pause, Pencil, PlayPause, SkipBack, } from '@/icons'
 import { deriveReplayFocusPreparation } from '@/recorder/focusPreparation'
 import { createSessionPlayer, PLAYBACK_SPEEDS } from '@/recorder/player'
+import { replayInterfaceCaptureSupported } from '@/recorder/replayInterfaceVideo'
 import { MAX_ACTION_HOLD_MS, MAX_ACTION_NOTE_CHARS, validateSession, } from '@/recorder/schema'
 import { deepClone } from '@/utils/clone'
-import { followCamEnabled, setFollowCamEnabled } from './recorderUi'
+import { followCamEnabled, setFollowCamEnabled, setRecorderExportPending, } from './recorderUi'
 import { ReplaySpotlight } from './ReplaySpotlight'
 import styles from './SessionReplayPanel.module.css'
 import type { ReplayFocusPreparation, ReplayFocusPreparationHandler, } from '@/recorder/focusPreparation'
 import type { ReplayTarget } from '@/recorder/replay'
+import type { ReplayVideoExportMode, ReplayVideoExportRequest, } from '@/recorder/replayInterfaceVideo'
 import type { RecordedSession } from '@/recorder/schema'
 
 /**
@@ -30,6 +32,9 @@ export function SessionReplayPanel(props: {
   /** Persist the edited session (captions and holds). Absent = no editing
    *  affordance, which is what a read-only replay surface wants. */
   onSave?: (session: RecordedSession) => Promise<void>
+  /** Export either a detached artwork composition or the live interface using
+   *  the currently edited captions, holds and selected replay speed. */
+  onExportVideo?: (request: ReplayVideoExportRequest) => Promise<void> | void
   onClose: () => void
   /** Lets the owning dock recede while timed replay is advancing. */
   onPlaybackChange?: (playing: boolean) => void
@@ -45,7 +50,27 @@ export function SessionReplayPanel(props: {
   const [speed, setSpeed] = createSignal(1)
   const [editing, setEditing] = createSignal<number>()
   const [saving, setSaving] = createSignal(false)
+  const [exporting, setExporting] = createSignal(false)
+  const [exportMode, setExportMode] =
+    createSignal<ReplayVideoExportMode>('artwork')
+  const [exportError, setExportError] = createSignal<string>()
   const panelId = createUniqueId()
+
+  type LiveReplayWaiter = {
+    resolve: () => void
+    reject: (error: Error) => void
+    cleanup: () => void
+  }
+  let liveReplayWaiter: LiveReplayWaiter | undefined
+
+  const settleLiveReplay = (error?: Error) => {
+    const waiter = liveReplayWaiter
+    if (!waiter) return
+    liveReplayWaiter = undefined
+    waiter.cleanup()
+    if (error) waiter.reject(error)
+    else waiter.resolve()
+  }
 
   /**
    * The session is cloned into a store so captions and holds are editable
@@ -61,6 +86,12 @@ export function SessionReplayPanel(props: {
       if (followCamEnabled()) {
         props.onPrepareAction?.(deriveReplayFocusPreparation(action))
       }
+    },
+    onFinished: () => {
+      settleLiveReplay()
+    },
+    onError: (message) => {
+      settleLiveReplay(new Error(message))
     },
   })
   const currentPreparation = createMemo(() => {
@@ -85,7 +116,9 @@ export function SessionReplayPanel(props: {
   })
   // A player left running past unmount would keep writing into the document.
   onCleanup(() => {
+    settleLiveReplay(new Error('Full-interface recording was interrupted'))
     player.stop()
+    setRecorderExportPending(false)
     props.onPlaybackChange?.(false)
     props.onCurrentPreparationChange?.(undefined)
   })
@@ -94,6 +127,57 @@ export function SessionReplayPanel(props: {
     const action = session.actions[index]
     if (!action) return ''
     return action.note ?? action.label ?? action.id
+  }
+  const interactionBlocked = () => props.blocked || exporting()
+  const interfaceCaptureAvailable = () =>
+    props.onExportVideo !== undefined && replayInterfaceCaptureSupported()
+
+  const prepareLiveReplay = () => {
+    setFollowCamEnabled(true)
+    player.stop()
+    player.seek(-1)
+    const error = player.lastError()
+    if (error) throw new Error(error)
+  }
+
+  const playLiveReplay = (signal: AbortSignal): Promise<void> => {
+    if (signal.aborted) {
+      return Promise.reject(
+        signal.reason instanceof Error
+          ? signal.reason
+          : new Error('Full-interface recording was cancelled'),
+      )
+    }
+    if (liveReplayWaiter) {
+      return Promise.reject(
+        new Error('A full-interface replay is already running'),
+      )
+    }
+
+    return new Promise<void>((resolve, reject) => {
+      const onAbort = () => {
+        player.stop()
+        settleLiveReplay(
+          signal.reason instanceof Error
+            ? signal.reason
+            : new Error('Full-interface recording was cancelled'),
+        )
+      }
+      signal.addEventListener('abort', onAbort, { once: true })
+      liveReplayWaiter = {
+        resolve,
+        reject,
+        cleanup: () => {
+          signal.removeEventListener('abort', onAbort)
+        },
+      }
+      player.play()
+      if (!player.isPlaying()) {
+        settleLiveReplay(
+          new Error(player.lastError() ?? 'The replay could not start'),
+        )
+      }
+    })
   }
   const replayStatus = createMemo(() => {
     const index = player.stepIndex()
@@ -139,15 +223,15 @@ export function SessionReplayPanel(props: {
           data-recorder-replay-close
           type="button"
           class={styles.close}
-          disabled={saving()}
+          disabled={saving() || exporting()}
           onClick={() => {
             // Commit wherever we are, then hand the document back.
             player.stop()
             props.onClose()
           }}
           title={
-            saving()
-              ? 'Wait for the caption save to finish before closing'
+            saving() || exporting()
+              ? 'Wait for the recorder task to finish before closing'
               : 'Stop replaying and keep this step as the current flame'
           }
         >
@@ -163,7 +247,7 @@ export function SessionReplayPanel(props: {
           onClick={() => {
             player.seek(-1)
           }}
-          disabled={props.blocked}
+          disabled={interactionBlocked()}
           title="Back to the starting flame"
           aria-label="Back to the starting flame"
         >
@@ -176,7 +260,7 @@ export function SessionReplayPanel(props: {
           onClick={() => {
             player.seek(player.stepIndex() - 1)
           }}
-          disabled={props.blocked || player.stepIndex() < 0}
+          disabled={interactionBlocked() || player.stepIndex() < 0}
           title="Previous step"
           aria-label="Previous step"
         >
@@ -192,7 +276,7 @@ export function SessionReplayPanel(props: {
               onClick={() => {
                 player.play()
               }}
-              disabled={props.blocked || player.total === 0}
+              disabled={interactionBlocked() || player.total === 0}
               title="Play replay"
             >
               <PlayPause class={styles.buttonIcon} aria-hidden="true" />
@@ -207,6 +291,7 @@ export function SessionReplayPanel(props: {
             onClick={() => {
               player.pause()
             }}
+            disabled={exporting()}
             title="Pause replay"
           >
             <Pause class={styles.buttonIcon} aria-hidden="true" />
@@ -220,7 +305,9 @@ export function SessionReplayPanel(props: {
           onClick={() => {
             player.seek(player.stepIndex() + 1)
           }}
-          disabled={props.blocked || player.stepIndex() >= player.total - 1}
+          disabled={
+            interactionBlocked() || player.stepIndex() >= player.total - 1
+          }
           title="Next step"
           aria-label="Next step"
         >
@@ -254,6 +341,7 @@ export function SessionReplayPanel(props: {
               ? 'Disable replay follow-cam'
               : 'Enable replay follow-cam'
           }
+          disabled={exporting()}
         >
           <Focus class={styles.buttonIcon} aria-hidden="true" />
         </button>
@@ -265,6 +353,7 @@ export function SessionReplayPanel(props: {
             id={`${panelId}-playback-speed`}
             class={styles.speed}
             value={speed()}
+            disabled={exporting()}
             onChange={(ev) => {
               setSpeed(Number(ev.currentTarget.value))
             }}
@@ -308,7 +397,7 @@ export function SessionReplayPanel(props: {
                       onClick={() => {
                         player.seek(index())
                       }}
-                      disabled={props.blocked}
+                      disabled={interactionBlocked()}
                       aria-current={
                         player.stepIndex() === index() ? 'step' : undefined
                       }
@@ -337,6 +426,7 @@ export function SessionReplayPanel(props: {
                       }
                       aria-expanded={editing() === index()}
                       aria-controls={editorId}
+                      disabled={exporting()}
                     >
                       <Pencil class={styles.stepEditIcon} aria-hidden="true" />
                     </button>
@@ -410,39 +500,205 @@ export function SessionReplayPanel(props: {
             }}
           </For>
         </ol>
-        <Show when={props.onSave}>
-          {(save) => (
-            <button
-              type="button"
-              class={styles.button}
-              disabled={saving()}
-              aria-busy={saving()}
-              onClick={() => {
-                // The controls above constrain authored fields, and this
-                // store-boundary check makes the guarantee explicit even if a
-                // future editor adds another field without matching limits.
-                const validated = validateSession(deepClone(unwrap(session)))
-                if (validated === undefined || saving()) return
+        <Show when={props.onSave || props.onExportVideo}>
+          <div class={styles.footerActions}>
+            <Show when={props.onExportVideo}>
+              {(exportVideo) => (
+                <div class={styles.videoExport}>
+                  <div
+                    class={styles.videoModes}
+                    role="group"
+                    aria-label="Video export mode"
+                  >
+                    <button
+                      type="button"
+                      class={styles.videoMode}
+                      classList={{
+                        [styles.videoModeActive as string]:
+                          exportMode() === 'artwork',
+                      }}
+                      aria-pressed={exportMode() === 'artwork'}
+                      disabled={exporting()}
+                      onClick={() => {
+                        setExportMode('artwork')
+                        setExportError(undefined)
+                      }}
+                    >
+                      Artwork
+                    </button>
+                    <button
+                      type="button"
+                      class={styles.videoMode}
+                      classList={{
+                        [styles.videoModeActive as string]:
+                          exportMode() === 'interface',
+                      }}
+                      aria-pressed={exportMode() === 'interface'}
+                      disabled={exporting() || !interfaceCaptureAvailable()}
+                      title={
+                        interfaceCaptureAvailable()
+                          ? 'Record the actual app, spotlight and flame in real time'
+                          : 'Full-interface capture is unavailable in this browser'
+                      }
+                      onClick={() => {
+                        setExportMode('interface')
+                        setExportError(undefined)
+                      }}
+                    >
+                      Full interface
+                    </button>
+                  </div>
+                  <p id={`${panelId}-video-mode-help`} class={styles.videoHelp}>
+                    {exportMode() === 'artwork'
+                      ? 'Widescreen 1080p MP4 · full flame and captions · renders in the background.'
+                      : 'Live capture · actual panels, timeline and spotlight. Choose This Tab when asked and keep it visible.'}
+                  </p>
+                  <button
+                    type="button"
+                    class={styles.button}
+                    disabled={
+                      saving() ||
+                      exporting() ||
+                      session.unnamedWriteCount > 0 ||
+                      player.total === 0
+                    }
+                    aria-busy={exporting()}
+                    aria-describedby={`${panelId}-video-mode-help`}
+                    onClick={() => {
+                      const validated = validateSession(
+                        deepClone(unwrap(session)),
+                      )
+                      if (validated === undefined || saving() || exporting()) {
+                        return
+                      }
 
-                setSaving(true)
-                void save()(validated)
-                  .catch(() => {
-                    // The owner reports the storage error. Keeping the panel
-                    // mounted and editable is the recovery path here.
-                  })
-                  .finally(() => {
-                    setSaving(false)
-                  })
-              }}
-              title={
-                saving()
-                  ? 'Saving captions locally'
-                  : 'Save the captions and holds as a new recording'
-              }
-            >
-              {saving() ? 'Saving captions…' : 'Save captions'}
-            </button>
-          )}
+                      const mode = exportMode()
+                      const previousFollowCam = followCamEnabled()
+                      const request: ReplayVideoExportRequest =
+                        mode === 'interface'
+                          ? {
+                              mode,
+                              session: validated,
+                              playbackSpeed: speed(),
+                              prepareReplay: prepareLiveReplay,
+                              playReplay: playLiveReplay,
+                            }
+                          : {
+                              mode,
+                              session: validated,
+                              playbackSpeed: speed(),
+                            }
+
+                      setExportError(undefined)
+                      setExporting(true)
+                      setRecorderExportPending(true)
+                      try {
+                        // Invoke directly from the click. Full-interface mode
+                        // must reach getDisplayMedia while transient user
+                        // activation is still available.
+                        const result = exportVideo()(request)
+                        void Promise.resolve(result)
+                          .catch((error: unknown) => {
+                            setExportError(
+                              error instanceof Error
+                                ? error.message
+                                : 'Could not export the replay video',
+                            )
+                          })
+                          .finally(() => {
+                            if (mode === 'interface') {
+                              setFollowCamEnabled(previousFollowCam)
+                            }
+                            setRecorderExportPending(false)
+                            setExporting(false)
+                          })
+                      } catch (error: unknown) {
+                        if (mode === 'interface') {
+                          setFollowCamEnabled(previousFollowCam)
+                        }
+                        setExportError(
+                          error instanceof Error
+                            ? error.message
+                            : 'Could not export the replay video',
+                        )
+                        setRecorderExportPending(false)
+                        setExporting(false)
+                      }
+                    }}
+                    title={
+                      session.unnamedWriteCount > 0
+                        ? 'Record a clean take before publishing a replay video'
+                        : player.total === 0
+                          ? 'Record at least one authored step before publishing a replay video'
+                          : exporting()
+                            ? exportMode() === 'interface'
+                              ? 'Recording the visible interface in real time'
+                              : 'Adding artwork video to Exports'
+                            : exportMode() === 'interface'
+                              ? 'Share this tab, replay the take and download the visible interface'
+                              : 'Render a widescreen, captioned artwork replay as MP4'
+                    }
+                  >
+                    <Download class={styles.buttonIcon} aria-hidden="true" />
+                    <span>
+                      {exporting()
+                        ? exportMode() === 'interface'
+                          ? 'Recording interface…'
+                          : 'Queuing artwork…'
+                        : exportMode() === 'interface'
+                          ? 'Record full interface'
+                          : 'Export artwork'}
+                    </span>
+                  </button>
+                  <Show when={exportError()}>
+                    {(message) => (
+                      <div class={styles.exportError} role="alert">
+                        {message()}
+                      </div>
+                    )}
+                  </Show>
+                </div>
+              )}
+            </Show>
+            <Show when={props.onSave}>
+              {(save) => (
+                <button
+                  type="button"
+                  class={styles.button}
+                  disabled={saving() || exporting()}
+                  aria-busy={saving()}
+                  onClick={() => {
+                    // The controls above constrain authored fields, and this
+                    // store-boundary check makes the guarantee explicit even
+                    // if a future editor adds a field without matching limits.
+                    const validated = validateSession(
+                      deepClone(unwrap(session)),
+                    )
+                    if (validated === undefined || saving() || exporting()) {
+                      return
+                    }
+
+                    setSaving(true)
+                    void save()(validated)
+                      .catch(() => {
+                        // The owner reports the storage error. Keeping the
+                        // panel mounted and editable is the recovery path.
+                      })
+                      .finally(() => {
+                        setSaving(false)
+                      })
+                  }}
+                  title={
+                    saving()
+                      ? 'Saving captions locally'
+                      : 'Save the captions and holds as a new recording'
+                  }
+                >
+                  {saving() ? 'Saving captions…' : 'Save captions'}
+                </button>
+              )}
+            </Show>
+          </div>
         </Show>
       </Show>
     </div>

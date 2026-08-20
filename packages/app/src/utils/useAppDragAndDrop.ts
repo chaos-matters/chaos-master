@@ -11,8 +11,11 @@ export function useAppDragAndDrop(
     flame: FlameDescriptor
     tracks: TimelineTrack[]
   }) => void,
-  /** Offered the session a dropped PNG carried, if any (M5). */
-  onSessionDropped?: (session: RecordedSession) => void,
+  /** Offered the session and source file carried by a dropped artifact. */
+  onSessionDropped?: (
+    session: RecordedSession,
+    sourceFile: File,
+  ) => Promise<void> | void,
 ) {
   const loadFlameFromFile = useLoadFlameFromFile()
 
@@ -22,7 +25,7 @@ export function useAppDragAndDrop(
     // A bare .steps.json carries no flame: there is nothing to load, only a
     // session to offer against whatever is already open.
     if (!result.flame) {
-      if (result.session) onSessionDropped?.(result.session)
+      if (result.session) await onSessionDropped?.(result.session, file)
       return
     }
     const flame = result.flame
@@ -45,7 +48,7 @@ export function useAppDragAndDrop(
     })
     // After the flame is in place, so replaying starts from the same
     // document the file describes.
-    if (result.session) onSessionDropped?.(result.session)
+    if (result.session) await onSessionDropped?.(result.session, file)
   }
 
   return onDrop
