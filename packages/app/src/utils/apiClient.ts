@@ -1,3 +1,5 @@
+import type { CommunityShowcaseRequest, CommunityShowcaseStatus, } from '@/lib/communityShowcase'
+
 /**
  * Minimal typed client for the Worker's share endpoints.
  *
@@ -50,5 +52,10 @@ export const ShareApi = {
     title?: string
     author: string
     token: string
-  }) => postJson<{ ok?: boolean }>('/api/share-discord', body),
+    showcase?: CommunityShowcaseRequest
+  }) =>
+    postJson<{ ok?: boolean; showcase?: CommunityShowcaseStatus }>(
+      '/api/share-discord',
+      body,
+    ),
 } as const

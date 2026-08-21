@@ -407,6 +407,107 @@
   }
 }
 
+/* A horizontal exhibition shelf for approved Discord submissions. Unlike the
+   editorial wall it keeps every work at the same weight: curation decides
+   whether a piece appears, not whether it gets a larger rectangle. */
+.community-frame {
+  position: relative;
+}
+
+.community-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin: calc(-1 * var(--space-3)) 0 var(--space-2);
+}
+
+.community-arrow {
+  appearance: none;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--home-line-strong);
+  border-radius: 50%;
+  background: var(--home-surface);
+  color: var(--home-text);
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+
+  & > svg {
+    width: 0.9rem;
+    height: 0.9rem;
+  }
+
+  &:hover:not(:disabled) {
+    border-color: var(--home-ember);
+    color: var(--home-ember);
+    transform: translateY(-1px);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--home-ember);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+}
+
+.community-rail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: clamp(17rem, 34vw, 26rem);
+  gap: var(--space-3);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  /* A real gutter keeps Firefox's overlay scrollbar off the captions. */
+  padding: 2px 2px 0.75rem;
+
+  &:focus-visible {
+    outline: 2px solid var(--home-ember);
+    outline-offset: 2px;
+  }
+}
+
+.community-item {
+  height: 15rem;
+  min-height: 64px;
+  scroll-snap-align: start;
+}
+
+@media (max-width: 600px) {
+  .community-controls {
+    margin-top: 0;
+  }
+
+  .community-rail {
+    grid-auto-columns: min(84vw, 22rem);
+  }
+
+  .community-item {
+    height: 13rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .community-arrow {
+    transition: none;
+
+    &:hover:not(:disabled) {
+      transform: none;
+    }
+  }
+}
+
 /* Motion option A: a row of equal tiles. */
 .motion-row {
   display: grid;

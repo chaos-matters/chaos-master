@@ -1,3 +1,8 @@
+import { tryValidateFlame } from '@/flame/schema/flameSchema'
+import { tryValidateTimelineSnapshot } from '@/flame/schema/timeline'
+import { SHOWCASE_CONSENT_VERSION } from '@/lib/communityShowcase'
+import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+
 export interface Env {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   KV_SHORTENER: any
@@ -5,8 +10,8 @@ export interface Env {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   OG_IMAGES: any
   // D1 holding the Home tab's gallery content (FlameDescriptor JSON per row).
-  // Read-only from the Worker — rows are written with `wrangler d1 execute`,
-  // so the gallery can be re-curated without a deploy.
+  // Curated rows are written with gallery-admin; the Worker may only add an
+  // explicitly consented Discord submission in unpublished/pending state.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   CONTENT_DB?: any
   // Per-IP rate limiter for the share/OG write endpoints.
@@ -38,6 +43,10 @@ const MAX_OG_UPLOAD = 4 * 1024 * 1024 // ~4 MB
 // Bound the request generously; Discord itself enforces its own file limit and
 // a too-big upload just falls back to manual sharing. base64 inflates ~1.33x.
 const MAX_DISCORD_UPLOAD = 12 * 1024 * 1024 // ~12 MB request (~9 MB image)
+// The showcase descriptor is tiny beside its PNG, but it becomes a D1 row and
+// later a renderer input. Keep an independent bound so a crafted client cannot
+// spend the image allowance on multi-megabyte JSON.
+const MAX_SHOWCASE_DESCRIPTOR = 512 * 1024
 // Per-IP soft cap on Discord shares per day (secondary to the native limiter).
 const DISCORD_DAILY_CAP = 15
 // Home tab sections a gallery row can belong to. Mirrors the CHECK constraint
@@ -93,6 +102,8 @@ const MISSING_TABLE =
   /no such table:\s*(?:main\.)?(?:gallery_items|home_config)\b/i
 const MISSING_GALLERY_PROVENANCE_COLUMN =
   /no such column:\s*(?:collection|provenance_kind|source_url|license|license_url|attribution|changes|original_id)\b/i
+const MISSING_GALLERY_COMMUNITY_COLUMN =
+  /no such column:\s*(?:submission_source|moderation_status|consent_version|reviewed_at)\b/i
 
 const GALLERY_PROVENANCE_COLUMNS =
   'collection, provenance_kind, source_url, license, license_url, ' +
@@ -102,6 +113,13 @@ const LEGACY_GALLERY_PROVENANCE_COLUMNS =
   "AS collection, 'unknown' AS provenance_kind, NULL AS source_url, " +
   'NULL AS license, NULL AS license_url, NULL AS attribution, ' +
   'NULL AS changes, NULL AS original_id'
+const GALLERY_COMMUNITY_COLUMNS =
+  'submission_source, moderation_status, consent_version, reviewed_at'
+const LEGACY_GALLERY_COMMUNITY_COLUMNS =
+  "'curated' AS submission_source, 'curated' AS moderation_status, " +
+  'NULL AS consent_version, NULL AS reviewed_at'
+const GALLERY_COMMUNITY_PUBLIC_PREDICATE =
+  " AND (submission_source <> 'discord' OR moderation_status = 'approved')"
 
 /** Did this D1 failure mean "a content table does not exist"? */
 function isMissingTable(err: unknown): boolean {
@@ -113,18 +131,54 @@ function isMissingTable(err: unknown): boolean {
  * down in between. Only a known missing provenance column gets the legacy
  * projection; every other D1 error still fails loudly.
  */
-async function withGalleryProvenanceFallback<T>(
-  read: (columns: string) => Promise<T>,
+async function withGalleryColumnsFallback<T>(
+  read: (columns: {
+    provenance: string
+    community: string
+    communityPublicPredicate: string
+  }) => Promise<T>,
 ): Promise<T> {
-  try {
-    return await read(GALLERY_PROVENANCE_COLUMNS)
-  } catch (err) {
-    if (!MISSING_GALLERY_PROVENANCE_COLUMN.test(errMsg(err))) throw err
-    console.warn(
-      'gallery provenance migration is pending — serving compatible defaults',
-    )
-    return read(LEGACY_GALLERY_PROVENANCE_COLUMNS)
+  let provenance = GALLERY_PROVENANCE_COLUMNS
+  let community = GALLERY_COMMUNITY_COLUMNS
+  let communityPublicPredicate = GALLERY_COMMUNITY_PUBLIC_PREDICATE
+
+  // A preview Worker can be deployed while either migration is still pending
+  // in the shared dev database. Retry only the exact known missing-column
+  // shapes; every other D1 fault remains loud.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await read({
+        provenance,
+        community,
+        communityPublicPredicate,
+      })
+    } catch (err) {
+      const message = errMsg(err)
+      if (
+        provenance === GALLERY_PROVENANCE_COLUMNS &&
+        MISSING_GALLERY_PROVENANCE_COLUMN.test(message)
+      ) {
+        console.warn(
+          'gallery provenance migration is pending — serving compatible defaults',
+        )
+        provenance = LEGACY_GALLERY_PROVENANCE_COLUMNS
+        continue
+      }
+      if (
+        community === GALLERY_COMMUNITY_COLUMNS &&
+        MISSING_GALLERY_COMMUNITY_COLUMN.test(message)
+      ) {
+        console.warn(
+          'gallery community migration is pending — serving curated rows compatibly',
+        )
+        community = LEGACY_GALLERY_COMMUNITY_COLUMNS
+        communityPublicPredicate = ''
+        continue
+      }
+      throw err
+    }
   }
+  throw new Error('gallery compatibility fallback exhausted')
 }
 
 /**
@@ -254,6 +308,231 @@ function buildDiscordContent(
   if (title) parts.push(`**${title}**`)
   parts.push(`by ${author}`)
   return parts.join(' -- ')
+}
+
+type ShowcaseRequest = {
+  consent?: unknown
+  consentVersion?: unknown
+  flame?: unknown
+  animation?: unknown
+  shareUrl?: unknown
+}
+
+type ShowcaseStatus = 'not-requested' | 'queued' | 'unavailable'
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false
+  }
+  const prototype = Object.getPrototypeOf(value)
+  return prototype === Object.prototype || prototype === null
+}
+
+function safeShowcaseShareUrl(value: unknown, requestUrl: URL): string | null {
+  if (typeof value !== 'string' || value.length > 2048) return null
+  try {
+    const url = new URL(value)
+    if (
+      url.origin !== requestUrl.origin ||
+      url.pathname !== '/' ||
+      (!url.searchParams.has('s') && !url.searchParams.has('flame'))
+    ) {
+      return null
+    }
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
+function containsCustomVariation(flame: FlameDescriptor): boolean {
+  for (const transform of Object.values(flame.transforms)) {
+    for (const variation of Object.values(transform.variations)) {
+      if (variation.type.startsWith('custom_')) return true
+    }
+  }
+  return false
+}
+
+function validateShowcaseAnimation(value: unknown): unknown | null {
+  if (value === undefined || value === null) return null
+  if (!isPlainRecord(value) || !isPlainRecord(value.config)) return undefined
+  const snapshot = tryValidateTimelineSnapshot({
+    config: { ...value.config, timeScale: 1 },
+    tracks: value.tracks,
+  })
+  if (snapshot === undefined) return undefined
+  const { timeScale: _timeScale, ...config } = snapshot.config
+  return { tracks: snapshot.tracks, config }
+}
+
+function pngDimensions(
+  bytes: Uint8Array,
+): { width: number; height: number } | undefined {
+  // PNG signature (8), IHDR length/type (8), then width/height (8).
+  if (bytes.length < 24) return undefined
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+  if (
+    signature.some((byte, index) => bytes[index] !== byte) ||
+    view.getUint32(8) !== 13 ||
+    bytes[12] !== 0x49 ||
+    bytes[13] !== 0x48 ||
+    bytes[14] !== 0x44 ||
+    bytes[15] !== 0x52
+  ) {
+    return undefined
+  }
+  const width = view.getUint32(16)
+  const height = view.getUint32(20)
+  if (width < 1 || height < 1 || width > 8192 || height > 8192) {
+    return undefined
+  }
+  return { width, height }
+}
+
+function slugWord(value: string): string {
+  return value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 36)
+}
+
+/**
+ * Stage an explicitly consented Discord share for human moderation.
+ *
+ * The Discord post already succeeded before this runs. A missing migration,
+ * unavailable D1/R2 binding, or unsupported descriptor therefore degrades to
+ * `unavailable` without turning a successful Discord share into a failure.
+ */
+async function stageCommunityShowcase(
+  env: Env,
+  requestUrl: URL,
+  rawShowcase: unknown,
+  imageBytes: Uint8Array,
+  publicAuthor: string,
+  publicTitle: string | undefined,
+): Promise<ShowcaseStatus> {
+  if (!isPlainRecord(rawShowcase)) return 'not-requested'
+  const showcase = rawShowcase as ShowcaseRequest
+  if (showcase?.consent !== true) return 'not-requested'
+  if (showcase.consentVersion !== SHOWCASE_CONSENT_VERSION || !env.CONTENT_DB) {
+    return 'unavailable'
+  }
+
+  try {
+    const rawFlame = showcase.flame
+    const rawFlameJson = JSON.stringify(rawFlame)
+    if (
+      rawFlameJson === undefined ||
+      rawFlameJson.length > MAX_SHOWCASE_DESCRIPTOR
+    ) {
+      return 'unavailable'
+    }
+    const flame = tryValidateFlame(rawFlame)
+    const animation = validateShowcaseAnimation(showcase.animation)
+    const sourceUrl = safeShowcaseShareUrl(showcase.shareUrl, requestUrl)
+    const dimensions = pngDimensions(imageBytes)
+    if (
+      flame === undefined ||
+      animation === undefined ||
+      sourceUrl === null ||
+      dimensions === undefined ||
+      containsCustomVariation(flame)
+    ) {
+      return 'unavailable'
+    }
+
+    const title =
+      (publicTitle && sanitizeDiscordText(publicTitle)) ||
+      sanitizeDiscordText(flame.metadata?.name ?? '') ||
+      'Community flame'
+    const author = sanitizeDiscordText(publicAuthor) || 'anonymous'
+    const storedFlame: FlameDescriptor = {
+      ...flame,
+      metadata: {
+        ...flame.metadata,
+        name: title,
+        author,
+      },
+    }
+    const id = globalThis.crypto.randomUUID().replaceAll('-', '')
+    const slug = `community-${slugWord(title) || 'flame'}-${id.slice(0, 8)}`
+    const posterKey = `community/${slug}.png`
+    const flameJson = JSON.stringify(storedFlame)
+    const animationJson = animation === null ? null : JSON.stringify(animation)
+    const sortOrder = -Math.floor(Date.now() / 1000)
+    const descriptorHash = await globalThis.crypto.subtle.digest(
+      'SHA-256',
+      new TextEncoder().encode(flameJson),
+    )
+    const originalId = [...new Uint8Array(descriptorHash)]
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('')
+      .slice(0, 32)
+
+    // Insert unpublished first. If R2 fails, moderation still sees a recoverable
+    // row with no poster and can re-capture it from the stored descriptor.
+    await env.CONTENT_DB.prepare(
+      'INSERT INTO gallery_items (' +
+        'slug, title, caption, author, section, capability, flame, animation, ' +
+        'collection, provenance_kind, source_url, license, license_url, ' +
+        'attribution, changes, original_id, dimensions, transform_count, ' +
+        'poster_key, poster_width, poster_height, poster_frame, sort_order, ' +
+        'published, submission_source, moderation_status, consent_version' +
+        ') VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, NULL, ?, NULL, ?, ' +
+        '?, ?, NULL, NULL, NULL, NULL, ?, 0, ?, ?, ?)',
+    )
+      .bind(
+        slug,
+        title,
+        flame.metadata?.description?.trim().slice(0, 280) || null,
+        author,
+        'gallery',
+        flameJson,
+        animationJson,
+        'artist',
+        'permission',
+        sourceUrl,
+        'Creator permission to feature and provide editable source in the Lumen Apeiron community showcase',
+        `By ${author}`,
+        originalId,
+        storedFlame.renderSettings?.dimensions === 3 ? 3 : 2,
+        Object.keys(storedFlame.transforms).length,
+        sortOrder,
+        'discord',
+        'pending',
+        SHOWCASE_CONSENT_VERSION,
+      )
+      .run()
+
+    try {
+      await env.OG_IMAGES.put(`gallery/${posterKey}`, imageBytes, {
+        httpMetadata: { contentType: 'image/png' },
+      })
+      await env.CONTENT_DB.prepare(
+        'UPDATE gallery_items SET poster_key = ?, poster_width = ?, ' +
+          'poster_height = ? WHERE slug = ? AND moderation_status = ?',
+      )
+        .bind(posterKey, dimensions.width, dimensions.height, slug, 'pending')
+        .run()
+    } catch (err) {
+      console.error(
+        `Community showcase poster could not be attached for ${slug}:`,
+        errMsg(err),
+      )
+    }
+    return 'queued'
+  } catch (err) {
+    console.error(
+      'Community showcase submission could not be staged:',
+      errMsg(err),
+    )
+    return 'unavailable'
+  }
 }
 
 /**
@@ -455,15 +734,15 @@ const baseHandler = {
         // The list view never needs the descriptors themselves — omitting them
         // keeps this response small even as the gallery grows. Callers fetch a
         // single item to get its flame.
-        const { results } = await withGalleryProvenanceFallback<{
+        const { results } = await withGalleryColumnsFallback<{
           results?: unknown[]
-        }>((provenance) => {
+        }>(({ provenance, community, communityPublicPredicate }) => {
           const base =
-            'SELECT slug, title, caption, author, section, capability, ' +
-            `${provenance}, dimensions, transform_count, poster_key, ` +
-            'poster_width, poster_height, poster_frame, sort_order, ' +
-            '(animation IS NOT NULL) AS has_animation ' +
-            'FROM gallery_items WHERE published = 1'
+            `SELECT slug, title, caption, author, section, capability, ` +
+            `${provenance}, ${community}, dimensions, transform_count, poster_key, ` +
+            `poster_width, poster_height, poster_frame, sort_order, ` +
+            `(animation IS NOT NULL) AS has_animation ` +
+            `FROM gallery_items WHERE published = 1${communityPublicPredicate}`
           const stmt =
             section === null
               ? env.CONTENT_DB.prepare(
@@ -560,16 +839,16 @@ const baseHandler = {
         return json({ error: 'Invalid slug' }, 400)
       }
       try {
-        const row = await withGalleryProvenanceFallback<Record<
+        const row = await withGalleryColumnsFallback<Record<
           string,
           unknown
-        > | null>((provenance) =>
+        > | null>(({ provenance, community, communityPublicPredicate }) =>
           env.CONTENT_DB.prepare(
-            'SELECT slug, title, caption, author, section, capability, flame, ' +
-              `animation, sequence, ${provenance}, dimensions, ` +
-              'transform_count, poster_key, poster_width, poster_height, ' +
-              'poster_frame FROM gallery_items ' +
-              'WHERE slug = ? AND published = 1',
+            `SELECT slug, title, caption, author, section, capability, flame, ` +
+              `animation, sequence, ${provenance}, ${community}, dimensions, ` +
+              `transform_count, poster_key, poster_width, poster_height, ` +
+              `poster_frame FROM gallery_items ` +
+              `WHERE slug = ? AND published = 1${communityPublicPredicate}`,
           )
             .bind(slug)
             .first(),
@@ -677,6 +956,7 @@ const baseHandler = {
         title?: string
         author?: string
         token?: string
+        showcase?: unknown
       }
       try {
         body = (await request.json()) as typeof body
@@ -684,8 +964,10 @@ const baseHandler = {
         return json({ error: 'Bad request' }, 400)
       }
       const { image, token } = body
-      const author = body.author?.trim()
-      const title = body.title?.trim()
+      const author =
+        typeof body.author === 'string' ? body.author.trim() : undefined
+      const title =
+        typeof body.title === 'string' ? body.title.trim() : undefined
       if (!image || typeof image !== 'string') {
         return json({ error: 'Missing image' }, 400)
       }
@@ -787,7 +1069,16 @@ const baseHandler = {
           method: 'POST',
           body: form,
         })
-        return json({ ok: res.ok }, res.ok ? 200 : 502)
+        if (!res.ok) return json({ ok: false }, 502)
+        const showcase = await stageCommunityShowcase(
+          env,
+          url,
+          body.showcase,
+          bytes,
+          author,
+          title,
+        )
+        return json({ ok: true, showcase })
       } catch (err) {
         console.error('Error forwarding to Discord:', errMsg(err))
         return json({ ok: false }, 502)

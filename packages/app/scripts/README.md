@@ -63,9 +63,12 @@ A local store starts with no tables. `gallery-admin` applies everything in
 `migrations/` itself (`wrangler d1 migrations apply`) the first time it finds
 `gallery_items` missing on a local target (and says so, with
 `"initialized": true` in the result); `seed-gallery.mjs --apply local` does the
-same before seeding. Remote targets never get schema written to them
-automatically — there, a missing table means something is wrong, and the error
-names the exact command instead.
+same before seeding. The scripts never write a remote schema automatically —
+there, a missing table means something is wrong, and the error names the exact
+command instead. The deployment workflow is separate: after a merge to
+upstream `main`, CI applies pending migrations to the remote **dev** database
+before deploying the dev Worker. Production migrations remain an explicit
+release action.
 
 It is `migrations apply` rather than `execute --file=<schema>` because those two
 callers re-apply the schema freely, so every migration has to survive being run
@@ -92,6 +95,9 @@ node scripts/gallery-admin.mjs reorder --slug shot --order 2
 node scripts/gallery-admin.mjs config get
 node scripts/gallery-admin.mjs config set --key portal_tour_id --value example2-creation
 node scripts/gallery-admin.mjs list --env dev            # the deployed dev row set
+node scripts/gallery-admin.mjs submissions --env dev      # pending Discord opt-ins
+node scripts/gallery-admin.mjs approve --env dev --slug community-example-ab12cd34
+node scripts/gallery-admin.mjs reject --env dev --slug community-example-ab12cd34
 node scripts/gallery-admin.mjs <command> --help
 ```
 
@@ -108,6 +114,10 @@ Three rules it will not bend:
   stays in gallery/motion sections whose layouts show that credit. Remixes
   identify the original and describe the changes. Local publication keeps
   those as warnings so unfinished curation is easy.
+- **Discord submissions require moderation.** An explicit, versioned showcase
+  opt-in creates an unpublished `pending` row. Ordinary `publish` refuses it;
+  `approve` applies the full publication gate and changes approval + visibility
+  together. `reject` keeps the descriptor/poster for audit while hiding it.
 - **Delete is intentionally awkward.** It accepts only an unpublished row and
   requires the slug again as confirmation. Prefer reversible unpublishing.
 
@@ -131,8 +141,9 @@ it does not auto-create a missing local schema or change D1/R2.
 ## seed-gallery
 
 The checked-in curation seed is a local preview fixture, not a remote publishing
-path. It clears stale posters/sequences whenever a descriptor changes and
-stages every row by default:
+path. It clears stale posters/sequences whenever a descriptor changes, assigns
+project-owned entries the public and embedded author credit `Lumen Apeiron`,
+and stages every row by default:
 
 ```sh
 node scripts/seed-gallery.mjs --apply local

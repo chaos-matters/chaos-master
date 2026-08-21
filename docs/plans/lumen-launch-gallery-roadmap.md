@@ -118,8 +118,17 @@ descriptors. The curation foundation now adds:
 2. Provenance fields plus a rights/poster gate for shared publication.
 3. Home chapters for Foundations, Lumen Originals, Flame Remixes, and Artist
    Editions; empty future chapters stay hidden until content exists.
+4. A separately moderated **From the community** rail. Discord sharing remains
+   independent; an explicit opt-in stages a validated, unpublished submission,
+   and only a human approval can make it public.
+5. Three launch-grade Lumen originals — Neon Julian Cosmos, Golden Apollonian
+   Gasket, and Cybernetic Swirl — replacing six weaker generic wall entries in
+   the checked-in curation seed. Both gallery and embedded descriptor credit are
+   normalized to Lumen Apeiron.
 
-Next, run promising permission-compatible XML packs through `pnpm
-flam3:compat`, curate clearly labelled **Flame Remix** companions for the exact
-classics, then stage/capture/publish the final Home plates. Once that gallery is
-locked, re-run `pnpm capture:readme` and perform the release gate.
+Next, follow `home-community-showcase-plan.md` to stage/capture/publish the new
+dev plates and exercise the moderation queue. Then run promising
+permission-compatible XML packs through `pnpm flam3:compat`, curate clearly
+labelled **Flame Remix** companions for the exact classics, and lock the final
+Home plates. Once that gallery is stable, re-run `pnpm capture:readme` and
+perform the release gate.

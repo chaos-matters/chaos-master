@@ -191,6 +191,71 @@
   color: oklch(60% 0.2 25);
 }
 
+.showcase-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid oklch(58% 0.16 280 / 28%);
+  border-radius: 8px;
+  background: oklch(58% 0.16 280 / 6%);
+  color: var(--neutral-700);
+  cursor: pointer;
+
+  & > input {
+    margin-top: 0.16rem;
+    accent-color: oklch(55% 0.18 280);
+  }
+
+  & > span {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  & strong {
+    font-size: 0.78rem;
+    font-weight: 650;
+  }
+
+  & small {
+    color: var(--neutral-500);
+    font-size: 0.69rem;
+    line-height: 1.45;
+  }
+
+  &:has(input:focus-visible) {
+    outline: 2px solid oklch(55% 0.18 280);
+    outline-offset: 2px;
+  }
+
+  [data-theme='dark'] & {
+    border-color: oklch(68% 0.13 280 / 30%);
+    background: oklch(68% 0.13 280 / 8%);
+    color: var(--neutral-200);
+
+    & small {
+      color: var(--neutral-400);
+    }
+  }
+}
+
+.showcase-unavailable {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--neutral-300);
+  color: var(--neutral-500);
+  font-size: 0.7rem;
+  line-height: 1.45;
+
+  [data-theme='dark'] & {
+    border-left-color: var(--neutral-700);
+    color: var(--neutral-400);
+  }
+}
+
 /* ── Turnstile ────────────────────────────────────────── */
 
 .turnstile {
