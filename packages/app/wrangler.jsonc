@@ -59,8 +59,9 @@
         },
       ],
       // Home tab content: FlameDescriptor JSON served to the app so the
-      // gallery renders real flames on the GPU. Read-only from the Worker;
-      // rows are written with `wrangler d1 execute` (see migrations/).
+      // gallery renders real flames on the GPU. Curated rows are written with
+      // gallery-admin; the Worker may only stage explicitly consented Discord
+      // submissions as unpublished/pending rows for human moderation.
       "d1_databases": [
         {
           "binding": "CONTENT_DB",

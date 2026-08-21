@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { byCollection, bySection, galleryCredit, galleryExternalUrl, galleryResourceItems, needsPosterFrame, posterUrl, sequenceFlames, } from './galleryContent'
+import { byCollection, bySection, galleryCredit, galleryExternalUrl, galleryResourceItems, isCommunityGalleryItem, needsPosterFrame, posterUrl, sequenceFlames, } from './galleryContent'
 import type { GalleryItem, GalleryListItem } from './galleryContent'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
@@ -176,5 +176,34 @@ describe('gallery collections and credit', () => {
     )
     expect(galleryExternalUrl('javascript:alert(1)')).toBeUndefined()
     expect(galleryExternalUrl('not a URL')).toBeUndefined()
+  })
+})
+
+describe('community gallery classification', () => {
+  it('requires both Discord provenance and human approval', () => {
+    expect(
+      isCommunityGalleryItem(
+        row({
+          submission_source: 'discord',
+          moderation_status: 'approved',
+        }),
+      ),
+    ).toBe(true)
+    expect(
+      isCommunityGalleryItem(
+        row({
+          submission_source: 'discord',
+          moderation_status: 'pending',
+        }),
+      ),
+    ).toBe(false)
+    expect(
+      isCommunityGalleryItem(
+        row({
+          submission_source: 'curated',
+          moderation_status: 'approved',
+        }),
+      ),
+    ).toBe(false)
   })
 })

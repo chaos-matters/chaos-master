@@ -8,6 +8,7 @@ import { executeCommand, executeReplayCommand, preflightReplayCommand, } from '@
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useToast } from '@/contexts/ToastContext'
 import { workspaceIsVisible } from '@/lib/activeTab'
+import { SHOWCASE_CONSENT_VERSION } from '@/lib/communityShowcase'
 import { trackAppInit } from '@/lib/telemetry'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
@@ -94,7 +95,7 @@ import { accumulatedPointCount, animationExportCancel, animationExportProgress, 
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, tryValidateFlame, } from './flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from './flame/transformFunction'
 import { allTransformVariations, isAnyParametricVariationType, isVariationType, } from './flame/variations'
-import { deleteCustomVariation, duplicateCustomVariation, getCustomVariations, isCustomVariationRegistered, loadCustomVariations, persistSharedVariations, restoreCustomVariation, } from './flame/variations/custom'
+import { collectFlameCustomVariations, deleteCustomVariation, duplicateCustomVariation, getCustomVariations, isCustomVariationRegistered, loadCustomVariations, persistSharedVariations, restoreCustomVariation, } from './flame/variations/custom'
 import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } from './flame/variations/utils'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { BoxArrowRight, Cross, Eye, EyeOff, Menu, Plus, Share, Shuffle, Terminal, } from './icons'
@@ -168,6 +169,7 @@ import type { RandomizerHistoryEntry } from './utils/randomizerHistoryDB'
 import type { SonificationConfig } from './utils/sonification'
 import type { EasingCurve, KeyframeInterpolation, TimelineTrack, } from './utils/timeline'
 import type { CommandContext } from '@/commands/types'
+import type { CommunityShowcaseRequest } from '@/lib/communityShowcase'
 
 const EDGE_FADE_COLOR = {
   light: vec4f(0.96, 0.96, 0.96, 0.7),
@@ -1938,6 +1940,22 @@ export function MainWorkspace(props: AppProps) {
     )
 
   async function shareToDiscord() {
+    // Freeze one authored document for the entire flow. The capture callback,
+    // share-link shortener and consent modal all resolve asynchronously; using
+    // the live store again later could pair flame B with flame A's PNG.
+    const sharedFlame = deepClone(flameDescriptor)
+    const tracks = deepClone(timeline.tracks())
+    const config = deepClone(timeline.config())
+    const hasAnimation = tracks.some((track) => track.keyframes.length > 0)
+    const customVariations = collectFlameCustomVariations(sharedFlame)
+    const hasCustomVariationReference = Object.values(
+      sharedFlame.transforms,
+    ).some((transform) =>
+      Object.values(transform.variations).some((variation) =>
+        variation.type.startsWith('custom_'),
+      ),
+    )
+
     // Step 1: Capture the current flame at its current resolution to prevent flickering/resizing
     const rawBlob = await new Promise<Blob | null>((resolve) => {
       setOnExportImage(() => (canvas: HTMLCanvasElement) => {
@@ -1958,12 +1976,16 @@ export function MainWorkspace(props: AppProps) {
     }
 
     // Step 2: Embed flame data into the PNG so it can be loaded back
-    const tracks = timeline.tracks()
-    const config = timeline.config()
-    const hasAnimation = tracks.some((track) => track.keyframes.length > 0)
-    const payload = hasAnimation
-      ? { flame: flameDescriptor, animation: { tracks, config } }
-      : flameDescriptor
+    const animation = hasAnimation ? { tracks, config } : undefined
+    const payload =
+      hasAnimation || customVariations.length > 0
+        ? {
+            flame: sharedFlame,
+            animation,
+            customVariations:
+              customVariations.length > 0 ? customVariations : undefined,
+          }
+        : sharedFlame
     const encoded = await compressJsonQueryParam(payload)
     let pngBytes = new Uint8Array(await rawBlob.arrayBuffer())
     pngBytes = new Uint8Array(
@@ -1980,25 +2002,48 @@ export function MainWorkspace(props: AppProps) {
     // fallback "Copy share link" is instant and correct. Runs in parallel; the
     // OG preview upload is best-effort so the copied link shows a rich card.
     const sharePromise = createShareLink({
-      flame: flameDescriptor,
-      animation: hasAnimation ? { tracks, config } : undefined,
+      flame: sharedFlame,
+      animation,
+      customVariations:
+        customVariations.length > 0 ? customVariations : undefined,
     })
-    void sharePromise.then(async ({ encoded: shareEncoded }) => {
-      const ogBlob = await captureOgImageBlob()
-      if (!ogBlob) return
-      const { title, description } = deriveOgMeta(flameDescriptor)
-      void uploadOgPreview({
-        encoded: shareEncoded,
-        blob: ogBlob,
-        title,
-        description,
+    void sharePromise
+      .then(async ({ encoded: shareEncoded }) => {
+        const ogBlob = await captureOgImageBlob()
+        if (!ogBlob) return
+        const { title, description } = deriveOgMeta(sharedFlame)
+        void uploadOgPreview({
+          encoded: shareEncoded,
+          blob: ogBlob,
+          title,
+          description,
+        })
       })
-    })
+      .catch(() => {
+        // The modal still offers the embedded PNG fallback if link creation
+        // fails. Avoid leaking a rejected best-effort preview task.
+      })
 
     const shared = await showDiscordShareModal({
       previewUrl,
-      initialMetadata: flameDescriptor.metadata,
-      onShare: (meta, token) => sendFlameToDiscord(blob, meta, token),
+      initialMetadata: sharedFlame.metadata,
+      showcaseEligible: !hasCustomVariationReference,
+      showcaseUnavailableReason: hasCustomVariationReference
+        ? 'Custom variations are shared to Discord, but cannot enter the Home showcase until their definitions can travel with gallery entries.'
+        : undefined,
+      onShare: async (meta, token) => {
+        const showcase: CommunityShowcaseRequest | undefined =
+          meta.submitToShowcase
+            ? {
+                consent: true,
+                consentVersion: SHOWCASE_CONSENT_VERSION,
+                flame: sharedFlame,
+                animation,
+                shareUrl: (await sharePromise).primaryUrl,
+              }
+            : undefined
+        return sendFlameToDiscord(blob, meta, token, showcase)
+      },
       onDownload: () => {
         downloadBlob(blob, 'flame.png')
       },
@@ -2014,7 +2059,13 @@ export function MainWorkspace(props: AppProps) {
       discordUrl: '/discord',
     })
     URL.revokeObjectURL(previewUrl)
-    if (shared) showToast('Shared to Discord')
+    if (shared?.showcaseQueued) {
+      showToast('Shared to Discord and submitted for Home review')
+    } else if (shared?.showcaseRequested) {
+      showToast('Shared to Discord; Home submission could not be staged')
+    } else if (shared) {
+      showToast('Shared to Discord')
+    }
   }
 
   const { showLogoFaviconGenerator } = createLogoFaviconGenerator(
