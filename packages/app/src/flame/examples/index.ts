@@ -1,6 +1,7 @@
 import { benchmark } from './benchmark'
 import { classicExamples } from './classics'
 import { cliffordCsch2 } from './cliffordCsch2'
+import { cyberneticSwirl } from './cyberneticSwirl'
 import { example1 } from './example1'
 import { example2 } from './example2'
 import { example3 } from './example3'
@@ -46,11 +47,13 @@ import { example43 } from './example43'
 import { example44 } from './example44'
 import { example45 } from './example45'
 import { example46 } from './example46'
+import { goldenApollonianGasket } from './goldenApollonianGasket'
 import { initExample } from './initExample'
 import { initExample3D } from './initExample3D'
 import { invCircleEx1, invCircleEx2 } from './invCircle'
 import { invCircle2Ex1 } from './invCircle2'
 import { linear1 } from './linear1'
+import { neonJulianCosmos } from './neonJulianCosmos'
 import type { FlameDescriptor } from '../schema/flameSchema'
 
 export const examples = {
@@ -108,5 +111,8 @@ export const examples = {
   invCircleEx1,
   invCircleEx2,
   invCircle2Ex1,
+  neonJulianCosmos,
+  goldenApollonianGasket,
+  cyberneticSwirl,
 } satisfies Record<string, FlameDescriptor>
 export type ExampleID = keyof typeof examples

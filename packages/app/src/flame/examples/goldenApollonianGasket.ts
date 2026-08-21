@@ -1,0 +1,148 @@
+import type { FlameDescriptor } from '../schema/flameSchema'
+
+export const goldenApollonianGasket = {
+  version: '1.0',
+  metadata: {
+    author: 'Lumen Apeiron',
+    name: 'Golden Apollonian Gasket',
+    description:
+      'Three spherical inversions fold into a luminous Apollonian study.',
+  },
+  renderSettings: {
+    exposure: 3,
+    skipIters: 0,
+    plotsPerChain: 16,
+    autoExposure3D: false,
+    autoExposure3DStrength: 1,
+    autoExposure3DRefRadius: 5,
+    autoExposure3DBase: 0,
+    dimensions: 2,
+    drawMode: 'light',
+    colorInitMode: 'colorInitZero',
+    pointInitMode: 'pointInitUnitDisk',
+    vibrancy: 0.5,
+    contrast: 1,
+    gamma: 2.2,
+    depthColorPower: 0,
+    lightDirection: [-0.5, 0.5, -1],
+    lightPower: 0,
+    highlightPower: 0.5,
+    densityEstimationQuality: 0.5,
+    estimatorCurve: 0.5,
+    paletteMode: 0,
+    palettePhase: 0,
+    paletteSpeed: 0.5,
+    backgroundColor: [0, 0, 0],
+    camera: {
+      zoom: 0.3645833333333333,
+      position: [0, 0],
+      rotation: 0,
+    },
+    camera3D: {
+      theta: 0,
+      phi: 1.5707963267948966,
+      radius: 5,
+      target: [0, 0, 0],
+      fov: 60,
+      roll: 0,
+    },
+  },
+  transforms: {
+    _flam3__fb61356f_c2ad_4d8c_9a4d_64257cacfc48: {
+      probability: 0.3333333333333333,
+      preAffine: {
+        a: 0.5,
+        b: 0,
+        c: 0.5,
+        d: 0,
+        e: 0.5,
+        f: 0.5,
+      },
+      postAffine: {
+        a: 1,
+        b: 0,
+        c: 0,
+        d: 0,
+        e: 1,
+        f: 0,
+      },
+      color: {
+        x: 0.049795903704942246,
+        y: 0.13983681855925517,
+      },
+      colorSpeed: 0.4,
+      visible: true,
+      variations: {
+        _flam3_0: {
+          type: 'sphericalVar',
+          weight: 1,
+          visible: true,
+        },
+      },
+    },
+    _flam3__fb589b37_19e8_40b8_9f87_2d6d4f1c1f3e: {
+      probability: 0.3333333333333333,
+      preAffine: {
+        a: 0.5,
+        b: 0,
+        c: -0.5,
+        d: 0,
+        e: 0.5,
+        f: 0.5,
+      },
+      postAffine: {
+        a: 1,
+        b: 0,
+        c: 0,
+        d: 0,
+        e: 1,
+        f: 0,
+      },
+      color: {
+        x: 0.1927621848060207,
+        y: 0.5310060755969265,
+      },
+      colorSpeed: 0.4,
+      visible: true,
+      variations: {
+        _flam3_0: {
+          type: 'sphericalVar',
+          weight: 1,
+          visible: true,
+        },
+      },
+    },
+    _flam3__770188ad_9659_48e1_9aca_2498e2501dec: {
+      probability: 0.3333333333333333,
+      preAffine: {
+        a: 0.5,
+        b: 0,
+        c: 0,
+        d: 0,
+        e: 0.5,
+        f: -0.5,
+      },
+      postAffine: {
+        a: 1,
+        b: 0,
+        c: 0,
+        d: 0,
+        e: 1,
+        f: 0,
+      },
+      color: {
+        x: 0.276803998827162,
+        y: 0.7638005928614457,
+      },
+      colorSpeed: 0.4,
+      visible: true,
+      variations: {
+        _flam3_0: {
+          type: 'sphericalVar',
+          weight: 1,
+          visible: true,
+        },
+      },
+    },
+  },
+} as FlameDescriptor
