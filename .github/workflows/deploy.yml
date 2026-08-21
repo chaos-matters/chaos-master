@@ -93,6 +93,23 @@ jobs:
           test -f packages/app/dist/index.html || exit 1
           echo "Build artifacts verified"
 
+      # Dev is the continuously deployed editorial environment. Apply its
+      # append-only D1 migrations before the Worker that reads them goes live,
+      # both on main and on an explicitly requested manual dev deploy. Prod
+      # remains a separate, deliberate release operation.
+      - name: Apply Dev Content Migrations
+        if: >-
+          env.DEPLOY_ENABLED == 'true' &&
+          ((github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+          (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'dev'))
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: d1 migrations apply chaos-master-content-dev --remote
+          packageManager: 'pnpm'
+          workingDirectory: 'packages/app'
+
       # Manual Deploy via workflow_dispatch
       - name: Manual Deploy
         if: github.event_name == 'workflow_dispatch' && env.DEPLOY_ENABLED == 'true'
@@ -135,23 +152,23 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
-            
+
             const templatePath = path.join(process.env.GITHUB_WORKSPACE, '.github/workflows/pr-deployment-table.md');
             let body = fs.readFileSync(templatePath, 'utf8');
-            
+
             const url = '${{ steps.deploy-preview.outputs.deployment-url }}';
             const commit = context.sha.substring(0, 7);
             const commitUrl = `${context.server_url}/${context.repo.owner}/${context.repo.repo}/commit/${context.sha}`;
             const logsUrl = `${context.server_url}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
             const updated = new Date().toUTCString();
-            
+
             body = body
               .replace(/PREVIEW_URL/g, url)
               .replace('COMMIT_SHA', commit)
               .replace('COMMIT_URL', commitUrl)
               .replace('LOGS_URL', logsUrl)
               .replace('UPDATED_TIME', updated);
-            
+
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,

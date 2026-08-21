@@ -10,6 +10,12 @@ import type { TimelineTrack } from '@/utils/timeline'
 
 export type GallerySection = 'hero' | 'gallery' | 'motion' | 'capability'
 export type GalleryCollection = 'foundation' | 'original' | 'remix' | 'artist'
+export type GallerySubmissionSource = 'curated' | 'discord'
+export type GalleryModerationStatus =
+  | 'curated'
+  | 'pending'
+  | 'approved'
+  | 'rejected'
 
 export const GALLERY_COLLECTIONS: {
   id: GalleryCollection
@@ -63,6 +69,10 @@ export interface GalleryListItem {
   attribution?: string | null
   changes?: string | null
   original_id?: string | null
+  submission_source?: GallerySubmissionSource | null
+  moderation_status?: GalleryModerationStatus | null
+  consent_version?: string | null
+  reviewed_at?: string | null
   section: GallerySection
   capability: string | null
   dimensions: number
@@ -83,6 +93,14 @@ export interface GalleryListItem {
   poster_frame: number | null
   sort_order: number
   has_animation: number
+}
+
+/** Public community rows are approved Discord submissions, never editorial clones. */
+export function isCommunityGalleryItem(item: GalleryListItem): boolean {
+  return (
+    item.submission_source === 'discord' &&
+    item.moderation_status === 'approved'
+  )
 }
 
 /** A single item, with the descriptor parsed. */

@@ -1,6 +1,7 @@
 import { ShareApi } from '@/utils/apiClient'
 import { blobToBase64 } from '@/utils/blob'
 import type { DiscordShareMeta } from '@/components/DiscordShareModal/DiscordShareModal'
+import type { CommunityShowcaseRequest, DiscordShareResult, } from '@/lib/communityShowcase'
 
 /**
  * Share a flame PNG to the project Discord via the Worker endpoint
@@ -11,14 +12,15 @@ import type { DiscordShareMeta } from '@/components/DiscordShareModal/DiscordSha
  * `token` is the Cloudflare Turnstile response from the share modal (may be an
  * empty string in local dev when no site key is configured).
  *
- * Returns `true` on success, `false` on failure (bot-check rejected,
- * rate-limited, webhook unconfigured, or network error).
+ * Returns the successful Discord/showcase outcome, or `undefined` on failure
+ * (bot-check rejected, rate-limited, webhook unconfigured, or network error).
  */
 export async function sendFlameToDiscord(
   blob: Blob,
   meta: DiscordShareMeta,
   token: string,
-): Promise<boolean> {
+  showcase?: CommunityShowcaseRequest,
+): Promise<DiscordShareResult | undefined> {
   // Transport (incl. the 20s timeout that lets a hanging endpoint fall back to
   // manual sharing) lives in ShareApi/postJson now.
   try {
@@ -28,9 +30,15 @@ export async function sendFlameToDiscord(
       title: meta.title,
       author: meta.author,
       token,
+      showcase,
     })
-    return res?.ok === true
+    if (res?.ok !== true) return undefined
+    return {
+      shared: true,
+      showcaseRequested: showcase !== undefined,
+      showcaseQueued: res.showcase === 'queued',
+    }
   } catch {
-    return false
+    return undefined
   }
 }
