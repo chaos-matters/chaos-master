@@ -53,7 +53,8 @@ function makeTimelineWorld() {
     position,
     setPosition,
     sidebar: { open: sidebarOpen, setOpen: setSidebarOpen },
-    arena: {} as any,
+    arena:
+      {} as any /* eslint-disable-line @typescript-eslint/no-explicit-any */,
     timeline: {
       tracks: raw.tracks,
       setTracks: raw.setTracks,

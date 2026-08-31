@@ -81,10 +81,14 @@ function createMockCommandContext(): CommandContext {
       undoStack.push(flame)
       flame = fn(flame)
       redoStack.length = 0
-    }) as any,
+    }) as any /* eslint-disable-line @typescript-eslint/no-explicit-any */,
     zoom: () => 1,
     setZoom: vi.fn(),
-    position: () => ({ x: 0, y: 0 }) as any,
+    position: () =>
+      ({
+        x: 0,
+        y: 0,
+      }) as any /* eslint-disable-line @typescript-eslint/no-explicit-any */,
     setPosition: vi.fn(),
     blendFlame: () => undefined,
     setBlendFlame: vi.fn(),

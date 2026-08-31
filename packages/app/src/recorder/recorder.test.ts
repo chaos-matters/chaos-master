@@ -77,7 +77,8 @@ function makeHeadlessWorld(start: FlameDescriptor) {
     position,
     setPosition,
     sidebar: { open: sidebarOpen, setOpen: setSidebarOpen },
-    arena: {} as any,
+    arena:
+      {} as any /* eslint-disable-line @typescript-eslint/no-explicit-any */,
     timeline: {
       tracks,
       setTracks,
@@ -1278,7 +1279,8 @@ describe('undo that reaches outside the recorded session', () => {
       }
       const ctx: CommandContext = {
         ...world.ctx,
-        arena: {} as any,
+        arena:
+          {} as any /* eslint-disable-line @typescript-eslint/no-explicit-any */,
         timeline: {
           ...world.ctx.timeline,
           edit: {

@@ -3246,8 +3246,8 @@ export function MainWorkspace(props: AppProps) {
     // Handle transform paths: transform.{tid}.{prop} or transform.{tid}.{sub}.{key}
     const parts = path.split('.')
     if (parts[0] === 'transform') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const transforms = fd.transforms as Record<string, any>
+       
+      const transforms = fd.transforms as Record<string, unknown>
       if (parts.length === 3 && parts[2] === 'probability') {
         return transforms[parts[1]!]?.probability ?? null
       }
@@ -3278,8 +3278,10 @@ export function MainWorkspace(props: AppProps) {
         string,
         string,
       ]
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const transform = (fd.transforms as Record<string, any>)[transformId] as
+       
+      const transform = (fd.transforms as Record<string, unknown>)[
+        transformId
+      ] as
         | {
             variations?: Record<
               string,
@@ -3312,8 +3314,8 @@ export function MainWorkspace(props: AppProps) {
       parts[0] !== 'camera'
     ) {
       const [transformId, variationId] = parts as [string, string]
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const variation = (fd.transforms as Record<string, any>)[transformId]
+       
+      const variation = (fd.transforms as Record<string, unknown>)[transformId]
         ?.variations?.[variationId] as { weight?: number } | undefined
       if (variation?.weight !== undefined) return variation.weight
     }
@@ -3448,8 +3450,8 @@ export function MainWorkspace(props: AppProps) {
         default: {
           const parts = path.split('.')
           if (parts[0] === 'transform') {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const transforms = draft.transforms as Record<string, any>
+             
+            const transforms = draft.transforms as Record<string, unknown>
             if (parts.length === 3 && parts[2] === 'probability') {
               if (transforms[parts[1]!]) {
                 transforms[parts[1]!].probability = value as number
@@ -3478,8 +3480,8 @@ export function MainWorkspace(props: AppProps) {
               string,
               string,
             ]
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const transform = (draft.transforms as Record<string, any>)[
+             
+            const transform = (draft.transforms as Record<string, unknown>)[
               transformId
             ] as
               | {
@@ -3495,8 +3497,8 @@ export function MainWorkspace(props: AppProps) {
             }
           } else if (parts.length === 2 && parts[0] !== 'camera') {
             const [transformId, variationId] = parts as [string, string]
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const transform = (draft.transforms as Record<string, any>)[
+             
+            const transform = (draft.transforms as Record<string, unknown>)[
               transformId
             ] as
               | {
