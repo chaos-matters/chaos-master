@@ -7,12 +7,39 @@
  * https://prng.di.unimi.it/xoroshiro64starstar.c
  */
 
-import { rotl, u32To01F32 } from '@typegpu/noise'
 import { tgpu } from 'typegpu'
-import { vec2f, vec2u, vec3f } from 'typegpu/data'
-import { acos, cos, mul, pow, sin, sqrt } from 'typegpu/std'
+import { f32, u32, vec2f, vec2u, vec3f } from 'typegpu/data'
+import { acos, bitcastU32toF32, cos, mul, pow, sin, sqrt } from 'typegpu/std'
 import { PI } from '@/flame/constants'
 import type { v2u } from 'typegpu/data'
+
+export const rotl = tgpu.fn(
+  [u32, u32],
+  u32,
+)((x: number, k: number) => {
+  return (x << k) | (x >> (32 - k))
+})
+
+export const u32To01F32 = tgpu.fn(
+  [u32],
+  f32,
+)((a: number) => {
+  return bitcastU32toF32((a & 0x007fffff) | 0x3f800000) - 1.0
+})
+
+export const hash = tgpu.fn(
+  [u32],
+  u32,
+)((i: number) => {
+  let x = i ^ (i >> 17)
+  x *= u32(0xed5ad4bb)
+  x ^= x >> 11
+  x *= u32(0xac4c1b51)
+  x ^= x >> 15
+  x *= u32(0x31848bab)
+  x ^= x >> 14
+  return x
+})
 
 export const RENDERER_RANDOM_IMPLEMENTATION_IDS = {
   canonical: 'xoroshiro64ss-canonical-v1',

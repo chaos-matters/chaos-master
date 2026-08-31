@@ -316,7 +316,7 @@ export function compileCustomVariationCode(wgslBody: string): CompileResult {
   }
 
   const { params, body } = irResult
-  const externalNames = [...irResult.externalNames.keys()]
+  const externalNames = [...irResult.externalNames]
 
   const banned = externalNames.filter((name: string) => BANNED_NAMES.has(name))
   if (banned.length > 0) {

@@ -45,7 +45,7 @@
     }
   },
   "transforms": {
-    "_flam3__c5a4eb25_6323_48cb_97ea_163c85467ad8": {
+    "_flam3__2dea5857_32a9_45d2_8a07_f24cbdf40c9d": {
       "probability": 0.3333333333333333,
       "preAffine": {
         "a": 0.8,
@@ -81,7 +81,7 @@
         }
       }
     },
-    "_flam3__30a53899_89e1_4444_8093_4be4ba112663": {
+    "_flam3__03a8c439_be00_41ee_92b0_6270361861a2": {
       "probability": 0.3333333333333333,
       "preAffine": {
         "a": 0.6,
@@ -123,7 +123,7 @@
         }
       }
     },
-    "_flam3__3245d5c1_7e32_4a93_96f7_5fe6aac7fc5e": {
+    "_flam3__56569a80_d4fa_4852_a2aa_7bb4e8ca5627": {
       "probability": 0.3333333333333333,
       "preAffine": {
         "a": 0.5,

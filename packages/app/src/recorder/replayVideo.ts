@@ -546,6 +546,7 @@ export function createReplayVideoDriver(
         return sidebarOpen
       },
     },
+    arena: {} as any,
     timeline: {
       tracks: () => timeline.snapshot.tracks,
       setTracks: (next) => {

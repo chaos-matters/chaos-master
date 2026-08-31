@@ -77,14 +77,14 @@ function createMockCommandContext(): CommandContext {
   return {
     beforeCommand: vi.fn(),
     flameDescriptor: () => flame,
-    setFlameDescriptor: vi.fn((fn: (f: FlameDescriptor) => FlameDescriptor) => {
+    setFlameDescriptor: vi.fn((fn: any) => {
       undoStack.push(flame)
       flame = fn(flame)
       redoStack.length = 0
-    }) as unknown as (fn: (f: FlameDescriptor) => FlameDescriptor) => void,
+    }) as any,
     zoom: () => 1,
     setZoom: vi.fn(),
-    position: () => ({ x: 0, y: 0 }),
+    position: () => ({ x: 0, y: 0 }) as any,
     setPosition: vi.fn(),
     blendFlame: () => undefined,
     setBlendFlame: vi.fn(),

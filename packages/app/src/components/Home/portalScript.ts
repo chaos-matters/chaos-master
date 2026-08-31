@@ -178,11 +178,11 @@ export function createPortalDriver(start: FlameDescriptor): PortalDriver {
     }
   }
 
-  const commandContext: CommandContext = {
+  const commandContext = {
     flameDescriptor: () => flame,
     setFlameDescriptor,
     blendFlame,
-    setBlendFlame: (next) => {
+    setBlendFlame: (next: any) => {
       setBlendFlame(() => next)
     },
     blendWeight,
@@ -245,7 +245,7 @@ export function createPortalDriver(start: FlameDescriptor): PortalDriver {
       // active (module-global, so it survives leaving the workspace), the
       // portal's commands must not leak into the user's log.
       withRecordingSuppressed(() => {
-        executeCommand(id, commandContext, ...args)
+        executeCommand(id, commandContext as any, ...args)
       })
     },
     animateValue: (start_, end, durationMs, onUpdate) => {

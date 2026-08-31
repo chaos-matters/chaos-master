@@ -22,11 +22,14 @@ describe('createClashFlame tool', () => {
       },
     } as unknown as FlameDescriptor
 
-    const result = createClashFlame.execute({
-      flameA,
-      flameB,
-      distance: 3.0,
-    }) as { success: boolean; clashFlame: FlameDescriptor }
+    const result = createClashFlame.execute(
+      {
+        flameA,
+        flameB,
+        distance: 3.0,
+      },
+      { signal: new AbortController().signal },
+    ) as { success: boolean; clashFlame: FlameDescriptor }
     expect(result.success).toBe(true)
 
     const clash = result.clashFlame
@@ -40,7 +43,7 @@ describe('createClashFlame tool', () => {
     expect(Object.keys(transforms).length).toBe(2)
 
     // Check translations
-    expect(transforms['p1_t1_0'].postAffine.e).toBe(-3.0)
-    expect(transforms['p2_t1_0'].postAffine.e).toBe(3.0)
+    expect(transforms['p1_t1_0']!.postAffine.e).toBe(-3.0)
+    expect(transforms['p2_t1_0']!.postAffine.e).toBe(3.0)
   })
 })

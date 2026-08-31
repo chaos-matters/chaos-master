@@ -1,7 +1,5 @@
 import { Show } from 'solid-js'
-import { CloseIcon } from '@/ui/icons/CloseIcon'
-import { FlameIcon } from '@/ui/icons/FlameIcon'
-import type { Component} from 'solid-js';
+import type { Component } from 'solid-js'
 import type { CommandContext } from '@/commands/types'
 
 export interface ArenaOverlayProps {
@@ -21,7 +19,7 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
         {/* Top Bar: Title & Close Button */}
         <div class="pointer-events-auto flex items-center justify-between bg-black/80 p-4 text-white shadow-[0_4px_20px_rgba(255,100,0,0.2)]">
           <div class="flex items-center gap-3">
-            <FlameIcon class="h-8 w-8 text-orange-500" />
+            <div class="h-8 w-8 text-orange-500" />
             <h1 class="text-2xl font-black uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-600">
               Flame Clash Arena
             </h1>
@@ -30,7 +28,7 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
             class="rounded bg-white/10 p-2 hover:bg-red-500/50 transition"
             onClick={() => props.arena.setOpen(false)}
           >
-            <CloseIcon class="h-6 w-6" />
+            <div class="h-6 w-6" />
           </button>
         </div>
 

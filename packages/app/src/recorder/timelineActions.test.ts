@@ -53,6 +53,7 @@ function makeTimelineWorld() {
     position,
     setPosition,
     sidebar: { open: sidebarOpen, setOpen: setSidebarOpen },
+    arena: {} as any,
     timeline: {
       tracks: raw.tracks,
       setTracks: raw.setTracks,
