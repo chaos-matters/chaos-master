@@ -7557,7 +7557,7 @@ export function MainWorkspace(props: AppProps) {
 
           {import.meta.env.DEV && (
             <button
-              class="fixed bottom-4 left-4 z-50 bg-red-500 text-white px-2 py-1 rounded shadow-lg text-xs hover:bg-red-600"
+              class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[9999] bg-red-500 text-white px-2 py-1 rounded shadow-lg text-xs hover:bg-red-600"
               onClick={() => {
                 setDirectorState({
                   isOpen: true,
