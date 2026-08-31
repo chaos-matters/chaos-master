@@ -7554,6 +7554,24 @@ export function MainWorkspace(props: AppProps) {
               throw new Error('[DEV] Injected crash from About panel')
             })()}
           </Show>
+
+          {import.meta.env.DEV && (
+            <button
+              class="fixed bottom-4 left-4 z-50 bg-red-500 text-white px-2 py-1 rounded shadow-lg text-xs hover:bg-red-600"
+              onClick={() => {
+                setDirectorState({
+                  isOpen: true,
+                  generation: 1,
+                  candidates: [
+                    { fitness: 0.85, flame: structuredClone(flameDescriptor) },
+                    { fitness: 0.92, flame: structuredClone(flameDescriptor) },
+                  ],
+                })
+              }}
+            >
+              [DEV] Test Art Director
+            </button>
+          )}
         </Dropzone>
       </TimelineContextProvider>
     </ChangeHistoryContextProvider>
