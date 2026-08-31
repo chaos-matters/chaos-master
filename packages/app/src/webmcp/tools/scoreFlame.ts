@@ -136,9 +136,9 @@ export const scoreFlame: WebMcpTool = {
         success: true,
         stats,
       }
-    } catch (err: any) {
+    } catch (err) {
       return {
-        error: `Failed to score flame: ${err.message}`,
+        error: `Failed to score flame: ${err instanceof Error ? err.message : String(err)}`,
       }
     }
   },

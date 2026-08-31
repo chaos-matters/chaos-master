@@ -77,14 +77,14 @@ function createMockCommandContext(): CommandContext {
   return {
     beforeCommand: vi.fn(),
     flameDescriptor: () => flame,
-    setFlameDescriptor: vi.fn((fn: any) => {
+    setFlameDescriptor: vi.fn((fn: (f: FlameDescriptor) => FlameDescriptor) => {
       undoStack.push(flame)
       flame = fn(flame)
       redoStack.length = 0
-    }) as any,
+    }) as unknown as (fn: (f: FlameDescriptor) => FlameDescriptor) => void,
     zoom: () => 1,
     setZoom: vi.fn(),
-    position: () => ({ x: 0, y: 0 }) as any,
+    position: () => ({ x: 0, y: 0 }),
     setPosition: vi.fn(),
     blendFlame: () => undefined,
     setBlendFlame: vi.fn(),
@@ -113,11 +113,11 @@ function createMockCommandContext(): CommandContext {
     },
     timeline: {
       timelineStore: {
-        state: {} as any,
+        state: {} as unknown,
         set: vi.fn(),
       },
       currentFrame: () => 0,
-    } as any,
+    } as unknown as CommandContext['timeline'],
     history: {
       undo: vi.fn(() => {
         const prev = undoStack.pop()

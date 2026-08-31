@@ -52,9 +52,9 @@ export const createCustomVariationTool: WebMcpTool = {
         }
         return { success: true, id: result.def.id, name: result.def.name }
       }
-    } catch (err: any) {
+    } catch (err) {
       return {
-        error: `Error creating custom variation: ${err.message}`,
+        error: `Error creating custom variation: ${err instanceof Error ? err.message : String(err)}`,
       }
     }
   },

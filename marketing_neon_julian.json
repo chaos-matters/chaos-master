@@ -1,0 +1,172 @@
+{
+  "version": "1.0",
+  "metadata": {
+    "author": "flam3",
+    "name": "Neon Julian Cosmos",
+    "description": "Imported from .flame file"
+  },
+  "renderSettings": {
+    "exposure": 4.5,
+    "skipIters": 0,
+    "plotsPerChain": 16,
+    "autoExposure3D": false,
+    "autoExposure3DStrength": 1,
+    "autoExposure3DRefRadius": 5,
+    "autoExposure3DBase": 0,
+    "dimensions": 2,
+    "drawMode": "light",
+    "colorInitMode": "colorInitZero",
+    "pointInitMode": "pointInitUnitDisk",
+    "vibrancy": 0.5,
+    "contrast": 1,
+    "gamma": 2.2,
+    "depthColorPower": 0,
+    "lightDirection": [-0.5, 0.5, -1],
+    "lightPower": 0,
+    "highlightPower": 0.5,
+    "densityEstimationQuality": 0.5,
+    "estimatorCurve": 0.5,
+    "paletteMode": 0,
+    "palettePhase": 0,
+    "paletteSpeed": 0.5,
+    "backgroundColor": [0, 0, 0],
+    "camera": {
+      "zoom": 0.4166666666666667,
+      "position": [0, 0],
+      "rotation": 0
+    },
+    "camera3D": {
+      "theta": 0,
+      "phi": 1.5707963267948966,
+      "radius": 5,
+      "target": [0, 0, 0],
+      "fov": 60,
+      "roll": 0
+    }
+  },
+  "transforms": {
+    "_flam3__c5a4eb25_6323_48cb_97ea_163c85467ad8": {
+      "probability": 0.3333333333333333,
+      "preAffine": {
+        "a": 0.8,
+        "b": 0.4,
+        "c": 0,
+        "d": -0.4,
+        "e": 0.8,
+        "f": 0
+      },
+      "postAffine": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 0,
+        "e": 1,
+        "f": 0
+      },
+      "color": {
+        "x": 0,
+        "y": 0
+      },
+      "colorSpeed": 0.4,
+      "visible": true,
+      "variations": {
+        "_flam3_0": {
+          "type": "juliaNVar",
+          "weight": 1,
+          "visible": true,
+          "params": {
+            "power": 5,
+            "dist": 1
+          }
+        }
+      }
+    },
+    "_flam3__30a53899_89e1_4444_8093_4be4ba112663": {
+      "probability": 0.3333333333333333,
+      "preAffine": {
+        "a": 0.6,
+        "b": 0,
+        "c": 0.3,
+        "d": 0,
+        "e": 0.6,
+        "f": -0.3
+      },
+      "postAffine": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 0,
+        "e": 1,
+        "f": 0
+      },
+      "color": {
+        "x": 0.3519678235207002,
+        "y": -0.8200610411070448
+      },
+      "colorSpeed": 0.4,
+      "visible": true,
+      "variations": {
+        "_flam3_0": {
+          "type": "linearVar",
+          "weight": 0.2,
+          "visible": true
+        },
+        "_flam3_1": {
+          "type": "sphericalVar",
+          "weight": 0.6,
+          "visible": true
+        },
+        "_flam3_2": {
+          "type": "swirlVar",
+          "weight": 0.2,
+          "visible": true
+        }
+      }
+    },
+    "_flam3__3245d5c1_7e32_4a93_96f7_5fe6aac7fc5e": {
+      "probability": 0.3333333333333333,
+      "preAffine": {
+        "a": 0.5,
+        "b": 0.1,
+        "c": -0.5,
+        "d": -0.1,
+        "e": 0.5,
+        "f": 0.5
+      },
+      "postAffine": {
+        "a": 1,
+        "b": 0,
+        "c": 0,
+        "d": 0,
+        "e": 1,
+        "f": 0
+      },
+      "color": {
+        "x": -0.007027314971642107,
+        "y": -0.040362970458594605
+      },
+      "colorSpeed": 0.4,
+      "visible": true,
+      "variations": {
+        "_flam3_0": {
+          "type": "linearVar",
+          "weight": 0.1,
+          "visible": true
+        },
+        "_flam3_1": {
+          "type": "horseshoeVar",
+          "weight": 0.9,
+          "visible": true
+        }
+      }
+    }
+  },
+  "finalTransform": {
+    "a": 1,
+    "b": 0,
+    "c": 0,
+    "d": 0,
+    "e": 1,
+    "f": 0
+  }
+}

@@ -10,6 +10,21 @@ const GROUP_SIZE_Y = 8
 const { ceil: ceilMath } = Math
 const MAX_SIGMA = 12
 
+const myCompute = tgpu.computeFn({
+  workgroupSize: [64],
+  in: {
+    gid: d.builtin.globalInvocationId, // vec3u
+    lid: d.builtin.localInvocationId, // vec3u
+    wgid: d.builtin.workgroupId, // vec3u
+    lidx: d.builtin.localInvocationIndex, // u32
+    nwg: d.builtin.numWorkgroups, // vec3u
+  },
+})((input) => {
+  'use gpu'
+  const a = vec2f(1, 2)
+  const b = a + a
+  return b
+})
 // Horizontal pass: accumulationBuffer → tempBuffer
 const hBlurBindGroupLayout = tgpu.bindGroupLayout({
   textureSize: {

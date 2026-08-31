@@ -26,14 +26,17 @@ describe('createClashFlame tool', () => {
       flameA,
       flameB,
       distance: 3.0,
-    }) as any
+    }) as { success: boolean; clashFlame: FlameDescriptor }
     expect(result.success).toBe(true)
 
-    const clash = result.clashFlame as FlameDescriptor
+    const clash = result.clashFlame
     expect(clash.metadata?.name).toBe('Clash: FlameA vs FlameB')
     expect(clash.renderSettings.exposure).toBe(0.8) // max of 0.5 and 0.8
 
-    const transforms = clash.transforms as Record<string, any>
+    const transforms = clash.transforms as Record<
+      string,
+      { postAffine: { e: number } }
+    >
     expect(Object.keys(transforms).length).toBe(2)
 
     // Check translations

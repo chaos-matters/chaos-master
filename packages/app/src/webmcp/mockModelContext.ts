@@ -20,12 +20,13 @@ export class MockModelContext implements ModelContext {
 
   /** Execute a registered tool by name. Throws if the tool is not found. */
   async executeTool(name: string, input: unknown): Promise<unknown> {
+    await Promise.resolve()
     const tool = this.tools.get(name)
     if (!tool) {
       throw new Error(`Tool "${name}" is not registered`)
     }
     const controller = new AbortController()
-    return tool.execute(input, { signal: controller.signal })
+    return await tool.execute(input, { signal: controller.signal })
   }
 
   /** All registered tool names, in registration order. */

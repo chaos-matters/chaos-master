@@ -43,10 +43,11 @@ export interface WebMcpTool {
 export function getModelContext(): ModelContext | undefined {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const doc = document as any
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, no-restricted-globals
   const nav = navigator as any
   return (
     (doc.modelContext as ModelContext | undefined) ??
+     
     (nav.modelContext as ModelContext | undefined)
   )
 }

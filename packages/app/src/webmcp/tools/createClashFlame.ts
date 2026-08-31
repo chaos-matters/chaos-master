@@ -1,8 +1,7 @@
-import { getWebMcpContext } from '@/webmcp/contextBridge'
-import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { FlameDescriptor, TransformFunction, } from '@/flame/schema/flameSchema'
 import type { WebMcpTool } from '@/webmcp/types'
 
-function translateTransform(t: any, dx: number, dy: number) {
+function translateTransform(t: TransformFunction, dx: number, dy: number) {
   // Deep clone to avoid mutating the original
   const clone = JSON.parse(JSON.stringify(t))
 
@@ -56,7 +55,7 @@ export const createClashFlame: WebMcpTool = {
       return { error: 'Both flameA and flameB must be provided.' }
     }
 
-    const combinedTransforms: Record<string, any> = {}
+    const combinedTransforms: Record<string, TransformFunction> = {}
 
     // Add Player 1 transforms (shifted left)
     Object.entries(flameA.transforms || {}).forEach(([id, t], idx) => {
@@ -93,7 +92,7 @@ export const createClashFlame: WebMcpTool = {
           rotation: 0,
         },
       },
-      transforms: combinedTransforms as any,
+      transforms: combinedTransforms,
     }
 
     return {

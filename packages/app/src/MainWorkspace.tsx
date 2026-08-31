@@ -391,8 +391,8 @@ export function MainWorkspace(props: AppProps) {
   const { isCompact, setCompact } = useCompactMode()
   const [showSidebar, setShowSidebar] = createSignal(true)
   const [showArena, setShowArena] = createSignal(false)
-  const [arenaP1Stats, setArenaP1Stats] = createSignal<any>(null)
-  const [arenaP2Stats, setArenaP2Stats] = createSignal<any>(null)
+  const [arenaP1Stats, setArenaP1Stats] = createSignal<unknown>(null)
+  const [arenaP2Stats, setArenaP2Stats] = createSignal<unknown>(null)
   const [sidebarDiffView, setSidebarDiffView] = createSignal<{
     flameA: FlameDescriptor
     flameB: FlameDescriptor

@@ -1,5 +1,5 @@
-import { breedFlames, CROSSOVER_MODES  } from '@/flame/breedFlame'
-import type {CrossoverMode} from '@/flame/breedFlame';
+import { breedFlames, CROSSOVER_MODES } from '@/flame/breedFlame'
+import type { CrossoverMode } from '@/flame/breedFlame'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { WebMcpTool } from '@/webmcp/types'
 
@@ -40,9 +40,15 @@ export const breedFlamesTool: WebMcpTool = {
     readOnlyHint: true,
   },
   execute: (input: unknown) => {
-    const rawInput = input as any
-    const flameA = rawInput.flameA as FlameDescriptor
-    const flameB = rawInput.flameB as FlameDescriptor
+    const rawInput = input as {
+      flameA: FlameDescriptor
+      flameB: FlameDescriptor
+      count?: number
+      crossoverMode?: string
+      mutationStrength?: number
+    }
+    const flameA = rawInput.flameA
+    const flameB = rawInput.flameB
 
     if (!flameA || !flameB) {
       return { error: 'Both flameA and flameB must be provided.' }
@@ -73,9 +79,9 @@ export const breedFlamesTool: WebMcpTool = {
         success: true,
         children,
       }
-    } catch (err: any) {
+    } catch (err) {
       return {
-        error: `Failed to breed flames: ${err.message}`,
+        error: `Failed to breed flames: ${err instanceof Error ? err.message : String(err)}`,
       }
     }
   },

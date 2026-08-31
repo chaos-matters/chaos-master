@@ -19,8 +19,12 @@ export const openArena: WebMcpTool = {
     const ctx = getWebMcpContext()
     if (!ctx) return { error: 'No workspace context' }
 
-    const { player1Name, player1Stats, player2Name, player2Stats } =
-      input as any
+    const { player1Name, player1Stats, player2Name, player2Stats } = input as {
+      player1Name: string
+      player1Stats: Record<string, unknown>
+      player2Name: string
+      player2Stats: Record<string, unknown>
+    }
 
     ctx.arena.setPlayer1Stats({
       name: player1Name || 'Player 1',

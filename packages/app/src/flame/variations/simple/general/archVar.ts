@@ -1,4 +1,4 @@
-import { vec2f } from 'typegpu/data'
+import { vec2f, vec3f } from 'typegpu/data'
 import { cos, sin } from 'typegpu/std'
 import { random } from '@/shaders/random'
 import { PI } from '../../../constants'
@@ -11,6 +11,7 @@ export const archVar = simpleVariation(
     const ang = random() * varInfo.weight * PI.$
     const s = sin(ang)
     const c = cos(ang)
+    const k = vec3f(c, s, 1)
     if (c === 0.0) {
       return vec2f(pos.x, pos.y)
     }
