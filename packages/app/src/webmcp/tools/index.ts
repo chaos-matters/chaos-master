@@ -5,7 +5,9 @@
  * a single array for bulk registration by `registerWebMcp.ts`.
  */
 
+import { breedFlamesTool } from './breedFlames'
 import { createClashFlame } from './createClashFlame'
+import { createCustomVariationTool } from './createCustomVariation'
 import { diffFlamesTool } from './diffFlames'
 import { executeCommandTool } from './executeCommand'
 // Read tools
@@ -41,6 +43,8 @@ export {
   scoreFlame,
   createClashFlame,
   openArena,
+  breedFlamesTool,
+  createCustomVariationTool,
 }
 
 /** All Tier 1 tools, in registration order. */
@@ -63,4 +67,6 @@ export const allTools: readonly WebMcpTool[] = [
   scoreFlame,
   createClashFlame,
   openArena,
+  breedFlamesTool,
+  createCustomVariationTool,
 ]
