@@ -134,6 +134,7 @@ import { useAppDragAndDrop } from './utils/useAppDragAndDrop'
 import { useAudioReactive } from './utils/useAudioReactive'
 import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
 import { useSonification } from './utils/useSonification'
+import { registerWebMcpTools } from './webmcp/registerWebMcp'
 import type { Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
 import type { Vec3 } from 'wgpu-matrix'
@@ -3787,6 +3788,11 @@ export function MainWorkspace(props: AppProps) {
       peekRedoTarget: undoRouter.peekRedoTarget,
     },
   }
+
+  // WebMCP: register tools so LLMs can read/mutate flame state via the
+  // browser's ModelContext API (ChatGPT in-app browser, Chrome flag, etc.).
+  const cleanupWebMcp = registerWebMcpTools(cmdContext)
+  onCleanup(cleanupWebMcp)
 
   /**
    * Whole-document command loads are undoable edits (randomize, genetics,
