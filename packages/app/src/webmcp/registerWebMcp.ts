@@ -14,6 +14,7 @@
  */
 
 import { clearWebMcpContext, setWebMcpContext } from './contextBridge'
+import { MockModelContext } from './mockModelContext'
 import { allTools } from './tools'
 import { getModelContext } from './types'
 import type { CommandContext } from '@/commands/types'
@@ -49,14 +50,24 @@ export function registerWebMcpTools(cmdContext: CommandContext): () => void {
     }
   } else if (import.meta.env.DEV) {
     console.info(
-      '[WebMCP] No ModelContext detected — tools not registered.',
-      'Context bridge is active for dev overlay / testing.',
+      '[WebMCP] No ModelContext detected — using MockModelContext for dev/testing.',
     )
+    const mockContext = new MockModelContext()
+    for (const tool of allTools) {
+      mockContext.registerTool(tool)
+    }
+    // Expose on window for easy testing in console
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(window as any).webmcp = mockContext
   }
 
   // 4. Return cleanup.
   return () => {
     clearWebMcpContext()
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (window as any).webmcp
+    }
     if (import.meta.env.DEV) {
       console.info('[WebMCP] Context bridge cleared.')
     }
