@@ -17,6 +17,7 @@ import { getUndoState } from './getUndoState'
 import { listCommands } from './listCommands'
 import { mutateFlame } from './mutateFlame'
 import { openArena } from './openArena'
+import { openArtDirector } from './openArtDirector'
 import { randomizeFlame } from './randomizeFlame'
 import { scoreFlame } from './scoreFlame'
 // Write tools
@@ -43,6 +44,7 @@ export {
   scoreFlame,
   createClashFlame,
   openArena,
+  openArtDirector,
   breedFlamesTool,
   createCustomVariationTool,
 }

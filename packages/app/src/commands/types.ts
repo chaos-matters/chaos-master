@@ -42,13 +42,66 @@ export interface CommandContext {
     open: Accessor<boolean>
     setOpen: Setter<boolean>
   }
+  director?: {
+    open: Accessor<boolean>
+    setOpen: Setter<boolean>
+    state: Accessor<{
+      generation: number
+      candidates: { fitness?: number; flame?: FlameDescriptor }[]
+    } | null>
+    setState: Setter<{
+      generation: number
+      candidates: { fitness?: number; flame?: FlameDescriptor }[]
+    } | null>
+    selectCandidate: (index: number) => void
+  }
   arena: {
     open: Accessor<boolean>
     setOpen: Setter<boolean>
-    player1Stats: Accessor<any | null>
-    setPlayer1Stats: Setter<any | null>
-    player2Stats: Accessor<any | null>
-    setPlayer2Stats: Setter<any | null>
+    player1Stats: Accessor<{
+      name?: string
+      type?: string
+      powerLevel?: number
+      metrics?: {
+        complexity?: number
+        chaosLevel?: number
+        symmetryScore?: number
+        energyIntensity?: number
+      }
+    } | null>
+    setPlayer1Stats: Setter<{
+      name?: string
+      type?: string
+      powerLevel?: number
+      metrics?: {
+        complexity?: number
+        chaosLevel?: number
+        symmetryScore?: number
+        energyIntensity?: number
+      }
+    } | null>
+    player2Stats: Accessor<{
+      name?: string
+      type?: string
+      powerLevel?: number
+      metrics?: {
+        complexity?: number
+        chaosLevel?: number
+        symmetryScore?: number
+        energyIntensity?: number
+      }
+    } | null>
+    setPlayer2Stats: Setter<{
+      name?: string
+      type?: string
+      powerLevel?: number
+      metrics?: {
+        complexity?: number
+        chaosLevel?: number
+        symmetryScore?: number
+        energyIntensity?: number
+      }
+    } | null>
   }
   timeline: {
     tracks: Accessor<TimelineTrack[]>

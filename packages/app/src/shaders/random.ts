@@ -6,7 +6,6 @@
  * upstreamed this generator from Chaos Master.
  * https://prng.di.unimi.it/xoroshiro64starstar.c
  */
-
 import { tgpu } from 'typegpu'
 import { f32, u32, vec2f, vec2u, vec3f } from 'typegpu/data'
 import { acos, bitcastU32toF32, cos, mul, pow, sin, sqrt } from 'typegpu/std'
@@ -24,6 +23,7 @@ export const u32To01F32 = tgpu.fn(
   [u32],
   f32,
 )((a: number) => {
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
   return bitcastU32toF32((a & 0x007fffff) | 0x3f800000) - 1.0
 })
 

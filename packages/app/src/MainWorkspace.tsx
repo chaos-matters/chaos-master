@@ -33,6 +33,7 @@ import { DebugOverlay } from './components/DebugOverlay'
 import { DiceButton } from './components/DiceButton/DiceButton'
 import { DiffViewContent, DiffViewModal, } from './components/DiffViewModal/DiffViewModal'
 import diffUi from './components/DiffViewModal/DiffViewModal.module.css'
+import { DirectorOverlay } from './components/DirectorOverlay'
 import { createDiscordShareModal } from './components/DiscordShareModal/DiscordShareModal'
 import { createShowDocumentation } from './components/DocumentationModal/DocumentationModal'
 import { Dropzone } from './components/Dropzone/Dropzone'
@@ -390,15 +391,48 @@ export function MainWorkspace(props: AppProps) {
   const SIDEBAR_RESIZABLE = false
   const { isCompact, setCompact } = useCompactMode()
   const [showSidebar, setShowSidebar] = createSignal(true)
+
+  const [directorOpen, setDirectorOpen] = createSignal(false)
+  const [directorState, setDirectorState] = createSignal<{
+    generation: number
+    candidates: {
+      fitness?: number
+      flame?: any /* eslint-disable-line @typescript-eslint/no-explicit-any */
+    }[]
+  } | null>(null)
+
+  const selectCandidate = (index: number) => {
+    // Dispatch selected candidate to AI or update state
+    // eslint-disable-next-line no-console
+    console.log('Selected candidate', index)
+    // AI will know since we could fire a system prompt or have an active wait...
+    // Let's just alert for the mock session
+    alert(`Candidate ${index + 1} selected!`)
+  }
+
   const [showArena, setShowArena] = createSignal(false)
-  const [arenaP1Stats, setArenaP1Stats] = createSignal<Record<
-    string,
-    any
-  > | null>(null)
-  const [arenaP2Stats, setArenaP2Stats] = createSignal<Record<
-    string,
-    any
-  > | null>(null)
+  const [arenaP1Stats, setArenaP1Stats] = createSignal<{
+    name?: string
+    type?: string
+    powerLevel?: number
+    metrics?: {
+      complexity?: number
+      chaosLevel?: number
+      symmetryScore?: number
+      energyIntensity?: number
+    }
+  } | null>(null)
+  const [arenaP2Stats, setArenaP2Stats] = createSignal<{
+    name?: string
+    type?: string
+    powerLevel?: number
+    metrics?: {
+      complexity?: number
+      chaosLevel?: number
+      symmetryScore?: number
+      energyIntensity?: number
+    }
+  } | null>(null)
   const [sidebarDiffView, setSidebarDiffView] = createSignal<{
     flameA: FlameDescriptor
     flameB: FlameDescriptor
@@ -3246,27 +3280,66 @@ export function MainWorkspace(props: AppProps) {
     // Handle transform paths: transform.{tid}.{prop} or transform.{tid}.{sub}.{key}
     const parts = path.split('.')
     if (parts[0] === 'transform') {
-       
       const transforms = fd.transforms as Record<string, unknown>
       if (parts.length === 3 && parts[2] === 'probability') {
-        return transforms[parts[1]!]?.probability ?? null
+        return (
+          (
+            transforms[parts[1]!] as {
+              probability?: number
+              colorSpeed?: number
+              color?: Record<string, number>
+              preAffine?: Record<string, number>
+              postAffine?: Record<string, number>
+              variations?: Record<string, { weight?: number }>
+            }
+          )?.probability ?? null
+        )
       }
       if (parts.length === 3 && parts[2] === 'colorSpeed') {
-        return transforms[parts[1]!]?.colorSpeed ?? 0.4
+        return (
+          (
+            transforms[parts[1]!] as {
+              probability?: number
+              colorSpeed?: number
+              color?: Record<string, number>
+              preAffine?: Record<string, number>
+              postAffine?: Record<string, number>
+              variations?: Record<string, { weight?: number }>
+            }
+          )?.colorSpeed ?? 0.4
+        )
       }
       if (
         parts.length === 4 &&
         (parts[2] === 'preAffine' || parts[2] === 'postAffine')
       ) {
-        const affine = transforms[parts[1]!]?.[parts[2]]
+        const affine = (
+          transforms[parts[1]!] as {
+            probability?: number
+            colorSpeed?: number
+            color?: Record<string, number>
+            preAffine?: Record<string, number>
+            postAffine?: Record<string, number>
+            variations?: Record<string, { weight?: number }>
+          }
+        )?.[parts[2]]
         if (affine && parts[3]! in affine) {
           return affine[parts[3]!] as number
         }
       }
       if (parts.length === 4 && parts[2] === 'color') {
-        const color = transforms[parts[1]!]?.color
+        const color = (
+          transforms[parts[1]!] as {
+            probability?: number
+            colorSpeed?: number
+            color?: Record<string, number>
+            preAffine?: Record<string, number>
+            postAffine?: Record<string, number>
+            variations?: Record<string, { weight?: number }>
+          }
+        )?.color
         if (color && parts[3]! in color) {
-          return color[parts[3]!]
+          return color[parts[3]!] ?? null
         }
       }
       return null
@@ -3278,10 +3351,13 @@ export function MainWorkspace(props: AppProps) {
         string,
         string,
       ]
-       
-      const transform = (fd.transforms as Record<string, unknown>)[
-        transformId
-      ] as
+
+      const transform = (
+        fd.transforms as Record<
+          string,
+          any /* eslint-disable-line @typescript-eslint/no-explicit-any */
+        >
+      )[transformId] as
         | {
             variations?: Record<
               string,
@@ -3314,9 +3390,15 @@ export function MainWorkspace(props: AppProps) {
       parts[0] !== 'camera'
     ) {
       const [transformId, variationId] = parts as [string, string]
-       
-      const variation = (fd.transforms as Record<string, unknown>)[transformId]
-        ?.variations?.[variationId] as { weight?: number } | undefined
+
+      const variation = (
+        fd.transforms as Record<
+          string,
+          any /* eslint-disable-line @typescript-eslint/no-explicit-any */
+        >
+      )[transformId]?.variations?.[variationId] as
+        | { weight?: number }
+        | undefined
       if (variation?.weight !== undefined) return variation.weight
     }
     return null
@@ -3450,26 +3532,61 @@ export function MainWorkspace(props: AppProps) {
         default: {
           const parts = path.split('.')
           if (parts[0] === 'transform') {
-             
             const transforms = draft.transforms as Record<string, unknown>
             if (parts.length === 3 && parts[2] === 'probability') {
               if (transforms[parts[1]!]) {
-                transforms[parts[1]!].probability = value as number
+                ;(
+                  transforms[parts[1]!] as {
+                    probability?: number
+                    colorSpeed?: number
+                    color?: Record<string, number>
+                    preAffine?: Record<string, number>
+                    postAffine?: Record<string, number>
+                    variations?: Record<string, { weight?: number }>
+                  }
+                ).probability = value as number
               }
             } else if (parts.length === 3 && parts[2] === 'colorSpeed') {
               if (transforms[parts[1]!]) {
-                transforms[parts[1]!].colorSpeed = value as number
+                ;(
+                  transforms[parts[1]!] as {
+                    probability?: number
+                    colorSpeed?: number
+                    color?: Record<string, number>
+                    preAffine?: Record<string, number>
+                    postAffine?: Record<string, number>
+                    variations?: Record<string, { weight?: number }>
+                  }
+                ).colorSpeed = value as number
               }
             } else if (
               parts.length === 4 &&
               (parts[2] === 'preAffine' || parts[2] === 'postAffine')
             ) {
-              const affine = transforms[parts[1]!]?.[parts[2]]
+              const affine = (
+                transforms[parts[1]!] as {
+                  probability?: number
+                  colorSpeed?: number
+                  color?: Record<string, number>
+                  preAffine?: Record<string, number>
+                  postAffine?: Record<string, number>
+                  variations?: Record<string, { weight?: number }>
+                }
+              )?.[parts[2]]
               if (affine && parts[3]! in affine) {
                 affine[parts[3]!] = value as number
               }
             } else if (parts.length === 4 && parts[2] === 'color') {
-              const color = transforms[parts[1]!]?.color
+              const color = (
+                transforms[parts[1]!] as {
+                  probability?: number
+                  colorSpeed?: number
+                  color?: Record<string, number>
+                  preAffine?: Record<string, number>
+                  postAffine?: Record<string, number>
+                  variations?: Record<string, { weight?: number }>
+                }
+              )?.color
               if (color && parts[3]! in color) {
                 color[parts[3]!] = value as number
               }
@@ -3480,10 +3597,13 @@ export function MainWorkspace(props: AppProps) {
               string,
               string,
             ]
-             
-            const transform = (draft.transforms as Record<string, unknown>)[
-              transformId
-            ] as
+
+            const transform = (
+              draft.transforms as Record<
+                string,
+                any /* eslint-disable-line @typescript-eslint/no-explicit-any */
+              >
+            )[transformId] as
               | {
                   variations?: Record<
                     string,
@@ -3497,7 +3617,7 @@ export function MainWorkspace(props: AppProps) {
             }
           } else if (parts.length === 2 && parts[0] !== 'camera') {
             const [transformId, variationId] = parts as [string, string]
-             
+
             const transform = (draft.transforms as Record<string, unknown>)[
               transformId
             ] as
@@ -3661,6 +3781,14 @@ export function MainWorkspace(props: AppProps) {
     sidebar: {
       open: showSidebar,
       setOpen: setShowSidebar,
+    },
+
+    director: {
+      open: directorOpen,
+      setOpen: setDirectorOpen,
+      state: directorState,
+      setState: setDirectorState,
+      selectCandidate,
     },
     arena: {
       open: showArena,
@@ -4752,6 +4880,9 @@ export function MainWorkspace(props: AppProps) {
             flameDescriptor={flameDescriptor}
           />
           <ArenaOverlay arena={cmdContext.arena} />
+          {cmdContext.director && (
+            <DirectorOverlay director={cmdContext.director} />
+          )}
 
           <Show when={showSidebar()}>
             <div

@@ -10,7 +10,6 @@ import { executeCommand } from '@/commands/registry'
 import { DEFAULT_ANIMATION_DURATION_MS } from '@/components/SpotlightTour/tourTypes'
 import { withRecordingSuppressed } from '@/recorder/recorder'
 import { deepClone } from '@/utils/clone'
-import type { CommandContext } from '@/commands/types'
 import type { TourContext, TourGuide, TourStep, } from '@/components/SpotlightTour/tourTypes'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { HistorySetter } from '@/utils/createStoreHistory'
@@ -179,7 +178,6 @@ export function createPortalDriver(start: FlameDescriptor): PortalDriver {
   }
 
   const commandContext = {
-     
     flameDescriptor: () => flame,
     setFlameDescriptor,
     blendFlame,

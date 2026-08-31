@@ -77,7 +77,7 @@ function createMockCommandContext(): CommandContext {
   return {
     beforeCommand: vi.fn(),
     flameDescriptor: () => flame,
-    setFlameDescriptor: vi.fn((fn: any) => {
+    setFlameDescriptor: vi.fn((fn: (f: FlameDescriptor) => FlameDescriptor) => {
       undoStack.push(flame)
       flame = fn(flame)
       redoStack.length = 0
