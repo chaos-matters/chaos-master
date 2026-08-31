@@ -17,6 +17,7 @@ import { recordEntries, recordKeys } from '@/utils/record'
 import ui from './App.module.css'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
 import { AncestryTreeModal } from './components/AncestryTreeModal/AncestryTreeModal'
+import { ArenaOverlay } from './components/ArenaOverlay'
 import { AudioReactivePanel } from './components/AudioReactivePanel/AudioReactivePanel'
 import { createShowBenchmark } from './components/BenchmarkModal/BenchmarkModal'
 import { BlendFlameGallery } from './components/BlendFlameGallery/BlendFlameGallery'
@@ -389,6 +390,9 @@ export function MainWorkspace(props: AppProps) {
   const SIDEBAR_RESIZABLE = false
   const { isCompact, setCompact } = useCompactMode()
   const [showSidebar, setShowSidebar] = createSignal(true)
+  const [showArena, setShowArena] = createSignal(false)
+  const [arenaP1Stats, setArenaP1Stats] = createSignal<any>(null)
+  const [arenaP2Stats, setArenaP2Stats] = createSignal<any>(null)
   const [sidebarDiffView, setSidebarDiffView] = createSignal<{
     flameA: FlameDescriptor
     flameB: FlameDescriptor
@@ -3650,6 +3654,14 @@ export function MainWorkspace(props: AppProps) {
       open: showSidebar,
       setOpen: setShowSidebar,
     },
+    arena: {
+      open: showArena,
+      setOpen: setShowArena,
+      player1Stats: arenaP1Stats,
+      setPlayer1Stats: setArenaP1Stats,
+      player2Stats: arenaP2Stats,
+      setPlayer2Stats: setArenaP2Stats,
+    },
     timeline: {
       tracks: timeline.tracks,
       setTracks: timeline.setTracks,
@@ -4731,6 +4743,7 @@ export function MainWorkspace(props: AppProps) {
             animationEnabled={animationEnabled()}
             flameDescriptor={flameDescriptor}
           />
+          <ArenaOverlay arena={cmdContext.arena} />
 
           <Show when={showSidebar()}>
             <div

@@ -42,6 +42,14 @@ export interface CommandContext {
     open: Accessor<boolean>
     setOpen: Setter<boolean>
   }
+  arena: {
+    open: Accessor<boolean>
+    setOpen: Setter<boolean>
+    player1Stats: Accessor<any>
+    setPlayer1Stats: Setter<any>
+    player2Stats: Accessor<any>
+    setPlayer2Stats: Setter<any>
+  }
   timeline: {
     tracks: Accessor<TimelineTrack[]>
     setTracks: Setter<TimelineTrack[]>

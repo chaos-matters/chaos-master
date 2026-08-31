@@ -11,7 +11,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { clearWebMcpContext,getWebMcpContext, setWebMcpContext,  } from './contextBridge'
+import { clearWebMcpContext, getWebMcpContext, setWebMcpContext, } from './contextBridge'
 import { MockModelContext } from './mockModelContext'
 import { allTools } from './tools'
 import type { CommandContext } from '@/commands/types'
@@ -77,26 +77,33 @@ function createMockCommandContext(): CommandContext {
   return {
     beforeCommand: vi.fn(),
     flameDescriptor: () => flame,
-    setFlameDescriptor: vi.fn(
-      (fn: (prev: FlameDescriptor) => FlameDescriptor) => {
-        undoStack.push(flame)
-        flame = fn(flame)
-        redoStack.length = 0
-      },
-    ),
+    setFlameDescriptor: vi.fn((fn: any) => {
+      undoStack.push(flame)
+      flame = fn(flame)
+      redoStack.length = 0
+    }) as any,
     zoom: () => 1,
     setZoom: vi.fn(),
-    position: () => ({ x: 0, y: 0 }),
+    position: () => ({ x: 0, y: 0 }) as any,
     setPosition: vi.fn(),
-    blendFlame: () => null,
+    blendFlame: () => undefined,
     setBlendFlame: vi.fn(),
     blendWeight: () => 0,
     setBlendWeight: vi.fn(),
     pixelRatio: () => 1,
-    paletteRestoreColors: null,
+    setPixelRatio: vi.fn(),
+    paletteRestoreColors: undefined,
     sidebar: {
       open: () => true,
       setOpen: vi.fn(),
+    },
+    arena: {
+      open: () => false,
+      setOpen: vi.fn(),
+      player1Stats: () => null,
+      setPlayer1Stats: vi.fn(),
+      player2Stats: () => null,
+      setPlayer2Stats: vi.fn(),
     },
     camera: {
       center: vi.fn(),
@@ -104,6 +111,13 @@ function createMockCommandContext(): CommandContext {
     modal: {
       open: vi.fn(),
     },
+    timeline: {
+      timelineStore: {
+        state: {} as any,
+        set: vi.fn(),
+      },
+      currentFrame: () => 0,
+    } as any,
     history: {
       undo: vi.fn(() => {
         const prev = undoStack.pop()
