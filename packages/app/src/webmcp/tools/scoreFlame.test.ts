@@ -43,10 +43,7 @@ describe('scoreFlame tool', () => {
       },
     } as unknown as FlameDescriptor
 
-    const result = scoreFlame.execute({ flame }, {}) as Record<
-      string,
-      unknown
-    >
+    const result = scoreFlame.execute({ flame }, {}) as Record<string, unknown>
     expect(result.success).toBe(true)
 
     const stats = result.stats as Record<string, unknown>

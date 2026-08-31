@@ -402,12 +402,12 @@ export function MainWorkspace(props: AppProps) {
   } | null>(null)
 
   const selectCandidate = (index: number) => {
-    // Dispatch selected candidate to AI or update state
-    // eslint-disable-next-line no-console
-    console.log('Selected candidate', index)
-    // AI will know since we could fire a system prompt or have an active wait...
-    // Let's just alert for the mock session
-    alert(`Candidate ${index + 1} selected!`)
+    const s = directorState()
+    if (s && s.candidates[index]?.flame) {
+      const candidateFlame = s.candidates[index].flame
+      setFlameDescriptor(candidateFlame)
+      showToast(`Art Director: Loaded candidate ${index + 1} into workspace.`)
+    }
   }
 
   const [showArena, setShowArena] = createSignal(false)
@@ -7560,13 +7560,13 @@ export function MainWorkspace(props: AppProps) {
               class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[9999] bg-red-500 text-white px-2 py-1 rounded shadow-lg text-xs hover:bg-red-600"
               onClick={() => {
                 setDirectorState({
-                  isOpen: true,
                   generation: 1,
                   candidates: [
                     { fitness: 0.85, flame: structuredClone(flameDescriptor) },
                     { fitness: 0.92, flame: structuredClone(flameDescriptor) },
                   ],
                 })
+                setDirectorOpen(true)
               }}
             >
               [DEV] Test Art Director

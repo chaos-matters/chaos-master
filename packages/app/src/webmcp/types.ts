@@ -47,7 +47,6 @@ export function getModelContext(): ModelContext | undefined {
   const nav = navigator as any
   return (
     (doc.modelContext as ModelContext | undefined) ??
-     
     (nav.modelContext as ModelContext | undefined)
   )
 }

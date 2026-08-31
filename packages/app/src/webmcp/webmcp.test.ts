@@ -109,6 +109,13 @@ function createMockCommandContext(): CommandContext {
       player2Stats: () => null,
       setPlayer2Stats: vi.fn(),
     },
+    director: {
+      open: vi.fn(() => false),
+      setOpen: vi.fn(),
+      state: vi.fn(() => null),
+      setState: vi.fn(),
+      selectCandidate: vi.fn(),
+    },
     camera: {
       center: vi.fn(),
     },
@@ -371,6 +378,37 @@ describe('WebMCP Foundation', () => {
         commandId: 'nonexistent.command',
       })) as Record<string, unknown>
       expect(result).toHaveProperty('error')
+    })
+  })
+
+  describe('open_art_director', () => {
+    it('opens director with candidates', async () => {
+      const candidates = [
+        { fitness: 0.85, flame: createTestFlame() },
+        { fitness: 0.92, flame: createTestFlame() },
+      ]
+      const result = (await mockContext.executeTool('open_art_director', {
+        generation: 1,
+        candidates,
+      })) as Record<string, unknown>
+
+      expect(result.success).toBe(true)
+      expect(cmdContext.director!.setState).toHaveBeenCalledWith({
+        generation: 1,
+        candidates,
+      })
+      expect(cmdContext.director!.setOpen).toHaveBeenCalledWith(true)
+    })
+  })
+
+  describe('open_arena', () => {
+    it('opens arena UI', async () => {
+      const result = (await mockContext.executeTool('open_arena', {
+        open: true,
+      })) as Record<string, unknown>
+
+      expect(result.success).toBe(true)
+      expect(cmdContext.arena.setOpen).toHaveBeenCalledWith(true)
     })
   })
 

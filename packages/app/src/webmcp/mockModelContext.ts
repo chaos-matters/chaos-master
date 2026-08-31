@@ -29,6 +29,11 @@ export class MockModelContext implements ModelContext {
     return await tool.execute(input, { signal: controller.signal })
   }
 
+  /** Alias for executeTool */
+  async execute(name: string, input: unknown): Promise<unknown> {
+    return await this.executeTool(name, input)
+  }
+
   /** All registered tool names, in registration order. */
   getToolNames(): string[] {
     return [...this.tools.keys()]

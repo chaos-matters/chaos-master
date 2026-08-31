@@ -48,23 +48,27 @@ export function registerWebMcpTools(cmdContext: CommandContext): () => void {
         allTools.map((t) => t.name).join(', '),
       )
     }
-  } else if (import.meta.env.DEV) {
-    console.info(
-      '[WebMCP] No ModelContext detected — using MockModelContext for dev/testing.',
-    )
+  } else {
+    if (import.meta.env.DEV) {
+      console.info(
+        '[WebMCP] No ModelContext detected — using MockModelContext for dev/testing.',
+      )
+    }
     const mockContext = new MockModelContext()
     for (const tool of allTools) {
       mockContext.registerTool(tool)
     }
-    // Expose on window for easy testing in console
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(window as any).webmcp = mockContext
+    if (typeof window !== 'undefined') {
+      // Expose on window for easy testing in console, Playwright, and dev overlay
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(window as any).webmcp = mockContext
+    }
   }
 
   // 4. Return cleanup.
   return () => {
     clearWebMcpContext()
-    if (import.meta.env.DEV) {
+    if (typeof window !== 'undefined') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (window as any).webmcp
     }

@@ -69,6 +69,7 @@ export const allTools: readonly WebMcpTool[] = [
   scoreFlame,
   createClashFlame,
   openArena,
+  openArtDirector,
   breedFlamesTool,
   createCustomVariationTool,
 ]
