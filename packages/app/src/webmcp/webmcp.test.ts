@@ -282,6 +282,28 @@ describe('WebMCP Foundation', () => {
       expect(result).toHaveProperty('error')
     })
 
+    it('returns a fresh cloned instance for full and transform sections', async () => {
+      const full1 = (await mockContext.executeTool('get_flame_detail', {
+        section: 'full',
+      })) as Record<string, unknown>
+      const full2 = (await mockContext.executeTool('get_flame_detail', {
+        section: 'full',
+      })) as Record<string, unknown>
+      expect(full1).not.toBe(full2)
+      expect(full1).toEqual(full2)
+
+      const xform1 = (await mockContext.executeTool('get_flame_detail', {
+        section: 'transform',
+        transformId: 't1',
+      })) as { transform: Record<string, unknown> }
+      const xform2 = (await mockContext.executeTool('get_flame_detail', {
+        section: 'transform',
+        transformId: 't1',
+      })) as { transform: Record<string, unknown> }
+      expect(xform1.transform).not.toBe(xform2.transform)
+      expect(xform1.transform).toEqual(xform2.transform)
+    })
+
     it('returns error for missing section', async () => {
       const result = (await mockContext.executeTool(
         'get_flame_detail',

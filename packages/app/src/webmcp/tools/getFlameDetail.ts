@@ -1,3 +1,4 @@
+import { deepClone } from '@/utils/clone'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
 import type { WebMcpTool } from '@/webmcp/types'
 
@@ -56,12 +57,12 @@ export const getFlameDetail: WebMcpTool = {
     }
 
     if (section === 'full') {
-      return flame
+      return deepClone(flame)
     }
 
     if (section === 'render') {
       return {
-        renderSettings: flame.renderSettings ?? {},
+        renderSettings: deepClone(flame.renderSettings ?? {}),
       }
     }
 
@@ -84,7 +85,9 @@ export const getFlameDetail: WebMcpTool = {
       if (Object.hasOwn(transforms, transformId)) {
         return {
           transformId,
-          transform: transforms[transformId as keyof typeof transforms],
+          transform: deepClone(
+            transforms[transformId as keyof typeof transforms],
+          ),
         }
       }
 
@@ -100,7 +103,7 @@ export const getFlameDetail: WebMcpTool = {
           return {
             transformId: entry[0],
             index: parsedIndex,
-            transform: entry[1],
+            transform: deepClone(entry[1]),
           }
         }
       }
