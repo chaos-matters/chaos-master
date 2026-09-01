@@ -14,6 +14,7 @@ import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
 import { useShortcutManager } from '@/shortcuts'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { recordEntries, recordKeys } from '@/utils/record'
+import { calculateFlameStats } from '@/webmcp/tools/scoreFlame'
 import ui from './App.module.css'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
 import { AncestryTreeModal } from './components/AncestryTreeModal/AncestryTreeModal'
@@ -531,29 +532,21 @@ export function MainWorkspace(props: AppProps) {
           mutateColors: true,
         },
       )
+      const p1Stats = calculateFlameStats(current)
+      const p2Stats = calculateFlameStats(opponent)
       setArenaP1Stats({
         name: current.metadata?.name || 'Cyan Guardian',
-        type: 'Symmetric Resonance',
-        powerLevel: 1420,
+        type: p1Stats.type,
+        powerLevel: p1Stats.powerLevel,
         flame: current,
-        metrics: {
-          complexity: 7.8,
-          chaosLevel: 4.2,
-          symmetryScore: 8.5,
-          energyIntensity: 6.9,
-        },
+        metrics: p1Stats.metrics,
       })
       setArenaP2Stats({
         name: 'Crimson Nemesis',
-        type: 'Chaotic Entropy',
-        powerLevel: 1390,
+        type: p2Stats.type,
+        powerLevel: p2Stats.powerLevel,
         flame: opponent,
-        metrics: {
-          complexity: 8.4,
-          chaosLevel: 8.9,
-          symmetryScore: 3.2,
-          energyIntensity: 9.1,
-        },
+        metrics: p2Stats.metrics,
       })
     }
     setShowArena(true)
@@ -7732,10 +7725,6 @@ export function MainWorkspace(props: AppProps) {
                 },
               }}
               hardwareTier={props.hardwareTier}
-              respond={() => {
-                isArenaModalOpen = false
-                setShowArena(false)
-              }}
               onClose={() => {
                 isArenaModalOpen = false
                 setShowArena(false)

@@ -1,4 +1,4 @@
-import { createSignal, For, Show } from 'solid-js'
+import { createSignal, For, onCleanup, Show } from 'solid-js'
 import { VariationPreview } from '@/components/VariationSelector/VariationSelector'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
@@ -15,7 +15,6 @@ export interface ArenaOverlayProps {
   arena: CommandContext['arena']
   hardwareTier?: HardwareTier | null
   onClose?: () => void
-  respond?: () => void
 }
 
 const PREVIEW_RES = { width: 380, height: 214 }
@@ -40,10 +39,21 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
   const [activeRoundIndex, setActiveRoundIndex] = createSignal<number>(0)
   const [eventBanner, setEventBanner] = createSignal<string | null>(null)
 
+  let activeInterval: ReturnType<typeof setInterval> | null = null
+
+  const clearActiveInterval = () => {
+    if (activeInterval !== null) {
+      clearInterval(activeInterval)
+      activeInterval = null
+    }
+  }
+
+  onCleanup(clearActiveInterval)
+
   const handleClose = () => {
+    clearActiveInterval()
     props.arena.setOpen(false)
     props.onClose?.()
-    props.respond?.()
   }
 
   const runSimulation = () => {
@@ -51,6 +61,7 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
     const p2 = props.arena.player2Stats()
     if (!p1 || !p2 || !p1.flame || !p2.flame) return
 
+    clearActiveInterval()
     setClashing(true)
     setWinner(null)
     setEventBanner(null)
@@ -78,7 +89,7 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
 
     // Step through round 1 -> round 2 -> round 3
     let currentIdx = 0
-    const stepInterval = setInterval(() => {
+    activeInterval = setInterval(() => {
       if (currentIdx < simRes.rounds.length) {
         const r = simRes.rounds[currentIdx]!
         setActiveRoundIndex(currentIdx)
@@ -96,14 +107,20 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
         )
         currentIdx++
       } else {
-        clearInterval(stepInterval)
+        clearActiveInterval()
         const finalWin =
           simRes.winner === 'A' ? 1 : simRes.winner === 'B' ? 2 : null
         setWinner(finalWin)
-        const winnerObj = finalWin === 1 ? p1 : p2
-        setCommentary(
-          `${winnerObj.name ?? `Player ${finalWin}`} secures victory in the 3D territory clash (${simRes.finalScore.A} - ${simRes.finalScore.B})!`,
-        )
+        if (finalWin === null) {
+          setCommentary(
+            `The arena is deadlocked! Neither flame could claim dominance (${simRes.finalScore.A} - ${simRes.finalScore.B}).`,
+          )
+        } else {
+          const winnerObj = finalWin === 1 ? p1 : p2
+          setCommentary(
+            `${winnerObj.name ?? `Player ${finalWin}`} secures victory in the 3D territory clash (${simRes.finalScore.A} - ${simRes.finalScore.B})!`,
+          )
+        }
         setClashing(false)
       }
     }, 900)
