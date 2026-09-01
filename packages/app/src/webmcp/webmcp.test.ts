@@ -108,6 +108,7 @@ function createMockCommandContext(): CommandContext {
       setPlayer1Stats: vi.fn(),
       player2Stats: () => null,
       setPlayer2Stats: vi.fn(),
+      selectFighter: vi.fn(),
     },
     director: {
       open: vi.fn(() => false),

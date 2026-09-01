@@ -62,6 +62,7 @@ export interface CommandContext {
       name?: string
       type?: string
       powerLevel?: number
+      flame?: FlameDescriptor
       metrics?: {
         complexity?: number
         chaosLevel?: number
@@ -73,6 +74,7 @@ export interface CommandContext {
       name?: string
       type?: string
       powerLevel?: number
+      flame?: FlameDescriptor
       metrics?: {
         complexity?: number
         chaosLevel?: number
@@ -84,6 +86,7 @@ export interface CommandContext {
       name?: string
       type?: string
       powerLevel?: number
+      flame?: FlameDescriptor
       metrics?: {
         complexity?: number
         chaosLevel?: number
@@ -95,6 +98,7 @@ export interface CommandContext {
       name?: string
       type?: string
       powerLevel?: number
+      flame?: FlameDescriptor
       metrics?: {
         complexity?: number
         chaosLevel?: number
@@ -102,6 +106,7 @@ export interface CommandContext {
         energyIntensity?: number
       }
     } | null>
+    selectFighter?: (player: 1 | 2) => void
   }
   timeline: {
     tracks: Accessor<TimelineTrack[]>

@@ -405,7 +405,10 @@ export function MainWorkspace(props: AppProps) {
     const s = directorState()
     if (s && s.candidates[index]?.flame) {
       const candidateFlame = s.candidates[index].flame
-      setFlameDescriptor(candidateFlame)
+      setFlameDescriptor(
+        () => structuredClone(candidateFlame),
+        `Art Director: Candidate ${index + 1}`,
+      )
       showToast(`Art Director: Loaded candidate ${index + 1} into workspace.`)
     }
   }
@@ -415,6 +418,7 @@ export function MainWorkspace(props: AppProps) {
     name?: string
     type?: string
     powerLevel?: number
+    flame?: FlameDescriptor
     metrics?: {
       complexity?: number
       chaosLevel?: number
@@ -426,6 +430,7 @@ export function MainWorkspace(props: AppProps) {
     name?: string
     type?: string
     powerLevel?: number
+    flame?: FlameDescriptor
     metrics?: {
       complexity?: number
       chaosLevel?: number
@@ -433,6 +438,94 @@ export function MainWorkspace(props: AppProps) {
       energyIntensity?: number
     }
   } | null>(null)
+
+  const openArtDirectorUI = () => {
+    const s = directorState()
+    if (!s || s.candidates.length === 0) {
+      const current = deepClone(flameDescriptor)
+      const presets = ['Subtle', 'Moderate', 'Chaotic', 'Structural'] as const
+      const candidates = presets.map((_, i) => {
+        const mutated = mutateFlame(
+          current,
+          {
+            strength: 0.2 + i * 0.1,
+            minTransforms: 2,
+            maxTransforms: 6,
+            minVariations: 1,
+            maxVariations: 3,
+            allowedVariations: [],
+            dimensions: current.renderSettings.dimensions ?? 2,
+          },
+          {
+            mutateAffine: true,
+            affineMode: 'smart',
+            mutateVariations: 'modify',
+            mutateColors: true,
+          },
+        )
+        return {
+          fitness: 0.82 + (i % 3) * 0.05,
+          flame: mutated,
+        }
+      })
+      setDirectorState({
+        generation: 1,
+        candidates,
+      })
+    }
+    setDirectorOpen(true)
+  }
+
+  const openFlameClashUI = () => {
+    const p1 = arenaP1Stats()
+    const p2 = arenaP2Stats()
+    if (!p1 || !p2) {
+      const current = deepClone(flameDescriptor)
+      const opponent = mutateFlame(
+        current,
+        {
+          strength: 0.45,
+          minTransforms: 2,
+          maxTransforms: 6,
+          minVariations: 1,
+          maxVariations: 3,
+          allowedVariations: [],
+          dimensions: current.renderSettings.dimensions ?? 2,
+        },
+        {
+          mutateAffine: true,
+          affineMode: 'smart',
+          mutateVariations: 'all',
+          mutateColors: true,
+        },
+      )
+      setArenaP1Stats({
+        name: current.metadata?.name || 'Cyan Guardian',
+        type: 'Symmetric Resonance',
+        powerLevel: 1420,
+        flame: current,
+        metrics: {
+          complexity: 7.8,
+          chaosLevel: 4.2,
+          symmetryScore: 8.5,
+          energyIntensity: 6.9,
+        },
+      })
+      setArenaP2Stats({
+        name: 'Crimson Nemesis',
+        type: 'Chaotic Entropy',
+        powerLevel: 1390,
+        flame: opponent,
+        metrics: {
+          complexity: 8.4,
+          chaosLevel: 8.9,
+          symmetryScore: 3.2,
+          energyIntensity: 9.1,
+        },
+      })
+    }
+    setShowArena(true)
+  }
   const [sidebarDiffView, setSidebarDiffView] = createSignal<{
     flameA: FlameDescriptor
     flameB: FlameDescriptor
@@ -3797,6 +3890,18 @@ export function MainWorkspace(props: AppProps) {
       setPlayer1Stats: setArenaP1Stats,
       player2Stats: arenaP2Stats,
       setPlayer2Stats: setArenaP2Stats,
+      selectFighter: (player: 1 | 2) => {
+        const fighter = player === 1 ? arenaP1Stats() : arenaP2Stats()
+        if (fighter?.flame) {
+          setFlameDescriptor(
+            () => structuredClone(fighter.flame!),
+            `Arena: ${fighter.name ?? `Player ${player}`}`,
+          )
+          showToast(
+            `Arena: Loaded ${fighter.name ?? `Player ${player}`} into editor.`,
+          )
+        }
+      },
     },
     timeline: {
       tracks: timeline.tracks,
@@ -4768,6 +4873,8 @@ export function MainWorkspace(props: AppProps) {
                     onDiffFlame={pickDiffFlame}
                     onAncestryFlame={pickAncestryFlame}
                     onGalleryFlame={pickGalleryFlame}
+                    onArtDirector={openArtDirectorUI}
+                    onFlameClash={openFlameClashUI}
                     onClearBlendFlame={() => {
                       setBlendFlame(undefined)
                     }}
@@ -7554,24 +7661,6 @@ export function MainWorkspace(props: AppProps) {
               throw new Error('[DEV] Injected crash from About panel')
             })()}
           </Show>
-
-          {import.meta.env.DEV && (
-            <button
-              class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[9999] bg-red-500 text-white px-2 py-1 rounded shadow-lg text-xs hover:bg-red-600"
-              onClick={() => {
-                setDirectorState({
-                  generation: 1,
-                  candidates: [
-                    { fitness: 0.85, flame: structuredClone(flameDescriptor) },
-                    { fitness: 0.92, flame: structuredClone(flameDescriptor) },
-                  ],
-                })
-                setDirectorOpen(true)
-              }}
-            >
-              [DEV] Test Art Director
-            </button>
-          )}
         </Dropzone>
       </TimelineContextProvider>
     </ChangeHistoryContextProvider>

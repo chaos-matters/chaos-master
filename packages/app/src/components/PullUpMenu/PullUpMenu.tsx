@@ -30,18 +30,21 @@ export function PullUpMenu(props: {
   let wrapEl: HTMLSpanElement | undefined
   let panelEl: HTMLDivElement | undefined
 
+  function updateAnchor() {
+    if (!wrapEl) return
+    const rect = wrapEl.getBoundingClientRect()
+    const PANEL_MAX = 240
+    const left = Math.min(rect.left, window.innerWidth - PANEL_MAX - 8)
+    setAnchor({
+      left: Math.max(8, left),
+      bottom: window.innerHeight - rect.top + 6,
+      width: rect.width,
+    })
+  }
+
   function toggle() {
-    if (!open() && wrapEl) {
-      const rect = wrapEl.getBoundingClientRect()
-      // Clamp so the panel never overflows the right viewport edge (the
-      // toolbar can be scrolled with the trigger near the edge).
-      const PANEL_MAX = 240
-      const left = Math.min(rect.left, window.innerWidth - PANEL_MAX - 8)
-      setAnchor({
-        left: Math.max(8, left),
-        bottom: window.innerHeight - rect.top + 6,
-        width: rect.width,
-      })
+    if (!open()) {
+      updateAnchor()
     }
     setOpen((v) => !v)
   }
@@ -50,24 +53,27 @@ export function PullUpMenu(props: {
     if (!open()) return
     const onPress = (e: PointerEvent) => {
       const t = e.target as Node
-      if (wrapEl?.contains(t) || panelEl?.contains(t)) return
+      if (
+        wrapEl?.contains(t) ||
+        panelEl?.contains(t) ||
+        (t instanceof Element && t.closest('[role="menu"]'))
+      ) {
+        return
+      }
       setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
     }
-    const onLayoutShift = () => setOpen(false)
     document.addEventListener('pointerdown', onPress)
     document.addEventListener('keydown', onKey)
-    window.addEventListener('resize', onLayoutShift)
-    // Capture-phase so scrolls inside nested containers (the toolbar itself)
-    // also close the panel — its anchor point is stale the moment they move.
-    window.addEventListener('scroll', onLayoutShift, true)
+    window.addEventListener('resize', updateAnchor)
+    window.addEventListener('scroll', updateAnchor, true)
     onCleanup(() => {
       document.removeEventListener('pointerdown', onPress)
       document.removeEventListener('keydown', onKey)
-      window.removeEventListener('resize', onLayoutShift)
-      window.removeEventListener('scroll', onLayoutShift, true)
+      window.removeEventListener('resize', updateAnchor)
+      window.removeEventListener('scroll', updateAnchor, true)
     })
   })
 

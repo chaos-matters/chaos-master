@@ -1,3 +1,5 @@
+import { mutateFlame } from '@/flame/randomize'
+import { deepClone } from '@/utils/clone'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { WebMcpTool } from '@/webmcp/types'
@@ -34,12 +36,48 @@ export const openArtDirector: WebMcpTool = {
 
     const { generation, candidates } = input as {
       generation: number
-      candidates: Array<{ flame: FlameDescriptor; fitness?: number }>
+      candidates: Array<{ flame?: FlameDescriptor; fitness?: number }>
     }
 
+    const currentFlame = ctx.flameDescriptor?.()
+    const normalizedCandidates = (candidates || []).map((c, i) => {
+      let flame = c.flame
+      if (
+        !flame ||
+        !flame.transforms ||
+        Object.keys(flame.transforms).length === 0 ||
+        !flame.renderSettings?.camera
+      ) {
+        if (currentFlame) {
+          flame = mutateFlame(
+            deepClone(currentFlame),
+            {
+              strength: 0.2 + i * 0.1,
+              minTransforms: 2,
+              maxTransforms: 6,
+              minVariations: 1,
+              maxVariations: 3,
+              allowedVariations: [],
+              dimensions: currentFlame.renderSettings?.dimensions ?? 2,
+            },
+            {
+              mutateAffine: true,
+              affineMode: 'smart',
+              mutateVariations: 'modify',
+              mutateColors: true,
+            },
+          )
+        }
+      }
+      return {
+        fitness: c.fitness ?? 0.85,
+        flame,
+      }
+    })
+
     ctx.director.setState({
-      generation,
-      candidates,
+      generation: generation || 1,
+      candidates: normalizedCandidates,
     })
     ctx.director.setOpen(true)
 
