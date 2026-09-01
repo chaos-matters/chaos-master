@@ -9,7 +9,7 @@ describe('createClashFlame tool', () => {
       metadata: { name: 'FlameA' },
       renderSettings: { zoom: 1, exposure: 0.5 },
       transforms: {
-        t1: { postAffine: { e: 0, f: 0 } },
+        t1: { postAffine: { c: 0, f: 0 } },
       },
     } as unknown as FlameDescriptor
 
@@ -18,7 +18,7 @@ describe('createClashFlame tool', () => {
       metadata: { name: 'FlameB' },
       renderSettings: { zoom: 1, exposure: 0.8 },
       transforms: {
-        t1: { postAffine: { e: 0, f: 0 } },
+        t1: { postAffine: { c: 0, f: 0 } },
       },
     } as unknown as FlameDescriptor
 
@@ -38,12 +38,12 @@ describe('createClashFlame tool', () => {
 
     const transforms = clash.transforms as Record<
       string,
-      { postAffine: { e: number } }
+      { postAffine: { c: number } }
     >
     expect(Object.keys(transforms).length).toBe(2)
 
     // Check translations
-    expect(transforms['p1_t1_0']!.postAffine.e).toBe(-3.0)
-    expect(transforms['p2_t1_0']!.postAffine.e).toBe(3.0)
+    expect(transforms['p1_t1_0']!.postAffine.c).toBe(-3.0)
+    expect(transforms['p2_t1_0']!.postAffine.c).toBe(3.0)
   })
 })

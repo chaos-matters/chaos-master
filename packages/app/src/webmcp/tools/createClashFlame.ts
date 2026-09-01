@@ -3,9 +3,9 @@ import type { FlameDescriptor, TransformFunction, } from '@/flame/schema/flameSc
 import type { WebMcpTool } from '@/webmcp/types'
 
 function translateTransform2D(t: TransformFunction, dx: number, dy: number) {
-  const clone = JSON.parse(JSON.stringify(t))
+  const clone = deepClone(t)
   if (clone.postAffine) {
-    clone.postAffine.e = (clone.postAffine.e || 0) + dx
+    clone.postAffine.c = (clone.postAffine.c || 0) + dx
     clone.postAffine.f = (clone.postAffine.f || 0) + dy
   }
   return clone

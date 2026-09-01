@@ -116,19 +116,20 @@ registerCommand({
       !Array.isArray(value)
     ) {
       ctx.timeline.setPreviewHeld?.(false)
-      const currentCamera =
-        (defaultAtPath('camera3D') as Record<string, unknown>) ?? {}
-      const mergedCamera = {
-        ...currentCamera,
-        ...(value as Record<string, unknown>),
-      }
       ctx.setFlameDescriptor((draft) => {
         if (!draft.renderSettings) {
           draft.renderSettings = deepClone(renderSettingsDefault)
         }
-        draft.renderSettings.camera3D = mergedCamera as unknown as NonNullable<
-          typeof draft.renderSettings.camera3D
+        const fallback =
+          (defaultAtPath('camera3D') as Record<string, unknown>) ?? {}
+        const existing = (draft.renderSettings.camera3D ?? fallback) as Record<
+          string,
+          unknown
         >
+        draft.renderSettings.camera3D = {
+          ...existing,
+          ...(value as Record<string, unknown>),
+        } as unknown as NonNullable<typeof draft.renderSettings.camera3D>
       }, 'Set camera3D')
       return
     }
@@ -140,19 +141,20 @@ registerCommand({
       !Array.isArray(value)
     ) {
       ctx.timeline.setPreviewHeld?.(false)
-      const currentCamera =
-        (defaultAtPath('camera') as Record<string, unknown>) ?? {}
-      const mergedCamera = {
-        ...currentCamera,
-        ...(value as Record<string, unknown>),
-      }
       ctx.setFlameDescriptor((draft) => {
         if (!draft.renderSettings) {
           draft.renderSettings = deepClone(renderSettingsDefault)
         }
-        draft.renderSettings.camera = mergedCamera as unknown as NonNullable<
-          typeof draft.renderSettings.camera
+        const fallback =
+          (defaultAtPath('camera') as Record<string, unknown>) ?? {}
+        const existing = (draft.renderSettings.camera ?? fallback) as Record<
+          string,
+          unknown
         >
+        draft.renderSettings.camera = {
+          ...existing,
+          ...(value as Record<string, unknown>),
+        } as unknown as NonNullable<typeof draft.renderSettings.camera>
       }, 'Set camera')
       return
     }
