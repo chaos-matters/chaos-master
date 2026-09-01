@@ -194,9 +194,9 @@ export const scoreClashRound: WebMcpTool = {
     const voxelsB = new Map<string, number>()
 
     function toVoxelKey(p: [number, number, number]): string {
-      const vx = Math.floor(Math.max(-8, Math.min(8, p[0])) * 2)
-      const vy = Math.floor(Math.max(-8, Math.min(8, p[1])) * 2)
-      const vz = Math.floor(Math.max(-8, Math.min(8, p[2])) * 2)
+      const vx = Math.trunc(Math.max(-8, Math.min(8, p[0])) * 2)
+      const vy = Math.trunc(Math.max(-8, Math.min(8, p[1])) * 2)
+      const vz = Math.trunc(Math.max(-8, Math.min(8, p[2])) * 2)
       return `${vx},${vy},${vz}`
     }
 

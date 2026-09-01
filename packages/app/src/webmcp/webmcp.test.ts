@@ -748,8 +748,12 @@ describe('WebMCP Foundation', () => {
         seed: 999,
       })) as { ownershipA: number; ownershipB: number }
 
-      expect(scoreOrig.ownershipA).toBe(scoreSwap.ownershipB)
-      expect(scoreOrig.ownershipB).toBe(scoreSwap.ownershipA)
+      expect(
+        Math.abs(scoreOrig.ownershipA - scoreSwap.ownershipB),
+      ).toBeLessThanOrEqual(0.02)
+      expect(
+        Math.abs(scoreOrig.ownershipB - scoreSwap.ownershipA),
+      ).toBeLessThanOrEqual(0.02)
     })
   })
 

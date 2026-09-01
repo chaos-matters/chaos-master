@@ -1,14 +1,20 @@
 import { createSignal, For, onCleanup, Show } from 'solid-js'
 import { VariationPreview } from '@/components/VariationSelector/VariationSelector'
+import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
+import { useTimeline } from '@/contexts/TimelineContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { Cross, Zap } from '@/icons'
+import { deepClone } from '@/utils/clone'
+import { getWebMcpContext } from '@/webmcp/contextBridge'
+import { animateClash } from '@/webmcp/tools/animateClash'
 import { simulateClash } from '@/webmcp/tools/simulateClash'
 import ui from './ArenaOverlay.module.css'
 import type { Component } from 'solid-js'
 import type { CommandContext } from '@/commands/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { HardwareTier } from '@/utils/hardwareTier'
+import type { TimelineTrack } from '@/utils/timeline'
 import type { ClashRoundOutcome, SimulateClashResult, } from '@/webmcp/tools/simulateClash'
 
 export interface ArenaOverlayProps {
@@ -32,6 +38,9 @@ function ensureCamera(flame?: FlameDescriptor): FlameDescriptor | null {
 }
 
 export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
+  const history = useChangeHistory()
+  const timeline = useTimeline()
+
   const [commentary, setCommentary] = createSignal<string | null>(null)
   const [winner, setWinner] = createSignal<1 | 2 | null>(null)
   const [clashing, setClashing] = createSignal(false)
@@ -40,6 +49,45 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
   const [eventBanner, setEventBanner] = createSignal<string | null>(null)
 
   let activeInterval: ReturnType<typeof setInterval> | null = null
+  let initialFlame: FlameDescriptor | null = null
+  let initialTracks: TimelineTrack[] | null = null
+  let initialDuration: number | null = null
+  let initialAnimationEnabled: boolean | null = null
+  let wasClashStaged = false
+
+  const captureWorkspace = () => {
+    const ctx = getWebMcpContext()
+    if (!wasClashStaged && ctx && timeline) {
+      initialFlame = deepClone(ctx.flameDescriptor())
+      initialTracks = deepClone(timeline.tracks())
+      initialDuration =
+        timeline.config().endFrame - timeline.config().startFrame
+      initialAnimationEnabled = ctx.timeline.animationEnabled()
+    }
+  }
+
+  const restoreWorkspace = () => {
+    if (wasClashStaged && initialFlame) {
+      if (timeline) {
+        timeline.pause()
+      }
+      history.replaceSilently(initialFlame)
+      if (initialTracks && timeline) {
+        timeline.loadTracks(initialTracks)
+      }
+      const ctx = getWebMcpContext()
+      if (initialDuration !== null && ctx) {
+        ctx.timeline.setDuration(initialDuration)
+      }
+      if (initialAnimationEnabled !== null && ctx) {
+        ctx.timeline.setAnimationEnabled(initialAnimationEnabled)
+      }
+      if (timeline) {
+        timeline.setCurrentFrame(0)
+      }
+      wasClashStaged = false
+    }
+  }
 
   const clearActiveInterval = () => {
     if (activeInterval !== null) {
@@ -48,10 +96,14 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
     }
   }
 
-  onCleanup(clearActiveInterval)
+  onCleanup(() => {
+    clearActiveInterval()
+    restoreWorkspace()
+  })
 
   const handleClose = () => {
     clearActiveInterval()
+    restoreWorkspace()
     props.arena.setOpen(false)
     props.onClose?.()
   }
@@ -62,6 +114,8 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
     if (!p1 || !p2 || !p1.flame || !p2.flame) return
 
     clearActiveInterval()
+    captureWorkspace()
+
     setClashing(true)
     setWinner(null)
     setEventBanner(null)
@@ -87,6 +141,24 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
     setRounds(simRes.rounds)
     setActiveRoundIndex(0)
 
+    // Stage Round 1 flame & keyframe 4 camera tracks across 90 frames (30 per round)
+    animateClash.execute(
+      {
+        simulation: simRes,
+        flameA: p1.flame,
+        flameB: p2.flame,
+        framesPerRound: 30,
+      },
+      {},
+    )
+    wasClashStaged = true
+
+    // Start timeline playback
+    if (timeline) {
+      timeline.setCurrentFrame(0)
+      timeline.play()
+    }
+
     // Step through round 1 -> round 2 -> round 3
     let currentIdx = 0
     activeInterval = setInterval(() => {
@@ -96,6 +168,12 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
         if (r.event) {
           setEventBanner(r.event)
         }
+
+        // Advance staged flame at round boundaries without extra undo entries
+        if (r.clashFlame) {
+          history.replaceSilently(r.clashFlame)
+        }
+
         const winnerName =
           r.winner === 'A'
             ? (p1.name ?? 'Player 1')
@@ -131,9 +209,12 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
   }
 
   const loadFighter = (player: 1 | 2) => {
+    clearActiveInterval()
+    wasClashStaged = false
     if (props.arena.selectFighter) {
       props.arena.selectFighter(player)
-      handleClose()
+      props.arena.setOpen(false)
+      props.onClose?.()
     }
   }
 
