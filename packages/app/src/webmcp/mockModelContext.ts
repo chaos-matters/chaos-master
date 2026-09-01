@@ -8,6 +8,43 @@
 
 import type { ModelContext, WebMcpTool } from './types'
 
+function validateInputSchema(
+  schema: Record<string, unknown> | undefined,
+  args: unknown,
+): string[] {
+  const errs: string[] = []
+  const schemaObj = schema as
+    | {
+        required?: string[]
+        properties?: Record<string, { type?: string }>
+      }
+    | undefined
+
+  const argsObj = args as Record<string, unknown> | undefined
+
+  for (const key of schemaObj?.required ?? []) {
+    if (argsObj?.[key] === undefined) {
+      errs.push(`missing required parameter "${key}"`)
+    }
+  }
+
+  if (argsObj && typeof argsObj === 'object') {
+    for (const [key, val] of Object.entries(argsObj)) {
+      if (val === undefined) continue
+      const expected = schemaObj?.properties?.[key]?.type
+      if (!expected) continue
+      const actual = Array.isArray(val) ? 'array' : typeof val
+      const ok =
+        expected === 'integer' ? Number.isInteger(val) : actual === expected
+      if (!ok) {
+        errs.push(`parameter "${key}" should be ${expected}, got ${actual}`)
+      }
+    }
+  }
+
+  return errs
+}
+
 export class MockModelContext implements ModelContext {
   readonly tools = new Map<string, WebMcpTool>()
 
@@ -25,6 +62,20 @@ export class MockModelContext implements ModelContext {
     if (!tool) {
       throw new Error(`Tool "${name}" is not registered`)
     }
+
+    const validationErrors = validateInputSchema(tool.inputSchema, input)
+    if (validationErrors.length > 0) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Validation error for tool "${name}": ${validationErrors.join('; ')}`,
+          },
+        ],
+        isError: true,
+      }
+    }
+
     const controller = new AbortController()
     return await tool.execute(input, { signal: controller.signal })
   }

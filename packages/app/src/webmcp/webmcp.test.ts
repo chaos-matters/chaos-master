@@ -333,8 +333,8 @@ describe('WebMCP Foundation', () => {
       const result = (await mockContext.executeTool(
         'get_flame_detail',
         {},
-      )) as Record<string, unknown>
-      expect(result).toHaveProperty('error')
+      )) as { isError?: boolean; error?: string }
+      expect(result.isError || Boolean(result.error)).toBe(true)
     })
   })
 
@@ -421,18 +421,18 @@ describe('WebMCP Foundation', () => {
     })
 
     it('rejects missing commandId', async () => {
-      const result = (await mockContext.executeTool(
-        'execute_command',
-        {},
-      )) as Record<string, unknown>
-      expect(result).toHaveProperty('error')
+      const result = (await mockContext.executeTool('execute_command', {})) as {
+        isError?: boolean
+        error?: string
+      }
+      expect(result.isError || Boolean(result.error)).toBe(true)
     })
 
     it('rejects unknown commands via preflight', async () => {
       const result = (await mockContext.executeTool('execute_command', {
         commandId: 'nonexistent.command',
-      })) as Record<string, unknown>
-      expect(result).toHaveProperty('error')
+      })) as { isError?: boolean; error?: string }
+      expect(result.isError || Boolean(result.error)).toBe(true)
     })
   })
 
@@ -481,8 +481,8 @@ describe('WebMCP Foundation', () => {
     it('fails when body is missing', async () => {
       const result = (await mockContext.executeTool('create_custom_variation', {
         name: 'no_body',
-      })) as Record<string, unknown>
-      expect(result).toHaveProperty('error')
+      })) as { isError?: boolean; error?: string }
+      expect(result.isError || Boolean(result.error)).toBe(true)
     })
   })
 
@@ -492,46 +492,46 @@ describe('WebMCP Foundation', () => {
     it('set_flame rejects invalid input', async () => {
       const result = (await mockContext.executeTool('set_flame', {
         flame: 'not-an-object',
-      })) as Record<string, unknown>
-      expect(result).toHaveProperty('error')
+      })) as { isError?: boolean; error?: string }
+      expect(result.isError || Boolean(result.error)).toBe(true)
     })
 
     it('set_flame rejects missing flame', async () => {
-      const result = (await mockContext.executeTool('set_flame', {})) as Record<
-        string,
-        unknown
-      >
-      expect(result).toHaveProperty('error')
+      const result = (await mockContext.executeTool('set_flame', {})) as {
+        isError?: boolean
+        error?: string
+      }
+      expect(result.isError || Boolean(result.error)).toBe(true)
     })
 
     it('diff_flames rejects invalid target', async () => {
       const result = (await mockContext.executeTool('diff_flames', {
         target: 'not-an-object',
-      })) as Record<string, unknown>
-      expect(result).toHaveProperty('error')
+      })) as { isError?: boolean; error?: string }
+      expect(result.isError || Boolean(result.error)).toBe(true)
     })
 
     it('diff_flames rejects missing target', async () => {
-      const result = (await mockContext.executeTool(
-        'diff_flames',
-        {},
-      )) as Record<string, unknown>
-      expect(result).toHaveProperty('error')
+      const result = (await mockContext.executeTool('diff_flames', {})) as {
+        isError?: boolean
+        error?: string
+      }
+      expect(result.isError || Boolean(result.error)).toBe(true)
     })
 
     it('randomize_flame rejects invalid transform range', async () => {
       const result = (await mockContext.executeTool('randomize_flame', {
         minTransforms: 5,
         maxTransforms: 2,
-      })) as Record<string, unknown>
-      expect(result).toHaveProperty('error')
+      })) as { isError?: boolean; error?: string }
+      expect(result.isError || Boolean(result.error)).toBe(true)
     })
 
     it('mutate_flame rejects invalid preset', async () => {
       const result = (await mockContext.executeTool('mutate_flame', {
         preset: 'InvalidPreset',
-      })) as Record<string, unknown>
-      expect(result).toHaveProperty('error')
+      })) as { isError?: boolean; error?: string }
+      expect(result.isError || Boolean(result.error)).toBe(true)
     })
   })
 })
