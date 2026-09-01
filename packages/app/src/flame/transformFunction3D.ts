@@ -43,17 +43,89 @@ function variationInvocation3D(
   return `${variationType}(pre, VariationInfo3D(uniforms.variation${vid}.weight, uniforms.preAffine))`
 }
 
+export const VARIATION_2D_TO_3D_MAP: Record<string, TransformVariationType3D> =
+  {
+    linear: 'linear3D',
+    linearT: 'linear3D',
+    spherical: 'spherical3D',
+    sinusoidal: 'sinusoidal3D',
+    swirl: 'swirl3D',
+    swirl3: 'swirl3D',
+    horseshoe: 'horseshoe3D',
+    polar: 'polar3D',
+    polar2: 'polar3D',
+    nPolar: 'polar3D',
+    handkerchief: 'handkerchief3D',
+    heart: 'heart3D',
+    disc: 'disc3D',
+    spiral: 'spiral3D',
+    diamond: 'diamond3D',
+    ex: 'ex3D',
+    julia: 'julia3D',
+    juliaN: 'julia3D',
+    juliaScope: 'julia3D',
+    bent: 'bent3D',
+    waves: 'waves3D',
+    fisheye: 'fisheye3D',
+    exponential: 'exponential3D',
+    power: 'power3D',
+    rings: 'rings3D',
+    rings2: 'rings3D',
+    eyefish: 'eyefish3D',
+    bubble: 'bubble3D',
+    bubbleVar: 'bubble3D',
+    cylinder: 'cylinder3D',
+    cylinderVar: 'cylinder3D',
+    cylinder2Var: 'cylindrical3D',
+    cylindrical: 'cylindrical3D',
+    cylinderApoVar: 'cylinder3D',
+    gaussian: 'gaussian3D',
+    gaussianVar: 'gaussian3D',
+    sphere: 'sphere3D',
+    sphereVar: 'sphere3D',
+    blur: 'blur3D',
+    blurVar: 'blur3D',
+    square: 'square3D',
+    squareVar: 'square3D',
+    scry: 'scry3D',
+    scryVar: 'scry3D',
+    cross: 'cross3D',
+    crossVar: 'cross3D',
+    curl: 'curl3D',
+    curlVar: 'curl3D',
+    pdj: 'pdj3D',
+    pdjVar: 'pdj3D',
+    hemisphere: 'hemisphere3D',
+    starfield: 'starfield3D',
+  }
+
+export function resolveVariationType3D(
+  type: string,
+): TransformVariationType3D | undefined {
+  if (isVariationType3D(type)) return type
+  if (type in VARIATION_2D_TO_3D_MAP) return VARIATION_2D_TO_3D_MAP[type]
+  return undefined
+}
+
 export function createFlameWgsl3D({
   variations,
 }: Pick<TransformFunction, 'variations'>) {
   const validVariations = Object.fromEntries(
-    Object.entries(variations).filter(([, v]) => {
-      if (isVariationType3D(v.type)) return true
-      console.warn(
-        `[createFlameWgsl3D] skipping unknown variation type "${v.type}"`,
-      )
-      return false
-    }),
+    Object.entries(variations)
+      .map(([vid, v]) => {
+        const resolved = resolveVariationType3D(v.type)
+        if (!resolved) {
+          console.warn(
+            `[createFlameWgsl3D] skipping unknown variation type "${v.type}"`,
+          )
+          return null
+        }
+        return [vid, { ...v, type: resolved }]
+      })
+      .filter(
+        (entry): entry is [string, { type: TransformVariationType3D }] =>
+          entry !== null,
+      ),
   ) as unknown as Record<VariationId, { type: TransformVariationType3D }>
   const Uniforms = struct({
     ...FlameUniformsBase3D.propTypes,
@@ -204,7 +276,10 @@ export function extractFlameUniforms3D({
                   const vtype = (v as Record<string, unknown>).type as
                     | string
                     | undefined
-                  return vtype !== undefined && isVariationType3D(vtype)
+                  return (
+                    vtype !== undefined &&
+                    resolveVariationType3D(vtype) !== undefined
+                  )
                 })
                 .map(([vid, variation]) => {
                   const {
@@ -221,8 +296,7 @@ export function extractFlameUniforms3D({
                   const typed: Record<string, unknown> = {
                     weight: isVarVisible ? (rest.weight ?? 1) : 0,
                   }
-                  const variationType =
-                    _type as keyof typeof transformVariations3D
+                  const variationType = resolveVariationType3D(_type)!
                   const isParametric =
                     isParametricVariationType3D(variationType)
                   if (isParametric) {

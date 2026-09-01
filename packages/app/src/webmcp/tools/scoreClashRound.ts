@@ -94,8 +94,17 @@ export const scoreClashRound: WebMcpTool = {
     let sumProbB = 0
 
     for (const [id, t] of transforms) {
-      const prob = Math.max(0.001, t.probability ?? 1)
-      const color = Array.isArray(t.color) ? (t.color[0] ?? 0.5) : 0.5
+      const rawColor = t.color as unknown
+      const color = Array.isArray(rawColor)
+        ? (rawColor[0] ?? 0.5)
+        : typeof rawColor === 'object' &&
+            rawColor !== null &&
+            'x' in rawColor &&
+            typeof (rawColor as { x: number }).x === 'number'
+          ? (rawColor as { x: number }).x
+          : typeof rawColor === 'number'
+            ? rawColor
+            : 0.5
       if (id.startsWith('p1_')) {
         p1List.push({ id, prob, color })
         sumProbA += prob
