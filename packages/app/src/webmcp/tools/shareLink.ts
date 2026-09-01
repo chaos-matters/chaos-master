@@ -7,7 +7,7 @@ import type { WebMcpTool } from '@/webmcp/types'
 export const createShareLink: WebMcpTool = {
   name: 'create_share_link',
   description:
-    'Generate a shareable URL for the current flame. The link encodes the full flame state and never expires. Returns both the full inline URL and a shortened version when available.',
+    'Generate a self-contained shareable URL for the current flame. The link encodes the full flame state into the URL query string, generates no server-side state, and never expires. Returns the full longUrl and the encoded base64 payload string.',
   annotations: {
     readOnlyHint: true,
   },
