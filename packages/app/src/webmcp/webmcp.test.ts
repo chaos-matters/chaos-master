@@ -299,12 +299,14 @@ describe('WebMCP Foundation', () => {
       expect(transform).toHaveProperty('variations')
     })
 
-    it('returns error for missing transform', async () => {
+    it('returns specific transform by numeric index', async () => {
       const result = (await mockContext.executeTool('get_flame_detail', {
         section: 'transform',
-        transformId: 'nonexistent',
+        index: 0,
       })) as Record<string, unknown>
-      expect(result).toHaveProperty('error')
+      expect(result).toHaveProperty('transformId', 't1')
+      expect(result).toHaveProperty('index', 0)
+      expect(result).toHaveProperty('transform')
     })
 
     it('returns a fresh cloned instance for full and transform sections', async () => {

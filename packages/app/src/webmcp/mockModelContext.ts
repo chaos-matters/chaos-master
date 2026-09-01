@@ -34,10 +34,17 @@ function validateInputSchema(
       const expected = schemaObj?.properties?.[key]?.type
       if (!expected) continue
       const actual = Array.isArray(val) ? 'array' : typeof val
-      const ok =
-        expected === 'integer' ? Number.isInteger(val) : actual === expected
+      const ok = Array.isArray(expected)
+        ? expected.some((t) =>
+            t === 'integer' ? Number.isInteger(val) : actual === t,
+          )
+        : expected === 'integer'
+          ? Number.isInteger(val)
+          : actual === expected
       if (!ok) {
-        errs.push(`parameter "${key}" should be ${expected}, got ${actual}`)
+        errs.push(
+          `parameter "${key}" should be ${Array.isArray(expected) ? expected.join(' or ') : expected}, got ${actual}`,
+        )
       }
     }
   }

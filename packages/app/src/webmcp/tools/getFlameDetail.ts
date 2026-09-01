@@ -18,7 +18,12 @@ export const getFlameDetail: WebMcpTool = {
       transformId: {
         type: 'string',
         description:
-          'Transform ID or 0-based index. Required when section is transform.',
+          'Transform ID string (e.g. "_benchmark_31415_0"). Required when section is "transform" unless index is provided.',
+      },
+      index: {
+        type: 'integer',
+        description:
+          '0-based positional index (0, 1, 2...). Can be used instead of transformId when section is "transform".',
       },
     },
     required: ['section'],
@@ -43,7 +48,7 @@ export const getFlameDetail: WebMcpTool = {
     }
 
     const rawInput = input as
-      | { section?: string; transformId?: string }
+      | { section?: string; transformId?: string | number; index?: number }
       | undefined
     const section = rawInput?.section
 
@@ -67,17 +72,17 @@ export const getFlameDetail: WebMcpTool = {
     }
 
     if (section === 'transform') {
-      const transformId = rawInput?.transformId
-      if (
-        transformId === undefined ||
-        transformId === null ||
-        transformId === ''
-      ) {
+      const rawTarget =
+        rawInput?.index !== undefined ? rawInput.index : rawInput?.transformId
+
+      if (rawTarget === undefined || rawTarget === null || rawTarget === '') {
         return {
           error:
-            'Parameter "transformId" is required when section is "transform". Provide a transform ID string or 0-based numeric index.',
+            'Parameter "transformId" or "index" is required when section is "transform". Provide a transform ID string or 0-based numeric index.',
         }
       }
+
+      const transformId = String(rawTarget)
 
       const transforms = flame.transforms ?? {}
       const entries = Object.entries(transforms)
