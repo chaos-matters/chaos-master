@@ -12,6 +12,38 @@ function translateTransform2D(t: TransformFunction, dx: number, dy: number) {
   return clone
 }
 
+function upgradeAffineTo3D(
+  affine: Record<string, number> = {},
+  dx = 0,
+  dy = 0,
+  dz = 0,
+) {
+  const is2D =
+    affine.g === undefined && affine.h === undefined && affine.l === undefined
+  if (is2D) {
+    return {
+      a: affine.a ?? 1,
+      b: affine.b ?? 0,
+      c: 0,
+      d: (affine.c ?? 0) + dx,
+      e: affine.d ?? 0,
+      f: affine.e ?? 1,
+      g: 0,
+      h: (affine.f ?? 0) + dy,
+      i: 0,
+      j: 0,
+      k: 1,
+      l: dz,
+    }
+  }
+  return {
+    ...affine,
+    d: (affine.d || 0) + dx,
+    h: (affine.h || 0) + dy,
+    l: (affine.l || 0) + dz,
+  }
+}
+
 function translateTransform3D(
   t: TransformFunction,
   dx: number,
@@ -21,34 +53,31 @@ function translateTransform3D(
   tintMode: 'override' | 'blend' | 'none' = 'override',
 ) {
   const clone = deepClone(t)
-  const pa = (clone.postAffine ?? {}) as Record<string, number>
 
-  // Check if postAffine is in 2D format ({ a, b, c, d, e, f }) or 3D ({ a..l })
-  const is2D = pa.g === undefined && pa.h === undefined && pa.l === undefined
+  const is2DPre = (clone.preAffine as Record<string, number>)?.l === undefined
+  const is2DPost = (clone.postAffine as Record<string, number>)?.l === undefined
 
-  if (is2D) {
-    clone.postAffine = {
-      a: pa.a ?? 1,
-      b: pa.b ?? 0,
-      c: 0,
-      d: (pa.c ?? 0) + dx,
-      e: pa.d ?? 0,
-      f: pa.e ?? 1,
-      g: 0,
-      h: (pa.f ?? 0) + dy,
-      i: 0,
-      j: 0,
-      k: 1,
-      l: dz,
-    }
-  } else {
-    clone.postAffine = {
-      ...pa,
-      d: (pa.d || 0) + dx,
-      h: (pa.h || 0) + dy,
-      l: (pa.l || 0) + dz,
-    } as unknown as typeof clone.postAffine
-  }
+  clone.preAffine = upgradeAffineTo3D(
+    clone.preAffine,
+    0,
+    0,
+    0,
+  ) as typeof clone.preAffine
+  clone.postAffine = upgradeAffineTo3D(
+    clone.postAffine,
+    dx,
+    dy,
+    dz,
+  ) as typeof clone.postAffine
+
+  console.info(
+    `[Arena 3D Upgrade] Translating transform (dx:${dx}, dy:${dy}, dz:${dz}).
+  - preAffine upgraded from 2D? ${is2DPre} => `,
+    clone.preAffine,
+    `
+  - postAffine upgraded from 2D? ${is2DPost} => `,
+    clone.postAffine,
+  )
 
   if (tintColor !== undefined && tintMode !== 'none') {
     const rawColor = clone.color as unknown

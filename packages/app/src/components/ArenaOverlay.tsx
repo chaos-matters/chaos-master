@@ -186,6 +186,9 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
         currentIdx++
       } else {
         clearActiveInterval()
+        if (timeline) {
+          timeline.pause()
+        }
         const finalWin =
           simRes.winner === 'A' ? 1 : simRes.winner === 'B' ? 2 : null
         setWinner(finalWin)
@@ -201,7 +204,7 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
         }
         setClashing(false)
       }
-    }, 900)
+    }, 1000)
   }
 
   const handleClash = () => {
