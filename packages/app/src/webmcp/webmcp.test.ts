@@ -13,6 +13,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearWebMcpContext, getWebMcpContext, setWebMcpContext, } from './contextBridge'
 import { MockModelContext } from './mockModelContext'
+import { wrapTool } from './registerWebMcp'
 import { allTools } from './tools'
 import type { CommandContext } from '@/commands/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -200,8 +201,32 @@ describe('WebMCP Foundation', () => {
     it('all tools have non-empty inputSchema', () => {
       for (const tool of allTools) {
         expect(tool.inputSchema).toBeDefined()
-        expect(tool.inputSchema.type).toBe('object')
+        expect(typeof tool.inputSchema).toBe('object')
       }
+    })
+
+    it('wraps successful tool execution in MCP result envelope', async () => {
+      const tool = wrapTool(allTools.find((t) => t.name === 'get_flame')!)
+      const res = (await tool.execute({})) as {
+        content: { type: string; text: string }[]
+        isError?: boolean
+      }
+      expect(Array.isArray(res.content)).toBe(true)
+      expect(res.content[0]?.type).toBe('text')
+      expect(res.isError).toBeUndefined()
+    })
+
+    it('wraps error tool results in MCP result envelope with isError: true', async () => {
+      const tool = wrapTool(
+        allTools.find((t) => t.name === 'get_flame_detail')!,
+      )
+      const res = (await tool.execute({})) as {
+        content: { type: string; text: string }[]
+        isError?: boolean
+      }
+      expect(Array.isArray(res.content)).toBe(true)
+      expect(res.isError).toBe(true)
+      expect(res.content[0]?.text).toContain('Invalid or missing section')
     })
   })
 

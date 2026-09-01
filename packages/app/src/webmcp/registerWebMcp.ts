@@ -17,7 +17,48 @@ import { clearWebMcpContext, setWebMcpContext } from './contextBridge'
 import { MockModelContext } from './mockModelContext'
 import { allTools } from './tools'
 import { getModelContext } from './types'
+import type { WebMcpTool } from './types'
 import type { CommandContext } from '@/commands/types'
+
+const isEnvelope = (r: unknown): r is { content: unknown[] } =>
+  Boolean(
+    r &&
+    typeof r === 'object' &&
+    Array.isArray((r as Record<string, unknown>).content),
+  )
+
+export const toMcpResult = (raw: unknown) => {
+  if (isEnvelope(raw)) return raw
+  const isError = Boolean(
+    raw &&
+    typeof raw === 'object' &&
+    'error' in (raw as Record<string, unknown>),
+  )
+  return {
+    content: [{ type: 'text', text: JSON.stringify(raw, null, 2) }],
+    ...(isError ? { isError: true } : {}),
+  }
+}
+
+export const wrapTool = (tool: WebMcpTool): WebMcpTool => ({
+  ...tool,
+  execute: async (args: unknown, context?: { signal?: AbortSignal }) => {
+    try {
+      const raw = await tool.execute(args, context)
+      return toMcpResult(raw)
+    } catch (e) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `${tool.name} failed: ${e instanceof Error ? e.message : String(e)}`,
+          },
+        ],
+        isError: true,
+      }
+    }
+  },
+})
 
 /**
  * Register all WebMCP tools and wire the context bridge.
@@ -36,7 +77,7 @@ export function registerWebMcpTools(cmdContext: CommandContext): () => void {
     // 3. Register all tools.
     for (const tool of allTools) {
       try {
-        modelContext.registerTool(tool)
+        modelContext.registerTool(wrapTool(tool))
       } catch (err) {
         console.error(`[WebMCP] Failed to register tool "${tool.name}":`, err)
       }
@@ -56,7 +97,7 @@ export function registerWebMcpTools(cmdContext: CommandContext): () => void {
     }
     const mockContext = new MockModelContext()
     for (const tool of allTools) {
-      mockContext.registerTool(tool)
+      mockContext.registerTool(wrapTool(tool))
     }
     if (typeof window !== 'undefined') {
       // Expose on window for easy testing in console, Playwright, and dev overlay
