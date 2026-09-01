@@ -1,8 +1,10 @@
 import { deepClone } from '@/utils/clone'
+import { TACTICAL_STANCES } from '@/webmcp/tools/arenaArchetypes'
 import { createClashFlame } from '@/webmcp/tools/createClashFlame'
 import { scoreClashRound } from '@/webmcp/tools/scoreClashRound'
 import { calculateFlameStats } from '@/webmcp/tools/scoreFlame'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { TacticalStance } from '@/webmcp/tools/arenaArchetypes'
 import type { ScoreClashRoundResult } from '@/webmcp/tools/scoreClashRound'
 import type { WebMcpTool } from '@/webmcp/types'
 
@@ -62,6 +64,18 @@ export const simulateClash: WebMcpTool = {
         type: 'number',
         description: 'Palette hue for Player 2. Default is 0.65.',
       },
+      stanceA: {
+        type: 'string',
+        enum: ['balanced', 'resonance', 'bastion', 'entropy'],
+        description:
+          'Tactical battle stance for Player 1. Default is balanced.',
+      },
+      stanceB: {
+        type: 'string',
+        enum: ['balanced', 'resonance', 'bastion', 'entropy'],
+        description:
+          'Tactical battle stance for Player 2. Default is balanced.',
+      },
     },
     required: ['flameA', 'flameB'],
   },
@@ -78,6 +92,8 @@ export const simulateClash: WebMcpTool = {
       dimensions?: 2 | 3
       tintA?: number
       tintB?: number
+      stanceA?: TacticalStance
+      stanceB?: TacticalStance
     }
 
     const {
@@ -89,14 +105,67 @@ export const simulateClash: WebMcpTool = {
       dimensions = 3,
       tintA = 0.15,
       tintB = 0.65,
+      stanceA = 'balanced',
+      stanceB = 'balanced',
     } = raw
 
     if (!flameA || !flameB) {
       return { error: 'Both flameA and flameB must be provided.' }
     }
 
-    const statsA = calculateFlameStats(flameA)
-    const statsB = calculateFlameStats(flameB)
+    const baseStatsA = calculateFlameStats(flameA)
+    const baseStatsB = calculateFlameStats(flameB)
+
+    const stanceInfoA = TACTICAL_STANCES[stanceA] ?? TACTICAL_STANCES.balanced
+    const stanceInfoB = TACTICAL_STANCES[stanceB] ?? TACTICAL_STANCES.balanced
+
+    const statsA = {
+      ...baseStatsA,
+      powerLevel: Math.round(
+        baseStatsA.powerLevel *
+          ((stanceInfoA.effects.energyMultiplier +
+            stanceInfoA.effects.symmetryMultiplier +
+            stanceInfoA.effects.chaosMultiplier) /
+            3),
+      ),
+      metrics: {
+        complexity:
+          baseStatsA.metrics.complexity *
+          stanceInfoA.effects.complexityMultiplier,
+        chaosLevel:
+          baseStatsA.metrics.chaosLevel * stanceInfoA.effects.chaosMultiplier,
+        symmetryScore:
+          baseStatsA.metrics.symmetryScore *
+          stanceInfoA.effects.symmetryMultiplier,
+        energyIntensity:
+          baseStatsA.metrics.energyIntensity *
+          stanceInfoA.effects.energyMultiplier,
+      },
+    }
+
+    const statsB = {
+      ...baseStatsB,
+      powerLevel: Math.round(
+        baseStatsB.powerLevel *
+          ((stanceInfoB.effects.energyMultiplier +
+            stanceInfoB.effects.symmetryMultiplier +
+            stanceInfoB.effects.chaosMultiplier) /
+            3),
+      ),
+      metrics: {
+        complexity:
+          baseStatsB.metrics.complexity *
+          stanceInfoB.effects.complexityMultiplier,
+        chaosLevel:
+          baseStatsB.metrics.chaosLevel * stanceInfoB.effects.chaosMultiplier,
+        symmetryScore:
+          baseStatsB.metrics.symmetryScore *
+          stanceInfoB.effects.symmetryMultiplier,
+        energyIntensity:
+          baseStatsB.metrics.energyIntensity *
+          stanceInfoB.effects.energyMultiplier,
+      },
+    }
 
     const roundOutcomes: ClashRoundOutcome[] = []
     let scoreA = 0
