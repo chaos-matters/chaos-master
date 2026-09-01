@@ -6,6 +6,7 @@ import { Cross, Zap } from '@/icons'
 import ui from './ArenaOverlay.module.css'
 import type { Component } from 'solid-js'
 import type { CommandContext } from '@/commands/types'
+import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { HardwareTier } from '@/utils/hardwareTier'
 
 export interface ArenaOverlayProps {
@@ -15,23 +16,16 @@ export interface ArenaOverlayProps {
   respond?: () => void
 }
 
-const PREVIEW_RES = 160
+const PREVIEW_RES = { width: 380, height: 214 }
 
 function ensureCamera(flame?: FlameDescriptor): FlameDescriptor | null {
   if (!flame || !flame.transforms) return null
+  const rs = flame.renderSettings ?? {}
   return {
     ...flame,
     renderSettings: {
-      exposure: 0.5,
-      vibrancy: 0.5,
-      gamma: 2.2,
-      contrast: 1,
-      skipIters: 20,
-      dimensions: 2,
-      drawMode: 'light',
-      backgroundColor: [0, 0, 0],
-      camera: { zoom: 1, position: [0, 0], rotation: 0 },
-      ...flame.renderSettings,
+      ...rs,
+      camera: rs.camera ?? { zoom: 1, position: [0, 0], rotation: 0 },
     },
   }
 }

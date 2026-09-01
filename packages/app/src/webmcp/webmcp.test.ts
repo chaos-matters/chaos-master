@@ -207,7 +207,7 @@ describe('WebMCP Foundation', () => {
 
     it('wraps successful tool execution in MCP result envelope', async () => {
       const tool = wrapTool(allTools.find((t) => t.name === 'get_flame')!)
-      const res = (await tool.execute({})) as {
+      const res = (await tool.execute({}, {})) as {
         content: { type: string; text: string }[]
         isError?: boolean
       }
@@ -220,7 +220,7 @@ describe('WebMCP Foundation', () => {
       const tool = wrapTool(
         allTools.find((t) => t.name === 'get_flame_detail')!,
       )
-      const res = (await tool.execute({})) as {
+      const res = (await tool.execute({}, {})) as {
         content: { type: string; text: string }[]
         isError?: boolean
       }

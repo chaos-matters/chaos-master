@@ -42,7 +42,7 @@ export const toMcpResult = (raw: unknown) => {
 
 export const wrapTool = (tool: WebMcpTool): WebMcpTool => ({
   ...tool,
-  execute: async (args: unknown, context?: { signal?: AbortSignal }) => {
+  execute: async (args: unknown, context: { signal?: AbortSignal }) => {
     try {
       const raw = await tool.execute(args, context)
       return toMcpResult(raw)
