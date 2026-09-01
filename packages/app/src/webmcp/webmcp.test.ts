@@ -683,6 +683,28 @@ describe('WebMCP Foundation', () => {
     })
   })
 
+  describe('set_flame', () => {
+    it('successfully loads 2D flame descriptor', async () => {
+      const base = createTestFlame()
+      const res = (await mockContext.executeTool('set_flame', {
+        flame: base,
+        label: 'ctl',
+      })) as { success?: boolean }
+      expect(res.success).toBe(true)
+    })
+
+    it('successfully loads 3D flame descriptor (dimensions: 3)', async () => {
+      const base = createTestFlame()
+      const d3 = JSON.parse(JSON.stringify(base))
+      d3.renderSettings.dimensions = 3
+      const res = (await mockContext.executeTool('set_flame', {
+        flame: d3,
+        label: 'd3',
+      })) as { success?: boolean }
+      expect(res.success).toBe(true)
+    })
+  })
+
   // ── Error handling ────────────────────────────────────────────────────
 
   describe('error handling', () => {

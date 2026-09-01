@@ -103,44 +103,88 @@ const VARIATION_TYPE_MIGRATIONS: Record<string, string> = {
   preDisc: 'preDiscVar',
 }
 
+function migrateAffine2Dto3D(raw: unknown) {
+  if (typeof raw === 'object' && raw !== null) {
+    const a = raw as Record<string, unknown>
+    if (
+      typeof a.a === 'number' &&
+      typeof a.b === 'number' &&
+      typeof a.c === 'number' &&
+      typeof a.d === 'number' &&
+      typeof a.e === 'number' &&
+      typeof a.f === 'number' &&
+      !('g' in a)
+    ) {
+      return {
+        a: a.a,
+        b: a.b,
+        c: 0,
+        d: a.c,
+        e: a.d,
+        f: a.e,
+        g: 0,
+        h: a.f,
+        i: 0,
+        j: 0,
+        k: 1,
+        l: 0,
+      }
+    }
+  }
+  return raw
+}
+
 /**
- * Migrates old variation type names to their canonical forms in-place.
+ * Migrates old variation type names and 2D affines in-place.
  *
  * Walks all `transforms.*.variations.*.type` fields in the raw flame data
- * and remaps any deprecated type names. This must be called on the raw
- * (unvalidated) data before schema validation, since the schema only
- * accepts canonical type literals.
+ * and remaps any deprecated type names. Also promotes 2D affines to 3D affines
+ * when renderSettings.dimensions === 3.
  *
  * @param data - Raw flame descriptor object (mutated in place)
- * @returns The same object with migrated type names
+ * @returns The same object with migrated types/affines
  */
 export function migrateFlameVariationTypes<T>(data: T): T {
   if (typeof data !== 'object' || data === null) return data
 
   const obj = data as Record<string, unknown>
+  const renderSettings = obj.renderSettings as
+    | Record<string, unknown>
+    | undefined
+  const is3D = renderSettings?.dimensions === 3
+
   const transforms = obj.transforms as
     | Record<string, Record<string, unknown>>
     | undefined
 
-  if (typeof transforms !== 'object' || transforms === null) return data
+  if (typeof transforms === 'object' && transforms !== null) {
+    for (const transform of Object.values(transforms)) {
+      if (typeof transform !== 'object' || transform === null) continue
 
-  for (const transform of Object.values(transforms)) {
-    if (typeof transform !== 'object' || transform === null) continue
+      if (is3D) {
+        transform.preAffine = migrateAffine2Dto3D(transform.preAffine)
+        transform.postAffine = migrateAffine2Dto3D(transform.postAffine)
+      }
 
-    const variations = transform.variations as
-      | Record<string, Record<string, unknown>>
-      | undefined
+      const variations = transform.variations as
+        | Record<string, Record<string, unknown>>
+        | undefined
 
-    if (typeof variations !== 'object' || variations === null) continue
+      if (typeof variations !== 'object' || variations === null) continue
 
-    for (const variation of Object.values(variations)) {
-      if (typeof variation !== 'object' || variation === null) continue
+      for (const variation of Object.values(variations)) {
+        if (typeof variation !== 'object' || variation === null) continue
 
-      const type = variation.type
-      if (typeof type === 'string' && type in VARIATION_TYPE_MIGRATIONS) {
-        variation.type = VARIATION_TYPE_MIGRATIONS[type]
+        const type = variation.type
+        if (typeof type === 'string' && type in VARIATION_TYPE_MIGRATIONS) {
+          variation.type = VARIATION_TYPE_MIGRATIONS[type]
+        }
       }
     }
+  }
+
+  if (is3D && obj.finalTransform) {
+    obj.finalTransform = migrateAffine2Dto3D(obj.finalTransform)
   }
 
   return data
