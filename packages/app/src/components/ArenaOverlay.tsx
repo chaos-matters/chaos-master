@@ -1,4 +1,4 @@
-import { createEffect, createSignal, For, onCleanup, onMount, Show, } from 'solid-js'
+import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { VariationPreview } from '@/components/VariationSelector/VariationSelector'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
@@ -258,9 +258,10 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
     setGameState('results')
 
     if (finalWin === 1) {
-      setWinStreak((s) => s + 1)
+      const nextStreak = winStreak() + 1
+      setWinStreak(nextStreak)
       setCommentary(
-        `${p1?.name ?? 'Player 1'} secures decisive victory (${simRes.finalScore.A} - ${simRes.finalScore.B})! Current Streak: ${winStreak()} Wins.`,
+        `${p1?.name ?? 'Player 1'} secures decisive victory (${simRes.finalScore.A} - ${simRes.finalScore.B})! Current Streak: ${nextStreak} ${nextStreak === 1 ? 'Win' : 'Wins'}.`,
       )
     } else if (finalWin === 2) {
       setWinStreak(0)
@@ -301,8 +302,18 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
   }
 
   // Keyboard shortcut handler
-  createEffect(() => {
+  onMount(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
+        return
+      }
+
       if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault()
         if (gameState() === 'idle' || gameState() === 'results') {
