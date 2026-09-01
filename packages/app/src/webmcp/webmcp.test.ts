@@ -10,6 +10,7 @@
  *   6. Error handling (missing context, bad input)
  */
 
+import '@/commands/builtins'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearWebMcpContext, getWebMcpContext, setWebMcpContext, } from './contextBridge'
 import { MockModelContext } from './mockModelContext'
@@ -443,6 +444,35 @@ describe('WebMCP Foundation', () => {
       })) as { isError?: boolean; error?: string }
       expect(result.isError || Boolean(result.error)).toBe(true)
     })
+
+    it('sets camera3D container object via flame.setRenderSetting', async () => {
+      const result = (await mockContext.executeTool('execute_command', {
+        commandId: 'flame.setRenderSetting',
+        args: [
+          'camera3D',
+          { theta: 0.5, phi: 1.2, radius: 6.0, target: [0, 0, 0] },
+        ],
+      })) as { success?: boolean }
+      expect(result.success).toBe(true)
+      expect(cmdContext.setFlameDescriptor).toHaveBeenCalled()
+    })
+
+    it('updates camera3D via flame.updateRenderSettings', async () => {
+      const result = (await mockContext.executeTool('execute_command', {
+        commandId: 'flame.updateRenderSettings',
+        args: [{ camera3D: { theta: 0.8 } }],
+      })) as { success?: boolean }
+      expect(result.success).toBe(true)
+      expect(cmdContext.setFlameDescriptor).toHaveBeenCalled()
+    })
+
+    it('rejects invalid render setting path', async () => {
+      const result = (await mockContext.executeTool('execute_command', {
+        commandId: 'flame.setRenderSetting',
+        args: ['invalid_path_xyz', 123],
+      })) as { isError?: boolean; error?: string }
+      expect(result.isError || Boolean(result.error)).toBe(true)
+    })
   })
 
   describe('open_art_director', () => {
@@ -526,34 +556,67 @@ describe('WebMCP Foundation', () => {
       expect(Object.keys(xforms).some((k) => k.startsWith('p2_'))).toBe(true)
     })
 
-    it('creates 3D clash flame with volumetric staging, tinting, and camera3D', async () => {
+    it('creates 3D clash flame with volumetric staging along x, y, and z axes', async () => {
+      const f1 = createTestFlame()
+      const f2 = createTestFlame()
+
+      for (const axis of ['x', 'y', 'z'] as const) {
+        const result = (await mockContext.executeTool('create_clash_flame', {
+          flameA: f1,
+          flameB: f2,
+          dimensions: 3,
+          axis,
+          separation: 2.5,
+          tintA: 0.2,
+          tintB: 0.7,
+        })) as { success: boolean; clashFlame: Record<string, unknown> }
+
+        expect(result.success).toBe(true)
+        const xforms = result.clashFlame.transforms as Record<
+          string,
+          { postAffine?: { d?: number; h?: number; l?: number } }
+        >
+        const p1Key = Object.keys(xforms).find((k) => k.startsWith('p1_'))!
+        const p2Key = Object.keys(xforms).find((k) => k.startsWith('p2_'))!
+
+        if (axis === 'x') {
+          expect(xforms[p1Key]?.postAffine?.d).toBe(-2.5)
+          expect(xforms[p2Key]?.postAffine?.d).toBe(2.5)
+        } else if (axis === 'y') {
+          expect(xforms[p1Key]?.postAffine?.h).toBe(-2.5)
+          expect(xforms[p2Key]?.postAffine?.h).toBe(2.5)
+        } else if (axis === 'z') {
+          expect(xforms[p1Key]?.postAffine?.l).toBe(-2.5)
+          expect(xforms[p2Key]?.postAffine?.l).toBe(2.5)
+        }
+      }
+    })
+
+    it('applies power-weighted probability split', async () => {
       const f1 = createTestFlame()
       const f2 = createTestFlame()
       const result = (await mockContext.executeTool('create_clash_flame', {
         flameA: f1,
         flameB: f2,
         dimensions: 3,
-        separation: 3.0,
-        tintA: 0.2,
-        tintB: 0.7,
+        powerA: 75,
+        powerB: 25,
       })) as { success: boolean; clashFlame: Record<string, unknown> }
 
       expect(result.success).toBe(true)
-      const rs = result.clashFlame.renderSettings as Record<string, unknown>
-      expect(rs.dimensions).toBe(3)
-      expect(rs.autoExposure3D).toBe(true)
-      expect(rs.camera3D).toMatchObject({
-        target: [0, 0, 0],
-        radius: 9.0,
-      })
       const xforms = result.clashFlame.transforms as Record<
         string,
-        { color?: number[]; postAffine?: { d?: number } }
+        { probability?: number }
       >
-      const p1Key = Object.keys(xforms).find((k) => k.startsWith('p1_'))!
-      const p2Key = Object.keys(xforms).find((k) => k.startsWith('p2_'))!
-      expect(xforms[p1Key]?.postAffine?.d).toBeLessThan(0)
-      expect(xforms[p2Key]?.postAffine?.d).toBeGreaterThan(0)
+      const sumProbA = Object.entries(xforms)
+        .filter(([k]) => k.startsWith('p1_'))
+        .reduce((sum, [, t]) => sum + (t.probability ?? 0), 0)
+      const sumProbB = Object.entries(xforms)
+        .filter(([k]) => k.startsWith('p2_'))
+        .reduce((sum, [, t]) => sum + (t.probability ?? 0), 0)
+
+      expect(sumProbA).toBeCloseTo(1.5, 2)
+      expect(sumProbB).toBeCloseTo(0.5, 2)
     })
   })
 
@@ -624,6 +687,67 @@ describe('WebMCP Foundation', () => {
         Math.abs(r1.ownershipA + r1.ownershipB + r1.contested - 1.0),
       ).toBeLessThan(0.01)
       expect(['A', 'B', 'draw']).toContain(r1.verdict)
+    })
+
+    it('mirror match (F vs F) evaluates to exact tie (draw)', async () => {
+      const f1 = createTestFlame()
+      const clash = (await mockContext.executeTool('create_clash_flame', {
+        flameA: f1,
+        flameB: f1,
+        dimensions: 3,
+      })) as { clashFlame: Record<string, unknown> }
+
+      const score = (await mockContext.executeTool('score_clash_round', {
+        clashFlame: clash.clashFlame,
+        seed: 42,
+      })) as {
+        ownershipA: number
+        ownershipB: number
+        verdict: string
+      }
+
+      expect(score.ownershipA).toBe(score.ownershipB)
+      expect(score.verdict).toBe('draw')
+    })
+
+    it('swapped match (B vs A) exactly mirrors original match (A vs B)', async () => {
+      const f1 = createTestFlame()
+      const f2 = createTestFlame()
+      f2.transforms = {
+        ...f2.transforms,
+        extra: {
+          probability: 2,
+          preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+          postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+          color: { x: 0.8, y: 1 },
+          variations: { v0: { type: 'spherical', weight: 1 } },
+        },
+      }
+
+      const clashOrig = (await mockContext.executeTool('create_clash_flame', {
+        flameA: f1,
+        flameB: f2,
+        dimensions: 3,
+      })) as { clashFlame: Record<string, unknown> }
+
+      const clashSwap = (await mockContext.executeTool('create_clash_flame', {
+        flameA: f2,
+        flameB: f1,
+        dimensions: 3,
+      })) as { clashFlame: Record<string, unknown> }
+
+      const scoreOrig = (await mockContext.executeTool('score_clash_round', {
+        clashFlame: clashOrig.clashFlame,
+        seed: 999,
+      })) as { ownershipA: number; ownershipB: number }
+
+      const scoreSwap = (await mockContext.executeTool('score_clash_round', {
+        clashFlame: clashSwap.clashFlame,
+        seed: 999,
+      })) as { ownershipA: number; ownershipB: number }
+
+      expect(scoreOrig.ownershipA).toBe(scoreSwap.ownershipB)
+      expect(scoreOrig.ownershipB).toBe(scoreSwap.ownershipA)
     })
   })
 

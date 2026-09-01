@@ -118,6 +118,14 @@ export const createClashFlame: WebMcpTool = {
         description:
           'Tint application mode. Default is "override" in 3D and "none" in 2D.',
       },
+      powerA: {
+        type: 'number',
+        description: 'Optional power level override for Player 1.',
+      },
+      powerB: {
+        type: 'number',
+        description: 'Optional power level override for Player 2.',
+      },
     },
     required: ['flameA', 'flameB'],
   },
@@ -135,6 +143,8 @@ export const createClashFlame: WebMcpTool = {
       tintA?: number
       tintB?: number
       tint?: 'override' | 'blend' | 'none'
+      powerA?: number
+      powerB?: number
     }
 
     const {
@@ -147,6 +157,8 @@ export const createClashFlame: WebMcpTool = {
       tintA = 0.15,
       tintB = 0.65,
       tint = dimensions === 3 ? 'override' : 'none',
+      powerA,
+      powerB,
     } = raw
 
     if (!flameA || !flameB) {
@@ -156,6 +168,24 @@ export const createClashFlame: WebMcpTool = {
     const combinedTransforms: Record<string, TransformFunction> = {}
     const rsA = flameA.renderSettings || {}
     const rsB = flameB.renderSettings || {}
+
+    // Power-weighted probability split
+    const pA = powerA !== undefined ? powerA : 1
+    const pB = powerB !== undefined ? powerB : 1
+    const totalPower = pA + pB
+    const splitA = totalPower > 0 ? pA / totalPower : 0.5
+    const splitB = 1 - splitA
+
+    const sumA =
+      Object.values(flameA.transforms || {}).reduce(
+        (acc, t) => acc + (t.probability ?? 1),
+        0,
+      ) || 1
+    const sumB =
+      Object.values(flameB.transforms || {}).reduce(
+        (acc, t) => acc + (t.probability ?? 1),
+        0,
+      ) || 1
 
     if (dimensions === 3) {
       const sep = separation
@@ -169,7 +199,8 @@ export const createClashFlame: WebMcpTool = {
 
       Object.entries(flameA.transforms || {}).forEach(([id, t], idx) => {
         const spread = ((idx % 3) - 1) * 0.04
-        combinedTransforms[`p1_${id}_${idx}`] = translateTransform3D(
+        const scaledProb = ((t.probability ?? 1) / sumA) * (2 * splitA)
+        const transformed = translateTransform3D(
           t,
           dxA,
           dyA,
@@ -177,11 +208,14 @@ export const createClashFlame: WebMcpTool = {
           Math.max(0, Math.min(1, tintA + spread)),
           tint,
         )
+        transformed.probability = scaledProb
+        combinedTransforms[`p1_${id}_${idx}`] = transformed
       })
 
       Object.entries(flameB.transforms || {}).forEach(([id, t], idx) => {
         const spread = ((idx % 3) - 1) * 0.04
-        combinedTransforms[`p2_${id}_${idx}`] = translateTransform3D(
+        const scaledProb = ((t.probability ?? 1) / sumB) * (2 * splitB)
+        const transformed = translateTransform3D(
           t,
           dxB,
           dyB,
@@ -189,6 +223,8 @@ export const createClashFlame: WebMcpTool = {
           Math.max(0, Math.min(1, tintB + spread)),
           tint,
         )
+        transformed.probability = scaledProb
+        combinedTransforms[`p2_${id}_${idx}`] = transformed
       })
 
       const clashFlame: FlameDescriptor = {
@@ -211,7 +247,7 @@ export const createClashFlame: WebMcpTool = {
           camera3D: {
             theta: 0,
             phi: 1.2,
-            radius: sep * 3,
+            radius: Math.max(3.0, sep * 3),
             target: [0, 0, 0],
             fov: 60,
             roll: 0,
@@ -226,21 +262,19 @@ export const createClashFlame: WebMcpTool = {
       }
     }
 
-    // 2D fallback path: byte-identical to previous behavior
+    // 2D fallback path
     Object.entries(flameA.transforms || {}).forEach(([id, t], idx) => {
-      combinedTransforms[`p1_${id}_${idx}`] = translateTransform2D(
-        t,
-        -distance,
-        0,
-      )
+      const scaledProb = ((t.probability ?? 1) / sumA) * (2 * splitA)
+      const transformed = translateTransform2D(t, -distance, 0)
+      transformed.probability = scaledProb
+      combinedTransforms[`p1_${id}_${idx}`] = transformed
     })
 
     Object.entries(flameB.transforms || {}).forEach(([id, t], idx) => {
-      combinedTransforms[`p2_${id}_${idx}`] = translateTransform2D(
-        t,
-        distance,
-        0,
-      )
+      const scaledProb = ((t.probability ?? 1) / sumB) * (2 * splitB)
+      const transformed = translateTransform2D(t, distance, 0)
+      transformed.probability = scaledProb
+      combinedTransforms[`p2_${id}_${idx}`] = transformed
     })
 
     const clashFlame: FlameDescriptor = {

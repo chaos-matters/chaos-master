@@ -116,6 +116,8 @@ export const simulateClash: WebMcpTool = {
           tintA,
           tintB,
           tint: 'override',
+          powerA: statsA.powerLevel,
+          powerB: statsB.powerLevel,
         },
         {},
       ) as { success?: boolean; clashFlame?: FlameDescriptor }

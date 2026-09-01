@@ -1,4 +1,4 @@
-import { isSafeFlameEntityId } from '@/flame/schema/flameSchema'
+import { isSafeFlameEntityId, renderSettingsDefault, } from '@/flame/schema/flameSchema'
 import { recordCommandExecution } from '@/recorder/recorder'
 import { IS_DEV } from '../defaults'
 import type { CommandContext, FlameCommand, ReplayArgsValidator } from './types'
@@ -125,20 +125,50 @@ function isReplaySettingValue(value: unknown): boolean {
     return typeof value !== 'string' || value.length <= 512
   }
   if (isBoundedNumber(value)) return true
-  return (
+  if (
     Array.isArray(value) &&
     value.length > 0 &&
     value.length <= 4 &&
     value.every(isBoundedNumber)
-  )
+  ) {
+    return true
+  }
+  if (isPlainRecord(value)) {
+    return Object.values(value).every(
+      (v) =>
+        isBoundedNumber(v) ||
+        (Array.isArray(v) && v.every(isBoundedNumber)) ||
+        typeof v === 'boolean' ||
+        typeof v === 'string',
+    )
+  }
+  return false
+}
+
+function defaultAtPath(path: string): unknown {
+  let node: unknown = renderSettingsDefault
+  for (const segment of path.split('.')) {
+    if (node === null || typeof node !== 'object' || Array.isArray(node)) {
+      return undefined
+    }
+    if (!(segment in node)) return undefined
+    node = (node as Record<string, unknown>)[segment]
+  }
+  return node
 }
 
 function renderSettingArgs(args: readonly unknown[]): string | undefined {
   if (args.length !== 2 || !isSafePath(args[0])) {
     return 'render setting expects a safe path and value'
   }
-  if (args[1] === null && args[0] !== 'backgroundColor') {
-    return 'only automatic background colour may be cleared'
+  const expected = defaultAtPath(args[0])
+  if (expected === undefined) {
+    return `unknown render setting path "${args[0]}"`
+  }
+  if (args[1] === null) {
+    return args[0] === 'backgroundColor'
+      ? undefined
+      : 'only automatic background colour may be cleared'
   }
   return isReplaySettingValue(args[1])
     ? undefined

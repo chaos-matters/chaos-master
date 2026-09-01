@@ -616,14 +616,32 @@ registerCommand({
   // exists because those call sites genuinely apply a batch as one edit.
   execute(ctx, settings?: unknown) {
     if (settings === null || typeof settings !== 'object') {
-      console.warn('[cmd] flame.updateRenderSettings: not an object', settings)
-      return
+      throw new Error('[cmd] flame.updateRenderSettings: not an object')
     }
-    const patch = deepClone(settings) as Partial<
-      FlameDescriptor['renderSettings']
-    >
+    const patch = deepClone(settings) as Record<string, unknown>
     const candidate = deepClone(ctx.flameDescriptor())
-    candidate.renderSettings = { ...candidate.renderSettings, ...patch }
+    const currentSettings = (candidate.renderSettings ?? {}) as Record<
+      string,
+      unknown
+    >
+    const mergedSettings: Record<string, unknown> = {
+      ...currentSettings,
+      ...patch,
+    }
+    if (patch.camera && typeof patch.camera === 'object') {
+      mergedSettings.camera = {
+        ...((currentSettings.camera) ?? {}),
+        ...(patch.camera as Record<string, unknown>),
+      }
+    }
+    if (patch.camera3D && typeof patch.camera3D === 'object') {
+      mergedSettings.camera3D = {
+        ...((currentSettings.camera3D) ?? {}),
+        ...(patch.camera3D as Record<string, unknown>),
+      }
+    }
+    candidate.renderSettings =
+      mergedSettings as unknown as FlameDescriptor['renderSettings']
     const validated = tryValidateFlame(candidate)
     if (!validated) {
       console.warn(
@@ -631,6 +649,14 @@ registerCommand({
         settings,
       )
       return
+    }
+    if (
+      patch.camera ||
+      patch.camera3D ||
+      currentSettings.dimensions === 3 ||
+      patch.dimensions === 3
+    ) {
+      ctx.timeline.setPreviewHeld?.(false)
     }
     ctx.setFlameDescriptor((draft) => {
       draft.renderSettings = deepClone(validated.renderSettings)

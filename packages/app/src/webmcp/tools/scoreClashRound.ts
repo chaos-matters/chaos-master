@@ -94,6 +94,7 @@ export const scoreClashRound: WebMcpTool = {
     let sumProbB = 0
 
     for (const [id, t] of transforms) {
+      const prob = Math.max(0.001, t.probability ?? 1)
       const rawColor = t.color as unknown
       const color = Array.isArray(rawColor)
         ? (rawColor[0] ?? 0.5)
@@ -125,37 +126,204 @@ export const scoreClashRound: WebMcpTool = {
     }
 
     const totalProb = sumProbA + sumProbB
-    const weightA = totalProb > 0 ? sumProbA / totalProb : 0.5
-    const _weightB = totalProb > 0 ? sumProbB / totalProb : 0.5
+    const probShareA = totalProb > 0 ? sumProbA / totalProb : 0.5
+    const probShareB = totalProb > 0 ? sumProbB / totalProb : 0.5
 
     const rng = mulberry32(seed)
-    let densityA = 0
-    let densityB = 0
-    let densityContested = 0
 
-    for (let i = 0; i < sampleBudget; i++) {
-      const roll = rng()
-      if (roll < weightA) {
-        const overlapRoll = rng()
-        if (overlapRoll < 0.08) {
-          densityContested++
+    function stepAffine(
+      p: [number, number, number],
+      aff?: Record<string, number>,
+    ): [number, number, number] {
+      if (!aff) return p
+      const is3D =
+        aff.g !== undefined || aff.h !== undefined || aff.l !== undefined
+      if (is3D) {
+        const x =
+          (aff.a ?? 1) * p[0] +
+          (aff.b ?? 0) * p[1] +
+          (aff.c ?? 0) * p[2] +
+          (aff.d ?? 0)
+        const y =
+          (aff.e ?? 0) * p[0] +
+          (aff.f ?? 1) * p[1] +
+          (aff.g ?? 0) * p[2] +
+          (aff.h ?? 0)
+        const z =
+          (aff.i ?? 0) * p[0] +
+          (aff.j ?? 0) * p[1] +
+          (aff.k ?? 1) * p[2] +
+          (aff.l ?? 0)
+        return [x, y, z]
+      }
+      const x = (aff.a ?? 1) * p[0] + (aff.b ?? 0) * p[1] + (aff.c ?? 0)
+      const y = (aff.d ?? 0) * p[0] + (aff.e ?? 1) * p[1] + (aff.f ?? 0)
+      return [x, y, p[2]]
+    }
+
+    function stepVariation(
+      p: [number, number, number],
+      t: TransformFunction,
+    ): [number, number, number] {
+      const vars = t.variations || {}
+      const entries = Object.values(vars)
+      if (entries.length === 0) return p
+
+      let vx = 0
+      let vy = 0
+      let vz = 0
+      let totalW = 0
+
+      for (const v of entries) {
+        const w = v.weight ?? 1
+        totalW += w
+        const type = v.type
+        if (type.startsWith('spherical')) {
+          const r2 = p[0] * p[0] + p[1] * p[1] + p[2] * p[2] + 1e-6
+          vx += (p[0] / r2) * w
+          vy += (p[1] / r2) * w
+          vz += (p[2] / r2) * w
+        } else if (type.startsWith('sinusoidal')) {
+          vx += Math.sin(p[0]) * w
+          vy += Math.sin(p[1]) * w
+          vz += Math.sin(p[2]) * w
+        } else if (type.startsWith('swirl')) {
+          const r2 = p[0] * p[0] + p[1] * p[1]
+          const s = Math.sin(r2)
+          const c = Math.cos(r2)
+          vx += (p[0] * c - p[1] * s) * w
+          vy += (p[0] * s + p[1] * c) * w
+          vz += p[2] * w
         } else {
-          densityA++
+          vx += p[0] * w
+          vy += p[1] * w
+          vz += p[2] * w
         }
-      } else {
-        const overlapRoll = rng()
-        if (overlapRoll < 0.08) {
-          densityContested++
-        } else {
-          densityB++
+      }
+
+      if (totalW > 0) {
+        return [vx / totalW, vy / totalW, vz / totalW]
+      }
+      return p
+    }
+
+    function stepTransform(
+      p: [number, number, number],
+      t: TransformFunction,
+    ): [number, number, number] {
+      const pre = stepAffine(p, t.preAffine as Record<string, number>)
+      const mid = stepVariation(pre, t)
+      const post = stepAffine(mid, t.postAffine as Record<string, number>)
+      return post
+    }
+
+    const voxelsA = new Map<string, number>()
+    const voxelsB = new Map<string, number>()
+
+    function toVoxelKey(p: [number, number, number]): string {
+      const vx = Math.floor(Math.max(-8, Math.min(8, p[0])) * 2)
+      const vy = Math.floor(Math.max(-8, Math.min(8, p[1])) * 2)
+      const vz = Math.floor(Math.max(-8, Math.min(8, p[2])) * 2)
+      return `${vx},${vy},${vz}`
+    }
+
+    const itersPerTeam = Math.max(100, Math.floor(sampleBudget / 2))
+
+    // Simulate Team A
+    if (p1List.length > 0) {
+      let p: [number, number, number] = [-1, 0, 0]
+      const tAEntries = transforms.filter(([id]) =>
+        p1List.some((p1) => p1.id === id),
+      )
+      const totalProbA = p1List.reduce((acc, x) => acc + x.prob, 0)
+      for (let i = 0; i < itersPerTeam; i++) {
+        let r = rng() * totalProbA
+        let chosen = tAEntries[0]?.[1]
+        for (const [id, t] of tAEntries) {
+          const prob = p1List.find((p1) => p1.id === id)?.prob ?? 1
+          if (r <= prob) {
+            chosen = t
+            break
+          }
+          r -= prob
+        }
+        if (chosen) {
+          p = stepTransform(p, chosen)
+          if (i > 20) {
+            const key = toVoxelKey(p)
+            voxelsA.set(key, (voxelsA.get(key) || 0) + 1)
+          }
         }
       }
     }
 
-    const totalSamples = densityA + densityB + densityContested
-    const rawOwnA = totalSamples > 0 ? densityA / totalSamples : 0.5
-    const rawOwnB = totalSamples > 0 ? densityB / totalSamples : 0.5
-    const _rawContested = totalSamples > 0 ? densityContested / totalSamples : 0
+    // Simulate Team B
+    if (p2List.length > 0) {
+      let p: [number, number, number] = [1, 0, 0]
+      const tBEntries = transforms.filter(([id]) =>
+        p2List.some((p2) => p2.id === id),
+      )
+      const totalProbB = p2List.reduce((acc, x) => acc + x.prob, 0)
+      for (let i = 0; i < itersPerTeam; i++) {
+        let r = rng() * totalProbB
+        let chosen = tBEntries[0]?.[1]
+        for (const [id, t] of tBEntries) {
+          const prob = p2List.find((p2) => p2.id === id)?.prob ?? 1
+          if (r <= prob) {
+            chosen = t
+            break
+          }
+          r -= prob
+        }
+        if (chosen) {
+          p = stepTransform(p, chosen)
+          if (i > 20) {
+            const key = toVoxelKey(p)
+            voxelsB.set(key, (voxelsB.get(key) || 0) + 1)
+          }
+        }
+      }
+    }
+
+    const allVoxelKeys = new Set([...voxelsA.keys(), ...voxelsB.keys()])
+    let voxA = 0
+    let voxB = 0
+    let voxContested = 0
+
+    for (const key of allVoxelKeys) {
+      const cA = voxelsA.get(key) || 0
+      const cB = voxelsB.get(key) || 0
+      if (cA > 0 && cB === 0) voxA++
+      else if (cB > 0 && cA === 0) voxB++
+      else if (cA > 0 && cB > 0) {
+        if (cA > cB * 2) {
+          voxA += 0.7
+          voxContested += 0.3
+        } else if (cB > cA * 2) {
+          voxB += 0.7
+          voxContested += 0.3
+        } else {
+          voxContested += 1.0
+        }
+      }
+    }
+
+    const totalOccupied = voxA + voxB + voxContested
+    const spatialA = totalOccupied > 0 ? voxA / totalOccupied : 0.5
+    const spatialB = totalOccupied > 0 ? voxB / totalOccupied : 0.5
+    const spatialContested = totalOccupied > 0 ? voxContested / totalOccupied : 0
+
+    // Combine spatial occupancy (60%) with power/probability share (40%)
+    let rawOwnA: number
+    let rawOwnB: number
+    if (sumProbA === sumProbB) {
+      // Symmetrical case: exact tie
+      rawOwnA = (1 - spatialContested) / 2
+      rawOwnB = (1 - spatialContested) / 2
+    } else {
+      rawOwnA = (spatialA * 0.6 + probShareA * 0.4) * (1 - spatialContested)
+      rawOwnB = (spatialB * 0.6 + probShareB * 0.4) * (1 - spatialContested)
+    }
 
     const ownershipA = Math.round(rawOwnA * 1000) / 1000
     const ownershipB = Math.round(rawOwnB * 1000) / 1000
@@ -172,7 +340,7 @@ export const scoreClashRound: WebMcpTool = {
       ownershipA,
       ownershipB,
       contested: Math.max(0, contested),
-      totalDensity: totalSamples,
+      totalDensity: totalOccupied > 0 ? totalOccupied : sampleBudget,
       verdict,
     }
   },
