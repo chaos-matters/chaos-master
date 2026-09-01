@@ -362,13 +362,20 @@ describe('WebMCP Foundation', () => {
       }
     })
 
-    it('respects the 30-item limit', async () => {
-      const result = (await mockContext.executeTool(
-        'list_commands',
-        {},
-      )) as Record<string, unknown>
-      const commands = result.commands as unknown[]
-      expect(commands.length).toBeLessThanOrEqual(30)
+    it('respects limit and offset for pagination and returns prefixes index', async () => {
+      const result = (await mockContext.executeTool('list_commands', {
+        limit: 10,
+        offset: 5,
+      })) as {
+        total: number
+        truncated: boolean
+        offset: number
+        prefixes: Array<{ prefix: string; count: number }>
+        commands: unknown[]
+      }
+      expect(result.offset).toBe(5)
+      expect(result.commands.length).toBeLessThanOrEqual(10)
+      expect(Array.isArray(result.prefixes)).toBe(true)
     })
   })
 
