@@ -449,14 +449,33 @@ describe('WebMCP Foundation', () => {
     })
   })
 
-  describe('open_arena', () => {
-    it('opens arena UI', async () => {
-      const result = (await mockContext.executeTool('open_arena', {
-        open: true,
-      })) as Record<string, unknown>
+  describe('create_custom_variation', () => {
+    it('creates custom variation using new body parameter with JS syntax', async () => {
+      const result = (await mockContext.executeTool('create_custom_variation', {
+        name: 'verify_ok',
+        body: 'let r = length(pos); let a = atan2(pos.y, pos.x) + r; return vec2f(r*cos(a), r*sin(a));',
+      })) as { success: boolean; id: string; name: string }
 
       expect(result.success).toBe(true)
-      expect(cmdContext.arena.setOpen).toHaveBeenCalledWith(true)
+      expect(result.id).toMatch(/^custom_/)
+      expect(result.name).toBe('verify_ok')
+    })
+
+    it('creates custom variation using legacy wgslBody alias', async () => {
+      const result = (await mockContext.executeTool('create_custom_variation', {
+        name: 'verify_legacy',
+        wgslBody: 'return vec2f(sin(pos.x), cos(pos.y));',
+      })) as { success: boolean; id: string; name: string }
+
+      expect(result.success).toBe(true)
+      expect(result.id).toMatch(/^custom_/)
+    })
+
+    it('fails when body is missing', async () => {
+      const result = (await mockContext.executeTool('create_custom_variation', {
+        name: 'no_body',
+      })) as Record<string, unknown>
+      expect(result).toHaveProperty('error')
     })
   })
 
