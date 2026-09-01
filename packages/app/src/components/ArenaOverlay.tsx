@@ -2,6 +2,7 @@ import { createSignal, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { VariationPreview } from '@/components/VariationSelector/VariationSelector'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
+import { Zap } from '@/icons'
 import type { Component } from 'solid-js'
 import type { CommandContext } from '@/commands/types'
 
@@ -100,7 +101,15 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
                 onClick={handleClash}
                 disabled={clashing()}
               >
-                {clashing() ? 'CLASHING...' : '⚡ CLASH FLAMES ⚡'}
+                {clashing() ? (
+                  'CLASHING...'
+                ) : (
+                  <div class="flex items-center justify-center gap-2">
+                    <Zap class="w-6 h-6" />
+                    <span>CLASH FLAMES</span>
+                    <Zap class="w-6 h-6" />
+                  </div>
+                )}
               </button>
             </div>
 

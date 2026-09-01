@@ -4,6 +4,7 @@ import { VariationPreview } from '@/components/VariationSelector/VariationSelect
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { breedFlames } from '@/flame/breedFlame'
 import { mutateFlame } from '@/flame/randomize'
+import { Star } from '@/icons'
 import type { Component } from 'solid-js'
 import type { CommandContext } from '@/commands/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -286,7 +287,7 @@ export const DirectorOverlay: Component<DirectorOverlayProps> = (props) => {
                                             }}
                                             title={`Rate ${star} star${star > 1 ? 's' : ''}`}
                                           >
-                                            ★
+                                            <Star class="w-4 h-4" />
                                           </button>
                                         )}
                                       </For>
