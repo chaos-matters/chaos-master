@@ -5,7 +5,7 @@ import type { WebMcpTool } from '@/webmcp/types'
 export const getFlameDetail: WebMcpTool = {
   name: 'get_flame_detail',
   description:
-    'Get detailed data for a specific part of the flame. Specify section: "transform" (with transformId or index), "render" for all render settings, or "full" for the complete descriptor. Use for precise inspection before targeted edits.',
+    'Get detailed data for a specific part of the flame. Specify section: "transform" (with transformId or index), "render" for all render settings, or "full" for the complete descriptor. Use for precise inspection before targeted edits. Note that the returned camera is the base un-animated camera; Timeline animations are applied dynamically during render and do not appear here.',
   inputSchema: {
     type: 'object',
     properties: {

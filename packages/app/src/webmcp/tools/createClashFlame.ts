@@ -1,4 +1,5 @@
 import { deepClone } from '@/utils/clone'
+import { calculateFlameStats } from '@/webmcp/tools/scoreFlame'
 import type { FlameDescriptor, TransformFunction, } from '@/flame/schema/flameSchema'
 import type { WebMcpTool } from '@/webmcp/types'
 
@@ -170,8 +171,10 @@ export const createClashFlame: WebMcpTool = {
     const rsB = flameB.renderSettings || {}
 
     // Power-weighted probability split
-    const pA = powerA !== undefined ? powerA : 1
-    const pB = powerB !== undefined ? powerB : 1
+    const statsA = powerA !== undefined ? null : calculateFlameStats(flameA)
+    const statsB = powerB !== undefined ? null : calculateFlameStats(flameB)
+    const pA = powerA ?? statsA?.powerLevel ?? 1
+    const pB = powerB ?? statsB?.powerLevel ?? 1
     const totalPower = pA + pB
     const splitA = totalPower > 0 ? pA / totalPower : 0.5
     const splitB = 1 - splitA

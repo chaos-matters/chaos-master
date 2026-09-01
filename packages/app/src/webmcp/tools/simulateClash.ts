@@ -2,7 +2,7 @@ import { deepClone } from '@/utils/clone'
 import { createClashFlame } from '@/webmcp/tools/createClashFlame'
 import { scoreClashRound } from '@/webmcp/tools/scoreClashRound'
 import { calculateFlameStats } from '@/webmcp/tools/scoreFlame'
-import type { FlameDescriptor, TransformFunction, } from '@/flame/schema/flameSchema'
+import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { ScoreClashRoundResult } from '@/webmcp/tools/scoreClashRound'
 import type { WebMcpTool } from '@/webmcp/types'
 
@@ -98,39 +98,35 @@ export const simulateClash: WebMcpTool = {
     const statsA = calculateFlameStats(flameA)
     const statsB = calculateFlameStats(flameB)
 
-    const currentFlameA = deepClone(flameA)
-    const currentFlameB = deepClone(flameB)
-
     const roundOutcomes: ClashRoundOutcome[] = []
     let scoreA = 0
     let scoreB = 0
 
-    for (let r = 1; r <= rounds; r++) {
-      // 1. Merge into a staged clash flame
-      const clashRes = createClashFlame.execute(
-        {
-          flameA: currentFlameA,
-          flameB: currentFlameB,
-          dimensions,
-          separation,
-          tintA,
-          tintB,
-          tint: 'override',
-          powerA: statsA.powerLevel,
-          powerB: statsB.powerLevel,
-        },
-        {},
-      ) as { success?: boolean; clashFlame?: FlameDescriptor }
+    // 1. Merge into a staged clash flame once
+    const clashRes = createClashFlame.execute(
+      {
+        flameA,
+        flameB,
+        dimensions,
+        separation,
+        tintA,
+        tintB,
+        tint: 'override',
+      },
+      {},
+    ) as { success?: boolean; clashFlame?: FlameDescriptor }
 
-      const stagedFlame = clashRes.clashFlame ?? deepClone(currentFlameA)
+    const stagedFlame = clashRes.clashFlame ?? deepClone(flameA)
+
+    for (let r = 1; r <= rounds; r++) {
+      // Create a snapshot for this round
+      const currentStagedFlame = deepClone(stagedFlame)
 
       // 2. Score territory for this round
       const roundSeed = seed + r * 1013
       const roundScore = scoreClashRound.execute(
         {
-          clashFlame: stagedFlame,
-          tintA,
-          tintB,
+          clashFlame: currentStagedFlame,
           seed: roundSeed,
         },
         {},
@@ -185,35 +181,25 @@ export const simulateClash: WebMcpTool = {
         contested: roundScore.contested,
         winner: roundWinner,
         event,
-        clashFlame: stagedFlame,
+        clashFlame: currentStagedFlame,
       })
 
       // 4. Update transform probability balance for the next round
       const winnerSide = roundWinner
       if (winnerSide === 'A') {
         const lossFactor = statsB.metrics.symmetryScore > 5 ? 0.85 : 0.7
-        Object.values(currentFlameB.transforms ?? {}).forEach(
-          (t: TransformFunction) => {
+        Object.entries(stagedFlame.transforms ?? {}).forEach(([k, t]) => {
+          if (k.startsWith('p1_')) t.probability = (t.probability ?? 1) * 1.15
+          if (k.startsWith('p2_'))
             t.probability = (t.probability ?? 1) * lossFactor
-          },
-        )
-        Object.values(currentFlameA.transforms ?? {}).forEach(
-          (t: TransformFunction) => {
-            t.probability = (t.probability ?? 1) * 1.15
-          },
-        )
+        })
       } else if (winnerSide === 'B') {
         const lossFactor = statsA.metrics.symmetryScore > 5 ? 0.85 : 0.7
-        Object.values(currentFlameA.transforms ?? {}).forEach(
-          (t: TransformFunction) => {
+        Object.entries(stagedFlame.transforms ?? {}).forEach(([k, t]) => {
+          if (k.startsWith('p1_'))
             t.probability = (t.probability ?? 1) * lossFactor
-          },
-        )
-        Object.values(currentFlameB.transforms ?? {}).forEach(
-          (t: TransformFunction) => {
-            t.probability = (t.probability ?? 1) * 1.15
-          },
-        )
+          if (k.startsWith('p2_')) t.probability = (t.probability ?? 1) * 1.15
+        })
       }
     }
 

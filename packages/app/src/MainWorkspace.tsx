@@ -557,42 +557,14 @@ export function MainWorkspace(props: AppProps) {
       })
     }
     setShowArena(true)
-    void _requestModal({
-      content: ({ respond }) => (
-        <ArenaOverlay
-          arena={{
-            open: showArena,
-            setOpen: setShowArena,
-            player1Stats: arenaP1Stats,
-            setPlayer1Stats: setArenaP1Stats,
-            player2Stats: arenaP2Stats,
-            setPlayer2Stats: setArenaP2Stats,
-            selectFighter: (player: 1 | 2) => {
-              const fighter = player === 1 ? arenaP1Stats() : arenaP2Stats()
-              if (fighter?.flame) {
-                setFlameDescriptor(
-                  () => deepClone(fighter.flame!),
-                  `Arena: ${fighter.name ?? `Player ${player}`}`,
-                )
-                showToast(
-                  `Arena: Loaded ${fighter.name ?? `Player ${player}`} into editor.`,
-                )
-              }
-            },
-          }}
-          hardwareTier={props.hardwareTier}
-          respond={() => {
-            isArenaModalOpen = false
-            setShowArena(false)
-            respond()
-          }}
-        />
-      ),
-    }).finally(() => {
-      isArenaModalOpen = false
-      setShowArena(false)
-    })
+    isArenaModalOpen = true
   }
+
+  createEffect(() => {
+    if (!showArena()) {
+      isArenaModalOpen = false
+    }
+  })
 
   createEffect(() => {
     if (directorOpen() && !isDirectorModalOpen) {
@@ -7735,6 +7707,40 @@ export function MainWorkspace(props: AppProps) {
             {(() => {
               throw new Error('[DEV] Injected crash from About panel')
             })()}
+          </Show>
+
+          <Show when={showArena()}>
+            <ArenaOverlay
+              arena={{
+                open: showArena,
+                setOpen: setShowArena,
+                player1Stats: arenaP1Stats,
+                setPlayer1Stats: setArenaP1Stats,
+                player2Stats: arenaP2Stats,
+                setPlayer2Stats: setArenaP2Stats,
+                selectFighter: (player: 1 | 2) => {
+                  const fighter = player === 1 ? arenaP1Stats() : arenaP2Stats()
+                  if (fighter?.flame) {
+                    setFlameDescriptor(
+                      () => deepClone(fighter.flame!),
+                      `Arena: ${fighter.name ?? `Player ${player}`}`,
+                    )
+                    showToast(
+                      `Arena: Loaded ${fighter.name ?? `Player ${player}`} into editor.`,
+                    )
+                  }
+                },
+              }}
+              hardwareTier={props.hardwareTier}
+              respond={() => {
+                isArenaModalOpen = false
+                setShowArena(false)
+              }}
+              onClose={() => {
+                isArenaModalOpen = false
+                setShowArena(false)
+              }}
+            />
           </Show>
         </Dropzone>
       </TimelineContextProvider>

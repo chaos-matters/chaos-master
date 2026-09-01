@@ -21,7 +21,7 @@ export interface ScoreClashRoundResult {
 export const scoreClashRound: WebMcpTool = {
   name: 'score_clash_round',
   description:
-    'Deterministically score a round of flame clash based on offscreen iteration density in the shared coordinate volume. Returns ownership shares for both fighters, contested share, and the round verdict.',
+    'Deterministically score a round of flame clash based on offscreen iteration density in the shared coordinate volume. Attribution is determined by transform key prefixes (p1_ and p2_). Returns ownership shares for both fighters, contested share, and the round verdict.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -29,16 +29,6 @@ export const scoreClashRound: WebMcpTool = {
         type: 'object',
         description:
           'The merged clash FlameDescriptor from create_clash_flame.',
-      },
-      tintA: {
-        type: 'number',
-        description:
-          'Expected palette hue for fighter A (Player 1). Default is 0.15.',
-      },
-      tintB: {
-        type: 'number',
-        description:
-          'Expected palette hue for fighter B (Player 2). Default is 0.65.',
       },
       sampleBudget: {
         type: 'integer',
@@ -57,19 +47,11 @@ export const scoreClashRound: WebMcpTool = {
   execute: (input: unknown): ScoreClashRoundResult | { error: string } => {
     const raw = (input ?? {}) as {
       clashFlame?: FlameDescriptor
-      tintA?: number
-      tintB?: number
       sampleBudget?: number
       seed?: number
     }
 
-    const {
-      clashFlame,
-      tintA = 0.15,
-      tintB = 0.65,
-      sampleBudget = 25000,
-      seed = 4242,
-    } = raw
+    const { clashFlame, sampleBudget = 25000, seed = 4242 } = raw
 
     if (!clashFlame || !clashFlame.transforms) {
       return { error: 'Invalid or missing clashFlame descriptor.' }
@@ -112,24 +94,14 @@ export const scoreClashRound: WebMcpTool = {
       } else if (id.startsWith('p2_')) {
         p2List.push({ id, prob, color })
         sumProbB += prob
-      } else {
-        const distA = Math.abs(color - tintA)
-        const distB = Math.abs(color - tintB)
-        if (distA <= distB) {
-          p1List.push({ id, prob, color })
-          sumProbA += prob
-        } else {
-          p2List.push({ id, prob, color })
-          sumProbB += prob
-        }
       }
     }
-
     const totalProb = sumProbA + sumProbB
     const probShareA = totalProb > 0 ? sumProbA / totalProb : 0.5
     const probShareB = totalProb > 0 ? sumProbB / totalProb : 0.5
 
-    const rng = mulberry32(seed)
+    const rngA = mulberry32(seed)
+    const rngB = mulberry32(seed)
 
     function stepAffine(
       p: [number, number, number],
@@ -238,7 +210,7 @@ export const scoreClashRound: WebMcpTool = {
       )
       const totalProbA = p1List.reduce((acc, x) => acc + x.prob, 0)
       for (let i = 0; i < itersPerTeam; i++) {
-        let r = rng() * totalProbA
+        let r = rngA() * totalProbA
         let chosen = tAEntries[0]?.[1]
         for (const [id, t] of tAEntries) {
           const prob = p1List.find((p1) => p1.id === id)?.prob ?? 1
@@ -266,7 +238,7 @@ export const scoreClashRound: WebMcpTool = {
       )
       const totalProbB = p2List.reduce((acc, x) => acc + x.prob, 0)
       for (let i = 0; i < itersPerTeam; i++) {
-        let r = rng() * totalProbB
+        let r = rngB() * totalProbB
         let chosen = tBEntries[0]?.[1]
         for (const [id, t] of tBEntries) {
           const prob = p2List.find((p2) => p2.id === id)?.prob ?? 1

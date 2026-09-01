@@ -201,18 +201,6 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
             </Show>
           </Show>
 
-          {/* Commentary Box */}
-          <Show when={commentary()}>
-            {(msg) => (
-              <div class={ui.commentaryBox}>
-                {msg()}
-                <Show when={eventBanner()}>
-                  {(evt) => <span class={ui.eventBanner}>{evt()}</span>}
-                </Show>
-              </div>
-            )}
-          </Show>
-
           {/* Battlefield */}
           <div class={ui.battlefield}>
             {/* Player 1 (Left / Cyan) */}
@@ -419,6 +407,18 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
               )}
             </Show>
           </div>
+
+          {/* Commentary Box */}
+          <Show when={commentary()}>
+            {(msg) => (
+              <div class={ui.commentaryBox}>
+                {msg()}
+                <Show when={eventBanner()}>
+                  {(evt) => <span class={ui.eventBanner}>{evt()}</span>}
+                </Show>
+              </div>
+            )}
+          </Show>
         </div>
       </div>
     </ComputeGate>
