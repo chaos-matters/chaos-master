@@ -45,7 +45,7 @@
     }
   },
   "transforms": {
-    "_flam3__076976e0_0b62_44ff_a793_9e72ed463890": {
+    "_flam3__49e008a5_33fc_459e_a16f_75ee09d42982": {
       "probability": 0.5,
       "preAffine": {
         "a": 0.8,
@@ -82,7 +82,7 @@
         }
       }
     },
-    "_flam3__afa87ce0_ee7f_4dfa_baa7_c39ad8cf5e85": {
+    "_flam3__26403294_4740_4322_8309_c09bf6705f19": {
       "probability": 0.5,
       "preAffine": {
         "a": 0.5,

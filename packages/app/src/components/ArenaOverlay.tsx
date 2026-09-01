@@ -1,17 +1,26 @@
 import { createSignal, Show } from 'solid-js'
-import { Portal } from 'solid-js/web'
 import { Cross, Zap } from '@/icons'
+import ui from './ArenaOverlay.module.css'
 import type { Component } from 'solid-js'
 import type { CommandContext } from '@/commands/types'
+import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 export interface ArenaOverlayProps {
   arena: CommandContext['arena']
+  onClose?: () => void
+  respond?: () => void
 }
 
 export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
   const [commentary, setCommentary] = createSignal<string | null>(null)
   const [winner, setWinner] = createSignal<1 | 2 | null>(null)
   const [clashing, setClashing] = createSignal(false)
+
+  const handleClose = () => {
+    props.arena.setOpen(false)
+    props.onClose?.()
+    props.respond?.()
+  }
 
   const handleClash = () => {
     const p1 = props.arena.player1Stats()
@@ -41,268 +50,252 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
         )
       }
       setClashing(false)
-    }, 900)
+    }, 800)
   }
 
   const loadFighter = (player: 1 | 2) => {
     if (props.arena.selectFighter) {
       props.arena.selectFighter(player)
+      handleClose()
     }
   }
 
+  const flameGradient = (flame: FlameDescriptor | undefined, player: 1 | 2) => {
+    const xformCount = flame?.transforms
+      ? Object.keys(flame.transforms).length
+      : 3
+    if (player === 1) {
+      const hue = (185 + xformCount * 12) % 360
+      return `linear-gradient(135deg, hsl(${hue} 80% 15%), hsl(${(hue + 25) % 360} 70% 25%))`
+    }
+    const hue = (25 + xformCount * 12) % 360
+    return `linear-gradient(135deg, hsl(${hue} 85% 18%), hsl(${(hue - 35 + 360) % 360} 70% 25%))`
+  }
+
   return (
-    <Show when={props.arena.open()}>
-      <Portal>
-        <div
-          class="fixed inset-0 flex flex-col justify-between font-sans"
-          style={{
-            'z-index': '500',
-            background:
-              'radial-gradient(circle at center, rgba(0,0,0,0.7) 30%, rgba(0,0,0,0.95) 100%)',
-          }}
-          data-testid="flame-clash-arena-overlay"
+    <div class={ui.modal} data-testid="flame-clash-arena-modal">
+      {/* Header */}
+      <div class={ui.header}>
+        <div class={ui.titleGroup}>
+          <div class={ui.pulseDot} />
+          <h2 class={ui.title}>Flame Clash Arena</h2>
+        </div>
+        <button
+          class={ui.closeButton}
+          onClick={handleClose}
+          aria-label="Exit Arena"
+          title="Exit Arena"
         >
-          {/* Top Bar: Title & Close Button */}
-          <div class="flex items-center justify-between bg-black/85 backdrop-blur-md px-6 py-4 text-white border-b border-orange-500/20 shadow-[0_4px_30px_rgba(255,100,0,0.15)]">
-            <div class="flex items-center gap-3">
-              <span class="inline-block w-3 h-3 rounded-full bg-gradient-to-r from-orange-400 to-red-500 animate-pulse" />
-              <h1 class="text-2xl font-black uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-orange-400 to-red-500">
-                Flame Clash Arena
-              </h1>
-            </div>
-            <button
-              class="rounded-lg p-1.5 text-neutral-400 hover:bg-red-600 hover:text-white border border-neutral-700 transition-colors"
-              onClick={() => props.arena.setOpen(false)}
-              aria-label="Exit Arena"
-            >
-              <Cross class="w-4 h-4" />
-            </button>
-          </div>
+          <Cross width="1rem" />
+        </button>
+      </div>
 
-          {/* Center Commentary & Clash Controller */}
-          <div class="flex flex-col items-center justify-center gap-4 px-4 my-auto">
-            <Show when={commentary()}>
-              {(msg) => (
-                <div class="max-w-xl text-center px-5 py-2.5 rounded-xl bg-black/90 border border-amber-500/40 text-amber-300 text-sm font-semibold shadow-[0_0_20px_rgba(245,158,11,0.2)] backdrop-blur-lg">
-                  {msg()}
+      {/* Body */}
+      <div class={ui.body}>
+        {/* Commentary Box */}
+        <Show when={commentary()}>
+          {(msg) => <div class={ui.commentaryBox}>{msg()}</div>}
+        </Show>
+
+        {/* Battlefield */}
+        <div class={ui.battlefield}>
+          {/* Player 1 (Left / Cyan) */}
+          <Show when={props.arena.player1Stats()}>
+            {(p1) => (
+              <div
+                class={`${ui.fighterCard} ${ui.p1Card}`}
+                classList={{ [ui.p1CardWinner!]: winner() === 1 }}
+              >
+                <div class={ui.fighterPreview}>
+                  <div
+                    class={ui.fighterPreviewInner}
+                    style={{ background: flameGradient(p1().flame, 1) }}
+                  >
+                    <span class={ui.fighterLabel}>
+                      {p1().name ?? 'Player 1'}
+                    </span>
+                  </div>
+                  <Show when={winner() === 1}>
+                    <div class={ui.victorBadge}>VICTOR</div>
+                  </Show>
                 </div>
-              )}
-            </Show>
 
+                <div class={ui.fighterHeader}>
+                  <div>
+                    <div class={`${ui.fighterName} ${ui.p1Name}`}>
+                      {p1().name ?? 'Player 1'}
+                    </div>
+                    <div class={ui.fighterClass}>
+                      Class: {p1().type || 'Fractal Guardian'}
+                    </div>
+                  </div>
+                  <Show when={p1().flame}>
+                    <button
+                      class={ui.loadBtn}
+                      onClick={() => {
+                        loadFighter(1)
+                      }}
+                    >
+                      Load
+                    </button>
+                  </Show>
+                </div>
+
+                <div class={ui.statList}>
+                  <StatRow
+                    label="Power"
+                    value={p1().powerLevel || 0}
+                    max={2000}
+                    color="#22d3ee"
+                  />
+                  <StatRow
+                    label="Complexity"
+                    value={(p1().metrics?.complexity || 0) * 10}
+                    max={100}
+                    color="#60a5fa"
+                  />
+                  <StatRow
+                    label="Chaos"
+                    value={(p1().metrics?.chaosLevel || 0) * 10}
+                    max={100}
+                    color="#c084fc"
+                  />
+                  <StatRow
+                    label="Symmetry"
+                    value={(p1().metrics?.symmetryScore || 0) * 10}
+                    max={100}
+                    color="#818cf8"
+                  />
+                  <StatRow
+                    label="Energy"
+                    value={(p1().metrics?.energyIntensity || 0) * 10}
+                    max={100}
+                    color="#2dd4bf"
+                  />
+                </div>
+              </div>
+            )}
+          </Show>
+
+          {/* VS Center Graphic & Clash Button */}
+          <div class={ui.vsCenter}>
+            <div class={ui.vsText}>VS</div>
             <button
-              class={`px-8 py-3 rounded-2xl font-black text-lg uppercase tracking-widest shadow-2xl transition-all ${
-                clashing()
-                  ? 'bg-neutral-800 text-neutral-400 scale-95 cursor-wait'
-                  : 'bg-gradient-to-r from-cyan-500 via-amber-500 to-red-500 hover:scale-105 text-black hover:shadow-[0_0_30px_rgba(245,158,11,0.6)] cursor-pointer'
-              }`}
+              class={ui.clashBtn}
               onClick={handleClash}
               disabled={clashing()}
             >
-              {clashing() ? (
-                'CLASHING...'
-              ) : (
-                <div class="flex items-center justify-center gap-2">
-                  <Zap class="w-6 h-6" />
-                  <span>CLASH FLAMES</span>
-                  <Zap class="w-6 h-6" />
-                </div>
-              )}
+              <Zap width="1.2rem" height="1.2rem" />
+              <span>{clashing() ? 'CLASHING...' : 'CLASH'}</span>
+              <Zap width="1.2rem" height="1.2rem" />
             </button>
           </div>
 
-          {/* Player Stats Side-by-Side */}
-          <div class="flex w-full justify-between px-8 pb-10 gap-6 items-end">
-            {/* Player 1 (Left / Cyan) */}
-            <Show when={props.arena.player1Stats()}>
-              {(p1) => (
-                <div
-                  class={`w-96 rounded-2xl bg-neutral-950/85 p-5 backdrop-blur-xl border transition-all ${
-                    winner() === 1
-                      ? 'border-cyan-400 shadow-[0_0_40px_rgba(6,182,212,0.4)]'
-                      : 'border-cyan-500/30 shadow-[0_0_25px_rgba(6,182,212,0.1)]'
-                  } text-cyan-50 flex flex-col gap-3`}
-                >
-                  <div class="flex items-center justify-between">
-                    <div>
-                      <h2 class="text-2xl font-black uppercase tracking-wide text-cyan-400">
-                        {p1().name ?? 'Fighter 1'}
-                      </h2>
-                      <div class="text-[11px] font-bold tracking-wider text-cyan-200/70 uppercase">
-                        Class: {p1().type || 'Fractal Guardian'}
-                      </div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <Show when={winner() === 1}>
-                        <span class="bg-cyan-400 text-black px-2 py-0.5 rounded-full font-black text-xs uppercase tracking-wider shadow-lg">
-                          VICTOR
-                        </span>
-                      </Show>
-                      <Show when={p1().flame}>
-                        <button
-                          class="px-2.5 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/40 text-xs font-semibold border border-cyan-500/30 transition-colors"
-                          onClick={() => {
-                            loadFighter(1)
-                          }}
-                        >
-                          Load
-                        </button>
-                      </Show>
-                    </div>
+          {/* Player 2 (Right / Orange) */}
+          <Show when={props.arena.player2Stats()}>
+            {(p2) => (
+              <div
+                class={`${ui.fighterCard} ${ui.p2Card}`}
+                classList={{ [ui.p2CardWinner!]: winner() === 2 }}
+              >
+                <div class={ui.fighterPreview}>
+                  <div
+                    class={ui.fighterPreviewInner}
+                    style={{ background: flameGradient(p2().flame, 2) }}
+                  >
+                    <span class={ui.fighterLabel}>
+                      {p2().name ?? 'Player 2'}
+                    </span>
                   </div>
-
-                  <div class="space-y-2.5 border-t border-cyan-500/20 pt-3">
-                    <StatBar
-                      label="Power Level"
-                      value={p1().powerLevel || 0}
-                      max={2000}
-                      color="bg-cyan-400"
-                    />
-                    <StatBar
-                      label="Complexity"
-                      value={(p1().metrics?.complexity || 0) * 10}
-                      max={100}
-                      color="bg-blue-400"
-                    />
-                    <StatBar
-                      label="Chaos Level"
-                      value={(p1().metrics?.chaosLevel || 0) * 10}
-                      max={100}
-                      color="bg-purple-400"
-                    />
-                    <StatBar
-                      label="Symmetry"
-                      value={(p1().metrics?.symmetryScore || 0) * 10}
-                      max={100}
-                      color="bg-indigo-400"
-                    />
-                    <StatBar
-                      label="Energy"
-                      value={(p1().metrics?.energyIntensity || 0) * 10}
-                      max={100}
-                      color="bg-teal-400"
-                    />
-                  </div>
+                  <Show when={winner() === 2}>
+                    <div class={ui.victorBadge}>VICTOR</div>
+                  </Show>
                 </div>
-              )}
-            </Show>
 
-            {/* VS Center Graphic */}
-            <div class="flex flex-col items-center justify-center pb-8">
-              <div class="text-5xl font-black italic text-white drop-shadow-[0_0_25px_rgba(245,158,11,0.8)] tracking-tighter">
-                VS
+                <div class={ui.fighterHeader}>
+                  <div>
+                    <div class={`${ui.fighterName} ${ui.p2Name}`}>
+                      {p2().name ?? 'Player 2'}
+                    </div>
+                    <div class={ui.fighterClass}>
+                      Class: {p2().type || 'Chaos Lord'}
+                    </div>
+                  </div>
+                  <Show when={p2().flame}>
+                    <button
+                      class={ui.loadBtn}
+                      onClick={() => {
+                        loadFighter(2)
+                      }}
+                    >
+                      Load
+                    </button>
+                  </Show>
+                </div>
+
+                <div class={ui.statList}>
+                  <StatRow
+                    label="Power"
+                    value={p2().powerLevel || 0}
+                    max={2000}
+                    color="#fb923c"
+                  />
+                  <StatRow
+                    label="Complexity"
+                    value={(p2().metrics?.complexity || 0) * 10}
+                    max={100}
+                    color="#f87171"
+                  />
+                  <StatRow
+                    label="Chaos"
+                    value={(p2().metrics?.chaosLevel || 0) * 10}
+                    max={100}
+                    color="#f472b6"
+                  />
+                  <StatRow
+                    label="Symmetry"
+                    value={(p2().metrics?.symmetryScore || 0) * 10}
+                    max={100}
+                    color="#facc15"
+                  />
+                  <StatRow
+                    label="Energy"
+                    value={(p2().metrics?.energyIntensity || 0) * 10}
+                    max={100}
+                    color="#fbbf24"
+                  />
+                </div>
               </div>
-            </div>
-
-            {/* Player 2 (Right / Orange) */}
-            <Show when={props.arena.player2Stats()}>
-              {(p2) => (
-                <div
-                  class={`w-96 rounded-2xl bg-neutral-950/85 p-5 backdrop-blur-xl border transition-all ${
-                    winner() === 2
-                      ? 'border-orange-400 shadow-[0_0_40px_rgba(249,115,22,0.4)]'
-                      : 'border-orange-500/30 shadow-[0_0_25px_rgba(249,115,22,0.1)]'
-                  } text-orange-50 flex flex-col gap-3`}
-                >
-                  <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                      <Show when={p2().flame}>
-                        <button
-                          class="px-2.5 py-1 rounded-lg bg-orange-500/20 text-orange-300 hover:bg-orange-500/40 text-xs font-semibold border border-orange-500/30 transition-colors"
-                          onClick={() => {
-                            loadFighter(2)
-                          }}
-                        >
-                          Load
-                        </button>
-                      </Show>
-                      <Show when={winner() === 2}>
-                        <span class="bg-orange-400 text-black px-2 py-0.5 rounded-full font-black text-xs uppercase tracking-wider shadow-lg">
-                          VICTOR
-                        </span>
-                      </Show>
-                    </div>
-                    <div class="text-right">
-                      <h2 class="text-2xl font-black uppercase tracking-wide text-orange-400">
-                        {p2().name ?? 'Fighter 2'}
-                      </h2>
-                      <div class="text-[11px] font-bold tracking-wider text-orange-200/70 uppercase">
-                        Class: {p2().type || 'Chaos Lord'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="space-y-2.5 border-t border-orange-500/20 pt-3">
-                    <StatBar
-                      label="Power Level"
-                      value={p2().powerLevel || 0}
-                      max={2000}
-                      color="bg-orange-400"
-                      rightAlign
-                    />
-                    <StatBar
-                      label="Complexity"
-                      value={(p2().metrics?.complexity || 0) * 10}
-                      max={100}
-                      color="bg-red-400"
-                      rightAlign
-                    />
-                    <StatBar
-                      label="Chaos Level"
-                      value={(p2().metrics?.chaosLevel || 0) * 10}
-                      max={100}
-                      color="bg-pink-400"
-                      rightAlign
-                    />
-                    <StatBar
-                      label="Symmetry"
-                      value={(p2().metrics?.symmetryScore || 0) * 10}
-                      max={100}
-                      color="bg-yellow-400"
-                      rightAlign
-                    />
-                    <StatBar
-                      label="Energy"
-                      value={(p2().metrics?.energyIntensity || 0) * 10}
-                      max={100}
-                      color="bg-amber-400"
-                      rightAlign
-                    />
-                  </div>
-                </div>
-              )}
-            </Show>
-          </div>
+            )}
+          </Show>
         </div>
-      </Portal>
-    </Show>
+      </div>
+    </div>
   )
 }
 
-function StatBar(props: {
+function StatRow(props: {
   label: string
   value: number
   max: number
   color: string
-  rightAlign?: boolean
 }) {
-  const percentage = Math.min(100, Math.max(0, (props.value / props.max) * 100))
+  const percentage = () =>
+    Math.min(100, Math.max(0, (props.value / props.max) * 100))
 
   return (
-    <div
-      class={`flex flex-col ${props.rightAlign ? 'items-end' : 'items-start'}`}
-    >
-      <div class="mb-1 flex w-full justify-between text-xs font-bold uppercase tracking-wider text-white/70">
-        <span class={props.rightAlign ? 'order-2' : ''}>{props.label}</span>
-        <span class={props.rightAlign ? 'order-1' : ''}>
-          {Math.round(props.value)}
-        </span>
+    <div class={ui.statRow}>
+      <div class={ui.statLabels}>
+        <span>{props.label}</span>
+        <span>{Math.round(props.value)}</span>
       </div>
-      <div
-        class={`h-2 w-full rounded-full bg-black/50 overflow-hidden ${props.rightAlign ? 'rotate-180' : ''}`}
-      >
+      <div class={ui.statTrack}>
         <div
-          class={`h-full rounded-full ${props.color} transition-all duration-1000 ease-out`}
-          style={{ width: `${percentage}%` }}
+          class={ui.statFill}
+          style={{
+            width: `${percentage()}%`,
+            background: props.color,
+          }}
         />
       </div>
     </div>

@@ -401,12 +401,14 @@ export function MainWorkspace(props: AppProps) {
     }[]
   } | null>(null)
 
+  const _requestModal = useRequestModal()
+
   const selectCandidate = (index: number) => {
     const s = directorState()
     if (s && s.candidates[index]?.flame) {
       const candidateFlame = s.candidates[index].flame
       setFlameDescriptor(
-        () => structuredClone(candidateFlame),
+        () => deepClone(candidateFlame),
         `Art Director: Candidate ${index + 1}`,
       )
       showToast(`Art Director: Loaded candidate ${index + 1} into workspace.`)
@@ -439,7 +441,11 @@ export function MainWorkspace(props: AppProps) {
     }
   } | null>(null)
 
-  const openArtDirectorUI = () => {
+  let isDirectorModalOpen = false
+
+  function openArtDirectorUI() {
+    if (isDirectorModalOpen) return
+    isDirectorModalOpen = true
     const s = directorState()
     if (!s || s.candidates.length === 0) {
       const current = deepClone(flameDescriptor)
@@ -474,9 +480,34 @@ export function MainWorkspace(props: AppProps) {
       })
     }
     setDirectorOpen(true)
+    void _requestModal({
+      content: ({ respond }) => (
+        <DirectorOverlay
+          director={{
+            open: directorOpen,
+            setOpen: setDirectorOpen,
+            state: directorState,
+            setState: setDirectorState,
+            selectCandidate,
+          }}
+          respond={() => {
+            isDirectorModalOpen = false
+            setDirectorOpen(false)
+            respond()
+          }}
+        />
+      ),
+    }).finally(() => {
+      isDirectorModalOpen = false
+      setDirectorOpen(false)
+    })
   }
 
-  const openFlameClashUI = () => {
+  let isArenaModalOpen = false
+
+  function openFlameClashUI() {
+    if (isArenaModalOpen) return
+    isArenaModalOpen = true
     const p1 = arenaP1Stats()
     const p2 = arenaP2Stats()
     if (!p1 || !p2) {
@@ -525,12 +556,58 @@ export function MainWorkspace(props: AppProps) {
       })
     }
     setShowArena(true)
+    void _requestModal({
+      content: ({ respond }) => (
+        <ArenaOverlay
+          arena={{
+            open: showArena,
+            setOpen: setShowArena,
+            player1Stats: arenaP1Stats,
+            setPlayer1Stats: setArenaP1Stats,
+            player2Stats: arenaP2Stats,
+            setPlayer2Stats: setArenaP2Stats,
+            selectFighter: (player: 1 | 2) => {
+              const fighter = player === 1 ? arenaP1Stats() : arenaP2Stats()
+              if (fighter?.flame) {
+                setFlameDescriptor(
+                  () => deepClone(fighter.flame!),
+                  `Arena: ${fighter.name ?? `Player ${player}`}`,
+                )
+                showToast(
+                  `Arena: Loaded ${fighter.name ?? `Player ${player}`} into editor.`,
+                )
+              }
+            },
+          }}
+          respond={() => {
+            isArenaModalOpen = false
+            setShowArena(false)
+            respond()
+          }}
+        />
+      ),
+    }).finally(() => {
+      isArenaModalOpen = false
+      setShowArena(false)
+    })
   }
+
+  createEffect(() => {
+    if (directorOpen() && !isDirectorModalOpen) {
+      openArtDirectorUI()
+    }
+  })
+
+  createEffect(() => {
+    if (showArena() && !isArenaModalOpen) {
+      openFlameClashUI()
+    }
+  })
+
   const [sidebarDiffView, setSidebarDiffView] = createSignal<{
     flameA: FlameDescriptor
     flameB: FlameDescriptor
   } | null>(null)
-  const _requestModal = useRequestModal()
   const [sidebarHidden, setSidebarHidden] = createSignal(!isWideLayout())
   // Flame Randomizer card open state is controlled here so the Timeline
   // "Animate" button can reveal it; the epoch bump also forces its Animation
@@ -3894,7 +3971,7 @@ export function MainWorkspace(props: AppProps) {
         const fighter = player === 1 ? arenaP1Stats() : arenaP2Stats()
         if (fighter?.flame) {
           setFlameDescriptor(
-            () => structuredClone(fighter.flame!),
+            () => deepClone(fighter.flame!),
             `Arena: ${fighter.name ?? `Player ${player}`}`,
           )
           showToast(
@@ -4986,10 +5063,6 @@ export function MainWorkspace(props: AppProps) {
             animationEnabled={animationEnabled()}
             flameDescriptor={flameDescriptor}
           />
-          <ArenaOverlay arena={cmdContext.arena} />
-          {cmdContext.director && (
-            <DirectorOverlay director={cmdContext.director} />
-          )}
 
           <Show when={showSidebar()}>
             <div
