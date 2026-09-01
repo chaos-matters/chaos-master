@@ -11,14 +11,55 @@ function calculateFlameStats(flame: FlameDescriptor) {
   let nonLinearWeightSum = 0
   let symmetryHits = 0
 
+  // Linear variations excluded from chaos accumulator
+  const LINEAR = new Set(['linearVar', 'linearTVar'])
+
   // Symmetry indicators
-  const symmetryVars = new Set([
-    'arch',
-    'cylinder',
-    'julia',
-    'julia3D',
-    'ngon',
-    'mirror',
+  const SYMMETRY = new Set([
+    // radial / kaleidoscopic
+    'juliaVar',
+    'juliaNVar',
+    'juliaScopeVar',
+    'kaleidoscopeVar',
+    'ngonVar',
+    'archVar',
+    'cylinderVar',
+    'cylinder2Var',
+    'cylinderApoVar',
+    'polarVar',
+    'polar2Var',
+    'nPolarVar',
+    // explicit symmetry-group variations
+    'symBandG1Var',
+    'symBandG2Var',
+    'symBandG3Var',
+    'symBandG4Var',
+    'symBandG5Var',
+    'symBandG6Var',
+    'symBandG7Var',
+    'symNetG1Var',
+    'symNetG2Var',
+    'symNetG3Var',
+    'symNetG4Var',
+    'symNetG5Var',
+    'symNetG6Var',
+    'symNetG7Var',
+    'symNetG8Var',
+    'symNetG9Var',
+    'symNetG10Var',
+    'symNetG11Var',
+    'symNetG12Var',
+    'symNetG13Var',
+    'symNetG14Var',
+    'symNetG15Var',
+    'symNetG16Var',
+    'symNetG17Var',
+    // post-transform symmetry
+    'postMirrorWfVar',
+    'postAxisSymmetryWfVar',
+    'postPointSymmetryWfVar',
+    'postRotateVar',
+    'preRotateVar',
   ])
 
   for (const t of transforms) {
@@ -28,10 +69,10 @@ function calculateFlameStats(flame: FlameDescriptor) {
 
     for (const [vName, vData] of vars) {
       const weight = Math.abs(vData.weight)
-      if (vName !== 'linear' && vName !== 'linear3D') {
+      if (!LINEAR.has(vName)) {
         nonLinearWeightSum += weight
       }
-      if (symmetryVars.has(vName)) {
+      if (SYMMETRY.has(vName)) {
         symmetryHits += weight
       }
     }
