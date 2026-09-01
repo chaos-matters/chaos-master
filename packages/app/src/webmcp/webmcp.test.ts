@@ -456,6 +456,45 @@ describe('WebMCP Foundation', () => {
     })
   })
 
+  describe('open_arena', () => {
+    it('opens arena HUD with fighter stats and automatic flame descriptors', async () => {
+      const s1 = {
+        powerLevel: 1095,
+        type: 'Hybrid',
+        metrics: { complexity: 1.6 },
+      }
+      const s2 = {
+        powerLevel: 895,
+        type: 'Chaotic Vortex',
+        metrics: { complexity: 1.4 },
+      }
+
+      const result = (await mockContext.executeTool('open_arena', {
+        player1Name: 'A',
+        player1Stats: s1,
+        player2Name: 'B',
+        player2Stats: s2,
+      })) as Record<string, unknown>
+
+      expect(result.success).toBe(true)
+      expect(cmdContext.arena.setOpen).toHaveBeenCalledWith(true)
+      expect(cmdContext.arena.setPlayer1Stats).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'A',
+          powerLevel: 1095,
+          flame: expect.anything(),
+        }),
+      )
+      expect(cmdContext.arena.setPlayer2Stats).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'B',
+          powerLevel: 895,
+          flame: expect.anything(),
+        }),
+      )
+    })
+  })
+
   describe('create_custom_variation', () => {
     it('creates custom variation using new body parameter with JS syntax', async () => {
       const result = (await mockContext.executeTool('create_custom_variation', {

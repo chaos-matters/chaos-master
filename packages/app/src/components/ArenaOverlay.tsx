@@ -15,7 +15,26 @@ export interface ArenaOverlayProps {
   respond?: () => void
 }
 
-const PREVIEW_RES = { width: 380, height: 214 }
+const PREVIEW_RES = 160
+
+function ensureCamera(flame?: FlameDescriptor): FlameDescriptor | null {
+  if (!flame || !flame.transforms) return null
+  return {
+    ...flame,
+    renderSettings: {
+      exposure: 0.5,
+      vibrancy: 0.5,
+      gamma: 2.2,
+      contrast: 1,
+      skipIters: 20,
+      dimensions: 2,
+      drawMode: 'light',
+      backgroundColor: [0, 0, 0],
+      camera: { zoom: 1, position: [0, 0], rotation: 0 },
+      ...flame.renderSettings,
+    },
+  }
+}
 
 export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
   const [commentary, setCommentary] = createSignal<string | null>(null)
@@ -103,9 +122,7 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
                 >
                   <div class={ui.fighterPreview}>
                     <Show
-                      when={
-                        p1().flame?.renderSettings?.camera ? p1().flame : null
-                      }
+                      when={ensureCamera(p1().flame)}
                       fallback={
                         <div class={ui.fighterPreviewInner}>
                           <span class={ui.fighterLabel}>
@@ -214,9 +231,7 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
                 >
                   <div class={ui.fighterPreview}>
                     <Show
-                      when={
-                        p2().flame?.renderSettings?.camera ? p2().flame : null
-                      }
+                      when={ensureCamera(p2().flame)}
                       fallback={
                         <div class={ui.fighterPreviewInner}>
                           <span class={ui.fighterLabel}>
