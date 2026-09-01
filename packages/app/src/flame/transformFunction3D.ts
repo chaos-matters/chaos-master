@@ -110,23 +110,21 @@ export function resolveVariationType3D(
 export function createFlameWgsl3D({
   variations,
 }: Pick<TransformFunction, 'variations'>) {
-  const validVariations = Object.fromEntries(
-    Object.entries(variations)
-      .map(([vid, v]) => {
-        const resolved = resolveVariationType3D(v.type)
-        if (!resolved) {
-          console.warn(
-            `[createFlameWgsl3D] skipping unknown variation type "${v.type}"`,
-          )
-          return null
-        }
-        return [vid, { ...v, type: resolved }]
-      })
-      .filter(
-        (entry): entry is [string, { type: TransformVariationType3D }] =>
-          entry !== null,
-      ),
-  ) as unknown as Record<VariationId, { type: TransformVariationType3D }>
+  const validRecord: Record<string, { type: TransformVariationType3D }> = {}
+  for (const [vid, v] of Object.entries(variations)) {
+    const resolved = resolveVariationType3D(v.type)
+    if (!resolved) {
+      console.warn(
+        `[createFlameWgsl3D] skipping unknown variation type "${v.type}"`,
+      )
+      continue
+    }
+    validRecord[vid] = { ...v, type: resolved }
+  }
+  const validVariations = validRecord as unknown as Record<
+    VariationId,
+    { type: TransformVariationType3D }
+  >
   const Uniforms = struct({
     ...FlameUniformsBase3D.propTypes,
     ...Object.fromEntries(

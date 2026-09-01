@@ -1,4 +1,4 @@
-import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { FlameDescriptor, TransformFunction, } from '@/flame/schema/flameSchema'
 import type { WebMcpTool } from '@/webmcp/types'
 
 function mulberry32(a: number) {
@@ -174,10 +174,11 @@ export const scoreClashRound: WebMcpTool = {
       let vz = 0
       let totalW = 0
 
-      for (const v of entries) {
+      for (const rawV of entries) {
+        const v = rawV as { weight?: number; type?: string }
         const w = v.weight ?? 1
         totalW += w
-        const type = v.type
+        const type = v.type ?? 'linear'
         if (type.startsWith('spherical')) {
           const r2 = p[0] * p[0] + p[1] * p[1] + p[2] * p[2] + 1e-6
           vx += (p[0] / r2) * w
@@ -211,9 +212,9 @@ export const scoreClashRound: WebMcpTool = {
       p: [number, number, number],
       t: TransformFunction,
     ): [number, number, number] {
-      const pre = stepAffine(p, t.preAffine as Record<string, number>)
+      const pre = stepAffine(p, t.preAffine)
       const mid = stepVariation(pre, t)
-      const post = stepAffine(mid, t.postAffine as Record<string, number>)
+      const post = stepAffine(mid, t.postAffine)
       return post
     }
 
@@ -311,7 +312,8 @@ export const scoreClashRound: WebMcpTool = {
     const totalOccupied = voxA + voxB + voxContested
     const spatialA = totalOccupied > 0 ? voxA / totalOccupied : 0.5
     const spatialB = totalOccupied > 0 ? voxB / totalOccupied : 0.5
-    const spatialContested = totalOccupied > 0 ? voxContested / totalOccupied : 0
+    const spatialContested =
+      totalOccupied > 0 ? voxContested / totalOccupied : 0
 
     // Combine spatial occupancy (60%) with power/probability share (40%)
     let rawOwnA: number

@@ -630,13 +630,13 @@ registerCommand({
     }
     if (patch.camera && typeof patch.camera === 'object') {
       mergedSettings.camera = {
-        ...((currentSettings.camera) ?? {}),
+        ...(currentSettings.camera ?? {}),
         ...(patch.camera as Record<string, unknown>),
       }
     }
     if (patch.camera3D && typeof patch.camera3D === 'object') {
       mergedSettings.camera3D = {
-        ...((currentSettings.camera3D) ?? {}),
+        ...(currentSettings.camera3D ?? {}),
         ...(patch.camera3D as Record<string, unknown>),
       }
     }

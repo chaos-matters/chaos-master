@@ -715,14 +715,16 @@ describe('WebMCP Foundation', () => {
       const f2 = createTestFlame()
       f2.transforms = {
         ...f2.transforms,
-        extra: {
+        t3: {
           probability: 2,
           preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
           postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
           color: { x: 0.8, y: 1 },
+          colorSpeed: 0.5,
+          visible: true,
           variations: { v0: { type: 'spherical', weight: 1 } },
         },
-      }
+      } as FlameDescriptor['transforms']
 
       const clashOrig = (await mockContext.executeTool('create_clash_flame', {
         flameA: f1,

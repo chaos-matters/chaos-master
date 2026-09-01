@@ -200,7 +200,7 @@ registerCommand({
     ) {
       ctx.timeline.setPreviewHeld?.(false)
     }
-    const segments = (path).split('.')
+    const segments = path.split('.')
     const leaf = segments.pop()
     if (leaf === undefined) return
     ctx.setFlameDescriptor((draft) => {
