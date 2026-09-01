@@ -3,10 +3,14 @@ import { tgpu } from 'typegpu'
 import { f32, struct, vec2f, vec3f } from 'typegpu/data'
 import { recordEntries } from '@/utils/record'
 import { sum } from '@/utils/sum'
+import { AffineParams } from './affineTranform'
 import { AffineParams3D, transformAffine3D } from './affineTransform3D'
 import { Point3D } from './types3D'
+import { isParametricVariationType, transformVariations } from './variations'
+import { VariationInfo } from './variations/simple/types'
 import { VariationInfo3D } from './variations/simple3D/types'
 import { isParametricVariationType3D, isVariationType3D, transformVariations3D, } from './variations3D'
+import type { WgslStruct } from 'typegpu/data'
 import type { FlameDescriptor, TransformFunction, VariationId, } from './schema/flameSchema'
 import type { TransformVariationType3D } from './variations3D'
 
@@ -22,25 +26,52 @@ const VariantUniformsBase3D = struct({
   weight: f32,
 }).$name('VariantUniformsBase3D')
 
-function variationUniforms3D(variationType: TransformVariationType3D) {
-  if ('paramStruct' in transformVariations3D[variationType]) {
+function variationUniforms3D(variationType: string) {
+  if (
+    variationType in transformVariations3D &&
+    'paramStruct' in
+      transformVariations3D[variationType as TransformVariationType3D]
+  ) {
     return struct({
       ...VariantUniformsBase3D.propTypes,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      params: (transformVariations3D[variationType] as any).paramStruct,
+
+      params: (
+        transformVariations3D[variationType as TransformVariationType3D] as {
+          paramStruct: WgslStruct
+        }
+      ).paramStruct,
     }).$name(`VariationUniforms3D_${variationType}`)
+  }
+  if (
+    variationType in transformVariations &&
+    isParametricVariationType(variationType)
+  ) {
+    const v = transformVariations[variationType] as { paramStruct: WgslStruct }
+    return struct({
+      ...VariantUniformsBase3D.propTypes,
+      params: v.paramStruct,
+    }).$name(`VariationUniforms3D_Fallback_${variationType}`)
   }
   return VariantUniformsBase3D
 }
 
-function variationInvocation3D(
-  variationType: TransformVariationType3D,
-  vid: VariationId,
-) {
-  if ('paramStruct' in transformVariations3D[variationType]) {
-    return `${variationType}(pre, VariationInfo3D(uniforms.variation${vid}.weight, uniforms.preAffine), uniforms.variation${vid}.params)`
+function variationInvocation3D(variationType: string, vid: VariationId) {
+  if (variationType in transformVariations3D) {
+    if (
+      'paramStruct' in
+      transformVariations3D[variationType as TransformVariationType3D]
+    ) {
+      return `${variationType}(pre, VariationInfo3D(uniforms.variation${vid}.weight, uniforms.preAffine), uniforms.variation${vid}.params)`
+    }
+    return `${variationType}(pre, VariationInfo3D(uniforms.variation${vid}.weight, uniforms.preAffine))`
   }
-  return `${variationType}(pre, VariationInfo3D(uniforms.variation${vid}.weight, uniforms.preAffine))`
+  if (
+    variationType in transformVariations &&
+    isParametricVariationType(variationType)
+  ) {
+    return `${variationType}(vec2f(pre.x, pre.y), VariationInfo(1.0, AffineParams(uniforms.preAffine.a, uniforms.preAffine.b, uniforms.preAffine.d, uniforms.preAffine.e, uniforms.preAffine.f, uniforms.preAffine.h)), uniforms.variation${vid}.params)`
+  }
+  return `${variationType}(vec2f(pre.x, pre.y), VariationInfo(1.0, AffineParams(uniforms.preAffine.a, uniforms.preAffine.b, uniforms.preAffine.d, uniforms.preAffine.e, uniforms.preAffine.f, uniforms.preAffine.h)))`
 }
 
 export const VARIATION_2D_TO_3D_MAP: Record<string, TransformVariationType3D> =
@@ -99,18 +130,17 @@ export const VARIATION_2D_TO_3D_MAP: Record<string, TransformVariationType3D> =
     starfield: 'starfield3D',
   }
 
-export function resolveVariationType3D(
-  type: string,
-): TransformVariationType3D | undefined {
+export function resolveVariationType3D(type: string): string | undefined {
   if (isVariationType3D(type)) return type
   if (type in VARIATION_2D_TO_3D_MAP) return VARIATION_2D_TO_3D_MAP[type]
+  if (type in transformVariations) return type
   return undefined
 }
 
 export function createFlameWgsl3D({
   variations,
 }: Pick<TransformFunction, 'variations'>) {
-  const validRecord: Record<string, { type: TransformVariationType3D }> = {}
+  const validRecord: Record<string, { type: string }> = {}
   for (const [vid, v] of Object.entries(variations)) {
     const resolved = resolveVariationType3D(v.type)
     if (!resolved) {
@@ -123,7 +153,7 @@ export function createFlameWgsl3D({
   }
   const validVariations = validRecord as unknown as Record<
     VariationId,
-    { type: TransformVariationType3D }
+    { type: string }
   >
   const Uniforms = struct({
     ...FlameUniformsBase3D.propTypes,
@@ -139,11 +169,13 @@ export function createFlameWgsl3D({
       let pre = transformAffine3D(uniforms.preAffine, point.position);
       var p = vec3f(0);
       ${recordEntries(validVariations)
-        .map(
-          ([vid, { type }]) => /* wgsl */ `
-            p += uniforms.variation${vid}.weight * ${variationInvocation3D(type, vid)};`,
-        )
-        .join('\n')}
+        .map(([vid, { type }]) => {
+          if (type in transformVariations3D) {
+            return `p += uniforms.variation${vid}.weight * ${variationInvocation3D(type, vid)};`
+          }
+          return `let r2_${vid} = ${variationInvocation3D(type, vid)};\n      p += uniforms.variation${vid}.weight * vec3f(r2_${vid}.x, r2_${vid}.y, pre.z);`
+        })
+        .join('\n      ')}
       p = transformAffine3D(uniforms.postAffine, p);
       let color = mix(point.color, uniforms.color, uniforms.colorSpeed);
       return Point3D(p, color);
@@ -151,14 +183,28 @@ export function createFlameWgsl3D({
   `.$uses({
     transformAffine3D,
     ...Object.fromEntries(
-      Object.values(validVariations).map((v) => [
-        v.type,
-        transformVariations3D[v.type].fn,
-      ]),
+      Object.values(validVariations).map((v) => {
+        if (v.type in transformVariations3D) {
+          return [
+            v.type,
+            transformVariations3D[v.type as TransformVariationType3D].fn,
+          ]
+        }
+        return [v.type, transformVariations[v.type]!.fn]
+      }),
     ),
     // Only referenced by variation invocations — listing with zero valid
     // variations triggers an "external wasn't used" warning at resolution.
-    ...(Object.keys(validVariations).length > 0 ? { VariationInfo3D } : {}),
+    ...(Object.values(validVariations).some(
+      (v) => v.type in transformVariations3D,
+    )
+      ? { VariationInfo3D }
+      : {}),
+    ...(Object.values(validVariations).some(
+      (v) => v.type in transformVariations,
+    )
+      ? { AffineParams, VariationInfo }
+      : {}),
   })
   return {
     Uniforms,
@@ -295,11 +341,22 @@ export function extractFlameUniforms3D({
                     weight: isVarVisible ? (rest.weight ?? 1) : 0,
                   }
                   const variationType = resolveVariationType3D(_type)!
-                  const isParametric =
-                    isParametricVariationType3D(variationType)
-                  if (isParametric) {
+                  let isParametric = false
+                  let defaults: Record<string, number> | undefined
+
+                  if (isParametricVariationType3D(variationType)) {
+                    isParametric = true
                     const v = transformVariations3D[variationType]
-                    const defaults = v.paramDefaults as Record<string, number>
+                    defaults = v.paramDefaults
+                  } else if (isParametricVariationType(variationType)) {
+                    isParametric = true
+                    const v = transformVariations[variationType] as {
+                      paramDefaults: Record<string, number>
+                    }
+                    defaults = v.paramDefaults
+                  }
+
+                  if (isParametric && defaults) {
                     const safe: Record<string, number> = { ...defaults }
                     if (rest.params) {
                       for (const key of Object.keys(defaults)) {
