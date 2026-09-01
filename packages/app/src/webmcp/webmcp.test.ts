@@ -125,11 +125,18 @@ function createMockCommandContext(): CommandContext {
       open: vi.fn(),
     },
     timeline: {
+      tracks: () => [],
+      setTracks: vi.fn(),
+      animationEnabled: () => false,
+      setAnimationEnabled: vi.fn(),
+      duration: () => 90,
+      setDuration: vi.fn(),
+      currentFrame: () => 0,
+      setCurrentFrame: vi.fn(),
       timelineStore: {
         state: {} as unknown,
         set: vi.fn(),
       },
-      currentFrame: () => 0,
     } as unknown as CommandContext['timeline'],
     history: {
       undo: vi.fn(() => {
@@ -497,6 +504,59 @@ describe('WebMCP Foundation', () => {
     })
   })
 
+  describe('create_clash_flame', () => {
+    it('creates 2D clash flame with backward compatibility', async () => {
+      const f1 = createTestFlame()
+      const f2 = createTestFlame()
+      const result = (await mockContext.executeTool('create_clash_flame', {
+        flameA: f1,
+        flameB: f2,
+      })) as { success: boolean; clashFlame: Record<string, unknown> }
+
+      expect(result.success).toBe(true)
+      expect(result.clashFlame.renderSettings).not.toHaveProperty(
+        'dimensions',
+        3,
+      )
+      const xforms = result.clashFlame.transforms as Record<
+        string,
+        { postAffine?: { e?: number } }
+      >
+      expect(Object.keys(xforms).some((k) => k.startsWith('p1_'))).toBe(true)
+      expect(Object.keys(xforms).some((k) => k.startsWith('p2_'))).toBe(true)
+    })
+
+    it('creates 3D clash flame with volumetric staging, tinting, and camera3D', async () => {
+      const f1 = createTestFlame()
+      const f2 = createTestFlame()
+      const result = (await mockContext.executeTool('create_clash_flame', {
+        flameA: f1,
+        flameB: f2,
+        dimensions: 3,
+        separation: 3.0,
+        tintA: 0.2,
+        tintB: 0.7,
+      })) as { success: boolean; clashFlame: Record<string, unknown> }
+
+      expect(result.success).toBe(true)
+      const rs = result.clashFlame.renderSettings as Record<string, unknown>
+      expect(rs.dimensions).toBe(3)
+      expect(rs.autoExposure3D).toBe(true)
+      expect(rs.camera3D).toMatchObject({
+        target: [0, 0, 0],
+        radius: 9.0,
+      })
+      const xforms = result.clashFlame.transforms as Record<
+        string,
+        { color?: number[]; postAffine?: { d?: number } }
+      >
+      const p1Key = Object.keys(xforms).find((k) => k.startsWith('p1_'))!
+      const p2Key = Object.keys(xforms).find((k) => k.startsWith('p2_'))!
+      expect(xforms[p1Key]?.postAffine?.d).toBeLessThan(0)
+      expect(xforms[p2Key]?.postAffine?.d).toBeGreaterThan(0)
+    })
+  })
+
   describe('create_custom_variation', () => {
     it('creates custom variation using new body parameter with JS syntax', async () => {
       const result = (await mockContext.executeTool('create_custom_variation', {
@@ -524,6 +584,102 @@ describe('WebMCP Foundation', () => {
         name: 'no_body',
       })) as { isError?: boolean; error?: string }
       expect(result.isError || Boolean(result.error)).toBe(true)
+    })
+  })
+
+  describe('score_clash_round', () => {
+    it('scores territory deterministically and sums to 1.0', async () => {
+      const f1 = createTestFlame()
+      const f2 = createTestFlame()
+      const clash = (await mockContext.executeTool('create_clash_flame', {
+        flameA: f1,
+        flameB: f2,
+        dimensions: 3,
+      })) as { clashFlame: Record<string, unknown> }
+
+      const r1 = (await mockContext.executeTool('score_clash_round', {
+        clashFlame: clash.clashFlame,
+        seed: 1234,
+      })) as {
+        ownershipA: number
+        ownershipB: number
+        contested: number
+        verdict: string
+      }
+
+      const r2 = (await mockContext.executeTool('score_clash_round', {
+        clashFlame: clash.clashFlame,
+        seed: 1234,
+      })) as {
+        ownershipA: number
+        ownershipB: number
+        contested: number
+        verdict: string
+      }
+
+      expect(r1.ownershipA).toBe(r2.ownershipA)
+      expect(r1.ownershipB).toBe(r2.ownershipB)
+      expect(r1.contested).toBe(r2.contested)
+      expect(
+        Math.abs(r1.ownershipA + r1.ownershipB + r1.contested - 1.0),
+      ).toBeLessThan(0.01)
+      expect(['A', 'B', 'draw']).toContain(r1.verdict)
+    })
+  })
+
+  describe('simulate_clash', () => {
+    it('simulates 3-round battle deterministically with narrative events', async () => {
+      const f1 = createTestFlame()
+      const f2 = createTestFlame()
+
+      const sim = (await mockContext.executeTool('simulate_clash', {
+        flameA: f1,
+        flameB: f2,
+        rounds: 3,
+        seed: 5555,
+      })) as {
+        winner: string
+        rounds: Array<{
+          round: number
+          ownershipA: number
+          ownershipB: number
+          contested: number
+          winner: string
+          event: string | null
+        }>
+        finalScore: { A: number; B: number }
+      }
+
+      expect(['A', 'B', 'draw']).toContain(sim.winner)
+      expect(sim.rounds.length).toBe(3)
+      expect(sim.rounds[0]?.round).toBe(1)
+      expect(sim.rounds[2]?.round).toBe(3)
+      expect(sim.finalScore.A + sim.finalScore.B).toBeLessThanOrEqual(3)
+    })
+  })
+
+  describe('animate_clash', () => {
+    it('lays down camera keyframe tracks on workspace timeline', async () => {
+      const f1 = createTestFlame()
+      const f2 = createTestFlame()
+
+      const res = (await mockContext.executeTool('animate_clash', {
+        flameA: f1,
+        flameB: f2,
+        framesPerRound: 30,
+      })) as { success: boolean; totalFrames: number; winner: string }
+
+      expect(res.success).toBe(true)
+      expect(res.totalFrames).toBe(90)
+      expect(cmdContext.timeline.setTracks).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ parameterPath: 'camera3D.theta' }),
+          expect.objectContaining({ parameterPath: 'camera3D.phi' }),
+          expect.objectContaining({ parameterPath: 'camera3D.radius' }),
+        ]),
+      )
+      expect(cmdContext.timeline.setDuration).toHaveBeenCalledWith(90)
+      expect(cmdContext.timeline.setAnimationEnabled).toHaveBeenCalledWith(true)
     })
   })
 

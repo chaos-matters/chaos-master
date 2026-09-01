@@ -1,13 +1,15 @@
-import { createSignal, Show } from 'solid-js'
+import { createSignal, For, Show } from 'solid-js'
 import { VariationPreview } from '@/components/VariationSelector/VariationSelector'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { Cross, Zap } from '@/icons'
+import { simulateClash } from '@/webmcp/tools/simulateClash'
 import ui from './ArenaOverlay.module.css'
 import type { Component } from 'solid-js'
 import type { CommandContext } from '@/commands/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { HardwareTier } from '@/utils/hardwareTier'
+import type { ClashRoundOutcome, SimulateClashResult, } from '@/webmcp/tools/simulateClash'
 
 export interface ArenaOverlayProps {
   arena: CommandContext['arena']
@@ -34,6 +36,9 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
   const [commentary, setCommentary] = createSignal<string | null>(null)
   const [winner, setWinner] = createSignal<1 | 2 | null>(null)
   const [clashing, setClashing] = createSignal(false)
+  const [rounds, setRounds] = createSignal<ClashRoundOutcome[]>([])
+  const [activeRoundIndex, setActiveRoundIndex] = createSignal<number>(0)
+  const [eventBanner, setEventBanner] = createSignal<string | null>(null)
 
   const handleClose = () => {
     props.arena.setOpen(false)
@@ -41,35 +46,71 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
     props.respond?.()
   }
 
-  const handleClash = () => {
+  const runSimulation = () => {
     const p1 = props.arena.player1Stats()
     const p2 = props.arena.player2Stats()
-    if (!p1 || !p2) return
+    if (!p1 || !p2 || !p1.flame || !p2.flame) return
 
     setClashing(true)
+    setWinner(null)
+    setEventBanner(null)
     setCommentary(
-      'Fighters engaging... Calculating resonance and fractal entropy!',
+      'Fighters engaging in shared 3D volume... Calculating territory density and entropy!',
     )
 
-    setTimeout(() => {
-      const p1Power =
-        (p1.powerLevel ?? 1000) + (p1.metrics?.complexity ?? 5) * 50
-      const p2Power =
-        (p2.powerLevel ?? 1000) + (p2.metrics?.chaosLevel ?? 5) * 50
+    const simRes = simulateClash.execute(
+      {
+        flameA: p1.flame,
+        flameB: p2.flame,
+        dimensions: 3,
+        rounds: 3,
+      },
+      {},
+    ) as SimulateClashResult
 
-      if (p1Power >= p2Power) {
-        setWinner(1)
-        setCommentary(
-          `${p1.name ?? 'Player 1'} dominates the arena with superior structural resonance! (Power: ${Math.round(p1Power)})`,
-        )
-      } else {
-        setWinner(2)
-        setCommentary(
-          `${p2.name ?? 'Player 2'} overwhelms with pure chaotic energy! (Power: ${Math.round(p2Power)})`,
-        )
-      }
+    if (!simRes || !simRes.rounds) {
       setClashing(false)
-    }, 800)
+      return
+    }
+
+    setRounds(simRes.rounds)
+    setActiveRoundIndex(0)
+
+    // Step through round 1 -> round 2 -> round 3
+    let currentIdx = 0
+    const stepInterval = setInterval(() => {
+      if (currentIdx < simRes.rounds.length) {
+        const r = simRes.rounds[currentIdx]!
+        setActiveRoundIndex(currentIdx)
+        if (r.event) {
+          setEventBanner(r.event)
+        }
+        const winnerName =
+          r.winner === 'A'
+            ? (p1.name ?? 'Player 1')
+            : r.winner === 'B'
+              ? (p2.name ?? 'Player 2')
+              : 'Contested'
+        setCommentary(
+          `Round ${r.round}: ${winnerName} takes territory (${Math.round(r.ownershipA * 100)}% vs ${Math.round(r.ownershipB * 100)}%)${r.event ? ` — [${r.event}]` : ''}`,
+        )
+        currentIdx++
+      } else {
+        clearInterval(stepInterval)
+        const finalWin =
+          simRes.winner === 'A' ? 1 : simRes.winner === 'B' ? 2 : null
+        setWinner(finalWin)
+        const winnerObj = finalWin === 1 ? p1 : p2
+        setCommentary(
+          `${winnerObj.name ?? `Player ${finalWin}`} secures victory in the 3D territory clash (${simRes.finalScore.A} - ${simRes.finalScore.B})!`,
+        )
+        setClashing(false)
+      }
+    }, 900)
+  }
+
+  const handleClash = () => {
+    runSimulation()
   }
 
   const loadFighter = (player: 1 | 2) => {
@@ -86,8 +127,17 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
         <div class={ui.header}>
           <div class={ui.titleGroup}>
             <div class={ui.pulseDot} />
-            <h2 class={ui.title}>Flame Clash Arena</h2>
+            <h2 class={ui.title}>Flame Clash Arena 3D</h2>
           </div>
+          <Show when={rounds().length > 0 && !clashing()}>
+            <button
+              class={ui.replayBtn}
+              onClick={runSimulation}
+              title="Replay Battle"
+            >
+              Replay Clash
+            </button>
+          </Show>
           <button
             class={ui.closeButton}
             onClick={handleClose}
@@ -100,9 +150,67 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
 
         {/* Body */}
         <div class={ui.body}>
+          {/* 3-Round Territory Bar */}
+          <Show when={rounds().length > 0}>
+            <div class={ui.roundsBar}>
+              <For each={rounds()}>
+                {(r, idx) => {
+                  const isCur = () => activeRoundIndex() === idx()
+                  return (
+                    <div
+                      class={ui.roundBadge}
+                      classList={{
+                        [ui.roundBadgeActive!]: isCur(),
+                        [ui.roundBadgeP1!]: r.winner === 'A',
+                        [ui.roundBadgeP2!]: r.winner === 'B',
+                      }}
+                    >
+                      R{r.round}:{' '}
+                      {r.winner === 'A'
+                        ? 'P1'
+                        : r.winner === 'B'
+                          ? 'P2'
+                          : 'DRAW'}
+                    </div>
+                  )
+                }}
+              </For>
+            </div>
+
+            {/* Active Round Territory Meter */}
+            <Show when={rounds()[activeRoundIndex()]}>
+              {(cur) => (
+                <div class={ui.territoryBar}>
+                  <div
+                    class={ui.territoryA}
+                    style={{ width: `${Math.round(cur().ownershipA * 100)}%` }}
+                    title={`P1 Territory: ${Math.round(cur().ownershipA * 100)}%`}
+                  />
+                  <div
+                    class={ui.territoryContested}
+                    style={{ width: `${Math.round(cur().contested * 100)}%` }}
+                    title={`Contested: ${Math.round(cur().contested * 100)}%`}
+                  />
+                  <div
+                    class={ui.territoryB}
+                    style={{ width: `${Math.round(cur().ownershipB * 100)}%` }}
+                    title={`P2 Territory: ${Math.round(cur().ownershipB * 100)}%`}
+                  />
+                </div>
+              )}
+            </Show>
+          </Show>
+
           {/* Commentary Box */}
           <Show when={commentary()}>
-            {(msg) => <div class={ui.commentaryBox}>{msg()}</div>}
+            {(msg) => (
+              <div class={ui.commentaryBox}>
+                {msg()}
+                <Show when={eventBanner()}>
+                  {(evt) => <span class={ui.eventBanner}>{evt()}</span>}
+                </Show>
+              </div>
+            )}
           </Show>
 
           {/* Battlefield */}

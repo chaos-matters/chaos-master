@@ -5,6 +5,7 @@
  * a single array for bulk registration by `registerWebMcp.ts`.
  */
 
+import { animateClash } from './animateClash'
 import { breedFlamesTool } from './breedFlames'
 import { createClashFlame } from './createClashFlame'
 import { createCustomVariationTool } from './createCustomVariation'
@@ -19,10 +20,12 @@ import { mutateFlame } from './mutateFlame'
 import { openArena } from './openArena'
 import { openArtDirector } from './openArtDirector'
 import { randomizeFlame } from './randomizeFlame'
+import { scoreClashRound } from './scoreClashRound'
 import { scoreFlame } from './scoreFlame'
 // Write tools
 import { setFlame } from './setFlame'
 import { createShareLink, loadShareLink } from './shareLink'
+import { simulateClash } from './simulateClash'
 import { redo, undo } from './undoRedo'
 import type { WebMcpTool } from '@/webmcp/types'
 
@@ -47,6 +50,9 @@ export {
   openArtDirector,
   breedFlamesTool,
   createCustomVariationTool,
+  scoreClashRound,
+  simulateClash,
+  animateClash,
 }
 
 /** All Tier 1 tools, in registration order. */
@@ -58,6 +64,9 @@ export const allTools: readonly WebMcpTool[] = [
   getUndoState,
   diffFlamesTool,
   createShareLink,
+  scoreFlame,
+  scoreClashRound,
+  simulateClash,
   // Write tools
   setFlame,
   randomizeFlame,
@@ -66,10 +75,10 @@ export const allTools: readonly WebMcpTool[] = [
   undo,
   redo,
   loadShareLink,
-  scoreFlame,
   createClashFlame,
   openArena,
   openArtDirector,
   breedFlamesTool,
   createCustomVariationTool,
+  animateClash,
 ]

@@ -2,7 +2,7 @@ import { getWebMcpContext } from '@/webmcp/contextBridge'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { WebMcpTool } from '@/webmcp/types'
 
-function calculateFlameStats(flame: FlameDescriptor) {
+export function calculateFlameStats(flame: FlameDescriptor) {
   const transforms = Object.values(flame.transforms ?? {})
 
   // 1. Complexity
