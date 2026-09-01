@@ -490,6 +490,7 @@ export function MainWorkspace(props: AppProps) {
             setState: setDirectorState,
             selectCandidate,
           }}
+          hardwareTier={props.hardwareTier}
           respond={() => {
             isDirectorModalOpen = false
             setDirectorOpen(false)
@@ -579,6 +580,7 @@ export function MainWorkspace(props: AppProps) {
               }
             },
           }}
+          hardwareTier={props.hardwareTier}
           respond={() => {
             isArenaModalOpen = false
             setShowArena(false)

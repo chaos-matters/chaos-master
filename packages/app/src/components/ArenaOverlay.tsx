@@ -1,15 +1,21 @@
 import { createSignal, Show } from 'solid-js'
+import { VariationPreview } from '@/components/VariationSelector/VariationSelector'
+import { ComputeGate } from '@/contexts/ComputeGateContext'
+import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { Cross, Zap } from '@/icons'
 import ui from './ArenaOverlay.module.css'
 import type { Component } from 'solid-js'
 import type { CommandContext } from '@/commands/types'
-import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { HardwareTier } from '@/utils/hardwareTier'
 
 export interface ArenaOverlayProps {
   arena: CommandContext['arena']
+  hardwareTier?: HardwareTier | null
   onClose?: () => void
   respond?: () => void
 }
+
+const PREVIEW_RES = { width: 380, height: 214 }
 
 export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
   const [commentary, setCommentary] = createSignal<string | null>(null)
@@ -60,217 +66,245 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
     }
   }
 
-  const flameGradient = (flame: FlameDescriptor | undefined, player: 1 | 2) => {
-    const xformCount = flame?.transforms
-      ? Object.keys(flame.transforms).length
-      : 3
-    if (player === 1) {
-      const hue = (185 + xformCount * 12) % 360
-      return `linear-gradient(135deg, hsl(${hue} 80% 15%), hsl(${(hue + 25) % 360} 70% 25%))`
-    }
-    const hue = (25 + xformCount * 12) % 360
-    return `linear-gradient(135deg, hsl(${hue} 85% 18%), hsl(${(hue - 35 + 360) % 360} 70% 25%))`
-  }
-
   return (
-    <div class={ui.modal} data-testid="flame-clash-arena-modal">
-      {/* Header */}
-      <div class={ui.header}>
-        <div class={ui.titleGroup}>
-          <div class={ui.pulseDot} />
-          <h2 class={ui.title}>Flame Clash Arena</h2>
-        </div>
-        <button
-          class={ui.closeButton}
-          onClick={handleClose}
-          aria-label="Exit Arena"
-          title="Exit Arena"
-        >
-          <Cross width="1rem" />
-        </button>
-      </div>
-
-      {/* Body */}
-      <div class={ui.body}>
-        {/* Commentary Box */}
-        <Show when={commentary()}>
-          {(msg) => <div class={ui.commentaryBox}>{msg()}</div>}
-        </Show>
-
-        {/* Battlefield */}
-        <div class={ui.battlefield}>
-          {/* Player 1 (Left / Cyan) */}
-          <Show when={props.arena.player1Stats()}>
-            {(p1) => (
-              <div
-                class={`${ui.fighterCard} ${ui.p1Card}`}
-                classList={{ [ui.p1CardWinner!]: winner() === 1 }}
-              >
-                <div class={ui.fighterPreview}>
-                  <div
-                    class={ui.fighterPreviewInner}
-                    style={{ background: flameGradient(p1().flame, 1) }}
-                  >
-                    <span class={ui.fighterLabel}>
-                      {p1().name ?? 'Player 1'}
-                    </span>
-                  </div>
-                  <Show when={winner() === 1}>
-                    <div class={ui.victorBadge}>VICTOR</div>
-                  </Show>
-                </div>
-
-                <div class={ui.fighterHeader}>
-                  <div>
-                    <div class={`${ui.fighterName} ${ui.p1Name}`}>
-                      {p1().name ?? 'Player 1'}
-                    </div>
-                    <div class={ui.fighterClass}>
-                      Class: {p1().type || 'Fractal Guardian'}
-                    </div>
-                  </div>
-                  <Show when={p1().flame}>
-                    <button
-                      class={ui.loadBtn}
-                      onClick={() => {
-                        loadFighter(1)
-                      }}
-                    >
-                      Load
-                    </button>
-                  </Show>
-                </div>
-
-                <div class={ui.statList}>
-                  <StatRow
-                    label="Power"
-                    value={p1().powerLevel || 0}
-                    max={2000}
-                    color="#22d3ee"
-                  />
-                  <StatRow
-                    label="Complexity"
-                    value={(p1().metrics?.complexity || 0) * 10}
-                    max={100}
-                    color="#60a5fa"
-                  />
-                  <StatRow
-                    label="Chaos"
-                    value={(p1().metrics?.chaosLevel || 0) * 10}
-                    max={100}
-                    color="#c084fc"
-                  />
-                  <StatRow
-                    label="Symmetry"
-                    value={(p1().metrics?.symmetryScore || 0) * 10}
-                    max={100}
-                    color="#818cf8"
-                  />
-                  <StatRow
-                    label="Energy"
-                    value={(p1().metrics?.energyIntensity || 0) * 10}
-                    max={100}
-                    color="#2dd4bf"
-                  />
-                </div>
-              </div>
-            )}
-          </Show>
-
-          {/* VS Center Graphic & Clash Button */}
-          <div class={ui.vsCenter}>
-            <div class={ui.vsText}>VS</div>
-            <button
-              class={ui.clashBtn}
-              onClick={handleClash}
-              disabled={clashing()}
-            >
-              <Zap width="1.2rem" height="1.2rem" />
-              <span>{clashing() ? 'CLASHING...' : 'CLASH'}</span>
-              <Zap width="1.2rem" height="1.2rem" />
-            </button>
+    <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
+      <div class={ui.modal} data-testid="flame-clash-arena-modal">
+        {/* Header */}
+        <div class={ui.header}>
+          <div class={ui.titleGroup}>
+            <div class={ui.pulseDot} />
+            <h2 class={ui.title}>Flame Clash Arena</h2>
           </div>
+          <button
+            class={ui.closeButton}
+            onClick={handleClose}
+            aria-label="Exit Arena"
+            title="Exit Arena"
+          >
+            <Cross width="1rem" />
+          </button>
+        </div>
 
-          {/* Player 2 (Right / Orange) */}
-          <Show when={props.arena.player2Stats()}>
-            {(p2) => (
-              <div
-                class={`${ui.fighterCard} ${ui.p2Card}`}
-                classList={{ [ui.p2CardWinner!]: winner() === 2 }}
-              >
-                <div class={ui.fighterPreview}>
-                  <div
-                    class={ui.fighterPreviewInner}
-                    style={{ background: flameGradient(p2().flame, 2) }}
-                  >
-                    <span class={ui.fighterLabel}>
-                      {p2().name ?? 'Player 2'}
-                    </span>
-                  </div>
-                  <Show when={winner() === 2}>
-                    <div class={ui.victorBadge}>VICTOR</div>
-                  </Show>
-                </div>
-
-                <div class={ui.fighterHeader}>
-                  <div>
-                    <div class={`${ui.fighterName} ${ui.p2Name}`}>
-                      {p2().name ?? 'Player 2'}
-                    </div>
-                    <div class={ui.fighterClass}>
-                      Class: {p2().type || 'Chaos Lord'}
-                    </div>
-                  </div>
-                  <Show when={p2().flame}>
-                    <button
-                      class={ui.loadBtn}
-                      onClick={() => {
-                        loadFighter(2)
-                      }}
-                    >
-                      Load
-                    </button>
-                  </Show>
-                </div>
-
-                <div class={ui.statList}>
-                  <StatRow
-                    label="Power"
-                    value={p2().powerLevel || 0}
-                    max={2000}
-                    color="#fb923c"
-                  />
-                  <StatRow
-                    label="Complexity"
-                    value={(p2().metrics?.complexity || 0) * 10}
-                    max={100}
-                    color="#f87171"
-                  />
-                  <StatRow
-                    label="Chaos"
-                    value={(p2().metrics?.chaosLevel || 0) * 10}
-                    max={100}
-                    color="#f472b6"
-                  />
-                  <StatRow
-                    label="Symmetry"
-                    value={(p2().metrics?.symmetryScore || 0) * 10}
-                    max={100}
-                    color="#facc15"
-                  />
-                  <StatRow
-                    label="Energy"
-                    value={(p2().metrics?.energyIntensity || 0) * 10}
-                    max={100}
-                    color="#fbbf24"
-                  />
-                </div>
-              </div>
-            )}
+        {/* Body */}
+        <div class={ui.body}>
+          {/* Commentary Box */}
+          <Show when={commentary()}>
+            {(msg) => <div class={ui.commentaryBox}>{msg()}</div>}
           </Show>
+
+          {/* Battlefield */}
+          <div class={ui.battlefield}>
+            {/* Player 1 (Left / Cyan) */}
+            <Show when={props.arena.player1Stats()}>
+              {(p1) => (
+                <div
+                  class={`${ui.fighterCard} ${ui.p1Card}`}
+                  classList={{ [ui.p1CardWinner!]: winner() === 1 }}
+                >
+                  <div class={ui.fighterPreview}>
+                    <Show
+                      when={
+                        p1().flame?.renderSettings?.camera ? p1().flame : null
+                      }
+                      fallback={
+                        <div class={ui.fighterPreviewInner}>
+                          <span class={ui.fighterLabel}>
+                            {p1().name ?? 'Player 1'}
+                          </span>
+                        </div>
+                      }
+                    >
+                      {(f) => (
+                        <div class={ui.previewLayer}>
+                          <VariationPreview
+                            version={0}
+                            isSelected={winner() === 1}
+                            flame={f()}
+                            name={p1().name ?? 'Player 1'}
+                            resolution={PREVIEW_RES}
+                            hardwareTier={props.hardwareTier}
+                            snapshotOnly
+                          />
+                        </div>
+                      )}
+                    </Show>
+
+                    <Show when={winner() === 1}>
+                      <div class={ui.victorBadge}>VICTOR</div>
+                    </Show>
+                  </div>
+
+                  <div class={ui.fighterHeader}>
+                    <div>
+                      <div class={`${ui.fighterName} ${ui.p1Name}`}>
+                        {p1().name ?? 'Player 1'}
+                      </div>
+                      <div class={ui.fighterClass}>
+                        Class: {p1().type || 'Fractal Guardian'}
+                      </div>
+                    </div>
+                    <Show when={p1().flame}>
+                      <button
+                        class={ui.loadBtn}
+                        onClick={() => {
+                          loadFighter(1)
+                        }}
+                      >
+                        Load
+                      </button>
+                    </Show>
+                  </div>
+
+                  <div class={ui.statList}>
+                    <StatRow
+                      label="Power"
+                      value={p1().powerLevel || 0}
+                      max={2000}
+                      color="#22d3ee"
+                    />
+                    <StatRow
+                      label="Complexity"
+                      value={(p1().metrics?.complexity || 0) * 10}
+                      max={100}
+                      color="#60a5fa"
+                    />
+                    <StatRow
+                      label="Chaos"
+                      value={(p1().metrics?.chaosLevel || 0) * 10}
+                      max={100}
+                      color="#c084fc"
+                    />
+                    <StatRow
+                      label="Symmetry"
+                      value={(p1().metrics?.symmetryScore || 0) * 10}
+                      max={100}
+                      color="#818cf8"
+                    />
+                    <StatRow
+                      label="Energy"
+                      value={(p1().metrics?.energyIntensity || 0) * 10}
+                      max={100}
+                      color="#2dd4bf"
+                    />
+                  </div>
+                </div>
+              )}
+            </Show>
+
+            {/* VS Center Graphic & Clash Button */}
+            <div class={ui.vsCenter}>
+              <div class={ui.vsText}>VS</div>
+              <button
+                class={ui.clashBtn}
+                onClick={handleClash}
+                disabled={clashing()}
+              >
+                <Zap width="1.2rem" height="1.2rem" />
+                <span>{clashing() ? 'CLASHING...' : 'CLASH'}</span>
+                <Zap width="1.2rem" height="1.2rem" />
+              </button>
+            </div>
+
+            {/* Player 2 (Right / Orange) */}
+            <Show when={props.arena.player2Stats()}>
+              {(p2) => (
+                <div
+                  class={`${ui.fighterCard} ${ui.p2Card}`}
+                  classList={{ [ui.p2CardWinner!]: winner() === 2 }}
+                >
+                  <div class={ui.fighterPreview}>
+                    <Show
+                      when={
+                        p2().flame?.renderSettings?.camera ? p2().flame : null
+                      }
+                      fallback={
+                        <div class={ui.fighterPreviewInner}>
+                          <span class={ui.fighterLabel}>
+                            {p2().name ?? 'Player 2'}
+                          </span>
+                        </div>
+                      }
+                    >
+                      {(f) => (
+                        <div class={ui.previewLayer}>
+                          <VariationPreview
+                            version={0}
+                            isSelected={winner() === 2}
+                            flame={f()}
+                            name={p2().name ?? 'Player 2'}
+                            resolution={PREVIEW_RES}
+                            hardwareTier={props.hardwareTier}
+                            snapshotOnly
+                          />
+                        </div>
+                      )}
+                    </Show>
+
+                    <Show when={winner() === 2}>
+                      <div class={ui.victorBadge}>VICTOR</div>
+                    </Show>
+                  </div>
+
+                  <div class={ui.fighterHeader}>
+                    <div>
+                      <div class={`${ui.fighterName} ${ui.p2Name}`}>
+                        {p2().name ?? 'Player 2'}
+                      </div>
+                      <div class={ui.fighterClass}>
+                        Class: {p2().type || 'Chaos Lord'}
+                      </div>
+                    </div>
+                    <Show when={p2().flame}>
+                      <button
+                        class={ui.loadBtn}
+                        onClick={() => {
+                          loadFighter(2)
+                        }}
+                      >
+                        Load
+                      </button>
+                    </Show>
+                  </div>
+
+                  <div class={ui.statList}>
+                    <StatRow
+                      label="Power"
+                      value={p2().powerLevel || 0}
+                      max={2000}
+                      color="#fb923c"
+                    />
+                    <StatRow
+                      label="Complexity"
+                      value={(p2().metrics?.complexity || 0) * 10}
+                      max={100}
+                      color="#f87171"
+                    />
+                    <StatRow
+                      label="Chaos"
+                      value={(p2().metrics?.chaosLevel || 0) * 10}
+                      max={100}
+                      color="#f472b6"
+                    />
+                    <StatRow
+                      label="Symmetry"
+                      value={(p2().metrics?.symmetryScore || 0) * 10}
+                      max={100}
+                      color="#facc15"
+                    />
+                    <StatRow
+                      label="Energy"
+                      value={(p2().metrics?.energyIntensity || 0) * 10}
+                      max={100}
+                      color="#fbbf24"
+                    />
+                  </div>
+                </div>
+              )}
+            </Show>
+          </div>
         </div>
       </div>
-    </div>
+    </ComputeGate>
   )
 }
 
