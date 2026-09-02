@@ -1,7 +1,8 @@
 .shield {
   position: fixed;
   inset: 0;
-  z-index: 10000;
+  /* Topmost layer: version pills 9999 < Arcade hub 10005/10006 < pilot lock 10010. */
+  z-index: 10010;
   pointer-events: all;
   background: rgba(4, 6, 12, 0.35);
   backdrop-filter: blur(1px);
@@ -124,7 +125,8 @@
 .endBackdrop {
   position: fixed;
   inset: 0;
-  z-index: 10000;
+  /* Topmost layer: version pills 9999 < Arcade hub 10005/10006 < pilot lock 10010. */
+  z-index: 10010;
   display: grid;
   place-items: center;
   background: rgba(4, 6, 12, 0.6);
