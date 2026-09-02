@@ -34,6 +34,14 @@ export type PilotEnded = {
   title: string
   summary?: string
   sessionName?: string
+  /**
+   * Did the take reach the library? `undefined` while the write is still in
+   * flight, and for a take that was never saved. The pilot leaves `driving`
+   * the moment the recorder stops (so no tool call can slip through the
+   * guard unrecorded), which is before the write settles — hence a second
+   * field rather than a value baked into `endPilot`.
+   */
+  saved?: boolean
   steps: number
   durationMs: number
 }
@@ -142,6 +150,13 @@ export function endPilot(
   setPilot(ended)
   appendPilotLog('system', `${ended.title}: ${reason}`)
   return ended
+}
+
+/** Record how the library write went, once it settles. */
+export function notePilotSaveResult(saved: boolean): void {
+  const state = pilot()
+  if (state.phase !== 'ended') return
+  setPilot({ ...state, saved })
 }
 
 export function resetPilot(): void {

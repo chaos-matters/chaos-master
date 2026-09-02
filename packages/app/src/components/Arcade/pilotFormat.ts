@@ -19,3 +19,13 @@ export function reasonLabel(reason: PilotEndReason): string {
       return 'Ended after an error'
   }
 }
+
+/**
+ * What the end card says about the library write. `saved` is undefined while
+ * the write is still in flight, which is a real state the card can render.
+ */
+export function savedLine(sessionName: string, saved?: boolean): string {
+  if (saved === false) return `Could not save "${sessionName}" to your library`
+  if (saved === true) return `Saved to your library as "${sessionName}"`
+  return `Saving "${sessionName}" to your library...`
+}

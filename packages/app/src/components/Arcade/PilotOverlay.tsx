@@ -2,7 +2,7 @@ import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
 import { agentDriving, drivingState, lastPilotSession, pilot, pilotElapsedMs, pilotLog, resetPilot, } from '@/arcade/pilot'
 import { finishPilot } from '@/arcade/pilotActions'
 import { Robot, Stop } from '@/icons'
-import { formatElapsed, reasonLabel } from './pilotFormat'
+import { formatElapsed, reasonLabel, savedLine } from './pilotFormat'
 import ui from './PilotOverlay.module.css'
 import type { PilotEnded } from '@/arcade/pilot'
 import type { CommandContext } from '@/commands/types'
@@ -153,7 +153,14 @@ export function PilotOverlay(props: { ctx: CommandContext }) {
               </Show>
               <Show when={end().sessionName}>
                 {(name) => (
-                  <p class={ui.endSaved}>Saved to your library as "{name()}"</p>
+                  <p
+                    classList={{
+                      [ui.endSaved!]: true,
+                      [ui.endFailed!]: end().saved === false,
+                    }}
+                  >
+                    {savedLine(name(), end().saved)}
+                  </p>
                 )}
               </Show>
               <div class={ui.endActions}>
@@ -162,6 +169,9 @@ export function PilotOverlay(props: { ctx: CommandContext }) {
                     <button
                       type="button"
                       class={ui.primary}
+                      // A take the library rejected is not one to hand to the
+                      // replay dock as if it were stored.
+                      disabled={end().saved === false}
                       onClick={() => {
                         const take = session()
                         resetPilot()

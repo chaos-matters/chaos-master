@@ -1,5 +1,5 @@
 import { clearNarration } from './narration'
-import { appendPilotLog, drivingState, endPilot } from './pilot'
+import { appendPilotLog, drivingState, endPilot, notePilotSaveResult, } from './pilot'
 import { isTopicId, LESSON_TOPICS } from './topics'
 import type { PilotDriving, PilotEnded, PilotEndReason } from './pilot'
 import type { CommandContext } from '@/commands/types'
@@ -65,6 +65,7 @@ export async function finishPilot(
       appendPilotLog('error', 'Could not save the session to the library')
     }
   }
+  if (session && sessionName !== undefined) notePilotSaveResult(saved)
   ctx.arcade?.toast(
     sessionName === undefined
       ? `${title} ended`

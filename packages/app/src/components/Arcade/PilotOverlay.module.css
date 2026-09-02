@@ -154,6 +154,11 @@
   font-size: 13px;
 }
 
+.endFailed {
+  color: #ffb3b3;
+  opacity: 1;
+}
+
 .endSummary {
   margin: 0 0 12px;
 }
@@ -180,4 +185,9 @@
 .primary {
   background: #2f6fed !important;
   border-color: #2f6fed !important;
+}
+
+.endActions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
