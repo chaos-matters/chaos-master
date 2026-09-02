@@ -42,23 +42,35 @@ export async function finishPilot(
   const title =
     (opts.title ?? '').trim().slice(0, 80) || defaultPilotTitle(state)
   const session = ctx.recorder?.stop()
-  let sessionName: string | undefined
-  if (session) {
-    sessionName = sessionNameFor(state, title, reason)
-    try {
-      await ctx.recorder?.save(session, sessionName)
-    } catch (error) {
-      console.warn('[arcade] could not save the session', error)
-      appendPilotLog('error', 'Could not save the session to the library')
-    }
-  }
+  const sessionName = session ? sessionNameFor(state, title, reason) : undefined
   clearNarration()
+  // Leave `driving` in the same tick the recorder stops. Awaiting the save
+  // first left a window in which the guard still said "driving" while nothing
+  // was being recorded, so a tool call landing there ran and counted a step
+  // the saved session does not contain.
   const ended = endPilot(reason, {
     title,
     summary: opts.summary?.slice(0, 400),
     sessionName,
     session,
   })
-  ctx.arcade?.toast(sessionName ? `Saved "${sessionName}"` : `${title} ended`)
-  return ended ?? { error: 'No active Arcade session.' }
+  if (!ended) return { error: 'No active Arcade session.' }
+  let saved = true
+  if (session && sessionName !== undefined) {
+    try {
+      await ctx.recorder?.save(session, sessionName)
+    } catch (error) {
+      saved = false
+      console.warn('[arcade] could not save the session', error)
+      appendPilotLog('error', 'Could not save the session to the library')
+    }
+  }
+  ctx.arcade?.toast(
+    sessionName === undefined
+      ? `${title} ended`
+      : saved
+        ? `Saved "${sessionName}"`
+        : `Could not save "${sessionName}" to your library`,
+  )
+  return ended
 }

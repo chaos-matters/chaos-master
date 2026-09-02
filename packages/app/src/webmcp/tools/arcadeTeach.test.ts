@@ -106,6 +106,31 @@ describe('Teach tools', () => {
     )
   })
 
+  it('leaves the driving phase before the save resolves', async () => {
+    const ctx = ctxWithRecorder()
+    let resolveSave: () => void = () => {}
+    const saving = new Promise<void>((resolve) => {
+      resolveSave = resolve
+    })
+    ctx.recorder!.save = vi.fn(() => saving)
+    await arcadeStartLesson.execute({ topic: 'color' }, {})
+
+    const ending = arcadeEndLesson.execute({ title: 'Warm tones' }, {})
+    // The recorder has already stopped here. If the pilot were still driving
+    // while the save awaited, a tool call landing in that window would pass
+    // the guard, count a step and run unrecorded.
+    expect(pilot().phase).toBe('ended')
+    expect(agentDriving()).toBe(false)
+    expect(
+      await arcadeNarrate.execute({ text: 'in the gap' }, {}),
+    ).toHaveProperty('error')
+    resolveSave()
+    expect(await ending).toMatchObject({
+      ok: true,
+      sessionName: 'Lesson: Colour and tone — Warm tones',
+    })
+  })
+
   it('gates non-arcade write tools while driving', async () => {
     ctxWithRecorder()
     await arcadeStartLesson.execute({ topic: 'color' }, {})
