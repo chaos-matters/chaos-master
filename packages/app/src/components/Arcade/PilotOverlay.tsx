@@ -61,6 +61,23 @@ export function PilotOverlay(props: { ctx: CommandContext }) {
   const ended = () =>
     pilot().phase === 'ended' ? (pilot() as PilotEnded) : undefined
 
+  // Escape on the end card does what "Stay in the editor" does. A modal that
+  // ignores Escape is a modal people feel stuck in, and by this point the
+  // take is already saved, so dismissing it costs nothing.
+  createEffect(() => {
+    if (!ended()) return
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape') return
+      ev.preventDefault()
+      ev.stopImmediatePropagation()
+      resetPilot()
+    }
+    document.addEventListener('keydown', onKey, true)
+    onCleanup(() => {
+      document.removeEventListener('keydown', onKey, true)
+    })
+  })
+
   return (
     <>
       <Show when={drivingState()}>

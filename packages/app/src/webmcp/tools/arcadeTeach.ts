@@ -122,8 +122,7 @@ export const arcadeStartLesson: WebMcpTool = {
       variationTypes: usesVariationTypes ? SAMPLE_VARIATION_TYPES : undefined,
       stepBudget: topic.stepBudget,
       tips: [
-        'arcade_narrate one sentence before each group of commands.',
-        'execute_command args must match the shapes above exactly.',
+        'Narrate before each group; args must match the shapes exactly.',
         'Check with get_flame; finish with arcade_end_lesson.',
       ],
     }

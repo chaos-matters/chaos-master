@@ -13,9 +13,12 @@ import { getAllCommands } from '@/commands/registry'
  * ~1.5 KB tool-result budget.
  */
 const COMMAND_ARG_HINTS: Readonly<Record<string, string>> = {
-  'flame.addTransform': '[variationType, newTransformId, newVariationId]',
-  'flame.deleteTransform': '[transformId, newVariationId]',
-  'flame.addVariation': '[transformId, variationType, newVariationId]',
+  'flame.addTransform':
+    '[variationType, newTransformId, newVariationId] — both ids must be new, e.g. "t3"/"v3"',
+  'flame.deleteTransform':
+    '[transformId, newVariationId] — the second id must be new (used if the last transform resets)',
+  'flame.addVariation':
+    '[transformId, variationType, newVariationId] — the variation id must be new',
   'flame.deleteVariation': '[transformId, variationId]',
   'flame.setVariation': '[transformId, variationId, { type: variationType }]',
   'flame.setVariationWeight': '[transformId, variationId, weight]',
@@ -54,10 +57,6 @@ export const SAMPLE_VARIATION_TYPES = [
   'horseshoeVar',
   'discVar',
   'polarVar',
-  'heartVar',
-  'diamondVar',
-  'eyefishVar',
-  'bubbleVar',
 ] as const
 
 /**

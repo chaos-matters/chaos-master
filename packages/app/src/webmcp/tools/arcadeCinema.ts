@@ -1,4 +1,5 @@
 import { buildAnimatableCatalog, buildTimelineSnapshot, MAX_CINEMA_FRAMES, MAX_CINEMA_KEYFRAMES_PER_TRACK, MAX_CINEMA_TRACKS, } from '@/arcade/animatablePaths'
+import { describeAllowedCommands } from '@/arcade/commandHints'
 import { qualityRank } from '@/arcade/guard'
 import { clearNarration } from '@/arcade/narration'
 import { agentDriving, drivingState, notePilotStep, pilotStepsRemaining, startPilot, } from '@/arcade/pilot'
@@ -66,7 +67,7 @@ export const arcadeStartCinema: WebMcpTool = {
     return {
       ok: true,
       stepBudget: CINEMA_STEP_BUDGET,
-      allowedCommands: allowed,
+      allowedCommands: describeAllowedCommands(allowed),
       tips: [
         'Call arcade_get_animatable_paths first.',
         'arcade_set_keyframes replaces the whole animation; send all tracks each time.',
@@ -76,16 +77,27 @@ export const arcadeStartCinema: WebMcpTool = {
   },
 }
 
+/** How many transforms get their variation weights listed before the result
+ *  would blow the ~1.5 KB tool-result budget. */
+const MAX_LISTED_TRANSFORMS = 8
+
+/** Every transform exposes the same paths, so the grammar is stated once
+ *  instead of repeated for each one. */
+const TRANSFORM_PATHS =
+  'transform.<id>.{preAffine|postAffine}.{a-f} | transform.<id>.{probability|colorSpeed|color.x|color.y} | <id>.<variationId> weight | finalTransform.{a-f}'
+
 function summarize(
   catalog: CatalogEntry[],
   config: { fps: number; endFrame: number; loopMode?: string } | undefined,
 ) {
+  // `type` is dropped for numbers, which is nearly every path; the tool
+  // description says so. It is the single biggest saving in this result.
   const simple = (group: string) =>
     catalog
       .filter((entry) => entry.group === group)
       .map((entry) => ({
         path: entry.path,
-        type: entry.type,
+        type: entry.type === 'number' ? undefined : entry.type,
         current: entry.current,
       }))
   const transformIds = [
@@ -95,33 +107,36 @@ function summarize(
         .map((entry) => entry.path.split('.')[1]!),
     ),
   ]
+  const listed = transformIds.slice(0, MAX_LISTED_TRANSFORMS)
   return {
     render: simple('Render'),
     palette: simple('Palette'),
     color: simple('Color'),
     camera: simple('Camera'),
-    transforms: transformIds.map((id) => ({
+    transformPaths: TRANSFORM_PATHS,
+    transforms: listed.map((id) => ({
       id,
-      affine: `transform.${id}.preAffine.{a-f} | transform.${id}.postAffine.{a-f}`,
-      other: [
-        `transform.${id}.probability`,
-        `transform.${id}.colorSpeed`,
-        `transform.${id}.color.x`,
-        `transform.${id}.color.y`,
-      ],
-      variations: catalog
-        .filter((entry) => entry.group === `Transform ${id} variations`)
-        .map((entry) => ({ path: entry.path, weight: entry.current })),
+      // Keyed by variation id, not the full path: the transform id is right
+      // there in `id`, and repeating it in every key is pure budget.
+      variations: Object.fromEntries(
+        catalog
+          .filter((entry) => entry.group === `Transform ${id} variations`)
+          .map((entry) => [entry.path.slice(id.length + 1), entry.current]),
+      ),
     })),
-    finalTransform: 'finalTransform.{a-f}',
+    // Set only when transforms were left out, together with the real count,
+    // so the agent knows to ask for the rest through get_flame.
+    truncated: listed.length < transformIds.length ? true : undefined,
+    transformCount:
+      listed.length < transformIds.length ? transformIds.length : undefined,
+    // Easing and interpolation names are not repeated here: they are the
+    // enums on arcade_set_keyframes' own input schema.
     limits: {
-      maxFrames: MAX_CINEMA_FRAMES,
-      maxTracks: MAX_CINEMA_TRACKS,
-      maxKeyframesPerTrack: MAX_CINEMA_KEYFRAMES_PER_TRACK,
+      frames: MAX_CINEMA_FRAMES,
+      tracks: MAX_CINEMA_TRACKS,
+      keyframesPerTrack: MAX_CINEMA_KEYFRAMES_PER_TRACK,
       fps: '1-60',
     },
-    easings: EASINGS,
-    interps: INTERPS,
     current: config
       ? {
           fps: config.fps,
@@ -135,7 +150,7 @@ function summarize(
 export const arcadeGetAnimatablePaths: WebMcpTool = {
   name: 'arcade_get_animatable_paths',
   description:
-    'List every parameter path the timeline can keyframe for the current flame (render settings, palette, camera, per-transform affine coefficients, probability, colour, variation weights, final transform) with current values, limits, easing and interpolation names.',
+    'List every parameter path the timeline can keyframe for the current flame (render settings, palette, camera, per-transform affine coefficients, probability, colour, variation weights, final transform) with current values and limits. A path with no "type" is a number; transformPaths gives the per-transform grammar; easing and interpolation names are the enums on arcade_set_keyframes.',
   inputSchema: { type: 'object', properties: {} },
   annotations: { readOnlyHint: true },
   execute: () => {

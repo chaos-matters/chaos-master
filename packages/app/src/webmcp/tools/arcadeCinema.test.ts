@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { pilot, resetPilot } from '@/arcade/pilot'
 import { cancelSessionRecording, startSessionRecording, stopSessionRecording, unnamedWriteCount, } from '@/recorder/recorder'
 import { clearWebMcpContext, setWebMcpContext } from '@/webmcp/contextBridge'
-import { createMockCommandContext } from '@/webmcp/testUtils'
+import { createMockCommandContext, createTestFlame } from '@/webmcp/testUtils'
 import { arcadeEndCinema, arcadeGetAnimatablePaths, arcadeSetKeyframes, arcadeStartCinema, } from './arcadeCinema'
 
 /** A mock whose recorder hands back a take, the way a real one does. */
@@ -27,10 +27,15 @@ describe('Cinema tools', () => {
 
   it('starts, lists paths, applies keyframes through timeline.loadTimeline, ends', async () => {
     const ctx = ctxWithRecorder()
-    expect(await arcadeStartCinema.execute({}, {})).toMatchObject({
-      ok: true,
-      stepBudget: 40,
-    })
+    const brief = (await arcadeStartCinema.execute({}, {})) as Record<
+      string,
+      unknown
+    >
+    expect(brief).toMatchObject({ ok: true, stepBudget: 40 })
+    // The brief names concrete command ids with their argument shapes, the
+    // same as Teach, and still fits the tool-result budget.
+    expect(JSON.stringify(brief)).toContain('timeline.setCurrentFrame')
+    expect(JSON.stringify(brief).length).toBeLessThan(1500)
     expect(ctx.recorder!.start).toHaveBeenCalledTimes(1)
     const paths = (await arcadeGetAnimatablePaths.execute({}, {})) as {
       render: { path: string }[]
@@ -79,6 +84,35 @@ describe('Cinema tools', () => {
       sessionName: 'Animation: Slow push-in',
     })
     expect(pilot().phase).toBe('ended')
+  })
+
+  it('keeps the paths result inside the budget for a busy flame', async () => {
+    const ctx = createMockCommandContext()
+    const flame = createTestFlame()
+    const template = (flame.transforms as unknown as Record<string, unknown>).t1
+    const busy: Record<string, unknown> = {}
+    for (let index = 1; index <= 8; index++) {
+      const copy = JSON.parse(JSON.stringify(template)) as {
+        variations: Record<string, unknown>
+      }
+      copy.variations = {
+        [`v${index}a`]: { type: 'linear', weight: 1 },
+        [`v${index}b`]: { type: 'spherical', weight: 0.5 },
+        [`v${index}c`]: { type: 'swirl', weight: 0.25 },
+      }
+      busy[`t${index}`] = copy
+    }
+    ;(flame as unknown as { transforms: unknown }).transforms = busy
+    ctx.flameDescriptor = () => flame
+    setWebMcpContext(ctx)
+
+    const paths = (await arcadeGetAnimatablePaths.execute({}, {})) as {
+      transforms: { id: string }[]
+      transformPaths: string
+    }
+    expect(paths.transforms).toHaveLength(8)
+    expect(paths.transformPaths).toContain('preAffine')
+    expect(JSON.stringify(paths).length).toBeLessThan(1500)
   })
 
   it('keeps the wall-clock play out of the recorded take', async () => {
