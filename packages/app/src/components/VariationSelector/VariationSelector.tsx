@@ -232,10 +232,9 @@ export function VariationPreview(props: {
   let activeObjectUrl: string | undefined
 
   createEffect(() => {
-    // When version increments or flame changes, discard the stale cached image
-    // so the Flam3 canvas becomes visible again and re-renders.
+    // When version increments (point init mode changed), discard the stale
+    // cached image so the Flam3 canvas becomes visible again and re-renders.
     void props.version
-    void props.flame
     if (activeObjectUrl !== undefined) {
       URL.revokeObjectURL(activeObjectUrl)
       activeObjectUrl = undefined
@@ -261,37 +260,6 @@ export function VariationPreview(props: {
       image() === undefined &&
       (allowed() || settledVisible() || renderStatus() === 'done'),
   )
-
-  const normalizedFlame = createMemo(() => {
-    const f = props.flame
-    if (!f) return f
-    const xforms = Object.values(f.transforms ?? {})
-    const xformCount = xforms.length
-    let totalVariations = 0
-    for (const t of xforms) {
-      totalVariations += Object.keys(t.variations ?? {}).length
-    }
-    const densityFactor = Math.max(
-      1,
-      Math.sqrt(
-        (xformCount * Math.max(1, totalVariations / Math.max(1, xformCount))) /
-          2,
-      ),
-    )
-    const minExposure = Math.max(1.3, 0.9 * densityFactor)
-    const currentExp = f.renderSettings?.exposure ?? 0.5
-    const exposure = Math.max(currentExp, minExposure)
-    const gamma = Math.max(f.renderSettings?.gamma ?? 2.2, 1.8)
-
-    return {
-      ...f,
-      renderSettings: {
-        ...f.renderSettings,
-        exposure,
-        gamma,
-      },
-    }
-  })
 
   createEffect(() => {
     if (!container() || renderStatus() !== 'done') {
@@ -387,7 +355,7 @@ export function VariationPreview(props: {
                   pointCountPerBatch={GALLERY_PREVIEW_POINT_COUNT}
                   persistChains={false}
                   adaptiveFilterEnabled={false}
-                  flameDescriptor={normalizedFlame()}
+                  flameDescriptor={props.flame}
                   renderInterval={allowed() ? 1 : Infinity}
                   onExportImage={exportImage()}
                   edgeFadeColor={vec4f(0)}
@@ -408,7 +376,7 @@ export function VariationPreview(props: {
                 // widens its kernel in sparse regions, smearing the soft edge of
                 // the projected 3D cloud into a dark halo around the bright core.
                 adaptiveFilterEnabled={false}
-                flameDescriptor={normalizedFlame()}
+                flameDescriptor={props.flame}
                 renderInterval={allowed() ? 1 : Infinity}
                 onExportImage={exportImage()}
                 edgeFadeColor={vec4f(0)}
