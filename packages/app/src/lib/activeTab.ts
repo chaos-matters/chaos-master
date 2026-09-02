@@ -5,7 +5,7 @@ import { createSignal } from 'solid-js'
  *
  * 'workspace' is the editor and stays the default: every existing entry path
  * (share links, benchmark, the welcome screen) expects to land there, so
- * adding Home must not change where anyone arrives.
+ * adding Home — and later the Arcade — must not change where anyone arrives.
  */
 export type AppTab = 'home' | 'workspace' | 'arcade'
 
@@ -13,20 +13,23 @@ export type AppTab = 'home' | 'workspace' | 'arcade'
 export type ArcadeMode = 'teach' | 'cinema' | 'duel' | 'beats'
 
 /**
- * The tab lives in the URL fragment (`#home`) rather than in storage, so a
- * reload keeps you where you were and the address bar tells the truth. The
- * fragment is deliberate: the app is served as a single page, so a real path
- * would 404 on refresh without server rewrites, and unlike a query parameter
- * a fragment is never sent to the server — which also keeps it out of
- * analytics alongside the share payloads (see lib/telemetry.ts).
+ * The tab lives in the URL fragment (`#home`, `#arcade`, `#arcade=teach`)
+ * rather than in storage, so a reload keeps you where you were and the address
+ * bar tells the truth. The fragment is deliberate: the app is served as a
+ * single page, so a real path would 404 on refresh without server rewrites,
+ * and unlike a query parameter a fragment is never sent to the server — which
+ * also keeps it out of analytics alongside the share payloads (see
+ * lib/telemetry.ts). `/arcade` is canonicalised to `#arcade` by the worker.
  */
 const HOME_HASH = '#home'
 const ARCADE_HASH = '#arcade'
+const ARCADE_MODES: readonly ArcadeMode[] = ['teach', 'cinema', 'duel', 'beats']
 
-function tabFromHash(): AppTab {
-  // Named `fragment` rather than `hash`: the security lint rule flags string
-  // comparisons against anything called a hash as a timing attack.
-  const fragment = globalThis.location?.hash ?? ''
+// The parameter is named `fragment` rather than `hash` because the security
+// lint rule reads any comparison against a "hash" as a timing attack.
+export function tabFromHash(
+  fragment: string = globalThis.location?.hash ?? '',
+): AppTab {
   if (fragment === HOME_HASH) return 'home'
   if (fragment === ARCADE_HASH || fragment.startsWith(`${ARCADE_HASH}=`)) {
     return 'arcade'
@@ -34,18 +37,32 @@ function tabFromHash(): AppTab {
   return 'workspace'
 }
 
+export function arcadeModeFromHash(
+  fragment: string = globalThis.location?.hash ?? '',
+): ArcadeMode | undefined {
+  const match = /^#arcade=([a-z]+)$/.exec(fragment)
+  const mode = match?.[1]
+  return ARCADE_MODES.includes(mode as ArcadeMode)
+    ? (mode as ArcadeMode)
+    : undefined
+}
+
+const [activeTab, setActiveTabSignal] = createSignal<AppTab>(tabFromHash())
+const [arcadeMode, setArcadeModeSignal] = createSignal<ArcadeMode | undefined>(
+  arcadeModeFromHash(),
+)
+
+export { activeTab, arcadeMode }
+
 function hashFor(tab: AppTab, mode?: ArcadeMode): string {
   if (tab === 'home') return HOME_HASH
   if (tab === 'arcade') return mode ? `${ARCADE_HASH}=${mode}` : ARCADE_HASH
   return ''
 }
 
-const [activeTab, setActiveTabSignal] = createSignal<AppTab>(tabFromHash())
-
-export { activeTab }
-
 export function setActiveTab(tab: AppTab, mode?: ArcadeMode): void {
   setActiveTabSignal(tab)
+  setArcadeModeSignal(tab === 'arcade' ? mode : undefined)
   const { location, history } = globalThis
   if (!location || !history) return
   // Preserve the query string: a share link (`?s=`, `?flame=`, `?cv=`) must
@@ -63,6 +80,7 @@ export function setActiveTab(tab: AppTab, mode?: ArcadeMode): void {
 // address bar disagree.
 globalThis.addEventListener?.('hashchange', () => {
   setActiveTabSignal(tabFromHash())
+  setArcadeModeSignal(arcadeModeFromHash())
 })
 
 /**

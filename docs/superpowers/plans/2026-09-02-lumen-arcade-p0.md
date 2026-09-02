@@ -2839,7 +2839,7 @@ git commit -m "feat(arcade): Cinema tools with validated keyframe tracks"
 
 - Produces: `AppTab = 'home' | 'workspace' | 'arcade'`, `ArcadeMode`, `tabFromHash(hash?)`, `arcadeModeFromHash(hash?)`, signal `arcadeMode()`, `setActiveTab(tab, mode?)`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // packages/app/src/lib/activeTab.test.ts
@@ -2862,12 +2862,12 @@ describe('tab routing by fragment', () => {
 })
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm --filter chaos-master exec vitest run src/lib/activeTab.test.ts`
 Expected: FAIL — `tabFromHash` is not exported.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Replace the relevant parts of `packages/app/src/lib/activeTab.ts` so it reads:
 
@@ -2945,12 +2945,12 @@ if (
 }
 ```
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `pnpm --filter chaos-master exec vitest run src/lib && pnpm typecheck`
 Expected: PASS. Then `pnpm --filter chaos-master exec wrangler dev --env dev` and in another shell `curl -sI http://localhost:8787/arcade | grep -i '^location'` — Expected: `location: http://localhost:8787/#arcade`. Stop wrangler afterwards (Ctrl+C in that shell).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/app/src/lib/activeTab.ts packages/app/src/lib/activeTab.test.ts packages/app/src/worker/index.ts
