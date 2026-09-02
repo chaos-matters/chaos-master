@@ -3680,7 +3680,7 @@ git commit -m "feat(arcade): hub with mode cards, prompt cards and WebMCP status
 
 - Consumes: `window.webmcp.execute(name, input)` (returns the MCP envelope `{ content: [{ type: 'text', text }], isError? }`), the `data-testid`s from Task 10, dialog labels from Task 7.
 
-- [ ] **Step 1: Write the spec**
+- [x] **Step 1: Write the spec**
 
 ```ts
 // tests/arcade.spec.ts
@@ -3836,12 +3836,12 @@ test.describe('Lumen Arcade', () => {
 })
 ```
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 Run: `pnpm test:e2e -- tests/arcade.spec.ts`
 Expected: PASS (the config builds and serves the app on `https://localhost:4173`; first run takes a few minutes). If `timeline.play` is rejected by preflight because it is marked `recordable: false`, replace that assertion with `execute_command` of `timeline.setCurrentFrame` `[10]` and keep the rest.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add tests/arcade.spec.ts
