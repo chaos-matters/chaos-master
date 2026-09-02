@@ -316,11 +316,9 @@ export function compileCustomVariationCode(wgslBody: string): CompileResult {
   }
 
   const { params, body } = irResult
-  const externalNames = [...irResult.externalNames]
+  const externalNames = [...irResult.externalNames.keys()]
 
-  const banned = externalNames
-    .map((x) => x[0])
-    .filter((name: string) => BANNED_NAMES.has(name))
+  const banned = externalNames.filter((name: string) => BANNED_NAMES.has(name))
   if (banned.length > 0) {
     return {
       valid: false,
@@ -341,7 +339,7 @@ export function compileCustomVariationCode(wgslBody: string): CompileResult {
   // BUILTIN_EXTERNALS, so they're already rejected here. (Compiled output is
   // sandboxed WGSL on the GPU, not JS.)
   const missingBuiltins = externalNames.filter(
-    (entry: [string, string]) => !Object.hasOwn(BUILTIN_EXTERNALS, entry[0]),
+    (name: string) => !Object.hasOwn(BUILTIN_EXTERNALS, name),
   )
   if (missingBuiltins.length > 0) {
     return {
@@ -449,7 +447,7 @@ export function compileCustomVariationCode(wgslBody: string): CompileResult {
 
   try {
     const fn = tgpu.fn([vec2f, VariationInfo], vec2f)(dummyFn as never)
-    return { valid: true, fn, externalNames: externalNames.map((x) => x[0]) }
+    return { valid: true, fn, externalNames }
   } catch (err) {
     return {
       valid: false,

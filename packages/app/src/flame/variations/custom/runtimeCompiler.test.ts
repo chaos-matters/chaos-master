@@ -1,5 +1,5 @@
 import { tgpu } from 'typegpu'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { compileCustomVariationCode, MAX_CUSTOM_WGSL_LENGTH, } from './runtimeCompiler'
 
 describe('compileCustomVariationCode - TypeGPU metadata', () => {
@@ -191,5 +191,54 @@ describe('compileCustomVariationCode - loop guard', () => {
     }
     return pos;`
     expect(loopError(code)).toMatch(/combined/i)
+  })
+})
+
+describe('compileCustomVariationCode - external names', () => {
+  /** What the compiler hands TypeGPU for the last compiled body. */
+  function capturedAst(body: string) {
+    const meta = (globalThis as Record<string, unknown>).__TYPEGPU_META__ as {
+      set: (key: object, value: object) => void
+    }
+    const spy = vi.spyOn(meta, 'set')
+    try {
+      const result = compileCustomVariationCode(body)
+      const payload = spy.mock.calls.at(-1)?.[1] as
+        | { ast?: { externalNames?: unknown } }
+        | undefined
+      return { result, externalNames: payload?.ast?.externalNames }
+    } finally {
+      spy.mockRestore()
+    }
+  }
+
+  it('hands TypeGPU plain identifier names, not transpiler map entries', () => {
+    // `externalNames` reaches TypeGPU inside the metadata `ast`, where it is
+    // typed `string[]` (typegpu/shared/normalizeMetadata.d.ts). Spreading the
+    // transpiler's `Externals` map directly puts `[name, name]` pairs there
+    // instead, which still returns a valid-looking result.
+    const { result, externalNames } = capturedAst(
+      'return pos.mul(sin(varInfo.weight))',
+    )
+
+    expect(result.valid).toBe(true)
+    if (!result.valid) return
+
+    expect(externalNames).toEqual(['sin'])
+    expect(result.externalNames).toEqual(['sin'])
+    expect(() => tgpu.resolve([result.fn], { names: 'strict' })).not.toThrow()
+  })
+
+  it('lists every builtin external the body references', () => {
+    const { result, externalNames } = capturedAst(
+      'return vec2f(sin(pos.x), pos.y).mul(varInfo.weight)',
+    )
+
+    expect(result.valid).toBe(true)
+    if (!result.valid) return
+
+    expect([...(externalNames as string[])].sort()).toEqual(['sin', 'vec2f'])
+    expect([...result.externalNames].sort()).toEqual(['sin', 'vec2f'])
+    expect(() => tgpu.resolve([result.fn], { names: 'strict' })).not.toThrow()
   })
 })
