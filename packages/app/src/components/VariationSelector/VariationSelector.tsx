@@ -229,11 +229,16 @@ export function VariationPreview(props: {
   })
   const [exportImage, setExportImage] = createSignal<ExportImageType>()
   const [image, setImage] = createSignal<string | undefined>()
+  let activeObjectUrl: string | undefined
 
   createEffect(() => {
     // When version increments (point init mode changed), discard the stale
     // cached image so the Flam3 canvas becomes visible again and re-renders.
     void props.version
+    if (activeObjectUrl !== undefined) {
+      URL.revokeObjectURL(activeObjectUrl)
+      activeObjectUrl = undefined
+    }
     setImage(undefined)
   })
 
@@ -269,21 +274,26 @@ export function VariationPreview(props: {
     })
 
     let cancelled = false
-    let objectUrl: string | undefined
 
     void promise.then((blob) => {
       if (cancelled) return
-      objectUrl = URL.createObjectURL(blob)
+      if (activeObjectUrl !== undefined) {
+        URL.revokeObjectURL(activeObjectUrl)
+      }
+      activeObjectUrl = URL.createObjectURL(blob)
       const img = new Image()
       img.onload = () => {
         if (!cancelled) setImage(img.src)
       }
-      img.src = objectUrl
+      img.src = activeObjectUrl
     })
 
     onCleanup(() => {
       cancelled = true
-      if (objectUrl !== undefined) URL.revokeObjectURL(objectUrl)
+      if (activeObjectUrl !== undefined) {
+        URL.revokeObjectURL(activeObjectUrl)
+        activeObjectUrl = undefined
+      }
       setExportImage(undefined)
     })
   })

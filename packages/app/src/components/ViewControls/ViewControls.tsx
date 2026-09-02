@@ -58,6 +58,8 @@ type ViewControlProps = {
   canRedo?: () => boolean
   onAudioReactive?: () => void
   onSonification?: () => void
+  onArtDirector?: () => void
+  onFlameClash?: () => void
 }
 
 export function ViewControls(props: ViewControlProps) {
@@ -373,6 +375,18 @@ export function ViewControls(props: ViewControlProps) {
             label: 'Diff…',
             title: 'Diff: compare two flames side by side to see what changed',
             onClick: props.onDiffFlame,
+          },
+          {
+            label: 'Art Director…',
+            title:
+              'Evolutionary Art Director: AI-guided interactive generative steering',
+            onClick: () => props.onArtDirector?.(),
+          },
+          {
+            label: 'Flame Clash…',
+            title:
+              'Flame Clash Arena: competitive visual fractal combat and heuristic scoring',
+            onClick: () => props.onFlameClash?.(),
           },
         ]}
       />

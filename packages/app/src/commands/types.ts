@@ -42,6 +42,77 @@ export interface CommandContext {
     open: Accessor<boolean>
     setOpen: Setter<boolean>
   }
+  director?: {
+    open: Accessor<boolean>
+    setOpen: Setter<boolean>
+    state: Accessor<{
+      generation: number
+      candidates: { fitness?: number; flame?: FlameDescriptor }[]
+    } | null>
+    setState: Setter<{
+      generation: number
+      candidates: { fitness?: number; flame?: FlameDescriptor }[]
+    } | null>
+    selectCandidate: (index: number) => void
+  }
+  /**
+   * Flame Clash Arena HUD. Optional for the same reason as `director?`:
+   * sandboxes (the Home portal, the replay video renderer, tests) have no
+   * arena, and a required member there is a lie paid for with `as any`.
+   */
+  arena?: {
+    open: Accessor<boolean>
+    setOpen: Setter<boolean>
+    player1Stats: Accessor<{
+      name?: string
+      type?: string
+      powerLevel?: number
+      flame?: FlameDescriptor
+      metrics?: {
+        complexity?: number
+        chaosLevel?: number
+        symmetryScore?: number
+        energyIntensity?: number
+      }
+    } | null>
+    setPlayer1Stats: Setter<{
+      name?: string
+      type?: string
+      powerLevel?: number
+      flame?: FlameDescriptor
+      metrics?: {
+        complexity?: number
+        chaosLevel?: number
+        symmetryScore?: number
+        energyIntensity?: number
+      }
+    } | null>
+    player2Stats: Accessor<{
+      name?: string
+      type?: string
+      powerLevel?: number
+      flame?: FlameDescriptor
+      metrics?: {
+        complexity?: number
+        chaosLevel?: number
+        symmetryScore?: number
+        energyIntensity?: number
+      }
+    } | null>
+    setPlayer2Stats: Setter<{
+      name?: string
+      type?: string
+      powerLevel?: number
+      flame?: FlameDescriptor
+      metrics?: {
+        complexity?: number
+        chaosLevel?: number
+        symmetryScore?: number
+        energyIntensity?: number
+      }
+    } | null>
+    selectFighter?: (player: 1 | 2) => void
+  }
   timeline: {
     tracks: Accessor<TimelineTrack[]>
     setTracks: Setter<TimelineTrack[]>

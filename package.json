@@ -14,7 +14,7 @@
     "lint": "NODE_OPTIONS=\"--max-old-space-size=4096\" eslint",
     "lint:fix": "NODE_OPTIONS=\"--max-old-space-size=4096\" eslint --fix",
     "typecheck": "NODE_OPTIONS=\"--max-old-space-size=8192\" tsc --noEmit --project packages/app/tsconfig.json",
-    "validate-wgsl": "npx tsx scripts/validate-wgsl-props.ts",
+    "validate-wgsl": "npx --yes tsx scripts/validate-wgsl-props.ts",
     "check": "pnpm typecheck && pnpm lint:fix && pnpm fmt:fix && pnpm validate-wgsl",
     "test": "pnpm --filter chaos-master exec vitest run && pnpm --filter chaos-master test:scripts",
     "test:ui": "pnpm --filter chaos-master exec vitest --ui",

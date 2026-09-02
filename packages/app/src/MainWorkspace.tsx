@@ -14,9 +14,11 @@ import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
 import { useShortcutManager } from '@/shortcuts'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { recordEntries, recordKeys } from '@/utils/record'
+import { calculateFlameStats } from '@/webmcp/tools/scoreFlame'
 import ui from './App.module.css'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
 import { AncestryTreeModal } from './components/AncestryTreeModal/AncestryTreeModal'
+import { ArenaOverlay } from './components/ArenaOverlay'
 import { AudioReactivePanel } from './components/AudioReactivePanel/AudioReactivePanel'
 import { createShowBenchmark } from './components/BenchmarkModal/BenchmarkModal'
 import { BlendFlameGallery } from './components/BlendFlameGallery/BlendFlameGallery'
@@ -32,6 +34,7 @@ import { DebugOverlay } from './components/DebugOverlay'
 import { DiceButton } from './components/DiceButton/DiceButton'
 import { DiffViewContent, DiffViewModal, } from './components/DiffViewModal/DiffViewModal'
 import diffUi from './components/DiffViewModal/DiffViewModal.module.css'
+import { DirectorOverlay } from './components/DirectorOverlay'
 import { createDiscordShareModal } from './components/DiscordShareModal/DiscordShareModal'
 import { createShowDocumentation } from './components/DocumentationModal/DocumentationModal'
 import { Dropzone } from './components/Dropzone/Dropzone'
@@ -134,6 +137,7 @@ import { useAppDragAndDrop } from './utils/useAppDragAndDrop'
 import { useAudioReactive } from './utils/useAudioReactive'
 import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
 import { useSonification } from './utils/useSonification'
+import { registerWebMcpTools } from './webmcp/registerWebMcp'
 import type { Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
 import type { Vec3 } from 'wgpu-matrix'
@@ -388,11 +392,189 @@ export function MainWorkspace(props: AppProps) {
   const SIDEBAR_RESIZABLE = false
   const { isCompact, setCompact } = useCompactMode()
   const [showSidebar, setShowSidebar] = createSignal(true)
+
+  const [directorOpen, setDirectorOpen] = createSignal(false)
+  const [directorState, setDirectorState] = createSignal<{
+    generation: number
+    candidates: {
+      fitness?: number
+      flame?: any /* eslint-disable-line @typescript-eslint/no-explicit-any */
+    }[]
+  } | null>(null)
+
+  const _requestModal = useRequestModal()
+
+  const selectCandidate = (index: number) => {
+    const s = directorState()
+    if (s && s.candidates[index]?.flame) {
+      const candidateFlame = s.candidates[index].flame
+      setFlameDescriptor(
+        () => deepClone(candidateFlame),
+        `Art Director: Candidate ${index + 1}`,
+      )
+      showToast(`Art Director: Loaded candidate ${index + 1} into workspace.`)
+    }
+  }
+
+  const [showArena, setShowArena] = createSignal(false)
+  const [arenaP1Stats, setArenaP1Stats] = createSignal<{
+    name?: string
+    type?: string
+    powerLevel?: number
+    flame?: FlameDescriptor
+    metrics?: {
+      complexity?: number
+      chaosLevel?: number
+      symmetryScore?: number
+      energyIntensity?: number
+    }
+  } | null>(null)
+  const [arenaP2Stats, setArenaP2Stats] = createSignal<{
+    name?: string
+    type?: string
+    powerLevel?: number
+    flame?: FlameDescriptor
+    metrics?: {
+      complexity?: number
+      chaosLevel?: number
+      symmetryScore?: number
+      energyIntensity?: number
+    }
+  } | null>(null)
+
+  let isDirectorModalOpen = false
+
+  function openArtDirectorUI() {
+    if (isDirectorModalOpen) return
+    isDirectorModalOpen = true
+    const s = directorState()
+    if (!s || s.candidates.length === 0) {
+      const current = deepClone(flameDescriptor)
+      const presets = ['Subtle', 'Moderate', 'Chaotic', 'Structural'] as const
+      const candidates = presets.map((_, i) => {
+        const mutated = mutateFlame(
+          current,
+          {
+            strength: 0.2 + i * 0.1,
+            minTransforms: 2,
+            maxTransforms: 6,
+            minVariations: 1,
+            maxVariations: 3,
+            allowedVariations: [],
+            dimensions: current.renderSettings.dimensions ?? 2,
+          },
+          {
+            mutateAffine: true,
+            affineMode: 'smart',
+            mutateVariations: 'modify',
+            mutateColors: true,
+          },
+        )
+        return {
+          fitness: 0.82 + (i % 3) * 0.05,
+          flame: mutated,
+        }
+      })
+      setDirectorState({
+        generation: 1,
+        candidates,
+      })
+    }
+    setDirectorOpen(true)
+    void _requestModal({
+      content: ({ respond }) => (
+        <DirectorOverlay
+          director={{
+            open: directorOpen,
+            setOpen: setDirectorOpen,
+            state: directorState,
+            setState: setDirectorState,
+            selectCandidate,
+          }}
+          hardwareTier={props.hardwareTier}
+          respond={() => {
+            isDirectorModalOpen = false
+            setDirectorOpen(false)
+            respond()
+          }}
+        />
+      ),
+    }).finally(() => {
+      isDirectorModalOpen = false
+      setDirectorOpen(false)
+    })
+  }
+
+  let isArenaModalOpen = false
+
+  function openFlameClashUI() {
+    if (isArenaModalOpen) return
+    isArenaModalOpen = true
+    const p1 = arenaP1Stats()
+    const p2 = arenaP2Stats()
+    if (!p1 || !p2) {
+      const current = deepClone(flameDescriptor)
+      const opponent = mutateFlame(
+        current,
+        {
+          strength: 0.45,
+          minTransforms: 2,
+          maxTransforms: 6,
+          minVariations: 1,
+          maxVariations: 3,
+          allowedVariations: [],
+          dimensions: current.renderSettings.dimensions ?? 2,
+        },
+        {
+          mutateAffine: true,
+          affineMode: 'smart',
+          mutateVariations: 'all',
+          mutateColors: true,
+        },
+      )
+      const p1Stats = calculateFlameStats(current)
+      const p2Stats = calculateFlameStats(opponent)
+      setArenaP1Stats({
+        name: current.metadata?.name || 'Cyan Guardian',
+        type: p1Stats.type,
+        powerLevel: p1Stats.powerLevel,
+        flame: current,
+        metrics: p1Stats.metrics,
+      })
+      setArenaP2Stats({
+        name: 'Crimson Nemesis',
+        type: p2Stats.type,
+        powerLevel: p2Stats.powerLevel,
+        flame: opponent,
+        metrics: p2Stats.metrics,
+      })
+    }
+    setShowArena(true)
+    isArenaModalOpen = true
+  }
+
+  createEffect(() => {
+    if (!showArena()) {
+      isArenaModalOpen = false
+    }
+  })
+
+  createEffect(() => {
+    if (directorOpen() && !isDirectorModalOpen) {
+      openArtDirectorUI()
+    }
+  })
+
+  createEffect(() => {
+    if (showArena() && !isArenaModalOpen) {
+      openFlameClashUI()
+    }
+  })
+
   const [sidebarDiffView, setSidebarDiffView] = createSignal<{
     flameA: FlameDescriptor
     flameB: FlameDescriptor
   } | null>(null)
-  const _requestModal = useRequestModal()
   const [sidebarHidden, setSidebarHidden] = createSignal(!isWideLayout())
   // Flame Randomizer card open state is controlled here so the Timeline
   // "Animate" button can reveal it; the epoch bump also forces its Animation
@@ -3235,27 +3417,66 @@ export function MainWorkspace(props: AppProps) {
     // Handle transform paths: transform.{tid}.{prop} or transform.{tid}.{sub}.{key}
     const parts = path.split('.')
     if (parts[0] === 'transform') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const transforms = fd.transforms as Record<string, any>
+      const transforms = fd.transforms as Record<string, unknown>
       if (parts.length === 3 && parts[2] === 'probability') {
-        return transforms[parts[1]!]?.probability ?? null
+        return (
+          (
+            transforms[parts[1]!] as {
+              probability?: number
+              colorSpeed?: number
+              color?: Record<string, number>
+              preAffine?: Record<string, number>
+              postAffine?: Record<string, number>
+              variations?: Record<string, { weight?: number }>
+            }
+          )?.probability ?? null
+        )
       }
       if (parts.length === 3 && parts[2] === 'colorSpeed') {
-        return transforms[parts[1]!]?.colorSpeed ?? 0.4
+        return (
+          (
+            transforms[parts[1]!] as {
+              probability?: number
+              colorSpeed?: number
+              color?: Record<string, number>
+              preAffine?: Record<string, number>
+              postAffine?: Record<string, number>
+              variations?: Record<string, { weight?: number }>
+            }
+          )?.colorSpeed ?? 0.4
+        )
       }
       if (
         parts.length === 4 &&
         (parts[2] === 'preAffine' || parts[2] === 'postAffine')
       ) {
-        const affine = transforms[parts[1]!]?.[parts[2]]
+        const affine = (
+          transforms[parts[1]!] as {
+            probability?: number
+            colorSpeed?: number
+            color?: Record<string, number>
+            preAffine?: Record<string, number>
+            postAffine?: Record<string, number>
+            variations?: Record<string, { weight?: number }>
+          }
+        )?.[parts[2]]
         if (affine && parts[3]! in affine) {
           return affine[parts[3]!] as number
         }
       }
       if (parts.length === 4 && parts[2] === 'color') {
-        const color = transforms[parts[1]!]?.color
+        const color = (
+          transforms[parts[1]!] as {
+            probability?: number
+            colorSpeed?: number
+            color?: Record<string, number>
+            preAffine?: Record<string, number>
+            postAffine?: Record<string, number>
+            variations?: Record<string, { weight?: number }>
+          }
+        )?.color
         if (color && parts[3]! in color) {
-          return color[parts[3]!]
+          return color[parts[3]!] ?? null
         }
       }
       return null
@@ -3267,8 +3488,13 @@ export function MainWorkspace(props: AppProps) {
         string,
         string,
       ]
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const transform = (fd.transforms as Record<string, any>)[transformId] as
+
+      const transform = (
+        fd.transforms as Record<
+          string,
+          any /* eslint-disable-line @typescript-eslint/no-explicit-any */
+        >
+      )[transformId] as
         | {
             variations?: Record<
               string,
@@ -3301,9 +3527,15 @@ export function MainWorkspace(props: AppProps) {
       parts[0] !== 'camera'
     ) {
       const [transformId, variationId] = parts as [string, string]
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const variation = (fd.transforms as Record<string, any>)[transformId]
-        ?.variations?.[variationId] as { weight?: number } | undefined
+
+      const variation = (
+        fd.transforms as Record<
+          string,
+          any /* eslint-disable-line @typescript-eslint/no-explicit-any */
+        >
+      )[transformId]?.variations?.[variationId] as
+        | { weight?: number }
+        | undefined
       if (variation?.weight !== undefined) return variation.weight
     }
     return null
@@ -3437,26 +3669,61 @@ export function MainWorkspace(props: AppProps) {
         default: {
           const parts = path.split('.')
           if (parts[0] === 'transform') {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const transforms = draft.transforms as Record<string, any>
+            const transforms = draft.transforms as Record<string, unknown>
             if (parts.length === 3 && parts[2] === 'probability') {
               if (transforms[parts[1]!]) {
-                transforms[parts[1]!].probability = value as number
+                ;(
+                  transforms[parts[1]!] as {
+                    probability?: number
+                    colorSpeed?: number
+                    color?: Record<string, number>
+                    preAffine?: Record<string, number>
+                    postAffine?: Record<string, number>
+                    variations?: Record<string, { weight?: number }>
+                  }
+                ).probability = value as number
               }
             } else if (parts.length === 3 && parts[2] === 'colorSpeed') {
               if (transforms[parts[1]!]) {
-                transforms[parts[1]!].colorSpeed = value as number
+                ;(
+                  transforms[parts[1]!] as {
+                    probability?: number
+                    colorSpeed?: number
+                    color?: Record<string, number>
+                    preAffine?: Record<string, number>
+                    postAffine?: Record<string, number>
+                    variations?: Record<string, { weight?: number }>
+                  }
+                ).colorSpeed = value as number
               }
             } else if (
               parts.length === 4 &&
               (parts[2] === 'preAffine' || parts[2] === 'postAffine')
             ) {
-              const affine = transforms[parts[1]!]?.[parts[2]]
+              const affine = (
+                transforms[parts[1]!] as {
+                  probability?: number
+                  colorSpeed?: number
+                  color?: Record<string, number>
+                  preAffine?: Record<string, number>
+                  postAffine?: Record<string, number>
+                  variations?: Record<string, { weight?: number }>
+                }
+              )?.[parts[2]]
               if (affine && parts[3]! in affine) {
                 affine[parts[3]!] = value as number
               }
             } else if (parts.length === 4 && parts[2] === 'color') {
-              const color = transforms[parts[1]!]?.color
+              const color = (
+                transforms[parts[1]!] as {
+                  probability?: number
+                  colorSpeed?: number
+                  color?: Record<string, number>
+                  preAffine?: Record<string, number>
+                  postAffine?: Record<string, number>
+                  variations?: Record<string, { weight?: number }>
+                }
+              )?.color
               if (color && parts[3]! in color) {
                 color[parts[3]!] = value as number
               }
@@ -3467,10 +3734,13 @@ export function MainWorkspace(props: AppProps) {
               string,
               string,
             ]
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const transform = (draft.transforms as Record<string, any>)[
-              transformId
-            ] as
+
+            const transform = (
+              draft.transforms as Record<
+                string,
+                any /* eslint-disable-line @typescript-eslint/no-explicit-any */
+              >
+            )[transformId] as
               | {
                   variations?: Record<
                     string,
@@ -3484,8 +3754,8 @@ export function MainWorkspace(props: AppProps) {
             }
           } else if (parts.length === 2 && parts[0] !== 'camera') {
             const [transformId, variationId] = parts as [string, string]
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const transform = (draft.transforms as Record<string, any>)[
+
+            const transform = (draft.transforms as Record<string, unknown>)[
               transformId
             ] as
               | {
@@ -3649,6 +3919,34 @@ export function MainWorkspace(props: AppProps) {
       open: showSidebar,
       setOpen: setShowSidebar,
     },
+
+    director: {
+      open: directorOpen,
+      setOpen: setDirectorOpen,
+      state: directorState,
+      setState: setDirectorState,
+      selectCandidate,
+    },
+    arena: {
+      open: showArena,
+      setOpen: setShowArena,
+      player1Stats: arenaP1Stats,
+      setPlayer1Stats: setArenaP1Stats,
+      player2Stats: arenaP2Stats,
+      setPlayer2Stats: setArenaP2Stats,
+      selectFighter: (player: 1 | 2) => {
+        const fighter = player === 1 ? arenaP1Stats() : arenaP2Stats()
+        if (fighter?.flame) {
+          setFlameDescriptor(
+            () => deepClone(fighter.flame!),
+            `Arena: ${fighter.name ?? `Player ${player}`}`,
+          )
+          showToast(
+            `Arena: Loaded ${fighter.name ?? `Player ${player}`} into editor.`,
+          )
+        }
+      },
+    },
     timeline: {
       tracks: timeline.tracks,
       setTracks: timeline.setTracks,
@@ -3787,6 +4085,11 @@ export function MainWorkspace(props: AppProps) {
       peekRedoTarget: undoRouter.peekRedoTarget,
     },
   }
+
+  // WebMCP: register tools so LLMs can read/mutate flame state via the
+  // browser's ModelContext API (ChatGPT in-app browser, Chrome flag, etc.).
+  const cleanupWebMcp = registerWebMcpTools(cmdContext)
+  onCleanup(cleanupWebMcp)
 
   /**
    * Whole-document command loads are undoable edits (randomize, genetics,
@@ -4614,6 +4917,8 @@ export function MainWorkspace(props: AppProps) {
                     onDiffFlame={pickDiffFlame}
                     onAncestryFlame={pickAncestryFlame}
                     onGalleryFlame={pickGalleryFlame}
+                    onArtDirector={openArtDirectorUI}
+                    onFlameClash={openFlameClashUI}
                     onClearBlendFlame={() => {
                       setBlendFlame(undefined)
                     }}
@@ -7395,6 +7700,36 @@ export function MainWorkspace(props: AppProps) {
             {(() => {
               throw new Error('[DEV] Injected crash from About panel')
             })()}
+          </Show>
+
+          <Show when={showArena()}>
+            <ArenaOverlay
+              arena={{
+                open: showArena,
+                setOpen: setShowArena,
+                player1Stats: arenaP1Stats,
+                setPlayer1Stats: setArenaP1Stats,
+                player2Stats: arenaP2Stats,
+                setPlayer2Stats: setArenaP2Stats,
+                selectFighter: (player: 1 | 2) => {
+                  const fighter = player === 1 ? arenaP1Stats() : arenaP2Stats()
+                  if (fighter?.flame) {
+                    setFlameDescriptor(
+                      () => deepClone(fighter.flame!),
+                      `Arena: ${fighter.name ?? `Player ${player}`}`,
+                    )
+                    showToast(
+                      `Arena: Loaded ${fighter.name ?? `Player ${player}`} into editor.`,
+                    )
+                  }
+                },
+              }}
+              hardwareTier={props.hardwareTier}
+              onClose={() => {
+                isArenaModalOpen = false
+                setShowArena(false)
+              }}
+            />
           </Show>
         </Dropzone>
       </TimelineContextProvider>

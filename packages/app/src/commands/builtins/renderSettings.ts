@@ -101,6 +101,64 @@ registerCommand({
       ? `Set ${path}${typeof value === 'number' ? ` to ${Number(value.toFixed(3))}` : ''}`
       : undefined,
   execute(ctx, path?: unknown, value?: unknown) {
+    if (typeof path !== 'string') {
+      console.warn(
+        '[cmd] flame.setRenderSetting: rejected non-string path',
+        path,
+      )
+      return
+    }
+
+    if (
+      path === 'camera3D' &&
+      typeof value === 'object' &&
+      value !== null &&
+      !Array.isArray(value)
+    ) {
+      ctx.timeline.setPreviewHeld?.(false)
+      ctx.setFlameDescriptor((draft) => {
+        if (!draft.renderSettings) {
+          draft.renderSettings = deepClone(renderSettingsDefault)
+        }
+        const fallback =
+          (defaultAtPath('camera3D') as Record<string, unknown>) ?? {}
+        const existing = (draft.renderSettings.camera3D ?? fallback) as Record<
+          string,
+          unknown
+        >
+        draft.renderSettings.camera3D = {
+          ...existing,
+          ...(value as Record<string, unknown>),
+        } as unknown as NonNullable<typeof draft.renderSettings.camera3D>
+      }, 'Set camera3D')
+      return
+    }
+
+    if (
+      path === 'camera' &&
+      typeof value === 'object' &&
+      value !== null &&
+      !Array.isArray(value)
+    ) {
+      ctx.timeline.setPreviewHeld?.(false)
+      ctx.setFlameDescriptor((draft) => {
+        if (!draft.renderSettings) {
+          draft.renderSettings = deepClone(renderSettingsDefault)
+        }
+        const fallback =
+          (defaultAtPath('camera') as Record<string, unknown>) ?? {}
+        const existing = (draft.renderSettings.camera ?? fallback) as Record<
+          string,
+          unknown
+        >
+        draft.renderSettings.camera = {
+          ...existing,
+          ...(value as Record<string, unknown>),
+        } as unknown as NonNullable<typeof draft.renderSettings.camera>
+      }, 'Set camera')
+      return
+    }
+
     const expected = defaultAtPath(path)
     if (expected === undefined || isContainerDefault(expected)) {
       console.warn('[cmd] flame.setRenderSetting: rejected', path, value)
@@ -115,24 +173,21 @@ registerCommand({
         console.warn('[cmd] flame.setRenderSetting: rejected clear', path)
         return
       }
-      const segments = (path as string).split('.')
+      const segments = path.split('.')
       const leaf = segments.pop()
       if (leaf === undefined) return
-      ctx.setFlameDescriptor(
-        (draft) => {
-          let node = draft.renderSettings as unknown as Record<string, unknown>
-          for (const segment of segments) {
-            const next = node[segment]
-            if (next === null || typeof next !== 'object') return
-            node = next as Record<string, unknown>
-          }
-          delete node[leaf]
-        },
-        `Clear ${path as string}`,
-      )
+      ctx.setFlameDescriptor((draft) => {
+        let node = draft.renderSettings as unknown as Record<string, unknown>
+        for (const segment of segments) {
+          const next = node[segment]
+          if (next === null || typeof next !== 'object') return
+          node = next as Record<string, unknown>
+        }
+        delete node[leaf]
+      }, `Clear ${path}`)
       return
     }
-    if (!matchesDefaultShape(path as string, expected, value)) {
+    if (!matchesDefaultShape(path, expected, value)) {
       console.warn('[cmd] flame.setRenderSetting: rejected', path, value)
       return
     }
@@ -147,7 +202,7 @@ registerCommand({
     ) {
       ctx.timeline.setPreviewHeld?.(false)
     }
-    const segments = (path as string).split('.')
+    const segments = path.split('.')
     const leaf = segments.pop()
     if (leaf === undefined) return
     ctx.setFlameDescriptor((draft) => {
