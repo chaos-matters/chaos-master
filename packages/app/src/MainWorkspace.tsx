@@ -62,7 +62,7 @@ import { PopulationSimulator } from './components/PopulationSimulator/Population
 import { ProgressBar } from './components/ProgressBar/ProgressBar'
 import { getPresetFromQuality, qualityPresets, } from './components/Quality/QualityPresets'
 import { QuickVariationPicker } from './components/QuickVariationPicker/QuickVariationPicker'
-import { recorderExportPending, recorderTaskPending, recorderVisible, } from './components/SessionRecorder/recorderUi'
+import { recorderExportPending, recorderTaskPending, recorderVisible, setRecorderCollapsed, setRecorderVisible, } from './components/SessionRecorder/recorderUi'
 import { SessionRecorderDock } from './components/SessionRecorder/SessionRecorderDock'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
 import { createShareVariationLinkModal, createShareVariationLoadModal, } from './components/ShareVariationModal/ShareVariationModal'
@@ -4134,7 +4134,16 @@ export function MainWorkspace(props: AppProps) {
         await storeSession(session, name)
         setExternalSessionLibraryRevision((revision) => revision + 1)
       },
-      openReplay: openReplaySession,
+      openReplay: (session) => {
+        // The dock is only mounted while it is visible or recording, and the
+        // pilot hides it for the duration of a take. Without this, a user who
+        // had the dock switched off clicks Replay on the end card and nothing
+        // happens. `setRecorderVisible` no-ops while a task is pending, which
+        // is the correct behaviour here too.
+        setRecorderVisible(true)
+        setRecorderCollapsed(false)
+        openReplaySession(session)
+      },
       actionCount: recordedActionCount,
     },
     arcade: {
