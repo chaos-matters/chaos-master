@@ -1,5 +1,15 @@
 import { dismissWelcomeIfPresent, expect, test } from './helpers'
 
+/** Registered tools are wrapped by `wrapTool`, so every call comes back in the
+ *  MCP envelope rather than as the tool's own return value. */
+type Envelope = { content: { type: string; text: string }[]; isError?: boolean }
+
+function payloadOf(result: unknown): Record<string, unknown> {
+  const envelope = result as Envelope
+  expect(Array.isArray(envelope.content)).toBe(true)
+  return JSON.parse(envelope.content[0]!.text) as Record<string, unknown>
+}
+
 test.describe('WebMCP & Evolutionary Art Director UI', () => {
   test('registers webmcp on window and opens Art Director overlay on executeTool', async ({
     page,
@@ -35,7 +45,7 @@ test.describe('WebMCP & Evolutionary Art Director UI', () => {
       })
     })
 
-    expect(result).toEqual({
+    expect(payloadOf(result)).toEqual({
       success: true,
       message: 'Art Director UI opened.',
     })
