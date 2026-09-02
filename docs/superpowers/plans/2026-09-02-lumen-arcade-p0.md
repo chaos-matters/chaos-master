@@ -65,7 +65,7 @@
 - Produces: `createTestFlame(): FlameDescriptor` and `createMockCommandContext(): CommandContext` exported from `@/webmcp/testUtils` (every later test uses them).
 - Produces: `execute_command` result `{ success: true, commandId }` unchanged; side effect: the action is now recorded.
 
-- [ ] **Step 1: Move the test helpers into `testUtils.ts`**
+- [x] **Step 1: Move the test helpers into `testUtils.ts`**
 
 Cut `function createTestFlame()` and `function createMockCommandContext()` (they start at `webmcp.test.ts:25` and `:74`; cut through the closing `}` of `createMockCommandContext`) into a new file and export them. Keep the `vi` import:
 
@@ -105,7 +105,7 @@ While moving, fix the mock's `setFlameDescriptor` so it honours the real `Histor
 Run: `pnpm --filter chaos-master exec vitest run src/webmcp/webmcp.test.ts`
 Expected: PASS (same count as before the move).
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 ```ts
 // packages/app/src/webmcp/tools/executeCommand.test.ts
@@ -154,12 +154,12 @@ describe('execute_command dispatch', () => {
 })
 ```
 
-- [ ] **Step 3: Run the test to verify it fails**
+- [x] **Step 3: Run the test to verify it fails**
 
 Run: `pnpm --filter chaos-master exec vitest run src/webmcp/tools/executeCommand.test.ts`
 Expected: FAIL — `session.actions` is `[]` and `beforeCommand` was not called (replay dispatch bypasses both).
 
-- [ ] **Step 4: Switch the dispatch path**
+- [x] **Step 4: Switch the dispatch path**
 
 ```ts
 // packages/app/src/webmcp/tools/executeCommand.ts (execute body, replacing the executeReplayCommand call)
@@ -187,12 +187,12 @@ return { success: true, commandId }
 
 Remove the now-unused `executeReplayCommand` import.
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `pnpm --filter chaos-master exec vitest run src/webmcp/tools/executeCommand.test.ts src/webmcp/webmcp.test.ts`
 Expected: PASS. If `flame.setExposure` with a string arg is accepted by preflight (no explicit validator), change the second test's command to `timeline.setDuration` with `['x']` (it has `validateReplayArgs`), and keep the assertion.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/app/src/webmcp/testUtils.ts packages/app/src/webmcp/webmcp.test.ts packages/app/src/webmcp/tools/executeCommand.ts packages/app/src/webmcp/tools/executeCommand.test.ts

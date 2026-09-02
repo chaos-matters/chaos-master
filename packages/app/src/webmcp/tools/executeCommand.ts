@@ -1,4 +1,4 @@
-import { executeReplayCommand, preflightReplayCommand, } from '@/commands/registry'
+import { executeCommand, preflightReplayCommand } from '@/commands/registry'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
 import type { WebMcpTool } from '@/webmcp/types'
 
@@ -53,9 +53,16 @@ export const executeCommandTool: WebMcpTool = {
       return { error: preflightError }
     }
 
-    const success = executeReplayCommand(commandId, ctx, ...args)
-    if (!success) {
-      return { error: 'Command execution failed' }
+    try {
+      // Live dispatch: recorded by the session recorder, args normalised, and
+      // `beforeCommand` hands any paused replay back first. The replay path
+      // (`executeReplayCommand`) skips all three, which is right for a
+      // .steps.json file and wrong for an agent driving the editor.
+      executeCommand(commandId, ctx, ...args)
+    } catch (e) {
+      return {
+        error: `Command failed: ${e instanceof Error ? e.message : String(e)}`,
+      }
     }
 
     return { success: true, commandId }
