@@ -1633,7 +1633,7 @@ git commit -m "feat(arcade): Teach tools, guarded execute_command, driving gate"
 - Produces: `<PilotOverlay ctx={cmdContext} />`; `formatElapsed(ms): string` ("0:42", "12:05"); `reasonLabel(reason): string`.
 - Consumes: `pilot`, `drivingState`, `pilotLog`, `lastPilotSession`, `resetPilot`, `agentDriving` (Task 4); `finishPilot` (Task 6); `ctx.recorder.openReplay`, `ctx.arcade.openHub` (Task 3).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // packages/app/src/components/Arcade/pilotFormat.test.ts
@@ -1655,12 +1655,12 @@ describe('pilot formatting', () => {
 })
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm --filter chaos-master exec vitest run src/components/Arcade`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement the helpers and icons**
+- [x] **Step 3: Implement the helpers and icons**
 
 ```ts
 // packages/app/src/components/Arcade/pilotFormat.ts
@@ -1699,7 +1699,7 @@ export function reasonLabel(reason: PilotEndReason): string {
 
 In `icons/index.ts` add `import Robot from './robot.svg'` and `import Stop from './stop.svg'` in alphabetical order, and add `Robot,` and `Stop,` to the `export { ... }` list.
 
-- [ ] **Step 4: Implement the overlay**
+- [x] **Step 4: Implement the overlay**
 
 ```tsx
 // packages/app/src/components/Arcade/PilotOverlay.tsx
@@ -2034,18 +2034,20 @@ export function PilotOverlay(props: { ctx: CommandContext }) {
 }
 ```
 
-- [ ] **Step 5: Gate shortcuts and mount the overlay**
+- [x] **Step 5: Gate shortcuts and mount the overlay**
 
 `packages/app/src/shortcuts/useShortcutManager.ts`: add `import { agentDriving } from '@/arcade/pilot'` and, as the first line of `onKeydown`, `if (agentDriving()) return`.
 
 `packages/app/src/MainWorkspace.tsx`: import `{ PilotOverlay } from './components/Arcade/PilotOverlay'` and `{ agentDriving } from './arcade/pilot'`; render `<PilotOverlay ctx={cmdContext} />` immediately before `<Show when={showArena()}>` (~line 7705); change the recorder dock condition (~4824) to `<Show when={(recorderVisible() || isSessionRecording()) && !agentDriving()}>` (the pilot's Stop owns the take while driving, so hiding the dock cannot strand a recording).
 
-- [ ] **Step 6: Verify**
+- [x] **Step 6: Verify**
+
+> Automated half done. The manual `pnpm start` half could not run in this environment: the dev server is HTTPS with a self-signed certificate (`@vitejs/plugin-basic-ssl`) that the agent's browser pane refuses. The same journey is covered by `tests/arcade.spec.ts` (Task 11), which runs against the production preview with `ignoreHTTPSErrors`.
 
 Run: `pnpm --filter chaos-master exec vitest run src/components/Arcade && pnpm typecheck && pnpm lint`
 Expected: PASS. Then `pnpm start`, open `http://localhost:5173/`, in the console run `await webmcp.execute('arcade_start_lesson', { topic: 'variations' })` — the banner and rail appear, clicks on the sidebar do nothing, `Ctrl+S` does nothing; run `await webmcp.execute('execute_command', { commandId: 'flame.addTransform', args: ['linearVar'] })` — a rail entry appears; click Stop — the end card shows "Stopped by you" and "Saved to your library as ...".
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add packages/app/src/icons packages/app/src/components/Arcade packages/app/src/shortcuts/useShortcutManager.ts packages/app/src/MainWorkspace.tsx

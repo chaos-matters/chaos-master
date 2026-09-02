@@ -4,6 +4,7 @@ import { createStore, unwrap } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { vec2f, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
+import { agentDriving } from '@/arcade/pilot'
 import { executeCommand, executeReplayCommand, preflightReplayCommand, } from '@/commands/registry'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useToast } from '@/contexts/ToastContext'
@@ -18,6 +19,7 @@ import { calculateFlameStats } from '@/webmcp/tools/scoreFlame'
 import ui from './App.module.css'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
 import { AncestryTreeModal } from './components/AncestryTreeModal/AncestryTreeModal'
+import { PilotOverlay } from './components/Arcade/PilotOverlay'
 import { ArenaOverlay } from './components/ArenaOverlay'
 import { AudioReactivePanel } from './components/AudioReactivePanel/AudioReactivePanel'
 import { createShowBenchmark } from './components/BenchmarkModal/BenchmarkModal'
@@ -4884,7 +4886,14 @@ export function MainWorkspace(props: AppProps) {
                 {/* Stays mounted while a recording is running whatever the
                     toolbar toggle says — hiding the only Stop button mid-take
                     would strand the recording. */}
-                <Show when={recorderVisible() || isSessionRecording()}>
+                {/* Hidden while the pilot drives: it owns the take, and its
+                    own Stop button is the one Stop on screen. */}
+                <Show
+                  when={
+                    (recorderVisible() || isSessionRecording()) &&
+                    !agentDriving()
+                  }
+                >
                   <SessionRecorderDock
                     flameDescriptor={flameDescriptor}
                     startExtras={captureRecorderStartExtras}
@@ -7747,6 +7756,8 @@ export function MainWorkspace(props: AppProps) {
               throw new Error('[DEV] Injected crash from About panel')
             })()}
           </Show>
+
+          <PilotOverlay ctx={cmdContext} />
 
           <Show when={showArena()}>
             <ArenaOverlay

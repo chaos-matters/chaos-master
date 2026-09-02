@@ -1,4 +1,5 @@
 import { createEffect, onCleanup } from 'solid-js'
+import { agentDriving } from '@/arcade/pilot'
 import { executeCommand, getAllCommands } from '@/commands/registry'
 import { letBrowserHandleActiveInput } from './activeInputGuard'
 import { matchesShortcut, parseShortcut } from './shortcutParser'
@@ -20,6 +21,9 @@ export function useShortcutManager(ctx: CommandContext) {
     if (bindings.size === 0) return
 
     function onKeydown(ev: KeyboardEvent) {
+      // The pilot owns the keyboard while an agent drives: the lock would be
+      // theatre if Ctrl+E still opened an export or Ctrl+Z rewound the take.
+      if (agentDriving()) return
       if (letBrowserHandleActiveInput(document.activeElement, ev)) {
         return
       }
