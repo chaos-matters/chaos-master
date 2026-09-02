@@ -14,7 +14,8 @@
 /* Shared pill style for the Docs and About buttons. */
 .about-pill,
 .docs-pill,
-.benchmark-lab-pill {
+.benchmark-lab-pill,
+.arcade-pill {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -85,5 +86,13 @@
 
   [data-theme='dark'] & {
     color: oklch(76% 0.13 35);
+  }
+}
+
+.arcade-pill:hover {
+  color: oklch(54% 0.18 300);
+
+  [data-theme='dark'] & {
+    color: oklch(78% 0.13 300);
   }
 }

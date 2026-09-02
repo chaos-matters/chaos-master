@@ -36,6 +36,7 @@ For generative artists, motion designers, creative coders, and curious explorers
 - **Your own mathematics** — author custom variations in WGSL or plain math, browse built-in documentation, and create or import palettes.
 - **Portable work** — keep local recents, undo and redo freely, import common flame formats, and export PNGs carrying their editable flame state.
 - **Tools for exploration** — guided tours, share links, a logo and favicon generator, and a dedicated Benchmark Studio.
+- **An AI at the controls** — WebMCP tools let an agent drive the editor and the Lumen Arcade modes, recording every step as a replayable lesson. See [docs/webmcp.md](docs/webmcp.md).
 
 ## A gallery that is alive
 

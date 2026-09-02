@@ -6,6 +6,8 @@
  */
 
 import { animateClash } from './animateClash'
+import { arcadeEndCinema, arcadeGetAnimatablePaths, arcadeSetKeyframes, arcadeStartCinema, } from './arcadeCinema'
+import { arcadeEndLesson, arcadeNarrate, arcadeStartLesson, arcadeStatus, } from './arcadeTeach'
 import { breedFlamesTool } from './breedFlames'
 import { createClashFlame } from './createClashFlame'
 import { createCustomVariationTool } from './createCustomVariation'
@@ -53,6 +55,14 @@ export {
   scoreClashRound,
   simulateClash,
   animateClash,
+  arcadeStatus,
+  arcadeStartLesson,
+  arcadeNarrate,
+  arcadeEndLesson,
+  arcadeGetAnimatablePaths,
+  arcadeStartCinema,
+  arcadeSetKeyframes,
+  arcadeEndCinema,
 }
 
 /** All Tier 1 tools, in registration order. */
@@ -62,6 +72,8 @@ export const allTools: readonly WebMcpTool[] = [
   getFlameDetail,
   listCommands,
   getUndoState,
+  arcadeStatus,
+  arcadeGetAnimatablePaths,
   diffFlamesTool,
   createShareLink,
   scoreFlame,
@@ -72,6 +84,12 @@ export const allTools: readonly WebMcpTool[] = [
   randomizeFlame,
   mutateFlame,
   executeCommandTool,
+  arcadeStartLesson,
+  arcadeNarrate,
+  arcadeEndLesson,
+  arcadeStartCinema,
+  arcadeSetKeyframes,
+  arcadeEndCinema,
   undo,
   redo,
   loadShareLink,

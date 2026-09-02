@@ -4,10 +4,11 @@ import { createStore, unwrap } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { vec2f, vec3f, vec4f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
+import { agentDriving } from '@/arcade/pilot'
 import { executeCommand, executeReplayCommand, preflightReplayCommand, } from '@/commands/registry'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useToast } from '@/contexts/ToastContext'
-import { workspaceIsVisible } from '@/lib/activeTab'
+import { setActiveTab, workspaceIsVisible } from '@/lib/activeTab'
 import { trackAppInit } from '@/lib/telemetry'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
@@ -18,6 +19,7 @@ import { calculateFlameStats } from '@/webmcp/tools/scoreFlame'
 import ui from './App.module.css'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
 import { AncestryTreeModal } from './components/AncestryTreeModal/AncestryTreeModal'
+import { PilotOverlay } from './components/Arcade/PilotOverlay'
 import { ArenaOverlay } from './components/ArenaOverlay'
 import { AudioReactivePanel } from './components/AudioReactivePanel/AudioReactivePanel'
 import { createShowBenchmark } from './components/BenchmarkModal/BenchmarkModal'
@@ -60,7 +62,7 @@ import { PopulationSimulator } from './components/PopulationSimulator/Population
 import { ProgressBar } from './components/ProgressBar/ProgressBar'
 import { getPresetFromQuality, qualityPresets, } from './components/Quality/QualityPresets'
 import { QuickVariationPicker } from './components/QuickVariationPicker/QuickVariationPicker'
-import { recorderExportPending, recorderTaskPending, recorderVisible, } from './components/SessionRecorder/recorderUi'
+import { recorderExportPending, recorderTaskPending, recorderVisible, setRecorderCollapsed, setRecorderVisible, } from './components/SessionRecorder/recorderUi'
 import { SessionRecorderDock } from './components/SessionRecorder/SessionRecorderDock'
 import { createShareLinkModal } from './components/ShareLinkModal/ShareLinkModal'
 import { createShareVariationLinkModal, createShareVariationLoadModal, } from './components/ShareVariationModal/ShareVariationModal'
@@ -103,7 +105,7 @@ import { getNormalizedVariationName, getParamsEditor, getVariationDefault, } fro
 import { BoxArrowRight, Cross, Eye, EyeOff, Menu, Plus, Share, Shuffle, Terminal, } from './icons'
 import { AutoCanvas } from './lib/AutoCanvas'
 import { affineFocusId, transformColorRandomizeFocusId, transformFocusId, transformVisibilityFocusId, variationParamsFocusId, variationRandomizeFocusId, variationTypeFocusId, variationVisibilityFocusId, } from './recorder/focusIds'
-import { breakRecordingCoalescing, invalidateLastFinishedSession, isSessionRecording, notePreviewStarted, recordSyntheticAction, reportDerivedWorkspaceWrite, reportDocumentWrite, reportTimelineTransport, reportUnreplayable, reportUnreplayableOnce, withRecordingSuppressed, } from './recorder/recorder'
+import { breakRecordingCoalescing, cancelSessionRecording, invalidateLastFinishedSession, isSessionRecording, notePreviewStarted, recordedActionCount, recordSyntheticAction, reportDerivedWorkspaceWrite, reportDocumentWrite, reportTimelineTransport, reportUnreplayable, reportUnreplayableOnce, startSessionRecording, stopSessionRecording, withRecordingSuppressed, } from './recorder/recorder'
 import { applyReplayAudioWiring, canEnableReplayAudio, sessionMayEnableSonification, } from './recorder/replay'
 import { captureReplayInterfaceVideo } from './recorder/replayInterfaceVideo'
 import { captureTransformColors, paletteRestoreColorsAfterReplayCommand, runPaletteRestoreTransition, } from './recorder/replayPaletteState'
@@ -127,7 +129,7 @@ import { persistentSignal } from './utils/persistentSignal'
 import { addRandomizerHistoryEntry, clearRandomizerHistory, loadRandomizerHistoryEntries, MAX_RANDOMIZER_HISTORY_LIMIT, } from './utils/randomizerHistoryDB'
 import { buildReadableIds } from './utils/readableIds'
 import { getOldestRecentFlame, saveRecentFlame, upsertRecentFlame, } from './utils/recentFlames'
-import { storeImportedSession } from './utils/sessionsDB'
+import { storeImportedSession, storeSession } from './utils/sessionsDB'
 import { createShareLink, deriveOgMeta, uploadOgPreview, } from './utils/shareLink'
 import { sum } from './utils/sum'
 import { createTimelineState, defaultConfig as defaultTimelineConfig, resolveKeyframeValue, } from './utils/timeline'
@@ -156,6 +158,7 @@ import type { TransformVariationType } from './flame/variations'
 import type { CustomVariationDef } from './flame/variations/custom/types'
 import type { TransformVariationType3D } from './flame/variations3D'
 import type { ReplayAffineMode, ReplayAffineTab, ReplayColorView, ReplayFocusPreparationHandler, } from './recorder/focusPreparation'
+import type { SessionStartExtras } from './recorder/recorder'
 import type { ReplayTarget } from './recorder/replay'
 import type { ReplayVideoExportRequest } from './recorder/replayInterfaceVideo'
 import type { ReplayNonFlameSideState, ReplayPresentationSnapshot, } from './recorder/replaySideState'
@@ -3897,6 +3900,30 @@ export function MainWorkspace(props: AppProps) {
     return newDuration
   }
 
+  /**
+   * The same snapshot the recorder dock passes as `startExtras`, shared with
+   * the `ctx.recorder.start` seam so an agent-started take records the same
+   * side state as a human-started one. Wall-clock playback is not authored
+   * session state and is deliberately absent.
+   */
+  function captureRecorderStartExtras(): SessionStartExtras {
+    return {
+      timeline: cmdContext.timeline.edit?.snapshot(),
+      audio: cmdContext.audio?.snapshot(),
+      sonification: captureSonificationSnapshot(),
+      view: {
+        qualityPreset: qualityPreset(),
+        pixelRatio: pixelRatio() as 1 | 0.5 | 0.25,
+        adaptiveFilter: adaptiveFilterEnabled(),
+        stochasticFilter: stochasticFilterEnabled(),
+        flyMode: flyMode(),
+        showTimeline: showTimeline(),
+        sidebarOpen: showSidebar(),
+        paletteRestoreColors: deepClone(prePaletteColors()),
+      },
+    }
+  }
+
   // Command context: bridges registered commands to app signals
   const cmdContext: CommandContext = {
     beforeCommand: () => {
@@ -4083,6 +4110,53 @@ export function MainWorkspace(props: AppProps) {
       redo: undoRouter.redoLast,
       peekUndoTarget: undoRouter.peekUndoTarget,
       peekRedoTarget: undoRouter.peekRedoTarget,
+    },
+    // The recorder as the Arcade pilot drives it. Starting a take from a tool
+    // must be indistinguishable from pressing Record in the dock, hence the
+    // shared extras closure and the same "freeze wall-clock playback" step.
+    recorder: {
+      isRecording: isSessionRecording,
+      start: () => {
+        const result = startSessionRecording(
+          flameDescriptor,
+          captureRecorderStartExtras(),
+        )
+        if (result.ok && timeline.isPlaying()) {
+          withRecordingSuppressed(() => {
+            timeline.pause()
+          })
+        }
+        return result
+      },
+      stop: stopSessionRecording,
+      cancel: cancelSessionRecording,
+      save: async (session, name) => {
+        await storeSession(session, name)
+        setExternalSessionLibraryRevision((revision) => revision + 1)
+      },
+      openReplay: (session) => {
+        // The dock is only mounted while it is visible or recording, and the
+        // pilot hides it for the duration of a take. Without this, a user who
+        // had the dock switched off clicks Replay on the end card and nothing
+        // happens. `setRecorderVisible` no-ops while a task is pending, which
+        // is the correct behaviour here too.
+        setRecorderVisible(true)
+        setRecorderCollapsed(false)
+        openReplaySession(session)
+      },
+      actionCount: recordedActionCount,
+    },
+    arcade: {
+      openHub: (mode) => {
+        setActiveTab('arcade', mode)
+      },
+      closeHub: () => {
+        setActiveTab('workspace')
+      },
+      toast: (text) => {
+        showToast(text, 3500)
+      },
+      qualityPreset: () => qualityPreset(),
     },
   }
 
@@ -4821,27 +4895,17 @@ export function MainWorkspace(props: AppProps) {
                 {/* Stays mounted while a recording is running whatever the
                     toolbar toggle says — hiding the only Stop button mid-take
                     would strand the recording. */}
-                <Show when={recorderVisible() || isSessionRecording()}>
+                {/* Hidden while the pilot drives: it owns the take, and its
+                    own Stop button is the one Stop on screen. */}
+                <Show
+                  when={
+                    (recorderVisible() || isSessionRecording()) &&
+                    !agentDriving()
+                  }
+                >
                   <SessionRecorderDock
                     flameDescriptor={flameDescriptor}
-                    startExtras={() => {
-                      // Wall-clock playback is not authored session state.
-                      return {
-                        timeline: cmdContext.timeline.edit?.snapshot(),
-                        audio: cmdContext.audio?.snapshot(),
-                        sonification: captureSonificationSnapshot(),
-                        view: {
-                          qualityPreset: qualityPreset(),
-                          pixelRatio: pixelRatio() as 1 | 0.5 | 0.25,
-                          adaptiveFilter: adaptiveFilterEnabled(),
-                          stochasticFilter: stochasticFilterEnabled(),
-                          flyMode: flyMode(),
-                          showTimeline: showTimeline(),
-                          sidebarOpen: showSidebar(),
-                          paletteRestoreColors: deepClone(prePaletteColors()),
-                        },
-                      }
-                    }}
+                    startExtras={captureRecorderStartExtras}
                     onRecordingStarted={() => {
                       // Freeze wall-clock playback only after the recorder
                       // accepts the snapshot. A rejected start must leave the
@@ -7701,6 +7765,8 @@ export function MainWorkspace(props: AppProps) {
               throw new Error('[DEV] Injected crash from About panel')
             })()}
           </Show>
+
+          <PilotOverlay ctx={cmdContext} />
 
           <Show when={showArena()}>
             <ArenaOverlay

@@ -1,6 +1,22 @@
-import { executeReplayCommand, preflightReplayCommand, } from '@/commands/registry'
+import { guardCommand } from '@/arcade/guard'
+import { appendPilotLog, drivingState, notePilotStep, pilotStepsRemaining, } from '@/arcade/pilot'
+import { executeCommand, getCommand, preflightReplayCommand, } from '@/commands/registry'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
 import type { WebMcpTool } from '@/webmcp/types'
+
+/** One readable line for the pilot overlay's live step list. */
+function describeStep(commandId: string, args: unknown[]): string {
+  const label = getCommand(commandId)?.label ?? commandId
+  let rendered = ''
+  try {
+    rendered = JSON.stringify(args)
+  } catch {
+    rendered = ''
+  }
+  return rendered.length > 80
+    ? `${label} ${rendered.slice(0, 77)}...`
+    : `${label} ${rendered}`
+}
 
 export const executeCommandTool: WebMcpTool = {
   name: 'execute_command',
@@ -48,14 +64,44 @@ export const executeCommandTool: WebMcpTool = {
     const commandId = rawInput.commandId
     const args = Array.isArray(rawInput.args) ? rawInput.args : []
 
+    // While an Arcade pilot drives, the mode's allow-list and the step budget
+    // apply before anything else: an agent must not be able to reach export,
+    // history or a quality bump through the generic escape hatch.
+    const driving = drivingState()
+    if (driving) {
+      const blocked = guardCommand(commandId, args, driving)
+      if (blocked !== undefined) {
+        appendPilotLog('error', blocked)
+        return { error: blocked }
+      }
+      if (pilotStepsRemaining() <= 0) {
+        return {
+          error:
+            'Step budget exhausted. Finish now with arcade_end_lesson or arcade_end_cinema.',
+        }
+      }
+    }
+
     const preflightError = preflightReplayCommand(commandId, args)
     if (preflightError !== undefined) {
       return { error: preflightError }
     }
 
-    const success = executeReplayCommand(commandId, ctx, ...args)
-    if (!success) {
-      return { error: 'Command execution failed' }
+    try {
+      // Live dispatch: recorded by the session recorder, args normalised, and
+      // `beforeCommand` hands any paused replay back first. The replay path
+      // (`executeReplayCommand`) skips all three, which is right for a
+      // .steps.json file and wrong for an agent driving the editor.
+      executeCommand(commandId, ctx, ...args)
+    } catch (e) {
+      return {
+        error: `Command failed: ${e instanceof Error ? e.message : String(e)}`,
+      }
+    }
+
+    if (driving) {
+      const remaining = notePilotStep('command', describeStep(commandId, args))
+      return { success: true, commandId, steps: driving.steps + 1, remaining }
     }
 
     return { success: true, commandId }

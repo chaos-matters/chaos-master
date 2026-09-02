@@ -387,6 +387,17 @@ const baseHandler = {
       return Response.redirect(url.toString(), 308)
     }
 
+    // The Arcade has a real path for sharing, but the app routes tabs by
+    // fragment (lib/activeTab.ts), so hand it to the SPA as `#arcade`.
+    if (
+      (pathname === '/arcade' || pathname === '/arcade/') &&
+      (request.method === 'GET' || request.method === 'HEAD')
+    ) {
+      url.pathname = '/'
+      url.hash = 'arcade'
+      return Response.redirect(url.toString(), 308)
+    }
+
     // ── Rate-limit the write endpoints per IP ──────────────────────────────
     // Bounds spam/abuse (and R2/KV cost). Fail-open: a limiter hiccup or a
     // missing binding never breaks sharing.
