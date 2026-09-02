@@ -1,5 +1,5 @@
 import { tgpu } from 'typegpu'
-import { arrayOf, builtin, f32, i32, u32, vec2f, vec2i } from 'typegpu/data'
+import { arrayOf, builtin, f32, i32, u32, vec2i } from 'typegpu/data'
 import { add, ceil, clamp, exp, max, sub } from 'typegpu/std'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { Bucket, BUCKET_FIXED_POINT_MULTIPLIER, FilterParams } from './types'
@@ -10,21 +10,6 @@ const GROUP_SIZE_Y = 8
 const { ceil: ceilMath } = Math
 const MAX_SIGMA = 12
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const myCompute = tgpu.computeFn({
-  workgroupSize: [64],
-  in: {
-    gid: builtin.globalInvocationId, // vec3u
-    lid: builtin.localInvocationId, // vec3u
-    wgid: builtin.workgroupId, // vec3u
-    lidx: builtin.localInvocationIndex, // u32
-    nwg: builtin.numWorkgroups, // vec3u
-  },
-})((_input) => {
-  'use gpu'
-  const a = vec2f(1, 2)
-  const _b = add(a, a)
-})
 // Horizontal pass: accumulationBuffer → tempBuffer
 const hBlurBindGroupLayout = tgpu.bindGroupLayout({
   textureSize: {
