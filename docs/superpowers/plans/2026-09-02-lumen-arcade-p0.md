@@ -935,7 +935,7 @@ git commit -m "feat(arcade): pilot state machine and lesson topic catalog"
 
 - Produces: `QUALITY_ORDER`, `qualityRank(key: unknown): number`, `isCommandAllowed(commandId, allowed): boolean`, `guardCommand(commandId, args, state: PilotState): string | undefined`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // packages/app/src/arcade/guard.test.ts
@@ -998,12 +998,12 @@ describe('guardCommand', () => {
 })
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm --filter chaos-master exec vitest run src/arcade/guard.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement `guard.ts`**
+- [x] **Step 3: Implement `guard.ts`**
 
 ```ts
 // packages/app/src/arcade/guard.ts
@@ -1074,12 +1074,12 @@ export function guardCommand(
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `pnpm --filter chaos-master exec vitest run src/arcade/guard.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/app/src/arcade/guard.ts packages/app/src/arcade/guard.test.ts
