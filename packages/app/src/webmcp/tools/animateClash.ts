@@ -1,3 +1,4 @@
+import { executeCommand } from '@/commands/registry'
 import { deepClone } from '@/utils/clone'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
 import { simulateClash } from '@/webmcp/tools/simulateClash'
@@ -67,7 +68,14 @@ export const animateClash: WebMcpTool = {
 
     const round1Flame = sim.rounds[0]?.clashFlame
     if (round1Flame) {
-      ctx.setFlameDescriptor(() => deepClone(round1Flame), 'Animate 3D Clash')
+      // Through the registry, not a raw setter: an unnamed document write is
+      // invisible to the session recorder and cannot be replayed (audit F2).
+      executeCommand(
+        'flame.load',
+        ctx,
+        deepClone(round1Flame),
+        'Animate 3D Clash',
+      )
     }
 
     const totalFrames = framesPerRound * 3
@@ -177,7 +185,15 @@ export const animateClash: WebMcpTool = {
       },
     ]
 
-    ctx.timeline.setTracks(tracks)
+    // Same reason: one named `timeline.loadTimeline` carrying the tracks,
+    // falling back to the raw setter only where there is no edit seam (the
+    // Home portal and other sandboxes).
+    const base = ctx.timeline.edit?.snapshot()
+    if (base) {
+      executeCommand('timeline.loadTimeline', ctx, { ...base, tracks })
+    } else {
+      ctx.timeline.setTracks(tracks)
+    }
     ctx.timeline.setDuration(totalFrames)
     ctx.timeline.setCurrentFrame(0)
     ctx.timeline.setAnimationEnabled(true)

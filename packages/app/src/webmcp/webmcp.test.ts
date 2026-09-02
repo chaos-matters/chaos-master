@@ -655,12 +655,17 @@ describe('WebMCP Foundation', () => {
 
       expect(res.success).toBe(true)
       expect(res.totalFrames).toBe(90)
-      expect(cmdContext.timeline.setTracks).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({ parameterPath: 'camera3D.theta' }),
-          expect.objectContaining({ parameterPath: 'camera3D.phi' }),
-          expect.objectContaining({ parameterPath: 'camera3D.radius' }),
-        ]),
+      // Named command, not a raw setter: the tracks ride in a recorded,
+      // replayable `timeline.loadTimeline` (audit F2).
+      expect(cmdContext.timeline.setTracks).not.toHaveBeenCalled()
+      expect(cmdContext.timeline.edit!.load).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tracks: expect.arrayContaining([
+            expect.objectContaining({ parameterPath: 'camera3D.theta' }),
+            expect.objectContaining({ parameterPath: 'camera3D.phi' }),
+            expect.objectContaining({ parameterPath: 'camera3D.radius' }),
+          ]),
+        }),
       )
       expect(cmdContext.timeline.setDuration).toHaveBeenCalledWith(90)
       expect(cmdContext.timeline.setAnimationEnabled).toHaveBeenCalledWith(true)

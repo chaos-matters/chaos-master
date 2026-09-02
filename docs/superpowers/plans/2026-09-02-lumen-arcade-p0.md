@@ -3858,7 +3858,7 @@ git commit -m "test(arcade): Playwright journeys for hub, Teach and Cinema"
 - Modify: `packages/app/src/webmcp/tools/animateClash.ts:70,180`
 - Modify: `README.md` (one link line under the features list)
 
-- [ ] **Step 1: Fix `animate_clash` to go through commands**
+- [x] **Step 1: Fix `animate_clash` to go through commands**
 
 Replace `ctx.setFlameDescriptor(() => deepClone(round1Flame), 'Animate 3D Clash')` with `executeCommand('flame.load', ctx, deepClone(round1Flame), 'Animate 3D Clash')` and `ctx.timeline.setTracks(tracks)` with:
 
@@ -3873,7 +3873,7 @@ if (base) {
 
 (import `executeCommand` from `@/commands/registry`). Run `pnpm --filter chaos-master exec vitest run src/webmcp` — Expected: PASS; if a test asserted `setTracks` was called, change it to assert `timeline.edit.load` was called.
 
-- [ ] **Step 2: Write `docs/webmcp.md`**
+- [x] **Step 2: Write `docs/webmcp.md`**
 
 ```markdown
 # WebMCP in Lumen Apeiron
@@ -3921,7 +3921,7 @@ Tool descriptions ≤ 500 chars; results kept under ~1.5 KB; step budgets per mo
 
 Add to `README.md` features list: `- WebMCP: an AI agent can drive the editor and the Arcade modes. See [docs/webmcp.md](docs/webmcp.md).`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/webmcp.md README.md packages/app/src/webmcp/tools/animateClash.ts

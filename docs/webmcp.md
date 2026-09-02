@@ -1,0 +1,128 @@
+# WebMCP in Lumen Apeiron
+
+Lumen Apeiron registers tools on `document.modelContext` (WebMCP) so an agent
+in ChatGPT's desktop browser, or in Chrome 149+ with
+`chrome://flags/#enable-webmcp-testing`, can drive the fractal flame editor:
+read the flame, execute editor commands, and run the Arcade modes. Every write
+goes through the app's command registry, so the semantic session recorder
+captures the agent's work as a replayable `.steps.json`.
+
+The agent is blind and mathematically precise; the human sees and cannot
+program. The Arcade is built on that asymmetry: the agent composes the maths,
+the human watches it happen and keeps the recording.
+
+## Prior work vs hackathon work (WebMCP Challenge, submission period Aug 25 to Sep 3, 2026)
+
+| Area                                                                                                                  | Status    | Where                                                                                                      | Evidence                           |
+| --------------------------------------------------------------------------------------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| Command registry, 82 editor commands, hardened replay validation                                                      | Prior     | `packages/app/src/commands/`                                                                               | commits before 2026-08-25          |
+| Semantic session recorder, timed replay, follow-cam, video export, PNG-embedded steps                                 | Prior     | `packages/app/src/recorder/`, `utils/sessionsDB.ts`                                                        | commits before 2026-08-25          |
+| Timeline, audio wiring, sonification, genetics, 3D, custom WGSL variations, share links, tours                        | Prior     | `packages/app/src/flame/`, `utils/timeline.ts`                                                             | commits before 2026-08-25          |
+| WebMCP foundation and the first 22 tools (`get_flame` through `animate_clash`)                                        | Hackathon | `packages/app/src/webmcp/`                                                                                 | first commit `ff6dff0`, 2026-09-01 |
+| Arena and Art Director overlays                                                                                       | Hackathon | `components/ArenaOverlay.tsx`, `components/DirectorOverlay.tsx`                                            | same log                           |
+| Lumen Arcade: hub, pilot lock, guard, Teach and Cinema tools, `lesson.note` (the 83rd command), recorder/arcade seams | Hackathon | `packages/app/src/arcade/`, `components/Arcade/`, `webmcp/tools/arcade*.ts`, `commands/builtins/lesson.ts` | first commit `6907ec8`, 2026-09-02 |
+
+Verify with:
+
+```bash
+git log --format='%h %ad %s' --date=iso --since=2026-08-25 \
+  -- packages/app/src/webmcp packages/app/src/arcade packages/app/src/components/Arcade
+```
+
+## Tool catalog
+
+30 tools are registered (`packages/app/src/webmcp/tools/index.ts`). Every
+description is at most 500 characters and every result is kept under about
+1.5 KB of JSON.
+
+| Tool                                                                                                      | Kind  | Purpose                                                                           |
+| --------------------------------------------------------------------------------------------------------- | ----- | --------------------------------------------------------------------------------- |
+| `get_flame`, `get_flame_detail`                                                                           | read  | Compact and paginated views of the active flame                                   |
+| `list_commands`                                                                                           | read  | Command ids, labels, descriptions, prefix index                                   |
+| `get_undo_state`, `diff_flames`                                                                           | read  | History depth; structural diff between two flames                                 |
+| `execute_command`                                                                                         | write | Run any registered command (validated, guarded while the Arcade drives, recorded) |
+| `set_flame`, `randomize_flame`, `mutate_flame`, `undo`, `redo`, `create_share_link`, `load_share_link`    | mixed | Document-level tools                                                              |
+| `score_flame`, `score_clash_round`, `simulate_clash`, `create_clash_flame`, `animate_clash`, `open_arena` | mixed | Arena (roadmap: the scoring heuristics still need grounding)                      |
+| `breed_flames`, `create_custom_variation`, `open_art_director`                                            | mixed | Genetics and Director (roadmap: the taste loop)                                   |
+| `arcade_status`                                                                                           | read  | Pilot phase, steps, budget, lock, recorder, last narration                        |
+| `arcade_start_lesson`, `arcade_narrate`, `arcade_end_lesson`                                              | write | Teach mode                                                                        |
+| `arcade_start_cinema`, `arcade_get_animatable_paths`, `arcade_set_keyframes`, `arcade_end_cinema`         | mixed | Cinema mode                                                                       |
+
+## How an agent write reaches the document
+
+1. `preflightReplayCommand(id, args)` validates the arguments against the
+   command's canonical replay signature, with a JSON size/depth budget applied
+   first (`packages/app/src/commands/registry.ts`).
+2. While an Arcade session is driving, `guardCommand` applies the mode's
+   allow-list, refuses `export.*` and `history.*`, forbids raising the quality
+   preset above the one active at the start, and locks point count, dimensions
+   and resolution (`packages/app/src/arcade/guard.ts`).
+3. `executeCommand(id, ctx, ...args)` dispatches live, which means
+   `normalizeArgs` canonicalises entity ids and seeds, `beforeCommand` hands a
+   paused replay back to the user, and `recordCommandExecution` logs the step.
+4. `arcade_end_lesson` / `arcade_end_cinema` (or the Stop button) stop the
+   recorder and store the take in the IndexedDB session library.
+
+No tool writes `ctx.setFlameDescriptor` or `ctx.timeline.setTracks` directly.
+
+## The Arcade
+
+`https://lumenapeiron.com/arcade` (the worker sends `/arcade` to the SPA as
+`#arcade`; `#arcade=teach|cinema|duel|beats` deep-links a panel).
+
+- **Teach** — pick one of four topics (`variations`, `affine`, `color`,
+  `camera`). The agent gets a brief with the goal, the allowed commands and
+  their exact argument shapes, and a step budget. It narrates through
+  `arcade_narrate` (a real `lesson.note` command, so the sentence replays as a
+  caption between the edits it describes) and builds the example with
+  `execute_command`. The recording is saved as `Lesson: <Topic> — <title>`.
+- **Cinema** — describe a move; the agent reads `arcade_get_animatable_paths`,
+  sends tracks to `arcade_set_keyframes` (validated against that catalog and
+  applied as one undoable `timeline.loadTimeline`), and playback starts. Saved
+  as `Animation: <title>`.
+- **Duel**, **Beats**, **Arena**, **Director** are on the hub as roadmap cards.
+
+While a mode runs, the editor is locked behind a full-screen shield: the
+banner shows the step counter and elapsed time, the right rail shows every
+step and narration line as it lands, keyboard shortcuts are disabled, and the
+recorder dock is hidden. Stop (or Escape twice) ends the take and still saves
+it.
+
+### Prompt cards
+
+The hub gives you the exact text to paste into the agent chat; the Teach card
+is per topic and the Cinema card embeds your description. They are generated by
+`teachPromptCard` / `cinemaPromptCard` in `packages/app/src/arcade/topics.ts`.
+
+## Try it
+
+1. Open `https://lumenapeiron.com/arcade` in ChatGPT's desktop browser, or in
+   Chrome with the flag above (the Model Context Tool Inspector extension lists
+   the tools and calls them by hand). WebGPU is required.
+2. Pick Teach, choose a topic, copy the prompt, paste it into the agent chat.
+3. Replay the lesson from the end card; export a video from the recorder dock.
+4. Developers: without a WebMCP browser, `registerWebMcp` installs a mock on
+   `window.webmcp`, so `await window.webmcp.execute(name, input)` calls any
+   tool from the console or from Playwright.
+
+```bash
+pnpm --filter chaos-master exec vitest run src/webmcp src/arcade
+pnpm test:e2e -- tests/arcade.spec.ts
+```
+
+## Limits
+
+- WebGPU is required to render; Chrome 149+ with the flag is the reference
+  surface. WebGPU inside ChatGPT's in-app browser is unconfirmed.
+- Tool descriptions are at most 500 characters; results are kept under about
+  1.5 KB of JSON.
+- Step budgets: 30 for `variations` and `affine`, 25 for `color`, 20 for
+  `camera`, 40 for Cinema. Narration counts as a step.
+- The agent can never raise render quality, point count, dimensions or
+  resolution, and exports and history are closed while it drives.
+- `timeline.play` is wall-clock transport: it is deliberately not replayable,
+  so `execute_command` refuses it and `arcade_set_keyframes` starts playback
+  itself. Scrub with `timeline.setCurrentFrame`.
+- A page reload ends any Arcade session and loses the recorder's in-memory
+  take.
+- Sessions are stored per browser in IndexedDB (capped at 100).
