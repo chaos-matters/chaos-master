@@ -215,7 +215,7 @@ git commit -m "fix(webmcp): dispatch execute_command through the recorded live p
 - Produces: `narration(): string | undefined`, `narrationLog(): { t: number; text: string }[]`, `clearNarration()` from `@/arcade/narration`.
 - Produces: command id `'lesson.note'` with args `[text: string]` (1–400 chars), `validateReplayArgs`, `label: 'Narration'`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // packages/app/src/commands/builtins/lesson.test.ts
@@ -257,12 +257,12 @@ describe('lesson.note', () => {
 })
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm --filter chaos-master exec vitest run src/commands/builtins/lesson.test.ts`
 Expected: FAIL — module `@/arcade/narration` not found.
 
-- [ ] **Step 3: Implement the signal and the command**
+- [x] **Step 3: Implement the signal and the command**
 
 ```ts
 // packages/app/src/arcade/narration.ts
@@ -328,12 +328,12 @@ registerCommand({
 
 Add `import './lesson'` to `packages/app/src/commands/builtins/index.ts` (alphabetical, after `./history`).
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `pnpm --filter chaos-master exec vitest run src/commands/builtins/lesson.test.ts src/recorder`
 Expected: PASS, including the existing recorder suites (a new command with a validator must not trip the coverage ratchet test; if `uiCoverageRatchet.test.ts` fails, add `lesson.note` to its allow-list exactly as it lists other non-UI commands).
 
-- [ ] **Step 5: Document the command**
+- [x] **Step 5: Document the command**
 
 Append to the "Covered" table in `docs/recorder-coverage.md`:
 
@@ -341,7 +341,7 @@ Append to the "Covered" table in `docs/recorder-coverage.md`:
 | Arcade narration | AI narration lines during Teach / Cinema (no UI control; issued by the `arcade_narrate` tool) | `lesson.note` (text is the caption on replay) |
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/app/src/arcade/narration.ts packages/app/src/commands/builtins/lesson.ts packages/app/src/commands/builtins/index.ts packages/app/src/commands/builtins/lesson.test.ts docs/recorder-coverage.md
