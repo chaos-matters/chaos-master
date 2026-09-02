@@ -524,7 +524,7 @@ git commit -m "feat(arcade): expose recorder and arcade seams on the command con
 - Produces from `@/arcade/pilot`: `PilotMode`, `PilotState`, `PilotDriving`, `PilotEnded`, `PilotEndReason`, signals `pilot()`, `pilotLog()`, `lastPilotSession()`, functions `agentDriving()`, `drivingState()`, `startPilot(input)`, `notePilotStep(kind, text)`, `pilotStepsRemaining()`, `appendPilotLog(kind, text)`, `endPilot(reason, extras)`, `resetPilot()`, `pilotElapsedMs(now?)`.
 - Produces from `@/arcade/topics`: `TopicId`, `LessonTopic`, `LESSON_TOPICS`, `TOPIC_IDS`, `isTopicId()`, `ALWAYS_ALLOWED`, `CINEMA_ALLOWED`, `CINEMA_STEP_BUDGET`, `BLANK_CANVAS_STEPS`, `teachPromptCard(topic)`, `cinemaPromptCard(description)`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 // packages/app/src/arcade/pilot.test.ts
@@ -616,12 +616,12 @@ describe('lesson topics', () => {
 })
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `pnpm --filter chaos-master exec vitest run src/arcade`
 Expected: FAIL — modules not found.
 
-- [ ] **Step 3: Implement `pilot.ts`**
+- [x] **Step 3: Implement `pilot.ts`**
 
 ```ts
 // packages/app/src/arcade/pilot.ts
@@ -775,7 +775,7 @@ export function resetPilot(): void {
 }
 ```
 
-- [ ] **Step 4: Implement `topics.ts`**
+- [x] **Step 4: Implement `topics.ts`**
 
 ```ts
 // packages/app/src/arcade/topics.ts
@@ -910,12 +910,12 @@ export function cinemaPromptCard(description: string): string {
 }
 ```
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `pnpm --filter chaos-master exec vitest run src/arcade`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/app/src/arcade/pilot.ts packages/app/src/arcade/topics.ts packages/app/src/arcade/pilot.test.ts packages/app/src/arcade/topics.test.ts
