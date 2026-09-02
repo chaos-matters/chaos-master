@@ -5,6 +5,7 @@ import { agentDriving, drivingState, notePilotStep, pilotStepsRemaining, startPi
 import { finishPilot } from '@/arcade/pilotActions'
 import { ALWAYS_ALLOWED, CINEMA_ALLOWED, CINEMA_STEP_BUDGET, } from '@/arcade/topics'
 import { executeCommand, preflightReplayCommand } from '@/commands/registry'
+import { withRecordingSuppressed } from '@/recorder/recorder'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
 import type { CatalogEntry } from '@/arcade/animatablePaths'
 import type { WebMcpTool } from '@/webmcp/types'
@@ -221,9 +222,15 @@ export const arcadeSetKeyframes: WebMcpTool = {
     // Wall-clock transport, so `timeline.play` is deliberately not replayable
     // and `execute_command` refuses it. The tool starts it here instead: an
     // animation the viewer has to press Play on is not an animation the agent
-    // showed them.
+    // showed them. Suppressed for the recorder the same way the workspace
+    // suppresses transport during a take — otherwise every Cinema session
+    // would be saved carrying an unnamed write and reported as unfaithful.
     const play = (input as { play?: unknown } | undefined)?.play !== false
-    if (play) executeCommand('timeline.play', ctx)
+    if (play) {
+      withRecordingSuppressed(() => {
+        executeCommand('timeline.play', ctx)
+      })
+    }
     const trackCount = built.snapshot.tracks.length
     const remaining = notePilotStep(
       'command',

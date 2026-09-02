@@ -1,7 +1,7 @@
 import '@/commands/builtins'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { pilot, resetPilot } from '@/arcade/pilot'
-import { cancelSessionRecording } from '@/recorder/recorder'
+import { cancelSessionRecording, startSessionRecording, stopSessionRecording, unnamedWriteCount, } from '@/recorder/recorder'
 import { clearWebMcpContext, setWebMcpContext } from '@/webmcp/contextBridge'
 import { createMockCommandContext } from '@/webmcp/testUtils'
 import { arcadeEndCinema, arcadeGetAnimatablePaths, arcadeSetKeyframes, arcadeStartCinema, } from './arcadeCinema'
@@ -79,6 +79,36 @@ describe('Cinema tools', () => {
       sessionName: 'Animation: Slow push-in',
     })
     expect(pilot().phase).toBe('ended')
+  })
+
+  it('keeps the wall-clock play out of the recorded take', async () => {
+    const ctx = ctxWithRecorder()
+    await arcadeStartCinema.execute({}, {})
+    // A real recording, not the mock seam: this asserts what the recorder
+    // itself sees. `timeline.play` is `recordable: false`, so an unsuppressed
+    // dispatch would push an unnamed write and mark the session unfaithful.
+    expect(startSessionRecording(ctx.flameDescriptor())).toEqual({ ok: true })
+    const result = await arcadeSetKeyframes.execute(
+      {
+        durationFrames: 60,
+        tracks: [
+          {
+            path: 'camera.zoom',
+            keyframes: [
+              { frame: 0, value: 1 },
+              { frame: 60, value: 2 },
+            ],
+          },
+        ],
+      },
+      {},
+    )
+    expect(result).toMatchObject({ ok: true, playing: true })
+    expect(ctx.timeline.play).toHaveBeenCalledTimes(1)
+    expect(unnamedWriteCount()).toBe(0)
+    const ids = stopSessionRecording()?.actions.map((action) => action.id)
+    expect(ids).toContain('timeline.loadTimeline')
+    expect(ids).not.toContain('timeline.play')
   })
 
   it('refuses keyframes when no cinema session is active', async () => {

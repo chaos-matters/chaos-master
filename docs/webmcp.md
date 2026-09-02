@@ -123,6 +123,9 @@ pnpm test:e2e -- tests/arcade.spec.ts
 - `timeline.play` is wall-clock transport: it is deliberately not replayable,
   so `execute_command` refuses it and `arcade_set_keyframes` starts playback
   itself. Scrub with `timeline.setCurrentFrame`.
-- A page reload ends any Arcade session and loses the recorder's in-memory
-  take.
+- A page reload during a session ends it and loses the recorder's in-memory
+  take: it was never saved, so nothing appears in the library.
+- Cinema playback is started by `arcade_set_keyframes` itself and is
+  deliberately suppressed for the recorder, so it is not part of the saved
+  session. A replay applies the keyframes; you press Play.
 - Sessions are stored per browser in IndexedDB (capped at 100).
