@@ -133,6 +133,20 @@ export function createMockCommandContext(): CommandContext {
       setDuration: vi.fn(),
       currentFrame: () => 0,
       setCurrentFrame: vi.fn(),
+      play: vi.fn(),
+      edit: {
+        snapshot: vi.fn(() => ({
+          config: {
+            fps: 30,
+            timeScale: 1,
+            startFrame: 0,
+            endFrame: 90,
+            loop: true,
+          },
+          tracks: [],
+        })),
+        load: vi.fn(),
+      },
       timelineStore: {
         state: {} as unknown,
         set: vi.fn(),

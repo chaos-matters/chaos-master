@@ -2072,7 +2072,7 @@ git commit -m "feat(arcade): pilot lock overlay with Stop, live steps and end ca
 - Produces tools `arcade_start_cinema`, `arcade_get_animatable_paths`, `arcade_set_keyframes`, `arcade_end_cinema`.
 - Path grammar (from `utils/timeline.ts` apply loop): bare `TIMELINE_PARAMETERS` paths (`exposure`, `camera.zoom`, ...), `transform.{tid}.preAffine.{a-f}`, `transform.{tid}.postAffine.{a-f}`, `transform.{tid}.color.{x|y}`, `transform.{tid}.probability`, `transform.{tid}.colorSpeed`, `{tid}.{vid}` (variation weight), `finalTransform.{a-f}`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```ts
 // packages/app/src/arcade/animatablePaths.test.ts
@@ -2293,12 +2293,12 @@ describe('Cinema tools', () => {
 })
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `pnpm --filter chaos-master exec vitest run src/arcade/animatablePaths.test.ts src/webmcp/tools/arcadeCinema.test.ts`
 Expected: FAIL — modules not found.
 
-- [ ] **Step 3: Implement `animatablePaths.ts`**
+- [x] **Step 3: Implement `animatablePaths.ts`**
 
 ```ts
 // packages/app/src/arcade/animatablePaths.ts
@@ -2548,7 +2548,7 @@ export function buildTimelineSnapshot(
 }
 ```
 
-- [ ] **Step 4: Implement `arcadeCinema.ts`**
+- [x] **Step 4: Implement `arcadeCinema.ts`**
 
 ```ts
 // packages/app/src/webmcp/tools/arcadeCinema.ts
@@ -2809,16 +2809,16 @@ export const arcadeEndCinema: WebMcpTool = {
 }
 ```
 
-- [ ] **Step 5: Mock the timeline edit seam and register**
+- [x] **Step 5: Mock the timeline edit seam and register**
 
 In `testUtils.ts` add inside the `timeline` object: `edit: { snapshot: vi.fn(() => ({ config: { fps: 30, timeScale: 1, startFrame: 0, endFrame: 90, loop: true }, tracks: [] })), load: vi.fn() },`. In `tools/index.ts` import the four tools from `./arcadeCinema`, export them, and add `arcadeGetAnimatablePaths` to the read group and `arcadeStartCinema`, `arcadeSetKeyframes`, `arcadeEndCinema` after the Teach tools.
 
-- [ ] **Step 6: Run the tests to verify they pass**
+- [x] **Step 6: Run the tests to verify they pass**
 
 Run: `pnpm --filter chaos-master exec vitest run src/arcade src/webmcp && pnpm typecheck`
 Expected: PASS. If `tryValidateTimelineSnapshot` rejects `autoFps: false` or `loop` in your snapshot, read `flame/schema/timeline.ts:176-215` and match its field names exactly.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add packages/app/src/arcade/animatablePaths.ts packages/app/src/arcade/animatablePaths.test.ts packages/app/src/webmcp/tools/arcadeCinema.ts packages/app/src/webmcp/tools/arcadeCinema.test.ts packages/app/src/webmcp/testUtils.ts packages/app/src/webmcp/tools/index.ts
