@@ -80,7 +80,7 @@ export function startPilot(
     mode: input.mode,
     topic: input.topic,
     title: input.title,
-    startedAt: input.now ?? performance.now(),
+    startedAt: input.now ?? globalThis.performance.now(),
     steps: 0,
     stepBudget: input.stepBudget,
     allowed: input.allowed,
@@ -107,7 +107,7 @@ export function pilotStepsRemaining(): number {
   return state ? Math.max(0, state.stepBudget - state.steps) : 0
 }
 
-export function pilotElapsedMs(now = performance.now()): number {
+export function pilotElapsedMs(now = globalThis.performance.now()): number {
   const state = drivingState()
   return state ? Math.max(0, now - state.startedAt) : 0
 }
@@ -135,7 +135,7 @@ export function endPilot(
     steps: state.steps,
     durationMs: Math.max(
       0,
-      (extras.now ?? performance.now()) - state.startedAt,
+      (extras.now ?? globalThis.performance.now()) - state.startedAt,
     ),
   }
   setLastPilotSession(extras.session)
