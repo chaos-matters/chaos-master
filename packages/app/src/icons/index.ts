@@ -14,6 +14,7 @@ import Discord from './discord.svg'
 import Download from './download.svg'
 import Eye from './eye.svg'
 import EyeOff from './eye-off.svg'
+import Film from './film.svg'
 import Focus from './focus.svg'
 import FolderOpen from './folder-open.svg'
 import GitHub from './github.svg'
@@ -43,6 +44,7 @@ import SkipForward from './skip-forward.svg'
 import Sparkle from './sparkle.svg'
 import Star from './star.svg'
 import Stop from './stop.svg'
+import Swords from './swords.svg'
 import Terminal from './terminal.svg'
 import TriangleAlert from './triangle-alert.svg'
 import Undo from './undo.svg'
@@ -66,6 +68,7 @@ export {
   Download,
   Eye,
   EyeOff,
+  Film,
   FolderOpen,
   Focus,
   GitHub,
@@ -95,6 +98,7 @@ export {
   Sparkle,
   Star,
   Stop,
+  Swords,
   Terminal,
   Undo,
   Zap,

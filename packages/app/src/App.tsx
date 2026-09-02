@@ -1,4 +1,5 @@
 import { batch, createEffect, createResource, createSignal, ErrorBoundary, onCleanup, onMount, Show, Suspense, } from 'solid-js'
+import { ArcadeHub } from './components/Arcade/ArcadeHub'
 import { AppCrashed, WebgpuNotSupported, } from './components/ErrorHandling/ErrorHandling'
 import { HomeTab } from './components/Home/HomeTab'
 import { Modal } from './components/Modal/Modal'
@@ -12,7 +13,7 @@ import { ToastProvider, useToast } from './contexts/ToastContext'
 import { IS_DEV } from './defaults'
 import { initAncestry } from './flame/ancestry'
 import { importSharedVariations, loadCustomVariations, remapFlameCustomVariations, } from './flame/variations/custom'
-import { activeTab, setActiveTab } from './lib/activeTab'
+import { activeTab, arcadeMode, setActiveTab } from './lib/activeTab'
 import { Root } from './lib/Root'
 import { MainWorkspace } from './MainWorkspace'
 import { getTour } from './tours/registry'
@@ -299,6 +300,17 @@ export function Wrappers() {
                               setSelectedCapability(capability)
                               setActiveTab('workspace')
                             })
+                          }}
+                        />
+                      </Show>
+                      {/* The Arcade overlays the workspace the same way Home
+                          does: the editor stays mounted underneath so a lesson
+                          starts on the flame you were already looking at. */}
+                      <Show when={activeTab() === 'arcade' && !showWelcome()}>
+                        <ArcadeHub
+                          initialMode={arcadeMode()}
+                          onBackToEditor={() => {
+                            setActiveTab('workspace')
                           }}
                         />
                       </Show>

@@ -2973,7 +2973,7 @@ git commit -m "feat(arcade): #arcade tab and /arcade redirect"
 - Produces: `detectWebMcp(win?): 'detected' | 'mock' | 'none'`; `<ArcadeHub initialMode onBackToEditor />`; `ARCADE_MODES` card list; `data-testid="arcade-card"` on cards, `data-testid="webmcp-status"` on the pill, `data-testid="prompt-card"` on the prompt block.
 - Consumes: `teachPromptCard`, `cinemaPromptCard`, `TOPIC_IDS`, `LESSON_TOPICS` (Task 4); `setActiveTab`, `arcadeMode` (Task 9).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // packages/app/src/arcade/webmcpDetect.test.ts
@@ -2997,12 +2997,12 @@ describe('detectWebMcp', () => {
 })
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm --filter chaos-master exec vitest run src/arcade/webmcpDetect.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement detection, icons, pill, panel, hub**
+- [x] **Step 3: Implement detection, icons, pill, panel, hub**
 
 ```ts
 // packages/app/src/arcade/webmcpDetect.ts
@@ -3654,12 +3654,14 @@ Mount in `packages/app/src/App.tsx` right after the Home `<Show>` (imports: `Arc
 </Show>
 ```
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
+
+> Automated half done. The manual `pnpm start` half could not run in this environment: the dev server is HTTPS with a self-signed certificate (`@vitejs/plugin-basic-ssl`) that the agent's browser pane refuses to load. The same checks (six cards, the status pill, the Teach prompt card) are asserted by `tests/arcade.spec.ts` (Task 11) against the production preview build.
 
 Run: `pnpm --filter chaos-master exec vitest run src/arcade && pnpm typecheck && pnpm lint`
 Expected: PASS. Then `pnpm start`, open `http://localhost:5173/#arcade`: six cards (four greyed), the pill reads "WebMCP dev mock active" after ~2 s, Teach opens the panel with topic chips and a prompt; Copy puts the text on the clipboard; Esc closes the panel; Esc again returns to the editor; `#arcade=cinema` opens the Cinema panel directly. Resize to 700 px: two columns, the panel is full width.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/app/src/arcade/webmcpDetect.ts packages/app/src/arcade/webmcpDetect.test.ts packages/app/src/icons packages/app/src/components/Arcade packages/app/src/App.tsx
