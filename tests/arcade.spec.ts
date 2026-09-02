@@ -55,6 +55,25 @@ test.describe('Lumen Arcade', () => {
     )
   })
 
+  test('the Arcade pill opens and closes the hub in place', async ({
+    page,
+  }) => {
+    await openEditor(page)
+    // The workspace is up and the hub is not.
+    await expect(page.getByTestId('arcade-card')).toHaveCount(0)
+
+    await page.getByRole('link', { name: 'Open Lumen Arcade' }).click()
+    await expect(page.getByTestId('arcade-card')).toHaveCount(6)
+    // In place: no reload, so the mock the workspace installed is still there.
+    expect(await page.evaluate(() => 'webmcp' in window)).toBe(true)
+
+    await page.getByRole('button', { name: 'Back to editor' }).click()
+    await expect(page.getByTestId('arcade-card')).toHaveCount(0)
+    await expect(
+      page.getByRole('link', { name: 'Open Lumen Arcade' }),
+    ).toBeVisible()
+  })
+
   test('Teach: start, drive, narrate, end, replay card', async ({ page }) => {
     await openEditor(page)
     const brief = await callTool(page, 'arcade_start_lesson', {

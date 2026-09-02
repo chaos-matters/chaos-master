@@ -1,4 +1,5 @@
-import { Book, GridIcon } from '@/icons'
+import { Book, GridIcon, Star } from '@/icons'
+import { setActiveTab } from '@/lib/activeTab'
 import { BENCHMARKS_PATH } from '@/routing/appPath'
 import { VERSION } from '@/version'
 import { BenchmarkButton } from '../BenchmarkButton/BenchmarkButton'
@@ -23,6 +24,23 @@ export function SoftwareVersion(props: {
         >
           <GridIcon />
           Lab
+        </a>
+        {/* A real href so the Arcade can be copied and opened in a new tab,
+            but the click switches tabs in place: the workspace stays mounted
+            underneath the hub, so a lesson starts on the flame you were
+            already looking at. */}
+        <a
+          class={ui.arcadePill}
+          href="#arcade"
+          aria-label="Open Lumen Arcade"
+          title="Open Lumen Arcade"
+          onClick={(ev) => {
+            ev.preventDefault()
+            setActiveTab('arcade')
+          }}
+        >
+          <Star />
+          Arcade
         </a>
         <button
           class={ui.docsPill}

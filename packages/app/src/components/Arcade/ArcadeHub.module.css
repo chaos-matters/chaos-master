@@ -1,7 +1,9 @@
 .hub {
   position: fixed;
   inset: 0;
-  z-index: 9000;
+  /* Above the floating version pills (z-index 9999) so the hub covers the
+     workspace chrome completely, including the Arcade pill that opened it. */
+  z-index: 10005;
   overflow-y: auto;
   padding: 48px clamp(16px, 5vw, 72px);
   color: #f2f4f8;
@@ -201,7 +203,7 @@
   right: 0;
   bottom: 0;
   width: min(440px, 100vw);
-  z-index: 9100;
+  z-index: 10006;
   padding: 20px 22px;
   overflow-y: auto;
   background: #0f1422;
