@@ -13,6 +13,7 @@
  * is still useful for the dev overlay and Vitest tests.
  */
 
+import { agentDriving } from '@/arcade/pilot'
 import { clearWebMcpContext, setWebMcpContext } from './contextBridge'
 import { MockModelContext } from './mockModelContext'
 import { allTools } from './tools'
@@ -40,9 +41,33 @@ export const toMcpResult = (raw: unknown) => {
   }
 }
 
+/** Write tools that stay usable while an Arcade pilot drives, because they
+ *  enforce the guard themselves. */
+const DRIVING_SAFE_TOOLS = new Set(['execute_command'])
+
 export const wrapTool = (tool: WebMcpTool): WebMcpTool => ({
   ...tool,
   execute: async (args: unknown, context: { signal?: AbortSignal }) => {
+    // One lock, one door. While the Arcade drives, every mutation goes
+    // through the guarded escape hatch or an arcade_* tool; the document-level
+    // tools (set_flame, undo, load_share_link, ...) would otherwise write
+    // straight past the mode's allow-list and the step budget.
+    if (
+      agentDriving() &&
+      tool.annotations?.readOnlyHint !== true &&
+      !tool.name.startsWith('arcade_') &&
+      !DRIVING_SAFE_TOOLS.has(tool.name)
+    ) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `${tool.name} is unavailable while an Arcade session is active. Use execute_command (guarded) or the arcade_* tools.`,
+          },
+        ],
+        isError: true,
+      }
+    }
     try {
       const raw = await tool.execute(args, context)
       return toMcpResult(raw)

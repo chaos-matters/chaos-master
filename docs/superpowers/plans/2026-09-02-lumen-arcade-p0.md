@@ -1104,7 +1104,7 @@ git commit -m "feat(arcade): command guard for agent-driven sessions"
 - Produces: `finishPilot(ctx, reason, opts?)` from `@/arcade/pilotActions` returning `Promise<PilotEnded | { error: string }>`; tools `arcade_status`, `arcade_start_lesson`, `arcade_narrate`, `arcade_end_lesson`.
 - Consumes: Task 3 seams, Task 4 pilot/topics, Task 5 guard, Task 2 `lesson.note`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 // packages/app/src/webmcp/tools/arcadeTeach.test.ts
@@ -1226,12 +1226,12 @@ describe('Teach tools', () => {
 })
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `pnpm --filter chaos-master exec vitest run src/webmcp/tools/arcadeTeach.test.ts`
 Expected: FAIL — module `./arcadeTeach` not found.
 
-- [ ] **Step 3: Implement `pilotActions.ts`**
+- [x] **Step 3: Implement `pilotActions.ts`**
 
 ```ts
 // packages/app/src/arcade/pilotActions.ts
@@ -1298,7 +1298,7 @@ export async function finishPilot(
 }
 ```
 
-- [ ] **Step 4: Implement `arcadeTeach.ts`**
+- [x] **Step 4: Implement `arcadeTeach.ts`**
 
 ```ts
 // packages/app/src/webmcp/tools/arcadeTeach.ts
@@ -1498,7 +1498,7 @@ export const arcadeEndLesson: WebMcpTool = {
 }
 ```
 
-- [ ] **Step 5: Add guard, budget and step counting to `execute_command`**
+- [x] **Step 5: Add guard, budget and step counting to `execute_command`**
 
 Final `execute` body of `packages/app/src/webmcp/tools/executeCommand.ts`:
 
@@ -1553,7 +1553,7 @@ if (driving) {
 return { success: true, commandId }
 ```
 
-- [ ] **Step 6: Add the driving gate to `wrapTool`**
+- [x] **Step 6: Add the driving gate to `wrapTool`**
 
 ```ts
 // packages/app/src/webmcp/registerWebMcp.ts
@@ -1598,16 +1598,16 @@ export const wrapTool = (tool: WebMcpTool): WebMcpTool => ({
 })
 ```
 
-- [ ] **Step 7: Register the tools**
+- [x] **Step 7: Register the tools**
 
 In `packages/app/src/webmcp/tools/index.ts` import `{ arcadeEndLesson, arcadeNarrate, arcadeStartLesson, arcadeStatus } from './arcadeTeach'`, add them to the `export { ... }` block, and to `allTools`: `arcadeStatus` in the read group (after `getUndoState`), the three write tools after `executeCommandTool`.
 
-- [ ] **Step 8: Run the tests to verify they pass**
+- [x] **Step 8: Run the tests to verify they pass**
 
 Run: `pnpm --filter chaos-master exec vitest run src/webmcp src/arcade && pnpm typecheck`
 Expected: PASS. `webmcp.test.ts` has a test that counts registered tools or checks description length; update the expected count if it is hard-coded (4 new tools).
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add packages/app/src/arcade/pilotActions.ts packages/app/src/webmcp/tools/arcadeTeach.ts packages/app/src/webmcp/tools/arcadeTeach.test.ts packages/app/src/webmcp/tools/executeCommand.ts packages/app/src/webmcp/registerWebMcp.ts packages/app/src/webmcp/tools/index.ts packages/app/src/webmcp/webmcp.test.ts
