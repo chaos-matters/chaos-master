@@ -41,8 +41,13 @@ async function openEditor(page: Page) {
 test.describe('Lumen Arcade', () => {
   test('hub renders six cards and the WebMCP status pill', async ({ page }) => {
     await page.goto('/#arcade', { waitUntil: 'domcontentloaded' })
-    await dismissWelcomeIfPresent(page, 12_000)
-    await expect(page.getByTestId('arcade-card')).toHaveCount(6)
+    // No welcome dismissal first: `/arcade` must land on the hub itself, or a
+    // judge following the link never reaches it.
+    await expect(page.getByTestId('arcade-card')).toHaveCount(6, {
+      timeout: 20_000,
+    })
+    // Kept afterwards so the test still passes if another path shows it.
+    await dismissWelcomeIfPresent(page, 2_000)
     await expect(page.getByTestId('webmcp-status')).toContainText(/WebMCP/)
     await page.getByTestId('arcade-card').filter({ hasText: 'Teach' }).click()
     await expect(page.getByTestId('prompt-card')).toContainText(

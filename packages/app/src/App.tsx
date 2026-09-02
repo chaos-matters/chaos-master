@@ -13,7 +13,7 @@ import { ToastProvider, useToast } from './contexts/ToastContext'
 import { IS_DEV } from './defaults'
 import { initAncestry } from './flame/ancestry'
 import { importSharedVariations, loadCustomVariations, remapFlameCustomVariations, } from './flame/variations/custom'
-import { activeTab, arcadeMode, setActiveTab } from './lib/activeTab'
+import { activeTab, arcadeMode, setActiveTab, tabFromHash, } from './lib/activeTab'
 import { Root } from './lib/Root'
 import { MainWorkspace } from './MainWorkspace'
 import { getTour } from './tours/registry'
@@ -197,11 +197,17 @@ export function Wrappers() {
     }
   })
 
-  // Support #tour=app|sidebar|timeline hash URLs
+  // Support #tour=app|sidebar|timeline and #arcade hash URLs
   createEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash
-      const match = /#tour=([a-zA-Z0-9_-]+)/.exec(hash)
+      const fragment = window.location.hash
+      // `lumenapeiron.com/arcade` redirects here. Landing a judge on the
+      // generic welcome screen instead of the hub loses them: neither
+      // "Browse gallery" nor picking a flame ever comes back to the Arcade.
+      if (tabFromHash(fragment) === 'arcade') {
+        setShowWelcome(false)
+      }
+      const match = /#tour=([a-zA-Z0-9_-]+)/.exec(fragment)
       if (match) {
         const tourId = match[1]!
         setShowWelcome(false)
