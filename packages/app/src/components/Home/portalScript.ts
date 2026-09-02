@@ -10,6 +10,7 @@ import { executeCommand } from '@/commands/registry'
 import { DEFAULT_ANIMATION_DURATION_MS } from '@/components/SpotlightTour/tourTypes'
 import { withRecordingSuppressed } from '@/recorder/recorder'
 import { deepClone } from '@/utils/clone'
+import type { CommandContext } from '@/commands/types'
 import type { TourContext, TourGuide, TourStep, } from '@/components/SpotlightTour/tourTypes'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { HistorySetter } from '@/utils/createStoreHistory'
@@ -177,13 +178,11 @@ export function createPortalDriver(start: FlameDescriptor): PortalDriver {
     }
   }
 
-  const commandContext = {
+  const commandContext: CommandContext = {
     flameDescriptor: () => flame,
     setFlameDescriptor,
     blendFlame,
-    setBlendFlame: (
-      next: any /* eslint-disable-line @typescript-eslint/no-explicit-any */,
-    ) => {
+    setBlendFlame: (next) => {
       setBlendFlame(() => next)
     },
     blendWeight,
@@ -246,11 +245,7 @@ export function createPortalDriver(start: FlameDescriptor): PortalDriver {
       // active (module-global, so it survives leaving the workspace), the
       // portal's commands must not leak into the user's log.
       withRecordingSuppressed(() => {
-        executeCommand(
-          id,
-          commandContext as any /* eslint-disable-line @typescript-eslint/no-explicit-any */,
-          ...args,
-        )
+        executeCommand(id, commandContext, ...args)
       })
     },
     animateValue: (start_, end, durationMs, onUpdate) => {

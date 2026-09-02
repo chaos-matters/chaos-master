@@ -35,6 +35,15 @@ export const openArena: WebMcpTool = {
   execute: (input: unknown) => {
     const ctx = getWebMcpContext()
     if (!ctx) return { error: 'No workspace context' }
+    // Sandboxed contexts (the Home portal, the replay renderer, tests) have
+    // no arena HUD. Say so rather than throwing on an undefined member.
+    const { arena } = ctx
+    if (!arena) {
+      return {
+        error:
+          'The Arena HUD is not available in this workspace. Open the editor and try again.',
+      }
+    }
 
     const raw = (input ?? {}) as {
       player1Name?: string
@@ -85,17 +94,17 @@ export const openArena: WebMcpTool = {
       )
     }
 
-    ctx.arena.setPlayer1Stats({
+    arena.setPlayer1Stats({
       name: raw.player1Name || (p1StatsObj.name as string) || 'Player 1',
       ...p1StatsObj,
       flame: p1Flame,
     })
-    ctx.arena.setPlayer2Stats({
+    arena.setPlayer2Stats({
       name: raw.player2Name || (p2StatsObj.name as string) || 'Player 2',
       ...p2StatsObj,
       flame: p2Flame,
     })
-    ctx.arena.setOpen(true)
+    arena.setOpen(true)
 
     return { success: true, message: 'Arena HUD opened.' }
   },

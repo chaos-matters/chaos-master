@@ -55,7 +55,12 @@ export interface CommandContext {
     } | null>
     selectCandidate: (index: number) => void
   }
-  arena: {
+  /**
+   * Flame Clash Arena HUD. Optional for the same reason as `director?`:
+   * sandboxes (the Home portal, the replay video renderer, tests) have no
+   * arena, and a required member there is a lie paid for with `as any`.
+   */
+  arena?: {
     open: Accessor<boolean>
     setOpen: Setter<boolean>
     player1Stats: Accessor<{

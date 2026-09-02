@@ -20,7 +20,9 @@ import type { ArchetypeId, OpponentArchetype, TacticalStance, } from '@/webmcp/t
 import type { ClashRoundOutcome, SimulateClashResult, } from '@/webmcp/tools/simulateClash'
 
 export interface ArenaOverlayProps {
-  arena: CommandContext['arena']
+  /** The overlay only mounts when the workspace actually has an arena, so it
+   *  takes the concrete shape rather than the optional context member. */
+  arena: NonNullable<CommandContext['arena']>
   hardwareTier?: HardwareTier | null
   onClose?: () => void
 }

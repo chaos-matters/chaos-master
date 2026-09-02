@@ -516,15 +516,15 @@ describe('WebMCP Foundation', () => {
       })) as Record<string, unknown>
 
       expect(result.success).toBe(true)
-      expect(cmdContext.arena.setOpen).toHaveBeenCalledWith(true)
-      expect(cmdContext.arena.setPlayer1Stats).toHaveBeenCalledWith(
+      expect(cmdContext.arena!.setOpen).toHaveBeenCalledWith(true)
+      expect(cmdContext.arena!.setPlayer1Stats).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'A',
           powerLevel: 1095,
           flame: expect.anything(),
         }),
       )
-      expect(cmdContext.arena.setPlayer2Stats).toHaveBeenCalledWith(
+      expect(cmdContext.arena!.setPlayer2Stats).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'B',
           powerLevel: 895,

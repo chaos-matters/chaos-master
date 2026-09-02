@@ -546,8 +546,6 @@ export function createReplayVideoDriver(
         return sidebarOpen
       },
     },
-    arena:
-      {} as any /* eslint-disable-line @typescript-eslint/no-explicit-any */,
     timeline: {
       tracks: () => timeline.snapshot.tracks,
       setTracks: (next) => {
