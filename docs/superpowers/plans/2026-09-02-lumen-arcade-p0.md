@@ -3934,7 +3934,15 @@ git commit -m "docs(webmcp): prior vs hackathon work, tool catalog; fix animate_
 
 **Files:** none new. This task is the release checklist; each box is a real check with the command that proves it.
 
-- [ ] **Step 1: Full local verification**
+- [x] **Step 1: Full local verification**
+
+> Run 2026-09-02: `pnpm typecheck` exit 0; `pnpm lint` exit 0 (1 pre-existing
+> warning in `AncestryTreeModal.tsx`); `pnpm --filter chaos-master exec vitest
+run` 146 files / 1860 tests passed; `pnpm test:e2e -- tests/arcade.spec.ts
+tests/smoke.spec.ts` 11 passed; emoji scan over the 52 changed files: none.
+>
+> Steps 2 to 5 below are human tasks (manual Chrome and ChatGPT runs, merge,
+> deploy, video, submission) and were deliberately not performed.
 
 ```bash
 pnpm typecheck && pnpm lint && pnpm --filter chaos-master exec vitest run && pnpm test:e2e -- tests/arcade.spec.ts tests/smoke.spec.ts
