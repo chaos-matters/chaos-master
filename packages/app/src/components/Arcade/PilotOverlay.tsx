@@ -169,9 +169,9 @@ export function PilotOverlay(props: { ctx: CommandContext }) {
                     <button
                       type="button"
                       class={ui.primary}
-                      // A take the library rejected is not one to hand to the
-                      // replay dock as if it were stored.
-                      disabled={end().saved === false}
+                      // Offered even when the library write failed: the take
+                      // is still in memory, so it is still replayable. The
+                      // card says separately that it did not reach the library.
                       onClick={() => {
                         const take = session()
                         resetPilot()
