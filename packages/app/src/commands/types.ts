@@ -3,7 +3,8 @@ import type { v2f } from 'typegpu/data'
 import type { AudioMapping, AudioWiringSnapshot, } from '@/flame/schema/audioWiring'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineSnapshot } from '@/flame/schema/timeline'
-import type { TransformColorSnapshot } from '@/recorder/schema'
+import type { SessionRecordingStartResult } from '@/recorder/recorder'
+import type { RecordedSession, TransformColorSnapshot } from '@/recorder/schema'
 import type { SonificationSnapshot } from '@/recorder/sonificationState'
 import type { HistorySetter } from '@/utils/createStoreHistory'
 import type { TimelineTrack } from '@/utils/timeline'
@@ -229,6 +230,30 @@ export interface CommandContext {
     redo: () => void
     peekUndoTarget?: () => UndoTarget | undefined
     peekRedoTarget?: () => UndoTarget | undefined
+  }
+  /**
+   * The session recorder as the workspace exposes it to tools.
+   *
+   * Optional for the same reason as `timeline.edit`: sandboxes (the Home
+   * portal, tests) have no recorder. `start` captures exactly the
+   * timeline/audio/sonification/view extras the recorder dock does, so an
+   * agent-started take records the same side state as a human-started one.
+   */
+  recorder?: {
+    isRecording: () => boolean
+    start: () => SessionRecordingStartResult
+    stop: () => RecordedSession | undefined
+    cancel: () => void
+    save: (session: RecordedSession, name: string) => Promise<void>
+    openReplay: (session: RecordedSession) => void
+    actionCount: () => number
+  }
+  /** Arcade hub and pilot affordances the tools may drive. */
+  arcade?: {
+    openHub: (mode?: 'teach' | 'cinema' | 'duel' | 'beats') => void
+    closeHub: () => void
+    toast: (text: string) => void
+    qualityPreset: () => string
   }
 }
 

@@ -138,6 +138,21 @@ export function createMockCommandContext(): CommandContext {
         set: vi.fn(),
       },
     } as unknown as CommandContext['timeline'],
+    recorder: {
+      isRecording: vi.fn(() => false),
+      start: vi.fn(() => ({ ok: true }) as const),
+      stop: vi.fn(() => undefined),
+      cancel: vi.fn(),
+      save: vi.fn(async () => {}),
+      openReplay: vi.fn(),
+      actionCount: vi.fn(() => 0),
+    },
+    arcade: {
+      openHub: vi.fn(),
+      closeHub: vi.fn(),
+      toast: vi.fn(),
+      qualityPreset: vi.fn(() => 'mid'),
+    },
     history: {
       undo: vi.fn(() => {
         const prev = undoStack.pop()

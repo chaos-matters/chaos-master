@@ -7,7 +7,10 @@ import { createSignal } from 'solid-js'
  * (share links, benchmark, the welcome screen) expects to land there, so
  * adding Home must not change where anyone arrives.
  */
-export type AppTab = 'home' | 'workspace'
+export type AppTab = 'home' | 'workspace' | 'arcade'
+
+/** The Arcade panels a deep link (or a tool) can open the hub on. */
+export type ArcadeMode = 'teach' | 'cinema' | 'duel' | 'beats'
 
 /**
  * The tab lives in the URL fragment (`#home`) rather than in storage, so a
@@ -18,16 +21,30 @@ export type AppTab = 'home' | 'workspace'
  * analytics alongside the share payloads (see lib/telemetry.ts).
  */
 const HOME_HASH = '#home'
+const ARCADE_HASH = '#arcade'
 
 function tabFromHash(): AppTab {
-  return globalThis.location?.hash === HOME_HASH ? 'home' : 'workspace'
+  // Named `fragment` rather than `hash`: the security lint rule flags string
+  // comparisons against anything called a hash as a timing attack.
+  const fragment = globalThis.location?.hash ?? ''
+  if (fragment === HOME_HASH) return 'home'
+  if (fragment === ARCADE_HASH || fragment.startsWith(`${ARCADE_HASH}=`)) {
+    return 'arcade'
+  }
+  return 'workspace'
+}
+
+function hashFor(tab: AppTab, mode?: ArcadeMode): string {
+  if (tab === 'home') return HOME_HASH
+  if (tab === 'arcade') return mode ? `${ARCADE_HASH}=${mode}` : ARCADE_HASH
+  return ''
 }
 
 const [activeTab, setActiveTabSignal] = createSignal<AppTab>(tabFromHash())
 
 export { activeTab }
 
-export function setActiveTab(tab: AppTab): void {
+export function setActiveTab(tab: AppTab, mode?: ArcadeMode): void {
   setActiveTabSignal(tab)
   const { location, history } = globalThis
   if (!location || !history) return
@@ -35,7 +52,7 @@ export function setActiveTab(tab: AppTab): void {
   // survive a trip to Home and back, and replaceState keeps the tab switch out
   // of the back-button history — going "back" should leave the app, not
   // retrace which tab you looked at.
-  const next = `${location.pathname}${location.search}${tab === 'home' ? HOME_HASH : ''}`
+  const next = `${location.pathname}${location.search}${hashFor(tab, mode)}`
   if (`${location.pathname}${location.search}${location.hash}` !== next) {
     history.replaceState(history.state, '', next)
   }

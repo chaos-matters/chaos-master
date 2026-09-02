@@ -380,7 +380,7 @@ arcade?: {
 }
 ```
 
-- [ ] **Step 1: Add the types**
+- [x] **Step 1: Add the types**
 
 ```ts
 // packages/app/src/commands/types.ts — add imports at the top
@@ -413,7 +413,7 @@ import type { SessionRecordingStartResult } from '@/recorder/recorder'
 
 Run: `pnpm typecheck` — Expected: PASS (both members optional; `createMockCommandContext` compiles unchanged).
 
-- [ ] **Step 2: Extract the recorder extras closure in `MainWorkspace.tsx`**
+- [x] **Step 2: Extract the recorder extras closure in `MainWorkspace.tsx`**
 
 Above `const cmdContext: CommandContext = {` (~line 3901) add:
 
@@ -442,7 +442,7 @@ function captureRecorderStartExtras(): SessionStartExtras {
 
 (`SessionStartExtras` is already imported by the dock; add `import type { SessionStartExtras } from './recorder/recorder'` if `MainWorkspace.tsx` lacks it.) Replace the body of the dock's `startExtras={() => { ... }}` prop (~4827) with `startExtras={captureRecorderStartExtras}`.
 
-- [ ] **Step 3: Wire the seams into `cmdContext`**
+- [x] **Step 3: Wire the seams into `cmdContext`**
 
 Add to the `cmdContext` object literal (after `history`):
 
@@ -475,7 +475,7 @@ Add to the `cmdContext` object literal (after `history`):
 
 Imports to add in `MainWorkspace.tsx` if missing: `isSessionRecording, startSessionRecording, stopSessionRecording, cancelSessionRecording, recordedActionCount, withRecordingSuppressed` from `./recorder/recorder`; `storeSession` from `./utils/sessionsDB`; `setActiveTab` from `./lib/activeTab`. `setExternalSessionLibraryRevision` is the setter of the existing `externalSessionLibraryRevision` signal (used at ~4861); if it is named differently, use that name. `setActiveTab(tab, mode?)` gains its second parameter in Task 9; until then call `setActiveTab('arcade')` and ignore `mode`.
 
-- [ ] **Step 4: Mock the seams in `testUtils.ts`**
+- [x] **Step 4: Mock the seams in `testUtils.ts`**
 
 In `createMockCommandContext()` add:
 
@@ -497,12 +497,12 @@ In `createMockCommandContext()` add:
     },
 ```
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 Run: `pnpm typecheck && pnpm --filter chaos-master exec vitest run src/webmcp src/recorder`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/app/src/commands/types.ts packages/app/src/MainWorkspace.tsx packages/app/src/webmcp/testUtils.ts
