@@ -164,6 +164,19 @@ implementations.
 
 ### Fixed
 
+- **Dropzone highlight stuck after a fileless drop** (`components/Dropzone/`,
+  `utils/dataTransferFiles.ts`, `LoadFlameModal.tsx`): a drop whose
+  `DataTransfer` carried no `File` (a URL dragged from another window, or a
+  Linux file-manager drop that Chromium delivers with an empty `files` list)
+  returned early, before `preventDefault` and before clearing the `dropping`
+  state, so the white drop overlay stayed on screen and the browser could run
+  its default action (navigating to a dropped URL). The drop is now always
+  taken and the highlight always cleared; files are read from `items` when
+  `files` is empty (shared with the Load Flame modal's own zone), and a
+  fileless drop logs the transfer types. dragenter/dragleave use a depth
+  counter (plus `relatedTarget` where the browser reports it) so the highlight
+  no longer flickers when the pointer crosses child elements.
+
 - **`wrangler dev` OOM-killed the workstation** (`packages/app/wrangler.jsonc`,
   `packages/app/package.json`): both envs declared `build.command`, and
   wrangler runs a custom build for `dev` as well as `deploy`, re-running it on

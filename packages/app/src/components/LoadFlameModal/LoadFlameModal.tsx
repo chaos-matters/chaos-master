@@ -16,6 +16,7 @@ import { Camera2D } from '@/lib/Camera2D'
 import { Default3DPreviewCamera } from '@/lib/Camera3D'
 import { Root } from '@/lib/Root'
 import { deepClone } from '@/utils/clone'
+import { filesFromDataTransfer } from '@/utils/dataTransferFiles'
 import { applyFlameImport, parseFlameEnvelope, readFlameFiles, summarizeImport, } from '@/utils/flameImport'
 import { extractFlameFromPng } from '@/utils/flameInPng'
 import { useElementIsScrolling } from '@/utils/isScrolling'
@@ -857,7 +858,7 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
   async function handleDrop(e: DragEvent) {
     e.preventDefault()
     setIsDragging(false)
-    const files = [...(e.dataTransfer?.files ?? [])]
+    const files = filesFromDataTransfer(e.dataTransfer)
     if (files.length === 0) return
     await processImportFiles(files)
   }
