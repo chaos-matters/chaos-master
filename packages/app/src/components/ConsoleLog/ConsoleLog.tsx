@@ -19,24 +19,6 @@ function formatTime(ts: number) {
     .padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`
 }
 
-function formatArgs(args: unknown[]) {
-  return args
-    .map((a) => {
-      if (a instanceof Error) {
-        return `${a.name}: ${a.message}`
-      }
-      if (typeof a === 'object' && a !== null) {
-        try {
-          return JSON.stringify(a, null, 2)
-        } catch {
-          return Object.prototype.toString.call(a)
-        }
-      }
-      return String(a)
-    })
-    .join(' ')
-}
-
 type ConsoleLogProps = {
   /** When true the section can be collapsed by tapping the header. */
   collapsible?: boolean
@@ -62,7 +44,7 @@ export function ConsoleLog(props: ConsoleLogProps) {
     const text = consoleLogs()
       .map(
         (entry) =>
-          `[${formatTime(entry.timestamp)}] ${entry.type.toUpperCase().padEnd(5)} ${formatArgs(entry.args)}`,
+          `[${formatTime(entry.timestamp)}] ${entry.type.toUpperCase().padEnd(5)} ${entry.text}`,
       )
       .join('\n')
     // eslint-disable-next-line no-restricted-globals
@@ -131,7 +113,7 @@ export function ConsoleLog(props: ConsoleLogProps) {
                   <span class={`${ui.type} ${typeClass[entry.type]}`}>
                     {entry.type}
                   </span>
-                  <span class={ui.args}>{formatArgs(entry.args)}</span>
+                  <span class={ui.args}>{entry.text}</span>
                 </div>
               )}
             </For>
