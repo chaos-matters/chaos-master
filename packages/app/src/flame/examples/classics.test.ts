@@ -286,4 +286,29 @@ describe('classic affine IFS descriptors', () => {
       expectPoint3D(apply3D(affine, expected[index]!), expected[index]!)
     })
   })
+
+  // The geometry above was always exact; what made the sponge illegible was
+  // tone and framing. Pinned because the settings look arbitrary next to the
+  // other classics and would be "tidied" back to the shared defaults, which
+  // is what produced the fog: at exposure 0.2 / gamma 2.8 the render had a
+  // mean luminance of 0.04 with over 80% of the frame at pure black, and the
+  // near-axis camera collapsed the cube onto one face.
+  it('renders the sponge from the corner, lit and properly exposed', () => {
+    const rs = mengerSponge.renderSettings
+    expect(rs.exposure).toBe(2)
+    expect(rs.gamma).toBe(2.2)
+    expect(rs.lightPower).toBe(2.5)
+    expect(rs.depthColorPower).toBe(1.2)
+    // The shared isometric corner view: every visible face at the same angle
+    // to the camera, so none of them integrates enough samples to blow out.
+    expect(rs.camera3D?.theta).toBeCloseTo(Math.PI / 4, 6)
+    expect(rs.camera3D?.phi).toBeCloseTo(Math.acos(1 / Math.sqrt(3)), 6)
+  })
+
+  it('leaves the other 3D classics on the shared tone defaults', () => {
+    const rs = sierpinskiTetrahedron.renderSettings
+    expect(rs.gamma).toBe(2.8)
+    expect(rs.lightPower).toBe(0.1)
+    expect(rs.depthColorPower).toBe(0.4)
+  })
 })

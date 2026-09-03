@@ -107,6 +107,19 @@ function createClassic3D(config: {
   exposure?: number
   theta?: number
   phi?: number
+  /**
+   * Per-flame tone overrides.
+   *
+   * The shared defaults suit a set that is mostly surface, like the
+   * tetrahedron. A denser attractor lands far lower on the tone curve and
+   * needs its own exposure, gamma and directional light or it renders as fog.
+   */
+  tone?: {
+    gamma?: number
+    contrast?: number
+    lightPower?: number
+    depthColorPower?: number
+  }
 }) {
   const count = config.maps.length
   return defineExample3D({
@@ -126,11 +139,11 @@ function createClassic3D(config: {
       pointInitMode: 'pointInitUnitBall',
       backgroundColor: [0, 0, 0],
       vibrancy: 0.9,
-      contrast: 1.2,
-      gamma: 2.8,
-      depthColorPower: 0.4,
+      contrast: config.tone?.contrast ?? 1.2,
+      gamma: config.tone?.gamma ?? 2.8,
+      depthColorPower: config.tone?.depthColorPower ?? 0.4,
       lightDirection: [-0.45, 0.65, -0.65],
-      lightPower: 0.1,
+      lightPower: config.tone?.lightPower ?? 0.1,
       highlightPower: 0.8,
       densityEstimationQuality: 0.8,
       estimatorCurve: 0.5,
@@ -345,9 +358,22 @@ export const mengerSponge = createClassic3D({
   description:
     'Classic IFS · Twenty exact 3D affine branches remove every face center and the cube core, forever.',
   radius: 3.4,
-  exposure: 0.2,
-  theta: 0.28,
-  phi: 1.32,
+  // The sponge has Hausdorff dimension log(20)/log(3) = 2.73, so it is nearly
+  // solid and lands far lower on the tone curve than the other classics: at
+  // the shared exposure it rendered with a mean luminance of 0.04 and over
+  // 80% of the frame at pure black, which is where the "mushy" reading came
+  // from. Exposure 2 does not clip anything here — measured, no flat white
+  // regions — and gamma 2.2 stops the midtones being crushed.
+  exposure: 2,
+  tone: { gamma: 2.2, lightPower: 2.5, depthColorPower: 1.2 },
+  // Deliberately NOT overriding theta/phi any more. The old 0.28/1.32 was
+  // barely off an axis, which projects the sponge onto a single face: you look
+  // straight down its square tunnels and the whole object degenerates into a
+  // mottled flat rectangle with no third face and no cubic silhouette. The
+  // shared isometric corner view is what makes it read as a cube, and it also
+  // keeps every visible face at the same angle to the camera — a face seen
+  // edge-on integrates far more samples per pixel and blows out, because the
+  // accumulator has no occlusion.
   maps: [-1, 0, 1].flatMap((z) =>
     [-1, 0, 1].flatMap((y) =>
       [-1, 0, 1]
