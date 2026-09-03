@@ -6,12 +6,12 @@
 
   Every other measurement in here is a ratio of the dial, taken from
   `hud-04-eclipse`: stroke 1.97%, bezel 109.4% of the radius, ticks hanging
-  inward from 87.5%, timer cap-height 14%, scores at 126% of the radius. The
+  inward from 87.5%, timer cap-height 14%. The
   mock draws the dial at 24.3% of the frame width, which is a poster; this
   ships smaller, because the two flames are what the viewer came for.
 */
 .hud {
-  --duel-dial-size: clamp(200px, 17vw, 300px);
+  --duel-dial-size: clamp(150px, 12vw, 230px);
   --duel-timer-size: calc(var(--duel-dial-size) * 0.197);
   --duel-warm-core: #fde7ac;
   --duel-warm-glow: #ff8a1a;
@@ -183,25 +183,6 @@
 
 /* Outside the ring, level with its centre, in their side's colour — inside it
    they competed with the clock for the one place the eye goes first. */
-.score {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: calc(var(--duel-dial-size) * 0.104);
-  font-weight: 300;
-  font-variant-numeric: tabular-nums;
-}
-
-.playerScore {
-  right: calc(100% * 0.13);
-  color: #fed798;
-}
-
-.rivalScore {
-  left: calc(100% * 0.13);
-  color: #95f1fd;
-}
-
 .end {
   width: calc(var(--duel-dial-size) * 0.516);
   height: calc(var(--duel-dial-size) * 0.13);

@@ -2,13 +2,14 @@
   width: 100%;
   height: 100%;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: #060810;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  /* Darker than the panel, so the well reads as recessed. */
+  background: #05070e;
   touch-action: none;
 }
 
 .rules line {
-  stroke: rgba(120, 160, 220, 0.1);
+  stroke: rgba(255, 255, 255, 0.05);
   stroke-width: 0.008;
 }
 
@@ -17,17 +18,19 @@
   stroke-width: 0.01;
 }
 
+/* No fill: the triangle is a measurement, and a filled one hides the ghost
+   behind it, which is the only thing telling you where its neighbours are. */
 .shape {
-  fill: rgba(53, 220, 240, 0.08);
-  stroke: #35dcf0;
-  stroke-width: 0.022;
+  fill: none;
+  stroke: #22c6e6;
+  stroke-width: 0.024;
   stroke-linejoin: round;
 }
 
 /* Every other transform, so you can see what you are aiming at. */
 .ghost {
   fill: none;
-  stroke: rgba(139, 108, 214, 0.4);
+  stroke: rgba(139, 108, 214, 0.55);
   stroke-width: 0.016;
   stroke-linejoin: round;
 }
@@ -41,16 +44,16 @@
 }
 
 .handleRing {
-  fill: #060810;
-  stroke: #35dcf0;
+  fill: #04060c;
+  stroke: #22c6e6;
   stroke-width: 0.026;
 }
 
 /* The origin is filled, the basis vectors are hollow: three identical dots
    would say the three points mean the same thing, and they do not. */
 .handleCore {
-  fill: #35dcf0;
-  stroke: #060810;
+  fill: #22c6e6;
+  stroke: #04060c;
   stroke-width: 0.02;
 }
 
@@ -60,11 +63,12 @@
 
 .handleOn .handleRing,
 .handleOn .handleCore {
-  filter: drop-shadow(0 0 0.1px #35dcf0) drop-shadow(0 0 0.06px #8bf0fb);
+  filter: drop-shadow(0 0 0.12px rgba(34, 198, 230, 0.9))
+    drop-shadow(0 0 0.3px rgba(34, 198, 230, 0.35));
 }
 
 .guides line {
-  stroke: rgba(53, 220, 240, 0.8);
+  stroke: rgba(34, 198, 230, 0.6);
   stroke-width: 0.01;
   stroke-dasharray: 0.06 0.05;
 }

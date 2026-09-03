@@ -79,6 +79,12 @@ export type AffineControlSpec = {
   /** Shown to the reader; radians are not a unit anyone scrubs in. */
   toDisplay: (value: number) => number
   fromDisplay: (value: number) => number
+  /** One chevron click or arrow key, in display units. */
+  nudge: number
+  /** Display units per pixel dragged. */
+  perPixel: number
+  decimals: number
+  unit?: string
 }
 
 const identity = (value: number) => value
@@ -93,6 +99,9 @@ export const AFFINE_CONTROLS: readonly AffineControlSpec[] = [
     step: 0.01,
     toDisplay: identity,
     fromDisplay: identity,
+    nudge: 0.01,
+    perPixel: 0.005,
+    decimals: 3,
   },
   {
     key: 'scaleY',
@@ -102,6 +111,9 @@ export const AFFINE_CONTROLS: readonly AffineControlSpec[] = [
     step: 0.01,
     toDisplay: identity,
     fromDisplay: identity,
+    nudge: 0.01,
+    perPixel: 0.005,
+    decimals: 3,
   },
   {
     key: 'rotation',
@@ -111,6 +123,10 @@ export const AFFINE_CONTROLS: readonly AffineControlSpec[] = [
     step: 1,
     toDisplay: (value) => value * DEGREES,
     fromDisplay: (value) => value / DEGREES,
+    nudge: 1,
+    perPixel: 0.5,
+    decimals: 1,
+    unit: 'deg',
   },
   {
     key: 'shear',
@@ -120,6 +136,9 @@ export const AFFINE_CONTROLS: readonly AffineControlSpec[] = [
     step: 0.01,
     toDisplay: identity,
     fromDisplay: identity,
+    nudge: 0.01,
+    perPixel: 0.005,
+    decimals: 3,
   },
   {
     key: 'offsetX',
@@ -129,6 +148,9 @@ export const AFFINE_CONTROLS: readonly AffineControlSpec[] = [
     step: 0.01,
     toDisplay: identity,
     fromDisplay: identity,
+    nudge: 0.01,
+    perPixel: 0.005,
+    decimals: 3,
   },
   {
     key: 'offsetY',
@@ -138,5 +160,8 @@ export const AFFINE_CONTROLS: readonly AffineControlSpec[] = [
     step: 0.01,
     toDisplay: identity,
     fromDisplay: identity,
+    nudge: 0.01,
+    perPixel: 0.005,
+    decimals: 3,
   },
 ]

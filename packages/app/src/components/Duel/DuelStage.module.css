@@ -22,20 +22,26 @@
 /*
   The HUD floats over the seam rather than sitting in a row of its own: a
   full-width bar would crop both flames, and the flames are the point.
+
+  Dead centre, not up at the top: the top of each half belongs to that
+  player's chips and their panels, and a dial up there covered the pickers
+  the moment one was opened. The middle of the seam is the one place on this
+  screen nothing else wants.
 */
 .hudSlot {
   position: absolute;
-  top: 14px;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   z-index: 1;
   display: grid;
   justify-items: center;
   gap: 8px;
   /* The dial's own size; the stage is where a size control would write.
      The mock draws it at 24.3% of the frame; this is deliberately smaller,
-     because the two flames are what the viewer came for. */
-  --duel-dial-size: clamp(200px, 17vw, 300px);
+     because the two flames are what the viewer came for — and smaller again
+     now that the scores have moved off it onto the name pills. */
+  --duel-dial-size: clamp(150px, 12vw, 230px);
 }
 
 .seats {
@@ -71,7 +77,10 @@
   transform: translateX(-50%);
   z-index: 1;
   margin: 0;
-  padding: 7px 22px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px 7px 18px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.06);
@@ -87,9 +96,30 @@
 /* Each side is tinted like its arc on the dial — border and text both, at the
    near-white end of the hue, so a glance at the ring and a glance at the
    pills agree about who is who. */
+/* Sits inside the pill as its own capsule, so the number reads as a value
+   attached to the name and not as part of it. */
+.seatScore {
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 .playerLabel {
   border-color: rgba(253, 231, 172, 0.42);
   color: #fffad1;
+}
+
+.playerLabel .seatScore {
+  background: rgba(253, 231, 172, 0.16);
+  color: #fed798;
+}
+
+.rivalLabel .seatScore {
+  background: rgba(139, 240, 251, 0.16);
+  color: #95f1fd;
 }
 
 .rivalLabel {
@@ -137,13 +167,6 @@
   .seats {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr 1fr;
-  }
-
-  /* Stacked, the seam runs horizontally, so the dial sits on it rather than
-     over the top flame. */
-  .hudSlot {
-    top: 50%;
-    transform: translate(-50%, -50%);
   }
 }
 

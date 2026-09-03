@@ -7,9 +7,10 @@ import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { defaultPalettes, paletteToGradientCSS } from '@/flame/palettes'
 import { getVariationPreviewFlame } from '@/flame/variations/utils'
-import { Check, ColourWedge, Cross, Minus, Plus, ShapeTriangle, VariationSpiral, } from '@/icons'
+import { Check, ColourWedge, Cross, Minus, Plus, ShapeTriangle, Undo, VariationSpiral, } from '@/icons'
 import { AffineGrid, resetAffine } from './AffineGrid'
 import ui from './DuelChips.module.css'
+import { ScrubField } from './ScrubField'
 import type { Accessor } from 'solid-js'
 import type { AffineControls } from '@/arcade/affineControls'
 import type { CommandContext } from '@/commands/types'
@@ -476,31 +477,21 @@ function ShapePanel(props: {
       <div class={ui.fields}>
         <For each={AFFINE_CONTROLS}>
           {(spec) => (
-            <label class={ui.field}>
-              <span class={ui.fieldLabel}>{spec.label}</span>
-              <input
-                class={ui.fieldInput}
-                type="range"
-                min={spec.min}
-                max={spec.max}
-                step={spec.step}
-                value={spec.toDisplay(controls()[spec.key])}
-                onInput={(ev) => {
-                  const next: AffineControls = {
-                    ...controls(),
-                    [spec.key]: spec.fromDisplay(
-                      Number(ev.currentTarget.value),
-                    ),
-                  }
-                  props.onChange(composeAffine(next, props.affine))
-                }}
-              />
-              <span class={ui.fieldValue}>
-                {spec
-                  .toDisplay(controls()[spec.key])
-                  .toFixed(spec.key === 'rotation' ? 0 : 2)}
-              </span>
-            </label>
+            <ScrubField
+              label={spec.label}
+              value={spec.toDisplay(controls()[spec.key])}
+              step={spec.nudge}
+              perPixel={spec.perPixel}
+              decimals={spec.decimals}
+              unit={spec.unit}
+              onChange={(next) => {
+                const controlsNext: AffineControls = {
+                  ...controls(),
+                  [spec.key]: spec.fromDisplay(next),
+                }
+                props.onChange(composeAffine(controlsNext, props.affine))
+              }}
+            />
           )}
         </For>
         <button
@@ -510,6 +501,7 @@ function ShapePanel(props: {
             props.onChange(resetAffine(props.affine))
           }}
         >
+          <Undo class={ui.resetIcon} aria-hidden="true" />
           Reset
         </button>
       </div>

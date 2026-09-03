@@ -106,6 +106,7 @@ export function DuelStage(props: {
             <div class={ui.side}>
               <SeatView
                 label="Your flame"
+                score={model().playerScore}
                 side="player"
                 flame={props.playerFlame}
                 zoom={props.playerZoom}
@@ -119,6 +120,7 @@ export function DuelStage(props: {
             <div class={ui.side}>
               <SeatView
                 label="The AI's flame"
+                score={model().rivalScore}
                 side="rival"
                 flame={state().rival.flame}
                 zoom={[state().rival.zoom, state().rival.setZoom]}

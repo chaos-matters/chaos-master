@@ -1,0 +1,92 @@
+.field {
+  display: grid;
+  gap: 2px;
+  padding: 5px 6px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  /* Room for the mid-scrub bar to sit flush with the bottom edge. */
+  position: relative;
+  overflow: hidden;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+.field:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.label {
+  text-align: center;
+  font-size: 0.66rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 2px;
+}
+
+.value {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 3px;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.95);
+  cursor: ew-resize;
+  user-select: none;
+  touch-action: none;
+}
+
+.unit {
+  font-size: 0.7em;
+  opacity: 0.5;
+}
+
+.chevron {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+}
+
+.chevron svg {
+  width: 11px;
+  height: 11px;
+}
+
+.field:hover .chevron {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* The whole mid-scrub tell: the field cools, and a bar lights along its
+   bottom edge. Nothing moves, because the flame underneath already is. */
+.scrubbing {
+  background: rgb(26 34 50);
+  border-color: rgba(120, 200, 255, 0.35);
+}
+
+.scrubbing .value {
+  color: #fff;
+}
+
+.scrubbing::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: #4af2fc;
+  box-shadow: 0 0 6px #4af2fc;
+}
