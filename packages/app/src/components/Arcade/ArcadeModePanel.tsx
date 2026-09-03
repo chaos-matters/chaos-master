@@ -1,5 +1,5 @@
 import { createSignal, For, Match, onMount, Show, Switch } from 'solid-js'
-import { DEFAULT_DUEL_SECONDS, MAX_DUEL_SECONDS, MIN_DUEL_SECONDS, } from '@/arcade/duel'
+import { clampDuelSeconds, DEFAULT_DUEL_SECONDS, MAX_DUEL_SECONDS, MIN_DUEL_SECONDS, } from '@/arcade/duel'
 import { CINEMA_PRESETS, cinemaPromptCard, duelPromptCard, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, } from '@/arcade/topics'
 import { Copy, Cross } from '@/icons'
 import ui from './ArcadeHub.module.css'
@@ -57,7 +57,13 @@ export function ArcadeModePanel(props: {
 }) {
   const [topic, setTopic] = createSignal<TopicId>('variations')
   const [description, setDescription] = createSignal('')
-  const [duelSeconds, setDuelSeconds] = createSignal(DEFAULT_DUEL_SECONDS)
+  // The field holds text while it is being typed; the clock is what that text
+  // means, clamped to the same range the tool clamps to, so the prompt card
+  // can never promise a duration the tool will silently override.
+  const [duelSecondsText, setDuelSecondsText] = createSignal(
+    String(DEFAULT_DUEL_SECONDS),
+  )
+  const duelSeconds = () => clampDuelSeconds(duelSecondsText())
   let closeButton: HTMLButtonElement | undefined
   onMount(() => {
     closeButton?.focus()
@@ -164,11 +170,17 @@ export function ArcadeModePanel(props: {
               type="number"
               min={MIN_DUEL_SECONDS}
               max={MAX_DUEL_SECONDS}
-              value={duelSeconds()}
+              value={duelSecondsText()}
+              // Kept as text while it is being typed. `Number(v) || DEFAULT`
+              // snapped the field back mid-keystroke the moment it was empty,
+              // so it could never be cleared and retyped — and it clamped
+              // nothing, so the prompt card could promise a duration the tool
+              // would silently override.
               onInput={(ev) => {
-                setDuelSeconds(
-                  Number(ev.currentTarget.value) || DEFAULT_DUEL_SECONDS,
-                )
+                setDuelSecondsText(ev.currentTarget.value)
+              }}
+              onBlur={() => {
+                setDuelSecondsText(String(duelSeconds()))
               }}
             />
           </label>

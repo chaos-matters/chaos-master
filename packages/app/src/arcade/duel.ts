@@ -53,6 +53,23 @@ export function runningDuel():
   return state.phase === 'running' ? state : undefined
 }
 
+/**
+ * The one place a typed or tool-supplied clock is made sense of. Anything
+ * unreadable falls back to the default rather than to zero, which would be a
+ * duel that is over before it starts.
+ */
+export function clampDuelSeconds(value: unknown): number {
+  const seconds =
+    typeof value === 'string' ? Number(value.trim() || Number.NaN) : value
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds)) {
+    return DEFAULT_DUEL_SECONDS
+  }
+  return Math.min(
+    MAX_DUEL_SECONDS,
+    Math.max(MIN_DUEL_SECONDS, Math.round(seconds)),
+  )
+}
+
 export const MIN_DUEL_SECONDS = 60
 export const MAX_DUEL_SECONDS = 600
 export const DEFAULT_DUEL_SECONDS = 180

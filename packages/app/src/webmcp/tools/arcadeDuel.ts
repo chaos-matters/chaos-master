@@ -1,5 +1,5 @@
 import { describeAllowedCommands } from '@/arcade/commandHints'
-import { DEFAULT_DUEL_SECONDS, duelActive, duelRemainingMs, markDuelReady, MAX_DUEL_SECONDS, MIN_DUEL_SECONDS, runningDuel, startDuel, stopDuel, } from '@/arcade/duel'
+import { clampDuelSeconds, DEFAULT_DUEL_SECONDS, duelActive, duelRemainingMs, markDuelReady, MAX_DUEL_SECONDS, MIN_DUEL_SECONDS, runningDuel, startDuel, stopDuel, } from '@/arcade/duel'
 import { finishDuel } from '@/arcade/duelActions'
 import { qualityRank } from '@/arcade/guard'
 import { clearNarration } from '@/arcade/narration'
@@ -11,16 +11,6 @@ import type { WebMcpTool } from '@/webmcp/types'
 
 const NOT_READY = {
   error: 'Workspace not ready. The flame editor has not finished loading.',
-}
-
-function clampSeconds(value: unknown): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return DEFAULT_DUEL_SECONDS
-  }
-  return Math.min(
-    MAX_DUEL_SECONDS,
-    Math.max(MIN_DUEL_SECONDS, Math.round(value)),
-  )
 }
 
 export const arcadeStartDuel: WebMcpTool = {
@@ -62,7 +52,7 @@ export const arcadeStartDuel: WebMcpTool = {
       durationSeconds?: unknown
       rivalFrom?: unknown
     }
-    const seconds = clampSeconds(raw.durationSeconds)
+    const seconds = clampDuelSeconds(raw.durationSeconds)
     const rivalFlame = deepClone(playerFlame)
     if (raw.rivalFrom === 'blank') {
       rivalFlame.transforms = {}

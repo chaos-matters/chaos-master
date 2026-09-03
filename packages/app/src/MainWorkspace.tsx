@@ -1600,8 +1600,7 @@ export function MainWorkspace(props: AppProps) {
     // renders the player's flame itself. An export still wins: those run to
     // completion in the background whichever tab is in front.
     isAnyModalOpen() ||
-    duelActive() ||
-    (!workspaceIsVisible() && !onExportImage())
+    ((duelActive() || !workspaceIsVisible()) && !onExportImage())
       ? Infinity
       : onExportImage()
         ? 0

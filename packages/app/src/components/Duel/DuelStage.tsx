@@ -1,4 +1,4 @@
-import { createEffect, createSignal, onCleanup, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, onCleanup, Show, } from 'solid-js'
 import { duelRemainingMs, runningDuel } from '@/arcade/duel'
 import { finishDuel } from '@/arcade/duelActions'
 import { scoreSheetJudge } from '@/arcade/duelJudge'
@@ -36,11 +36,13 @@ export function DuelStage(props: {
     })
   })
 
-  const verdict = () => {
+  // Memoised: the scores are read several times per render, and each read
+  // walks both flames' transforms.
+  const verdict = createMemo(() => {
     const state = runningDuel()
     if (!state) return undefined
     return scoreSheetJudge.judge(props.playerFlame(), state.rival.flame())
-  }
+  })
 
   return (
     <Show when={runningDuel()}>
