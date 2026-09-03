@@ -175,3 +175,28 @@ describe('createToastStore', () => {
     expect(store.toasts()).toHaveLength(1)
   })
 })
+
+describe('muting while an agent drives', () => {
+  it('drops toasts, including sticky questions, while muted', () => {
+    let muted = true
+    const store = createToastStore(() => muted)
+
+    expect(store.showToast('Applied')).toBe(-1)
+    expect(
+      store.showToast('Auto-save your flames?', 'sticky', [
+        { label: 'Yes', onClick: () => {} },
+      ]),
+    ).toBe(-1)
+    expect(store.toasts()).toHaveLength(0)
+
+    muted = false
+    store.showToast('Applied')
+    expect(store.toasts()).toHaveLength(1)
+  })
+
+  it('leaves toasts alone when nothing is driving', () => {
+    const store = createToastStore()
+    store.showToast('Saved')
+    expect(store.toasts()).toHaveLength(1)
+  })
+})

@@ -3162,7 +3162,15 @@ export function MainWorkspace(props: AppProps) {
     if (dirty && editingSince === null) editingSince = Date.now()
 
     // First time an edit would be autosaved: ask once, remember the answer.
-    if (dirty && autosaveRecents() === 'unset' && !autosavePromptShown) {
+    // Never while an agent drives — the toast column is muted then, so asking
+    // would burn the one-shot flag on a question nobody ever sees. The poll
+    // comes back every 30s and asks once the viewer has the controls again.
+    if (
+      dirty &&
+      autosaveRecents() === 'unset' &&
+      !autosavePromptShown &&
+      !agentDriving()
+    ) {
       autosavePromptShown = true
       // Sticky: a question must wait for an answer, never auto-hide.
       showToast('Auto-save your flames to Recents while you edit?', 'sticky', [
@@ -3187,6 +3195,7 @@ export function MainWorkspace(props: AppProps) {
     if (
       !reminderShown &&
       !saveReminderDismissed() &&
+      !agentDriving() &&
       editingSince !== null &&
       Date.now() - editingSince >= REMINDER_AFTER_MS
     ) {
@@ -4935,7 +4944,13 @@ export function MainWorkspace(props: AppProps) {
               <ProgressBar />
               <ExportJobHost />
               <ExportJobTracker />
-              <div class={ui.bottomBar} data-replay-region="dim">
+              {/* No `data-replay-region` on the bar itself. It is an
+                  absolutely positioned full-width column overlaying the
+                  bottom of the canvas, and most of it is empty space between
+                  its children — dimming the container re-dimmed a ~330px band
+                  of the flame during every replay step. Each opaque child
+                  carries its own region instead. */}
+              <div class={ui.bottomBar}>
                 {/* In the bottom bar's normal flow rather than floating over
                     the canvas — the draggable FloatingActions widget is fixed
                     at z-index 200 and would sit on top of it, swallowing its
@@ -4988,6 +5003,7 @@ export function MainWorkspace(props: AppProps) {
                 <div
                   class={ui.viewControlsWrapper}
                   data-tour-target="view-controls"
+                  data-replay-region="dim"
                   style={{
                     'pointer-events':
                       animationExportRunning() || timeline.isPlaying()
@@ -5083,7 +5099,7 @@ export function MainWorkspace(props: AppProps) {
                       recorderReplayPresentation().playing &&
                       !recorderReplayPresentation().timelineTargeted
                         ? 'recessed'
-                        : undefined
+                        : 'dim'
                     }
                     style={{
                       'pointer-events':

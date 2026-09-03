@@ -1,4 +1,5 @@
 import { createContext, createSignal, onCleanup, untrack } from 'solid-js'
+import { agentDriving } from '@/arcade/pilot'
 import { useContextSafe } from '@/utils/useContextSafe'
 import type { JSX } from 'solid-js'
 
@@ -39,7 +40,17 @@ const DEFAULT_ACTION_MS = 12000
  * Toast state as a plain store so the timer/eviction/dedupe rules are unit
  * testable without mounting the provider.
  */
-export function createToastStore() {
+export function createToastStore(
+  /**
+   * While an Arcade pilot drives, the workspace is locked and the pilot's own
+   * banner and Stop button live in the top-right corner — exactly where the
+   * toast column is. A first-run question ("auto-save your flames?") landing
+   * there covers the only control the viewer has, in a take they are
+   * recording. Suppress rather than queue: by the time the agent stops, an
+   * "applied" line about a step nobody performed by hand is stale.
+   */
+  isMuted: () => boolean = () => false,
+) {
   const [toasts, setToasts] = createSignal<ToastItem[]>([])
   const timers = new Map<number, ReturnType<typeof setTimeout>>()
   let nextId = 1
@@ -88,6 +99,8 @@ export function createToastStore() {
     durationMs?: ToastDuration,
     actions?: ToastAction[],
   ): number {
+    if (isMuted()) return -1
+
     const sticky = durationMs === 'sticky'
     const ms =
       typeof durationMs === 'number'
@@ -149,7 +162,7 @@ export function createToastStore() {
 const ToastContext = createContext<ToastContextValue>()
 
 export function ToastProvider(props: { children: JSX.Element }) {
-  const store = createToastStore()
+  const store = createToastStore(agentDriving)
 
   onCleanup(() => {
     store.dismissToast()
