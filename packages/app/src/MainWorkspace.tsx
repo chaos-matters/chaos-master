@@ -3988,6 +3988,7 @@ export function MainWorkspace(props: AppProps) {
 
   // Command context: bridges registered commands to app signals
   const cmdContext: CommandContext = {
+    seatId: 'player',
     beforeCommand: () => {
       history.takeOverOwnedPreview()
     },
