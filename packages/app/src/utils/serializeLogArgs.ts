@@ -133,7 +133,7 @@ function serializeObjectEntries(value: object, depth: number, ctx: Context) {
       return items
     }
     const key = keys[i]!
-    const label = charge(ctx, JSON.stringify(key))
+    const label = charge(ctx, JSON.stringify(clampString(key)))
     const read = readOwn(value, key)
     const text = read.ok
       ? serializeValue(read.value, depth + 1, ctx)
@@ -151,7 +151,14 @@ function serializeObject(value: object, depth: number, ctx: Context): string {
     return charge(ctx, `[${value.name}: ${value.message}]`)
   }
   if (value instanceof Date) {
-    return charge(ctx, JSON.stringify(value.toISOString()))
+    // toISOString throws on an invalid date, and a bad parse is exactly the
+    // kind of value someone reaches for the console to look at.
+    return charge(
+      ctx,
+      Number.isNaN(value.getTime())
+        ? '[Invalid Date]'
+        : JSON.stringify(value.toISOString()),
+    )
   }
   if (value instanceof RegExp) {
     return charge(ctx, String(value))
@@ -266,7 +273,15 @@ export function serializeLogArgs(args: unknown[]): string {
       ctx.truncated = true
       break
     }
-    parts.push(serializeArg(arg, ctx))
+    try {
+      parts.push(serializeArg(arg, ctx))
+    } catch {
+      // Nothing here may throw: this runs inside the patched console methods,
+      // so an escaping error would break the caller's own console call. An
+      // exotic value (a revoked proxy, a throwing prototype trap) costs its own
+      // argument and nothing more.
+      parts.push(charge(ctx, '[unserializable]'))
+    }
   }
 
   let text = parts.join(' ')

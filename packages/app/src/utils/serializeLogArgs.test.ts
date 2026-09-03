@@ -188,3 +188,26 @@ describe('serializeLogArgs', () => {
     expect(serializeLogArgs([])).toBe('')
   })
 })
+
+// The serializer runs inside the patched console methods, so a throw here would
+// break the caller's own console.log call, not just the panel entry.
+describe('serializeLogArgs robustness', () => {
+  it('names an invalid date instead of throwing on toISOString', () => {
+    expect(serializeLogArgs([new Date('not a date')])).toBe('[Invalid Date]')
+  })
+
+  it('caps a pathologically long key', () => {
+    const key = 'k'.repeat(LOG_SERIALIZE_LIMITS.stringLength + 40)
+    const text = serializeLogArgs([{ [key]: 1 }])
+    expect(text).toContain('... (+40 chars)')
+    expect(text.length).toBeLessThan(LOG_SERIALIZE_LIMITS.stringLength + 120)
+  })
+
+  it('falls back for a value whose prototype cannot be inspected', () => {
+    const { proxy, revoke } = Proxy.revocable({ a: 1 }, {})
+    revoke()
+    expect(serializeLogArgs(['context', proxy])).toBe(
+      'context [unserializable]',
+    )
+  })
+})
