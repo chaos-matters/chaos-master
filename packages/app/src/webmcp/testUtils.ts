@@ -134,6 +134,7 @@ export function createMockCommandContext(): CommandContext {
       currentFrame: () => 0,
       setCurrentFrame: vi.fn(),
       play: vi.fn(),
+      setLoop: vi.fn(),
       edit: {
         snapshot: vi.fn(() => ({
           config: {
