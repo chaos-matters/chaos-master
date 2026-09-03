@@ -4,6 +4,7 @@ import Bookmark from './bookmark.svg'
 import BoxArrowRight from './box-arrow-right.svg'
 import CameraIcon from './camera.svg'
 import Changelog from './changelog.svg'
+import Check from './check.svg'
 import ChevronDown from './chevron-down.svg'
 import ChevronLeft from './chevron-left.svg'
 import ChevronRight from './chevron-right.svg'
@@ -65,6 +66,7 @@ export {
   BoxArrowRight,
   CameraIcon,
   Changelog,
+  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
