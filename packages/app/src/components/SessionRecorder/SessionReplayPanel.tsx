@@ -1,5 +1,6 @@
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, Show, untrack, } from 'solid-js'
 import { createStore, unwrap } from 'solid-js/store'
+import { usePrefersReducedMotion } from '@/components/Home/homePlayback'
 import { ChevronLeft, ChevronRight, Download, Focus, Pause, Pencil, PlayPause, SkipBack, Speech, } from '@/icons'
 import { deriveReplayFocusPreparation } from '@/recorder/focusPreparation'
 import { createSessionPlayer, PLAYBACK_SPEEDS } from '@/recorder/player'
@@ -56,6 +57,7 @@ export function SessionReplayPanel(props: {
     createSignal<ReplayVideoExportMode>('artwork')
   const [exportError, setExportError] = createSignal<string>()
   const panelId = createUniqueId()
+  const reducedMotion = usePrefersReducedMotion()
 
   type LiveReplayWaiter = {
     resolve: () => void
@@ -105,6 +107,28 @@ export function SessionReplayPanel(props: {
     if (!action) return undefined
     const focus = currentPreparation()?.spotlightFocus
     return focus === action.focus ? action : { ...action, focus }
+  })
+  /**
+   * Keep the step the viewer is watching in view.
+   *
+   * The list is a scroll container and the current step carries
+   * `aria-current`, but nothing ever scrolled it — so on a lesson longer than
+   * the panel the active step walked below the fold and the list sat still
+   * while the flame changed, which reads as broken in a full-interface
+   * recording next to a timeline that does move.
+   *
+   * `block: 'nearest'` scrolls only when the step is actually out of view, so
+   * a viewer reading further down the list is not yanked back on every step.
+   */
+  let stepsEl: HTMLOListElement | undefined
+  createEffect(() => {
+    const index = player.stepIndex()
+    if (index < 0 || stepsEl === undefined) return
+    const current = stepsEl.querySelector('[aria-current="step"]')
+    current?.scrollIntoView({
+      block: 'nearest',
+      behavior: reducedMotion() ? 'auto' : 'smooth',
+    })
   })
   createEffect(() => {
     props.onPlaybackChange?.(player.isPlaying())
@@ -400,7 +424,7 @@ export function SessionReplayPanel(props: {
       </Show>
 
       <Show when={props.compact !== true}>
-        <ol class={styles.steps}>
+        <ol class={styles.steps} ref={stepsEl}>
           <For each={session.actions}>
             {(action, index) => {
               const editorId = `${panelId}-step-${index()}-editor`
