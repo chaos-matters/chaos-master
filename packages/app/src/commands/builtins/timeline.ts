@@ -172,8 +172,13 @@ function validateSetKeyframeValueArgs(
 
 registerCommand({
   id: 'timeline.setAnimationEnabled',
+  // No argument means toggle, so the label cannot claim a direction.
   describe: ([enabled]) =>
-    enabled === false ? 'Disable animation' : 'Enable animation',
+    enabled === true
+      ? 'Enable animation'
+      : enabled === false
+        ? 'Disable animation'
+        : 'Toggle animation',
   label: 'Toggle Animation',
   description: 'Enable or disable timeline animation playback',
   shortcut: 'Ctrl+T',
@@ -212,7 +217,8 @@ registerCommand({
 
 registerCommand({
   id: 'timeline.setLoop',
-  describe: ([loop]) => (loop === false ? 'Loop off' : 'Loop on'),
+  describe: ([loop]) =>
+    loop === true ? 'Loop on' : loop === false ? 'Loop off' : undefined,
   label: 'Set Animation Loop',
   description: 'Enable or disable timeline animation loop',
   validateReplayArgs: (args) => exactReplayArgs(args, [isBoolean]),
@@ -243,7 +249,12 @@ registerCommand({
 
 registerCommand({
   id: 'timeline.setAutoFps',
-  describe: ([enabled]) => (enabled === false ? 'Auto FPS off' : 'Auto FPS on'),
+  describe: ([enabled]) =>
+    enabled === true
+      ? 'Auto FPS on'
+      : enabled === false
+        ? 'Auto FPS off'
+        : undefined,
   label: 'Set Auto FPS',
   description: 'Wait for render quality before advancing each frame',
   validateReplayArgs: (args) => exactReplayArgs(args, [isBoolean]),
@@ -618,7 +629,11 @@ registerCommand({
 registerCommand({
   id: 'timeline.setAutoKeyframe',
   describe: ([enabled]) =>
-    enabled === false ? 'Auto-keyframe off' : 'Auto-keyframe on',
+    enabled === true
+      ? 'Auto-keyframe on'
+      : enabled === false
+        ? 'Auto-keyframe off'
+        : undefined,
   label: 'Toggle Auto-Keyframe',
   description: 'Record a keyframe automatically whenever a parameter changes',
   validateReplayArgs: (args) => exactReplayArgs(args, [isBoolean]),

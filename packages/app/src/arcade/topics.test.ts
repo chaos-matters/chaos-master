@@ -61,6 +61,24 @@ describe('lesson topics', () => {
     expect([...rawJson].sort()).toEqual([])
   })
 
+  // A command that toggles when its argument is missing must not claim a
+  // direction it did not take, and one that no-ops must claim nothing.
+  it('does not invent a direction for a missing boolean', () => {
+    const describeOf = (id: string, args: unknown[]) =>
+      getAllCommands()
+        .find((command) => command.id === id)
+        ?.describe?.(args)
+    expect(describeOf('timeline.setAnimationEnabled', [true])).toBe(
+      'Enable animation',
+    )
+    expect(describeOf('timeline.setAnimationEnabled', [])).toBe(
+      'Toggle animation',
+    )
+    expect(describeOf('sidebar.open', [])).toBe('Toggle the sidebar')
+    expect(describeOf('timeline.setLoop', [])).toBeUndefined()
+    expect(describeOf('view.setShowTimeline', [])).toBeUndefined()
+  })
+
   it('offers cinema presets that fill the wish with a full sentence', () => {
     expect(CINEMA_PRESETS.map((preset) => preset.id)).toEqual([
       'small',

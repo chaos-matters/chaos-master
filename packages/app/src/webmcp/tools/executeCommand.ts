@@ -19,7 +19,15 @@ import type { WebMcpTool } from '@/webmcp/types'
  */
 function describeStep(commandId: string, args: unknown[]): string {
   const cmd = getCommand(commandId)
-  const described = cmd?.describe?.([...args])
+  // A describe reads args it did not validate. One that throws here would
+  // fail the tool call AFTER the command already mutated the document, so the
+  // agent would see an error for a step the viewer just watched land.
+  let described: string | undefined
+  try {
+    described = cmd?.describe?.([...args])
+  } catch {
+    described = undefined
+  }
   if (described !== undefined && described !== '') return described
   const label = cmd?.label ?? commandId
   let rendered = ''

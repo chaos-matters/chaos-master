@@ -94,8 +94,13 @@ registerCommand({
 
 registerCommand({
   id: 'view.setShowTimeline',
+  // A non-boolean is a no-op here, so it gets no sentence of its own.
   describe: ([show]) =>
-    show === false ? 'Hide the timeline panel' : 'Show the timeline panel',
+    show === true
+      ? 'Show the timeline panel'
+      : show === false
+        ? 'Hide the timeline panel'
+        : undefined,
   label: 'Toggle Timeline Panel',
   description: 'Show or hide the timeline',
   execute(ctx, shown?: unknown) {
