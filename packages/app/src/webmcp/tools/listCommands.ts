@@ -1,3 +1,4 @@
+import { commandArgHint } from '@/arcade/commandHints'
 import { getAllCommands } from '@/commands/registry'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
 import type { WebMcpTool } from '@/webmcp/types'
@@ -86,6 +87,13 @@ export const listCommands: WebMcpTool = {
         id: cmd.id,
         label: cmd.label,
         description: cmd.description,
+        // Only on a narrowed query. Hints exist for a third of the registry
+        // and run to a line each, so attaching them to an unfiltered page
+        // would push it into the same client truncation this exists to
+        // recover from.
+        ...(prefix !== undefined && prefix.length > 0
+          ? { args: commandArgHint(cmd.id) }
+          : {}),
       })),
     }
   },

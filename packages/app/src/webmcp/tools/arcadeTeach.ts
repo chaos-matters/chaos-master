@@ -34,6 +34,15 @@ export const arcadeStatus: WebMcpTool = {
       locked: agentDriving(),
       recorderActive: ctx?.recorder?.isRecording() ?? false,
       narration: narration(),
+      // The brief is sent once and a client that truncates it cannot ask for
+      // it again: a second arcade_start_lesson is refused as already active.
+      // The goal is the half worth re-reading and costs ~240 chars; the
+      // allow-list is the half that caused the truncation and belongs in
+      // list_commands.
+      goal:
+        state.phase !== 'idle' && isTopicId(state.topic)
+          ? LESSON_TOPICS[state.topic].goal
+          : undefined,
       lastEnd:
         state.phase === 'ended'
           ? { reason: state.reason, sessionName: state.sessionName }

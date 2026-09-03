@@ -38,6 +38,12 @@
   left: 0;
   right: 0;
   z-index: 5;
+  /* So an overlay can sit exactly above the chrome without measuring it in
+     JS. Its height moves with the timeline (shown, hidden, dragged), and a
+     ResizeObserver writing a custom property would fire at frame rate while
+     the user drags. Dashed idents are not rewritten by CSS Modules, so the
+     name resolves from PilotOverlay.module.css. */
+  anchor-name: --app-bottom-chrome;
   display: flex;
   flex-direction: column;
 

@@ -48,7 +48,7 @@ describe('replay video timing', () => {
     ])
 
     expect(() => createReplayVideoSchedule(session)).toThrow(
-      /Shorten long holds or choose a faster replay speed/,
+      /Choose a faster replay speed/,
     )
   })
 

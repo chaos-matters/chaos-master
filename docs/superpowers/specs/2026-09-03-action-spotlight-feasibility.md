@@ -17,13 +17,13 @@ larger step, and it needs UI changes the replay path never needed.
 Replay already spotlights the control behind each step, and every piece is
 command-driven rather than markup-driven, so none of it is replay-specific by nature:
 
-| Piece                                  | Where                                                                | What it does                                                                                                                                                          |
-| -------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `focusHintFor(commandId, args)`        | `packages/app/src/recorder/focus.ts:130`                             | Maps a command to a semantic hint — `param:<path>`, `ui:<tourTarget>`, `focus:<id>`. Never a selector or a rectangle, so it survives markup changes and window sizes. |
-| `deriveReplayFocusPreparation(action)` | `packages/app/src/recorder/focusPreparation.ts:371`                  | Turns a hint into the UI state that must exist _first_: reveal the sidebar, expand the owning transform, switch the affine tab, show the sonification panel.          |
-| `prepareReplayFocus`                   | `packages/app/src/MainWorkspace.tsx:4464`                            | Applies that state. Owns every signal it touches.                                                                                                                     |
-| `ReplaySpotlight`                      | `packages/app/src/components/SessionRecorder/ReplaySpotlight.tsx:66` | SVG-mask scrim that keeps the canvas and the target lit, dims the chrome, tracks the rect, captions the step.                                                         |
-| 108 `data-tour-target` anchors         | across `src/components`                                              | The vocabulary `ui:` hints resolve against.                                                                                                                           |
+| Piece                                  | Where                                                                | What it does                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `focusHintFor(commandId, args)`        | `packages/app/src/recorder/focus.ts:130`                             | Maps a command to a semantic hint — `param:<path>`, `ui:<tourTarget>`, `focus:<id>`. Never a selector or a rectangle, so it survives markup changes and window sizes.                                                                                                                                                                                            |
+| `deriveReplayFocusPreparation(action)` | `packages/app/src/recorder/focusPreparation.ts:371`                  | Turns a hint into the UI state that must exist _first_: reveal the sidebar, expand the owning transform, switch the affine tab, show the sonification panel.                                                                                                                                                                                                     |
+| `prepareReplayFocus`                   | `packages/app/src/MainWorkspace.tsx:4464`                            | Applies that state. Owns every signal it touches.                                                                                                                                                                                                                                                                                                                |
+| `ReplaySpotlight`                      | `packages/app/src/components/SessionRecorder/ReplaySpotlight.tsx:66` | SVG-mask scrim that keeps the canvas and the target lit, dims the chrome, tracks the rect, captions the step.                                                                                                                                                                                                                                                    |
+| ~87 `data-tour-target` anchors         | 21 files across `src`                                                | The vocabulary `ui:` hints resolve against. 87 distinct literal names, 52 of them under `src/components`; 33 live in `MainWorkspace.tsx` alone. Six components also forward the attribute as a pass-through prop (`Slider`, `ScrubInput`, `CollapsibleCard`, `ButtonGroup`, `PullUpMenu`, `AngleEditor`), so the real surface is larger than any grep can count. |
 
 The hints for the exact case asked about are already written:
 
@@ -41,19 +41,36 @@ command. Nothing asks it.
 
 ## The gaps
 
-**1. Nothing computes a hint on the live path.** `execute_command` now has
-`preflight.args` — the same normalized args the recorder logs, which is what
-`focusHintFor` expects. One call at that site produces the hint.
+**1. The hint already exists live — what is missing is a consumer.** This was
+wrong when first written. A Teach session records while the agent drives, and the
+recorder stamps a hint on every action as it happens: `focusFor`
+(`packages/app/src/recorder/recorder.ts:135`) is called at four sites during
+recording. The producer is already running; nothing reads it.
+
+That matters for the seam. `focusFor` is
+`cmd.focus?.(args) ?? focusHintFor(cmd.id, args)` — a command's own `focus()`
+override (`commands/types.ts:331`) wins over the central table. A live consumer
+hooked into `execute_command`'s `preflight.args` that called `focusHintFor`
+directly would silently lose that override and light the wrong control for
+exactly the commands that bothered to say where they live. Read the hint the
+recorder already produced, or call `focusFor` — never `focusHintFor` alone.
 
 **2. The handler is not reachable from the pilot.** `prepareReplayFocus` is defined in
 `MainWorkspace` and handed down to the recorder dock as `onPrepareAction`. The pilot
 would need the same handler through the WebMCP context or a module-level signal, the
 way the other pilot state is carried.
 
-**3. Z-order.** The pilot shield sits at `z-index: 10010`; the spotlight scrim at
-`300`. As-is the spotlight paints _under_ the lock and is invisible. Either the
-spotlight moves above the shield, or the shield splits into a scrim and a separate
-pointer-catcher with the spotlight between them.
+**3. Z-order — and it is three layers, not two.** The pilot shield sits at
+`z-index: 10010`, the spotlight scrim at `300`, and `ReplayAgentRail` at `310`,
+with a comment saying it is deliberately above the scrim so the rail stays
+readable. `PilotOverlay`'s `.endBackdrop` is a second element at 10010.
+
+As-is the spotlight paints _under_ the lock and is invisible. But simply raising
+it above 10010 has a consequence the first draft missed: `ReplaySpotlight` dims
+everything except elements carrying `data-replay-region`, so a raised scrim would
+dim the pilot's own banner, rail and hint — the chrome that explains what is
+happening. Either those get a region marker, or the shield splits into a scrim
+and a separate pointer-catcher with the spotlight between them.
 
 **4. There is no beat.** Replay has a transport; the pilot does not. Today a command
 applies its preparation and executes in the same tick, so there is nothing to watch.
@@ -80,6 +97,13 @@ four signals at once (`MainWorkspace.tsx:1126`). To _show_ Audio → Sonificatio
 ---
 
 ## Recommended shape
+
+**Phase 0 — give an agent's steps a beat.** Discovered after this document was
+written, from a real lesson: an agent's edits land in bursts of six steps inside
+26 milliseconds, and its narration gets 10.3 ms of screen time across six
+sentences. A live spotlight retargeting six times in 25 ms is a strobe, not a
+follow-cam. Pacing is a **prerequisite** for everything below, not an orthogonal
+nicety — see `docs/superpowers/plans/2026-09-04-teach-replay-pacing.md`.
 
 **Phase 1 — live follow-cam.** Reuse hint + preparation + spotlight on the pilot path.
 The spotlight lands on the destination control (the Sonification panel's model select),
