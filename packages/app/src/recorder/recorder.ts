@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js'
-import { agentDriving } from '@/arcade/pilot'
+import { drivingSeat } from '@/arcade/pilot'
 import { latestSchemaVersion } from '@/flame/schema/flameSchema'
 import { DEFAULT_SEAT } from '@/seats/seatId'
 import { deepClone } from '@/utils/clone'
@@ -845,10 +845,9 @@ function reportTimelineTransportIn(s: StreamState, description: string): void {
   // An Arcade pilot's playback is the tool's own preview, started so the
   // viewer can see the animation, and the session deliberately does not claim
   // to reproduce it — a replay applies the keyframes and leaves Play to the
-  // viewer. Counting it would mark every Cinema take as unfaithful for doing
-  // exactly what it was designed to do. A human scrubbing during their own
-  // recording is a different thing and still counts.
-  if (agentDriving()) return
+  // viewer. Only the seat the agent drives is exempt: in a duel the viewer is
+  // editing the other seat, and their transport counts as it always has.
+  if (drivingSeat() === s.id) return
   noteLiveWorkspaceMutation(s)
   if (!s.active) {
     invalidateLastFinishedSessionIn(s)

@@ -1,6 +1,8 @@
 import { createSignal } from 'solid-js'
+import { DEFAULT_SEAT } from '@/seats/seatId'
 import { clearPilotFocus } from './pilotFocus'
 import type { RecordedSession } from '@/recorder/schema'
+import type { SeatId } from '@/seats/seatId'
 
 /**
  * "An agent is driving the editor" as one module-global state, the same way
@@ -23,6 +25,18 @@ export type PilotDriving = {
   stepBudget: number
   /** Exact command ids, or prefixes ending in ".", the guard accepts. */
   allowed: readonly string[]
+  /**
+   * Whose flame the agent is editing. Teach and Cinema drive the workspace's
+   * own seat; a duel drives the rival's.
+   */
+  seatId: SeatId
+  /**
+   * How much the lock covers. `'screen'` is the Teach/Cinema shield: the
+   * whole editor is the agent's and the viewer watches. `'seat'` covers only
+   * the agent's half, because in a duel the viewer is playing too and needs
+   * their own controls and their own keyboard.
+   */
+  lock: 'screen' | 'seat'
   /** Index into guard.QUALITY_ORDER when the session started. */
   qualityRankAtStart: number
 }
@@ -66,6 +80,11 @@ export function drivingState(): PilotDriving | undefined {
   return state.phase === 'driving' ? state : undefined
 }
 
+/** The seat an agent is currently editing, if any. */
+export function drivingSeat(): SeatId | undefined {
+  return drivingState()?.seatId
+}
+
 export function appendPilotLog(kind: PilotLogKind, text: string): void {
   setPilotLog((log) => [
     ...log.slice(-(MAX_PILOT_LOG - 1)),
@@ -74,7 +93,14 @@ export function appendPilotLog(kind: PilotLogKind, text: string): void {
 }
 
 export function startPilot(
-  input: Omit<PilotDriving, 'phase' | 'startedAt' | 'steps'> & { now?: number },
+  input: Omit<
+    PilotDriving,
+    'phase' | 'startedAt' | 'steps' | 'seatId' | 'lock'
+  > & {
+    now?: number
+    seatId?: SeatId
+    lock?: 'screen' | 'seat'
+  },
 ): { ok: true } | { ok: false; error: string } {
   if (pilot().phase === 'driving') {
     return {
@@ -93,6 +119,8 @@ export function startPilot(
     steps: 0,
     stepBudget: input.stepBudget,
     allowed: input.allowed,
+    seatId: input.seatId ?? DEFAULT_SEAT,
+    lock: input.lock ?? 'screen',
     qualityRankAtStart: input.qualityRankAtStart,
   })
   appendPilotLog('system', `${input.title} started`)
