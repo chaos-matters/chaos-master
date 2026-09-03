@@ -109,6 +109,21 @@ describe('PilotOverlay end card', () => {
       screen.getByText('Saved to your library as "Lesson: Colour and tone"'),
     ).toBeTruthy()
   })
+  it('renders no full-screen shield for a seat-scoped lock', () => {
+    startPilot({
+      mode: 'duel',
+      title: 'Duel',
+      stepBudget: 60,
+      allowed: ['flame.'],
+      qualityRankAtStart: 1,
+      seatId: 'rival',
+      lock: 'seat',
+    })
+    render(() => <PilotOverlay ctx={createMockCommandContext()} />)
+    expect(
+      screen.queryByRole('dialog', { name: 'AI is driving the editor' }),
+    ).toBeNull()
+  })
 })
 
 /**
