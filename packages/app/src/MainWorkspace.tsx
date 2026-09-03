@@ -7639,13 +7639,22 @@ export function MainWorkspace(props: AppProps) {
                   ),
                 })
                 if (confirmed) {
-                  saveRecentFlame(flameDescriptor, undefined, tracks, true)
-                  markSavedBaseline()
-                  showToast(
-                    tracks.length > 0
-                      ? 'Flame + animation saved (replaced oldest)'
-                      : 'Flame saved (replaced oldest)',
-                  )
+                  // Honour the write result. `saveRecentFlame` now reports a
+                  // failed write instead of always claiming success, so marking
+                  // the workspace clean here unconditionally would tell the user
+                  // their flame is safe when nothing landed.
+                  if (
+                    saveRecentFlame(flameDescriptor, undefined, tracks, true)
+                  ) {
+                    markSavedBaseline()
+                    showToast(
+                      tracks.length > 0
+                        ? 'Flame + animation saved (replaced oldest)'
+                        : 'Flame saved (replaced oldest)',
+                    )
+                  } else {
+                    showToast('Could not save the flame to Recents', 5000)
+                  }
                 }
               } else {
                 markSavedBaseline()
