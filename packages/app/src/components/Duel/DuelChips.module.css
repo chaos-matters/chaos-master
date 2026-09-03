@@ -150,23 +150,150 @@
   opacity: 1;
 }
 
+/* A horizontal row of tiles, not a list: the mock's whole idea is that you
+   pick a variation by looking at what it does, not by reading its name. */
 .tiles {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 4px;
 }
 
 .tile {
+  flex: none;
+  width: 104px;
   display: grid;
-  grid-template-columns: minmax(88px, 1fr) 2fr auto auto;
-  align-items: center;
-  gap: 10px;
+  gap: 3px;
+}
+
+.tileButton {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.tileThumb {
+  position: relative;
+  display: block;
+  height: 58px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: #05070c;
+  overflow: hidden;
+}
+
+/* Active tiles carry the light; inactive ones are dimmed to about half, which
+   is the mock's whole hierarchy in the row. */
+.tile:not(.tileOn) .tileThumb {
+  opacity: 0.55;
+}
+
+.tileOn .tileThumb {
+  border: 1.5px solid rgba(213, 249, 255, 0.9);
+  box-shadow: 0 0 14px rgba(111, 210, 240, 0.35);
+}
+
+.tileBadge {
+  position: absolute;
+  top: -7px;
+  right: -6px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: #080b13;
+  color: #fff;
+}
+
+.tileBadge svg {
+  width: 12px;
+  height: 12px;
+}
+
+.tileOn .tileBadge {
+  border-color: rgba(139, 240, 251, 0.85);
+  color: #bfe9f7;
 }
 
 .tileName {
-  font-size: 0.76rem;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.62);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.tileOn .tileName {
+  color: #fff;
+}
+
+.tileWeightRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The dashed head of the row: the mock's Add affordance. */
+.addTile {
+  flex: none;
+  width: 84px;
+  height: 84px;
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  align-content: center;
+  border-radius: 12px;
+  border: 1.5px dashed rgba(255, 255, 255, 0.45);
+  background: none;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+.addTile svg {
+  width: 20px;
+  height: 20px;
+}
+
+.addBar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: stretch;
+}
+
+.search {
+  width: 168px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font-size: 0.76rem;
+}
+
+.addBack {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: none;
+  color: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
 }
 
 .tileValue,
@@ -178,33 +305,21 @@
   text-align: right;
 }
 
-.tileRemove {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border: none;
-  background: transparent;
-  color: inherit;
-  opacity: 0.5;
-  cursor: pointer;
-}
-
-.tileRemove:hover {
-  opacity: 1;
-}
-
 .empty {
   margin: 0;
+  align-self: center;
   font-size: 0.76rem;
   opacity: 0.55;
+  white-space: nowrap;
 }
 
 .fields {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-content: start;
   align-items: center;
   gap: 6px 16px;
+  min-width: 0;
 }
 
 .field {
@@ -227,9 +342,132 @@
   cursor: ew-resize;
 }
 
+/* Shape: the grid takes a fixed square of the strip's height, the numbers
+   take the rest. Both edit the same affine, one coarsely and one precisely. */
+.shape {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  min-height: 0;
+}
+
+.shapeCanvas {
+  width: 128px;
+  height: 128px;
+  flex: none;
+}
+
 .colour {
   display: grid;
   gap: 8px;
+  min-height: 0;
+}
+
+.swatches {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  /* A flick that runs out of swatches must not nudge the duel behind it. */
+  overscroll-behavior: contain;
+  padding-bottom: 2px;
+}
+
+.swatch {
+  position: relative;
+  flex: none;
+  width: 92px;
+  display: grid;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.swatchBand {
+  display: block;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.swatchName {
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.62);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.swatchOn .swatchBand {
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.22);
+}
+
+.swatchOn .swatchName {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.swatchCheck {
+  position: absolute;
+  top: -7px;
+  right: -6px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: #080b13;
+  color: #fff;
+}
+
+.swatchCheck svg {
+  width: 11px;
+  height: 11px;
+}
+
+/*
+  The position track carries the palette in use, full length, so the slider
+  shows the colours it moves through. Speed is deliberately the lesser of the
+  two: a hairline and a plain knob.
+*/
+.colourTrack {
+  appearance: none;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--duel-track, #2a2f3d);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.colourTrack::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #0a0d14;
+  border: 3px solid #fff;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.35);
+  cursor: grab;
+}
+
+.colourTrack::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #0a0d14;
+  border: 3px solid #fff;
+  cursor: grab;
+}
+
+.speedTrack {
+  accent-color: rgba(255, 255, 255, 0.55);
+}
+
+.speedField .fieldLabel,
+.speedField .fieldValue {
+  opacity: 0.55;
 }
 
 .colourTrack {
@@ -260,5 +498,15 @@
 
   .fields {
     grid-template-columns: 1fr;
+  }
+
+  /* Below this the grid and six fields cannot both be read; the numbers win,
+     because they are the ones that can be used precisely. */
+  .shape {
+    grid-template-columns: 1fr;
+  }
+
+  .shapeCanvas {
+    display: none;
   }
 }

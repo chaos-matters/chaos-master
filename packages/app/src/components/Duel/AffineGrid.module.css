@@ -1,0 +1,70 @@
+.grid {
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #060810;
+  touch-action: none;
+}
+
+.rules line {
+  stroke: rgba(120, 160, 220, 0.1);
+  stroke-width: 0.008;
+}
+
+.axes line {
+  stroke: rgba(255, 255, 255, 0.45);
+  stroke-width: 0.01;
+}
+
+.shape {
+  fill: rgba(53, 220, 240, 0.08);
+  stroke: #35dcf0;
+  stroke-width: 0.022;
+  stroke-linejoin: round;
+}
+
+/* Every other transform, so you can see what you are aiming at. */
+.ghost {
+  fill: none;
+  stroke: rgba(139, 108, 214, 0.4);
+  stroke-width: 0.016;
+  stroke-linejoin: round;
+}
+
+.handle {
+  cursor: grab;
+}
+
+.handleOn {
+  cursor: grabbing;
+}
+
+.handleRing {
+  fill: #060810;
+  stroke: #35dcf0;
+  stroke-width: 0.026;
+}
+
+/* The origin is filled, the basis vectors are hollow: three identical dots
+   would say the three points mean the same thing, and they do not. */
+.handleCore {
+  fill: #35dcf0;
+  stroke: #060810;
+  stroke-width: 0.02;
+}
+
+.handleHit {
+  fill: transparent;
+}
+
+.handleOn .handleRing,
+.handleOn .handleCore {
+  filter: drop-shadow(0 0 0.1px #35dcf0) drop-shadow(0 0 0.06px #8bf0fb);
+}
+
+.guides line {
+  stroke: rgba(53, 220, 240, 0.8);
+  stroke-width: 0.01;
+  stroke-dasharray: 0.06 0.05;
+}

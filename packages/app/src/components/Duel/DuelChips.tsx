@@ -1,12 +1,20 @@
 import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
 import { AFFINE_CONTROLS, composeAffine, decomposeAffine, } from '@/arcade/affineControls'
+import { SAMPLE_VARIATION_TYPES } from '@/arcade/commandHints'
 import { executeCommand } from '@/commands/registry'
-import { ColourWedge, Cross, ShapeTriangle, VariationSpiral } from '@/icons'
+import { VariationPreview } from '@/components/VariationSelector/VariationSelector'
+import { ComputeGate } from '@/contexts/ComputeGateContext'
+import { COMPUTE_GATE_CAPACITY } from '@/defaults'
+import { defaultPalettes, paletteToGradientCSS } from '@/flame/palettes'
+import { getVariationPreviewFlame } from '@/flame/variations/utils'
+import { Check, ColourWedge, Cross, Minus, Plus, ShapeTriangle, VariationSpiral, } from '@/icons'
+import { AffineGrid, resetAffine } from './AffineGrid'
 import ui from './DuelChips.module.css'
 import type { Accessor } from 'solid-js'
 import type { AffineControls } from '@/arcade/affineControls'
 import type { CommandContext } from '@/commands/types'
 import type { AffineParams } from '@/flame/affineTranform'
+import type { Palette } from '@/flame/colorMap'
 import type { FlameDescriptor, TransformId } from '@/flame/schema/flameSchema'
 
 type Panel = 'variations' | 'shape' | 'colour'
@@ -88,6 +96,15 @@ export function DuelChips(props: {
     window.clearTimeout(hoverTimer)
   })
 
+  /** Every transform but the one being edited, drawn behind it. */
+  const ghostAffines = () => {
+    const current = transformId()
+    return Object.entries(props.flame().transforms)
+      .filter(([id]) => id !== current)
+      .map(([, transform]) => transform.preAffine)
+      .slice(0, 8)
+  }
+
   const dispatch = (id: string, ...args: unknown[]) => {
     executeCommand(id, props.ctx, ...args)
   }
@@ -150,6 +167,10 @@ export function DuelChips(props: {
               <Show when={open() === 'variations'}>
                 <VariationsPanel
                   transform={active()}
+                  paused={open() !== 'variations'}
+                  onAdd={(type) => {
+                    dispatch('flame.addVariation', transformId(), type)
+                  }}
                   onWeight={(vid, weight) => {
                     dispatch(
                       'flame.setVariationWeight',
@@ -166,6 +187,7 @@ export function DuelChips(props: {
               <Show when={open() === 'shape'}>
                 <ShapePanel
                   affine={active().preAffine}
+                  ghosts={ghostAffines()}
                   onChange={(affine) => {
                     dispatch(
                       'flame.setTransformAffine',
@@ -179,7 +201,11 @@ export function DuelChips(props: {
               </Show>
               <Show when={open() === 'colour'}>
                 <ColourPanel
+                  flame={props.flame()}
                   transform={active()}
+                  onPalette={(palette) => {
+                    dispatch('flame.applyPalette', palette)
+                  }}
                   onColor={(x) => {
                     dispatch('flame.setTransformColor', transformId(), x, 0)
                   }}
@@ -222,50 +248,172 @@ function TransformPicker(props: {
   )
 }
 
-function VariationsPanel(props: {
-  transform: { variations: Record<string, { type: string; weight: number }> }
-  onWeight: (variationId: string, weight: number) => void
-  onRemove: (variationId: string) => void
+/**
+ * The catalogue the Add tile offers.
+ *
+ * Deliberately a curated handful rather than the ~370 registered types: each
+ * tile that scrolls into view mounts a live WebGPU preview, and a duel already
+ * has two full-size seat canvases running. The sidebar is where the whole
+ * catalogue lives.
+ */
+const CATALOGUE = SAMPLE_VARIATION_TYPES
+
+function VariationTile(props: {
+  type: string
+  name: string
+  weight?: number
+  active: boolean
+  paused: boolean
+  onPrimary: () => void
+  onWeight?: (weight: number) => void
 }) {
-  const entries = () => Object.entries(props.transform.variations)
   return (
-    <div class={ui.tiles}>
-      <For each={entries()}>
-        {([id, variation]) => (
-          <div class={ui.tile}>
-            <span class={ui.tileName}>{readableType(variation.type)}</span>
+    <div class={ui.tile} classList={{ [ui.tileOn!]: props.active }}>
+      <button
+        type="button"
+        class={ui.tileButton}
+        aria-label={props.active ? `Remove ${props.name}` : `Add ${props.name}`}
+        onClick={() => {
+          props.onPrimary()
+        }}
+      >
+        <span class={ui.tileThumb}>
+          <VariationPreview
+            version={0}
+            isSelected={props.active}
+            flame={getVariationPreviewFlame(props.type)}
+            name={props.name}
+            resolution={{ width: 128, height: 72 }}
+            paused={props.paused}
+          />
+        </span>
+        <span class={ui.tileName}>{props.name}</span>
+        <span class={ui.tileBadge} aria-hidden="true">
+          {props.active ? <Minus /> : <Plus />}
+        </span>
+      </button>
+      <Show when={props.onWeight}>
+        {(onWeight) => (
+          <label class={ui.tileWeightRow}>
             <input
               class={ui.tileWeight}
               type="range"
               min={-1}
               max={2}
               step={0.01}
-              value={variation.weight}
-              aria-label={`${readableType(variation.type)} weight`}
+              value={props.weight ?? 0}
+              aria-label={`${props.name} weight`}
               onInput={(ev) => {
-                props.onWeight(id, Number(ev.currentTarget.value))
+                onWeight()(Number(ev.currentTarget.value))
               }}
             />
-            <span class={ui.tileValue}>{variation.weight.toFixed(2)}</span>
-            <button
-              type="button"
-              class={ui.tileRemove}
-              aria-label={`Remove ${readableType(variation.type)}`}
-              onClick={() => {
-                props.onRemove(id)
-              }}
-            >
-              <Cross aria-hidden="true" />
-            </button>
-          </div>
+            <span class={ui.tileValue}>{(props.weight ?? 0).toFixed(2)}</span>
+          </label>
         )}
-      </For>
-      <Show when={entries().length === 0}>
-        <p class={ui.empty}>
-          This transform has no variations. Add one from the sidebar.
-        </p>
       </Show>
     </div>
+  )
+}
+
+function VariationsPanel(props: {
+  transform: {
+    variations: Record<string, { type: string; weight: number }>
+  }
+  paused: boolean
+  onWeight: (variationId: string, weight: number) => void
+  onRemove: (variationId: string) => void
+  onAdd: (type: string) => void
+}) {
+  const [adding, setAdding] = createSignal(false)
+  const [query, setQuery] = createSignal('')
+  const entries = () => Object.entries(props.transform.variations)
+  const present = () => new Set(entries().map(([, v]) => v.type))
+  const matches = () =>
+    CATALOGUE.filter(
+      (type) =>
+        !present().has(type) &&
+        readableType(type).toLowerCase().includes(query().trim().toLowerCase()),
+    )
+
+  return (
+    <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
+      <div class={ui.tiles}>
+        <Show
+          when={adding()}
+          fallback={
+            <>
+              <button
+                type="button"
+                class={ui.addTile}
+                onClick={() => setAdding(true)}
+              >
+                <Plus aria-hidden="true" />
+                Add
+              </button>
+              <For each={entries()}>
+                {([id, variation]) => (
+                  <VariationTile
+                    type={variation.type}
+                    name={readableType(variation.type)}
+                    weight={variation.weight}
+                    active
+                    paused={props.paused}
+                    onPrimary={() => {
+                      props.onRemove(id)
+                    }}
+                    onWeight={(weight) => {
+                      props.onWeight(id, weight)
+                    }}
+                  />
+                )}
+              </For>
+              <Show when={entries().length === 0}>
+                <p class={ui.empty}>
+                  This transform has no variations yet. Add one.
+                </p>
+              </Show>
+            </>
+          }
+        >
+          <div class={ui.addBar}>
+            <input
+              class={ui.search}
+              type="search"
+              placeholder="Search variations"
+              value={query()}
+              aria-label="Search variations"
+              onInput={(ev) => setQuery(ev.currentTarget.value)}
+            />
+            <button
+              type="button"
+              class={ui.addBack}
+              onClick={() => {
+                setAdding(false)
+                setQuery('')
+              }}
+            >
+              Done
+            </button>
+          </div>
+          <For each={matches()}>
+            {(type) => (
+              <VariationTile
+                type={type}
+                name={readableType(type)}
+                active={false}
+                paused={props.paused}
+                onPrimary={() => {
+                  props.onAdd(type)
+                }}
+              />
+            )}
+          </For>
+          <Show when={matches().length === 0}>
+            <p class={ui.empty}>No variations match "{query()}".</p>
+          </Show>
+        </Show>
+      </div>
+    </ComputeGate>
   )
 }
 
@@ -280,74 +428,123 @@ function readableType(type: string): string {
 
 function ShapePanel(props: {
   affine: AffineParams
+  ghosts: readonly AffineParams[]
   onChange: (affine: AffineParams) => void
 }) {
   const controls = () => decomposeAffine(props.affine)
   return (
-    <div class={ui.fields}>
-      <For each={AFFINE_CONTROLS}>
-        {(spec) => (
-          <label class={ui.field}>
-            <span class={ui.fieldLabel}>{spec.label}</span>
-            <input
-              class={ui.fieldInput}
-              type="range"
-              min={spec.min}
-              max={spec.max}
-              step={spec.step}
-              value={spec.toDisplay(controls()[spec.key])}
-              onInput={(ev) => {
-                const next: AffineControls = {
-                  ...controls(),
-                  [spec.key]: spec.fromDisplay(Number(ev.currentTarget.value)),
-                }
-                props.onChange(composeAffine(next, props.affine))
-              }}
-            />
-            <span class={ui.fieldValue}>
-              {spec
-                .toDisplay(controls()[spec.key])
-                .toFixed(spec.key === 'rotation' ? 0 : 2)}
-            </span>
-          </label>
-        )}
-      </For>
-      <button
-        type="button"
-        class={ui.reset}
-        onClick={() => {
-          props.onChange(
-            composeAffine(
-              {
-                scaleX: 1,
-                scaleY: 1,
-                rotation: 0,
-                shear: 0,
-                offsetX: 0,
-                offsetY: 0,
-              },
-              props.affine,
-            ),
-          )
-        }}
-      >
-        Reset
-      </button>
+    <div class={ui.shape}>
+      <div class={ui.shapeCanvas}>
+        <AffineGrid
+          affine={props.affine}
+          ghosts={props.ghosts}
+          onChange={props.onChange}
+        />
+      </div>
+      <div class={ui.fields}>
+        <For each={AFFINE_CONTROLS}>
+          {(spec) => (
+            <label class={ui.field}>
+              <span class={ui.fieldLabel}>{spec.label}</span>
+              <input
+                class={ui.fieldInput}
+                type="range"
+                min={spec.min}
+                max={spec.max}
+                step={spec.step}
+                value={spec.toDisplay(controls()[spec.key])}
+                onInput={(ev) => {
+                  const next: AffineControls = {
+                    ...controls(),
+                    [spec.key]: spec.fromDisplay(
+                      Number(ev.currentTarget.value),
+                    ),
+                  }
+                  props.onChange(composeAffine(next, props.affine))
+                }}
+              />
+              <span class={ui.fieldValue}>
+                {spec
+                  .toDisplay(controls()[spec.key])
+                  .toFixed(spec.key === 'rotation' ? 0 : 2)}
+              </span>
+            </label>
+          )}
+        </For>
+        <button
+          type="button"
+          class={ui.reset}
+          onClick={() => {
+            props.onChange(resetAffine(props.affine))
+          }}
+        >
+          Reset
+        </button>
+      </div>
     </div>
   )
 }
 
+/**
+ * How many palettes the strip offers.
+ *
+ * `defaultPalettes` holds 53 and is synchronous, module-level, and free. The
+ * official flam3 set is a 1.5 MB XML fetch parsed on the main thread, which is
+ * not something to spend a duel's clock on — the sidebar can offer those.
+ */
+const STRIP_PALETTES = defaultPalettes.slice(0, 14)
+
 function ColourPanel(props: {
+  flame: FlameDescriptor
   transform: { color: { x: number; y: number }; colorSpeed?: number }
+  onPalette: (palette: Palette) => void
   onColor: (x: number) => void
   onSpeed: (speed: number) => void
 }) {
+  const selectedId = () => props.flame.renderSettings.palette?.id ?? ''
+  // The position track carries the palette actually in use, so the slider
+  // shows you the colours you are moving through rather than a stock rainbow.
+  const trackGradient = () => {
+    const applied = STRIP_PALETTES.find((p) => p.id === selectedId())
+    return applied
+      ? paletteToGradientCSS(applied)
+      : 'linear-gradient(to right, #1b1f2a, #6f7a92)'
+  }
+
   return (
     <div class={ui.colour}>
+      <div class={ui.swatches} role="group" aria-label="Palette">
+        <For each={STRIP_PALETTES}>
+          {(palette) => (
+            <button
+              type="button"
+              class={ui.swatch}
+              classList={{ [ui.swatchOn!]: palette.id === selectedId() }}
+              aria-pressed={palette.id === selectedId()}
+              onClick={() => {
+                props.onPalette(palette)
+              }}
+            >
+              <span
+                class={ui.swatchBand}
+                style={{ background: paletteToGradientCSS(palette) }}
+              />
+              <span class={ui.swatchName}>{palette.name}</span>
+              <Show when={palette.id === selectedId()}>
+                <span class={ui.swatchCheck} aria-hidden="true">
+                  <Check />
+                </span>
+              </Show>
+            </button>
+          )}
+        </For>
+      </div>
+
       <label class={ui.field}>
         <span class={ui.fieldLabel}>Colour position</span>
         <input
           class={`${ui.fieldInput} ${ui.colourTrack}`}
+          style={{ '--duel-track': trackGradient() }}
           type="range"
           min={0}
           max={1}
@@ -359,10 +556,13 @@ function ColourPanel(props: {
         />
         <span class={ui.fieldValue}>{props.transform.color.x.toFixed(2)}</span>
       </label>
-      <label class={ui.field}>
+
+      {/* Deliberately the lesser of the two: a hairline track and a plain
+          knob, because colour position is what a player reaches for. */}
+      <label class={`${ui.field} ${ui.speedField}`}>
         <span class={ui.fieldLabel}>Speed</span>
         <input
-          class={ui.fieldInput}
+          class={`${ui.fieldInput} ${ui.speedTrack}`}
           type="range"
           min={0}
           max={1}
