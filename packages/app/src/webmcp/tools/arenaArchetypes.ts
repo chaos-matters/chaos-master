@@ -2,6 +2,8 @@ import { mutateFlameSeeded } from '@/flame/randomize'
 import { deepClone } from '@/utils/clone'
 import { calculateFlameStats } from '@/webmcp/tools/scoreFlame'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { TransformVariationType } from '@/flame/variations'
+import type { TransformVariationType3D } from '@/flame/variations3D'
 
 export type TacticalStance = 'resonance' | 'bastion' | 'entropy' | 'balanced'
 
@@ -92,7 +94,17 @@ export interface OpponentArchetype {
   color: string
   paletteHue: number
   mutationStrength: number
-  allowedVariations: string[]
+  /**
+   * Variation pool `generateArchetypeOpponent` draws from. These must be live
+   * registry keys (`transformVariations` / `transformVariations3D`), i.e. the
+   * `…Var` / `…3D` names — NOT the bare Apophysis names (`polar`, `cross`).
+   * A bare name reaches the shader compiler unresolved, gets dropped with
+   * `[createFlameWgsl] skipping unsupported variation type "…"`, and is then
+   * persisted to Recents so it warns again on every reload. The type alone
+   * cannot enforce this (`TransformVariationType` carries a `string & {}`
+   * escape hatch), so `arenaArchetypes.test.ts` pins it against the registry.
+   */
+  allowedVariations: (TransformVariationType | TransformVariationType3D)[]
 }
 
 export const ARENA_ARCHETYPES: Record<ArchetypeId, OpponentArchetype> = {
@@ -105,14 +117,14 @@ export const ARENA_ARCHETYPES: Record<ArchetypeId, OpponentArchetype> = {
     paletteHue: 0.55,
     mutationStrength: 0.35,
     allowedVariations: [
-      'polar',
-      'polar2',
-      'julia',
-      'juliaN',
-      'cylinder',
-      'disc',
-      'square',
-      'cross',
+      'polarVar',
+      'polar2Var',
+      'juliaVar',
+      'juliaNVar',
+      'cylinderVar',
+      'discVar',
+      'squareVar',
+      'crossVar',
     ],
   },
   chaos_lord: {
@@ -124,14 +136,14 @@ export const ARENA_ARCHETYPES: Record<ArchetypeId, OpponentArchetype> = {
     paletteHue: 0.98,
     mutationStrength: 0.65,
     allowedVariations: [
-      'swirl',
-      'spherical',
-      'exponential',
-      'bubble',
-      'bent',
-      'waves',
-      'pdj',
-      'gaussian',
+      'swirlVar',
+      'sphericalVar',
+      'exponentialVar',
+      'bubbleVar',
+      'bentVar',
+      'wavesVar',
+      'pdjVar',
+      'gaussianVar',
     ],
   },
   spiral_leviathan: {
@@ -143,14 +155,14 @@ export const ARENA_ARCHETYPES: Record<ArchetypeId, OpponentArchetype> = {
     paletteHue: 0.5,
     mutationStrength: 0.45,
     allowedVariations: [
-      'spiral',
-      'swirl',
-      'rings',
-      'rings2',
-      'eyefish',
-      'fisheye',
-      'curl',
-      'waves',
+      'spiralVar',
+      'swirlVar',
+      'ringsVar',
+      'rings2Var',
+      'eyefishVar',
+      'fisheyeVar',
+      'curlVar',
+      'wavesVar',
     ],
   },
   quantum_siren: {
@@ -162,13 +174,16 @@ export const ARENA_ARCHETYPES: Record<ArchetypeId, OpponentArchetype> = {
     paletteHue: 0.78,
     mutationStrength: 0.5,
     allowedVariations: [
-      'ex',
-      'diamond',
-      'handkerchief',
-      'heart',
-      'starfield',
-      'cylinder',
-      'bubble',
+      'exVar',
+      'diamondVar',
+      'handkerchiefVar',
+      'heartVar',
+      // `starfield` is 3D-only (`starfield3D`). `noiseVar` is the 2D registry's
+      // stochastic scatter — the nearest kin to starfield's randomized point
+      // cloud, and it reads as the Siren's flickering probability field.
+      'noiseVar',
+      'cylinderVar',
+      'bubbleVar',
     ],
   },
   solar_seraph: {
@@ -180,12 +195,15 @@ export const ARENA_ARCHETYPES: Record<ArchetypeId, OpponentArchetype> = {
     paletteHue: 0.12,
     mutationStrength: 0.4,
     allowedVariations: [
-      'sinusoidal',
-      'spherical',
-      'linear',
-      'linearT',
-      'hemisphere',
-      'cylinder',
+      'sinusoidalVar',
+      'sphericalVar',
+      'linearVar',
+      'linearTVar',
+      // `hemisphere` is 3D-only (`hemisphere3D`, `pos / sqrt(|pos|² + 1)`).
+      // `bubbleVar` is the same dome projection in 2D — a bounded radiant orb,
+      // which is exactly the Seraph's solar disc.
+      'bubbleVar',
+      'cylinderVar',
     ],
   },
   void_stalker: {
@@ -197,13 +215,13 @@ export const ARENA_ARCHETYPES: Record<ArchetypeId, OpponentArchetype> = {
     paletteHue: 0.85,
     mutationStrength: 0.55,
     allowedVariations: [
-      'spherical',
-      'scry',
-      'power',
-      'eyefish',
-      'fisheye',
-      'square',
-      'cross',
+      'sphericalVar',
+      'scryVar',
+      'powerVar',
+      'eyefishVar',
+      'fisheyeVar',
+      'squareVar',
+      'crossVar',
     ],
   },
 }
