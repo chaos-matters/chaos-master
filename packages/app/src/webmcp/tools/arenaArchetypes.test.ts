@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { transformVariations } from '@/flame/variations'
+import { transformVariations3D } from '@/flame/variations3D'
 import { ARCHETYPE_IDS, ARENA_ARCHETYPES, generateArchetypeOpponent, TACTICAL_STANCES, } from './arenaArchetypes'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
@@ -68,6 +70,25 @@ describe('arenaArchetypes', () => {
       expect(arch.lore.length).toBeGreaterThan(10)
       expect(arch.allowedVariations.length).toBeGreaterThan(0)
     }
+  })
+
+  // Regression guard: the archetype pools once held bare Apophysis names
+  // ("cross", "polar", "julia"), none of which exist in the registry — the
+  // generated opponents carried variation types the shader compiler could not
+  // resolve, and every clash logged
+  //   [createFlameWgsl] skipping unsupported variation type "cross"
+  // then saved the broken flame to Recents so it resurfaced on every reload.
+  it('only lists variation names that exist in the live registries', () => {
+    const known = new Set([
+      ...Object.keys(transformVariations),
+      ...Object.keys(transformVariations3D),
+    ])
+    const unknown = ARCHETYPE_IDS.flatMap((id) =>
+      ARENA_ARCHETYPES[id].allowedVariations
+        .filter((name) => !known.has(name))
+        .map((name) => `${id}: ${name}`),
+    )
+    expect(unknown).toEqual([])
   })
 
   it('defines tactical stances with distinct stat multipliers', () => {
