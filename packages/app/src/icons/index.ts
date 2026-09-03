@@ -17,6 +17,7 @@ import EyeOff from './eye-off.svg'
 import Film from './film.svg'
 import Focus from './focus.svg'
 import FolderOpen from './folder-open.svg'
+import GaugeMax from './gauge-max.svg'
 import GitHub from './github.svg'
 import Globe from './globe.svg'
 import GridIcon from './grid.svg'
@@ -24,6 +25,7 @@ import Heart from './heart.svg'
 import Home from './home.svg'
 import HoverEyePreview from './hover-eye-preview.svg'
 import HoverPreview from './hover-preview.svg'
+import Info from './info.svg'
 import Lineage from './lineage.svg'
 import ListIcon from './list.svg'
 import Menu from './menu.svg'
@@ -72,11 +74,13 @@ export {
   Film,
   FolderOpen,
   Focus,
+  GaugeMax,
   GitHub,
   Globe,
   GridIcon,
   Heart,
   Home,
+  Info,
   HoverEyePreview,
   HoverPreview,
   Lineage,

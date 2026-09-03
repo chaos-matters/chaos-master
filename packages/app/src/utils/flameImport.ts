@@ -17,7 +17,7 @@ const ALL = 1_000_000
 
 /** Same guard as the single-file loader: catch an accidental multi-GB drop
  *  before reading the whole thing into memory. */
-const MAX_IMPORT_FILE_SIZE = 500 * 1024 * 1024
+export const MAX_IMPORT_FILE_SIZE = 500 * 1024 * 1024
 
 export const ALL_BACKUP_GROUPS: BackupGroups = {
   recents: true,
