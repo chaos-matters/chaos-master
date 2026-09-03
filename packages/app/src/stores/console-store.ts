@@ -1,32 +1,56 @@
 /* eslint-disable no-console */
-import { createSignal } from 'solid-js'
+import { createStore, produce } from 'solid-js/store'
+import { serializeLogArgs } from '@/utils/serializeLogArgs'
 
 export type LogType = 'log' | 'error' | 'warn' | 'info' | 'debug'
 
 export interface LogEntry {
   type: LogType
   timestamp: number
-  args: unknown[]
+  /**
+   * Bounded snapshot of the logged arguments, taken when the call happened.
+   * Holding the arguments themselves would pin every object ever logged — GPU
+   * handles, flame state, DOM subtrees — until the entry fell out of the ring
+   * buffer, and would show later mutations instead of what was logged.
+   */
+  text: string
 }
 
-const MAX_ENTRIES = 2000
+export const MAX_CONSOLE_ENTRIES = 2000
 
-const [consoleLogs, setConsoleLogs] = createSignal<LogEntry[]>([])
+// A store rather than a signal: appending an entry used to build a whole new
+// array, so every reader woke up on every console call. Here a push touches the
+// new index and the length, and readers of the other entries stay asleep.
+const [entries, setEntries] = createStore<LogEntry[]>([])
 
-export { consoleLogs }
+/** The captured console output, oldest first. */
+export function consoleLogs(): readonly LogEntry[] {
+  return entries
+}
 
 export function clearConsoleLogs() {
-  setConsoleLogs([])
+  setEntries(
+    produce((list) => {
+      list.splice(0, list.length)
+    }),
+  )
 }
 
-function pushEntry(type: LogType, args: unknown[]) {
-  setConsoleLogs((prev) => {
-    const next = [...prev, { type, timestamp: Date.now(), args }]
-    if (next.length > MAX_ENTRIES) {
-      return next.slice(next.length - MAX_ENTRIES)
-    }
-    return next
-  })
+/** Records one entry. The console patch below is the only caller in the app. */
+export function pushConsoleEntry(type: LogType, args: unknown[]) {
+  const entry: LogEntry = {
+    type,
+    timestamp: Date.now(),
+    text: serializeLogArgs(args),
+  }
+  setEntries(
+    produce((list) => {
+      list.push(entry)
+      if (list.length > MAX_CONSOLE_ENTRIES) {
+        list.splice(0, list.length - MAX_CONSOLE_ENTRIES)
+      }
+    }),
+  )
 }
 
 // Guard against re-patching. ES modules are singletons in production, but a
@@ -48,27 +72,27 @@ if (!consoleFlags[PATCH_FLAG]) {
   }
 
   console.log = (...args: unknown[]) => {
-    pushEntry('log', args)
+    pushConsoleEntry('log', args)
     _orig.log(...args)
   }
 
   console.error = (...args: unknown[]) => {
-    pushEntry('error', args)
+    pushConsoleEntry('error', args)
     _orig.error(...args)
   }
 
   console.warn = (...args: unknown[]) => {
-    pushEntry('warn', args)
+    pushConsoleEntry('warn', args)
     _orig.warn(...args)
   }
 
   console.info = (...args: unknown[]) => {
-    pushEntry('info', args)
+    pushConsoleEntry('info', args)
     _orig.info(...args)
   }
 
   console.debug = (...args: unknown[]) => {
-    pushEntry('debug', args)
+    pushConsoleEntry('debug', args)
     _orig.debug(...args)
   }
 }
