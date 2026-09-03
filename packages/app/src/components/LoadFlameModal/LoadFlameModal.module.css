@@ -276,6 +276,66 @@
   }
 }
 
+/* The drag-hover state. This class was referenced from the component but never
+   existed here, so `ui.uploadZoneDragging` was undefined and a drag changed the
+   copy while leaving the zone looking exactly as it did at rest — no border, no
+   fill, nothing to say the drop would be accepted. */
+.uploadZoneDragging {
+  border-style: solid;
+  border-width: 2px;
+  border-color: var(--accent-color, #6366f1);
+  background: rgba(99, 102, 241, 0.1);
+  /* Slightly larger than rest, and larger than :hover's 0.995, so the zone
+     visibly "opens up" to receive the file. */
+  transform: scale(1.01);
+
+  [data-theme='dark'] & {
+    border-color: var(--accent-color, #818cf8);
+    background: rgba(129, 140, 248, 0.14);
+  }
+
+  .uploadIcon {
+    color: var(--accent-color, #6366f1);
+    transform: translateY(-3px) scale(1.1);
+
+    [data-theme='dark'] & {
+      color: var(--accent-color, #818cf8);
+    }
+  }
+
+  .uploadTitle {
+    color: var(--accent-color, #6366f1);
+
+    [data-theme='dark'] & {
+      color: var(--accent-color, #818cf8);
+    }
+  }
+
+  /* The pointer is mid-drag over these; letting them take hit-testing only
+     produces more enter/leave churn for the counter to unwind. */
+  .uploadIcon,
+  .uploadTitle,
+  .uploadSubtitle {
+    pointer-events: none;
+  }
+
+  /* `:active` fires mid-drag in some browsers and would fight the scale above. */
+  &:active {
+    transform: scale(1.01);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uploadZoneDragging,
+  .uploadZoneDragging:active {
+    transform: none;
+  }
+
+  .uploadZoneDragging .uploadIcon {
+    transform: none;
+  }
+}
+
 .uploadIcon {
   color: var(--neutral-400);
   transition: all 0.2s ease;

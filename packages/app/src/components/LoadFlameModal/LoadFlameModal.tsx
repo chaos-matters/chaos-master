@@ -17,6 +17,7 @@ import { Default3DPreviewCamera } from '@/lib/Camera3D'
 import { Root } from '@/lib/Root'
 import { deepClone } from '@/utils/clone'
 import { filesFromDataTransfer } from '@/utils/dataTransferFiles'
+import { createFileDragState } from '@/utils/fileDragState'
 import { applyFlameImport, parseFlameEnvelope, readFlameFiles, summarizeImport, } from '@/utils/flameImport'
 import { extractFlameFromPng } from '@/utils/flameInPng'
 import { useElementIsScrolling } from '@/utils/isScrolling'
@@ -607,7 +608,8 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
   const galleryScrolling = useElementIsScrolling(scrollBodyElement)
   const showAlert = useAlert()
   const { showToast } = useToast()
-  const [isDragging, setIsDragging] = createSignal(false)
+  const fileDrag = createFileDragState()
+  const isDragging = fileDrag.active
   const [isImporting, setIsImporting] = createSignal(false)
   const isGallery = () => props.mode === 'gallery'
 
@@ -841,25 +843,19 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
     await processImportFiles(await pickFlameFiles())
   }
 
-  function handleDragOver(e: DragEvent) {
-    e.preventDefault()
-  }
-
-  function handleDragEnter(e: DragEvent) {
-    e.preventDefault()
-    setIsDragging(true)
-  }
-
-  function handleDragLeave(e: DragEvent) {
-    e.preventDefault()
-    setIsDragging(false)
-  }
-
   async function handleDrop(e: DragEvent) {
     e.preventDefault()
-    setIsDragging(false)
+    // `drop` never emits a matching `dragleave`, so the state has to be reset
+    // here or the highlight sticks until the next drag.
+    fileDrag.reset()
     const files = filesFromDataTransfer(e.dataTransfer)
-    if (files.length === 0) return
+    if (files.length === 0) {
+      console.warn(
+        'LoadFlameModal: drop carried no file; types:',
+        Array.from(e.dataTransfer?.types ?? []),
+      )
+      return
+    }
     await processImportFiles(files)
   }
 
@@ -942,9 +938,9 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
             class={ui.uploadZone}
             classList={{ [ui.uploadZoneDragging as string]: isDragging() }}
             onClick={loadFromFile}
-            onDragOver={handleDragOver}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
+            onDragOver={fileDrag.onDragOver}
+            onDragEnter={fileDrag.onDragEnter}
+            onDragLeave={fileDrag.onDragLeave}
             onDrop={handleDrop}
           >
             <svg
