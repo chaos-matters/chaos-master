@@ -87,6 +87,20 @@ export const [followCamEnabled, setFollowCamEnabled] = persistentSignal(
   true,
 )
 
+/**
+ * Replay the agent's own rail: the running list of what it did and said,
+ * rebuilt from the recorded actions.
+ *
+ * Off by default. It is the right frame for an Arcade take, where the point
+ * is watching something reason its way through the editor, and pure clutter
+ * over a session a person recorded by hand — and the recorder cannot tell the
+ * two apart from the file alone.
+ */
+export const [agentRailEnabled, setAgentRailEnabled] = persistentSignal(
+  'recorder/agent-rail',
+  false,
+)
+
 export const MIN_RECORDER_OPACITY = 0.2
 
 /** Opacity while the canvas is animating, when fading is on. Low enough to

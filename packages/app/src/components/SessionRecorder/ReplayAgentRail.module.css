@@ -1,0 +1,57 @@
+/* Deliberately the same furniture as the live pilot rail: a viewer who
+   watched the agent work should recognise the replay as the same thing being
+   shown again, not as a different feature.
+
+   Above the follow-cam scrim (z-index 300) so the rail stays readable while
+   every other surface is dimmed, and click-through so it never steals the
+   transport or a takeover click. */
+.rail {
+  position: fixed;
+  top: 12%;
+  right: 12px;
+  z-index: 310;
+  width: min(22rem, 34vw);
+  max-height: 56vh;
+  overflow-y: auto;
+  margin: 0;
+  padding: 10px;
+  border-radius: 10px;
+  background: oklch(16% 0.02 240 / 0.88);
+  border: 1px solid oklch(50% 0.06 240 / 0.4);
+  color: oklch(92% 0.01 240);
+  font:
+    13px/1.4 system-ui,
+    sans-serif;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 6px 24px oklch(0% 0 0 / 0.4);
+}
+
+.entry {
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  border-left: 2px solid oklch(70% 0.02 240 / 0.25);
+}
+
+/* What the agent said, as opposed to what it did. */
+.narrate {
+  border-left-color: oklch(75% 0.12 250);
+  font-style: italic;
+}
+
+.current {
+  background: oklch(35% 0.06 240 / 0.5);
+  border-left-color: oklch(85% 0.12 240 / 0.9);
+}
+
+.empty {
+  margin: 0;
+  padding: 6px 8px;
+  opacity: 0.7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail {
+    scroll-behavior: auto;
+  }
+}
