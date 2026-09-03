@@ -38,18 +38,33 @@ describe('DuelChips', () => {
 
   it('closes on its own chip, on the X, and on Escape', () => {
     mount()
-    const chip = screen.getByRole('button', { name: /Variations/ })
-    chip.click()
-    chip.click()
+    // Re-queried every time: opening a panel moves the chip row into the
+    // panel's header, so the button is a different node than it was.
+    const chip = () => screen.getByRole('button', { name: /Variations/ })
+
+    chip().click()
+    chip().click()
     expect(screen.queryByLabelText('Variations')).toBeNull()
 
-    chip.click()
+    chip().click()
     screen.getByRole('button', { name: 'Close' }).click()
     expect(screen.queryByLabelText('Variations')).toBeNull()
 
-    chip.click()
+    chip().click()
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     expect(screen.queryByLabelText('Variations')).toBeNull()
+  })
+
+  it('keeps the other two chips reachable from inside an open panel', () => {
+    mount()
+    screen.getByRole('button', { name: /Shape/ }).click()
+
+    // The mock hides the resting chip row behind the panel; if switching
+    // meant closing first, that would cost a click every time.
+    screen.getByRole('button', { name: /Colour/ }).click()
+
+    expect(screen.getByLabelText('Colour')).toBeTruthy()
+    expect(screen.queryByLabelText('Shape')).toBeNull()
   })
 
   it('scrubs the shape through a real command on the player context', () => {
