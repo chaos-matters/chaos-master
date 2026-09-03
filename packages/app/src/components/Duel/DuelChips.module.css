@@ -165,6 +165,14 @@
 
 /* A horizontal row of tiles, not a list: the mock's whole idea is that you
    pick a variation by looking at what it does, not by reading its name. */
+.variations {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-height: 0;
+  min-width: 0;
+}
+
 .tiles {
   display: flex;
   align-items: flex-start;
@@ -172,6 +180,10 @@
   scroll-snap-type: x proximity;
   overflow-x: auto;
   overscroll-behavior: contain;
+  /* `overflow-x: auto` makes the other axis a scroll box too, so the badge
+     that hangs off each thumbnail's corner was being clipped AND raising a
+     vertical scrollbar on a row that fits. The overhang gets its own room. */
+  padding-top: 10px;
   padding-bottom: 4px;
 }
 
