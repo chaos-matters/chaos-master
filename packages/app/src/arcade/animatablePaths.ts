@@ -3,6 +3,7 @@ import { TIMELINE_PARAMETERS } from '@/utils/timeline'
 import * as v from '@/valibot'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineSnapshot } from '@/flame/schema/timeline'
+import type { TimelineTrack } from '@/utils/timeline'
 
 export type CatalogType = 'number' | 'string' | 'color'
 export type CatalogEntry = {
@@ -146,6 +147,7 @@ export const SetKeyframesInput = v.object({
     v.maxValue(MAX_CINEMA_FRAMES),
   ),
   loopMode: v.optional(v.picklist(['off', 'seamless', 'cycle']), 'off'),
+  mode: v.optional(v.picklist(['replace', 'add']), 'replace'),
   tracks: v.pipe(
     v.array(TrackInput),
     v.nonEmpty(),
@@ -174,6 +176,17 @@ function valueType(value: unknown): CatalogType {
 export function buildTimelineSnapshot(
   raw: unknown,
   catalog: CatalogEntry[],
+  /**
+   * What the timeline already holds, for `mode: 'add'`.
+   *
+   * A whole animation arriving as one call is one step in the log and one
+   * thing for the viewer to watch, which is the wrong shape for both: the
+   * lesson reads as a single opaque jump, and nobody sees a beat land. Adding
+   * lets the agent send one idea at a time without resending everything it
+   * has already placed. A path present in both wins from the new call, so a
+   * second pass over the same track is a correction rather than a duplicate.
+   */
+  existingTracks: readonly TimelineTrack[] = [],
 ):
   | { ok: true; snapshot: TimelineSnapshot; keyframeCount: number }
   | { ok: false; error: string } {
@@ -228,27 +241,56 @@ export function buildTimelineSnapshot(
       keyframeCount++
     }
   }
+  const additions = input.tracks.map((track) => ({
+    parameterPath: track.path,
+    keyframes: track.keyframes.map((keyframe) => ({
+      frame: keyframe.frame,
+      value: keyframe.value,
+      easing: keyframe.easing ?? 'linear',
+      interp: keyframe.interp ?? 'linear',
+    })),
+  }))
+  const kept =
+    input.mode === 'add'
+      ? existingTracks.filter((track) => !seen.has(track.parameterPath))
+      : []
+  for (const track of kept) {
+    const last = track.keyframes.at(-1)
+    if (last !== undefined && last.frame > input.durationFrames) {
+      return {
+        ok: false,
+        error: `durationFrames ${input.durationFrames} would cut the existing track "${track.parameterPath}", which runs to frame ${last.frame}. Keep the same duration or send mode "replace".`,
+      }
+    }
+  }
+  const merged = [...kept, ...additions]
+  if (merged.length > MAX_CINEMA_TRACKS) {
+    return {
+      ok: false,
+      error: `That would leave ${merged.length} tracks; the limit is ${MAX_CINEMA_TRACKS}.`,
+    }
+  }
+  for (const track of kept) {
+    keyframeCount += track.keyframes.length
+  }
+
   const snapshot = {
     config: {
       fps: input.fps,
       timeScale: 1,
       startFrame: 0,
       endFrame: input.durationFrames,
-      loop: true,
+      // Never looping. An agent's preview plays once and stops, because the
+      // agent cannot see the result and would otherwise leave the GPU running
+      // the animation for the whole time it spends thinking about the next
+      // call. The viewer turns looping on themselves once the take is theirs.
+      loop: false,
       autoFps: false,
       loopMode: input.loopMode,
     },
     currentFrame: 0,
     animationEnabled: true,
-    tracks: input.tracks.map((track) => ({
-      parameterPath: track.path,
-      keyframes: track.keyframes.map((keyframe) => ({
-        frame: keyframe.frame,
-        value: keyframe.value,
-        easing: keyframe.easing ?? 'linear',
-        interp: keyframe.interp ?? 'linear',
-      })),
-    })),
+    tracks: merged,
   }
   const validated = tryValidateTimelineSnapshot(snapshot)
   if (!validated) {

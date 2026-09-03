@@ -142,7 +142,7 @@ ${WEBMCP_FALLBACK_NOTE}`
 export function cinemaPromptCard(description: string): string {
   const wish =
     description.trim() || 'a slow, cinematic move that suits this flame'
-  return `Animate my current flame in Lumen Apeiron: ${wish}. Call arcade_start_cinema, then arcade_get_animatable_paths to see what you can keyframe, then arcade_set_keyframes with tracks that realise the description (use easing, keep it under 10 seconds unless I say otherwise). Playback starts as soon as the keyframes land. Narrate your choices with arcade_narrate. Ask me if you want changes, and finish with arcade_end_cinema.
+  return `Animate my current flame in Lumen Apeiron: ${wish}. Call arcade_start_cinema, then arcade_get_animatable_paths to see what you can keyframe, then build the animation up with arcade_set_keyframes: one call per idea (camera move, then colour drift, then transform sway), each with mode "add" and the same durationFrames, so I watch each beat land and can replay it. Use easing, keep it under 10 seconds unless I say otherwise. Playback runs once per call. Narrate your choices with arcade_narrate. Ask me if you want changes, and finish with arcade_end_cinema.
 
 ${WEBMCP_FALLBACK_NOTE}`
 }
