@@ -200,10 +200,13 @@ export function SessionRecorderControls(props: {
                   ? 'Fold narration into the step it introduces'
                   : 'Record narration as its own step'
               }
+              // Both titles name where the change shows up. The setting is read
+              // as each narration lands, so pressing it with nothing recording
+              // changes nothing on screen — which read as a dead button.
               title={
                 narrationAsStep()
-                  ? 'Narration is its own step — a caption that holds while nothing moves'
-                  : 'Narration captions the next step — the list is only what changed'
+                  ? 'How narration is recorded: as its own step, a caption that holds while nothing moves. Shows up in the next recording you or the AI make.'
+                  : 'How narration is recorded: as the caption on the next step, so the list is only what changed. Shows up in the next recording you or the AI make.'
               }
             >
               <Speech class={styles.icon} aria-hidden="true" />
