@@ -1,0 +1,130 @@
+import { createSignal } from 'solid-js'
+import { recorderStream } from '@/recorder/recorder'
+import { createSeat } from '@/seats/seat'
+import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { RecordedSession } from '@/recorder/schema'
+import type { Seat } from '@/seats/seat'
+
+/**
+ * A duel, as one module-global state — the same shape as `arcade/pilot.ts`,
+ * and for the same reason: the tools that start it, the stage that renders it
+ * and the clock that ends it all read it, and none of them owns it.
+ *
+ * The rival seat is created here rather than in the component tree because a
+ * WebMCP tool starts the duel, and a tool has no component to mount into.
+ */
+export type DuelRecording = 'both' | 'rival' | 'player' | 'none'
+
+export type DuelState =
+  | { phase: 'idle' }
+  | {
+      phase: 'running'
+      rival: Seat
+      endsAt: number
+      durationMs: number
+      recording: DuelRecording
+    }
+
+const [duel, setDuel] = createSignal<DuelState>({ phase: 'idle' })
+
+export { duel }
+
+export const duelActive = (): boolean => duel().phase === 'running'
+
+export function runningDuel():
+  | Extract<DuelState, { phase: 'running' }>
+  | undefined {
+  const state = duel()
+  return state.phase === 'running' ? state : undefined
+}
+
+export const MIN_DUEL_SECONDS = 60
+export const MAX_DUEL_SECONDS = 600
+export const DEFAULT_DUEL_SECONDS = 180
+
+function recordsPlayer(recording: DuelRecording): boolean {
+  return recording === 'both' || recording === 'player'
+}
+
+function recordsRival(recording: DuelRecording): boolean {
+  return recording === 'both' || recording === 'rival'
+}
+
+/**
+ * Start both sides in one synchronous call.
+ *
+ * Both streams take the same time origin, so the two logs share a zero and a
+ * later combined replay can interleave them without guessing. If the second
+ * start fails the first is cancelled: a duel with one recorded side would be
+ * a half-take nobody asked for.
+ */
+export function startDuel(input: {
+  rivalFlame: FlameDescriptor
+  playerFlame: FlameDescriptor
+  durationMs: number
+  recording: DuelRecording
+  now?: number
+}): { ok: true; rival: Seat } | { ok: false; error: string } {
+  if (duelActive()) {
+    return { ok: false, error: 'A duel is already running.' }
+  }
+  const now = input.now ?? globalThis.performance.now()
+  const player = recorderStream('player')
+  const rival = recorderStream('rival')
+  if (recordsPlayer(input.recording)) {
+    const started = player.start(input.playerFlame, {}, now)
+    if (!started.ok) {
+      return {
+        ok: false,
+        error: `Could not record your side: ${started.reason}`,
+      }
+    }
+  }
+  if (recordsRival(input.recording)) {
+    const started = rival.start(input.rivalFlame, {}, now)
+    if (!started.ok) {
+      if (recordsPlayer(input.recording)) player.cancel()
+      return {
+        ok: false,
+        error: `Could not record the AI's side: ${started.reason}`,
+      }
+    }
+  }
+  const seat = createSeat('rival', input.rivalFlame)
+  setDuel({
+    phase: 'running',
+    rival: seat,
+    endsAt: now + input.durationMs,
+    durationMs: input.durationMs,
+    recording: input.recording,
+  })
+  return { ok: true, rival: seat }
+}
+
+/** Stop both sides in one synchronous call and dispose the rival seat. */
+export function stopDuel(): {
+  player?: RecordedSession
+  rival?: RecordedSession
+} {
+  const state = runningDuel()
+  if (!state) return {}
+  const playerSession = recorderStream('player').isRecording()
+    ? recorderStream('player').stop()
+    : undefined
+  const rivalSession = recorderStream('rival').isRecording()
+    ? recorderStream('rival').stop()
+    : undefined
+  setDuel({ phase: 'idle' })
+  // After the sessions are taken: disposing cancels the stream, which would
+  // throw away the take if it ran first.
+  state.rival.dispose()
+  return { player: playerSession, rival: rivalSession }
+}
+
+/** Milliseconds left on the clock, never negative. */
+export function duelRemainingMs(
+  now: number = globalThis.performance.now(),
+): number {
+  const state = runningDuel()
+  return state ? Math.max(0, state.endsAt - now) : 0
+}
