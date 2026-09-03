@@ -50,7 +50,7 @@ describe('EclipseHud', () => {
     resetPilot()
   })
 
-  it('shows the clock and both scores', () => {
+  it('shows the clock', () => {
     render(() => (
       <EclipseHud
         model={duelHudModel({
@@ -63,8 +63,9 @@ describe('EclipseHud', () => {
     ))
 
     expect(screen.getByLabelText('Time remaining').textContent).toBe('1:35')
-    expect(screen.getByText('62')).toBeTruthy()
-    expect(screen.getByText('38')).toBeTruthy()
+    // The figures themselves live on the seat name pills now; what the dial
+    // carries is the comparison, and the ring tests below measure that.
+    expect(screen.queryByText('62')).toBeNull()
   })
 
   it('gives the leader more of the ring', () => {

@@ -71,15 +71,43 @@ describe('DuelChips', () => {
     const ctx = mount()
     screen.getByRole('button', { name: /Shape/ }).click()
 
-    const rotate = screen.getByLabelText('Shape').querySelectorAll('input')[2]!
-    rotate.value = '90'
-    rotate.dispatchEvent(new Event('input', { bubbles: true }))
+    // Rotate reads 0.5 deg per pixel, so 180px of drag is a quarter turn.
+    const rotate = screen.getByRole('slider', { name: 'Rotate' })
+    rotate.dispatchEvent(
+      new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 0 }),
+    )
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 180 }))
+    window.dispatchEvent(new MouseEvent('pointerup', {}))
 
-    // A quarter turn: the stored matrix is what changed, not a private copy,
-    // and it went through the registry so the recorder logged one step.
+    // The stored matrix is what changed, not a private copy, and it went
+    // through the registry so the recorder logged one step.
     const affine = firstTransform(ctx.flameDescriptor()).preAffine
     expect(affine.a).toBeCloseTo(0, 6)
-    expect(affine.d).toBeCloseTo(Math.hypot(affine.a, affine.d), 6)
+    expect(affine.b).toBeCloseTo(-Math.hypot(affine.a, affine.b), 6)
+  })
+
+  it('nudges a shape field by one step from the keyboard', () => {
+    const ctx = mount()
+    screen.getByRole('button', { name: /Shape/ }).click()
+
+    const offsetX = screen.getByRole('slider', { name: 'X offset' })
+    offsetX.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }),
+    )
+    // Shift is the coarse modifier everywhere else in the editor, so it is
+    // ten steps here too.
+    offsetX.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'ArrowRight',
+        shiftKey: true,
+        bubbles: true,
+      }),
+    )
+
+    expect(firstTransform(ctx.flameDescriptor()).preAffine.c).toBeCloseTo(
+      0.11,
+      6,
+    )
   })
 
   it('moves a transform along the palette', () => {

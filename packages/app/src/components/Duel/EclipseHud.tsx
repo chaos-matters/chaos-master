@@ -235,13 +235,6 @@ export function EclipseHud(props: {
           </span>
           <span class={ui.clockLabel}>Time remaining</span>
         </div>
-
-        <span class={`${ui.score} ${ui.playerScore}`}>
-          {props.model.playerScore}
-        </span>
-        <span class={`${ui.score} ${ui.rivalScore}`}>
-          {props.model.rivalScore}
-        </span>
       </div>
 
       <button

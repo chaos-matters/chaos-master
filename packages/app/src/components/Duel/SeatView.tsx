@@ -17,6 +17,8 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
  */
 export function SeatView(props: {
   label: string
+  /** This seat's standing, shown on the name pill. */
+  score: number
   side: 'player' | 'rival'
   flame: Accessor<FlameDescriptor>
   zoom: Signal<number>
@@ -34,6 +36,10 @@ export function SeatView(props: {
         }}
       >
         {props.label}
+        {/* The number rides with the name rather than on the dial: the dial
+            says who is ahead by how much of the ring each side owns, which is
+            the comparison; this is the figure, and it belongs to a flame. */}
+        <span class={ui.seatScore}>{props.score}</span>
       </h3>
       <AutoCanvas
         class={ui.seatCanvas}

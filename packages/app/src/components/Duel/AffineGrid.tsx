@@ -21,7 +21,7 @@ import type { AffineParams } from '@/flame/affineTranform'
 
 /** World units visible across the box, so a unit transform sits comfortably. */
 const EXTENT = 1.6
-const GRID_STEP = 0.4
+const GRID_STEP = 0.2
 
 type Handle = 'o' | 'x' | 'y'
 
@@ -149,7 +149,7 @@ export function AffineGrid(props: {
                 class={handle === 'o' ? ui.handleCore : ui.handleRing}
                 cx={P()[handle].x}
                 cy={P()[handle].y}
-                r={0.1}
+                r={dragging() === handle ? 0.24 : 0.144}
               />
               {/* A fat invisible target, because 0.1 world units is a small
                   thing to hit with a finger. */}
