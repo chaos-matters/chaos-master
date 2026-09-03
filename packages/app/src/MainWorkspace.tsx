@@ -18,6 +18,7 @@ import { createDragHandler } from '@/utils/createDragHandler'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { calculateFlameStats } from '@/webmcp/tools/scoreFlame'
 import ui from './App.module.css'
+import { duelActive } from './arcade/duel'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
 import { AncestryTreeModal } from './components/AncestryTreeModal/AncestryTreeModal'
 import { PilotOverlay } from './components/Arcade/PilotOverlay'
@@ -41,6 +42,7 @@ import { DirectorOverlay } from './components/DirectorOverlay'
 import { createDiscordShareModal } from './components/DiscordShareModal/DiscordShareModal'
 import { createShowDocumentation } from './components/DocumentationModal/DocumentationModal'
 import { Dropzone } from './components/Dropzone/Dropzone'
+import { DuelStage } from './components/Duel/DuelStage'
 import { EvolutionChamber } from './components/EvolutionChamber/EvolutionChamber'
 import { ExportActions } from './components/ExportJobs/ExportActions'
 import { ExportJobHost } from './components/ExportJobs/ExportJobHost'
@@ -1594,9 +1596,12 @@ export function MainWorkspace(props: AppProps) {
   const finalRenderInterval = () =>
     // Home covers the workspace while it is showing, so the canvas has nothing
     // to display — pause it exactly as an open modal does rather than paying
-    // for frames nobody sees. An export still wins: those run to completion in
-    // the background whichever tab is in front.
-    isAnyModalOpen() || (!workspaceIsVisible() && !onExportImage())
+    // for frames nobody sees. The duel stage covers it the same way and
+    // renders the player's flame itself. An export still wins: those run to
+    // completion in the background whichever tab is in front.
+    isAnyModalOpen() ||
+    duelActive() ||
+    (!workspaceIsVisible() && !onExportImage())
       ? Infinity
       : onExportImage()
         ? 0
@@ -7848,6 +7853,16 @@ export function MainWorkspace(props: AppProps) {
           </Show>
 
           <PilotOverlay ctx={cmdContext} onPrepareFocus={prepareReplayFocus} />
+
+          <Show when={duelActive()}>
+            <DuelStage
+              ctx={cmdContext}
+              playerFlame={effectiveFlame}
+              playerZoom={[effectiveZoom, setFlameZoom]}
+              playerPosition={[effectivePosition, setFlamePosition]}
+              quality={qualityPresets[qualityPreset()]}
+            />
+          </Show>
 
           <Show when={showArena()}>
             <ArenaOverlay

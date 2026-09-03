@@ -1,5 +1,6 @@
 import { createSignal, For, Match, onMount, Show, Switch } from 'solid-js'
-import { CINEMA_PRESETS, cinemaPromptCard, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, } from '@/arcade/topics'
+import { DEFAULT_DUEL_SECONDS, MAX_DUEL_SECONDS, MIN_DUEL_SECONDS, } from '@/arcade/duel'
+import { CINEMA_PRESETS, cinemaPromptCard, duelPromptCard, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, } from '@/arcade/topics'
 import { Copy, Cross } from '@/icons'
 import ui from './ArcadeHub.module.css'
 import type { TopicId } from '@/arcade/topics'
@@ -56,15 +57,19 @@ export function ArcadeModePanel(props: {
 }) {
   const [topic, setTopic] = createSignal<TopicId>('variations')
   const [description, setDescription] = createSignal('')
+  const [duelSeconds, setDuelSeconds] = createSignal(DEFAULT_DUEL_SECONDS)
   let closeButton: HTMLButtonElement | undefined
   onMount(() => {
     closeButton?.focus()
   })
-  const ready = () => props.mode === 'teach' || props.mode === 'cinema'
+  const ready = () =>
+    props.mode === 'teach' || props.mode === 'cinema' || props.mode === 'duel'
   const prompt = () =>
     props.mode === 'teach'
       ? teachPromptCard(topic())
-      : cinemaPromptCard(description())
+      : props.mode === 'duel'
+        ? duelPromptCard(duelSeconds())
+        : cinemaPromptCard(description())
   return (
     <aside
       class={ui.panel}
@@ -145,6 +150,26 @@ export function ArcadeModePanel(props: {
               value={description()}
               onInput={(ev) => setDescription(ev.currentTarget.value)}
               placeholder="slow zoom into the core while the palette drifts from ember to violet, 8 seconds, seamless loop"
+            />
+          </label>
+        </Match>
+        <Match when={props.mode === 'duel'}>
+          <p>
+            You and the AI each get a flame and one clock. Paste the prompt,
+            then build against it — both sides are recorded and replayable.
+          </p>
+          <label class={ui.field}>
+            <span>Clock, in seconds</span>
+            <input
+              type="number"
+              min={MIN_DUEL_SECONDS}
+              max={MAX_DUEL_SECONDS}
+              value={duelSeconds()}
+              onInput={(ev) => {
+                setDuelSeconds(
+                  Number(ev.currentTarget.value) || DEFAULT_DUEL_SECONDS,
+                )
+              }}
             />
           </label>
         </Match>
