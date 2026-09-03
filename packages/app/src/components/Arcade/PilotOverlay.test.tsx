@@ -10,6 +10,22 @@ const take = {
   actions: [{ t: 0, id: 'flame.setExposure', args: [0.3] }],
 } as unknown as RecordedSession
 
+function endCinema() {
+  startPilot({
+    mode: 'cinema',
+    title: 'Animating your flame',
+    stepBudget: 25,
+    allowed: ['timeline.'],
+    qualityRankAtStart: 1,
+  })
+  endPilot('finished', {
+    title: 'Pendulum waltz',
+    sessionName: 'Cinema: Pendulum waltz',
+    session: take,
+  })
+  notePilotSaveResult(true)
+}
+
 function endWithSave(saved: boolean) {
   startPilot({
     mode: 'teach',
@@ -49,6 +65,38 @@ describe('PilotOverlay end card', () => {
         'Could not save "Lesson: Colour and tone" to your library',
       ),
     ).toBeTruthy()
+  })
+
+  it('plays a Cinema take from the top once the card is dismissed', () => {
+    endCinema()
+    const ctx = createMockCommandContext()
+    ctx.timeline.tracks = () =>
+      [
+        {
+          parameterPath: 'camera.zoom',
+          keyframes: [
+            { frame: 0, value: 1, easing: 'linear', interp: 'linear' },
+          ],
+        },
+      ] as unknown as ReturnType<typeof ctx.timeline.tracks>
+    render(() => <PilotOverlay ctx={ctx} />)
+
+    screen.getByRole('button', { name: 'Play the animation' }).click()
+
+    // Looping stays off — the viewer gets one pass, not a take that runs
+    // until they find the transport.
+    expect(ctx.timeline.setLoop).toHaveBeenCalledWith(false)
+    expect(ctx.timeline.setCurrentFrame).toHaveBeenCalledWith(0)
+    expect(ctx.timeline.play).toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('does not offer playback for a Teach take', () => {
+    endWithSave(true)
+    render(() => <PilotOverlay ctx={createMockCommandContext()} />)
+    expect(
+      screen.queryByRole('button', { name: 'Play the animation' }),
+    ).toBeNull()
   })
 
   it('offers Replay and the saved line after a successful save', () => {

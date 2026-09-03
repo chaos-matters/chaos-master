@@ -70,7 +70,7 @@ export const arcadeStartCinema: WebMcpTool = {
       allowedCommands: describeAllowedCommands(allowed),
       tips: [
         'Call arcade_get_animatable_paths first.',
-        'arcade_set_keyframes replaces the whole animation; send all tracks each time.',
+        'Build the animation one idea at a time: arcade_set_keyframes with mode "add" per group of related tracks, keeping the same durationFrames. Each call is a step the viewer watches land and can replay.',
         'Keep it under 10 seconds unless asked; use easeInOut for camera moves.',
       ],
     }
@@ -166,7 +166,7 @@ export const arcadeGetAnimatablePaths: WebMcpTool = {
 export const arcadeSetKeyframes: WebMcpTool = {
   name: 'arcade_set_keyframes',
   description:
-    'Replace the animation with the given tracks (validated against arcade_get_animatable_paths) and start playing it. fps 1-60, durationFrames 2-1800, loopMode off|seamless|cycle, each track { path, keyframes: [{ frame, value, easing?, interp? }] }. Applied as one undoable, recorded step. Requires an active Cinema session.',
+    'Apply animation tracks (validated against arcade_get_animatable_paths) and play them once. mode "add" keeps the tracks already placed, "replace" (default) discards them. Prefer one call per idea: each is a recorded step the viewer watches land. fps 1-60, durationFrames 2-1800, track { path, keyframes: [{ frame, value, easing?, interp? }] }. Needs an active Cinema session.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -176,6 +176,12 @@ export const arcadeSetKeyframes: WebMcpTool = {
       },
       durationFrames: { type: 'integer', description: 'Total frames, 2-1800' },
       loopMode: { type: 'string', enum: ['off', 'seamless', 'cycle'] },
+      mode: {
+        type: 'string',
+        enum: ['replace', 'add'],
+        description:
+          'add = merge with the tracks already placed (same path wins from this call); replace = start over (default)',
+      },
       play: {
         type: 'boolean',
         description: 'Start playback after applying (default true)',
@@ -226,6 +232,7 @@ export const arcadeSetKeyframes: WebMcpTool = {
     const built = buildTimelineSnapshot(
       input,
       buildAnimatableCatalog(ctx.flameDescriptor()),
+      ctx.timeline.tracks(),
     )
     if (!built.ok) return { error: built.error }
     const invalid = preflightReplayCommand('timeline.loadTimeline', [
@@ -260,7 +267,7 @@ export const arcadeSetKeyframes: WebMcpTool = {
       ),
       playing: play,
       remaining,
-      next: 'Narrate with arcade_narrate, refine by calling this again with all tracks, and finish with arcade_end_cinema.',
+      next: 'Narrate with arcade_narrate, add the next idea with mode "add", and finish with arcade_end_cinema.',
     }
   },
 }

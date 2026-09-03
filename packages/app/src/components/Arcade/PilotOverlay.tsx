@@ -164,11 +164,33 @@ export function PilotOverlay(props: { ctx: CommandContext }) {
                 )}
               </Show>
               <div class={ui.endActions}>
+                <Show
+                  when={
+                    end().mode === 'cinema' &&
+                    props.ctx.timeline.tracks().length > 0
+                  }
+                >
+                  {/* The take is an animation nobody has watched at speed
+                      yet: playback during the session runs once per call and
+                      stops, and the card covers the canvas. This closes the
+                      card and plays it from the first frame. */}
+                  <button
+                    type="button"
+                    class={ui.primary}
+                    onClick={() => {
+                      resetPilot()
+                      props.ctx.timeline.setLoop(false)
+                      props.ctx.timeline.setCurrentFrame(0)
+                      props.ctx.timeline.play()
+                    }}
+                  >
+                    Play the animation
+                  </button>
+                </Show>
                 <Show when={lastPilotSession()}>
                   {(session) => (
                     <button
                       type="button"
-                      class={ui.primary}
                       // Offered even when the library write failed: the take
                       // is still in memory, so it is still replayable. The
                       // card says separately that it did not reach the library.
