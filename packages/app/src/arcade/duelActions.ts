@@ -1,12 +1,109 @@
 import { DEFAULT_SEAT } from '@/seats/seatId'
-import { setWebMcpTarget } from '@/webmcp/contextBridge'
-import { runningDuel, stopDuel } from './duel'
+import { deepClone } from '@/utils/clone'
+import { getWebMcpContext, setWebMcpContext, setWebMcpTarget, } from '@/webmcp/contextBridge'
+import { duelActive, runningDuel, startDuel, stopDuel } from './duel'
 import { scoreSheetJudge } from './duelJudge'
+import { qualityRank } from './guard'
 import { clearNarration } from './narration'
-import { appendPilotLog, endPilot, notePilotSaveResult } from './pilot'
+import { agentDriving, appendPilotLog, endPilot, notePilotSaveResult, startPilot, } from './pilot'
+import { ALWAYS_ALLOWED, DUEL_ALLOWED, DUEL_STEP_BUDGET } from './topics'
 import type { DuelVerdict } from './duelJudge'
 import type { PilotEndReason } from './pilot'
 import type { CommandContext } from '@/commands/types'
+
+/**
+ * Who is in the other seat.
+ *
+ * `none` opens the split screen with nobody driving it. Everything else is
+ * the same duel — the same clock, the same dial, the same chips, the same
+ * ending — so the interface can be looked at, and changed, without a chat
+ * connected and a model round trip between every edit. It is a development
+ * affordance, not a game mode: there is no opponent, so there is nothing to
+ * win, and the hub only offers it where `SOLO_DUEL_AVAILABLE` says so.
+ */
+export type DuelOpponent = 'ai' | 'none'
+
+/**
+ * The one way a duel starts, whoever is in the other seat.
+ *
+ * Shared with the tool rather than reimplemented beside it: the 3D refusal,
+ * the mirrored rival flame, the recorder hand-off and the clock that ends the
+ * thing are exactly the parts a second entry point would drift on, and a solo
+ * duel that drifts is worthless for inspecting the real one.
+ */
+export function beginDuel(
+  ctx: CommandContext,
+  opts: {
+    seconds: number
+    rivalFrom?: 'mirror' | 'blank'
+    opponent: DuelOpponent
+  },
+): { ok: true; seconds: number; allowed: string[] } | { error: string } {
+  if (agentDriving()) {
+    return {
+      error: 'An Arcade session is already active. Finish or stop it first.',
+    }
+  }
+  if (duelActive()) return { error: 'A duel is already running.' }
+  const playerFlame = ctx.flameDescriptor()
+  if (playerFlame.renderSettings.dimensions === 3) {
+    return {
+      error:
+        'Duel runs on 2D flames only for now, and this flame is 3D: the split screen binds a 2D camera per side. Switch to 2D and start again.',
+    }
+  }
+  const solo = opts.opponent === 'none'
+  const rivalFlame = deepClone(playerFlame)
+  if (opts.rivalFrom === 'blank') {
+    rivalFlame.transforms = {}
+  }
+  const started = startDuel({
+    rivalFlame,
+    playerFlame,
+    durationMs: opts.seconds * 1000,
+    // The toggle lives in the recorder UI; both by default, which is what a
+    // duel worth replaying needs. A solo duel records neither side: it is an
+    // inspection pass, and it should not leave takes in the library.
+    recording: solo ? 'none' : 'both',
+    // Through the workspace's own facade, so the viewer's duel take begins
+    // with the same snapshot a take they started themselves would.
+    startPlayer: (now) => ctx.recorder?.start(now) ?? { ok: true },
+    // The clock is what ends a duel; the agent cannot. Resolve the context
+    // when it fires rather than capturing it, so a workspace that remounted
+    // mid-duel still ends on the live one.
+    onExpire: () => {
+      const player = getWebMcpContext('player')
+      if (player) void finishDuel(player, 'finished')
+    },
+  })
+  if (!started.ok) return { error: started.error }
+  const allowed = [...DUEL_ALLOWED, ...ALWAYS_ALLOWED]
+  if (!solo) {
+    const pilotResult = startPilot({
+      mode: 'duel',
+      title: 'Duelling you',
+      stepBudget: DUEL_STEP_BUDGET,
+      allowed,
+      qualityRankAtStart: qualityRank(ctx.arcade?.qualityPreset() ?? 'mid'),
+      seatId: 'rival',
+      lock: 'seat',
+    })
+    if (!pilotResult.ok) {
+      stopDuel()
+      return { error: pilotResult.error }
+    }
+    // The rival's context becomes what every tool reads, so execute_command,
+    // get_flame and the rest act on the AI's flame with no per-tool change.
+    // Solo leaves the bridge on the player: there is no agent to point at the
+    // other seat, and moving it would aim a stray tool call at a flame nobody
+    // is playing.
+    setWebMcpContext(started.rival.ctx, 'rival')
+    setWebMcpTarget('rival')
+  }
+  clearNarration()
+  ctx.arcade?.closeHub()
+  return { ok: true, seconds: opts.seconds, allowed }
+}
 
 export type DuelOutcome = {
   ok: true

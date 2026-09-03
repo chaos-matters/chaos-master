@@ -99,6 +99,17 @@ No tool writes `ctx.setFlameDescriptor` or `ctx.timeline.setTracks` directly.
   (`Duel: <title> — your flame` / `— the AI's flame`) and shows the verdict. 2D
   and still flames for now.
 
+  **Running one without an agent.** The Duel panel in the hub carries a "Start
+  without the AI" button under `pnpm dev` (and behind `VITE_SOLO_DUEL=1` for a
+  preview build). It opens the same split screen with nobody in the other seat:
+  no pilot, so no seat lock, no step budget and no narration rail; the tool
+  bridge stays pointed at your own flame; and neither side is recorded, so an
+  inspection leaves no takes in your library. Everything else — the clock, the
+  dial, the chips, the score sheet, the End button — behaves as it does in a
+  real duel, because both entry points go through the same `beginDuel`. It is
+  there so the interface can be worked on without a model round trip between
+  every change.
+
   The viewer's half carries its own editing surface: three chips on the top
   edge — Variations, Shape, Colour — each opening into a strip across that half
   only, and a toggle that steps the stage aside so the real sidebar comes

@@ -1,12 +1,8 @@
 import { describeAllowedCommands } from '@/arcade/commandHints'
-import { clampDuelSeconds, DEFAULT_DUEL_SECONDS, duelActive, duelRemainingMs, markDuelReady, MAX_DUEL_SECONDS, MIN_DUEL_SECONDS, runningDuel, startDuel, stopDuel, } from '@/arcade/duel'
-import { finishDuel } from '@/arcade/duelActions'
-import { qualityRank } from '@/arcade/guard'
-import { clearNarration } from '@/arcade/narration'
-import { agentDriving, startPilot } from '@/arcade/pilot'
-import { ALWAYS_ALLOWED, DUEL_ALLOWED, DUEL_STEP_BUDGET } from '@/arcade/topics'
-import { deepClone } from '@/utils/clone'
-import { getWebMcpContext, setWebMcpContext, setWebMcpTarget, } from '@/webmcp/contextBridge'
+import { clampDuelSeconds, DEFAULT_DUEL_SECONDS, duelRemainingMs, markDuelReady, MAX_DUEL_SECONDS, MIN_DUEL_SECONDS, runningDuel, } from '@/arcade/duel'
+import { beginDuel } from '@/arcade/duelActions'
+import { DUEL_STEP_BUDGET } from '@/arcade/topics'
+import { getWebMcpContext } from '@/webmcp/contextBridge'
 import type { WebMcpTool } from '@/webmcp/types'
 
 const NOT_READY = {
@@ -35,72 +31,24 @@ export const arcadeStartDuel: WebMcpTool = {
   execute: (input) => {
     const ctx = getWebMcpContext('player')
     if (!ctx) return NOT_READY
-    if (agentDriving()) {
-      return {
-        error: 'An Arcade session is already active. Finish or stop it first.',
-      }
-    }
-    if (duelActive()) return { error: 'A duel is already running.' }
-    const playerFlame = ctx.flameDescriptor()
-    if (playerFlame.renderSettings.dimensions === 3) {
-      return {
-        error:
-          'Duel runs on 2D flames only for now, and this flame is 3D: the split screen binds a 2D camera per side. Switch to 2D and start again.',
-      }
-    }
     const raw = (input ?? {}) as {
       durationSeconds?: unknown
       rivalFrom?: unknown
     }
     const seconds = clampDuelSeconds(raw.durationSeconds)
-    const rivalFlame = deepClone(playerFlame)
-    if (raw.rivalFrom === 'blank') {
-      rivalFlame.transforms = {}
-    }
-    const started = startDuel({
-      rivalFlame,
-      playerFlame,
-      durationMs: seconds * 1000,
-      // The toggle lives in the recorder UI; both by default, which is what a
-      // duel worth replaying needs.
-      recording: 'both',
-      // Through the workspace's own facade, so the viewer's duel take begins
-      // with the same snapshot a take they started themselves would.
-      startPlayer: (now) => ctx.recorder?.start(now) ?? { ok: true },
-      // The clock is what ends a duel; the agent cannot. Resolve the context
-      // when it fires rather than capturing it, so a workspace that remounted
-      // mid-duel still ends on the live one.
-      onExpire: () => {
-        const player = getWebMcpContext('player')
-        if (player) void finishDuel(player, 'finished')
-      },
+    // Everything a duel start does lives in `beginDuel`, so the hub's
+    // opponent-less variant cannot drift away from the real thing.
+    const started = beginDuel(ctx, {
+      seconds,
+      rivalFrom: raw.rivalFrom === 'blank' ? 'blank' : 'mirror',
+      opponent: 'ai',
     })
-    if (!started.ok) return { error: started.error }
-    const allowed = [...DUEL_ALLOWED, ...ALWAYS_ALLOWED]
-    const pilotResult = startPilot({
-      mode: 'duel',
-      title: 'Duelling you',
-      stepBudget: DUEL_STEP_BUDGET,
-      allowed,
-      qualityRankAtStart: qualityRank(ctx.arcade?.qualityPreset() ?? 'mid'),
-      seatId: 'rival',
-      lock: 'seat',
-    })
-    if (!pilotResult.ok) {
-      stopDuel()
-      return { error: pilotResult.error }
-    }
-    clearNarration()
-    // The rival's context becomes what every tool reads, so execute_command,
-    // get_flame and the rest act on the AI's flame with no per-tool change.
-    setWebMcpContext(started.rival.ctx, 'rival')
-    setWebMcpTarget('rival')
-    ctx.arcade?.closeHub()
+    if ('error' in started) return { error: started.error }
     return {
       ok: true,
-      durationSeconds: seconds,
+      durationSeconds: started.seconds,
       stepBudget: DUEL_STEP_BUDGET,
-      allowedCommands: describeAllowedCommands(allowed),
+      allowedCommands: describeAllowedCommands(started.allowed),
       tips: [
         "get_flame and execute_command now act on YOUR flame, not the viewer's.",
         'Aim for something striking rather than merely complicated; the score sheet rewards contrast and symmetry.',
