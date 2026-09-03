@@ -33,7 +33,7 @@
   justify-items: center;
   gap: 8px;
   /* The dial's own size; the stage is where a size control would write. */
-  --duel-dial-size: 132px;
+  --duel-dial-size: 180px;
 }
 
 .seats {

@@ -98,6 +98,16 @@ No tool writes `ctx.setFlameDescriptor` or `ctx.timeline.setTracks` directly.
   afterwards. Whoever ends it, `finishDuel` saves each side as its own take
   (`Duel: <title> — your flame` / `— the AI's flame`) and shows the verdict. 2D
   and still flames for now.
+
+  The viewer's half carries its own editing surface: three chips on the top
+  edge — Variations, Shape, Colour — each opening into a strip across that half
+  only, and a toggle that steps the stage aside so the real sidebar comes
+  through on the same store with the same undo. Every one of those controls
+  dispatches a registered command through the player's `CommandContext`, so a
+  duel take replays exactly like a Teach take and neither the guard nor the
+  recorder gained a surface. Shape shows scale, rotation, shear and offset
+  rather than the six matrix coefficients (`arcade/affineControls.ts`).
+
 - **Beats**, **Arena**, **Director** are on the hub as roadmap cards.
 
 While a whole-screen mode runs, the editor is locked behind a full-screen
@@ -106,7 +116,8 @@ banner shows the step counter and elapsed time, the right rail shows every
 step and narration line as it lands, keyboard shortcuts are disabled, and the
 recorder dock is hidden. Stop (or Escape twice) ends the take and still saves
 it. A Duel locks only the agent's seat (`lock: 'seat'`), so the viewer keeps
-their keyboard and their control strip while the clock runs.
+their keyboard and their control strip while the clock runs, and the agent's
+narration and step counter render in the duel's own HUD instead.
 
 ### Prompt cards
 
