@@ -14,12 +14,14 @@
  */
 
 import { agentDriving } from '@/arcade/pilot'
+import { DEFAULT_SEAT } from '@/seats/seatId'
 import { clearWebMcpContext, setWebMcpContext } from './contextBridge'
 import { MockModelContext } from './mockModelContext'
 import { allTools } from './tools'
 import { getModelContext } from './types'
 import type { WebMcpTool } from './types'
 import type { CommandContext } from '@/commands/types'
+import type { SeatId } from '@/seats/seatId'
 
 const isEnvelope = (r: unknown): r is { content: unknown[] } =>
   Boolean(
@@ -91,9 +93,12 @@ export const wrapTool = (tool: WebMcpTool): WebMcpTool => ({
  * @param cmdContext The live CommandContext from MainWorkspace.
  * @returns A cleanup function that tears down the bridge.
  */
-export function registerWebMcpTools(cmdContext: CommandContext): () => void {
+export function registerWebMcpTools(
+  cmdContext: CommandContext,
+  seatId: SeatId = DEFAULT_SEAT,
+): () => void {
   // 1. Install the bridge so tools can reach the app state.
-  setWebMcpContext(cmdContext)
+  setWebMcpContext(cmdContext, seatId)
 
   // 2. Feature-detect the WebMCP ModelContext.
   const modelContext = getModelContext()
@@ -133,7 +138,7 @@ export function registerWebMcpTools(cmdContext: CommandContext): () => void {
 
   // 4. Return cleanup.
   return () => {
-    clearWebMcpContext()
+    clearWebMcpContext(seatId)
     if (typeof window !== 'undefined') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (window as any).webmcp
