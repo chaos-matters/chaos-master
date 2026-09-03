@@ -933,3 +933,37 @@ describe('worker frontend routing', () => {
     expect(assetFetch).toHaveBeenCalledWith(request)
   })
 })
+
+describe('worker — CSP script nonce', () => {
+  const cspOf = async () =>
+    (
+      await worker.fetch(
+        post('https://x.test/api/shorten', { payload: 'abc' }),
+        makeEnv(),
+        ctx,
+      )
+    ).headers.get('Content-Security-Policy') ?? ''
+  const scriptSrc = (csp: string) =>
+    csp
+      .split(';')
+      .map((d) => d.trim())
+      .find((d) => d.startsWith('script-src ')) ?? ''
+
+  it('carries a fresh script-src nonce on every response', async () => {
+    // Cloudflare's bot detection ("JavaScript Detections") injects an inline
+    // <script> into the HTML it serves for this zone and copies the nonce it
+    // finds in the CSP response header onto that tag. Without one the browser
+    // refuses the script on every page load; a hash cannot work because the
+    // injected script embeds the request's ray id.
+    const a = scriptSrc(await cspOf())
+    const b = scriptSrc(await cspOf())
+    const nonce = /'nonce-([A-Za-z0-9+/]{22}==)'/
+    expect(a).toMatch(nonce)
+    expect(b).toMatch(nonce)
+    expect(a.match(nonce)?.[1]).not.toBe(b.match(nonce)?.[1])
+    // The nonce is the only inline allowance: scripts still get no
+    // 'unsafe-inline', and the app's own <script src> tags stay on 'self'.
+    expect(a).not.toContain("'unsafe-inline'")
+    expect(a).toContain("'self'")
+  })
+})
