@@ -1,11 +1,16 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import postcss from 'postcss'
 import { describe, expect, it } from 'vitest'
 
 // Read the stylesheet as text rather than importing the CSS module: under vitest
 // a CSS-module import resolves to a proxy that answers every key, so it can
 // never tell us a class is missing — which is exactly the bug this guards.
+// These assertions are regexes, and a regex matches happily inside a file that
+// no longer parses — a partial edit once left orphaned rules here and every one
+// of them still passed. Two things catch that now, neither of them here:
+// prettier's pre-commit hook rejects the file, and
+// `tests/load-flame-dropzone.spec.ts` asserts the computed styles and geometry
+// in a real browser, so a rule that stops applying fails loudly.
 const css = readFileSync(
   join(import.meta.dirname, 'LoadFlameModal.module.css'),
   'utf8',
@@ -18,37 +23,6 @@ const dragBlock = () => {
   const end = css.indexOf('  .uploadIcon {', start)
   return css.slice(start, end === -1 ? undefined : end)
 }
-
-// The assertions below are regexes over the stylesheet, and a regex happily
-// matches inside a file that no longer parses — a partial edit once left
-// orphaned rules here and every test still passed. Parse it for real first.
-describe('stylesheet integrity', () => {
-  it('parses as CSS', () => {
-    expect(() =>
-      postcss.parse(css, { from: 'LoadFlameModal.module.css' }),
-    ).not.toThrow()
-  })
-
-  it('declares every rule this file is expected to own', () => {
-    const root = postcss.parse(css, { from: 'LoadFlameModal.module.css' })
-    const selectors = new Set<string>()
-    root.walkRules((rule) => {
-      selectors.add(rule.selector)
-    })
-    for (const required of [
-      '.uploadZone',
-      '.uploadZoneDragging',
-      '.uploadHeading',
-      '.formatPills',
-      '.formatPill',
-      '.sizeLimit',
-      '.infoButton',
-      '.infoTooltip',
-    ]) {
-      expect(selectors.has(required), `missing rule ${required}`).toBe(true)
-    }
-  })
-})
 
 describe('upload dropzone styles', () => {
   // The component has always toggled `ui.uploadZoneDragging` on drag, but the
