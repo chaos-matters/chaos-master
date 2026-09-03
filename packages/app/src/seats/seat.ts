@@ -8,6 +8,7 @@ import { recorderStream } from '@/recorder/recorder'
 import { deepClone } from '@/utils/clone'
 import { createStoreHistory } from '@/utils/createStoreHistory'
 import { createTimelineState } from '@/utils/timeline'
+import { clearWebMcpContext } from '@/webmcp/contextBridge'
 import { DEFAULT_SEAT } from './seatId'
 import type { Accessor, Setter } from 'solid-js'
 import type { v2f } from 'typegpu/data'
@@ -65,7 +66,7 @@ export function createSeat(id: SeatId, initial: FlameDescriptor): Seat {
         },
       },
     )
-    const timeline = createTimelineState({ seatId: id })
+    const timeline = createTimelineState({ seatId: id, journal: false })
 
     const zoom = () => flame.renderSettings.camera.zoom
     const position = () => vec2f(...flame.renderSettings.camera.position)
@@ -118,6 +119,9 @@ export function createSeat(id: SeatId, initial: FlameDescriptor): Seat {
       setPosition,
       dispose: () => {
         stream.cancel()
+        // The bridge is a module-level map: a context left behind here points
+        // at a disposed root for the rest of the page's life.
+        clearWebMcpContext(id)
         disposeRoot()
       },
     }
