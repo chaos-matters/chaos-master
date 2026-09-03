@@ -1,9 +1,10 @@
 import '@/commands/builtins'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { examples } from '@/flame/examples'
 import { isTimelineParameterPath, MAX_TIMELINE_FRAME, MAX_TIMELINE_KEYFRAMES, MAX_TIMELINE_PARAMETER_PATH_LENGTH, MAX_TIMELINE_PLAYBACK_FPS, MAX_TIMELINE_TIME_SCALE, tryValidateTimelineSnapshot, } from '@/flame/schema/timeline'
+import { recorderStream } from '@/recorder/recorder'
 import { snapshotOrigin } from '@/recorder/snapshotOrigin'
-import { createMockCommandContext } from '@/webmcp/testUtils'
+import { createMockCommandContext, createTestFlame } from '@/webmcp/testUtils'
 import { executeCommand, getAllCommands, hasExplicitReplayPolicy, preflightLiveCommand, preflightReplayCommand, registerCommand, } from './registry'
 import type { CommandContext } from './types'
 
@@ -375,5 +376,42 @@ describe('preflightLiveCommand', () => {
   it('passes ordinary args through unchanged', () => {
     const result = preflightLiveCommand('flame.setExposure', ctx, [0.4])
     expect(result).toEqual({ args: [0.4] })
+  })
+})
+
+describe('command recording is routed by seat', () => {
+  const flame = createTestFlame()
+
+  afterEach(() => {
+    recorderStream('player').cancel()
+    recorderStream('rival').cancel()
+  })
+
+  it('records into the stream named by the context', () => {
+    const rival = recorderStream('rival')
+    const player = recorderStream('player')
+    player.start(flame)
+    rival.start(flame)
+    const ctx = createMockCommandContext()
+    ctx.seatId = 'rival'
+
+    executeCommand('flame.setExposure', ctx, 0.42)
+
+    expect(rival.actionCount()).toBe(1)
+    expect(player.actionCount()).toBe(0)
+    player.cancel()
+    expect(rival.stop()?.actions[0]?.id).toBe('flame.setExposure')
+  })
+
+  it('records into the player stream when the context names no seat', () => {
+    const player = recorderStream('player')
+    player.start(flame)
+    const ctx = createMockCommandContext()
+    expect(ctx.seatId).toBeUndefined()
+
+    executeCommand('flame.setExposure', ctx, 0.42)
+
+    expect(player.actionCount()).toBe(1)
+    player.cancel()
   })
 })

@@ -1,5 +1,6 @@
 import { isSafeFlameEntityId, renderSettingsDefault, } from '@/flame/schema/flameSchema'
-import { recordCommandExecution } from '@/recorder/recorder'
+import { recorderStream } from '@/recorder/recorder'
+import { DEFAULT_SEAT } from '@/seats/seatId'
 import { IS_DEV } from '../defaults'
 import type { CommandContext, FlameCommand, ReplayArgsValidator } from './types'
 
@@ -459,9 +460,16 @@ function runCommand(
   args: unknown[],
 ): void {
   const finalArgs = cmd.normalizeArgs ? cmd.normalizeArgs(ctx, args) : args
-  recordCommandExecution(cmd, finalArgs, () => {
-    cmd.execute(ctx, ...finalArgs)
-  })
+  // The seat decides which log the action lands in. Everything the workspace
+  // dispatches carries no seat and therefore lands in the player's, which is
+  // what every caller before duels meant.
+  recorderStream(ctx.seatId ?? DEFAULT_SEAT).recordCommandExecution(
+    cmd,
+    finalArgs,
+    () => {
+      cmd.execute(ctx, ...finalArgs)
+    },
+  )
 }
 
 export function executeCommand(

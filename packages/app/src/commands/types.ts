@@ -6,6 +6,7 @@ import type { TimelineSnapshot } from '@/flame/schema/timeline'
 import type { SessionRecordingStartResult } from '@/recorder/recorder'
 import type { RecordedSession, TransformColorSnapshot } from '@/recorder/schema'
 import type { SonificationSnapshot } from '@/recorder/sonificationState'
+import type { SeatId } from '@/seats/seatId'
 import type { HistorySetter } from '@/utils/createStoreHistory'
 import type { TimelineTrack } from '@/utils/timeline'
 import type { UndoTarget } from '@/utils/undoRouting'
@@ -18,6 +19,13 @@ type KeyframeValue =
   | [number, number, number, number]
 
 export interface CommandContext {
+  /**
+   * Which seat this context edits. Absent means the workspace's own seat,
+   * which is every context that existed before duels: the recorder routes a
+   * command's action to `recorderStream(seatId ?? DEFAULT_SEAT)`, so a
+   * sandbox or a test that never sets it keeps recording where it always did.
+   */
+  seatId?: SeatId
   /**
    * Live-dispatch boundary invoked before an in-app command mutates any
    * subsystem. The workspace uses it to hand an in-flight timed replay back
