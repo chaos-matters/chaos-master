@@ -72,7 +72,7 @@
 
 .panel {
   width: 100%;
-  max-height: min(230px, 34vh);
+  height: min(230px, 34vh);
   display: grid;
   grid-template-rows: auto 1fr;
   gap: 10px;
@@ -468,7 +468,6 @@
 .swatch {
   position: relative;
   flex: none;
-  width: 93px;
   display: grid;
   gap: 4px;
   padding: 0;
@@ -574,10 +573,6 @@
   cursor: grab;
 }
 
-.speedTrack {
-  accent-color: rgba(255, 255, 255, 0.55);
-}
-
 .speedField .fieldLabel,
 .speedField .fieldValue {
   opacity: 0.55;
@@ -640,4 +635,37 @@
   .shapeCanvas {
     display: none;
   }
+}
+
+/* Divides what this transform has from what it could have. */
+.tileRule {
+  flex: none;
+  align-self: stretch;
+  width: 1px;
+  margin: 4px 4px 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.16) 30%,
+    rgba(255, 255, 255, 0.16) 70%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+/* Bigger than a chip and closer to the mock's, now that the panel is a fixed
+   height and the strip is what has room to grow into it. */
+.swatch {
+  width: auto;
+}
+
+.swatchBand {
+  height: 56px;
+  width: auto;
+}
+
+/* Colour position is the control a player reaches for; Speed is its dimmer
+   companion. A white filled track made the lesser of the two the brightest
+   object in the panel. */
+.speedTrack {
+  accent-color: rgba(255, 255, 255, 0.3);
 }

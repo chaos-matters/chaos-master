@@ -49,9 +49,10 @@
 */
 .narrationSlot {
   position: absolute;
-  top: calc(100% + var(--duel-dial-size) * 0.44);
+  bottom: 14px;
   left: 50%;
   transform: translateX(-50%);
+  z-index: 1;
   /* `max-content`, because an absolutely positioned box otherwise shrinks to
      its containing block — which is the dial, and the dial is 200px wide. The
      narration was being cut to a 70px column. */

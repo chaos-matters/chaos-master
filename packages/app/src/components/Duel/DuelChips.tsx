@@ -362,11 +362,10 @@ function VariationsPanel(props: {
   const [query, setQuery] = createSignal('')
   const entries = () => Object.entries(props.transform.variations)
   const present = () => new Set(entries().map(([, v]) => v.type))
+  const rest = () => CATALOGUE.filter((type) => !present().has(type))
   const matches = () =>
-    CATALOGUE.filter(
-      (type) =>
-        !present().has(type) &&
-        readableType(type).toLowerCase().includes(query().trim().toLowerCase()),
+    rest().filter((type) =>
+      readableType(type).toLowerCase().includes(query().trim().toLowerCase()),
     )
 
   return (
@@ -427,11 +426,26 @@ function VariationsPanel(props: {
                     />
                   )}
                 </For>
-                <Show when={entries().length === 0}>
-                  <p class={ui.empty}>
-                    This transform has no variations yet. Add one.
-                  </p>
+                {/* Then everything you could add. A panel listing only what
+                    a transform already has is emptiest exactly when you most
+                    need it: one variation opened a 790px slab to show one
+                    tile. The catalogue is the rest of the row. */}
+                <Show when={rest().length > 0}>
+                  <span class={ui.tileRule} aria-hidden="true" />
                 </Show>
+                <For each={rest()}>
+                  {(type) => (
+                    <VariationTile
+                      type={type}
+                      name={readableType(type)}
+                      active={false}
+                      paused={props.paused}
+                      onPrimary={() => {
+                        props.onAdd(type)
+                      }}
+                    />
+                  )}
+                </For>
               </>
             }
           >
