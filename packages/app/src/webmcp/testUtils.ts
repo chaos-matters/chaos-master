@@ -121,6 +121,27 @@ export function createMockCommandContext(): CommandContext {
     camera: {
       center: vi.fn(),
     },
+    // Present so commands whose normalizeArgs expands a boolean into the
+    // bounded snapshot replay needs can be exercised without a workspace.
+    sonification: {
+      snapshot: () => ({
+        version: 1 as const,
+        enabled: false,
+        config: {
+          model: 'orchestral' as const,
+          volume: 0.3,
+          updateRate: 20,
+          scale: 'pentatonicMajor' as const,
+          voiceCount: 8,
+          harmonicDensity: 1,
+          triggerRate: 4,
+          spatialSpread: 0.7,
+          reverbMix: 0.3,
+        },
+      }),
+      setConfig: vi.fn(),
+      setEnabled: vi.fn(),
+    },
     modal: {
       open: vi.fn(),
     },

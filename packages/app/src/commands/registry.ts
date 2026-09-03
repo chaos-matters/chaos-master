@@ -501,6 +501,55 @@ export function preflightReplayCommand(
 }
 
 /**
+ * Validate one command an agent is about to run live.
+ *
+ * The replay policy is the right standard — whatever the agent runs is
+ * recorded, and a recorded action has to survive replay — but it must be
+ * applied to the args that will actually be recorded, which is what
+ * `normalizeArgs` produces. Checking the raw args instead makes every command
+ * whose whole job is normalization unreachable: `flame.mutate` mints its seed
+ * there, `sonification.setEnabled` turns a boolean into the bounded snapshot
+ * replay needs, and both refuse an agent that passes exactly what their own
+ * argument shape advertises.
+ *
+ * The size guard still runs first, on the raw args, so nothing hostile is
+ * allocated before it — which is the reason `preflightReplayCommand` checks
+ * before normalizing on the replay path, and that path is unchanged.
+ */
+export function preflightLiveCommand(
+  id: string,
+  ctx: CommandContext,
+  args: readonly unknown[],
+): { error: string } | { args: unknown[] } {
+  const cmd = commandRegistry.get(id)
+  if (!cmd) return { error: `Unknown command "${id}"` }
+  if (cmd.replayable === false)
+    return { error: `${cmd.label} is not replayable` }
+  const validator =
+    cmd.validateReplayArgs ??
+    (Object.hasOwn(REPLAY_ARG_POLICIES, id)
+      ? REPLAY_ARG_POLICIES[id]
+      : undefined)
+  if (!validator) return { error: `${cmd.label} has no explicit replay policy` }
+  const budgetError = replayArgBudgetError(args)
+  if (budgetError !== undefined) return { error: budgetError }
+  let normalized: unknown[]
+  try {
+    normalized = cmd.normalizeArgs
+      ? cmd.normalizeArgs(ctx, [...args])
+      : [...args]
+  } catch (error) {
+    return {
+      error: `Could not prepare arguments: ${error instanceof Error ? error.message : String(error)}`,
+    }
+  }
+  const policyError = replayArgBudgetError(normalized) ?? validator(normalized)
+  return policyError === undefined
+    ? { args: normalized }
+    : { error: policyError }
+}
+
+/**
  * Execute one action loaded from a `.steps.json` file.
  *
  * Unlike ordinary in-app dispatch, this rejects unknown commands and applies
