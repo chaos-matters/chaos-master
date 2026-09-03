@@ -45,7 +45,7 @@ export const arcadeStatus: WebMcpTool = {
 export const arcadeStartLesson: WebMcpTool = {
   name: 'arcade_start_lesson',
   description:
-    'Start a Teach session: locks the editor, starts recording, and returns the lesson brief (goal, allowed commands with their argument shapes, step budget). Topics: variations, affine, color, camera. Then use arcade_narrate and execute_command, and finish with arcade_end_lesson.',
+    'Start a Teach session: locks the editor, starts recording, and returns the lesson brief (goal, allowed commands with their argument shapes, step budget). Topics: variations, affine, color, camera, genetics, sonification, render. Then use arcade_narrate and execute_command, and finish with arcade_end_lesson.',
   inputSchema: {
     type: 'object',
     properties: {

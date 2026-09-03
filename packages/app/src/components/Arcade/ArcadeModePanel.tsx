@@ -1,5 +1,5 @@
 import { createSignal, For, Match, onMount, Show, Switch } from 'solid-js'
-import { cinemaPromptCard, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, } from '@/arcade/topics'
+import { CINEMA_PRESETS, cinemaPromptCard, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, } from '@/arcade/topics'
 import { Copy, Cross } from '@/icons'
 import ui from './ArcadeHub.module.css'
 import type { TopicId } from '@/arcade/topics'
@@ -117,9 +117,27 @@ export function ArcadeModePanel(props: {
         </Match>
         <Match when={props.mode === 'cinema'}>
           <p>
-            Describe the move you want. The AI reads your flame, keyframes it,
-            and plays it back.
+            Describe the move you want, or start from one of these. The AI reads
+            your flame, keyframes it, and plays it back.
           </p>
+          <div class={ui.chips} aria-label="Animation presets">
+            <For each={CINEMA_PRESETS}>
+              {(preset) => (
+                <button
+                  type="button"
+                  classList={{
+                    [ui.chip!]: true,
+                    [ui.chipActive!]: description() === preset.wish,
+                  }}
+                  // Fills the field rather than replacing it: the preset is a
+                  // starting sentence the viewer can edit, not a mode.
+                  onClick={() => setDescription(preset.wish)}
+                >
+                  {preset.label}
+                </button>
+              )}
+            </For>
+          </div>
           <label class={ui.field}>
             <span>Describe the animation</span>
             <textarea
