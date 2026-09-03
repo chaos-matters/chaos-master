@@ -2,37 +2,66 @@
  * Module-global seam between the WebMCP tool layer and the workspace.
  *
  * Follows the same pattern as `recorder/documentWriteHook.ts`: this module
- * imports nothing, which is the whole point — it breaks the import cycle
- * between the WebMCP tools (which need the CommandContext to dispatch
+ * imports nothing but types, which is the whole point — it breaks the import
+ * cycle between the WebMCP tools (which need the CommandContext to dispatch
  * commands) and MainWorkspace (which constructs the CommandContext but must
  * not be imported by the tools).
  *
  * MainWorkspace installs the live context via `setWebMcpContext` after
- * building its `cmdContext`. The tools read it via `getWebMcpContext`.
- * Until the context is installed, tool calls return errors gracefully.
+ * building its `cmdContext`; a duel installs a second one for its rival seat
+ * and moves the target. The tools read it via `getWebMcpContext`. Until a
+ * context is installed, tool calls return errors gracefully.
  */
 
+import { DEFAULT_SEAT } from '@/seats/seatId'
 import type { CommandContext } from '@/commands/types'
+import type { SeatId } from '@/seats/seatId'
 
-let context: CommandContext | undefined
+const contexts = new Map<SeatId, CommandContext>()
 
-/** Install the live CommandContext. Called once from MainWorkspace. */
-export function setWebMcpContext(ctx: CommandContext): void {
-  context = ctx
+/**
+ * Which seat the tools act on.
+ *
+ * Every tool reads `getWebMcpContext()` with no argument, so moving this is
+ * how a duel points the whole tool surface at the rival's flame without
+ * touching a single tool. It returns to the player whenever the targeted
+ * seat is cleared, and `finishPilot` resets it when a session ends.
+ */
+let target: SeatId = DEFAULT_SEAT
+
+/** Install the live CommandContext for a seat. Called from MainWorkspace for
+ *  the player, and from the duel for the rival. */
+export function setWebMcpContext(
+  ctx: CommandContext,
+  seatId: SeatId = DEFAULT_SEAT,
+): void {
+  contexts.set(seatId, ctx)
 }
 
 /**
- * Read the live CommandContext.
+ * Read a seat's live CommandContext; with no argument, the current target.
  *
- * Returns `undefined` before MainWorkspace mounts or after it unmounts.
- * Tool implementations must handle the missing-context case with a
- * descriptive error so the LLM can self-correct.
+ * Returns `undefined` before MainWorkspace mounts or after it unmounts. Tool
+ * implementations must handle the missing-context case with a descriptive
+ * error so the LLM can self-correct.
  */
-export function getWebMcpContext(): CommandContext | undefined {
-  return context
+export function getWebMcpContext(seatId?: SeatId): CommandContext | undefined {
+  return contexts.get(seatId ?? target)
 }
 
-/** Tear down the bridge. Called from MainWorkspace's `onCleanup`. */
-export function clearWebMcpContext(): void {
-  context = undefined
+/** Tear down one seat's bridge entry. Called from MainWorkspace's `onCleanup`
+ *  and when a duel disposes its rival seat. */
+export function clearWebMcpContext(seatId: SeatId = DEFAULT_SEAT): void {
+  contexts.delete(seatId)
+  // A target pointing at a seat that no longer exists would make every tool
+  // report "workspace not ready" with no way back.
+  if (target === seatId) target = DEFAULT_SEAT
+}
+
+export function setWebMcpTarget(seatId: SeatId): void {
+  target = seatId
+}
+
+export function getWebMcpTarget(): SeatId {
+  return target
 }
