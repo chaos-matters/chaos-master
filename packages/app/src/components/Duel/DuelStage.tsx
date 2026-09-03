@@ -1,10 +1,13 @@
 import { createEffect, createMemo, createSignal, onCleanup, Show, } from 'solid-js'
-import { duelRemainingMs, runningDuel } from '@/arcade/duel'
+import { duelReady, duelRemainingMs, runningDuel } from '@/arcade/duel'
 import { finishDuel } from '@/arcade/duelActions'
+import { duelHudModel } from '@/arcade/duelHud'
 import { scoreSheetJudge } from '@/arcade/duelJudge'
-import { formatElapsed } from '@/components/Arcade/pilotFormat'
+import { drivingState } from '@/arcade/pilot'
 import { DuelControls } from './DuelControls'
+import { DuelNarration } from './DuelNarration'
 import ui from './DuelStage.module.css'
+import { EclipseHud } from './EclipseHud'
 import { SeatView } from './SeatView'
 import type { Accessor, Signal } from 'solid-js'
 import type { v2f } from 'typegpu/data'
@@ -16,8 +19,11 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
  *
  * Mounted over the workspace, whose own canvas is parked while this is up, so
  * the player's flame renders once rather than twice. The clock here only
- * *displays* the time left; the ending is scheduled in `startDuel`, so a
- * modal covering the stage cannot leave the duel running forever.
+ * *displays* the time left; the ending is scheduled in `startDuel`, so a modal
+ * covering the stage cannot leave the duel running forever.
+ *
+ * The HUD is deliberately one centred object rather than a full-width bar: the
+ * two flames are the point, and a bar across the top crops both of them.
  */
 export function DuelStage(props: {
   ctx: CommandContext
@@ -27,6 +33,7 @@ export function DuelStage(props: {
   quality: number
 }) {
   const [remaining, setRemaining] = createSignal(duelRemainingMs())
+  const [ending, setEnding] = createSignal(false)
 
   createEffect(() => {
     if (!runningDuel()) return
@@ -44,29 +51,30 @@ export function DuelStage(props: {
     return scoreSheetJudge.judge(props.playerFlame(), state.rival.flame())
   })
 
+  const model = createMemo(() =>
+    duelHudModel({
+      remainingMs: remaining(),
+      durationMs: runningDuel()?.durationMs ?? 0,
+      verdict: verdict(),
+      readyTitle: duelReady()?.title,
+    }),
+  )
+
+  const end = () => {
+    if (ending()) return
+    setEnding(true)
+    void finishDuel(props.ctx, 'stopped').finally(() => setEnding(false))
+  }
+
   return (
     <Show when={runningDuel()}>
       {(state) => (
         <div class={ui.stage} aria-label="Duel">
-          <header class={ui.clockBar}>
-            <span class={ui.clock} aria-label="Time remaining">
-              {formatElapsed(remaining())}
-            </span>
-            <span class={ui.score}>
-              {verdict()?.playerScore ?? 0} - {verdict()?.rivalScore ?? 0}
-            </span>
-            <button
-              type="button"
-              class={ui.stop}
-              onClick={() => void finishDuel(props.ctx, 'stopped')}
-            >
-              End the duel
-            </button>
-          </header>
           <div class={ui.seats}>
             <div class={ui.side}>
               <SeatView
                 label="Your flame"
+                side="player"
                 flame={props.playerFlame}
                 zoom={props.playerZoom}
                 position={props.playerPosition}
@@ -78,6 +86,7 @@ export function DuelStage(props: {
             <div class={ui.side}>
               <SeatView
                 label="The AI's flame"
+                side="rival"
                 flame={state().rival.flame}
                 zoom={[state().rival.zoom, state().rival.setZoom]}
                 position={[state().rival.position, state().rival.setPosition]}
@@ -85,6 +94,10 @@ export function DuelStage(props: {
                 interactive={false}
               />
             </div>
+          </div>
+          <div class={ui.hudSlot}>
+            <EclipseHud model={model()} onEnd={end} ending={ending()} />
+            <DuelNarration driving={drivingState()} />
           </div>
         </div>
       )}

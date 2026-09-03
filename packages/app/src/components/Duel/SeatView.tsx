@@ -17,6 +17,7 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
  */
 export function SeatView(props: {
   label: string
+  side: 'player' | 'rival'
   flame: Accessor<FlameDescriptor>
   zoom: Signal<number>
   position: Signal<v2f>
@@ -25,7 +26,15 @@ export function SeatView(props: {
 }) {
   return (
     <section class={ui.seat} aria-label={props.label}>
-      <h3 class={ui.seatLabel}>{props.label}</h3>
+      <h3
+        class={ui.seatLabel}
+        classList={{
+          [ui.playerLabel!]: props.side === 'player',
+          [ui.rivalLabel!]: props.side === 'rival',
+        }}
+      >
+        {props.label}
+      </h3>
       <AutoCanvas
         class={ui.seatCanvas}
         role="img"

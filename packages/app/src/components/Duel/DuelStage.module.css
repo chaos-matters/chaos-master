@@ -4,66 +4,82 @@
   /* Below the pilot lock (10010) so a seat-scoped shield still sits on top of
      the agent's half, above the workspace chrome. */
   z-index: 10008;
-  display: grid;
-  grid-template-rows: auto 1fr;
   background: rgba(4, 6, 12, 0.92);
   color: #f4f6ff;
 }
 
-.clockBar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 24px;
-  padding: 10px 16px;
-}
-
-.clock {
-  font-variant-numeric: tabular-nums;
-  font-size: 1.6rem;
-}
-
-.score {
-  font-variant-numeric: tabular-nums;
-  opacity: 0.75;
-}
-
-.stop {
-  padding: 8px 14px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.06);
-  color: inherit;
-  cursor: pointer;
+/*
+  The HUD floats over the seam rather than sitting in a row of its own: a
+  full-width bar would crop both flames, and the flames are the point.
+*/
+.hudSlot {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  /* The dial's own size; the stage is where a size control would write. */
+  --duel-dial-size: 132px;
 }
 
 .seats {
+  position: absolute;
+  inset: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  padding: 0 12px 12px;
+  padding: 12px;
   min-height: 0;
 }
 
 .side {
+  position: relative;
   display: grid;
-  grid-template-rows: 1fr auto;
-  gap: 8px;
   min-height: 0;
 }
 
 .seat {
+  position: relative;
   display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 6px;
   min-height: 0;
 }
 
+/*
+  A pill centred over its own half, level with the top of the dial, so the two
+  names and the VS read as one line across the seam.
+*/
 .seatLabel {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
   margin: 0;
-  font-size: 0.85rem;
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(4, 6, 12, 0.55);
+  backdrop-filter: blur(6px);
+  font-size: 0.78rem;
   font-weight: 500;
-  opacity: 0.8;
+  white-space: nowrap;
+  /* The pill sits over a live canvas the viewer drags to pan. */
+  pointer-events: none;
+}
+
+/* Each side is tinted like its arc on the dial, so a glance at the ring and a
+   glance at the pills agree about who is who. */
+.playerLabel {
+  border-color: rgba(246, 179, 82, 0.45);
+  color: #f6d7a8;
+}
+
+.rivalLabel {
+  border-color: rgba(111, 210, 240, 0.45);
+  color: #bfe9f7;
 }
 
 .seatCanvas {
@@ -74,6 +90,11 @@
 }
 
 .controls {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -101,5 +122,12 @@
   .seats {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr 1fr;
+  }
+
+  /* Stacked, the seam runs horizontally, so the dial sits on it rather than
+     over the top flame. */
+  .hudSlot {
+    top: 50%;
+    transform: translate(-50%, -50%);
   }
 }
