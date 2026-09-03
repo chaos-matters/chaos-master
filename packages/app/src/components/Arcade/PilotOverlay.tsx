@@ -87,56 +87,61 @@ export function PilotOverlay(props: {
     <>
       <Show when={drivingState()}>
         {(state) => (
-          <div
-            class={ui.shield}
-            role="dialog"
-            aria-modal="true"
-            aria-label="AI is driving the editor"
-          >
-            <div class={ui.banner}>
-              <Robot class={ui.icon} aria-hidden="true" />
-              <div class={ui.titleBlock}>
-                <div class={ui.title}>{state().title}</div>
-                <div class={ui.meta}>
-                  step {state().steps} of {state().stepBudget} ·{' '}
-                  {formatElapsed(elapsed())} · recording
-                </div>
-              </div>
-              <button
-                type="button"
-                class={ui.stop}
-                onClick={stop}
-                aria-label="Stop the AI and keep what was recorded"
-              >
-                <Stop aria-hidden="true" />
-                {escArmed() ? 'Press Esc again to stop' : 'Stop'}
-              </button>
-            </div>
-            <aside
-              class={ui.rail}
-              aria-label="Steps so far"
-              aria-live="polite"
-              ref={railEl}
+          // A seat-scoped lock covers only the agent's half of a duel, and the
+          // duel stage draws that half itself — a full-screen shield here
+          // would also lock the viewer out of the seat they are playing.
+          <Show when={state().lock === 'screen'}>
+            <div
+              class={ui.shield}
+              role="dialog"
+              aria-modal="true"
+              aria-label="AI is driving the editor"
             >
-              <For each={pilotLog()}>
-                {(entry) => (
-                  <div
-                    classList={{
-                      [ui.entry!]: true,
-                      [ui.narrate!]: entry.kind === 'narrate',
-                      [ui.error!]: entry.kind === 'error',
-                      [ui.system!]: entry.kind === 'system',
-                    }}
-                  >
-                    {entry.text}
+              <div class={ui.banner}>
+                <Robot class={ui.icon} aria-hidden="true" />
+                <div class={ui.titleBlock}>
+                  <div class={ui.title}>{state().title}</div>
+                  <div class={ui.meta}>
+                    step {state().steps} of {state().stepBudget} ·{' '}
+                    {formatElapsed(elapsed())} · recording
                   </div>
-                )}
-              </For>
-            </aside>
-            <div class={ui.hint}>
-              You are watching. Press Esc twice or Stop to take over.
+                </div>
+                <button
+                  type="button"
+                  class={ui.stop}
+                  onClick={stop}
+                  aria-label="Stop the AI and keep what was recorded"
+                >
+                  <Stop aria-hidden="true" />
+                  {escArmed() ? 'Press Esc again to stop' : 'Stop'}
+                </button>
+              </div>
+              <aside
+                class={ui.rail}
+                aria-label="Steps so far"
+                aria-live="polite"
+                ref={railEl}
+              >
+                <For each={pilotLog()}>
+                  {(entry) => (
+                    <div
+                      classList={{
+                        [ui.entry!]: true,
+                        [ui.narrate!]: entry.kind === 'narrate',
+                        [ui.error!]: entry.kind === 'error',
+                        [ui.system!]: entry.kind === 'system',
+                      }}
+                    >
+                      {entry.text}
+                    </div>
+                  )}
+                </For>
+              </aside>
+              <div class={ui.hint}>
+                You are watching. Press Esc twice or Stop to take over.
+              </div>
             </div>
-          </div>
+          </Show>
         )}
       </Show>
       <Show when={agentDriving()}>

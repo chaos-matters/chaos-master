@@ -1,0 +1,98 @@
+.stage {
+  position: fixed;
+  inset: 0;
+  /* Below the pilot lock (10010) so a seat-scoped shield still sits on top of
+     the agent's half, above the workspace chrome. */
+  z-index: 10008;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: rgba(4, 6, 12, 0.92);
+  color: #f4f6ff;
+}
+
+.clockBar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 10px 16px;
+}
+
+.clock {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.6rem;
+}
+
+.score {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.stop {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+}
+
+.seats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 0 12px 12px;
+  min-height: 0;
+}
+
+.side {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 8px;
+  min-height: 0;
+}
+
+.seat {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 6px;
+  min-height: 0;
+}
+
+.seatLabel {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.seatCanvas {
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.control {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+}
+
+@media (max-width: 900px) {
+  .seats {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+}
