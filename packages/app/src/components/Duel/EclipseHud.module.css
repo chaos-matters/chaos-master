@@ -48,26 +48,36 @@
   place-items: center;
 }
 
-/* The artwork is suppressed in a wide halo so the dial reads as cut into the
-   picture rather than floating on top of it. */
+/*
+  The artwork is suppressed in a halo so the dial reads as cut into the picture
+  rather than floating on top of it.
+
+  `closest-side` is load-bearing. A bare `radial-gradient(circle, ...)` means
+  farthest-CORNER, which lays the ramp out over the box's half-diagonal while
+  `border-radius: 50%` clips at the half-width — so the fade was guillotined at
+  three-quarters opacity and the halo ended in a hard circular seam nearly
+  twice the width of the dial. Pure black, too: rgba(4,6,12) at that alpha
+  composites LIGHTER than the near-black artwork it was meant to darken.
+*/
 .vignette {
   position: absolute;
-  width: 190%;
-  height: 190%;
+  width: 150%;
+  height: 150%;
   border-radius: 50%;
   background: radial-gradient(
-    circle,
-    rgba(4, 6, 12, 0.92) 0 62%,
-    rgba(4, 6, 12, 0.55) 78%,
-    rgba(4, 6, 12, 0) 100%
+    circle closest-side,
+    rgba(0, 0, 0, 0.92) 0 74%,
+    rgba(0, 0, 0, 0.5) 88%,
+    rgba(0, 0, 0, 0) 100%
   );
   pointer-events: none;
 }
 
 .ring {
   position: absolute;
-  /* The bezel sits at 109.4% of the radius and the bloom reaches past it, so
-     the drawing is wider than the ring it is named for. */
+  /* 464 viewBox units over a 407-unit score ring: this is what makes the ring
+     render at exactly `--duel-dial-size`. The bloom paints past the box and is
+     let out by `overflow: visible`. */
   width: 114%;
   height: 114%;
   overflow: visible;
@@ -124,11 +134,13 @@
   opacity: 0.5;
 }
 
-/* The one line that makes it an instrument rather than a progress ring. */
+/* The one line that makes it an instrument rather than a progress ring — at a
+   twentieth of the weight it had, which is the budget the mock allows for
+   anything that is not the arc itself. */
 .bezel {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.45);
-  stroke-width: 1.5;
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 1;
 }
 
 .tickMinor {
@@ -226,7 +238,7 @@
 }
 
 .urgent .bezel {
-  stroke: rgba(255, 157, 122, 0.55);
+  stroke: rgba(255, 157, 122, 0.14);
 }
 
 @media (prefers-reduced-motion: reduce) {
