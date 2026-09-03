@@ -1,7 +1,7 @@
 import '@/commands/builtins'
 import { describe, expect, it } from 'vitest'
 import { getAllCommands } from '@/commands/registry'
-import { ALWAYS_ALLOWED, CINEMA_ALLOWED, CINEMA_PRESETS, cinemaPromptCard, isTopicId, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, } from './topics'
+import { ALWAYS_ALLOWED, CINEMA_ALLOWED, CINEMA_PRESETS, cinemaPromptCard, DUEL_ALLOWED, DUEL_STEP_BUDGET, duelPromptCard, isTopicId, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, WEBMCP_FALLBACK_NOTE, } from './topics'
 
 describe('lesson topics', () => {
   it('has every topic with a goal, a budget and an allow-list', () => {
@@ -107,5 +107,23 @@ describe('lesson topics', () => {
     expect(cinema).toContain('slow zoom into the core')
     expect(cinema).toContain('arcade_set_keyframes')
     expect(CINEMA_ALLOWED).toContain('timeline.')
+  })
+})
+
+describe('duel', () => {
+  it('lets a duel edit the flame and the camera, and nothing else', () => {
+    expect(DUEL_ALLOWED).toContain('flame.')
+    expect(DUEL_ALLOWED).toContain('camera.')
+    expect(DUEL_ALLOWED).not.toContain('timeline.')
+    expect(DUEL_ALLOWED).not.toContain('view.')
+    expect(DUEL_STEP_BUDGET).toBeGreaterThan(20)
+  })
+
+  it('gives the duel prompt card the clock and the tools', () => {
+    const card = duelPromptCard(180)
+    expect(card).toContain('arcade_start_duel')
+    expect(card).toContain('arcade_end_duel')
+    expect(card).toContain('3 minutes')
+    expect(card).toContain(WEBMCP_FALLBACK_NOTE)
   })
 })

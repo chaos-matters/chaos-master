@@ -229,3 +229,24 @@ export function cinemaPromptCard(description: string): string {
 
 ${WEBMCP_FALLBACK_NOTE}`
 }
+
+/**
+ * What an agent may do in a duel.
+ *
+ * Flame and camera only. No `timeline.` — a duel is judged on a still, and an
+ * animation running on one half while the viewer works on the other is noise
+ * and GPU cost. No `view.` or `sidebar.` — those are the viewer's chrome, and
+ * the agent's seat has none. The guard's existing locks (point count,
+ * dimensions, quality, exports, history) apply on top.
+ */
+export const DUEL_ALLOWED = ['flame.', 'camera.'] as const
+
+export const DUEL_STEP_BUDGET = 60
+
+export function duelPromptCard(seconds: number): string {
+  const minutes = Math.round((seconds / 60) * 10) / 10
+  const clock = minutes === 1 ? '1 minute' : `${minutes} minutes`
+  return `Duel me in Lumen Apeiron. Call arcade_start_duel to begin: we each get ${clock} and our own flame, side by side, and I am editing mine while you edit yours. Read your flame with get_flame and change it with execute_command — only flame.* and camera.* are allowed, and you have ${DUEL_STEP_BUDGET} steps. Say what you are going for with arcade_narrate as you work. Aim for something striking rather than merely complicated. When the clock runs out, or when you are happy, call arcade_end_duel with a short title.
+
+${WEBMCP_FALLBACK_NOTE}`
+}
