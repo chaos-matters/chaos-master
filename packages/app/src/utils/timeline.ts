@@ -3,6 +3,7 @@ import { notifyDocumentWrite, notifyTimelineTransport, } from '@/recorder/docume
 import { applyEasing, catmullRom, clamp } from './easing'
 import { persistentSignal } from './persistentSignal'
 import { clearAllRedos, nextUndoSeq, registerRedoClearer } from './undoJournal'
+import type { SeatId } from '@/seats/seatId'
 
 interface WindowTimelineState {
   tracks: () => TimelineTrack[]
@@ -605,7 +606,14 @@ export function getAllTrackFrames(tracks: TimelineTrack[]): number[] {
  * Creates a timeline state manager.
  * Returns current frame, config, tracks, and utility functions.
  */
-export function createTimelineState() {
+export type TimelineStateOptions = {
+  /** Which seat's recorder this timeline's writes belong to. Omitted means
+   *  the workspace's own seat. */
+  seatId?: SeatId
+}
+
+export function createTimelineState(options: TimelineStateOptions = {}) {
+  const seatId = options.seatId
   const [currentFrame, setCurrentFrameRaw] = createSignal(0)
   // Moving the playhead ends any keyframe-coalescing run: returning to a
   // frame later must start a NEW undo step, not merge into the old gesture.
@@ -771,7 +779,7 @@ export function createTimelineState() {
     // that caused it, or an edit the log cannot replay. Without this the
     // timeline was invisible to the recorder — not even counted — and a
     // session's "0 unnamed writes" was a claim about half the app.
-    notifyDocumentWrite('timeline edit')
+    notifyDocumentWrite('timeline edit', seatId)
     undoStack.push({
       tracks: tracks().map((t) => ({
         ...t,
@@ -1309,7 +1317,7 @@ export function createTimelineState() {
   }
 
   function advanceFrame() {
-    notifyTimelineTransport('Timeline frame transport')
+    notifyTimelineTransport('Timeline frame transport', seatId)
     const cfg = config()
     // Sample the achieved rate between auto-FPS advances (each advance fires
     // when a frame hits target quality). Skip manual stepping (not playing).
@@ -1342,7 +1350,7 @@ export function createTimelineState() {
   }
 
   function goBackFrame() {
-    notifyTimelineTransport('Timeline frame transport')
+    notifyTimelineTransport('Timeline frame transport', seatId)
     const cfg = config()
     const prev = currentFrame() - 1
     if (prev < cfg.startFrame) {
@@ -1354,13 +1362,13 @@ export function createTimelineState() {
   }
 
   function goToFrame(frame: number) {
-    notifyTimelineTransport('Timeline frame transport')
+    notifyTimelineTransport('Timeline frame transport', seatId)
     setCurrentFrame(clamp(frame, config().startFrame, config().endFrame))
     setPreviewHeld(true)
   }
 
   function play() {
-    notifyTimelineTransport('Timeline playback transport')
+    notifyTimelineTransport('Timeline playback transport', seatId)
     const cfg = config()
     if (!cfg.loop && currentFrame() >= cfg.endFrame) {
       setCurrentFrame(cfg.startFrame)
@@ -1371,13 +1379,13 @@ export function createTimelineState() {
   }
 
   function pause() {
-    notifyTimelineTransport('Timeline playback transport')
+    notifyTimelineTransport('Timeline playback transport', seatId)
     setIsPlaying(false)
     resetFpsMeter()
   }
 
   function togglePlay() {
-    notifyTimelineTransport('Timeline playback transport')
+    notifyTimelineTransport('Timeline playback transport', seatId)
     setIsPlaying(!isPlaying())
     resetFpsMeter()
   }
