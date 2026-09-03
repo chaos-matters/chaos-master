@@ -38,21 +38,76 @@ const TICKS = 120
  * back by half of it, so the split reads as a cut rather than a colour change.
  */
 const GAP_DEG = 3.5
+/**
+ * The hue runs along each arc rather than sitting flat on it: the anchored
+ * end recedes and the score boundary blazes, which is the readability the
+ * flat version lacked.
+ */
+const WARM_TAIL = '#8f3413'
+const WARM_HEAD = '#fde7ac'
+const COOL_TAIL = '#7633e3'
+const COOL_HEAD = '#8bf0fb'
 const SWEEP_DEG = 360 - 2 * GAP_DEG
 
-function polar(deg: number): [number, number] {
+function polar(deg: number, radius = RADIUS): [number, number] {
   // 0 degrees is twelve o'clock; positive is clockwise.
   const rad = ((deg - 90) * Math.PI) / 180
-  return [CENTRE + RADIUS * Math.cos(rad), CENTRE + RADIUS * Math.sin(rad)]
+  return [CENTRE + radius * Math.cos(rad), CENTRE + radius * Math.sin(rad)]
 }
 
-function arc(startDeg: number, sweepDeg: number): string {
-  const [x1, y1] = polar(startDeg)
-  const [x2, y2] = polar(startDeg + sweepDeg)
+/**
+ * How many pieces each arc is drawn in.
+ *
+ * SVG cannot run a gradient along a curve, and a `linearGradient` across the
+ * chord is visibly wrong once an arc passes a half turn. Segments are the
+ * honest way: each takes a flat colour, and at this count the joins are
+ * smaller than the stroke is wide.
+ */
+const SEGMENTS = 30
+
+/** Hex to [r,g,b], for the only interpolation this file needs. */
+function rgb(hex: string): [number, number, number] {
+  const n = Number.parseInt(hex.slice(1), 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+
+function mix(from: string, to: string, t: number): string {
+  const a = rgb(from)
+  const b = rgb(to)
+  const c = a.map((v, i) => Math.round(v + (b[i]! - v) * t))
+  return `rgb(${c[0]} ${c[1]} ${c[2]})`
+}
+
+/**
+ * One arc as a run of segments, deepening from the fixed twelve o'clock
+ * anchor to the meeting point that moves.
+ *
+ * The boundary is the only part of the ring that carries information — it is
+ * where the lead is — so it is the part that blazes, and the anchored end
+ * recedes into the plate.
+ */
+function segments(
+  startDeg: number,
+  sweepDeg: number,
+): { d: string; t: number }[] {
+  const step = sweepDeg / SEGMENTS
+  return Array.from({ length: SEGMENTS }, (_, i) => ({
+    // A hair of overlap, so a seam can never open between two segments.
+    d: arc(startDeg + i * step, step * 1.04),
+    t: (i + 0.5) / SEGMENTS,
+  }))
+}
+
+function arc(startDeg: number, sweepDeg: number, radius = RADIUS): string {
+  const [x1, y1] = polar(startDeg, radius)
+  const [x2, y2] = polar(startDeg + sweepDeg, radius)
   const large = Math.abs(sweepDeg) > 180 ? 1 : 0
   const clockwise = sweepDeg > 0 ? 1 : 0
-  return `M${x1} ${y1}A${RADIUS} ${RADIUS} 0 ${large} ${clockwise} ${x2} ${y2}`
+  return `M${x1} ${y1}A${radius} ${radius} 0 ${large} ${clockwise} ${x2} ${y2}`
 }
+
+/** The arc's inner edge, where the specular hairline rides. */
+const INNER = RADIUS - 3.5
 
 export function EclipseHud(props: {
   model: DuelHudModel
@@ -65,6 +120,14 @@ export function EclipseHud(props: {
   const playerPath = () =>
     arc(-GAP_DEG / 2, -SWEEP_DEG * props.model.playerShare)
   const rivalPath = () => arc(GAP_DEG / 2, SWEEP_DEG * props.model.rivalShare)
+  const playerSegments = () =>
+    segments(-GAP_DEG / 2, -SWEEP_DEG * props.model.playerShare)
+  const rivalSegments = () =>
+    segments(GAP_DEG / 2, SWEEP_DEG * props.model.rivalShare)
+  const playerInner = () =>
+    arc(-GAP_DEG / 2, -SWEEP_DEG * props.model.playerShare, INNER)
+  const rivalInner = () =>
+    arc(GAP_DEG / 2, SWEEP_DEG * props.model.rivalShare, INNER)
 
   return (
     <div class={ui.hud} classList={{ [ui.urgent!]: props.model.urgent }}>
@@ -137,8 +200,33 @@ export function EclipseHud(props: {
             <path class={ui.warmNear} d={playerPath()} />
             <path class={ui.coolNear} d={rivalPath()} />
           </g>
-          <path class={ui.warmCore} d={playerPath()} />
-          <path class={ui.coolCore} d={rivalPath()} />
+          {/* The core, segment by segment, so the hue travels along the arc:
+              deep at the anchored end, blazing at the boundary that moves. */}
+          <For each={playerSegments()}>
+            {(seg) => (
+              <path
+                class={ui.warmCore}
+                d={seg.d}
+                stroke={mix(WARM_TAIL, WARM_HEAD, seg.t)}
+              />
+            )}
+          </For>
+          <For each={rivalSegments()}>
+            {(seg) => (
+              <path
+                class={ui.coolCore}
+                d={seg.d}
+                stroke={mix(COOL_TAIL, COOL_HEAD, seg.t)}
+              />
+            )}
+          </For>
+          {/* The specular line: what gives the mock's bars their glass-tube
+              solidity, a hairline riding the arc's inner edge. */}
+          {/* `data-side` is the stable hook the component test measures each
+              arc's sweep from; these two carry the full extent of their
+              side, where the coloured core is drawn in segments. */}
+          <path class={ui.specular} data-side="player" d={playerInner()} />
+          <path class={ui.specular} data-side="rival" d={rivalInner()} />
         </svg>
 
         <div class={ui.readout}>

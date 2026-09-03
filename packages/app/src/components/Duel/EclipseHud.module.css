@@ -106,8 +106,16 @@
   stroke-width: 11;
 }
 
-.warmCore {
-  stroke: var(--duel-warm-core);
+/* Stroke colour comes from the segment, not from here: the hue travels
+   along the arc. */
+
+.specular {
+  fill: none;
+  /* A hairline riding the arc's inner edge — what gives the mock's bands
+     their glass-tube solidity rather than reading as flat paint. */
+  stroke: rgba(255, 255, 255, 0.85);
+  stroke-width: 1;
+  stroke-linecap: butt;
 }
 
 .warmNear {
@@ -118,10 +126,6 @@
 .warmFar {
   stroke: var(--duel-warm-far);
   opacity: 0.5;
-}
-
-.coolCore {
-  stroke: var(--duel-cool-core);
 }
 
 .coolNear {

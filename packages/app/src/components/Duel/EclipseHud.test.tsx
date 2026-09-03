@@ -36,12 +36,12 @@ function sweepOf(path: Element | null | undefined): number {
 }
 
 function arcs() {
-  const svg = document.querySelector('svg')
-  const paths = svg?.querySelectorAll('path')
-  // The last two are the near-white cores, one per side.
-  const player = paths?.[paths.length - 2]
-  const rival = paths?.[paths.length - 1]
-  return { player: sweepOf(player), rival: sweepOf(rival) }
+  // Each side's coloured core is drawn as a run of segments so the hue can
+  // travel along the curve; these two carry the full extent of their side.
+  return {
+    player: sweepOf(document.querySelector('[data-side="player"]')),
+    rival: sweepOf(document.querySelector('[data-side="rival"]')),
+  }
 }
 
 describe('EclipseHud', () => {
