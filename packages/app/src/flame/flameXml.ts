@@ -41,12 +41,15 @@ const NORMALIZED_TO_TYPE: Map<string, string> = (() => {
 // listed here.
 // (gaussian_blur, pre_blur, wedge_julia, julian, juliascope, pie, ngon, … all
 // resolve straight from the registry by normalized name — no alias needed.)
-const FLAM3_ALIASES_RAW: Record<string, string> = {
+// Exported so `flameXml.test.ts` can assert the no-shadowing invariant.
+export const FLAM3_ALIASES_RAW: Record<string, string> = {
   // NOTE: `sinusoidal` itself is NOT aliased — it resolves straight from the
   // registry to `sinusoidalVar` (flam3 var #1, sin(x)/sin(y)). Only the
   // misspelling needs a hand-written entry.
   sinusodial: 'sinusoidalVar', // historical flam3 misspelling of "sinusoidal"
-  blur: 'circleBlurVar', // flam3 "blur" fills a disc — closest CM blur
+  // NOTE: `blur` is likewise NOT aliased — the registry resolves it to
+  // `blurVar` (flam3 var #29: uniform angle, uniform radius). `circleBlurVar`
+  // is a different distribution (sqrt-radius, uniform over the disc's area).
   flatten: 'preFlattenVar', // flam3 flatten (zeros z) ↔ CM preFlatten
   post_mirror: 'postMirrorWfVar', // Apophysis post_mirror plugin
 }
@@ -60,10 +63,16 @@ const FLAM3_ALIASES: Record<string, string> = Object.fromEntries(
   }),
 )
 
-// These aliases are useful fallbacks, but they are not mathematically exact.
-// Keep them importable while making the compatibility report honest about the
-// visual difference.
-const APPROXIMATE_FLAM3_ALIASES = new Set(['blur'])
+// Aliases that are useful fallbacks but not mathematically exact. Listing one
+// here keeps it importable while making the compatibility report honest about
+// the visual difference.
+//
+// Currently empty, and that is the accurate state: every alias above is an
+// exact equivalent. `blur` used to sit here, but only because it was aliased to
+// `circleBlurVar`; now that it resolves to the exact `blurVar`, flagging it
+// would be a false warning. Kept as the extension point for the next
+// genuinely-approximate alias.
+const APPROXIMATE_FLAM3_ALIASES = new Set<string>()
 
 /**
  * Resolve a flam3 variation name to a chaos-master internal type, or `undefined`

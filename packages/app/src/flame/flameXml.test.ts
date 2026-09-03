@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { rgbToOklab } from './flam3PaletteParser'
 import { FLAM3_SAMPLES } from './flam3Samples'
-import { exportFlameXml, extractFlamePalette, isFlameXmlContent, parseFlameXml, resolveVariationType, } from './flameXml'
-import { isVariationType } from './variations'
+import { exportFlameXml, extractFlamePalette, FLAM3_ALIASES_RAW, isFlameXmlContent, parseFlameXml, resolveVariationType, } from './flameXml'
+import { isVariationType, variationTypes } from './variations'
+import { getNormalizedVariationName } from './variations/utils'
 
 // ── helpers ───────────────────────────────────────────────────────────────
 
@@ -114,7 +115,8 @@ describe('resolveVariationType', () => {
 
   it('applies explicit aliases', () => {
     expect(resolveVariationType('sinusodial')).toBe('sinusoidalVar')
-    expect(resolveVariationType('blur')).toBe('circleBlurVar')
+    expect(resolveVariationType('flatten')).toBe('preFlattenVar')
+    expect(resolveVariationType('post_mirror')).toBe('postMirrorWfVar')
   })
 
   // flam3 var #1 is sin(x)/sin(y) — `sinusoidalVar`, not `sinVar` (the complex
@@ -124,6 +126,31 @@ describe('resolveVariationType', () => {
     expect(resolveVariationType('sinusoidal')).toBe('sinusoidalVar')
     expect(resolveVariationType('sinusodial')).toBe('sinusoidalVar')
     expect(resolveVariationType('sin')).toBe('sinVar')
+  })
+
+  // flam3 var #29 is a uniform-radius disc — `blurVar`. `circleBlurVar` uses a
+  // sqrt-distributed radius (uniform over the disc's area), a visibly different
+  // density. No alias: the registry resolves `blur` on its own.
+  it('resolves blur to blurVar, not the sqrt-radius circle blur', () => {
+    expect(resolveVariationType('blur')).toBe('blurVar')
+    expect(resolveVariationType('circle_blur')).toBe('circleBlurVar')
+  })
+
+  // Guards the whole class of bug this file has now hit twice: an alias whose
+  // key the registry can already resolve silently overrides the exact match,
+  // because resolveVariationType consults aliases first.
+  it('never aliases a name the registry can already resolve', () => {
+    for (const flam3Name of Object.keys(FLAM3_ALIASES_RAW)) {
+      const key = flam3Name.replace(/_/g, '').toLowerCase()
+      const fromRegistry = variationTypes.filter(
+        (t) =>
+          getNormalizedVariationName(t).replace(/_/g, '').toLowerCase() === key,
+      )
+      expect(
+        fromRegistry,
+        `alias "${flam3Name}" shadows registry type(s) ${fromRegistry.join(', ')}; drop the alias and let the registry resolve it`,
+      ).toEqual([])
+    }
   })
 
   it('returns undefined for unknown variations (does not invent a type)', () => {
