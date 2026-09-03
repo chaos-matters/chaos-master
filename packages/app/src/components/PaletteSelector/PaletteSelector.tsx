@@ -92,7 +92,9 @@ export function PaletteSelector(props: PaletteSelectorProps) {
           importedCount += palettes.length
         }
         setForceUpdate((n) => n + 1)
-        console.info(`Imported ${importedCount} palettes`)
+        if (import.meta.env.DEV) {
+          console.info(`Imported ${importedCount} palettes`)
+        }
       } catch (err) {
         console.error('Failed to import palettes:', err)
       }
