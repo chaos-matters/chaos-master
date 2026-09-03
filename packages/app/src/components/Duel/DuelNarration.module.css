@@ -16,10 +16,14 @@
 .lines {
   display: grid;
   gap: 2px;
+  min-width: 0;
 }
 
 .line {
   margin: 0;
+  /* Without this the line grows past its grid track and the rail clips it
+     mid-glyph; `text-overflow` never gets a chance to fire. */
+  min-width: 0;
   font-size: 0.74rem;
   opacity: 0.4;
   overflow: hidden;

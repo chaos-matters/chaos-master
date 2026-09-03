@@ -370,44 +370,11 @@ function VariationsPanel(props: {
 
   return (
     <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
-      <div class={ui.tiles}>
-        <Show
-          when={adding()}
-          fallback={
-            <>
-              <button
-                type="button"
-                class={ui.addTile}
-                onClick={() => setAdding(true)}
-              >
-                <Plus aria-hidden="true" />
-                Add
-              </button>
-              <For each={entries()}>
-                {([id, variation]) => (
-                  <VariationTile
-                    type={variation.type}
-                    name={readableType(variation.type)}
-                    weight={variation.weight}
-                    active
-                    paused={props.paused}
-                    onPrimary={() => {
-                      props.onRemove(id)
-                    }}
-                    onWeight={(weight) => {
-                      props.onWeight(id, weight)
-                    }}
-                  />
-                )}
-              </For>
-              <Show when={entries().length === 0}>
-                <p class={ui.empty}>
-                  This transform has no variations yet. Add one.
-                </p>
-              </Show>
-            </>
-          }
-        >
+      <div class={ui.variations}>
+        {/* The search bar sits ABOVE the scroller, not inside it: as a flex
+            item of a horizontally scrolling row it scrolled away with the
+            tiles and the first thing a search did was cut off its own box. */}
+        <Show when={adding()}>
           <div class={ui.addBar}>
             <input
               class={ui.search}
@@ -428,23 +395,63 @@ function VariationsPanel(props: {
               Done
             </button>
           </div>
-          <For each={matches()}>
-            {(type) => (
-              <VariationTile
-                type={type}
-                name={readableType(type)}
-                active={false}
-                paused={props.paused}
-                onPrimary={() => {
-                  props.onAdd(type)
-                }}
-              />
-            )}
-          </For>
-          <Show when={matches().length === 0}>
-            <p class={ui.empty}>No variations match "{query()}".</p>
-          </Show>
         </Show>
+        <div class={ui.tiles}>
+          <Show
+            when={adding()}
+            fallback={
+              <>
+                <button
+                  type="button"
+                  class={ui.addTile}
+                  onClick={() => setAdding(true)}
+                >
+                  <Plus aria-hidden="true" />
+                  Add
+                </button>
+                <For each={entries()}>
+                  {([id, variation]) => (
+                    <VariationTile
+                      type={variation.type}
+                      name={readableType(variation.type)}
+                      weight={variation.weight}
+                      active
+                      paused={props.paused}
+                      onPrimary={() => {
+                        props.onRemove(id)
+                      }}
+                      onWeight={(weight) => {
+                        props.onWeight(id, weight)
+                      }}
+                    />
+                  )}
+                </For>
+                <Show when={entries().length === 0}>
+                  <p class={ui.empty}>
+                    This transform has no variations yet. Add one.
+                  </p>
+                </Show>
+              </>
+            }
+          >
+            <For each={matches()}>
+              {(type) => (
+                <VariationTile
+                  type={type}
+                  name={readableType(type)}
+                  active={false}
+                  paused={props.paused}
+                  onPrimary={() => {
+                    props.onAdd(type)
+                  }}
+                />
+              )}
+            </For>
+            <Show when={matches().length === 0}>
+              <p class={ui.empty}>No variations match "{query()}".</p>
+            </Show>
+          </Show>
+        </div>
       </div>
     </ComputeGate>
   )
@@ -516,7 +523,16 @@ function ShapePanel(props: {
  * official flam3 set is a 1.5 MB XML fetch parsed on the main thread, which is
  * not something to spend a duel's clock on — the sidebar can offer those.
  */
-const STRIP_PALETTES = defaultPalettes.slice(0, 14)
+const STRIP_PALETTES = defaultPalettes
+  // A swatch is a chroma ramp — lightness comes from the flame's density, not
+  // the palette — so a palette with no chroma has nothing to show and the
+  // greyscale entries all render as the same flat grey block. They stay in the
+  // sidebar, where they are labelled and picked deliberately; in a strip you
+  // scan under a clock, three identical blocks are three wrong answers.
+  .filter((palette) =>
+    palette.entries.some((entry) => Math.hypot(entry.a, entry.b) > 0.02),
+  )
+  .slice(0, 14)
 
 function ColourPanel(props: {
   flame: FlameDescriptor
