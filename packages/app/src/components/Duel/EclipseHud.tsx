@@ -20,7 +20,15 @@ import type { DuelHudModel } from '@/arcade/duelHud'
 const CENTRE = 232
 /** Score-ring centreline. Stroke, bezel and ticks are all ratios of this. */
 const RADIUS = 203.5
-const BEZEL = RADIUS * 1.094
+/**
+ * The instrument line. It lives INSIDE the arc, not outside it: the mock's
+ * strongest feature anywhere beyond the ring is a soft +20% swell, and a
+ * hairline out there measured +345% over its neighbours — which is most of
+ * what read as an unexplained rim.
+ */
+const BEZEL = RADIUS - 7
+/** Tucked under the arc's widest stroke, so the plate's edge never shows. */
+const PLATE = RADIUS - 5.5
 const TICK_OUTER = RADIUS * 0.875
 const TICK_MINOR = RADIUS * 0.044
 const TICK_MAJOR = RADIUS * 0.157
@@ -67,10 +75,13 @@ export function EclipseHud(props: {
         <div class={ui.vignette} aria-hidden="true" />
         <svg class={ui.ring} viewBox="0 0 464 464" aria-hidden="true">
           <defs>
+            {/* The lift peaks inside the face and returns to the base tone
+                at the rim. A gradient whose lightest stop sits on the edge of
+                the circle it fills cannot help but draw a collar. */}
             <radialGradient id="duel-plate">
               <stop offset="0" stop-color="#05080c" />
-              <stop offset="0.64" stop-color="#05080c" />
-              <stop offset="1" stop-color="#141218" />
+              <stop offset="0.62" stop-color="#12141b" />
+              <stop offset="1" stop-color="#06080d" />
             </radialGradient>
             {/* Blur in viewBox units, so the bloom scales with the dial
                 rather than being a fixed pixel halo at every size. */}
@@ -94,12 +105,8 @@ export function EclipseHud(props: {
             </filter>
           </defs>
 
-          <circle
-            cx={CENTRE}
-            cy={CENTRE}
-            r={BEZEL - 6}
-            fill="url(#duel-plate)"
-          />
+          <circle cx={CENTRE} cy={CENTRE} r={PLATE} fill="url(#duel-plate)" />
+          <circle class={ui.bezel} cx={CENTRE} cy={CENTRE} r={BEZEL} />
 
           <g class={ui.ticks}>
             <For each={Array.from({ length: TICKS }, (_, i) => i)}>
@@ -132,8 +139,6 @@ export function EclipseHud(props: {
           </g>
           <path class={ui.warmCore} d={playerPath()} />
           <path class={ui.coolCore} d={rivalPath()} />
-
-          <circle class={ui.bezel} cx={CENTRE} cy={CENTRE} r={BEZEL} />
         </svg>
 
         <div class={ui.readout}>
