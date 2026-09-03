@@ -1,0 +1,241 @@
+/*
+  The editing surface rests on the top edge of the viewer's own half. It is
+  capped in height on purpose: watching the render evolve is the point of a
+  duel, so the flame is never traded away for controls.
+*/
+.chips {
+  position: absolute;
+  top: 52px;
+  left: 12px;
+  right: 12px;
+  z-index: 2;
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(4, 6, 12, 0.5);
+  backdrop-filter: blur(8px);
+  color: #f4f6ff;
+  font-size: 0.76rem;
+  cursor: pointer;
+  /* Quiet by default: this is the state a player spends most of a duel
+     looking at, so the chips must lose the contrast fight with the artwork. */
+  opacity: 0.72;
+  transition:
+    opacity 140ms ease,
+    border-color 140ms ease;
+  /* 30px is above the 24px minimum but below the 44px touch guideline, so the
+     hit area is padded rather than the pill grown. */
+  position: relative;
+}
+
+.chip::after {
+  content: '';
+  position: absolute;
+  inset: -7px 0;
+}
+
+.chip:hover,
+.chip:focus-visible {
+  opacity: 1;
+}
+
+.chipOpen {
+  opacity: 1;
+  border-color: rgba(255, 255, 255, 0.38);
+}
+
+.chipIcon {
+  width: 15px;
+  height: 15px;
+}
+
+.panel {
+  width: 100%;
+  max-height: min(170px, 28vh);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  /* Solid enough to keep labels legible over a white-hot flame core. */
+  background: rgba(4, 6, 12, 0.88);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+
+.panelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panelBody {
+  min-height: 0;
+  overflow: auto;
+  /* A flick that runs out of tiles must not scroll the page behind. */
+  overscroll-behavior: contain;
+}
+
+.transforms {
+  display: flex;
+  gap: 4px;
+}
+
+.transformChip {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: transparent;
+  color: inherit;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.transformOn {
+  opacity: 1;
+  border-color: rgba(246, 179, 82, 0.6);
+  background: rgba(246, 179, 82, 0.14);
+}
+
+.close {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.close:hover {
+  opacity: 1;
+}
+
+.tiles {
+  display: grid;
+  gap: 6px;
+}
+
+.tile {
+  display: grid;
+  grid-template-columns: minmax(88px, 1fr) 2fr auto auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.tileName {
+  font-size: 0.76rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tileValue,
+.fieldValue {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.65;
+  min-width: 4ch;
+  text-align: right;
+}
+
+.tileRemove {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.5;
+  cursor: pointer;
+}
+
+.tileRemove:hover {
+  opacity: 1;
+}
+
+.empty {
+  margin: 0;
+  font-size: 0.76rem;
+  opacity: 0.55;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  align-items: center;
+  gap: 6px 16px;
+}
+
+.field {
+  display: grid;
+  grid-template-columns: minmax(64px, auto) 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.fieldLabel {
+  font-size: 0.74rem;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.fieldInput,
+.tileWeight {
+  width: 100%;
+  accent-color: #f6b352;
+  cursor: ew-resize;
+}
+
+.colour {
+  display: grid;
+  gap: 8px;
+}
+
+.colourTrack {
+  accent-color: #6fd2f0;
+}
+
+.reset {
+  justify-self: start;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: transparent;
+  color: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .chips {
+    top: 46px;
+  }
+
+  .fields {
+    grid-template-columns: 1fr;
+  }
+}

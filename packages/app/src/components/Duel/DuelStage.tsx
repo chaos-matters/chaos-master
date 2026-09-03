@@ -1,9 +1,11 @@
 import { createEffect, createMemo, createSignal, onCleanup, Show, } from 'solid-js'
-import { duelReady, duelRemainingMs, runningDuel } from '@/arcade/duel'
+import { duelReady, duelRemainingMs, duelSidebarOpen, runningDuel, setDuelSidebarOpen, } from '@/arcade/duel'
 import { finishDuel } from '@/arcade/duelActions'
 import { duelHudModel } from '@/arcade/duelHud'
 import { scoreSheetJudge } from '@/arcade/duelJudge'
 import { drivingState } from '@/arcade/pilot'
+import { SidebarPanel } from '@/icons'
+import { DuelChips } from './DuelChips'
 import { DuelControls } from './DuelControls'
 import { DuelNarration } from './DuelNarration'
 import ui from './DuelStage.module.css'
@@ -31,9 +33,12 @@ export function DuelStage(props: {
   playerZoom: Signal<number>
   playerPosition: Signal<v2f>
   quality: number
+  /** The workspace sidebar's width in rem, so the stage can step aside. */
+  sidebarWidthRem: Accessor<number>
 }) {
   const [remaining, setRemaining] = createSignal(duelRemainingMs())
   const [ending, setEnding] = createSignal(false)
+  let stageEl: HTMLDivElement | undefined
 
   createEffect(() => {
     if (!runningDuel()) return
@@ -60,6 +65,33 @@ export function DuelStage(props: {
     }),
   )
 
+  // The chips cover the fast, high-leverage moves; the sidebar is for when
+  // you know exactly which parameter you want. Rather than duplicate it, the
+  // stage steps aside and lets the real one through — it is the same editor,
+  // bound to the same store, with the same undo.
+  // What the viewer had before the duel, restored when they close it again:
+  // a duel is a few minutes long and should not rearrange the editor they
+  // come back to.
+  const sidebarBefore = props.ctx.sidebar.open()
+  const toggleSidebar = () => {
+    const next = !duelSidebarOpen()
+    setDuelSidebarOpen(next)
+    props.ctx.sidebar.setOpen(next ? true : sidebarBefore)
+  }
+  onCleanup(() => {
+    if (duelSidebarOpen()) props.ctx.sidebar.setOpen(sidebarBefore)
+  })
+
+  // Written through a ref rather than the `style` prop: this is a CSS custom
+  // property that another component's layout depends on, and an explicit
+  // effect makes the dependency and the update order obvious.
+  createEffect(() => {
+    stageEl?.style.setProperty(
+      '--duel-inset-left',
+      duelSidebarOpen() ? `${props.sidebarWidthRem()}rem` : '0px',
+    )
+  })
+
   const end = () => {
     if (ending()) return
     setEnding(true)
@@ -69,7 +101,7 @@ export function DuelStage(props: {
   return (
     <Show when={runningDuel()}>
       {(state) => (
-        <div class={ui.stage} aria-label="Duel">
+        <div class={ui.stage} aria-label="Duel" ref={stageEl}>
           <div class={ui.seats}>
             <div class={ui.side}>
               <SeatView
@@ -81,6 +113,7 @@ export function DuelStage(props: {
                 quality={props.quality}
                 interactive
               />
+              <DuelChips ctx={props.ctx} flame={props.playerFlame} />
               <DuelControls ctx={props.ctx} />
             </div>
             <div class={ui.side}>
@@ -95,6 +128,15 @@ export function DuelStage(props: {
               />
             </div>
           </div>
+          <button
+            type="button"
+            class={ui.sidebarToggle}
+            aria-pressed={duelSidebarOpen()}
+            onClick={toggleSidebar}
+          >
+            <SidebarPanel class={ui.sidebarIcon} aria-hidden="true" />
+            {duelSidebarOpen() ? 'Hide the sidebar' : 'Show the sidebar'}
+          </button>
           <div class={ui.hudSlot}>
             <EclipseHud model={model()} onEnd={end} ending={ending()} />
             <DuelNarration driving={drivingState()} />

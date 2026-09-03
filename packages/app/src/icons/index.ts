@@ -8,6 +8,7 @@ import ChevronDown from './chevron-down.svg'
 import ChevronLeft from './chevron-left.svg'
 import ChevronRight from './chevron-right.svg'
 import CircleHalf from './circle-half.svg'
+import ColourWedge from './colour-wedge.svg'
 import Copy from './copy.svg'
 import Cross from './cross.svg'
 import Discord from './discord.svg'
@@ -39,8 +40,10 @@ import Record from './record.svg'
 import Redo from './redo.svg'
 import Reset from './reset.svg'
 import Robot from './robot.svg'
+import ShapeTriangle from './shape-triangle.svg'
 import Share from './share.svg'
 import Shuffle from './shuffle.svg'
+import SidebarPanel from './sidebar-panel.svg'
 import SkipBack from './skip-back.svg'
 import SkipForward from './skip-forward.svg'
 import Sparkle from './sparkle.svg'
@@ -51,6 +54,7 @@ import Swords from './swords.svg'
 import Terminal from './terminal.svg'
 import TriangleAlert from './triangle-alert.svg'
 import Undo from './undo.svg'
+import VariationSpiral from './variation-spiral.svg'
 import Zap from './zap.svg'
 
 // Re-exported for easier auto-importing in components
@@ -65,6 +69,7 @@ export {
   ChevronLeft,
   ChevronRight,
   CircleHalf,
+  ColourWedge,
   Copy,
   Cross,
   Discord,
@@ -107,6 +112,9 @@ export {
   Terminal,
   Undo,
   Zap,
+  ShapeTriangle,
+  SidebarPanel,
   TriangleAlert,
+  VariationSpiral,
   Speech,
 }

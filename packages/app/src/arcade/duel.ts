@@ -46,6 +46,19 @@ export { duel }
 
 export const duelActive = (): boolean => duel().phase === 'running'
 
+/**
+ * Whether the viewer has asked for the real sidebar.
+ *
+ * Off by default, and reset with every duel: the brief settled on a clean
+ * two-canvas read, and the sidebar is the escape hatch for when you know
+ * exactly which parameter you want. It lives here rather than in the stage
+ * because the workspace has to raise the sidebar over the stage's overlay,
+ * and the stage has to step aside for it — two components, one fact.
+ */
+const [duelSidebarOpen, setDuelSidebarOpen] = createSignal(false)
+
+export { duelSidebarOpen, setDuelSidebarOpen }
+
 export function runningDuel():
   | Extract<DuelState, { phase: 'running' }>
   | undefined {
@@ -138,6 +151,7 @@ export function startDuel(input: {
       }
     }
   }
+  setDuelSidebarOpen(false)
   const seat = createSeat('rival', input.rivalFlame)
   if (input.onExpire) {
     const onExpire = input.onExpire
@@ -204,6 +218,7 @@ export function stopDuel(): {
       ? recorderStream('rival').stop()
       : undefined
   setDuel({ phase: 'idle' })
+  setDuelSidebarOpen(false)
   // After the sessions are taken: disposing cancels the stream, which would
   // throw away the take if it ran first.
   state.rival.dispose()
