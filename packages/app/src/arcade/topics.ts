@@ -22,7 +22,7 @@ export const LESSON_TOPICS: Record<TopicId, LessonTopic> = {
   variations: {
     id: 'variations',
     title: 'Variations',
-    goal: 'From a blank canvas, build a flame with three transforms that show three different variation families (for example linear, spherical and swirl). Change one weight and one parameter per transform so the viewer sees what each does. Narrate before each group of changes.',
+    goal: "Teach what a variation is, from a blank canvas. Show three different variation families on separate transforms and change enough weights and parameters that each family's effect is attributable. Pick the families and values yourself.",
     allowed: [
       'flame.addTransform',
       'flame.deleteTransform',
@@ -34,7 +34,8 @@ export const LESSON_TOPICS: Record<TopicId, LessonTopic> = {
       'flame.setVariationVisible',
       'flame.setProbability',
       'flame.setColorSpeed',
-      'camera.',
+      'camera.center',
+      'camera.zoomTo',
     ],
     stepBudget: 30,
     defaultStartFrom: 'blank',
@@ -42,7 +43,7 @@ export const LESSON_TOPICS: Record<TopicId, LessonTopic> = {
   affine: {
     id: 'affine',
     title: 'Affine transforms',
-    goal: 'Show what the affine matrix does: on one transform demonstrate scale, rotation, shear and translation one at a time, then add a final transform and rotate it. Narrate what each coefficient means before changing it.',
+    goal: 'Teach what the affine matrix does. Demonstrate scale, rotation, shear and translation one at a time so each is attributable, then show what a final transform adds. Pick the values yourself.',
     allowed: [
       'flame.addTransform',
       'flame.setTransformAffine',
@@ -51,7 +52,8 @@ export const LESSON_TOPICS: Record<TopicId, LessonTopic> = {
       'flame.setFinalTransform',
       'flame.applySymmetry',
       'flame.setProbability',
-      'camera.',
+      'camera.center',
+      'camera.zoomTo',
     ],
     stepBudget: 30,
     defaultStartFrom: 'blank',
@@ -59,7 +61,7 @@ export const LESSON_TOPICS: Record<TopicId, LessonTopic> = {
   color: {
     id: 'color',
     title: 'Colour and tone',
-    goal: 'Keep the current flame. Walk through colour: apply a palette, set one transform colour by hand, change colour speed, then tune exposure, gamma, vibrancy, contrast and background. Narrate the visual effect you expect before each change.',
+    goal: "Teach how colour and tone are decided on this flame: where a transform's colour comes from, what colour speed changes, and how the tone controls trade brightness for detail. Pick the controls that make the point.",
     allowed: [
       'flame.applyPalette',
       'flame.removePalette',
@@ -79,7 +81,7 @@ export const LESSON_TOPICS: Record<TopicId, LessonTopic> = {
   camera: {
     id: 'camera',
     title: 'Camera and framing',
-    goal: 'Keep the current flame. Centre it, zoom into one detail, zoom back out, then explain skip iterations and draw mode by changing each once. Narrate what the viewer should look at.',
+    goal: 'Teach framing on this flame: what the camera changes about the picture and what it leaves untouched in the fractal, and how to find and hold a detail. Pick the moves yourself.',
     allowed: [
       'camera.',
       'flame.setSkipIters',
@@ -118,12 +120,29 @@ export const CINEMA_ALLOWED = [
 ] as const
 export const CINEMA_STEP_BUDGET = 40
 
+/**
+ * The escape hatch, appended to every prompt card.
+ *
+ * A judge's assistant may report the page as WebMCP-capable and still not
+ * surface the tools to itself — the tools are on `document.modelContext`
+ * either way. Two things trip up anyone driving that API by hand, and both
+ * throw rather than returning an error: `executeTool` wants the registered
+ * tool object rather than its name, and the arguments must already be a JSON
+ * string. Spelling both out costs a few lines and saves the session.
+ */
+export const WEBMCP_FALLBACK_NOTE =
+  "If you cannot see these as tools, drive them from the page instead - they are registered on document.modelContext. Take the tool object from getTools and pass arguments as a JSON string: const t = (await document.modelContext.getTools()).find(x => x.name === 'arcade_status'); await document.modelContext.executeTool(t, JSON.stringify({})). Passing the name, or a plain object, throws."
+
 export function teachPromptCard(topic: TopicId): string {
-  return `Teach me ${LESSON_TOPICS[topic].title.toLowerCase()} in Lumen Apeiron. Call arcade_start_lesson with topic "${topic}", then build the example step by step using only the commands listed in the lesson brief. Before each group of changes call arcade_narrate with one sentence explaining what you are about to do and why. Check your work with get_flame. When done, call arcade_end_lesson with a short title and summary.`
+  return `Teach me ${LESSON_TOPICS[topic].title.toLowerCase()} in Lumen Apeiron. Call arcade_start_lesson with topic "${topic}", then build the example step by step using only the commands listed in the lesson brief. Before each group of changes call arcade_narrate with one sentence explaining what you are about to do and why. Check your work with get_flame. When done, call arcade_end_lesson with a short title and summary.
+
+${WEBMCP_FALLBACK_NOTE}`
 }
 
 export function cinemaPromptCard(description: string): string {
   const wish =
     description.trim() || 'a slow, cinematic move that suits this flame'
-  return `Animate my current flame in Lumen Apeiron: ${wish}. Call arcade_start_cinema, then arcade_get_animatable_paths to see what you can keyframe, then arcade_set_keyframes with tracks that realise the description (use easing, keep it under 10 seconds unless I say otherwise). Playback starts as soon as the keyframes land. Narrate your choices with arcade_narrate. Ask me if you want changes, and finish with arcade_end_cinema.`
+  return `Animate my current flame in Lumen Apeiron: ${wish}. Call arcade_start_cinema, then arcade_get_animatable_paths to see what you can keyframe, then arcade_set_keyframes with tracks that realise the description (use easing, keep it under 10 seconds unless I say otherwise). Playback starts as soon as the keyframes land. Narrate your choices with arcade_narrate. Ask me if you want changes, and finish with arcade_end_cinema.
+
+${WEBMCP_FALLBACK_NOTE}`
 }

@@ -124,3 +124,10 @@
     height: 1rem;
   }
 }
+
+/* Same reading as the replay panel's toggles: lit means the non-default mode
+   is on, so the recorder's state is legible without opening a menu. */
+.toggle-on {
+  background: oklch(50% 0.14 240 / 0.5);
+  border-color: oklch(65% 0.14 240 / 0.8);
+}

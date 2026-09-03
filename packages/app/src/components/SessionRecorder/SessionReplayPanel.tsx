@@ -1,12 +1,13 @@
 import { createEffect, createMemo, createSignal, createUniqueId, For, onCleanup, Show, untrack, } from 'solid-js'
 import { createStore, unwrap } from 'solid-js/store'
-import { ChevronLeft, ChevronRight, Download, Focus, Pause, Pencil, PlayPause, SkipBack, } from '@/icons'
+import { ChevronLeft, ChevronRight, Download, Focus, Pause, Pencil, PlayPause, SkipBack, Speech, } from '@/icons'
 import { deriveReplayFocusPreparation } from '@/recorder/focusPreparation'
 import { createSessionPlayer, PLAYBACK_SPEEDS } from '@/recorder/player'
 import { replayInterfaceCaptureSupported } from '@/recorder/replayInterfaceVideo'
 import { MAX_ACTION_HOLD_MS, MAX_ACTION_NOTE_CHARS, validateSession, } from '@/recorder/schema'
 import { deepClone } from '@/utils/clone'
-import { followCamEnabled, setFollowCamEnabled, setRecorderExportPending, } from './recorderUi'
+import { agentRailEnabled, followCamEnabled, setAgentRailEnabled, setFollowCamEnabled, setRecorderExportPending, } from './recorderUi'
+import { ReplayAgentRail } from './ReplayAgentRail'
 import { ReplaySpotlight } from './ReplaySpotlight'
 import styles from './SessionReplayPanel.module.css'
 import type { ReplayFocusPreparation, ReplayFocusPreparationHandler, } from '@/recorder/focusPreparation'
@@ -203,6 +204,12 @@ export function SessionReplayPanel(props: {
           finished={player.isFinished()}
         />
       </Show>
+      <Show when={agentRailEnabled()}>
+        <ReplayAgentRail
+          actions={session.actions}
+          stepIndex={player.stepIndex()}
+        />
+      </Show>
       <div class={styles.header}>
         <span class={styles.title}>Replay</span>
         <span class={styles.count}>
@@ -344,6 +351,24 @@ export function SessionReplayPanel(props: {
           disabled={exporting()}
         >
           <Focus class={styles.buttonIcon} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          class={styles.button}
+          classList={{ [styles.toggleOn as string]: agentRailEnabled() }}
+          onClick={() => setAgentRailEnabled((on) => !on)}
+          title={
+            agentRailEnabled()
+              ? 'Agent rail on — what the agent did and said, step by step'
+              : 'Agent rail off — replay without the running commentary'
+          }
+          aria-pressed={agentRailEnabled()}
+          aria-label={
+            agentRailEnabled() ? 'Hide the agent rail' : 'Show the agent rail'
+          }
+          disabled={exporting()}
+        >
+          <Speech class={styles.buttonIcon} aria-hidden="true" />
         </button>
         <Show when={props.compact !== true}>
           <label class="sr-only" for={`${panelId}-playback-speed`}>

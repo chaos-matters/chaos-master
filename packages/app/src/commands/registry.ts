@@ -223,6 +223,10 @@ function isMetadataPatch(value: unknown): boolean {
 const REPLAY_ARG_POLICIES: Readonly<Record<string, ReplayArgsValidator>> = {
   'camera.center': noArgs,
   'camera.zoomTo': signature(isFiniteNumber),
+  'camera.zoomBy': signature(isFiniteNumber),
+  'camera.panTo': signature(isBoundedNumber, isBoundedNumber),
+  'camera.panBy': signature(isBoundedNumber, isBoundedNumber),
+  'camera.frame': signature(isBoundedNumber, isBoundedNumber, isFiniteNumber),
 
   'view.setQualityPreset': signature(
     (value) =>

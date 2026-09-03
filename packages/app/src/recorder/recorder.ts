@@ -5,6 +5,7 @@ import { currentUndoSeq } from '@/utils/undoJournal'
 import { VERSION } from '@/version'
 import { setDocumentWriteReporter, setTimelineTransportReporter, } from './documentWriteHook'
 import { focusHintFor } from './focus'
+import { NARRATION_COMMAND_ID, narrationAsStep } from './narrationMode'
 import { MAX_ACTION_TIMESTAMP_MS, MAX_SESSION_ACTIONS, MAX_SESSION_FILE_BYTES, MAX_SESSION_JSON_CHARS, serializeSession, SESSION_FORMAT_VERSION, validateRecordedAction, validateSession, } from './schema'
 import type { RecordedAction, RecordedSession, SessionViewSnapshot, } from './schema'
 import type { SonificationSnapshot } from './sonificationState'
@@ -107,6 +108,10 @@ let suppressDepth = 0
 let liveWorkspaceMutationGeneration = 0
 /** Index of the action logged for the top-level command currently running,
  *  so that command can retract it (see {@link reportUnreplayable}). */
+/** A narration sentence waiting to caption the next real step. Only ever set
+ *  while `narrationAsStep()` is off; see recorder/narrationMode.ts. */
+let pendingNarration: string | undefined
+
 let pendingActionIndex: number | undefined
 /** A command has run since the current gesture opened, so the entry that
  *  gesture eventually pushes is accounted for by the log. */
@@ -342,6 +347,11 @@ export function startSessionRecording(
   }
   active = next
   resetGestureState()
+  // A sentence with nothing left to caption belongs to the take that ended,
+  // never to the next one. Deliberately not in resetGestureState: that also
+  // runs on every drag boundary, which would drop a caption the agent had
+  // already spoken for the step about to be recorded.
+  pendingNarration = undefined
   setRecordedActionCount(0)
   setUnnamedWriteCount(0)
   // A finished session describes the flame it was recorded against; once a
@@ -459,6 +469,18 @@ export function recordCommandExecution(
     coalesceAnchors = new Map()
     gestureClaimed = false
     noteUnnamedWrite(rec, `${cmd.label} is wall-clock transport`)
+  } else if (
+    rec &&
+    commandDepth === 0 &&
+    suppressDepth === 0 &&
+    cmd.id === NARRATION_COMMAND_ID &&
+    !narrationAsStep()
+  ) {
+    // The sentence still runs (the live rail shows it); it just waits to
+    // caption the step it introduces instead of standing as a step itself.
+    gestureClaimed = true
+    const text = args[0]
+    pendingNarration = typeof text === 'string' ? text : undefined
   } else if (rec && commandDepth === 0 && suppressDepth === 0) {
     // Any command during a gesture accounts for the entry that gesture will
     // push, so the commit is not reported as an anonymous write.
@@ -498,12 +520,15 @@ export function recordCommandExecution(
           pendingActionIndex = anchorIndex
         }
       } else {
+        const narration = pendingNarration
+        pendingNarration = undefined
         const snapshot = snapshotAction(rec, {
           t: elapsedMs(rec),
           id: cmd.id,
           args,
           label: cmd.describe?.([...args]) ?? cmd.label,
           focus: focusFor(cmd, [...args]),
+          ...(narration === undefined ? {} : { note: narration }),
         })
         if (snapshot !== undefined) {
           rec.actions.push(snapshot.action)

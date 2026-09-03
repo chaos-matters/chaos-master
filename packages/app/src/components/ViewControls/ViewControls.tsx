@@ -101,7 +101,10 @@ export function ViewControls(props: ViewControlProps) {
         {/* Each button targets camera.zoom for keyframing in addition to its
             zoom action, so the targeting is keyboard-operable (the wrappers are
             presentational layout only). */}
-        <ButtonGroup data-tour-target="zoom-controls">
+        <ButtonGroup
+          data-tour-target="zoom-controls"
+          data-parameter-path="camera.zoom"
+        >
           <div class={ui.viewControlWrapper}>
             <Button
               aria-label="Zoom out"
@@ -141,7 +144,10 @@ export function ViewControls(props: ViewControlProps) {
             </Button>
           </div>
         </ButtonGroup>
-        <ButtonGroup data-tour-target="camera-coordinates">
+        <ButtonGroup
+          data-tour-target="camera-coordinates"
+          data-parameter-path="camera.position"
+        >
           <div class={ui.cameraCoord}>
             <button
               type="button"

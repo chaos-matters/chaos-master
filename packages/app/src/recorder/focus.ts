@@ -302,9 +302,18 @@ export function focusHintFor(
         : 'ui:metadata-card'
 
     // ---- view, timeline, audio -----------------------------------------
+    // Not `ui:canvas`. The canvas is the one region follow-cam never dims, so
+    // pointing a camera step at it spotlights something already lit and the
+    // viewer sees no highlight at all. Point at the control that moved — the
+    // same anchors the UI path (`flame.setRenderSetting camera.*`) resolves to.
     case 'camera.zoomTo':
+    case 'camera.zoomBy':
     case 'camera.center':
-      return 'ui:canvas'
+    case 'camera.frame':
+      return 'param:camera.zoom'
+    case 'camera.panTo':
+    case 'camera.panBy':
+      return 'param:camera.position'
     case 'timeline.play':
       return 'ui:play-button'
     case 'timeline.setCurrentFrame':

@@ -573,8 +573,20 @@ describe('deriveReplayFocusPreparation', () => {
   })
 
   it('leaves unrelated canvas focus alone', () => {
+    // A command this build does not recognise keeps whatever the file says.
+    expect(
+      deriveReplayFocusPreparation(
+        action('some.futureCommand', [], 'ui:canvas'),
+      ),
+    ).toEqual({ spotlightFocus: 'ui:canvas' })
+  })
+
+  it('re-derives a camera step recorded before the anchors existed', () => {
+    // Camera steps used to record `ui:canvas`, which spotlights the one region
+    // follow-cam never dims — so those sessions highlighted nothing. Deriving
+    // at replay time is exactly what fixes an old file in place.
     expect(
       deriveReplayFocusPreparation(action('camera.center', [], 'ui:canvas')),
-    ).toEqual({ spotlightFocus: 'ui:canvas' })
+    ).toEqual({ spotlightFocus: 'param:camera.zoom' })
   })
 })

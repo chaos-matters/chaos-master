@@ -134,3 +134,33 @@ pnpm test:e2e -- tests/arcade.spec.ts
   deliberately suppressed for the recorder, so it is not part of the saved
   session. A replay applies the keyframes; you press Play.
 - Sessions are stored per browser in IndexedDB (capped at 100).
+
+## What the agent cannot reach yet
+
+Audited 2026-09-03 against the registry: all 87 registered commands carry an
+explicit replay policy, so anything the agent can execute, a session file can
+reproduce. The gaps are elsewhere.
+
+- **Undo and redo run live but do not replay.** `history.undo` / `history.redo`
+  are `replayable: false` on purpose — a log replays the writes, and replaying
+  a takeback of a write that never happened in this run is meaningless. An
+  agent that undoes mid-lesson therefore records a session whose replay
+  diverges from what the viewer watched. Prefer setting the value back.
+- **Playback is wall-clock, not a step.** `timeline.play` is neither
+  recordable nor replayable; `arcade_set_keyframes` starts playback itself and
+  a replay leaves the Play button to the viewer.
+- **3D framing has no first-class commands.** The 2D camera has
+  `camera.center/panTo/panBy/zoomTo/zoomBy/frame`; the 3D camera is reachable
+  only as `flame.setRenderSetting` on `camera3D.*`, which records and replays
+  correctly but reads as a raw settings write in a lesson and has no follow-cam
+  anchor of its own.
+- **Custom variations are a tool, not a command.** `create_custom_variation`
+  compiles user WGSL through the same validator the editor uses, but there is
+  no registered command behind it, so a lesson that authors a variation cannot
+  replay that step.
+- **Pointer-only surfaces stay pointer-only.** Direct canvas drag, pinch and
+  orbit write through `flame.setRenderSetting`, so they record; there is no
+  agent-facing equivalent of "drag from here to there" beyond `camera.panBy`.
+
+`docs/recorder-coverage.md` is the inventory for the recorder side, including
+the surfaces that still write anonymously.
