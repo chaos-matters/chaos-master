@@ -115,6 +115,42 @@ export function AffineGrid(props: {
       viewBox={`${-EXTENT} ${-EXTENT} ${EXTENT * 2} ${EXTENT * 2}`}
       aria-label="Transform shape"
     >
+      <defs>
+        {/*
+          A neighbour's triangle can reach past the well, and cut square at the
+          border it reads as a broken shape rather than as one continuing
+          outside the frame. In user space deliberately: a CSS mask would be
+          sized to each polygon's own bounding box and fade its outline instead
+          of the rim.
+        */}
+        <radialGradient
+          id="duel-grid-fade"
+          gradientUnits="userSpaceOnUse"
+          cx="0"
+          cy="0"
+          r={EXTENT}
+        >
+          <stop offset="0.62" stop-color="#fff" />
+          <stop offset="0.88" stop-color="#fff" stop-opacity="0.45" />
+          <stop offset="1" stop-color="#fff" stop-opacity="0" />
+        </radialGradient>
+        <mask
+          id="duel-grid-rim"
+          maskUnits="userSpaceOnUse"
+          x={-EXTENT}
+          y={-EXTENT}
+          width={EXTENT * 2}
+          height={EXTENT * 2}
+        >
+          <rect
+            x={-EXTENT}
+            y={-EXTENT}
+            width={EXTENT * 2}
+            height={EXTENT * 2}
+            fill="url(#duel-grid-fade)"
+          />
+        </mask>
+      </defs>
       {/* One flip, so every coordinate below is in flame space. */}
       <g transform="scale(1,-1)">
         <g class={ui.rules}>
@@ -132,9 +168,11 @@ export function AffineGrid(props: {
           <line x1="0" y1={-EXTENT} x2="0" y2={EXTENT} />
         </g>
 
-        <For each={props.ghosts}>
-          {(ghost) => <polygon class={ui.ghost} points={tri(ghost)} />}
-        </For>
+        <g mask="url(#duel-grid-rim)">
+          <For each={props.ghosts}>
+            {(ghost) => <polygon class={ui.ghost} points={tri(ghost)} />}
+          </For>
+        </g>
 
         <polygon class={ui.shape} points={tri(props.affine)} />
 
