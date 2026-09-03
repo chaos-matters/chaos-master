@@ -1,4 +1,4 @@
-import { createSignal } from 'solid-js'
+import { createSignal, getOwner, onCleanup } from 'solid-js'
 import { notifyDocumentWrite, notifyTimelineTransport, } from '@/recorder/documentWriteHook'
 import { applyEasing, catmullRom, clamp } from './easing'
 import { persistentSignal } from './persistentSignal'
@@ -610,6 +610,15 @@ export type TimelineStateOptions = {
   /** Which seat's recorder this timeline's writes belong to. Omitted means
    *  the workspace's own seat. */
   seatId?: SeatId
+  /**
+   * Join the app-wide undo journal. A seat's timeline does not, for the same
+   * reason its flame store does not: one Ctrl+Z arbitrates between the
+   * workspace's own systems, and a seat with no keyboard has no business in
+   * that arbitration. Registration is also global and outlives the seat, so
+   * an unjournaled timeline that registered anyway would leak a closure
+   * pinning a dead undo stack for every duel played.
+   */
+  journal?: boolean
 }
 
 export function createTimelineState(options: TimelineStateOptions = {}) {
@@ -705,10 +714,15 @@ export function createTimelineState(options: TimelineStateOptions = {}) {
   const touchStacks = () => setStacksVersion((v) => v + 1)
   // Journal membership: timeline pushes stamp a recency seq and invalidate
   // redo across every journaled system (see utils/undoJournal.ts).
-  registerRedoClearer(() => {
-    redoStack.length = 0
-    touchStacks()
-  })
+  if (options.journal ?? true) {
+    const unregisterRedoClearer = registerRedoClearer(() => {
+      redoStack.length = 0
+      touchStacks()
+    })
+    // Guarded: a timeline built outside a root (tests, one-off tooling) has
+    // nothing to clean up on, and Solid warns about it.
+    if (getOwner()) onCleanup(unregisterRedoClearer)
+  }
   // Coalescing key set by addKeyframesAtCurrentFrame: continuous re-records
   // of the same param set at the same frame (auto-keyframe / track-changes
   // fire per pointer-move while scrubbing) merge into one undo entry, so one

@@ -1,8 +1,9 @@
 import '@/commands/builtins'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { executeCommand } from '@/commands/registry'
 import { deepClone } from '@/utils/clone'
-import { createTestFlame } from '@/webmcp/testUtils'
+import { clearWebMcpContext, getWebMcpContext, getWebMcpTarget, setWebMcpContext, setWebMcpTarget, } from '@/webmcp/contextBridge'
+import { createMockCommandContext, createTestFlame } from '@/webmcp/testUtils'
 import { createSeat } from './seat'
 
 /**
@@ -55,5 +56,56 @@ describe('createSeat', () => {
     const rival = createSeat('rival', createTestFlame())
     expect(rival.ctx.seatId).toBe('rival')
     rival.dispose()
+  })
+})
+
+describe('disposing a seat', () => {
+  it('takes its bridge entry with it', () => {
+    const seat = createSeat('rival', createTestFlame())
+    setWebMcpContext(seat.ctx, 'rival')
+    setWebMcpTarget('rival')
+
+    seat.dispose()
+
+    // The bridge is a module-level map. A context left behind points at a
+    // disposed root for the rest of the page's life, and the target points
+    // every tool at it.
+    expect(getWebMcpContext('rival')).toBeUndefined()
+    expect(getWebMcpTarget()).toBe('player')
+  })
+})
+
+describe('the bridge target', () => {
+  afterEach(() => {
+    clearWebMcpContext('player')
+    clearWebMcpContext('rival')
+    setWebMcpTarget('player')
+  })
+
+  it('comes home when the workspace goes away mid-duel', () => {
+    const seat = createSeat('rival', createTestFlame())
+    setWebMcpContext(createMockCommandContext(), 'player')
+    setWebMcpContext(seat.ctx, 'rival')
+    setWebMcpTarget('rival')
+
+    // MainWorkspace unmounting, with the duel still up.
+    clearWebMcpContext('player')
+
+    // Leaving the target on the rival stranded both duel tools, which read
+    // 'player' explicitly, with no way back.
+    expect(getWebMcpTarget()).toBe('player')
+    seat.dispose()
+  })
+
+  it('stays put while the seat it points at is alive', () => {
+    const seat = createSeat('rival', createTestFlame())
+    setWebMcpContext(createMockCommandContext(), 'player')
+    setWebMcpContext(seat.ctx, 'rival')
+    setWebMcpTarget('rival')
+
+    clearWebMcpContext('nobody' as never)
+
+    expect(getWebMcpTarget()).toBe('rival')
+    seat.dispose()
   })
 })

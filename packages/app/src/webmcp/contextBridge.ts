@@ -54,8 +54,12 @@ export function getWebMcpContext(seatId?: SeatId): CommandContext | undefined {
 export function clearWebMcpContext(seatId: SeatId = DEFAULT_SEAT): void {
   contexts.delete(seatId)
   // A target pointing at a seat that no longer exists would make every tool
-  // report "workspace not ready" with no way back.
-  if (target === seatId) target = DEFAULT_SEAT
+  // report "workspace not ready" with no way back — and so would one pointing
+  // at a live seat after the workspace under it went away, which is what
+  // stranded things: unmounting mid-duel cleared `player` while the target sat
+  // on `rival`, and the duel tools, which read `player` explicitly, never
+  // recovered. Losing the default seat takes the target home either way.
+  if (target === seatId || seatId === DEFAULT_SEAT) target = DEFAULT_SEAT
 }
 
 export function setWebMcpTarget(seatId: SeatId): void {
