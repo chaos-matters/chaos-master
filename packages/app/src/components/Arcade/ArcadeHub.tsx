@@ -39,9 +39,9 @@ export const ARCADE_MODES: CardDef[] = [
   {
     id: 'duel',
     title: 'Duel',
-    tagline: 'Race the AI to the most beautiful flame against the clock.',
+    tagline: 'Race the AI to the better flame, side by side against the clock.',
     tag: 'You + AI',
-    ready: false,
+    ready: true,
     icon: Swords,
   },
   {
