@@ -10,7 +10,7 @@ import { classicExamples } from '@/flame/examples/classics'
 import { Flam3 } from '@/flame/Flam3'
 import { isFlameXmlContent, parseFlameXml, registerImportedFlamePalette, } from '@/flame/flameXml'
 import { camera3DDefault } from '@/flame/schema/flameSchema'
-import { ChevronDown, Cross, Info, LessEqual } from '@/icons'
+import { ChevronDown, Cross, GaugeMax, Info } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
 import { Default3DPreviewCamera } from '@/lib/Camera3D'
@@ -1045,7 +1045,7 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
                 >
                   {/* The glyph carries the "at most"; spell it out for anyone
                       who cannot see it. */}
-                  <LessEqual aria-hidden="true" />
+                  <GaugeMax aria-hidden="true" />
                   <span class={ui.srOnly}>Maximum file size </span>
                   {MAX_IMPORT_FILE_SIZE_LABEL}
                 </span>
