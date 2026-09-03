@@ -1,6 +1,7 @@
 import '@/commands/builtins'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { agentDriving, pilot, resetPilot } from '@/arcade/pilot'
+import { TOPIC_IDS } from '@/arcade/topics'
 import { cancelSessionRecording } from '@/recorder/recorder'
 import { clearWebMcpContext, setWebMcpContext } from '@/webmcp/contextBridge'
 import { wrapTool } from '@/webmcp/registerWebMcp'
@@ -45,6 +46,26 @@ describe('Teach tools', () => {
     expect(agentDriving()).toBe(true)
     // The brief is a tool result: it has to fit the ~1.5 KB budget.
     expect(JSON.stringify(brief).length).toBeLessThan(1500)
+  })
+
+  // One topic passing says nothing about the other three, and the brief grows
+  // whenever a command is added under an allowed prefix — which is exactly how
+  // it drifted over budget once already.
+  it('keeps every topic brief inside the result budget', async () => {
+    for (const topic of TOPIC_IDS) {
+      ctxWithRecorder()
+      const brief = (await arcadeStartLesson.execute({ topic }, {})) as Record<
+        string,
+        unknown
+      >
+      expect(brief).toMatchObject({ ok: true, topic })
+      expect(
+        JSON.stringify(brief).length,
+        `${topic} brief is over the 1.5 KB result budget`,
+      ).toBeLessThan(1500)
+      resetPilot()
+      cancelSessionRecording()
+    }
   })
 
   it('rejects unknown topics and double starts', async () => {
