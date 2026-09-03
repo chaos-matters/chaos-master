@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { examples } from '@/flame/examples'
 import { deepClone } from '@/utils/clone'
-import { createReplayVideoDriver, createReplayVideoJobSpec, createReplayVideoSchedule, drawReplayVideoOverlay, MAX_REPLAY_VIDEO_DURATION_MS, REPLAY_VIDEO_DIMENSIONS, REPLAY_VIDEO_FPS, replayActionIndexAtFrame, replayFramesInStateRun, replayVideoFileName, replayVideoVisualFingerprint, } from './replayVideo'
+import { NARRATION_MS_PER_WORD } from './player'
+import { createReplayVideoDriver, createReplayVideoJobSpec, createReplayVideoSchedule, drawReplayVideoOverlay, MAX_REPLAY_VIDEO_DURATION_MS, REPLAY_VIDEO_DIMENSIONS, REPLAY_VIDEO_FPS, REPLAY_VIDEO_TAIL_MS, replayActionIndexAtFrame, replayFramesInStateRun, replayVideoFileName, replayVideoVisualFingerprint, } from './replayVideo'
 import { SESSION_FORMAT_VERSION } from './schema'
 import type { RecordedAction, RecordedSession } from './schema'
 
@@ -266,6 +267,28 @@ describe('createReplayVideoJobSpec', () => {
   })
 })
 
+describe('replay video tail', () => {
+  it('grows the tail to the closing sentence, and publishes it', () => {
+    // The closing sentence has no step after it to be the dwell on. The
+    // interface capture records the live player and waits this value, so a
+    // flat tail cut the last line off mid-read while the artwork export
+    // showed all of it — a 2.5s difference between two exports of one take.
+    const words = Array.from({ length: 12 }, (_, i) => `w${i}`).join(' ')
+    const session = makeSession([
+      { t: 0, id: 'flame.setGamma', args: [1.5] },
+      { t: 2000, id: 'lesson.note', args: [words] },
+    ])
+    const schedule = createReplayVideoSchedule(session, 1)
+    expect(schedule.tailMs).toBe(12 * NARRATION_MS_PER_WORD)
+    expect(schedule.tailMs).toBeGreaterThan(REPLAY_VIDEO_TAIL_MS)
+
+    const quiet = makeSession([{ t: 0, id: 'flame.setGamma', args: [1.5] }])
+    expect(createReplayVideoSchedule(quiet, 1).tailMs).toBe(
+      REPLAY_VIDEO_TAIL_MS,
+    )
+  })
+})
+
 describe('drawReplayVideoOverlay', () => {
   it('keeps an unbroken authored caption inside the output safe width', () => {
     const drawn: string[] = []
@@ -295,5 +318,51 @@ describe('drawReplayVideoOverlay', () => {
     expect(caption).toBeDefined()
     expect(caption?.endsWith('…')).toBe(true)
     expect((caption?.length ?? 0) * 10).toBeLessThanOrEqual(182)
+  })
+
+  // A real canvas measures against the font in effect; the mock above does
+  // not, which is why it cannot see the adaptive fit at all.
+  function fontAwareContext(drawn: string[]) {
+    let font = '650 41px sans-serif'
+    return {
+      save: () => {},
+      restore: () => {},
+      createLinearGradient: () => ({ addColorStop: () => {} }),
+      fillText: (text: string) => drawn.push(text),
+      fillRect: () => {},
+      clearRect: () => {},
+      measureText: (text: string) => ({
+        // ~0.52em average advance for a 650-weight humanist sans.
+        width: text.length * (Number.parseInt(font, 10) || 41) * 0.52,
+      }),
+      set font(next: string) {
+        font = next.replace(/^650 /, '')
+      },
+      get font() {
+        return font
+      },
+    } as unknown as CanvasRenderingContext2D
+  }
+
+  it('shows a whole agent-length sentence rather than cutting it', () => {
+    // Measured from a real lesson: its narration ran 213-266 characters, and a
+    // two-line block at full size holds about 170 — so every sentence was cut,
+    // the longest losing a third of itself.
+    const sentence =
+      'For the third family I will add pdj on its own transform, because its four frequency parameters produce a wave texture that neither spherical nor juliaN can make, and keeping it separate is what lets you attribute the change you are about to see.'
+    expect(sentence.length).toBeGreaterThan(230)
+    const drawn: string[] = []
+    drawReplayVideoOverlay(fontAwareContext(drawn), 1920, 1080, {
+      action: { t: 0, id: 'lesson.note', args: [sentence], note: sentence },
+      actionIndex: 0,
+      totalActions: 1,
+      progress: 0.5,
+    })
+    const lines = drawn.filter((text) => sentence.includes(text.slice(0, 12)))
+    expect(lines.length).toBeGreaterThan(2)
+    expect(lines.length).toBeLessThanOrEqual(4)
+    expect(lines.some((line) => line.endsWith('…'))).toBe(false)
+    // Every word survives, in order.
+    expect(lines.join(' ').split(/\s+/)).toEqual(sentence.split(/\s+/))
   })
 })

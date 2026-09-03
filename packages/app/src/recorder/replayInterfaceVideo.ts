@@ -1,7 +1,7 @@
 import { deepClone } from '@/utils/clone'
 import { createMetadataPayload, injectMetadataIntoMp4, } from '@/utils/flameInMp4'
 import { createVideoEncoder } from '@/utils/videoEncoder'
-import { createReplayVideoSchedule, MAX_REPLAY_VIDEO_DURATION_MS, REPLAY_VIDEO_FPS, REPLAY_VIDEO_LEAD_IN_MS, REPLAY_VIDEO_TAIL_MS, replayVideoInitialTimelineSnapshot, } from './replayVideo'
+import { createReplayVideoSchedule, MAX_REPLAY_VIDEO_DURATION_MS, REPLAY_VIDEO_FPS, REPLAY_VIDEO_LEAD_IN_MS, replayVideoInitialTimelineSnapshot, } from './replayVideo'
 import { validateSession } from './schema'
 import type { RecordedSession } from './schema'
 import type { VideoEncoderConfig } from '@/utils/videoEncoder'
@@ -321,7 +321,7 @@ export async function captureReplayInterfaceVideo(
   }
   // Validates speed, authored holds and the two-minute resource budget before
   // showing a privacy-sensitive capture chooser.
-  createReplayVideoSchedule(session, request.playbackSpeed)
+  const schedule = createReplayVideoSchedule(session, request.playbackSpeed)
 
   // This call must remain on the direct Export-button stack. getDisplayMedia
   // requires transient user activation and must prompt on every recording.
@@ -385,7 +385,10 @@ export async function captureReplayInterfaceVideo(
     request.prepareReplay()
     await waitFor(REPLAY_VIDEO_LEAD_IN_MS, controller.signal)
     await request.playReplay(controller.signal)
-    await waitFor(REPLAY_VIDEO_TAIL_MS, controller.signal)
+    // The schedule's tail, not the constant: a closing narration step holds
+    // for its reading time, and waiting the flat tail cut the last sentence
+    // off mid-read while the artwork export showed all of it.
+    await waitFor(schedule.tailMs, controller.signal)
     completed = true
     captureOpen = false
     await sampling
