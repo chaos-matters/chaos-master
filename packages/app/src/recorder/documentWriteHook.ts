@@ -14,8 +14,10 @@
  * which is correct, because with no recorder loaded there is no recording.
  */
 
-type DocumentWriteReporter = (description?: string) => void
-type TimelineTransportReporter = (description: string) => void
+import type { SeatId } from '@/seats/seatId'
+
+type DocumentWriteReporter = (description?: string, seatId?: SeatId) => void
+type TimelineTransportReporter = (description: string, seatId?: SeatId) => void
 
 let reporter: DocumentWriteReporter | undefined
 let transportReporter: TimelineTransportReporter | undefined
@@ -24,8 +26,13 @@ export function setDocumentWriteReporter(fn: DocumentWriteReporter): void {
   reporter = fn
 }
 
-export function notifyDocumentWrite(description?: string): void {
-  reporter?.(description)
+/** `seatId` is supplied by the store that owns the write — each timeline
+ *  instance captures its own at construction. Omitted means the player. */
+export function notifyDocumentWrite(
+  description?: string,
+  seatId?: SeatId,
+): void {
+  reporter?.(description, seatId)
 }
 
 /** Timeline transport does not push an undo entry, but it still changes the
@@ -36,6 +43,9 @@ export function setTimelineTransportReporter(
   transportReporter = fn
 }
 
-export function notifyTimelineTransport(description: string): void {
-  transportReporter?.(description)
+export function notifyTimelineTransport(
+  description: string,
+  seatId?: SeatId,
+): void {
+  transportReporter?.(description, seatId)
 }

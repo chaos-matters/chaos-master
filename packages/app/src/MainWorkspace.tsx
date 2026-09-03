@@ -1872,7 +1872,7 @@ export function MainWorkspace(props: AppProps) {
     importReplaySession,
   )
 
-  const timeline = createTimelineState()
+  const timeline = createTimelineState({ seatId: 'player' })
   const captureTimelineSnapshot = (): TimelineSnapshot => ({
     config: deepClone(timeline.config()),
     currentFrame: timeline.currentFrame(),

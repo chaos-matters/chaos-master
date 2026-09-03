@@ -1138,5 +1138,9 @@ export function breakRecordingCoalescing(): void {
 // it: a direct import closes a cycle through the flame schema (see
 // documentWriteHook.ts). Installed on load, which is early enough — nothing
 // can be recorded before the recorder module exists.
-setDocumentWriteReporter(reportTimelineWrite)
-setTimelineTransportReporter(reportTimelineTransport)
+setDocumentWriteReporter((description, seatId) => {
+  recorderStream(seatId ?? DEFAULT_SEAT).reportTimelineWrite(description)
+})
+setTimelineTransportReporter((description, seatId) => {
+  recorderStream(seatId ?? DEFAULT_SEAT).reportTimelineTransport(description)
+})
