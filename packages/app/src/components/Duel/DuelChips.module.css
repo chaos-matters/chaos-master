@@ -214,8 +214,10 @@
 */
 .tile {
   flex: none;
-  /* The thumbnail is square, so the tile's width sets the row's height: this
-     is the widest tile that fits the panel without the caption being cut. */
+  /* The thumbnail is square, so the tile's width sets the row's height, and
+     the panel's height is what caps it: measured, 64px is the widest that
+     fits — 76px overflows the row by 11px, and the panel cannot grow without
+     the artwork's boundary moving when you switch tabs. */
   width: 64px;
   min-width: 0;
   display: grid;
