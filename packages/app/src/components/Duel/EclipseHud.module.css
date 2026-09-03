@@ -1,19 +1,27 @@
 /*
   Sizing is two custom properties, set on `.hud` by whatever mounts it:
 
-    --duel-dial-size   the ring's diameter (default 180px)
-    --duel-timer-size  the countdown's type size (default 33% of the dial)
+    --duel-dial-size   the ring's centreline diameter
+    --duel-timer-size  the countdown's font size (default 19.7% of the dial)
 
-  The mock drew the dial at nearly a third of the window; that is a poster, not
-  a duel. Everything inside scales from these two, so changing them — or adding
-  a size control later — moves the whole assembly together.
+  Every other measurement in here is a ratio of the dial, taken from
+  `hud-04-eclipse`: stroke 1.97%, bezel 109.4% of the radius, ticks hanging
+  inward from 87.5%, timer cap-height 14%, scores at 126% of the radius. The
+  mock draws the dial at 24.3% of the frame width, which is a poster; this
+  ships smaller, because the two flames are what the viewer came for.
 */
 .hud {
-  --duel-dial-size: 180px;
-  --duel-timer-size: calc(var(--duel-dial-size) * 0.33);
+  --duel-dial-size: clamp(200px, 17vw, 300px);
+  --duel-timer-size: calc(var(--duel-dial-size) * 0.197);
+  --duel-warm-core: #fde7ac;
+  --duel-warm-glow: #ff8a1a;
+  --duel-warm-far: #ff6014;
+  --duel-cool-core: #8bf0fb;
+  --duel-cool-glow: #3cbeff;
+  --duel-cool-far: #29a0e8;
   display: grid;
   justify-items: center;
-  gap: 6px;
+  gap: calc(var(--duel-dial-size) * 0.055);
   pointer-events: none;
 }
 
@@ -22,11 +30,14 @@
 }
 
 .versus {
-  margin: 0;
-  font-size: 0.72rem;
-  letter-spacing: 0.42em;
-  text-indent: 0.42em;
-  opacity: 0.55;
+  margin: 0 0 calc(var(--duel-dial-size) * -0.01);
+  font-size: calc(var(--duel-dial-size) * 0.076);
+  font-weight: 400;
+  /* 0.08em, not the 0.42em a "VS" badge tempts you into: wider than this and
+     the two letters stop being a word. */
+  letter-spacing: 0.08em;
+  text-indent: 0.08em;
+  color: rgba(244, 246, 255, 0.82);
 }
 
 .dial {
@@ -37,87 +48,162 @@
   place-items: center;
 }
 
+/* The artwork is suppressed in a wide halo so the dial reads as cut into the
+   picture rather than floating on top of it. */
+.vignette {
+  position: absolute;
+  width: 190%;
+  height: 190%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(4, 6, 12, 0.92) 0 62%,
+    rgba(4, 6, 12, 0.55) 78%,
+    rgba(4, 6, 12, 0) 100%
+  );
+  pointer-events: none;
+}
+
 .ring {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  /* Twelve o'clock, clockwise: the arcs are drawn from the top. */
-  transform: rotate(-90deg);
+  /* The bezel sits at 109.4% of the radius and the bloom reaches past it, so
+     the drawing is wider than the ring it is named for. */
+  width: 114%;
+  height: 114%;
+  overflow: visible;
 }
 
-.ring circle {
+.ring path {
   fill: none;
-  stroke-width: 5;
+  /* Flat ends and a real gap at each meeting point: the split has to read as
+     a cut, not as one colour becoming another. */
   stroke-linecap: butt;
+  transition: d 400ms ease;
 }
 
-.track {
-  stroke: rgba(255, 255, 255, 0.1);
+.warmCore,
+.coolCore {
+  stroke-width: 8;
 }
 
-.ticks line {
-  stroke: rgba(255, 255, 255, 0.22);
-  stroke-width: 0.7;
+.warmNear,
+.coolNear {
+  stroke-width: 9;
 }
 
-.playerArc {
-  stroke: #f6b352;
-  transition: stroke-dasharray 400ms ease;
+.warmFar,
+.coolFar {
+  stroke-width: 11;
 }
 
-.rivalArc {
-  stroke: #6fd2f0;
-  transition:
-    stroke-dasharray 400ms ease,
-    stroke-dashoffset 400ms ease;
+.warmCore {
+  stroke: var(--duel-warm-core);
+}
+
+.warmNear {
+  stroke: var(--duel-warm-glow);
+  opacity: 0.85;
+}
+
+.warmFar {
+  stroke: var(--duel-warm-far);
+  opacity: 0.5;
+}
+
+.coolCore {
+  stroke: var(--duel-cool-core);
+}
+
+.coolNear {
+  stroke: var(--duel-cool-glow);
+  opacity: 0.85;
+}
+
+.coolFar {
+  stroke: var(--duel-cool-far);
+  opacity: 0.5;
+}
+
+/* The one line that makes it an instrument rather than a progress ring. */
+.bezel {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.45);
+  stroke-width: 1.5;
+}
+
+.tickMinor {
+  stroke: rgba(255, 255, 255, 0.2);
+  stroke-width: 2;
+}
+
+.tickMajor {
+  stroke: rgba(244, 246, 255, 0.62);
+  stroke-width: 2;
 }
 
 .readout {
+  position: relative;
   display: grid;
   justify-items: center;
-  gap: 2px;
+  /* Optically centred, which is a little above the geometric centre. */
+  transform: translateY(calc(var(--duel-dial-size) * -0.032));
   line-height: 1;
 }
 
 .clock {
   font-size: var(--duel-timer-size);
+  /* Light, not regular: the mock's stems are 8% of the cap height. */
+  font-weight: 300;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.02em;
+  color: #fff;
 }
 
-.scores {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  font-size: calc(var(--duel-timer-size) * 0.36);
+.clockLabel {
+  margin-top: calc(var(--duel-timer-size) * 0.46);
+  font-size: calc(var(--duel-dial-size) * 0.052);
+  color: rgba(244, 246, 255, 0.55);
+}
+
+/* Outside the ring, level with its centre, in their side's colour — inside it
+   they competed with the clock for the one place the eye goes first. */
+.score {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: calc(var(--duel-dial-size) * 0.104);
+  font-weight: 300;
   font-variant-numeric: tabular-nums;
 }
 
 .playerScore {
-  color: #f6b352;
+  right: calc(100% * 0.13);
+  color: #fed798;
 }
 
 .rivalScore {
-  color: #6fd2f0;
-}
-
-.scoreDash {
-  opacity: 0.4;
+  left: calc(100% * 0.13);
+  color: #95f1fd;
 }
 
 .end {
-  padding: 6px 14px;
+  width: calc(var(--duel-dial-size) * 0.516);
+  height: calc(var(--duel-dial-size) * 0.13);
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.06);
-  color: inherit;
-  font-size: 0.8rem;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  font-size: calc(var(--duel-dial-size) * 0.062);
   cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease;
 }
 
 .end:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.62);
 }
 
 .end:disabled {
@@ -127,31 +213,30 @@
 
 .ready {
   margin: 0;
-  max-width: 22ch;
+  max-width: 24ch;
   text-align: center;
-  font-size: 0.72rem;
-  opacity: 0.6;
+  font-size: calc(var(--duel-dial-size) * 0.05);
+  color: rgba(244, 246, 255, 0.6);
 }
 
-/* The last ten seconds. Colour and weight only — nothing that moves, because
-   the flames underneath are already moving. */
+/* The last ten seconds. Colour only — the flames underneath are already
+   moving, and a HUD that also moves is two things competing. */
 .urgent .clock {
   color: #ff9d7a;
 }
 
-.urgent .track {
-  stroke: rgba(255, 157, 122, 0.22);
+.urgent .bezel {
+  stroke: rgba(255, 157, 122, 0.55);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .playerArc,
-  .rivalArc {
+  .ring path {
     transition: none;
   }
 }
 
 @media (max-width: 900px) {
   .hud {
-    --duel-dial-size: 140px;
+    --duel-dial-size: clamp(150px, 34vw, 220px);
   }
 }
