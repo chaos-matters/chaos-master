@@ -233,6 +233,13 @@
   transition: transform 200ms ease;
 }
 
+/* Above the duel stage (10008), so a duel can show the real editor rather
+   than growing a second one of its own. */
+.sidebarOverDuel {
+  z-index: 10009;
+  background: var(--color-bg, #04060c);
+}
+
 .sidebarResizeHandle {
   position: absolute;
   top: 0;
@@ -287,6 +294,13 @@
 }
 
 @media (pointer: coarse) {
+  /* Above the duel stage (10008), so a duel can show the real editor rather
+   than growing a second one of its own. */
+  .sidebarOverDuel {
+    z-index: 10009;
+    background: var(--color-bg, #04060c);
+  }
+
   .sidebarResizeHandle {
     width: 12px;
   }
@@ -1366,6 +1380,13 @@
     font-size: 0.92em;
   }
 
+  /* Above the duel stage (10008), so a duel can show the real editor rather
+   than growing a second one of its own. */
+  .sidebarOverDuel {
+    z-index: 10009;
+    background: var(--color-bg, #04060c);
+  }
+
   .sidebarResizeHandle {
     display: none;
   }
@@ -1410,6 +1431,13 @@
       border-right: 1px solid var(--neutral-800);
       box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
     }
+  }
+
+  /* Above the duel stage (10008), so a duel can show the real editor rather
+   than growing a second one of its own. */
+  .sidebarOverDuel {
+    z-index: 10009;
+    background: var(--color-bg, #04060c);
   }
 
   .sidebarResizeHandle {

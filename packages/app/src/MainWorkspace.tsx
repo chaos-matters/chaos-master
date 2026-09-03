@@ -18,7 +18,7 @@ import { createDragHandler } from '@/utils/createDragHandler'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { calculateFlameStats } from '@/webmcp/tools/scoreFlame'
 import ui from './App.module.css'
-import { duelActive } from './arcade/duel'
+import { duelActive, duelSidebarOpen } from './arcade/duel'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
 import { AncestryTreeModal } from './components/AncestryTreeModal/AncestryTreeModal'
 import { PilotOverlay } from './components/Arcade/PilotOverlay'
@@ -5177,6 +5177,10 @@ export function MainWorkspace(props: AppProps) {
               classList={{
                 [ui.sidebarLocked as string]: timeline.isPlaying(),
                 [ui.sidebarHidden as string]: sidebarHidden(),
+                // The duel stage is a fixed overlay above the workspace; the
+                // sidebar has to climb over it to be reachable during a duel.
+                [ui.sidebarOverDuel as string]:
+                  duelActive() && duelSidebarOpen(),
               }}
               style={{ '--sidebar-width': `${sidebarWidth()}rem` }}
               data-tour-target="sidebar"
@@ -7861,6 +7865,7 @@ export function MainWorkspace(props: AppProps) {
               playerZoom={[effectiveZoom, setFlameZoom]}
               playerPosition={[effectivePosition, setFlamePosition]}
               quality={qualityPresets[qualityPreset()]}
+              sidebarWidthRem={sidebarWidth}
             />
           </Show>
 

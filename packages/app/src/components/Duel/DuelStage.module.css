@@ -1,6 +1,17 @@
 .stage {
   position: fixed;
-  inset: 0;
+  /* Four sides rather than `inset: 0`, deliberately: a shorthand followed by
+     a `left` the minifier cannot evaluate gets merged back into the shorthand,
+     and the stage silently stops stepping aside for the sidebar. */
+  top: 0;
+  right: 0;
+  bottom: 0;
+  /* Set by the component: while the real sidebar is showing, the stage stops
+     covering it rather than the duel growing a second editor of its own. */
+  left: var(--duel-inset-left, 0px);
+  /* No transition here. `left` reads an unregistered custom property, and a
+     transitioned property whose value comes from one lags a change behind:
+     the stage would sit over the sidebar until the next toggle. */
   /* Below the pilot lock (10010) so a seat-scoped shield still sits on top of
      the agent's half, above the workspace chrome. */
   z-index: 10008;
@@ -130,4 +141,33 @@
     top: 50%;
     transform: translate(-50%, -50%);
   }
+}
+
+.sidebarToggle {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(4, 6, 12, 0.55);
+  backdrop-filter: blur(8px);
+  color: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
+  opacity: 0.72;
+}
+
+.sidebarToggle:hover,
+.sidebarToggle[aria-pressed='true'] {
+  opacity: 1;
+}
+
+.sidebarIcon {
+  width: 15px;
+  height: 15px;
 }
