@@ -18,10 +18,12 @@ describe('lesson.note', () => {
     expect(narration()).toBe('Adding a spherical variation next.')
     expect(narrationLog()).toHaveLength(1)
     const session = stopSessionRecording()
+    // The label IS the sentence: a replay step list reading "Narration" for
+    // every line tells the viewer nothing.
     expect(session?.actions[0]).toMatchObject({
       id: 'lesson.note',
       args: ['Adding a spherical variation next.'],
-      label: 'Narration',
+      label: 'Adding a spherical variation next.',
     })
   })
 

@@ -37,6 +37,30 @@ describe('lesson topics', () => {
     expect(missing).toEqual([])
   })
 
+  // Every step the pilot takes is shown twice — in the live rail while the AI
+  // drives, and in the replay step list afterwards — and both read the same
+  // `describe`. A command without one falls back to its label plus raw JSON
+  // (`Toggle Sidebar [true]`), which is what the viewer is left staring at.
+  it('only allows commands that can describe themselves', () => {
+    const commands = getAllCommands()
+    const allowLists = [
+      ...TOPIC_IDS.map((id) => LESSON_TOPICS[id].allowed),
+      CINEMA_ALLOWED,
+    ]
+    const rawJson = new Set<string>()
+    for (const allowed of allowLists) {
+      for (const entry of allowed) {
+        const matched = entry.endsWith('.')
+          ? commands.filter((command) => command.id.startsWith(entry))
+          : commands.filter((command) => command.id === entry)
+        for (const command of matched) {
+          if (command.describe === undefined) rawJson.add(command.id)
+        }
+      }
+    }
+    expect([...rawJson].sort()).toEqual([])
+  })
+
   it('offers cinema presets that fill the wish with a full sentence', () => {
     expect(CINEMA_PRESETS.map((preset) => preset.id)).toEqual([
       'small',

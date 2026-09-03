@@ -1,6 +1,7 @@
 import { isTimelineParameterPath, MAX_TIMELINE_FRAME, MAX_TIMELINE_KEYFRAME_NUMBER_MAGNITUDE, MAX_TIMELINE_KEYFRAME_STRING_LENGTH, MAX_TIMELINE_PLAYBACK_FPS, MAX_TIMELINE_TIME_SCALE, MAX_TIMELINE_TRACKS, tryValidateTimelineSnapshot, } from '@/flame/schema/timeline'
 import { snapshotOriginForCommand, snapshotOriginLabel, tryValidateSnapshotOrigin, } from '@/recorder/snapshotOrigin'
 import { registerCommand } from '../registry'
+import { num, str } from './describeArgs'
 
 type ReplayArgGuard = (value: unknown) => boolean
 
@@ -171,6 +172,8 @@ function validateSetKeyframeValueArgs(
 
 registerCommand({
   id: 'timeline.setAnimationEnabled',
+  describe: ([enabled]) =>
+    enabled === false ? 'Disable animation' : 'Enable animation',
   label: 'Toggle Animation',
   description: 'Enable or disable timeline animation playback',
   shortcut: 'Ctrl+T',
@@ -186,6 +189,12 @@ registerCommand({
 
 registerCommand({
   id: 'timeline.setDuration',
+  describe: ([frames]) => {
+    const f = num(frames, 0)
+    return f === undefined
+      ? 'Set the animation duration'
+      : `Duration: ${f} frames`
+  },
   label: 'Set Animation Duration',
   description: 'Set the animation duration in frames',
   coalesceKey: ([, coalesce]) => (coalesce === true ? 'duration' : undefined),
@@ -203,6 +212,7 @@ registerCommand({
 
 registerCommand({
   id: 'timeline.setLoop',
+  describe: ([loop]) => (loop === false ? 'Loop off' : 'Loop on'),
   label: 'Set Animation Loop',
   description: 'Enable or disable timeline animation loop',
   validateReplayArgs: (args) => exactReplayArgs(args, [isBoolean]),
@@ -215,6 +225,10 @@ registerCommand({
 
 registerCommand({
   id: 'timeline.setFps',
+  describe: ([fps]) => {
+    const f = num(fps, 0)
+    return f === undefined ? 'Set the animation FPS' : `Animation FPS: ${f}`
+  },
   label: 'Set Animation FPS',
   description: 'Set the frames per second for timeline playback',
   coalesceKey: ([, coalesce]) => (coalesce === true ? 'fps' : undefined),
@@ -229,6 +243,7 @@ registerCommand({
 
 registerCommand({
   id: 'timeline.setAutoFps',
+  describe: ([enabled]) => (enabled === false ? 'Auto FPS off' : 'Auto FPS on'),
   label: 'Set Auto FPS',
   description: 'Wait for render quality before advancing each frame',
   validateReplayArgs: (args) => exactReplayArgs(args, [isBoolean]),
@@ -239,6 +254,10 @@ registerCommand({
 
 registerCommand({
   id: 'timeline.setTimeScale',
+  describe: ([scale]) => {
+    const s = num(scale, 2)
+    return s === undefined ? 'Set the playback speed' : `Playback speed: ${s}x`
+  },
   label: 'Set Playback Speed',
   description: 'Set the timeline playback speed multiplier',
   coalesceKey: ([, coalesce]) => (coalesce === true ? 'time-scale' : undefined),
@@ -268,6 +287,10 @@ registerCommand({
 
 registerCommand({
   id: 'timeline.setCurrentFrame',
+  describe: ([frame]) => {
+    const f = num(frame, 0)
+    return f === undefined ? 'Jump to a frame' : `Go to frame ${f}`
+  },
   label: 'Set Current Frame',
   description: 'Jump to a specific frame in the timeline',
   coalesceKey: ([, coalesce]) => (coalesce === true ? 'playhead' : undefined),
@@ -282,6 +305,12 @@ registerCommand({
 
 registerCommand({
   id: 'timeline.addKeyframe',
+  describe: ([path, , frame]) => {
+    const p = str(path)
+    if (p === undefined) return 'Add a keyframe'
+    const f = num(frame, 0)
+    return f === undefined ? `Keyframe ${p}` : `Keyframe ${p} @${f}`
+  },
   label: 'Add Keyframe',
   description: 'Add a keyframe at the current or specified frame',
   validateReplayArgs: validateAddKeyframeArgs,
@@ -310,6 +339,12 @@ registerCommand({
 
 registerCommand({
   id: 'timeline.addKeyframes',
+  describe: ([writes, frame]) => {
+    const count = Array.isArray(writes) ? writes.length : 0
+    const f = num(frame, 0)
+    const what = count === 1 ? '1 keyframe' : `${count} keyframes`
+    return f === undefined ? `Add ${what}` : `Add ${what} @${f}`
+  },
   label: 'Add Keyframes',
   description: 'Keyframe multiple parameter values as one authored edit',
   coalesceKey: ([writes, frame, coalesce]) => {
@@ -335,6 +370,7 @@ registerCommand({
 
 registerCommand({
   id: 'timeline.play',
+  describe: () => 'Play the timeline',
   label: 'Play Timeline',
   description: 'Start timeline playback',
   recordable: false,
@@ -521,6 +557,7 @@ registerCommand({
 
 registerCommand({
   id: 'timeline.clearTracks',
+  describe: () => 'Clear the timeline',
   label: 'Clear Timeline',
   description: 'Remove every track and keyframe',
   validateReplayArgs: (args) => exactReplayArgs(args, []),
@@ -580,6 +617,8 @@ registerCommand({
 
 registerCommand({
   id: 'timeline.setAutoKeyframe',
+  describe: ([enabled]) =>
+    enabled === false ? 'Auto-keyframe off' : 'Auto-keyframe on',
   label: 'Toggle Auto-Keyframe',
   description: 'Record a keyframe automatically whenever a parameter changes',
   validateReplayArgs: (args) => exactReplayArgs(args, [isBoolean]),

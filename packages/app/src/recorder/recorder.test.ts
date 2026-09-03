@@ -1638,10 +1638,11 @@ describe('.steps.json serialization', () => {
     const session = recordSmallSession()
     const parsed = parseSession(serializeSession(session))
     expect(parsed).toEqual(session)
-    // Labels resolved at record time, timestamps monotonic.
+    // Labels resolved at record time, timestamps monotonic. A named scalar
+    // command describes itself, so the label carries the value it set.
     expect(parsed?.actions.map((x) => x.label)).toEqual([
-      'Set Gamma',
-      'Set Vibrancy',
+      'Gamma: 2.42',
+      'Vibrancy: 0.95',
     ])
     // A generic command describes the invocation instead of itself, so the
     // replay step list reads "Set gamma to 2.42" rather than repeating "Set

@@ -1,4 +1,5 @@
 import { registerCommand } from '../registry'
+import { num } from './describeArgs'
 
 /**
  * The actions-toolbar switches: quality preset, the two filters, 2D/3D, fly
@@ -30,6 +31,12 @@ registerCommand({
 
 registerCommand({
   id: 'view.setPixelRatio',
+  describe: ([ratio]) => {
+    const r = num(ratio, 2)
+    return r === undefined
+      ? 'Set the canvas resolution'
+      : `Canvas resolution: ${r}x`
+  },
   label: 'Set Canvas Resolution',
   description: 'Choose the live canvas resolution scale',
   execute(ctx, ratio?: unknown) {
@@ -87,6 +94,8 @@ registerCommand({
 
 registerCommand({
   id: 'view.setShowTimeline',
+  describe: ([show]) =>
+    show === false ? 'Hide the timeline panel' : 'Show the timeline panel',
   label: 'Toggle Timeline Panel',
   description: 'Show or hide the timeline',
   execute(ctx, shown?: unknown) {
