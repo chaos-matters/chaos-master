@@ -141,7 +141,11 @@ export function DuelStage(props: {
           </button>
           <div class={ui.hudSlot}>
             <EclipseHud model={model()} onEnd={end} ending={ending()} />
-            <DuelNarration driving={drivingState()} />
+            {/* Below the dial rather than in a column with it, so the dial
+                keeps the exact centre of the frame to itself. */}
+            <div class={ui.narrationSlot}>
+              <DuelNarration driving={drivingState()} />
+            </div>
           </div>
         </div>
       )}

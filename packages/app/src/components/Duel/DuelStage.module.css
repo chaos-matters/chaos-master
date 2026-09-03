@@ -36,12 +36,26 @@
   z-index: 1;
   display: grid;
   justify-items: center;
-  gap: 8px;
   /* The dial's own size; the stage is where a size control would write.
      The mock draws it at 24.3% of the frame; this is deliberately smaller,
      because the two flames are what the viewer came for — and smaller again
      now that the scores have moved off it onto the name pills. */
   --duel-dial-size: clamp(150px, 12vw, 230px);
+}
+
+/*
+  The narration reads over whichever flame is behind it, and a flame can go
+  white-hot, so it carries its own ground rather than trusting the artwork.
+*/
+.narrationSlot {
+  position: absolute;
+  top: calc(100% + var(--duel-dial-size) * 0.44);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: 12px;
+  background: rgba(4, 6, 12, 0.72);
+  backdrop-filter: blur(6px);
 }
 
 .seats {
@@ -52,6 +66,27 @@
   gap: 12px;
   padding: 12px;
   min-height: 0;
+}
+
+/* The seam the dial straddles, drawn rather than left as a gap: the mock's
+   two halves meet on a hairline, and a 12px trough of page black reads as a
+   missing panel instead of a divider. */
+.seats::after {
+  content: '';
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(
+    to bottom,
+    rgba(116, 122, 131, 0) 0%,
+    rgba(116, 122, 131, 0.55) 12%,
+    rgba(116, 122, 131, 0.55) 88%,
+    rgba(116, 122, 131, 0) 100%
+  );
+  pointer-events: none;
 }
 
 .side {

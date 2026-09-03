@@ -10,7 +10,13 @@
   mock draws the dial at 24.3% of the frame width, which is a poster; this
   ships smaller, because the two flames are what the viewer came for.
 */
+/*
+  Only the dial is in flow. VS, the button and the ready line hang off it, so
+  the HUD's box IS the dial's box and whatever centres the HUD centres the
+  dial — not the taller stack that happens to surround it.
+*/
 .hud {
+  position: relative;
   --duel-dial-size: clamp(150px, 12vw, 230px);
   --duel-timer-size: calc(var(--duel-dial-size) * 0.197);
   --duel-warm-core: #fde7ac;
@@ -21,7 +27,6 @@
   --duel-cool-far: #29a0e8;
   display: grid;
   justify-items: center;
-  gap: calc(var(--duel-dial-size) * 0.055);
   pointer-events: none;
 }
 
@@ -30,14 +35,21 @@
 }
 
 .versus {
-  margin: 0 0 calc(var(--duel-dial-size) * -0.01);
+  position: absolute;
+  bottom: calc(100% + var(--duel-dial-size) * 0.03);
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
   font-size: calc(var(--duel-dial-size) * 0.076);
   font-weight: 400;
   /* 0.08em, not the 0.42em a "VS" badge tempts you into: wider than this and
      the two letters stop being a word. */
   letter-spacing: 0.08em;
   text-indent: 0.08em;
-  color: rgba(244, 246, 255, 0.82);
+  /* The mock draws this bright, not as a whisper: at 0.82 alpha over the
+     artwork it measured 2.5:1, which fails even the large-text floor. */
+  color: #eef9ff;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.85);
 }
 
 .dial {
@@ -184,7 +196,11 @@
 /* Outside the ring, level with its centre, in their side's colour — inside it
    they competed with the clock for the one place the eye goes first. */
 .end {
-  width: calc(var(--duel-dial-size) * 0.516);
+  position: absolute;
+  top: calc(100% + var(--duel-dial-size) * 0.09);
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(var(--duel-dial-size) * 0.72);
   height: calc(var(--duel-dial-size) * 0.13);
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.38);
@@ -209,11 +225,16 @@
 }
 
 .ready {
+  position: absolute;
+  top: calc(100% + var(--duel-dial-size) * 0.28);
+  left: 50%;
+  transform: translateX(-50%);
   margin: 0;
   max-width: 24ch;
   text-align: center;
   font-size: calc(var(--duel-dial-size) * 0.05);
-  color: rgba(244, 246, 255, 0.6);
+  color: rgba(244, 246, 255, 0.72);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9);
 }
 
 /* The last ten seconds. Colour only — the flames underneath are already
