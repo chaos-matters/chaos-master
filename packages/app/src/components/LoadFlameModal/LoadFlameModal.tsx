@@ -10,7 +10,7 @@ import { classicExamples } from '@/flame/examples/classics'
 import { Flam3 } from '@/flame/Flam3'
 import { isFlameXmlContent, parseFlameXml, registerImportedFlamePalette, } from '@/flame/flameXml'
 import { camera3DDefault } from '@/flame/schema/flameSchema'
-import { ChevronDown, Cross, Info } from '@/icons'
+import { ChevronDown, Cross, Info, LessEqual } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
 import { Default3DPreviewCamera } from '@/lib/Camera3D'
@@ -580,8 +580,8 @@ const FORMAT_LABELS: Record<string, { label: string; hint: string }> = {
   },
   '.json': { label: 'JSON', hint: 'A flame descriptor' },
   '.zip': { label: 'ZIP', hint: 'A full backup archive' },
-  '.flame': { label: '.flame', hint: 'An Apophysis or flam3 configuration' },
-  '.xml': { label: '.xml', hint: 'An Apophysis or flam3 configuration' },
+  '.flame': { label: 'FLAME', hint: 'An Apophysis or flam3 configuration' },
+  '.xml': { label: 'XML', hint: 'An Apophysis or flam3 configuration' },
 }
 
 export const ACCEPTED_FORMATS = Object.values(FLAME_FILE_ACCEPT)
@@ -1039,8 +1039,15 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
                     </span>
                   )}
                 </For>
-                <span class={ui.sizeLimit}>
-                  up to {MAX_IMPORT_FILE_SIZE_LABEL}
+                <span
+                  class={ui.sizeLimit}
+                  title={`Maximum file size: ${MAX_IMPORT_FILE_SIZE_LABEL}`}
+                >
+                  {/* The glyph carries the "at most"; spell it out for anyone
+                      who cannot see it. */}
+                  <LessEqual aria-hidden="true" />
+                  <span class={ui.srOnly}>Maximum file size </span>
+                  {MAX_IMPORT_FILE_SIZE_LABEL}
                 </span>
               </div>
             </Show>

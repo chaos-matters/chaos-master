@@ -25,6 +25,7 @@ import Home from './home.svg'
 import HoverEyePreview from './hover-eye-preview.svg'
 import HoverPreview from './hover-preview.svg'
 import Info from './info.svg'
+import LessEqual from './less-equal.svg'
 import Lineage from './lineage.svg'
 import ListIcon from './list.svg'
 import Menu from './menu.svg'
@@ -81,6 +82,7 @@ export {
   Info,
   HoverEyePreview,
   HoverPreview,
+  LessEqual,
   Lineage,
   ListIcon,
   Menu,

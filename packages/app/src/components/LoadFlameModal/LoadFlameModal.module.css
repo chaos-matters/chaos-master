@@ -430,7 +430,7 @@
   border-radius: 4px;
   background: var(--neutral-50);
   color: var(--neutral-600);
-  font-size: 0.6rem;
+  font-size: 0.66rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   white-space: nowrap;
@@ -442,14 +442,27 @@
   }
 }
 
-/* A limit, not a format — reads as a note so it cannot be mistaken for one. */
+/* A limit, not a format — reads as a note so it cannot be mistaken for one.
+   It reads as a note because it has no pill chrome, not because it is faint:
+   dimming it to --neutral-600 measured 2.25:1 on the dark surface and
+   --neutral-500 only reached 3.71:1, both under the 4.5:1 floor. It now sits
+   at the pills' own text level and is told apart by the missing border and
+   fill, which costs no legibility. */
 .sizeLimit {
-  color: var(--neutral-400);
-  font-size: 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--neutral-600);
+  font-size: 0.66rem;
   white-space: nowrap;
 
+  & svg {
+    width: 0.8rem;
+    height: 0.8rem;
+  }
+
   [data-theme='dark'] & {
-    color: var(--neutral-600);
+    color: var(--neutral-400);
   }
 }
 
@@ -678,4 +691,17 @@
 .galleryTagClear {
   border-color: oklch(62% 0.16 280 / 55%);
   color: oklch(70% 0.14 270);
+}
+
+/* Available to assistive tech, absent from the visual composition. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
