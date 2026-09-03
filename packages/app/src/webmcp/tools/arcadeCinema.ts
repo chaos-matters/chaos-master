@@ -72,6 +72,7 @@ export const arcadeStartCinema: WebMcpTool = {
         'Call arcade_get_animatable_paths first.',
         'Build the animation one idea at a time: arcade_set_keyframes with mode "add" per group of related tracks, keeping the same durationFrames. Each call is a step the viewer watches land and can replay.',
         'Keep it under 10 seconds unless asked; use easeInOut for camera moves.',
+        'arcade_get_animatable_paths is free; every arcade_set_keyframes call that is accepted costs a step, play or no play, and leaves its tracks behind. A rejected call costs nothing.',
       ],
     }
   },
@@ -84,7 +85,7 @@ const MAX_LISTED_TRANSFORMS = 8
 /** Every transform exposes the same paths, so the grammar is stated once
  *  instead of repeated for each one. */
 const TRANSFORM_PATHS =
-  'transform.<id>.{preAffine|postAffine}.{a-f} | transform.<id>.{probability|colorSpeed|color.x|color.y} | <id>.<variationId> weight | finalTransform.{a-f}'
+  'transform.<id>.{preAffine|postAffine}.{a-f} or .{probability|colorSpeed|color.x|color.y} | finalTransform.{a-f} | <id>.<variationId>[.<param>] (no transform. prefix)'
 
 function summarize(
   catalog: CatalogEntry[],

@@ -109,6 +109,27 @@ export function buildAnimatableCatalog(flame: FlameDescriptor): CatalogEntry[] {
   return entries
 }
 
+/**
+ * The one asymmetry in the path grammar: everything on a transform is
+ * addressed `transform.<tid>.<what>`, but a variation weight is `<tid>.<vid>`
+ * and a variation parameter `<tid>.<vid>.<name>` — no prefix. That is what the
+ * timeline resolver has always written and what every saved animation stores,
+ * so the format cannot move; agents reach for the prefixed form anyway and
+ * burn a call on the rejection. A prefixed path that resolves to a real
+ * variation path is accepted and rewritten to the canonical one, so the stored
+ * track is the same either way. Reserved forms are looked up first, so a
+ * variation that happens to be called `probability` cannot shadow one.
+ */
+function canonicalPath(
+  byPath: ReadonlyMap<string, CatalogEntry>,
+  path: string,
+): string | undefined {
+  if (byPath.has(path)) return path
+  if (!path.startsWith('transform.')) return undefined
+  const stripped = path.slice('transform.'.length)
+  return byPath.has(stripped) ? stripped : undefined
+}
+
 const KeyframeInput = v.object({
   frame: v.pipe(
     v.number(),
@@ -203,19 +224,22 @@ export function buildTimelineSnapshot(
   const input = parsed.output
   const byPath = new Map(catalog.map((entry) => [entry.path, entry]))
   const seen = new Set<string>()
+  const canonical = new Map<string, string>()
   let keyframeCount = 0
   for (const track of input.tracks) {
-    const entry = byPath.get(track.path)
-    if (!entry) {
+    const path = canonicalPath(byPath, track.path)
+    const entry = path === undefined ? undefined : byPath.get(path)
+    if (entry === undefined || path === undefined) {
       return {
         ok: false,
         error: `Unknown path "${track.path}". Call arcade_get_animatable_paths for the list.`,
       }
     }
-    if (seen.has(track.path)) {
-      return { ok: false, error: `Path "${track.path}" appears twice.` }
+    canonical.set(track.path, path)
+    if (seen.has(path)) {
+      return { ok: false, error: `Path "${path}" appears twice.` }
     }
-    seen.add(track.path)
+    seen.add(path)
     let last = -1
     for (const keyframe of track.keyframes) {
       if (keyframe.frame > input.durationFrames) {
@@ -242,7 +266,7 @@ export function buildTimelineSnapshot(
     }
   }
   const additions = input.tracks.map((track) => ({
-    parameterPath: track.path,
+    parameterPath: canonical.get(track.path) ?? track.path,
     keyframes: track.keyframes.map((keyframe) => ({
       frame: keyframe.frame,
       value: keyframe.value,
