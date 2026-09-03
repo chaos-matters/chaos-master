@@ -1,16 +1,16 @@
 /*
   Sizing is two custom properties, set on `.hud` by whatever mounts it:
 
-    --duel-dial-size   the ring's diameter (default 132px)
-    --duel-timer-size  the countdown's type size (default 30% of the dial)
+    --duel-dial-size   the ring's diameter (default 180px)
+    --duel-timer-size  the countdown's type size (default 33% of the dial)
 
   The mock drew the dial at nearly a third of the window; that is a poster, not
   a duel. Everything inside scales from these two, so changing them — or adding
   a size control later — moves the whole assembly together.
 */
 .hud {
-  --duel-dial-size: 132px;
-  --duel-timer-size: calc(var(--duel-dial-size) * 0.3);
+  --duel-dial-size: 180px;
+  --duel-timer-size: calc(var(--duel-dial-size) * 0.33);
   display: grid;
   justify-items: center;
   gap: 6px;
@@ -152,6 +152,6 @@
 
 @media (max-width: 900px) {
   .hud {
-    --duel-dial-size: 104px;
+    --duel-dial-size: 140px;
   }
 }
