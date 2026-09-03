@@ -1,7 +1,14 @@
 # Home tab — onboarding, gallery, and the marketing frontline
 
-Status: **planning**. No implementation yet.
-Author decisions captured 2026-07-29.
+Status: **implemented through the hybrid Home gallery and community rail**.
+Original author decisions captured 2026-07-29; reconciled 2026-08-21.
+
+The original phased design below is retained as the decision record. The live
+implementation now includes the Home shell, visibility-gated live plates,
+motion and capability sections, the Made Here tour portal, curated collections,
+and an approved Discord-community rail. See
+`docs/plans/home-community-showcase-plan.md` for the submission, moderation, and
+rollout design.
 
 ## Why
 

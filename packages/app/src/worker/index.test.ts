@@ -1,4 +1,6 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { example1 } from '@/flame/examples/example1'
+import { SHOWCASE_CONSENT_VERSION } from '@/lib/communityShowcase'
 import worker from './index'
 import type { Env } from './index'
 
@@ -57,9 +59,23 @@ const ctx = {}
 const PNG = btoa(
   String.fromCharCode(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a),
 )
+const SHOWCASE_PNG = (() => {
+  const bytes = new Uint8Array(24)
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+  const view = new DataView(bytes.buffer)
+  view.setUint32(8, 13)
+  bytes.set([0x49, 0x48, 0x44, 0x52], 12)
+  view.setUint32(16, 640)
+  view.setUint32(20, 480)
+  return btoa(String.fromCharCode(...bytes))
+})()
 const KEY = 'a'.repeat(32)
 const post = (url: string, body: unknown) =>
   new Request(url, { method: 'POST', body: JSON.stringify(body) })
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 // Mirror of the Worker's `ogKey` so a test can address the same content key.
 async function ogKey(encoded: string): Promise<string> {
@@ -166,6 +182,176 @@ describe('worker /api/shorten — S-2 payload cap', () => {
   })
 })
 
+describe('worker /api/share-discord — community showcase staging', () => {
+  function discordBody(showcase?: unknown) {
+    return {
+      image: SHOWCASE_PNG,
+      title: 'Shared Flame',
+      author: 'Ada Artist',
+      token: '',
+      showcase,
+    }
+  }
+
+  function successfulDiscord() {
+    return vi.fn(() => Promise.resolve(new Response(null, { status: 204 })))
+  }
+
+  it('stages an explicitly consented share as pending and unpublished', async () => {
+    const db = makeD1([])
+    const r2 = makeR2()
+    vi.stubGlobal('fetch', successfulDiscord())
+    const res = await worker.fetch(
+      post(
+        'https://x.test/api/share-discord',
+        discordBody({
+          consent: true,
+          consentVersion: SHOWCASE_CONSENT_VERSION,
+          flame: example1,
+          shareUrl: 'https://x.test/?flame=abc',
+        }),
+      ),
+      makeEnv({
+        CONTENT_DB: db,
+        OG_IMAGES: r2,
+        DISCORD_WEBHOOK_URL: 'https://discord.test/webhook',
+      }),
+      ctx,
+    )
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ ok: true, showcase: 'queued' })
+    expect(db.calls).toHaveLength(2)
+    expect(db.calls[0]?.sql).toContain('published, submission_source')
+    expect(db.calls[0]?.params).toEqual(
+      expect.arrayContaining(['discord', 'pending', SHOWCASE_CONSENT_VERSION]),
+    )
+    expect(JSON.parse(String(db.calls[0]?.params[5]))).toMatchObject({
+      metadata: { name: 'Shared Flame', author: 'Ada Artist' },
+    })
+    expect(r2.put).toHaveBeenCalledOnce()
+    expect(r2.put.mock.calls[0]?.[0]).toMatch(
+      /^gallery\/community\/community-shared-flame-[a-f0-9]{8}\.png$/,
+    )
+  })
+
+  it('does not touch gallery storage without explicit consent', async () => {
+    const db = makeD1([])
+    const r2 = makeR2()
+    vi.stubGlobal('fetch', successfulDiscord())
+    const res = await worker.fetch(
+      post('https://x.test/api/share-discord', discordBody()),
+      makeEnv({
+        CONTENT_DB: db,
+        OG_IMAGES: r2,
+        DISCORD_WEBHOOK_URL: 'https://discord.test/webhook',
+      }),
+      ctx,
+    )
+
+    expect(await res.json()).toEqual({
+      ok: true,
+      showcase: 'not-requested',
+    })
+    expect(db.calls).toHaveLength(0)
+    expect(r2.put).not.toHaveBeenCalled()
+  })
+
+  it('keeps a successful Discord share when the showcase migration is pending', async () => {
+    const db = makeD1([], {
+      failOnce: 'D1_ERROR: no such column: submission_source',
+    })
+    vi.stubGlobal('fetch', successfulDiscord())
+    const res = await worker.fetch(
+      post(
+        'https://x.test/api/share-discord',
+        discordBody({
+          consent: true,
+          consentVersion: SHOWCASE_CONSENT_VERSION,
+          flame: example1,
+          shareUrl: 'https://x.test/?s=abc123',
+        }),
+      ),
+      makeEnv({
+        CONTENT_DB: db,
+        DISCORD_WEBHOOK_URL: 'https://discord.test/webhook',
+      }),
+      ctx,
+    )
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ ok: true, showcase: 'unavailable' })
+    expect(db.calls).toHaveLength(1)
+  })
+
+  it.each([
+    {
+      name: 'a cross-origin share URL',
+      image: undefined,
+      showcase: {
+        consent: true,
+        consentVersion: SHOWCASE_CONSENT_VERSION,
+        flame: example1,
+        shareUrl: 'https://attacker.test/?flame=abc',
+      },
+    },
+    {
+      name: 'an invalid flame descriptor',
+      image: undefined,
+      showcase: {
+        consent: true,
+        consentVersion: SHOWCASE_CONSENT_VERSION,
+        flame: {},
+        shareUrl: 'https://x.test/?flame=abc',
+      },
+    },
+    {
+      name: 'a stale consent version',
+      image: undefined,
+      showcase: {
+        consent: true,
+        consentVersion: 'home-showcase-v0',
+        flame: example1,
+        shareUrl: 'https://x.test/?flame=abc',
+      },
+    },
+    {
+      name: 'an image without a structural PNG header',
+      image: PNG,
+      showcase: {
+        consent: true,
+        consentVersion: SHOWCASE_CONSENT_VERSION,
+        flame: example1,
+        shareUrl: 'https://x.test/?flame=abc',
+      },
+    },
+  ])(
+    'keeps Discord successful but refuses $name',
+    async ({ showcase, image }) => {
+      const db = makeD1([])
+      const r2 = makeR2()
+      vi.stubGlobal('fetch', successfulDiscord())
+      const res = await worker.fetch(
+        post('https://x.test/api/share-discord', {
+          ...discordBody(showcase),
+          image: image ?? SHOWCASE_PNG,
+        }),
+        makeEnv({
+          CONTENT_DB: db,
+          OG_IMAGES: r2,
+          DISCORD_WEBHOOK_URL: 'https://discord.test/webhook',
+        }),
+        ctx,
+      )
+
+      expect(res.status).toBe(200)
+      expect(await res.json()).toEqual({ ok: true, showcase: 'unavailable' })
+      expect(db.calls).toHaveLength(0)
+      expect(r2.put).not.toHaveBeenCalled()
+    },
+  )
+})
+
 describe('worker — S-3 security headers', () => {
   it('sets nosniff and an enforced CSP (with unsafe-eval for TypeGPU) on responses', async () => {
     const res = await worker.fetch(
@@ -265,6 +451,14 @@ function makeD1(
           }
           return Promise.resolve(rows[0] ?? null)
         },
+        run: () => {
+          if (failure !== undefined) {
+            const message = failure
+            failure = undefined
+            return Promise.reject(new Error(message))
+          }
+          return Promise.resolve({ success: true })
+        },
       }
       return stmt
     },
@@ -276,6 +470,10 @@ const galleryRow = {
   title: 'First Light',
   caption: null,
   author: 'unknown',
+  submission_source: 'curated',
+  moderation_status: 'curated',
+  consent_version: null,
+  reviewed_at: null,
   collection: 'original',
   provenance_kind: 'project-original',
   source_url: null,
@@ -320,6 +518,8 @@ describe('worker /api/gallery', () => {
     expect(db.calls[0]?.sql).not.toContain('flame,')
     expect(db.calls[0]?.sql).toContain('published = 1')
     expect(db.calls[0]?.sql).toContain('provenance_kind')
+    expect(db.calls[0]?.sql).toContain('moderation_status')
+    expect(db.calls[0]?.sql).toContain("moderation_status = 'approved'")
     expect(res.headers.get('Cache-Control')).toContain('max-age=')
   })
 
@@ -336,6 +536,22 @@ describe('worker /api/gallery', () => {
     expect(res.status).toBe(200)
     expect(db.calls).toHaveLength(2)
     expect(db.calls[1]?.sql).toContain("'unknown' AS provenance_kind")
+  })
+
+  it('keeps serving curated rows while the community migration is pending', async () => {
+    const db = makeD1([galleryRow], {
+      failOnce: 'D1_ERROR: no such column: submission_source',
+    })
+    const res = await worker.fetch(
+      new Request('https://x.test/api/gallery'),
+      makeEnv({ CONTENT_DB: db }),
+      ctx,
+    )
+
+    expect(res.status).toBe(200)
+    expect(db.calls).toHaveLength(2)
+    expect(db.calls[1]?.sql).toContain("'curated' AS submission_source")
+    expect(db.calls[1]?.sql).not.toContain("moderation_status = 'approved'")
   })
 
   it('filters by section and rejects an unknown one', async () => {
@@ -375,6 +591,7 @@ describe('worker /api/gallery', () => {
     expect(body.animation.tracks).toEqual([])
     expect(db.calls[0]?.params).toEqual(['first-light'])
     expect(db.calls[0]?.sql).toContain('attribution')
+    expect(db.calls[0]?.sql).toContain("moderation_status = 'approved'")
   })
 
   it('uses the provenance compatibility projection for a single item too', async () => {

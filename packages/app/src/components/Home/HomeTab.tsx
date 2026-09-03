@@ -1,8 +1,9 @@
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, Show, } from 'solid-js'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
+import { ChevronLeft, ChevronRight } from '@/icons'
 import { setActiveTab } from '@/lib/activeTab'
-import { byCollection, bySection, fetchGallery, fetchGalleryItem, GALLERY_COLLECTIONS, galleryCredit, galleryExternalUrl, galleryResourceItems, needsPosterFrame, posterUrl, } from '@/lib/galleryContent'
+import { byCollection, bySection, fetchGallery, fetchGalleryItem, GALLERY_COLLECTIONS, galleryCredit, galleryExternalUrl, galleryResourceItems, isCommunityGalleryItem, needsPosterFrame, posterUrl, } from '@/lib/galleryContent'
 import { createSharedIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { installHomeEscapeBoundary } from './homeEscape'
 import { HomeFlame } from './HomeFlame'
@@ -68,9 +69,13 @@ export interface HomeTabProps {
   ) => void
 }
 
-const SECTIONS: { id: GallerySection | 'made'; label: string }[] = [
+const SECTIONS: {
+  id: GallerySection | 'community' | 'made'
+  label: string
+}[] = [
   { id: 'hero', label: 'Overview' },
   { id: 'gallery', label: 'The flames' },
+  { id: 'community', label: 'Community' },
   { id: 'motion', label: 'In motion' },
   { id: 'made', label: 'Made here' },
   { id: 'capability', label: 'Explore' },
@@ -178,6 +183,117 @@ function usePlateInteraction(props: {
       },
     },
   }
+}
+
+function CommunityRail(props: {
+  items: GalleryListItem[]
+  track: TrackVisibility
+  onOpen: (slug: string) => void
+  selectedSlug: string | undefined
+  onSelect: (slug: string) => void
+  playback: PlaybackCoordinator
+}) {
+  const [railEl, setRailEl] = createSignal<HTMLDivElement>()
+  const [canPrevious, setCanPrevious] = createSignal(false)
+  const [canNext, setCanNext] = createSignal(false)
+
+  function updateButtons() {
+    const el = railEl()
+    if (el === undefined) return
+    setCanPrevious(el.scrollLeft > 2)
+    setCanNext(el.scrollLeft + el.clientWidth < el.scrollWidth - 2)
+  }
+
+  createEffect(() => {
+    const el = railEl()
+    if (el === undefined) return
+    // Reading the length retriggers this after async content arrives. A
+    // ResizeObserver alone does not have to fire when scrollWidth changes but
+    // the rail's own border box does not.
+    void props.items.length
+    const observer =
+      globalThis.ResizeObserver === undefined
+        ? undefined
+        : new ResizeObserver(updateButtons)
+    observer?.observe(el)
+    el.addEventListener('scroll', updateButtons, { passive: true })
+    queueMicrotask(updateButtons)
+    onCleanup(() => {
+      observer?.disconnect()
+      el.removeEventListener('scroll', updateButtons)
+    })
+  })
+
+  function move(direction: -1 | 1) {
+    const el = railEl()
+    if (el === undefined) return
+    const reduced = globalThis.matchMedia?.(
+      '(prefers-reduced-motion: reduce)',
+    ).matches
+    el.scrollBy({
+      left: direction * Math.max(260, el.clientWidth * 0.82),
+      behavior: reduced ? 'auto' : 'smooth',
+    })
+  }
+
+  return (
+    <div class={ui.communityFrame}>
+      <div
+        class={ui.communityControls}
+        role="group"
+        aria-label="Community gallery pages"
+      >
+        <button
+          type="button"
+          class={ui.communityArrow}
+          aria-label="Previous community flames"
+          aria-controls="home-community-rail"
+          disabled={!canPrevious()}
+          onClick={() => {
+            move(-1)
+          }}
+        >
+          <ChevronLeft aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          class={ui.communityArrow}
+          aria-label="Next community flames"
+          aria-controls="home-community-rail"
+          disabled={!canNext()}
+          onClick={() => {
+            move(1)
+          }}
+        >
+          <ChevronRight aria-hidden="true" />
+        </button>
+      </div>
+      <div
+        class={ui.communityRail}
+        id="home-community-rail"
+        ref={setRailEl}
+        role="region"
+        tabindex="0"
+        aria-label="Approved community flames"
+      >
+        <For each={props.items}>
+          {(item) => (
+            <div class={ui.communityItem}>
+              <Plate
+                item={item}
+                placement="plate"
+                track={props.track}
+                onOpen={props.onOpen}
+                selected={props.selectedSlug === item.slug}
+                onSelect={props.onSelect}
+                playback={props.playback}
+              />
+            </div>
+          )}
+        </For>
+      </div>
+    </div>
+  )
 }
 
 /** What a selected plate can do, phrased for the device that selected it. */
@@ -460,7 +576,14 @@ export function HomeTab(props: HomeTabProps) {
   const sections = createMemo(() =>
     bySection(galleryResourceItems(content, content.error)),
   )
-  const collections = createMemo(() => byCollection(sections().gallery))
+  const community = createMemo(() =>
+    sections().gallery.filter(isCommunityGalleryItem),
+  )
+  const collections = createMemo(() =>
+    byCollection(
+      sections().gallery.filter((item) => !isCommunityGalleryItem(item)),
+    ),
+  )
 
   // ONE observer for every plate on the page, rooted on Home's scroll container.
   // A viewport root cannot preload rows past the fold, because the inner scroll
@@ -555,15 +678,17 @@ export function HomeTab(props: HomeTabProps) {
         <span class={ui.railBrand}>Lumen Apeiron</span>
         <For each={SECTIONS}>
           {(section) => (
-            <button
-              type="button"
-              class={ui.railLink}
-              onClick={() => {
-                scrollTo(section.id)
-              }}
-            >
-              {section.label}
-            </button>
+            <Show when={section.id !== 'community' || community().length > 0}>
+              <button
+                type="button"
+                class={ui.railLink}
+                onClick={() => {
+                  scrollTo(section.id)
+                }}
+              >
+                {section.label}
+              </button>
+            </Show>
           )}
         </For>
         <button
@@ -660,6 +785,26 @@ export function HomeTab(props: HomeTabProps) {
                   </For>
                 </div>
               </section>
+
+              <Show when={community().length > 0}>
+                <section class={ui.section} id="home-community">
+                  <div class={ui.sectionHead}>
+                    <h2 class={ui.sectionTitle}>From the community</h2>
+                  </div>
+                  <p class={ui.sectionNote}>
+                    Flames shared by artists in our Discord and selected for the
+                    Home gallery. Every work opens as its editable source.
+                  </p>
+                  <CommunityRail
+                    items={community()}
+                    track={track}
+                    onOpen={open}
+                    selectedSlug={selectedSlug()}
+                    onSelect={select}
+                    playback={playback}
+                  />
+                </section>
+              </Show>
 
               {/* In motion — option A, row of tiles */}
               <section class={ui.section} id="home-motion">

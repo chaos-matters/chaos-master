@@ -17,10 +17,13 @@
 // Subcommands (each takes --help):
 //   list     what is in the gallery
 //   audit    read-only publication-readiness check for every published row
+//   submissions review the Discord showcase moderation queue
 //   inspect  what is inside dropped PNG/JSON files — writes nothing
 //   put      stage a flame as a gallery row (published = 0, no poster)
 //   capture  render + upload posters for rows that need one
 //   publish  take a staged row live, or pull a live one back
+//   approve  approve and publish a consented community submission
+//   reject   reject and hide a consented community submission
 //   reorder  set a row's position within its section
 //   sequence give a row a curated flame walk (or clear it back to one still)
 //   delete   remove an unpublished row and its poster — the only destructive one
@@ -87,6 +90,7 @@ const ROW_COLUMNS =
   'slug, title, caption, author, section, capability, dimensions, ' +
   'collection, provenance_kind, source_url, license, license_url, ' +
   'attribution, changes, original_id, ' +
+  'submission_source, moderation_status, consent_version, reviewed_at, ' +
   'transform_count, poster_key, poster_width, poster_height, poster_frame, ' +
   'sort_order, published, (animation IS NOT NULL) AS has_animation, ' +
   // Presence, not the value: a curated sequence is the largest thing in the
@@ -172,10 +176,13 @@ Usage:
 Commands:
   list      list every gallery row with its section, order and poster
   audit     check every published row against the shared publication gate
+  submissions list consented Discord submissions by moderation status
   inspect   report what is inside PNG/JSON files, writing nothing
   put       stage a flame as a gallery row (published = 0, poster_key = NULL)
   capture   render and upload posters for rows that have none
   publish   set published to 0 or 1 for one row
+  approve   approve and publish a community submission
+  reject    reject and hide a community submission
   reorder   set sort_order for one row
   sequence  give a row a curated flame walk, or clear it back to one still
   delete    remove an unpublished row and its poster (not reversible)
@@ -221,6 +228,19 @@ rights and visible attribution. It never creates a schema or changes D1/R2.
 
 Returns \`ok: false\` and exits 1 when any published row has unresolved blockers,
 while still printing every affected slug and issue for automation and review.`,
+
+  submissions: `gallery-admin submissions — Discord showcase moderation queue
+
+Usage:
+  node scripts/gallery-admin.mjs submissions [--status <state>] [options]
+
+Options:
+  --status <state>      pending | approved | rejected | all (default pending)
+${COMMON_OPTIONS}
+
+Lists only explicitly consented Discord submissions. Descriptors stay omitted;
+the source URL opens the exact shared flame and poster metadata shows whether a
+reviewer can publish it. This command never changes D1 or R2.`,
 
   inspect: `gallery-admin inspect — what is inside a file, without writing anything
 
@@ -318,6 +338,31 @@ Unpublishing is the reversible alternative to deleting, which this tool does
 not do. Local publication reports incomplete poster/provenance as warnings so
 curation stays easy. Shared dev/prod publication blocks them, preventing an
 uncredited work or empty no-WebGPU plate from going live.`,
+
+  approve: `gallery-admin approve — approve and publish a community submission
+
+Usage:
+  node scripts/gallery-admin.mjs approve --slug <slug> [options]
+
+Options:
+  --slug <slug>         pending or rejected Discord submission to approve
+${COMMON_OPTIONS}
+
+Runs the same poster, creator, provenance and rights gate as normal publication,
+then atomically marks the row approved and published. Curated rows are refused;
+use publish for those.`,
+
+  reject: `gallery-admin reject — reject and hide a community submission
+
+Usage:
+  node scripts/gallery-admin.mjs reject --slug <slug> [options]
+
+Options:
+  --slug <slug>         Discord submission to reject
+${COMMON_OPTIONS}
+
+Marks the row rejected and unpublished. The descriptor and poster remain for
+audit/reconsideration; delete is still the separate destructive operation.`,
 
   reorder: `gallery-admin reorder — position within a section
 
@@ -874,6 +919,39 @@ function commandList(values) {
   }
 }
 
+// ── community moderation queue ──────────────────────────────────────
+
+function commandSubmissions(values) {
+  const env = resolveEnv(values)
+  const status = values.status ?? 'pending'
+  const known = ['pending', 'approved', 'rejected', 'all']
+  if (!known.includes(status)) {
+    throw new AdminError(
+      'invalid-status',
+      `--status must be one of ${known.join(', ')}`,
+      { given: status },
+    )
+  }
+  const predicate =
+    status === 'all'
+      ? "submission_source = 'discord'"
+      : `submission_source = 'discord' AND moderation_status = ${sqlStr(status)}`
+  note(`Reading ${status} community submissions in ${targetLabel(env)} ...`)
+  const { results } = d1(
+    env,
+    `SELECT ${ROW_COLUMNS} FROM gallery_items WHERE ${predicate} ` +
+      'ORDER BY created_at DESC, slug',
+  )
+  note(`${results.length} ${status} submission(s).`)
+  return {
+    ...targetFields(env),
+    readOnly: true,
+    status,
+    count: results.length,
+    items: results,
+  }
+}
+
 // ── audit ───────────────────────────────────────────────────────────
 
 function commandAudit(values) {
@@ -889,9 +967,21 @@ function commandAudit(values) {
 
   const unresolved = results.flatMap((row) => {
     const { blockers } = publicationReadiness(row, { remote: true })
-    return blockers.length === 0
+    const moderationBlockers =
+      row.submission_source === 'discord' &&
+      row.moderation_status !== 'approved'
+        ? [
+            {
+              code: 'community-not-approved',
+              message:
+                'Discord submissions must be approved before publication',
+            },
+          ]
+        : []
+    const issues = [...moderationBlockers, ...blockers]
+    return issues.length === 0
       ? []
-      : [{ slug: row.slug, title: row.title, blockers }]
+      : [{ slug: row.slug, title: row.title, blockers: issues }]
   })
   note(
     unresolved.length === 0
@@ -1026,6 +1116,17 @@ function commandPut(values) {
 
   const existing = readRow(env, slug)
   if (existing !== null) {
+    if (existing.submission_source === 'discord') {
+      throw new AdminError(
+        'community-row-owned-by-moderation',
+        `"${slug}" is a consented community submission — put cannot replace it`,
+        {
+          ...targetFields(env),
+          slug,
+          hint: 'use approve, reject or delete so its moderation history remains explicit',
+        },
+      )
+    }
     note(`Slug ${slug} already exists — upserting (published resets to 0)`)
     if (existing.published === 1) {
       warnings.push(
@@ -1066,7 +1167,8 @@ function commandPut(values) {
   collection, provenance_kind, source_url, license, license_url, attribution,
   changes, original_id,
   dimensions, transform_count, poster_key, poster_width, poster_height,
-  poster_frame, sort_order, published
+  poster_frame, sort_order, published, submission_source, moderation_status,
+  consent_version, reviewed_at
 ) VALUES (
   ${sqlStr(slug)}, ${sqlStr(title)}, ${sqlStr(caption)}, ${sqlStr(author)},
   ${sqlStr(section)}, ${sqlStr(capability)},
@@ -1079,7 +1181,7 @@ function commandPut(values) {
   NULL, NULL, NULL, NULL,
   (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM gallery_items
     WHERE section = ${sqlStr(section)}),
-  0
+  0, 'curated', 'curated', NULL, NULL
 )
 ON CONFLICT(slug) DO UPDATE SET
   title = excluded.title,
@@ -1113,6 +1215,10 @@ ON CONFLICT(slug) DO UPDATE SET
   -- rendering bug rather than stale content. Cleared, the row is simply "one
   -- flame" again until scripts/gallery-sequence.mjs is re-run.
   sequence = NULL,
+  submission_source = 'curated',
+  moderation_status = 'curated',
+  consent_version = NULL,
+  reviewed_at = NULL,
   published = 0;
 `
 
@@ -1166,6 +1272,21 @@ function commandPublish(values) {
   const before = requireRow(env, slug)
   const warnings = []
   if (published === 1) {
+    if (
+      before.submission_source === 'discord' &&
+      before.moderation_status !== 'approved'
+    ) {
+      throw new AdminError(
+        'community-approval-required',
+        `${slug} is a community submission and must be approved first`,
+        {
+          ...targetFields(env),
+          slug,
+          moderationStatus: before.moderation_status,
+          fix: `node scripts/gallery-admin.mjs approve --env ${env} --slug ${slug}${env === 'prod' ? ' --confirm prod' : ''}`,
+        },
+      )
+    }
     const readiness = publicationReadiness(before, {
       remote: TARGETS[env].storage === 'remote',
     })
@@ -1203,6 +1324,109 @@ function commandPublish(values) {
     previous: { published: before.published },
     row,
     warnings,
+  }
+}
+
+// ── approve / reject community submissions ─────────────────────────
+
+function requireCommunitySubmission(env, slug) {
+  const row = requireRow(env, slug)
+  if (row.submission_source !== 'discord') {
+    throw new AdminError(
+      'not-community-submission',
+      `"${slug}" is a curated row, not a Discord submission`,
+      {
+        ...targetFields(env),
+        slug,
+        hint: 'use publish for curated rows',
+      },
+    )
+  }
+  if (typeof row.consent_version !== 'string' || row.consent_version === '') {
+    throw new AdminError(
+      'consent-missing',
+      `"${slug}" has no recorded showcase consent version`,
+      { ...targetFields(env), slug },
+    )
+  }
+  return row
+}
+
+function commandApprove(values) {
+  const env = resolveEnv(values)
+  if (values.slug === undefined) {
+    throw new AdminError('usage', 'approve needs --slug')
+  }
+  const slug = validateSlug(values.slug, '--slug')
+  const before = requireCommunitySubmission(env, slug)
+  const readiness = publicationReadiness(before, {
+    remote: TARGETS[env].storage === 'remote',
+  })
+  if (readiness.blockers.length > 0) {
+    throw new AdminError(
+      'approval-blocked',
+      `${slug} is not ready for the public community rail`,
+      {
+        ...targetFields(env),
+        slug,
+        blockers: readiness.blockers,
+        hint: `repair the row or run capture --env ${env} --slug ${slug}`,
+      },
+    )
+  }
+
+  note(`Approving ${slug} in ${targetLabel(env)} ...`)
+  d1(
+    env,
+    "UPDATE gallery_items SET moderation_status = 'approved', " +
+      `published = 1, reviewed_at = CURRENT_TIMESTAMP WHERE slug = ${sqlStr(slug)}`,
+  )
+  const row = requireRow(env, slug)
+  return {
+    ...targetFields(env),
+    slug,
+    approved: true,
+    published: row.published,
+    changed:
+      before.moderation_status !== row.moderation_status ||
+      before.published !== row.published,
+    previous: {
+      moderationStatus: before.moderation_status,
+      published: before.published,
+    },
+    row,
+    warnings: readiness.warnings.map((entry) => entry.message),
+  }
+}
+
+function commandReject(values) {
+  const env = resolveEnv(values)
+  if (values.slug === undefined) {
+    throw new AdminError('usage', 'reject needs --slug')
+  }
+  const slug = validateSlug(values.slug, '--slug')
+  const before = requireCommunitySubmission(env, slug)
+
+  note(`Rejecting ${slug} in ${targetLabel(env)} ...`)
+  d1(
+    env,
+    "UPDATE gallery_items SET moderation_status = 'rejected', " +
+      `published = 0, reviewed_at = CURRENT_TIMESTAMP WHERE slug = ${sqlStr(slug)}`,
+  )
+  const row = requireRow(env, slug)
+  return {
+    ...targetFields(env),
+    slug,
+    rejected: true,
+    published: row.published,
+    changed:
+      before.moderation_status !== row.moderation_status ||
+      before.published !== row.published,
+    previous: {
+      moderationStatus: before.moderation_status,
+      published: before.published,
+    },
+    row,
   }
 }
 
@@ -2148,6 +2372,7 @@ const OPTIONS = {
   'original-id': { type: 'string' },
   capability: { type: 'string' },
   published: { type: 'string' },
+  status: { type: 'string' },
   order: { type: 'string' },
   key: { type: 'string' },
   value: { type: 'string' },
@@ -2170,6 +2395,10 @@ const OPTIONS = {
 const COMMANDS = {
   list: { run: commandList, options: ['env', 'confirm'] },
   audit: { run: commandAudit, options: ['env', 'confirm'] },
+  submissions: {
+    run: commandSubmissions,
+    options: ['env', 'confirm', 'status'],
+  },
   inspect: { run: commandInspect, options: ['file'] },
   put: {
     run: commandPut,
@@ -2209,6 +2438,14 @@ const COMMANDS = {
   publish: {
     run: commandPublish,
     options: ['env', 'confirm', 'slug', 'published'],
+  },
+  approve: {
+    run: commandApprove,
+    options: ['env', 'confirm', 'slug'],
+  },
+  reject: {
+    run: commandReject,
+    options: ['env', 'confirm', 'slug'],
   },
   delete: {
     run: commandDelete,

@@ -7,20 +7,27 @@ import { Button } from '../Button/Button'
 import { useRequestModal } from '../Modal/ModalContext'
 import { ModalTitleBar } from '../Modal/ModalTitleBar'
 import ui from './DiscordShare.module.css'
+import type { DiscordShareResult } from '@/lib/communityShowcase'
 
 const CANCEL = Symbol('cancel')
 
 export type DiscordShareMeta = {
   author: string
   title: string
+  submitToShowcase: boolean
 }
 
 type DiscordShareModalProps = {
   previewUrl: string
-  respond: (value: boolean | symbol) => void
+  respond: (value: DiscordShareResult | typeof CANCEL) => void
   initialMetadata?: { name?: string; author?: string }
-  /** Performs the actual upload; resolves `true` when Discord accepted it. */
-  onShare: (meta: DiscordShareMeta, token: string) => Promise<boolean>
+  /** Performs the actual upload and reports whether showcase staging succeeded. */
+  onShare: (
+    meta: DiscordShareMeta,
+    token: string,
+  ) => Promise<DiscordShareResult | undefined>
+  showcaseEligible: boolean
+  showcaseUnavailableReason?: string
   /** Fallback: download the captured PNG (with embedded flame data). */
   onDownload: () => void
   /** Fallback: copy a share link; resolves `true` when copied. */
@@ -31,7 +38,7 @@ type DiscordShareModalProps = {
 
 type Phase = 'form' | 'sending' | 'failed'
 
-function DiscordShareModal(props: DiscordShareModalProps) {
+export function DiscordShareModal(props: DiscordShareModalProps) {
   const [storedAuthor, setStoredAuthor] = persistentSignal('discord/author', '')
   const [author, setAuthor] = createSignal(
     props.initialMetadata?.author && props.initialMetadata.author !== 'unknown'
@@ -43,6 +50,7 @@ function DiscordShareModal(props: DiscordShareModalProps) {
   const [phase, setPhase] = createSignal<Phase>('form')
   const [token, setToken] = createSignal('')
   const [copied, setCopied] = createSignal(false)
+  const [submitToShowcase, setSubmitToShowcase] = createSignal(false)
 
   const authorTrimmed = () => author().trim()
   const titleTrimmed = () => title().trim()
@@ -112,13 +120,22 @@ function DiscordShareModal(props: DiscordShareModalProps) {
     if (authorTrimmed() === '' || !hasToken() || phase() === 'sending') return
     setStoredAuthor(authorTrimmed())
     setPhase('sending')
-    const ok = await props.onShare(
-      { author: authorTrimmed(), title: titleTrimmed() },
-      token(),
-    )
-    if (ok) {
+    let result: DiscordShareResult | undefined
+    try {
+      result = await props.onShare(
+        {
+          author: authorTrimmed(),
+          title: titleTrimmed(),
+          submitToShowcase: props.showcaseEligible && submitToShowcase(),
+        },
+        token(),
+      )
+    } catch {
+      result = undefined
+    }
+    if (result !== undefined) {
       trackDiscordShare()
-      props.respond(true)
+      props.respond(result)
     } else {
       // A token is single-use once verified — force a fresh solve on retry.
       resetTurnstile()
@@ -213,10 +230,11 @@ function DiscordShareModal(props: DiscordShareModalProps) {
         >
           {/* Author field */}
           <div class={ui.field}>
-            <label class={ui.fieldLabel}>
+            <label class={ui.fieldLabel} for="discord-share-author">
               Author <span class={ui.required}>*</span>
             </label>
             <input
+              id="discord-share-author"
               class={ui.input}
               classList={{ [ui.inputError as string]: showError() }}
               type="text"
@@ -237,10 +255,11 @@ function DiscordShareModal(props: DiscordShareModalProps) {
 
           {/* Title field */}
           <div class={ui.field}>
-            <label class={ui.fieldLabel}>
+            <label class={ui.fieldLabel} for="discord-share-title">
               Title <span class={ui.optional}>(optional)</span>
             </label>
             <input
+              id="discord-share-title"
               class={ui.input}
               type="text"
               placeholder="Name your flame"
@@ -253,6 +272,34 @@ function DiscordShareModal(props: DiscordShareModalProps) {
               }}
             />
           </div>
+
+          <Show
+            when={props.showcaseEligible}
+            fallback={
+              <p class={ui.showcaseUnavailable}>
+                {props.showcaseUnavailableReason ??
+                  'This flame cannot be submitted to the Home showcase yet.'}
+              </p>
+            }
+          >
+            <label class={ui.showcaseOption}>
+              <input
+                type="checkbox"
+                checked={submitToShowcase()}
+                onChange={(event) => {
+                  setSubmitToShowcase(event.currentTarget.checked)
+                }}
+              />
+              <span>
+                <strong>Submit to the Home showcase</strong>
+                <small>
+                  Allow Lumen Apeiron to feature this flame and your public
+                  author credit after moderation, where visitors can open and
+                  remix its editable source. You can ask us to remove it.
+                </small>
+              </span>
+            </label>
+          </Show>
 
           <Show when={turnstileEnabled()}>
             <div class={ui.turnstile} ref={turnstileEl} />
@@ -308,12 +355,17 @@ export function createDiscordShareModal() {
   async function showDiscordShareModal(opts: {
     previewUrl: string
     initialMetadata?: { name?: string; author?: string }
-    onShare: (meta: DiscordShareMeta, token: string) => Promise<boolean>
+    onShare: (
+      meta: DiscordShareMeta,
+      token: string,
+    ) => Promise<DiscordShareResult | undefined>
+    showcaseEligible?: boolean
+    showcaseUnavailableReason?: string
     onDownload: () => void
     onCopyLink: () => Promise<boolean>
     discordUrl: string
-  }): Promise<boolean> {
-    const result = await requestModal<boolean | symbol>({
+  }): Promise<DiscordShareResult | undefined> {
+    const result = await requestModal<DiscordShareResult | typeof CANCEL>({
       class: ui.container,
       content: ({ respond }) => (
         <DiscordShareModal
@@ -321,13 +373,15 @@ export function createDiscordShareModal() {
           respond={respond}
           initialMetadata={opts.initialMetadata}
           onShare={opts.onShare}
+          showcaseEligible={opts.showcaseEligible ?? true}
+          showcaseUnavailableReason={opts.showcaseUnavailableReason}
           onDownload={opts.onDownload}
           onCopyLink={opts.onCopyLink}
           discordUrl={opts.discordUrl}
         />
       ),
     })
-    return result === true
+    return result === CANCEL ? undefined : result
   }
 
   return { showDiscordShareModal }
