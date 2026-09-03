@@ -44,10 +44,10 @@ description is at most 500 characters and every result is kept under about
 | `set_flame`, `randomize_flame`, `mutate_flame`, `undo`, `redo`, `create_share_link`, `load_share_link`    | mixed | Document-level tools                                                              |
 | `score_flame`, `score_clash_round`, `simulate_clash`, `create_clash_flame`, `animate_clash`, `open_arena` | mixed | Arena (roadmap: the scoring heuristics still need grounding)                      |
 | `breed_flames`, `create_custom_variation`, `open_art_director`                                            | mixed | Genetics and Director (roadmap: the taste loop)                                   |
-| `arcade_status`                                                                                           | read  | Pilot phase, steps, budget, lock, recorder, last narration                        |
+| `arcade_status`                                                                                           | read  | Pilot phase, steps, budget, lock, recorder, last narration, duel clock            |
 | `arcade_start_lesson`, `arcade_narrate`, `arcade_end_lesson`                                              | write | Teach mode                                                                        |
 | `arcade_start_cinema`, `arcade_get_animatable_paths`, `arcade_set_keyframes`, `arcade_end_cinema`         | mixed | Cinema mode                                                                       |
-| `arcade_start_duel`, `arcade_end_duel`                                                                    | write | Duel mode: opens the split screen, then saves both takes and the verdict          |
+| `arcade_start_duel`, `arcade_duel_ready`                                                                  | write | Duel mode: opens the split screen; the clock ends it and saves both takes         |
 
 ## How an agent write reaches the document
 
@@ -61,9 +61,10 @@ description is at most 500 characters and every result is kept under about
 3. `executeCommand(id, ctx, ...args)` dispatches live, which means
    `normalizeArgs` canonicalises entity ids and seeds, `beforeCommand` hands a
    paused replay back to the user, and `recordCommandExecution` logs the step.
-4. `arcade_end_lesson` / `arcade_end_cinema` / `arcade_end_duel` (or the Stop
-   button) stop the recorder and store the take in the IndexedDB session
-   library. A duel stops both streams in one call and stores two takes.
+4. `arcade_end_lesson` / `arcade_end_cinema` (or the Stop button) stop the
+   recorder and store the take in the IndexedDB session library. A duel ends
+   differently — see below — but ends the same way, through `finishDuel`, which
+   stops both streams in one call and stores two takes.
 
 No tool writes `ctx.setFlameDescriptor` or `ctx.timeline.setTracks` directly.
 
@@ -88,9 +89,15 @@ No tool writes `ctx.setFlameDescriptor` or `ctx.timeline.setTracks` directly.
   seat (a real flame with its own history and recorder stream), and points the
   whole tool surface at it: `get_flame` and `execute_command` act on the
   agent's flame while your half stays yours, keyboard and all. Only `flame.*`
-  and `camera.*` are allowed. `arcade_end_duel` stops the clock, saves each
-  side as its own take (`Duel: <title> — your flame` / `— the AI's flame`) and
-  shows the verdict. 2D and still flames for now.
+  and `camera.*` are allowed. **The agent cannot end a duel**: the clock ends
+  it, and you can end it early. That is the time pressure, and it is why
+  `arcade_end_duel` still exists only to refuse — a chat already in flight will
+  keep calling the name it was told about, and a missing tool gives it nothing
+  to correct against. The agent calls `arcade_duel_ready` to name its flame,
+  which costs no steps and changes nothing else, and may keep polishing
+  afterwards. Whoever ends it, `finishDuel` saves each side as its own take
+  (`Duel: <title> — your flame` / `— the AI's flame`) and shows the verdict. 2D
+  and still flames for now.
 - **Beats**, **Arena**, **Director** are on the hub as roadmap cards.
 
 While a whole-screen mode runs, the editor is locked behind a full-screen

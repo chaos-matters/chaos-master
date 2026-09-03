@@ -122,7 +122,8 @@ describe('duel', () => {
   it('gives the duel prompt card the clock and the tools', () => {
     const card = duelPromptCard(180)
     expect(card).toContain('arcade_start_duel')
-    expect(card).toContain('arcade_end_duel')
+    expect(card).toContain('arcade_duel_ready')
+    expect(card).not.toContain('arcade_end_duel')
     expect(card).toContain('3 minutes')
     expect(card).toContain(WEBMCP_FALLBACK_NOTE)
   })

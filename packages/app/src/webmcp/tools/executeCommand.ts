@@ -1,5 +1,6 @@
 import { guardCommand } from '@/arcade/guard'
 import { appendPilotLog, drivingState, notePilotStep, pilotStepsRemaining, } from '@/arcade/pilot'
+import { budgetExhaustedMessage } from '@/arcade/pilotActions'
 import { notePilotFocus } from '@/arcade/pilotFocus'
 import { executeCommand, getCommand, preflightLiveCommand, } from '@/commands/registry'
 import { focusForCommand } from '@/recorder/focus'
@@ -102,10 +103,7 @@ export const executeCommandTool: WebMcpTool = {
         return { error: blocked }
       }
       if (pilotStepsRemaining() <= 0) {
-        return {
-          error:
-            'Step budget exhausted. Finish now with arcade_end_lesson or arcade_end_cinema.',
-        }
+        return { error: budgetExhaustedMessage(driving.mode) }
       }
     }
 

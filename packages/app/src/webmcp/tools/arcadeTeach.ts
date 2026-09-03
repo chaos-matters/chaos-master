@@ -1,10 +1,12 @@
 import { describeAllowedCommands, SAMPLE_VARIATION_TYPES, } from '@/arcade/commandHints'
+import { duelReady, duelRemainingMs, runningDuel } from '@/arcade/duel'
 import { qualityRank } from '@/arcade/guard'
 import { clearNarration, narration } from '@/arcade/narration'
 import { agentDriving, drivingState, notePilotStep, pilot, pilotElapsedMs, pilotStepsRemaining, startPilot, } from '@/arcade/pilot'
-import { finishPilot } from '@/arcade/pilotActions'
+import { budgetExhaustedMessage, finishPilot } from '@/arcade/pilotActions'
 import { ALWAYS_ALLOWED, BLANK_CANVAS_STEPS, isTopicId, LESSON_TOPICS, TOPIC_IDS, } from '@/arcade/topics'
 import { executeCommand, preflightReplayCommand } from '@/commands/registry'
+import { anySessionRecording } from '@/recorder/recorder'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
 import type { WebMcpTool } from '@/webmcp/types'
 
@@ -15,13 +17,13 @@ const NOT_READY = {
 export const arcadeStatus: WebMcpTool = {
   name: 'arcade_status',
   description:
-    'Read the Arcade session state: phase (idle, driving, ended), mode, topic, steps used and remaining, elapsed time, whether the editor is locked, whether a recording is active, and the last narration. Call it when unsure what to do next.',
+    'Read the Arcade session state: phase (idle, driving, ended), mode, topic, steps used and remaining, elapsed time, whether the editor is locked, whether a recording is active, the last narration, and — during a duel — the time left on the clock. Call it when unsure what to do next.',
   inputSchema: { type: 'object', properties: {} },
   annotations: { readOnlyHint: true },
   execute: () => {
-    const ctx = getWebMcpContext()
     const state = pilot()
     const driving = state.phase === 'driving' ? state : undefined
+    const duel = runningDuel()
     return {
       phase: state.phase,
       mode: state.phase === 'idle' ? undefined : state.mode,
@@ -32,7 +34,10 @@ export const arcadeStatus: WebMcpTool = {
       remaining: pilotStepsRemaining(),
       elapsedMs: Math.round(pilotElapsedMs()),
       locked: agentDriving(),
-      recorderActive: ctx?.recorder?.isRecording() ?? false,
+      // Not `ctx.recorder`: in a duel the target is the rival seat, which has
+      // no recorder facade, and this reported "not recording" while both
+      // streams were running.
+      recorderActive: anySessionRecording(),
       narration: narration(),
       // The brief is sent once and a client that truncates it cannot ask for
       // it again: a second arcade_start_lesson is refused as already active.
@@ -43,6 +48,13 @@ export const arcadeStatus: WebMcpTool = {
         state.phase !== 'idle' && isTopicId(state.topic)
           ? LESSON_TOPICS[state.topic].goal
           : undefined,
+      duel: duel
+        ? {
+            remainingMs: Math.round(duelRemainingMs()),
+            durationMs: duel.durationMs,
+            ready: duelReady() !== undefined,
+          }
+        : undefined,
       lastEnd:
         state.phase === 'ended'
           ? { reason: state.reason, sessionName: state.sessionName }
@@ -168,10 +180,7 @@ export const arcadeNarrate: WebMcpTool = {
         ? (input as { text: string }).text.trim()
         : ''
     if (pilotStepsRemaining() <= 0) {
-      return {
-        error:
-          'Step budget exhausted. Finish now with arcade_end_lesson or arcade_end_cinema.',
-      }
+      return { error: budgetExhaustedMessage(state.mode) }
     }
     const invalid = preflightReplayCommand('lesson.note', [text])
     if (invalid) return { error: invalid }

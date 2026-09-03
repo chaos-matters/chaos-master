@@ -7,7 +7,7 @@
 
 import { animateClash } from './animateClash'
 import { arcadeEndCinema, arcadeGetAnimatablePaths, arcadeSetKeyframes, arcadeStartCinema, } from './arcadeCinema'
-import { arcadeEndDuel, arcadeStartDuel } from './arcadeDuel'
+import { arcadeDuelReady, arcadeEndDuel, arcadeStartDuel } from './arcadeDuel'
 import { arcadeEndLesson, arcadeNarrate, arcadeStartLesson, arcadeStatus, } from './arcadeTeach'
 import { breedFlamesTool } from './breedFlames'
 import { createClashFlame } from './createClashFlame'
@@ -65,6 +65,7 @@ export {
   arcadeSetKeyframes,
   arcadeEndCinema,
   arcadeStartDuel,
+  arcadeDuelReady,
   arcadeEndDuel,
 }
 
@@ -94,6 +95,7 @@ export const allTools: readonly WebMcpTool[] = [
   arcadeSetKeyframes,
   arcadeEndCinema,
   arcadeStartDuel,
+  arcadeDuelReady,
   arcadeEndDuel,
   undo,
   redo,
