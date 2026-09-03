@@ -4184,10 +4184,11 @@ export function MainWorkspace(props: AppProps) {
     // shared extras closure and the same "freeze wall-clock playback" step.
     recorder: {
       isRecording: isSessionRecording,
-      start: () => {
+      start: (now) => {
         const result = startSessionRecording(
           flameDescriptor,
           captureRecorderStartExtras(),
+          now,
         )
         if (result.ok && timeline.isPlaying()) {
           withRecordingSuppressed(() => {

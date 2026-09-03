@@ -249,7 +249,8 @@ export interface CommandContext {
    */
   recorder?: {
     isRecording: () => boolean
-    start: () => SessionRecordingStartResult
+    /** `now` lets a duel start both seats on one time origin. */
+    start: (now?: number) => SessionRecordingStartResult
     stop: () => RecordedSession | undefined
     cancel: () => void
     save: (session: RecordedSession, name: string) => Promise<void>

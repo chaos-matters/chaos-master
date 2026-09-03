@@ -127,3 +127,33 @@ describe('markDuelReady', () => {
     expect(markDuelReady({ title: 'nothing' })).toBe(false)
   })
 })
+
+describe('what a duel records', () => {
+  it("starts the viewer's side through the workspace's own facade", () => {
+    const startPlayer = vi.fn((now: number) => {
+      recorderStream('player').start(flame, {}, now)
+      return { ok: true } as const
+    })
+
+    startDuel({ ...base, startPlayer, now: 1234 })
+
+    // The facade snapshots timeline/audio/view state and pauses a playing
+    // timeline; bypassing it made the duel take the only one in the app that
+    // begins with none of that.
+    expect(startPlayer).toHaveBeenCalledWith(1234)
+    expect(recorderStream('player').isRecording()).toBe(true)
+    expect(recorderStream('rival').isRecording()).toBe(true)
+  })
+
+  it('leaves alone a recording the duel did not start', () => {
+    // The viewer was already recording something of their own.
+    recorderStream('player').start(flame)
+    startDuel({ ...base, recording: 'rival' })
+
+    const sessions = stopDuel()
+
+    expect(sessions.player).toBeUndefined()
+    expect(recorderStream('player').isRecording()).toBe(true)
+    expect(sessions.rival).toBeDefined()
+  })
+})

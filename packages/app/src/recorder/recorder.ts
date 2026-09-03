@@ -1048,8 +1048,9 @@ export function getLiveWorkspaceMutationGeneration(): number {
 export function startSessionRecording(
   initial: FlameDescriptor,
   extras: SessionStartExtras = {},
+  now?: number,
 ): SessionRecordingStartResult {
-  return player().start(initial, extras)
+  return player().start(initial, extras, now)
 }
 
 export function lastFinishedSession(): RecordedSession | undefined {

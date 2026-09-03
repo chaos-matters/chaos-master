@@ -2,6 +2,7 @@ import { createSignal } from 'solid-js'
 import { recorderStream } from '@/recorder/recorder'
 import { createSeat } from '@/seats/seat'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { SessionRecordingStartResult } from '@/recorder/recorder'
 import type { RecordedSession } from '@/recorder/schema'
 import type { Seat } from '@/seats/seat'
 
@@ -86,6 +87,13 @@ export function startDuel(input: {
    * dismiss from a stage that can no longer be clicked.
    */
   onExpire?: () => void
+  /**
+   * How to start the viewer's own stream. The workspace passes its recorder
+   * facade, which snapshots the timeline, audio, sonification and view state
+   * and pauses a playing timeline first. Without it the viewer's duel take is
+   * the only take in the app that begins with no starting state.
+   */
+  startPlayer?: (now: number) => SessionRecordingStartResult
 }): { ok: true; rival: Seat } | { ok: false; error: string } {
   if (duelActive()) {
     return { ok: false, error: 'A duel is already running.' }
@@ -94,7 +102,8 @@ export function startDuel(input: {
   const player = recorderStream('player')
   const rival = recorderStream('rival')
   if (recordsPlayer(input.recording)) {
-    const started = player.start(input.playerFlame, {}, now)
+    const started =
+      input.startPlayer?.(now) ?? player.start(input.playerFlame, {}, now)
     if (!started.ok) {
       return {
         ok: false,
@@ -166,12 +175,17 @@ export function stopDuel(): {
     globalThis.clearTimeout(expiryTimer)
     expiryTimer = undefined
   }
-  const playerSession = recorderStream('player').isRecording()
-    ? recorderStream('player').stop()
-    : undefined
-  const rivalSession = recorderStream('rival').isRecording()
-    ? recorderStream('rival').stop()
-    : undefined
+  // Only the sides this duel started. Reading `isRecording()` alone stopped
+  // whatever the viewer happened to be recording already and filed it as a
+  // duel take.
+  const playerSession =
+    recordsPlayer(state.recording) && recorderStream('player').isRecording()
+      ? recorderStream('player').stop()
+      : undefined
+  const rivalSession =
+    recordsRival(state.recording) && recorderStream('rival').isRecording()
+      ? recorderStream('rival').stop()
+      : undefined
   setDuel({ phase: 'idle' })
   // After the sessions are taken: disposing cancels the stream, which would
   // throw away the take if it ran first.
