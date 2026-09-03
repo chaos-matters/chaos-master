@@ -138,7 +138,11 @@
 .hint {
   grid-column: 1 / -1;
   justify-self: center;
-  margin: 0 0 12px;
+  /* Clear of the view-controls strip rather than flush with the viewport
+     edge: a host browser driving this session puts its own floating controls
+     down there, and they sit on top of ours. This is the floor for engines
+     without anchor positioning — with it, the rule below is exact. */
+  margin: 0 0 62px;
   padding: 7px 16px;
   border-radius: 999px;
   text-align: center;
@@ -150,6 +154,20 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   /* Blur belongs on the chrome, never on the whole viewport. */
   backdrop-filter: blur(8px);
+}
+
+/* Exactly above the app's own bottom chrome, whatever height it currently is —
+   the timeline can be hidden, shown, or dragged to 55vh. Chrome 125+; the
+   margin above stands in everywhere else, and this app already needs WebGPU. */
+@supports (anchor-name: --x) {
+  .hint {
+    position: fixed;
+    position-anchor: --app-bottom-chrome;
+    bottom: calc(anchor(top) + 12px);
+    left: 50%;
+    translate: -50% 0;
+    margin: 0;
+  }
 }
 
 @media (max-width: 768px) {
