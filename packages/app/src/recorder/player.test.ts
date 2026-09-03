@@ -7,7 +7,7 @@ import { examples } from '@/flame/examples'
 import { deepClone } from '@/utils/clone'
 import { createStoreHistory } from '@/utils/createStoreHistory'
 import { createTimelineState } from '@/utils/timeline'
-import { createSessionPlayer, MAX_STEP_GAP_MS } from './player'
+import { createSessionPlayer, MAX_STEP_GAP_MS, MIN_STEP_GAP_MS, NARRATION_MAX_HOLD_MS, NARRATION_MIN_HOLD_MS, NARRATION_MS_PER_WORD, stepGapMs, } from './player'
 import { cancelSessionRecording, recordSyntheticAction, startSessionRecording, stopSessionRecording, } from './recorder'
 import { SESSION_FORMAT_VERSION } from './schema'
 import { createRecorderAwareTimeline } from './timelineActions'
@@ -203,6 +203,94 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+function at(t: number, extra: Partial<RecordedAction> = {}): RecordedAction {
+  return { t, id: 'flame.setGamma', args: [1], ...extra }
+}
+
+/**
+ * The pacing rule, which the live player and the video exporter share.
+ *
+ * These are the numbers a Teach replay lives or dies by: an agent issues its
+ * edits milliseconds apart and thinks for seconds between them, so the raw
+ * recording is a burst nobody can watch punctuated by pauses charged to the
+ * wrong step.
+ */
+describe('stepGapMs', () => {
+  it('floors a machine-speed burst so each step can be seen', () => {
+    // Six steps inside 26ms is a real measurement, not a hypothetical.
+    expect(stepGapMs(at(353851), at(353852), 1)).toBe(MIN_STEP_GAP_MS)
+    expect(stepGapMs(at(353843), at(353848), 1)).toBe(MIN_STEP_GAP_MS)
+  })
+
+  it('leaves a human-paced gap alone', () => {
+    expect(stepGapMs(at(0), at(600), 1)).toBe(600)
+    expect(stepGapMs(at(0), at(1000), 1)).toBe(1000)
+  })
+
+  it('still clamps a long thinking pause', () => {
+    expect(stepGapMs(at(0), at(15_670), 1)).toBe(MAX_STEP_GAP_MS)
+  })
+
+  it('floors the recording, not the playback, so speed keeps working', () => {
+    // Flooring after the division would pin every step of an agent take to
+    // MIN_STEP_GAP_MS at every speed, and the 4x button would do nothing on
+    // exactly the takes that need it.
+    expect(stepGapMs(at(0), at(1), 4)).toBe(MIN_STEP_GAP_MS / 4)
+    expect(stepGapMs(at(0), at(1), 2)).toBe(MIN_STEP_GAP_MS / 2)
+  })
+
+  it('does not floor the lead-in before the first step', () => {
+    expect(stepGapMs(undefined, at(12), 1)).toBe(12)
+    expect(stepGapMs(undefined, at(0), 1)).toBe(0)
+  })
+
+  it('does not pull a companion pair apart', () => {
+    // Two commands sharing a timestamp are one gesture; the video scheduler
+    // says so in as many words, and a floor between them would stage a single
+    // user action as two.
+    expect(stepGapMs(at(500), at(500), 1)).toBe(0)
+  })
+
+  it('lets an authored hold win, unclamped in both directions', () => {
+    expect(stepGapMs(at(0, { holdMs: 0 }), at(1), 1)).toBe(0)
+    expect(stepGapMs(at(0, { holdMs: 9000 }), at(1), 1)).toBe(9000)
+    expect(stepGapMs(at(0, { holdMs: 9000 }), at(1), 2)).toBe(4500)
+  })
+
+  it('holds a narration step long enough to read it', () => {
+    // The bug this exists for: six sentences shared 10.3ms of screen time
+    // because the pause the agent spent writing them was charged to the edit
+    // BEFORE each one.
+    const note = at(0, { id: 'lesson.note', args: ['one two three four five'] })
+    expect(stepGapMs(note, at(2), 1)).toBe(5 * NARRATION_MS_PER_WORD)
+    expect(stepGapMs(note, at(2), 1)).toBeGreaterThan(MAX_STEP_GAP_MS)
+  })
+
+  it('bounds a narration hold at both ends', () => {
+    const terse = at(0, { id: 'lesson.note', args: ['go'] })
+    expect(stepGapMs(terse, at(2), 1)).toBe(NARRATION_MIN_HOLD_MS)
+    const essay = at(0, {
+      id: 'lesson.note',
+      args: [Array.from({ length: 200 }, () => 'word').join(' ')],
+    })
+    expect(stepGapMs(essay, at(2), 1)).toBe(NARRATION_MAX_HOLD_MS)
+  })
+
+  it('reads a sentence that rode along as a caption', () => {
+    // With narrationAsStep off there is no lesson.note action at all: the
+    // sentence captions the step it introduces. Same prose, same pacing.
+    const captioned = at(0, { note: 'one two three four five' })
+    expect(stepGapMs(captioned, at(2), 1)).toBe(5 * NARRATION_MS_PER_WORD)
+  })
+
+  it('ignores an empty sentence', () => {
+    expect(stepGapMs(at(0, { note: '   ' }), at(2), 1)).toBe(MIN_STEP_GAP_MS)
+    expect(stepGapMs(at(0, { id: 'lesson.note', args: [] }), at(2), 1)).toBe(
+      MIN_STEP_GAP_MS,
+    )
+  })
+})
+
 describe('createSessionPlayer', () => {
   it('clears transient UI before opening the replay batch and loading the baseline', () => {
     createRoot((dispose) => {
@@ -296,17 +384,20 @@ describe('createSessionPlayer', () => {
       const player = createSessionPlayer(gammaSteps, target)
       player.play()
 
-      // The first step waits out its own offset from the session start.
+      // The first step waits out its own offset from the session start, which
+      // is a lead-in rather than a dwell on anything, so no floor applies.
       vi.advanceTimersByTime(0)
       expect(flame.renderSettings.gamma).toBeCloseTo(1.5, 5)
       expect(player.stepIndex()).toBe(0)
 
-      vi.advanceTimersByTime(99)
+      // The recorded 100ms and 150ms gaps are below MIN_STEP_GAP_MS: nobody
+      // can watch a step that lasts a tenth of a second, so both are floored.
+      vi.advanceTimersByTime(MIN_STEP_GAP_MS - 1)
       expect(player.stepIndex()).toBe(0)
       vi.advanceTimersByTime(1)
       expect(flame.renderSettings.gamma).toBeCloseTo(2.5, 5)
 
-      vi.advanceTimersByTime(150)
+      vi.advanceTimersByTime(MIN_STEP_GAP_MS)
       expect(flame.renderSettings.gamma).toBeCloseTo(3.5, 5)
       expect(player.isPlaying()).toBe(false)
       dispose()
@@ -384,11 +475,14 @@ describe('createSessionPlayer', () => {
       // change lands on the step after it — never more than one gap late,
       // which MAX_STEP_GAP_MS bounds.
       setSpeed(10)
-      vi.advanceTimersByTime(100)
+      vi.advanceTimersByTime(MIN_STEP_GAP_MS)
       expect(player.stepIndex()).toBe(1)
 
-      // Step 2's 150ms gap now takes 15ms.
-      vi.advanceTimersByTime(14)
+      // Step 2's gap is floored to MIN_STEP_GAP_MS as a RECORDED gap, then
+      // divided: 50ms, not 500. The floor repairs the recording; it does not
+      // pin playback, or the speed control would do nothing on an agent take,
+      // where every measured gap is under the floor.
+      vi.advanceTimersByTime(MIN_STEP_GAP_MS / 10 - 1)
       expect(player.stepIndex()).toBe(1)
       vi.advanceTimersByTime(1)
       expect(player.stepIndex()).toBe(2)
@@ -447,7 +541,7 @@ describe('createSessionPlayer', () => {
       player.play()
       expect(loaded()).toBe(1)
       expect(player.stepIndex()).toBe(0)
-      vi.advanceTimersByTime(100)
+      vi.advanceTimersByTime(MIN_STEP_GAP_MS)
       expect(player.stepIndex()).toBe(1)
       expect(flame.renderSettings.gamma).toBeCloseTo(2.5, 5)
       dispose()
@@ -475,7 +569,7 @@ describe('createSessionPlayer', () => {
       vi.advanceTimersByTime(0)
       expect(player.stepIndex()).toBe(0)
       expect(flame.renderSettings.gamma).toBeCloseTo(1.5, 5)
-      vi.advanceTimersByTime(100)
+      vi.advanceTimersByTime(MIN_STEP_GAP_MS)
       expect(player.stepIndex()).toBe(1)
       expect(flame.renderSettings.gamma).toBeCloseTo(2.5, 5)
       dispose()
@@ -552,7 +646,7 @@ describe('createSessionPlayer', () => {
       vi.advanceTimersByTime(0)
       expect(player.stepIndex()).toBe(0)
       expect(flame.renderSettings.gamma).toBeCloseTo(1.5, 5)
-      vi.advanceTimersByTime(100)
+      vi.advanceTimersByTime(MIN_STEP_GAP_MS)
       expect(player.stepIndex()).toBe(1)
       expect(flame.renderSettings.gamma).toBeCloseTo(2.5, 5)
       dispose()
@@ -926,7 +1020,7 @@ describe('createSessionPlayer', () => {
       expect(player.stepIndex()).toBe(0)
 
       startSessionRecording(world.flame)
-      vi.advanceTimersByTime(100)
+      vi.advanceTimersByTime(MIN_STEP_GAP_MS)
 
       expect(player.isPlaying()).toBe(false)
       expect(player.stepIndex()).toBe(0)

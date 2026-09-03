@@ -1,5 +1,6 @@
 import { createSignal } from 'solid-js'
 import { deepClone } from '@/utils/clone'
+import { NARRATION_COMMAND_ID } from './narrationMode'
 import { getLiveWorkspaceMutationGeneration, isSessionRecording, withRecordingSuppressed, } from './recorder'
 import { loadSessionStart } from './replay'
 import type { ReplayTarget } from './replay'
@@ -29,6 +30,124 @@ import type { RecordedAction, RecordedSession } from './schema'
 
 /** Longest wait between two steps, however long the human paused for. */
 export const MAX_STEP_GAP_MS = 1200
+
+/**
+ * Shortest wait between two steps, however fast they were recorded.
+ *
+ * A person cannot issue two commands three milliseconds apart; an agent does
+ * nothing else. A real lesson put `flame.addTransform` and four
+ * `setVariationParams` calls inside 26 ms, and replayed at that speed there is
+ * nothing to see: the follow-cam needs LAYOUT_SETTLE_MS (400) just to measure
+ * its target, and the browser paints at most once across the whole burst.
+ *
+ * Applied to the RECORDED gap, before playback speed divides it. The floor
+ * repairs the recording; speed is then the viewer's business as usual. Putting
+ * it after the division instead would pin every step of an agent take to the
+ * floor at every speed — the 4x button would do nothing on exactly the takes
+ * that need it, because every one of their gaps is under the floor.
+ */
+export const MIN_STEP_GAP_MS = 500
+
+/** 240 words per minute, the usual figure for reading prose on screen. */
+export const NARRATION_MS_PER_WORD = 250
+
+/** Even three words deserve to be seen. */
+export const NARRATION_MIN_HOLD_MS = 1200
+
+/**
+ * ...and even a paragraph does not get to stop the show. Full reading time for
+ * the sentences an agent writes is 8-12 s each; six of those would spend most
+ * of MAX_REPLAY_VIDEO_DURATION_MS on held text. The transport is right there
+ * for a viewer who wants longer.
+ */
+export const NARRATION_MAX_HOLD_MS = 4000
+
+/**
+ * The sentence this step says out loud, in either recording mode.
+ *
+ * With `narrationAsStep` on, a sentence is its own `lesson.note` step. With it
+ * off the recorder attaches it to the step it introduces as a `note`, and a
+ * human author can type one there too. Both are prose somebody is meant to
+ * read, so both are paced the same way.
+ */
+function narrationText(action: RecordedAction): string | undefined {
+  if (action.id === NARRATION_COMMAND_ID) {
+    const [text] = action.args
+    if (typeof text === 'string' && text.trim() !== '') return text
+  }
+  const note = action.note
+  return note !== undefined && note.trim() !== '' ? note : undefined
+}
+
+/**
+ * The reading hold this step earns, or undefined when it says nothing.
+ *
+ * Exported for the tail of a video: the closing sentence has no step after it
+ * to be the dwell on, so without this a take ends on the words the whole
+ * lesson was building to for however long the default tail happens to be.
+ */
+export function narrationHoldFor(
+  action: RecordedAction,
+  speed: number,
+): number | undefined {
+  const text = narrationText(action)
+  return text === undefined ? undefined : narrationHoldMs(text) / speed
+}
+
+function narrationHoldMs(text: string): number {
+  const words = text.trim().split(/\s+/).length
+  return Math.min(
+    NARRATION_MAX_HOLD_MS,
+    Math.max(NARRATION_MIN_HOLD_MS, words * NARRATION_MS_PER_WORD),
+  )
+}
+
+/**
+ * How long to wait before applying `next` — which is the dwell on `previous`.
+ *
+ * That inversion is the whole subtlety here, and getting it wrong is what made
+ * agent lessons unwatchable: a recorded gap is time the viewer spends looking
+ * at the step BEFORE it. An agent thinks for fifteen seconds, writes a
+ * sentence, then edits in a burst, so the pause was being spent holding the
+ * previous burst's last edit while the sentence it produced was replaced a
+ * millisecond later. Six narration steps in one real lesson shared 10.3 ms of
+ * screen time between them.
+ *
+ * The rules, in order:
+ *
+ *  - An authored `holdMs` on the previous step wins and is not clamped in
+ *    either direction. Pacing is authorial; `holdMs: 0` means zero.
+ *  - A previous step that says something is held long enough to read.
+ *  - Otherwise the measured gap, clamped at both ends: MAX so a thinking pause
+ *    does not stall playback, MIN so a machine's burst is watchable.
+ *
+ * The floor is skipped where it would do harm: before the first step, whose
+ * gap is a lead-in rather than a dwell on anything, and between two actions
+ * sharing a timestamp, which is how a companion pair says it is one gesture
+ * and not two. A narration hold and an authored hold both ignore the ceiling —
+ * a sentence nobody can finish reading is the bug being fixed.
+ *
+ * Shared with `createReplayVideoSchedule` so a live replay and an exported
+ * video cannot drift — `replayInterfaceVideo` validates its encoder budget
+ * from the schedule and then screen-records the live player, so a difference
+ * between the two overruns the capture.
+ */
+export function stepGapMs(
+  previous: RecordedAction | undefined,
+  next: RecordedAction | undefined,
+  speed: number,
+): number {
+  if (!next) return 0
+  if (previous?.holdMs !== undefined) return previous.holdMs / speed
+  const sentence = previous === undefined ? undefined : narrationText(previous)
+  if (sentence !== undefined) return narrationHoldMs(sentence) / speed
+  const measured = Math.max(0, previous ? next.t - previous.t : next.t)
+  const paced =
+    previous !== undefined && previous.t !== next.t
+      ? Math.max(MIN_STEP_GAP_MS, measured)
+      : measured
+  return Math.min(MAX_STEP_GAP_MS, paced / speed)
+}
 
 /** Playback speeds the panel offers. 1 = the pace it was recorded at. */
 export const PLAYBACK_SPEEDS = [0.5, 1, 2, 4] as const
@@ -278,22 +397,13 @@ export function createSessionPlayer(
     return withDeferredEffects(() => rebuildToNow(index))
   }
 
-  /**
-   * How long to wait before applying `index`.
-   *
-   * An authored `holdMs` on the PREVIOUS step wins: pacing belongs to the step
-   * an author wants held, not to the one that follows it, and an authored hold
-   * is a deliberate choice so it is not clamped by MAX_STEP_GAP_MS. Otherwise
-   * it is the gap the recording measured, clamped so a long thinking pause
-   * does not stall playback.
-   */
+  /** How long to wait before applying `index`. See {@link stepGapMs}. */
   function gapBefore(index: number): number {
-    const next = actions[index]
-    if (!next) return 0
-    const previous = index > 0 ? actions[index - 1] : undefined
-    if (previous?.holdMs !== undefined) return previous.holdMs / speed()
-    const delta = previous ? next.t - previous.t : next.t
-    return Math.min(MAX_STEP_GAP_MS, Math.max(0, delta) / speed())
+    return stepGapMs(
+      index > 0 ? actions[index - 1] : undefined,
+      actions[index],
+      speed(),
+    )
   }
 
   function scheduleNext() {

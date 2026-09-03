@@ -9,7 +9,7 @@ import { tryValidateFlame } from '@/flame/schema/flameSchema'
 import { defaultTimelineConfig } from '@/flame/schema/timeline'
 import { deepClone } from '@/utils/clone'
 import { applyTracksToFlame, getUserEndFrame, loopOptsFromConfig, resolveLoopValue, } from '@/utils/timeline'
-import { MAX_STEP_GAP_MS } from './player'
+import { narrationHoldFor, stepGapMs } from './player'
 import { paletteRestoreColorsAfterReplayCommand } from './replayPaletteState'
 import { validateSession } from './schema'
 import type { RecordedAction, RecordedSession, SessionViewSnapshot, TransformColorSnapshot, } from './schema'
@@ -389,15 +389,10 @@ export function createReplayVideoSchedule(
   for (let index = 0; index < session.actions.length; index++) {
     const action = session.actions[index]!
     const previous = index > 0 ? session.actions[index - 1] : undefined
-    const gap =
-      previous?.holdMs !== undefined
-        ? previous.holdMs / spec.playbackSpeed
-        : Math.min(
-            MAX_STEP_GAP_MS,
-            Math.max(0, previous ? action.t - previous.t : action.t) /
-              spec.playbackSpeed,
-          )
-    cursor += gap
+    // The same rule the live player uses, not a copy of it: the interface
+    // exporter validates this schedule and then screen-records the player, so
+    // the two drifting apart overruns the capture budget.
+    cursor += stepGapMs(previous, action, spec.playbackSpeed)
     // Two companion commands can share a timestamp. A video cannot represent
     // both on one frame, so advance at least one frame and never silently skip
     // an authored step/caption.
@@ -410,10 +405,19 @@ export function createReplayVideoSchedule(
     actionTimesMs.push((frame * 1000) / fps)
   }
   const finalActionTime = actionTimesMs.at(-1) ?? spec.leadInMs
-  const durationMs = Math.max(cursor, finalActionTime) + spec.tailMs
+  // A closing sentence has no step after it to be the dwell on, so it would
+  // otherwise get the bare tail — on the one line the lesson was building to.
+  const closing = session.actions.at(-1)
+  const effectiveTailMs = Math.max(
+    spec.tailMs,
+    (closing === undefined
+      ? undefined
+      : narrationHoldFor(closing, spec.playbackSpeed)) ?? 0,
+  )
+  const durationMs = Math.max(cursor, finalActionTime) + effectiveTailMs
   if (durationMs > MAX_REPLAY_VIDEO_DURATION_MS) {
     throw new Error(
-      `Replay video is ${Math.ceil(durationMs / 1000)}s; the current limit is ${MAX_REPLAY_VIDEO_DURATION_MS / 1000}s. Shorten long holds or choose a faster replay speed.`,
+      `Replay video is ${Math.ceil(durationMs / 1000)}s; the current limit is ${MAX_REPLAY_VIDEO_DURATION_MS / 1000}s. Choose a faster replay speed, shorten authored holds, or split the take — steps are paced to be watchable, so a long take runs longer than it was recorded.`,
     )
   }
   return {
