@@ -1,3 +1,5 @@
+import { DEFAULT_SEAT } from '@/seats/seatId'
+import { setWebMcpTarget } from '@/webmcp/contextBridge'
 import { clearNarration } from './narration'
 import { appendPilotLog, drivingState, endPilot, notePilotSaveResult, } from './pilot'
 import { clearPilotFocus } from './pilotFocus'
@@ -46,6 +48,9 @@ export async function finishPilot(
   const sessionName = session ? sessionNameFor(state, title, reason) : undefined
   clearNarration()
   clearPilotFocus()
+  // The tools follow the bridge target; leaving it on a seat whose duel has
+  // ended would point every later call at a disposed context.
+  setWebMcpTarget(DEFAULT_SEAT)
   // Leave `driving` in the same tick the recorder stops. Awaiting the save
   // first left a window in which the guard still said "driving" while nothing
   // was being recorded, so a tool call landing there ran and counted a step

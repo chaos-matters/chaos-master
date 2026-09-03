@@ -11,6 +11,8 @@ const driving: PilotState = {
   steps: 0,
   stepBudget: 30,
   allowed: ['flame.addTransform', 'camera.', 'view.', 'lesson.note'],
+  seatId: 'player',
+  lock: 'screen',
   qualityRankAtStart: 1,
 }
 

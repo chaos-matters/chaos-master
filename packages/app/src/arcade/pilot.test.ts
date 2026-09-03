@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { agentDriving, drivingState, endPilot, notePilotStep, pilot, pilotLog, pilotStepsRemaining, resetPilot, startPilot, } from './pilot'
+import { agentDriving, drivingSeat, drivingState, endPilot, notePilotStep, pilot, pilotLog, pilotStepsRemaining, resetPilot, startPilot, } from './pilot'
 
 const start = () =>
   startPilot({
@@ -52,5 +52,36 @@ describe('pilot state machine', () => {
     resetPilot()
     expect(notePilotStep('command', 'x')).toBe(-1)
     expect(endPilot('finished', {})).toBeUndefined()
+  })
+})
+
+describe('pilot seats', () => {
+  afterEach(() => {
+    resetPilot()
+  })
+
+  it('defaults to owning the whole screen on the player seat', () => {
+    expect(start()).toEqual({ ok: true })
+    expect(drivingState()).toMatchObject({ seatId: 'player', lock: 'screen' })
+    expect(drivingSeat()).toBe('player')
+  })
+
+  it('can drive the rival seat with a seat-scoped lock', () => {
+    expect(
+      startPilot({
+        mode: 'duel',
+        title: 'Duel',
+        stepBudget: 40,
+        allowed: ['flame.'],
+        qualityRankAtStart: 1,
+        seatId: 'rival',
+        lock: 'seat',
+        now: 0,
+      }),
+    ).toEqual({ ok: true })
+    expect(drivingSeat()).toBe('rival')
+    expect(drivingState()?.lock).toBe('seat')
+    resetPilot()
+    expect(drivingSeat()).toBeUndefined()
   })
 })
