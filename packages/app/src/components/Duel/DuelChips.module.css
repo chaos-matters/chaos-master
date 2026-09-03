@@ -72,7 +72,7 @@
 
 .panel {
   width: 100%;
-  max-height: min(190px, 32vh);
+  max-height: min(230px, 34vh);
   display: grid;
   grid-template-rows: auto 1fr;
   gap: 10px;
@@ -115,11 +115,17 @@
   --chip-height: 27px;
 }
 
+/*
+  No scrolling on this axis. Each panel is built to fit its own body and
+  scrolls sideways where it needs to; a vertical scrollbar here meant the
+  body was a few pixels short, and in the add flow it silently carried the
+  search bar off the top of the panel.
+*/
 .panelBody {
   min-height: 0;
-  overflow: auto;
-  /* A flick that runs out of tiles must not scroll the page behind. */
-  overscroll-behavior: contain;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
 }
 
 .transforms {
@@ -167,14 +173,17 @@
    pick a variation by looking at what it does, not by reading its name. */
 .variations {
   display: grid;
+  /* The bar is fixed and the row below it takes what is left, so the tiles
+     can never push the search box out of the panel. */
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 8px;
-  align-content: start;
   min-height: 0;
   min-width: 0;
 }
 
 .tiles {
   display: flex;
+  min-height: 0;
   align-items: flex-start;
   gap: 8px;
   scroll-snap-type: x proximity;
@@ -416,8 +425,11 @@
   overflow-x: auto;
   /* A flick that runs out of swatches must not nudge the duel behind it. */
   overscroll-behavior: contain;
-  /* Room for the selected swatch's ring, which is drawn outside the band. */
-  padding: 4px 4px 2px;
+  /* Room for the selected swatch's ring, which is drawn outside the band, and
+     for the last swatch's label, which otherwise ends flush against the edge
+     and reads as a broken word rather than as more content. */
+  padding: 4px 20px 2px 4px;
+  scroll-padding-right: 20px;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
 }

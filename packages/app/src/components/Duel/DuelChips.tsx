@@ -5,6 +5,7 @@ import { executeCommand } from '@/commands/registry'
 import { VariationPreview } from '@/components/VariationSelector/VariationSelector'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
+import { palette } from '@/flame/colorMap'
 import { defaultPalettes, paletteToGradientCSS } from '@/flame/palettes'
 import { getVariationPreviewFlame } from '@/flame/variations/utils'
 import { Check, ColourWedge, Cross, Minus, Plus, ShapeTriangle, Undo, VariationSpiral, } from '@/icons'
@@ -523,16 +524,53 @@ function ShapePanel(props: {
  * official flam3 set is a 1.5 MB XML fetch parsed on the main thread, which is
  * not something to spend a duel's clock on — the sidebar can offer those.
  */
-const STRIP_PALETTES = defaultPalettes
-  // A swatch is a chroma ramp — lightness comes from the flame's density, not
-  // the palette — so a palette with no chroma has nothing to show and the
-  // greyscale entries all render as the same flat grey block. They stay in the
-  // sidebar, where they are labelled and picked deliberately; in a strip you
-  // scan under a clock, three identical blocks are three wrong answers.
-  .filter((palette) =>
+/** A palette's own hue, in radians, from the mean chroma of its stops. */
+function paletteHue(palette: Palette): number {
+  const a =
+    palette.entries.reduce((sum, entry) => sum + entry.a, 0) /
+    palette.entries.length
+  const b =
+    palette.entries.reduce((sum, entry) => sum + entry.b, 0) /
+    palette.entries.length
+  return Math.atan2(b, a)
+}
+
+/**
+ * Fourteen palettes chosen to look like fourteen palettes.
+ *
+ * `defaultPalettes` is ordered by family, so the first fourteen are five reds
+ * and three blues — a strip you cannot pick from at a glance, which is the
+ * only kind of picking a duel allows. Taking one from each hue bucket spends
+ * the same fourteen slots on the whole wheel instead.
+ *
+ * Chroma is also the filter: a swatch draws a palette's colour and takes its
+ * lightness from the flame's density, so the greyscale palettes have nothing
+ * to draw and rendered as identical flat blocks. They keep their place in the
+ * sidebar, where they are labelled and picked deliberately.
+ */
+const STRIP_PALETTES = (() => {
+  const BUCKETS = 14
+  const chromatic = defaultPalettes.filter((palette) =>
     palette.entries.some((entry) => Math.hypot(entry.a, entry.b) > 0.02),
   )
-  .slice(0, 14)
+  const taken = new Map<number, Palette>()
+  for (const palette of chromatic) {
+    const bucket = Math.floor(
+      ((paletteHue(palette) + Math.PI) / (2 * Math.PI)) * BUCKETS,
+    )
+    if (!taken.has(bucket)) taken.set(bucket, palette)
+  }
+  const spread = [...taken.entries()]
+    .sort(([left], [right]) => left - right)
+    .map(([, palette]) => palette)
+  // Buckets can come up empty; top up in order rather than shipping a short
+  // strip, and never repeat one already taken.
+  for (const palette of chromatic) {
+    if (spread.length >= BUCKETS) break
+    if (!spread.includes(palette)) spread.push(palette)
+  }
+  return spread.slice(0, BUCKETS)
+})()
 
 function ColourPanel(props: {
   flame: FlameDescriptor
@@ -541,20 +579,38 @@ function ColourPanel(props: {
   onColor: (x: number) => void
   onSpeed: (speed: number) => void
 }) {
-  const selectedId = () => props.flame.renderSettings.palette?.id ?? ''
+  const applied = () => props.flame.renderSettings.palette
+  const selectedId = () => applied()?.id ?? ''
+  /**
+   * The strip, with the flame's own palette on the front if it is not already
+   * in it. Without this the strip marks nothing as selected and the position
+   * track falls back to grey — the two things that tell you where you are.
+   */
+  const swatches = (): Palette[] => {
+    const live = applied()
+    if (live === undefined || STRIP_PALETTES.some((p) => p.id === live.id)) {
+      return STRIP_PALETTES
+    }
+    // The descriptor stores a palette without the provenance a `Palette`
+    // carries, so it is rebuilt rather than cast.
+    return [
+      palette(live.id, live.name, live.entries, 'custom'),
+      ...STRIP_PALETTES,
+    ]
+  }
   // The position track carries the palette actually in use, so the slider
   // shows you the colours you are moving through rather than a stock rainbow.
   const trackGradient = () => {
-    const applied = STRIP_PALETTES.find((p) => p.id === selectedId())
-    return applied
-      ? paletteToGradientCSS(applied)
-      : 'linear-gradient(to right, #1b1f2a, #6f7a92)'
+    const live = swatches().find((p) => p.id === selectedId())
+    return live === undefined
+      ? 'linear-gradient(to right, #1b1f2a, #6f7a92)'
+      : paletteToGradientCSS(live)
   }
 
   return (
     <div class={ui.colour}>
       <div class={ui.swatches} role="group" aria-label="Palette">
-        <For each={STRIP_PALETTES}>
+        <For each={swatches()}>
           {(palette) => (
             <button
               type="button"
