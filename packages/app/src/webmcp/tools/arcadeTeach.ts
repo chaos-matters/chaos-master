@@ -141,13 +141,14 @@ export const arcadeStartLesson: WebMcpTool = {
 export const arcadeNarrate: WebMcpTool = {
   name: 'arcade_narrate',
   description:
-    'Say one sentence to the viewer about the step you are about to take. Shown live and recorded as a caption in the replay. Counts as one step of the budget. Only valid while an Arcade session is active.',
+    'Say one SHORT sentence to the viewer about the step you are about to take. It is burned into the replay as a caption over the flame, so keep it under 25 words — a longer one is held on screen longer but is harder to read while the picture is changing. Two ideas means two calls. Counts as one step of the budget. Only valid while an Arcade session is active.',
   inputSchema: {
     type: 'object',
     properties: {
       text: {
         type: 'string',
-        description: 'One sentence, at most 400 characters',
+        description:
+          'One sentence, at most 400 characters. Aim for under 25 words: it is shown as a caption over the flame, not as prose on a page.',
       },
     },
     required: ['text'],

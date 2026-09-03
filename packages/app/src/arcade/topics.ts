@@ -217,7 +217,7 @@ export const WEBMCP_FALLBACK_NOTE =
   "If you cannot see these as tools, drive them from the page instead - they are registered on document.modelContext. Take the tool object from getTools and pass arguments as a JSON string: const t = (await document.modelContext.getTools()).find(x => x.name === 'arcade_status'); await document.modelContext.executeTool(t, JSON.stringify({})). Passing the name, or a plain object, throws."
 
 export function teachPromptCard(topic: TopicId): string {
-  return `Teach me ${LESSON_TOPICS[topic].title.toLowerCase()} in Lumen Apeiron. Call arcade_start_lesson with topic "${topic}", then build the example step by step using only the commands listed in the lesson brief. Before each group of changes call arcade_narrate with one sentence explaining what you are about to do and why. Check your work with get_flame. When done, call arcade_end_lesson with a short title and summary.
+  return `Teach me ${LESSON_TOPICS[topic].title.toLowerCase()} in Lumen Apeiron. Call arcade_start_lesson with topic "${topic}", then build the example step by step using only the commands listed in the lesson brief. Before each group of changes call arcade_narrate with one short sentence — under 25 words — explaining what you are about to do and why; the sentence is shown as a caption over the flame while it changes, so split a longer explanation into two narration steps rather than writing a paragraph. Check your work with get_flame. When done, call arcade_end_lesson with a short title and summary.
 
 ${WEBMCP_FALLBACK_NOTE}`
 }
