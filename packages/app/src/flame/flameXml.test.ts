@@ -113,9 +113,17 @@ describe('resolveVariationType', () => {
   })
 
   it('applies explicit aliases', () => {
-    expect(resolveVariationType('sinusoidal')).toBe('sinVar')
-    expect(resolveVariationType('sinusodial')).toBe('sinVar')
+    expect(resolveVariationType('sinusodial')).toBe('sinusoidalVar')
     expect(resolveVariationType('blur')).toBe('circleBlurVar')
+  })
+
+  // flam3 var #1 is sin(x)/sin(y) — `sinusoidalVar`, not `sinVar` (the complex
+  // sine, sin(x)cosh(y)/cos(x)sinh(y)). It resolves from the registry, not an
+  // alias; the misspelling is aliased to the same target.
+  it('resolves sinusoidal to sinusoidalVar, not the complex sine', () => {
+    expect(resolveVariationType('sinusoidal')).toBe('sinusoidalVar')
+    expect(resolveVariationType('sinusodial')).toBe('sinusoidalVar')
+    expect(resolveVariationType('sin')).toBe('sinVar')
   })
 
   it('returns undefined for unknown variations (does not invent a type)', () => {

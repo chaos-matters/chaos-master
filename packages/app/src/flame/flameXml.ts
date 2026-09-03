@@ -42,8 +42,10 @@ const NORMALIZED_TO_TYPE: Map<string, string> = (() => {
 // (gaussian_blur, pre_blur, wedge_julia, julian, juliascope, pie, ngon, … all
 // resolve straight from the registry by normalized name — no alias needed.)
 const FLAM3_ALIASES_RAW: Record<string, string> = {
-  sinusoidal: 'sinVar', // flam3 var #1 — registry has no "sinusoidalVar"
-  sinusodial: 'sinVar', // historical flam3 misspelling
+  // NOTE: `sinusoidal` itself is NOT aliased — it resolves straight from the
+  // registry to `sinusoidalVar` (flam3 var #1, sin(x)/sin(y)). Only the
+  // misspelling needs a hand-written entry.
+  sinusodial: 'sinusoidalVar', // historical flam3 misspelling of "sinusoidal"
   blur: 'circleBlurVar', // flam3 "blur" fills a disc — closest CM blur
   flatten: 'preFlattenVar', // flam3 flatten (zeros z) ↔ CM preFlatten
   post_mirror: 'postMirrorWfVar', // Apophysis post_mirror plugin
