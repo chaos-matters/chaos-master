@@ -1,6 +1,7 @@
 import { createSignal, Show } from 'solid-js'
 import { useToast } from '@/contexts/ToastContext'
-import { Book, FolderOpen, Record } from '@/icons'
+import { Book, FolderOpen, Record, Speech } from '@/icons'
+import { narrationAsStep, setNarrationAsStep } from '@/recorder/narrationMode'
 import { cancelSessionRecording, isSessionRecording, recordedActionCount, startSessionRecording, stopSessionRecording, unnamedWriteCount, } from '@/recorder/recorder'
 import { MAX_SESSION_FILE_BYTES, parseSession, serializeSession, sessionFilename, } from '@/recorder/schema'
 import { downloadBlob } from '@/utils/blob'
@@ -185,6 +186,27 @@ export function SessionRecorderControls(props: {
               }
             >
               <Book class={styles.icon} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              class={styles.iconButton}
+              classList={{
+                [styles.toggleOn as string]: !narrationAsStep(),
+              }}
+              onClick={() => setNarrationAsStep((on) => !on)}
+              aria-pressed={!narrationAsStep()}
+              aria-label={
+                narrationAsStep()
+                  ? 'Fold narration into the step it introduces'
+                  : 'Record narration as its own step'
+              }
+              title={
+                narrationAsStep()
+                  ? 'Narration is its own step — a caption that holds while nothing moves'
+                  : 'Narration captions the next step — the list is only what changed'
+              }
+            >
+              <Speech class={styles.icon} aria-hidden="true" />
             </button>
             <button
               type="button"

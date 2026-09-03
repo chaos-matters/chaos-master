@@ -42,6 +42,7 @@ import Shuffle from './shuffle.svg'
 import SkipBack from './skip-back.svg'
 import SkipForward from './skip-forward.svg'
 import Sparkle from './sparkle.svg'
+import Speech from './speech.svg'
 import Star from './star.svg'
 import Stop from './stop.svg'
 import Swords from './swords.svg'
@@ -103,4 +104,5 @@ export {
   Undo,
   Zap,
   TriangleAlert,
+  Speech,
 }
