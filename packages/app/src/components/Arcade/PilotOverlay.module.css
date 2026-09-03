@@ -1,11 +1,21 @@
+/* The lock you can see through.
+   Teach and Cinema exist to be WATCHED: the sidebar labels, the affine
+   handles and the flame itself are the lesson. A heavy scrim plus a
+   full-viewport backdrop blur hid exactly the thing the viewer is supposed to
+   be learning from, so both are gone. What enforces the lock is
+   `pointer-events`, not opacity — nothing here is load-bearing for safety, it
+   only has to SAY "these controls are not yours right now". A ring around the
+   viewport says that without costing a single pixel of legibility. */
 .shield {
   position: fixed;
   inset: 0;
   /* Topmost layer: version pills 9999 < Arcade hub 10005/10006 < pilot lock 10010. */
   z-index: 10010;
   pointer-events: all;
-  background: rgba(4, 6, 12, 0.35);
-  backdrop-filter: blur(1px);
+  background: rgba(4, 6, 12, 0.08);
+  box-shadow:
+    inset 0 0 0 2px rgba(138, 180, 255, 0.45),
+    inset 0 0 60px rgba(138, 180, 255, 0.07);
   display: grid;
   grid-template-rows: auto 1fr auto;
   grid-template-columns: 1fr 320px;
@@ -62,6 +72,7 @@
 .stop {
   display: inline-flex;
   align-items: center;
+  flex: none;
   gap: 8px;
   padding: 7px 14px;
   border-radius: 999px;
@@ -72,6 +83,15 @@
     600 13px system-ui,
     sans-serif;
   cursor: pointer;
+}
+
+/* An unsized SVG in a flex row lays out at its default replaced size, which
+   pushed the label off the button's centre. Every other icon here is sized by
+   a class; this one is inside a button and gets it from the button. */
+.stop svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
 }
 
 .stop:focus-visible {
@@ -113,15 +133,23 @@
   opacity: 0.6;
 }
 
+/* A pill, for the same reason the banner is one: a full-width bar across the
+   bottom covers the timeline and the transport, which a Cinema take is about. */
 .hint {
   grid-column: 1 / -1;
-  padding: 8px 18px;
+  justify-self: center;
+  margin: 0 0 12px;
+  padding: 7px 16px;
+  border-radius: 999px;
   text-align: center;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.8);
   font:
     12px system-ui,
     sans-serif;
-  background: rgba(10, 14, 24, 0.7);
+  background: rgba(10, 14, 24, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  /* Blur belongs on the chrome, never on the whole viewport. */
+  backdrop-filter: blur(8px);
 }
 
 @media (max-width: 768px) {
