@@ -225,4 +225,48 @@ describe('animatable catalog', () => {
       ),
     ).toMatchObject({ ok: false, error: expect.stringContaining('increasing') })
   })
+
+  // Variation paths are the one form that takes no `transform.` prefix, so
+  // agents reach for the prefixed one and lose a call to the rejection. It is
+  // accepted and stored canonically, which is what keeps a later call on the
+  // same target overwriting the same track instead of making a second one.
+  it('accepts a transform-prefixed variation path and stores the canonical one', () => {
+    const result = buildTimelineSnapshot(
+      {
+        durationFrames: 60,
+        tracks: [
+          {
+            path: 'transform.t2.v2',
+            keyframes: [
+              { frame: 0, value: 0.5 },
+              { frame: 60, value: 0.9 },
+            ],
+          },
+        ],
+      },
+      catalog,
+    )
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.snapshot.tracks.map((track) => track.parameterPath)).toEqual([
+      't2.v2',
+    ])
+  })
+
+  it('still refuses a prefixed path that names nothing', () => {
+    expect(
+      buildTimelineSnapshot(
+        {
+          durationFrames: 60,
+          tracks: [
+            { path: 'transform.t2.nope', keyframes: [{ frame: 0, value: 1 }] },
+          ],
+        },
+        catalog,
+      ),
+    ).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Unknown path'),
+    })
+  })
 })

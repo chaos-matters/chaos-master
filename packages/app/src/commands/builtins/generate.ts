@@ -222,6 +222,7 @@ function resolveSeededArgs(
 
 registerCommand({
   id: 'flame.randomize',
+  describe: () => 'Randomize the flame',
   label: 'Randomize Flame',
   description:
     'Replace the flame with a generated one — deterministic per seed',
@@ -256,6 +257,7 @@ registerCommand({
 
 registerCommand({
   id: 'flame.mutate',
+  describe: () => 'Mutate the flame',
   label: 'Mutate Flame',
   description:
     'Mutate the current flame — deterministic per seed and input flame',

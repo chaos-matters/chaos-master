@@ -42,6 +42,14 @@ const COMMAND_ARG_HINTS: Readonly<Record<string, string>> = {
   'lesson.note': '[text] — prefer the arcade_narrate tool',
   'timeline.setFps': '[fps 1-60]',
   'timeline.setLoopMode': '["off"|"seamless"|"cycle"]',
+  'sonification.setEnabled': '[boolean]',
+  // The shape that cost a real agent several rejected calls: the first
+  // argument is a COMPLETE config, not a patch, and the second names the one
+  // control the step is about (it is what the step's label reads back).
+  'sonification.setConfig':
+    '[config, changedKey] — config needs all of model,volume,updateRate,scale,voiceCount,harmonicDensity,triggerRate,spatialSpread,reverbMix; a partial patch is refused',
+  'flame.randomize': '[] — the seed and generator config are filled in for you',
+  'flame.mutate': '[] — the seed, config and mutation options are filled in',
 }
 
 /**

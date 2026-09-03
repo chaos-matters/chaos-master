@@ -1,6 +1,7 @@
 import { vec2f } from 'typegpu/data'
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from '@/flame/schema/flameSchema'
 import { registerCommand } from '../registry'
+import { num } from './describeArgs'
 
 /**
  * Framing as commands, so both a person and an agent reach the camera the
@@ -32,6 +33,7 @@ function finite(value: unknown, fallback: number): number {
 
 registerCommand({
   id: 'camera.center',
+  describe: () => 'Centre the camera',
   label: 'Center Camera',
   description: 'Reset camera position to (0, 0) and zoom to 1',
   shortcut: 'Ctrl+0',
@@ -43,6 +45,10 @@ registerCommand({
 
 registerCommand({
   id: 'camera.zoomTo',
+  describe: ([zoom]) => {
+    const z = num(zoom, 3)
+    return z === undefined ? 'Zoom the camera' : `Zoom to ${z}`
+  },
   label: 'Zoom To',
   description: 'Set camera zoom to a specific level',
   execute(ctx, zoom?: unknown) {
@@ -52,6 +58,10 @@ registerCommand({
 
 registerCommand({
   id: 'camera.zoomBy',
+  describe: ([factor]) => {
+    const f = num(factor, 3)
+    return f === undefined ? 'Zoom the camera' : `Zoom by ${f}x`
+  },
   label: 'Zoom By',
   description: 'Multiply the current zoom by a factor (2 = twice as close)',
   execute(ctx, factor?: unknown) {
@@ -65,6 +75,13 @@ registerCommand({
 
 registerCommand({
   id: 'camera.panTo',
+  describe: ([x, y]) => {
+    const px = num(x, 3)
+    const py = num(y, 3)
+    return px === undefined || py === undefined
+      ? 'Pan the camera'
+      : `Pan to ${px}, ${py}`
+  },
   label: 'Pan To',
   description: 'Move the camera centre to a world position',
   execute(ctx, x?: unknown, y?: unknown) {
@@ -80,6 +97,13 @@ registerCommand({
 
 registerCommand({
   id: 'camera.panBy',
+  describe: ([dx, dy]) => {
+    const px = num(dx, 3)
+    const py = num(dy, 3)
+    return px === undefined || py === undefined
+      ? 'Pan the camera'
+      : `Pan by ${px}, ${py}`
+  },
   label: 'Pan By',
   description: 'Move the camera centre by a world-space offset',
   execute(ctx, dx?: unknown, dy?: unknown) {
@@ -95,6 +119,14 @@ registerCommand({
 
 registerCommand({
   id: 'camera.frame',
+  describe: ([x, y, zoom]) => {
+    const px = num(x, 3)
+    const py = num(y, 3)
+    const z = num(zoom, 3)
+    return px === undefined || py === undefined || z === undefined
+      ? 'Frame the camera'
+      : `Frame ${px}, ${py} at zoom ${z}`
+  },
   label: 'Frame Camera',
   description: 'Pan and zoom in one step, so the move reads as one beat',
   execute(ctx, x?: unknown, y?: unknown, zoom?: unknown) {

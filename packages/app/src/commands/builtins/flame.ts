@@ -9,6 +9,7 @@ import { tryValidateTransformColorSnapshot } from '@/recorder/schema'
 import { snapshotOriginForCommand, snapshotOriginLabel, tryValidateSnapshotOrigin, } from '@/recorder/snapshotOrigin'
 import { deepClone } from '@/utils/clone'
 import { registerCommand } from '../registry'
+import { num, str } from './describeArgs'
 import type { CommandContext } from '../types'
 import type { Palette } from '@/flame/colorMap'
 import type { FlameDescriptor, TransformFunction, TransformId, VariationId, } from '@/flame/schema/flameSchema'
@@ -184,6 +185,12 @@ function normalizeVariationRef(
 
 registerCommand({
   id: 'flame.setSkipIters',
+  describe: ([iters]) => {
+    const n = num(iters, 0)
+    return n === undefined
+      ? 'Set the skipped iterations'
+      : `Skipped iterations: ${n}`
+  },
   label: 'Set Skip Iters',
   description: 'Set the number of initial skip iterations',
   shortcut: 'Shift+I',
@@ -341,6 +348,8 @@ function resolveNewVariationId(variationId: unknown): VariationId {
 
 registerCommand({
   id: 'flame.addTransform',
+  describe: ([type]) =>
+    `Add a transform${str(type) ? `: ${String(type)}` : ''}`,
   label: 'Add Transform',
   description: 'Add a new transform with an optional variation type',
   shortcut: 'Shift+T',
@@ -424,6 +433,10 @@ registerCommand({
 
 registerCommand({
   id: 'flame.setVariationWeight',
+  describe: ([, , weight]) => {
+    const w = num(weight)
+    return w === undefined ? 'Set a variation weight' : `Variation weight: ${w}`
+  },
   label: 'Set Variation Weight',
   description: 'Set the weight of a variation on a specific transform',
   normalizeArgs(ctx, [transformRef, variationRef, weight]) {
@@ -457,6 +470,8 @@ registerCommand({
 
 registerCommand({
   id: 'flame.addVariation',
+  describe: ([, type]) =>
+    `Add a variation${str(type) ? `: ${String(type)}` : ''}`,
   label: 'Add Variation',
   description: 'Add a variation type to a specific transform',
   validateReplayArgs(args) {
@@ -511,6 +526,10 @@ registerCommand({
 
 registerCommand({
   id: 'flame.setColorSpeed',
+  describe: ([, speed]) => {
+    const s = num(speed)
+    return s === undefined ? 'Set a colour speed' : `Colour speed: ${s}`
+  },
   label: 'Set Color Speed',
   description: 'Set the color speed of a specific transform',
   normalizeArgs(ctx, [transformRef, speed]) {
@@ -666,6 +685,12 @@ registerCommand({
 
 registerCommand({
   id: 'flame.setProbability',
+  describe: ([, probability]) => {
+    const p = num(probability)
+    return p === undefined
+      ? 'Set a transform probability'
+      : `Transform probability: ${p}`
+  },
   label: 'Set Transform Probability',
   description: 'Set the probability weight of a transform by id or index',
   normalizeArgs(ctx, [transformRef, probability]) {
@@ -684,6 +709,12 @@ registerCommand({
 
 registerCommand({
   id: 'flame.setAffine',
+  describe: ([, which, param, value]) => {
+    const p = str(param)
+    const v = num(value, 3)
+    if (p === undefined || v === undefined) return 'Set an affine coefficient'
+    return `${which === 'post' ? 'Post' : 'Pre'}-affine ${p}: ${v}`
+  },
   label: 'Set Affine Coefficient',
   description: 'Set a pre/post affine coefficient on a transform',
   normalizeArgs(ctx, [transformRef, affineType, param, value]) {
@@ -716,6 +747,13 @@ registerCommand({
 
 registerCommand({
   id: 'flame.setTransformColor',
+  describe: ([, x, y]) => {
+    const cx = num(x)
+    const cy = num(y)
+    return cx === undefined || cy === undefined
+      ? 'Set a transform colour'
+      : `Transform colour: ${cx}, ${cy}`
+  },
   label: 'Set Transform Color',
   description: 'Set the color x/y coordinates of a transform',
   normalizeArgs(ctx, [transformRef, x, y, origin]) {
@@ -744,6 +782,10 @@ registerCommand({
 
 registerCommand({
   id: 'flame.setExposure',
+  describe: ([value]) => {
+    const n = num(value, 3)
+    return n === undefined ? 'Set the exposure' : `Exposure: ${n}`
+  },
   label: 'Set Exposure',
   description: 'Set the flame exposure value',
   execute(ctx, value?: unknown) {
@@ -756,6 +798,10 @@ registerCommand({
 
 registerCommand({
   id: 'flame.setVibrancy',
+  describe: ([value]) => {
+    const n = num(value, 3)
+    return n === undefined ? 'Set the vibrancy' : `Vibrancy: ${n}`
+  },
   label: 'Set Vibrancy',
   description: 'Set the flame vibrancy value',
   execute(ctx, value?: unknown) {
@@ -768,6 +814,10 @@ registerCommand({
 
 registerCommand({
   id: 'flame.setGamma',
+  describe: ([value]) => {
+    const n = num(value, 3)
+    return n === undefined ? 'Set the gamma' : `Gamma: ${n}`
+  },
   label: 'Set Gamma',
   description: 'Set the flame gamma value',
   execute(ctx, value?: unknown) {
@@ -780,6 +830,10 @@ registerCommand({
 
 registerCommand({
   id: 'flame.setContrast',
+  describe: ([value]) => {
+    const n = num(value, 3)
+    return n === undefined ? 'Set the contrast' : `Contrast: ${n}`
+  },
   label: 'Set Contrast',
   description: 'Set the flame contrast value',
   execute(ctx, value?: unknown) {
@@ -792,6 +846,11 @@ registerCommand({
 
 registerCommand({
   id: 'flame.setBackgroundColor',
+  describe: ([r, g, b]) => {
+    const to255 = (c: unknown) =>
+      typeof c === 'number' ? Math.round(Math.min(1, Math.max(0, c)) * 255) : 0
+    return `Background: rgb(${to255(r)}, ${to255(g)}, ${to255(b)})`
+  },
   label: 'Set Background Color',
   description: 'Set the background color (RGB, values 0-1)',
   execute(ctx, r?: unknown, g?: unknown, b?: unknown) {
@@ -806,6 +865,7 @@ registerCommand({
 
 registerCommand({
   id: 'flame.setDrawMode',
+  describe: ([mode]) => `Draw mode: ${mode === 'paint' ? 'paint' : 'light'}`,
   label: 'Set Draw Mode',
   description: 'Set the render draw mode (light or paint)',
   execute(ctx, mode?: unknown) {
@@ -838,6 +898,12 @@ registerCommand({
 
 registerCommand({
   id: 'flame.setVariationParams',
+  describe: ([, , name, value]) => {
+    const n = str(name)
+    if (n === undefined) return 'Set a variation parameter'
+    const v = num(value) ?? String(value)
+    return `Variation ${n}: ${v}`
+  },
   label: 'Set Variation Params',
   description:
     'Set a parametric variation parameter by name on a specific transform/variation',
@@ -894,6 +960,8 @@ registerCommand({
 
 registerCommand({
   id: 'flame.setVariationVisible',
+  describe: ([, , visible]) =>
+    visible === true ? 'Show a variation' : 'Hide a variation',
   label: 'Set Variation Visibility',
   description: 'Show or hide a variation on a transform',
   normalizeArgs(ctx, [transformRef, variationRef, visible]) {
@@ -922,6 +990,12 @@ registerCommand({
 
 registerCommand({
   id: 'flame.setVariation',
+  describe: ([, , descriptor]) => {
+    const type = str(variationDescriptorType(descriptor))
+    return type === undefined
+      ? 'Replace a variation'
+      : `Replace a variation with ${type}`
+  },
   label: 'Set Variation',
   description:
     'Replace a variation descriptor wholesale (type, weight and params)',
@@ -997,6 +1071,7 @@ registerCommand({
 
 registerCommand({
   id: 'flame.deleteTransform',
+  describe: () => 'Delete a transform',
   label: 'Delete Transform',
   description:
     'Delete a transform, or reset it to a blank one when it is the last',
@@ -1041,6 +1116,7 @@ registerCommand({
 
 registerCommand({
   id: 'flame.deleteVariation',
+  describe: () => 'Delete a variation',
   label: 'Delete Variation',
   description:
     'Delete a variation, or reset it to its type default when it is the last',
@@ -1072,6 +1148,10 @@ registerCommand({
 
 registerCommand({
   id: 'flame.setFinalTransform',
+  describe: ([affine]) =>
+    affine === null || affine === undefined
+      ? 'Clear the final transform'
+      : 'Set the final transform',
   label: 'Set Final Transform',
   description: 'Set or clear the flame-wide final affine transform',
   normalizeArgs(_ctx, [affine, origin]) {
@@ -1104,6 +1184,13 @@ registerCommand({
 
 registerCommand({
   id: 'flame.setFinalAffine',
+  describe: ([param, value]) => {
+    const p = str(param)
+    const v = num(value, 3)
+    return p === undefined || v === undefined
+      ? 'Set a final affine coefficient'
+      : `Final affine ${p}: ${v}`
+  },
   label: 'Set Final Affine Coefficient',
   description: 'Set one coefficient on the flame-wide final transform',
   coalesceKey: ([param]) => `final-affine:${String(param)}`,
@@ -1190,6 +1277,8 @@ registerCommand({
 
 registerCommand({
   id: 'flame.setTransformAffine',
+  describe: ([, which]) =>
+    `Reshape a transform (${which === 'post' ? 'post' : 'pre'}-affine)`,
   label: 'Set Transform Affine',
   description:
     "Replace a transform's whole pre- or post-affine (the affine editor's drag)",
@@ -1225,6 +1314,13 @@ registerCommand({
 
 registerCommand({
   id: 'flame.applyPalette',
+  describe: ([palette]) => {
+    const name =
+      palette !== null && typeof palette === 'object' && 'name' in palette
+        ? str((palette as { name?: unknown }).name)
+        : undefined
+    return name === undefined ? 'Apply a palette' : `Apply palette: ${name}`
+  },
   label: 'Apply Palette',
   description:
     'Recolour every transform from a palette and record the palette itself',
@@ -1265,6 +1361,7 @@ registerCommand({
 
 registerCommand({
   id: 'flame.removePalette',
+  describe: () => 'Remove the palette',
   label: 'Remove Palette',
   description:
     'Drop the palette, restoring the colours transforms had before it',
@@ -1420,6 +1517,13 @@ function symmetryArgsError(args: readonly unknown[]): string | undefined {
 
 registerCommand({
   id: 'flame.applySymmetry',
+  describe: ([n, type]) => {
+    const fold = num(n, 0)
+    const kind = type === 'dihedral' ? 'dihedral' : 'rotational'
+    return fold === undefined
+      ? `Apply ${kind} symmetry`
+      : `Apply ${fold}-fold ${kind} symmetry`
+  },
   label: 'Apply Symmetry',
   description:
     'Replace the generated symmetry transforms with an n-fold rotational or dihedral set',
@@ -1575,6 +1679,15 @@ registerCommand({
 
 registerCommand({
   id: 'flame.setAllTransformColors',
+  describe: ([colors]) => {
+    const count =
+      colors !== null && typeof colors === 'object'
+        ? Object.keys(colors).length
+        : 0
+    return count === 0
+      ? 'Randomize every transform colour'
+      : `Randomize ${count} transform colours`
+  },
   label: 'Randomize All Colors',
   description: 'Set every transform colour at once, by transform id',
   // The colours are rolled by the caller and recorded as data, so replay

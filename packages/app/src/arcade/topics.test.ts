@@ -1,7 +1,7 @@
 import '@/commands/builtins'
 import { describe, expect, it } from 'vitest'
 import { getAllCommands } from '@/commands/registry'
-import { CINEMA_ALLOWED, CINEMA_PRESETS, cinemaPromptCard, isTopicId, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, } from './topics'
+import { ALWAYS_ALLOWED, CINEMA_ALLOWED, CINEMA_PRESETS, cinemaPromptCard, isTopicId, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, } from './topics'
 
 describe('lesson topics', () => {
   it('has every topic with a goal, a budget and an allow-list', () => {
@@ -35,6 +35,51 @@ describe('lesson topics', () => {
         .map((entry) => `${id}: ${entry}`),
     )
     expect(missing).toEqual([])
+  })
+
+  // Every step the pilot takes is shown twice — in the live rail while the AI
+  // drives, and in the replay step list afterwards — and both read the same
+  // `describe`. A command without one falls back to its label plus raw JSON
+  // (`Toggle Sidebar [true]`), which is what the viewer is left staring at.
+  it('only allows commands that can describe themselves', () => {
+    const commands = getAllCommands()
+    const allowLists = [
+      ...TOPIC_IDS.map((id) => LESSON_TOPICS[id].allowed),
+      CINEMA_ALLOWED,
+      // Every session gets these on top of its topic list, so a command that
+      // is always allowed is exactly the one a viewer sees most often.
+      ALWAYS_ALLOWED,
+    ]
+    const rawJson = new Set<string>()
+    for (const allowed of allowLists) {
+      for (const entry of allowed) {
+        const matched = entry.endsWith('.')
+          ? commands.filter((command) => command.id.startsWith(entry))
+          : commands.filter((command) => command.id === entry)
+        for (const command of matched) {
+          if (command.describe === undefined) rawJson.add(command.id)
+        }
+      }
+    }
+    expect([...rawJson].sort()).toEqual([])
+  })
+
+  // A command that toggles when its argument is missing must not claim a
+  // direction it did not take, and one that no-ops must claim nothing.
+  it('does not invent a direction for a missing boolean', () => {
+    const describeOf = (id: string, args: unknown[]) =>
+      getAllCommands()
+        .find((command) => command.id === id)
+        ?.describe?.(args)
+    expect(describeOf('timeline.setAnimationEnabled', [true])).toBe(
+      'Enable animation',
+    )
+    expect(describeOf('timeline.setAnimationEnabled', [])).toBe(
+      'Toggle animation',
+    )
+    expect(describeOf('sidebar.open', [])).toBe('Toggle the sidebar')
+    expect(describeOf('timeline.setLoop', [])).toBeUndefined()
+    expect(describeOf('view.setShowTimeline', [])).toBeUndefined()
   })
 
   it('offers cinema presets that fill the wish with a full sentence', () => {

@@ -19,6 +19,8 @@ function isNarrationText(value: unknown): value is string {
 
 registerCommand({
   id: 'lesson.note',
+  describe: ([text]) =>
+    typeof text === 'string' && text.trim() !== '' ? text.trim() : undefined,
   label: 'Narration',
   description: 'A sentence the AI says about the step it is about to take',
   validateReplayArgs(args) {
