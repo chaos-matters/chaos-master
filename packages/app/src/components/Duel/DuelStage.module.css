@@ -52,6 +52,11 @@
   top: calc(100% + var(--duel-dial-size) * 0.44);
   left: 50%;
   transform: translateX(-50%);
+  /* `max-content`, because an absolutely positioned box otherwise shrinks to
+     its containing block — which is the dial, and the dial is 200px wide. The
+     narration was being cut to a 70px column. */
+  width: max-content;
+  max-width: min(42ch, 42vw);
   padding: 6px 14px;
   border-radius: 12px;
   background: rgba(4, 6, 12, 0.72);
@@ -82,8 +87,8 @@
   background: linear-gradient(
     to bottom,
     rgba(116, 122, 131, 0) 0%,
-    rgba(116, 122, 131, 0.55) 12%,
-    rgba(116, 122, 131, 0.55) 88%,
+    rgba(116, 122, 131, 0.9) 12%,
+    rgba(116, 122, 131, 0.9) 88%,
     rgba(116, 122, 131, 0) 100%
   );
   pointer-events: none;
