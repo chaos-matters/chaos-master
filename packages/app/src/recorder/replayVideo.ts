@@ -947,7 +947,12 @@ function fitCaptionLines(
     }
     if (current !== '') lines.push(current)
     current = word
-    if (lines.length === maxLines - 1) break
+    // `maxLines`, not `maxLines - 1`: breaking one line early left the final
+    // line holding only the word that overflowed the previous one, so a
+    // four-line budget bought three filled lines and an orphan. With two lines
+    // that cost half the caption; it is why raising the budget alone did not
+    // fix the truncation.
+    if (lines.length === maxLines) break
   }
   if (current !== '' && lines.length < maxLines) lines.push(current)
   const fitWithEllipsis = (line: string): string => {
@@ -1018,11 +1023,16 @@ export function drawReplayVideoOverlay(
   // taking the largest size and cutting the sentence to fit it.
   let captionScale = 1
   let lines: string[] = []
+  const captionWords = caption.trim().split(/\s+/).filter(Boolean).length
   for (const scale of CAPTION_FONT_STEPS) {
     captionScale = scale
     context.font = `650 ${Math.round(captionFont * scale)}px ui-sans-serif, system-ui, sans-serif`
     lines = fitCaptionLines(context, caption, textWidth, MAX_CAPTION_LINES)
-    if (!lines.some((line) => line.endsWith('…'))) break
+    // Count the words that survived rather than sniffing for a trailing '…':
+    // an author may end a sentence with one, and that must not be read as a
+    // cut and shrink the caption for text that already fitted.
+    const shown = lines.join(' ').split(/\s+/).filter(Boolean).length
+    if (shown >= captionWords) break
   }
   const fittedFont = Math.round(captionFont * captionScale)
   context.font = `650 ${fittedFont}px ui-sans-serif, system-ui, sans-serif`

@@ -344,6 +344,43 @@ describe('drawReplayVideoOverlay', () => {
     } as unknown as CanvasRenderingContext2D
   }
 
+  it('fills the last line it is allowed, not just the word that overflowed', () => {
+    // The loop used to break one line early, leaving the final line holding
+    // only the word that overflowed the previous one — so a four-line budget
+    // bought three filled lines and an orphan, and raising the budget alone
+    // did not fix the truncation it was raised to fix.
+    const drawn: string[] = []
+    const words = Array.from({ length: 200 }, (_, i) => `w${i}`).join(' ')
+    drawReplayVideoOverlay(fontAwareContext(drawn), 1920, 1080, {
+      action: { t: 0, id: 'lesson.note', args: [words], note: words },
+      actionIndex: 0,
+      totalActions: 1,
+      progress: 0.5,
+    })
+    const lines = drawn.filter((text) => /^w\d/.test(text))
+    expect(lines).toHaveLength(4)
+    // Every line carries a real share of the text; none is a lone orphan.
+    const counts = lines.map((line) => line.split(/\s+/).length)
+    expect(Math.min(...counts)).toBeGreaterThan(1)
+  })
+
+  it('does not read an author own ellipsis as a cut', () => {
+    // Sniffing for a trailing '…' shrank the caption for text that already
+    // fitted, because a written sentence may legitimately end in one.
+    const drawn: string[] = []
+    const sentence = 'Watch what happens next…'
+    drawReplayVideoOverlay(fontAwareContext(drawn), 1920, 1080, {
+      action: { t: 0, id: 'lesson.note', args: [sentence], note: sentence },
+      actionIndex: 0,
+      totalActions: 1,
+      progress: 0.5,
+    })
+    // Short enough for one line at full size, so it must not have been
+    // stepped down looking for a fit it already had.
+    const line = drawn.find((text) => text.startsWith('Watch'))
+    expect(line).toBe(sentence)
+  })
+
   it('shows a whole agent-length sentence rather than cutting it', () => {
     // Measured from a real lesson: its narration ran 213-266 characters, and a
     // two-line block at full size holds about 170 — so every sentence was cut,
