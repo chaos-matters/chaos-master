@@ -167,6 +167,13 @@
     left: 50%;
     translate: -50% 0;
     margin: 0;
+    /* An auto-width fixed box with `left: 50%` and `right: auto` shrink-to-fits
+       against the INSET-MODIFIED containing block — half the viewport — so
+       without this the pill wrapped to three lines below ~673px wide, where as
+       a grid item it had the shield's full width. `translate` is paint-time and
+       does not size anything. */
+    width: max-content;
+    max-width: min(30rem, calc(100vw - 32px));
   }
 }
 
