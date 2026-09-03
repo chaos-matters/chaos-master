@@ -76,7 +76,7 @@ describe('analyzeFlameXmlBatch', () => {
     expect(first.summary.invalidFlames).toBe(0)
   })
 
-  it('marks every unsupported or approximate active behavior as lossy', () => {
+  it('marks every unsupported active behavior as lossy', () => {
     const xml = `<flames>
       <flame name="Unknown final attr" size="800 600">
         <xform weight="1" linear="1" coefs="1 0 0 1 0 0"/>
@@ -91,15 +91,12 @@ describe('analyzeFlameXmlBatch', () => {
       <flame name="Chaos matrix" size="800 600">
         <xform weight="1" linear="1" chaos="0 0" animate="1" plots="2" coefs="1 0 0 1 0 0"/>
       </flame>
-      <flame name="Approximate alias" size="800 600">
-        <xform weight="1" blur="1" coefs="1 0 0 1 0 0"/>
-      </flame>
     </flames>`
     const report = analyzeFlameXmlBatch([
       { path: 'lossy.flame', xml, bytes: xml.length },
     ])
 
-    expect(report.summary.importableWithLoss).toBe(4)
+    expect(report.summary.importableWithLoss).toBe(3)
     expect(flameXmlCompatibilityFailed(report)).toBe(false)
     expect(flameXmlCompatibilityFailed(report, true)).toBe(true)
     expect(
@@ -115,9 +112,26 @@ describe('analyzeFlameXmlBatch', () => {
       'animate',
     )
     expect(report.files[0]!.flames[2]!.diagnostics.join(' ')).toContain('plots')
-    expect(report.files[0]!.flames[3]!.diagnostics.join(' ')).toContain(
-      'Approximated',
-    )
+  })
+
+  // flam3 `blur` resolves to the exact `blurVar`, so it must import cleanly —
+  // no "Approximated" caveat. It used to alias to `circleBlurVar` (a different
+  // radius distribution) and was reported as lossy for that reason.
+  it('imports flam3 blur exactly, with no approximation warning', () => {
+    const xml = `<flames>
+      <flame name="Exact blur" size="800 600">
+        <xform weight="1" linear="1" coefs="1 0 0 1 0 0"/>
+        <xform weight="1" blur="1" coefs="1 0 0 1 0 0"/>
+      </flame>
+    </flames>`
+    const report = analyzeFlameXmlBatch([
+      { path: 'blur.flame', xml, bytes: xml.length },
+    ])
+
+    const flame = report.files[0]!.flames[0]!
+    expect(flame.status).toBe('importable')
+    expect(flame.variationTypes).toContain('blurVar')
+    expect(flame.diagnostics.join(' ')).not.toContain('Approximated')
   })
 
   it('ignores inactive unknown attributes and rejects negative probabilities', () => {
