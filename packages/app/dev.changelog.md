@@ -268,6 +268,17 @@ implementations.
   panels, live modulation and the timeline first, so leftover exposure/vibrancy
   tracks stop modulating the new descriptor every frame ("too bright"), and no
   dialog stays open across the hand-off.
+- **CSP blocked Cloudflare's bot-detection script on every page load**
+  (`worker/index.ts`): the zone's JavaScript Detections injects an inline
+  `<script>` (`window.__CF$cv$params`, the loader for
+  `/cdn-cgi/challenge-platform/scripts/jsd/main.js`) into HTML responses, and
+  the Worker's `script-src` had no inline allowance, so every load logged a CSP
+  violation and the detection never ran. Its hash changes per request (it
+  embeds the ray id), so a hash allowlist cannot work. The Worker now appends a
+  fresh `'nonce-…'` to `script-src` on every response; Cloudflare copies the
+  nonce it finds in the CSP header onto the tag it injects (its documented
+  mechanism). `'unsafe-inline'` stays out and the app's own `<script src>`
+  tags remain allowed by `'self'`.
 
 ## [0.9.8] - 2026-07-24
 

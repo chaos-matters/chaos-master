@@ -1193,7 +1193,9 @@ const baseHandler = {
 // covers inline / CSS-in-JS styles. This is deliberately not a "strict" CSP,
 // but it still blocks inline <script> / event-handler injection (no
 // 'unsafe-inline' in script-src), cross-origin scripts / frames / connections,
-// clickjacking (frame-ancestors), and <base> injection.
+// clickjacking (frame-ancestors), and <base> injection. The CSP itself is
+// built per response by `contentSecurityPolicy` (see below) so `script-src`
+// can carry a fresh nonce.
 const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
@@ -1215,30 +1217,55 @@ const SECURITY_HEADERS: Readonly<Record<string, string>> = {
     'accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(self), payment=(), usb=(), browsing-topics=()',
   // Disable legacy Adobe cross-domain policy files.
   'X-Permitted-Cross-Domain-Policies': 'none',
-  'Content-Security-Policy': [
-    "default-src 'self'",
-    // GA4 pixels: google-analytics.com is the no-JS/beacon fallback,
-    // googletagmanager.com serves /td and /a (verified blocked by Google's Tag
-    // Assistant before these were listed).
-    "img-src 'self' data: blob: https://*.google-analytics.com https://*.googletagmanager.com",
-    // 'unsafe-eval' is mandatory — TypeGPU uses new Function for shader codegen.
-    // googletagmanager.com serves gtag.js (see lib/telemetry.ts); without it
-    // the loader is refused and no analytics event is ever recorded.
-    "script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' https://challenges.cloudflare.com https://*.googletagmanager.com",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com",
-    // GA4 beacons go to google-analytics.com (regional endpoints on
-    // analytics.google.com); googletagmanager.com is needed for the container
-    // /td fetches. This is the allowlist Google documents for gtag.js at
-    // developers.google.com/tag-platform/security/guides/csp — kept explicit
-    // rather than widening to `https:`, which would defeat the point of an
-    // allowlist-based policy.
-    "connect-src 'self' https://challenges.cloudflare.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com",
-    'frame-src https://challenges.cloudflare.com',
-    "worker-src 'self' blob:",
-    "frame-ancestors 'none'",
-    "base-uri 'self'",
-  ].join('; '),
+}
+
+// Content-Security-Policy directives. `script-src` gets a per-response nonce
+// appended in `contentSecurityPolicy()`: Cloudflare's bot detection
+// ("JavaScript Detections", part of Bot Fight Mode) injects an inline <script>
+// into the HTML served for this zone and, per its docs, copies the nonce it
+// finds in the CSP response header onto that tag. Without a nonce the browser
+// blocks that script on every page load (a console error, and no detection
+// signal for real visitors). 'unsafe-inline' would also unblock it but would
+// re-open the inline injection this policy exists to close, and a hash cannot
+// work because the injected script embeds the request's ray id.
+const CSP_DIRECTIVES: readonly string[] = [
+  "default-src 'self'",
+  // GA4 pixels: google-analytics.com is the no-JS/beacon fallback,
+  // googletagmanager.com serves /td and /a (verified blocked by Google's Tag
+  // Assistant before these were listed).
+  "img-src 'self' data: blob: https://*.google-analytics.com https://*.googletagmanager.com",
+  // 'unsafe-eval' is mandatory — TypeGPU uses new Function for shader codegen.
+  // googletagmanager.com serves gtag.js (see lib/telemetry.ts); without it
+  // the loader is refused and no analytics event is ever recorded.
+  "script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval' https://challenges.cloudflare.com https://*.googletagmanager.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  // GA4 beacons go to google-analytics.com (regional endpoints on
+  // analytics.google.com); googletagmanager.com is needed for the container
+  // /td fetches. This is the allowlist Google documents for gtag.js at
+  // developers.google.com/tag-platform/security/guides/csp — kept explicit
+  // rather than widening to `https:`, which would defeat the point of an
+  // allowlist-based policy.
+  "connect-src 'self' https://challenges.cloudflare.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com",
+  'frame-src https://challenges.cloudflare.com',
+  "worker-src 'self' blob:",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+]
+
+/** Sixteen random bytes as base64: a fresh CSP nonce for one response. */
+function scriptNonce(): string {
+  const bytes = new Uint8Array(16)
+  globalThis.crypto.getRandomValues(bytes)
+  return btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(''))
+}
+
+function contentSecurityPolicy(nonce: string): string {
+  return CSP_DIRECTIVES.map((directive) =>
+    directive.startsWith('script-src ')
+      ? `${directive} 'nonce-${nonce}'`
+      : directive,
+  ).join('; ')
 }
 
 /** Return a copy of `res` with the security headers applied. */
@@ -1247,6 +1274,7 @@ function withSecurityHeaders(res: Response): Response {
   for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
     headers.set(name, value)
   }
+  headers.set('Content-Security-Policy', contentSecurityPolicy(scriptNonce()))
   return new Response(res.body, {
     status: res.status,
     statusText: res.statusText,
