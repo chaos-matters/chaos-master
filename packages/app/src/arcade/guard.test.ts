@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { guardCommand, isCommandAllowed, qualityRank } from './guard'
+import { DUEL_ALLOWED } from './topics'
 import type { PilotState } from './pilot'
 
 const driving: PilotState = {
@@ -65,5 +66,25 @@ describe('guardCommand', () => {
     expect(
       guardCommand('flame.setRenderSetting', ['gamma', 2], state),
     ).toBeUndefined()
+  })
+  it('holds a duel to flame and camera work', () => {
+    const state: PilotState = {
+      ...driving,
+      mode: 'duel',
+      topic: undefined,
+      allowed: [...DUEL_ALLOWED],
+    }
+    expect(guardCommand('flame.setExposure', [0.4], state)).toBeUndefined()
+    expect(guardCommand('camera.zoomTo', [2], state)).toBeUndefined()
+    expect(guardCommand('timeline.play', [], state)).toMatch(/not allowed/)
+    expect(guardCommand('view.setShowTimeline', [true], state)).toMatch(
+      /not allowed/,
+    )
+    expect(guardCommand('history.undo', [], state)).toMatch(/not available/)
+    expect(guardCommand('export.png', [], state)).toMatch(/not available/)
+    // The render-setting locks still apply.
+    expect(
+      guardCommand('flame.setRenderSetting', ['pointCount', 10], state),
+    ).toMatch(/locked/)
   })
 })
