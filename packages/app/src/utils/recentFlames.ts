@@ -30,16 +30,41 @@ function isValidRecentFlame(item: unknown): item is RecentFlame {
   )
 }
 
+/** Memo for `loadRecentFlames`, keyed on the exact payload it was built from.
+ *
+ *  The schema pass costs ~90ms for a full 150-entry list (measured; `JSON.parse`
+ *  of the same payload is ~2ms), and the Load Flame modal reloads the list on
+ *  open, on import and on every delete — so without this, opening the modal
+ *  re-validates the same 150 flames and blocks the frame each time.
+ *
+ *  Keying on the raw string rather than asking writers to invalidate means any
+ *  write invalidates it for free, including ones this module never sees: another
+ *  tab, a devtools edit, or a future writer that forgets to call an invalidator.
+ *
+ *  Entries are shared with every caller, so they must be treated as read-only —
+ *  which is already the contract elsewhere (consumers `deepClone` before
+ *  editing). Only the outer array is copied per call, so callers can still
+ *  filter and spread freely. */
+let validatedCache: { raw: string; entries: readonly RecentFlame[] } | undefined
+
+/** Test seam: drop the memo so a test can observe a fresh validation pass. */
+export function clearRecentFlamesCache(): void {
+  validatedCache = undefined
+}
+
 export function loadRecentFlames(): RecentFlame[] {
   try {
     const raw = safeGetItem(STORAGE_KEY)
     if (raw === null) return []
+    if (validatedCache?.raw === raw) return [...validatedCache.entries]
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
-    return parsed.filter(isValidRecentFlame).flatMap((item) => {
+    const entries = parsed.filter(isValidRecentFlame).flatMap((item) => {
       const flame = tryValidateFlame(item.flame)
       return flame ? [{ ...item, flame }] : []
     })
+    validatedCache = { raw, entries }
+    return [...entries]
   } catch {
     return []
   }
@@ -51,7 +76,11 @@ export function saveRecentFlame(
   tracks?: TimelineTrack[],
   forceOverwriteOldest: boolean = true,
 ): boolean {
-  const recent = loadRecentFlames()
+  // Read-modify-write: use the structural loader, not the schema one. Rewriting
+  // the list from schema-validated entries silently deletes every entry the
+  // validator rejects, and under-counts the list so the "full" guard below
+  // never fires. Same reasoning as `upsertRecentFlame`.
+  const recent = loadRecentFlamesForRewrite()
   if (recent.length >= MAX_RECENT_FLAMES && !forceOverwriteOldest) {
     return false
   }
@@ -130,8 +159,12 @@ export function upsertRecentFlame(
   return safeSetItem(STORAGE_KEY, JSON.stringify(updated))
 }
 
+/** The oldest stored entry — the one a save would evict. Structural load only:
+ *  the caller reads `name` for a confirm prompt, so a schema pass over the whole
+ *  list would be wasted work, and a rejected entry is still a real entry that
+ *  can be evicted. */
 export function getOldestRecentFlame(): RecentFlame | undefined {
-  const recent = loadRecentFlames()
+  const recent = loadRecentFlamesForRewrite()
   if (recent.length === 0) return undefined
   return recent[recent.length - 1]
 }
@@ -168,7 +201,9 @@ export function formatRecentDate(timestamp: number): string {
 }
 
 export function deleteRecentFlame(id: string): void {
-  const recent = loadRecentFlames()
+  // Read-modify-write — structural loader only, so deleting one entry cannot
+  // take every schema-rejected entry with it.
+  const recent = loadRecentFlamesForRewrite()
   const filtered = recent.filter((item) => item.id !== id)
   safeSetItem(STORAGE_KEY, JSON.stringify(filtered))
 }
