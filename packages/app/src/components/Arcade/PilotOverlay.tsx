@@ -41,6 +41,18 @@ export function PilotOverlay(props: {
   createEffect(() => {
     if (!agentDriving()) return
     const tick = window.setInterval(() => setElapsed(pilotElapsedMs()), 1000)
+    onCleanup(() => {
+      window.clearInterval(tick)
+      setElapsed(0)
+    })
+  })
+
+  createEffect(() => {
+    // Only the screen lock claims Escape. Under a seat lock the shield is not
+    // drawn, so swallowing every Escape globally took the key away from every
+    // dialog in the app with nothing on screen to explain why — and two of
+    // them within 1500 ms silently ended the take.
+    if (drivingState()?.lock !== 'screen') return
     // Captured on the way down so nothing else can claim Escape first: while
     // the AI drives, Escape means "give me the controls back", never "close
     // this panel".
@@ -59,10 +71,9 @@ export function PilotOverlay(props: {
     }
     document.addEventListener('keydown', onKey, true)
     onCleanup(() => {
-      window.clearInterval(tick)
       window.clearTimeout(escTimer)
       document.removeEventListener('keydown', onKey, true)
-      setElapsed(0)
+      setEscArmed(false)
     })
   })
 

@@ -124,6 +124,55 @@ describe('PilotOverlay end card', () => {
       screen.queryByRole('dialog', { name: 'AI is driving the editor' }),
     ).toBeNull()
   })
+
+  it('leaves Escape alone under a seat-scoped lock', () => {
+    startPilot({
+      mode: 'duel',
+      title: 'Duel',
+      stepBudget: 60,
+      allowed: ['flame.'],
+      qualityRankAtStart: 1,
+      seatId: 'rival',
+      lock: 'seat',
+    })
+    render(() => <PilotOverlay ctx={createMockCommandContext()} />)
+    let reachedTheApp = false
+    const listener = () => {
+      reachedTheApp = true
+    }
+    document.addEventListener('keydown', listener)
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+
+    // With no shield drawn there is nothing on screen to explain a swallowed
+    // Escape, and two of them within 1500 ms used to end the take silently.
+    expect(reachedTheApp).toBe(true)
+    document.removeEventListener('keydown', listener)
+  })
+
+  it('claims Escape while the AI owns the screen', () => {
+    startPilot({
+      mode: 'teach',
+      title: 'Teaching',
+      stepBudget: 25,
+      allowed: ['flame.'],
+      qualityRankAtStart: 1,
+    })
+    render(() => <PilotOverlay ctx={createMockCommandContext()} />)
+    let reachedTheApp = false
+    const listener = () => {
+      reachedTheApp = true
+    }
+    document.addEventListener('keydown', listener)
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+
+    expect(reachedTheApp).toBe(false)
+    expect(screen.getByRole('button', { name: /Stop/ }).textContent).toContain(
+      'Press Esc again',
+    )
+    document.removeEventListener('keydown', listener)
+  })
 })
 
 /**

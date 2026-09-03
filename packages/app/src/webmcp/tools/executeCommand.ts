@@ -1,3 +1,4 @@
+import { duelActive, duelRemainingMs } from '@/arcade/duel'
 import { guardCommand } from '@/arcade/guard'
 import { appendPilotLog, drivingState, notePilotStep, pilotStepsRemaining, } from '@/arcade/pilot'
 import { budgetExhaustedMessage } from '@/arcade/pilotActions'
@@ -104,6 +105,15 @@ export const executeCommandTool: WebMcpTool = {
       }
       if (pilotStepsRemaining() <= 0) {
         return { error: budgetExhaustedMessage(driving.mode) }
+      }
+      // The clock is a limit like the budget is. `startDuel` schedules the
+      // ending, but a background tab throttles timers, so this is what stops
+      // an agent from editing on past zero while that timer waits its turn.
+      if (duelActive() && duelRemainingMs() <= 0) {
+        return {
+          error:
+            'Time is up. The duel is ending; your flame is as you left it.',
+        }
       }
     }
 
