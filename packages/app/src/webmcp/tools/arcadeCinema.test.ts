@@ -1,5 +1,6 @@
 import '@/commands/builtins'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { buildAnimatableCatalog } from '@/arcade/animatablePaths'
 import { pilot, resetPilot } from '@/arcade/pilot'
 import { cancelSessionRecording, startSessionRecording, stopSessionRecording, unnamedWriteCount, } from '@/recorder/recorder'
 import { clearWebMcpContext, setWebMcpContext } from '@/webmcp/contextBridge'
@@ -113,6 +114,33 @@ describe('Cinema tools', () => {
     expect(paths.transforms).toHaveLength(8)
     expect(paths.transformPaths).toContain('preAffine')
     expect(JSON.stringify(paths).length).toBeLessThan(1500)
+  })
+
+  // The grammar is the agent's only description of what set_keyframes accepts,
+  // so it must not name a form the catalog cannot produce. `buildAnimatableCatalog`
+  // emits ONE entry per variation — its weight — and nothing keyed by parameter
+  // name, so advertising `<id>.<variationId>.<param>` bought a guaranteed
+  // "Unknown path" rejection and a wasted call.
+  it('advertises only the variation form the catalog can produce', async () => {
+    const ctx = ctxWithRecorder()
+    setWebMcpContext(ctx)
+    const paths = (await arcadeGetAnimatablePaths.execute({}, {})) as {
+      transformPaths: string
+    }
+    expect(paths.transformPaths).toContain('<id>.<variationId>')
+    expect(paths.transformPaths).toContain('weight')
+    expect(paths.transformPaths).not.toContain('<param>')
+
+    const catalog = buildAnimatableCatalog(ctx.flameDescriptor())
+    const variationPaths = catalog
+      .filter((entry) => entry.group.endsWith('variations'))
+      .map((entry) => entry.path)
+    expect(variationPaths.length).toBeGreaterThan(0)
+    // Two segments each: the weight. A third would be a parameter, and there
+    // are none.
+    for (const path of variationPaths) {
+      expect(path.split('.')).toHaveLength(2)
+    }
   })
 
   it('keeps the wall-clock play out of the recorded take', async () => {

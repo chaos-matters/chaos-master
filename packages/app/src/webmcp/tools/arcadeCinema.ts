@@ -85,7 +85,7 @@ const MAX_LISTED_TRANSFORMS = 8
 /** Every transform exposes the same paths, so the grammar is stated once
  *  instead of repeated for each one. */
 const TRANSFORM_PATHS =
-  'transform.<id>.{preAffine|postAffine}.{a-f} or .{probability|colorSpeed|color.x|color.y} | finalTransform.{a-f} | <id>.<variationId>[.<param>] (no transform. prefix)'
+  'transform.<id>.{preAffine|postAffine}.{a-f} or .{probability|colorSpeed|color.x|color.y} | finalTransform.{a-f} | <id>.<variationId> = variation weight (no transform. prefix)'
 
 function summarize(
   catalog: CatalogEntry[],

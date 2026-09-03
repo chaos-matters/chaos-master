@@ -1,7 +1,7 @@
 import '@/commands/builtins'
 import { describe, expect, it } from 'vitest'
 import { getAllCommands } from '@/commands/registry'
-import { CINEMA_ALLOWED, CINEMA_PRESETS, cinemaPromptCard, isTopicId, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, } from './topics'
+import { ALWAYS_ALLOWED, CINEMA_ALLOWED, CINEMA_PRESETS, cinemaPromptCard, isTopicId, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, } from './topics'
 
 describe('lesson topics', () => {
   it('has every topic with a goal, a budget and an allow-list', () => {
@@ -46,6 +46,9 @@ describe('lesson topics', () => {
     const allowLists = [
       ...TOPIC_IDS.map((id) => LESSON_TOPICS[id].allowed),
       CINEMA_ALLOWED,
+      // Every session gets these on top of its topic list, so a command that
+      // is always allowed is exactly the one a viewer sees most often.
+      ALWAYS_ALLOWED,
     ]
     const rawJson = new Set<string>()
     for (const allowed of allowLists) {

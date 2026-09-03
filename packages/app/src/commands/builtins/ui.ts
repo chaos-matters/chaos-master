@@ -22,6 +22,7 @@ registerCommand({
 
 registerCommand({
   id: 'sidebar.close',
+  describe: () => 'Close the sidebar',
   label: 'Close Sidebar',
   description: 'Close the sidebar panel',
   execute(ctx) {

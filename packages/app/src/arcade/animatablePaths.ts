@@ -115,9 +115,11 @@ export function buildAnimatableCatalog(flame: FlameDescriptor): CatalogEntry[] {
  * and a variation parameter `<tid>.<vid>.<name>` — no prefix. That is what the
  * timeline resolver has always written and what every saved animation stores,
  * so the format cannot move; agents reach for the prefixed form anyway and
- * burn a call on the rejection. A prefixed path that resolves to a real
- * variation path is accepted and rewritten to the canonical one, so the stored
- * track is the same either way. Reserved forms are looked up first, so a
+ * burn a call on the rejection. Any prefixed path that resolves to a real
+ * catalog entry once the prefix is dropped is accepted and rewritten to the
+ * canonical one, so the stored track is the same either way — the variation
+ * forms are the ones this exists for, but `transform.gamma` costing nothing
+ * is a feature, not an accident. The unprefixed path is looked up FIRST, so a
  * variation that happens to be called `probability` cannot shadow one.
  */
 function canonicalPath(
