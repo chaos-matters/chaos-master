@@ -115,6 +115,13 @@
   --chip-height: 27px;
 }
 
+/* The chips are the tallest thing in the header; without this the row is
+   sized by the text beside them and they overhang it by a few pixels. */
+.panelHead,
+.panelIdentity {
+  min-height: var(--chip-height, 34px);
+}
+
 /*
   No scrolling on this axis. Each panel is built to fit its own body and
   scrolls sideways where it needs to; a vertical scrollbar here meant the
@@ -188,6 +195,10 @@
   gap: 8px;
   scroll-snap-type: x proximity;
   overflow-x: auto;
+  /* Sideways only. `overflow-x: auto` alone makes the other axis a scroll box
+     too, and four pixels of rounding then raise a full scrollbar on a row
+     that fits. */
+  overflow-y: hidden;
   overscroll-behavior: contain;
   /* `overflow-x: auto` makes the other axis a scroll box too, so the badge
      that hangs off each thumbnail's corner was being clipped AND raising a
@@ -203,7 +214,10 @@
 */
 .tile {
   flex: none;
-  width: 76px;
+  /* The thumbnail is square, so the tile's width sets the row's height: this
+     is the widest tile that fits the panel without the caption being cut. */
+  width: 64px;
+  min-width: 0;
   display: grid;
   gap: 3px;
   scroll-snap-align: start;
@@ -211,6 +225,7 @@
 
 .tileButton {
   position: relative;
+  min-width: 0;
   display: grid;
   gap: 4px;
   padding: 0;
@@ -370,6 +385,7 @@
    the one that fits six numbers into a strip this short. */
 .fields {
   display: grid;
+  min-height: 0;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   align-content: start;
   gap: 8px;
@@ -401,6 +417,9 @@
 .shape {
   display: grid;
   grid-template-columns: auto 1fr;
+  /* One row, definite: without it the square canvas sizes itself from its own
+     width and grows the row past the panel, which then clips the fields. */
+  grid-template-rows: minmax(0, 1fr);
   gap: 14px;
   min-height: 0;
 }
@@ -410,6 +429,9 @@
 .shapeCanvas {
   aspect-ratio: 1;
   height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
   flex: none;
 }
 

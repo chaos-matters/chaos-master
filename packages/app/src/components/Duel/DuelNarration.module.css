@@ -2,7 +2,7 @@
   display: grid;
   justify-items: center;
   gap: 4px;
-  max-width: 34ch;
+  max-width: 40ch;
   text-align: center;
 }
 
@@ -25,7 +25,8 @@
      mid-glyph; `text-overflow` never gets a chance to fire. */
   min-width: 0;
   font-size: 0.74rem;
-  opacity: 0.4;
+  /* These sit on a scrim now, not on the artwork, so they can be read. */
+  opacity: 0.66;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -33,7 +34,7 @@
 
 /* The newest line is the one worth reading. */
 .line:last-child {
-  opacity: 0.8;
+  opacity: 0.95;
 }
 
 .narrate {
