@@ -70,14 +70,20 @@ function translateTransform3D(
     dz,
   ) as typeof clone.postAffine
 
-  console.info(
-    `[Arena 3D Upgrade] Translating transform (dx:${dx}, dy:${dy}, dz:${dz}).
+  // Dev only: this runs once per transform, twice per clash, so a 6-vs-6 duel
+  // prints a dozen affine dumps. `import.meta.env.DEV` is statically replaced
+  // with `false` in production, so the whole block — strings included — is
+  // dropped from the bundle rather than merely skipped at runtime.
+  if (import.meta.env.DEV) {
+    console.info(
+      `[Arena 3D Upgrade] Translating transform (dx:${dx}, dy:${dy}, dz:${dz}).
   - preAffine upgraded from 2D? ${is2DPre} => `,
-    clone.preAffine,
-    `
+      clone.preAffine,
+      `
   - postAffine upgraded from 2D? ${is2DPost} => `,
-    clone.postAffine,
-  )
+      clone.postAffine,
+    )
+  }
 
   if (tintColor !== undefined && tintMode !== 'none') {
     const rawColor = clone.color as unknown

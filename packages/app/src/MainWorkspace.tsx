@@ -2939,14 +2939,16 @@ export function MainWorkspace(props: AppProps) {
         ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     },
     executeCommand: (id, ...args) => {
-      console.info(
-        '[tourContext:executeCommand]',
-        id,
-        'args:',
-        ...args,
-        'fn:',
-        !!runTourCommand.fn,
-      )
+      if (import.meta.env.DEV) {
+        console.info(
+          '[tourContext:executeCommand]',
+          id,
+          'args:',
+          ...args,
+          'fn:',
+          !!runTourCommand.fn,
+        )
+      }
       runTourCommand.fn?.(id, ...args)
     },
     animateValue: (start, end, durationMs, onUpdate) => {
@@ -5312,10 +5314,12 @@ export function MainWorkspace(props: AppProps) {
                                 mode={quickPickerMode()}
                                 onModeChange={setQuickPickerMode}
                                 onOpenFullSelector={() => {
-                                  console.info(
-                                    '[QuickVariationPicker] onOpenFullSelector — opening full VariationSelector',
-                                    { tid: state.tid, vid: state.vid },
-                                  )
+                                  if (import.meta.env.DEV) {
+                                    console.info(
+                                      '[QuickVariationPicker] onOpenFullSelector — opening full VariationSelector',
+                                      { tid: state.tid, vid: state.vid },
+                                    )
+                                  }
                                   const currentVar =
                                     flameDescriptor.transforms[state.tid]
                                       ?.variations[state.vid]
