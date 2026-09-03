@@ -223,8 +223,14 @@ describe('stepGapMs', () => {
   })
 
   it('leaves a human-paced gap alone', () => {
-    expect(stepGapMs(at(0), at(600), 1)).toBe(600)
-    expect(stepGapMs(at(0), at(1000), 1)).toBe(1000)
+    // Expressed against the constants rather than as literals: the numbers are
+    // a judgement about how fast a lesson should read and will be tuned again,
+    // and a test that has to be edited each time proves nothing.
+    const human = MIN_STEP_GAP_MS + 200
+    expect(stepGapMs(at(0), at(human), 1)).toBe(human)
+    expect(stepGapMs(at(0), at(MAX_STEP_GAP_MS - 100), 1)).toBe(
+      MAX_STEP_GAP_MS - 100,
+    )
   })
 
   it('still clamps a long thinking pause', () => {
@@ -261,8 +267,9 @@ describe('stepGapMs', () => {
     // The bug this exists for: six sentences shared 10.3ms of screen time
     // because the pause the agent spent writing them was charged to the edit
     // BEFORE each one.
-    const note = at(0, { id: 'lesson.note', args: ['one two three four five'] })
-    expect(stepGapMs(note, at(2), 1)).toBe(5 * NARRATION_MS_PER_WORD)
+    const words = Array.from({ length: 10 }, (_, i) => `w${i}`).join(' ')
+    const note = at(0, { id: 'lesson.note', args: [words] })
+    expect(stepGapMs(note, at(2), 1)).toBe(10 * NARRATION_MS_PER_WORD)
     expect(stepGapMs(note, at(2), 1)).toBeGreaterThan(MAX_STEP_GAP_MS)
   })
 
@@ -279,8 +286,9 @@ describe('stepGapMs', () => {
   it('reads a sentence that rode along as a caption', () => {
     // With narrationAsStep off there is no lesson.note action at all: the
     // sentence captions the step it introduces. Same prose, same pacing.
-    const captioned = at(0, { note: 'one two three four five' })
-    expect(stepGapMs(captioned, at(2), 1)).toBe(5 * NARRATION_MS_PER_WORD)
+    const words = Array.from({ length: 10 }, (_, i) => `w${i}`).join(' ')
+    const captioned = at(0, { note: words })
+    expect(stepGapMs(captioned, at(2), 1)).toBe(10 * NARRATION_MS_PER_WORD)
   })
 
   it('ignores an empty sentence', () => {
@@ -450,7 +458,7 @@ describe('createSessionPlayer', () => {
       const before = deepClone(flame)
       const player = createSessionPlayer(gammaSteps, target)
       player.play()
-      vi.advanceTimersByTime(1000)
+      vi.advanceTimersByTime(10_000)
 
       expect(committed()).toBe(1)
       expect(flame.renderSettings.gamma).toBeCloseTo(3.5, 5)
@@ -937,7 +945,7 @@ describe('createSessionPlayer', () => {
       player.play()
       // Rewound to the initial flame, then plays forward again.
       expect(player.stepIndex()).toBe(-1)
-      vi.advanceTimersByTime(1000)
+      vi.advanceTimersByTime(10_000)
       expect(player.stepIndex()).toBe(2)
       expect(flame.renderSettings.gamma).toBeCloseTo(3.5, 5)
       dispose()
@@ -984,7 +992,7 @@ describe('createSessionPlayer', () => {
       const player = createSessionPlayer(gammaSteps, target)
 
       player.play()
-      vi.advanceTimersByTime(1000)
+      vi.advanceTimersByTime(10_000)
 
       expect(player.isPlaying()).toBe(false)
       expect(player.stepIndex()).toBe(0)

@@ -28,8 +28,14 @@ import type { RecordedAction, RecordedSession } from './schema'
  *    be unusable.
  */
 
-/** Longest wait between two steps, however long the human paused for. */
-export const MAX_STEP_GAP_MS = 1200
+/**
+ * Longest wait between two steps, however long the human paused for.
+ *
+ * Raised with the floor below rather than independently: a floor close to the
+ * ceiling squeezes every gap into a narrow band and erases whatever rhythm the
+ * recording had, so the two have to move together.
+ */
+export const MAX_STEP_GAP_MS = 2000
 
 /**
  * Shortest wait between two steps, however fast they were recorded.
@@ -46,21 +52,29 @@ export const MAX_STEP_GAP_MS = 1200
  * floor at every speed — the 4x button would do nothing on exactly the takes
  * that need it, because every one of their gaps is under the floor.
  */
-export const MIN_STEP_GAP_MS = 500
-
-/** 240 words per minute, the usual figure for reading prose on screen. */
-export const NARRATION_MS_PER_WORD = 250
-
-/** Even three words deserve to be seen. */
-export const NARRATION_MIN_HOLD_MS = 1200
+export const MIN_STEP_GAP_MS = 800
 
 /**
- * ...and even a paragraph does not get to stop the show. Full reading time for
- * the sentences an agent writes is 8-12 s each; six of those would spend most
- * of MAX_REPLAY_VIDEO_DURATION_MS on held text. The transport is right there
- * for a viewer who wants longer.
+ * Reading speed for a caption, not for a book: ~170 words per minute.
+ *
+ * The usual 240 wpm figure assumes prose is all the reader is doing. Here the
+ * flame is changing underneath the sentence, which is the entire point, so a
+ * viewer is splitting attention between the two.
  */
-export const NARRATION_MAX_HOLD_MS = 4000
+export const NARRATION_MS_PER_WORD = 350
+
+/** Even three words deserve to be seen, and read twice. */
+export const NARRATION_MIN_HOLD_MS = 2000
+
+/**
+ * ...and even a paragraph does not get to stop the show.
+ *
+ * A sentence long enough to hit this cap is one the agent should have split in
+ * two, which the lesson brief now asks for; the cap is what stops one that was
+ * not from eating MAX_REPLAY_VIDEO_DURATION_MS on its own. The transport is
+ * right there for a viewer who wants longer.
+ */
+export const NARRATION_MAX_HOLD_MS = 7000
 
 /**
  * The sentence this step says out loud, in either recording mode.
