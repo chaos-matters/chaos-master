@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { duelActive, stopDuel } from '@/arcade/duel'
+import { duelActive, duelReady, stopDuel } from '@/arcade/duel'
 import { resetPilot } from '@/arcade/pilot'
 import { clearWebMcpContext, getWebMcpTarget, setWebMcpContext, } from '@/webmcp/contextBridge'
 import { createMockCommandContext, createTestFlame } from '@/webmcp/testUtils'
-import { arcadeEndDuel, arcadeStartDuel } from './arcadeDuel'
+import { arcadeDuelReady, arcadeEndDuel, arcadeStartDuel } from './arcadeDuel'
 
 const run = async (tool: typeof arcadeStartDuel, input: unknown) =>
   (await tool.execute(input, {})) as Record<string, unknown>
@@ -30,7 +30,7 @@ describe('arcade duel tools', () => {
     expect(String(result.error)).toMatch(/3D/)
   })
 
-  it('starts, points the tools at the rival, and ends', async () => {
+  it('starts and points the tools at the rival', async () => {
     setWebMcpContext(createMockCommandContext())
     const started = await run(arcadeStartDuel, { durationSeconds: 60 })
     expect(started.ok).toBe(true)
@@ -38,11 +38,39 @@ describe('arcade duel tools', () => {
     // Every tool reads the bridge with no argument, so this is what makes
     // execute_command land on the AI's flame.
     expect(getWebMcpTarget()).toBe('rival')
+  })
 
-    const ended = await run(arcadeEndDuel, { title: 'Probe' })
-    expect(ended.ok).toBe(true)
-    expect(duelActive()).toBe(false)
-    expect(getWebMcpTarget()).toBe('player')
+  it('refuses to end the duel, and says so without hedging', async () => {
+    setWebMcpContext(createMockCommandContext())
+    await run(arcadeStartDuel, { durationSeconds: 60 })
+
+    const refused = await run(arcadeEndDuel, { title: 'Probe' })
+
+    expect(refused.ok).toBeUndefined()
+    expect(String(refused.error)).toContain('You cannot end a duel')
+    // "not yet" would read as an invitation to retry in a second.
+    expect(String(refused.error)).not.toMatch(/not yet/i)
+    expect(String(refused.error)).toContain('arcade_duel_ready')
+    expect(duelActive()).toBe(true)
+  })
+
+  it('takes a ready declaration without ending anything', async () => {
+    setWebMcpContext(createMockCommandContext())
+    await run(arcadeStartDuel, { durationSeconds: 60 })
+
+    const ready = await run(arcadeDuelReady, { title: 'Ember lattice' })
+
+    expect(ready.ok).toBe(true)
+    expect(duelReady()?.title).toBe('Ember lattice')
+    expect(duelActive()).toBe(true)
+    expect(getWebMcpTarget()).toBe('rival')
+  })
+
+  it('will not take a ready declaration outside a duel', async () => {
+    setWebMcpContext(createMockCommandContext())
+    expect(await run(arcadeDuelReady, { title: 'nothing' })).toHaveProperty(
+      'error',
+    )
   })
 
   it('refuses to start twice', async () => {

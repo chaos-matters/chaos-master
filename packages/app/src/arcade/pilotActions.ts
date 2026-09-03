@@ -4,7 +4,7 @@ import { clearNarration } from './narration'
 import { appendPilotLog, drivingState, endPilot, notePilotSaveResult, } from './pilot'
 import { clearPilotFocus } from './pilotFocus'
 import { isTopicId, LESSON_TOPICS } from './topics'
-import type { PilotDriving, PilotEnded, PilotEndReason } from './pilot'
+import type { PilotDriving, PilotEnded, PilotEndReason, PilotMode, } from './pilot'
 import type { CommandContext } from '@/commands/types'
 
 function topicTitle(state: PilotDriving): string | undefined {
@@ -13,6 +13,23 @@ function topicTitle(state: PilotDriving): string | undefined {
 
 export function defaultPilotTitle(state: PilotDriving): string {
   return state.mode === 'cinema' ? 'Animation' : (topicTitle(state) ?? 'Lesson')
+}
+
+/**
+ * What to tell an agent that has run out of steps. Mode-aware because the end
+ * tools are: telling a duelling agent to call `arcade_end_lesson` sent it into
+ * a loop against a mode check it could never satisfy — and a duel has no end
+ * tool at all, so it is told to wait instead.
+ */
+export function budgetExhaustedMessage(mode: PilotMode): string {
+  switch (mode) {
+    case 'duel':
+      return 'Step budget exhausted. You cannot end a duel; the clock does. Call arcade_duel_ready with a title if you have not already, then wait for time to run out.'
+    case 'cinema':
+      return 'Step budget exhausted. Finish now with arcade_end_cinema.'
+    default:
+      return 'Step budget exhausted. Finish now with arcade_end_lesson.'
+  }
 }
 
 export function sessionNameFor(

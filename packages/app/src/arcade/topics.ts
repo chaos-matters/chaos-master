@@ -246,7 +246,7 @@ export const DUEL_STEP_BUDGET = 60
 export function duelPromptCard(seconds: number): string {
   const minutes = Math.round((seconds / 60) * 10) / 10
   const clock = minutes === 1 ? '1 minute' : `${minutes} minutes`
-  return `Duel me in Lumen Apeiron. Call arcade_start_duel to begin: we each get ${clock} and our own flame, side by side, and I am editing mine while you edit yours. Read your flame with get_flame and change it with execute_command — only flame.* and camera.* are allowed, and you have ${DUEL_STEP_BUDGET} steps. Say what you are going for with arcade_narrate as you work. Aim for something striking rather than merely complicated. When the clock runs out, or when you are happy, call arcade_end_duel with a short title.
+  return `Duel me in Lumen Apeiron. Call arcade_start_duel to begin: we each get ${clock} and our own flame, side by side, and I am editing mine while you edit yours. Read your flame with get_flame and change it with execute_command — only flame.* and camera.* are allowed, and you have ${DUEL_STEP_BUDGET} steps. Say what you are going for with arcade_narrate as you work. Aim for something striking rather than merely complicated. You cannot end the duel — the clock does, and I can call it early — so when you are happy call arcade_duel_ready with a short title and keep polishing until time runs out.
 
 ${WEBMCP_FALLBACK_NOTE}`
 }
