@@ -42,6 +42,16 @@ describe('guardCommand', () => {
       guardCommand('view.setQualityPreset', ['nonsense'], driving),
     ).toMatch(/Quality/)
   })
+  it('keeps timeline looping off while the agent drives', () => {
+    const state: PilotState = { ...driving, allowed: ['timeline.'] }
+    expect(guardCommand('timeline.setLoop', [true], state)).toMatch(
+      /Looping playback stays off/,
+    )
+    expect(guardCommand('timeline.setLoop', [], state)).toMatch(
+      /Looping playback stays off/,
+    )
+    expect(guardCommand('timeline.setLoop', [false], state)).toBeUndefined()
+  })
   it('locks point count, dimensions and quality render settings', () => {
     const state: PilotState = { ...driving, allowed: ['flame.'] }
     expect(

@@ -39,6 +39,13 @@ export function guardCommand(
     const scope = state.topic ? `${state.mode}/${state.topic}` : state.mode
     return `${commandId} is not allowed in ${scope}. Allowed: ${state.allowed.join(', ')}`
   }
+  // Looping playback is the one transport setting that keeps the GPU busy
+  // indefinitely, and an agent has no way to see that it is happening: it
+  // would leave the animation running for the whole time it spends composing
+  // the next call. The viewer turns it on themselves afterwards.
+  if (commandId === 'timeline.setLoop' && args[0] !== false) {
+    return 'Looping playback stays off while the AI drives; the viewer can turn it on afterwards'
+  }
   if (commandId === 'view.setQualityPreset') {
     const rank = qualityRank(args[0])
     if (rank < 0 || rank > state.qualityRankAtStart) {
@@ -58,9 +65,7 @@ export function guardCommand(
     commandId === 'flame.updateRenderSettings' &&
     args[0] !== null &&
     typeof args[0] === 'object' &&
-    Object.keys(args[0]).some((key) =>
-      LOCKED_RENDER_SETTING.test(key),
-    )
+    Object.keys(args[0]).some((key) => LOCKED_RENDER_SETTING.test(key))
   ) {
     return 'Point count, dimensions and quality are locked while the AI drives'
   }

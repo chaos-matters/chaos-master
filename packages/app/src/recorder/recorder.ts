@@ -1,4 +1,5 @@
 import { createSignal } from 'solid-js'
+import { agentDriving } from '@/arcade/pilot'
 import { latestSchemaVersion } from '@/flame/schema/flameSchema'
 import { deepClone } from '@/utils/clone'
 import { currentUndoSeq } from '@/utils/undoJournal'
@@ -782,6 +783,13 @@ export function reportTimelineWrite(description?: string): void {
  * the log and therefore skip this hook while `commandDepth > 0`. */
 export function reportTimelineTransport(description: string): void {
   if (commandDepth > 0 || suppressDepth > 0) return
+  // An Arcade pilot's playback is the tool's own preview, started so the
+  // viewer can see the animation, and the session deliberately does not claim
+  // to reproduce it — a replay applies the keyframes and leaves Play to the
+  // viewer. Counting it would mark every Cinema take as unfaithful for doing
+  // exactly what it was designed to do. A human scrubbing during their own
+  // recording is a different thing and still counts.
+  if (agentDriving()) return
   noteLiveWorkspaceMutation()
   if (!active) {
     invalidateLastFinishedSession()
