@@ -1,7 +1,7 @@
 import { createEffect, createSignal, onCleanup, Show } from 'solid-js'
 import { duelRemainingMs, runningDuel } from '@/arcade/duel'
+import { finishDuel } from '@/arcade/duelActions'
 import { scoreSheetJudge } from '@/arcade/duelJudge'
-import { finishPilot } from '@/arcade/pilotActions'
 import { formatElapsed } from '@/components/Arcade/pilotFormat'
 import { DuelControls } from './DuelControls'
 import ui from './DuelStage.module.css'
@@ -15,9 +15,9 @@ import type { FlameDescriptor } from '@/flame/schema/flameSchema'
  * The split screen.
  *
  * Mounted over the workspace, whose own canvas is parked while this is up, so
- * the player's flame renders once rather than twice. The clock is shared: when
- * it reaches zero the duel ends exactly as Stop does, through `finishPilot`,
- * so a timed-out take is saved like any other.
+ * the player's flame renders once rather than twice. The clock here only
+ * *displays* the time left; the ending is scheduled in `startDuel`, so a
+ * modal covering the stage cannot leave the duel running forever.
  */
 export function DuelStage(props: {
   ctx: CommandContext
@@ -30,14 +30,7 @@ export function DuelStage(props: {
 
   createEffect(() => {
     if (!runningDuel()) return
-    const tick = window.setInterval(() => {
-      const left = duelRemainingMs()
-      setRemaining(left)
-      if (left <= 0) {
-        window.clearInterval(tick)
-        void finishPilot(props.ctx, 'finished')
-      }
-    }, 250)
+    const tick = window.setInterval(() => setRemaining(duelRemainingMs()), 250)
     onCleanup(() => {
       window.clearInterval(tick)
     })
@@ -63,7 +56,7 @@ export function DuelStage(props: {
             <button
               type="button"
               class={ui.stop}
-              onClick={() => void finishPilot(props.ctx, 'stopped')}
+              onClick={() => void finishDuel(props.ctx, 'stopped')}
             >
               End the duel
             </button>

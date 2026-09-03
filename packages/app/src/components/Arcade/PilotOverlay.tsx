@@ -1,4 +1,6 @@
 import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
+import { duelActive } from '@/arcade/duel'
+import { finishDuel } from '@/arcade/duelActions'
 import { agentDriving, drivingState, lastPilotSession, pilot, pilotElapsedMs, pilotLog, resetPilot, } from '@/arcade/pilot'
 import { finishPilot } from '@/arcade/pilotActions'
 import { Robot, Stop } from '@/icons'
@@ -26,7 +28,13 @@ export function PilotOverlay(props: {
   let escTimer: number | undefined
   let railEl: HTMLElement | undefined
 
+  // A duel needs its own ending: `finishPilot` would end the pilot and leave
+  // the stage up with the rival seat still alive.
   const stop = () => {
+    if (duelActive()) {
+      void finishDuel(props.ctx, 'stopped')
+      return
+    }
     void finishPilot(props.ctx, 'stopped')
   }
 
