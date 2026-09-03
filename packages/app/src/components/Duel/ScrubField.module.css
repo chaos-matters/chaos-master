@@ -1,7 +1,7 @@
 .field {
   display: grid;
-  gap: 2px;
-  padding: 5px 6px 6px;
+  gap: 1px;
+  padding: 3px 5px 4px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.04);
@@ -19,8 +19,9 @@
 
 .label {
   text-align: center;
-  font-size: 0.66rem;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.62rem;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.58);
 }
 
 .row {
@@ -35,7 +36,8 @@
   align-items: baseline;
   justify-content: center;
   gap: 3px;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
   color: rgba(255, 255, 255, 0.95);
   cursor: ew-resize;
@@ -51,8 +53,8 @@
 .chevron {
   display: grid;
   place-items: center;
-  width: 14px;
-  height: 18px;
+  width: 13px;
+  height: 15px;
   padding: 0;
   border: none;
   background: none;
@@ -61,8 +63,8 @@
 }
 
 .chevron svg {
-  width: 11px;
-  height: 11px;
+  width: 10px;
+  height: 10px;
 }
 
 .field:hover .chevron {
