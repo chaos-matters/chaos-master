@@ -1,4 +1,11 @@
-export type TopicId = 'variations' | 'affine' | 'color' | 'camera'
+export type TopicId =
+  | 'variations'
+  | 'affine'
+  | 'color'
+  | 'camera'
+  | 'genetics'
+  | 'sonification'
+  | 'render'
 
 export interface LessonTopic {
   id: TopicId
@@ -91,6 +98,49 @@ export const LESSON_TOPICS: Record<TopicId, LessonTopic> = {
     stepBudget: 20,
     defaultStartFrom: 'current',
   },
+  genetics: {
+    id: 'genetics',
+    title: 'Randomness and mutation',
+    goal: 'Teach how the randomizer and the mutator explore flame space. Draw a few fresh flames, then mutate one of them repeatedly so the family resemblance between generations is visible. Pick the strengths yourself.',
+    allowed: [
+      'flame.randomize',
+      'flame.mutate',
+      'flame.setExposure',
+      'camera.center',
+      'camera.zoomTo',
+    ],
+    stepBudget: 20,
+    defaultStartFrom: 'current',
+  },
+  sonification: {
+    id: 'sonification',
+    title: 'Sound and sonification',
+    goal: 'Teach how this flame is turned into sound. Switch sonification on, then change the model, the scale and the voice count one at a time so each is audible on its own. Say what to listen for before each change.',
+    allowed: [
+      'sonification.setEnabled',
+      'sonification.setConfig',
+      'camera.center',
+      'camera.zoomTo',
+    ],
+    stepBudget: 18,
+    defaultStartFrom: 'current',
+  },
+  render: {
+    id: 'render',
+    title: 'Noise and convergence',
+    goal: 'Teach how the picture converges: what the quality preset, the skipped iterations and the two filters change about noise and detail, and what each costs. Lowering quality is allowed, raising it is not.',
+    allowed: [
+      'view.setQualityPreset',
+      'view.setPixelRatio',
+      'view.setAdaptiveFilter',
+      'view.setStochasticFilter',
+      'flame.setSkipIters',
+      'flame.setDrawMode',
+      'camera.zoomTo',
+    ],
+    stepBudget: 18,
+    defaultStartFrom: 'current',
+  },
 }
 
 export const TOPIC_IDS = Object.keys(LESSON_TOPICS) as TopicId[]
@@ -109,6 +159,39 @@ export const BLANK_CANVAS_STEPS: readonly (readonly [string, ...unknown[]])[] =
     ['camera.center'],
     ['camera.zoomTo', 1],
   ]
+
+/**
+ * One-click starting points for a Cinema wish.
+ *
+ * A blank description is the worst moment in the flow: it asks the viewer to
+ * art-direct a fractal before they have seen the mode work. Each preset fills
+ * the field with a sentence they can then edit, and names a scope as well as
+ * an ambition — "small" alone tells the agent how much to move but not what,
+ * which is the half that decides whether the take reads.
+ */
+export interface CinemaPreset {
+  id: string
+  label: string
+  wish: string
+}
+
+export const CINEMA_PRESETS: readonly CinemaPreset[] = [
+  {
+    id: 'small',
+    label: 'Small and slow',
+    wish: 'one idea only, moved slowly — about five seconds, so the change reads clearly',
+  },
+  {
+    id: 'big',
+    label: 'Big and cinematic',
+    wish: 'a full take with the camera, the colour and the transforms all moving together, about nine seconds, building to a resolve',
+  },
+  {
+    id: 'surprise',
+    label: 'Surprise me',
+    wish: 'surprise me — read the flame first and pick whichever move suits it, then tell me why you chose it',
+  },
+]
 
 export const CINEMA_ALLOWED = [
   'timeline.',

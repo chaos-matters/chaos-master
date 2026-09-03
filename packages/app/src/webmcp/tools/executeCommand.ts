@@ -1,6 +1,6 @@
 import { guardCommand } from '@/arcade/guard'
 import { appendPilotLog, drivingState, notePilotStep, pilotStepsRemaining, } from '@/arcade/pilot'
-import { executeCommand, getCommand, preflightReplayCommand, } from '@/commands/registry'
+import { executeCommand, getCommand, preflightLiveCommand, } from '@/commands/registry'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
 import type { WebMcpTool } from '@/webmcp/types'
 
@@ -82,9 +82,12 @@ export const executeCommandTool: WebMcpTool = {
       }
     }
 
-    const preflightError = preflightReplayCommand(commandId, args)
-    if (preflightError !== undefined) {
-      return { error: preflightError }
+    // Checked against the args that will be RECORDED, not the ones the agent
+    // typed: `preflightLiveCommand` normalizes first, so a command that mints
+    // its own seed or expands a boolean into a snapshot is reachable.
+    const preflight = preflightLiveCommand(commandId, ctx, args)
+    if ('error' in preflight) {
+      return { error: preflight.error }
     }
 
     try {

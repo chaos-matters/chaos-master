@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { examples } from '@/flame/examples'
 import { isTimelineParameterPath, MAX_TIMELINE_FRAME, MAX_TIMELINE_KEYFRAMES, MAX_TIMELINE_PARAMETER_PATH_LENGTH, MAX_TIMELINE_PLAYBACK_FPS, MAX_TIMELINE_TIME_SCALE, tryValidateTimelineSnapshot, } from '@/flame/schema/timeline'
 import { snapshotOrigin } from '@/recorder/snapshotOrigin'
-import { executeCommand, getAllCommands, hasExplicitReplayPolicy, preflightReplayCommand, registerCommand, } from './registry'
+import { createMockCommandContext } from '@/webmcp/testUtils'
+import { executeCommand, getAllCommands, hasExplicitReplayPolicy, preflightLiveCommand, preflightReplayCommand, registerCommand, } from './registry'
 import type { CommandContext } from './types'
 
 function timelineSnapshot(
@@ -335,5 +336,44 @@ describe('timeline snapshot budgets', () => {
         undefined,
       ]),
     ).toBeDefined()
+  })
+})
+
+describe('preflightLiveCommand', () => {
+  const ctx = createMockCommandContext()
+
+  // The whole point of the live path: these two commands exist to turn what an
+  // agent can reasonably type into what replay needs, and the replay policy
+  // applied to the raw args rejects both.
+  it('normalizes before applying the replay policy', () => {
+    expect(preflightReplayCommand('flame.mutate', [])).toMatch(/expects a seed/)
+    const mutate = preflightLiveCommand('flame.mutate', ctx, [])
+    expect('args' in mutate).toBe(true)
+    if (!('args' in mutate)) return
+    expect(mutate.args).toHaveLength(3)
+    expect(typeof mutate.args[0]).toBe('number')
+
+    expect(preflightReplayCommand('sonification.setEnabled', [true])).toMatch(
+      /bounded snapshot/,
+    )
+    const sonify = preflightLiveCommand('sonification.setEnabled', ctx, [true])
+    expect('args' in sonify).toBe(true)
+  })
+
+  it('still refuses unknown ids, unreplayable commands and bad args', () => {
+    expect(preflightLiveCommand('nope.nothing', ctx, [])).toEqual({
+      error: 'Unknown command "nope.nothing"',
+    })
+    expect(
+      preflightLiveCommand('flame.setExposure', ctx, ['loud']),
+    ).toHaveProperty('error')
+    expect(preflightLiveCommand('timeline.play', ctx, [])).toHaveProperty(
+      'error',
+    )
+  })
+
+  it('passes ordinary args through unchanged', () => {
+    const result = preflightLiveCommand('flame.setExposure', ctx, [0.4])
+    expect(result).toEqual({ args: [0.4] })
   })
 })
