@@ -74,6 +74,9 @@ export const arcadeStartDuel: WebMcpTool = {
       // The toggle lives in the recorder UI; both by default, which is what a
       // duel worth replaying needs.
       recording: 'both',
+      // Through the workspace's own facade, so the viewer's duel take begins
+      // with the same snapshot a take they started themselves would.
+      startPlayer: (now) => ctx.recorder?.start(now) ?? { ok: true },
       // The clock is what ends a duel; the agent cannot. Resolve the context
       // when it fires rather than capturing it, so a workspace that remounted
       // mid-duel still ends on the live one.

@@ -579,9 +579,20 @@ export function Flam3(props: Flam3Props) {
   /**
    * Timeline animation playback loop.
    * When isPlaying is true, advances the frame at the configured FPS rate.
+   *
+   * Gated on `animationEnabled` because the timeline is shared and this
+   * advances it: every extra instance mounted while something plays used to
+   * add its own interval, so two previews meant triple-speed playback, and a
+   * transport marker the recorder then flagged as unreplayable. Previews all
+   * pass `false`, so only the instance that owns the animation drives it.
    */
   createEffect(() => {
-    if (!timeline || !timeline.isPlaying() || timeline.config().autoFps) {
+    if (
+      !timeline ||
+      !props.animationEnabled ||
+      !timeline.isPlaying() ||
+      timeline.config().autoFps
+    ) {
       return
     }
 
