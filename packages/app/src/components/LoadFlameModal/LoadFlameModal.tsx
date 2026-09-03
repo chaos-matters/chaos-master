@@ -10,7 +10,7 @@ import { classicExamples } from '@/flame/examples/classics'
 import { Flam3 } from '@/flame/Flam3'
 import { isFlameXmlContent, parseFlameXml, registerImportedFlamePalette, } from '@/flame/flameXml'
 import { camera3DDefault } from '@/flame/schema/flameSchema'
-import { ChevronDown, Cross } from '@/icons'
+import { ChevronDown, Cross, Info } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Camera2D } from '@/lib/Camera2D'
 import { Default3DPreviewCamera } from '@/lib/Camera3D'
@@ -18,7 +18,7 @@ import { Root } from '@/lib/Root'
 import { deepClone } from '@/utils/clone'
 import { filesFromDataTransfer } from '@/utils/dataTransferFiles'
 import { createFileDragState } from '@/utils/fileDragState'
-import { applyFlameImport, parseFlameEnvelope, readFlameFiles, summarizeImport, } from '@/utils/flameImport'
+import { applyFlameImport, MAX_IMPORT_FILE_SIZE, parseFlameEnvelope, readFlameFiles, summarizeImport, } from '@/utils/flameImport'
 import { extractFlameFromPng } from '@/utils/flameInPng'
 import { useElementIsScrolling } from '@/utils/isScrolling'
 import { persistentSignal } from '@/utils/persistentSignal'
@@ -36,6 +36,7 @@ import ui from './LoadFlameModal.module.css'
 import type { Accessor, JSX } from 'solid-js'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { ChangeHistory } from '@/utils/createStoreHistory'
+import type { AcceptMap } from '@/utils/pickFiles'
 import type { TimelineTrack } from '@/utils/timeline'
 
 const { performance } = globalThis
@@ -560,16 +561,42 @@ function ExampleItem(props: {
 
 /** Everything the import zone accepts: an exported PNG, a JSON descriptor, an
  *  Apophysis `.flame` config, or a whole backup ZIP. */
+/** What the picker accepts. Single source of truth: the zone's format pills are
+ *  derived from this, so a format cannot be added to the picker while the zone
+ *  goes on advertising the old list. */
+export const FLAME_FILE_ACCEPT: AcceptMap = {
+  'image/png': ['.png'],
+  'application/json': ['.json'],
+  'application/zip': ['.zip'],
+  'text/xml': ['.flame', '.xml'],
+}
+
+/** Display name and hover hint per accepted extension. An extension with no
+ *  entry still gets a pill, labelled with the extension itself. */
+const FORMAT_LABELS: Record<string, { label: string; hint: string }> = {
+  '.png': {
+    label: 'PNG',
+    hint: 'A PNG exported from here — the flame travels inside the image',
+  },
+  '.json': { label: 'JSON', hint: 'A flame descriptor' },
+  '.zip': { label: 'ZIP', hint: 'A full backup archive' },
+  '.flame': { label: '.flame', hint: 'An Apophysis or flam3 configuration' },
+  '.xml': { label: '.xml', hint: 'An Apophysis or flam3 configuration' },
+}
+
+export const ACCEPTED_FORMATS = Object.values(FLAME_FILE_ACCEPT)
+  .flat()
+  .map((ext) => FORMAT_LABELS[ext] ?? { label: ext, hint: ext })
+
+export const MAX_IMPORT_FILE_SIZE_LABEL = `${Math.round(
+  MAX_IMPORT_FILE_SIZE / (1024 * 1024),
+)} MB`
+
 async function pickFlameFiles(): Promise<File[]> {
   return await pickFiles({
     id: 'load-flame-from-file',
     multiple: true,
-    accept: {
-      'image/png': ['.png'],
-      'application/json': ['.json'],
-      'application/zip': ['.zip'],
-      'text/xml': ['.flame', '.xml'],
-    },
+    accept: FLAME_FILE_ACCEPT,
   })
 }
 
@@ -610,6 +637,7 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
   const { showToast } = useToast()
   const fileDrag = createFileDragState()
   const isDragging = fileDrag.active
+  const [infoOpen, setInfoOpen] = createSignal(false)
   const [isImporting, setIsImporting] = createSignal(false)
   const isGallery = () => props.mode === 'gallery'
 
@@ -890,7 +918,7 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
         <p class={ui.modalSubtitle}>
           {isGallery()
             ? 'Browse everything in one place — curated examples, animations, and your bred & evolved flames. Search by name or filter by variation.'
-            : 'Select a preset to begin, load a recent creation, or import saved PNGs, .flame configs or a backup ZIP.'}
+            : 'Start from a preset, a recent flame, or your own file.'}
         </p>
         <Show when={isGallery()}>
           <div class={ui.gallerySearchRow}>
@@ -958,20 +986,64 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
               <polyline points="17 8 12 3 7 8" />
               <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
-            <div class={ui.uploadTitle}>
-              {isImporting()
-                ? 'Importing…'
-                : isDragging()
-                  ? 'Drop Flames Here!'
-                  : 'Import from File'}
+            <div class={ui.uploadHeading}>
+              <span class={ui.uploadTitle}>
+                {isImporting()
+                  ? 'Importing…'
+                  : isDragging()
+                    ? 'Drop to load'
+                    : 'Drop files or click to browse'}
+              </span>
+              {/* The multi-file rule is the only thing here a user cannot infer
+                  from the formats, so it is the only thing kept — behind an
+                  info affordance rather than in a paragraph nobody reads. */}
+              <Show when={!isImporting() && !isDragging()}>
+                <span
+                  class={ui.infoWrap}
+                  onClick={(e) => {
+                    // The zone itself opens the file picker; asking what a
+                    // format means should not also pick a file.
+                    e.stopPropagation()
+                  }}
+                >
+                  <button
+                    type="button"
+                    class={ui.infoButton}
+                    aria-label="What can I import?"
+                    aria-expanded={infoOpen()}
+                    onClick={() => setInfoOpen((v) => !v)}
+                    onBlur={() => setInfoOpen(false)}
+                  >
+                    <Info />
+                  </button>
+                  <span class={ui.infoTooltip} role="tooltip">
+                    One file opens straight away. Drop several and they all go
+                    to Recent flames without opening.
+                  </span>
+                </span>
+              </Show>
             </div>
-            <div class={ui.uploadSubtitle}>
-              {isImporting()
-                ? 'Reading your files into Recent flames.'
-                : isDragging()
-                  ? 'Release to load. One file opens it, several go to Recent flames.'
-                  : 'Click to choose files, or drag and drop exported PNGs, JSON descriptors, .flame configs or a backup ZIP. A single file opens straight away; drop several to load them all into Recent flames without opening any.'}
-            </div>
+            <Show
+              when={!isImporting()}
+              fallback={
+                <div class={ui.uploadNote}>
+                  Reading files into Recent flames.
+                </div>
+              }
+            >
+              <div class={ui.formatPills} aria-label="Accepted formats">
+                <For each={ACCEPTED_FORMATS}>
+                  {(format) => (
+                    <span class={ui.formatPill} title={format.hint}>
+                      {format.label}
+                    </span>
+                  )}
+                </For>
+                <span class={ui.sizeLimit}>
+                  up to {MAX_IMPORT_FILE_SIZE_LABEL}
+                </span>
+              </div>
+            </Show>
           </div>
         </Show>
         <div class={ui.filterRow} role="group" aria-label="Filter by dimension">

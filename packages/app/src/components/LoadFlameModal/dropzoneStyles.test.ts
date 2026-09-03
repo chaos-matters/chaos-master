@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import postcss from 'postcss'
 import { describe, expect, it } from 'vitest'
 
 // Read the stylesheet as text rather than importing the CSS module: under vitest
@@ -9,6 +10,45 @@ const css = readFileSync(
   join(import.meta.dirname, 'LoadFlameModal.module.css'),
   'utf8',
 )
+
+const dragBlock = () => {
+  const start = css.indexOf('.uploadZoneDragging {')
+  // Stop at the nested rules so the assertions below read only the zone's own
+  // declarations, not those of its children.
+  const end = css.indexOf('  .uploadIcon {', start)
+  return css.slice(start, end === -1 ? undefined : end)
+}
+
+// The assertions below are regexes over the stylesheet, and a regex happily
+// matches inside a file that no longer parses — a partial edit once left
+// orphaned rules here and every test still passed. Parse it for real first.
+describe('stylesheet integrity', () => {
+  it('parses as CSS', () => {
+    expect(() =>
+      postcss.parse(css, { from: 'LoadFlameModal.module.css' }),
+    ).not.toThrow()
+  })
+
+  it('declares every rule this file is expected to own', () => {
+    const root = postcss.parse(css, { from: 'LoadFlameModal.module.css' })
+    const selectors = new Set<string>()
+    root.walkRules((rule) => {
+      selectors.add(rule.selector)
+    })
+    for (const required of [
+      '.uploadZone',
+      '.uploadZoneDragging',
+      '.uploadHeading',
+      '.formatPills',
+      '.formatPill',
+      '.sizeLimit',
+      '.infoButton',
+      '.infoTooltip',
+    ]) {
+      expect(selectors.has(required), `missing rule ${required}`).toBe(true)
+    }
+  })
+})
 
 describe('upload dropzone styles', () => {
   // The component has always toggled `ui.uploadZoneDragging` on drag, but the
@@ -20,7 +60,7 @@ describe('upload dropzone styles', () => {
   })
 
   it('gives the drag state a visible border and fill, not just a text swap', () => {
-    const block = css.slice(css.indexOf('.uploadZoneDragging {'))
+    const block = dragBlock()
     expect(block).toMatch(/border-color:/)
     expect(block).toMatch(/background:/)
     // The resting zone is dashed; a solid border is the "now it will take it"
@@ -28,7 +68,45 @@ describe('upload dropzone styles', () => {
     expect(block).toMatch(/border-style:\s*solid/)
   })
 
-  it('honours reduced motion for the drag transform', () => {
+  // Regression: the first version grew the border to 2px and scaled to 1.01,
+  // which pushed the zone past the modal's left edge while dragging over it.
+  // The ring has to be painted inside the existing box instead.
+  it('changes no box dimension, so it cannot overflow the modal edge', () => {
+    const block = dragBlock()
+    expect(block).not.toMatch(/border-width:/)
+    expect(block).not.toMatch(/transform:\s*scale/)
+    expect(block).not.toMatch(/(^|[^-])padding:/)
+    expect(block).not.toMatch(/\bmargin:/)
+    // The ring is an inset shadow, which paints within the border box.
+    expect(block).toMatch(/box-shadow:\s*inset/)
+  })
+
+  it('honours reduced motion for the icon nudge', () => {
     expect(css).toMatch(/prefers-reduced-motion/)
+  })
+})
+
+describe('format pills', () => {
+  it('styles the pills and the size note distinctly', () => {
+    expect(css).toMatch(/^\.formatPills\s*\{/m)
+    expect(css).toMatch(/^\.formatPill\s*\{/m)
+    // The limit is not a format; it must not reuse the pill chrome.
+    expect(css).toMatch(/^\.sizeLimit\s*\{/m)
+  })
+
+  it('lets the pills wrap rather than overflow a narrow modal', () => {
+    const block = css.slice(css.indexOf('.formatPills {'))
+    expect(block).toMatch(/flex-wrap:\s*wrap/)
+  })
+})
+
+describe('info tooltip', () => {
+  it('is hidden until hover, focus or an expanded press', () => {
+    const block = css.slice(css.indexOf('.infoTooltip {'))
+    expect(block).toMatch(/visibility:\s*hidden/)
+    expect(block).toMatch(/:hover/)
+    // Keyboard users get it too, and aria-expanded carries touch.
+    expect(block).toMatch(/focus-within/)
+    expect(block).toMatch(/aria-expanded='true'/)
   })
 })

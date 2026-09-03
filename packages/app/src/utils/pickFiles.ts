@@ -1,5 +1,5 @@
 /** The File System Access API types both halves of its `accept` map. */
-type AcceptMap = Record<`${string}/${string}`, `.${string}`[]>
+export type AcceptMap = Record<`${string}/${string}`, `.${string}`[]>
 
 type PickFilesOptions = {
   /** Stable picker id — browsers reopen the directory last used under it. */
