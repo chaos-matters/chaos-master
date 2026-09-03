@@ -4,15 +4,31 @@ import { executeCommand, getCommand, preflightLiveCommand, } from '@/commands/re
 import { getWebMcpContext } from '@/webmcp/contextBridge'
 import type { WebMcpTool } from '@/webmcp/types'
 
-/** One readable line for the pilot overlay's live step list. */
+/**
+ * One readable line for the pilot overlay's live step list.
+ *
+ * The same sentence the recorder writes into the log, so the live rail and the
+ * replay's step list say the same thing about the same step. Commands that
+ * render their value into their own label ("Sonification model: ambient") are
+ * why: appending raw JSON instead produced "Set Sonification Sound
+ * [{"version":1,"model":"ambient",...]" live and the readable form only on
+ * replay, which made the two views look like different sessions.
+ *
+ * The argument dump survives only as the fallback for commands that describe
+ * nothing, where the values are the only thing distinguishing two steps.
+ */
 function describeStep(commandId: string, args: unknown[]): string {
-  const label = getCommand(commandId)?.label ?? commandId
+  const cmd = getCommand(commandId)
+  const described = cmd?.describe?.([...args])
+  if (described !== undefined && described !== '') return described
+  const label = cmd?.label ?? commandId
   let rendered = ''
   try {
     rendered = JSON.stringify(args)
   } catch {
     rendered = ''
   }
+  if (rendered === '' || rendered === '[]') return label
   return rendered.length > 80
     ? `${label} ${rendered.slice(0, 77)}...`
     : `${label} ${rendered}`
@@ -103,7 +119,15 @@ export const executeCommandTool: WebMcpTool = {
     }
 
     if (driving) {
-      const remaining = notePilotStep('command', describeStep(commandId, args))
+      // The NORMALIZED args, which are the ones the recorder describes and
+      // logs. A command whose label renders its value reads them back out of
+      // its canonical shape — `sonification.setConfig` cannot say
+      // "Sonification model: ambient" from the flat config an agent typed,
+      // only from the snapshot normalization builds.
+      const remaining = notePilotStep(
+        'command',
+        describeStep(commandId, preflight.args),
+      )
       return { success: true, commandId, steps: driving.steps + 1, remaining }
     }
 
