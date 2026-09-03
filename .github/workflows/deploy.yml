@@ -97,6 +97,17 @@ jobs:
       # append-only D1 migrations before the Worker that reads them goes live,
       # both on main and on an explicitly requested manual dev deploy. Prod
       # remains a separate, deliberate release operation.
+      #
+      # `--env dev` is REQUIRED. The CONTENT_DB binding lives only inside
+      # `env.dev` in wrangler.jsonc, and wrangler does not inherit bindings up
+      # into the top-level config. Without the flag wrangler reads the
+      # binding-less top-level config and dies with "Couldn't find a D1 DB with
+      # the name or binding 'chaos-master-content-dev'", failing the whole job
+      # before the dev deploy step ever runs.
+      #
+      # Passing the database *name* instead of the binding is also deliberate:
+      # a mistaken `--env` then errors out rather than quietly migrating
+      # another environment's database.
       - name: Apply Dev Content Migrations
         if: >-
           env.DEPLOY_ENABLED == 'true' &&
@@ -106,7 +117,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: d1 migrations apply chaos-master-content-dev --remote
+          command: d1 migrations apply chaos-master-content-dev --remote --env dev
           packageManager: 'pnpm'
           workingDirectory: 'packages/app'
 
