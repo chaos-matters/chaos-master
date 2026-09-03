@@ -311,13 +311,16 @@ function VariationTile(props: {
           props.onPrimary()
         }}
       >
+        {/* The preview is square because the thumbnail is: a 16:9 render
+            inside it letterboxed the motif into the middle third, and most
+            of what the row showed was the black bars. */}
         <span class={ui.tileThumb}>
           <VariationPreview
             version={0}
             isSelected={props.active}
             flame={getVariationPreviewFlame(props.type)}
             name={props.name}
-            resolution={{ width: 128, height: 72 }}
+            resolution={{ width: 112, height: 112 }}
             paused={props.paused}
           />
         </span>

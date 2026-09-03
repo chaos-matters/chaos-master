@@ -247,10 +247,12 @@
   overflow: hidden;
 }
 
-/* Active tiles carry the light; inactive ones are dimmed to about half, which
-   is the mock's whole hierarchy in the row. */
+/* Active tiles carry the light, but only a little more of it. The mock's row
+   is mostly owned variations, where dimming the odd one out is the hierarchy;
+   this row is mostly the catalogue, and at 0.55 eight of nine tiles read as
+   black boxes told apart by their labels. */
 .tile:not(.tileOn) .tileThumb {
-  opacity: 0.55;
+  opacity: 0.84;
 }
 
 .tileOn .tileThumb {
@@ -387,7 +389,10 @@
   display: grid;
   min-height: 0;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  align-content: start;
+  /* Spread, not stacked at the top: the two rows own the panel's full height
+     rather than leaving a dead strip under them for every tab to pay for. */
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  align-items: center;
   gap: 8px;
   min-width: 0;
 }
@@ -666,6 +671,11 @@
 /* Colour position is the control a player reaches for; Speed is its dimmer
    companion. A white filled track made the lesser of the two the brightest
    object in the panel. */
+/*
+  Opaque, deliberately: `accent-color` ignores alpha, so every translucent
+  grey we asked for came back as pure white — the least important control in
+  the panel rendering as the brightest object in it.
+*/
 .speedTrack {
-  accent-color: rgba(255, 255, 255, 0.3);
+  accent-color: #52565e;
 }
