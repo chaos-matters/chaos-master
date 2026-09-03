@@ -1,9 +1,9 @@
 import { describeAllowedCommands } from '@/arcade/commandHints'
 import { DEFAULT_DUEL_SECONDS, duelActive, MAX_DUEL_SECONDS, MIN_DUEL_SECONDS, runningDuel, startDuel, stopDuel, } from '@/arcade/duel'
-import { scoreSheetJudge } from '@/arcade/duelJudge'
+import { finishDuel } from '@/arcade/duelActions'
 import { qualityRank } from '@/arcade/guard'
 import { clearNarration } from '@/arcade/narration'
-import { agentDriving, endPilot, startPilot } from '@/arcade/pilot'
+import { agentDriving, startPilot } from '@/arcade/pilot'
 import { ALWAYS_ALLOWED, DUEL_ALLOWED, DUEL_STEP_BUDGET } from '@/arcade/topics'
 import { deepClone } from '@/utils/clone'
 import { getWebMcpContext, setWebMcpContext, setWebMcpTarget, } from '@/webmcp/contextBridge'
@@ -74,6 +74,13 @@ export const arcadeStartDuel: WebMcpTool = {
       // The toggle lives in the recorder UI; both by default, which is what a
       // duel worth replaying needs.
       recording: 'both',
+      // The clock is what ends a duel; the agent cannot. Resolve the context
+      // when it fires rather than capturing it, so a workspace that remounted
+      // mid-duel still ends on the live one.
+      onExpire: () => {
+        const player = getWebMcpContext('player')
+        if (player) void finishDuel(player, 'finished')
+      },
     })
     if (!started.ok) return { error: started.error }
     const allowed = [...DUEL_ALLOWED, ...ALWAYS_ALLOWED]
@@ -122,47 +129,13 @@ export const arcadeEndDuel: WebMcpTool = {
     },
   },
   execute: async (input) => {
-    const state = runningDuel()
-    if (!state) return { error: 'No duel is running.' }
+    if (!runningDuel()) return { error: 'No duel is running.' }
     const playerCtx = getWebMcpContext('player')
     if (!playerCtx) return NOT_READY
     const raw = (input ?? {}) as { title?: unknown; summary?: unknown }
-    const title =
-      (typeof raw.title === 'string' ? raw.title : '').trim().slice(0, 80) ||
-      'Duel'
-    const verdict = scoreSheetJudge.judge(
-      playerCtx.flameDescriptor(),
-      state.rival.flame(),
-    )
-    // Take the sessions BEFORE the pilot ends, so the seat is still alive.
-    const sessions = stopDuel()
-    endPilot('finished', {
-      title,
+    return await finishDuel(playerCtx, 'finished', {
+      title: typeof raw.title === 'string' ? raw.title : undefined,
       summary: typeof raw.summary === 'string' ? raw.summary : undefined,
     })
-    setWebMcpTarget('player')
-    let saved = 0
-    for (const [seat, session] of [
-      ['your flame', sessions.player],
-      ["the AI's flame", sessions.rival],
-    ] as const) {
-      if (!session) continue
-      try {
-        await playerCtx.recorder?.save(session, `Duel: ${title} — ${seat}`)
-        saved++
-      } catch (error) {
-        console.warn('[arcade] could not save a duel take', error)
-      }
-    }
-    playerCtx.arcade?.toast(`${title}: ${verdict.line}`)
-    return {
-      ok: true,
-      title,
-      winner: verdict.winner,
-      verdict: verdict.line,
-      playerScore: verdict.playerScore,
-      rivalScore: verdict.rivalScore,
-      savedTakes: saved,
-    }
   },
 }

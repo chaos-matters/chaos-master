@@ -1,9 +1,9 @@
 import '@/commands/builtins'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { executeCommand } from '@/commands/registry'
 import { recorderStream } from '@/recorder/recorder'
 import { createTestFlame } from '@/webmcp/testUtils'
-import { duel, duelActive, duelRemainingMs, runningDuel, startDuel, stopDuel, } from './duel'
+import { duel, duelActive, duelReady, duelRemainingMs, markDuelReady, runningDuel, startDuel, stopDuel, } from './duel'
 
 const flame = createTestFlame()
 const base = {
@@ -12,6 +12,12 @@ const base = {
   durationMs: 180_000,
   recording: 'both' as const,
 }
+
+afterEach(() => {
+  if (duelActive()) stopDuel()
+  recorderStream('player').cancel()
+  recorderStream('rival').cancel()
+})
 
 describe('duel state', () => {
   afterEach(() => {
@@ -60,5 +66,64 @@ describe('duel state', () => {
     const sessions = stopDuel()
     expect(sessions.rival?.actions).toHaveLength(1)
     expect(sessions.player?.actions).toEqual([])
+  })
+})
+
+describe('the clock', () => {
+  it('ends the duel itself, so a modal over the stage cannot outlast it', () => {
+    vi.useFakeTimers()
+    try {
+      const expired = vi.fn()
+      startDuel({
+        rivalFlame: createTestFlame(),
+        playerFlame: createTestFlame(),
+        durationMs: 1000,
+        recording: 'both',
+        onExpire: expired,
+      })
+      vi.advanceTimersByTime(999)
+      expect(expired).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(2)
+      expect(expired).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not fire after the duel has already been stopped', () => {
+    vi.useFakeTimers()
+    try {
+      const expired = vi.fn()
+      startDuel({
+        rivalFlame: createTestFlame(),
+        playerFlame: createTestFlame(),
+        durationMs: 1000,
+        recording: 'both',
+        onExpire: expired,
+      })
+      stopDuel()
+      vi.advanceTimersByTime(5000)
+      expect(expired).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('markDuelReady', () => {
+  it('records the title without ending anything', () => {
+    startDuel({
+      rivalFlame: createTestFlame(),
+      playerFlame: createTestFlame(),
+      durationMs: 1000,
+      recording: 'both',
+    })
+    expect(markDuelReady({ title: '  Ember lattice  ' })).toBe(true)
+    expect(duelReady()?.title).toBe('Ember lattice')
+    expect(duelActive()).toBe(true)
+  })
+
+  it('refuses when no duel is running', () => {
+    expect(markDuelReady({ title: 'nothing' })).toBe(false)
   })
 })

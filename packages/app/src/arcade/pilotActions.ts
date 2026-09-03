@@ -20,7 +20,12 @@ export function sessionNameFor(
   title: string,
   reason: PilotEndReason,
 ): string {
-  const kind = state.mode === 'cinema' ? 'Animation' : 'Lesson'
+  const kind =
+    state.mode === 'cinema'
+      ? 'Animation'
+      : state.mode === 'duel'
+        ? 'Duel'
+        : 'Lesson'
   const suffix = reason === 'finished' ? '' : ` (${reason})`
   const topic = topicTitle(state)
   return topic

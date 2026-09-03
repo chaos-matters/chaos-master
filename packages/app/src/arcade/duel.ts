@@ -15,6 +15,13 @@ import type { Seat } from '@/seats/seat'
  */
 export type DuelRecording = 'both' | 'rival' | 'player' | 'none'
 
+/**
+ * What the agent said when it declared itself happy. It cannot end the duel —
+ * only the viewer or the clock can — so this is how it still gets to name its
+ * own work: `finishDuel` falls back to this title.
+ */
+export type DuelReady = { title?: string; summary?: string; at: number }
+
 export type DuelState =
   | { phase: 'idle' }
   | {
@@ -23,9 +30,16 @@ export type DuelState =
       endsAt: number
       durationMs: number
       recording: DuelRecording
+      ready?: DuelReady
     }
 
 const [duel, setDuel] = createSignal<DuelState>({ phase: 'idle' })
+
+/**
+ * Module-scoped rather than part of the state, so that `setDuel` stays a plain
+ * value swap and nothing can accidentally clone a live handle into a new state.
+ */
+let expiryTimer: ReturnType<typeof globalThis.setTimeout> | undefined
 
 export { duel }
 
@@ -64,6 +78,14 @@ export function startDuel(input: {
   durationMs: number
   recording: DuelRecording
   now?: number
+  /**
+   * Called once when the clock reaches zero. It is scheduled here rather than
+   * from the stage, because every modal in this app opens with
+   * `dialog.showModal()`, which makes the rest of the document inert — a
+   * component-owned timer would keep counting behind a dialog nobody can
+   * dismiss from a stage that can no longer be clicked.
+   */
+  onExpire?: () => void
 }): { ok: true; rival: Seat } | { ok: false; error: string } {
   if (duelActive()) {
     return { ok: false, error: 'A duel is already running.' }
@@ -91,6 +113,13 @@ export function startDuel(input: {
     }
   }
   const seat = createSeat('rival', input.rivalFlame)
+  if (input.onExpire) {
+    const onExpire = input.onExpire
+    expiryTimer = globalThis.setTimeout(() => {
+      expiryTimer = undefined
+      onExpire()
+    }, input.durationMs)
+  }
   setDuel({
     phase: 'running',
     rival: seat,
@@ -101,6 +130,31 @@ export function startDuel(input: {
   return { ok: true, rival: seat }
 }
 
+/**
+ * The agent declaring itself happy. Deliberately not an ending: it records a
+ * title and lets the duel run on, so the agent can keep polishing until the
+ * clock or the viewer calls it.
+ */
+export function markDuelReady(note: {
+  title?: string
+  summary?: string
+  now?: number
+}): boolean {
+  const state = runningDuel()
+  if (!state) return false
+  setDuel({
+    ...state,
+    ready: {
+      title: note.title?.trim().slice(0, 80) || undefined,
+      summary: note.summary?.trim().slice(0, 400) || undefined,
+      at: note.now ?? globalThis.performance.now(),
+    },
+  })
+  return true
+}
+
+export const duelReady = (): DuelReady | undefined => runningDuel()?.ready
+
 /** Stop both sides in one synchronous call and dispose the rival seat. */
 export function stopDuel(): {
   player?: RecordedSession
@@ -108,6 +162,10 @@ export function stopDuel(): {
 } {
   const state = runningDuel()
   if (!state) return {}
+  if (expiryTimer !== undefined) {
+    globalThis.clearTimeout(expiryTimer)
+    expiryTimer = undefined
+  }
   const playerSession = recorderStream('player').isRecording()
     ? recorderStream('player').stop()
     : undefined
