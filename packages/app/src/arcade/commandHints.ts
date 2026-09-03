@@ -73,6 +73,19 @@ export const SAMPLE_VARIATION_TYPES = [
  * signature is not a single obvious value. One array instead of an id list
  * plus a parallel hint map, because the brief pays for every byte twice.
  */
+/**
+ * The argument shape for one command, for a caller that lost the brief.
+ *
+ * A lesson brief is sent once, at `arcade_start_lesson`, and a client that
+ * truncates it takes the argument shapes with it — a real agent lost the line
+ * for `flame.setVariationParams` mid-lesson and had to recover it by reading
+ * the app bundle. `list_commands` is free, read-only and filterable, so it can
+ * hand back one line without restarting anything.
+ */
+export function commandArgHint(id: string): string | undefined {
+  return COMMAND_ARG_HINTS[id]
+}
+
 export function describeAllowedCommands(allowed: readonly string[]): string[] {
   const ids: string[] = []
   for (const entry of allowed) {

@@ -1,7 +1,7 @@
 import '@/commands/builtins'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { agentDriving, pilot, resetPilot } from '@/arcade/pilot'
-import { TOPIC_IDS } from '@/arcade/topics'
+import { LESSON_TOPICS, TOPIC_IDS } from '@/arcade/topics'
 import { cancelSessionRecording } from '@/recorder/recorder'
 import { clearWebMcpContext, setWebMcpContext } from '@/webmcp/contextBridge'
 import { wrapTool } from '@/webmcp/registerWebMcp'
@@ -108,6 +108,10 @@ describe('Teach tools', () => {
       steps: 2,
       locked: true,
     })
+    // The brief is sent once and cannot be asked for again — a second
+    // arcade_start_lesson is refused as already active — so the half worth
+    // re-reading rides on the free, read-only status call.
+    expect(status.goal).toBe(LESSON_TOPICS.color.goal)
     const ended = (await arcadeEndLesson.execute(
       { title: 'Warm tones', summary: 'Palette then exposure.' },
       {},
