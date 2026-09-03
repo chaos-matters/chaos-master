@@ -1,10 +1,22 @@
 import { createSignal, For, Match, onMount, Show, Switch } from 'solid-js'
 import { clampDuelSeconds, DEFAULT_DUEL_SECONDS, MAX_DUEL_SECONDS, MIN_DUEL_SECONDS, } from '@/arcade/duel'
+import { beginDuel } from '@/arcade/duelActions'
 import { CINEMA_PRESETS, cinemaPromptCard, duelPromptCard, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, } from '@/arcade/topics'
-import { Copy, Cross } from '@/icons'
+import { Copy, Cross, Swords } from '@/icons'
+import { getWebMcpContext } from '@/webmcp/contextBridge'
 import ui from './ArcadeHub.module.css'
 import type { TopicId } from '@/arcade/topics'
 import type { ArcadeMode } from '@/lib/activeTab'
+
+/**
+ * Whether the hub offers a duel with nobody in the other seat.
+ *
+ * On under `pnpm dev`, and behind `VITE_SOLO_DUEL=1` for a preview build, so
+ * the split screen can be inspected on a deploy without shipping a duel with
+ * no opponent to the people the Arcade is actually for.
+ */
+const SOLO_DUEL_AVAILABLE =
+  import.meta.env.DEV || Boolean(import.meta.env.VITE_SOLO_DUEL)
 
 const TITLES: Record<ArcadeMode, string> = {
   teach: 'Teach',
@@ -64,6 +76,25 @@ export function ArcadeModePanel(props: {
     String(DEFAULT_DUEL_SECONDS),
   )
   const duelSeconds = () => clampDuelSeconds(duelSecondsText())
+  const [soloError, setSoloError] = createSignal<string>()
+  /**
+   * The hub is mounted beside the workspace rather than inside it, so it has
+   * no `CommandContext` to be handed one. It reads the same bridge the WebMCP
+   * tools read, which exists for exactly this: a duel is started by things
+   * that have no component to mount into.
+   */
+  const startSolo = () => {
+    const ctx = getWebMcpContext('player')
+    if (!ctx) {
+      setSoloError('The flame editor has not finished loading.')
+      return
+    }
+    const started = beginDuel(ctx, {
+      seconds: duelSeconds(),
+      opponent: 'none',
+    })
+    setSoloError('error' in started ? started.error : undefined)
+  }
   let closeButton: HTMLButtonElement | undefined
   onMount(() => {
     closeButton?.focus()
@@ -184,6 +215,29 @@ export function ArcadeModePanel(props: {
               }}
             />
           </label>
+          <Show when={SOLO_DUEL_AVAILABLE}>
+            <div class={ui.solo}>
+              <button
+                type="button"
+                class={ui.soloButton}
+                onClick={startSolo}
+                data-testid="solo-duel"
+              >
+                <Swords aria-hidden="true" />
+                Start without the AI
+              </button>
+              <p class={ui.soloNote}>
+                Dev build only. Opens the split screen with the other seat left
+                empty, so the duel can be used and looked at without a chat
+                connected. Nothing is recorded and nothing reaches your library;
+                the clock, the dial and the End button all behave as they do in
+                a real duel.
+              </p>
+              <Show when={soloError()}>
+                {(message) => <p class={ui.soloError}>{message()}</p>}
+              </Show>
+            </div>
+          </Show>
         </Match>
         <Match when={!ready()}>
           <p>

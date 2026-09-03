@@ -318,3 +318,55 @@
   font-size: 13px;
   opacity: 0.85;
 }
+
+/*
+  The opponent-less duel. Set apart with a dashed edge rather than styled like
+  the rest of the panel, because it is a development affordance and should
+  never be mistaken for the mode the card is advertising.
+*/
+.solo {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.soloButton {
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.soloButton:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.soloButton svg {
+  width: 15px;
+  height: 15px;
+}
+
+.soloNote {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0.62;
+}
+
+.soloError {
+  margin: 0;
+  font-size: 12px;
+  color: #ff9d7a;
+}
