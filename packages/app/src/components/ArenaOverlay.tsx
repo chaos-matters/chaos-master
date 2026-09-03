@@ -5,6 +5,7 @@ import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { useTimeline } from '@/contexts/TimelineContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { Cross, Zap } from '@/icons'
+import { DEFAULT_SEAT } from '@/seats/seatId'
 import { deepClone } from '@/utils/clone'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
 import { animateClash } from '@/webmcp/tools/animateClash'
@@ -69,8 +70,11 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
   let wasClashStaged = false
   let cachedSimResult: SimulateClashResult | null = null
 
+  // Pinned to the player throughout: the target follows a duel to the rival
+  // seat, and restoring through it would write the AI's flame into the
+  // viewer's document.
   const captureWorkspace = () => {
-    const ctx = getWebMcpContext()
+    const ctx = getWebMcpContext(DEFAULT_SEAT)
     if (!wasClashStaged && ctx && timeline) {
       initialFlame = deepClone(ctx.flameDescriptor())
       initialTracks = deepClone(timeline.tracks())
@@ -89,7 +93,7 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
       if (initialTracks && timeline) {
         timeline.loadTracks(initialTracks)
       }
-      const ctx = getWebMcpContext()
+      const ctx = getWebMcpContext(DEFAULT_SEAT)
       if (initialDuration !== null && ctx) {
         ctx.timeline.setDuration(initialDuration)
       }

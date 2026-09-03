@@ -59,6 +59,28 @@ describe('createSeat', () => {
   })
 })
 
+describe("a seat's history", () => {
+  it('is visible to the tools that ask about it', () => {
+    const seat = createSeat('rival', createTestFlame())
+
+    expect(seat.ctx.history?.peekUndoTarget?.()).toBeUndefined()
+    executeCommand('flame.addTransform', seat.ctx)
+
+    // `get_undo_state` is read-only, so the guard lets it through mid-duel; it
+    // used to answer "nothing to undo" with total confidence.
+    expect(seat.ctx.history?.peekUndoTarget?.()).toEqual({
+      system: 'flame',
+      seq: null,
+    })
+    seat.ctx.history?.undo()
+    expect(seat.ctx.history?.peekRedoTarget?.()).toEqual({
+      system: 'flame',
+      seq: null,
+    })
+    seat.dispose()
+  })
+})
+
 describe('disposing a seat', () => {
   it('takes its bridge entry with it', () => {
     const seat = createSeat('rival', createTestFlame())

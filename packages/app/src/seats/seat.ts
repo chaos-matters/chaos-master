@@ -16,7 +16,7 @@ import type { SeatId } from './seatId'
 import type { CommandContext } from '@/commands/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { RecorderStream } from '@/recorder/recorder'
-import type { HistorySetter } from '@/utils/createStoreHistory'
+import type { ChangeHistory, HistorySetter } from '@/utils/createStoreHistory'
 import type { TimelineState } from '@/utils/timeline'
 
 /**
@@ -76,6 +76,7 @@ export function createSeat(id: SeatId, initial: FlameDescriptor): Seat {
       flame: () => flame,
       setFlame,
       timeline,
+      history,
     })
 
     // Defined after ctx because they dispatch through it; same shape as the
@@ -142,8 +143,12 @@ export function createSeatCommandContext(seat: {
   flame: Accessor<FlameDescriptor>
   setFlame: HistorySetter<FlameDescriptor>
   timeline: TimelineState
+  history?: Pick<
+    ChangeHistory<FlameDescriptor>,
+    'undo' | 'redo' | 'hasUndo' | 'hasRedo'
+  >
 }): CommandContext {
-  const { timeline } = seat
+  const { timeline, history } = seat
   return {
     seatId: seat.id ?? DEFAULT_SEAT,
     flameDescriptor: seat.flame,
@@ -161,6 +166,17 @@ export function createSeatCommandContext(seat: {
     position: () => vec2f(0, 0),
     setPosition: () => vec2f(0, 0),
     sidebar: { open: () => false, setOpen: () => false },
+    // A seat has one undo system, not two, so there is nothing to route
+    // between and `seq` carries no meaning here. Without this `get_undo_state`
+    // still answered — confidently, and wrongly, "nothing to undo".
+    history: history && {
+      undo: history.undo,
+      redo: history.redo,
+      peekUndoTarget: () =>
+        history.hasUndo() ? { system: 'flame', seq: null } : undefined,
+      peekRedoTarget: () =>
+        history.hasRedo() ? { system: 'flame', seq: null } : undefined,
+    },
     timeline: {
       tracks: timeline.tracks,
       setTracks: timeline.setTracks,

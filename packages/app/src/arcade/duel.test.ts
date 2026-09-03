@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { executeCommand } from '@/commands/registry'
 import { recorderStream } from '@/recorder/recorder'
 import { createTestFlame } from '@/webmcp/testUtils'
-import { duel, duelActive, duelReady, duelRemainingMs, markDuelReady, runningDuel, startDuel, stopDuel, } from './duel'
+import { clampDuelSeconds, duel, duelActive, duelReady, duelRemainingMs, markDuelReady, runningDuel, startDuel, stopDuel, } from './duel'
 
 const flame = createTestFlame()
 const base = {
@@ -155,5 +155,22 @@ describe('what a duel records', () => {
     expect(sessions.player).toBeUndefined()
     expect(recorderStream('player').isRecording()).toBe(true)
     expect(sessions.rival).toBeDefined()
+  })
+})
+
+describe('clampDuelSeconds', () => {
+  it('reads what was typed, including mid-edit emptiness', () => {
+    expect(clampDuelSeconds('240')).toBe(240)
+    expect(clampDuelSeconds(' 240 ')).toBe(240)
+    // An empty field is a field being retyped, not a zero-second duel.
+    expect(clampDuelSeconds('')).toBe(180)
+    expect(clampDuelSeconds('abc')).toBe(180)
+    expect(clampDuelSeconds(undefined)).toBe(180)
+  })
+
+  it('holds the range the prompt card promises', () => {
+    expect(clampDuelSeconds(5)).toBe(60)
+    expect(clampDuelSeconds(99_999)).toBe(600)
+    expect(clampDuelSeconds(180.4)).toBe(180)
   })
 })
