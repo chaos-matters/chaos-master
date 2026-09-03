@@ -264,3 +264,30 @@ describe('resolveFocusElement', () => {
     })
   })
 })
+
+describe('camera framing hints', () => {
+  // `ui:canvas` used to be the answer here, which pointed every camera step at
+  // the one region follow-cam never dims — so a zoom lit up nothing at all.
+  it('points at the control that moved, not at the canvas', () => {
+    expect(focusHintFor('camera.zoomTo', [3])).toBe('param:camera.zoom')
+    expect(focusHintFor('camera.zoomBy', [2])).toBe('param:camera.zoom')
+    expect(focusHintFor('camera.center', [])).toBe('param:camera.zoom')
+    expect(focusHintFor('camera.frame', [0, 0, 2])).toBe('param:camera.zoom')
+    expect(focusHintFor('camera.panTo', [1, 2])).toBe('param:camera.position')
+    expect(focusHintFor('camera.panBy', [1, 2])).toBe('param:camera.position')
+  })
+
+  it('lands on the same anchor the pointer path writes through', () => {
+    // Dragging the canvas and the zoom buttons record as render settings, so
+    // both routes must resolve to one control or a mixed session jumps about.
+    expect(focusHintFor('flame.setRenderSetting', ['camera.zoom', 3])).toBe(
+      'param:camera.zoom',
+    )
+    expect(focusSelectors('param:camera.zoom')).toContain(
+      '[data-parameter-path="camera.zoom"]',
+    )
+    expect(focusSelectors('param:camera.position')).toContain(
+      '[data-parameter-path="camera.position"]',
+    )
+  })
+})
