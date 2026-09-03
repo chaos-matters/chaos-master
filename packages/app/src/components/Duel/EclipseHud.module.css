@@ -18,7 +18,7 @@
 .hud {
   position: relative;
   --duel-dial-size: clamp(150px, 12vw, 230px);
-  --duel-timer-size: calc(var(--duel-dial-size) * 0.197);
+  --duel-timer-size: calc(var(--duel-dial-size) * 0.23);
   --duel-warm-core: #fde7ac;
   --duel-warm-glow: #ff8a1a;
   --duel-warm-far: #ff6014;
@@ -173,8 +173,8 @@
   position: relative;
   display: grid;
   justify-items: center;
-  /* Optically centred, which is a little above the geometric centre. */
-  transform: translateY(calc(var(--duel-dial-size) * -0.032));
+  /* Dead centre now that the caption is gone: with nothing under it there is
+     nothing for the numerals to be optically lifted above. */
   line-height: 1;
 }
 
@@ -185,12 +185,6 @@
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
   color: #fff;
-}
-
-.clockLabel {
-  margin-top: calc(var(--duel-timer-size) * 0.46);
-  font-size: calc(var(--duel-dial-size) * 0.052);
-  color: rgba(244, 246, 255, 0.55);
 }
 
 /* Outside the ring, level with its centre, in their side's colour — inside it
@@ -256,5 +250,52 @@
 @media (max-width: 900px) {
   .hud {
     --duel-dial-size: clamp(150px, 34vw, 220px);
+  }
+}
+
+/*
+  The side that just gained lights up for a beat.
+
+  Brightness rather than movement: the ring is already sliding to its new
+  share, and a second animation on the same object would read as instability
+  — which is what the raw, undamped ring read as in the first place.
+*/
+@keyframes duelGained {
+  0% {
+    filter: brightness(1);
+  }
+  18% {
+    filter: brightness(1.85) saturate(1.15);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+.hud[data-gained='player'] .warmCore,
+.hud[data-gained='player'] .warmNear,
+.hud[data-gained='rival'] .coolCore,
+.hud[data-gained='rival'] .coolNear {
+  animation: duelGained 900ms ease-out;
+}
+
+/* The seat that gained gets the same beat on its numeral, so the number and
+   the ring agree about what just happened. */
+@keyframes duelGainedGlow {
+  0%,
+  100% {
+    text-shadow: none;
+  }
+  22% {
+    text-shadow: 0 0 14px currentcolor;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud[data-gained] .warmCore,
+  .hud[data-gained] .warmNear,
+  .hud[data-gained] .coolCore,
+  .hud[data-gained] .coolNear {
+    animation: none;
   }
 }

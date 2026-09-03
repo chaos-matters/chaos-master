@@ -1,4 +1,4 @@
-import { For, Show } from 'solid-js'
+import { createEffect, createSignal, For, onCleanup, Show, untrack, } from 'solid-js'
 import ui from './EclipseHud.module.css'
 import type { DuelHudModel } from '@/arcade/duelHud'
 
@@ -109,6 +109,60 @@ function arc(startDeg: number, sweepDeg: number, radius = RADIUS): string {
 /** The arc's inner edge, where the specular hairline rides. */
 const INNER = RADIUS - 3.5
 
+/**
+ * How long the ring takes to catch up with the score.
+ *
+ * The share is recomputed on every edit, and a randomize can move it by a
+ * third in one step; drawn straight it read as a twitch rather than as a
+ * lead changing. Long enough to be a movement, short enough that the ring is
+ * never lying about the score for more than half a beat.
+ */
+const SETTLE_MS = 520
+
+/** How long the side that just gained stays lit. */
+const PULSE_MS = 900
+
+function prefersReducedMotion(): boolean {
+  return (
+    globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  )
+}
+
+/**
+ * The drawn share, chasing the scored one.
+ *
+ * Eased rather than sprung: a spring overshoots, and an overshooting score
+ * ring shows a lead that did not happen.
+ */
+function useSettledShare(target: () => number) {
+  const [shown, setShown] = createSignal(target())
+  let frame: number | undefined
+  const stop = () => {
+    if (frame !== undefined) globalThis.cancelAnimationFrame(frame)
+    frame = undefined
+  }
+  createEffect(() => {
+    const goal = target()
+    const from = untrack(shown)
+    stop()
+    if (prefersReducedMotion() || Math.abs(goal - from) < 0.0005) {
+      setShown(goal)
+      return
+    }
+    const started = globalThis.performance.now()
+    const step = (now: number) => {
+      const k = Math.min(1, (now - started) / SETTLE_MS)
+      // Ease-out cubic: fastest where the change is news, settling where it
+      // is not.
+      setShown(from + (goal - from) * (1 - (1 - k) ** 3))
+      frame = k < 1 ? globalThis.requestAnimationFrame(step) : undefined
+    }
+    frame = globalThis.requestAnimationFrame(step)
+  })
+  onCleanup(stop)
+  return shown
+}
+
 export function EclipseHud(props: {
   model: DuelHudModel
   onEnd: () => void
@@ -117,20 +171,40 @@ export function EclipseHud(props: {
 }) {
   // The player owns the left of the ring and the rival the right, matching
   // the halves they are playing.
-  const playerPath = () =>
-    arc(-GAP_DEG / 2, -SWEEP_DEG * props.model.playerShare)
-  const rivalPath = () => arc(GAP_DEG / 2, SWEEP_DEG * props.model.rivalShare)
+  const playerShare = useSettledShare(() => props.model.playerShare)
+  const rivalShare = () => 1 - playerShare()
+
+  // Which side just gained, so the ring can say so rather than only show it.
+  const [pulse, setPulse] = createSignal<'player' | 'rival'>()
+  let last = untrack(() => props.model.playerShare)
+  let pulseTimer: ReturnType<typeof globalThis.setTimeout> | undefined
+  createEffect(() => {
+    const next = props.model.playerShare
+    const moved = next - last
+    last = next
+    if (Math.abs(moved) < 0.002 || prefersReducedMotion()) return
+    setPulse(moved > 0 ? 'player' : 'rival')
+    if (pulseTimer !== undefined) globalThis.clearTimeout(pulseTimer)
+    pulseTimer = globalThis.setTimeout(() => { setPulse(undefined); }, PULSE_MS)
+  })
+  onCleanup(() => {
+    if (pulseTimer !== undefined) globalThis.clearTimeout(pulseTimer)
+  })
+
+  const playerPath = () => arc(-GAP_DEG / 2, -SWEEP_DEG * playerShare())
+  const rivalPath = () => arc(GAP_DEG / 2, SWEEP_DEG * rivalShare())
   const playerSegments = () =>
-    segments(-GAP_DEG / 2, -SWEEP_DEG * props.model.playerShare)
-  const rivalSegments = () =>
-    segments(GAP_DEG / 2, SWEEP_DEG * props.model.rivalShare)
-  const playerInner = () =>
-    arc(-GAP_DEG / 2, -SWEEP_DEG * props.model.playerShare, INNER)
-  const rivalInner = () =>
-    arc(GAP_DEG / 2, SWEEP_DEG * props.model.rivalShare, INNER)
+    segments(-GAP_DEG / 2, -SWEEP_DEG * playerShare())
+  const rivalSegments = () => segments(GAP_DEG / 2, SWEEP_DEG * rivalShare())
+  const playerInner = () => arc(-GAP_DEG / 2, -SWEEP_DEG * playerShare(), INNER)
+  const rivalInner = () => arc(GAP_DEG / 2, SWEEP_DEG * rivalShare(), INNER)
 
   return (
-    <div class={ui.hud} classList={{ [ui.urgent!]: props.model.urgent }}>
+    <div
+      class={ui.hud}
+      classList={{ [ui.urgent!]: props.model.urgent }}
+      data-gained={pulse()}
+    >
       <p class={ui.versus} aria-hidden="true">
         VS
       </p>
@@ -229,11 +303,12 @@ export function EclipseHud(props: {
           <path class={ui.specular} data-side="rival" d={rivalInner()} />
         </svg>
 
+        {/* No caption. A countdown in the middle of a dial is not ambiguous,
+            and the label was pushing the numerals off the plate's centre. */}
         <div class={ui.readout}>
           <span class={ui.clock} aria-label="Time remaining">
             {props.model.clock}
           </span>
-          <span class={ui.clockLabel}>Time remaining</span>
         </div>
       </div>
 

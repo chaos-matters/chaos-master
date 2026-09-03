@@ -7,8 +7,11 @@ import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { palette } from '@/flame/colorMap'
 import { defaultPalettes, paletteToGradientCSS } from '@/flame/palettes'
+import { variationTypesFor } from '@/flame/variationRegistry'
+import { filterVariations } from '@/flame/variations/search'
 import { getVariationPreviewFlame } from '@/flame/variations/utils'
 import { Check, ColourWedge, Cross, Minus, Plus, ShapeTriangle, Undo, VariationSpiral, } from '@/icons'
+import { createSharedIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { AffineGrid, resetAffine } from './AffineGrid'
 import ui from './DuelChips.module.css'
 import { ScrubField } from './ScrubField'
@@ -290,7 +293,35 @@ function TransformPicker(props: {
  * has two full-size seat canvases running. The sidebar is where the whole
  * catalogue lives.
  */
-const CATALOGUE = SAMPLE_VARIATION_TYPES
+/**
+ * Every variation the editor has, not the eight the agent's brief names.
+ *
+ * `SAMPLE_VARIATION_TYPES` is a prompt hint — a handful of well-known names to
+ * show a model what a type id looks like — and using it here meant the strip
+ * offered eight of the app's 268 and a search could never reach the rest.
+ * 2D deliberately: a duel refuses 3D flames, so there is no dimension to pick.
+ */
+const CATALOGUE = variationTypesFor(2)
+
+/**
+ * What the resting row offers after what you already have.
+ *
+ * Named, not sliced: the registry is alphabetical, so the first twelve were
+ * Acosech, Acosh, Acoth, Apocarpet — a shortcut row nobody would use. These
+ * are the same well-known handful the agent's brief names, which is what
+ * `SAMPLE_VARIATION_TYPES` is for. Everything else is behind Add.
+ */
+const QUICK_PICKS: readonly string[] = SAMPLE_VARIATION_TYPES
+
+/** One page of the add gallery: about three rows at this tile pitch. */
+const GALLERY_PAGE = 30
+
+/**
+ * Search results shown at once. A duel is three minutes long — twenty ranked
+ * matches is already more than anyone reads under a clock, and rendering them
+ * costs a GPU preview each.
+ */
+const SEARCH_LIMIT = 20
 
 function VariationTile(props: {
   type: string
@@ -298,11 +329,19 @@ function VariationTile(props: {
   weight?: number
   active: boolean
   paused: boolean
+  /**
+   * Registers this tile with its scroller's observer. A preview is a GPU job
+   * behind a two-slot gate, so a tile far from the viewport asks for nothing
+   * and shows an empty well instead.
+   */
+  track?: (el: Accessor<Element | undefined>) => Accessor<boolean>
   onPrimary: () => void
   onWeight?: (weight: number) => void
 }) {
+  const [el, setEl] = createSignal<HTMLElement>()
+  const near = props.track?.(el) ?? (() => true)
   return (
-    <div class={ui.tile} classList={{ [ui.tileOn!]: props.active }}>
+    <div class={ui.tile} classList={{ [ui.tileOn!]: props.active }} ref={setEl}>
       <button
         type="button"
         class={ui.tileButton}
@@ -315,14 +354,16 @@ function VariationTile(props: {
             inside it letterboxed the motif into the middle third, and most
             of what the row showed was the black bars. */}
         <span class={ui.tileThumb}>
-          <VariationPreview
-            version={0}
-            isSelected={props.active}
-            flame={getVariationPreviewFlame(props.type)}
-            name={props.name}
-            resolution={{ width: 112, height: 112 }}
-            paused={props.paused}
-          />
+          <Show when={near()}>
+            <VariationPreview
+              version={0}
+              isSelected={props.active}
+              flame={getVariationPreviewFlame(props.type)}
+              name={props.name}
+              resolution={{ width: 112, height: 112 }}
+              paused={props.paused}
+            />
+          </Show>
         </span>
         <span class={ui.tileName}>{props.name}</span>
         <span class={ui.tileBadge} aria-hidden="true">
@@ -363,13 +404,36 @@ function VariationsPanel(props: {
 }) {
   const [adding, setAdding] = createSignal(false)
   const [query, setQuery] = createSignal('')
+  const [shown, setShown] = createSignal(GALLERY_PAGE)
+  const [rowEl, setRowEl] = createSignal<HTMLDivElement>()
+  const [galleryEl, setGalleryEl] = createSignal<HTMLDivElement>()
+  // A preview is a GPU job. 268 of them is not a strip, it is a render farm,
+  // so a tile only asks for one once it is near the scroller's viewport.
+  const trackRow = createSharedIntersectionObserver(rowEl, {
+    rootMargin: '200px',
+  })
+  const trackGallery = createSharedIntersectionObserver(galleryEl, {
+    rootMargin: '160px',
+  })
+
   const entries = () => Object.entries(props.transform.variations)
   const present = () => new Set(entries().map(([, v]) => v.type))
   const rest = () => CATALOGUE.filter((type) => !present().has(type))
-  const matches = () =>
-    rest().filter((type) =>
-      readableType(type).toLowerCase().includes(query().trim().toLowerCase()),
-    )
+  const quick = () => QUICK_PICKS.filter((type) => !present().has(type))
+  const matches = () => filterVariations(rest(), query())
+  const searching = () => query().trim() !== ''
+  const visible = () =>
+    searching() ? matches().slice(0, SEARCH_LIMIT) : matches().slice(0, shown())
+  const hidden = () => matches().length - visible().length
+
+  const openAdd = () => {
+    setShown(GALLERY_PAGE)
+    setAdding(true)
+  }
+  const closeAdd = () => {
+    setAdding(false)
+    setQuery('')
+  }
 
   return (
     <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
@@ -382,94 +446,111 @@ function VariationsPanel(props: {
             <input
               class={ui.search}
               type="search"
-              placeholder="Search variations"
+              placeholder={`Search ${CATALOGUE.length} variations`}
               value={query()}
               aria-label="Search variations"
-              onInput={(ev) => setQuery(ev.currentTarget.value)}
-            />
-            <button
-              type="button"
-              class={ui.addBack}
-              onClick={() => {
-                setAdding(false)
-                setQuery('')
+              onInput={(ev) => {
+                setQuery(ev.currentTarget.value)
               }}
-            >
+            />
+            <span class={ui.addCount}>
+              {searching()
+                ? `${matches().length} match${matches().length === 1 ? '' : 'es'}`
+                : `${matches().length} to add`}
+            </span>
+            <button type="button" class={ui.addBack} onClick={closeAdd}>
               Done
             </button>
           </div>
         </Show>
-        <div class={ui.tiles}>
-          <Show
-            when={adding()}
-            fallback={
-              <>
-                <button
-                  type="button"
-                  class={ui.addTile}
-                  onClick={() => setAdding(true)}
-                >
-                  <Plus aria-hidden="true" />
-                  Add
-                </button>
-                <For each={entries()}>
-                  {([id, variation]) => (
-                    <VariationTile
-                      type={variation.type}
-                      name={readableType(variation.type)}
-                      weight={variation.weight}
-                      active
-                      paused={props.paused}
-                      onPrimary={() => {
-                        props.onRemove(id)
-                      }}
-                      onWeight={(weight) => {
-                        props.onWeight(id, weight)
-                      }}
-                    />
-                  )}
-                </For>
-                {/* Then everything you could add. A panel listing only what
-                    a transform already has is emptiest exactly when you most
-                    need it: one variation opened a 790px slab to show one
-                    tile. The catalogue is the rest of the row. */}
-                <Show when={rest().length > 0}>
-                  <span class={ui.tileRule} aria-hidden="true" />
-                </Show>
-                <For each={rest()}>
-                  {(type) => (
-                    <VariationTile
-                      type={type}
-                      name={readableType(type)}
-                      active={false}
-                      paused={props.paused}
-                      onPrimary={() => {
-                        props.onAdd(type)
-                      }}
-                    />
-                  )}
-                </For>
-              </>
-            }
-          >
-            <For each={matches()}>
+        <Show
+          when={adding()}
+          fallback={
+            <div class={ui.tiles} ref={setRowEl}>
+              <button type="button" class={ui.addTile} onClick={openAdd}>
+                <Plus aria-hidden="true" />
+                Add
+              </button>
+              <For each={entries()}>
+                {([id, variation]) => (
+                  <VariationTile
+                    type={variation.type}
+                    name={readableType(variation.type)}
+                    weight={variation.weight}
+                    active
+                    paused={props.paused}
+                    track={trackRow}
+                    onPrimary={() => {
+                      props.onRemove(id)
+                    }}
+                    onWeight={(weight) => {
+                      props.onWeight(id, weight)
+                    }}
+                  />
+                )}
+              </For>
+              {/* Then a few you could add. A panel listing only what a
+                  transform already has is emptiest exactly when you most need
+                  it: one variation opened a 790px slab to show one tile. The
+                  whole catalogue lives behind Add — this row is the shortcut,
+                  not the library. */}
+              <Show when={quick().length > 0}>
+                <span class={ui.tileRule} aria-hidden="true" />
+              </Show>
+              <For each={quick()}>
+                {(type) => (
+                  <VariationTile
+                    type={type}
+                    name={readableType(type)}
+                    active={false}
+                    paused={props.paused}
+                    track={trackRow}
+                    onPrimary={() => {
+                      props.onAdd(type)
+                    }}
+                  />
+                )}
+              </For>
+            </div>
+          }
+        >
+          {/* Rows rather than a corridor: the catalogue is 268 long, and a
+              single scrolling line makes you drag past everything you do not
+              want to reach anything you do. */}
+          <div class={ui.gallery} ref={setGalleryEl}>
+            <For each={visible()}>
               {(type) => (
                 <VariationTile
                   type={type}
                   name={readableType(type)}
                   active={false}
                   paused={props.paused}
+                  track={trackGallery}
                   onPrimary={() => {
                     props.onAdd(type)
                   }}
                 />
               )}
             </For>
+            <Show when={hidden() > 0 && !searching()}>
+              <button
+                type="button"
+                class={ui.showMore}
+                onClick={() => setShown((n) => n + GALLERY_PAGE)}
+              >
+                Show {Math.min(hidden(), GALLERY_PAGE)} more
+              </button>
+            </Show>
+            <Show when={hidden() > 0 && searching()}>
+              <p class={ui.moreNote}>
+                {hidden()} more match. Keep typing to narrow it down.
+              </p>
+            </Show>
             <Show when={matches().length === 0}>
               <p class={ui.empty}>No variations match "{query()}".</p>
             </Show>
-          </Show>
-        </div>
+          </div>
+        </Show>
       </div>
     </ComputeGate>
   )

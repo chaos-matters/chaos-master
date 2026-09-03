@@ -3,6 +3,7 @@ import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { categoryOf, variationTypesFor } from '@/flame/variationRegistry'
 import { CATEGORIES, CATEGORY_LABELS, sortByCategory, } from '@/flame/variations/categories'
+import { filterVariations } from '@/flame/variations/search'
 import { getNormalizedVariationName } from '@/flame/variations/utils'
 import { createSharedIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { VariationPreview, variationPreviewFlames, } from '../VariationSelector/VariationSelector'
@@ -69,47 +70,6 @@ function CloseIcon() {
       <line x1="12" y1="4" x2="4" y2="12" />
     </svg>
   )
-}
-
-/* ---- Fuzzy scoring ---- */
-
-/**
- * Very small fuzzy scorer. Returns a score >= 0 (higher = better).
- * Returns -1 when there is no match at all.
- */
-function fuzzyScore(needle: string, haystack: string): number {
-  if (needle === '') return 0
-  const n = needle.toLowerCase()
-  const h = haystack.toLowerCase()
-  if (h.startsWith(n)) return 100
-  if (h.includes(n)) return 80
-  // subsequence match
-  let hi = 0
-  let ni = 0
-  let score = 60
-  while (ni < n.length && hi < h.length) {
-    if (h[hi] === n[ni]) {
-      ni++
-      score -= hi // penalise gaps
-    }
-    hi++
-  }
-  return ni === n.length ? Math.max(1, score) : -1
-}
-
-function filterVariations<T extends string>(
-  all: readonly T[],
-  query: string,
-): T[] {
-  if (!query.trim()) return [...all]
-  return all
-    .map((t) => ({
-      t,
-      score: fuzzyScore(query, getNormalizedVariationName(t)),
-    }))
-    .filter((x) => x.score >= 0)
-    .sort((a, b) => b.score - a.score)
-    .map((x) => x.t)
 }
 
 /* ---- Types ---- */

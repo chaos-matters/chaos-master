@@ -391,11 +391,12 @@
   display: grid;
   min-height: 0;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  /* Spread, not stacked at the top: the two rows own the panel's full height
-     rather than leaving a dead strip under them for every tab to pay for. */
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  align-items: center;
-  gap: 8px;
+  /* Two content-height rows packed at the top. Stretched to fill the panel
+     they became tall boxes with the control floating in the middle of each,
+     which read as margin rather than as structure. */
+  grid-template-rows: auto auto;
+  align-content: start;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -680,4 +681,92 @@
 */
 .speedTrack {
   accent-color: #52565e;
+}
+
+/*
+  The add view: rows, not a corridor.
+
+  The catalogue is 268 long, and a single scrolling line makes you drag past
+  everything you do not want to reach anything you do. The panel grows for it
+  — that is a mode you opened deliberately, unlike a tab switch, which is the
+  case the fixed height exists to protect.
+*/
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  align-content: start;
+  gap: 10px 8px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Room for the badge that hangs off each thumbnail's corner. */
+  padding: 10px 4px 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+.gallery::-webkit-scrollbar {
+  width: 6px;
+}
+
+.gallery::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.gallery .tile {
+  width: auto;
+}
+
+.panel:has(.gallery) {
+  height: min(392px, 52vh);
+}
+
+.showMore {
+  grid-column: 1 / -1;
+  justify-self: center;
+  margin-top: 2px;
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+.showMore:hover {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.42);
+}
+
+.moreNote {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  text-align: center;
+  font-size: 0.72rem;
+  opacity: 0.55;
+}
+
+/* The count sits between the field and Done, so a search says how much of the
+   catalogue it reached rather than leaving you to count tiles. */
+.addCount {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.6;
+  white-space: nowrap;
+}
+
+.addBar {
+  min-width: 0;
+}
+
+.addBar .search {
+  flex: 1;
+  min-width: 0;
+  max-width: 260px;
+}
+
+.addBar .addBack {
+  margin-left: auto;
 }
