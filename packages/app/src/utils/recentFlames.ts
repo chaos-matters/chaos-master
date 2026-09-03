@@ -52,10 +52,33 @@ export function clearRecentFlamesCache(): void {
   validatedCache = undefined
 }
 
+/** Dev-only tripwire for the read-only contract above. Sharing entries between
+ *  callers is what makes the memo cheap, so a caller that mutates one instead of
+ *  cloning would corrupt every later read — a bug that is invisible until some
+ *  unrelated screen shows stale data. Freezing turns it into a throw at the
+ *  mutation site. Paid once per distinct payload, and `import.meta.env.DEV` is
+ *  statically false in production, so this whole path is dropped from the
+ *  bundle. */
+function deepFreeze<T>(value: T, seen = new WeakSet<object>()): T {
+  if (typeof value !== 'object' || value === null) return value
+  // Freezing a typed array with elements throws; stored flames are JSON so this
+  // should not arise, but a dev-only guard must not be the thing that crashes.
+  if (ArrayBuffer.isView(value)) return value
+  if (seen.has(value)) return value
+  seen.add(value)
+  for (const key of Object.getOwnPropertyNames(value)) {
+    deepFreeze((value as Record<string, unknown>)[key], seen)
+  }
+  return Object.freeze(value)
+}
+
 export function loadRecentFlames(): RecentFlame[] {
   try {
     const raw = safeGetItem(STORAGE_KEY)
-    if (raw === null) return []
+    if (raw === null) {
+      validatedCache = undefined
+      return []
+    }
     if (validatedCache?.raw === raw) return [...validatedCache.entries]
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
@@ -63,6 +86,7 @@ export function loadRecentFlames(): RecentFlame[] {
       const flame = tryValidateFlame(item.flame)
       return flame ? [{ ...item, flame }] : []
     })
+    if (import.meta.env.DEV) entries.forEach((entry) => deepFreeze(entry))
     validatedCache = { raw, entries }
     return [...entries]
   } catch {
@@ -96,8 +120,10 @@ export function saveRecentFlame(
     entry.tracks = deepClone(tracks)
   }
   const updated = [entry, ...recent].slice(0, MAX_RECENT_FLAMES)
-  safeSetItem(STORAGE_KEY, JSON.stringify(updated))
-  return true
+  // Report the real outcome. This used to return `true` unconditionally, so a
+  // write that failed on quota or in private mode still told the caller the
+  // flame was saved — and the caller marks the workspace clean on success.
+  return safeSetItem(STORAGE_KEY, JSON.stringify(updated))
 }
 
 /**
@@ -200,12 +226,14 @@ export function formatRecentDate(timestamp: number): string {
   return `${month} ${day}, ${time}`
 }
 
-export function deleteRecentFlame(id: string): void {
+/** @returns false when the localStorage write failed, so a caller can tell the
+ *  user the entry is still there instead of silently leaving it on screen. */
+export function deleteRecentFlame(id: string): boolean {
   // Read-modify-write — structural loader only, so deleting one entry cannot
   // take every schema-rejected entry with it.
   const recent = loadRecentFlamesForRewrite()
   const filtered = recent.filter((item) => item.id !== id)
-  safeSetItem(STORAGE_KEY, JSON.stringify(filtered))
+  return safeSetItem(STORAGE_KEY, JSON.stringify(filtered))
 }
 
 export function clearRecentFlames(): void {
