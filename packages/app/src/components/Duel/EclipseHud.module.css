@@ -1,0 +1,157 @@
+/*
+  Sizing is two custom properties, set on `.hud` by whatever mounts it:
+
+    --duel-dial-size   the ring's diameter (default 132px)
+    --duel-timer-size  the countdown's type size (default 30% of the dial)
+
+  The mock drew the dial at nearly a third of the window; that is a poster, not
+  a duel. Everything inside scales from these two, so changing them — or adding
+  a size control later — moves the whole assembly together.
+*/
+.hud {
+  --duel-dial-size: 132px;
+  --duel-timer-size: calc(var(--duel-dial-size) * 0.3);
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.hud > * {
+  pointer-events: auto;
+}
+
+.versus {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.42em;
+  text-indent: 0.42em;
+  opacity: 0.55;
+}
+
+.dial {
+  position: relative;
+  width: var(--duel-dial-size);
+  height: var(--duel-dial-size);
+  display: grid;
+  place-items: center;
+}
+
+.ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* Twelve o'clock, clockwise: the arcs are drawn from the top. */
+  transform: rotate(-90deg);
+}
+
+.ring circle {
+  fill: none;
+  stroke-width: 5;
+  stroke-linecap: butt;
+}
+
+.track {
+  stroke: rgba(255, 255, 255, 0.1);
+}
+
+.ticks line {
+  stroke: rgba(255, 255, 255, 0.22);
+  stroke-width: 0.7;
+}
+
+.playerArc {
+  stroke: #f6b352;
+  transition: stroke-dasharray 400ms ease;
+}
+
+.rivalArc {
+  stroke: #6fd2f0;
+  transition:
+    stroke-dasharray 400ms ease,
+    stroke-dashoffset 400ms ease;
+}
+
+.readout {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  line-height: 1;
+}
+
+.clock {
+  font-size: var(--duel-timer-size);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.scores {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: calc(var(--duel-timer-size) * 0.36);
+  font-variant-numeric: tabular-nums;
+}
+
+.playerScore {
+  color: #f6b352;
+}
+
+.rivalScore {
+  color: #6fd2f0;
+}
+
+.scoreDash {
+  opacity: 0.4;
+}
+
+.end {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.end:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.end:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.ready {
+  margin: 0;
+  max-width: 22ch;
+  text-align: center;
+  font-size: 0.72rem;
+  opacity: 0.6;
+}
+
+/* The last ten seconds. Colour and weight only — nothing that moves, because
+   the flames underneath are already moving. */
+.urgent .clock {
+  color: #ff9d7a;
+}
+
+.urgent .track {
+  stroke: rgba(255, 157, 122, 0.22);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playerArc,
+  .rivalArc {
+    transition: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .hud {
+    --duel-dial-size: 104px;
+  }
+}

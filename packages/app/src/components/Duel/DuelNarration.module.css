@@ -1,0 +1,42 @@
+.rail {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  max-width: 34ch;
+  text-align: center;
+}
+
+.steps {
+  margin: 0;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.5;
+}
+
+.lines {
+  display: grid;
+  gap: 2px;
+}
+
+.line {
+  margin: 0;
+  font-size: 0.74rem;
+  opacity: 0.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The newest line is the one worth reading. */
+.line:last-child {
+  opacity: 0.8;
+}
+
+.narrate {
+  font-style: italic;
+}
+
+.error {
+  color: #ff9d7a;
+  opacity: 0.85;
+}
