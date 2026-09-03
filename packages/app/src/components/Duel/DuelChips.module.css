@@ -102,6 +102,19 @@
   gap: 12px;
 }
 
+.panelIdentity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Inside the header the chips are smaller: they are a switch here, not the
+   resting affordance on the flame. */
+.panelIdentity .chip {
+  --chip-height: 27px;
+}
+
 .panelBody {
   min-height: 0;
   overflow: auto;
@@ -155,17 +168,24 @@
 .tiles {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 8px;
+  scroll-snap-type: x proximity;
   overflow-x: auto;
   overscroll-behavior: contain;
   padding-bottom: 4px;
 }
 
+/*
+  Tile proportions are the mock's: width 0.83 of height, a SQUARE thumbnail at
+  0.80 of the width, one caption line. Scroll-snap so a flick lands on a tile
+  rather than between two.
+*/
 .tile {
   flex: none;
-  width: 104px;
+  width: 76px;
   display: grid;
   gap: 3px;
+  scroll-snap-align: start;
 }
 
 .tileButton {
@@ -183,10 +203,11 @@
 .tileThumb {
   position: relative;
   display: block;
-  height: 58px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: #05070c;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  /* Darker than the panel, so the motif reads as lit from inside. */
+  background: #04060c;
   overflow: hidden;
 }
 
@@ -197,21 +218,24 @@
 }
 
 .tileOn .tileThumb {
-  border: 1.5px solid rgba(213, 249, 255, 0.9);
-  box-shadow: 0 0 14px rgba(111, 210, 240, 0.35);
+  border: 1.5px solid rgba(160, 215, 235, 0.85);
+  background: rgba(120, 200, 255, 0.06);
+  box-shadow: inset 0 0 16px rgba(90, 200, 255, 0.14);
 }
 
+/* Centred on the thumbnail's corner, half in and half out, as the mock has
+   it — a badge fully outside reads as belonging to the gap. */
 .tileBadge {
   position: absolute;
-  top: -7px;
-  right: -6px;
+  top: -9px;
+  right: -9px;
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  background: #080b13;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(4, 6, 12, 0.8);
   color: #fff;
 }
 
@@ -221,12 +245,16 @@
 }
 
 .tileOn .tileBadge {
-  border-color: rgba(139, 240, 251, 0.85);
-  color: #bfe9f7;
+  border-color: rgba(160, 225, 255, 0.95);
+  background: rgba(20, 60, 80, 0.9);
+  color: #d6f3ff;
 }
 
 .tileName {
-  font-size: 0.72rem;
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  font-size: 0.68rem;
   color: rgba(255, 255, 255, 0.62);
   white-space: nowrap;
   overflow: hidden;
@@ -237,24 +265,23 @@
   color: #fff;
 }
 
-.tileWeightRow {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 6px;
-}
-
 /* The dashed head of the row: the mock's Add affordance. */
+/* Sticky, so "create" never scrolls away from "catalogue", and separated
+   from the first tile by a wider gap than the tiles use between themselves. */
 .addTile {
+  position: sticky;
+  left: 0;
+  z-index: 1;
   flex: none;
-  width: 84px;
-  height: 84px;
+  margin-right: 4px;
+  width: 52px;
+  align-self: stretch;
   display: grid;
   place-items: center;
   gap: 4px;
   align-content: center;
   border-radius: 12px;
-  border: 1.5px dashed rgba(255, 255, 255, 0.45);
+  border: 1px dashed rgba(255, 255, 255, 0.28);
   background: none;
   color: rgba(255, 255, 255, 0.8);
   font-size: 0.74rem;
@@ -296,7 +323,12 @@
   cursor: pointer;
 }
 
-.tileValue,
+.tileValue {
+  /* One step brighter than the name, so it reads as data, not label. */
+  color: rgba(255, 255, 255, 0.88);
+  font-variant-numeric: tabular-nums;
+}
+
 .fieldValue {
   font-size: 0.72rem;
   font-variant-numeric: tabular-nums;

@@ -105,6 +105,11 @@ export function DuelChips(props: {
       .slice(0, 8)
   }
 
+  const pick = (panel: Panel) => {
+    cancelIntent()
+    setOpen(open() === panel ? undefined : panel)
+  }
+
   const dispatch = (id: string, ...args: unknown[]) => {
     executeCommand(id, props.ctx, ...args)
   }
@@ -117,28 +122,22 @@ export function DuelChips(props: {
       }}
       onPointerEnter={cancelIntent}
     >
-      <div class={ui.row} role="toolbar" aria-label="Editing tools">
-        <For each={CHIPS}>
-          {(chip) => (
-            <button
-              type="button"
-              class={ui.chip}
-              classList={{ [ui.chipOpen!]: open() === chip.id }}
-              aria-expanded={open() === chip.id}
-              onPointerEnter={() => {
-                if (hoverCapable()) intend(chip.id, HOVER_IN_MS)
-              }}
-              onClick={() => {
-                cancelIntent()
-                setOpen(open() === chip.id ? undefined : chip.id)
-              }}
-            >
-              <chip.icon class={ui.chipIcon} aria-hidden="true" />
-              {chip.label}
-            </button>
-          )}
-        </For>
-      </div>
+      {/* The panel takes the chips' place rather than stacking under them —
+          the mock puts it at the same inset, and stacked they cost ~50px of
+          flame. The chips do not disappear though: they move into the panel's
+          header, where the lit one names the panel and the other two are how
+          you switch without closing first. */}
+      <Show when={open() === undefined}>
+        <div class={ui.row} role="toolbar" aria-label="Editing tools">
+          <ChipRow
+            open={open()}
+            onPick={pick}
+            onIntend={(panel) => {
+              if (hoverCapable()) intend(panel, HOVER_IN_MS)
+            }}
+          />
+        </div>
+      </Show>
 
       <Show when={open() !== undefined && transform()}>
         {(active) => (
@@ -147,11 +146,18 @@ export function DuelChips(props: {
             aria-label={CHIPS.find((c) => c.id === open())?.label}
           >
             <header class={ui.panelHead}>
-              <TransformPicker
-                ids={transformIds()}
-                current={transformId()}
-                onPick={setSelected}
-              />
+              <div
+                class={ui.panelIdentity}
+                role="toolbar"
+                aria-label="Editing tools"
+              >
+                <ChipRow open={open()} onPick={pick} />
+                <TransformPicker
+                  ids={transformIds()}
+                  current={transformId()}
+                  onPick={setSelected}
+                />
+              </div>
               <button
                 type="button"
                 class={ui.close}
@@ -219,6 +225,32 @@ export function DuelChips(props: {
         )}
       </Show>
     </div>
+  )
+}
+
+function ChipRow(props: {
+  open: Panel | undefined
+  onPick: (panel: Panel) => void
+  onIntend?: (panel: Panel) => void
+}) {
+  return (
+    <For each={CHIPS}>
+      {(chip) => (
+        <button
+          type="button"
+          class={ui.chip}
+          classList={{ [ui.chipOpen!]: props.open === chip.id }}
+          aria-expanded={props.open === chip.id}
+          onPointerEnter={() => props.onIntend?.(chip.id)}
+          onClick={() => {
+            props.onPick(chip.id)
+          }}
+        >
+          <chip.icon class={ui.chipIcon} aria-hidden="true" />
+          {chip.label}
+        </button>
+      )}
+    </For>
   )
 }
 
