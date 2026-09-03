@@ -32,8 +32,10 @@
   display: grid;
   justify-items: center;
   gap: 8px;
-  /* The dial's own size; the stage is where a size control would write. */
-  --duel-dial-size: 180px;
+  /* The dial's own size; the stage is where a size control would write.
+     The mock draws it at 24.3% of the frame; this is deliberately smaller,
+     because the two flames are what the viewer came for. */
+  --duel-dial-size: clamp(200px, 17vw, 300px);
 }
 
 .seats {
@@ -64,33 +66,35 @@
 */
 .seatLabel {
   position: absolute;
-  top: 14px;
+  top: 16px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 1;
   margin: 0;
-  padding: 5px 14px;
+  padding: 7px 22px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(4, 6, 12, 0.55);
-  backdrop-filter: blur(6px);
-  font-size: 0.78rem;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  font-size: 0.82rem;
   font-weight: 500;
+  letter-spacing: 0.01em;
   white-space: nowrap;
   /* The pill sits over a live canvas the viewer drags to pan. */
   pointer-events: none;
 }
 
-/* Each side is tinted like its arc on the dial, so a glance at the ring and a
-   glance at the pills agree about who is who. */
+/* Each side is tinted like its arc on the dial — border and text both, at the
+   near-white end of the hue, so a glance at the ring and a glance at the
+   pills agree about who is who. */
 .playerLabel {
-  border-color: rgba(246, 179, 82, 0.45);
-  color: #f6d7a8;
+  border-color: rgba(253, 231, 172, 0.42);
+  color: #fffad1;
 }
 
 .rivalLabel {
-  border-color: rgba(111, 210, 240, 0.45);
-  color: #bfe9f7;
+  border-color: rgba(139, 240, 251, 0.42);
+  color: #dbfcff;
 }
 
 .seatCanvas {

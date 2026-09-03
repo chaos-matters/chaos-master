@@ -18,12 +18,30 @@ const verdict = (playerScore: number, rivalScore: number): DuelVerdict => ({
   line: 'test',
 })
 
+/**
+ * How many degrees of the ring an arc owns, read back off the path the
+ * component actually drew — the arithmetic is the model's and tested there,
+ * so what matters here is that the drawing agrees with it.
+ */
+function sweepOf(path: Element | null | undefined): number {
+  const d = path?.getAttribute('d') ?? ''
+  const numbers = d.match(/-?\d+(?:\.\d+)?/g)?.map(Number) ?? []
+  if (numbers.length < 9) return 0
+  const [x1, y1, , , , large, , x2, y2] = numbers
+  const angle = (x: number, y: number) =>
+    (Math.atan2(y - 232, x - 232) * 180) / Math.PI
+  const raw = Math.abs(angle(x2!, y2!) - angle(x1!, y1!))
+  const minor = raw > 180 ? 360 - raw : raw
+  return large === 1 ? 360 - minor : minor
+}
+
 function arcs() {
   const svg = document.querySelector('svg')
-  const [, , player, rival] = Array.from(svg?.querySelectorAll('circle') ?? [])
-  const length = (el: Element | undefined) =>
-    Number(el?.getAttribute('stroke-dasharray')?.split(' ')[0] ?? '0')
-  return { player: length(player), rival: length(rival) }
+  const paths = svg?.querySelectorAll('path')
+  // The last two are the near-white cores, one per side.
+  const player = paths?.[paths.length - 2]
+  const rival = paths?.[paths.length - 1]
+  return { player: sweepOf(player), rival: sweepOf(rival) }
 }
 
 describe('EclipseHud', () => {
@@ -64,8 +82,9 @@ describe('EclipseHud', () => {
     const { player, rival } = arcs()
     expect(player).toBeGreaterThan(rival)
     // Being ahead is owning more of one loop, not filling a bar against a
-    // maximum the score does not have.
-    expect(player + rival).toBeLessThanOrEqual(2 * Math.PI * 46)
+    // maximum the score does not have — and the two always close one ring,
+    // less the gap where they meet.
+    expect(player + rival).toBeCloseTo(353, 0)
   })
 
   it('still draws a sliver for a side that has scored nothing', () => {

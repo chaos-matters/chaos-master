@@ -5,9 +5,9 @@
 */
 .chips {
   position: absolute;
-  top: 52px;
-  left: 12px;
-  right: 12px;
+  top: 58px;
+  left: 14px;
+  right: 14px;
   z-index: 2;
   display: grid;
   gap: 8px;
@@ -20,63 +20,79 @@
 }
 
 .chip {
+  /* A rounded rectangle at 0.19 of its own height, not a pill: the mock's
+     chips are square-shouldered, and a pill reads as a filter tag. */
+  --chip-height: 34px;
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(4, 6, 12, 0.5);
-  backdrop-filter: blur(8px);
-  color: #f4f6ff;
-  font-size: 0.76rem;
+  gap: calc(var(--chip-height) * 0.27);
+  height: var(--chip-height);
+  padding: 0 calc(var(--chip-height) * 0.7) 0 calc(var(--chip-height) * 0.53);
+  border-radius: calc(var(--chip-height) * 0.19);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  /* Quiet through the fill and the border, never by dimming the label: the
+     text stays white and legible over a bright flame. */
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(14px) saturate(1.1);
+  color: #fff;
+  font-size: calc(var(--chip-height) * 0.32);
+  font-weight: 450;
   cursor: pointer;
-  /* Quiet by default: this is the state a player spends most of a duel
-     looking at, so the chips must lose the contrast fight with the artwork. */
-  opacity: 0.72;
   transition:
-    opacity 140ms ease,
-    border-color 140ms ease;
-  /* 30px is above the 24px minimum but below the 44px touch guideline, so the
-     hit area is padded rather than the pill grown. */
-  position: relative;
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 200ms ease;
 }
 
+/* The chip is 34px, above the 24px minimum but below the 44px touch target,
+   so the hit area is padded rather than the visible pill grown. */
 .chip::after {
   content: '';
   position: absolute;
-  inset: -7px 0;
+  inset: -5px 0;
 }
 
 .chip:hover,
 .chip:focus-visible {
-  opacity: 1;
+  border-color: rgba(255, 255, 255, 0.48);
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.1);
 }
 
 .chipOpen {
-  opacity: 1;
-  border-color: rgba(255, 255, 255, 0.38);
+  border-color: rgba(255, 255, 255, 0.48);
+  background: rgba(255, 255, 255, 0.09);
 }
 
 .chipIcon {
-  width: 15px;
-  height: 15px;
+  width: calc(var(--chip-height) * 0.62);
+  height: calc(var(--chip-height) * 0.62);
 }
 
 .panel {
   width: 100%;
-  max-height: min(170px, 28vh);
+  max-height: min(190px, 32vh);
   display: grid;
   grid-template-rows: auto 1fr;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  /* Solid enough to keep labels legible over a white-hot flame core. */
-  background: rgba(4, 6, 12, 0.88);
-  backdrop-filter: blur(10px);
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.36);
+  /* Effectively opaque, not lightly translucent: these labels sit over live
+     artwork that can go white-hot, and contrast there is not negotiable. */
+  background: #080b13;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
   overflow: hidden;
+  animation: panelIn 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes panelIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scaleY(0.94);
+    transform-origin: top center;
+  }
 }
 
 .panelHead {
@@ -113,8 +129,9 @@
 
 .transformOn {
   opacity: 1;
-  border-color: rgba(246, 179, 82, 0.6);
-  background: rgba(246, 179, 82, 0.14);
+  border-color: rgba(253, 231, 172, 0.62);
+  background: rgba(253, 231, 172, 0.14);
+  color: #fffad1;
 }
 
 .close {
@@ -206,7 +223,7 @@
 .fieldInput,
 .tileWeight {
   width: 100%;
-  accent-color: #f6b352;
+  accent-color: var(--duel-warm-core, #fde7ac);
   cursor: ew-resize;
 }
 
@@ -216,7 +233,7 @@
 }
 
 .colourTrack {
-  accent-color: #6fd2f0;
+  accent-color: #4af2fc;
 }
 
 .reset {
@@ -230,9 +247,15 @@
   cursor: pointer;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
+}
+
 @media (max-width: 900px) {
   .chips {
-    top: 46px;
+    top: 50px;
   }
 
   .fields {
