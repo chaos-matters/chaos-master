@@ -72,3 +72,13 @@
   stroke-width: 0.01;
   stroke-dasharray: 0.06 0.05;
 }
+
+/* The third axis, when there is one: a spoke off the origin rather than a side
+   of the triangle, which is the x/y face. */
+.zSpoke {
+  stroke: rgba(160, 215, 235, 0.75);
+  stroke-width: 0.024;
+  stroke-dasharray: 0.09 0.06;
+  stroke-linecap: round;
+  fill: none;
+}

@@ -200,6 +200,37 @@ describe('DuelChips', () => {
     expect(screen.queryByRole('button', { name: /more$/ })).toBeNull()
   })
 
+  it('edits a 3D transform through offsets and a fourth handle', () => {
+    const ctx = createMockCommandContext()
+    ctx.setFlameDescriptor((draft) => {
+      draft.renderSettings.dimensions = 3
+    }, 'test')
+    render(() => <DuelChips ctx={ctx} flame={ctx.flameDescriptor} />)
+    screen.getByRole('button', { name: /Shape/ }).click()
+    const panel = screen.getByLabelText('Shape')
+
+    // Four handles, not three: the triangle is the x/y face and Z is a spoke
+    // off the origin.
+    expect(panel.querySelectorAll('[class*="handleHit"]')).toHaveLength(4)
+    // And the fields are the three translations. A 3x4 does not decompose
+    // into scale/rotation/shear the way a 2x3 does.
+    for (const label of ['X offset', 'Y offset', 'Z offset']) {
+      expect(screen.getByRole('slider', { name: label })).toBeTruthy()
+    }
+    expect(screen.queryByRole('slider', { name: 'Rotate' })).toBeNull()
+
+    screen
+      .getByRole('slider', { name: 'Z offset' })
+      .dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }),
+      )
+
+    expect(firstTransform(ctx.flameDescriptor()).preAffine.l).toBeCloseTo(
+      0.01,
+      6,
+    )
+  })
+
   it('keeps working when a randomize takes the chosen transform away', () => {
     const ctx = mount()
     screen.getByRole('button', { name: /Shape/ }).click()

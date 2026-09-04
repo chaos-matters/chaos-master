@@ -9,6 +9,7 @@ import { TrackChangesDiamond } from '@/components/Timeline/TrackChangesDiamond'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useTimeline } from '@/contexts/TimelineContext'
+import { ensure3DAffine, project3D as projectIso } from '@/flame/affine3DView'
 import { randomizeAffineCoef } from '@/flame/randomize'
 import { ArrowRightToBox, BoxArrowRight, GridIcon, ListIcon, Sparkle, } from '@/icons'
 import { AutoCanvas } from '@/lib/AutoCanvas'
@@ -91,11 +92,8 @@ function cross2d(a: v2f, b: v2f) {
 }
 
 function project3D(x: number, y: number, z: number): v2f {
-  const zAngle = (135 * Math.PI) / 180
-  const zScale = 0.5
-  const px = x + z * Math.cos(zAngle) * zScale
-  const py = y + z * Math.sin(zAngle) * zScale
-  return vec2f(px, py)
+  const p = projectIso(x, y, z)
+  return vec2f(p.x, p.y)
 }
 
 function Grid(props: { isVisible: () => boolean }) {
@@ -433,36 +431,6 @@ function AffineHandle(props: {
     const g = props.transform.g ?? 0
     const k = props.transform.k ?? 1
     return getPointProj(d - c, h - g, l - k)
-  }
-
-  // In a 3D flame the affine handles must operate on a full 3D affine in the
-  // kernel's layout (rows a,b,c,d / e,f,g,h / i,j,k,l; translation d,h,l). A 2D
-  // affine (a..f) dragged here would otherwise be misread: its 2D y-row (d,e,f)
-  // lands in the 3D y-row and the result collapses to a plane (pancake). Promote
-  // it first, mirroring ifsPipeline3D's 2D→3D mapping.
-  const ensure3DAffine = (t: AffineParams): AffineParams => {
-    const already3D =
-      t.g !== undefined ||
-      t.h !== undefined ||
-      t.i !== undefined ||
-      t.j !== undefined ||
-      t.k !== undefined ||
-      t.l !== undefined
-    if (already3D) return t
-    return {
-      a: t.a ?? 1,
-      b: t.b ?? 0,
-      c: 0,
-      d: t.c ?? 0,
-      e: t.d ?? 0,
-      f: t.e ?? 1,
-      g: 0,
-      h: t.f ?? 0,
-      i: 0,
-      j: 0,
-      k: 1,
-      l: 0,
-    }
   }
 
   const startDragging3D = createDragHandler((initEvent) => {

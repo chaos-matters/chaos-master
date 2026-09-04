@@ -1,5 +1,6 @@
 import { createSignal, For, Show } from 'solid-js'
 import { composeAffine, decomposeAffine } from '@/arcade/affineControls'
+import { basis3D, depthFromScreenDelta, ensure3DAffine, project3D, unproject3D, } from '@/flame/affine3DView'
 import ui from './AffineGrid.module.css'
 import type { AffineParams } from '@/flame/affineTranform'
 
@@ -23,8 +24,12 @@ import type { AffineParams } from '@/flame/affineTranform'
 const EXTENT = 1.6
 const GRID_STEP = 0.2
 
-type Handle = 'o' | 'x' | 'y'
+type Handle = 'o' | 'x' | 'y' | 'z'
 
+const HANDLES_2D = ['o', 'x', 'y'] as const satisfies readonly Handle[]
+const HANDLES_3D = ['o', 'x', 'y', 'z'] as const satisfies readonly Handle[]
+
+/** The 2D layout: `a,b,c` / `d,e,f`, translation in `c,f`. */
 function points(affine: AffineParams) {
   const { a, b, c, d, e, f } = affine
   return {
@@ -34,10 +39,27 @@ function points(affine: AffineParams) {
   }
 }
 
+/**
+ * The same three handles plus a Z, flattened onto the fixed isometric the
+ * workspace editor draws on — the same `project3D`, so the two diagrams of a
+ * 3D transform agree.
+ */
+function points3D(affine: AffineParams) {
+  const b = basis3D(affine)
+  return {
+    o: project3D(b.o.x, b.o.y, b.o.z),
+    x: project3D(b.x.x, b.x.y, b.x.z),
+    y: project3D(b.y.x, b.y.y, b.y.z),
+    z: project3D(b.z.x, b.z.y, b.z.z),
+  }
+}
+
 export function AffineGrid(props: {
   affine: AffineParams
   /** Every other transform, drawn behind so you can see what you are aiming at. */
   ghosts: readonly AffineParams[]
+  /** Draw and drag the third axis. */
+  is3D?: boolean
   onChange: (affine: AffineParams) => void
   onCommit?: () => void
 }) {
@@ -63,8 +85,52 @@ export function AffineGrid(props: {
     setDragging(handle)
     const target = ev.currentTarget as Element
     target.setPointerCapture(ev.pointerId)
+    const start = toWorld(ev)
+
+    const move3D = (moveEv: PointerEvent) => {
+      const screen = toWorld(moveEv)
+      if (!screen || !start) return
+      const current = ensure3DAffine(props.affine)
+      const b = basis3D(current)
+      const held = b[handle]
+      /*
+       * Two screen axes cannot decide three world ones, so a drag holds one.
+       * Plain drag moves the handle in the projection plane at its own depth;
+       * Shift drags along the projection's own diagonal and moves depth alone,
+       * which is the only axis a flat gesture cannot otherwise reach.
+       */
+      const next = moveEv.shiftKey
+        ? {
+            x: held.x,
+            y: held.y,
+            z:
+              held.z +
+              depthFromScreenDelta(screen.x - start.x, screen.y - start.y),
+          }
+        : { ...unproject3D(screen.x, screen.y, held.z), z: held.z }
+
+      if (handle === 'o') {
+        props.onChange({ ...current, d: next.x, h: next.y, l: next.z })
+        return
+      }
+      // The basis handles are vectors FROM the origin, so what a drag sets is
+      // the difference, not the position.
+      const o = b.o
+      const v = { x: next.x - o.x, y: next.y - o.y, z: next.z - o.z }
+      props.onChange(
+        handle === 'x'
+          ? { ...current, a: v.x, e: v.y, i: v.z }
+          : handle === 'y'
+            ? { ...current, b: v.x, f: v.y, j: v.z }
+            : { ...current, c: v.x, g: v.y, k: v.z },
+      )
+    }
 
     const move = (moveEv: PointerEvent) => {
+      if (props.is3D === true) {
+        move3D(moveEv)
+        return
+      }
       const world = toWorld(moveEv)
       if (!world) return
       const current = props.affine
@@ -95,9 +161,15 @@ export function AffineGrid(props: {
   }
 
   // SVG space: the box is 2*EXTENT wide, centred, y flipped once on the group.
-  const P = () => points(props.affine)
+  // Always four entries, so the guide lines can index by handle whichever
+  // dimension is in play; `z` sits on the origin in 2D and is never drawn.
+  const P = (): Record<Handle, { x: number; y: number }> => {
+    if (props.is3D === true) return points3D(props.affine)
+    const flat = points(props.affine)
+    return { ...flat, z: flat.o }
+  }
   const tri = (affine: AffineParams) => {
-    const p = points(affine)
+    const p = props.is3D === true ? points3D(affine) : points(affine)
     return `${p.o.x},${p.o.y} ${p.x.x},${p.x.y} ${p.y.x},${p.y.y}`
   }
   const lines = () => {
@@ -176,7 +248,19 @@ export function AffineGrid(props: {
 
         <polygon class={ui.shape} points={tri(props.affine)} />
 
-        <For each={['o', 'x', 'y'] as const}>
+        {/* The third axis is a spoke rather than a side: the triangle is the
+            x/y face, and Z leaves it. */}
+        <Show when={props.is3D === true}>
+          <line
+            class={ui.zSpoke}
+            x1={P().o.x}
+            y1={P().o.y}
+            x2={P().z.x}
+            y2={P().z.y}
+          />
+        </Show>
+
+        <For each={props.is3D === true ? HANDLES_3D : HANDLES_2D}>
           {(handle) => (
             <g
               class={ui.handle}

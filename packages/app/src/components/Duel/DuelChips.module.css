@@ -815,3 +815,12 @@
 .addBar .addBack {
   margin-left: auto;
 }
+
+/* Depth is the one axis a flat gesture cannot reach, so it is worth one line
+   of prose rather than a control nobody would find. */
+.shapeHint {
+  margin: 0;
+  font-size: 0.68rem;
+  text-align: center;
+  opacity: 0.55;
+}
