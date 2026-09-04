@@ -26,6 +26,12 @@ export const arcadeStartDuel: WebMcpTool = {
         description:
           "mirror (default) starts you from a copy of the viewer's flame; blank starts you from an empty canvas",
       },
+      startFrom: {
+        type: 'string',
+        enum: ['current', 'random-2d', 'random-3d'],
+        description:
+          "What the viewer's side starts as. current (default) is the flame they have open; random-2d and random-3d replace it with a generated one, which is how a 3D duel is asked for. Use whichever the viewer named in the prompt.",
+      },
     },
   },
   execute: (input) => {
@@ -34,6 +40,7 @@ export const arcadeStartDuel: WebMcpTool = {
     const raw = (input ?? {}) as {
       durationSeconds?: unknown
       rivalFrom?: unknown
+      startFrom?: unknown
     }
     const seconds = clampDuelSeconds(raw.durationSeconds)
     // Everything a duel start does lives in `beginDuel`, so the hub's
@@ -41,6 +48,10 @@ export const arcadeStartDuel: WebMcpTool = {
     const started = beginDuel(ctx, {
       seconds,
       rivalFrom: raw.rivalFrom === 'blank' ? 'blank' : 'mirror',
+      startFrom:
+        raw.startFrom === 'random-2d' || raw.startFrom === 'random-3d'
+          ? raw.startFrom
+          : 'current',
       opponent: 'ai',
     })
     if ('error' in started) return { error: started.error }

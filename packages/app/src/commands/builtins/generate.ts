@@ -23,8 +23,13 @@ function mintSeed(): number {
 }
 
 /** The randomizer card's baseline generation shape. An empty
- *  `allowedVariations` means the full variation pool. */
-function generateDefaults(dimensions: Dims): GenerateRandomFlameConfig {
+ *  `allowedVariations` means the full variation pool.
+ *
+ *  Exported because `asGenerateConfig` accepts only a COMPLETE config — a
+ *  partial `{ dimensions: 3 }` fails every one of its checks and falls back to
+ *  the flame's current dimension, silently. A caller that wants to randomize
+ *  at a chosen dimension has to hand over the whole shape. */
+export function generateDefaults(dimensions: Dims): GenerateRandomFlameConfig {
   return {
     strength: 0.5,
     minTransforms: 2,

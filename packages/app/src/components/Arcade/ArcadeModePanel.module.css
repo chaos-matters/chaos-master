@@ -1,0 +1,27 @@
+/* What a duel would run on, said before it starts: only the agent starts one,
+   on whatever the viewer has open, so the dimension is otherwise a surprise. */
+.dimensionRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 0.78rem;
+  opacity: 0.72;
+}
+
+.dimensionPill {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.dimension3D {
+  border-color: rgba(149, 241, 253, 0.5);
+  background: rgba(149, 241, 253, 0.12);
+  color: #cbf6ff;
+}
