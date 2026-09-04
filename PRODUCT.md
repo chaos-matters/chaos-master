@@ -56,7 +56,11 @@ attested server executor is a future extension.
 
 ## Brand Commitments
 
-The public product name is **Lumen Apeiron**, formerly **Chaos Master**. Existing
+The public product name is **Lumen Apeiron**, on its own or in full as
+**Lumen Apeiron — The Chaos Master**. Do not write "formerly Chaos Master" in
+user-facing copy: the rename is finished, and carrying the old name forward
+reads as an apology for it. `chaos-master` survives as the repository, package
+and worker name — an identifier, not a product name. Existing
 flame, attractor, and controlled-chaos language may remain where it helps users
 understand the renderer. The interface should feel like a precise creative
 instrument, not a generic gaming benchmark or an astronomy-themed dashboard.
