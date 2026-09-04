@@ -15,11 +15,12 @@ export const CARD = {
   padding: 44,
   /** The winner-tinted stroke. Nothing may sit on it. */
   rim: { inset: 19, width: 3, radius: 14 },
-  badge: { x: 40, y: 30, width: 74, height: 82, outline: 2, glyph: 30 },
+  badge: { x: 40, y: 30, width: 74, height: 82, outline: 2, glyph: 46 },
   titleBar: { x: 104, y: 40, width: 392, height: 60, radius: 12 },
   title: { size: 32, baseline: 80 },
-  verdict: { x: 44, y: 108, width: 452, height: 20, size: 15 },
-  window: { x: 44, y: 138, width: 452, height: 372, radius: 18, border: 4 },
+  /* Starts below the badge, not below the title bar: the badge hangs past the
+     bar's bottom edge and the window is full width. */
+  window: { x: 44, y: 118, width: 452, height: 392, radius: 18, border: 4 },
   rows: {
     x: 44,
     y: 524,
@@ -40,12 +41,12 @@ export const CARD = {
     /** The seam sits at the row's centre and is always visible. */
     divider: 2,
   },
-  watermark: { right: 496, baseline: 746, size: 12 },
+  watermark: { right: 496, baseline: 746, size: 13 },
   close: { x: 466, y: 30, size: 24 },
 } as const
 
 /** The still, at twice the window it fills. */
-export const STILL = { width: 904, height: 744 } as const
+export const STILL = { width: 904, height: 784 } as const
 
 /** The exported card, at twice the DOM card. */
 export const CARD_SCALE = 2
@@ -84,10 +85,6 @@ export type DuelCardModel = {
   winner: CardSide
   /** The winner's own name, or who they are when they have none. */
   title: string
-  verdict: string
-  archetype: string
-  /** The word under the badge glyph: the archetype, or `Draw`. */
-  badgeWord: string
   rows: readonly CardRow[]
 }
 
@@ -133,11 +130,6 @@ export function toCardModel(result: DuelResult): DuelCardModel {
         : winner === 'rival'
           ? result.rivalName
           : result.playerName,
-    verdict: verdict.line,
-    archetype: result.archetype,
-    // The archetype, which says something about the flame, rather than the
-    // side, which the rim and the title already say twice.
-    badgeWord: winner === 'draw' ? 'Draw' : result.archetype,
     rows: [...verdict.components.map(componentRow), scoreRow(verdict)],
   }
 }
@@ -151,7 +143,12 @@ export const CARD_COLORS = {
   body: '#05070d',
   window: '#010409',
   row: '#050608',
-  seam: '#04060b',
+  /* The pale slate of the flame window, not a dark line: dark-on-dark vanished
+     on a row where neither side scored, which is the one case it exists for. */
+  seam: 'rgba(120,140,167,0.9)',
+  /* The label's outline stays dark — it is what makes the word readable over
+     a bright fill. */
+  labelOutline: '#04060b',
 } as const
 
 export function rimColor(winner: CardSide): string {
@@ -191,7 +188,7 @@ export const DISPLAY_FACE = "'Cinzel Decorative', 'Times New Roman', serif"
  *  silently substitutes the default serif into a card nobody re-checks. */
 export const CARD_FONTS = [
   `700 ${CARD.title.size}px ${DISPLAY_FACE}`,
-  `${CARD.verdict.size}px ${INTER}`,
+  `700 ${CARD.watermark.size}px ${DISPLAY_FACE}`,
   `600 20px ${INTER}`,
 ] as const
 
@@ -205,6 +202,39 @@ function roundRectPath(
 ): void {
   ctx.beginPath()
   ctx.roundRect(x, y, w, h, r)
+}
+
+/**
+ * Stroke a box the way CSS draws a border: inside the box, not straddling it.
+ *
+ * A canvas stroke is centred on its path, so stroking the same rectangle a CSS
+ * `border` describes puts half the line outside it. On the flame window that
+ * was four pixels of frame the DOM card does not have, and the opening came
+ * out three pixels wider per side.
+ */
+function strokeInside(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+  width: number,
+): void {
+  const half = width / 2
+  ctx.beginPath()
+  ctx.roundRect(x + half, y + half, w - width, h - width, Math.max(0, r - half))
+  ctx.lineWidth = width
+  ctx.stroke()
+}
+
+/** CSS tracks letters; canvas does not, unless it is told to. */
+function tracking(
+  ctx: CanvasRenderingContext2D,
+  em: number,
+  size: number,
+): void {
+  ctx.letterSpacing = `${em * size}px`
 }
 
 function hexagonPath(
@@ -254,12 +284,10 @@ function paintRim(ctx: CanvasRenderingContext2D, winner: CardSide): void {
     stroke = split
   }
   ctx.save()
-  roundRectPath(ctx, inset, inset, w, h, radius)
   ctx.strokeStyle = stroke
-  ctx.lineWidth = width
   ctx.shadowColor = rimColor(winner)
   ctx.shadowBlur = 18
-  ctx.stroke()
+  strokeInside(ctx, inset, inset, w, h, radius, width)
   ctx.restore()
 }
 
@@ -267,39 +295,30 @@ function paintBadge(ctx: CanvasRenderingContext2D, model: DuelCardModel): void {
   const { x, y, width, height, outline, glyph } = CARD.badge
   const rim = rimColor(model.winner)
   ctx.save()
+  // Two hexagons, as in the stylesheet: the outline is the larger one behind.
+  hexagonPath(
+    ctx,
+    x - outline,
+    y - outline,
+    width + outline * 2,
+    height + outline * 2,
+  )
+  ctx.fillStyle = rim
+  ctx.fill()
   hexagonPath(ctx, x, y, width, height)
   ctx.fillStyle = '#080b13'
   ctx.fill()
-  ctx.strokeStyle = rim
-  ctx.lineWidth = outline
-  ctx.stroke()
 
-  const cx = x + width / 2
+  // The glyph alone, at the size the hexagon can hold. The archetype word used
+  // to sit under it and meant nothing to anyone reading the card.
   const scale = glyph / 24
-  ctx.save()
-  ctx.translate(cx - glyph / 2, y + 13)
+  ctx.translate(x + (width - glyph) / 2, y + (height - glyph) / 2)
   ctx.scale(scale, scale)
   ctx.strokeStyle = model.winner === 'draw' ? 'rgba(244,246,255,0.7)' : rim
   ctx.lineWidth = 1.8
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   ctx.stroke(new Path2D(SPIRAL_PATH))
-  ctx.restore()
-
-  ctx.fillStyle = 'rgba(244,246,255,0.82)'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'alphabetic'
-  const words = model.badgeWord.split(' ')
-  if (words.length > 1) {
-    // `Chaotic Vortex` and `Structured Mandala` do not fit the hexagon's waist
-    // on one line at any size worth reading.
-    ctx.font = `10px ${INTER}`
-    ctx.fillText(words[0]!, cx, y + 54)
-    ctx.fillText(words.slice(1).join(' '), cx, y + 66)
-  } else {
-    ctx.font = `11px ${INTER}`
-    ctx.fillText(model.badgeWord, cx, y + 60)
-  }
   ctx.restore()
 }
 
@@ -310,14 +329,14 @@ function paintTitle(ctx: CanvasRenderingContext2D, model: DuelCardModel): void {
   ctx.fillStyle = '#07090f'
   ctx.fill()
   ctx.strokeStyle = 'rgba(255,255,255,0.22)'
-  ctx.lineWidth = 1
-  ctx.stroke()
+  strokeInside(ctx, bar.x, bar.y, bar.width, bar.height, bar.radius, 1)
 
   const [from, to] = TITLE_GRADIENT[model.winner]
   const ink = ctx.createLinearGradient(0, bar.y + 12, 0, bar.y + bar.height - 8)
   ink.addColorStop(0, from)
   ink.addColorStop(1, to)
   ctx.font = `700 ${CARD.title.size}px ${DISPLAY_FACE}`
+  tracking(ctx, 0.02, CARD.title.size)
   ctx.textAlign = 'center'
   ctx.textBaseline = 'alphabetic'
   ctx.fillStyle = ink
@@ -362,8 +381,7 @@ function paintWindow(
     ctx.restore()
   }
   ctx.strokeStyle = 'rgba(120,140,167,0.9)'
-  ctx.lineWidth = win.border
-  ctx.stroke()
+  strokeInside(ctx, win.x, win.y, win.width, win.height, win.radius, win.border)
   ctx.restore()
 }
 
@@ -382,8 +400,8 @@ function paintRow(
   ctx.fillStyle = CARD_COLORS.row
   ctx.fill()
   ctx.strokeStyle = 'rgba(255,255,255,0.28)'
-  ctx.lineWidth = r.border
-  ctx.stroke()
+  strokeInside(ctx, r.x, y, r.width, r.height, r.radius, r.border)
+  roundRectPath(ctx, r.x, y, r.width, r.height, r.radius)
 
   const seam = r.x + r.width / 2
   const top = y + r.border
@@ -411,21 +429,24 @@ function paintRow(
 
   const middle = y + r.height / 2
   ctx.textBaseline = 'middle'
-  ctx.font = `600 ${row.headline ? 21 : 19}px ${INTER}`
+  ctx.font = `${row.headline ? '600 21' : '19'}px ${INTER}`
+  tracking(ctx, 0, 0)
   ctx.textAlign = 'left'
   ctx.fillStyle = CARD_COLORS.playerValue
-  ctx.fillText(format(row.player, row.headline), r.x + 12, middle)
+  // 14, not 12: the DOM insets from the padding box, inside the 2px border.
+  ctx.fillText(format(row.player, row.headline), r.x + 14, middle)
   ctx.textAlign = 'right'
   ctx.fillStyle = CARD_COLORS.rivalValue
-  ctx.fillText(format(row.rival, row.headline), r.x + r.width - 12, middle)
+  ctx.fillText(format(row.rival, row.headline), r.x + r.width - 14, middle)
 
   // stroke then fill IS `paint-order: stroke fill`: the label keeps a dark
   // outline over whichever fill has reached the seam.
   ctx.textAlign = 'center'
   ctx.font = `${row.headline ? '600 16' : '15'}px ${INTER}`
+  tracking(ctx, 0.06, row.headline ? 16 : 15)
   ctx.lineWidth = 3
   ctx.lineJoin = 'round'
-  ctx.strokeStyle = CARD_COLORS.seam
+  ctx.strokeStyle = CARD_COLORS.labelOutline
   ctx.strokeText(row.label, seam, middle)
   ctx.fillStyle = '#e8ecf3'
   ctx.fillText(row.label, seam, middle)
@@ -459,24 +480,13 @@ export function drawDuelCard(
   ctx.fillStyle = CARD_COLORS.body
   ctx.fill()
   ctx.strokeStyle = 'rgba(255,255,255,0.10)'
-  ctx.lineWidth = 1
-  ctx.stroke()
+  strokeInside(ctx, 0, 0, CARD.width, CARD.height, CARD.radius, 1)
 
   paintRim(ctx, model.winner)
-  paintBadge(ctx, model)
+  // The bar first: the badge overlaps its left end by ten pixels, as in the
+  // mock and as the stylesheet stacks them.
   paintTitle(ctx, model)
-
-  ctx.save()
-  ctx.font = `${CARD.verdict.size}px ${INTER}`
-  ctx.fillStyle = 'rgba(244,246,255,0.62)'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(
-    clip(ctx, model.verdict, CARD.verdict.width),
-    CARD.verdict.x + CARD.verdict.width / 2,
-    CARD.verdict.y + CARD.verdict.height / 2,
-  )
-  ctx.restore()
+  paintBadge(ctx, model)
 
   paintWindow(ctx, still, stillSize.width, stillSize.height)
 
@@ -485,7 +495,8 @@ export function drawDuelCard(
   })
 
   ctx.save()
-  ctx.font = `${CARD.watermark.size}px ${INTER}`
+  ctx.font = `700 ${CARD.watermark.size}px ${DISPLAY_FACE}`
+  tracking(ctx, 0.06, CARD.watermark.size)
   ctx.fillStyle = 'rgba(244,246,255,0.45)'
   ctx.textAlign = 'right'
   ctx.textBaseline = 'alphabetic'

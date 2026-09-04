@@ -134,45 +134,41 @@
   left: 40px;
   z-index: 1;
   display: grid;
-  justify-items: center;
-  align-content: center;
-  gap: 3px;
+  place-items: center;
   width: 74px;
   height: 82px;
-  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-  background: #080b13;
 }
 
-/* `clip-path` cuts a CSS border off with the rest of the box, so the outline
-   is a second, 2px-larger hexagon behind this one — the only way a clipped
-   shape gets an even stroke. */
-.badge::before {
+/* The outline and the fill, as two hexagons in paint order. `clip-path` cuts a
+   CSS border off with the rest of the box, and an outline pseudo-element sent
+   behind with `z-index: -1` paints on top of its own parent's background — it
+   is negative only relative to the parent's *contents* — which is what turned
+   the badge into a solid cyan blob. Two siblings in tree order cannot do that. */
+.badge::before,
+.badge::after {
   content: '';
   position: absolute;
-  inset: -2px;
-  z-index: -1;
   clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+
+.badge::before {
+  inset: -2px;
   background: var(--result-rim, rgba(255, 255, 255, 0.4));
 }
 
+.badge::after {
+  inset: 0;
+  background: #080b13;
+}
+
 .badgeGlyph {
-  width: 30px;
-  height: 30px;
+  /* Positioned, and last in tree order, so it paints over the fill. */
+  position: relative;
+  /* The glyph alone. The archetype word used to sit under it and meant
+     nothing to anyone reading the card. */
+  width: 46px;
+  height: 46px;
   color: var(--result-rim, rgba(255, 255, 255, 0.7));
-}
-
-.badgeWord {
-  max-width: 62px;
-  color: rgba(244, 246, 255, 0.82);
-  font-size: 11px;
-  line-height: 1.1;
-  text-align: center;
-}
-
-/* `Chaotic Vortex` and `Structured Mandala` do not fit the hexagon's waist on
-   one line at any size worth reading. */
-.badgeWordLong {
-  font-size: 10px;
 }
 
 .titleBar {
@@ -212,31 +208,16 @@
   filter: drop-shadow(0 0 14px var(--result-glow, rgba(255, 255, 255, 0.45)));
 }
 
-.verdict {
-  position: absolute;
-  top: 108px;
-  left: 44px;
-  width: 452px;
-  height: 20px;
-  margin: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  color: rgba(244, 246, 255, 0.62);
-  font-size: 15px;
-  letter-spacing: 0.08em;
-  line-height: 20px;
-  text-align: center;
-}
-
 /* The centrepiece. The flame is what the duel was about, so it gets the
    largest single region on the card. */
 .window {
   position: absolute;
-  top: 138px;
+  /* Starts below the badge, not below the title bar: the badge hangs past the
+     bar's bottom edge and the window is full width. */
+  top: 118px;
   left: 44px;
   width: 452px;
-  height: 372px;
+  height: 392px;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -314,7 +295,9 @@
   background: linear-gradient(to right, #3a4a72, #4f8fb0 55%, #95f1fd);
 }
 
-/* Permanent, so the meeting point reads even when both fills match. */
+/* Permanent, so the meeting point reads even when both fills match. The pale
+   slate of the flame window rather than a dark line: dark-on-dark vanished on
+   a row where neither side scored, which is the one case it exists for. */
 .seam {
   position: absolute;
   top: 0;
@@ -322,7 +305,7 @@
   left: 50%;
   width: 2px;
   transform: translateX(-1px);
-  background: #04060b;
+  background: rgba(120, 140, 167, 0.9);
 }
 
 .value {
@@ -335,6 +318,8 @@
   font-size: 19px;
   font-variant-numeric: tabular-nums;
   line-height: 1;
+  /* `left`/`right` are measured from the padding box, inside the 2px border,
+     so 12 here is the canvas routine's 14 from the row's own edge. */
 }
 
 .valuePlayer {
@@ -352,19 +337,41 @@
 .rowLabel {
   position: relative;
   justify-self: center;
+  display: grid;
   color: #e8ecf3;
   font-size: 15px;
+  /* Matches the values, so both centre on the same baseline in a 36px row. */
+  line-height: 1;
   letter-spacing: 0.06em;
-  /* A real outline, not a shadow: the label sits over whichever fill has
-     reached the seam, and both of those are bright. */
+}
+
+/*
+  The outline is a second copy underneath, not `-webkit-text-stroke` on the
+  word itself. A centred stroke painted over its own fill erodes a 15px stem to
+  a hairline, and `paint-order: stroke fill` did not save it in Chrome — the
+  measured DOM stem came out 1.3px against the canvas routine's 2.3px. Two
+  copies is literally what `strokeText` then `fillText` does, and a pseudo-
+  element keeps the duplicate out of the accessibility tree.
+*/
+.rowLabel::before {
+  content: attr(data-label);
+  grid-area: 1 / 1;
+  color: #04060b;
   -webkit-text-stroke: 3px #04060b;
-  paint-order: stroke fill;
+}
+
+.rowLabelInk {
+  grid-area: 1 / 1;
 }
 
 /* The totals read as the headline of the block without being a different
    component. */
 .rowHeadline .rowLabel {
   font-size: 16px;
+  font-weight: 600;
+}
+
+.rowHeadline .rowLabel::before {
   font-weight: 600;
 }
 
@@ -376,21 +383,22 @@
 .watermark {
   position: absolute;
   right: 44px;
-  /* The rim's inner edge is at 758; a 12px face's descender reaches about
-     three pixels below its baseline, so 746 keeps the word eight clear of it.
-     The v1 card put this word on the rim. */
-  bottom: 26px;
+  /* Baseline 746: the rim's inner edge is at 758, and the display face has no
+     descender in this word. The v1 card put it on the rim. */
+  bottom: 30px;
   margin: 0;
   color: rgba(244, 246, 255, 0.45);
-  font-size: 12px;
-  letter-spacing: 0.04em;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   line-height: 1;
 }
 
 .close {
   position: absolute;
   top: 30px;
-  right: 26px;
+  right: 50px;
   display: grid;
   place-items: center;
   width: 24px;

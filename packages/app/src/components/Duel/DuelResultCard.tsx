@@ -151,19 +151,11 @@ export function DuelResultCard(props: {
       >
         <div class={ui.badge}>
           <VariationSpiral class={ui.badgeGlyph} aria-hidden="true" />
-          <span
-            class={ui.badgeWord}
-            classList={{ [ui.badgeWordLong!]: model().badgeWord.includes(' ') }}
-          >
-            {model().badgeWord}
-          </span>
         </div>
 
         <header class={ui.titleBar}>
           <h2 class={ui.title}>{model().title}</h2>
         </header>
-
-        <p class={ui.verdict}>{verdict().line}</p>
 
         <div class={ui.window}>
           <Show
@@ -304,7 +296,9 @@ function StatRow(props: { row: CardRow }) {
       <span class={`${ui.value} ${ui.valuePlayer}`}>
         {format(props.row.player, props.row.headline)}
       </span>
-      <span class={ui.rowLabel}>{props.row.label}</span>
+      <span class={ui.rowLabel} data-label={props.row.label}>
+        <span class={ui.rowLabelInk}>{props.row.label}</span>
+      </span>
       <span class={`${ui.value} ${ui.valueRival}`}>
         {format(props.row.rival, props.row.headline)}
       </span>
