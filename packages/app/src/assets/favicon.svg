@@ -1,23 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <defs>
-    <linearGradient id="cmArm" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#06d6c8" />
-      <stop offset="40%" stop-color="#a3e635" />
-      <stop offset="72%" stop-color="#ffae34" />
-      <stop offset="100%" stop-color="#ff5e7e" />
-    </linearGradient>
-    <radialGradient id="cmCore" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#ffffff" />
-      <stop offset="55%" stop-color="#7be0e8" />
-      <stop offset="100%" stop-color="#7be0e8" stop-opacity="0" />
-    </radialGradient>
-  </defs>
-  <rect width="64" height="64" rx="15" fill="#0a0a12" />
-  <!-- infinity ribbon (lemniscate): an endless, self-crossing IFS flame loop -->
-  <g transform="rotate(-20 32 32)" fill="none" stroke="url(#cmArm)"
-     stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M32 32 C 24 19, 9 19, 9 32 C 9 45, 24 45, 32 32 C 40 19, 55 19, 55 32 C 55 45, 40 45, 32 32 Z" />
+  <rect width="64" height="64" rx="15" fill="#080A0E" />
+  <!-- "Deep C": a heavy band sweeping 249 degrees, its mouth open to the west.
+       Light with no source - the band has no beginning; it gathers out of the
+       ember marks drifting in the mouth, the smallest already detached.
+       Two flat inks and no gradients, on purpose: a favicon is judged at 16px,
+       where a four-stop gradient collapses toward one value and the shape has
+       to carry the mark on its own. Geometry: r=20.03, stroke 9.46, arc from
+       235.62 to 124.38 degrees (mouth 111.24 degrees, centred due west). -->
+  <path d="M 20.69 15.47 A 20.03 20.03 0 1 1 20.69 48.53"
+        fill="none" stroke="#F2F3F5" stroke-width="9.46" stroke-linecap="butt" />
+  <g fill="#FF7448">
+    <rect x="14.79" y="22.76" width="17.22" height="3.72" rx="1.86" />
+    <rect x="14.79" y="30.14" width="13.05" height="3.72" rx="1.86" />
+    <rect x="7.19" y="30.14" width="5.87" height="3.72" rx="1.86" />
+    <rect x="17.40" y="37.52" width="14.61" height="3.72" rx="1.86" />
   </g>
-  <circle cx="32" cy="32" r="7.5" fill="url(#cmCore)" />
-  <circle cx="32" cy="32" r="2.4" fill="#fff" />
 </svg>

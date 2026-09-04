@@ -7,6 +7,13 @@
       "runtimeArgs": ["--filter", "chaos-master", "start"],
       "port": 5173,
       "url": "https://localhost:5173"
+    },
+    {
+      "name": "landing-dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@chaos-master/landing", "dev"],
+      "port": 4321,
+      "url": "https://localhost:4321"
     }
   ]
 }

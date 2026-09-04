@@ -9,32 +9,19 @@ const repoUrl = 'https://github.com/chaos-matters/chaos-master'
   <div class="wrap nav-in">
     <a class="brand" href="#top">
       <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
-        <defs>
-          <linearGradient id="navArm" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#06d6c8" />
-            <stop offset="40%" stop-color="#a3e635" />
-            <stop offset="72%" stop-color="#ffae34" />
-            <stop offset="100%" stop-color="#ff5e7e" />
-          </linearGradient>
-          <radialGradient id="navCore" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="#fff" />
-            <stop offset="55%" stop-color="#7be0e8" />
-            <stop offset="100%" stop-color="#7be0e8" stop-opacity="0" />
-          </radialGradient>
-        </defs>
-        <rect width="64" height="64" rx="15" fill="#0a0a12" />
-        <g
-          transform="rotate(-20 32 32)"
+        <rect width="64" height="64" rx="15" fill="#080A0E"></rect>
+        <path
+          d="M 20.69 15.47 A 20.03 20.03 0 1 1 20.69 48.53"
           fill="none"
-          stroke="url(#navArm)"
-          stroke-width="6.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M32 32 C 24 19, 9 19, 9 32 C 9 45, 24 45, 32 32 C 40 19, 55 19, 55 32 C 55 45, 40 45, 32 32 Z" />
+          stroke="#F2F3F5"
+          stroke-width="9.46"
+          stroke-linecap="butt"></path>
+        <g fill="#FF7448">
+          <rect x="14.79" y="22.76" width="17.22" height="3.72" rx="1.86"></rect>
+          <rect x="14.79" y="30.14" width="13.05" height="3.72" rx="1.86"></rect>
+          <rect x="7.19" y="30.14" width="5.87" height="3.72" rx="1.86"></rect>
+          <rect x="17.40" y="37.52" width="14.61" height="3.72" rx="1.86"></rect>
         </g>
-        <circle cx="32" cy="32" r="7.5" fill="url(#navCore)" />
-        <circle cx="32" cy="32" r="2.4" fill="#fff" />
       </svg>
       Lumen Apeiron
     </a>
@@ -81,7 +68,7 @@ const repoUrl = 'https://github.com/chaos-matters/chaos-master'
     height: 24px;
     flex: none;
     border-radius: 7px;
-    filter: drop-shadow(0 0 10px rgba(123, 224, 232, 0.35));
+    filter: drop-shadow(0 0 10px rgba(255, 116, 72, 0.35));
   }
   .nav-links {
     display: flex;
