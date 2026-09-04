@@ -1,3 +1,5 @@
+import { generateDefaults } from '@/commands/builtins/generate'
+import { executeCommand } from '@/commands/registry'
 import { DEFAULT_SEAT } from '@/seats/seatId'
 import { deepClone } from '@/utils/clone'
 import { getWebMcpContext, setWebMcpContext, setWebMcpTarget, } from '@/webmcp/contextBridge'
@@ -26,6 +28,17 @@ import type { CommandContext } from '@/commands/types'
 export type DuelOpponent = 'ai' | 'none'
 
 /**
+ * What the viewer's side starts as.
+ *
+ * `current` is the flame they have loaded, which is the only thing a duel
+ * could start from before. The two random options exist because a duel is
+ * started by the agent, on whatever the viewer happens to have open — so
+ * without this, wanting a 3D duel meant loading a 3D flame by hand first and
+ * hoping the agent asked at the right moment.
+ */
+export type DuelStartFrom = 'current' | 'random-2d' | 'random-3d'
+
+/**
  * The one way a duel starts, whoever is in the other seat.
  *
  * Shared with the tool rather than reimplemented beside it: the 3D refusal,
@@ -38,6 +51,7 @@ export function beginDuel(
   opts: {
     seconds: number
     rivalFrom?: 'mirror' | 'blank'
+    startFrom?: DuelStartFrom
     opponent: DuelOpponent
   },
 ): { ok: true; seconds: number; allowed: string[] } | { error: string } {
@@ -50,6 +64,19 @@ export function beginDuel(
   // A result card left on screen is not a running duel, but its seat is still
   // alive; starting over takes the old screen down first.
   if (duelShowing()) closeDuelView()
+  // Through the registry, so the replacement is one recorded step the viewer
+  // can undo — and so the duel's own take begins from a state that exists.
+  if (opts.startFrom === 'random-2d' || opts.startFrom === 'random-3d') {
+    // The whole config, not `{ dimensions }`: a partial one fails every check
+    // in `asGenerateConfig` and falls back to the flame's current dimension
+    // without saying so, which is the opposite of what was asked for.
+    executeCommand(
+      'flame.randomize',
+      ctx,
+      undefined,
+      generateDefaults(opts.startFrom === 'random-3d' ? 3 : 2),
+    )
+  }
   // 2D and 3D both. The seats bind whichever camera the flame asks for, and
   // the rival is a mirror of the player, so the two halves are always the same
   // dimension — there is nothing to reconcile.

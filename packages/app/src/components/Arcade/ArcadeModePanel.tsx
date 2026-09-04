@@ -5,6 +5,7 @@ import { CINEMA_PRESETS, cinemaPromptCard, duelPromptCard, LESSON_TOPICS, teachP
 import { Copy, Cross, Swords } from '@/icons'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
 import ui from './ArcadeHub.module.css'
+import type { DuelStartFrom } from '@/arcade/duelActions'
 import type { TopicId } from '@/arcade/topics'
 import type { ArcadeMode } from '@/lib/activeTab'
 
@@ -76,6 +77,22 @@ export function ArcadeModePanel(props: {
     String(DEFAULT_DUEL_SECONDS),
   )
   const duelSeconds = () => clampDuelSeconds(duelSecondsText())
+  const [startFrom, setStartFrom] = createSignal<DuelStartFrom>('current')
+  /**
+   * What a duel would run on right now.
+   *
+   * Only the agent starts a duel, on whatever the viewer has open, so without
+   * this the dimension of the duel about to begin is a surprise. Reads the
+   * same bridge the solo button reads.
+   */
+  const loadedDimensions = () =>
+    getWebMcpContext('player')?.flameDescriptor().renderSettings.dimensions ?? 2
+  const duelDimensions = () =>
+    startFrom() === 'random-3d'
+      ? 3
+      : startFrom() === 'random-2d'
+        ? 2
+        : loadedDimensions()
   const [soloError, setSoloError] = createSignal<string>()
   /**
    * The hub is mounted beside the workspace rather than inside it, so it has
@@ -91,6 +108,7 @@ export function ArcadeModePanel(props: {
     }
     const started = beginDuel(ctx, {
       seconds: duelSeconds(),
+      startFrom: startFrom(),
       opponent: 'none',
     })
     setSoloError('error' in started ? started.error : undefined)
@@ -105,7 +123,7 @@ export function ArcadeModePanel(props: {
     props.mode === 'teach'
       ? teachPromptCard(topic())
       : props.mode === 'duel'
-        ? duelPromptCard(duelSeconds())
+        ? duelPromptCard(duelSeconds(), startFrom())
         : cinemaPromptCard(description())
   return (
     <aside
@@ -195,6 +213,38 @@ export function ArcadeModePanel(props: {
           <p>
             You and the agent each get a flame and one clock. Paste the prompt,
             then build against it — both sides are recorded and replayable.
+          </p>
+          <label class={ui.field}>
+            <span>Start from</span>
+            <select
+              value={startFrom()}
+              onChange={(ev) => {
+                setStartFrom(ev.currentTarget.value as DuelStartFrom)
+              }}
+            >
+              <option value="current">The flame I have open</option>
+              <option value="random-2d">A random 2D flame</option>
+              <option value="random-3d">A random 3D flame</option>
+            </select>
+          </label>
+          <p class={ui.dimensionRow}>
+            <span
+              class={ui.dimensionPill}
+              classList={{ [ui.dimension3D!]: duelDimensions() === 3 }}
+            >
+              {duelDimensions() === 3 ? '3D' : '2D'}
+            </span>
+            <Show
+              when={duelDimensions() === 3}
+              fallback={
+                <span>Pan and zoom, and the full 403-variation set.</span>
+              }
+            >
+              <span>
+                Orbit camera per side, and the 43 variations that work in three
+                dimensions.
+              </span>
+            </Show>
           </p>
           <label class={ui.field}>
             <span>Clock, in seconds</span>

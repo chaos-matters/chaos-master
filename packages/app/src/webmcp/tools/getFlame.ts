@@ -54,8 +54,39 @@ export const getFlame: WebMcpTool = {
       }
     })
 
+    /*
+     * The camera, which this tool never returned.
+     *
+     * An agent could move it — `camera.*`, and `camera3D.*` through
+     * `flame.setRenderSetting` — and never read where it was, so every framing
+     * decision had to be relative and hope. That is survivable in 2D, where
+     * one zoom and one offset are easy to feel out, and not in 3D, where six
+     * coupled numbers decide whether the flame is on screen at all.
+     *
+     * The 3D block is included only for a 3D flame: `get_flame`'s whole point
+     * is that it fits in about 1.5 KB.
+     */
+    const dimensions = flame.renderSettings?.dimensions ?? 2
+    const c3d = flame.renderSettings?.camera3D
     const renderSettings = {
-      dimensions: flame.renderSettings?.dimensions ?? 2,
+      dimensions,
+      camera: {
+        zoom: flame.renderSettings?.camera?.zoom ?? 1,
+        position: flame.renderSettings?.camera?.position ?? [0, 0],
+        rotation: flame.renderSettings?.camera?.rotation ?? 0,
+      },
+      ...(dimensions === 3 && c3d
+        ? {
+            camera3D: {
+              theta: c3d.theta,
+              phi: c3d.phi,
+              radius: c3d.radius,
+              target: c3d.target,
+              fov: c3d.fov,
+              roll: c3d.roll,
+            },
+          }
+        : {}),
       exposure: flame.renderSettings?.exposure ?? 0.25,
       gamma: flame.renderSettings?.gamma ?? 2.2,
       vibrancy: flame.renderSettings?.vibrancy ?? 0.5,

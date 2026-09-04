@@ -93,6 +93,21 @@ describe('a duel with no agent in it', () => {
     expect(duelRivalSeat()?.flame().renderSettings.dimensions).toBe(3)
   })
 
+  it('starts a 3D duel from a 2D flame when asked to', () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    expect(ctx.flameDescriptor().renderSettings.dimensions ?? 2).toBe(2)
+
+    // Only the agent starts a duel, on whatever the viewer has open — so this
+    // is how a 3D duel is asked for without loading a 3D flame by hand first.
+    expect(
+      beginDuel(ctx, { seconds: 90, startFrom: 'random-3d', opponent: 'none' }),
+    ).toMatchObject({ ok: true })
+
+    expect(ctx.flameDescriptor().renderSettings.dimensions).toBe(3)
+    expect(duelRivalSeat()?.flame().renderSettings.dimensions).toBe(3)
+  })
+
   it('refuses a second duel on top of a running one', () => {
     const ctx = createMockCommandContext()
     setWebMcpContext(ctx)

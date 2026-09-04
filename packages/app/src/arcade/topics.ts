@@ -1,3 +1,5 @@
+import type { DuelStartFrom } from './duelActions'
+
 export type TopicId =
   | 'variations'
   | 'affine'
@@ -252,10 +254,33 @@ export const DUEL_ALLOWED = ['flame.', 'camera.'] as const
 
 export const DUEL_STEP_BUDGET = 60
 
-export function duelPromptCard(seconds: number): string {
+/**
+ * What the viewer's side starts as, in the words the prompt uses.
+ *
+ * The duel is started by the agent, on whatever the viewer has open, so this
+ * is how a viewer asks for a 3D duel without loading a 3D flame by hand first.
+ */
+const START_FROM_PHRASE: Record<DuelStartFrom, string> = {
+  current: '',
+  'random-2d':
+    ' Pass startFrom: "random-2d" — I want to start from a fresh random 2D flame rather than the one I have open.',
+  'random-3d':
+    ' Pass startFrom: "random-3d" — I want a 3D duel, starting from a fresh random 3D flame rather than the one I have open.',
+}
+
+export function duelPromptCard(
+  seconds: number,
+  startFrom: DuelStartFrom = 'current',
+): string {
   const minutes = Math.round((seconds / 60) * 10) / 10
   const clock = minutes === 1 ? '1 minute' : `${minutes} minutes`
-  return `Duel me in Lumen Apeiron. Call arcade_start_duel to begin: we each get ${clock} and our own flame, side by side, and I am editing mine while you edit yours. Read your flame with get_flame and change it with execute_command — only flame.* and camera.* are allowed, and you have ${DUEL_STEP_BUDGET} steps. Say what you are going for with arcade_narrate as you work. Aim for something striking rather than merely complicated. You cannot end the duel — the clock does, and I can call it early — so when you are happy call arcade_duel_ready with a short title and keep polishing until time runs out.
+  // The 3D camera has no commands of its own; it is reached through the
+  // generic render-setting path, which the agent has no way to guess.
+  const camera3D =
+    startFrom === 'random-3d'
+      ? ' In 3D the camera is orbit, not pan and zoom: read it from get_flame under renderSettings.camera3D and move it with execute_command flame.setRenderSetting on the paths camera3D.theta, camera3D.phi, camera3D.radius, camera3D.target, camera3D.fov and camera3D.roll. camera.* does nothing useful in 3D.'
+      : ''
+  return `Duel me in Lumen Apeiron. Call arcade_start_duel to begin: we each get ${clock} and our own flame, side by side, and I am editing mine while you edit yours.${START_FROM_PHRASE[startFrom]} Read your flame with get_flame and change it with execute_command — only flame.* and camera.* are allowed, and you have ${DUEL_STEP_BUDGET} steps.${camera3D} Say what you are going for with arcade_narrate as you work. Aim for something striking rather than merely complicated. You cannot end the duel — the clock does, and I can call it early — so when you are happy call arcade_duel_ready with a short title and keep polishing until time runs out.
 
 ${WEBMCP_FALLBACK_NOTE}`
 }
