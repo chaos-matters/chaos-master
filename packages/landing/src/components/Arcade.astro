@@ -22,27 +22,27 @@ const modes = [
   {
     icon: 'book',
     name: 'Teach',
-    tag: 'AI drives',
-    body: 'Pick one of seven topics, from variations and affine transforms to sonification. The AI builds a worked example on the flame you already have open, says one sentence before each step, and the whole take replays as a captioned lesson.',
+    tag: 'Agent drives',
+    body: 'Pick one of seven topics, from variations and affine transforms to sonification. The agent builds a worked example on the flame you already have open, says one sentence before each step, and the whole take replays as a captioned lesson.',
   },
   {
     icon: 'film',
     name: 'Cinema',
-    tag: 'AI drives',
-    body: 'Describe the move in a sentence, or press Small and slow, Big and cinematic, or Surprise me. The AI reads what can be keyframed, writes the tracks, and the animation lands as one undoable step that plays at once. Not right? Undo, say what to change, ask again.',
+    tag: 'Agent drives',
+    body: 'Describe the move in a sentence, or press Small and slow, Big and cinematic, or Surprise me. The agent reads what can be keyframed, writes the tracks, and the animation lands as one undoable step that plays at once. Not right? Undo, say what to change, ask again.',
   },
   {
     icon: 'swords',
     name: 'Duel',
-    tag: 'You + AI',
-    body: "You and the AI edit your own flames side by side against one clock. The AI gets its own seat with its own history; your half stays yours, keyboard and all. It cannot stop the clock — that is the pressure. Both takes are saved and a card names the winner.",
+    tag: 'You + agent',
+    body: 'Race the agent to the better flame, side by side against one clock. It gets its own seat with its own history; your half stays yours, keyboard and all. It cannot stop the clock — that is the pressure. Both takes are saved and a card names the winner.',
   },
 ]
 ---
 
 <section id="arcade" class="wrap">
   <p class="kicker">Lumen Arcade</p>
-  <h2>Hand the controls to an AI.</h2>
+  <h2>Hand the controls to an agent.</h2>
   <p class="lede">
     The Arcade opens the editor to any agent in your browser as {TOOL_COUNT} WebMCP
     tools on <code>document.modelContext</code>. Every write goes through the
@@ -68,11 +68,11 @@ const modes = [
   <div class="run">
     <span class="run-icon" set:html={icons.robot} />
     <p>
-      While the AI drives, the editor is locked behind a shield: the banner
+      While the agent drives, the editor is locked behind a shield: the banner
       counts steps against the budget and the clock, the rail lists every command
       and sentence as it lands, and your shortcuts are off. Stop — or Escape
       twice — hands the controls back and still saves the take. A Duel locks only
-      the AI's seat, so your half keeps its keyboard while the clock runs.
+      the agent's seat, so your half keeps its keyboard while the clock runs.
     </p>
   </div>
 
