@@ -2,7 +2,7 @@ import { MAX_NARRATION_CHARS, pushNarration } from '@/arcade/narration'
 import { registerCommand } from '../registry'
 
 /**
- * The AI's voice as a recordable step.
+ * The agent's voice as a recordable step.
  *
  * An Arcade lesson is only worth replaying if the explanation replays with
  * it, and the recorder already carries a per-action label. Routing narration
@@ -22,7 +22,7 @@ registerCommand({
   describe: ([text]) =>
     typeof text === 'string' && text.trim() !== '' ? text.trim() : undefined,
   label: 'Narration',
-  description: 'A sentence the AI says about the step it is about to take',
+  description: 'A sentence the agent says about the step it is about to take',
   validateReplayArgs(args) {
     if (args.length !== 1 || !isNarrationText(args[0])) {
       return `narration expects one non-empty string of at most ${MAX_NARRATION_CHARS} characters`

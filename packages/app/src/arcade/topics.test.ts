@@ -37,7 +37,7 @@ describe('lesson topics', () => {
     expect(missing).toEqual([])
   })
 
-  // Every step the pilot takes is shown twice — in the live rail while the AI
+  // Every step the pilot takes is shown twice — in the live rail while the agent
   // drives, and in the replay step list afterwards — and both read the same
   // `describe`. A command without one falls back to its label plus raw JSON
   // (`Toggle Sidebar [true]`), which is what the viewer is left staring at.

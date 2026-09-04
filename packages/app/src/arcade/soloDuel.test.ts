@@ -12,7 +12,7 @@ import { agentDriving, resetPilot } from './pilot'
  * the whole point is that it is the SAME duel: these cases pin the two things
  * that must differ (no pilot, no recording) and the several that must not.
  */
-describe('a duel with no AI in it', () => {
+describe('a duel with no agent in it', () => {
   afterEach(() => {
     if (duelActive()) stopDuel()
     resetPilot()
@@ -79,7 +79,7 @@ describe('a duel with no AI in it', () => {
     expect(runningDuel()?.rival.flame().transforms).toEqual({})
   })
 
-  it('refuses the same things the AI duel refuses', () => {
+  it('refuses the same things the agent duel refuses', () => {
     const ctx = createMockCommandContext()
     const flame = createTestFlame()
     flame.renderSettings.dimensions = 3
@@ -103,7 +103,7 @@ describe('a duel with no AI in it', () => {
     expect(second).toHaveProperty('error')
   })
 
-  it('leaves the AI duel exactly as it was', () => {
+  it('leaves the agent duel exactly as it was', () => {
     const ctx = createMockCommandContext()
     setWebMcpContext(ctx)
 

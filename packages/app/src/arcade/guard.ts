@@ -33,7 +33,7 @@ export function guardCommand(
 ): string | undefined {
   if (state.phase !== 'driving') return undefined
   if (BLOCKED_PREFIXES.some((prefix) => commandId.startsWith(prefix))) {
-    return `${commandId} is not available while the AI drives`
+    return `${commandId} is not available while the agent drives`
   }
   if (!isCommandAllowed(commandId, state.allowed)) {
     const scope = state.topic ? `${state.mode}/${state.topic}` : state.mode
@@ -44,14 +44,14 @@ export function guardCommand(
   // would leave the animation running for the whole time it spends composing
   // the next call. The viewer turns it on themselves afterwards.
   if (commandId === 'timeline.setLoop' && args[0] !== false) {
-    return 'Looping playback stays off while the AI drives; the viewer can turn it on afterwards'
+    return 'Looping playback stays off while the agent drives; the viewer can turn it on afterwards'
   }
   if (commandId === 'view.setQualityPreset') {
     const rank = qualityRank(args[0])
     if (rank < 0 || rank > state.qualityRankAtStart) {
       const cap =
         QUALITY_ORDER[state.qualityRankAtStart] ?? 'the starting preset'
-      return `Quality can only stay at or below "${cap}" while the AI drives`
+      return `Quality can only stay at or below "${cap}" while the agent drives`
     }
   }
   if (
@@ -59,7 +59,7 @@ export function guardCommand(
     typeof args[0] === 'string' &&
     LOCKED_RENDER_SETTING.test(args[0])
   ) {
-    return `Render setting "${args[0]}" is locked while the AI drives`
+    return `Render setting "${args[0]}" is locked while the agent drives`
   }
   if (
     commandId === 'flame.updateRenderSettings' &&
@@ -67,7 +67,7 @@ export function guardCommand(
     typeof args[0] === 'object' &&
     Object.keys(args[0]).some((key) => LOCKED_RENDER_SETTING.test(key))
   ) {
-    return 'Point count, dimensions and quality are locked while the AI drives'
+    return 'Point count, dimensions and quality are locked while the agent drives'
   }
   return undefined
 }

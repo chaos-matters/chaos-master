@@ -323,7 +323,7 @@ export function EclipseHud(props: {
         {props.ending === true ? 'Ending…' : 'End the duel'}
       </button>
       <Show when={props.model.readyTitle}>
-        {(title) => <p class={ui.ready}>The AI is happy with "{title()}"</p>}
+        {(title) => <p class={ui.ready}>The agent is happy with "{title()}"</p>}
       </Show>
     </div>
   )

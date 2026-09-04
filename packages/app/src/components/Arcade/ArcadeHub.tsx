@@ -22,8 +22,8 @@ export const ARCADE_MODES: CardDef[] = [
     id: 'teach',
     title: 'Teach',
     tagline:
-      'The AI builds a flame step by step and records a lesson you can replay.',
-    tag: 'AI drives',
+      'The agent builds a flame step by step and records a lesson you can replay.',
+    tag: 'Agent drives',
     ready: true,
     icon: Book,
   },
@@ -31,24 +31,25 @@ export const ARCADE_MODES: CardDef[] = [
     id: 'cinema',
     title: 'Cinema',
     tagline:
-      'Describe a move; the AI keyframes a cinematic animation of your flame.',
-    tag: 'AI drives',
+      'Describe a move; the agent keyframes a cinematic animation of your flame.',
+    tag: 'Agent drives',
     ready: true,
     icon: Film,
   },
   {
     id: 'duel',
     title: 'Duel',
-    tagline: 'Race the AI to the better flame, side by side against the clock.',
-    tag: 'You + AI',
+    tagline:
+      'Race the agent to the better flame, side by side against the clock.',
+    tag: 'You + agent',
     ready: true,
     icon: Swords,
   },
   {
     id: 'beats',
     title: 'Beats',
-    tagline: 'The AI wires your flame to a song so it dances.',
-    tag: 'AI drives',
+    tagline: 'The agent wires your flame to a song so it dances.',
+    tag: 'Agent drives',
     ready: false,
     icon: MusicNote,
   },
@@ -63,7 +64,7 @@ export const ARCADE_MODES: CardDef[] = [
   {
     id: 'director',
     title: 'Director',
-    tagline: 'The AI learns your taste and evolves flames toward it.',
+    tagline: 'The agent learns your taste and evolves flames toward it.',
     tag: 'Roadmap',
     ready: false,
     icon: Lineage,
@@ -95,8 +96,8 @@ export function ArcadeHub(props: {
       <header class={ui.header}>
         <h1 class={ui.wordmark}>Lumen Arcade</h1>
         <p class={ui.promise}>
-          Hand the controls to an AI. It builds, teaches, animates. You watch,
-          replay, and keep everything.
+          Hand the controls to an agent. It builds, teaches, animates. You
+          watch, replay, and keep everything.
         </p>
         <WebMcpStatusPill />
       </header>

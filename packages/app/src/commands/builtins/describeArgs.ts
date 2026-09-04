@@ -2,7 +2,7 @@
  * Shared formatters for the `describe` hook.
  *
  * `describe` writes the one line a human reads for a step — in the Arcade's
- * live rail while the AI drives, and in the replay step list afterwards. Both
+ * live rail while the agent drives, and in the replay step list afterwards. Both
  * call it with the same normalized args, so a command that describes itself
  * reads identically in both places; one that does not falls back to its label
  * plus raw JSON.

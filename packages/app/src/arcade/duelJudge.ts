@@ -173,7 +173,7 @@ export const powerCurveJudge: DuelJudge = {
         ? `A dead heat at ${playerScore} each.`
         : winner === 'player'
           ? `Your flame wins by ${margin}.`
-          : `The AI's flame wins by ${margin}.`
+          : `The agent's flame wins by ${margin}.`
     return { winner, line, playerScore, rivalScore, components }
   },
 }

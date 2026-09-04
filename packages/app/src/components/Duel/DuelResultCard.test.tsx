@@ -177,6 +177,6 @@ describe('DuelResultCard', () => {
     mount()
     expect(screen.queryByText(/duel length/i)).toBeNull()
     expect(screen.queryByText(/How was this scored\?$/)).toBeNull()
-    expect(screen.queryByText("The AI's flame")).toBeNull()
+    expect(screen.queryByText("The agent's flame")).toBeNull()
   })
 })

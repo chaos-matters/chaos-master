@@ -36,7 +36,7 @@ describe('arcade duel tools', () => {
     expect(started.ok).toBe(true)
     expect(duelActive()).toBe(true)
     // Every tool reads the bridge with no argument, so this is what makes
-    // execute_command land on the AI's flame.
+    // execute_command land on the agent's flame.
     expect(getWebMcpTarget()).toBe('rival')
   })
 

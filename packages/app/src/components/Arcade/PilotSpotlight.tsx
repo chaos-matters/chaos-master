@@ -39,7 +39,7 @@ function same(a: Rect | undefined, b: Rect | undefined): boolean {
 }
 
 /**
- * A ring around the control the AI just used, over the pilot lock.
+ * A ring around the control the agent just used, over the pilot lock.
  *
  * Deliberately NOT the replay follow-cam. That one dims everything it is not
  * pointing at, which is exactly wrong here: the lock was just made almost
@@ -100,7 +100,7 @@ export function PilotSpotlight(props: {
 
     if (hint === undefined) {
       // A step the focus vocabulary cannot place. Say nothing, rather than
-      // leave the ring on the last control and imply the AI touched it again.
+      // leave the ring on the last control and imply the agent touched it again.
       setRect(undefined)
       setLabel(undefined)
     } else {

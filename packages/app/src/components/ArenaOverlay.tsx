@@ -71,7 +71,7 @@ export const ArenaOverlay: Component<ArenaOverlayProps> = (props) => {
   let cachedSimResult: SimulateClashResult | null = null
 
   // Pinned to the player throughout: the target follows a duel to the rival
-  // seat, and restoring through it would write the AI's flame into the
+  // seat, and restoring through it would write the agent's flame into the
   // viewer's document.
   const captureWorkspace = () => {
     const ctx = getWebMcpContext(DEFAULT_SEAT)

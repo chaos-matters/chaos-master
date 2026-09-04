@@ -163,7 +163,7 @@ export function startDuel(input: {
       if (recordsPlayer(input.recording)) player.cancel()
       return {
         ok: false,
-        error: `Could not record the AI's side: ${started.reason}`,
+        error: `Could not record the agent's side: ${started.reason}`,
       }
     }
   }

@@ -21,7 +21,7 @@ export type DuelResult = {
   reason: PilotEndReason
   /** The card's title when the player wins: their flame's name, or `You`. */
   playerName: string
-  /** The same for the rival: the name the agent declared, or `The AI`. */
+  /** The same for the rival: the name the agent declared, or `The agent`. */
   rivalName: string
   /** The winning flame, kept whole so the share link can encode it. */
   winnerFlame: FlameDescriptor

@@ -2,7 +2,7 @@ import { createSignal } from 'solid-js'
 import type { RecordedAction } from '@/recorder/schema'
 
 /**
- * The AI's latest step, in the shape replay reads, for the live spotlight.
+ * The agent's latest step, in the shape replay reads, for the live spotlight.
  *
  * It carries the whole action rather than just a hint because that is what
  * `deriveReplayFocusPreparation` reads: the id and args decide which panel to

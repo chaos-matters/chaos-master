@@ -119,7 +119,7 @@ describe('EclipseHud', () => {
     expect(button.hasAttribute('disabled')).toBe(true)
   })
 
-  it('says when the AI has declared itself happy', () => {
+  it('says when the agent has declared itself happy', () => {
     render(() => (
       <EclipseHud
         model={duelHudModel({
@@ -143,7 +143,7 @@ describe('DuelNarration', () => {
     resetPilot()
   })
 
-  it('renders what the AI says, and what it has spent', () => {
+  it('renders what the agent says, and what it has spent', () => {
     startPilot({
       mode: 'duel',
       title: 'Duel',
