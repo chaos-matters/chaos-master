@@ -16,7 +16,7 @@ import { Camera2D } from '@/lib/Camera2D'
 import { Default3DPreviewCamera } from '@/lib/Camera3D'
 import { Root } from '@/lib/Root'
 import { deepClone } from '@/utils/clone'
-import { filesFromDataTransfer } from '@/utils/dataTransferFiles'
+import { EMPTY_DROP_MESSAGE, filesFromDataTransfer, } from '@/utils/dataTransferFiles'
 import { createFileDragState } from '@/utils/fileDragState'
 import { applyFlameImport, MAX_IMPORT_FILE_SIZE, parseFlameEnvelope, readFlameFiles, summarizeImport, } from '@/utils/flameImport'
 import { extractFlameFromPng } from '@/utils/flameInPng'
@@ -882,6 +882,10 @@ export function LoadFlameModal(props: LoadFlameModalProps) {
         'LoadFlameModal: drop carried no file; types:',
         Array.from(e.dataTransfer?.types ?? []),
       )
+      // Here the picker is one click away, so the toast can just offer it.
+      showToast(EMPTY_DROP_MESSAGE, 10000, [
+        { label: 'Browse files', onClick: () => void loadFromFile() },
+      ])
       return
     }
     await processImportFiles(files)

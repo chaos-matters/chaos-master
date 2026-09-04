@@ -1,5 +1,7 @@
-import { cleanup, render } from '@solidjs/testing-library'
+import { cleanup, render, screen } from '@solidjs/testing-library'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ToastHost } from '@/components/Toast/Toast'
+import { ToastProvider } from '@/contexts/ToastContext'
 import { Dropzone } from './Dropzone'
 
 type FakeTransfer = {
@@ -25,10 +27,14 @@ function dragEvent(type: string, transfer: FakeTransfer = {}): Event {
 
 function setup() {
   const onDrop = vi.fn()
+  // The zone tells the user when a drop arrives empty, so it needs the host.
   const { container } = render(() => (
-    <Dropzone onDrop={onDrop}>
-      <div data-testid="child">child</div>
-    </Dropzone>
+    <ToastProvider>
+      <ToastHost />
+      <Dropzone onDrop={onDrop}>
+        <div data-testid="child">child</div>
+      </Dropzone>
+    </ToastProvider>
   ))
   const zone = container.querySelector('.dropzone') as HTMLElement
   const child = container.querySelector('[data-testid="child"]') as HTMLElement
@@ -37,6 +43,20 @@ function setup() {
 
 describe('Dropzone', () => {
   afterEach(cleanup)
+
+  it('says so on screen when a drop arrives with nothing in it', async () => {
+    // The failure the user actually hit: four drops, four console warnings
+    // nobody sees, and the file they dropped got the blame for a drag that
+    // never carried it. The console line stays for diagnosis; this is the
+    // half a person can read.
+    const { zone } = setup()
+    zone.dispatchEvent(dragEvent('drop', { types: [] }))
+
+    const toast = await screen.findByText(/drop arrived empty/i)
+    expect(toast).toBeTruthy()
+    // It has to say the file is not the problem, and where to go instead.
+    expect(toast.textContent).toMatch(/Load Flame/)
+  })
 
   it('clears the highlight and takes the drop even when no file arrives', () => {
     // A drop with no File (a URL dragged from another window, or a file

@@ -1,5 +1,6 @@
 import { createEffect, onCleanup } from 'solid-js'
-import { filesFromDataTransfer } from '@/utils/dataTransferFiles'
+import { useToast } from '@/contexts/ToastContext'
+import { EMPTY_DROP_MESSAGE, filesFromDataTransfer, } from '@/utils/dataTransferFiles'
 import { createFileDragState } from '@/utils/fileDragState'
 import ui from './Dropzone.module.css'
 import type { ParentProps } from 'solid-js'
@@ -25,6 +26,7 @@ export function Dropzone(props: ParentProps<DropzoneProps>) {
   // Shared with the Load Flame modal's own zone so the two cannot drift — they
   // already had different enter/leave behaviour, and only one of them flickered.
   const fileDrag = createFileDragState()
+  const { showToast } = useToast()
   const dropping = fileDrag.active
 
   preventDraggingAnyElement()
@@ -47,10 +49,14 @@ export function Dropzone(props: ParentProps<DropzoneProps>) {
         fileDrag.reset()
         const [file] = filesFromDataTransfer(ev.dataTransfer)
         if (!file) {
+          // A console warning is invisible to the person who just dropped
+          // something: the app looked broken, and the file they dropped got
+          // the blame for a drag that never carried it. Say so on screen.
           console.warn(
             'Dropzone: drop carried no file; types:',
             Array.from(ev.dataTransfer?.types ?? []),
           )
+          showToast(EMPTY_DROP_MESSAGE, 8000)
           return
         }
         const report = (err: unknown) => {
