@@ -52,3 +52,27 @@ export function categoryOf(
 export function defaultLinearType(dims: Dims): AnyVariationType {
   return dims === 3 ? 'linear3D' : 'linearVar'
 }
+
+/**
+ * The categories a random flame is drawn from: General and Blur.
+ *
+ * The rest — symmetry, post, pre, crop, cut, direct colour — shape or tint an
+ * image that is already there; alone on a fresh transform they render black
+ * until someone tunes them. The randomizer card has always started with
+ * exactly these two groups, and a duel's random flame draws from the same.
+ */
+export const RANDOM_FLAME_CATEGORIES: readonly VariationCategory[] = [
+  'general',
+  'blur',
+]
+
+export function randomFlameVariationTypes(dims: Dims): AnyVariationType[] {
+  return (variationTypesFor(dims) as readonly AnyVariationType[]).filter(
+    (type) => {
+      const category = categoryOf(dims, type)
+      return (
+        category !== undefined && RANDOM_FLAME_CATEGORIES.includes(category)
+      )
+    },
+  )
+}

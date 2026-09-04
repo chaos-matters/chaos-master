@@ -1,6 +1,6 @@
-import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
 import { AFFINE_CONTROLS, composeAffine, decomposeAffine, } from '@/arcade/affineControls'
-import { SAMPLE_VARIATION_TYPES } from '@/arcade/commandHints'
+import { SAMPLE_VARIATION_TYPES, SAMPLE_VARIATION_TYPES_3D, } from '@/arcade/commandHints'
 import { executeCommand } from '@/commands/registry'
 import { VariationPreview } from '@/components/VariationSelector/VariationSelector'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
@@ -8,9 +8,9 @@ import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { ensure3DAffine } from '@/flame/affine3DView'
 import { palette } from '@/flame/colorMap'
 import { defaultPalettes, paletteToGradientCSS } from '@/flame/palettes'
-import { variationTypesFor } from '@/flame/variationRegistry'
+import { isVariationTypeFor, variationTypesFor, } from '@/flame/variationRegistry'
 import { filterVariations } from '@/flame/variations/search'
-import { getVariationPreviewFlame, getVariationPreviewFlame3D, } from '@/flame/variations/utils'
+import { getNormalizedVariationName, getVariationPreviewFlame, getVariationPreviewFlame3D, } from '@/flame/variations/utils'
 import { Check, ColourWedge, Cross, Minus, Plus, ShapeTriangle, Undo, VariationSpiral, } from '@/icons'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { createSharedIntersectionObserver } from '@/utils/useIntersectionObserver'
@@ -23,6 +23,7 @@ import type { CommandContext } from '@/commands/types'
 import type { AffineParams } from '@/flame/affineTranform'
 import type { Palette } from '@/flame/colorMap'
 import type { FlameDescriptor, TransformId } from '@/flame/schema/flameSchema'
+import type { Dims } from '@/flame/variationRegistry'
 import type { TransformVariationType3D } from '@/flame/variations3D'
 
 type Panel = 'variations' | 'shape' | 'colour'
@@ -63,6 +64,11 @@ export function DuelChips(props: {
   const [open, setOpen] = createSignal<Panel | undefined>()
   const [selected, setSelected] = createSignal<TransformId | undefined>()
   let hoverTimer: number | undefined
+  // One accessor for the shape and variations panels both, and a memo: a
+  // scrub of the affine must not re-run every tile's preview branch.
+  const dims = createMemo(
+    (): Dims => ((props.flame().renderSettings.dimensions ?? 2) === 3 ? 3 : 2),
+  )
 
   const transformIds = () =>
     Object.keys(props.flame().transforms) as TransformId[]
@@ -181,9 +187,7 @@ export function DuelChips(props: {
               <Show when={open() === 'variations'}>
                 <VariationsPanel
                   transform={active()}
-                  dims={
-                    (props.flame().renderSettings.dimensions ?? 2) === 3 ? 3 : 2
-                  }
+                  dims={dims()}
                   paused={open() !== 'variations'}
                   onAdd={(type) => {
                     dispatch('flame.addVariation', transformId(), type)
@@ -205,7 +209,7 @@ export function DuelChips(props: {
                 <ShapePanel
                   affine={active().preAffine}
                   ghosts={ghostAffines()}
-                  is3D={(props.flame().renderSettings.dimensions ?? 2) === 3}
+                  is3D={dims() === 3}
                   onChange={(affine) => {
                     dispatch(
                       'flame.setTransformAffine',
@@ -293,52 +297,17 @@ function TransformPicker(props: {
 }
 
 /**
- * The catalogue the Add tile offers.
- *
- * Deliberately a curated handful rather than the ~370 registered types: each
- * tile that scrolls into view mounts a live WebGPU preview, and a duel already
- * has two full-size seat canvases running. The sidebar is where the whole
- * catalogue lives.
- */
-/**
- * Every variation the editor has, not the eight the agent's brief names.
- *
- * `SAMPLE_VARIATION_TYPES` is a prompt hint — a handful of well-known names to
- * show a model what a type id looks like — and using it here meant the strip
- * offered eight of the app's 268 and a search could never reach the rest.
- * 2D deliberately: a duel refuses 3D flames, so there is no dimension to pick.
- */
-/**
- * The catalogue is the flame's own registry: 403 variations in 2D, 43 in 3D.
- * Wired to 2D, it offered every 3D flame a list the validator refuses
- * ("rejected unsafe or oversized add"), so nothing could be added at all.
- */
-function catalogueFor(dims: 2 | 3): readonly string[] {
-  return variationTypesFor(dims)
-}
-
-/**
  * What the resting row offers after what you already have.
  *
  * Named, not sliced: the registry is alphabetical, so the first twelve were
  * Acosech, Acosh, Acoth, Apocarpet — a shortcut row nobody would use. These
- * are the same well-known handful the agent's brief names, which is what
- * `SAMPLE_VARIATION_TYPES` is for. Everything else is behind Add.
+ * are the same well-known handful the agent's brief names, per dimension.
+ * Everything else — the flame's whole registry, 403 types in 2D and 43 in
+ * 3D — is behind Add. Wired to 2D alone, the gallery offered every 3D flame
+ * a list the validator refuses, so nothing could be added at all.
  */
-/** The 3D counterparts of the 2D sample list, name for name. */
-const QUICK_PICKS_3D = [
-  'linear3D',
-  'spherical3D',
-  'swirl3D',
-  'julia3D',
-  'sinusoidal3D',
-  'horseshoe3D',
-  'disc3D',
-  'polar3D',
-] as const
-
-function quickPicksFor(dims: 2 | 3): readonly string[] {
-  return dims === 3 ? QUICK_PICKS_3D : SAMPLE_VARIATION_TYPES
+function quickPicksFor(dims: Dims): readonly string[] {
+  return dims === 3 ? SAMPLE_VARIATION_TYPES_3D : SAMPLE_VARIATION_TYPES
 }
 
 /** One page of the add gallery: about three rows at this tile pitch. */
@@ -354,7 +323,7 @@ const SEARCH_LIMIT = 20
 function VariationTile(props: {
   type: string
   name: string
-  dims: 2 | 3
+  dims: Dims
   weight?: number
   active: boolean
   paused: boolean
@@ -369,6 +338,14 @@ function VariationTile(props: {
 }) {
   const [el, setEl] = createSignal<HTMLElement>()
   const near = props.track?.(el) ?? (() => true)
+  // By the type's own registry, not the flame's dimension alone: a 3D flame
+  // can still carry a 2D variation, and that one has a 2D preview. A memo,
+  // because the 3D fallback builds and validates a whole descriptor.
+  const previewFlame = createMemo(() =>
+    props.dims === 3 && isVariationTypeFor(3, props.type)
+      ? getVariationPreviewFlame3D(props.type as TransformVariationType3D)
+      : getVariationPreviewFlame(props.type),
+  )
   return (
     <div class={ui.tile} classList={{ [ui.tileOn!]: props.active }} ref={setEl}>
       <button
@@ -387,13 +364,7 @@ function VariationTile(props: {
             <VariationPreview
               version={0}
               isSelected={props.active}
-              flame={
-                props.dims === 3
-                  ? getVariationPreviewFlame3D(
-                      props.type as TransformVariationType3D,
-                    )
-                  : getVariationPreviewFlame(props.type)
-              }
+              flame={previewFlame()}
               name={props.name}
               resolution={{ width: 112, height: 112 }}
               paused={props.paused}
@@ -432,7 +403,7 @@ function VariationsPanel(props: {
   transform: {
     variations: Record<string, { type: string; weight: number }>
   }
-  dims: 2 | 3
+  dims: Dims
   paused: boolean
   onWeight: (variationId: string, weight: number) => void
   onRemove: (variationId: string) => void
@@ -443,7 +414,7 @@ function VariationsPanel(props: {
   const [shown, setShown] = createSignal(GALLERY_PAGE)
   const [rowEl, setRowEl] = createSignal<HTMLDivElement>()
   const [galleryEl, setGalleryEl] = createSignal<HTMLDivElement>()
-  // A preview is a GPU job. 268 of them is not a strip, it is a render farm,
+  // A preview is a GPU job. Four hundred of them is not a strip, it is a render farm,
   // so a tile only asks for one once it is near the scroller's viewport.
   const trackRow = createSharedIntersectionObserver(rowEl, {
     rootMargin: '200px',
@@ -453,12 +424,16 @@ function VariationsPanel(props: {
   })
 
   const entries = () => Object.entries(props.transform.variations)
-  const present = () => new Set(entries().map(([, v]) => v.type))
-  const rest = () =>
-    catalogueFor(props.dims).filter((type) => !present().has(type))
-  const quick = () =>
-    quickPicksFor(props.dims).filter((type) => !present().has(type))
-  const matches = () => filterVariations(rest(), query())
+  const present = createMemo(() => new Set(entries().map(([, v]) => v.type)))
+  const rest = createMemo(() =>
+    (variationTypesFor(props.dims) as readonly string[]).filter(
+      (type) => !present().has(type),
+    ),
+  )
+  const quick = createMemo(() =>
+    quickPicksFor(props.dims).filter((type) => !present().has(type)),
+  )
+  const matches = createMemo(() => filterVariations(rest(), query()))
   const searching = () => query().trim() !== ''
   const visible = () =>
     searching() ? matches().slice(0, SEARCH_LIMIT) : matches().slice(0, shown())
@@ -484,7 +459,7 @@ function VariationsPanel(props: {
             <input
               class={ui.search}
               type="search"
-              placeholder={`Search ${catalogueFor(props.dims).length} variations`}
+              placeholder={`Search ${variationTypesFor(props.dims).length} variations`}
               value={query()}
               aria-label="Search variations"
               onInput={(ev) => {
@@ -554,7 +529,7 @@ function VariationsPanel(props: {
             </div>
           }
         >
-          {/* Rows rather than a corridor: the catalogue is 268 long, and a
+          {/* Rows rather than a corridor: the catalogue is hundreds long, and a
               single scrolling line makes you drag past everything you do not
               want to reach anything you do. */}
           <div class={ui.gallery} ref={setGalleryEl}>
@@ -599,11 +574,10 @@ function VariationsPanel(props: {
 
 /** `linearVar` reads as "Linear" once, here, rather than in four places. */
 function readableType(type: string): string {
-  const trimmed = type.replace(/Var$/, '').replace(/3D$/, '')
-  return (
-    trimmed.charAt(0).toUpperCase() +
-    trimmed.slice(1).replace(/([A-Z])/g, ' $1')
-  )
+  const name = getNormalizedVariationName(type)
+  // A custom variation's name is already a name.
+  if (type.startsWith('custom_')) return name
+  return name.charAt(0).toUpperCase() + name.slice(1).replace(/([A-Z])/g, ' $1')
 }
 
 /**

@@ -1,6 +1,6 @@
 import { vec2f } from 'typegpu/data'
 import { camera3DDefault, MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from '@/flame/schema/flameSchema'
-import { registerCommand } from '../registry'
+import { executeCommand, registerCommand } from '../registry'
 import { num } from './describeArgs'
 
 /**
@@ -40,15 +40,17 @@ registerCommand({
   shortcut: 'Ctrl+0',
   execute(ctx) {
     // In 3D the camera is an orbit and `position`/`zoom` are unused, so this
-    // was a no-op there — which is what a viewer who had just spun a flame
-    // around and pressed Centre saw. Same intent, the orbit's own fields.
+    // was a no-op there. The orbit only: fov and roll are the lens, and Centre
+    // leaves the 2D rotation alone for the same reason. Through the same
+    // render-setting path as the 2D setters, so a held timeline frame lets go.
     if ((ctx.flameDescriptor().renderSettings.dimensions ?? 2) === 3) {
-      ctx.setFlameDescriptor((draft) => {
-        draft.renderSettings.camera3D = {
-          ...camera3DDefault,
-          target: [0, 0, 0],
-        }
-      }, 'Center Camera')
+      const { theta, phi, radius } = camera3DDefault
+      executeCommand('flame.setRenderSetting', ctx, 'camera3D', {
+        theta,
+        phi,
+        radius,
+        target: [0, 0, 0],
+      })
       return
     }
     ctx.setPosition(vec2f(0, 0))

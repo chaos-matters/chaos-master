@@ -1,6 +1,6 @@
 import { generateSeededRandomFlame, mutateFlameSeeded, MUTATION_PRESETS, } from '@/flame/randomize'
 import { isFlameGraphWithinLimits, isSafeFlameEntityId, MAX_FLAME_TRANSFORMS, tryValidateFlame, } from '@/flame/schema/flameSchema'
-import { isVariationTypeFor } from '@/flame/variationRegistry'
+import { isVariationTypeFor, randomFlameVariationTypes, } from '@/flame/variationRegistry'
 import { deepClone } from '@/utils/clone'
 import { registerCommand } from '../registry'
 import type { CommandContext } from '../types'
@@ -22,8 +22,10 @@ function mintSeed(): number {
   return Math.floor(Math.random() * 0x1_0000_0000)
 }
 
-/** The randomizer card's baseline generation shape. An empty
- *  `allowedVariations` means the full variation pool.
+/** The randomizer card's baseline generation shape, drawing from General and
+ *  Blur like the card does. (An empty `allowedVariations` would mean the full
+ *  pool — symmetry and post variations included, which render black on a
+ *  fresh transform until someone tunes them.)
  *
  *  Exported because `asGenerateConfig` accepts only a COMPLETE config — a
  *  partial `{ dimensions: 3 }` fails every one of its checks and falls back to
@@ -36,7 +38,7 @@ export function generateDefaults(dimensions: Dims): GenerateRandomFlameConfig {
     maxTransforms: 4,
     minVariations: 1,
     maxVariations: 2,
-    allowedVariations: [],
+    allowedVariations: randomFlameVariationTypes(dimensions),
     dimensions,
   }
 }

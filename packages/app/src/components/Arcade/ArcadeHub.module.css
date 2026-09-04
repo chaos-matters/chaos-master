@@ -265,22 +265,7 @@
   font-size: 13px;
 }
 
-.field textarea {
-  width: 100%;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.05);
-  color: inherit;
-  font:
-    14px/1.4 system-ui,
-    sans-serif;
-  resize: vertical;
-}
-
-/* A native select does not inherit colour: unstyled, it drew the page's white
-   text on its own white field. Same box as the textarea, and `color-scheme`
-   so the dropdown list Chrome opens is dark too. */
+.field textarea,
 .field select {
   width: 100%;
   padding: 8px 10px;
@@ -288,10 +273,20 @@
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.05);
   color: inherit;
-  color-scheme: dark;
   font:
     14px/1.4 system-ui,
     sans-serif;
+}
+
+.field textarea {
+  resize: vertical;
+}
+
+/* A native select does not inherit colour: unstyled, it drew the page's white
+   text on its own white field. `color-scheme` so the dropdown list Chrome
+   opens is dark too. */
+.field select {
+  color-scheme: dark;
   cursor: pointer;
 }
 

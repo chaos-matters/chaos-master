@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { categoryOf } from '@/flame/variationRegistry'
 import { clearWebMcpContext, getWebMcpTarget, setWebMcpContext, setWebMcpTarget, } from '@/webmcp/contextBridge'
 import { createMockCommandContext, createTestFlame } from '@/webmcp/testUtils'
 import { duelActive, duelRivalSeat, runningDuel, stopDuel } from './duel'
@@ -106,6 +107,23 @@ describe('a duel with no agent in it', () => {
 
     expect(ctx.flameDescriptor().renderSettings.dimensions).toBe(3)
     expect(duelRivalSeat()?.flame().renderSettings.dimensions).toBe(3)
+  })
+
+  it('builds a random 2D flame from variations that render on their own', () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+
+    expect(
+      beginDuel(ctx, { seconds: 90, startFrom: 'random-2d', opponent: 'none' }),
+    ).toMatchObject({ ok: true })
+
+    const types = Object.values(ctx.flameDescriptor().transforms).flatMap(
+      (transform) => Object.values(transform.variations).map((v) => v.type),
+    )
+    expect(types.length).toBeGreaterThan(0)
+    for (const type of types) {
+      expect(['general', 'blur']).toContain(categoryOf(2, type))
+    }
   })
 
   it('refuses a second duel on top of a running one', () => {

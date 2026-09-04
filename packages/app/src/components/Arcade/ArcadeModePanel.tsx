@@ -8,6 +8,7 @@ import { getWebMcpContext } from '@/webmcp/contextBridge'
 import ui from './ArcadeHub.module.css'
 import type { DuelStartFrom } from '@/arcade/duelActions'
 import type { TopicId } from '@/arcade/topics'
+import type { Dims } from '@/flame/variationRegistry'
 import type { ArcadeMode } from '@/lib/activeTab'
 
 /**
@@ -86,9 +87,12 @@ export function ArcadeModePanel(props: {
    * this the dimension of the duel about to begin is a surprise. Reads the
    * same bridge the solo button reads.
    */
-  const loadedDimensions = () =>
-    getWebMcpContext('player')?.flameDescriptor().renderSettings.dimensions ?? 2
-  const duelDimensions = () =>
+  const loadedDimensions = (): Dims =>
+    getWebMcpContext('player')?.flameDescriptor().renderSettings.dimensions ===
+    3
+      ? 3
+      : 2
+  const duelDimensions = (): Dims =>
     startFrom() === 'random-3d'
       ? 3
       : startFrom() === 'random-2d'
@@ -124,7 +128,7 @@ export function ArcadeModePanel(props: {
     props.mode === 'teach'
       ? teachPromptCard(topic())
       : props.mode === 'duel'
-        ? duelPromptCard(duelSeconds(), startFrom())
+        ? duelPromptCard(duelSeconds(), startFrom(), duelDimensions())
         : cinemaPromptCard(description())
   return (
     <aside
@@ -243,8 +247,7 @@ export function ArcadeModePanel(props: {
                 : 'Pan and zoom'}
             </li>
             <li class={ui.setupPill}>
-              {variationTypesFor(duelDimensions() === 3 ? 3 : 2).length}{' '}
-              variations
+              {variationTypesFor(duelDimensions()).length} variations
             </li>
           </ul>
           <label class={ui.field}>

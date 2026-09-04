@@ -1,4 +1,5 @@
 import { getAllCommands } from '@/commands/registry'
+import type { TransformVariationType3D } from '@/flame/variations3D'
 
 /**
  * Argument shapes for the commands an Arcade mode allows.
@@ -66,6 +67,22 @@ export const SAMPLE_VARIATION_TYPES = [
   'discVar',
   'polarVar',
 ] as const
+
+/**
+ * The 3D counterparts of the sample list, name for name. The brief for a 3D
+ * flame and the duel's shortcut row both read this one; `satisfies` keeps
+ * every entry a registered 3D type.
+ */
+export const SAMPLE_VARIATION_TYPES_3D = [
+  'linear3D',
+  'spherical3D',
+  'swirl3D',
+  'julia3D',
+  'sinusoidal3D',
+  'horseshoe3D',
+  'disc3D',
+  'polar3D',
+] as const satisfies readonly TransformVariationType3D[]
 
 /**
  * One mode's allow-list as concrete `"<id> <arg shape>"` lines: dot-prefixes
