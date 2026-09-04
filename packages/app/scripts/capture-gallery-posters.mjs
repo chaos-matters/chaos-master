@@ -329,6 +329,9 @@ async function main() {
       '--enable-unsafe-webgpu',
       '--enable-features=Vulkan',
       '--ignore-gpu-blocklist',
+      // The window manager files agent-owned windows by this class on a hidden
+      // workspace, so a capture never lands on top of whatever the user is doing.
+      '--class=agent-browser',
     ],
   })
   // ignoreHTTPSErrors: the dev server runs over HTTPS with a self-signed cert
