@@ -129,7 +129,7 @@ const modes = [
         aria-label="Which browsers can run the Arcade"
         set:html={icons.info}
       />
-      <span class="info-pop" id="webmcp-req" role="tooltip">
+      <span class="info-pop" id="webmcp-req">
         <b>WebMCP is early.</b> Open the Arcade in ChatGPT's desktop browser, or in
         Chrome 149+ with <code>chrome://flags/#enable-webmcp-testing</code> switched
         on. WebGPU draws the flame either way. Anywhere else the Arcade still opens
@@ -151,6 +151,10 @@ const modes = [
       e.stopPropagation()
       set(btn.getAttribute('aria-expanded') !== 'true')
     })
+    // Selecting the flag inside the panel must not dismiss it.
+    document
+      .getElementById('webmcp-req')
+      ?.addEventListener('click', (e) => e.stopPropagation())
     document.addEventListener('click', () => set(false))
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') set(false)

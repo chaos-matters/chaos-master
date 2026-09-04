@@ -79,7 +79,9 @@ const repoUrl = 'https://github.com/chaos-matters/chaos-master'
     font-size: 0.6rem;
     font-weight: 500;
     letter-spacing: 0.2em;
-    color: var(--neutral-500);
+    /* neutral-400, not -500: at 9.6px this is the smallest type on the page and
+       -500 measures 4.43:1 on black, just under AA. */
+    color: var(--neutral-400);
   }
   @media (max-width: 560px) {
     .brand-sub {
