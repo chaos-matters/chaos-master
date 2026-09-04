@@ -5,7 +5,7 @@ import { deepClone } from '@/utils/clone'
 import { currentUndoSeq } from '@/utils/undoJournal'
 import { VERSION } from '@/version'
 import { setDocumentWriteReporter, setTimelineTransportReporter, } from './documentWriteHook'
-import { focusHintFor } from './focus'
+import { focusForCommand, focusHintFor } from './focus'
 import { NARRATION_COMMAND_ID, narrationAsStep } from './narrationMode'
 import { MAX_ACTION_TIMESTAMP_MS, MAX_SESSION_ACTIONS, MAX_SESSION_FILE_BYTES, MAX_SESSION_JSON_CHARS, serializeSession, SESSION_FORMAT_VERSION, validateRecordedAction, validateSession, } from './schema'
 import type { RecordedAction, RecordedSession, SessionViewSnapshot, } from './schema'
@@ -136,7 +136,7 @@ function focusFor(
   cmd: Pick<FlameCommand, 'id' | 'focus'>,
   args: unknown[],
 ): string | undefined {
-  return cmd.focus?.(args) ?? focusHintFor(cmd.id, args)
+  return focusForCommand(cmd, args)
 }
 
 function resetGestureState() {

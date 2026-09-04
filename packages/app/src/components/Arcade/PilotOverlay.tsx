@@ -4,8 +4,10 @@ import { finishPilot } from '@/arcade/pilotActions'
 import { Robot, Stop } from '@/icons'
 import { formatElapsed, reasonLabel, savedLine } from './pilotFormat'
 import ui from './PilotOverlay.module.css'
+import { PilotSpotlight } from './PilotSpotlight'
 import type { PilotEnded } from '@/arcade/pilot'
 import type { CommandContext } from '@/commands/types'
+import type { ReplayFocusPreparationHandler } from '@/recorder/focusPreparation'
 
 const ESC_ARM_MS = 1500
 
@@ -15,7 +17,10 @@ const ESC_ARM_MS = 1500
  * take and still saves it. When the pilot ends, the same component shows the
  * end card with Replay / Back to Arcade.
  */
-export function PilotOverlay(props: { ctx: CommandContext }) {
+export function PilotOverlay(props: {
+  ctx: CommandContext
+  onPrepareFocus?: ReplayFocusPreparationHandler
+}) {
   const [escArmed, setEscArmed] = createSignal(false)
   const [elapsed, setElapsed] = createSignal(0)
   let escTimer: number | undefined
@@ -133,6 +138,9 @@ export function PilotOverlay(props: { ctx: CommandContext }) {
             </div>
           </div>
         )}
+      </Show>
+      <Show when={agentDriving()}>
+        <PilotSpotlight onPrepareFocus={props.onPrepareFocus} />
       </Show>
       <Show when={ended()}>
         {(end) => (

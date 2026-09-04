@@ -1,6 +1,9 @@
 import { guardCommand } from '@/arcade/guard'
 import { appendPilotLog, drivingState, notePilotStep, pilotStepsRemaining, } from '@/arcade/pilot'
+import { notePilotFocus } from '@/arcade/pilotFocus'
 import { executeCommand, getCommand, preflightLiveCommand, } from '@/commands/registry'
+import { focusForCommand } from '@/recorder/focus'
+import { NARRATION_COMMAND_ID } from '@/recorder/narrationMode'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
 import type { WebMcpTool } from '@/webmcp/types'
 
@@ -132,10 +135,29 @@ export const executeCommandTool: WebMcpTool = {
       // its canonical shape — `sonification.setConfig` cannot say
       // "Sonification model: ambient" from the flat config an agent typed,
       // only from the snapshot normalization builds.
-      const remaining = notePilotStep(
-        'command',
-        describeStep(commandId, preflight.args),
-      )
+      const line = describeStep(commandId, preflight.args)
+      const remaining = notePilotStep('command', line)
+      // Point the overlay at the control this step moved. Same hint the
+      // recorder stamps on the action, resolved the same way, so the live
+      // spotlight and the replay follow-cam cannot pick different targets for
+      // the same command.
+      //
+      // Narration is the exception: a sentence is the agent SPEAKING about
+      // what it just did, not a move on the interface. Retiring the ring for
+      // it would pull the pointer off the control the sentence is explaining.
+      if (commandId !== NARRATION_COMMAND_ID) {
+        const cmd = getCommand(commandId)
+        const args = [...preflight.args]
+        notePilotFocus(
+          {
+            t: 0,
+            id: commandId,
+            args,
+            focus: cmd === undefined ? undefined : focusForCommand(cmd, args),
+          },
+          line,
+        )
+      }
       return { success: true, commandId, steps: driving.steps + 1, remaining }
     }
 

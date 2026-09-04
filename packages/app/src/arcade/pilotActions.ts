@@ -1,5 +1,6 @@
 import { clearNarration } from './narration'
 import { appendPilotLog, drivingState, endPilot, notePilotSaveResult, } from './pilot'
+import { clearPilotFocus } from './pilotFocus'
 import { isTopicId, LESSON_TOPICS } from './topics'
 import type { PilotDriving, PilotEnded, PilotEndReason } from './pilot'
 import type { CommandContext } from '@/commands/types'
@@ -44,6 +45,7 @@ export async function finishPilot(
   const session = ctx.recorder?.stop()
   const sessionName = session ? sessionNameFor(state, title, reason) : undefined
   clearNarration()
+  clearPilotFocus()
   // Leave `driving` in the same tick the recorder stops. Awaiting the save
   // first left a window in which the guard still said "driving" while nothing
   // was being recorded, so a tool call landing there ran and counted a step

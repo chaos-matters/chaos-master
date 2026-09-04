@@ -1,4 +1,5 @@
 import { createSignal } from 'solid-js'
+import { clearPilotFocus } from './pilotFocus'
 import type { RecordedSession } from '@/recorder/schema'
 
 /**
@@ -161,6 +162,7 @@ export function notePilotSaveResult(saved: boolean): void {
 
 export function resetPilot(): void {
   setPilot({ phase: 'idle' })
+  clearPilotFocus()
   setPilotLog([])
   setLastPilotSession(undefined)
 }
