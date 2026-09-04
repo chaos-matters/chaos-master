@@ -328,7 +328,7 @@ export function buildTimelineSnapshot(
     if (last !== undefined && last.frame > input.durationFrames) {
       return {
         ok: false,
-        error: `durationFrames ${input.durationFrames} would cut the existing track "${track.parameterPath}", which runs to frame ${last.frame}. Keep the same duration or send mode "replace".`,
+        error: `durationFrames ${input.durationFrames} would cut the existing track "${track.parameterPath}", which runs to frame ${last.frame}. This flame arrived with its own animation: use durationFrames ${last.frame} or more to build on it, send mode "replace" to drop it, or empty the timeline first with execute_command timeline.clearTracks.`,
       }
     }
   }

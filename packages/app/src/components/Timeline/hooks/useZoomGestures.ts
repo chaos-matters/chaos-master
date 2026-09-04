@@ -1,4 +1,5 @@
-import { createEffect, createMemo, createSignal, onCleanup } from 'solid-js'
+import { createEffect, createMemo, createSignal, onCleanup, untrack, } from 'solid-js'
+import { agentDriving } from '@/arcade/pilot'
 import { createPinchHandler } from '@/utils/createPinchHandler'
 import type { Accessor } from 'solid-js'
 
@@ -145,6 +146,32 @@ export function useZoomGestures(
     ro.observe(ruler)
     onCleanup(() => {
       ro.disconnect()
+    })
+  })
+
+  // Fit is a button, and an agent has no pointer to press it with.
+  //
+  // A Cinema take replaces the whole timeline, usually with a longer duration
+  // than whatever was on it — a nine-second take over a preset's ninety frames
+  // is three times the span. The dope sheet kept the zoom it had, so the frames
+  // the agent had just written ran off the right edge of the panel the lock
+  // overlay is pointing at, and the viewer watched a step land somewhere they
+  // could not see. Re-fit whenever the span changes while the agent drives.
+  //
+  // Only while it drives: a zoom a person set by hand is theirs, and the
+  // workspace is locked for the whole time this can fire.
+  let previousTotalFrames: number | undefined
+  createEffect(() => {
+    const frames = totalFrames()
+    const driving = agentDriving()
+    const changed =
+      previousTotalFrames !== undefined && previousTotalFrames !== frames
+    previousTotalFrames = frames
+    if (!changed || !driving) return
+    // Untracked: autoFitZoom reads containerHeight, and this effect must depend
+    // on the frame span alone or a panel resize would re-run it.
+    untrack(() => {
+      autoFitZoom()
     })
   })
 

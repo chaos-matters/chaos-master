@@ -80,7 +80,9 @@ test.describe('Lumen Arcade', () => {
       topic: 'variations',
     })
     expect(brief).toMatchObject({ ok: true, topic: 'variations' })
-    const lock = page.getByRole('dialog', { name: 'AI is driving the editor' })
+    const lock = page.getByRole('dialog', {
+      name: 'The agent is driving the editor',
+    })
     await expect(lock).toBeVisible()
     await expect(lock).toContainText('Teaching: Variations')
 
@@ -144,13 +146,66 @@ test.describe('Lumen Arcade', () => {
   test('Stop ends the lesson and keeps the recording', async ({ page }) => {
     await openEditor(page)
     await callTool(page, 'arcade_start_lesson', { topic: 'color' })
-    await page.getByRole('button', { name: /Stop the AI/ }).click()
+    await page.getByRole('button', { name: /Stop the agent/ }).click()
     await expect(
       page.getByRole('dialog', { name: /Stopped by you/ }),
     ).toBeVisible()
     expect(
       await callTool(page, 'arcade_narrate', { text: 'too late' }),
     ).toHaveProperty('error')
+  })
+
+  /**
+   * Fit is a button, and the agent has no pointer.
+   *
+   * A take is usually longer than whatever span the dope sheet was showing, so
+   * the frames the agent just wrote ran off the right edge of the panel the
+   * lock overlay points at. Only a real layout can answer this: jsdom gives
+   * every element a zero width, and autoFitZoom returns early on one.
+   */
+  test('Cinema fits the dope sheet to the take it just wrote', async ({
+    page,
+  }) => {
+    await openEditor(page)
+    expect(await callTool(page, 'arcade_start_cinema', {})).toMatchObject({
+      ok: true,
+    })
+    const zoom = page.getByTestId('timeline-zoom')
+    await expect(zoom).toBeVisible({ timeout: 20_000 })
+    const before = await zoom.textContent()
+
+    // A nine-second take at 30fps, three times the span the editor opens with.
+    expect(
+      await callTool(page, 'arcade_set_keyframes', {
+        fps: 30,
+        durationFrames: 270,
+        play: false,
+        tracks: [
+          {
+            path: 'camera.zoom',
+            keyframes: [
+              { frame: 0, value: 1 },
+              { frame: 270, value: 1.6 },
+            ],
+          },
+        ],
+      }),
+    ).toMatchObject({ ok: true })
+    await expect(zoom).not.toHaveText(before ?? '', { timeout: 10_000 })
+
+    // The invariant, independent of how far the zoom range actually reaches:
+    // the take is already fitted, so pressing Fit changes nothing. Fit has to
+    // wait for the session to end — the pilot shield intercepts every pointer
+    // event over the workspace, which is exactly why the agent cannot press it
+    // and the dope sheet has to fit itself.
+    const fitted = await zoom.textContent()
+    await callTool(page, 'arcade_end_cinema', { title: 'Fit check' })
+    const endCard = page.getByRole('dialog', { name: /Fit check: Finished/ })
+    await expect(endCard).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(endCard).toBeHidden()
+    await page.getByRole('button', { name: 'Fit' }).click()
+    await expect(zoom).toHaveText(fitted ?? '')
   })
 
   test('Cinema: paths, keyframes, end', async ({ page }) => {

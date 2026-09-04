@@ -6,6 +6,7 @@ import { cancelSessionRecording, startSessionRecording, stopSessionRecording, un
 import { clearWebMcpContext, setWebMcpContext } from '@/webmcp/contextBridge'
 import { createMockCommandContext, createTestFlame } from '@/webmcp/testUtils'
 import { arcadeEndCinema, arcadeGetAnimatablePaths, arcadeSetKeyframes, arcadeStartCinema, } from './arcadeCinema'
+import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 /** A mock whose recorder hands back a take, the way a real one does. */
 function ctxWithRecorder() {
@@ -238,7 +239,27 @@ describe('Cinema tools', () => {
     }
     expect(paths.transforms).toHaveLength(8)
     expect(paths.transformPaths).toContain('preAffine')
-    expect(JSON.stringify(paths).length).toBeLessThan(1500)
+    // Was 1500 before blendWeight (the one keyable parameter no group named)
+    // joined the result at 24 bytes. Every other addition here has to pay for
+    // itself the same way: measure, then move this, rather than the reverse.
+    expect(JSON.stringify(paths).length).toBeLessThan(1600)
+  })
+
+  /** The same flame opened from a motion row: the preset's own tracks are
+   *  reported too, and that is the case an agent actually meets. */
+  it('stays inside the budget when the flame arrives animated', async () => {
+    const ctx = createMockCommandContext()
+    ctx.timeline.tracks = () =>
+      ['camera3D.theta', 'camera3D.phi', 'camera3D.radius'].map((path) => ({
+        parameterPath: path,
+        keyframes: [
+          { frame: 0, value: 1 },
+          { frame: 90, value: 2 },
+        ],
+      }))
+    setWebMcpContext(ctx)
+    const paths = await arcadeGetAnimatablePaths.execute({}, {})
+    expect(JSON.stringify(paths).length).toBeLessThan(1900)
   })
 
   // The grammar is the agent's only description of what set_keyframes accepts,
@@ -303,5 +324,145 @@ describe('Cinema tools', () => {
     expect(
       await arcadeSetKeyframes.execute({ durationFrames: 30, tracks: [] }, {}),
     ).toHaveProperty('error')
+  })
+})
+
+/**
+ * The listing an agent plans its whole take from.
+ *
+ * A 3D flame reported `camera: []` while `camera3D.theta` was keyable, moved
+ * the picture, and was in the catalog the same call had just built — the
+ * summary named the 2D group and nothing else, so a whole parameter family was
+ * offered to nobody.
+ */
+describe('arcade_get_animatable_paths lists everything the timeline drives', () => {
+  afterEach(() => {
+    resetPilot()
+    cancelSessionRecording()
+    clearWebMcpContext()
+  })
+
+  type Summary = {
+    render: { path: string }[]
+    palette: { path: string }[]
+    color: { path: string }[]
+    camera: { path: string; current?: unknown }[]
+    other: { path: string; current?: unknown }[]
+    transformPaths: string
+    existingTracks?: { count: number; endFrame: number; paths: string[] }
+  }
+
+  const summaryFor = async (flame: FlameDescriptor, ctxPatch = {}) => {
+    const ctx = createMockCommandContext()
+    ctx.flameDescriptor = () => flame
+    Object.assign(ctx, ctxPatch)
+    setWebMcpContext(ctx)
+    return (await arcadeGetAnimatablePaths.execute({}, {})) as Summary
+  }
+
+  /**
+   * Nothing the timeline can drive may be invisible to the agent: every
+   * non-transform catalog path is either listed with its current value or
+   * named by the `transformPaths` grammar. The bug was one whole group going
+   * unnamed; this is the ratchet for the next one.
+   */
+  const assertCoversCatalog = (flame: FlameDescriptor, summary: Summary) => {
+    const listed = new Set(
+      [
+        ...summary.render,
+        ...summary.palette,
+        ...summary.color,
+        ...summary.camera,
+        ...summary.other,
+      ].map((entry) => entry.path),
+    )
+    const namedByGrammar = (path: string) =>
+      path.startsWith('finalTransform.') &&
+      summary.transformPaths.includes('finalTransform.{a-f}')
+    const missing = buildAnimatableCatalog(flame)
+      .filter((entry) => !entry.group.startsWith('Transform '))
+      .map((entry) => entry.path)
+      .filter((path) => !listed.has(path) && !namedByGrammar(path))
+    expect(missing).toEqual([])
+  }
+
+  it('offers the 3D camera family on a 3D flame', async () => {
+    const flame = createTestFlame()
+    flame.renderSettings.dimensions = 3
+    flame.renderSettings.camera3D = {
+      theta: 1.2,
+      phi: 1.5,
+      radius: 2.2,
+      fov: 60,
+    } as never
+    const summary = await summaryFor(flame)
+    expect(summary.camera.map((entry) => entry.path)).toEqual([
+      'camera3D.theta',
+      'camera3D.phi',
+      'camera3D.radius',
+      'camera3D.fov',
+    ])
+    expect(summary.camera[0]).toMatchObject({ current: 1.2 })
+    assertCoversCatalog(flame, summary)
+  })
+
+  it('offers the 2D camera family on a 2D flame', async () => {
+    const flame = createTestFlame()
+    const summary = await summaryFor(flame)
+    expect(summary.camera.map((entry) => entry.path)).toEqual([
+      'camera.x',
+      'camera.y',
+      'camera.zoom',
+      'camera.rotation',
+    ])
+    assertCoversCatalog(flame, summary)
+  })
+
+  it('names the tracks a preset arrived with', async () => {
+    const ctx = createMockCommandContext()
+    ctx.timeline.tracks = () =>
+      [
+        {
+          parameterPath: 'camera3D.theta',
+          keyframes: [
+            { frame: 0, value: 1.2 },
+            { frame: 90, value: 7.5 },
+          ],
+        },
+      ] as never
+    setWebMcpContext(ctx)
+    const summary = (await arcadeGetAnimatablePaths.execute({}, {})) as Summary
+    expect(summary.existingTracks).toMatchObject({
+      count: 1,
+      endFrame: 90,
+      paths: ['camera3D.theta'],
+    })
+  })
+
+  it('tells the pilot at the start what the timeline already holds', async () => {
+    const ctx = ctxWithRecorder()
+    ctx.timeline.tracks = () =>
+      [
+        {
+          parameterPath: 'camera3D.theta',
+          keyframes: [
+            { frame: 0, value: 1.2 },
+            { frame: 90, value: 7.5 },
+          ],
+        },
+      ] as never
+    const started = (await arcadeStartCinema.execute({}, {})) as {
+      existingTracks?: { count: number; endFrame: number }
+      tips: string[]
+    }
+    expect(started.existingTracks).toMatchObject({ count: 1, endFrame: 90 })
+    expect(started.tips[0]).toContain('already holds 1 track(s)')
+    expect(started.tips[0]).toContain('timeline.clearTracks')
+  })
+
+  it('says nothing about existing tracks when the timeline is empty', async () => {
+    setWebMcpContext(createMockCommandContext())
+    const summary = (await arcadeGetAnimatablePaths.execute({}, {})) as Summary
+    expect(summary.existingTracks).toBeUndefined()
   })
 })

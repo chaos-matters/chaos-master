@@ -9,6 +9,7 @@ import { executeCommand, preflightReplayCommand } from '@/commands/registry'
 import { withRecordingSuppressed } from '@/recorder/recorder'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
 import type { CatalogEntry } from '@/arcade/animatablePaths'
+import type { TimelineTrack } from '@/utils/timeline'
 import type { WebMcpTool } from '@/webmcp/types'
 
 const NOT_READY = {
@@ -68,11 +69,18 @@ export const arcadeStartCinema: WebMcpTool = {
     if (ctx.view?.showTimeline?.() !== true) {
       executeCommand('view.setShowTimeline', ctx, true)
     }
+    const existing = summarizeExisting(ctx.timeline.tracks())
     return {
       ok: true,
       stepBudget: CINEMA_STEP_BUDGET,
       allowedCommands: describeAllowedCommands(allowed),
+      existingTracks: existing,
       tips: [
+        ...(existing
+          ? [
+              `The timeline already holds ${existing.count} track(s) running to frame ${existing.endFrame} — this flame arrived with an animation. ${existing.note}`,
+            ]
+          : []),
         'Call arcade_get_animatable_paths first.',
         'Build the animation one idea at a time: arcade_set_keyframes with mode "add" per group of related tracks, keeping the same durationFrames. Each call is a step the viewer watches land and can replay.',
         'Keep it under 10 seconds unless asked; use easeInOut for camera moves.',
@@ -91,9 +99,45 @@ const MAX_LISTED_TRANSFORMS = 8
 const TRANSFORM_PATHS =
   'transform.<id>.{preAffine|postAffine}.{a-f} or .{probability|colorSpeed|color.x|color.y} | finalTransform.{a-f} | <id>.<variationId> = variation weight (no transform. prefix)'
 
+/** Groups `summarize` names explicitly. Everything else lands in `other`. */
+const NAMED_GROUPS = new Set([
+  'Render',
+  'Palette',
+  'Color',
+  'Camera',
+  'Camera3D',
+])
+
+/** How many existing track paths are named before the list is truncated. */
+const MAX_LISTED_EXISTING = 12
+
+/**
+ * What the timeline already holds, so a Cinema call can be built around it.
+ *
+ * A flame opened from a motion row arrives with its own animation on the
+ * timeline. An agent that cannot see it sends `mode: "add"` with a shorter
+ * duration, gets the (correct) refusal naming a track it never placed, and has
+ * to guess what happened — the run this came from blamed the keyframes' missing
+ * `interp`, which is optional and was never the problem.
+ */
+function summarizeExisting(tracks: readonly TimelineTrack[]) {
+  if (tracks.length === 0) return undefined
+  const endFrame = Math.max(
+    ...tracks.map((track) => track.keyframes.at(-1)?.frame ?? 0),
+  )
+  return {
+    count: tracks.length,
+    endFrame,
+    paths: tracks.slice(0, MAX_LISTED_EXISTING).map((t) => t.parameterPath),
+    truncated: tracks.length > MAX_LISTED_EXISTING ? true : undefined,
+    note: `mode "add" keeps these and needs durationFrames >= ${endFrame}; "replace" drops them; timeline.clearTracks empties the timeline.`,
+  }
+}
+
 function summarize(
   catalog: CatalogEntry[],
   config: { fps: number; endFrame: number; loopMode?: string } | undefined,
+  existingTracks: readonly TimelineTrack[] = [],
 ) {
   // `type` is dropped for numbers, which is nearly every path; the tool
   // description says so. It is the single biggest saving in this result.
@@ -117,7 +161,28 @@ function summarize(
     render: simple('Render'),
     palette: simple('Palette'),
     color: simple('Color'),
-    camera: simple('Camera'),
+    // A flame renders through exactly one camera family and the catalog drops
+    // the other, so this key always holds the live one — camera3D.* on a 3D
+    // flame. Naming only the 2D group here is what reported `camera: []` for a
+    // 3D flame whose camera3D paths were keyable all along.
+    camera: [...simple('Camera'), ...simple('Camera3D')],
+    // Everything else the timeline drives, collected by exclusion so a new
+    // parameter group cannot go missing the way Camera3D did. Transforms have
+    // their own block below, and `transformPaths` already gives the
+    // finalTransform grammar — its current values are a get_flame away and
+    // would cost more of the result than they are worth here.
+    other: catalog
+      .filter(
+        (entry) =>
+          !NAMED_GROUPS.has(entry.group) &&
+          entry.group !== 'Final Transform' &&
+          !entry.group.startsWith('Transform '),
+      )
+      .map((entry) => ({
+        path: entry.path,
+        type: entry.type === 'number' ? undefined : entry.type,
+        current: entry.current,
+      })),
     transformPaths: TRANSFORM_PATHS,
     transforms: listed.map((id) => ({
       id,
@@ -149,6 +214,7 @@ function summarize(
           loopMode: config.loopMode ?? 'off',
         }
       : undefined,
+    existingTracks: summarizeExisting(existingTracks),
   }
 }
 
@@ -164,6 +230,7 @@ export const arcadeGetAnimatablePaths: WebMcpTool = {
     return summarize(
       buildAnimatableCatalog(ctx.flameDescriptor()),
       ctx.timeline.edit?.snapshot().config,
+      ctx.timeline.tracks(),
     )
   },
 }
