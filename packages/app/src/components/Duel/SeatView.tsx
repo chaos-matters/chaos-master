@@ -1,5 +1,7 @@
+import { createMemo } from 'solid-js'
 import { vec4f } from 'typegpu/data'
 import { DEFAULT_POINT_COUNT, DEFAULT_RENDER_INTERVAL_MS } from '@/defaults'
+import { palette as makePalette } from '@/flame/colorMap'
 import { Flam3 } from '@/flame/Flam3'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
@@ -24,8 +26,28 @@ export function SeatView(props: {
   zoom: Signal<number>
   position: Signal<v2f>
   quality: number
+  /** The viewer's own filter settings, so a seat matches their workspace. */
+  adaptiveFilter: boolean
+  stochasticFilter: boolean
   interactive: boolean
 }) {
+  /*
+   * `Flam3` takes the palette as a prop and ignores the descriptor's own —
+   * `paletteEntryCount` comes from `props.palette()` and nothing else. Without
+   * this the seats rendered every flame on the default colour map, so a
+   * palette picked from the Colour panel changed the stored flame, showed up
+   * in the exported card, and did nothing at all on screen.
+   *
+   * The descriptor stores a palette without the provenance a `Palette`
+   * carries, so it is rebuilt rather than cast, exactly as `FlameStill` does.
+   */
+  const seatPalette = createMemo(() => {
+    const stored = props.flame().renderSettings.palette
+    return stored
+      ? makePalette(stored.id, stored.name, stored.entries, 'custom')
+      : undefined
+  })
+
   return (
     <section class={ui.seat} aria-label={props.label}>
       <h3
@@ -55,10 +77,12 @@ export function SeatView(props: {
             quality={props.quality}
             pointCountPerBatch={DEFAULT_POINT_COUNT}
             renderInterval={DEFAULT_RENDER_INTERVAL_MS}
-            adaptiveFilterEnabled
+            adaptiveFilterEnabled={props.adaptiveFilter}
+            stochasticFilterEnabled={props.stochasticFilter}
             animationEnabled={false}
             flameDescriptor={props.flame()}
             edgeFadeColor={vec4f(0)}
+            palette={seatPalette}
           />
         </WheelZoomCamera2D>
       </AutoCanvas>

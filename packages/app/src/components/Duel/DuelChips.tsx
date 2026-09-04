@@ -647,11 +647,20 @@ function paletteHue(palette: Palette): number {
  * to draw and rendered as identical flat blocks. They keep their place in the
  * sidebar, where they are labelled and picked deliberately.
  */
+/**
+ * Has colour to draw.
+ *
+ * A swatch renders a palette's chroma and takes its lightness from the flame's
+ * density, so a palette with no chroma has nothing to draw and comes out as a
+ * flat block indistinguishable from the next one.
+ */
+function isChromatic(palette: Palette): boolean {
+  return palette.entries.some((entry) => Math.hypot(entry.a, entry.b) > 0.02)
+}
+
 const STRIP_PALETTES = (() => {
   const BUCKETS = 14
-  const chromatic = defaultPalettes.filter((palette) =>
-    palette.entries.some((entry) => Math.hypot(entry.a, entry.b) > 0.02),
-  )
+  const chromatic = defaultPalettes.filter(isChromatic)
   const taken = new Map<number, Palette>()
   for (const palette of chromatic) {
     const bucket = Math.floor(
@@ -671,6 +680,30 @@ const STRIP_PALETTES = (() => {
   return spread.slice(0, BUCKETS)
 })()
 
+/**
+ * The whole synchronous set, behind "Show more" — the same `defaultPalettes`
+ * the sidebar's gallery lists.
+ *
+ * The hue spread stays first so the strip does not reorder under the viewer's
+ * hand, then the rest of the coloured ones in family order, then the
+ * greyscale ones last: they all draw the same flat block (see `isChromatic`),
+ * so they are worth reaching by name but not worth crowding the front of a
+ * strip anyone is picking from against a clock.
+ *
+ * The official flam3 set is not here: it is a 1.5 MB XML fetch parsed on the
+ * main thread, which is not something to spend a duel's clock on.
+ */
+const ALL_PALETTES: Palette[] = (() => {
+  const rest = defaultPalettes.filter(
+    (palette) => !STRIP_PALETTES.includes(palette),
+  )
+  return [
+    ...STRIP_PALETTES,
+    ...rest.filter(isChromatic),
+    ...rest.filter((palette) => !isChromatic(palette)),
+  ]
+})()
+
 function ColourPanel(props: {
   flame: FlameDescriptor
   transform: { color: { x: number; y: number }; colorSpeed?: number }
@@ -680,6 +713,8 @@ function ColourPanel(props: {
 }) {
   const applied = () => props.flame.renderSettings.palette
   const selectedId = () => applied()?.id ?? ''
+  const [showAll, setShowAll] = createSignal(false)
+  const strip = () => (showAll() ? ALL_PALETTES : STRIP_PALETTES)
   /**
    * The strip, with the flame's own palette on the front if it is not already
    * in it. Without this the strip marks nothing as selected and the position
@@ -687,15 +722,12 @@ function ColourPanel(props: {
    */
   const swatches = (): Palette[] => {
     const live = applied()
-    if (live === undefined || STRIP_PALETTES.some((p) => p.id === live.id)) {
-      return STRIP_PALETTES
+    if (live === undefined || strip().some((p) => p.id === live.id)) {
+      return strip()
     }
     // The descriptor stores a palette without the provenance a `Palette`
     // carries, so it is rebuilt rather than cast.
-    return [
-      palette(live.id, live.name, live.entries, 'custom'),
-      ...STRIP_PALETTES,
-    ]
+    return [palette(live.id, live.name, live.entries, 'custom'), ...strip()]
   }
   // The position track carries the palette actually in use, so the slider
   // shows you the colours you are moving through rather than a stock rainbow.
@@ -773,6 +805,21 @@ function ColourPanel(props: {
             </button>
           )}
         </For>
+        {/* At the tail of the strip rather than above it: the row already
+            reads left to right, and "more this way" is where the eye is. */}
+        <Show when={!showAll() && ALL_PALETTES.length > STRIP_PALETTES.length}>
+          <button
+            type="button"
+            class={ui.swatchMore}
+            onClick={() => {
+              if (dragged()) return
+              setShowAll(true)
+            }}
+          >
+            {ALL_PALETTES.length - STRIP_PALETTES.length}
+            <span class={ui.swatchMoreWord}>more</span>
+          </button>
+        </Show>
       </div>
 
       <label class={ui.field}>

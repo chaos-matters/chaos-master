@@ -128,7 +128,12 @@ registerCommand({
       : `Frame ${px}, ${py} at zoom ${z}`
   },
   label: 'Frame Camera',
-  description: 'Pan and zoom in one step, so the move reads as one beat',
+  // The three arguments were nowhere an agent could read them: the replay
+  // guard rejects anything but exactly three, and the description said only
+  // what the command was for. An agent reading this reached for an empty call
+  // expecting auto-framing and got "expected exactly 3 arguments".
+  description:
+    'Pan and zoom in one step, so the move reads as one beat. Takes exactly three arguments: [x, y, zoom] — the world position to centre on and the zoom to land at. Does not auto-frame; use camera.reset for a known starting point.',
   execute(ctx, x?: unknown, y?: unknown, zoom?: unknown) {
     const current = ctx.position()
     ctx.setPosition(

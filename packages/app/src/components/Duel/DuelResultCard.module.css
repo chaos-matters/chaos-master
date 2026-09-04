@@ -127,48 +127,31 @@
 }
 
 /* A seal, as in the mock. Fully inside the rim (its inner edge is at 22px),
-   so the stroke stays unbroken. */
+   so the stroke stays unbroken. The outline hangs 2px outside the 74x82 seal,
+   which is why the SVG box is 78x86 at (38, 28). */
 .badge {
   position: absolute;
-  top: 30px;
-  left: 40px;
+  top: 28px;
+  left: 38px;
   z-index: 1;
-  display: grid;
-  place-items: center;
-  width: 74px;
-  height: 82px;
+  width: 78px;
+  height: 86px;
 }
 
-/* The outline and the fill, as two hexagons in paint order. `clip-path` cuts a
-   CSS border off with the rest of the box, and an outline pseudo-element sent
-   behind with `z-index: -1` paints on top of its own parent's background — it
-   is negative only relative to the parent's *contents* — which is what turned
-   the badge into a solid cyan blob. Two siblings in tree order cannot do that. */
-.badge::before,
-.badge::after {
-  content: '';
-  position: absolute;
-  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+.badgeOutline {
+  fill: var(--result-rim, rgba(255, 255, 255, 0.4));
 }
 
-.badge::before {
-  inset: -2px;
-  background: var(--result-rim, rgba(255, 255, 255, 0.4));
-}
-
-.badge::after {
-  inset: 0;
-  background: #080b13;
+.badgeFill {
+  fill: #080b13;
 }
 
 .badgeGlyph {
-  /* Positioned, and last in tree order, so it paints over the fill. */
-  position: relative;
-  /* The glyph alone. The archetype word used to sit under it and meant
-     nothing to anyone reading the card. */
-  width: 46px;
-  height: 46px;
-  color: var(--result-rim, rgba(255, 255, 255, 0.7));
+  fill: none;
+  stroke: var(--result-rim, rgba(255, 255, 255, 0.7));
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .titleBar {

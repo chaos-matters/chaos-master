@@ -1,11 +1,11 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
 import { clearDuelResult, setDuelCard, setDuelShareUrl, } from '@/arcade/duelResult'
-import { Check, Cross, Download, Info, Share, VariationSpiral } from '@/icons'
+import { Check, Cross, Download, Info, Share } from '@/icons'
 import { downloadBlob } from '@/utils/blob'
 import { addFlameDataToPng } from '@/utils/flameInPng'
 import { compressJsonQueryParam } from '@/utils/jsonQueryParam'
 import { createShareLink } from '@/utils/shareLink'
-import { CARD, CARD_FONTS, CARD_SCALE, CARD_STILL_DEADLINE_MS, cardQuality, drawDuelCard, format, HALF_TRACK, STILL, toCardModel, } from './duelCard'
+import { BADGE_BOX, CARD, CARD_FONTS, CARD_SCALE, CARD_STILL_DEADLINE_MS, cardQuality, drawDuelCard, format, HALF_TRACK, hexagonPoints, SPIRAL_PATH, STILL, toCardModel, } from './duelCard'
 import ui from './DuelResultCard.module.css'
 import { FlameStill } from './FlameStill'
 import type { CardRow } from './duelCard'
@@ -32,7 +32,9 @@ export function DuelResultCard(props: {
   result: DuelResult
   /** The viewer's own render quality; the still is clamped from it. */
   quality: number
-  onAgain: () => void
+  /** And their filters, so the card's still matches the seat it came from. */
+  adaptiveFilter: boolean
+  stochasticFilter: boolean
 }) {
   const [stillUrl, setStillUrl] = createSignal<string>()
   const [bitmap, setBitmap] = createSignal<ImageBitmap>()
@@ -149,9 +151,38 @@ export function DuelResultCard(props: {
         aria-modal="true"
         aria-label={`Duel result: ${verdict().line}`}
       >
-        <div class={ui.badge}>
-          <VariationSpiral class={ui.badgeGlyph} aria-hidden="true" />
-        </div>
+        {/*
+          One SVG, three shapes, painted in document order: outline, fill,
+          glyph. The badge was a `div` with two pseudo-elements, and `::after`
+          is painted after its element's children — so the dark fill covered
+          the glyph on screen while the canvas routine drew it correctly. SVG
+          has no such trap, and it is the same hexagon the PNG draws.
+        */}
+        <svg
+          class={ui.badge}
+          viewBox={`0 0 ${BADGE_BOX.width} ${BADGE_BOX.height}`}
+          aria-hidden="true"
+        >
+          <polygon
+            class={ui.badgeOutline}
+            points={hexagonPoints(BADGE_BOX.width, BADGE_BOX.height)}
+          />
+          <polygon
+            class={ui.badgeFill}
+            points={hexagonPoints(
+              BADGE_BOX.width,
+              BADGE_BOX.height,
+              CARD.badge.outline,
+            )}
+          />
+          <path
+            class={ui.badgeGlyph}
+            d={SPIRAL_PATH}
+            transform={`translate(${(BADGE_BOX.width - CARD.badge.glyph) / 2} ${
+              (BADGE_BOX.height - CARD.badge.glyph) / 2
+            }) scale(${CARD.badge.glyph / 24})`}
+          />
+        </svg>
 
         <header class={ui.titleBar}>
           <h2 class={ui.title}>{model().title}</h2>
@@ -245,10 +276,11 @@ export function DuelResultCard(props: {
           </div>
         </div>
 
+        {/* No "Duel again": WebMCP is a pull model, so nothing here can make
+            the agent take another turn, and the button restarted the split
+            screen with nobody in the other seat. Starting one is the agent's
+            job, from the hub. */}
         <div class={ui.actions}>
-          <button type="button" class={ui.action} onClick={props.onAgain}>
-            Duel again
-          </button>
           <button type="button" class={ui.action} onClick={clearDuelResult}>
             Back to the editor
           </button>
@@ -264,6 +296,8 @@ export function DuelResultCard(props: {
             width={STILL.width}
             height={STILL.height}
             quality={cardQuality(props.quality)}
+            adaptiveFilter={props.adaptiveFilter}
+            stochasticFilter={props.stochasticFilter}
             deadlineMs={CARD_STILL_DEADLINE_MS}
             onStill={takeStill}
           />

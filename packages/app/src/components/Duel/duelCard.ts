@@ -45,6 +45,35 @@ export const CARD = {
   close: { x: 466, y: 30, size: 24 },
 } as const
 
+/**
+ * The badge's hexagon, as SVG polygon points in a `w` x `h` box.
+ *
+ * Pointy-top, with the waist between 25% and 75% of the height — the same
+ * shape the `clip-path` used to cut, now drawn instead of clipped.
+ */
+export function hexagonPoints(w: number, h: number, inset = 0): string {
+  const l = inset
+  const r = w - inset
+  const t = inset
+  const b = h - inset
+  const mx = w / 2
+  const q = t + (b - t) * 0.25
+  const s = t + (b - t) * 0.75
+  return `${mx},${t} ${r},${q} ${r},${s} ${mx},${b} ${l},${s} ${l},${q}`
+}
+
+/**
+ * The badge's own box, which is the hexagon plus its outline: the outline sits
+ * two pixels outside the 74x82 seal, so the SVG that draws both is 78x86 at
+ * (38, 28).
+ */
+export const BADGE_BOX = {
+  x: CARD.badge.x - CARD.badge.outline,
+  y: CARD.badge.y - CARD.badge.outline,
+  width: CARD.badge.width + CARD.badge.outline * 2,
+  height: CARD.badge.height + CARD.badge.outline * 2,
+} as const
+
 /** The still, at twice the window it fills. */
 export const STILL = { width: 904, height: 784 } as const
 
@@ -178,7 +207,7 @@ const FILL_STOPS = {
 } as const
 
 /** The `variation-spiral` icon's path, in its own 24x24 box. */
-const SPIRAL_PATH =
+export const SPIRAL_PATH =
   'M12 12A1.5 1.5 0 0 1 12 9A3 3 0 0 1 12 15A4.5 4.5 0 0 1 12 6A6 6 0 0 1 12 18'
 
 const INTER = "Inter, system-ui, -apple-system, 'Segoe UI', sans-serif"
@@ -314,7 +343,7 @@ function paintBadge(ctx: CanvasRenderingContext2D, model: DuelCardModel): void {
   const scale = glyph / 24
   ctx.translate(x + (width - glyph) / 2, y + (height - glyph) / 2)
   ctx.scale(scale, scale)
-  ctx.strokeStyle = model.winner === 'draw' ? 'rgba(244,246,255,0.7)' : rim
+  ctx.strokeStyle = rim
   ctx.lineWidth = 1.8
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'

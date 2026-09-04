@@ -26,6 +26,9 @@ export function FlameStill(props: {
   width: number
   height: number
   quality: number
+  /** The viewer's own filters, so the still matches the seat it came from. */
+  adaptiveFilter: boolean
+  stochasticFilter: boolean
   /**
    * Capture whatever is on the canvas after this long. A high quality target
    * can take a while to converge, and a card that never arrives is worse
@@ -81,7 +84,8 @@ export function FlameStill(props: {
           <Flam3
             quality={props.quality}
             pointCountPerBatch={DEFAULT_POINT_COUNT}
-            adaptiveFilterEnabled
+            adaptiveFilterEnabled={props.adaptiveFilter}
+            stochasticFilterEnabled={props.stochasticFilter}
             animationEnabled={false}
             exportDriver
             flameDescriptor={props.flame}
