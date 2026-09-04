@@ -50,13 +50,10 @@ export function beginDuel(
   // A result card left on screen is not a running duel, but its seat is still
   // alive; starting over takes the old screen down first.
   if (duelShowing()) closeDuelView()
+  // 2D and 3D both. The seats bind whichever camera the flame asks for, and
+  // the rival is a mirror of the player, so the two halves are always the same
+  // dimension — there is nothing to reconcile.
   const playerFlame = ctx.flameDescriptor()
-  if (playerFlame.renderSettings.dimensions === 3) {
-    return {
-      error:
-        'Duel runs on 2D flames only for now, and this flame is 3D: the split screen binds a 2D camera per side. Switch to 2D and start again.',
-    }
-  }
   const solo = opts.opponent === 'none'
   const rivalFlame = deepClone(playerFlame)
   if (opts.rivalFrom === 'blank') {

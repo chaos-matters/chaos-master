@@ -1,11 +1,14 @@
-import { createSignal } from 'solid-js'
+import { createSignal, Show } from 'solid-js'
 import { vec2f, vec4f } from 'typegpu/data'
 import { DEFAULT_POINT_COUNT } from '@/defaults'
 import { palette as makePalette } from '@/flame/colorMap'
 import { Flam3 } from '@/flame/Flam3'
+import { camera3DDefault } from '@/flame/schema/flameSchema'
 import { AutoCanvas } from '@/lib/AutoCanvas'
 import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
+import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
+import type { Vec3 } from 'wgpu-matrix'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { ExportImageType } from '@/MainWorkspace'
 
@@ -18,8 +21,9 @@ import type { ExportImageType } from '@/MainWorkspace'
  * the export tracker, because this is a picture the app wants, not a job the
  * viewer asked for.
  *
- * 2D only, deliberately: a duel refuses 3D flames, so there is no dimension
- * to branch on.
+ * Both dimensions, as `ExportJobHost` does: a duel runs on whichever the
+ * viewer's flame is, and a 3D card that fell back to the 2D camera would
+ * render the flame flat.
  */
 export function FlameStill(props: {
   flame: FlameDescriptor
@@ -40,6 +44,17 @@ export function FlameStill(props: {
   const camera = props.flame.renderSettings.camera
   const zoom = createSignal(camera.zoom)
   const position = createSignal(vec2f(camera.position[0], camera.position[1]))
+
+  // Frozen at the flame's own camera, as `OffscreenRender` does: the still is
+  // one frame of a finished duel, so nothing moves it.
+  const is3D = (props.flame.renderSettings.dimensions ?? 2) === 3
+  const c3d = props.flame.renderSettings.camera3D ?? camera3DDefault
+  const theta = createSignal(c3d.theta)
+  const phi = createSignal(c3d.phi)
+  const radius = createSignal(c3d.radius)
+  const target = createSignal<Vec3>(new Float32Array(c3d.target))
+  const fov = createSignal(c3d.fov)
+  const roll = createSignal(c3d.roll)
 
   // The descriptor stores a palette without the provenance a `Palette`
   // carries, so it is rebuilt rather than cast.
@@ -70,31 +85,56 @@ export function FlameStill(props: {
     capture(canvas)
   }
 
+  // A component, not a hoisted JSX value: JSX in a variable is evaluated where
+  // it is written, which put `Flam3` outside `<Root>` and threw on its first
+  // `useRootContext`. As a component it runs where it is rendered — inside
+  // whichever camera the flame asked for.
+  const FlameLayer = () => (
+    <Flam3
+      quality={props.quality}
+      pointCountPerBatch={DEFAULT_POINT_COUNT}
+      adaptiveFilterEnabled={props.adaptiveFilter}
+      stochasticFilterEnabled={props.stochasticFilter}
+      animationEnabled={false}
+      exportDriver
+      flameDescriptor={props.flame}
+      renderInterval={0}
+      edgeFadeColor={vec4f(0)}
+      palette={() => palette}
+      onExportImage={handleExport}
+    />
+  )
+
   return (
     <Root adapterOptions={{ powerPreference: 'high-performance' }}>
       <AutoCanvas
         fixedResolution={{ width: props.width, height: props.height }}
         alphaMode="opaque"
       >
-        <WheelZoomCamera2D
-          zoom={zoom}
-          position={position}
-          interactive={() => false}
+        <Show
+          when={is3D}
+          fallback={
+            <WheelZoomCamera2D
+              zoom={zoom}
+              position={position}
+              interactive={() => false}
+            >
+              <FlameLayer />
+            </WheelZoomCamera2D>
+          }
         >
-          <Flam3
-            quality={props.quality}
-            pointCountPerBatch={DEFAULT_POINT_COUNT}
-            adaptiveFilterEnabled={props.adaptiveFilter}
-            stochasticFilterEnabled={props.stochasticFilter}
-            animationEnabled={false}
-            exportDriver
-            flameDescriptor={props.flame}
-            renderInterval={0}
-            edgeFadeColor={vec4f(0)}
-            palette={() => palette}
-            onExportImage={handleExport}
-          />
-        </WheelZoomCamera2D>
+          <WheelZoomCamera3D
+            theta={theta}
+            phi={phi}
+            radius={radius}
+            target={target}
+            fov={fov}
+            roll={roll}
+            interactive={() => false}
+          >
+            <FlameLayer />
+          </WheelZoomCamera3D>
+        </Show>
       </AutoCanvas>
     </Root>
   )

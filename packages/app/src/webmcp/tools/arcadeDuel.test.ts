@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { duelActive, duelReady, stopDuel } from '@/arcade/duel'
+import { duelActive, duelReady, duelRivalSeat, stopDuel } from '@/arcade/duel'
 import { resetPilot } from '@/arcade/pilot'
 import { clearWebMcpContext, getWebMcpTarget, setWebMcpContext, } from '@/webmcp/contextBridge'
 import { createMockCommandContext, createTestFlame } from '@/webmcp/testUtils'
@@ -20,14 +20,19 @@ describe('arcade duel tools', () => {
     expect(await run(arcadeStartDuel, {})).toHaveProperty('error')
   })
 
-  it('refuses a 3D flame, naming the reason', async () => {
+  it('duels a 3D flame, with both seats at that dimension', async () => {
     const ctx = createMockCommandContext()
     const flame = createTestFlame()
     flame.renderSettings.dimensions = 3
     ctx.flameDescriptor = () => flame
     setWebMcpContext(ctx)
-    const result = await run(arcadeStartDuel, {})
-    expect(String(result.error)).toMatch(/3D/)
+
+    const result = await run(arcadeStartDuel, { durationSeconds: 60 })
+
+    // The rival is a mirror of the player, so the two halves are the same
+    // dimension by construction and the seats bind a 3D camera each.
+    expect(result.ok).toBe(true)
+    expect(duelRivalSeat()?.flame().renderSettings.dimensions).toBe(3)
   })
 
   it('starts and points the tools at the rival', async () => {

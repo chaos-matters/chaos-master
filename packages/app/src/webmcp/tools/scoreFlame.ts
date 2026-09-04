@@ -53,6 +53,25 @@ const SYMMETRY = new Set([
   'postPointSymmetryWfVar',
   'postRotateVar',
   'preRotateVar',
+  /*
+   * The 3D registry, which had no entry here at all — so every 3D flame
+   * scored 0.0 symmetry by construction and lost a quarter of the duel
+   * score's range.
+   *
+   * The rule is the same one the 2D list follows: the direct counterparts of
+   * names already above (julia, polar, the cylinder family), plus the radial
+   * maps about a point that only exist in three dimensions and are the
+   * strongest symmetry there is here. Deliberately not `spiral3D`, `swirl3D`
+   * or `curl3D` — rotational is not symmetric — nor `disc3D`/`fan3D`, whose
+   * 2D counterparts are not in the list either.
+   */
+  'julia3D',
+  'polar3D',
+  'cylinder3D',
+  'cylindrical3D',
+  'spherical3D',
+  'sphere3D',
+  'hemisphere3D',
 ])
 
 export function calculateFlameStats(flame: FlameDescriptor) {
