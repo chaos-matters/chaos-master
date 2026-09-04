@@ -6,8 +6,11 @@ import { agentDriving, drivingState, notePilotStep, pilot, pilotElapsedMs, pilot
 import { budgetExhaustedMessage, finishPilot } from '@/arcade/pilotActions'
 import { ALWAYS_ALLOWED, BLANK_CANVAS_STEPS, isTopicId, LESSON_TOPICS, TOPIC_IDS, } from '@/arcade/topics'
 import { executeCommand, preflightReplayCommand } from '@/commands/registry'
+import { variationTypes as registeredVariationTypes } from '@/flame/variations'
+import { variationTypes3D } from '@/flame/variations3D'
 import { anySessionRecording } from '@/recorder/recorder'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
+import type { CommandContext } from '@/commands/types'
 import type { WebMcpTool } from '@/webmcp/types'
 
 const NOT_READY = {
@@ -61,6 +64,26 @@ export const arcadeStatus: WebMcpTool = {
           : undefined,
     }
   },
+}
+
+/**
+ * One example of the naming, from the registry the flame actually renders in.
+ *
+ * The two registries do not share a convention — 2D names end in `Var` and 3D
+ * ones in `3D` — so a single hardcoded example is wrong half the time, which
+ * is what a sample list here was for. `list_variations` carries the rest and
+ * defaults to the same registry.
+ */
+function variationSample(ctx: CommandContext): string {
+  return renders3D(ctx) ? SAMPLE_VARIATION_TYPES_3D[1] : SAMPLE_VARIATION_TYPES[1]
+}
+
+function variationCount(ctx: CommandContext): number {
+  return renders3D(ctx) ? variationTypes3D.length : registeredVariationTypes.length
+}
+
+function renders3D(ctx: CommandContext): boolean {
+  return (ctx.flameDescriptor().renderSettings.dimensions ?? 2) === 3
 }
 
 export const arcadeStartLesson: WebMcpTool = {
@@ -140,13 +163,19 @@ export const arcadeStartLesson: WebMcpTool = {
       goal: topic.goal,
       startFrom,
       allowedCommands: describeAllowedCommands(allowed),
-      variationTypes: usesVariationTypes
-        ? (ctx.flameDescriptor().renderSettings.dimensions ?? 2) === 3
-          ? SAMPLE_VARIATION_TYPES_3D
-          : SAMPLE_VARIATION_TYPES
-        : undefined,
       stepBudget: topic.stepBudget,
       tips: [
+        // A short sample list used to sit here, and it read as the whole
+        // registry: one run took it as a starting point and probed for more
+        // names with add-then-delete pairs, spending 26 of its 45 steps before
+        // the lesson began. One example of the naming, and the tool that lists
+        // the rest, is smaller than the list AND covers both registries —
+        // list_variations defaults to the one the flame renders in.
+        ...(usesVariationTypes
+          ? [
+              `Variation names look like ${variationSample(ctx)}, and ${variationCount(ctx)} are registered: call list_variations, which is free. Never probe a name with add-then-delete.`,
+            ]
+          : []),
         'Narrate before each group; args must match the shapes exactly.',
         'Check with get_flame; finish with arcade_end_lesson.',
       ],

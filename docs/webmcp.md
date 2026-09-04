@@ -31,7 +31,7 @@ git log --format='%h %ad %s' --date=iso --since=2026-08-25 \
 
 ## Tool catalog
 
-33 tools are registered (`packages/app/src/webmcp/tools/index.ts`). Every
+34 tools are registered (`packages/app/src/webmcp/tools/index.ts`). Every
 description is at most 500 characters and every result is kept under about
 1.5 KB of JSON. The table below lists 32: `arcade_end_duel` is registered
 but does nothing except refuse, so it is described where that refusal is
@@ -41,6 +41,7 @@ explained rather than offered here as a capability.
 | --------------------------------------------------------------------------------------------------------- | ----- | --------------------------------------------------------------------------------- |
 | `get_flame`, `get_flame_detail`                                                                           | read  | Compact and paginated views of the active flame                                   |
 | `list_commands`                                                                                           | read  | Command ids, labels, descriptions, prefix index                                   |
+| `list_variations`                                                                                         | read  | Registered variation names, with the parameters of parametric ones                |
 | `get_undo_state`, `diff_flames`                                                                           | read  | History depth; structural diff between two flames                                 |
 | `execute_command`                                                                                         | write | Run any registered command (validated, guarded while the Arcade drives, recorded) |
 | `set_flame`, `randomize_flame`, `mutate_flame`, `undo`, `redo`, `create_share_link`, `load_share_link`    | mixed | Document-level tools                                                              |
