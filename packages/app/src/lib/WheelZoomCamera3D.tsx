@@ -1,6 +1,7 @@
 import { batch, createEffect, createMemo, createSignal, onCleanup, } from 'solid-js'
 import { vec3 } from 'wgpu-matrix'
 import { useChangeHistory } from '@/contexts/ChangeHistoryContext'
+import { MAX_ORBIT_RADIUS, MIN_ORBIT_RADIUS } from '@/flame/schema/flameSchema'
 import { Camera3D } from '@/lib/Camera3D'
 import { useCamera3D } from '@/lib/Camera3DContext'
 import { cameraBasis, rollAdjustLookDelta } from '@/lib/cameraMath'
@@ -24,12 +25,6 @@ const FLY_SPEED_RANGE: [number, number] = [0.05, 20]
 // the radius is clamped to this range first so panning is never absurdly fast
 // when far out or painfully slow when zoomed in close.
 const PAN_RADIUS_RANGE: [number, number] = [1, 12]
-// Orbit-zoom radius clamp. The lower bound keeps the 3D brightness/quality
-// normalization out of its blow-out regime at extreme magnification — use fly
-// mode (which translates the rig instead of shrinking the radius) to get
-// visually closer than this.
-const MIN_ORBIT_RADIUS = 0.02
-const MAX_ORBIT_RADIUS = 100
 // Movement keys (always camera-controlled in 3D) and fly-only keys.
 const MOVE_KEYS = new Set([
   'w',

@@ -17,6 +17,13 @@ export const backgroundColorDefault: [number, number, number] = [0, 0, 0]
 export const backgroundColorDefaultWhite: [number, number, number] = [1, 1, 1]
 export const MIN_CAMERA_ZOOM_VALUE: number = 0.01
 export const MAX_CAMERA_ZOOM_VALUE: number = 500
+// Orbit-zoom radius clamp. The lower bound keeps the 3D brightness/quality
+// normalization out of its blow-out regime at extreme magnification — use fly
+// mode (which translates the rig instead of shrinking the radius) to get
+// visually closer than this. Here rather than in the camera component because
+// the framing commands clamp to the same range the wheel does.
+export const MIN_ORBIT_RADIUS: number = 0.02
+export const MAX_ORBIT_RADIUS: number = 100
 const cameraDefault: {
   zoom: number
   position: [number, number]
