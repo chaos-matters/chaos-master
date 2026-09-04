@@ -31,9 +31,11 @@ git log --format='%h %ad %s' --date=iso --since=2026-08-25 \
 
 ## Tool catalog
 
-32 tools are registered (`packages/app/src/webmcp/tools/index.ts`). Every
+33 tools are registered (`packages/app/src/webmcp/tools/index.ts`). Every
 description is at most 500 characters and every result is kept under about
-1.5 KB of JSON.
+1.5 KB of JSON. The table below lists 32: `arcade_end_duel` is registered
+but does nothing except refuse, so it is described where that refusal is
+explained rather than offered here as a capability.
 
 | Tool                                                                                                      | Kind  | Purpose                                                                           |
 | --------------------------------------------------------------------------------------------------------- | ----- | --------------------------------------------------------------------------------- |
