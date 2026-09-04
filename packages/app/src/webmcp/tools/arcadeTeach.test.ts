@@ -37,7 +37,10 @@ describe('Teach tools', () => {
     expect(brief).toMatchObject({
       ok: true,
       topic: 'variations',
-      stepBudget: 30,
+      // The topic's own number, not a copy of it: what the budget should BE is
+      // settled by stepBudgetFitsVideo.test.ts, and this only checks that the
+      // brief reports it.
+      stepBudget: LESSON_TOPICS.variations.stepBudget,
     })
     expect(ctx.recorder!.start).toHaveBeenCalledTimes(1)
     expect(ctx.arcade!.closeHub).toHaveBeenCalledTimes(1)
