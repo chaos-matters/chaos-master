@@ -1,6 +1,7 @@
 import '@/commands/builtins'
 import { afterEach, describe, expect, it } from 'vitest'
 import { pilotLog, resetPilot, startPilot } from '@/arcade/pilot'
+import { clearPilotFocus, pilotFocus } from '@/arcade/pilotFocus'
 import { cancelSessionRecording, startSessionRecording, stopSessionRecording, } from '@/recorder/recorder'
 import { clearWebMcpContext, setWebMcpContext } from '@/webmcp/contextBridge'
 import { createMockCommandContext } from '@/webmcp/testUtils'
@@ -11,6 +12,7 @@ describe('execute_command dispatch', () => {
     cancelSessionRecording()
     clearWebMcpContext()
     resetPilot()
+    clearPilotFocus()
   })
 
   it('records the command in an active session and honours beforeCommand', async () => {
@@ -131,6 +133,92 @@ describe('execute_command dispatch', () => {
     const line = pilotLog().find((e) => e.kind === 'command')?.text
     expect(line).toBe('Centre the camera')
     expect(line).not.toContain('[')
+  })
+
+  // The live spotlight and the replay follow-cam have to agree, or watching a
+  // lesson live and watching its recording would point at different controls.
+  it('publishes the same focus hint the recorder stamps on the action', async () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    expect(startSessionRecording(ctx.flameDescriptor())).toEqual({ ok: true })
+    startPilot({
+      mode: 'teach',
+      topic: 'color',
+      title: 'Teaching: Colour and tone',
+      stepBudget: 5,
+      allowed: ['flame.'],
+      qualityRankAtStart: 3,
+    })
+
+    // A command whose hint is derived FROM its arguments, so the test fails if
+    // the live path ever resolves the hint from anything but the same
+    // normalized args the recorder describes.
+    await executeCommandTool.execute(
+      { commandId: 'flame.setRenderSetting', args: ['gamma', 2.4] },
+      {},
+    )
+
+    const recorded = stopSessionRecording()?.actions[0]
+    expect(recorded?.focus).toBe('param:gamma')
+    // The whole action, not just the hint: the panel to open, the transform to
+    // select and the affine tab to show are all derived from the id and args.
+    expect(pilotFocus()?.action.focus).toBe(recorded?.focus)
+    expect(pilotFocus()?.action.id).toBe(recorded?.id)
+    expect(pilotFocus()?.action.args).toEqual(recorded?.args)
+    // And it carries the rail's own wording, so the ring's label and the rail
+    // entry cannot describe the step differently.
+    expect(pilotFocus()?.label).toBe(
+      pilotLog().find((e) => e.kind === 'command')?.text,
+    )
+  })
+
+  it('publishes a step even when no hint can place it', async () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    startPilot({
+      mode: 'teach',
+      topic: 'color',
+      title: 'Teaching: Colour and tone',
+      stepBudget: 5,
+      allowed: ['flame.'],
+      qualityRankAtStart: 3,
+    })
+
+    // `flame.reset` rearranges everything and points at nothing.
+    await executeCommandTool.execute({ commandId: 'flame.reset', args: [] }, {})
+
+    // A step with no hint still advances the sequence: the overlay needs it to
+    // retire the previous ring instead of leaving a stale one up.
+    expect(pilotFocus()?.seq).toBeGreaterThan(0)
+    expect(pilotFocus()?.action.focus).toBeUndefined()
+  })
+
+  it('leaves the ring where it is while the agent narrates', async () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    startPilot({
+      mode: 'teach',
+      topic: 'color',
+      title: 'Teaching: Colour and tone',
+      stepBudget: 5,
+      allowed: ['flame.', 'lesson.'],
+      qualityRankAtStart: 3,
+    })
+
+    await executeCommandTool.execute(
+      { commandId: 'flame.setGamma', args: [2.4] },
+      {},
+    )
+    const afterEdit = pilotFocus()
+    await executeCommandTool.execute(
+      { commandId: 'lesson.note', args: ['Gamma lifts the shadows.'] },
+      {},
+    )
+
+    // The sentence explains the edit that is still ringed. Moving the ring off
+    // it — or clearing it — would point away from what is being explained.
+    expect(pilotFocus()).toBe(afterEdit)
+    expect(pilotFocus()?.action.focus).toBe('param:gamma')
   })
 
   // The line the user actually reported: a boolean argument rendered as JSON.

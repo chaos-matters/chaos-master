@@ -26,6 +26,7 @@
 
 import { affineFocusId, affineRandomizeFocusId, affineResetFocusId, colorFocusId, colorRandomizeFocusId, colorResetFocusId, FINAL_AFFINE_FOCUS_ID, FINAL_AFFINE_RANDOMIZE_FOCUS_ID, transformColorRandomizeFocusId, transformFocusId, transformVisibilityFocusId, variationParamsFocusId, variationRandomizeFocusId, variationTypeFocusId, variationVisibilityFocusId, } from './focusIds'
 import { snapshotOriginFocus, snapshotOriginForCommand } from './snapshotOrigin'
+import type { FlameCommand } from '@/commands/types'
 
 /** Elements the follow-cam can be asked to look at, most specific first. */
 export function focusSelectors(hint: string): string[] {
@@ -116,6 +117,23 @@ function cssQuote(value: string): string {
 function transformOwnerFocusId(value: string): string | undefined {
   const match = /^tx:([^:]+)(?::|$)/.exec(value)
   return match?.[1] ? transformFocusId(match[1]) : undefined
+}
+
+/**
+ * The hint for one command invocation — a command's own `focus()` if it has
+ * one, else the table below.
+ *
+ * The override matters: a command that bothers to say where it lives knows
+ * better than the central table, and a caller that reaches for `focusHintFor`
+ * directly silently loses that for exactly those commands. Both the recorder
+ * and the live pilot resolve their hints through here so the two cannot say
+ * different things about the same command.
+ */
+export function focusForCommand(
+  cmd: Pick<FlameCommand, 'id' | 'focus'>,
+  args: unknown[],
+): string | undefined {
+  return cmd.focus?.(args) ?? focusHintFor(cmd.id, args)
 }
 
 /**

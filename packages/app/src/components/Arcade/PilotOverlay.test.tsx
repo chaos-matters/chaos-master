@@ -1,9 +1,10 @@
 import { cleanup, render, screen } from '@solidjs/testing-library'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { endPilot, notePilotSaveResult, resetPilot, startPilot, } from '@/arcade/pilot'
+import { clearPilotFocus, notePilotFocus } from '@/arcade/pilotFocus'
 import { createMockCommandContext } from '@/webmcp/testUtils'
 import { PilotOverlay } from './PilotOverlay'
-import type { RecordedSession } from '@/recorder/schema'
+import type { RecordedAction, RecordedSession } from '@/recorder/schema'
 
 const take = {
   version: 1,
@@ -107,5 +108,92 @@ describe('PilotOverlay end card', () => {
     expect(
       screen.getByText('Saved to your library as "Lesson: Colour and tone"'),
     ).toBeTruthy()
+  })
+})
+
+/**
+ * The ring belongs to the lock, not to the app: it exists exactly as long as
+ * the AI holds the controls. One left behind on the end card would point at a
+ * control the viewer can now touch.
+ */
+describe('PilotOverlay live spotlight', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) =>
+      setTimeout(() => {
+        cb(globalThis.performance.now())
+      }, 16),
+    )
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+      clearTimeout(id)
+    })
+    const control = document.createElement('div')
+    control.setAttribute('data-parameter-path', 'gamma')
+    control.getBoundingClientRect = () => ({
+      x: 40,
+      y: 60,
+      width: 200,
+      height: 24,
+      left: 40,
+      top: 60,
+      right: 240,
+      bottom: 84,
+      toJSON: () => ({}),
+    })
+    document.body.append(control)
+  })
+
+  afterEach(() => {
+    cleanup()
+    resetPilot()
+    clearPilotFocus()
+    document.body.innerHTML = ''
+    vi.unstubAllGlobals()
+    vi.useRealTimers()
+  })
+
+  function step(focus: string): RecordedAction {
+    return { t: 0, id: 'pilot.test', args: [], focus }
+  }
+
+  function ring(): HTMLElement | null {
+    return document.querySelector('[aria-hidden="true"][style*="left"]')
+  }
+
+  function startTeach() {
+    startPilot({
+      mode: 'teach',
+      topic: 'color',
+      title: 'Teaching: Colour and tone',
+      stepBudget: 25,
+      allowed: ['flame.'],
+      qualityRankAtStart: 1,
+    })
+  }
+
+  it('rings the control a step moved while the AI drives', () => {
+    startTeach()
+    render(() => <PilotOverlay ctx={createMockCommandContext()} />)
+
+    notePilotFocus(step('param:gamma'), 'Gamma: 2.4')
+    vi.advanceTimersByTime(200)
+
+    expect(ring()?.style.left).toBe('40px')
+  })
+
+  it('takes the ring down with the lock', () => {
+    startTeach()
+    render(() => <PilotOverlay ctx={createMockCommandContext()} />)
+    notePilotFocus(step('param:gamma'), 'Gamma: 2.4')
+    vi.advanceTimersByTime(200)
+    expect(ring()).not.toBeNull()
+
+    endPilot('stopped', {
+      title: 'Warm tones',
+      sessionName: 'Lesson: Colour and tone',
+      session: take,
+    })
+
+    expect(ring()).toBeNull()
   })
 })

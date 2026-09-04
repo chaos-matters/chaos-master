@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { focusHintFor, focusSelectors, resolveFocusElement, revealFocusElement, } from './focus'
+import { focusForCommand, focusHintFor, focusSelectors, resolveFocusElement, revealFocusElement, } from './focus'
 import { snapshotOrigin } from './snapshotOrigin'
 
 /**
@@ -9,6 +9,33 @@ import { snapshotOrigin } from './snapshotOrigin'
  * the app's existing anchor vocabulary, and a hint that resolves to nothing
  * degrades to "show the whole canvas" rather than framing an empty box.
  */
+
+describe('focusForCommand', () => {
+  it('falls back to the central table when a command says nothing', () => {
+    expect(focusForCommand({ id: 'flame.setGamma' }, [2.4])).toBe('param:gamma')
+  })
+
+  it('lets a command that declares its own focus win', () => {
+    // The whole reason the override exists: a command that knows where it
+    // lives beats a table entry derived from its arguments. Every caller has
+    // to go through here, or the recorder and the live spotlight would point
+    // at different controls for the same step.
+    const cmd = {
+      id: 'flame.setGamma',
+      focus: () => 'ui:recorder-dock',
+    }
+    expect(focusForCommand(cmd, [2.4])).toBe('ui:recorder-dock')
+  })
+
+  it('falls back when the command’s own focus declines this invocation', () => {
+    const cmd = {
+      id: 'flame.setGamma',
+      focus: (args: unknown[]) =>
+        args[0] === 0 ? 'ui:recorder-dock' : undefined,
+    }
+    expect(focusForCommand(cmd, [2.4])).toBe('param:gamma')
+  })
+})
 
 describe('focusHintFor', () => {
   it('derives a parameter hint from the path a render-setting command carries', () => {

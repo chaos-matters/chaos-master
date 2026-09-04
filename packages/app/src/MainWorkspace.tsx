@@ -7846,7 +7846,7 @@ export function MainWorkspace(props: AppProps) {
             })()}
           </Show>
 
-          <PilotOverlay ctx={cmdContext} />
+          <PilotOverlay ctx={cmdContext} onPrepareFocus={prepareReplayFocus} />
 
           <Show when={showArena()}>
             <ArenaOverlay
