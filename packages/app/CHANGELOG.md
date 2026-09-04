@@ -3,6 +3,14 @@
 What's new in Lumen Apeiron. Concise highlights for each release; the full
 developer history lives in `dev.changelog.md`.
 
+## [0.9.10] - 2026-09-04
+
+### Fixed
+
+- **A development panel is no longer on the page.** A debug readout — frame
+  counter, camera numbers, track list — had been drawn over the top-left of
+  the canvas on every visit since April, with no way to close it.
+
 ## [0.9.9] - 2026-09-04
 
 ### Added

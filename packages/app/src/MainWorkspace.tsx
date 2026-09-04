@@ -5172,10 +5172,16 @@ export function MainWorkspace(props: AppProps) {
               </div>
             </div>
           </>
-          <DebugOverlay
-            animationEnabled={animationEnabled()}
-            flameDescriptor={flameDescriptor}
-          />
+          {/* Development only. The gate was dropped in 53e1486 and the panel
+              has been rendering over the top-left of the canvas in production
+              ever since, on every visit, with no way for a visitor to close
+              it. */}
+          <Show when={IS_DEV}>
+            <DebugOverlay
+              animationEnabled={animationEnabled()}
+              flameDescriptor={flameDescriptor}
+            />
+          </Show>
 
           <Show when={showSidebar()}>
             <div

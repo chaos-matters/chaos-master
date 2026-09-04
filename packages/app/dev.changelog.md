@@ -7,6 +7,20 @@ changelog surfaced in the About panel lives in `CHANGELOG.md`.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.10] - 2026-09-04
+
+### Fixed
+
+- **`DebugOverlay` shipped to production** (`MainWorkspace.tsx`): the
+  `<Show when={IS_DEV}>` around it was dropped in 53e1486 (#97, 2026-04) and
+  nothing noticed, so every visitor since has had the animation debug readout
+  painted over the top-left of the canvas — frame, playing, autokey, both
+  cameras, exposure and the resolved track values — undismissable, since its
+  only control is a drag handle. The gate is back, and `tests/smoke.spec.ts`
+  now asserts the string is absent from a production build. The smoke suite is
+  the one CI runs and it builds for production, so this class of leak fails the
+  build from here on.
+
 ## [0.9.9] - 2026-09-04
 
 The release that hands the editor to an agent. WebMCP tools expose the command

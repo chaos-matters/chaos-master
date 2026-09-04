@@ -54,6 +54,24 @@ test.describe('CI smoke', () => {
     expect(childCount).toBeGreaterThan(5)
   })
 
+  /**
+   * A development panel shipped to production for four months.
+   *
+   * `DebugOverlay` lost its `IS_DEV` gate in 53e1486 and rendered over the
+   * top-left of the canvas on every visit — frame counter, camera numbers,
+   * track list — with no way for a visitor to close it. This suite runs
+   * against a production build, which is exactly the build that has to be
+   * free of it.
+   */
+  test('ships no development overlay in the production build', async ({
+    page,
+  }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
+    await dismissWelcomeIfPresent(page, 12_000)
+    await page.waitForTimeout(2000)
+    await expect(page.getByText('ANIMATION DEBUG')).toHaveCount(0)
+  })
+
   test('boots the isolated benchmark entry from a direct URL', async ({
     page,
   }) => {
