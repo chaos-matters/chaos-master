@@ -44,6 +44,22 @@ const MOVE_KEYS = new Set([
 // Fly-only keys: Q/E roll, Space/C move up/down (along the camera's local up).
 const FLY_KEYS = new Set(['q', 'e', ' ', 'c'])
 
+/**
+ * Whether a key press is the focused control's, not the camera's.
+ *
+ * Text fields were always exempt. A focused `role="slider"` is the same case:
+ * the duel's scrub fields nudge on the arrow keys, and this handler — bound
+ * on `window`, in the capture phase — was orbiting the flame on the very same
+ * press, so a nudge to an X offset also turned the camera.
+ */
+export function keyBelongsToTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false
+  const tag = target.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true
+  if (target.getAttribute('role') === 'slider') return true
+  return (target as HTMLElement).isContentEditable
+}
+
 type WheelZoomCamera3DProps = {
   theta: Signal<number>
   phi: Signal<number>
@@ -488,9 +504,7 @@ export function WheelZoomCamera3D(props: ParentProps<WheelZoomCamera3DProps>) {
   }
 
   function onKeyDown(ev: KeyboardEvent) {
-    // Don't capture when typing in inputs
-    const tag = (ev.target as HTMLElement)?.tagName
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+    if (keyBelongsToTarget(ev.target)) return
 
     const key = ev.key.toLowerCase()
     // Modifier combos (e.g. Ctrl+D theme toggle) are app shortcuts, not camera

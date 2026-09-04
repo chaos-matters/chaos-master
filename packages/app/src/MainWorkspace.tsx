@@ -4896,7 +4896,13 @@ export function MainWorkspace(props: AppProps) {
                         roll={[effectiveRoll, setFlameRoll]}
                         flyMode={flyMode}
                         flySpeed={flySpeed}
+                        // Not while a duel covers this canvas: this camera
+                        // listens on `window` for the orbit keys, and the
+                        // player's seat binds the same setters to its own
+                        // camera — with both live, every key moved the flame
+                        // twice.
                         interactive={() =>
+                          !duelShowing() &&
                           !timeline.isPlaying() &&
                           (!animationExportRunning() ||
                             cameraDuringExportEnabled())

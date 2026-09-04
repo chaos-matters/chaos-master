@@ -86,6 +86,12 @@ export function AffineGrid(props: {
     const target = ev.currentTarget as Element
     target.setPointerCapture(ev.pointerId)
     const start = toWorld(ev)
+    // Depth at pointer-down. The delta below is measured from `start`, so it
+    // has to be added to where the handle WAS, not to where the previous move
+    // already put it — re-reading the live value each move re-added the whole
+    // displacement every frame and the depth ran away.
+    const startZ =
+      props.is3D === true ? basis3D(ensure3DAffine(props.affine))[handle].z : 0
 
     const move3D = (moveEv: PointerEvent) => {
       const screen = toWorld(moveEv)
@@ -104,7 +110,7 @@ export function AffineGrid(props: {
             x: held.x,
             y: held.y,
             z:
-              held.z +
+              startZ +
               depthFromScreenDelta(screen.x - start.x, screen.y - start.y),
           }
         : { ...unproject3D(screen.x, screen.y, held.z), z: held.z }
