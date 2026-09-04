@@ -7,6 +7,64 @@ changelog surfaced in the About panel lives in `CHANGELOG.md`.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.11] - 2026-09-04
+
+Agent-facing correctness, from three recorded Arcade sessions: what the tools
+under-reported, what they accepted in silence, and what the viewer could not
+see happen.
+
+### Added
+
+- **`list_variations`** (`webmcp/tools/listVariations.ts`, 34 tools now): the
+  registry was reachable only by guessing — 446 names, none enumerated, and
+  `linear` refused in favour of `linearVar` (3D uses no suffix at all:
+  `spiral3D`). A failed guess is free, a successful one costs an add and a
+  delete, so one Teach run spent 26 of its 45 steps probing 13 names. The tool
+  is read-only, paged (80 per call, 200 max), filterable by substring or
+  `parametricOnly`, carries the parameter names of parametric variations, and
+  defaults to the registry the current flame renders in. The lesson brief drops
+  its sample list for a dimension-aware pointer at it.
+
+### Fixed
+
+- **The animatable-paths summary dropped whole groups**
+  (`webmcp/tools/arcadeCinema.ts`): it named four groups, and `Camera3D`,
+  `Final Transform` and `Blend` were not among them, so a 3D flame reported
+  `camera: []` while `camera3D.theta` sat in the catalog that call had just
+  built. `camera` now holds whichever family the flame renders through, an
+  `other` bucket collects anything unnamed, and a test walks the catalog so the
+  next group cannot vanish.
+- **Existing timeline tracks were invisible to the agent** (same file): a
+  motion-row flame arrives animated, so `mode: "add"` with a shorter duration
+  is refused for a track the agent never placed — one run blamed the preset
+  keyframes' missing `interp`, which is optional and was never the cause.
+  `arcade_start_cinema` and `arcade_get_animatable_paths` now report the track
+  count, how far they run and their paths; the refusal names all three ways
+  past it, including `timeline.clearTracks`.
+- **The dope sheet did not fit an agent's take**
+  (`components/Timeline/hooks/useZoomGestures.ts`): a take is usually longer
+  than the span on screen, and Fit is a button the pilot shield intercepts. The
+  sheet re-fits whenever the frame span changes while the agent drives; a zoom
+  set by hand is untouched.
+- **`flame.setVariation` reported success for a write that never happened**
+  (`commands/builtins/flame.ts`): a partial descriptor passed the registered-type
+  check, then failed whole-flame validation inside `execute`, which only warns.
+  An incomplete descriptor is refused at preflight now, naming what is missing.
+- **`flame.setVariationParams` wrote any name it was given** (same file):
+  probing the argument shape left `__nope__: 1` inside a pdj variation, carried
+  by the descriptor and every export of it. Only a parameter the variation has
+  is written; an old recording carrying a junk name replays as a no-op rather
+  than failing.
+- **The variation tile's weight readout lost its row**
+  (`components/Duel/DuelChips.module.css`): the label asked for a class the
+  stylesheet never defined, so it rendered as `class={undefined}` — no layout,
+  the number against the tile's left edge. A CSS-module import under vitest
+  answers every key, so nothing caught it; `duelChipsCss.test.ts` now checks
+  every class the panel asks for exists.
+- Two e2e selectors left stale by the agent/AI copy rename, and
+  `tests/arcade.spec.ts` gained coverage for the fit, the listing and the two
+  refusals.
+
 ## [0.9.10] - 2026-09-04
 
 ### Fixed

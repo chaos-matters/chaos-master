@@ -3,6 +3,32 @@
 What's new in Lumen Apeiron. Concise highlights for each release; the full
 developer history lives in `dev.changelog.md`.
 
+## [0.9.11] - 2026-09-04
+
+### Added
+
+- **The agent can look up variations.** It could not before: nothing listed the
+  446 registered names, so an agent teaching variations had to find them by
+  adding a transform and deleting it again, which spent half a lesson's budget
+  before the lesson began.
+
+### Fixed
+
+- **The agent can see the 3D camera.** On a 3D flame the list of animatable
+  parameters reported no camera at all, while the camera it should have offered
+  was working the whole time.
+- **A flame that arrives animated says so.** Opening one of the animated
+  gallery pieces and then asking for an animation could be refused for a track
+  the agent never placed, with nothing explaining why.
+- **The timeline fits what the agent just wrote.** A longer animation ran off
+  the right edge of the panel, and Fit is a button nobody could press while the
+  editor was locked.
+- **A variation's weight reads under its slider again**, instead of against the
+  left edge of the tile.
+- **Changing a variation says whether it worked.** A partial change reported
+  success and did nothing; unknown parameter names are no longer written into
+  the flame.
+
 ## [0.9.10] - 2026-09-04
 
 ### Fixed
