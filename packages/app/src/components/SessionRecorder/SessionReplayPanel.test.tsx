@@ -57,6 +57,40 @@ describe('SessionReplayPanel accessibility', () => {
     setFollowCamEnabled(true)
   })
 
+  // The list is a scroll container, and on a lesson longer than the panel the
+  // active step used to walk below the fold while the flame kept changing —
+  // conspicuous in a full-interface recording next to a timeline that moves.
+  it('scrolls the step it is playing into view', () => {
+    const spy = vi
+      .spyOn(Element.prototype, 'scrollIntoView')
+      .mockImplementation(() => {})
+    try {
+      const { unmount } = render(() => (
+        <SessionReplayPanel
+          session={makeSession()}
+          target={makeTarget()}
+          onClose={() => {}}
+        />
+      ))
+      fireEvent.click(screen.getByRole('button', { name: /Next step/i }))
+
+      // `mock.instances` is the receiver of each call, so this asks which
+      // element was scrolled rather than trusting that only one was.
+      const index = spy.mock.instances.findIndex(
+        (element) =>
+          element instanceof Element &&
+          element.getAttribute('aria-current') === 'step',
+      )
+      expect(index).toBeGreaterThanOrEqual(0)
+      // 'nearest' so a viewer reading further down the list is not yanked back
+      // on a step that was already visible.
+      expect(spy.mock.calls[index]?.[0]).toMatchObject({ block: 'nearest' })
+      unmount()
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
   it('announces transport progress and exposes the current step', () => {
     const { unmount } = render(() => (
       <SessionReplayPanel

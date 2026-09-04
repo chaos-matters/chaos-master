@@ -57,6 +57,13 @@ export type ReplayVideoSchedule = {
   actionFrames: number[]
   durationMs: number
   totalFrames: number
+  /**
+   * How long to hold after the last step — the requested tail, or the closing
+   * sentence's reading time when that is longer. The interface capture records
+   * the live player rather than these frames, so it has to wait this and not
+   * the constant, or it cuts the closing line off mid-read.
+   */
+  tailMs: number
 }
 
 export type ReplayVideoFrameState = {
@@ -425,6 +432,7 @@ export function createReplayVideoSchedule(
     actionTimesMs,
     actionFrames,
     durationMs,
+    tailMs: effectiveTailMs,
     // Keep the final authored action representable even when a future caller
     // deliberately asks for no tail. Frame indexes are zero-based, so an
     // action landing on frame N needs at least N + 1 output frames.
@@ -902,6 +910,25 @@ export type ReplayVideoOverlayFrame = {
   flameName?: string
 }
 
+/**
+ * The tallest the caption block may grow, in lines.
+ *
+ * Two lines hold about 170 characters at 1080p, and an agent's sentences
+ * measured 213-266 — so every one of them was cut, the longest losing a third
+ * of itself to an ellipsis. Four lines at the reduced size below hold roughly
+ * 450, which covers anything the brief now asks for.
+ */
+const MAX_CAPTION_LINES = 4
+
+/**
+ * How much the caption shrinks once it needs more than two lines.
+ *
+ * Without this a four-line block at full size is 194px of a 1080px frame,
+ * covering the flame the caption is describing. Shrinking as it grows keeps
+ * the block around 150px, and a short caption still gets the full size.
+ */
+const CAPTION_FONT_STEPS = [1, 0.88, 0.78] as const
+
 function fitCaptionLines(
   context: CanvasRenderingContext2D,
   text: string,
@@ -920,7 +947,12 @@ function fitCaptionLines(
     }
     if (current !== '') lines.push(current)
     current = word
-    if (lines.length === maxLines - 1) break
+    // `maxLines`, not `maxLines - 1`: breaking one line early left the final
+    // line holding only the word that overflowed the previous one, so a
+    // four-line budget bought three filled lines and an orphan. With two lines
+    // that cost half the caption; it is why raising the budget alone did not
+    // fix the truncation.
+    if (lines.length === maxLines) break
   }
   if (current !== '' && lines.length < maxLines) lines.push(current)
   const fitWithEllipsis = (line: string): string => {
@@ -987,9 +1019,24 @@ export function drawReplayVideoOverlay(
   context.fillText('CREATION REPLAY', margin, margin + tagFont * 1.45)
 
   const textWidth = width - margin * 2
-  context.font = `650 ${captionFont}px ui-sans-serif, system-ui, sans-serif`
-  const lines = fitCaptionLines(context, caption, textWidth, 2)
-  const lineHeight = captionFont * 1.18
+  // Take the largest size that shows the WHOLE sentence, rather than always
+  // taking the largest size and cutting the sentence to fit it.
+  let captionScale = 1
+  let lines: string[] = []
+  const captionWords = caption.trim().split(/\s+/).filter(Boolean).length
+  for (const scale of CAPTION_FONT_STEPS) {
+    captionScale = scale
+    context.font = `650 ${Math.round(captionFont * scale)}px ui-sans-serif, system-ui, sans-serif`
+    lines = fitCaptionLines(context, caption, textWidth, MAX_CAPTION_LINES)
+    // Count the words that survived rather than sniffing for a trailing '…':
+    // an author may end a sentence with one, and that must not be read as a
+    // cut and shrink the caption for text that already fitted.
+    const shown = lines.join(' ').split(/\s+/).filter(Boolean).length
+    if (shown >= captionWords) break
+  }
+  const fittedFont = Math.round(captionFont * captionScale)
+  context.font = `650 ${fittedFont}px ui-sans-serif, system-ui, sans-serif`
+  const lineHeight = fittedFont * 1.18
   const blockHeight = Math.max(1, lines.length) * lineHeight
   const captionY = height - margin - blockHeight - unit * 0.045
   const gradient = context.createLinearGradient(
@@ -1012,7 +1059,7 @@ export function drawReplayVideoOverlay(
 
   context.shadowColor = 'rgba(0, 0, 0, 0.8)'
   context.shadowBlur = unit * 0.012
-  context.font = `650 ${captionFont}px ui-sans-serif, system-ui, sans-serif`
+  context.font = `650 ${fittedFont}px ui-sans-serif, system-ui, sans-serif`
   context.fillStyle = 'rgba(255, 255, 255, 0.98)'
   lines.forEach((line, index) => {
     context.fillText(line, margin, captionY + index * lineHeight)
