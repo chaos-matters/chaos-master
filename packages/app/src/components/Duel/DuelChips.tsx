@@ -5,6 +5,7 @@ import { executeCommand } from '@/commands/registry'
 import { VariationPreview } from '@/components/VariationSelector/VariationSelector'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
+import { ensure3DAffine } from '@/flame/affine3DView'
 import { palette } from '@/flame/colorMap'
 import { defaultPalettes, paletteToGradientCSS } from '@/flame/palettes'
 import { variationTypesFor } from '@/flame/variationRegistry'
@@ -200,6 +201,7 @@ export function DuelChips(props: {
                 <ShapePanel
                   affine={active().preAffine}
                   ghosts={ghostAffines()}
+                  is3D={(props.flame().renderSettings.dimensions ?? 2) === 3}
                   onChange={(affine) => {
                     dispatch(
                       'flame.setTransformAffine',
@@ -566,9 +568,26 @@ function readableType(type: string): string {
   )
 }
 
+/**
+ * The three translations, which are the only part of a 3D transform a scrub
+ * field can state honestly.
+ *
+ * The 2D panel decomposes into scale, rotation and shear because a 2x3 matrix
+ * decomposes cleanly. A 3x4 does not: rotation needs three angles, the order
+ * matters, and a naive Euler triple gimbal-locks at exactly the default camera
+ * angle. So shape comes from dragging the basis handles — which is what the
+ * grid was always for — and the fields say where the transform sits.
+ */
+const OFFSET_3D = [
+  { key: 'd', label: 'X offset' },
+  { key: 'h', label: 'Y offset' },
+  { key: 'l', label: 'Z offset' },
+] as const
+
 function ShapePanel(props: {
   affine: AffineParams
   ghosts: readonly AffineParams[]
+  is3D?: boolean
   onChange: (affine: AffineParams) => void
 }) {
   const controls = () => decomposeAffine(props.affine)
@@ -578,11 +597,36 @@ function ShapePanel(props: {
         <AffineGrid
           affine={props.affine}
           ghosts={props.ghosts}
+          is3D={props.is3D}
           onChange={props.onChange}
         />
       </div>
+      <Show when={props.is3D === true}>
+        <p class={ui.shapeHint}>
+          Drag a handle to move it flat; hold Shift to move it in depth.
+        </p>
+      </Show>
       <div class={ui.fields}>
-        <For each={AFFINE_CONTROLS}>
+        <Show when={props.is3D === true}>
+          <For each={OFFSET_3D}>
+            {(spec) => (
+              <ScrubField
+                label={spec.label}
+                value={ensure3DAffine(props.affine)[spec.key] ?? 0}
+                step={0.01}
+                perPixel={0.005}
+                decimals={3}
+                onChange={(next) => {
+                  props.onChange({
+                    ...ensure3DAffine(props.affine),
+                    [spec.key]: next,
+                  })
+                }}
+              />
+            )}
+          </For>
+        </Show>
+        <For each={props.is3D === true ? [] : AFFINE_CONTROLS}>
           {(spec) => (
             <ScrubField
               label={spec.label}
