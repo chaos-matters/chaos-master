@@ -6,6 +6,38 @@ Versioned independently from the app. Tag a release as `vA.B.C-web` (e.g.
 
 This file is internal (not surfaced anywhere on the site).
 
+## [0.2.0] — 2026-09-04
+
+### Lumen Arcade
+
+- A section between Features and Studio for the WebMCP story: what an agent
+  can do in the editor, the three live modes, and a CTA to
+  `lumenapeiron.com/arcade`. Its clicks are counted as their own
+  `click_launch_arcade` event — the existing handler matched the site root
+  only, so every Arcade click would have gone unrecorded.
+
+### Brand
+
+- **The Deep C mark** replaces the infinity ribbon in the favicon and the nav
+  lockup: a heavy band with three ember marks in its mouth, two flat inks and
+  no gradient, so it survives being 16 pixels tall.
+- **Deep C palette.** The chrome drops the app's blue ramp for ember as its
+  single accent. Ember is never a solid behind white text (2.68:1); the
+  primary CTA is frosted ember glass instead. The navy tints behind flame
+  plates, the modal and the orbit cards become graphite at equal luminance.
+  Solar, rose and the rest land as data colours only.
+- **Social card rebuilt** around the mark: hero flame, then mark, wordmark and
+  "The Chaos Master" as a subtitle. The mark is read from `favicon.svg` at
+  generation time, so the card cannot drift from the favicon. 269 KB, under
+  the 300 KB where WhatsApp stops showing a large preview.
+- "Formerly Chaos Master" is gone from the hero and the meta description, and
+  the third hero badge is now WebMCP.
+
+### Maintenance
+
+- A `landing-dev` entry in `.claude/launch.json`: the package had no preview
+  config, so any visual change needed a full build to see.
+
 ## [0.1.3] — 2026-07-24
 
 ### Analytics
