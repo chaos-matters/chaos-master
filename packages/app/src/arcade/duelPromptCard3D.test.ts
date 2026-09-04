@@ -6,8 +6,11 @@ describe('duelPromptCard in three dimensions', () => {
     const current3D = duelPromptCard(120, 'current', 3)
     expect(current3D).toContain('camera3D.theta')
     // The one camera command that now works in 3D, named as such.
-    expect(current3D).toContain('camera.center recentres the orbit')
-    expect(current3D).not.toContain('does nothing useful')
+    // Every camera command drives the orbit now, so the brief says so
+    // rather than sending the agent to the render-setting path for all of it.
+    expect(current3D).toContain('every camera.* command drives it')
+    expect(current3D).toContain('camera3D.theta')
+    expect(current3D).not.toContain('do nothing in 3D')
 
     expect(duelPromptCard(120, 'random-3d')).toContain('camera3D.theta')
     expect(duelPromptCard(120, 'current')).not.toContain('camera3D')

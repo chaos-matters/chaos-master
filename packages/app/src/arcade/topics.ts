@@ -278,11 +278,12 @@ export function duelPromptCard(
 ): string {
   const minutes = Math.round((seconds / 60) * 10) / 10
   const clock = minutes === 1 ? '1 minute' : `${minutes} minutes`
-  // The 3D camera has no commands of its own; it is reached through the
-  // generic render-setting path, which the agent has no way to guess.
+  // The camera commands read as 2D verbs, and how they land on an orbit is
+  // not something an agent can guess; the angles have no 2D counterpart at
+  // all, so those are named as the render-setting paths they are.
   const camera3D =
     dimensions === 3
-      ? ' In 3D the camera is orbit, not pan and zoom: read it from get_flame under renderSettings.camera3D and move it with execute_command flame.setRenderSetting on the paths camera3D.theta, camera3D.phi, camera3D.radius, camera3D.target, camera3D.fov and camera3D.roll. camera.center recentres the orbit; the other camera.* commands do nothing in 3D.'
+      ? ' In 3D the camera is an orbit around a point, and every camera.* command drives it: zoom is how close the orbit sits, pan moves the point it looks at, camera.center puts both back. To swing around the flame, and for the lens, read renderSettings.camera3D from get_flame and set camera3D.theta, camera3D.phi, camera3D.fov or camera3D.roll with execute_command flame.setRenderSetting.'
       : ''
   return `Duel me in Lumen Apeiron. Call arcade_start_duel to begin: we each get ${clock} and our own flame, side by side, and I am editing mine while you edit yours.${START_FROM_PHRASE[startFrom]} Read your flame with get_flame and change it with execute_command — only flame.* and camera.* are allowed, and you have ${DUEL_STEP_BUDGET} steps.${camera3D} Say what you are going for with arcade_narrate as you work. Aim for something striking rather than merely complicated. You cannot end the duel — the clock does, and I can call it early — so when you are happy call arcade_duel_ready with a short title and keep polishing until time runs out.
 

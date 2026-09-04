@@ -28,6 +28,34 @@ import { affineFocusId, affineRandomizeFocusId, affineResetFocusId, colorFocusId
 import { snapshotOriginFocus, snapshotOriginForCommand } from './snapshotOrigin'
 import type { FlameCommand } from '@/commands/types'
 
+/**
+ * The 3D control that stands in for a 2D camera parameter.
+ *
+ * One verb, two viewports: `camera.zoom` and `camera3D.radius` are the same
+ * knob under different names, and the orbit target has no control of its own,
+ * so a pan points at the orbit group as a whole. Offering both sets of
+ * selectors is what lets every caller stay dimension-blind — ViewControls
+ * mounts the 2D group or the 3D one and never both, so at most one can match.
+ */
+const CAMERA_3D_COUNTERPART: Record<string, string | undefined> = {
+  'camera.zoom': 'camera3D.radius',
+  'camera.position': 'camera3D',
+}
+
+function paramSelectors(value: string): string[] {
+  const quoted = cssQuote(value)
+  return [
+    `[data-parameter-path=${quoted}]`,
+    // The tour anchors name the control by role, and which suffix a given
+    // parameter uses is not derivable — try the ones in use.
+    `[data-tour-target=${cssQuote(`${value}-slider`)}]`,
+    `[data-tour-target=${cssQuote(`${value}-select`)}]`,
+    `[data-tour-target=${cssQuote(`${value}-picker`)}]`,
+    `[data-tour-target=${cssQuote(`${value}-buttons`)}]`,
+    `[data-tour-target=${cssQuote(`${value}-controls`)}]`,
+  ]
+}
+
 /** Elements the follow-cam can be asked to look at, most specific first. */
 export function focusSelectors(hint: string): string[] {
   const separator = hint.indexOf(':')
@@ -37,17 +65,12 @@ export function focusSelectors(hint: string): string[] {
   if (value === '') return []
   const quoted = cssQuote(value)
   switch (kind) {
-    case 'param':
-      return [
-        `[data-parameter-path=${quoted}]`,
-        // The tour anchors name the control by role, and which suffix a given
-        // parameter uses is not derivable — try the ones in use.
-        `[data-tour-target=${cssQuote(`${value}-slider`)}]`,
-        `[data-tour-target=${cssQuote(`${value}-select`)}]`,
-        `[data-tour-target=${cssQuote(`${value}-picker`)}]`,
-        `[data-tour-target=${cssQuote(`${value}-buttons`)}]`,
-        `[data-tour-target=${cssQuote(`${value}-controls`)}]`,
-      ]
+    case 'param': {
+      const counterpart = CAMERA_3D_COUNTERPART[value]
+      return counterpart === undefined
+        ? paramSelectors(value)
+        : [...paramSelectors(value), ...paramSelectors(counterpart)]
+    }
     case 'ui':
       return [`[data-tour-target=${quoted}]`]
     case 'focus': {
