@@ -68,6 +68,26 @@ export function DuelResultCard(props: {
     })
   })
 
+  // Escape leaves the card, the same as its own two exits. It is a dialog with
+  // nothing to lose: the takes are already in the library.
+  createEffect(() => {
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape') return
+      if (openInfo()) {
+        // The tooltip is the innermost thing open; it goes first.
+        setOpenInfo(false)
+        return
+      }
+      ev.preventDefault()
+      ev.stopPropagation()
+      clearDuelResult()
+    }
+    document.addEventListener('keydown', onKey)
+    onCleanup(() => {
+      document.removeEventListener('keydown', onKey)
+    })
+  })
+
   const download = () => {
     const card = props.result.card
     if (!card) return

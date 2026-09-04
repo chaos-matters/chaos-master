@@ -1,5 +1,6 @@
 import { cleanup, render, screen, within } from '@solidjs/testing-library'
 import { afterEach, describe, expect, it } from 'vitest'
+import { duelResult, showDuelResult } from '@/arcade/duelResult'
 import { createTestFlame } from '@/webmcp/testUtils'
 import { DuelResultCard } from './DuelResultCard'
 import type { DuelComponent } from '@/arcade/duelJudge'
@@ -119,6 +120,26 @@ describe('DuelResultCard', () => {
     mount()
     expect(document.body.textContent).not.toContain('?flame=')
     expect(document.body.textContent).not.toContain('http')
+  })
+
+  it('leaves on Escape, closing the tooltip first', () => {
+    mount()
+    const escape = () =>
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    const info = screen.getByRole('button', { name: 'How was this scored?' })
+
+    info.click()
+    expect(info.getAttribute('aria-expanded')).toBe('true')
+    escape()
+    expect(info.getAttribute('aria-expanded')).toBe('false')
+    // Still on screen: the first Escape spent itself on the tooltip.
+    expect(screen.queryByRole('dialog')).toBeTruthy()
+
+    // The card is mounted directly here, so what Escape has to prove is that
+    // it cleared the result the stage renders from.
+    showDuelResult(result())
+    escape()
+    expect(duelResult()).toBeUndefined()
   })
 
   it('drops the dial, the maths panel and the seat captions', () => {
