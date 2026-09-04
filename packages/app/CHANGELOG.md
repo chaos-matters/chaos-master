@@ -1,7 +1,7 @@
 # Changelog
 
-What's new in Lumen Apeiron (formerly Chaos Master). Concise highlights for
-each release; the full developer history lives in `dev.changelog.md`.
+What's new in Lumen Apeiron. Concise highlights for each release; the full
+developer history lives in `dev.changelog.md`.
 
 ## [Unreleased]
 

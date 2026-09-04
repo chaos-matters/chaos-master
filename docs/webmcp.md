@@ -70,9 +70,10 @@ No tool writes `ctx.setFlameDescriptor` or `ctx.timeline.setTracks` directly.
 `https://lumenapeiron.com/arcade` (the worker sends `/arcade` to the SPA as
 `#arcade`; `#arcade=teach|cinema|duel|beats` deep-links a panel).
 
-- **Teach** — pick one of four topics (`variations`, `affine`, `color`,
-  `camera`). The agent gets a brief with the goal, the allowed commands and
-  their exact argument shapes, and a step budget. It narrates through
+- **Teach** — pick one of seven topics (`variations`, `affine`, `color`,
+  `camera`, `genetics`, `sonification`, `render`). The agent gets a brief with
+  the goal, the allowed commands and their exact argument shapes, and a step
+  budget. It narrates through
   `arcade_narrate` (a real `lesson.note` command, so the sentence replays as a
   caption between the edits it describes) and builds the example with
   `execute_command`. The recording is saved as `Lesson: <Topic> — <title>`.
