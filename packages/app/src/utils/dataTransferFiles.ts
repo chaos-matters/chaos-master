@@ -7,6 +7,18 @@
  * or image dragged from another window carries no file at all. Callers get an
  * empty array in that case instead of a crash or a silently ignored drop.
  */
+/**
+ * What to tell someone whose drop arrived with nothing in it.
+ *
+ * `types: []` is not a rejected file — the browser was handed an empty drag
+ * and the file never reached the page at all, so nothing about the file is at
+ * fault. A file manager on Wayland or X11 that loses the payload mid-drag is
+ * the usual cause, and the picker does not go through drag at all, so it is
+ * the way out rather than a workaround.
+ */
+export const EMPTY_DROP_MESSAGE =
+  'That drop arrived empty — no file came with it. The file is probably fine: open Load Flame and pick it instead.'
+
 export function filesFromDataTransfer(
   dt: DataTransfer | null | undefined,
 ): File[] {
