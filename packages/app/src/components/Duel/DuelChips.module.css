@@ -414,6 +414,14 @@
 }
 
 .fieldInput,
+/* The slider takes the tile's whole 64px width, so its readout goes under it,
+   centred like the name above — beside it there is no room for either. */
+.tileWeightRow {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+}
+
 .tileWeight {
   width: 100%;
   accent-color: var(--duel-warm-core, #fde7ac);
