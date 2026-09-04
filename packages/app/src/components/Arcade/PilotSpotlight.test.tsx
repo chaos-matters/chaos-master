@@ -141,6 +141,28 @@ describe('PilotSpotlight', () => {
     expect(ring()?.style.left).toBe('500px')
   })
 
+  it('never wears the next step\u2019s caption on the last step\u2019s ring', () => {
+    control('gamma', { x: 40, y: 60 })
+    control('contrast', { x: 500, y: 120 })
+    render(() => <PilotSpotlight />)
+
+    notePilotFocus(step('param:gamma'), 'Gamma: 2.4')
+    settle(1000)
+    expect(ring()?.textContent).toBe('Gamma: 2.4')
+
+    notePilotFocus(step('param:contrast'), 'Contrast: 1.1')
+    // The panel the next control lives in may take a moment to open, and the
+    // ring cannot move until it has. Relabelling first put the new caption on
+    // the old box, which reads as the AI pointing at the wrong control.
+    settle(50)
+    expect(ring()?.style.left).toBe('40px')
+    expect(ring()?.textContent).toBe('Gamma: 2.4')
+
+    settle(200)
+    expect(ring()?.style.left).toBe('500px')
+    expect(ring()?.textContent).toBe('Contrast: 1.1')
+  })
+
   it('retires the ring for a step no hint can place', () => {
     control('gamma')
     render(() => <PilotSpotlight />)

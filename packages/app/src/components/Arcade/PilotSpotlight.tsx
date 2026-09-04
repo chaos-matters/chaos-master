@@ -104,13 +104,16 @@ export function PilotSpotlight(props: {
       setRect(undefined)
       setLabel(undefined)
     } else {
-      setLabel(target.label)
       // Open whatever has to be open before the control exists to be measured.
       props.onPrepareFocus?.(preparation)
       settleTimer = window.setTimeout(() => {
         const element = resolveFocusElement(hint)
         if (element !== null) revealFocusElement(element)
         trackUntil = globalThis.performance.now() + TRACK_MS
+        // The label changes with the box, not before it: relabelling first
+        // left the previous step's ring wearing the next step's caption for
+        // as long as the panel took to settle.
+        setLabel(target.label)
         measure(hint)
       }, SETTLE_MS)
     }
@@ -154,6 +157,7 @@ export function PilotSpotlight(props: {
       {(box) => (
         <div
           class={ui.ring}
+          data-testid="pilot-spotlight"
           aria-hidden="true"
           style={{
             left: `${box().x}px`,
