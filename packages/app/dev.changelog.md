@@ -7,7 +7,14 @@ changelog surfaced in the About panel lives in `CHANGELOG.md`.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.9] - 2026-08-02
+## [0.9.9] - 2026-09-04
+
+The release that hands the editor to an agent. WebMCP tools expose the command
+registry and the flame to any agent in the browser; Lumen Arcade builds three
+modes on them — Teach, Cinema and the split-screen Duel — over a session
+recorder that captures every authored change as a replayable, exportable step.
+Underneath: seats (a reusable editing unit, so two can share one screen), the
+curation and community pipeline behind Home, and the Fractal Classics.
 
 A Home tab backed by a D1 content database — live WebGPU flames rather than
 screenshots, bounded by the existing visibility/compute gating — plus the
@@ -151,6 +158,76 @@ implementations.
   else catches this class of bug — the app builds, deploys and renders
   perfectly, and the only symptom is a prompt that never appears.
 
+- **WebMCP tools** (`src/webmcp/`, `docs/webmcp.md`): 33 tools registered on
+  `document.modelContext`; a `window.webmcp` mock stands in for dev builds and
+  Playwright. Foundation: `get_flame`, `set_flame`, `list_commands`,
+  `get_undo_state`, `execute_command`; `score_flame` and `breed_flames`; the
+  Arcade family (`arcade_status`, `arcade_start_lesson`, `arcade_narrate`,
+  `arcade_end_lesson`, `arcade_start_cinema`, `arcade_set_keyframes`,
+  `arcade_get_animatable_paths`, `arcade_start_duel`, `arcade_end_duel`); and
+  the Flame Clash arena, Evolutionary Art Director and custom-WGSL tools behind
+  the greyed hub cards. `execute_command` dispatches through the recorded live
+  path: `preflightLiveCommand` normalizes the args first and applies the replay
+  policy to what will actually be recorded, so `flame.mutate` and
+  `sonification.setEnabled` are reachable, and a budget error names the path
+  (`arguments[0].tracks[0].keyframes[1].value is undefined`). `arcade/guard.ts`
+  refuses `export.*`, `history.*` and point count / dimensions / quality while
+  an agent drives.
+- **Lumen Arcade** (`src/arcade/`, `components/Arcade/`): `#arcade` tab, a
+  Worker 308 from `/arcade`, a hub with mode cards (Teach, Cinema and Duel
+  live; Beats, Arena and Director greyed), prompt cards and a WebMCP status
+  pill. A pilot state machine owns the lock overlay (Stop, live step list, an
+  end card that replays or saves the take) and the spotlight ring
+  (`PilotSpotlight`: measures the focus hint of each executed command, 700 ms
+  dwell, off during a duel). `topics.ts` carries the seven lessons and their
+  step budgets (variations and affine 45, colour 40, camera and genetics 32,
+  sonification and render 28), held to the video cap by
+  `stepBudgetFitsVideo.test.ts`. Cinema validates keyframe tracks against the
+  animatable catalog, which drops the camera family the flame does not render
+  with (`camera.*` on 3D, `camera3D.*` on 2D) and says so, in radians. The
+  camera gained `panTo`, `panBy`, `zoomBy` and `frame`, clamped to the schema.
+- **Seats and Duel** (`createSeat`, `components/Duel/`): a seat is the reusable
+  editing unit — flame store, history, camera, lock scope — so two mount side
+  by side; the recorder keeps one stream per seat behind a handle, the WebMCP
+  context bridge is keyed by seat, and a command's recording routes by its
+  seat. `DuelStage` mounts over the parked workspace: a clock dial on the seam,
+  a per-seat lock, the whole variation catalogue on the human side, a judge
+  seam with a v0 score sheet, and the clock — not the agent — ends the duel.
+  The result card sits over both flames and exports the winner as a PNG duel
+  card carrying its `FlameJson`. 2D and 3D (`affine3DView`, `startFrom:
+"random-3d"`; orbit keys are disabled while a duel covers the canvas).
+- **Session recorder** (`src/recorder/`, `components/SessionRecorder/`):
+  versioned `.steps.json` (valibot; the initial flame goes through
+  migrate-on-parse). `executeCommand` logs top-level commands while recording
+  and opens a scope per execution so history writes are attributed;
+  `createStoreHistory.onEntryPushed` counts any write that bypassed the
+  registry as an unnamed write — the coverage ratchet in
+  `docs/recorder-coverage.md`. Deterministic replay with a follow-cam driven by
+  focus hints (`recorder/focus.ts`), captions and hold per step, a recordings
+  library, and a `FlameSteps` zTXt chunk in exported PNGs. Video export
+  (`replayVideo.ts`): full-interface capture through WebCodecs into
+  `mp4-muxer`, reading-speed pacing with lead-in and tail, and a 300 s cap —
+  the MP4 is muxed into RAM at the encoder's 8 Mbps floor, so five minutes is
+  about 300 MB.
+- **Community showcase** (`migrations/0006`, `DiscordShareModal`,
+  `worker/index.ts`): the Discord share carries an opt-in consent, off by
+  default, that stages the flame as a `submission_source = 'discord'`,
+  `moderation_status = 'pending'` row; public reads only ever return approved
+  submissions; `gallery-admin approve` and `reject` move the queue.
+- **Gallery curation foundations** (`migrations/0005`,
+  `scripts/seed-gallery.mjs`): provenance columns (`collection`,
+  `provenance_kind`, `source_url`, `license`, `license_url`, `attribution`,
+  `changes`, `original_id`) and one publication gate shared by `publish` and
+  `audit`. `seed-gallery` holds the curated 18-row set — hero, six classics,
+  three gallery pieces, three motion rows, five capability cards — and emits
+  an upsert for any environment.
+- **Fractal Classics and curated examples** (`flame/examples/`): eight exact
+  affine constructions as 2D or 3D flames, and the showcase flames Neon Julian
+  Cosmos, Golden Apollonian Gasket and Cybernetic Swirl.
+- **`@typegpu/noise` RNG** (`shaders/random.ts`, TypeGPU 0.12): the renderer's
+  random sequence comes from TypeGPU's noise primitives, and Benchmark Studio
+  can compare renderer RNG implementations.
+
 ### Changed
 
 - **Home art direction** (`HomeTab.module.css`): Home now carries its own
@@ -161,6 +238,19 @@ implementations.
   one palette keeps the full-bleed hero framed identically regardless of a
   theme setting nobody chose for this page. The nine `[data-theme='dark']`
   overrides are gone with it.
+
+- **Deep C mark** (`assets/favicon.svg`): two flat inks, a 249-degree band
+  open to the west with three ember marks in its mouth; 16 px legibility
+  (greyscale standard deviation of the downsampled mark) 0.245 to 0.325.
+- **Load Flame drop zone** (`Dropzone`, `LoadFlameModal`,
+  `createFileDragState()`, `utils/dataTransferFiles.ts`): one shared drag
+  state with dragenter/dragleave depth counting and `dropEffect = 'copy'`; the
+  drag rule that had never existed (`ui.uploadZoneDragging` was undefined, so
+  the element carried a literal `undefined` class) is an inset ring that
+  cannot overflow the modal; formats as pills with an info affordance for the
+  multi-file rule; an empty drop (`types: []`) raises a toast that names the
+  cause and offers the picker.
+- **Copy**: the product says "agent", not "AI", throughout the Arcade.
 
 ### Fixed
 
@@ -292,6 +382,33 @@ implementations.
   nonce it finds in the CSP header onto the tag it injects (its documented
   mechanism). `'unsafe-inline'` stays out and the app's own `<script src>`
   tags remain allowed by `'self'`.
+
+- **flam3 alias shadowed an exact variation** (flame import):
+  `sinusoidal` resolved to `sinVar` (the complex sine) instead of the
+  registry's exact `sinusoidalVar`. The alias is gone so the registry resolves
+  it, and the historical `sinusodial` misspelling points at `sinusoidalVar`.
+- **Recents** (`LoadFlameModal`, recent-flames store): validating 150 stored
+  flames cost ~90 ms on every open; the validated list is now memoized on the
+  raw payload (cold 104.7 ms, warm 0). `saveRecentFlame` and
+  `deleteRecentFlame` did a read-modify-write on the validated list and
+  silently dropped every entry the schema rejected.
+- **Console panel pinned every logged object** (console store): entries carry
+  a bounded serialization taken at log time (depth, items, keys, string and
+  total length; cycles resolved; DOM and GPU handles named; own enumerable
+  keys only), and the ring buffer is a store so a push wakes only readers of
+  the new index.
+- **Audio mappings clamped** (`applyAudioMappingsToFlame`,
+  `scripts/validate-gallery.mjs`): every mapping funnels through one clamp
+  against the schema — `palettePhase` is 0–1, not radians; `skipIters`
+  rounds; NaN becomes finite; a transform's probability stays above zero,
+  since zero is the collapse itself. `validate-gallery` runs `validateFlame`
+  over every stored row and sequence entry.
+- **Arcade and replay, before release**: Cinema no longer records a
+  `timeline.setAnimationEnabled` no-op ahead of the keyframes; the pause a
+  step earns is paid to that step, and the closing step is held before a take
+  is called finished; captions are whole sentences at reading speed; the
+  Teach and Cinema overlay is readable over the flame; the arena archetypes
+  name variations that exist (all 44 were bare Apophysis names).
 
 ## [0.9.8] - 2026-07-24
 
