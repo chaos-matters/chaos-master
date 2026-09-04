@@ -53,7 +53,7 @@ export function PilotOverlay(props: {
     // them within 1500 ms silently ended the take.
     if (drivingState()?.lock !== 'screen') return
     // Captured on the way down so nothing else can claim Escape first: while
-    // the AI drives, Escape means "give me the controls back", never "close
+    // the agent drives, Escape means "give me the controls back", never "close
     // this panel".
     const onKey = (ev: KeyboardEvent) => {
       if (ev.key !== 'Escape') return
@@ -121,7 +121,7 @@ export function PilotOverlay(props: {
               class={ui.shield}
               role="dialog"
               aria-modal="true"
-              aria-label="AI is driving the editor"
+              aria-label="The agent is driving the editor"
             >
               <div class={ui.banner}>
                 <Robot class={ui.icon} aria-hidden="true" />
@@ -136,7 +136,7 @@ export function PilotOverlay(props: {
                   type="button"
                   class={ui.stop}
                   onClick={stop}
-                  aria-label="Stop the AI and keep what was recorded"
+                  aria-label="Stop the agent and keep what was recorded"
                 >
                   <Stop aria-hidden="true" />
                   {escArmed() ? 'Press Esc again to stop' : 'Stop'}

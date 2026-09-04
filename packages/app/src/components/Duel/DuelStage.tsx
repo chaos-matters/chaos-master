@@ -136,7 +136,7 @@ export function DuelStage(props: {
             </div>
             <div class={ui.side}>
               <SeatView
-                label="The AI's flame"
+                label="The agent's flame"
                 score={model().rivalScore}
                 side="rival"
                 flame={rival().flame}
@@ -147,7 +147,7 @@ export function DuelStage(props: {
                 stochasticFilter={props.stochasticFilter}
                 interactive={false}
               />
-              {/* The AI's play-by-play, in the AI's half. On the seam it cut
+              {/* The agent's play-by-play, in its own half. On the seam it cut
                   the divider and stacked a fourth object into the centre
                   column; here it is the only thing this half has to hold. */}
               <Show when={runningDuel()}>

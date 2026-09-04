@@ -49,13 +49,13 @@ describe('shortcuts under an Arcade lock', () => {
 
     pressCtrlS()
 
-    // The seat lock covers the AI's half. Taking Ctrl+Z and the rest away
+    // The seat lock covers the agent's half. Taking Ctrl+Z and the rest away
     // from the person playing the other half is the app fighting its user.
     expect(ctx.sidebar.setOpen).toHaveBeenCalledTimes(1)
     dispose()
   })
 
-  it('takes the keyboard while the AI owns the screen', () => {
+  it('takes the keyboard while the agent owns the screen', () => {
     const { ctx, dispose } = mount()
     drive('screen', 'player')
 

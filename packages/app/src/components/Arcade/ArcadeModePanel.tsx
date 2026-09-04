@@ -26,8 +26,8 @@ const TITLES: Record<ArcadeMode, string> = {
 }
 
 const STEPS = [
-  'Copy the prompt and paste it into your AI chat (ChatGPT sidebar or Chrome).',
-  'The AI takes the controls; the editor locks and records every step.',
+  'Copy the prompt and paste it into your agent chat (ChatGPT sidebar or Chrome).',
+  'The agent takes the controls; the editor locks and records every step.',
   'When it finishes, replay the session, export a video, or keep building.',
 ]
 
@@ -135,8 +135,9 @@ export function ArcadeModePanel(props: {
       <Switch>
         <Match when={props.mode === 'teach'}>
           <p>
-            Pick a topic. The AI builds a small example step by step, narrating
-            as it goes, and the recording becomes a lesson you can replay.
+            Pick a topic. The agent builds a small example step by step,
+            narrating as it goes, and the recording becomes a lesson you can
+            replay.
           </p>
           <div class={ui.chips} role="radiogroup" aria-label="Lesson topic">
             <For each={TOPIC_IDS}>
@@ -159,8 +160,8 @@ export function ArcadeModePanel(props: {
         </Match>
         <Match when={props.mode === 'cinema'}>
           <p>
-            Describe the move you want, or start from one of these. The AI reads
-            your flame, keyframes it, and plays it back.
+            Describe the move you want, or start from one of these. The agent
+            reads your flame, keyframes it, and plays it back.
           </p>
           <div class={ui.chips} aria-label="Animation presets">
             <For each={CINEMA_PRESETS}>
@@ -192,7 +193,7 @@ export function ArcadeModePanel(props: {
         </Match>
         <Match when={props.mode === 'duel'}>
           <p>
-            You and the AI each get a flame and one clock. Paste the prompt,
+            You and the agent each get a flame and one clock. Paste the prompt,
             then build against it — both sides are recorded and replayable.
           </p>
           <label class={ui.field}>
@@ -224,7 +225,7 @@ export function ArcadeModePanel(props: {
                 data-testid="solo-duel"
               >
                 <Swords aria-hidden="true" />
-                Start without the AI
+                Start without the agent
               </button>
               <p class={ui.soloNote}>
                 Dev build only. Opens the split screen with the other seat left

@@ -98,7 +98,7 @@ No tool writes `ctx.setFlameDescriptor` or `ctx.timeline.setTracks` directly.
   to correct against. The agent calls `arcade_duel_ready` to name its flame,
   which costs no steps and changes nothing else, and may keep polishing
   afterwards. Whoever ends it, `finishDuel` saves each side as its own take
-  (`Duel: <title> — your flame` / `— the AI's flame`) and shows the verdict. 2D
+  (`Duel: <title> — your flame` / `— the agent's flame`) and shows the verdict. 2D
   and still flames for now.
 
   **The result card is a PNG.** Both flames keep rendering behind it, and its
@@ -107,7 +107,7 @@ No tool writes `ctx.setFlameDescriptor` or `ctx.timeline.setTracks` directly.
   winner, exactly as a PNG exported from the editor does.
 
   **Running one without an agent.** The Duel panel in the hub carries a "Start
-  without the AI" button under `pnpm dev` (and behind `VITE_SOLO_DUEL=1` for a
+  without the agent" button under `pnpm dev` (and behind `VITE_SOLO_DUEL=1` for a
   preview build). It opens the same split screen with nobody in the other seat:
   no pilot, so no seat lock, no step budget and no narration rail; the tool
   bridge stays pointed at your own flame; and neither side is recorded, so an

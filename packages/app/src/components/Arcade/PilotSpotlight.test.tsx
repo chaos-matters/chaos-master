@@ -6,7 +6,7 @@ import type { ReplayFocusPreparation } from '@/recorder/focusPreparation'
 import type { RecordedAction } from '@/recorder/schema'
 
 /**
- * The live spotlight's contract: while the AI drives, a ring says WHICH
+ * The live spotlight's contract: while the agent drives, a ring says WHICH
  * control each step moved, resolved through the same hints replay uses. It
  * must survive an agent that fires its steps as fast as its tool loop allows
  * — six inside 26ms in a real lesson — without turning into a strobe.
@@ -153,7 +153,7 @@ describe('PilotSpotlight', () => {
     notePilotFocus(step('param:contrast'), 'Contrast: 1.1')
     // The panel the next control lives in may take a moment to open, and the
     // ring cannot move until it has. Relabelling first put the new caption on
-    // the old box, which reads as the AI pointing at the wrong control.
+    // the old box, which reads as the agent pointing at the wrong control.
     settle(50)
     expect(ring()?.style.left).toBe('40px')
     expect(ring()?.textContent).toBe('Gamma: 2.4')
@@ -173,7 +173,7 @@ describe('PilotSpotlight', () => {
 
     notePilotFocus(step(undefined), 'Saved the flame')
     settle(1000)
-    // Leaving the ring where it was would claim the AI touched gamma again.
+    // Leaving the ring where it was would claim the agent touched gamma again.
     expect(ring()).toBeNull()
   })
 

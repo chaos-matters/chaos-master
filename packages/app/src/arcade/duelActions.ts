@@ -98,7 +98,7 @@ export function beginDuel(
       return { error: pilotResult.error }
     }
     // The rival's context becomes what every tool reads, so execute_command,
-    // get_flame and the rest act on the AI's flame with no per-tool change.
+    // get_flame and the rest act on the agent's flame with no per-tool change.
     // Solo leaves the bridge on the player: there is no agent to point at the
     // other seat, and moving it would aim a stray tool call at a flame nobody
     // is playing.
@@ -163,7 +163,7 @@ export async function finishDuel(
   let attempted = 0
   for (const [name, session] of [
     [playerName, sessions.player],
-    [`Duel: ${title} — the AI's flame`, sessions.rival],
+    [`Duel: ${title} — the agent's flame`, sessions.rival],
   ] as const) {
     if (!session) continue
     attempted++
@@ -184,7 +184,7 @@ export async function finishDuel(
     // The card names the winner and only falls back to who they are. The
     // take names above are a filename convention and stay as they are.
     playerName: playerFlame.metadata?.name?.trim() || 'You',
-    rivalName: state.ready?.title?.trim() || 'The AI',
+    rivalName: state.ready?.title?.trim() || 'The agent',
     winnerFlame,
     archetype: calculateFlameStats(winnerFlame).type,
     durationMs: state.durationMs,

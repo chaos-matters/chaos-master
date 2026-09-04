@@ -385,7 +385,7 @@ export function ViewControls(props: ViewControlProps) {
           {
             label: 'Art Director…',
             title:
-              'Evolutionary Art Director: AI-guided interactive generative steering',
+              'Evolutionary Art Director: agent-guided interactive generative steering',
             onClick: () => props.onArtDirector?.(),
           },
           {

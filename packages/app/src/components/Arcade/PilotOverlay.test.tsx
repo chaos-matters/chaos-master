@@ -121,7 +121,7 @@ describe('PilotOverlay end card', () => {
     })
     render(() => <PilotOverlay ctx={createMockCommandContext()} />)
     expect(
-      screen.queryByRole('dialog', { name: 'AI is driving the editor' }),
+      screen.queryByRole('dialog', { name: 'The agent is driving the editor' }),
     ).toBeNull()
   })
 
@@ -150,7 +150,7 @@ describe('PilotOverlay end card', () => {
     document.removeEventListener('keydown', listener)
   })
 
-  it('claims Escape while the AI owns the screen', () => {
+  it('claims Escape while the agent owns the screen', () => {
     startPilot({
       mode: 'teach',
       title: 'Teaching',
@@ -177,7 +177,7 @@ describe('PilotOverlay end card', () => {
 
 /**
  * The ring belongs to the lock, not to the app: it exists exactly as long as
- * the AI holds the controls. One left behind on the end card would point at a
+ * the agent holds the controls. One left behind on the end card would point at a
  * control the viewer can now touch.
  */
 describe('PilotOverlay live spotlight', () => {
@@ -235,7 +235,7 @@ describe('PilotOverlay live spotlight', () => {
     })
   }
 
-  it('rings the control a step moved while the AI drives', () => {
+  it('rings the control a step moved while the agent drives', () => {
     startTeach()
     render(() => <PilotOverlay ctx={createMockCommandContext()} />)
 

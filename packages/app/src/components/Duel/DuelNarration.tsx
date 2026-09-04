@@ -7,7 +7,7 @@ import type { PilotDriving } from '@/arcade/pilot'
 const VISIBLE_LINES = 3
 
 /**
- * What the AI says while it works, and how much budget it has left.
+ * What the agent says while it works, and how much budget it has left.
  *
  * Both used to render only inside the pilot's full-screen shield, which a duel
  * never draws — so the prompt card asked the agent to narrate, each call spent
@@ -25,7 +25,7 @@ export function DuelNarration(props: { driving?: PilotDriving }) {
           <div
             class={ui.lines}
             aria-live="polite"
-            aria-label="What the AI says"
+            aria-label="What the agent says"
           >
             <For each={lines()}>
               {(entry) => (

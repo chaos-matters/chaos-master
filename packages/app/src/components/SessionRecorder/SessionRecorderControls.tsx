@@ -205,8 +205,8 @@ export function SessionRecorderControls(props: {
               // changes nothing on screen — which read as a dead button.
               title={
                 narrationAsStep()
-                  ? 'How narration is recorded: as its own step, a caption that holds while nothing moves. Shows up in the next recording you or the AI make.'
-                  : 'How narration is recorded: as the caption on the next step, so the list is only what changed. Shows up in the next recording you or the AI make.'
+                  ? 'How narration is recorded: as its own step, a caption that holds while nothing moves. Shows up in the next recording you or the agent make.'
+                  : 'How narration is recorded: as the caption on the next step, so the list is only what changed. Shows up in the next recording you or the agent make.'
               }
             >
               <Speech class={styles.icon} aria-hidden="true" />

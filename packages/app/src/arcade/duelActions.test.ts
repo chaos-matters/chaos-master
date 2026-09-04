@@ -76,7 +76,7 @@ describe('finishDuel', () => {
     // Filed under the duel's own names, not "Lesson".
     expect(saved).toEqual([
       'Duel: Probe — your flame',
-      "Duel: Probe — the AI's flame",
+      "Duel: Probe — the agent's flame",
     ])
     expect(result.savedTakes).toBe(2)
     expect(result.winner).toBeDefined()
