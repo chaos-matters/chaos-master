@@ -9,7 +9,7 @@
     "start": "astro dev",
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview",
+    "preview": "astro preview --port 4322",
     "check": "astro check",
     "deploy:dev": "pnpm run build && pnpm exec wrangler deploy --env dev",
     "deploy:prod": "pnpm run build && pnpm exec wrangler deploy --env prod"

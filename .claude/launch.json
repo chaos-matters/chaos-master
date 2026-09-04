@@ -14,6 +14,13 @@
       "runtimeArgs": ["--filter", "@chaos-master/landing", "dev"],
       "port": 4321,
       "url": "https://localhost:4321"
+    },
+    {
+      "name": "landing-preview",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@chaos-master/landing", "preview"],
+      "port": 4322,
+      "url": "http://localhost:4322"
     }
   ]
 }

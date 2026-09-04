@@ -36,7 +36,7 @@ import StudioDemo from './StudioDemo.tsx'
     /* deep-space tint — also the graceful empty state without WebGPU */
     background: radial-gradient(
       120% 120% at 50% 40%,
-      rgba(20, 24, 50, 0.45),
+      var(--graphite),
       #000 74%
     );
     min-height: 440px;
@@ -136,7 +136,7 @@ import StudioDemo from './StudioDemo.tsx'
   }
   #studio .ph-btn:hover {
     color: #fff;
-    border-color: var(--blue-500);
+    border-color: var(--ember);
   }
   #studio .ph-btn svg {
     width: 10px;
@@ -145,9 +145,9 @@ import StudioDemo from './StudioDemo.tsx'
   }
   /* animate button while a run is playing — accent + the icon becomes a stop */
   #studio .animate.running {
-    color: var(--blue-300);
-    border-color: var(--blue-500);
-    background: rgba(37, 99, 235, 0.16);
+    color: var(--ember);
+    border-color: var(--ember);
+    background: rgba(var(--ember-rgb), 0.16);
   }
   /* panel is read-only while animating; dim the draggable values */
   #studio .panel.animating .scrub {
@@ -207,8 +207,8 @@ import StudioDemo from './StudioDemo.tsx'
     -webkit-touch-callout: none;
   }
   #studio .scrub:hover {
-    color: var(--blue-300);
-    border-bottom-color: var(--blue-400);
+    color: var(--ember);
+    border-bottom-color: var(--ember);
   }
   #studio .vbar {
     display: flex;
@@ -220,14 +220,14 @@ import StudioDemo from './StudioDemo.tsx'
     font-size: 0.64rem;
     padding: 3px 7px;
     border-radius: 4px;
-    background: rgba(96, 165, 250, 0.12);
-    color: var(--blue-300);
+    background: rgba(var(--ember-rgb), 0.12);
+    color: var(--ember);
   }
   #studio .live {
     display: flex;
     align-items: center;
     gap: 7px;
-    color: var(--blue-400);
+    color: var(--ember);
   }
 
   @media (max-width: 860px) {

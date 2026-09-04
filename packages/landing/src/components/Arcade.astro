@@ -1,0 +1,461 @@
+---
+import { LAUNCH_ICON } from '../icons'
+
+const arcadeUrl = 'https://lumenapeiron.com/arcade'
+const docsUrl =
+  'https://github.com/chaos-matters/chaos-master/blob/main/docs/webmcp.md'
+
+// Inline SVG icons, matching Features.astro. These three are the app's own mode
+// icons (packages/app/src/icons/{book,film,swords,robot}.svg) so the cards here
+// and the hub cards in the editor are the same drawings.
+const icons = {
+  book: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10.5 5 8 4.5 4 4.5v13c4 0 6.5.5 8 2 1.5-1.5 4-2 8-2v-13c-4 0-6.5.5-8 2z"/><path d="M12 6.5v11"/></svg>`,
+  film: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/></svg>`,
+  swords: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="M13 19l6-6M16 16l4 4M19 21l2-2"/><path d="M9.5 6.5 21 18v3h-3L6.5 9.5"/><path d="M5 14l-2 2M8 17l-2 2"/></svg>`,
+  robot: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="16" height="12" rx="2"/><circle cx="9" cy="14" r="1.25"/><circle cx="15" cy="14" r="1.25"/><path d="M12 8V4M9 4h6M2 13h2M20 13h2"/></svg>`,
+  musicNote: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="18" r="3"/><path d="M11 18V6l9-3v11"/><circle cx="18" cy="14" r="3"/><path d="M11 6l9-3"/></svg>`,
+  zap: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`,
+  lineage: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="5" r="2.5"/><circle cx="18" cy="5" r="2.5"/><circle cx="12" cy="19" r="2.5"/><path d="M6 7.5V11h12V7.5"/><path d="M12 11v5.5"/></svg>`,
+  info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11.2v5"/><circle cx="12" cy="7.9" r="0.55" fill="currentColor" stroke="none"/></svg>`,
+}
+
+// The hub's other three cards. Taglines are the hub's own, so a visitor reads
+// the same sentence here and on the card itself.
+const soon = [
+  {
+    icon: 'musicNote',
+    name: 'Beats',
+    tag: 'The agent wires your flame to a song so it dances.',
+  },
+  {
+    icon: 'zap',
+    name: 'Arena',
+    tag: 'Flames clash on real stats; the winner gets a shareable card.',
+  },
+  {
+    icon: 'lineage',
+    name: 'Director',
+    tag: 'The agent learns your taste and evolves flames toward it.',
+  },
+]
+
+const modes = [
+  {
+    icon: 'book',
+    name: 'Teach',
+    tag: 'Agent drives',
+    body: 'Pick one of seven topics, from variations and affine transforms to sonification. The agent builds a worked example on the flame you already have open, says one sentence before each step, and the whole take replays as a captioned lesson.',
+  },
+  {
+    icon: 'film',
+    name: 'Cinema',
+    tag: 'Agent drives',
+    body: 'Describe the move in a sentence, or press Small and slow, Big and cinematic, or Surprise me. The agent reads what can be keyframed, writes the tracks, and the animation lands as one undoable step that plays at once. Not right? Undo, say what to change, ask again.',
+  },
+  {
+    icon: 'swords',
+    name: 'Duel',
+    tag: 'You + agent',
+    body: 'Race the agent to the better flame, side by side against one clock. It gets its own seat with its own history; your half stays yours, keyboard and all. It cannot stop the clock — that is the pressure. Both takes are saved and a card names the winner.',
+  },
+]
+---
+
+<section id="arcade" class="wrap">
+  <p class="kicker">Lumen Arcade</p>
+  <h2>Hand the controls to an agent.</h2>
+  <p class="lede">
+    The Arcade opens the editor to any agent in your browser, as WebMCP tools on
+    <code>document.modelContext</code>. Every write goes through the same
+    validated command bus a click uses — undoable, recorded, replayable — so you
+    watch the agent work on your own flame and keep everything it makes.
+  </p>
+
+  <div class="modes">
+    {
+      modes.map((m) => (
+        <article class="mode">
+          <div class="mode-top">
+            <span class="mode-icon" set:html={icons[m.icon]} />
+            <span class="mode-tag">{m.tag}</span>
+          </div>
+          <h3>{m.name}</h3>
+          <p>{m.body}</p>
+        </article>
+      ))
+    }
+  </div>
+
+  <div class="soon">
+    <p class="soon-label">On the horizon</p>
+    <div class="soon-grid">
+      {
+        soon.map((c) => (
+          <div class="soon-card">
+            <span class="soon-icon" set:html={icons[c.icon]} />
+            <div>
+              <div class="soon-name">{c.name}</div>
+              <div class="soon-tag">{c.tag}</div>
+            </div>
+            <span class="soon-badge">Soon</span>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+
+  <div class="run">
+    <span class="run-icon" set:html={icons.robot} />
+    <p>
+      While the agent drives, the editor is locked behind a shield: the banner
+      counts steps against the budget and the clock, the rail lists every command
+      and sentence as it lands, and your shortcuts are off. Stop — or Escape
+      twice — hands the controls back and still saves the take. A Duel locks only
+      the agent's seat, so your half keeps its keyboard while the clock runs.
+    </p>
+  </div>
+
+  <div class="arcade-cta">
+    <a class="btn btn-primary" href={arcadeUrl}
+      >Open Lumen Arcade<span class="btn-ico" set:html={LAUNCH_ICON} /></a
+    >
+    <a class="btn btn-ghost" href={docsUrl}>How it works</a>
+    <span class="info">
+      <button
+        class="info-btn"
+        type="button"
+        aria-expanded="false"
+        aria-controls="webmcp-req"
+        aria-label="Which browsers can run the Arcade"
+        set:html={icons.info}
+      />
+      <span class="info-pop" id="webmcp-req">
+        <b>WebMCP is early.</b> Open the Arcade in ChatGPT's desktop browser, or in
+        Chrome 149+ with <code>chrome://flags/#enable-webmcp-testing</code> switched
+        on. WebGPU draws the flame either way. Anywhere else the Arcade still opens
+        and the prompt cards still copy, but the status pill reads "WebMCP not detected
+        in this browser" and no agent can reach the tools.
+      </span>
+    </span>
+  </div>
+</section>
+
+<script>
+  // Tap-to-open for touch, where :hover never fires. Desktop hover and keyboard
+  // focus are handled in CSS; this only drives the pressed state.
+  const btn = document.querySelector('#arcade .info-btn')
+  if (btn) {
+    const set = (open: boolean) =>
+      btn.setAttribute('aria-expanded', String(open))
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      set(btn.getAttribute('aria-expanded') !== 'true')
+    })
+    // Selecting the flag inside the panel must not dismiss it.
+    document
+      .getElementById('webmcp-req')
+      ?.addEventListener('click', (e) => e.stopPropagation())
+    document.addEventListener('click', () => set(false))
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') set(false)
+    })
+  }
+</script>
+
+<style>
+  .modes {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    margin-top: 56px;
+  }
+  .mode {
+    padding: 28px;
+    border-radius: 16px;
+    background: var(--neutral-950);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    transition:
+      transform 0.3s ease,
+      border-color 0.3s ease;
+  }
+  .mode:hover {
+    transform: translateY(-3px);
+    border-color: rgba(var(--ember-rgb), 0.35);
+  }
+  .mode-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .mode-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+    color: var(--ember);
+    background: rgba(var(--ember-rgb), 0.1);
+    border: 1px solid rgba(var(--ember-rgb), 0.22);
+  }
+  .mode-icon :global(svg) {
+    width: 21px;
+    height: 21px;
+  }
+  .mode-tag {
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--neutral-400);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--round);
+    padding: 4px 10px;
+    white-space: nowrap;
+  }
+  .mode h3 {
+    margin: 0 0 10px;
+    font-size: 1.16rem;
+  }
+  .mode p {
+    margin: 0;
+    color: var(--neutral-400);
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+
+  /* The safety story. Dashed, because it describes a boundary rather than a
+     feature — same visual grammar as the "On the horizon" cards. */
+  .run {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-top: 22px;
+    padding: 20px 22px;
+    border: 1px dashed rgba(255, 255, 255, 0.14);
+    border-radius: 14px;
+  }
+  .run-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    color: var(--ember);
+    margin-top: 1px;
+  }
+  .run-icon :global(svg) {
+    width: 22px;
+    height: 22px;
+  }
+  .run p {
+    margin: 0;
+    color: var(--neutral-400);
+    font-size: 0.92rem;
+    line-height: 1.65;
+  }
+
+  /* The three modes that are not built yet. Same grammar as the Features
+     "On the horizon" row - dashed, dimmer, no hover - so the page has one
+     way of saying "later" rather than two. */
+  .soon {
+    margin-top: 34px;
+    padding-top: 30px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .soon-label {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--neutral-500);
+    margin: 0 0 18px;
+  }
+  .soon-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  .soon-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+    border-radius: 13px;
+    border: 1px dashed rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.015);
+  }
+  .soon-icon {
+    display: inline-flex;
+    width: 34px;
+    height: 34px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9px;
+    color: var(--neutral-400);
+    background: rgba(255, 255, 255, 0.04);
+  }
+  .soon-icon :global(svg) {
+    width: 18px;
+    height: 18px;
+  }
+  .soon-name {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--neutral-200);
+  }
+  .soon-tag {
+    font-size: 0.78rem;
+    color: var(--neutral-500);
+    margin-top: 3px;
+    line-height: 1.45;
+  }
+  .soon-badge {
+    margin-left: auto;
+    align-self: flex-start;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ember);
+    border: 1px solid rgba(var(--ember-rgb), 0.3);
+    border-radius: var(--round);
+    padding: 3px 8px;
+    white-space: nowrap;
+  }
+
+  .arcade-cta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    margin-top: 34px;
+  }
+
+  /* Browser requirements, folded into the CTA row. The detail is real and a
+     visitor in the wrong browser needs it, but it is a footnote, not an
+     argument - so it opens on hover, on focus, or on tap, and takes no space
+     until then. */
+  .info {
+    position: relative;
+    display: inline-flex;
+  }
+  .info-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--neutral-400);
+    cursor: pointer;
+    transition:
+      color 0.18s ease,
+      border-color 0.18s ease,
+      background 0.18s ease;
+  }
+  .info-btn :global(svg) {
+    width: 16px;
+    height: 16px;
+  }
+  .info-btn:hover,
+  .info-btn:focus-visible,
+  .info-btn[aria-expanded='true'] {
+    color: var(--ember);
+    border-color: rgba(var(--ember-rgb), 0.5);
+    background: rgba(var(--ember-rgb), 0.1);
+    outline: none;
+  }
+  .info-pop {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 13px);
+    z-index: 5;
+    width: min(410px, calc(100vw - 56px));
+    padding: 16px 18px;
+    border-radius: 12px;
+    background: var(--graphite);
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    box-shadow: 0 20px 50px -18px rgba(0, 0, 0, 0.92);
+    color: var(--neutral-400);
+    font-size: 0.85rem;
+    line-height: 1.62;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translate(-50%, 5px);
+    transition:
+      opacity 0.18s ease,
+      transform 0.18s ease,
+      visibility 0.18s;
+  }
+  .info-pop b {
+    color: var(--neutral-200);
+    font-weight: 600;
+  }
+  /* the little pointer down to the button */
+  .info-pop::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    translate: -50% 0;
+    border: 7px solid transparent;
+    border-top-color: var(--graphite);
+  }
+  .info:hover .info-pop,
+  .info-btn:focus-visible + .info-pop,
+  .info-btn[aria-expanded='true'] + .info-pop {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translate(-50%, 0);
+  }
+
+  .info-pop code,
+  .lede code {
+    font-family: var(--mono);
+    font-size: 0.92em;
+    color: var(--neutral-300);
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 5px;
+    padding: 1px 6px;
+  }
+
+  @media (max-width: 900px) {
+    .modes,
+    .soon-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  /* On a phone the button sits mid-row, so anything anchored to it runs off one
+     edge or the other - there is not 410px of room beside it either way. Below
+     620px the popover stops being a popover and becomes a sheet pinned to the
+     bottom of the viewport, which is where a tapped explanation belongs anyway. */
+  @media (max-width: 620px) {
+    .info-pop {
+      position: fixed;
+      left: 16px;
+      right: 16px;
+      bottom: 16px;
+      width: auto;
+      z-index: 50;
+      transform: translate(0, 10px);
+    }
+    .info-pop::after {
+      display: none;
+    }
+    .info:hover .info-pop,
+    .info-btn:focus-visible + .info-pop,
+    .info-btn[aria-expanded='true'] + .info-pop {
+      transform: translate(0, 0);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .info-pop {
+      transition: none;
+    }
+  }
+</style>

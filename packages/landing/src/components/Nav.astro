@@ -23,10 +23,13 @@ const repoUrl = 'https://github.com/chaos-matters/chaos-master'
           <rect x="17.40" y="37.52" width="14.61" height="3.72" rx="1.86"></rect>
         </g>
       </svg>
-      Lumen Apeiron
+      <span class="brand-name"
+        >Lumen Apeiron<span class="brand-sub">The Chaos Master</span></span
+      >
     </a>
     <div class="nav-links">
       <a class="hide" href="#features">Features</a>
+      <a class="hide" href="#arcade">Arcade</a>
       <a class="hide" href="#gallery">Gallery</a>
       <a class="hide" href={repoUrl}>GitHub</a>
       <a class="pill btn btn-primary" href={appUrl}
@@ -63,12 +66,34 @@ const repoUrl = 'https://github.com/chaos-matters/chaos-master'
     font-size: 0.82rem;
     text-transform: uppercase;
   }
+  /* Two-line lockup: the name, and the subtitle the project kept. The subtitle
+     is the first thing to go when the nav gets tight — it is a grace note, not
+     a wayfinding label. */
+  .brand-name {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    line-height: 1;
+  }
+  .brand-sub {
+    font-size: 0.6rem;
+    font-weight: 500;
+    letter-spacing: 0.2em;
+    /* neutral-400, not -500: at 9.6px this is the smallest type on the page and
+       -500 measures 4.43:1 on black, just under AA. */
+    color: var(--neutral-400);
+  }
+  @media (max-width: 560px) {
+    .brand-sub {
+      display: none;
+    }
+  }
   .brand-mark {
     width: 24px;
     height: 24px;
     flex: none;
     border-radius: 7px;
-    filter: drop-shadow(0 0 10px rgba(255, 116, 72, 0.35));
+    filter: drop-shadow(0 0 10px rgba(var(--ember-rgb), 0.35));
   }
   .nav-links {
     display: flex;

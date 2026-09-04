@@ -24,9 +24,9 @@ const repoUrl = 'https://github.com/chaos-matters/chaos-master'
   <div class="hero-content">
     <h1>Paint with<br /><em>infinite chaos.</em></h1>
     <p class="lede">
-      Lumen Apeiron (formerly Chaos Master) is a GPU-accelerated IFS flame
-      fractal generator for artists and explorers — millions of iterations
-      rendered live, shaped by your hand. No install, no render queue.
+      Lumen Apeiron is a GPU-accelerated IFS flame fractal generator for
+      artists and explorers — millions of iterations rendered live, shaped by
+      your hand. No install, no render queue.
     </p>
     <div class="hero-cta">
       <a class="btn btn-primary" href={appUrl}
@@ -37,7 +37,7 @@ const repoUrl = 'https://github.com/chaos-matters/chaos-master'
     <ul class="hero-badges">
       <li>WebGPU</li>
       <li>TypeGPU</li>
-      <li>In your browser</li>
+      <li>WebMCP</li>
     </ul>
     <p class="note">
       Move your cursor over the flame. Requires a WebGPU browser — Chrome / Edge
@@ -156,14 +156,14 @@ const repoUrl = 'https://github.com/chaos-matters/chaos-master'
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
   }
-  /* A single small blue accent dot — the lone bit of brand color on the chrome. */
+  /* A single small ember dot — the lone bit of brand color on the chrome. */
   .hero-badges li::before {
     content: '';
     width: 5px;
     height: 5px;
     border-radius: 50%;
-    background: var(--blue-400);
-    box-shadow: 0 0 8px var(--blue-400);
+    background: var(--ember);
+    box-shadow: 0 0 8px var(--ember);
   }
   .hero h1 {
     font-size: clamp(2.6rem, 7vw, 5.6rem);
@@ -175,7 +175,7 @@ const repoUrl = 'https://github.com/chaos-matters/chaos-master'
   }
   .hero h1 em {
     font-style: normal;
-    background: linear-gradient(110deg, #7be0e8, #a3e635 40%, #ffae34 65%, #ff5e7e);
+    background: linear-gradient(110deg, var(--ember), var(--solar));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
