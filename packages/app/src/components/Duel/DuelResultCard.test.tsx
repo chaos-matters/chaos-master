@@ -65,9 +65,18 @@ describe('DuelResultCard', () => {
     expect(screen.getByRole('heading').textContent).toBe('Cinder')
   })
 
-  it('puts the archetype on the badge, not the side', () => {
+  it('leaves the badge to the glyph alone', () => {
     mount()
-    expect(screen.getByText('Chaotic Vortex')).toBeTruthy()
+    // The archetype word used to sit under it and meant nothing to anyone
+    // reading the card.
+    expect(screen.queryByText('Chaotic Vortex')).toBeNull()
+  })
+
+  it('drops the verdict sentence from the card, keeping it as the label', () => {
+    mount()
+    const card = screen.getByRole('dialog')
+    expect(card.textContent).not.toContain('wins by')
+    expect(card.getAttribute('aria-label')).toContain('Your flame wins by 37.')
   })
 
   it('shows five rows, the last of them the totals', () => {

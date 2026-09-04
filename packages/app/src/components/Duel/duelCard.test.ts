@@ -86,13 +86,11 @@ describe('toCardModel', () => {
     expect(model.rows[4]!.playerFill).toBe(1)
     expect(model.rows[4]!.rivalFill).toBe(1)
     expect(model.title).toBe('Dead heat')
-    expect(model.badgeWord).toBe('Draw')
   })
 
-  it('names the winner, and the badge says what the flame is', () => {
+  it('names the winner and nobody else', () => {
     expect(toCardModel(result()).title).toBe('Ember')
     expect(toCardModel(result({ winner: 'rival' })).title).toBe('Cinder')
-    expect(toCardModel(result()).badgeWord).toBe('Chaotic Vortex')
   })
 })
 
@@ -125,11 +123,19 @@ describe('the card geometry', () => {
     )
   })
 
-  it('leaves the flame window between the verdict and the rows', () => {
+  it('clears the badge above and the rows below with the flame window', () => {
+    // The badge hangs past the title bar, and the window is full width, so it
+    // is the badge and not the bar that sets the window's ceiling.
     expect(CARD.window.y).toBeGreaterThanOrEqual(
-      CARD.verdict.y + CARD.verdict.height,
+      CARD.badge.y + CARD.badge.height,
     )
     expect(CARD.window.y + CARD.window.height).toBeLessThanOrEqual(CARD.rows.y)
+  })
+
+  it('spends the largest region on the flame', () => {
+    const window = CARD.window.width * CARD.window.height
+    const rows = CARD.rows.width * (CARD.rows.pitch * 4 + CARD.rows.height)
+    expect(window).toBeGreaterThan(rows)
   })
 
   it('splits the row into two equal halves either side of the seam', () => {
