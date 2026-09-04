@@ -1,4 +1,5 @@
 import type { DuelStartFrom } from './duelActions'
+import type { Dims } from '@/flame/variationRegistry'
 
 export type TopicId =
   | 'variations'
@@ -271,14 +272,17 @@ const START_FROM_PHRASE: Record<DuelStartFrom, string> = {
 export function duelPromptCard(
   seconds: number,
   startFrom: DuelStartFrom = 'current',
+  // Start from the open flame and it is whatever that flame is; the panel
+  // that builds the card knows, and passes it.
+  dimensions: Dims = startFrom === 'random-3d' ? 3 : 2,
 ): string {
   const minutes = Math.round((seconds / 60) * 10) / 10
   const clock = minutes === 1 ? '1 minute' : `${minutes} minutes`
   // The 3D camera has no commands of its own; it is reached through the
   // generic render-setting path, which the agent has no way to guess.
   const camera3D =
-    startFrom === 'random-3d'
-      ? ' In 3D the camera is orbit, not pan and zoom: read it from get_flame under renderSettings.camera3D and move it with execute_command flame.setRenderSetting on the paths camera3D.theta, camera3D.phi, camera3D.radius, camera3D.target, camera3D.fov and camera3D.roll. camera.* does nothing useful in 3D.'
+    dimensions === 3
+      ? ' In 3D the camera is orbit, not pan and zoom: read it from get_flame under renderSettings.camera3D and move it with execute_command flame.setRenderSetting on the paths camera3D.theta, camera3D.phi, camera3D.radius, camera3D.target, camera3D.fov and camera3D.roll. camera.center recentres the orbit; the other camera.* commands do nothing in 3D.'
       : ''
   return `Duel me in Lumen Apeiron. Call arcade_start_duel to begin: we each get ${clock} and our own flame, side by side, and I am editing mine while you edit yours.${START_FROM_PHRASE[startFrom]} Read your flame with get_flame and change it with execute_command — only flame.* and camera.* are allowed, and you have ${DUEL_STEP_BUDGET} steps.${camera3D} Say what you are going for with arcade_narrate as you work. Aim for something striking rather than merely complicated. You cannot end the duel — the clock does, and I can call it early — so when you are happy call arcade_duel_ready with a short title and keep polishing until time runs out.
 

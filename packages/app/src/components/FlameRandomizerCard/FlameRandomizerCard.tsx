@@ -6,7 +6,7 @@ import { RangeSlider } from '@/components/Sliders/RangeSlider'
 import { Slider } from '@/components/Sliders/Slider'
 import { VariationMultiSelect } from '@/components/VariationMultiSelect/VariationMultiSelect'
 import { MUTATION_PRESETS, MUTATION_RATE_DEFAULTS } from '@/flame/randomize'
-import { categoryOf } from '@/flame/variationRegistry'
+import { randomFlameVariationTypes } from '@/flame/variationRegistry'
 import { variationTypes } from '@/flame/variations'
 import { variationTypes3D } from '@/flame/variations3D'
 import { persistentSignal } from '@/utils/persistentSignal'
@@ -121,13 +121,7 @@ function RandomizeToggleButton(props: {
 function defaultSelectedVariations(
   dims: Dims,
 ): Set<TransformVariationType | TransformVariationType3D> {
-  const list = dims === 3 ? variationTypes3D : variationTypes
-  return new Set(
-    list.filter((type) => {
-      const category = categoryOf(dims, type)
-      return category === 'general' || category === 'blur'
-    }),
-  )
+  return new Set(randomFlameVariationTypes(dims))
 }
 
 export function FlameRandomizerCard(props: FlameRandomizerCardProps) {

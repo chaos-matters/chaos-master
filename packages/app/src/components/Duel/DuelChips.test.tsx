@@ -231,6 +231,21 @@ describe('DuelChips', () => {
     )
   })
 
+  it('offers a 2D flame the 2D handful and the whole 2D registry', () => {
+    const ctx = mount()
+    screen.getByRole('button', { name: /Variations/ }).click()
+
+    screen.getByRole('button', { name: 'Add Swirl' }).click()
+    expect(
+      Object.values(firstTransform(ctx.flameDescriptor()).variations).map(
+        (v) => v.type,
+      ),
+    ).toContain('swirlVar')
+
+    screen.getByRole('button', { name: 'Add' }).click()
+    expect(screen.getByPlaceholderText('Search 403 variations')).toBeTruthy()
+  })
+
   it('offers a 3D flame the variations it can actually take', () => {
     const ctx = createMockCommandContext()
     ctx.setFlameDescriptor((draft) => {
@@ -238,22 +253,23 @@ describe('DuelChips', () => {
     }, 'test')
     render(() => <DuelChips ctx={ctx} flame={ctx.flameDescriptor} />)
     screen.getByRole('button', { name: /Variations/ }).click()
+    const types = () =>
+      Object.values(firstTransform(ctx.flameDescriptor()).variations).map(
+        (v) => v.type,
+      )
+
+    // The resting row's shortcuts are the 3D counterparts of the 2D handful.
+    const before = types().length
+    screen.getByRole('button', { name: 'Add Swirl' }).click()
+    expect(types()).toHaveLength(before + 1)
+    expect(types()).toContain('swirl3D')
+
+    // And the gallery is the 3D registry. Wired to 2D, every add here came
+    // back as "rejected unsafe or oversized add".
     screen.getByRole('button', { name: 'Add' }).click()
-
-    // The 2D catalogue here was why every add on a 3D flame came back as
-    // "rejected unsafe or oversized add": the registry is per dimension.
     expect(screen.getByPlaceholderText('Search 43 variations')).toBeTruthy()
-
-    const before = Object.keys(
-      firstTransform(ctx.flameDescriptor()).variations,
-    ).length
-    screen.getAllByRole('button', { name: 'Add Spherical' })[0]!.click()
-
-    const types = Object.values(
-      firstTransform(ctx.flameDescriptor()).variations,
-    ).map((v) => v.type)
-    expect(types).toHaveLength(before + 1)
-    expect(types).toContain('spherical3D')
+    screen.getByRole('button', { name: 'Add Spherical' }).click()
+    expect(types()).toContain('spherical3D')
   })
 
   it('keeps working when a randomize takes the chosen transform away', () => {

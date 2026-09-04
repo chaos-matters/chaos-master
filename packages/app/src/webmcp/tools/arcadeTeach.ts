@@ -1,4 +1,4 @@
-import { describeAllowedCommands, SAMPLE_VARIATION_TYPES, } from '@/arcade/commandHints'
+import { describeAllowedCommands, SAMPLE_VARIATION_TYPES, SAMPLE_VARIATION_TYPES_3D, } from '@/arcade/commandHints'
 import { duelReady, duelRemainingMs, runningDuel } from '@/arcade/duel'
 import { qualityRank } from '@/arcade/guard'
 import { clearNarration, narration } from '@/arcade/narration'
@@ -140,7 +140,11 @@ export const arcadeStartLesson: WebMcpTool = {
       goal: topic.goal,
       startFrom,
       allowedCommands: describeAllowedCommands(allowed),
-      variationTypes: usesVariationTypes ? SAMPLE_VARIATION_TYPES : undefined,
+      variationTypes: usesVariationTypes
+        ? (ctx.flameDescriptor().renderSettings.dimensions ?? 2) === 3
+          ? SAMPLE_VARIATION_TYPES_3D
+          : SAMPLE_VARIATION_TYPES
+        : undefined,
       stepBudget: topic.stepBudget,
       tips: [
         'Narrate before each group; args must match the shapes exactly.',

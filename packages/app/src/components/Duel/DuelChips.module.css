@@ -425,11 +425,12 @@
 .shape {
   display: grid;
   grid-template-columns: auto 1fr;
-  /* One definite row for the canvas and fields — without it the square canvas
-     sizes itself from its own width and grows past the panel — and one for
-     the hint, which only exists in 3D. */
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: 14px 14px;
+  /* One definite row: without it the square canvas sizes itself from its own
+     width and grows the row past the panel, which then clips the fields. The
+     3D hint spans both columns and lands in an implicit row under this one,
+     so 2D never pays that row's gap. */
+  grid-template-rows: minmax(0, 1fr);
+  gap: 14px;
   min-height: 0;
 }
 
@@ -473,32 +474,8 @@
   user-select: none;
 }
 
-.swatches[data-panning] .swatch,
-.swatches[data-panning] .swatchMore {
+.swatches[data-panning] .swatch {
   pointer-events: none;
-}
-
-/* Shaped exactly like a swatch — the same band, the same name under it — so
-   the row keeps one rhythm; dashed and unfilled so it is plainly not one. */
-.swatchMore {
-  width: 64px;
-}
-
-.swatchMoreBand {
-  display: grid;
-  place-items: center;
-  border-style: dashed;
-  border-color: rgba(255, 255, 255, 0.3);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 0.78rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.swatchMore:hover .swatchMoreBand {
-  border-color: rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
 }
 
 .swatches::-webkit-scrollbar {
@@ -816,4 +793,24 @@
   font-size: 0.68rem;
   text-align: center;
   opacity: 0.55;
+}
+
+/* The More tile is a swatch — the same band, the same name under it — so the
+   row keeps one rhythm; dashed and unfilled so it is plainly not a palette.
+   After every .swatchBand rule on purpose: same specificity, later wins. */
+.swatchMoreBand {
+  display: grid;
+  place-items: center;
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.swatchMore:hover .swatchMoreBand {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
 }
