@@ -7,7 +7,7 @@ import { examples } from '@/flame/examples'
 import { deepClone } from '@/utils/clone'
 import { createStoreHistory } from '@/utils/createStoreHistory'
 import { createTimelineState } from '@/utils/timeline'
-import { createSessionPlayer, MAX_STEP_GAP_MS, MIN_STEP_GAP_MS, NARRATION_MAX_HOLD_MS, NARRATION_MIN_HOLD_MS, NARRATION_MS_PER_WORD, stepGapMs, } from './player'
+import { closingHoldMs, createSessionPlayer, MAX_STEP_GAP_MS, MIN_STEP_GAP_MS, NARRATION_MAX_HOLD_MS, NARRATION_MIN_HOLD_MS, NARRATION_MS_PER_WORD, stepGapMs, } from './player'
 import { cancelSessionRecording, recordSyntheticAction, startSessionRecording, stopSessionRecording, } from './recorder'
 import { SESSION_FORMAT_VERSION } from './schema'
 import { createRecorderAwareTimeline } from './timelineActions'
@@ -299,6 +299,28 @@ describe('stepGapMs', () => {
   })
 })
 
+describe('closingHoldMs', () => {
+  it('holds a closing sentence for its reading time', () => {
+    const words = Array.from({ length: 10 }, (_, i) => `w${i}`).join(' ')
+    const note = at(0, { id: 'lesson.note', args: [words] })
+    expect(closingHoldMs(note, 1)).toBe(10 * NARRATION_MS_PER_WORD)
+    expect(closingHoldMs(note, 2)).toBe((10 * NARRATION_MS_PER_WORD) / 2)
+  })
+
+  it('asks for nothing when the last step says nothing', () => {
+    // A silent last step finishes as it always has. A default beat here would
+    // have to be added to the exporter's tail too, and at 0.5x it exceeded
+    // that tail — caught by the identity test in replayVideo.test.ts.
+    expect(closingHoldMs(at(0), 1)).toBeUndefined()
+  })
+
+  it('lets an authored hold win, and holds nothing for no take', () => {
+    expect(closingHoldMs(at(0, { holdMs: 0 }), 1)).toBe(0)
+    expect(closingHoldMs(at(0, { holdMs: 9000 }), 1)).toBe(9000)
+    expect(closingHoldMs(undefined, 1)).toBeUndefined()
+  })
+})
+
 describe('createSessionPlayer', () => {
   it('clears transient UI before opening the replay batch and loading the baseline', () => {
     createRoot((dispose) => {
@@ -407,7 +429,61 @@ describe('createSessionPlayer', () => {
 
       vi.advanceTimersByTime(MIN_STEP_GAP_MS)
       expect(flame.renderSettings.gamma).toBeCloseTo(3.5, 5)
+
+      // This take's last step says nothing, so it finishes on the tick that
+      // applied it, as it always has. A closing sentence is held instead —
+      // see 'holds a closing sentence before it finishes'.
       expect(player.isPlaying()).toBe(false)
+      dispose()
+    })
+  })
+
+  it('holds a closing sentence before it finishes', () => {
+    // The bug: the last step was applied and playback declared itself finished
+    // in the same tick, so the end card opened over the sentence the whole
+    // lesson was built to land on.
+    const words = Array.from({ length: 10 }, (_, i) => `w${i}`).join(' ')
+    const hold = 10 * NARRATION_MS_PER_WORD
+    const closing = makeSession([
+      { t: 0, id: 'flame.setGamma', args: [1.5], label: 'Set Gamma' },
+      { t: 900, id: 'lesson.note', args: [words], label: words },
+    ])
+    createRoot((dispose) => {
+      const { target } = makeTarget(examples.initExample)
+      const player = createSessionPlayer(closing, target)
+      player.play()
+      vi.advanceTimersByTime(0)
+      // The recorded 900ms gap is above the floor, so it is used as recorded.
+      vi.advanceTimersByTime(900)
+      expect(player.stepIndex()).toBe(1)
+
+      expect(player.isPlaying()).toBe(true)
+      expect(player.isFinished()).toBe(false)
+      vi.advanceTimersByTime(hold - 1)
+      expect(player.isFinished()).toBe(false)
+      vi.advanceTimersByTime(1)
+      expect(player.isPlaying()).toBe(false)
+      expect(player.isFinished()).toBe(true)
+      dispose()
+    })
+  })
+
+  it('drops the closing hold when the viewer pauses inside it', () => {
+    const words = Array.from({ length: 10 }, (_, i) => `w${i}`).join(' ')
+    const closing = makeSession([
+      { t: 0, id: 'flame.setGamma', args: [1.5], label: 'Set Gamma' },
+      { t: 900, id: 'lesson.note', args: [words], label: words },
+    ])
+    createRoot((dispose) => {
+      const { target } = makeTarget(examples.initExample)
+      const player = createSessionPlayer(closing, target)
+      player.play()
+      vi.advanceTimersByTime(0)
+      vi.advanceTimersByTime(900)
+      player.pause()
+      vi.advanceTimersByTime(60_000)
+      // Paused inside the hold is paused, not finished: the viewer took over.
+      expect(player.isFinished()).toBe(false)
       dispose()
     })
   })

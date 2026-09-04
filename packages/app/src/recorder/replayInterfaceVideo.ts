@@ -1,6 +1,7 @@
 import { deepClone } from '@/utils/clone'
 import { createMetadataPayload, injectMetadataIntoMp4, } from '@/utils/flameInMp4'
 import { createVideoEncoder } from '@/utils/videoEncoder'
+import { closingHoldMs } from './player'
 import { createReplayVideoSchedule, MAX_REPLAY_VIDEO_DURATION_MS, REPLAY_VIDEO_FPS, REPLAY_VIDEO_LEAD_IN_MS, replayVideoInitialTimelineSnapshot, } from './replayVideo'
 import { validateSession } from './schema'
 import type { RecordedSession } from './schema'
@@ -385,10 +386,17 @@ export async function captureReplayInterfaceVideo(
     request.prepareReplay()
     await waitFor(REPLAY_VIDEO_LEAD_IN_MS, controller.signal)
     await request.playReplay(controller.signal)
-    // The schedule's tail, not the constant: a closing narration step holds
-    // for its reading time, and waiting the flat tail cut the last sentence
-    // off mid-read while the artwork export showed all of it.
-    await waitFor(schedule.tailMs, controller.signal)
+    // Only the REMAINDER of the tail. This mode records the live player, and
+    // the player now holds the last step itself before resolving, so waiting
+    // the whole tail on top would hold the closing sentence twice and run the
+    // capture past the duration the schedule validated the encoder budget
+    // against. What is left over is the beat the end card gets.
+    const heldByPlayer =
+      closingHoldMs(session.actions.at(-1), request.playbackSpeed) ?? 0
+    await waitFor(
+      Math.max(0, schedule.tailMs - heldByPlayer),
+      controller.signal,
+    )
     completed = true
     captureOpen = false
     await sampling

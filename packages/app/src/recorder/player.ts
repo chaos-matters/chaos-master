@@ -117,6 +117,31 @@ function narrationHoldMs(text: string): number {
 }
 
 /**
+ * How long to hold the LAST step before playback calls itself finished.
+ *
+ * Every other step is held by the gap before the step that follows it. The
+ * last one has no successor, so it was applied and playback declared itself
+ * finished in the same tick — the end card opened over the sentence the whole
+ * lesson was built to land on. The video exporter already grew its tail for
+ * exactly this; this is the same beat for the live player, and it is the same
+ * function so the two cannot disagree.
+ *
+ * Only a hold the take itself asked for — an authored `holdMs`, or the reading
+ * time of a closing sentence. A silent last step finishes as it always has: a
+ * default beat here would have to be added to the exporter's tail as well, and
+ * at 0.5x it exceeded that tail and ran the interface capture past the
+ * duration its own schedule validated the encoder budget against.
+ */
+export function closingHoldMs(
+  last: RecordedAction | undefined,
+  speed: number,
+): number | undefined {
+  if (!last) return undefined
+  if (last.holdMs !== undefined) return last.holdMs / speed
+  return narrationHoldFor(last, speed)
+}
+
+/**
  * How long to wait before applying `next` — which is the dwell on `previous`.
  *
  * That inversion is the whole subtlety here, and getting it wrong is what made
@@ -420,13 +445,29 @@ export function createSessionPlayer(
     )
   }
 
+  function finish() {
+    setIsPlaying(false)
+    setIsFinished(true)
+    closeBatch()
+    options.onFinished?.()
+  }
+
   function scheduleNext() {
     const next = stepIndex() + 1
     if (next >= actions.length) {
-      setIsPlaying(false)
-      setIsFinished(true)
-      closeBatch()
-      options.onFinished?.()
+      // Hold the last step before finishing, rather than finishing on the same
+      // tick that applied it. `isPlaying` stays true through the hold, because
+      // it is still playing — the final beat — so Pause cancels it like any
+      // other gap.
+      const hold = closingHoldMs(actions.at(-1), speed()) ?? 0
+      if (hold <= 0) {
+        finish()
+        return
+      }
+      timer = setTimeout(() => {
+        if (!isPlaying()) return
+        finish()
+      }, hold)
       return
     }
     timer = setTimeout(() => {

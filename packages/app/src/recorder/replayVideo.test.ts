@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { examples } from '@/flame/examples'
 import { deepClone } from '@/utils/clone'
-import { NARRATION_MS_PER_WORD } from './player'
+import { closingHoldMs, NARRATION_MS_PER_WORD } from './player'
 import { createReplayVideoDriver, createReplayVideoJobSpec, createReplayVideoSchedule, drawReplayVideoOverlay, MAX_REPLAY_VIDEO_DURATION_MS, REPLAY_VIDEO_DIMENSIONS, REPLAY_VIDEO_FPS, REPLAY_VIDEO_TAIL_MS, replayActionIndexAtFrame, replayFramesInStateRun, replayVideoFileName, replayVideoVisualFingerprint, } from './replayVideo'
 import { SESSION_FORMAT_VERSION } from './schema'
 import type { RecordedAction, RecordedSession } from './schema'
@@ -286,6 +286,31 @@ describe('replay video tail', () => {
     expect(createReplayVideoSchedule(quiet, 1).tailMs).toBe(
       REPLAY_VIDEO_TAIL_MS,
     )
+  })
+
+  // The live player now holds the last step itself, and the interface capture
+  // waits only the remainder. This identity is what keeps that mode inside the
+  // duration its own schedule validated the encoder budget against.
+  it('always covers the hold the live player will take', () => {
+    const words = Array.from({ length: 12 }, (_, i) => `w${i}`).join(' ')
+    const endings = [
+      { t: 2000, id: 'lesson.note', args: [words] },
+      { t: 2000, id: 'flame.setGamma', args: [2] },
+      { t: 2000, id: 'flame.setGamma', args: [2], holdMs: 30_000 },
+    ]
+    for (const ending of endings) {
+      for (const speed of [0.5, 1, 2, 4]) {
+        const session = makeSession([
+          { t: 0, id: 'flame.setGamma', args: [1.5] },
+          ending,
+        ])
+        const schedule = createReplayVideoSchedule(session, speed)
+        const held = closingHoldMs(session.actions.at(-1), speed) ?? 0
+        expect(schedule.tailMs).toBeGreaterThanOrEqual(held)
+        // player hold + capture wait === the tail the schedule budgeted for
+        expect(held + Math.max(0, schedule.tailMs - held)).toBe(schedule.tailMs)
+      }
+    }
   })
 })
 
