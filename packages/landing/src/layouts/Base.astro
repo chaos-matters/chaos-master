@@ -11,7 +11,7 @@ interface Props {
 
 const {
   title = 'Lumen Apeiron — WebGPU IFS Flame Generator',
-  description = 'Lumen Apeiron (formerly Chaos Master): high-performance, real-time IFS fractal flame generation in the browser, powered by WebGPU. For artists and explorers.',
+  description = 'Lumen Apeiron — The Chaos Master: high-performance, real-time IFS fractal flame generation in the browser, powered by WebGPU. For artists and explorers.',
 } = Astro.props
 
 const canonical = new URL(Astro.url.pathname, Astro.site).href
@@ -192,15 +192,22 @@ const gaId = import.meta.env.PUBLIC_GA_ID
       document.addEventListener('click', (e) => {
         const link = (e.target as HTMLElement)?.closest('a')
         if (!link || !link.href) return
+        let event: 'click_launch_app' | 'click_launch_arcade'
         try {
           const url = new URL(link.href)
           if (url.hostname !== 'lumenapeiron.com') return
-          if (url.pathname !== '/' && url.pathname !== '') return
+          if (url.pathname === '/' || url.pathname === '') {
+            event = 'click_launch_app'
+          } else if (url.pathname === '/arcade' || url.pathname === '/arcade/') {
+            event = 'click_launch_arcade'
+          } else {
+            return
+          }
         } catch {
           return
         }
         if (typeof window.gtag === 'function') {
-          window.gtag('event', 'click_launch_app', {
+          window.gtag('event', event, {
             link_url: link.href,
             link_text: link.textContent?.trim() || '',
           })

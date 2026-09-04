@@ -16,7 +16,9 @@ import PosterFlame from './PosterFlame'
  * variation structure), so scrubbing just resets accumulation — cheap and smooth.
  */
 const AFFINE_KEYS = ['a', 'b', 'c', 'd', 'e', 'f'] as const
-const SWATCHES = ['#06d6c8', '#d4e157', '#ff5e7e', '#60a5fa', '#a3e635']
+// Per-transform identity colours: brand data colours, not chrome. Ember is
+// deliberately absent — it means "action" everywhere else on the page.
+const SWATCHES = ['teal', 'solar', 'rose', 'cyan', 'acid']
 
 type Affine = Record<(typeof AFFINE_KEYS)[number], number>
 const TWO_PI = Math.PI * 2
@@ -432,7 +434,7 @@ export default function StudioDemo() {
               <div class="xh">
                 <span
                   class="swatch"
-                  style={`background:${SWATCHES[i() % SWATCHES.length]}`}
+                  style={`background:var(--${SWATCHES[i() % SWATCHES.length]})`}
                 />
                 F{i()}
                 <span class="prob">

@@ -1,6 +1,7 @@
-/* Lumen Apeiron landing — design tokens lifted verbatim from packages/app design
-   system (designSystem/colors.css): monochrome oklch neutral ramp + a single blue
-   accent, Inter. Color comes from the art, not the chrome. */
+/* Lumen Apeiron landing — design tokens: the monochrome oklch neutral ramp
+   lifted from packages/app (designSystem/colors.css), plus the brand inks the
+   Deep C mark is drawn in. Color comes from the art, not the chrome — so the
+   chrome gets exactly one accent, ember, and the rest are data colours. */
 :root {
   /* neutrals (oklch grayscale) */
   --neutral-50: oklch(98.5% 0 0);
@@ -15,12 +16,19 @@
   --neutral-900: oklch(20.5% 0 0);
   --neutral-950: oklch(14.5% 0 0);
 
-  /* blue accent ramp */
-  --blue-300: #93c5fd;
-  --blue-400: #60a5fa;
-  --blue-500: #3b82f6;
-  --blue-600: #2563eb;
-  --blue-700: #1d4ed8;
+  /* brand inks — the palette the Deep C mark is drawn in. Ember is the one
+     accent the chrome may use; the others are data colours (swatches, notices)
+     and never chrome. --ember-rgb is the triplet, for rgba(var(--ember-rgb), a). */
+  --void: #080a0e;
+  --graphite: #0d1117;
+  --paper: #f2f3f5;
+  --ember: #ff7448;
+  --ember-rgb: 255, 116, 72;
+  --solar: #f3a64b;
+  --cyan: #73d9ff;
+  --teal: #06d6c8;
+  --acid: #a3e635;
+  --rose: #ff5e7e;
 
   /* spacing (0.25rem base) */
   --spacing: 0.25rem;
@@ -59,8 +67,8 @@ a {
 }
 
 ::selection {
-  background: var(--blue-600);
-  color: #fff;
+  background: var(--ember);
+  color: var(--void);
 }
 
 /* ---- shared layout / typography ---- */
@@ -95,7 +103,7 @@ h2 {
   font-size: 0.74rem;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--blue-400);
+  color: var(--ember);
   margin: 0 0 18px;
 }
 
@@ -103,7 +111,7 @@ h2 {
   content: '';
   width: 26px;
   height: 1px;
-  background: var(--blue-500);
+  background: var(--ember);
 }
 
 .sec-lede {
@@ -132,22 +140,23 @@ h2 {
     box-shadow 0.15s ease;
 }
 
-/* Primary CTA: a frosted blue-tinted glass rather than a solid vivid-blue block,
-   so it reads as the accent action without the harsh contrast — the art stays the
-   loudest thing on the page. The blue tint + border keep it distinct from the
+/* Primary CTA: frosted ember glass rather than a solid ember block. Solid ember
+   behind white text is 2.68:1 and fails AA outright; a 16% tint over black keeps
+   the label near 17:1 while still reading as the accent action. The art stays the
+   loudest thing on the page, and the tint + border keep this distinct from the
    neutral ghost button. */
 .btn-primary {
   color: #fff;
-  background: rgba(59, 130, 246, 0.16);
-  border-color: rgba(96, 165, 250, 0.42);
+  background: rgba(var(--ember-rgb), 0.16);
+  border-color: rgba(var(--ember-rgb), 0.42);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   box-shadow: 0 6px 22px rgba(0, 0, 0, 0.3);
 }
 
 .btn-primary:hover {
-  background: rgba(59, 130, 246, 0.26);
-  border-color: rgba(96, 165, 250, 0.7);
+  background: rgba(var(--ember-rgb), 0.26);
+  border-color: rgba(var(--ember-rgb), 0.7);
   transform: translateY(-2px);
 }
 
@@ -201,12 +210,8 @@ h2 {
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  /* deep-space tint — also the graceful empty state if WebGPU is unavailable */
-  background: radial-gradient(
-    120% 120% at 50% 35%,
-    rgba(22, 26, 52, 0.45),
-    #000 72%
-  );
+  /* graphite lift — also the graceful empty state if WebGPU is unavailable */
+  background: radial-gradient(120% 120% at 50% 35%, var(--graphite), #000 72%);
   aspect-ratio: 1;
   will-change: transform;
   transition:
@@ -217,7 +222,7 @@ h2 {
 .plate:hover {
   transform: translateY(-4px) scale(1.012);
   box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.75);
-  border-color: rgba(96, 165, 250, 0.35);
+  border-color: rgba(var(--ember-rgb), 0.35);
   z-index: 2;
 }
 .plate.wide {
@@ -285,9 +290,9 @@ h2 {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  color: #fff;
-  background: rgba(37, 99, 235, 0.85);
-  border: 1px solid rgba(147, 197, 253, 0.55);
+  color: var(--ember);
+  background: rgba(8, 10, 14, 0.72);
+  border: 1px solid rgba(var(--ember-rgb), 0.55);
   backdrop-filter: blur(6px);
   box-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.6);
   opacity: 0;
@@ -311,7 +316,8 @@ h2 {
   pointer-events: auto;
 }
 .open-in-app:hover {
-  background: var(--blue-500);
+  background: var(--ember);
+  color: var(--void);
   transform: translateY(-1px);
 }
 
@@ -354,7 +360,7 @@ h2 {
   width: 17px;
   height: 17px;
   flex-shrink: 0;
-  color: #fbbf24; /* warm amber — a heads-up accent, not an alarm */
+  color: var(--solar); /* solar — a heads-up accent, not an alarm */
 }
 .preview-notice-x {
   flex-shrink: 0;
@@ -482,6 +488,25 @@ h2 {
   .js #features.is-revealed .feat:nth-child(6) {
     transition-delay: 0.35s;
   }
+
+  /* same stagger for the Arcade mode cards */
+  .js #arcade .mode {
+    opacity: 0;
+    transform: translateY(18px);
+    transition:
+      opacity 0.55s ease,
+      transform 0.55s ease;
+  }
+  .js #arcade.is-revealed .mode {
+    opacity: 1;
+    transform: none;
+  }
+  .js #arcade.is-revealed .mode:nth-child(2) {
+    transition-delay: 0.07s;
+  }
+  .js #arcade.is-revealed .mode:nth-child(3) {
+    transition-delay: 0.14s;
+  }
 }
 
 /* ---- "Explore Earth Flame" CTA (on the earth community card) ---- */
@@ -499,8 +524,8 @@ h2 {
   font-size: 0.82rem;
   font-weight: 600;
   color: #fff;
-  background: rgba(13, 16, 38, 0.72);
-  border: 1px solid rgba(147, 197, 253, 0.4);
+  background: rgba(8, 10, 14, 0.72);
+  border: 1px solid rgba(var(--ember-rgb), 0.4);
   backdrop-filter: blur(8px);
   box-shadow: 0 8px 24px -10px rgba(0, 0, 0, 0.7);
   cursor: pointer;
@@ -514,8 +539,8 @@ h2 {
   height: 15px;
 }
 .explore-btn:hover {
-  background: var(--blue-600);
-  border-color: var(--blue-400);
+  background: rgba(var(--ember-rgb), 0.26);
+  border-color: var(--ember);
   transform: translateX(-50%) translateY(-2px);
 }
 
@@ -527,7 +552,7 @@ h2 {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(4, 6, 16, 0.78);
+  background: rgba(8, 10, 14, 0.78);
   backdrop-filter: blur(10px);
   animation: ev-fade 0.2s ease;
 }
@@ -545,7 +570,7 @@ h2 {
   padding: 20px;
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(180deg, #0c0f1d, #070810);
+  background: linear-gradient(180deg, var(--graphite), var(--void));
   box-shadow: 0 40px 120px -30px rgba(0, 0, 0, 0.85);
 }
 .ev-head {
@@ -598,12 +623,12 @@ h2 {
 }
 .ev-play:hover {
   color: #fff;
-  border-color: var(--blue-500);
+  border-color: var(--ember);
 }
 .ev-play.playing {
-  color: var(--blue-300);
-  border-color: var(--blue-500);
-  background: rgba(37, 99, 235, 0.16);
+  color: var(--ember);
+  border-color: var(--ember);
+  background: rgba(var(--ember-rgb), 0.16);
 }
 .ev-close {
   display: inline-flex;
@@ -633,11 +658,7 @@ h2 {
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: radial-gradient(
-    120% 120% at 50% 38%,
-    rgba(16, 18, 44, 0.7),
-    #000 72%
-  );
+  background: radial-gradient(120% 120% at 50% 38%, var(--graphite), #000 72%);
 }
 .ev-stage-hint {
   position: absolute;
@@ -689,14 +710,14 @@ h2 {
 }
 .ev-thumb:hover {
   transform: translateY(-2px);
-  border-color: rgba(147, 197, 253, 0.5);
+  border-color: rgba(var(--ember-rgb), 0.5);
 }
 .ev-thumb:hover span {
   opacity: 1;
 }
 .ev-thumb.active {
-  border-color: var(--blue-400);
-  box-shadow: 0 0 0 1px var(--blue-500);
+  border-color: var(--ember);
+  box-shadow: 0 0 0 1px var(--ember);
 }
 .ev-thumb.active span {
   opacity: 1;

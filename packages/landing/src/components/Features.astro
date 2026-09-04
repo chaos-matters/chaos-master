@@ -134,7 +134,7 @@ const comingSoon = [
       transform 0.2s;
   }
   .feat:hover {
-    border-color: rgba(96, 165, 250, 0.35);
+    border-color: rgba(var(--ember-rgb), 0.35);
     transform: translateY(-3px);
   }
   .feat-top {
@@ -149,9 +149,9 @@ const comingSoon = [
     align-items: center;
     justify-content: center;
     border-radius: 11px;
-    color: var(--blue-400);
-    background: rgba(96, 165, 250, 0.1);
-    border: 1px solid rgba(96, 165, 250, 0.22);
+    color: var(--ember);
+    background: rgba(var(--ember-rgb), 0.1);
+    border: 1px solid rgba(var(--ember-rgb), 0.22);
   }
   .feat-icon :global(svg) {
     width: 22px;
@@ -235,8 +235,8 @@ const comingSoon = [
     font-size: 0.62rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--blue-300);
-    border: 1px solid rgba(96, 165, 250, 0.3);
+    color: var(--ember);
+    border: 1px solid rgba(var(--ember-rgb), 0.3);
     border-radius: var(--round);
     padding: 3px 8px;
   }
