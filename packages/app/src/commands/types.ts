@@ -220,6 +220,9 @@ export interface CommandContext {
     setStochasticFilter: (on: boolean) => void
     setFlyMode: (on: boolean) => void
     setShowTimeline: (shown: boolean) => void
+    /** Optional so sandboxes need not provide it; a caller that cannot read
+     *  the current value simply issues the command unconditionally. */
+    showTimeline?: () => boolean
   }
   camera: {
     center: () => void

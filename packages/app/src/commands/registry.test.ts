@@ -8,6 +8,51 @@ import { createMockCommandContext, createTestFlame } from '@/webmcp/testUtils'
 import { executeCommand, getAllCommands, hasExplicitReplayPolicy, preflightLiveCommand, preflightReplayCommand, registerCommand, } from './registry'
 import type { CommandContext } from './types'
 
+/**
+ * A rejection an agent can act on.
+ *
+ * These messages are read by an AI holding a sixteen-track timeline, not by a
+ * developer with a debugger. "arguments must be finite JSON data" with no
+ * locator sent a Cinema agent bisecting its own payload by deleting fields,
+ * and it blamed an unrelated one — so every rejection names the path.
+ */
+describe('replay argument rejections name what is wrong and where', () => {
+  it('points at the exact field that is not finite JSON', () => {
+    const bad = timelineSnapshot({
+      tracks: [
+        {
+          parameterPath: 'camera.zoom',
+          keyframes: [
+            { frame: 0, value: 1 },
+            { frame: 30, value: undefined },
+          ],
+        },
+      ],
+    })
+    const error = preflightReplayCommand('timeline.loadTimeline', [bad])
+    expect(error).toContain('finite JSON data')
+    expect(error).toContain('tracks[0].keyframes[1].value')
+    expect(error).toContain('undefined')
+  })
+
+  it('names the value, so NaN is not mistaken for a missing field', () => {
+    const bad = timelineSnapshot()
+    ;(bad.config as Record<string, unknown>).fps = Number.NaN
+    const error = preflightReplayCommand('timeline.loadTimeline', [bad])
+    expect(error).toContain('config.fps')
+    expect(error).toContain('NaN')
+  })
+
+  it('locates an over-long string rather than just reporting one exists', () => {
+    const bad = timelineSnapshot({
+      tracks: [{ parameterPath: 'x'.repeat(100_000), keyframes: [] }],
+    })
+    const error = preflightReplayCommand('timeline.loadTimeline', [bad])
+    expect(error).toContain('too long')
+    expect(error).toContain('tracks[0].parameterPath')
+  })
+})
+
 function timelineSnapshot(
   overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {

@@ -63,7 +63,11 @@ export const arcadeStartCinema: WebMcpTool = {
     }
     clearNarration()
     ctx.arcade.closeHub()
-    executeCommand('view.setShowTimeline', ctx, true)
+    // Only when it is not already open. Recording a step that changes nothing
+    // makes every Cinema take start with a no-op the viewer watches replay.
+    if (ctx.view?.showTimeline?.() !== true) {
+      executeCommand('view.setShowTimeline', ctx, true)
+    }
     return {
       ok: true,
       stepBudget: CINEMA_STEP_BUDGET,
@@ -240,8 +244,13 @@ export const arcadeSetKeyframes: WebMcpTool = {
       built.snapshot,
     ])
     if (invalid) return { error: invalid }
+    // One tool call, one recorded action. The snapshot carries
+    // `animationEnabled: true` and `load` applies it (MainWorkspace's timeline
+    // edit context), so a `timeline.setAnimationEnabled` on the next line only
+    // re-set what the line above had already set — and cost the take a second
+    // action the rail never mentioned, which replayed as its own step with its
+    // own dwell and its own spotlight on a toggle that never moved.
     executeCommand('timeline.loadTimeline', ctx, built.snapshot)
-    executeCommand('timeline.setAnimationEnabled', ctx, true)
     // Wall-clock transport, so `timeline.play` is deliberately not replayable
     // and `execute_command` refuses it. The tool starts it here instead: an
     // animation the viewer has to press Play on is not an animation the agent

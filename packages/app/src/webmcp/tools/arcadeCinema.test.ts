@@ -19,6 +19,131 @@ function ctxWithRecorder() {
   return ctx
 }
 
+/**
+ * The rail and the recording have to agree about how many steps happened.
+ * They used to disagree by one per keyframe write: the tool logged one line
+ * and the recorder wrote two, so a seven-call take replayed with seven extra
+ * steps pointing at an animation toggle that never moved.
+ */
+describe('Cinema records one action per tool call', () => {
+  afterEach(() => {
+    resetPilot()
+    cancelSessionRecording()
+    clearWebMcpContext()
+  })
+
+  /** The mock context has no view block; Cinema only needs these two. */
+  const viewMock = () => ({
+    setQualityPreset: vi.fn(),
+    setAdaptiveFilter: vi.fn(),
+    setStochasticFilter: vi.fn(),
+    setFlyMode: vi.fn(),
+    setShowTimeline: vi.fn(),
+  })
+
+  const TRACKS = [
+    {
+      path: 'camera.zoom',
+      keyframes: [
+        { frame: 0, value: 1 },
+        { frame: 59, value: 1.4 },
+      ],
+    },
+  ]
+
+  it('writes exactly one action per arcade_set_keyframes call', async () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    await arcadeStartCinema.execute({}, {})
+    expect(startSessionRecording(ctx.flameDescriptor())).toEqual({ ok: true })
+
+    await arcadeSetKeyframes.execute(
+      { fps: 30, durationFrames: 60, tracks: TRACKS },
+      {},
+    )
+    await arcadeSetKeyframes.execute(
+      { fps: 30, durationFrames: 60, tracks: TRACKS },
+      {},
+    )
+
+    const ids = stopSessionRecording()?.actions.map((a) => a.id) ?? []
+    expect(ids).toEqual(['timeline.loadTimeline', 'timeline.loadTimeline'])
+    // The snapshot is what turns animation on, so a separate toggle is noise.
+    expect(ids).not.toContain('timeline.setAnimationEnabled')
+  })
+
+  it('carries animationEnabled in add mode too', async () => {
+    // The mode the tool recommends ("one idea at a time"). If a merge ever
+    // dropped the flag, removing the separate toggle would silently stop
+    // animation for exactly the workflow the brief tells agents to use.
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    await arcadeStartCinema.execute({}, {})
+    await arcadeSetKeyframes.execute(
+      { fps: 30, durationFrames: 60, mode: 'replace', tracks: TRACKS },
+      {},
+    )
+    await arcadeSetKeyframes.execute(
+      {
+        fps: 30,
+        durationFrames: 60,
+        mode: 'add',
+        tracks: [
+          {
+            path: 'exposure',
+            keyframes: [
+              { frame: 0, value: -4 },
+              { frame: 59, value: -3.6 },
+            ],
+          },
+        ],
+      },
+      {},
+    )
+    const calls = vi.mocked(ctx.timeline.edit!.load).mock.calls
+    expect(calls).toHaveLength(2)
+    // The flag, which is the whole point: what "add" merges into comes from
+    // the live timeline, and this mock's tracks() does not follow its own
+    // load() — merging itself is covered in animatablePaths.test.ts.
+    expect(calls[1]?.[0]?.animationEnabled).toBe(true)
+  })
+
+  it('still applies the snapshot that carries animationEnabled', async () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    await arcadeStartCinema.execute({}, {})
+    await arcadeSetKeyframes.execute(
+      { fps: 30, durationFrames: 60, tracks: TRACKS },
+      {},
+    )
+    const loaded = vi.mocked(ctx.timeline.edit!.load).mock.calls[0]?.[0]
+    expect(loaded?.animationEnabled).toBe(true)
+  })
+
+  it('does not record opening a timeline that is already open', async () => {
+    const ctx = createMockCommandContext()
+    ctx.view = { ...viewMock(), showTimeline: () => true }
+    setWebMcpContext(ctx)
+    expect(startSessionRecording(ctx.flameDescriptor())).toEqual({ ok: true })
+    await arcadeStartCinema.execute({}, {})
+
+    // Every take used to open with a step that changed nothing.
+    expect(stopSessionRecording()?.actions ?? []).toEqual([])
+  })
+
+  it('still opens a timeline that is closed', async () => {
+    const ctx = createMockCommandContext()
+    ctx.view = { ...viewMock(), showTimeline: () => false }
+    setWebMcpContext(ctx)
+    expect(startSessionRecording(ctx.flameDescriptor())).toEqual({ ok: true })
+    await arcadeStartCinema.execute({}, {})
+
+    expect(stopSessionRecording()?.actions.map((a) => a.id)).toEqual([
+      'view.setShowTimeline',
+    ])
+  })
+})
+
 describe('Cinema tools', () => {
   afterEach(() => {
     resetPilot()

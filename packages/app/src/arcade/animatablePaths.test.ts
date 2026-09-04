@@ -3,6 +3,87 @@ import { createTestFlame } from '@/webmcp/testUtils'
 import { buildAnimatableCatalog, buildTimelineSnapshot, } from './animatablePaths'
 import type { TimelineTrack } from '@/utils/timeline'
 
+/**
+ * A flame renders through exactly one pipeline, and the two take different
+ * cameras: `createIFSPipeline3D` never sees the 2D camera and
+ * `createIFSPipeline` never sees `camera3D` (Flam3.tsx). Offering an agent the
+ * family that is not wired up hands it four controls that resolve correctly on
+ * the timeline and move nothing on screen — which is exactly what happened to
+ * a Cinema take on a 3D flame: it checked its own work by reading the values
+ * back, and they were right.
+ */
+describe('only the camera that renders is animatable', () => {
+  function flameIn(dimensions: 2 | 3) {
+    const flame = createTestFlame()
+    flame.renderSettings.dimensions = dimensions
+    return flame
+  }
+
+  it('offers a 3D flame the 3D camera and hides the 2D one', () => {
+    const paths = buildAnimatableCatalog(flameIn(3)).map((e) => e.path)
+    expect(paths).toContain('camera3D.radius')
+    expect(paths).toContain('camera3D.theta')
+    expect(paths.filter((p) => p.startsWith('camera.'))).toEqual([])
+  })
+
+  it('offers a 2D flame the 2D camera and hides the 3D one', () => {
+    const paths = buildAnimatableCatalog(flameIn(2)).map((e) => e.path)
+    expect(paths).toContain('camera.zoom')
+    expect(paths.filter((p) => p.startsWith('camera3D.'))).toEqual([])
+  })
+
+  it('says which camera to use instead of calling the path unknown', () => {
+    const flame = flameIn(3)
+    const result = buildTimelineSnapshot(
+      {
+        fps: 30,
+        durationFrames: 60,
+        tracks: [
+          {
+            path: 'camera.zoom',
+            keyframes: [
+              { frame: 0, value: 1 },
+              { frame: 59, value: 1.75 },
+            ],
+          },
+        ],
+      },
+      buildAnimatableCatalog(flame),
+      [],
+    )
+    expect(result.ok).toBe(false)
+    const error = result.ok ? '' : result.error
+    // "Unknown path" would be a lie — it exists, it just is not wired up here.
+    expect(error).not.toContain('Unknown path')
+    expect(error).toContain('2D camera')
+    expect(error).toContain('camera3D.radius')
+    // The unit question the agent could not answer from the tool alone.
+    expect(error).toContain('radians')
+  })
+
+  it('says the same thing the other way round', () => {
+    const result = buildTimelineSnapshot(
+      {
+        fps: 30,
+        durationFrames: 60,
+        tracks: [
+          {
+            path: 'camera3D.radius',
+            keyframes: [
+              { frame: 0, value: 3 },
+              { frame: 59, value: 2 },
+            ],
+          },
+        ],
+      },
+      buildAnimatableCatalog(flameIn(2)),
+      [],
+    )
+    expect(result.ok).toBe(false)
+    expect(result.ok ? '' : result.error).toContain('camera.zoom')
+  })
+})
+
 describe('animatable catalog', () => {
   const flame = createTestFlame()
   const catalog = buildAnimatableCatalog(flame)
