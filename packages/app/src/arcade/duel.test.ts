@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { executeCommand } from '@/commands/registry'
 import { recorderStream } from '@/recorder/recorder'
 import { createTestFlame } from '@/webmcp/testUtils'
-import { clampDuelSeconds, duel, duelActive, duelReady, duelRemainingMs, markDuelReady, runningDuel, startDuel, stopDuel, } from './duel'
+import { clampDuelSeconds, closeDuelView, duel, duelActive, duelReady, duelRemainingMs, duelRivalSeat, markDuelReady, runningDuel, startDuel, stopDuel, } from './duel'
 
 const flame = createTestFlame()
 const base = {
@@ -40,7 +40,15 @@ describe('duel state', () => {
     const sessions = stopDuel()
     expect(sessions.player).toBeDefined()
     expect(sessions.rival).toBeDefined()
+    // The clock stops but the seat lives: the result card renders over both
+    // flames, so the rival's half keeps drawing until the viewer dismisses it.
+    expect(duel().phase).toBe('result')
+    expect(duelRivalSeat()).toBeDefined()
+    expect(duelActive()).toBe(false)
+
+    closeDuelView()
     expect(duel()).toEqual({ phase: 'idle' })
+    expect(duelRivalSeat()).toBeUndefined()
     expect(recorderStream('rival').isRecording()).toBe(false)
   })
 

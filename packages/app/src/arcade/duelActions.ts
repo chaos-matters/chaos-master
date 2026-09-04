@@ -1,8 +1,10 @@
 import { DEFAULT_SEAT } from '@/seats/seatId'
 import { deepClone } from '@/utils/clone'
 import { getWebMcpContext, setWebMcpContext, setWebMcpTarget, } from '@/webmcp/contextBridge'
-import { duelActive, runningDuel, startDuel, stopDuel } from './duel'
-import { scoreSheetJudge } from './duelJudge'
+import { calculateFlameStats } from '@/webmcp/tools/scoreFlame'
+import { closeDuelView, duelActive, duelShowing, runningDuel, startDuel, stopDuel, } from './duel'
+import { duelJudge } from './duelJudge'
+import { newDuelId, showDuelResult } from './duelResult'
 import { qualityRank } from './guard'
 import { clearNarration } from './narration'
 import { agentDriving, appendPilotLog, endPilot, notePilotSaveResult, startPilot, } from './pilot'
@@ -45,6 +47,9 @@ export function beginDuel(
     }
   }
   if (duelActive()) return { error: 'A duel is already running.' }
+  // A result card left on screen is not a running duel, but its seat is still
+  // alive; starting over takes the old screen down first.
+  if (duelShowing()) closeDuelView()
   const playerFlame = ctx.flameDescriptor()
   if (playerFlame.renderSettings.dimensions === 3) {
     return {
@@ -138,10 +143,10 @@ export async function finishDuel(
   const title =
     (opts.title ?? state.ready?.title ?? '').trim().slice(0, 80) || 'Duel'
   const summary = opts.summary ?? state.ready?.summary
-  const verdict = scoreSheetJudge.judge(
-    ctx.flameDescriptor(),
-    state.rival.flame(),
-  )
+  const playerFlame = ctx.flameDescriptor()
+  const rivalFlame = state.rival.flame()
+  const verdict = duelJudge.judge(playerFlame, rivalFlame)
+  const winnerFlame = verdict.winner === 'rival' ? rivalFlame : playerFlame
   const sessions = stopDuel()
   clearNarration()
   // The tools follow the bridge target; leaving it on the rival seat would
@@ -171,7 +176,19 @@ export async function finishDuel(
     }
   }
   if (attempted > 0) notePilotSaveResult(saved === attempted)
-  ctx.arcade?.toast(`${title}: ${verdict.line}`)
+  // The card is the report. A toast as well would say the same thing twice,
+  // in the corner, over a screen that is now entirely about the result.
+  showDuelResult({
+    verdict,
+    reason,
+    playerTitle: playerFlame.metadata?.name?.trim() || 'Your flame',
+    rivalTitle: title,
+    winnerFlame,
+    archetype: calculateFlameStats(winnerFlame).type,
+    durationMs: state.durationMs,
+    id: newDuelId(),
+    savedTakes: saved,
+  })
   return {
     ok: true,
     title,

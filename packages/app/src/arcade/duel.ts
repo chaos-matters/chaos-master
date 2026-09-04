@@ -25,6 +25,13 @@ export type DuelReady = { title?: string; summary?: string; at: number }
 
 export type DuelState =
   | { phase: 'idle' }
+  /**
+   * The clock has stopped and the takes are harvested, but the rival seat is
+   * still alive and still rendering. The result card is on screen, and both
+   * flames stay under it — a duel that blanks the artwork the moment it ends
+   * reads as a crash rather than as an ending.
+   */
+  | { phase: 'result'; rival: Seat; durationMs: number }
   | {
       phase: 'running'
       rival: Seat
@@ -45,6 +52,15 @@ let expiryTimer: ReturnType<typeof globalThis.setTimeout> | undefined
 export { duel }
 
 export const duelActive = (): boolean => duel().phase === 'running'
+
+/** Whether the split screen is on screen at all, duelling or reporting. */
+export const duelShowing = (): boolean => duel().phase !== 'idle'
+
+/** The rival's seat in either phase, for the half that keeps rendering. */
+export function duelRivalSeat(): Seat | undefined {
+  const state = duel()
+  return state.phase === 'idle' ? undefined : state.rival
+}
 
 /**
  * Whether the viewer has asked for the real sidebar.
@@ -217,12 +233,34 @@ export function stopDuel(): {
     recordsRival(state.recording) && recorderStream('rival').isRecording()
       ? recorderStream('rival').stop()
       : undefined
+  // Not disposed here, and not idle: the result card renders over both live
+  // flames, so the rival's seat outlives the clock by however long the viewer
+  // spends reading the verdict. `closeDuelView` is what finally frees it.
+  setDuel({
+    phase: 'result',
+    rival: state.rival,
+    durationMs: state.durationMs,
+  })
+  setDuelSidebarOpen(false)
+  return { player: playerSession, rival: rivalSession }
+}
+
+/**
+ * Take the split screen down for good.
+ *
+ * Disposing after the sessions were taken, never before: disposing cancels
+ * the stream, which would throw away the take.
+ */
+export function closeDuelView(): void {
+  const state = duel()
+  if (state.phase === 'idle') return
+  if (state.phase === 'running') {
+    stopDuel()
+  }
+  const seat = duelRivalSeat()
   setDuel({ phase: 'idle' })
   setDuelSidebarOpen(false)
-  // After the sessions are taken: disposing cancels the stream, which would
-  // throw away the take if it ran first.
-  state.rival.dispose()
-  return { player: playerSession, rival: rivalSession }
+  seat?.dispose()
 }
 
 /** Milliseconds left on the clock, never negative. */

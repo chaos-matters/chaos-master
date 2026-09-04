@@ -1,13 +1,15 @@
 import { createEffect, createMemo, createSignal, onCleanup, Show, } from 'solid-js'
-import { duelReady, duelRemainingMs, duelSidebarOpen, runningDuel, setDuelSidebarOpen, } from '@/arcade/duel'
-import { finishDuel } from '@/arcade/duelActions'
+import { clampDuelSeconds, duelReady, duelRemainingMs, duelRivalSeat, duelShowing, duelSidebarOpen, runningDuel, setDuelSidebarOpen, } from '@/arcade/duel'
+import { beginDuel, finishDuel } from '@/arcade/duelActions'
 import { duelHudModel } from '@/arcade/duelHud'
 import { scoreSheetJudge } from '@/arcade/duelJudge'
+import { clearDuelResult, duelResult } from '@/arcade/duelResult'
 import { drivingState } from '@/arcade/pilot'
 import { SidebarPanel } from '@/icons'
 import { DuelChips } from './DuelChips'
 import { DuelControls } from './DuelControls'
 import { DuelNarration } from './DuelNarration'
+import { DuelResultCard } from './DuelResultCard'
 import ui from './DuelStage.module.css'
 import { EclipseHud } from './EclipseHud'
 import { SeatView } from './SeatView'
@@ -98,9 +100,24 @@ export function DuelStage(props: {
     void finishDuel(props.ctx, 'stopped').finally(() => setEnding(false))
   }
 
+  const again = () => {
+    const previous = duelResult()
+    clearDuelResult()
+    beginDuel(props.ctx, {
+      seconds: clampDuelSeconds((previous?.durationMs ?? 0) / 1000),
+      // Whatever the last one was against. A solo duel restarts solo; a real
+      // one asks the agent to come back, which it cannot do on its own, so
+      // this is the honest default.
+      opponent: 'none',
+    })
+  }
+
+  // The stage outlives the clock. `stopDuel` leaves the rival's seat alive
+  // precisely so the result can be read over both flames, still rendering,
+  // rather than over the black rectangle an unmounted canvas leaves behind.
   return (
-    <Show when={runningDuel()}>
-      {(state) => (
+    <Show when={duelShowing() && duelRivalSeat()}>
+      {(rival) => (
         <div class={ui.stage} aria-label="Duel" ref={stageEl}>
           <div class={ui.seats}>
             <div class={ui.side}>
@@ -114,40 +131,51 @@ export function DuelStage(props: {
                 quality={props.quality}
                 interactive
               />
-              <DuelChips ctx={props.ctx} flame={props.playerFlame} />
-              <DuelControls ctx={props.ctx} />
+              <Show when={runningDuel()}>
+                <DuelChips ctx={props.ctx} flame={props.playerFlame} />
+                <DuelControls ctx={props.ctx} />
+              </Show>
             </div>
             <div class={ui.side}>
               <SeatView
                 label="The AI's flame"
                 score={model().rivalScore}
                 side="rival"
-                flame={state().rival.flame}
-                zoom={[state().rival.zoom, state().rival.setZoom]}
-                position={[state().rival.position, state().rival.setPosition]}
+                flame={rival().flame}
+                zoom={[rival().zoom, rival().setZoom]}
+                position={[rival().position, rival().setPosition]}
                 quality={props.quality}
                 interactive={false}
               />
               {/* The AI's play-by-play, in the AI's half. On the seam it cut
                   the divider and stacked a fourth object into the centre
                   column; here it is the only thing this half has to hold. */}
-              <div class={ui.narrationSlot}>
-                <DuelNarration driving={drivingState()} />
-              </div>
+              <Show when={runningDuel()}>
+                <div class={ui.narrationSlot}>
+                  <DuelNarration driving={drivingState()} />
+                </div>
+              </Show>
             </div>
           </div>
-          <button
-            type="button"
-            class={ui.sidebarToggle}
-            aria-pressed={duelSidebarOpen()}
-            onClick={toggleSidebar}
-          >
-            <SidebarPanel class={ui.sidebarIcon} aria-hidden="true" />
-            {duelSidebarOpen() ? 'Hide the sidebar' : 'Show the sidebar'}
-          </button>
-          <div class={ui.hudSlot}>
-            <EclipseHud model={model()} onEnd={end} ending={ending()} />
-          </div>
+          <Show when={runningDuel()}>
+            <button
+              type="button"
+              class={ui.sidebarToggle}
+              aria-pressed={duelSidebarOpen()}
+              onClick={toggleSidebar}
+            >
+              <SidebarPanel class={ui.sidebarIcon} aria-hidden="true" />
+              {duelSidebarOpen() ? 'Hide the sidebar' : 'Show the sidebar'}
+            </button>
+          </Show>
+          <Show when={duelResult()}>
+            {(result) => <DuelResultCard result={result()} onAgain={again} />}
+          </Show>
+          <Show when={runningDuel()}>
+            <div class={ui.hudSlot}>
+              <EclipseHud model={model()} onEnd={end} ending={ending()} />
+            </div>
+          </Show>
         </div>
       )}
     </Show>

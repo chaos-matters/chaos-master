@@ -7,7 +7,6 @@ import { Robot, Stop } from '@/icons'
 import { formatElapsed, reasonLabel, savedLine } from './pilotFormat'
 import ui from './PilotOverlay.module.css'
 import { PilotSpotlight } from './PilotSpotlight'
-import type { PilotEnded } from '@/arcade/pilot'
 import type { CommandContext } from '@/commands/types'
 import type { ReplayFocusPreparationHandler } from '@/recorder/focusPreparation'
 
@@ -82,8 +81,16 @@ export function PilotOverlay(props: {
     railEl?.scrollTo({ top: railEl.scrollHeight })
   })
 
-  const ended = () =>
-    pilot().phase === 'ended' ? (pilot() as PilotEnded) : undefined
+  /**
+   * A duel is excluded: it has its own ending, drawn over both flames, and
+   * two end cards stacked on each other means the generic one lands on top of
+   * the specific one and swallows its buttons.
+   */
+  const ended = () => {
+    const state = pilot()
+    if (state.phase !== 'ended' || state.mode === 'duel') return undefined
+    return state
+  }
 
   // Escape on the end card does what "Stay in the editor" does. A modal that
   // ignores Escape is a modal people feel stuck in, and by this point the

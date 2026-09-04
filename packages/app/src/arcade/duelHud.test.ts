@@ -47,6 +47,7 @@ describe('duelHudModel', () => {
     playerScore: 70,
     rivalScore: 30,
     line: 'You lead',
+    components: [],
   }
 
   it('derives the clock, the elapsed fraction and the shares together', () => {
