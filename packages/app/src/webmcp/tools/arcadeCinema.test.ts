@@ -72,6 +72,42 @@ describe('Cinema records one action per tool call', () => {
     expect(ids).not.toContain('timeline.setAnimationEnabled')
   })
 
+  it('carries animationEnabled in add mode too', async () => {
+    // The mode the tool recommends ("one idea at a time"). If a merge ever
+    // dropped the flag, removing the separate toggle would silently stop
+    // animation for exactly the workflow the brief tells agents to use.
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    await arcadeStartCinema.execute({}, {})
+    await arcadeSetKeyframes.execute(
+      { fps: 30, durationFrames: 60, mode: 'replace', tracks: TRACKS },
+      {},
+    )
+    await arcadeSetKeyframes.execute(
+      {
+        fps: 30,
+        durationFrames: 60,
+        mode: 'add',
+        tracks: [
+          {
+            path: 'exposure',
+            keyframes: [
+              { frame: 0, value: -4 },
+              { frame: 59, value: -3.6 },
+            ],
+          },
+        ],
+      },
+      {},
+    )
+    const calls = vi.mocked(ctx.timeline.edit!.load).mock.calls
+    expect(calls).toHaveLength(2)
+    // The flag, which is the whole point: what "add" merges into comes from
+    // the live timeline, and this mock's tracks() does not follow its own
+    // load() — merging itself is covered in animatablePaths.test.ts.
+    expect(calls[1]?.[0]?.animationEnabled).toBe(true)
+  })
+
   it('still applies the snapshot that carries animationEnabled', async () => {
     const ctx = createMockCommandContext()
     setWebMcpContext(ctx)

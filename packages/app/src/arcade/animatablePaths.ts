@@ -53,8 +53,26 @@ function renderCurrent(flame: FlameDescriptor, path: string): unknown {
 }
 
 /** Every path the timeline can drive for this flame, with its current value. */
+/**
+ * The camera family that does NOT drive this flame's render.
+ *
+ * A flame renders through exactly one of two pipelines, and they take
+ * different cameras: `createIFSPipeline3D` is handed `camera3D` and never sees
+ * the 2D camera, while `createIFSPipeline` is handed the 2D one and never sees
+ * `camera3D` (Flam3.tsx). Offering both to an agent is offering a set of
+ * controls that are wired to nothing — it animated `camera.zoom` across a 3D
+ * flame, read the resolved values back off the timeline to check its work
+ * (they were correct), and got a picture that never moved.
+ */
+function deadCameraPrefix(flame: FlameDescriptor): string {
+  return flame.renderSettings.dimensions === 3 ? 'camera.' : 'camera3D.'
+}
+
 export function buildAnimatableCatalog(flame: FlameDescriptor): CatalogEntry[] {
-  const entries: CatalogEntry[] = TIMELINE_PARAMETERS.map((parameter) => ({
+  const dead = deadCameraPrefix(flame)
+  const entries: CatalogEntry[] = TIMELINE_PARAMETERS.filter(
+    (parameter) => !parameter.path.startsWith(dead),
+  ).map((parameter) => ({
     path: parameter.path,
     type: parameter.type === 'array' ? 'color' : parameter.type,
     group: parameter.group,
@@ -122,6 +140,29 @@ export function buildAnimatableCatalog(flame: FlameDescriptor): CatalogEntry[] {
  * is a feature, not an accident. The unprefixed path is looked up FIRST, so a
  * variation that happens to be called `probability` cannot shadow one.
  */
+/**
+ * "Unknown path" is the wrong thing to say about `camera.zoom`.
+ *
+ * It exists, it is in the schema, the timeline will happily resolve it — it
+ * just is not connected to the pipeline that renders THIS flame. Saying so,
+ * and naming the family that is, turns a silent still frame into one call.
+ * Which family is live is read back off the catalog, so this cannot disagree
+ * with what `arcade_get_animatable_paths` just offered.
+ */
+function wrongCameraFamilyError(
+  byPath: ReadonlyMap<string, CatalogEntry>,
+  path: string,
+): string | undefined {
+  const rendersIn3D = byPath.has('camera3D.radius')
+  if (rendersIn3D && path.startsWith('camera.')) {
+    return `"${path}" is the 2D camera and a 3D flame does not render through it. Animate camera3D.theta, camera3D.phi, camera3D.radius or camera3D.fov instead (theta and phi are radians; a full turn is 2*PI).`
+  }
+  if (!rendersIn3D && path.startsWith('camera3D.')) {
+    return `"${path}" is the 3D camera and a 2D flame does not render through it. Animate camera.x, camera.y, camera.zoom or camera.rotation instead (rotation is radians; a full turn is 2*PI).`
+  }
+  return undefined
+}
+
 function canonicalPath(
   byPath: ReadonlyMap<string, CatalogEntry>,
   path: string,
@@ -234,7 +275,9 @@ export function buildTimelineSnapshot(
     if (entry === undefined || path === undefined) {
       return {
         ok: false,
-        error: `Unknown path "${track.path}". Call arcade_get_animatable_paths for the list.`,
+        error:
+          wrongCameraFamilyError(byPath, track.path) ??
+          `Unknown path "${track.path}". Call arcade_get_animatable_paths for the list.`,
       }
     }
     canonical.set(track.path, path)
