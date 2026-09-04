@@ -9,7 +9,7 @@ import { tryValidateFlame } from '@/flame/schema/flameSchema'
 import { defaultTimelineConfig } from '@/flame/schema/timeline'
 import { deepClone } from '@/utils/clone'
 import { applyTracksToFlame, getUserEndFrame, loopOptsFromConfig, resolveLoopValue, } from '@/utils/timeline'
-import { narrationHoldFor, stepGapMs } from './player'
+import { closingHoldMs, stepGapMs } from './player'
 import { paletteRestoreColorsAfterReplayCommand } from './replayPaletteState'
 import { validateSession } from './schema'
 import type { RecordedAction, RecordedSession, SessionViewSnapshot, TransformColorSnapshot, } from './schema'
@@ -414,12 +414,13 @@ export function createReplayVideoSchedule(
   const finalActionTime = actionTimesMs.at(-1) ?? spec.leadInMs
   // A closing sentence has no step after it to be the dwell on, so it would
   // otherwise get the bare tail — on the one line the lesson was building to.
-  const closing = session.actions.at(-1)
+  // The same hold the live player gives its last step, so the two agree for
+  // an authored `holdMs` as well as for a closing sentence — and so the
+  // interface capture, which waits the remainder, always adds up to exactly
+  // this.
   const effectiveTailMs = Math.max(
     spec.tailMs,
-    (closing === undefined
-      ? undefined
-      : narrationHoldFor(closing, spec.playbackSpeed)) ?? 0,
+    closingHoldMs(session.actions.at(-1), spec.playbackSpeed) ?? 0,
   )
   const durationMs = Math.max(cursor, finalActionTime) + effectiveTailMs
   if (durationMs > MAX_REPLAY_VIDEO_DURATION_MS) {
