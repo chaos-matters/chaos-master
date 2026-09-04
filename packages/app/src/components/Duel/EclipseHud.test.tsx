@@ -16,6 +16,7 @@ const verdict = (playerScore: number, rivalScore: number): DuelVerdict => ({
   playerScore,
   rivalScore,
   line: 'test',
+  components: [],
 })
 
 /**

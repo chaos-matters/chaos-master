@@ -123,9 +123,7 @@ const SETTLE_MS = 520
 const PULSE_MS = 900
 
 function prefersReducedMotion(): boolean {
-  return (
-    globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  )
+  return globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 }
 
 /**
@@ -185,7 +183,9 @@ export function EclipseHud(props: {
     if (Math.abs(moved) < 0.002 || prefersReducedMotion()) return
     setPulse(moved > 0 ? 'player' : 'rival')
     if (pulseTimer !== undefined) globalThis.clearTimeout(pulseTimer)
-    pulseTimer = globalThis.setTimeout(() => { setPulse(undefined); }, PULSE_MS)
+    pulseTimer = globalThis.setTimeout(() => {
+      setPulse(undefined)
+    }, PULSE_MS)
   })
   onCleanup(() => {
     if (pulseTimer !== undefined) globalThis.clearTimeout(pulseTimer)

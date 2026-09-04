@@ -18,7 +18,7 @@ import { createDragHandler } from '@/utils/createDragHandler'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { calculateFlameStats } from '@/webmcp/tools/scoreFlame'
 import ui from './App.module.css'
-import { duelActive, duelSidebarOpen } from './arcade/duel'
+import { duelShowing, duelSidebarOpen } from './arcade/duel'
 import { AffineEditor } from './components/AffineEditor/AffineEditor'
 import { AncestryTreeModal } from './components/AncestryTreeModal/AncestryTreeModal'
 import { PilotOverlay } from './components/Arcade/PilotOverlay'
@@ -1600,7 +1600,7 @@ export function MainWorkspace(props: AppProps) {
     // renders the player's flame itself. An export still wins: those run to
     // completion in the background whichever tab is in front.
     isAnyModalOpen() ||
-    ((duelActive() || !workspaceIsVisible()) && !onExportImage())
+    ((duelShowing() || !workspaceIsVisible()) && !onExportImage())
       ? Infinity
       : onExportImage()
         ? 0
@@ -5180,7 +5180,7 @@ export function MainWorkspace(props: AppProps) {
                 // The duel stage is a fixed overlay above the workspace; the
                 // sidebar has to climb over it to be reachable during a duel.
                 [ui.sidebarOverDuel as string]:
-                  duelActive() && duelSidebarOpen(),
+                  duelShowing() && duelSidebarOpen(),
               }}
               style={{ '--sidebar-width': `${sidebarWidth()}rem` }}
               data-tour-target="sidebar"
@@ -7858,7 +7858,7 @@ export function MainWorkspace(props: AppProps) {
 
           <PilotOverlay ctx={cmdContext} onPrepareFocus={prepareReplayFocus} />
 
-          <Show when={duelActive()}>
+          <Show when={duelShowing()}>
             <DuelStage
               ctx={cmdContext}
               playerFlame={effectiveFlame}

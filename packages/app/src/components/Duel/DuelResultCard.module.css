@@ -1,0 +1,551 @@
+/*
+  The result, over the two flames that earned it.
+
+  Width is the scarce axis on this screen, not height: the flames are side by
+  side, so a portrait card hides less artwork than a landscape one — and it
+  keeps the champion mock's 5:7 proportion for free. At 540px each flame
+  keeps 566 of its 836px half, and each flame's bright centre stays 148px
+  clear of the card's edge.
+*/
+.layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 16px;
+}
+
+/* Not a flat wash: an ellipse centred on the card, so the artwork is dimmed
+   where the card needs a ground and left alone where it does not. */
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 900px 700px at 50% 50%,
+    rgba(4, 6, 11, 0.72) 0%,
+    rgba(4, 6, 11, 0.46) 55%,
+    rgba(4, 6, 11, 0.3) 100%
+  );
+  animation: resultScrim 240ms ease-out;
+}
+
+@keyframes resultScrim {
+  from {
+    opacity: 0;
+  }
+}
+
+.card {
+  position: relative;
+  width: min(540px, 92vw);
+  max-height: min(700px, 84vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 18px 44px 22px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  /* Opaque. The card carries small type over two live flames that can go
+     white-hot, and the chips README is explicit that contrast there is not
+     negotiable. */
+  background: #05070d;
+  box-shadow:
+    0 0 64px var(--result-glow, rgba(255, 255, 255, 0.18)),
+    0 40px 120px rgba(0, 0, 0, 0.75);
+  animation: resultCard 300ms cubic-bezier(0.16, 1, 0.3, 1) 120ms backwards;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+@keyframes resultCard {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+/* The rim is the answer to "who won", legible from across the room. Three
+   pixels, not the mock's five: 1px hairlines are the house weight, so this
+   is already the loudest stroke on screen. */
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 19px;
+  border-radius: 14px;
+  border: 3px solid var(--result-rim, rgba(255, 255, 255, 0.5));
+  box-shadow:
+    0 0 18px var(--result-glow, rgba(255, 255, 255, 0.3)),
+    inset 0 0 22px var(--result-inner, rgba(255, 255, 255, 0.12));
+  pointer-events: none;
+}
+
+.wonPlayer {
+  --result-rim: #fed798;
+  --result-glow: rgba(254, 215, 152, 0.55);
+  --result-inner: rgba(254, 215, 152, 0.22);
+}
+
+.wonRival {
+  --result-rim: #95f1fd;
+  --result-glow: rgba(149, 241, 253, 0.55);
+  --result-inner: rgba(149, 241, 253, 0.22);
+}
+
+.wonDraw {
+  --result-glow: rgba(255, 255, 255, 0.35);
+  --result-inner: rgba(255, 255, 255, 0.12);
+}
+
+/* Both sides own the rim when nobody won it. */
+.wonDraw::before {
+  border-color: transparent;
+  background:
+    linear-gradient(#05070d, #05070d) padding-box,
+    linear-gradient(
+        to right,
+        #fed798 0%,
+        #fed798 48%,
+        #95f1fd 52%,
+        #95f1fd 100%
+      )
+      border-box;
+}
+
+/* A seal, as in the mock: the winner's mark and the word for who it is. */
+.badge {
+  position: absolute;
+  top: 10px;
+  left: 28px;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  width: 74px;
+  padding: 8px 0 6px;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  border: 1.5px solid var(--result-rim, rgba(255, 255, 255, 0.4));
+  background: #080b13;
+}
+
+.badgeGlyph {
+  width: 30px;
+  height: 30px;
+  color: var(--result-rim, #f4f6ff);
+}
+
+.badgeWord {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: rgba(244, 246, 255, 0.82);
+}
+
+.titleBar {
+  margin: 8px 0 0 60px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: #07090f;
+}
+
+/*
+  A gradient, not a display face. The mock sets this in blackletter, which is
+  at odds with every other word in the app; the warm-to-cool ramp carries the
+  "champion" register on its own.
+*/
+.title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: linear-gradient(
+    to bottom,
+    var(--result-title-top, #ffd9a0),
+    var(--result-title-bottom, #e88a4e)
+  );
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.wonRival .title {
+  --result-title-top: #dff6ff;
+  --result-title-bottom: #6fd6ec;
+}
+
+.wonDraw .title {
+  --result-title-top: #f4f6ff;
+  --result-title-bottom: #9aa6b8;
+}
+
+.verdict {
+  margin: 2px 0 4px;
+  text-align: center;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  color: rgba(244, 246, 255, 0.62);
+}
+
+.pills {
+  display: grid;
+  gap: 8px;
+}
+
+/*
+  Tug of war, not a bar chart. A one-sided bar cannot say who won a
+  component: both fills start at the middle and push outward, so the meeting
+  point IS the answer.
+*/
+.pill {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 13px;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  background: #050608;
+  overflow: hidden;
+}
+
+.pillFill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  /* Hard edge, no feather, as the mock draws it. */
+  pointer-events: none;
+}
+
+.pillFillPlayer {
+  right: 50%;
+  background: linear-gradient(to left, #fed798, #d0825b 55%, #8f6d7b);
+}
+
+.pillFillRival {
+  left: 50%;
+  background: linear-gradient(to right, #95f1fd, #4f8fb0 55%, #3a4a72);
+}
+
+/* The one place the mock's outline treatment earns its keep: this label sits
+   over both fills, and silver on the warm end is under 3:1 without it. */
+.pillName {
+  position: relative;
+  text-align: center;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  color: #e8ecf3;
+  text-shadow:
+    0 0 2px #04060b,
+    0 1px 3px #04060b;
+}
+
+.pillValue {
+  position: relative;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 3px #04060b;
+}
+
+.pillValuePlayer {
+  text-align: left;
+  color: #ffeccb;
+}
+
+.pillValueRival {
+  text-align: right;
+  color: #d6fbff;
+}
+
+.dialRow {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.dial {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 168px;
+  height: 168px;
+}
+
+.dialSvg {
+  width: 100%;
+  height: 100%;
+}
+
+.dialPlate {
+  fill: #0a0e14;
+}
+
+.dialBezel {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 1;
+}
+
+.dialWarm,
+.dialCool {
+  fill: none;
+  stroke-width: 8;
+  stroke-linecap: butt;
+}
+
+.dialWarm {
+  stroke: #fed798;
+  filter: drop-shadow(0 0 6px rgba(255, 138, 26, 0.55));
+}
+
+.dialCool {
+  stroke: #8bf0fb;
+  filter: drop-shadow(0 0 6px rgba(60, 190, 255, 0.55));
+}
+
+.dialReadout {
+  position: absolute;
+  display: grid;
+  justify-items: center;
+  line-height: 1.1;
+}
+
+.dialClock {
+  font-size: 34px;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  color: #f4f6ff;
+}
+
+.dialLabel {
+  font-size: 12px;
+  color: rgba(244, 246, 255, 0.45);
+}
+
+.score {
+  font-size: 30px;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+}
+
+.scorePlayer {
+  text-align: right;
+  color: #fed798;
+}
+
+.scoreRival {
+  text-align: left;
+  color: #95f1fd;
+}
+
+.captions {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+.captionPlayer {
+  color: #fed798;
+}
+
+.captionRival {
+  color: #95f1fd;
+}
+
+.chips {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.chip {
+  flex: 1;
+  padding: 9px 12px;
+  border-radius: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  background: #04060b;
+  text-align: center;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shareRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #080b13;
+}
+
+.shareUrl {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(244, 246, 255, 0.72);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+
+.shareButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  color: #f4f6ff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.shareButton:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.shareButton:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.shareButton svg {
+  width: 14px;
+  height: 14px;
+}
+
+.maths {
+  justify-self: center;
+  padding: 4px 10px;
+  border: none;
+  background: none;
+  color: rgba(244, 246, 255, 0.55);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.maths:hover {
+  color: rgba(244, 246, 255, 0.85);
+}
+
+.mathsPanel {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #04060b;
+}
+
+.mathsIntro {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: rgba(244, 246, 255, 0.6);
+}
+
+.mathsLine {
+  display: grid;
+  grid-template-columns: 84px 1fr auto;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.mathsName {
+  color: #e8ecf3;
+}
+
+.mathsDetail {
+  color: rgba(244, 246, 255, 0.5);
+  line-height: 1.35;
+}
+
+.mathsWeight {
+  font-variant-numeric: tabular-nums;
+  color: rgba(254, 215, 152, 0.85);
+  white-space: nowrap;
+}
+
+.watermark {
+  margin: 2px 0 0;
+  text-align: right;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: rgba(244, 246, 255, 0.45);
+}
+
+.close {
+  position: absolute;
+  top: 26px;
+  right: 26px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(4, 6, 11, 0.7);
+  color: rgba(244, 246, 255, 0.7);
+  cursor: pointer;
+}
+
+.close:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.close svg {
+  width: 12px;
+  height: 12px;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+}
+
+.action {
+  height: 40px;
+  padding: 0 20px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(8px);
+  color: #f4f6ff;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.action:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.42);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scrim,
+  .card {
+    animation-duration: 160ms;
+  }
+}
