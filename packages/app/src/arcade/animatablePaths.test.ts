@@ -238,6 +238,34 @@ describe('animatable catalog', () => {
     })
   })
 
+  /** The agent that met this refusal on a preset's 90-frame orbit guessed the
+   *  keyframes were malformed and spent a step clearing the timeline. All
+   *  three ways out are in the sentence now, including the one it took. */
+  it('names every way past a preset animation it would cut', () => {
+    const built = buildTimelineSnapshot(
+      {
+        durationFrames: 30,
+        mode: 'add',
+        tracks: [{ path: 't2.v2', keyframes: [{ frame: 0, value: 0.7 }] }],
+      },
+      catalog,
+      [
+        {
+          parameterPath: 'exposure',
+          keyframes: [
+            { frame: 0, value: 0.25 },
+            { frame: 90, value: 0.5 },
+          ],
+        },
+      ] satisfies TimelineTrack[],
+    )
+    expect(built.ok).toBe(false)
+    if (built.ok) return
+    expect(built.error).toContain('durationFrames 90 or more')
+    expect(built.error).toContain('mode "replace"')
+    expect(built.error).toContain('timeline.clearTracks')
+  })
+
   it('rejects unknown paths, frames past the end, wrong value types and duplicates', () => {
     const base = { durationFrames: 60 }
     expect(

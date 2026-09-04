@@ -91,7 +91,7 @@ export function TimelineSection(props: TimelineSectionProps) {
             >
               −
             </button>
-            <span class={ui.zoomLabel}>
+            <span class={ui.zoomLabel} data-testid="timeline-zoom">
               {Math.round((viewApi()?.zoomLevel() ?? 1) * 100)}%
             </span>
             <button
