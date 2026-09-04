@@ -472,8 +472,41 @@
   user-select: none;
 }
 
-.swatches[data-panning] .swatch {
+.swatches[data-panning] .swatch,
+.swatches[data-panning] .swatchMore {
   pointer-events: none;
+}
+
+/* Sized like a swatch so the row keeps one rhythm, but plainly not one: it
+   carries a count and a word, not a gradient. */
+.swatchMore {
+  flex: none;
+  align-self: stretch;
+  display: grid;
+  place-content: center;
+  gap: 1px;
+  min-width: 52px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  text-align: center;
+  cursor: pointer;
+}
+
+.swatchMore:hover {
+  border-color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.swatchMoreWord {
+  font-size: 0.62rem;
+  opacity: 0.7;
 }
 
 .swatches::-webkit-scrollbar {

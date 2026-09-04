@@ -1,9 +1,9 @@
 import { createEffect, createMemo, createSignal, onCleanup, Show, } from 'solid-js'
-import { clampDuelSeconds, duelReady, duelRemainingMs, duelRivalSeat, duelShowing, duelSidebarOpen, runningDuel, setDuelSidebarOpen, } from '@/arcade/duel'
-import { beginDuel, finishDuel } from '@/arcade/duelActions'
+import { duelReady, duelRemainingMs, duelRivalSeat, duelShowing, duelSidebarOpen, runningDuel, setDuelSidebarOpen, } from '@/arcade/duel'
+import { finishDuel } from '@/arcade/duelActions'
 import { duelHudModel } from '@/arcade/duelHud'
 import { scoreSheetJudge } from '@/arcade/duelJudge'
-import { clearDuelResult, duelResult } from '@/arcade/duelResult'
+import { duelResult } from '@/arcade/duelResult'
 import { drivingState } from '@/arcade/pilot'
 import { SidebarPanel } from '@/icons'
 import { DuelChips } from './DuelChips'
@@ -34,7 +34,15 @@ export function DuelStage(props: {
   playerFlame: Accessor<FlameDescriptor>
   playerZoom: Signal<number>
   playerPosition: Signal<v2f>
+  /**
+   * The viewer's own render settings, verbatim. A duel is two flames on one
+   * GPU, so ultra converges at about half the rate it does on the workspace —
+   * but it is the same target, deliberately: nothing here trims quality
+   * because there are two canvases.
+   */
   quality: number
+  adaptiveFilter: boolean
+  stochasticFilter: boolean
   /** The workspace sidebar's width in rem, so the stage can step aside. */
   sidebarWidthRem: Accessor<number>
 }) {
@@ -100,18 +108,6 @@ export function DuelStage(props: {
     void finishDuel(props.ctx, 'stopped').finally(() => setEnding(false))
   }
 
-  const again = () => {
-    const previous = duelResult()
-    clearDuelResult()
-    beginDuel(props.ctx, {
-      seconds: clampDuelSeconds((previous?.durationMs ?? 0) / 1000),
-      // Whatever the last one was against. A solo duel restarts solo; a real
-      // one asks the agent to come back, which it cannot do on its own, so
-      // this is the honest default.
-      opponent: 'none',
-    })
-  }
-
   // The stage outlives the clock. `stopDuel` leaves the rival's seat alive
   // precisely so the result can be read over both flames, still rendering,
   // rather than over the black rectangle an unmounted canvas leaves behind.
@@ -129,6 +125,8 @@ export function DuelStage(props: {
                 zoom={props.playerZoom}
                 position={props.playerPosition}
                 quality={props.quality}
+                adaptiveFilter={props.adaptiveFilter}
+                stochasticFilter={props.stochasticFilter}
                 interactive
               />
               <Show when={runningDuel()}>
@@ -145,6 +143,8 @@ export function DuelStage(props: {
                 zoom={[rival().zoom, rival().setZoom]}
                 position={[rival().position, rival().setPosition]}
                 quality={props.quality}
+                adaptiveFilter={props.adaptiveFilter}
+                stochasticFilter={props.stochasticFilter}
                 interactive={false}
               />
               {/* The AI's play-by-play, in the AI's half. On the seam it cut
@@ -173,7 +173,8 @@ export function DuelStage(props: {
               <DuelResultCard
                 result={result()}
                 quality={props.quality}
-                onAgain={again}
+                adaptiveFilter={props.adaptiveFilter}
+                stochasticFilter={props.stochasticFilter}
               />
             )}
           </Show>

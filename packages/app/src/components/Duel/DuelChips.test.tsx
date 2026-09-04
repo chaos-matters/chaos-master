@@ -185,6 +185,21 @@ describe('DuelChips', () => {
     expect(ctx.flameDescriptor().renderSettings.palette?.name).toBe(name)
   })
 
+  it('opens the rest of the palettes on Show more', () => {
+    mount()
+    screen.getByRole('button', { name: /Colour/ }).click()
+    const strip = screen.getByRole('group', { name: 'Palette' })
+    const before = strip.querySelectorAll('button').length
+
+    const more = screen.getByRole('button', { name: /more$/ })
+    more.click()
+
+    const after = strip.querySelectorAll('button').length
+    expect(after).toBeGreaterThan(before)
+    // And the button retires rather than paging again: this is the whole set.
+    expect(screen.queryByRole('button', { name: /more$/ })).toBeNull()
+  })
+
   it('keeps working when a randomize takes the chosen transform away', () => {
     const ctx = mount()
     screen.getByRole('button', { name: /Shape/ }).click()

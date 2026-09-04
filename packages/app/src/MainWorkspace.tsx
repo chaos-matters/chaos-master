@@ -7866,6 +7866,8 @@ export function MainWorkspace(props: AppProps) {
               playerZoom={[effectiveZoom, setFlameZoom]}
               playerPosition={[effectivePosition, setFlamePosition]}
               quality={qualityPresets[qualityPreset()]}
+              adaptiveFilter={adaptiveFilterEnabled()}
+              stochasticFilter={stochasticFilterEnabled()}
               sidebarWidthRem={sidebarWidth}
             />
           </Show>

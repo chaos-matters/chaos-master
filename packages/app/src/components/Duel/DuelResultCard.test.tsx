@@ -46,7 +46,8 @@ function mount(over: Partial<DuelResult> = {}) {
     <DuelResultCard
       result={result(over)}
       quality={0.95}
-      onAgain={() => undefined}
+      adaptiveFilter
+      stochasticFilter={false}
     />
   ))
 }
@@ -70,6 +71,17 @@ describe('DuelResultCard', () => {
     // The archetype word used to sit under it and meant nothing to anyone
     // reading the card.
     expect(screen.queryByText('Chaotic Vortex')).toBeNull()
+  })
+
+  it('paints the badge glyph last, so nothing can cover it', () => {
+    mount()
+    const badge = screen.getByRole('dialog').querySelector('svg')!
+    // Document order is paint order in SVG. The badge used to be a div whose
+    // `::after` fill painted after its children and hid the spiral on screen,
+    // while the canvas routine drew it — a divergence only the export showed.
+    const shapes = [...badge.children].map((el) => el.tagName)
+    expect(shapes).toEqual(['polygon', 'polygon', 'path'])
+    expect(badge.querySelector('path')?.getAttribute('d')).toBeTruthy()
   })
 
   it('drops the verdict sentence from the card, keeping it as the label', () => {
@@ -129,6 +141,16 @@ describe('DuelResultCard', () => {
     mount()
     expect(document.body.textContent).not.toContain('?flame=')
     expect(document.body.textContent).not.toContain('http')
+  })
+
+  it('offers only one way out: nothing here can restart a real duel', () => {
+    mount()
+    // WebMCP is a pull model, so the browser cannot make the agent take
+    // another turn. "Duel again" restarted the split screen with nobody in it.
+    expect(screen.queryByRole('button', { name: /Duel again/ })).toBeNull()
+    expect(
+      screen.getByRole('button', { name: 'Back to the editor' }),
+    ).toBeTruthy()
   })
 
   it('leaves on Escape, closing the tooltip first', () => {

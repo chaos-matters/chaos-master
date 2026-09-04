@@ -170,7 +170,11 @@ export function PilotOverlay(props: {
           </Show>
         )}
       </Show>
-      <Show when={agentDriving()}>
+      {/* Not during a duel. The ring points at the workspace sidebar, which
+          in a duel belongs to the viewer — so the agent's edits kept lighting
+          up controls on the human's half, over their own flame. What the agent
+          is doing is already listed under its seat. */}
+      <Show when={agentDriving() && !duelActive()}>
         <PilotSpotlight onPrepareFocus={props.onPrepareFocus} />
       </Show>
       <Show when={ended()}>

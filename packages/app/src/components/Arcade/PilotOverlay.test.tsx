@@ -245,6 +245,38 @@ describe('PilotOverlay live spotlight', () => {
     expect(ring()?.style.left).toBe('40px')
   })
 
+  it('draws no ring while a duel is running', async () => {
+    const { startDuel, closeDuelView } = await import('@/arcade/duel')
+    const { createTestFlame } = await import('@/webmcp/testUtils')
+    const ctx = createMockCommandContext()
+    const flame = createTestFlame()
+    startDuel({
+      rivalFlame: flame,
+      playerFlame: flame,
+      durationMs: 60_000,
+      recording: 'none',
+    })
+    startPilot({
+      mode: 'duel',
+      title: 'Duel',
+      stepBudget: 60,
+      allowed: ['flame.'],
+      qualityRankAtStart: 1,
+      seatId: 'rival',
+      lock: 'seat',
+    })
+    render(() => <PilotOverlay ctx={ctx} />)
+
+    notePilotFocus(step('param:gamma'), 'Gamma: 2.4')
+    vi.advanceTimersByTime(200)
+
+    // The ring points at the workspace sidebar, which in a duel belongs to the
+    // viewer — so the agent's edits lit up controls on the human's half, over
+    // their own flame. What it is doing is already listed under its seat.
+    expect(ring()).toBeNull()
+    closeDuelView()
+  })
+
   it('takes the ring down with the lock', () => {
     startTeach()
     render(() => <PilotOverlay ctx={createMockCommandContext()} />)
