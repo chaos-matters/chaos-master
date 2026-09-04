@@ -425,10 +425,11 @@
 .shape {
   display: grid;
   grid-template-columns: auto 1fr;
-  /* One row, definite: without it the square canvas sizes itself from its own
-     width and grows the row past the panel, which then clips the fields. */
-  grid-template-rows: minmax(0, 1fr);
-  gap: 14px;
+  /* One definite row for the canvas and fields — without it the square canvas
+     sizes itself from its own width and grows past the panel — and one for
+     the hint, which only exists in 3D. */
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 14px 14px;
   min-height: 0;
 }
 
@@ -477,36 +478,27 @@
   pointer-events: none;
 }
 
-/* Sized like a swatch so the row keeps one rhythm, but plainly not one: it
-   carries a count and a word, not a gradient. */
+/* Shaped exactly like a swatch — the same band, the same name under it — so
+   the row keeps one rhythm; dashed and unfilled so it is plainly not one. */
 .swatchMore {
-  flex: none;
-  align-self: stretch;
-  display: grid;
-  place-content: center;
-  gap: 1px;
-  min-width: 52px;
-  padding: 0 10px;
-  border-radius: 8px;
-  border: 1px dashed rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.75);
-  font-size: 0.8rem;
-  font-variant-numeric: tabular-nums;
-  line-height: 1.15;
-  text-align: center;
-  cursor: pointer;
+  width: 64px;
 }
 
-.swatchMore:hover {
-  border-color: rgba(255, 255, 255, 0.45);
+.swatchMoreBand {
+  display: grid;
+  place-items: center;
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.swatchMore:hover .swatchMoreBand {
+  border-color: rgba(255, 255, 255, 0.5);
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
-}
-
-.swatchMoreWord {
-  font-size: 0.62rem;
-  opacity: 0.7;
 }
 
 .swatches::-webkit-scrollbar {
@@ -819,6 +811,7 @@
 /* Depth is the one axis a flat gesture cannot reach, so it is worth one line
    of prose rather than a control nobody would find. */
 .shapeHint {
+  grid-column: 1 / -1;
   margin: 0;
   font-size: 0.68rem;
   text-align: center;

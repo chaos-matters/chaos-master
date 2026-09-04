@@ -1,5 +1,5 @@
 import { vec2f } from 'typegpu/data'
-import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from '@/flame/schema/flameSchema'
+import { camera3DDefault, MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from '@/flame/schema/flameSchema'
 import { registerCommand } from '../registry'
 import { num } from './describeArgs'
 
@@ -35,9 +35,22 @@ registerCommand({
   id: 'camera.center',
   describe: () => 'Centre the camera',
   label: 'Center Camera',
-  description: 'Reset camera position to (0, 0) and zoom to 1',
+  description:
+    'Reset the camera: position (0, 0) and zoom 1 in 2D, the default orbit in 3D',
   shortcut: 'Ctrl+0',
   execute(ctx) {
+    // In 3D the camera is an orbit and `position`/`zoom` are unused, so this
+    // was a no-op there — which is what a viewer who had just spun a flame
+    // around and pressed Centre saw. Same intent, the orbit's own fields.
+    if ((ctx.flameDescriptor().renderSettings.dimensions ?? 2) === 3) {
+      ctx.setFlameDescriptor((draft) => {
+        draft.renderSettings.camera3D = {
+          ...camera3DDefault,
+          target: [0, 0, 0],
+        }
+      }, 'Center Camera')
+      return
+    }
     ctx.setPosition(vec2f(0, 0))
     ctx.setZoom(1)
   },
@@ -133,7 +146,7 @@ registerCommand({
   // what the command was for. An agent reading this reached for an empty call
   // expecting auto-framing and got "expected exactly 3 arguments".
   description:
-    'Pan and zoom in one step, so the move reads as one beat. Takes exactly three arguments: [x, y, zoom] — the world position to centre on and the zoom to land at. Does not auto-frame; use camera.reset for a known starting point.',
+    'Pan and zoom in one step, so the move reads as one beat. Takes exactly three arguments: [x, y, zoom] — the world position to centre on and the zoom to land at. Does not auto-frame; use camera.center for a known starting point.',
   execute(ctx, x?: unknown, y?: unknown, zoom?: unknown) {
     const current = ctx.position()
     ctx.setPosition(

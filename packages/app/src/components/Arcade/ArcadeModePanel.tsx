@@ -2,6 +2,7 @@ import { createSignal, For, Match, onMount, Show, Switch } from 'solid-js'
 import { clampDuelSeconds, DEFAULT_DUEL_SECONDS, MAX_DUEL_SECONDS, MIN_DUEL_SECONDS, } from '@/arcade/duel'
 import { beginDuel } from '@/arcade/duelActions'
 import { CINEMA_PRESETS, cinemaPromptCard, duelPromptCard, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, } from '@/arcade/topics'
+import { variationTypesFor } from '@/flame/variationRegistry'
 import { Copy, Cross, Swords } from '@/icons'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
 import ui from './ArcadeHub.module.css'
@@ -227,25 +228,25 @@ export function ArcadeModePanel(props: {
               <option value="random-3d">A random 3D flame</option>
             </select>
           </label>
-          <p class={ui.dimensionRow}>
-            <span
-              class={ui.dimensionPill}
-              classList={{ [ui.dimension3D!]: duelDimensions() === 3 }}
+          {/* What the duel would run on, as pills: the dimension, the camera
+              it brings, and the catalogue counted from the registry itself. */}
+          <ul class={ui.setupPills} aria-label="Duel setup">
+            <li
+              class={`${ui.setupPill} ${ui.setupDims}`}
+              classList={{ [ui.setupPill3D!]: duelDimensions() === 3 }}
             >
               {duelDimensions() === 3 ? '3D' : '2D'}
-            </span>
-            <Show
-              when={duelDimensions() === 3}
-              fallback={
-                <span>Pan and zoom, and the full 403-variation set.</span>
-              }
-            >
-              <span>
-                Orbit camera per side, and the 43 variations that work in three
-                dimensions.
-              </span>
-            </Show>
-          </p>
+            </li>
+            <li class={ui.setupPill}>
+              {duelDimensions() === 3
+                ? 'Orbit camera per side'
+                : 'Pan and zoom'}
+            </li>
+            <li class={ui.setupPill}>
+              {variationTypesFor(duelDimensions() === 3 ? 3 : 2).length}{' '}
+              variations
+            </li>
+          </ul>
           <label class={ui.field}>
             <span>Clock, in seconds</span>
             <input
