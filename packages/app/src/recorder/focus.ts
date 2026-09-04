@@ -37,10 +37,10 @@ import type { FlameCommand } from '@/commands/types'
  * selectors is what lets every caller stay dimension-blind — ViewControls
  * mounts the 2D group or the 3D one and never both, so at most one can match.
  */
-const CAMERA_3D_COUNTERPART: Record<string, string | undefined> = {
-  'camera.zoom': 'camera3D.radius',
-  'camera.position': 'camera3D',
-}
+const CAMERA_3D_COUNTERPART = new Map([
+  ['camera.zoom', 'camera3D.radius'],
+  ['camera.position', 'camera3D'],
+])
 
 function paramSelectors(value: string): string[] {
   const quoted = cssQuote(value)
@@ -66,7 +66,10 @@ export function focusSelectors(hint: string): string[] {
   const quoted = cssQuote(value)
   switch (kind) {
     case 'param': {
-      const counterpart = CAMERA_3D_COUNTERPART[value]
+      // A Map, not an object literal: hints come out of session files, and
+      // `param:constructor` against a literal answers with a function, which
+      // `cssQuote` would then throw on rather than resolve to no element.
+      const counterpart = CAMERA_3D_COUNTERPART.get(value)
       return counterpart === undefined
         ? paramSelectors(value)
         : [...paramSelectors(value), ...paramSelectors(counterpart)]

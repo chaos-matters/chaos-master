@@ -1,5 +1,5 @@
 import { vec2f } from 'typegpu/data'
-import { camera3DDefault, MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from '@/flame/schema/flameSchema'
+import { camera3DDefault, MAX_CAMERA_ZOOM_VALUE, MAX_ORBIT_RADIUS, MIN_CAMERA_ZOOM_VALUE, MIN_ORBIT_RADIUS, } from '@/flame/schema/flameSchema'
 import { executeCommand, registerCommand } from '../registry'
 import { num } from './describeArgs'
 import type { CommandContext } from '../types'
@@ -21,11 +21,6 @@ import type { Camera3DObj } from '@/flame/schema/flameSchema'
  *  malformed session file cannot send the viewport to infinity. */
 const MAX_CAMERA_OFFSET = 10_000
 
-/** The range the orbit's own R control offers. The schema leaves radius
- *  unbounded, and a radius of zero puts the eye inside the flame. */
-const MIN_CAMERA_RADIUS = 0.1
-const MAX_CAMERA_RADIUS = 100
-
 function clampZoom(value: number): number {
   return Math.min(MAX_CAMERA_ZOOM_VALUE, Math.max(MIN_CAMERA_ZOOM_VALUE, value))
 }
@@ -38,8 +33,10 @@ function finite(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
 }
 
+/** The same range the wheel clamps to, so a command and a scroll cannot
+ *  disagree about how close the orbit may sit. */
 function clampRadius(value: number): number {
-  return Math.min(MAX_CAMERA_RADIUS, Math.max(MIN_CAMERA_RADIUS, value))
+  return Math.min(MAX_ORBIT_RADIUS, Math.max(MIN_ORBIT_RADIUS, value))
 }
 
 /**
@@ -74,6 +71,11 @@ function zoomForRadius(radius: number): number {
 
 /** The orbit as the commands need it, with anything malformed replaced.
  *
+ *  The radius is read as it is stored, NOT clamped: clamping the reading and
+ *  then dividing it inverts a relative zoom — from a radius below the floor,
+ *  "twice as close" would compute from the floor and move the camera away.
+ *  Only what is written back is clamped.
+ *
  *  Defensively, because a descriptor can say `dimensions: 3` and carry no
  *  orbit at all: `flame.setRenderSetting dimensions 3` writes the number
  *  straight into the store, and the schema only fills the default in on a
@@ -87,7 +89,7 @@ function orbitOf(ctx: CommandContext): {
   const camera = stored ?? camera3DDefault
   const [x, y, z] = camera.target
   return {
-    radius: clampRadius(finite(camera.radius, camera3DDefault.radius)),
+    radius: finite(camera.radius, camera3DDefault.radius),
     target: [finite(x, 0), finite(y, 0), finite(z, 0)],
   }
 }

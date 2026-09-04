@@ -283,7 +283,7 @@ export function duelPromptCard(
   // all, so those are named as the render-setting paths they are.
   const camera3D =
     dimensions === 3
-      ? ' In 3D the camera is an orbit around a point, and every camera.* command drives it: zoom is how close the orbit sits, pan moves the point it looks at, camera.center puts both back. To swing around the flame, and for the lens, read renderSettings.camera3D from get_flame and set camera3D.theta, camera3D.phi, camera3D.fov or camera3D.roll with execute_command flame.setRenderSetting.'
+      ? ' In 3D the camera is an orbit around a point, and every camera.* command drives it: zoom is how close the orbit sits, pan moves the point it looks at in x and y, and camera.center resets the whole orbit including the angle you are viewing from. For the angle itself, the depth of that point, and the lens, read renderSettings.camera3D from get_flame and set camera3D.theta, camera3D.phi, camera3D.target, camera3D.fov or camera3D.roll with execute_command flame.setRenderSetting.'
       : ''
   return `Duel me in Lumen Apeiron. Call arcade_start_duel to begin: we each get ${clock} and our own flame, side by side, and I am editing mine while you edit yours.${START_FROM_PHRASE[startFrom]} Read your flame with get_flame and change it with execute_command — only flame.* and camera.* are allowed, and you have ${DUEL_STEP_BUDGET} steps.${camera3D} Say what you are going for with arcade_narrate as you work. Aim for something striking rather than merely complicated. You cannot end the duel — the clock does, and I can call it early — so when you are happy call arcade_duel_ready with a short title and keep polishing until time runs out.
 

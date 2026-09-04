@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { focusHintFor, focusSelectors, resolveFocusElement } from './focus'
 
 /**
@@ -7,6 +7,10 @@ import { focusHintFor, focusSelectors, resolveFocusElement } from './focus'
  * is loaded, so it offers both. Only one is ever mounted.
  */
 describe('camera focus across dimensions', () => {
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
   it('offers the orbit control after the 2D one, never instead of it', () => {
     const zoom = focusSelectors(focusHintFor('camera.zoomBy', [2])!)
     expect(zoom[0]).toBe('[data-parameter-path="camera.zoom"]')
@@ -33,8 +37,19 @@ describe('camera focus across dimensions', () => {
     // The 2D controls are unmounted in 3D, so the first four selectors miss
     // and the step lands on the orbit's own field instead of nothing.
     expect(resolveFocusElement('param:camera.zoom')).toBe(radius)
+  })
 
-    document.body.innerHTML = ''
+  it('answers nothing for a hint that names an inherited property', () => {
+    // Hints come out of session files. Looked up in an object literal,
+    // `constructor` answers with a function and the selector builder throws
+    // inside a replay's animation frame instead of resolving to no element.
+    expect(() => focusSelectors('param:constructor')).not.toThrow()
+    expect(focusSelectors('param:constructor')).toEqual(
+      focusSelectors('param:gamma').map((selector) =>
+        selector.replace(/gamma/g, 'constructor'),
+      ),
+    )
+    expect(resolveFocusElement('param:__proto__')).toBeNull()
   })
 
   it('leaves every other parameter with the selectors it always had', () => {

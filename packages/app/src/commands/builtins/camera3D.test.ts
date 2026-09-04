@@ -1,8 +1,8 @@
 import '@/commands/builtins'
 import { describe, expect, it, vi } from 'vitest'
-import { camera3DDefault } from '@/flame/schema/flameSchema'
+import { camera3DDefault, MAX_ORBIT_RADIUS, MIN_ORBIT_RADIUS, } from '@/flame/schema/flameSchema'
 import { createMockCommandContext } from '@/webmcp/testUtils'
-import { executeCommand } from '../registry'
+import { executeCommand, executeReplayCommand } from '../registry'
 import type { CommandContext } from '../types'
 
 /** A 3D flame with an orbit that is nowhere near its default. */
@@ -62,14 +62,37 @@ describe('the framing commands in three dimensions', () => {
     expect(orbit(ctx).radius).toBeCloseTo(4, 6)
   })
 
-  it('keeps the orbit at a distance the R control could reach', () => {
+  it('keeps the orbit inside the range the wheel itself allows', () => {
     const ctx = orbiting()
 
     executeCommand('camera.zoomTo', ctx, 1e9)
-    expect(orbit(ctx).radius).toBe(0.1)
+    expect(orbit(ctx).radius).toBe(MIN_ORBIT_RADIUS)
 
     executeCommand('camera.zoomTo', ctx, 0.000_001)
-    expect(orbit(ctx).radius).toBe(100)
+    expect(orbit(ctx).radius).toBe(MAX_ORBIT_RADIUS)
+  })
+
+  it('never backs away from a zoom-in, however close the orbit already is', () => {
+    // Reading the radius through the clamp and then dividing inverts the
+    // move: from the floor, "twice as close" computed from 0.1 and pushed
+    // the camera out to 0.05. The wheel can leave the orbit right here.
+    const ctx = orbiting()
+    executeCommand('flame.setRenderSetting', ctx, 'camera3D', {
+      radius: MIN_ORBIT_RADIUS,
+    })
+
+    executeCommand('camera.zoomBy', ctx, 2)
+
+    expect(orbit(ctx).radius).toBe(MIN_ORBIT_RADIUS)
+  })
+
+  it('zooms in from a radius the R control cannot type', () => {
+    const ctx = orbiting()
+    executeCommand('flame.setRenderSetting', ctx, 'camera3D', { radius: 0.04 })
+
+    executeCommand('camera.zoomBy', ctx, 2)
+
+    expect(orbit(ctx).radius).toBeCloseTo(0.02, 6)
   })
 
   it('pans the point the orbit looks at, leaving its depth alone', () => {
@@ -112,8 +135,12 @@ describe('the framing commands in three dimensions', () => {
     }
   })
 
-  it('leaves the orbit alone on a 2D flame', () => {
+  it('leaves the orbit alone on a 2D flame that has one', () => {
+    // A parsed flame always carries a camera3D, whatever its dimensions.
     const ctx = createMockCommandContext()
+    ctx.setFlameDescriptor((draft) => {
+      draft.renderSettings.camera3D = { ...camera3DDefault, radius: 8 }
+    }, 'test')
     const before = ctx.flameDescriptor().renderSettings.camera3D
 
     executeCommand('camera.zoomTo', ctx, 3)
@@ -138,6 +165,23 @@ describe('the framing commands in three dimensions', () => {
 
     expect(orbit(ctx).radius).toBeCloseTo(camera3DDefault.radius / 2, 6)
     expect(ctx.setZoom).not.toHaveBeenCalled()
+  })
+
+  it('replays as itself, without the nested write becoming a step', () => {
+    // The 3D branches dispatch flame.setRenderSetting; a replayed camera step
+    // must still land the same orbit and be accepted by the replay guard.
+    const ctx = orbiting()
+
+    expect(executeReplayCommand('camera.zoomTo', ctx, 2)).toBe(true)
+    expect(orbit(ctx).radius).toBeCloseTo(camera3DDefault.radius / 2, 6)
+
+    expect(executeReplayCommand('camera.panTo', ctx, 1, 2)).toBe(true)
+    expect(orbit(ctx).target).toEqual([1, 2, 3])
+
+    // The same malformed calls the 2D suite rejects are still rejected.
+    expect(executeReplayCommand('camera.panTo', ctx, 'left', 2)).toBe(false)
+    expect(executeReplayCommand('camera.panTo', ctx, 1)).toBe(false)
+    expect(orbit(ctx).target).toEqual([1, 2, 3])
   })
 
   it('still resets position and zoom for a 2D flame', () => {
