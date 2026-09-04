@@ -71,12 +71,12 @@ export function PilotSpotlight(props: {
   }
 
   const measure = (hint: string) => {
+    // A control that is not there YET is the normal case, not a dead end: a
+    // card that has to expand first mounts its contents a frame or two after
+    // the preparation asks it to. Keep looking for the whole tracking window
+    // rather than giving up on the first miss and showing no ring at all.
     const element = resolveFocusElement(hint)
-    if (element === null) {
-      setRect(undefined)
-      return
-    }
-    const next = rectOf(element)
+    const next = element === null ? undefined : rectOf(element)
     setRect((previous) => (same(previous, next) ? previous : next))
     if (globalThis.performance.now() < trackUntil) {
       frame = requestAnimationFrame(() => {

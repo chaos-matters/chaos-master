@@ -189,6 +189,22 @@ describe('PilotSpotlight', () => {
     expect(ring()).toBeNull()
   })
 
+  it('waits for a control that has not mounted yet', () => {
+    render(() => <PilotSpotlight />)
+
+    notePilotFocus(step('param:gamma'), 'Gamma: 2.4')
+    settle(200)
+    // The card is still opening: nothing to point at on the first look.
+    expect(ring()).toBeNull()
+
+    control('gamma', { x: 40, y: 60 })
+    settle(100)
+
+    // Giving up on the first miss would mean no ring at all for every control
+    // that mounts with its card, which is most of the sidebar.
+    expect(ring()?.style.left).toBe('40px')
+  })
+
   it('says nothing rather than framing a control that is not on screen', () => {
     render(() => <PilotSpotlight />)
 
