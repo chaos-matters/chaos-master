@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { clearWebMcpContext, getWebMcpTarget, setWebMcpContext, setWebMcpTarget, } from '@/webmcp/contextBridge'
 import { createMockCommandContext, createTestFlame } from '@/webmcp/testUtils'
-import { duelActive, runningDuel, stopDuel } from './duel'
+import { duelActive, duelRivalSeat, runningDuel, stopDuel } from './duel'
 import { beginDuel, finishDuel } from './duelActions'
 import { agentDriving, resetPilot } from './pilot'
 
@@ -79,18 +79,18 @@ describe('a duel with no agent in it', () => {
     expect(runningDuel()?.rival.flame().transforms).toEqual({})
   })
 
-  it('refuses the same things the agent duel refuses', () => {
+  it('opens on a 3D flame too', () => {
     const ctx = createMockCommandContext()
     const flame = createTestFlame()
     flame.renderSettings.dimensions = 3
     ctx.flameDescriptor = () => flame
     setWebMcpContext(ctx)
 
-    expect(
-      (beginDuel(ctx, { seconds: 90, opponent: 'none' }) as { error: string })
-        .error,
-    ).toMatch(/3D/)
-    expect(duelActive()).toBe(false)
+    expect(beginDuel(ctx, { seconds: 90, opponent: 'none' })).toMatchObject({
+      ok: true,
+    })
+    expect(duelActive()).toBe(true)
+    expect(duelRivalSeat()?.flame().renderSettings.dimensions).toBe(3)
   })
 
   it('refuses a second duel on top of a running one', () => {

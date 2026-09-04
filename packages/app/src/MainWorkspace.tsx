@@ -7865,6 +7865,14 @@ export function MainWorkspace(props: AppProps) {
               playerFlame={effectiveFlame}
               playerZoom={[effectiveZoom, setFlameZoom]}
               playerPosition={[effectivePosition, setFlamePosition]}
+              playerCamera3D={{
+                theta: [effectiveTheta, setFlameTheta],
+                phi: [effectivePhi, setFlamePhi],
+                radius: [effectiveRadius, setFlameRadius],
+                target: [effectiveTarget3D, setFlameTarget3D],
+                fov: [effectiveFov, setFlameFov],
+                roll: [effectiveRoll, setFlameRoll],
+              }}
               quality={qualityPresets[qualityPreset()]}
               adaptiveFilter={adaptiveFilterEnabled()}
               stochasticFilter={stochasticFilterEnabled()}

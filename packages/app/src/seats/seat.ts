@@ -3,15 +3,16 @@ import { createStore } from 'solid-js/store'
 import { vec2f } from 'typegpu/data'
 import { clamp } from 'typegpu/std'
 import { executeCommand } from '@/commands/registry'
-import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from '@/flame/schema/flameSchema'
+import { camera3DDefault, MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, } from '@/flame/schema/flameSchema'
 import { recorderStream } from '@/recorder/recorder'
 import { deepClone } from '@/utils/clone'
 import { createStoreHistory } from '@/utils/createStoreHistory'
 import { createTimelineState } from '@/utils/timeline'
 import { clearWebMcpContext } from '@/webmcp/contextBridge'
 import { DEFAULT_SEAT } from './seatId'
-import type { Accessor, Setter } from 'solid-js'
+import type { Accessor, Setter, Signal } from 'solid-js'
 import type { v2f } from 'typegpu/data'
+import type { Vec3 } from 'wgpu-matrix'
 import type { SeatId } from './seatId'
 import type { CommandContext } from '@/commands/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
@@ -44,7 +45,24 @@ export interface Seat {
   setZoom: Setter<number>
   position: Accessor<v2f>
   setPosition: Setter<v2f>
+  /**
+   * The 3D camera, in the shape `WheelZoomCamera3D` binds.
+   *
+   * Always present, whatever the flame's dimension: the seat reads and writes
+   * `renderSettings.camera3D`, which the schema fills with `camera3DDefault`
+   * for every flame. A 2D seat simply never mounts the camera that uses it.
+   */
+  camera3D: Seat3DCamera
   dispose(): void
+}
+
+export type Seat3DCamera = {
+  theta: Signal<number>
+  phi: Signal<number>
+  radius: Signal<number>
+  target: Signal<Vec3>
+  fov: Signal<number>
+  roll: Signal<number>
 }
 
 export function createSeat(id: SeatId, initial: FlameDescriptor): Seat {
@@ -70,6 +88,7 @@ export function createSeat(id: SeatId, initial: FlameDescriptor): Seat {
 
     const zoom = () => flame.renderSettings.camera.zoom
     const position = () => vec2f(...flame.renderSettings.camera.position)
+    const camera3D = () => flame.renderSettings.camera3D ?? camera3DDefault
 
     const ctx: CommandContext = createSeatCommandContext({
       id,
@@ -102,6 +121,46 @@ export function createSeat(id: SeatId, initial: FlameDescriptor): Seat {
       return vec2f(...flame.renderSettings.camera.position)
     }) as Setter<v2f>
 
+    /*
+     * The 3D six, derived and dispatched exactly as the 2D pair above: read
+     * through the store so a seat's camera IS its flame's camera, write
+     * through `flame.setRenderSetting` so the move is recorded and replays.
+     * The workspace builds its own five the same way (`makeCamera3DSetter`);
+     * `target` is a vec3 and stays bespoke, as it does there.
+     */
+    const scalar3D = (
+      field: 'theta' | 'phi' | 'radius' | 'fov' | 'roll',
+    ): Signal<number> => [
+      () => camera3D()[field],
+      (value: number | ((previous: number) => number)) => {
+        const current = camera3D()[field]
+        const next = typeof value === 'function' ? value(current) : value
+        executeCommand('flame.setRenderSetting', ctx, `camera3D.${field}`, next)
+        return camera3D()[field]
+      },
+    ]
+    const target3D: Signal<Vec3> = [
+      () => new Float32Array(camera3D().target),
+      (value: Vec3 | ((previous: Vec3) => Vec3)) => {
+        const current = new Float32Array(camera3D().target) as Vec3
+        const next = typeof value === 'function' ? value(current) : value
+        executeCommand('flame.setRenderSetting', ctx, 'camera3D.target', [
+          next[0],
+          next[1],
+          next[2],
+        ])
+        return new Float32Array(camera3D().target) as Vec3
+      },
+    ]
+    const seatCamera3D: Seat3DCamera = {
+      theta: scalar3D('theta'),
+      phi: scalar3D('phi'),
+      radius: scalar3D('radius'),
+      target: target3D,
+      fov: scalar3D('fov'),
+      roll: scalar3D('roll'),
+    }
+
     ctx.zoom = zoom
     ctx.setZoom = setZoom
     ctx.position = position
@@ -118,6 +177,7 @@ export function createSeat(id: SeatId, initial: FlameDescriptor): Seat {
       setZoom,
       position,
       setPosition,
+      camera3D: seatCamera3D,
       dispose: () => {
         stream.cancel()
         // The bridge is a module-level map: a context left behind here points

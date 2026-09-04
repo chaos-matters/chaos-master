@@ -17,6 +17,7 @@ import type { Accessor, Signal } from 'solid-js'
 import type { v2f } from 'typegpu/data'
 import type { CommandContext } from '@/commands/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { Seat3DCamera } from '@/seats/seat'
 
 /**
  * The split screen.
@@ -34,6 +35,8 @@ export function DuelStage(props: {
   playerFlame: Accessor<FlameDescriptor>
   playerZoom: Signal<number>
   playerPosition: Signal<v2f>
+  /** The workspace's own 3D camera, bound when the duel is on a 3D flame. */
+  playerCamera3D: Seat3DCamera
   /**
    * The viewer's own render settings, verbatim. A duel is two flames on one
    * GPU, so ultra converges at about half the rate it does on the workspace —
@@ -124,6 +127,7 @@ export function DuelStage(props: {
                 flame={props.playerFlame}
                 zoom={props.playerZoom}
                 position={props.playerPosition}
+                camera3D={props.playerCamera3D}
                 quality={props.quality}
                 adaptiveFilter={props.adaptiveFilter}
                 stochasticFilter={props.stochasticFilter}
@@ -142,6 +146,7 @@ export function DuelStage(props: {
                 flame={rival().flame}
                 zoom={[rival().zoom, rival().setZoom]}
                 position={[rival().position, rival().setPosition]}
+                camera3D={rival().camera3D}
                 quality={props.quality}
                 adaptiveFilter={props.adaptiveFilter}
                 stochasticFilter={props.stochasticFilter}
