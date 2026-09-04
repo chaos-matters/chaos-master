@@ -101,6 +101,11 @@ No tool writes `ctx.setFlameDescriptor` or `ctx.timeline.setTracks` directly.
   (`Duel: <title> — your flame` / `— the AI's flame`) and shows the verdict. 2D
   and still flames for now.
 
+  **The result card is a PNG.** Both flames keep rendering behind it, and its
+  Download button hands over the card itself with the winning flame written
+  into a `FlameJson` chunk — drop that file back on the app and it loads the
+  winner, exactly as a PNG exported from the editor does.
+
   **Running one without an agent.** The Duel panel in the hub carries a "Start
   without the AI" button under `pnpm dev` (and behind `VITE_SOLO_DUEL=1` for a
   preview build). It opens the same split screen with nobody in the other seat:

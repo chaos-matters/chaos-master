@@ -14,6 +14,16 @@ function mount() {
 const firstTransform = (flame: FlameDescriptor) =>
   Object.values(flame.transforms)[0]!
 
+/**
+ * jsdom has no `PointerEvent`, and the pan handler only takes over mouse
+ * pointers — touch already flicks the strip natively.
+ */
+function mousePointer(type: string, clientX: number): MouseEvent {
+  const event = new MouseEvent(type, { bubbles: true, button: 0, clientX })
+  Object.defineProperty(event, 'pointerType', { value: 'mouse' })
+  return event
+}
+
 describe('DuelChips', () => {
   afterEach(cleanup)
 
@@ -138,6 +148,41 @@ describe('DuelChips', () => {
       firstTransform(ctx.flameDescriptor()).variations,
     ).map((v) => v.weight)
     expect(weights).toContain(1.5)
+  })
+
+  it('pans the palette strip on a mouse drag without picking a palette', () => {
+    const ctx = mount()
+    screen.getByRole('button', { name: /Colour/ }).click()
+    const strip = screen.getByRole('group', { name: 'Palette' })
+    // jsdom has no layout, so `scrollLeft` reads a permanent 0 unless the
+    // element is given somewhere to put it.
+    Object.defineProperty(strip, 'scrollLeft', { value: 0, writable: true })
+    const swatch = strip.querySelector('button')!
+    const before = ctx.flameDescriptor().renderSettings.palette?.id
+
+    swatch.dispatchEvent(mousePointer('pointerdown', 100))
+    document.dispatchEvent(mousePointer('pointermove', 40))
+    document.dispatchEvent(mousePointer('pointerup', 40))
+    swatch.click()
+
+    expect(strip.scrollLeft).toBe(60)
+    // The click that ends a pan is the pan's own click, not a choice.
+    expect(ctx.flameDescriptor().renderSettings.palette?.id).toBe(before)
+  })
+
+  it('still applies a palette on a plain click', () => {
+    const ctx = mount()
+    screen.getByRole('button', { name: /Colour/ }).click()
+    const strip = screen.getByRole('group', { name: 'Palette' })
+    const swatch = strip.querySelectorAll('button')[2]!
+
+    const name = swatch.textContent
+
+    swatch.dispatchEvent(mousePointer('pointerdown', 100))
+    document.dispatchEvent(mousePointer('pointerup', 100))
+    swatch.click()
+
+    expect(ctx.flameDescriptor().renderSettings.palette?.name).toBe(name)
   })
 
   it('keeps working when a randomize takes the chosen transform away', () => {

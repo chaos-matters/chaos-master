@@ -181,8 +181,10 @@ export async function finishDuel(
   showDuelResult({
     verdict,
     reason,
-    playerTitle: playerFlame.metadata?.name?.trim() || 'Your flame',
-    rivalTitle: title,
+    // The card names the winner and only falls back to who they are. The
+    // take names above are a filename convention and stay as they are.
+    playerName: playerFlame.metadata?.name?.trim() || 'You',
+    rivalName: state.ready?.title?.trim() || 'The AI',
     winnerFlame,
     archetype: calculateFlameStats(winnerFlame).type,
     durationMs: state.durationMs,

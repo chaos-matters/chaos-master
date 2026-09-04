@@ -462,6 +462,18 @@
   scroll-padding-right: 20px;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+  cursor: grab;
+}
+
+/* Mid-pan: the swatches stop reacting to the pointer sweeping over them, so
+   the row moves as one surface rather than lighting up under the cursor. */
+.swatches[data-panning] {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.swatches[data-panning] .swatch {
+  pointer-events: none;
 }
 
 .swatches::-webkit-scrollbar {

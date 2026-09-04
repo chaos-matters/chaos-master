@@ -4,8 +4,23 @@
 @import './designSystem/colors.css';
 @import './designSystem/dark-mode.css';
 
+/* The duel's trophy title. Self-hosted rather than a second Google import:
+   the result card is also drawn into a PNG with canvas `fillText`, and a face
+   that arrives late (or not at all, offline) silently substitutes the default
+   serif into the exported image. Only weight 700, Latin subset — the one cut
+   the card uses. SIL OFL 1.1; licence in ../assets/fonts/OFL.txt. */
+@font-face {
+  font-family: 'Cinzel Decorative';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../assets/fonts/cinzel-decorative-700-latin.woff2') format('woff2');
+}
+
 :root {
   interpolate-size: allow-keywords;
+
+  --font-display: 'Cinzel Decorative', 'Times New Roman', serif;
 
   /* Keyboard-focus ring color: the app's indigo accent (light theme) replaces
      the old violet default so the ring matches the rest of the UI. The dark

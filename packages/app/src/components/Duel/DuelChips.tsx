@@ -11,6 +11,7 @@ import { variationTypesFor } from '@/flame/variationRegistry'
 import { filterVariations } from '@/flame/variations/search'
 import { getVariationPreviewFlame } from '@/flame/variations/utils'
 import { Check, ColourWedge, Cross, Minus, Plus, ShapeTriangle, Undo, VariationSpiral, } from '@/icons'
+import { createDragHandler } from '@/utils/createDragHandler'
 import { createSharedIntersectionObserver } from '@/utils/useIntersectionObserver'
 import { AffineGrid, resetAffine } from './AffineGrid'
 import ui from './DuelChips.module.css'
@@ -705,9 +706,48 @@ function ColourPanel(props: {
       : paletteToGradientCSS(live)
   }
 
+  /**
+   * The strip pans with a mouse drag, as well as scrolling.
+   *
+   * Fifty-three palettes do not fit, and a horizontal scrollbar under a row
+   * of buttons is a target you have to aim at. Touch already flicks natively,
+   * so only mouse pointers are taken over.
+   */
+  const [dragged, setDragged] = createSignal(false)
+  const startPan = createDragHandler(
+    (down) => {
+      if (down.pointerType !== 'mouse') return undefined
+      const el = down.currentTarget as HTMLElement
+      const startX = down.clientX
+      const startLeft = el.scrollLeft
+      el.dataset.panning = ''
+      return {
+        onPointerMove(move) {
+          el.scrollLeft = startLeft - (move.clientX - startX)
+          setDragged(true)
+        },
+        onDone() {
+          delete el.dataset.panning
+          // The click that ends a pan must not pick a palette. Clearing on the
+          // next task leaves the flag readable by the swatch's own onClick,
+          // which fires first.
+          window.setTimeout(() => setDragged(false), 0)
+        },
+      }
+    },
+    // A shaky hand is still a click; `preventDefault: false` so the swatches
+    // keep taking focus.
+    { deadZoneRadius: 6, preventDefault: false },
+  )
+
   return (
     <div class={ui.colour}>
-      <div class={ui.swatches} role="group" aria-label="Palette">
+      <div
+        class={ui.swatches}
+        role="group"
+        aria-label="Palette"
+        onPointerDown={startPan}
+      >
         <For each={swatches()}>
           {(palette) => (
             <button
@@ -716,6 +756,7 @@ function ColourPanel(props: {
               classList={{ [ui.swatchOn!]: palette.id === selectedId() }}
               aria-pressed={palette.id === selectedId()}
               onClick={() => {
+                if (dragged()) return
                 props.onPalette(palette)
               }}
             >

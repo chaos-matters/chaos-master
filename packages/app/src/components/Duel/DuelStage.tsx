@@ -169,7 +169,13 @@ export function DuelStage(props: {
             </button>
           </Show>
           <Show when={duelResult()}>
-            {(result) => <DuelResultCard result={result()} onAgain={again} />}
+            {(result) => (
+              <DuelResultCard
+                result={result()}
+                quality={props.quality}
+                onAgain={again}
+              />
+            )}
           </Show>
           <Show when={runningDuel()}>
             <div class={ui.hudSlot}>
