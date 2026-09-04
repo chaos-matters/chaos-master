@@ -180,6 +180,68 @@ describe('bounded flame entity commands', () => {
     ).toHaveLength(MAX_VARIATIONS_PER_TRANSFORM)
   })
 
+  /**
+   * The agent's report, in a test.
+   *
+   * `{ type: "sphericalVar" }` reached execute, failed flame validation there,
+   * warned to the console and returned — so `execute_command` answered
+   * `success: true` for a variation that never changed, and the run worked
+   * around it with an add and a delete it did not have the steps for.
+   */
+  it('refuses a variation descriptor that is missing its weight', () => {
+    const world = makeContext(deepClone(examples.initExample))
+    const transformId = Object.keys(world.flame().transforms)[0]! as TransformId
+    const variationId = Object.keys(
+      world.flame().transforms[transformId]!.variations,
+    )[0]! as VariationId
+    const setVariation = command('flame.setVariation')
+
+    const refusal = setVariation.validateReplayArgs?.([
+      transformId,
+      variationId,
+      { type: 'sphericalVar' },
+    ])
+    expect(refusal).toContain('incomplete')
+    expect(refusal).toContain('weight')
+    // The whole descriptor still goes through, so the UI paths are untouched.
+    expect(
+      setVariation.validateReplayArgs?.([
+        transformId,
+        variationId,
+        { type: 'sphericalVar', weight: 1 },
+      ]),
+    ).toBeUndefined()
+  })
+
+  /** `__nope__: 1` sat inside a saved pdj variation because nothing checked
+   *  the name against the variation that owns the params. */
+  it('never writes a parameter the variation does not have', () => {
+    const world = makeContext(deepClone(examples.initExample))
+    const transformId = Object.keys(world.flame().transforms)[0]! as TransformId
+    const variationId = Object.keys(
+      world.flame().transforms[transformId]!.variations,
+    )[0]! as VariationId
+    command('flame.setVariation').execute(world.ctx, transformId, variationId, {
+      type: 'pdjVar',
+      weight: 1,
+      params: { a: 1, b: 2, c: 3, d: 4 },
+    })
+    const setParams = command('flame.setVariationParams')
+
+    setParams.execute(world.ctx, transformId, variationId, '__nope__', 1)
+    const params = world.flame().transforms[transformId]!.variations[
+      variationId
+    ]! as unknown as { params: Record<string, number> }
+    expect(Object.hasOwn(params.params, '__nope__')).toBe(false)
+    expect(Object.keys(params.params).sort()).toEqual(['a', 'b', 'c', 'd'])
+
+    setParams.execute(world.ctx, transformId, variationId, 'a', -2.4)
+    const after = world.flame().transforms[transformId]!.variations[
+      variationId
+    ]! as unknown as { params: Record<string, number> }
+    expect(after.params.a).toBe(-2.4)
+  })
+
   it('validates whole-variation replacements before they reach state', () => {
     const world = makeContext(deepClone(examples.initExample))
     const transformId = Object.keys(world.flame().transforms)[0]! as TransformId

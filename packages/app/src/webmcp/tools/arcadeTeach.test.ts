@@ -5,7 +5,7 @@ import { LESSON_TOPICS, TOPIC_IDS } from '@/arcade/topics'
 import { cancelSessionRecording } from '@/recorder/recorder'
 import { clearWebMcpContext, setWebMcpContext } from '@/webmcp/contextBridge'
 import { wrapTool } from '@/webmcp/registerWebMcp'
-import { createMockCommandContext } from '@/webmcp/testUtils'
+import { createMockCommandContext, createTestFlame, } from '@/webmcp/testUtils'
 import { arcadeEndLesson, arcadeNarrate, arcadeStartLesson, arcadeStatus, } from './arcadeTeach'
 import { executeCommandTool } from './executeCommand'
 import { setFlame } from './setFlame'
@@ -167,5 +167,47 @@ describe('Teach tools', () => {
       isError?: boolean
     }
     expect(result.isError).toBe(true)
+  })
+})
+
+/**
+ * The brief used to carry a short sample list, which read as the whole
+ * registry: one run treated it as a starting point and probed for more names
+ * with add-then-delete pairs, spending 26 of its 45 steps before teaching
+ * anything. What replaced it has to name the convention of the registry the
+ * flame actually renders in — the two do not share one.
+ */
+describe('the variations brief points at the registry it renders in', () => {
+  afterEach(() => {
+    resetPilot()
+    cancelSessionRecording()
+    clearWebMcpContext()
+  })
+
+  const briefFor = async (dimensions: 2 | 3) => {
+    const ctx = createMockCommandContext()
+    const flame = createTestFlame()
+    flame.renderSettings.dimensions = dimensions
+    ctx.flameDescriptor = () => flame
+    setWebMcpContext(ctx)
+    return (await arcadeStartLesson.execute({ topic: 'variations' }, {})) as {
+      tips: string[]
+      stepBudget: number
+    }
+  }
+
+  it('names a 2D example and the tool that lists the rest', async () => {
+    const brief = await briefFor(2)
+    const tip = brief.tips.join(' ')
+    expect(tip).toContain('sphericalVar')
+    expect(tip).toContain('list_variations')
+    expect(tip).toContain('add-then-delete')
+  })
+
+  it('names a 3D example on a 3D flame', async () => {
+    const brief = await briefFor(3)
+    const tip = brief.tips.join(' ')
+    expect(tip).toContain('spherical3D')
+    expect(tip).not.toContain('sphericalVar')
   })
 })

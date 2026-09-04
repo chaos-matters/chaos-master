@@ -208,6 +208,79 @@ test.describe('Lumen Arcade', () => {
     await expect(zoom).toHaveText(fitted ?? '')
   })
 
+  /**
+   * The registry, without probing it.
+   *
+   * A lesson spent 26 of its 45 steps adding and deleting transforms to find
+   * out which names exist, because nothing listed them and `linear` is
+   * rejected in favour of `linearVar`. This asserts the listing is there, is
+   * free, and answers with names the same session can hand to addTransform.
+   */
+  test('list_variations answers without costing the lesson a step', async ({
+    page,
+  }) => {
+    await openEditor(page)
+    const brief = await callTool(page, 'arcade_start_lesson', {
+      topic: 'variations',
+    })
+    expect(brief).toMatchObject({ ok: true, stepBudget: 45 })
+    expect(JSON.stringify(brief.tips)).toContain('list_variations')
+
+    const listing = (await callTool(page, 'list_variations', {
+      starters: true,
+    })) as { variations: (string | { name: string })[]; total: number }
+    const names = listing.variations.map((entry) =>
+      typeof entry === 'string' ? entry : entry.name,
+    )
+    expect(names).toContain('sphericalVar')
+    // `total` counts what the filter matched, so the whole registry needs its
+    // own call — which is the paging contract the tool advertises.
+    expect(listing.total).toBe(names.length)
+    const whole = (await callTool(page, 'list_variations', {})) as {
+      total: number
+      truncated?: boolean
+    }
+    expect(whole.total).toBeGreaterThan(300)
+    expect(whole.truncated).toBe(true)
+
+    // A name straight from the listing, and the step count is untouched by
+    // the listing call itself: this is the first step of the lesson.
+    expect(
+      await callTool(page, 'execute_command', {
+        commandId: 'flame.addTransform',
+        args: ['sphericalVar', 'tListed', 'vListed'],
+      }),
+    ).toMatchObject({ success: true, steps: 1 })
+
+    // The junk key that outlived a session: pdj has a, b, c and d, and
+    // nothing else reaches the descriptor.
+    await callTool(page, 'execute_command', {
+      commandId: 'flame.addTransform',
+      args: ['pdjVar', 'tPdj', 'vPdj'],
+    })
+    await callTool(page, 'execute_command', {
+      commandId: 'flame.setVariationParams',
+      args: ['tPdj', 'vPdj', '__nope__', 1],
+    })
+    const flame = (await callTool(page, 'get_flame_detail', {
+      section: 'transform',
+      transformId: 'tPdj',
+    })) as {
+      transform?: { variations?: Record<string, { params?: object }> }
+    }
+    const params = flame.transform?.variations?.vPdj?.params ?? {}
+    expect(Object.keys(params).sort()).toEqual(['a', 'b', 'c', 'd'])
+
+    // And a half-written descriptor is refused rather than reported as done.
+    const refused = await callTool(page, 'execute_command', {
+      commandId: 'flame.setVariation',
+      args: ['tListed', 'vListed', { type: 'swirlVar' }],
+    })
+    expect(String(refused.error)).toContain('incomplete')
+
+    await callTool(page, 'arcade_end_lesson', { title: 'Listing check' })
+  })
+
   test('Cinema: paths, keyframes, end', async ({ page }) => {
     await openEditor(page)
     expect(await callTool(page, 'arcade_start_cinema', {})).toMatchObject({

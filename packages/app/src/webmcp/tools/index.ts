@@ -19,6 +19,7 @@ import { getFlame } from './getFlame'
 import { getFlameDetail } from './getFlameDetail'
 import { getUndoState } from './getUndoState'
 import { listCommands } from './listCommands'
+import { listVariations } from './listVariations'
 import { mutateFlame } from './mutateFlame'
 import { openArena } from './openArena'
 import { openArtDirector } from './openArtDirector'
@@ -38,6 +39,7 @@ export {
   getFlameDetail,
   getUndoState,
   listCommands,
+  listVariations,
   diffFlamesTool,
   createShareLink,
   setFlame,
@@ -75,6 +77,7 @@ export const allTools: readonly WebMcpTool[] = [
   getFlame,
   getFlameDetail,
   listCommands,
+  listVariations,
   getUndoState,
   arcadeStatus,
   arcadeGetAnimatablePaths,

@@ -4,10 +4,12 @@ import { newDefaultTransform } from '@/flame/newTransform'
 import { isFlameGraphWithinLimits, isSafeFlameEntityId, tryValidateFlame, } from '@/flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from '@/flame/transformFunction'
 import { defaultLinearType, isVariationTypeFor, } from '@/flame/variationRegistry'
+import { TransformVariationDescriptor } from '@/flame/variations'
 import { getVariationDefault } from '@/flame/variations/utils'
 import { tryValidateTransformColorSnapshot } from '@/recorder/schema'
 import { snapshotOriginForCommand, snapshotOriginLabel, tryValidateSnapshotOrigin, } from '@/recorder/snapshotOrigin'
 import { deepClone } from '@/utils/clone'
+import * as v from '@/valibot'
 import { registerCommand } from '../registry'
 import { num, str } from './describeArgs'
 import type { CommandContext } from '../types'
@@ -934,7 +936,19 @@ registerCommand({
       const vKey = resolveVariationKey(transform.variations, variationRef)
       const variation = vKey ? transform.variations[vKey] : undefined
       if (variation && 'params' in variation) {
-        ;(variation.params as Record<string, number>)[name] = value
+        const params = variation.params as Record<string, number>
+        // Only a name this variation actually has. Every parametric variation
+        // arrives with its full set of defaults, so a real name is always
+        // present — and an unknown one used to be written straight in, which is
+        // how `__nope__: 1` ended up saved inside a pdj variation, inert but
+        // carried by the descriptor and every export of it from then on.
+        if (!Object.hasOwn(params, name)) {
+          console.warn(
+            `[cmd] flame.setVariationParams: "${name}" is not a parameter of ${String((variation as { type?: unknown }).type)} (has ${Object.keys(params).join(', ')})`,
+          )
+          return
+        }
+        params[name] = value
       }
     })
   },
@@ -1005,8 +1019,17 @@ registerCommand({
     }
     if (!isSafeFlameEntityId(args[0])) return 'transform id is unsafe'
     if (!isSafeFlameEntityId(args[1])) return 'variation id is unsafe'
-    if (!isKnownVariationType(variationDescriptorType(args[2]))) {
+    const descriptorType = variationDescriptorType(args[2])
+    if (!isKnownVariationType(descriptorType)) {
       return 'variation descriptor type is not registered'
+    }
+    // A WHOLE descriptor, not just a registered type. `{ type: "sphericalVar" }`
+    // used to pass here and then fail validation inside execute, which warns to
+    // the console and returns — so the caller was told the step succeeded while
+    // the variation never changed. An agent watched exactly that happen and
+    // spent two more steps working around it with add + delete.
+    if (!v.safeParse(TransformVariationDescriptor, args[2]).success) {
+      return `variation descriptor for "${descriptorType}" is incomplete: send the whole descriptor, including weight (and params for a parametric variation). Read the current one with get_flame_detail.`
     }
     if (
       args.length === 4 &&
