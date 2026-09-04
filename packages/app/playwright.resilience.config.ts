@@ -45,6 +45,8 @@ export default defineConfig({
             '--enable-unsafe-webgpu',
             '--enable-features=Vulkan',
             '--ignore-gpu-blocklist',
+            // Hidden agent workspace: the headed window never covers the user's screen.
+            '--class=agent-browser',
           ],
         },
       },

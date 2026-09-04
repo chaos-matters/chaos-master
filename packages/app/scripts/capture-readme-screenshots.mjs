@@ -739,6 +739,8 @@ try {
       '--enable-unsafe-webgpu',
       '--enable-features=Vulkan',
       '--ignore-gpu-blocklist',
+      // Same reason as capture-gallery-posters: a hidden workspace for agent windows.
+      '--class=agent-browser',
     ],
   })
 

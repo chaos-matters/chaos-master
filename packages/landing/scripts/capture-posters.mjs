@@ -64,7 +64,13 @@ mkdirSync(resolve(OUT_DIR, 'earth-variants'), { recursive: true })
 
 const browser = await chromium.launch({
   headless: false,
-  args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan'],
+  // --class: the window manager files agent-owned windows by this class on a
+  // hidden workspace, so the capture window never covers the user's screen.
+  args: [
+    '--enable-unsafe-webgpu',
+    '--enable-features=Vulkan',
+    '--class=agent-browser',
+  ],
 })
 // ignoreHTTPSErrors: the dev server runs over HTTPS (basic-ssl) with a
 // self-signed cert; without this Playwright refuses to load the capture page.

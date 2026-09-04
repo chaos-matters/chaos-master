@@ -3,27 +3,37 @@
 What's new in Lumen Apeiron. Concise highlights for each release; the full
 developer history lives in `dev.changelog.md`.
 
-## [Unreleased]
+## [0.9.9] - 2026-09-04
 
 ### Added
 
+- **Lumen Arcade.** Open `/arcade` and hand the editor to an AI agent that
+  speaks WebMCP (Chrome 149+ with the WebMCP flag, or an agent extension such
+  as Claude in Chrome). The app exposes 33 tools, and the hub gives you a
+  prompt card to paste for each mode. **Teach** runs a lesson on the flame you
+  have open, seven topics from variations to sonification, narrated step by
+  step. **Cinema** turns a sentence into motion: the agent authors keyframes
+  for the flame and plays them back, with three presets to start from.
+  **Duel** splits the screen: you and the agent edit the same flame against
+  a clock, in 2D or 3D, and the winner's flame becomes a shareable card that
+  loads straight back into the app. While the agent drives, the workspace is
+  locked behind a Stop button, a ring follows every edit, and the steps list
+  as they happen. Every session is recorded, so you can replay it, save it,
+  or export it as a video. Beats, Arena and Director are on the hub as
+  previews.
+- **Step recorder.** Record what you do as named steps, then replay it with a
+  camera that lands on each control as it changes. Give steps captions and
+  hold times, keep a library of recordings, download any of them as
+  `.steps.json`, or export the replay as a video of up to five minutes.
+  Exported PNGs carry their steps, so dropping one back in brings the
+  recording with it.
 - **Fractal Classics.** Open eight exact affine constructions—including the
   Sierpiński triangle and carpet, Koch curve, Barnsley fern, Heighway dragon,
   Cantor dust, Sierpiński tetrahedron, and Menger sponge—as editable 2D or 3D
   flames from the Gallery.
-
-### Changed
-
-- **Home has a keyboard exit.** Press Escape anywhere in the Home gallery to
-  return to the editor; an open dialog still closes first.
-- **Gallery previews stay lightweight while scrolling.** Tiles wait for the
-  gallery itself to settle, keep a static snapshot, and release their live GPU
-  canvas; animated tiles only return to a live render while hovered.
-
-## [0.9.9] - 2026-08-02
-
-### Added
-
+- **Community showcase.** Sharing to Discord gains an opt-in, off by default,
+  to let Lumen Apeiron feature your flame on Home. Submissions are reviewed
+  before they appear.
 - **Benchmark Studio.** Open the Lab from the bottom toolbar or visit
   `/benchmarks` to compare the real WebGPU flame pipeline with repeatable,
   paired A/B runs. Choose example, recent, uploaded, or freshly generated
@@ -40,8 +50,8 @@ developer history lives in `dev.changelog.md`.
   welcome screen, and reload straight back into it — Home has its own address.
   The Explore cards demonstrate what they describe rather than sitting still:
   the randomizer rolls a flame and steers it, and breeding crosses two flames
-  and plays through their children, one for each crossover mode.
-
+  and plays through their children, one for each crossover mode. Escape
+  returns you to the editor, and tiles stay lightweight while you scroll.
 - **Audio presets that do something.** The wiring presets now drive the
   settings that visibly change the picture, and three of them are built from
   the flame you have loaded — re-weighting its own transforms, variation
@@ -50,8 +60,25 @@ developer history lives in `dev.changelog.md`.
 - **Ancestry as a family tree.** A Pedigree view puts a flame's parents above
   it and its children below, alongside the existing generations view.
 
+### Changed
+
+- **A new mark.** The infinity ribbon gives way to the "Deep C": a heavy arc
+  gathering out of scattered ember marks, drawn to stay legible at favicon
+  size.
+- **Load Flame drop zone.** It now shows when a drag will be accepted, no
+  longer flickers as the pointer moves, lists its formats as pills, and tells
+  you when a drop arrived with nothing in it instead of failing silently.
+
 ### Fixed
 
+- **Audio modulation can no longer corrupt a flame.** Values are held to what
+  the flame accepts; a wide mapping used to leave a flame that would collapse
+  mid-track and then refuse to breed or export.
+- **Importing `.flame` files.** The `sinusoidal` variation was imported as the
+  complex sine and rendered a different shape. Re-import affected files.
+- **Load Flame with a full Recent list** no longer stalls each time it opens,
+  and saving or deleting a recent flame no longer silently drops entries the
+  app could not read.
 - **The microphone works on the site.** Live mic input for audio-reactive
   flames and sonification was blocked outright on lumenapeiron.com — the
   browser never even asked for permission. It worked locally, which is why it
