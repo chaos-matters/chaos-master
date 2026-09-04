@@ -19,8 +19,10 @@ export type DuelResult = {
   verdict: DuelVerdict
   /** Ends the same way the pilot does, so the card can name the reason. */
   reason: PilotEndReason
-  playerTitle: string
-  rivalTitle: string
+  /** The card's title when the player wins: their flame's name, or `You`. */
+  playerName: string
+  /** The same for the rival: the name the agent declared, or `The AI`. */
+  rivalName: string
   /** The winning flame, kept whole so the share link can encode it. */
   winnerFlame: FlameDescriptor
   /** `calculateFlameStats().type` for the winner: the badge's archetype word. */
@@ -31,6 +33,15 @@ export type DuelResult = {
   id: string
   /** How many takes reached the library; 0 for a solo duel. */
   savedTakes: number
+  /**
+   * The exported card, once it has been rendered.
+   *
+   * Cached here rather than in the component so a remount does not re-run a
+   * multi-second GPU still. Download and Share both want the same bytes.
+   */
+  card?: Blob
+  /** The share link, once the Worker has answered (or refused). */
+  shareUrl?: string
 }
 
 const [duelResult, setDuelResult] = createSignal<DuelResult | undefined>()
@@ -39,6 +50,23 @@ export { duelResult }
 
 export function showDuelResult(result: DuelResult): void {
   setDuelResult(result)
+}
+
+/**
+ * Attach the rendered card, if the same duel is still on screen.
+ *
+ * The id guard matters: rendering the still takes seconds, and a viewer who
+ * closes the card and starts another duel in that window must not have the
+ * old PNG land on the new result.
+ */
+export function setDuelCard(id: string, card: Blob): void {
+  setDuelResult((prev) => (prev && prev.id === id ? { ...prev, card } : prev))
+}
+
+export function setDuelShareUrl(id: string, shareUrl: string): void {
+  setDuelResult((prev) =>
+    prev && prev.id === id ? { ...prev, shareUrl } : prev,
+  )
 }
 
 /**

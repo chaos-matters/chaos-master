@@ -1,69 +1,117 @@
-import { createSignal, For, Show } from 'solid-js'
-import { clearDuelResult } from '@/arcade/duelResult'
-import { Check, Copy, Cross, VariationSpiral } from '@/icons'
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, } from 'solid-js'
+import { clearDuelResult, setDuelCard, setDuelShareUrl, } from '@/arcade/duelResult'
+import { Check, Cross, Download, Info, Share, VariationSpiral } from '@/icons'
+import { downloadBlob } from '@/utils/blob'
+import { addFlameDataToPng } from '@/utils/flameInPng'
+import { compressJsonQueryParam } from '@/utils/jsonQueryParam'
 import { createShareLink } from '@/utils/shareLink'
+import { CARD, CARD_FONTS, CARD_SCALE, CARD_STILL_DEADLINE_MS, cardQuality, drawDuelCard, format, HALF_TRACK, STILL, toCardModel, } from './duelCard'
 import ui from './DuelResultCard.module.css'
+import { FlameStill } from './FlameStill'
+import type { CardRow } from './duelCard'
 import type { DuelResult } from '@/arcade/duelResult'
 
-/** Long enough to read "Copied", short enough not to look stuck. */
+/** Long enough to notice the tick, short enough not to look stuck. */
 const COPIED_MS = 1600
 
-function clock(ms: number): string {
-  const total = Math.round(ms / 1000)
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
-}
-
 /**
- * The verdict, over the two flames that earned it.
+ * The winning flame, in a frame, with the numbers that won it.
  *
- * The split screen stays up behind this. Freezing or unmounting the canvases
+ * The card is also the export: `drawDuelCard` paints exactly this layout into
+ * a canvas at 2x and the flame rides along in a zTXt chunk, so dropping the
+ * downloaded PNG back on the app loads the winner. Both readings come from
+ * the one `CARD` table in `duelCard.ts` — the DOM boxes below are absolutely
+ * positioned from it rather than flowed, because a card that only roughly
+ * matches its own PNG is the bug this arrangement exists to prevent.
+ *
+ * The split screen stays up behind it. Freezing or unmounting the canvases
  * makes the ending read as a crash, and watching the render evolve is the
- * whole appeal of the mode — so both keep rendering and the card is backed by
- * a scrim instead.
- *
- * The champion-card mock is a single-flame trading card; three of its regions
- * do not survive contact with a two-sided result. Its art window is redundant
- * when both flames are live behind the card, so the frozen dial takes that
- * slot; its HP plaque is replaced by the ring and the two numerals; and its
- * one-sided stat bars become tug-of-war bars, because a one-sided bar cannot
- * say who won a component.
+ * whole appeal of the mode.
  */
 export function DuelResultCard(props: {
   result: DuelResult
+  /** The viewer's own render quality; the still is clamped from it. */
+  quality: number
   onAgain: () => void
 }) {
-  const [link, setLink] = createSignal<string>()
+  const [stillUrl, setStillUrl] = createSignal<string>()
+  const [bitmap, setBitmap] = createSignal<ImageBitmap>()
   const [copied, setCopied] = createSignal(false)
-  const [working, setWorking] = createSignal(false)
-  const [showMaths, setShowMaths] = createSignal(false)
+  const [sharing, setSharing] = createSignal(false)
+  const [openInfo, setOpenInfo] = createSignal(false)
 
+  const model = createMemo(() => toCardModel(props.result))
   const verdict = () => props.result.verdict
-  const won = () => verdict().winner
-  const total = () => verdict().playerScore + verdict().rivalScore
-  const playerShare = () =>
-    total() === 0 ? 0.5 : verdict().playerScore / total()
+  const rim = () => model().winner
 
-  const winnerName = () =>
-    won() === 'rival' ? props.result.rivalTitle : props.result.playerTitle
+  const takeStill = (blob: Blob) => {
+    setStillUrl((old) => {
+      if (old) URL.revokeObjectURL(old)
+      return URL.createObjectURL(blob)
+    })
+    void globalThis.createImageBitmap(blob).then(setBitmap)
+  }
+  onCleanup(() => {
+    const url = stillUrl()
+    if (url) URL.revokeObjectURL(url)
+    bitmap()?.close()
+  })
+
+  // Composite as soon as the still lands rather than on the first click: the
+  // download is then instant, and the share sheet has a file to offer.
+  createEffect(() => {
+    const still = bitmap()
+    if (!still || props.result.card) return
+    const id = props.result.id
+    void composeCard(model(), still, props.result).then((card) => {
+      setDuelCard(id, card)
+    })
+  })
+
+  const download = () => {
+    const card = props.result.card
+    if (!card) return
+    downloadBlob(card, `duel-${props.result.id}.png`)
+  }
 
   const share = async () => {
-    if (working()) return
-    setWorking(true)
+    if (sharing()) return
+    setSharing(true)
     try {
-      const existing = link()
       const url =
-        existing ??
+        props.result.shareUrl ??
         (await createShareLink({ flame: props.result.winnerFlame })).primaryUrl
-      setLink(url)
-      await window.navigator.clipboard.writeText(url)
+      setDuelShareUrl(props.result.id, url)
+      const card = props.result.card
+      const file = card
+        ? new File([card], `duel-${props.result.id}.png`, {
+            type: 'image/png',
+          })
+        : undefined
+      if (file && window.navigator.canShare?.({ files: [file] })) {
+        await window.navigator.share({
+          files: [file],
+          title: 'Lumen Apeiron duel',
+          text: verdict().line,
+          url,
+        })
+        return
+      }
+      try {
+        await window.navigator.clipboard.writeText(url)
+      } catch {
+        // No clipboard permission. `prompt` is the one dialog that hands over
+        // a selectable string without putting a 10,000-character URL through
+        // the card's layout.
+        window.prompt('Copy this link', url)
+        return
+      }
       setCopied(true)
       window.setTimeout(() => setCopied(false), COPIED_MS)
     } catch {
-      // No clipboard permission, or the worker is unreachable and encoding
-      // failed. The URL, if we got one, is on screen to copy by hand.
       setCopied(false)
     } finally {
-      setWorking(false)
+      setSharing(false)
     }
   }
 
@@ -73,9 +121,9 @@ export function DuelResultCard(props: {
       <section
         class={ui.card}
         classList={{
-          [ui.wonPlayer!]: won() === 'player',
-          [ui.wonRival!]: won() === 'rival',
-          [ui.wonDraw!]: won() === 'draw',
+          [ui.wonPlayer!]: rim() === 'player',
+          [ui.wonRival!]: rim() === 'rival',
+          [ui.wonDraw!]: rim() === 'draw',
         }}
         role="dialog"
         aria-modal="true"
@@ -83,146 +131,32 @@ export function DuelResultCard(props: {
       >
         <div class={ui.badge}>
           <VariationSpiral class={ui.badgeGlyph} aria-hidden="true" />
-          <span class={ui.badgeWord}>
-            {won() === 'draw' ? 'Draw' : won() === 'player' ? 'You' : 'AI'}
+          <span
+            class={ui.badgeWord}
+            classList={{ [ui.badgeWordLong!]: model().badgeWord.includes(' ') }}
+          >
+            {model().badgeWord}
           </span>
         </div>
 
         <header class={ui.titleBar}>
-          <h2 class={ui.title}>
-            {won() === 'draw'
-              ? `${props.result.playerTitle} · ${props.result.rivalTitle}`
-              : winnerName()}
-          </h2>
+          <h2 class={ui.title}>{model().title}</h2>
         </header>
 
         <p class={ui.verdict}>{verdict().line}</p>
 
-        <div class={ui.pills}>
-          <For each={verdict().components}>
-            {(component) => {
-              const sum = () => component.player + component.rival
-              const left = () =>
-                sum() === 0 ? 50 : (component.player / sum()) * 100
-              return (
-                <div class={ui.pill}>
-                  <span
-                    class={`${ui.pillFill} ${ui.pillFillPlayer}`}
-                    style={{ width: `${left() / 2}%` }}
-                    aria-hidden="true"
-                  />
-                  <span
-                    class={`${ui.pillFill} ${ui.pillFillRival}`}
-                    style={{ width: `${(100 - left()) / 2}%` }}
-                    aria-hidden="true"
-                  />
-                  <span class={`${ui.pillValue} ${ui.pillValuePlayer}`}>
-                    {component.player.toFixed(1)}
-                  </span>
-                  <span class={ui.pillName}>{component.label}</span>
-                  <span class={`${ui.pillValue} ${ui.pillValueRival}`}>
-                    {component.rival.toFixed(1)}
-                  </span>
-                </div>
-              )
-            }}
-          </For>
-        </div>
-
-        <div class={ui.dialRow}>
-          <span class={`${ui.score} ${ui.scorePlayer}`}>
-            {verdict().playerScore}
-          </span>
-          <div class={ui.dial}>
-            <svg viewBox="0 0 200 200" class={ui.dialSvg} aria-hidden="true">
-              <circle cx="100" cy="100" r="88" class={ui.dialPlate} />
-              <circle cx="100" cy="100" r="82" class={ui.dialBezel} />
-              {/* One closed loop split where the lead sits: the same idea the
-                  live HUD draws, frozen at the final score. */}
-              <circle
-                cx="100"
-                cy="100"
-                r="82"
-                class={ui.dialWarm}
-                stroke-dasharray={`${playerShare() * 515} 515`}
-                transform="rotate(-90 100 100)"
-              />
-              <circle
-                cx="100"
-                cy="100"
-                r="82"
-                class={ui.dialCool}
-                stroke-dasharray={`${(1 - playerShare()) * 515} 515`}
-                transform={`rotate(${-90 + playerShare() * 360} 100 100)`}
-              />
-            </svg>
-            <div class={ui.dialReadout}>
-              <span class={ui.dialClock}>{clock(props.result.durationMs)}</span>
-              <span class={ui.dialLabel}>duel length</span>
-            </div>
-          </div>
-          <span class={`${ui.score} ${ui.scoreRival}`}>
-            {verdict().rivalScore}
-          </span>
-        </div>
-
-        <div class={ui.captions}>
-          <span class={ui.captionPlayer}>Your flame</span>
-          <span class={ui.captionRival}>The AI's flame</span>
-        </div>
-
-        <div class={ui.chips}>
-          <span class={ui.chip}>{props.result.archetype}</span>
-          <span class={ui.chip}>
-            {props.result.reason === 'finished' ? 'Time up' : 'Ended early'}
-          </span>
-          <span class={ui.chip}>Duel {props.result.id}</span>
-        </div>
-
-        <div class={ui.shareRow}>
-          <span class={ui.shareUrl}>{link() ?? 'Share the winning flame'}</span>
-          <button
-            type="button"
-            class={ui.shareButton}
-            onClick={() => void share()}
-            disabled={working()}
+        <div class={ui.window}>
+          <Show
+            when={stillUrl()}
+            fallback={<span class={ui.spinner} aria-hidden="true" />}
           >
-            <Show when={copied()} fallback={<Copy aria-hidden="true" />}>
-              <Check aria-hidden="true" />
-            </Show>
-            {copied() ? 'Copied' : working() ? 'Linking…' : 'Copy link'}
-          </button>
+            {(url) => <img class={ui.still} src={url()} alt="" />}
+          </Show>
         </div>
 
-        <button
-          type="button"
-          class={ui.maths}
-          aria-expanded={showMaths()}
-          onClick={() => setShowMaths((open) => !open)}
-        >
-          {showMaths() ? 'Hide the maths' : 'How was this scored?'}
-        </button>
-        <Show when={showMaths()}>
-          <div class={ui.mathsPanel}>
-            <p class={ui.mathsIntro}>
-              Four measurements, each on a curve that never caps, weighted and
-              summed. More always counts for something, so a flame can keep
-              gaining until the buzzer.
-            </p>
-            <For each={verdict().components}>
-              {(component) => (
-                <p class={ui.mathsLine}>
-                  <span class={ui.mathsName}>{component.label}</span>
-                  <span class={ui.mathsDetail}>{component.detail}</span>
-                  <span class={ui.mathsWeight}>
-                    {component.player.toFixed(1)} × {component.weight} ={' '}
-                    {Math.round(component.player * component.weight)}
-                  </span>
-                </p>
-              )}
-            </For>
-          </div>
-        </Show>
+        <div class={ui.rows}>
+          <For each={model().rows}>{(row) => <StatRow row={row} />}</For>
+        </div>
 
         <p class={ui.watermark}>Lumen Apeiron</p>
 
@@ -236,14 +170,154 @@ export function DuelResultCard(props: {
         </button>
       </section>
 
-      <div class={ui.actions}>
-        <button type="button" class={ui.action} onClick={props.onAgain}>
-          Duel again
-        </button>
-        <button type="button" class={ui.action} onClick={clearDuelResult}>
-          Back to the editor
-        </button>
+      <div class={ui.below}>
+        <div class={ui.icons}>
+          <button
+            type="button"
+            class={ui.icon}
+            aria-label="Download the card"
+            aria-disabled={!props.result.card}
+            onClick={download}
+          >
+            <Download aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            class={ui.icon}
+            aria-label="Share the winning flame"
+            onClick={() => void share()}
+          >
+            <Show when={copied()} fallback={<Share aria-hidden="true" />}>
+              <Check aria-hidden="true" />
+            </Show>
+          </button>
+          <div class={ui.infoWrap}>
+            <button
+              type="button"
+              class={ui.icon}
+              aria-label="How was this scored?"
+              aria-expanded={openInfo()}
+              onClick={() => setOpenInfo((open) => !open)}
+            >
+              <Info aria-hidden="true" />
+            </button>
+            <div class={ui.infoTooltip} role="tooltip">
+              <p class={ui.infoIntro}>
+                Four measurements, each on a curve that never caps, weighted and
+                summed. Chaos and symmetry weigh most.
+              </p>
+              <For each={verdict().components}>
+                {(component) => {
+                  const value = () =>
+                    rim() === 'rival' ? component.rival : component.player
+                  return (
+                    <p class={ui.infoLine}>
+                      <span>{component.label}</span>
+                      <span class={ui.infoSum}>
+                        {value().toFixed(1)} × {component.weight} ={' '}
+                        {Math.round(value() * component.weight)}
+                      </span>
+                    </p>
+                  )
+                }}
+              </For>
+              <p class={`${ui.infoLine} ${ui.infoTotal}`}>
+                <span>Score</span>
+                <span class={ui.infoSum}>
+                  {rim() === 'rival'
+                    ? verdict().rivalScore
+                    : verdict().playerScore}
+                </span>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class={ui.actions}>
+          <button type="button" class={ui.action} onClick={props.onAgain}>
+            Duel again
+          </button>
+          <button type="button" class={ui.action} onClick={clearDuelResult}>
+            Back to the editor
+          </button>
+        </div>
       </div>
+
+      {/* Parked out of layout, like the export host's own render: the canvas
+          still runs at its full backing store, it is simply never seen. */}
+      <Show when={!stillUrl()}>
+        <div class={ui.offscreen} aria-hidden="true">
+          <FlameStill
+            flame={props.result.winnerFlame}
+            width={STILL.width}
+            height={STILL.height}
+            quality={cardQuality(props.quality)}
+            deadlineMs={CARD_STILL_DEADLINE_MS}
+            onStill={takeStill}
+          />
+        </div>
+      </Show>
     </div>
   )
+}
+
+function StatRow(props: { row: CardRow }) {
+  const width = (fill: number) =>
+    `${Math.max(0, Math.min(1, fill)) * HALF_TRACK}px`
+  return (
+    <div
+      class={ui.row}
+      classList={{ [ui.rowHeadline!]: props.row.headline }}
+      style={{ height: `${CARD.rows.height}px` }}
+    >
+      <span
+        class={`${ui.fill} ${ui.fillPlayer}`}
+        style={{ width: width(props.row.playerFill) }}
+        aria-hidden="true"
+      />
+      <span
+        class={`${ui.fill} ${ui.fillRival}`}
+        style={{ width: width(props.row.rivalFill) }}
+        aria-hidden="true"
+      />
+      <span class={ui.seam} aria-hidden="true" />
+      <span class={`${ui.value} ${ui.valuePlayer}`}>
+        {format(props.row.player, props.row.headline)}
+      </span>
+      <span class={ui.rowLabel}>{props.row.label}</span>
+      <span class={`${ui.value} ${ui.valueRival}`}>
+        {format(props.row.rival, props.row.headline)}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * The card as a shareable PNG, with the winning flame inside it twice: once
+ * as the picture, once as the `FlameJson` chunk the drop path already reads.
+ */
+async function composeCard(
+  model: ReturnType<typeof toCardModel>,
+  still: ImageBitmap,
+  result: DuelResult,
+): Promise<Blob> {
+  // Canvas silently falls back to the default serif for a face it does not
+  // have yet, and a card that went out in Times New Roman would never be
+  // noticed until someone opened it.
+  await Promise.all(CARD_FONTS.map((font) => document.fonts.load(font)))
+  const canvas = document.createElement('canvas')
+  canvas.width = CARD.width * CARD_SCALE
+  canvas.height = CARD.height * CARD_SCALE
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('no 2d context for the duel card')
+  drawDuelCard(ctx, model, still, CARD_SCALE, {
+    width: still.width,
+    height: still.height,
+  })
+  const png = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, 'image/png', 1)
+  })
+  if (!png) throw new Error('could not encode the duel card')
+  const encoded = await compressJsonQueryParam(result.winnerFlame)
+  return addFlameDataToPng(encoded, new Uint8Array(await png.arrayBuffer()))
 }
