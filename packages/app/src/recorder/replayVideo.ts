@@ -36,7 +36,19 @@ export const REPLAY_VIDEO_DIMENSIONS = {
 } as const
 export const REPLAY_VIDEO_LEAD_IN_MS = 650
 export const REPLAY_VIDEO_TAIL_MS = 1400
-export const MAX_REPLAY_VIDEO_DURATION_MS = 120_000
+/**
+ * How long a replay video may be.
+ *
+ * The limit is memory, not taste: the muxer writes into an `ArrayBufferTarget`,
+ * so the whole MP4 is held in RAM until the download starts. At 1920x1080 the
+ * encoder sits on its 8 Mbps floor, which is 1 MB per second of video — five
+ * minutes is ~300 MB resident, and more than that during the buffer's growth.
+ *
+ * Two minutes was too tight in practice. A narrated Teach lesson holds each
+ * sentence long enough to read, so a twenty-two step lesson already ran 92s,
+ * and any lesson worth watching was one sentence away from being unexportable.
+ */
+export const MAX_REPLAY_VIDEO_DURATION_MS = 300_000
 
 // Custom variation definitions are global, executable WGSL today; they are not
 // part of the portable recorder schema. Publishing a take that references one

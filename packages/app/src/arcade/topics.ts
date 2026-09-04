@@ -14,6 +14,15 @@ export interface LessonTopic {
   goal: string
   /** Exact ids or prefixes ending in "." (see guard.isCommandAllowed). */
   allowed: readonly string[]
+  /**
+   * How many steps the agent gets, narration included.
+   *
+   * It is capped by the replay VIDEO, not by patience: a narrated step is
+   * held long enough to read, so about four seconds of finished video per step
+   * is the real exchange rate, and MAX_REPLAY_VIDEO_DURATION_MS is what a
+   * budget ultimately spends. `stepBudgetFitsVideo.test.ts` holds the two
+   * numbers together so raising one cannot silently make lessons unexportable.
+   */
   stepBudget: number
   defaultStartFrom: 'blank' | 'current'
 }
@@ -44,7 +53,7 @@ export const LESSON_TOPICS: Record<TopicId, LessonTopic> = {
       'camera.center',
       'camera.zoomTo',
     ],
-    stepBudget: 30,
+    stepBudget: 45,
     defaultStartFrom: 'blank',
   },
   affine: {
@@ -62,7 +71,7 @@ export const LESSON_TOPICS: Record<TopicId, LessonTopic> = {
       'camera.center',
       'camera.zoomTo',
     ],
-    stepBudget: 30,
+    stepBudget: 45,
     defaultStartFrom: 'blank',
   },
   color: {
@@ -82,7 +91,7 @@ export const LESSON_TOPICS: Record<TopicId, LessonTopic> = {
       'flame.setBackgroundColor',
       'flame.setDrawMode',
     ],
-    stepBudget: 25,
+    stepBudget: 40,
     defaultStartFrom: 'current',
   },
   camera: {
@@ -95,7 +104,7 @@ export const LESSON_TOPICS: Record<TopicId, LessonTopic> = {
       'flame.setDrawMode',
       'view.setShowTimeline',
     ],
-    stepBudget: 20,
+    stepBudget: 32,
     defaultStartFrom: 'current',
   },
   genetics: {
@@ -109,7 +118,7 @@ export const LESSON_TOPICS: Record<TopicId, LessonTopic> = {
       'camera.center',
       'camera.zoomTo',
     ],
-    stepBudget: 20,
+    stepBudget: 32,
     defaultStartFrom: 'current',
   },
   sonification: {
@@ -122,7 +131,7 @@ export const LESSON_TOPICS: Record<TopicId, LessonTopic> = {
       'camera.center',
       'camera.zoomTo',
     ],
-    stepBudget: 18,
+    stepBudget: 28,
     defaultStartFrom: 'current',
   },
   render: {
@@ -138,7 +147,7 @@ export const LESSON_TOPICS: Record<TopicId, LessonTopic> = {
       'flame.setDrawMode',
       'camera.zoomTo',
     ],
-    stepBudget: 18,
+    stepBudget: 28,
     defaultStartFrom: 'current',
   },
 }
