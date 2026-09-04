@@ -19,6 +19,95 @@ function ctxWithRecorder() {
   return ctx
 }
 
+/**
+ * The rail and the recording have to agree about how many steps happened.
+ * They used to disagree by one per keyframe write: the tool logged one line
+ * and the recorder wrote two, so a seven-call take replayed with seven extra
+ * steps pointing at an animation toggle that never moved.
+ */
+describe('Cinema records one action per tool call', () => {
+  afterEach(() => {
+    resetPilot()
+    cancelSessionRecording()
+    clearWebMcpContext()
+  })
+
+  /** The mock context has no view block; Cinema only needs these two. */
+  const viewMock = () => ({
+    setQualityPreset: vi.fn(),
+    setAdaptiveFilter: vi.fn(),
+    setStochasticFilter: vi.fn(),
+    setFlyMode: vi.fn(),
+    setShowTimeline: vi.fn(),
+  })
+
+  const TRACKS = [
+    {
+      path: 'camera.zoom',
+      keyframes: [
+        { frame: 0, value: 1 },
+        { frame: 59, value: 1.4 },
+      ],
+    },
+  ]
+
+  it('writes exactly one action per arcade_set_keyframes call', async () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    await arcadeStartCinema.execute({}, {})
+    expect(startSessionRecording(ctx.flameDescriptor())).toEqual({ ok: true })
+
+    await arcadeSetKeyframes.execute(
+      { fps: 30, durationFrames: 60, tracks: TRACKS },
+      {},
+    )
+    await arcadeSetKeyframes.execute(
+      { fps: 30, durationFrames: 60, tracks: TRACKS },
+      {},
+    )
+
+    const ids = stopSessionRecording()?.actions.map((a) => a.id) ?? []
+    expect(ids).toEqual(['timeline.loadTimeline', 'timeline.loadTimeline'])
+    // The snapshot is what turns animation on, so a separate toggle is noise.
+    expect(ids).not.toContain('timeline.setAnimationEnabled')
+  })
+
+  it('still applies the snapshot that carries animationEnabled', async () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    await arcadeStartCinema.execute({}, {})
+    await arcadeSetKeyframes.execute(
+      { fps: 30, durationFrames: 60, tracks: TRACKS },
+      {},
+    )
+    const loaded = vi.mocked(ctx.timeline.edit!.load).mock.calls[0]?.[0]
+    expect(loaded?.animationEnabled).toBe(true)
+  })
+
+  it('does not record opening a timeline that is already open', async () => {
+    const ctx = createMockCommandContext()
+    ctx.view = { ...viewMock(), showTimeline: () => true }
+    setWebMcpContext(ctx)
+    expect(startSessionRecording(ctx.flameDescriptor())).toEqual({ ok: true })
+    await arcadeStartCinema.execute({}, {})
+
+    // Every take used to open with a step that changed nothing.
+    expect(stopSessionRecording()?.actions ?? []).toEqual([])
+  })
+
+  it('still opens a timeline that is closed', async () => {
+    const ctx = createMockCommandContext()
+    ctx.view = { ...viewMock(), showTimeline: () => false }
+    setWebMcpContext(ctx)
+    expect(startSessionRecording(ctx.flameDescriptor())).toEqual({ ok: true })
+    await arcadeStartCinema.execute({}, {})
+
+    expect(stopSessionRecording()?.actions.map((a) => a.id)).toEqual([
+      'view.setShowTimeline',
+    ])
+  })
+})
+
 describe('Cinema tools', () => {
   afterEach(() => {
     resetPilot()

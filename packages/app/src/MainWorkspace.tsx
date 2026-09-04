@@ -4159,6 +4159,7 @@ export function MainWorkspace(props: AppProps) {
       setStochasticFilter: setStochasticFilterEnabled,
       setFlyMode,
       setShowTimeline,
+      showTimeline,
     },
     camera: {
       center: () => {

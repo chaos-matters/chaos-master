@@ -397,9 +397,35 @@ export function hasExplicitReplayPolicy(command: FlameCommand): boolean {
   )
 }
 
-/** Generic JSON-shape budget applied before any command-specific normalizer. */
+/**
+ * Describe a value the way an author would recognise it, without printing it.
+ *
+ * The offender is almost always `undefined` or `NaN` in one field of a large
+ * payload, and the agent that sent it cannot see which. A type plus, for the
+ * short ones, the value itself is enough to find it; anything longer is
+ * summarised so an error message can never become a data dump.
+ */
+function describeBadValue(value: unknown): string {
+  if (value === undefined) return 'undefined'
+  if (typeof value === 'number') return String(value)
+  if (typeof value === 'bigint') return `a bigint (${String(value)})`
+  if (typeof value === 'function') return 'a function'
+  if (typeof value === 'symbol') return 'a symbol'
+  return typeof value
+}
+
+/**
+ * Generic JSON-shape budget applied before any command-specific normalizer.
+ *
+ * Every rejection names the path that caused it. Without one the message is
+ * un-actionable on a payload of any size: a Cinema agent that hit
+ * "arguments must be finite JSON data" on a sixteen-track timeline bisected by
+ * deleting fields and blamed an unrelated one, which cost it real steps.
+ */
 function replayArgBudgetError(root: unknown): string | undefined {
-  const stack: { value: unknown; depth: number }[] = [{ value: root, depth: 0 }]
+  const stack: { value: unknown; depth: number; path: string }[] = [
+    { value: root, depth: 0, path: 'arguments' },
+  ]
   const seen = new WeakSet<object>()
   let nodes = 0
 
@@ -408,7 +434,7 @@ function replayArgBudgetError(root: unknown): string | undefined {
     nodes++
     if (nodes > MAX_REPLAY_ARG_NODES) return 'argument data is too large'
     if (current.depth > MAX_REPLAY_ARG_DEPTH) {
-      return 'argument data is nested too deeply'
+      return `argument data is nested too deeply at ${current.path}`
     }
 
     const value = current.value
@@ -421,34 +447,46 @@ function replayArgBudgetError(root: unknown): string | undefined {
     }
     if (typeof value === 'string') {
       if (value.length > MAX_REPLAY_STRING_LENGTH) {
-        return 'an argument string is too long'
+        return `an argument string is too long at ${current.path} (${value.length} characters, limit ${MAX_REPLAY_STRING_LENGTH})`
       }
       continue
     }
-    if (typeof value !== 'object') return 'arguments must be finite JSON data'
+    if (typeof value !== 'object') {
+      return `arguments must be finite JSON data: ${current.path} is ${describeBadValue(value)}`
+    }
 
-    if (seen.has(value)) return 'arguments must not contain cycles'
+    if (seen.has(value)) {
+      return `arguments must not contain cycles, and ${current.path} points back into the payload`
+    }
     seen.add(value)
     if (Array.isArray(value)) {
       if (value.length > MAX_REPLAY_ARRAY_LENGTH) {
-        return 'an argument array is too long'
+        return `an argument array is too long at ${current.path} (${value.length} items, limit ${MAX_REPLAY_ARRAY_LENGTH})`
       }
-      for (const item of value) {
-        stack.push({ value: item, depth: current.depth + 1 })
+      for (const [index, item] of value.entries()) {
+        stack.push({
+          value: item,
+          depth: current.depth + 1,
+          path: `${current.path}[${index}]`,
+        })
       }
       continue
     }
 
     const prototype = Object.getPrototypeOf(value)
     if (prototype !== Object.prototype && prototype !== null) {
-      return 'arguments must contain plain JSON objects only'
+      return `arguments must contain plain JSON objects only, and ${current.path} is not one`
     }
-    const entries = Object.values(value)
+    const entries = Object.entries(value)
     if (entries.length > MAX_REPLAY_OBJECT_KEYS) {
-      return 'an argument object has too many fields'
+      return `an argument object has too many fields at ${current.path} (${entries.length} fields, limit ${MAX_REPLAY_OBJECT_KEYS})`
     }
-    for (const item of entries) {
-      stack.push({ value: item, depth: current.depth + 1 })
+    for (const [key, item] of entries) {
+      stack.push({
+        value: item,
+        depth: current.depth + 1,
+        path: `${current.path}.${key}`,
+      })
     }
   }
   return undefined
