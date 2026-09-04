@@ -231,6 +231,31 @@ describe('DuelChips', () => {
     )
   })
 
+  it('offers a 3D flame the variations it can actually take', () => {
+    const ctx = createMockCommandContext()
+    ctx.setFlameDescriptor((draft) => {
+      draft.renderSettings.dimensions = 3
+    }, 'test')
+    render(() => <DuelChips ctx={ctx} flame={ctx.flameDescriptor} />)
+    screen.getByRole('button', { name: /Variations/ }).click()
+    screen.getByRole('button', { name: 'Add' }).click()
+
+    // The 2D catalogue here was why every add on a 3D flame came back as
+    // "rejected unsafe or oversized add": the registry is per dimension.
+    expect(screen.getByPlaceholderText('Search 43 variations')).toBeTruthy()
+
+    const before = Object.keys(
+      firstTransform(ctx.flameDescriptor()).variations,
+    ).length
+    screen.getAllByRole('button', { name: 'Add Spherical' })[0]!.click()
+
+    const types = Object.values(
+      firstTransform(ctx.flameDescriptor()).variations,
+    ).map((v) => v.type)
+    expect(types).toHaveLength(before + 1)
+    expect(types).toContain('spherical3D')
+  })
+
   it('keeps working when a randomize takes the chosen transform away', () => {
     const ctx = mount()
     screen.getByRole('button', { name: /Shape/ }).click()

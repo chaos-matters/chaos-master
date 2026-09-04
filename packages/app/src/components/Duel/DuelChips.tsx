@@ -10,7 +10,7 @@ import { palette } from '@/flame/colorMap'
 import { defaultPalettes, paletteToGradientCSS } from '@/flame/palettes'
 import { variationTypesFor } from '@/flame/variationRegistry'
 import { filterVariations } from '@/flame/variations/search'
-import { getVariationPreviewFlame } from '@/flame/variations/utils'
+import { getVariationPreviewFlame, getVariationPreviewFlame3D, } from '@/flame/variations/utils'
 import { Check, ColourWedge, Cross, Minus, Plus, ShapeTriangle, Undo, VariationSpiral, } from '@/icons'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { createSharedIntersectionObserver } from '@/utils/useIntersectionObserver'
@@ -23,6 +23,7 @@ import type { CommandContext } from '@/commands/types'
 import type { AffineParams } from '@/flame/affineTranform'
 import type { Palette } from '@/flame/colorMap'
 import type { FlameDescriptor, TransformId } from '@/flame/schema/flameSchema'
+import type { TransformVariationType3D } from '@/flame/variations3D'
 
 type Panel = 'variations' | 'shape' | 'colour'
 
@@ -180,6 +181,9 @@ export function DuelChips(props: {
               <Show when={open() === 'variations'}>
                 <VariationsPanel
                   transform={active()}
+                  dims={
+                    (props.flame().renderSettings.dimensions ?? 2) === 3 ? 3 : 2
+                  }
                   paused={open() !== 'variations'}
                   onAdd={(type) => {
                     dispatch('flame.addVariation', transformId(), type)
@@ -304,7 +308,14 @@ function TransformPicker(props: {
  * offered eight of the app's 268 and a search could never reach the rest.
  * 2D deliberately: a duel refuses 3D flames, so there is no dimension to pick.
  */
-const CATALOGUE = variationTypesFor(2)
+/**
+ * The catalogue is the flame's own registry: 403 variations in 2D, 43 in 3D.
+ * Wired to 2D, it offered every 3D flame a list the validator refuses
+ * ("rejected unsafe or oversized add"), so nothing could be added at all.
+ */
+function catalogueFor(dims: 2 | 3): readonly string[] {
+  return variationTypesFor(dims)
+}
 
 /**
  * What the resting row offers after what you already have.
@@ -314,7 +325,21 @@ const CATALOGUE = variationTypesFor(2)
  * are the same well-known handful the agent's brief names, which is what
  * `SAMPLE_VARIATION_TYPES` is for. Everything else is behind Add.
  */
-const QUICK_PICKS: readonly string[] = SAMPLE_VARIATION_TYPES
+/** The 3D counterparts of the 2D sample list, name for name. */
+const QUICK_PICKS_3D = [
+  'linear3D',
+  'spherical3D',
+  'swirl3D',
+  'julia3D',
+  'sinusoidal3D',
+  'horseshoe3D',
+  'disc3D',
+  'polar3D',
+] as const
+
+function quickPicksFor(dims: 2 | 3): readonly string[] {
+  return dims === 3 ? QUICK_PICKS_3D : SAMPLE_VARIATION_TYPES
+}
 
 /** One page of the add gallery: about three rows at this tile pitch. */
 const GALLERY_PAGE = 30
@@ -329,6 +354,7 @@ const SEARCH_LIMIT = 20
 function VariationTile(props: {
   type: string
   name: string
+  dims: 2 | 3
   weight?: number
   active: boolean
   paused: boolean
@@ -361,7 +387,13 @@ function VariationTile(props: {
             <VariationPreview
               version={0}
               isSelected={props.active}
-              flame={getVariationPreviewFlame(props.type)}
+              flame={
+                props.dims === 3
+                  ? getVariationPreviewFlame3D(
+                      props.type as TransformVariationType3D,
+                    )
+                  : getVariationPreviewFlame(props.type)
+              }
               name={props.name}
               resolution={{ width: 112, height: 112 }}
               paused={props.paused}
@@ -400,6 +432,7 @@ function VariationsPanel(props: {
   transform: {
     variations: Record<string, { type: string; weight: number }>
   }
+  dims: 2 | 3
   paused: boolean
   onWeight: (variationId: string, weight: number) => void
   onRemove: (variationId: string) => void
@@ -421,8 +454,10 @@ function VariationsPanel(props: {
 
   const entries = () => Object.entries(props.transform.variations)
   const present = () => new Set(entries().map(([, v]) => v.type))
-  const rest = () => CATALOGUE.filter((type) => !present().has(type))
-  const quick = () => QUICK_PICKS.filter((type) => !present().has(type))
+  const rest = () =>
+    catalogueFor(props.dims).filter((type) => !present().has(type))
+  const quick = () =>
+    quickPicksFor(props.dims).filter((type) => !present().has(type))
   const matches = () => filterVariations(rest(), query())
   const searching = () => query().trim() !== ''
   const visible = () =>
@@ -449,7 +484,7 @@ function VariationsPanel(props: {
             <input
               class={ui.search}
               type="search"
-              placeholder={`Search ${CATALOGUE.length} variations`}
+              placeholder={`Search ${catalogueFor(props.dims).length} variations`}
               value={query()}
               aria-label="Search variations"
               onInput={(ev) => {
@@ -479,6 +514,7 @@ function VariationsPanel(props: {
                   <VariationTile
                     type={variation.type}
                     name={readableType(variation.type)}
+                    dims={props.dims}
                     weight={variation.weight}
                     active
                     paused={props.paused}
@@ -505,6 +541,7 @@ function VariationsPanel(props: {
                   <VariationTile
                     type={type}
                     name={readableType(type)}
+                    dims={props.dims}
                     active={false}
                     paused={props.paused}
                     track={trackRow}
@@ -526,6 +563,7 @@ function VariationsPanel(props: {
                 <VariationTile
                   type={type}
                   name={readableType(type)}
+                  dims={props.dims}
                   active={false}
                   paused={props.paused}
                   track={trackGallery}
@@ -561,7 +599,7 @@ function VariationsPanel(props: {
 
 /** `linearVar` reads as "Linear" once, here, rather than in four places. */
 function readableType(type: string): string {
-  const trimmed = type.replace(/Var$/, '')
+  const trimmed = type.replace(/Var$/, '').replace(/3D$/, '')
   return (
     trimmed.charAt(0).toUpperCase() +
     trimmed.slice(1).replace(/([A-Z])/g, ' $1')
@@ -601,11 +639,6 @@ function ShapePanel(props: {
           onChange={props.onChange}
         />
       </div>
-      <Show when={props.is3D === true}>
-        <p class={ui.shapeHint}>
-          Drag a handle to move it flat; hold Shift to move it in depth.
-        </p>
-      </Show>
       <div class={ui.fields}>
         <Show when={props.is3D === true}>
           <For each={OFFSET_3D}>
@@ -656,6 +689,14 @@ function ShapePanel(props: {
           Reset
         </button>
       </div>
+      {/* Last, on its own row across both columns. Placed between the grid and
+          the fields it became a third grid child and pushed the fields under
+          the canvas. */}
+      <Show when={props.is3D === true}>
+        <p class={ui.shapeHint}>
+          Drag a handle to move it flat; hold Shift to move it in depth.
+        </p>
+      </Show>
     </div>
   )
 }
@@ -854,14 +895,16 @@ function ColourPanel(props: {
         <Show when={!showAll() && ALL_PALETTES.length > STRIP_PALETTES.length}>
           <button
             type="button"
-            class={ui.swatchMore}
+            class={`${ui.swatch} ${ui.swatchMore}`}
             onClick={() => {
               if (dragged()) return
               setShowAll(true)
             }}
           >
-            {ALL_PALETTES.length - STRIP_PALETTES.length}
-            <span class={ui.swatchMoreWord}>more</span>
+            <span class={`${ui.swatchBand} ${ui.swatchMoreBand}`}>
+              +{ALL_PALETTES.length - STRIP_PALETTES.length}
+            </span>
+            <span class={ui.swatchName}>more</span>
           </button>
         </Show>
       </div>

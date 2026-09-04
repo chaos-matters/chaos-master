@@ -278,6 +278,60 @@
   resize: vertical;
 }
 
+/* A native select does not inherit colour: unstyled, it drew the page's white
+   text on its own white field. Same box as the textarea, and `color-scheme`
+   so the dropdown list Chrome opens is dark too. */
+.field select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  color-scheme: dark;
+  font:
+    14px/1.4 system-ui,
+    sans-serif;
+  cursor: pointer;
+}
+
+.field select option {
+  background: #171b26;
+  color: #f2f4f8;
+}
+
+/* What a duel would run on, said before it starts: only the agent starts one,
+   on whatever the viewer has open, so the dimension is otherwise a surprise. */
+.setupPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.setupPill {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 0.74rem;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.setupDims {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+
+.setupPill3D {
+  border-color: rgba(149, 241, 253, 0.5);
+  background: rgba(149, 241, 253, 0.12);
+  color: #cbf6ff;
+}
+
 .prompt {
   display: grid;
   gap: 8px;
