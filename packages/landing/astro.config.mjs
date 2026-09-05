@@ -51,6 +51,7 @@ function remoteLogPlugin() {
 // compiler — so we mirror that here. The `@` alias only matches `@/…` (not
 // `@typegpu/*` / `@astrojs/*`), so it's safe to point at the app's src.
 const appSrc = fileURLToPath(new URL('../app/src', import.meta.url))
+const coreSrc = fileURLToPath(new URL('../core/src', import.meta.url))
 const stub = (p) =>
   fileURLToPath(new URL(`./src/flame/stubs/${p}`, import.meta.url))
 
@@ -88,6 +89,7 @@ export default defineConfig({
           find: '@/components/ErrorHandling/ErrorHandling',
           replacement: stub('ErrorHandling.tsx'),
         },
+        { find: '@chaos-master/core', replacement: coreSrc },
         { find: '@', replacement: appSrc },
       ],
     },

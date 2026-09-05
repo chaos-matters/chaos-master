@@ -15,6 +15,7 @@
     "deploy:prod": "pnpm run build && pnpm exec wrangler deploy --env prod"
   },
   "dependencies": {
+    "@chaos-master/core": "workspace:*",
     "@astrojs/solid-js": "^5.1.0",
     "@typegpu/color": "0.12.0",
     "@typegpu/noise": "0.12.0",

@@ -39,6 +39,7 @@ export default defineConfig({
     conditions: ['development', 'browser'],
     alias: {
       '@': resolve(__dirname, './src'),
+      '@chaos-master/core': resolve(__dirname, '../core/src'),
     },
   },
 })

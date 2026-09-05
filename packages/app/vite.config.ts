@@ -1,5 +1,7 @@
 import ssl from '@vitejs/plugin-basic-ssl'
 import { execSync } from 'node:child_process'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import devtools from 'solid-devtools/vite'
 import typegpuPlugin from 'unplugin-typegpu/vite'
 import { defineConfig } from 'vite'
@@ -8,6 +10,8 @@ import { qrcode } from 'vite-plugin-qrcode'
 import solidPlugin from 'vite-plugin-solid'
 import solidSvg from 'vite-plugin-solid-svg'
 import type { ProxyOptions } from 'vite'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const resolveCommitHash = (): string => {
   // Deno Deploy and GitHub Actions expose this automatically.
@@ -69,6 +73,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': '/src',
+      '@chaos-master/core': resolve(__dirname, '../core/src'),
     },
   },
   define: {

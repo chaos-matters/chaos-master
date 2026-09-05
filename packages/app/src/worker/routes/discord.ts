@@ -1,12 +1,11 @@
-import { tryValidateFlame } from '@/flame/schema/flameSchema'
-import { tryValidateTimelineSnapshot } from '@/flame/schema/timeline'
+import { tryValidateFlame, tryValidateTimelineSnapshot, } from '@chaos-master/core'
 import { SHOWCASE_CONSENT_VERSION } from '@/lib/communityShowcase'
 import { checkDiscordDailyCap, checkDiscordRateLimit, } from '../middleware/rateLimit'
 import { verifyTurnstile } from '../middleware/turnstile'
 import { MAX_DISCORD_UPLOAD, MAX_SHOWCASE_DESCRIPTOR } from '../types'
 import { base64ToBytes, errMsg, isPlainRecord, json, pngDimensions, slugWord, } from '../utils'
+import type { FlameDescriptor } from '@chaos-master/core'
 import type { Env, ShowcaseRequest, ShowcaseStatus } from '../types'
-import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 
 /**
  * Reduce a share title/author to inert plain text before it goes into the

@@ -1,0 +1,36 @@
+{
+  "name": "@chaos-master/core",
+  "version": "0.1.0",
+  "description": "Pure schema, affine math, diffing, and XML serialization for Chaos Master",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "types": "./src/*.ts",
+      "import": "./src/*.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "license": "AGPL-3.0-only",
+  "dependencies": {
+    "structurajs": "0.12.6",
+    "typegpu": "0.12.0",
+    "valibot": "1.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  }
+}
