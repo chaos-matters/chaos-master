@@ -31,7 +31,7 @@ import { createStoreHistory } from '@/utils/createStoreHistory'
 import { hardwareTierToQuality } from '@/utils/hardwareTier'
 import { useIsScrolling } from '@/utils/isScrolling'
 import { recordEntries, recordKeys } from '@/utils/record'
-import { useIntersectionObserver } from '@/utils/useIntersectionObserver'
+import { createSharedIntersectionObserver, useIntersectionObserver, } from '@/utils/useIntersectionObserver'
 import { useKeyboardShortcuts } from '@/utils/useKeyboardShortcuts'
 import { livePreviewCount, setLivePreviewLive, vramLog } from '@/utils/vramLog'
 import { AffineEditor } from '../AffineEditor/AffineEditor'
@@ -507,6 +507,10 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
 
   const [categoryFilter, setCategoryFilter] =
     createSignal<VariationCategory | null>(null)
+  const [galleryEl, setGalleryEl] = createSignal<HTMLElement>()
+  const trackTileVisibility = createSharedIntersectionObserver(galleryEl, {
+    rootMargin: '300px',
+  })
 
   const groupedEntries = () => {
     const items = filteredVariationEntries()
@@ -932,7 +936,11 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
               </For>
             </div>
           </Show>
-          <section class={ui.gallery} onMouseLeave={handleContainerLeave}>
+          <section
+            ref={setGalleryEl}
+            class={ui.gallery}
+            onMouseLeave={handleContainerLeave}
+          >
             <ComputeGate capacity={COMPUTE_GATE_CAPACITY}>
               <For each={groupedEntries()}>
                 {({ label, entries }) => (
@@ -943,9 +951,13 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                         const variation =
                           getVarFromPreviewFlame(variationExample)
                         const isSelected = () => selectedItemId() === id
+                        const [tileEl, setTileEl] =
+                          createSignal<HTMLButtonElement>()
+                        const nearViewport = trackTileVisibility(tileEl)
                         return (
                           variation && (
                             <button
+                              ref={setTileEl}
                               class={ui.item}
                               classList={{
                                 [ui.selected as string]: isSelected(),
@@ -963,15 +975,24 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                                 e.preventDefault()
                               }}
                             >
-                              <VariationPreview
-                                version={
-                                  version() * 1_000_000 + (paramRev()[id] ?? 0)
-                                }
-                                isSelected={isSelected()}
-                                flame={variationExample}
-                                name={variation.type}
-                                hardwareTier={props.hardwareTier}
-                              />
+                              <Show
+                                when={nearViewport() && variationExample}
+                                keyed
+                              >
+                                {(example) => (
+                                  <VariationPreview
+                                    version={
+                                      version() * 1_000_000 +
+                                      (paramRev()[id] ?? 0)
+                                    }
+                                    isSelected={isSelected()}
+                                    flame={example}
+                                    name={variation.type}
+                                    hardwareTier={props.hardwareTier}
+                                    isVisible={nearViewport()}
+                                  />
+                                )}
+                              </Show>
                               <div class={ui.itemTitle}>
                                 {getNormalizedVariationName(variation.type)}
                               </div>

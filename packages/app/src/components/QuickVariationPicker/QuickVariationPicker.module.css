@@ -262,7 +262,7 @@
      Firefox (whose overlay/auto scrollbars otherwise overlap content), matching
      .sidebarScroll. */
   scrollbar-gutter: stable;
-  padding: 0.4rem 0.5rem;
+  padding: 0.4rem 0.6rem 0.4rem 0.5rem;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.35rem;
