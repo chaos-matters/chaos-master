@@ -4,7 +4,9 @@
     "allowJs": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@chaos-master/core": ["../core/src/index.ts"],
+      "@chaos-master/core/*": ["../core/src/*"]
     }
   },
   // Build output (dist) and e2e specs must never enter the typecheck program:
