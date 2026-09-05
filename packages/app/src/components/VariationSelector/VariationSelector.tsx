@@ -389,7 +389,7 @@ export function VariationPreview(props: {
     </div>
   )
 }
-type RespondType =
+export type RespondType =
   | {
       transform: TransformFunction
       variation: TransformVariationDescriptor

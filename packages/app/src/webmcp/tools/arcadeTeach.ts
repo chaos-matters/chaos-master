@@ -75,11 +75,15 @@ export const arcadeStatus: WebMcpTool = {
  * defaults to the same registry.
  */
 function variationSample(ctx: CommandContext): string {
-  return renders3D(ctx) ? SAMPLE_VARIATION_TYPES_3D[1] : SAMPLE_VARIATION_TYPES[1]
+  return renders3D(ctx)
+    ? SAMPLE_VARIATION_TYPES_3D[1]
+    : SAMPLE_VARIATION_TYPES[1]
 }
 
 function variationCount(ctx: CommandContext): number {
-  return renders3D(ctx) ? variationTypes3D.length : registeredVariationTypes.length
+  return renders3D(ctx)
+    ? variationTypes3D.length
+    : registeredVariationTypes.length
 }
 
 function renders3D(ctx: CommandContext): boolean {
