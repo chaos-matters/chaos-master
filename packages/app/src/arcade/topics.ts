@@ -1,34 +1,7 @@
-import type { DuelStartFrom } from './duelActions'
+import type { DuelStartFrom, LessonTopic, TopicId } from './types'
 import type { Dims } from '@/flame/variationRegistry'
 
-export type TopicId =
-  | 'variations'
-  | 'affine'
-  | 'color'
-  | 'camera'
-  | 'genetics'
-  | 'sonification'
-  | 'render'
-
-export interface LessonTopic {
-  id: TopicId
-  title: string
-  /** Sent to the agent verbatim as the lesson goal. */
-  goal: string
-  /** Exact ids or prefixes ending in "." (see guard.isCommandAllowed). */
-  allowed: readonly string[]
-  /**
-   * How many steps the agent gets, narration included.
-   *
-   * It is capped by the replay VIDEO, not by patience: a narrated step is
-   * held long enough to read, so about four seconds of finished video per step
-   * is the real exchange rate, and MAX_REPLAY_VIDEO_DURATION_MS is what a
-   * budget ultimately spends. `stepBudgetFitsVideo.test.ts` holds the two
-   * numbers together so raising one cannot silently make lessons unexportable.
-   */
-  stepBudget: number
-  defaultStartFrom: 'blank' | 'current'
-}
+export type { DuelStartFrom, LessonTopic, TopicId }
 
 /** Commands every Arcade mode may use. */
 export const ALWAYS_ALLOWED = [

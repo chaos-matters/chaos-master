@@ -10,13 +10,9 @@ interface WindowTimelineState {
   getFrame: () => number
 }
 
-export type EasingCurve =
-  | 'linear'
-  | 'easeIn'
-  | 'easeOut'
-  | 'easeInOut'
-  | 'bounce'
-  | 'elastic'
+import type { EasingCurve } from '@chaos-master/core'
+
+export type { EasingCurve }
 
 import type { PointInitMode } from '@/flame/pointInitMode'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'

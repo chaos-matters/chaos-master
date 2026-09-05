@@ -1,4 +1,4 @@
-import type { EasingCurve } from './timeline'
+import type { EasingCurve } from '@chaos-master/core'
 
 export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t

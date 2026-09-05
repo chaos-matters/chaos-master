@@ -1,0 +1,162 @@
+.skeletonLayout {
+  height: 100dvh;
+  display: grid;
+  grid-template-columns: var(--sidebar-width, 26rem) 1fr;
+  grid-template-rows: 1fr auto;
+  grid-template-areas:
+    'sidebar viewport'
+    'sidebar bottombar';
+  overflow: hidden;
+  background: var(--color-bg, #04060c);
+  color: var(--color-text, #f0f4f8);
+  isolation: isolate;
+  user-select: none;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.03) 100%
+  );
+  background-size: 200% 100%;
+  animation: pulse 2s ease-in-out infinite;
+  border-radius: var(--radius-md, 6px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+.skeletonSidebar {
+  grid-area: sidebar;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 12px);
+  padding: var(--space-3, 12px);
+  background: rgba(12, 16, 24, 0.75);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  overflow: hidden;
+  z-index: 10;
+}
+
+.sidebarHeader {
+  height: 38px;
+  width: 60%;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.sidebarCard {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md, 8px);
+  padding: var(--space-3, 12px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 8px);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.cardTitle {
+  height: 18px;
+  width: 45%;
+}
+
+.cardRow {
+  height: 32px;
+  width: 100%;
+}
+
+.cardRowHalf {
+  height: 32px;
+  width: 48%;
+}
+
+.rowGroup {
+  display: flex;
+  gap: var(--space-2, 8px);
+  width: 100%;
+}
+
+.skeletonViewport {
+  grid-area: viewport;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.viewportCenterAura {
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(99, 102, 241, 0.15) 0%,
+    transparent 70%
+  );
+  animation: pulse 3s ease-in-out infinite;
+}
+
+.skeletonFloatingActions {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 8px;
+  z-index: 20;
+}
+
+.actionPill {
+  height: 34px;
+  width: 90px;
+  border-radius: 9999px;
+}
+
+.skeletonBottomBar {
+  grid-area: bottombar;
+  height: 48px;
+  background: rgba(12, 16, 24, 0.9);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  z-index: 10;
+}
+
+.timelineScrubber {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+}
+
+.timelineButton {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+@media (max-width: 768px) {
+  .skeletonLayout {
+    grid-template-columns: 1fr;
+  }
+  .skeletonSidebar {
+    display: none;
+  }
+}

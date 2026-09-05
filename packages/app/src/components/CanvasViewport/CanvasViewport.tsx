@@ -19,11 +19,11 @@ import type { v2f } from 'typegpu/data'
 import type { Vec3 } from 'wgpu-matrix'
 import type { QualityPreset } from '@/components/Quality/QualityPresets'
 import type { Palette } from '@/flame/colorMap'
+import type { ExportImageType } from '@/flame/exportImageType'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TransformVariationType } from '@/flame/variations'
 import type { CustomVariationDef } from '@/flame/variations/custom/types'
 import type { TransformVariationType3D } from '@/flame/variations3D'
-import type { ExportImageType } from '@/MainWorkspace'
 import type { ExportDimensions } from '@/utils/exportDimensions'
 
 export const EDGE_FADE_COLOR = {

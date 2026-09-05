@@ -20,7 +20,7 @@ import type { AudioWiringSnapshot } from '@/flame/schema/audioWiring'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { TimelineSnapshot } from '@/flame/schema/timeline'
 import type { HistorySetter } from '@/utils/createStoreHistory'
-import type { AnimationJobSpec } from '@/utils/exportJobs'
+import type { AnimationJobSpec, ReplayVideoSpec } from '@/utils/exportJobs'
 
 export const REPLAY_VIDEO_FPS = 24
 /**
@@ -55,12 +55,7 @@ export const MAX_REPLAY_VIDEO_DURATION_MS = 300_000
 // would therefore depend on whichever local registry happens to render it.
 const CUSTOM_VARIATION_TYPE_PREFIX = 'custom_'
 
-export type ReplayVideoSpec = {
-  version: 1
-  playbackSpeed: number
-  leadInMs: number
-  tailMs: number
-}
+export type { ReplayVideoSpec }
 
 export type ReplayVideoSchedule = {
   fps: number

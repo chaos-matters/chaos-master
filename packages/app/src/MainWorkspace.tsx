@@ -2,7 +2,6 @@ import '@/commands/builtins'
 import { batch, createEffect, createMemo, createSignal, lazy, onCleanup, onMount, Show, Suspense, untrack, } from 'solid-js'
 import { createStore, unwrap } from 'solid-js/store'
 import { vec2f } from 'typegpu/data'
-import { clamp } from 'typegpu/std'
 import { agentDriving } from '@/arcade/pilot'
 import { executeCommand, executeReplayCommand, preflightReplayCommand, } from '@/commands/registry'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
@@ -10,7 +9,6 @@ import { useToast } from '@/contexts/ToastContext'
 import { setActiveTab, workspaceIsVisible } from '@/lib/activeTab'
 import { SHOWCASE_CONSENT_VERSION } from '@/lib/communityShowcase'
 import { trackAppInit } from '@/lib/telemetry'
-import { useShortcutManager } from '@/shortcuts'
 import { createDragHandler } from '@/utils/createDragHandler'
 import { recordEntries, recordKeys } from '@/utils/record'
 import { calculateFlameStats } from '@/webmcp/tools/scoreFlame'
@@ -28,6 +26,7 @@ import { recorderExportPending, recorderTaskPending, setRecorderCollapsed, setRe
 import { WorkspaceBottomBar } from './components/WorkspaceBottomBar'
 import { createLazyDiscordShareModal, createLazyImportVariationsModal, createLazyLogoFaviconGenerator, createLazyMigrationModal, createLazyShareLinkModal, createLazyShareVariationLinkModal, createLazyShareVariationLoadModal, createLazyShowBenchmark, createLazyShowCustomVariationEditor, createLazyShowDocumentation, createLazyShowHelp, WorkspaceModalsHost, } from './components/WorkspaceModalsHost'
 import { WorkspaceSidebar } from './components/WorkspaceSidebar'
+import { useWorkspaceAutosave, useWorkspaceCamera, useWorkspaceCommands, useWorkspacePalette, useWorkspaceShortcuts, } from './hooks'
 import { createWorkspaceExportStore, createWorkspaceLayoutStore, createWorkspaceSelectionStore, isWideLayout, } from './stores'
 
 const AncestryTreeModal = lazy(() =>
@@ -79,7 +78,7 @@ import { initExample3D } from './flame/examples/initExample3D'
 import { newDefaultTransform } from './flame/newTransform'
 import { generateRandomFlame, mutateFlame, randomizeAllColors, randomRange, } from './flame/randomize'
 import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, qualityPointCountLimit, setExportQuality, setForceAnimationExportNow, } from './flame/renderStats'
-import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, tryValidateFlame, } from './flame/schema/flameSchema'
+import { tryValidateFlame } from './flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from './flame/transformFunction'
 import { allTransformVariations, isAnyParametricVariationType, } from './flame/variations'
 import { collectFlameCustomVariations, deleteCustomVariation, duplicateCustomVariation, getCustomVariations, loadCustomVariations, persistSharedVariations, restoreCustomVariation, } from './flame/variations/custom'
@@ -94,7 +93,6 @@ import { snapshotOrigin, snapshotOriginLabel } from './recorder/snapshotOrigin'
 import { applySonificationSnapshot, closeAuthoredSonificationPanel, shouldRevealSonificationAfterReplay, shouldStopHiddenSonification, SONIFICATION_SNAPSHOT_VERSION, } from './recorder/sonificationState'
 import { createRecorderAwareTimeline, runTimelineSnapshotMutation, } from './recorder/timelineActions'
 import { createAnimationExport } from './utils/animationExport'
-import { autosaveIntervalMin, autosaveRecents, saveReminderDismissed, setAutosaveRecents, setSaveReminderDismissed, } from './utils/autosaveSettings'
 import { downloadBlob } from './utils/blob'
 import { deepClone } from './utils/clone'
 import { createStoreHistory } from './utils/createStoreHistory'
@@ -103,10 +101,9 @@ import { enqueueAnimationJob, enqueueImageJob } from './utils/exportJobs'
 import { addFlameDataToPng } from './utils/flameInPng'
 import { hardwareTierToPreset } from './utils/hardwareTier'
 import { compressJsonQueryParam } from './utils/jsonQueryParam'
-import { persistentSignal } from './utils/persistentSignal'
 import { addRandomizerHistoryEntry, clearRandomizerHistory, loadRandomizerHistoryEntries, MAX_RANDOMIZER_HISTORY_LIMIT, } from './utils/randomizerHistoryDB'
 import { buildReadableIds } from './utils/readableIds'
-import { getOldestRecentFlame, saveRecentFlame, upsertRecentFlame, } from './utils/recentFlames'
+import { getOldestRecentFlame, saveRecentFlame } from './utils/recentFlames'
 import { storeImportedSession, storeSession } from './utils/sessionsDB'
 import { createShareLink, deriveOgMeta, uploadOgPreview, } from './utils/shareLink'
 import { sum } from './utils/sum'
@@ -115,12 +112,7 @@ import { sortedTransformEntries } from './utils/transformOrder'
 import { createUndoRouter } from './utils/undoRouting'
 import { useAppDragAndDrop } from './utils/useAppDragAndDrop'
 import { useAudioReactive } from './utils/useAudioReactive'
-import { useKeyboardShortcuts } from './utils/useKeyboardShortcuts'
 import { useSonification } from './utils/useSonification'
-import { registerWebMcpTools } from './webmcp/registerWebMcp'
-import type { Setter } from 'solid-js'
-import type { v2f } from 'typegpu/data'
-import type { Vec3 } from 'wgpu-matrix'
 import type { AudioMapping } from './components/AudioReactivePanel/AudioReactivePanel'
 import type { QualityPreset } from './components/Quality/QualityPresets'
 import type { TourContext } from './components/SpotlightTour/tourTypes'
@@ -151,16 +143,7 @@ import type { EasingCurve, KeyframeInterpolation, TimelineTrack, } from './utils
 import type { CommandContext } from '@/commands/types'
 import type { CommunityShowcaseRequest } from '@/lib/communityShowcase'
 
-export type ExportImageInfo = {
-  /** True when the canvas holds a final color-graded image at the requested
-   *  quality limit, i.e. it is safe to capture the canvas for an export. */
-  finalImageReady: boolean
-}
-
-export type ExportImageType = (
-  canvas: HTMLCanvasElement,
-  info?: ExportImageInfo,
-) => void
+export type { ExportImageInfo, ExportImageType } from '@/flame/exportImageType'
 
 export type AppProps = {
   /**
@@ -616,11 +599,6 @@ export function MainWorkspace(props: AppProps) {
     }
     openReplaySession(session)
   }
-  // Colors as they were before the first palette apply — lets Unselect
-  // restore the "natural" colors. UI stash only; undo handles the rest.
-  const [prePaletteColors, setPrePaletteColors] = createSignal<
-    Record<string, { x: number; y: number }>
-  >({})
   const [flameDescriptor, setFlameDescriptor, history] = createStoreHistory(
     createStore(
       deepClone(
@@ -639,20 +617,16 @@ export function MainWorkspace(props: AppProps) {
     },
   )
 
-  const withPaletteRestoreTransition = (
-    after: Record<string, { x: number; y: number }>,
-    description: string,
-    writeDocument: () => void,
-  ) => {
-    runPaletteRestoreTransition(
-      history,
-      prePaletteColors(),
-      after,
-      (colors) => setPrePaletteColors(colors),
-      description,
-      writeDocument,
-    )
-  }
+  const {
+    prePaletteColors,
+    setPrePaletteColors,
+    withPaletteRestoreTransition,
+    selectedPalette,
+    selectedPaletteId,
+  } = useWorkspacePalette({
+    flameDescriptor,
+    history,
+  })
 
   /**
    * File/gallery loads are document boundaries in the live editor, but a
@@ -685,21 +659,6 @@ export function MainWorkspace(props: AppProps) {
       description,
     )
   }
-  // Palette selection is part of the flame document (renderSettings.palette):
-  // applying/removing one is a single undoable history entry, and the palette
-  // travels with saves/shares. These accessors derive the UI/render views.
-  const selectedPalette = createMemo<Palette | undefined>(() => {
-    const stored = flameDescriptor.renderSettings.palette
-    if (!stored) return undefined
-    return {
-      id: stored.id,
-      name: stored.name,
-      entries: stored.entries.map((entry) => ({ ...entry })),
-      source: 'imported',
-    }
-  })
-  const selectedPaletteId = () =>
-    flameDescriptor.renderSettings.palette?.id ?? ''
   // Blend composition is part of the flame document too (renderSettings
   // .blendFlame / .blendWeight): picking, adjusting, or clearing a blend is
   // one undoable history entry each, and the composition survives
@@ -1547,35 +1506,6 @@ export function MainWorkspace(props: AppProps) {
     return blendWeight()
   })
 
-  const handlePaletteSelect = (palette: Palette) => {
-    // If no palette was selected before, save the current "natural" colors.
-    // Switching palettes preserves that first snapshot.
-    const nextRestoreColors =
-      selectedPaletteId() === ''
-        ? captureTransformColors(flameDescriptor)
-        : prePaletteColors()
-
-    // ONE history entry: transform colors AND the palette itself (it lives in
-    // renderSettings.palette), so a single undo fully reverts the apply —
-    // previously the palette identity sat in signals and undo half-reverted
-    // (colors back, palette grading still on). Palette provenance travels in
-    // the same entry's undo/redo effects, so Unselect remains correct after
-    // either history direction.
-    withPaletteRestoreTransition(nextRestoreColors, 'Apply Palette', () => {
-      executeCommand('flame.applyPalette', cmdContext, palette)
-    })
-  }
-
-  const handlePaletteUnselect = () => {
-    // One undoable entry: restore pre-palette colors + drop the palette. The
-    // colors come from a UI signal, so they are passed as an argument —
-    // nothing outside the document can be reconstructed on replay.
-    const restoreColors = prePaletteColors()
-    withPaletteRestoreTransition({}, 'Remove Palette', () => {
-      executeCommand('flame.removePalette', cmdContext, restoreColors)
-    })
-  }
-
   // Shared by the toolbar Benchmark button and the `?benchmark` auto-open.
   const showBenchmark = createLazyShowBenchmark()
 
@@ -1624,153 +1554,39 @@ export function MainWorkspace(props: AppProps) {
   })
 
   // The camera setters keep Solid's Setter contract (a value OR an updater),
-  // but resolve it against the CURRENT state before dispatching, so the
-  // command — and therefore the recorded action — carries a concrete value.
-  // Every camera gesture is bracketed by startPreview/commit in
-  // WheelZoomCamera2D/3D, so a whole pan or orbit folds into one recorded
-  // step, matching the single undo entry it already produced.
-  const setFlameZoom: Setter<number> = (value) => {
-    const current = flameDescriptor.renderSettings.camera.zoom
-    const next = clamp(
-      typeof value === 'function' ? value(current) : value,
-      MIN_CAMERA_ZOOM_VALUE,
-      MAX_CAMERA_ZOOM_VALUE,
-    )
-    setRenderSetting('camera.zoom', next)
-    return flameDescriptor.renderSettings.camera.zoom
-  }
-  const setFlamePosition: Setter<v2f> = (value) => {
-    const current = vec2f(...flameDescriptor.renderSettings.camera.position)
-    const next = typeof value === 'function' ? value(current) : value
-    setRenderSetting('camera.position', [next.x, next.y])
-    return flameDescriptor.renderSettings.camera.position
-  }
-
-  // Build a Setter<number> for a uniform camera3D scalar: detach the held-frame
-  // preview (Blender-like), apply the value/updater into the store, return the
-  // result. theta/phi/radius/fov/roll were byte-for-byte identical modulo the
-  // field; zoom (clamped), position (vec2) and target3D (vec3) stay bespoke.
-  function makeCamera3DSetter(
-    field: 'theta' | 'phi' | 'radius' | 'fov' | 'roll',
-  ): Setter<number> {
-    return (value) => {
-      const current = flameDescriptor.renderSettings.camera3D[field]
-      const next =
-        typeof value === 'function'
-          ? (value as (p: number) => number)(current)
-          : value
-      setRenderSetting(`camera3D.${field}`, next)
-      return flameDescriptor.renderSettings.camera3D[field]
-    }
-  }
-  const setFlameTheta = makeCamera3DSetter('theta')
-  const setFlamePhi = makeCamera3DSetter('phi')
-  const setFlameRadius = makeCamera3DSetter('radius')
-  // 3D auto-exposure: drive the real Exposure value from the camera zoom so the
-  // slider visibly tracks it. exposure = base + strength*log(radius/refRadius),
-  // neutral at the radius where the toggle was enabled. The exposure read is
-  // untracked so manual edits between zooms aren't immediately reverted.
-  // The target is a pure derivation of the camera/auto-exposure settings, so it
-  // lives in a memo; the effect's only job is to write it back (reading the
-  // current exposure untracked so it never re-subscribes to its own output).
-  const autoExposureTarget = createMemo<number | null>(() => {
-    const rs = flameDescriptor.renderSettings
-    if (!rs.autoExposure3D || (rs.dimensions ?? 2) !== 3) return null
-    const radius = rs.camera3D?.radius ?? 0
-    const ref = rs.autoExposure3DRefRadius
-    if (radius <= 0 || ref <= 0) return null
-    return (
-      rs.autoExposure3DBase + rs.autoExposure3DStrength * Math.log(radius / ref)
-    )
+  const {
+    setFlameZoom,
+    setFlamePosition,
+    setFlameTheta,
+    setFlamePhi,
+    setFlameRadius,
+    setFlameTarget3D,
+    setFlameFov,
+    setFlameRoll,
+    flyMode,
+    setFlyMode,
+    flySpeed,
+    effectiveTheta,
+    effectivePhi,
+    effectiveRadius,
+    effectiveTarget3D,
+    effectiveRoll,
+    effectiveFov,
+  } = useWorkspaceCamera({
+    flameDescriptor,
+    setRenderSetting: (path, value) => {
+      setRenderSetting(path, value)
+    },
+    timeline: {
+      isDrivingView: () => timeline.isDrivingView(),
+      resolveValueAtPath: (path, frame) =>
+        timeline.resolveValueAtPath(path, frame),
+      currentFrame: () => timeline.currentFrame(),
+    },
+    setSilently: (updater) => {
+      history.setSilently(updater)
+    },
   })
-  createEffect(() => {
-    const target = autoExposureTarget()
-    if (target === null) return
-    const current = untrack(() => flameDescriptor.renderSettings.exposure)
-    if (Math.abs(target - current) > 1e-4) {
-      // Silent: this is a derived follower of the camera radius. Recording it
-      // injected a fresh history entry whenever an undo reverted the radius
-      // (effects run after the undo completes) — destroying redo and making
-      // undo fight the user.
-      history.setSilently((draft) => {
-        draft.renderSettings.exposure = target
-      })
-    }
-  })
-  const setFlameTarget3D = (value: Vec3 | ((prev: Vec3) => Vec3)) => {
-    const current = new Float32Array(
-      flameDescriptor.renderSettings.camera3D.target,
-    )
-    const newTarget = typeof value === 'function' ? value(current) : value
-    setRenderSetting('camera3D.target', [
-      newTarget[0] ?? 0,
-      newTarget[1] ?? 0,
-      newTarget[2] ?? 0,
-    ])
-    return new Float32Array(flameDescriptor.renderSettings.camera3D.target)
-  }
-  const setFlameFov = makeCamera3DSetter('fov')
-  const setFlameRoll = makeCamera3DSetter('roll')
-
-  // First-person "fly" navigation for 3D flames. Session-only (you don't want
-  // to reopen the app mid-flight); the movement speed is remembered.
-  const [flyMode, setFlyMode] = createSignal(false)
-  const flySpeed = persistentSignal('camera3D/fly-speed', 1)
-
-  const effectiveTheta = () => {
-    if (timeline.isDrivingView()) {
-      const val = timeline.resolveValueAtPath(
-        'camera3D.theta',
-        timeline.currentFrame(),
-      )
-      if (val !== null && typeof val === 'number') return val
-    }
-    return flameDescriptor.renderSettings.camera3D.theta
-  }
-  const effectivePhi = () => {
-    if (timeline.isDrivingView()) {
-      const val = timeline.resolveValueAtPath(
-        'camera3D.phi',
-        timeline.currentFrame(),
-      )
-      if (val !== null && typeof val === 'number') return val
-    }
-    return flameDescriptor.renderSettings.camera3D.phi
-  }
-  const effectiveRadius = () => {
-    if (timeline.isDrivingView()) {
-      const val = timeline.resolveValueAtPath(
-        'camera3D.radius',
-        timeline.currentFrame(),
-      )
-      if (val !== null && typeof val === 'number') return val
-    }
-    return flameDescriptor.renderSettings.camera3D.radius
-  }
-  const effectiveTarget3D = () => {
-    // Array properties are not easily animatable yet, so just use descriptor
-    return new Float32Array(flameDescriptor.renderSettings.camera3D.target)
-  }
-  const effectiveRoll = () => {
-    if (timeline.isDrivingView()) {
-      const val = timeline.resolveValueAtPath(
-        'camera3D.roll',
-        timeline.currentFrame(),
-      )
-      if (val !== null && typeof val === 'number') return val
-    }
-    return flameDescriptor.renderSettings.camera3D.roll
-  }
-  const effectiveFov = () => {
-    if (timeline.isDrivingView()) {
-      const val = timeline.resolveValueAtPath(
-        'camera3D.fov',
-        timeline.currentFrame(),
-      )
-      if (val !== null && typeof val === 'number') return val
-    }
-    return flameDescriptor.renderSettings.camera3D.fov
-  }
 
   // Per-mode flame memory: the dimension toggle stashes the active flame and
   // restores the one last used in the target mode, so 2D work is never lost
@@ -3029,126 +2845,13 @@ export function MainWorkspace(props: AppProps) {
   })
 
   // ── Autosave & save-awareness ──────────────────────────────────────────
-  // Baseline JSON of the last loaded/saved state; the flame is "dirty" when
-  // the current state differs. Loads reset the baseline (and the editing
-  // clock), so untouched examples are never autosaved; any edit diverges.
-  // Every fresh starting point also rotates the autosave id, so a new
-  // load/flame can never clobber the previous flame's autosave entry.
-  const newAutosaveId = () =>
-    `autosave-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
-  let autosaveSessionId = newAutosaveId()
-  const autosaveSnapshot = () =>
-    JSON.stringify({ flame: flameDescriptor, tracks: timeline.tracks() })
-  let autosaveBaseline = autosaveSnapshot()
-  let editingSince: number | null = null
-  let lastAutosaveAt = 0
-  let reminderShown = false
-  let autosavePromptShown = false
-
-  const isFlameDirty = () => autosaveSnapshot() !== autosaveBaseline
-  const markSavedBaseline = () => {
-    autosaveBaseline = autosaveSnapshot()
-  }
-  const markLoadedBaseline = () => {
-    autosaveBaseline = autosaveSnapshot()
-    editingSince = null
-    autosaveSessionId = newAutosaveId()
-  }
-
-  const autosaveNow = () => {
-    const saved = upsertRecentFlame(
-      autosaveSessionId,
+  const { markSavedBaseline, markLoadedBaseline, flushDirtyToRecents } =
+    useWorkspaceAutosave({
       flameDescriptor,
-      undefined,
-      timeline.tracks(),
-    )
-    // A failed write (quota, private mode) must not mark the flame clean —
-    // the pagehide fallback would then skip it and the work would vanish.
-    if (!saved) return
-    lastAutosaveAt = Date.now()
-    markSavedBaseline()
-  }
-
-  // Flush outgoing dirty work before the flame gets replaced (load, New
-  // Flame, 2D/3D switch): the replace resets the baseline, after which the
-  // pagehide safety net no longer sees the old state as dirty.
-  const flushDirtyToRecents = () => {
-    if (isFlameDirty()) autosaveNow()
-  }
-
-  // Reload/close/freeze with unsaved changes: persist silently — no prompt,
-  // the work just shows up in Recent flames. Also saves on bfcache freezes
-  // (`persisted`): frozen pages are routinely evicted without another
-  // pagehide, and the upsert is idempotent when the page is restored.
-  // Independent of the periodic-autosave setting.
-  const saveOnPagehide = () => {
-    flushDirtyToRecents()
-  }
-  window.addEventListener('pagehide', saveOnPagehide)
-  onCleanup(() => {
-    window.removeEventListener('pagehide', saveOnPagehide)
-  })
-
-  const AUTOSAVE_POLL_MS = 30_000
-  const REMINDER_AFTER_MS = 5 * 60_000
-  const autosavePoll = setInterval(() => {
-    const dirty = isFlameDirty()
-    if (dirty && editingSince === null) editingSince = Date.now()
-
-    // First time an edit would be autosaved: ask once, remember the answer.
-    // Never while an agent drives — the toast column is muted then, so asking
-    // would burn the one-shot flag on a question nobody ever sees. The poll
-    // comes back every 30s and asks once the viewer has the controls again.
-    if (
-      dirty &&
-      autosaveRecents() === 'unset' &&
-      !autosavePromptShown &&
-      !agentDriving()
-    ) {
-      autosavePromptShown = true
-      // Sticky: a question must wait for an answer, never auto-hide.
-      showToast('Auto-save your flames to Recents while you edit?', 'sticky', [
-        {
-          label: 'Yes',
-          onClick: () => {
-            setAutosaveRecents('on')
-            flushDirtyToRecents()
-          },
-        },
-        { label: 'No', onClick: () => setAutosaveRecents('off') },
-      ])
-      return
-    }
-
-    if (dirty && autosaveRecents() === 'on') {
-      const intervalMs = Math.max(1, autosaveIntervalMin()) * 60_000
-      if (Date.now() - lastAutosaveAt >= intervalMs) autosaveNow()
-    }
-
-    // Gentle one-time pointer to saving/exporting after sustained editing.
-    if (
-      !reminderShown &&
-      !saveReminderDismissed() &&
-      !agentDriving() &&
-      editingSince !== null &&
-      Date.now() - editingSince >= REMINDER_AFTER_MS
-    ) {
-      reminderShown = true
-      showToast(
-        'Enjoying this flame? Save it for later, export a PNG, or share a link from the actions bar.',
-        12000,
-        [
-          {
-            label: "Don't show again",
-            onClick: () => setSaveReminderDismissed(true),
-          },
-        ],
-      )
-    }
-  }, AUTOSAVE_POLL_MS)
-  onCleanup(() => {
-    clearInterval(autosavePoll)
-  })
+      getTracks: () => timeline.tracks(),
+      agentDriving,
+      showToast,
+    })
 
   // Apply flame and animation from shared URL (fires once when resource resolves)
   let queryApplied = false
@@ -3801,88 +3504,6 @@ export function MainWorkspace(props: AppProps) {
     return vec2f(...base)
   })
 
-  useKeyboardShortcuts({
-    Escape: () => {
-      if (sidebarDiffView()) {
-        closeSidebarDiff()
-        return true
-      }
-      // Let browser/dialog handle Escape when no sidebar diff is open
-    },
-    KeyF: () => {
-      if ('startViewTransition' in document) {
-        document.startViewTransition(toggleSidebarAsAuthoredAction)
-      } else {
-        toggleSidebarAsAuthoredAction()
-      }
-      return true
-    },
-    KeyZ: (ev) => {
-      if (animationExportRunning()) return false
-      if (ev.metaKey || ev.ctrlKey) {
-        // Chronological across flame history + timeline (see undoRouting.ts);
-        // the toolbar Undo/Redo buttons route through the same arbiter.
-        // Routed through the command registry so a session recording sees
-        // the undo; guarded so a no-op never lands in the log.
-        if (ev.shiftKey ? !undoRouter.canRedo() : !undoRouter.canUndo()) {
-          return false
-        }
-        executeCommand(
-          ev.shiftKey ? 'history.redo' : 'history.undo',
-          cmdContext,
-        )
-        return true
-      }
-    },
-    KeyY: (ev) => {
-      if (animationExportRunning()) return false
-      if (ev.metaKey || ev.ctrlKey) {
-        if (!undoRouter.canRedo()) return false
-        executeCommand('history.redo', cmdContext)
-        return true
-      }
-    },
-    KeyD: (ev) => {
-      // Plain "D" pans the 3D camera right (WASD), so the theme toggle lives
-      // on Ctrl/Cmd+D to avoid the conflict.
-      if (!(ev.ctrlKey || ev.metaKey)) return false
-      if (animationExportRunning()) return false
-      const toggleTheme = () => {
-        setTheme(theme() === 'dark' ? 'light' : 'dark')
-      }
-      if ('startViewTransition' in document) {
-        document.startViewTransition(toggleTheme)
-      } else {
-        toggleTheme()
-      }
-      return true
-    },
-    KeyI: (ev) => {
-      if (animationExportRunning()) return false
-      if (ev.altKey) {
-        const path = targetedParameter()
-        if (path) {
-          recorderTimeline.removeKeyframe(path, timeline.currentFrame())
-        }
-      } else {
-        const path = targetedParameter()
-        if (path) {
-          recorderTimeline.addKeyframeAtCurrentFrame(path)
-        }
-      }
-      return true
-    },
-    Space: () => {
-      if (animationExportRunning()) return false
-      if (!showTimeline()) return
-      if (!animationEnabled()) {
-        executeCommand('timeline.setAnimationEnabled', cmdContext, true)
-      }
-      recorderTimeline.togglePlay()
-      return true
-    },
-  })
-
   const timelineDuration = () => timeline.config().endFrame
   const setTimelineDuration = (
     value: number | ((previous: number) => number),
@@ -4157,10 +3778,7 @@ export function MainWorkspace(props: AppProps) {
     },
   }
 
-  // WebMCP: register tools so LLMs can read/mutate flame state via the
-  // browser's ModelContext API (ChatGPT in-app browser, Chrome flag, etc.).
-  const cleanupWebMcp = registerWebMcpTools(cmdContext)
-  onCleanup(cleanupWebMcp)
+  useWorkspaceCommands(cmdContext)
 
   /**
    * Whole-document command loads are undoable edits (randomize, genetics,
@@ -4194,7 +3812,20 @@ export function MainWorkspace(props: AppProps) {
       history.takeOverOwnedPreview()
     },
   )
-  useShortcutManager(cmdContext)
+  useWorkspaceShortcuts({
+    getCmdContext: () => cmdContext,
+    sidebarDiffView,
+    closeSidebarDiff,
+    toggleSidebarAsAuthoredAction,
+    undoRouter,
+    theme,
+    setTheme,
+    targetedParameter,
+    recorderTimeline,
+    timeline,
+    showTimeline,
+    animationEnabled,
+  })
 
   /**
    * Every render-settings control goes through the registry, so a recording
@@ -4213,6 +3844,24 @@ export function MainWorkspace(props: AppProps) {
     patch: Partial<FlameDescriptor['renderSettings']>,
   ) => {
     executeCommand('flame.updateRenderSettings', cmdContext, patch, 'render')
+  }
+
+  const handlePaletteSelect = (palette: Palette) => {
+    const nextRestoreColors =
+      selectedPaletteId() === ''
+        ? captureTransformColors(flameDescriptor)
+        : prePaletteColors()
+
+    withPaletteRestoreTransition(nextRestoreColors, 'Apply Palette', () => {
+      executeCommand('flame.applyPalette', cmdContext, palette)
+    })
+  }
+
+  const handlePaletteUnselect = () => {
+    const restoreColors = prePaletteColors()
+    withPaletteRestoreTransition({}, 'Remove Palette', () => {
+      executeCommand('flame.removePalette', cmdContext, restoreColors)
+    })
   }
 
   /**

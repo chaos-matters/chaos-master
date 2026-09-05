@@ -17,7 +17,7 @@ import { createVideoEncoder } from '@/utils/videoEncoder'
 import type { Setter, Signal } from 'solid-js'
 import type { v2f } from 'typegpu/data'
 import type { Vec3 } from 'wgpu-matrix'
-import type { ExportImageType } from '@/App'
+import type { ExportImageType } from '@/flame/exportImageType'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { AnimationJob } from '@/utils/exportJobs'
 
