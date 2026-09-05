@@ -4,8 +4,14 @@ import type { TimelineConfig, TimelineTrack } from './timeline'
 import type { VideoEncoderConfig } from './videoEncoder'
 import type { Palette } from '@/flame/colorMap'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
-import type { ReplayVideoSpec } from '@/recorder/replayVideo'
 import type { RecordedSession } from '@/recorder/schema'
+
+export type ReplayVideoSpec = {
+  version: 1
+  playbackSpeed: number
+  leadInMs: number
+  tailMs: number
+}
 
 /**
  * Background export jobs. Image (and opt-in animation) exports run OFFSCREEN (see

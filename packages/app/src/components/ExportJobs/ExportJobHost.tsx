@@ -14,7 +14,7 @@ import { saveRecentFlame } from '@/utils/recentFlames'
 import ui from './ExportJobHost.module.css'
 import { OffscreenAnimationRender } from './OffscreenAnimationRender'
 import type { Vec3 } from 'wgpu-matrix'
-import type { ExportImageType } from '@/App'
+import type { ExportImageType } from '@/flame/exportImageType'
 import type { ImageJob } from '@/utils/exportJobs'
 
 /**

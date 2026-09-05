@@ -9,8 +9,8 @@ import { Root } from '@/lib/Root'
 import { WheelZoomCamera2D } from '@/lib/WheelZoomCamera2D'
 import { WheelZoomCamera3D } from '@/lib/WheelZoomCamera3D'
 import type { Vec3 } from 'wgpu-matrix'
+import type { ExportImageType } from '@/flame/exportImageType'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
-import type { ExportImageType } from '@/MainWorkspace'
 
 /**
  * One flame, rendered off-screen to a still, once.

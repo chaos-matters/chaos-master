@@ -13,8 +13,6 @@ import { agentDriving, appendPilotLog, endPilot, notePilotSaveResult, startPilot
 import { ALWAYS_ALLOWED, DUEL_ALLOWED, DUEL_STEP_BUDGET } from './topics'
 import type { DuelVerdict } from './duelJudge'
 import type { PilotEndReason } from './pilot'
-import type { CommandContext } from '@/commands/types'
-
 /**
  * Who is in the other seat.
  *
@@ -25,18 +23,10 @@ import type { CommandContext } from '@/commands/types'
  * affordance, not a game mode: there is no opponent, so there is nothing to
  * win, and the hub only offers it where `SOLO_DUEL_AVAILABLE` says so.
  */
-export type DuelOpponent = 'ai' | 'none'
+import type { DuelOpponent, DuelStartFrom } from './types'
+import type { CommandContext } from '@/commands/types'
 
-/**
- * What the viewer's side starts as.
- *
- * `current` is the flame they have loaded, which is the only thing a duel
- * could start from before. The two random options exist because a duel is
- * started by the agent, on whatever the viewer happens to have open — so
- * without this, wanting a 3D duel meant loading a 3D flame by hand first and
- * hoping the agent asked at the right moment.
- */
-export type DuelStartFrom = 'current' | 'random-2d' | 'random-3d'
+export type { DuelOpponent, DuelStartFrom }
 
 /**
  * The one way a duel starts, whoever is in the other seat.

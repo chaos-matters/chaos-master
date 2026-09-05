@@ -1,10 +1,11 @@
-import { batch, createEffect, createResource, createSignal, ErrorBoundary, onCleanup, onMount, Show, Suspense, } from 'solid-js'
+import { batch, createEffect, createResource, createSignal, ErrorBoundary, lazy, onCleanup, onMount, Show, Suspense, } from 'solid-js'
 import { ArcadeHub } from './components/Arcade/ArcadeHub'
 import { AppCrashed, WebgpuNotSupported, } from './components/ErrorHandling/ErrorHandling'
 import { HomeTab } from './components/Home/HomeTab'
 import { Modal } from './components/Modal/Modal'
 import { ToastHost } from './components/Toast/Toast'
 import { WelcomeScreen } from './components/WelcomeScreen/WelcomeScreen'
+import { WorkspaceSkeleton } from './components/WorkspaceSkeleton'
 import { CompactModeProvider } from './contexts/CompactModeContext'
 import { KeyframeTargetProvider } from './contexts/KeyframeTargetContext'
 import { createSpotlightTourState, SpotlightTourContext, } from './contexts/SpotlightTourContext'
@@ -15,7 +16,10 @@ import { initAncestry } from './flame/ancestry'
 import { importSharedVariations, loadCustomVariations, remapFlameCustomVariations, } from './flame/variations/custom'
 import { activeTab, arcadeMode, setActiveTab, tabFromHash, } from './lib/activeTab'
 import { Root } from './lib/Root'
-import { MainWorkspace } from './MainWorkspace'
+
+const MainWorkspace = lazy(() =>
+  import('./MainWorkspace').then((m) => ({ default: m.MainWorkspace })),
+)
 import { getTour } from './tours/registry'
 import { isBenchmarkAuto, isBenchmarkRequested } from './utils/benchmarkRequest'
 import { decodeSharePayload, decodeVariationShare, } from './utils/jsonQueryParam'
@@ -26,16 +30,7 @@ import type { FlameDescriptor } from './flame/schema/flameSchema'
 import type { HardwareTier } from './utils/hardwareTier'
 import type { TimelineTrack } from './utils/timeline'
 
-export type ExportImageInfo = {
-  /** True when the canvas holds a final color-graded image at the requested
-   *  quality limit, i.e. it is safe to capture the canvas for an export. */
-  finalImageReady: boolean
-}
-
-export type ExportImageType = (
-  canvas: HTMLCanvasElement,
-  info?: ExportImageInfo,
-) => void
+export type { ExportImageInfo, ExportImageType } from './flame/exportImageType'
 
 function QueryErrorToast(props: { error: string | null }) {
   const { showToast } = useToast()
@@ -269,7 +264,7 @@ export function Wrappers() {
               >
                 <Modal>
                   <ErrorBoundary fallback={errorHandler}>
-                    <Suspense>
+                    <Suspense fallback={<WorkspaceSkeleton />}>
                       <QueryErrorToast error={queryError()} />
                       <MainWorkspace
                         flameFromQuery={flameFromQuery()}

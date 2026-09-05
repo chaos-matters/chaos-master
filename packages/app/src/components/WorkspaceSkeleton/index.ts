@@ -1,0 +1,1 @@
+export { WorkspaceSkeleton } from './WorkspaceSkeleton'

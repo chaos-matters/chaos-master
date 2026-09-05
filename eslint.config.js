@@ -64,6 +64,7 @@ export default defineConfig(
       'no-useless-concat': 'error',
       'prefer-template': 'error',
       eqeqeq: 'error',
+      complexity: ['warn', 20],
 
       '@typescript-eslint/no-unused-vars': [
         'error',

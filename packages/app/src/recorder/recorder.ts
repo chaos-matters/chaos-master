@@ -87,14 +87,9 @@ export type SessionStartExtras = {
   view?: SessionViewSnapshot
 }
 
-export type SessionRecordingStartFailureReason =
-  | 'already-recording'
-  | 'workspace-not-serializable'
-  | 'workspace-not-recordable'
+import type { SessionRecordingStartFailureReason, SessionRecordingStartResult, } from './types'
 
-export type SessionRecordingStartResult =
-  | { ok: true }
-  | { ok: false; reason: SessionRecordingStartFailureReason }
+export type { SessionRecordingStartFailureReason, SessionRecordingStartResult }
 
 /**
  * One recording per seat.
