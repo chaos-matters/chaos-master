@@ -23,11 +23,12 @@ import { createExportPngDialog } from './components/ExportPngDialog/ExportPngDia
 import { FloatingActions } from './components/FloatingActions/FloatingActions'
 import { createLoadFlame } from './components/LoadFlameModal/LoadFlameModal'
 import { useRequestModal } from './components/Modal/ModalContext'
-import { getPresetFromQuality, qualityPresets, } from './components/Quality/QualityPresets'
+import { qualityPresets } from './components/Quality/QualityPresets'
 import { recorderExportPending, recorderTaskPending, setRecorderCollapsed, setRecorderVisible, } from './components/SessionRecorder/recorderUi'
 import { WorkspaceBottomBar } from './components/WorkspaceBottomBar'
 import { createLazyDiscordShareModal, createLazyImportVariationsModal, createLazyLogoFaviconGenerator, createLazyMigrationModal, createLazyShareLinkModal, createLazyShareVariationLinkModal, createLazyShareVariationLoadModal, createLazyShowBenchmark, createLazyShowCustomVariationEditor, createLazyShowDocumentation, createLazyShowHelp, WorkspaceModalsHost, } from './components/WorkspaceModalsHost'
 import { WorkspaceSidebar } from './components/WorkspaceSidebar'
+import { createWorkspaceExportStore, createWorkspaceLayoutStore, createWorkspaceSelectionStore, isWideLayout, } from './stores'
 
 const AncestryTreeModal = lazy(() =>
   import('./components/AncestryTreeModal/AncestryTreeModal').then((m) => ({
@@ -69,7 +70,7 @@ import { ChangeHistoryContextProvider } from './contexts/ChangeHistoryContext'
 import { useCompactMode } from './contexts/CompactModeContext'
 import { useTheme } from './contexts/ThemeContext'
 import { TimelineContextProvider } from './contexts/TimelineContext'
-import { DEFAULT_QUALITY, DEFAULT_RENDER_INTERVAL_MS, DEFAULT_RESOLUTION, IS_DEV, } from './defaults'
+import { DEFAULT_RENDER_INTERVAL_MS, IS_DEV } from './defaults'
 import { breedFlames } from './flame/breedFlame'
 import { example1 } from './flame/examples/example1'
 import { example34 } from './flame/examples/example34'
@@ -81,7 +82,7 @@ import { accumulatedPointCount, animationExportCancel, animationExportProgress, 
 import { MAX_CAMERA_ZOOM_VALUE, MIN_CAMERA_ZOOM_VALUE, tryValidateFlame, } from './flame/schema/flameSchema'
 import { generateTransformId, generateVariationId, } from './flame/transformFunction'
 import { allTransformVariations, isAnyParametricVariationType, } from './flame/variations'
-import { collectFlameCustomVariations, deleteCustomVariation, duplicateCustomVariation, getCustomVariations, isCustomVariationRegistered, loadCustomVariations, persistSharedVariations, restoreCustomVariation, } from './flame/variations/custom'
+import { collectFlameCustomVariations, deleteCustomVariation, duplicateCustomVariation, getCustomVariations, loadCustomVariations, persistSharedVariations, restoreCustomVariation, } from './flame/variations/custom'
 import { getVariationDefault } from './flame/variations/utils'
 import { breakRecordingCoalescing, cancelSessionRecording, invalidateLastFinishedSession, isSessionRecording, notePreviewStarted, recordedActionCount, recordSyntheticAction, reportDerivedWorkspaceWrite, reportDocumentWrite, reportTimelineTransport, reportUnreplayable, reportUnreplayableOnce, startSessionRecording, stopSessionRecording, withRecordingSuppressed, } from './recorder/recorder'
 import { applyReplayAudioWiring, canEnableReplayAudio, sessionMayEnableSonification, } from './recorder/replay'
@@ -122,7 +123,6 @@ import type { v2f } from 'typegpu/data'
 import type { Vec3 } from 'wgpu-matrix'
 import type { AudioMapping } from './components/AudioReactivePanel/AudioReactivePanel'
 import type { QualityPreset } from './components/Quality/QualityPresets'
-import type { QuickPickerMode } from './components/QuickVariationPicker/QuickVariationPicker'
 import type { TourContext } from './components/SpotlightTour/tourTypes'
 import type { Palette } from './flame/colorMap'
 import type { PointInitMode } from './flame/pointInitMode'
@@ -132,7 +132,6 @@ import type { FlameDescriptor, TransformId, VariationId, } from './flame/schema/
 import type { TimelineSnapshot } from './flame/schema/timeline'
 import type { TransformVariationType } from './flame/variations'
 import type { CustomVariationDef } from './flame/variations/custom/types'
-import type { TransformVariationType3D } from './flame/variations3D'
 import type { ReplayAffineMode, ReplayAffineTab, ReplayColorView, ReplayFocusPreparationHandler, } from './recorder/focusPreparation'
 import type { SessionStartExtras } from './recorder/recorder'
 import type { ReplayTarget } from './recorder/replay'
@@ -144,7 +143,6 @@ import type { SonificationSnapshot } from './recorder/sonificationState'
 import type { AnimationExportConfig } from './utils/animationExport'
 import type { AudioAnalyzer, LiveAudioAnalyzer } from './utils/audioAnalysis'
 import type { HistoryPreviewOwner } from './utils/createStoreHistory'
-import type { ExportDimensions } from './utils/exportDimensions'
 import type { HardwareTier } from './utils/hardwareTier'
 import type { SharePayload } from './utils/jsonQueryParam'
 import type { RandomizerHistoryEntry } from './utils/randomizerHistoryDB'
@@ -218,14 +216,6 @@ export function extractFlameVariationTypes(
 }
 
 /**
- * Viewport width at/above which the workspace lays out "wide": the timeline
- * strip starts open and the sidebar is not auto-hidden. Mirrors the
- * `max-width: 768px` media query the mobile layout listens on.
- */
-const WIDE_LAYOUT_MIN_WIDTH = 769
-const isWideLayout = () => window.innerWidth >= WIDE_LAYOUT_MIN_WIDTH
-
-/**
  * Animation starts enabled — a flame with no tracks renders identically either
  * way, and the timeline's affordances are visible from the start.
  *
@@ -250,11 +240,82 @@ export function MainWorkspace(props: AppProps) {
     }
   })
 
-  const [qualityPreset, setQualityPreset] = createSignal<QualityPreset>(
-    props.hardwareTier
-      ? hardwareTierToPreset(props.hardwareTier)
-      : getPresetFromQuality(DEFAULT_QUALITY),
-  )
+  const layoutStore = createWorkspaceLayoutStore()
+  const selectionStore = createWorkspaceSelectionStore()
+  const exportStore = createWorkspaceExportStore(props.hardwareTier)
+
+  const {
+    isMobile,
+    setIsMobile,
+    sidebarHidden,
+    setSidebarHidden,
+    showSidebar,
+    setShowSidebar,
+    sidebarLayoutMode,
+    setSidebarLayoutMode,
+    sidebarWidth,
+    setSidebarEl,
+    timelineCollapsed,
+    setTimelineCollapsed,
+    showTimeline,
+    setShowTimeline,
+    affineCardOpen,
+    setAffineCardOpen,
+    colorCardOpen,
+    setColorCardOpen,
+    metadataCardOpen,
+    setMetadataCardOpen,
+    paletteCardOpen,
+    setPaletteCardOpen,
+    renderCardOpen,
+    setRenderCardOpen,
+    symmetryCardOpen,
+    setSymmetryCardOpen,
+    randomizerOpen,
+    setRandomizerOpen,
+    randomizerAnimEpoch,
+    setRandomizerAnimEpoch,
+    floatingActionsCollapsed,
+    setFloatingActionsCollapsed,
+    floatingLeft,
+    floatingTop,
+  } = layoutStore
+
+  const {
+    selectedTransformId,
+    setSelectedTransformId,
+    toggleSelectedTransform,
+    collapsedTransforms,
+    setCollapsedTransforms,
+    toggleTransformCollapsed,
+    quickPickState,
+    setQuickPickState,
+    quickPickerMode,
+    setQuickPickerMode,
+    hoveredVariationType,
+    setHoveredVariationType,
+    hoveredCustomVarDef,
+    setHoveredCustomVarDef,
+    customVarsVersion,
+    setCustomVarsVersion,
+    customStatus,
+  } = selectionStore
+
+  const {
+    qualityPreset,
+    setQualityPreset,
+    pixelRatio,
+    setPixelRatio,
+    exportDimensions,
+    setExportDimensions,
+    canvasPixelRatio,
+    onExportImage,
+    setOnExportImage,
+    adaptiveFilterEnabled,
+    setAdaptiveFilterEnabled,
+    stochasticFilterEnabled,
+    setStochasticFilterEnabled,
+  } = exportStore
 
   createEffect(() => {
     if (props.hardwareTier) {
@@ -262,33 +323,8 @@ export function MainWorkspace(props: AppProps) {
     }
   })
 
-  const [pixelRatio, setPixelRatio] = createSignal(DEFAULT_RESOLUTION)
-  // When set during an export, the main canvas renders at this exact pixel size
-  // (resolution + aspect resolved) instead of the viewport-scaled pixelRatio, so
-  // the captured image/video matches the chosen export format.
-  const [exportDimensions, setExportDimensions] = createSignal<
-    ExportDimensions | undefined
-  >()
-  // Hoist this conditional out of the AutoCanvas JSX prop: a ternary in a prop
-  // compiles to a memo that Solid instantiates lazily on first read — and the
-  // first read happens inside Flam3's rAF export loop (no owner), which warns
-  // "computations created outside a createRoot". Created here it lives in this
-  // component's owner. See memory: solid-conditional-prop-memo-leak.
-  const canvasPixelRatio = createMemo(() =>
-    exportDimensions() ? 1 : pixelRatio(),
-  )
-  const [onExportImage, setOnExportImage] = createSignal<ExportImageType>()
-
   // Dev-only: crash injection trigger (renders inside ErrorBoundary)
   const [devCrashTest, setDevCrashTest] = createSignal(false)
-  const [adaptiveFilterEnabled, setAdaptiveFilterEnabled] = createSignal(true)
-  const [stochasticFilterEnabled, setStochasticFilterEnabled] =
-    createSignal(false)
-  // Which transform is "selected" — shared across the affine grid, the color
-  // picker and the sidebar transform cards so it's clear which one edits target.
-  const [selectedTransformId, setSelectedTransformId] = createSignal<
-    string | null
-  >(null)
   const [replayAffineModeRequest, setReplayAffineModeRequest] = createSignal<{
     mode: ReplayAffineMode
     tab: ReplayAffineTab
@@ -298,44 +334,16 @@ export function MainWorkspace(props: AppProps) {
     view: ReplayColorView
     epoch: number
   }>({ view: 'grid', epoch: 0 })
-  const [affineCardOpen, setAffineCardOpen] = createSignal(true)
-  const [colorCardOpen, setColorCardOpen] = createSignal(true)
-  const [metadataCardOpen, setMetadataCardOpen] = createSignal(false)
-  const [paletteCardOpen, setPaletteCardOpen] = createSignal(false)
-  const [renderCardOpen, setRenderCardOpen] = createSignal(true)
-  const [floatingActionsCollapsed, setFloatingActionsCollapsed] =
-    createSignal(false)
-  const [timelineCollapsed, setTimelineCollapsed] = createSignal(false)
-  // Toggle: clicking the already-selected transform clears the selection
-  // (deselect-all → nothing dimmed). Canvas handles only ever *set* (drag-safe).
-  const toggleSelectedTransform = (tid: string) =>
-    setSelectedTransformId((prev) => (prev === tid ? null : tid))
-  // Per-transform collapsed state drives the (controlled) transform cards, so the
-  // sidebar toolbar toggle can collapse-all / expand-all based on actual state:
-  // if any card is open it collapses all, otherwise it expands all.
-  const [collapsedTransforms, setCollapsedTransforms] = createSignal<
-    Set<string>
-  >(new Set())
+
   const visibleTransformTids = () =>
     sortedTransformEntries(recordEntries(flameDescriptor.transforms))
       .filter(([tid]) => !tid.startsWith('_sym__'))
       .map(([tid]) => tid)
   const anyTransformOpen = () =>
-    visibleTransformTids().some((tid) => !collapsedTransforms().has(tid))
+    selectionStore.anyTransformOpen(visibleTransformTids())
 
   function toggleCollapseAllTransforms() {
-    setCollapsedTransforms(
-      anyTransformOpen() ? new Set(visibleTransformTids()) : new Set<string>(),
-    )
-  }
-
-  function toggleTransformCollapsed(tid: string) {
-    setCollapsedTransforms((prev) => {
-      const next = new Set(prev)
-      if (next.has(tid)) next.delete(tid)
-      else next.add(tid)
-      return next
-    })
+    selectionStore.toggleCollapseAllTransforms(visibleTransformTids())
   }
 
   // Browser tab title: "Lumen Apeiron — <flame name>" when the flame is named,
@@ -359,7 +367,6 @@ export function MainWorkspace(props: AppProps) {
   const { showToast } = useToast()
   const SIDEBAR_RESIZABLE = false
   const { isCompact, setCompact } = useCompactMode()
-  const [showSidebar, setShowSidebar] = createSignal(true)
 
   const [directorOpen, setDirectorOpen] = createSignal(false)
   const [directorState, setDirectorState] = createSignal<{
@@ -545,33 +552,10 @@ export function MainWorkspace(props: AppProps) {
     flameA: FlameDescriptor
     flameB: FlameDescriptor
   } | null>(null)
-  const [sidebarHidden, setSidebarHidden] = createSignal(!isWideLayout())
-  // Flame Randomizer card open state is controlled here so the Timeline
-  // "Animate" button can reveal it; the epoch bump also forces its Animation
-  // Settings section open.
-  const [randomizerOpen, setRandomizerOpen] = createSignal(false)
-  const [randomizerAnimEpoch, setRandomizerAnimEpoch] = createSignal(0)
-  const [sidebarLayoutMode, setSidebarLayoutMode] = persistentSignal<
-    'compact' | 'wide'
-  >('sidebar-layout-mode', 'wide')
-  const sidebarWidth = createMemo(() =>
-    sidebarLayoutMode() === 'wide' ? 26 : 21,
-  )
   const setSidebarWidth = () => {} // Drag resize disabled
   let sidebarRef: HTMLDivElement | undefined
   let sidebarScrollRef: HTMLDivElement | undefined
   let randomizerCardRef: HTMLDivElement | undefined
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [sidebarEl, setSidebarEl] = createSignal<HTMLDivElement | undefined>()
-  const floatingLeft = () => {
-    const rootFontSize = parseFloat(
-      // eslint-disable-next-line no-restricted-globals
-      getComputedStyle(document.documentElement).fontSize,
-    )
-    return sidebarWidth() * rootFontSize + 8
-  }
-  const floatingTop = () => 8
-  const [isMobile, setIsMobile] = createSignal(window.innerWidth < 769)
   createEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)')
     setIsMobile(mq.matches)
@@ -592,8 +576,6 @@ export function MainWorkspace(props: AppProps) {
       mq.removeEventListener('change', handler)
     }
   })
-  // Hide timeline by default on mobile -- users can toggle it back on
-  const [showTimeline, setShowTimeline] = createSignal(isWideLayout())
   // The session currently open for replay (M4), if any. Lives here rather than
   // in the dock because dropping a .steps.json opens one too.
   const [replaySession, setReplaySession] = createSignal<RecordedSession>()
@@ -830,7 +812,6 @@ export function MainWorkspace(props: AppProps) {
   // Stable ID list for <For> -- only changes when transforms are added/removed,
   // not when their values change, so dragging angle editors stays fluid.
   const symTransformIds = createMemo(() => symTransforms().map(([tid]) => tid))
-  const [symmetryCardOpen, setSymmetryCardOpen] = createSignal(true)
   createEffect(() => {
     if (symTransforms().length === 0) setSymmetryCardOpen(true)
   })
@@ -1478,37 +1459,10 @@ export function MainWorkspace(props: AppProps) {
     exportModalIsOpen() ||
     customVariationEditorIsOpen()
 
-  // Quick variation picker state
-  const [quickPickerMode, setQuickPickerMode] =
-    persistentSignal<QuickPickerMode>('quick-picker-mode', 'list')
-  type QuickPickState = {
-    tid: TransformId
-    vid: VariationId
-    type: TransformVariationType | TransformVariationType3D
-  } | null
-  const [quickPickState, setQuickPickState] = createSignal<QuickPickState>(null)
-  const [hoveredVariationType, setHoveredVariationType] = createSignal<
-    TransformVariationType | TransformVariationType3D | null
-  >(null)
-  const [hoveredCustomVarDef, setHoveredCustomVarDef] =
-    createSignal<CustomVariationDef | null>(null)
-
-  // Trigger for refreshing the custom variations list (incremented on delete/duplicate/modal close)
-  const [customVarsVersion, setCustomVarsVersion] = createSignal(0)
   const customVariationsList = createMemo(() => {
     void customVarsVersion()
     return getCustomVariations()
   })
-
-  // Status of a variation type for the per-transform list badge: 'none' for
-  // built-ins, 'available' for a live custom variation, 'unavailable' for one a
-  // flame still references after it was deleted from the library (or never
-  // imported). Reads customVarsVersion so the badge re-evaluates on delete/import.
-  function customStatus(type: string): 'none' | 'available' | 'unavailable' {
-    if (!type.startsWith('custom_')) return 'none'
-    void customVarsVersion()
-    return isCustomVariationRegistered(type) ? 'available' : 'unavailable'
-  }
 
   // Close the quick variation picker when its target transform/variation no
   // longer exists in the current flame — i.e. the flame was switched or toggled
