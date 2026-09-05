@@ -1,7 +1,7 @@
 import { sortedTransformEntries } from './transformOrder'
 import type { TransformRecord } from '@/flame/schema/flameSchema'
 
-interface ReadableIds {
+export interface ReadableIds {
   transformLabel: Record<string, string>
   variationLabel: Record<string, string>
   formatTrackPath: (path: string) => string

@@ -1,5 +1,10 @@
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
+import colorAndPaletteSectionSource from '../components/WorkspaceSidebar/ColorAndPaletteSection.tsx?raw'
+import randomizerSectionSource from '../components/WorkspaceSidebar/RandomizerSection.tsx?raw'
+import renderSettingsSectionSource from '../components/WorkspaceSidebar/RenderSettingsSection.tsx?raw'
+import transformsSectionSource from '../components/WorkspaceSidebar/TransformsSection.tsx?raw'
+import sidebarSource from '../components/WorkspaceSidebar/WorkspaceSidebar.tsx?raw'
 import workspaceSource from '../MainWorkspace.tsx?raw'
 
 const workspacePath = 'src/MainWorkspace.tsx'
@@ -10,6 +15,69 @@ const workspaceAst = ts.createSourceFile(
   true,
   ts.ScriptKind.TSX,
 )
+
+const allAstEntries = [
+  { path: workspacePath, ast: workspaceAst },
+  {
+    path: 'src/components/WorkspaceSidebar/WorkspaceSidebar.tsx',
+    ast: ts.createSourceFile(
+      'src/components/WorkspaceSidebar/WorkspaceSidebar.tsx',
+      sidebarSource,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
+    ),
+  },
+  {
+    path: 'src/components/WorkspaceSidebar/ColorAndPaletteSection.tsx',
+    ast: ts.createSourceFile(
+      'src/components/WorkspaceSidebar/ColorAndPaletteSection.tsx',
+      colorAndPaletteSectionSource,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
+    ),
+  },
+  {
+    path: 'src/components/WorkspaceSidebar/RandomizerSection.tsx',
+    ast: ts.createSourceFile(
+      'src/components/WorkspaceSidebar/RandomizerSection.tsx',
+      randomizerSectionSource,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
+    ),
+  },
+  {
+    path: 'src/components/WorkspaceSidebar/TransformsSection.tsx',
+    ast: ts.createSourceFile(
+      'src/components/WorkspaceSidebar/TransformsSection.tsx',
+      transformsSectionSource,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
+    ),
+  },
+  {
+    path: 'src/components/WorkspaceSidebar/RenderSettingsSection.tsx',
+    ast: ts.createSourceFile(
+      'src/components/WorkspaceSidebar/RenderSettingsSection.tsx',
+      renderSettingsSectionSource,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TSX,
+    ),
+  },
+]
+
+const allSources = [
+  workspaceSource,
+  sidebarSource,
+  colorAndPaletteSectionSource,
+  randomizerSectionSource,
+  transformsSectionSource,
+  renderSettingsSectionSource,
+].join('\n')
 
 /**
  * MainWorkspace owns the final callbacks for most editor controls, but mounting
@@ -25,6 +93,8 @@ function compact(text: string): string {
     .replace(/\s+/g, ' ')
     .replace(/\(\s+/g, '(')
     .replace(/\s+\)/g, ')')
+    .replace(/\{\s+/g, '{')
+    .replace(/\s+\}/g, '}')
     .trim()
 }
 
@@ -62,16 +132,18 @@ function callsWithin(node: ts.Node): ts.CallExpression[] {
 
 function jsxOpenings(tagName: string): string[] {
   const matches: string[] = []
-  const visit = (node: ts.Node) => {
-    if (
-      (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
-      node.tagName.getText(workspaceAst) === tagName
-    ) {
-      matches.push(compact(node.getText(workspaceAst)))
+  for (const { ast } of allAstEntries) {
+    const visit = (node: ts.Node) => {
+      if (
+        (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
+        node.tagName.getText(ast) === tagName
+      ) {
+        matches.push(compact(node.getText(ast)))
+      }
+      ts.forEachChild(node, visit)
     }
-    ts.forEachChild(node, visit)
+    visit(ast)
   }
-  visit(workspaceAst)
   return matches
 }
 
@@ -97,8 +169,9 @@ function expectNamedDeclarationToUse(
 }
 
 function expectSomeOpeningToUse(tagName: string, ...fragments: string[]) {
+  const compactFragments = fragments.map(compact)
   const match = jsxOpenings(tagName).find((opening) =>
-    fragments.every((fragment) => opening.includes(fragment)),
+    compactFragments.every((fragment) => opening.includes(fragment)),
   )
   expect(
     match,
@@ -187,7 +260,7 @@ describe('real UI recorder coverage ratchet', () => {
     )
     expectSomeOpeningToUse(
       'FlameRandomizerCard',
-      'onUpdateRenderSettings={ handleUpdateRenderSettings }',
+      'onUpdateRenderSettings={handleUpdateRenderSettings}',
     )
     expectSomeOpeningToUse(
       'Slider',
@@ -233,27 +306,25 @@ describe('real UI recorder coverage ratchet', () => {
   })
 
   it('keeps symmetry-row follow-cam anchors on the dedicated card', () => {
-    expect(workspaceSource).toContain('data-focus-id={affineFocusId(tid)}')
-    expect(workspaceSource).toContain(
-      'data-focus-id={transformVisibilityFocusId(',
-    )
+    expect(allSources).toContain('data-focus-id={affineFocusId(tid)}')
+    expect(allSources).toContain('data-focus-id={transformVisibilityFocusId(')
   })
 
   it('keeps document and transport boundaries honest', () => {
-    expect(workspaceSource).toContain("'card-randomize',")
-    expect(workspaceSource).toContain(
+    expect(allSources).toContain("'card-randomize',")
+    expect(allSources).toContain(
       'data-focus-id={transformColorRandomizeFocusId(',
     )
-    expect(workspaceSource).toContain(
+    expect(allSources).toContain(
       'Loaded animation autoplay is wall-clock transport and is not replayed',
     )
-    expect(workspaceSource).toContain(
+    expect(allSources).toContain(
       'Stop or discard the recording before opening a Home flame',
     )
-    expect(workspaceSource).toContain(
+    expect(allSources).toContain(
       'if (isSessionRecording()) hideMobileSidebarAsAuthoredAction()',
     )
-    expect(workspaceSource).toContain('else setSidebarHidden(true)')
-    expect(workspaceSource).toContain('primeEffects: (session) =>')
+    expect(allSources).toContain('else setSidebarHidden(true)')
+    expect(allSources).toContain('primeEffects: (session) =>')
   })
 })
