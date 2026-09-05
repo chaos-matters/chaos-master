@@ -766,9 +766,12 @@ export function Flam3(props: Flam3Props) {
 
     // Reset accumulation when any structural or rendering parameter changes
     // (weights, affine, colors, etc.) but ignore color grading post-processing.
+    // During animation export, accumulation resets are driven explicitly by export frame change.
     createEffect(() => {
       accumulationFingerprint()
-      resetAccumulation()
+      if (!animationExportRunning()) {
+        resetAccumulation()
+      }
     })
 
     // Reset accumulation on animation frame change whenever the timeline drives

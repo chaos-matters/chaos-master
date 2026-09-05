@@ -98,6 +98,8 @@ type RenderDialogProps = {
   onEmbedMetadataChange: (v: boolean) => void
   cameraDuringExport: boolean
   onCameraDuringExportChange: (v: boolean) => void
+  motionBlurSamples: number
+  onMotionBlurSamplesChange: (v: number) => void
   animationOffscreen: boolean
   onAnimationOffscreenChange: (v: boolean) => void
   onRenderAnimation: () => void
@@ -850,6 +852,22 @@ function RenderDialog(props: RenderDialogProps) {
             </label>
 
             <label class={ui.field}>
+              <span>Motion Blur</span>
+              <select
+                class={ui.select}
+                value={props.motionBlurSamples}
+                onChange={(e) => {
+                  props.onMotionBlurSamplesChange(Number(e.currentTarget.value))
+                }}
+              >
+                <option value={1}>Off (Standard)</option>
+                <option value={4}>Smooth (4x sub-sampling)</option>
+                <option value={8}>High Quality (8x sub-sampling)</option>
+                <option value={16}>Cinematic (16x sub-sampling)</option>
+              </select>
+            </label>
+
+            <label class={ui.field}>
               <span>Name</span>
               <input
                 type="text"
@@ -1110,6 +1128,10 @@ export function createExportPngDialog(
       'export/camera-during-export',
       ALLOW_CAMERA_DURING_EXPORT,
     )
+    const [motionBlurSamples, setMotionBlurSamples] = persistentSignal<number>(
+      'export/motion-blur-samples',
+      1,
+    )
     const [animationOffscreen, setAnimationOffscreen] = persistentSignal(
       'export/animation-offscreen',
       false,
@@ -1223,6 +1245,7 @@ export function createExportPngDialog(
           session: sessionSnapshot,
           audioBuffer: getAudioBuffer?.(),
           audioMapping: getAudioMapping?.(),
+          motionBlurSamples: motionBlurSamples(),
         })
         return
       }
@@ -1245,6 +1268,7 @@ export function createExportPngDialog(
         session: sessionSnapshot,
         audioBuffer: audioBuf,
         audioMapping: getAudioMapping?.(),
+        motionBlurSamples: motionBlurSamples(),
       }
       // The canvas will be obtained from the Flam3 component in App.tsx
       // For now, we pass config and the factory calls startAnimationExport
@@ -1309,6 +1333,8 @@ export function createExportPngDialog(
           onEmbedMetadataChange={setEmbedMetadata}
           cameraDuringExport={cameraDuringExport()}
           onCameraDuringExportChange={setCameraDuringExport}
+          motionBlurSamples={motionBlurSamples()}
+          onMotionBlurSamplesChange={setMotionBlurSamples}
           animationOffscreen={animationOffscreen()}
           onAnimationOffscreenChange={setAnimationOffscreen}
           onRenderAnimation={() => {

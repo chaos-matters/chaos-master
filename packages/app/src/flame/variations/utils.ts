@@ -4,6 +4,7 @@ import { generateTransformId, generateVariationId } from '../transformFunction'
 import { isParametricVariationType3D, isVariationType3D, transformVariations3D, } from '../variations3D'
 import { allTransformVariations, isParametricVariationType, transformVariations, variationTypes, } from '.'
 import { getCustomVariationDef } from './custom/CustomVariationRegistry'
+import { resolveParamEditor } from './paramEditorRegistry'
 import type { FlameDescriptor, TransformId, VariationId, } from '../schema/flameSchema'
 import type { TransformVariationType3D } from '../variations3D'
 import type { TransformVariationDescriptor, TransformVariationType } from '.'
@@ -53,13 +54,15 @@ export function getVariationDefault(
 export function getParamsEditor<T extends { type: string; params?: unknown }>(
   variation: T,
 ): { component: EditorFor<T['params']>; value: T['params'] } {
-  // Only parametric variations (the ones with params) carry an `editor`, which
-  // is exactly what this helper is called for; assert that shape.
   const v = allTransformVariations[
     variation.type as keyof typeof allTransformVariations
-  ] as { editor: EditorFor<T['params']> }
+  ] as { editor?: EditorFor<T['params']> } | undefined
+  const component = resolveParamEditor(
+    variation.type,
+    v?.editor as EditorFor<Record<string, number>> | undefined,
+  ) as unknown as EditorFor<T['params']>
   return {
-    component: v.editor,
+    component,
     get value() {
       return variation.params as T['params']
     },

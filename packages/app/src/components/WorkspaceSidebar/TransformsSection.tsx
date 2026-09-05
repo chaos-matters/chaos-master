@@ -1,4 +1,4 @@
-import { For, Show } from 'solid-js'
+import { For, Show, Suspense } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { vec2f } from 'typegpu/data'
 import ui from '@/App.module.css'
@@ -511,36 +511,40 @@ export function TransformsSection(props: TransformsSectionProps) {
                             setTargetedParameter(`${tid}.${vid}`)
                           }}
                         >
-                          <Dynamic
-                            {...getParamsEditor(variation)}
-                            dataParameterPath={`${tid}.${vid}`}
-                            setValue={(value: unknown) => {
-                              executeCommand(
-                                'flame.setVariation',
-                                cmdContext,
-                                tid,
-                                vid,
-                                {
-                                  ...deepClone(variation),
-                                  params: value as Record<string, number>,
-                                },
-                                'params',
-                              )
-                            }}
-                            setParamValue={(
-                              paramName: string,
-                              value: unknown,
-                            ) => {
-                              executeCommand(
-                                'flame.setVariationParams',
-                                cmdContext,
-                                tid,
-                                vid,
-                                paramName,
-                                value,
-                              )
-                            }}
-                          />
+                          <Suspense
+                            fallback={<div>Loading parameter editor...</div>}
+                          >
+                            <Dynamic
+                              {...getParamsEditor(variation)}
+                              dataParameterPath={`${tid}.${vid}`}
+                              setValue={(value: unknown) => {
+                                executeCommand(
+                                  'flame.setVariation',
+                                  cmdContext,
+                                  tid,
+                                  vid,
+                                  {
+                                    ...deepClone(variation),
+                                    params: value as Record<string, number>,
+                                  },
+                                  'params',
+                                )
+                              }}
+                              setParamValue={(
+                                paramName: string,
+                                value: unknown,
+                              ) => {
+                                executeCommand(
+                                  'flame.setVariationParams',
+                                  cmdContext,
+                                  tid,
+                                  vid,
+                                  paramName,
+                                  value,
+                                )
+                              }}
+                            />
+                          </Suspense>
                         </div>
                       )}
                     </Show>
