@@ -403,14 +403,26 @@ export function makeFlameDescriptorSchema<
     variations: variationRecord,
   })
   const TransformRecord = v.record(TransformId, TransformFunction)
+  const FlameLayer = v.object({
+    id: v.string(),
+    name: v.optional(v.string(), 'Layer'),
+    visible: v.optional(v.boolean(), true),
+    opacity: v.optional(v.pipe(v.number(), v.minValue(0), v.maxValue(1)), 1),
+    blendMode: v.optional(
+      v.picklist(['normal', 'add', 'multiply', 'screen', 'overlay']),
+      'normal',
+    ),
+    transforms: TransformRecord,
+  })
   const FlameDescriptor = v.object({
     version: v.optional(FlameDescriptorVersion),
     metadata: v.optional(FlameMetadata, metadataDefault),
     renderSettings: v.optional(RenderSettings, renderSettingsDefault),
     transforms: TransformRecord,
     finalTransform: v.optional(affine),
+    layers: v.optional(v.array(FlameLayer)),
   })
-  return { TransformFunction, TransformRecord, FlameDescriptor }
+  return { TransformFunction, TransformRecord, FlameDescriptor, FlameLayer }
 }
 
 const schema2D = makeFlameDescriptorSchema(AffineParamsSchema)
@@ -420,6 +432,15 @@ export const TransformFunction = schema2D.TransformFunction
 export type TransformFunction = v.InferOutput<typeof TransformFunction>
 const TransformRecord = schema2D.TransformRecord
 export type TransformRecord = v.InferOutput<typeof TransformRecord>
+
+export const FlameLayer = schema2D.FlameLayer
+export type FlameLayer = v.InferOutput<typeof FlameLayer>
+export type FlameBlendMode =
+  | 'normal'
+  | 'add'
+  | 'multiply'
+  | 'screen'
+  | 'overlay'
 
 export const FlameDescriptor = schema2D.FlameDescriptor
 export type FlameDescriptor = v.InferOutput<typeof FlameDescriptor>

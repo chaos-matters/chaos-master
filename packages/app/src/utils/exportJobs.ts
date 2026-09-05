@@ -75,6 +75,8 @@ export type AnimationJobSpec = {
   replayVideo?: ReplayVideoSpec
   audioBuffer?: AudioBuffer
   audioMapping?: AudioMappingEntry[]
+  motionBlurSamples?: number
+  shutterAngle?: number
 }
 
 export type ExportJobStatus = 'queued' | 'rendering' | 'done' | 'error'

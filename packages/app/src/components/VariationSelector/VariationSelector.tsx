@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack, } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, Suspense, untrack, } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { Dynamic } from 'solid-js/web'
 import { produce, unfreeze } from 'structurajs'
@@ -1042,50 +1042,59 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                             </h2>
                             <Show when={!paramsCollapsed()}>
                               <div class={ui.itemParams}>
-                                <Dynamic
-                                  {...getParamsEditor(variation)}
-                                  dataParameterPath={`${getTransformPreviewTid(variation.type)}.${getTransformPreviewVid(variation.type)}`}
-                                  setValue={(value) => {
-                                    setVariationExamples(
-                                      (
-                                        draft: Record<string, FlameDescriptor>,
-                                      ) => {
-                                        const variationDraft =
-                                          draft[id]?.transforms[
-                                            getTransformPreviewTid(
-                                              variation.type,
+                                <Suspense
+                                  fallback={
+                                    <div>Loading parameter editor...</div>
+                                  }
+                                >
+                                  <Dynamic
+                                    {...getParamsEditor(variation)}
+                                    dataParameterPath={`${getTransformPreviewTid(variation.type)}.${getTransformPreviewVid(variation.type)}`}
+                                    setValue={(value) => {
+                                      setVariationExamples(
+                                        (
+                                          draft: Record<
+                                            string,
+                                            FlameDescriptor
+                                          >,
+                                        ) => {
+                                          const variationDraft =
+                                            draft[id]?.transforms[
+                                              getTransformPreviewTid(
+                                                variation.type,
+                                              )
+                                            ]?.variations[
+                                              getTransformPreviewVid(
+                                                variation.type,
+                                              )
+                                            ]
+                                          if (
+                                            variationDraft === undefined ||
+                                            !isAnyParametricVariationType(
+                                              variationDraft.type,
                                             )
-                                          ]?.variations[
-                                            getTransformPreviewVid(
-                                              variation.type,
-                                            )
-                                          ]
-                                        if (
-                                          variationDraft === undefined ||
-                                          !isAnyParametricVariationType(
-                                            variationDraft.type,
-                                          )
-                                        ) {
-                                          throw new Error(`Unreachable code`)
-                                        }
-                                        ;(
-                                          variationDraft as {
-                                            params: Record<string, number>
+                                          ) {
+                                            throw new Error(`Unreachable code`)
                                           }
-                                        ).params = value as Record<
-                                          string,
-                                          number
-                                        >
-                                      },
-                                    )
-                                    // Invalidate this tile's cached preview so it
-                                    // re-renders live with the new params.
-                                    setParamRev((r) => ({
-                                      ...r,
-                                      [id]: (r[id] ?? 0) + 1,
-                                    }))
-                                  }}
-                                />
+                                          ;(
+                                            variationDraft as {
+                                              params: Record<string, number>
+                                            }
+                                          ).params = value as Record<
+                                            string,
+                                            number
+                                          >
+                                        },
+                                      )
+                                      // Invalidate this tile's cached preview so it
+                                      // re-renders live with the new params.
+                                      setParamRev((r) => ({
+                                        ...r,
+                                        [id]: (r[id] ?? 0) + 1,
+                                      }))
+                                    }}
+                                  />
+                                </Suspense>
                               </div>
                             </Show>
                           </>

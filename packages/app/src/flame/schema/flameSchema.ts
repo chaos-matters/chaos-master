@@ -9,6 +9,8 @@ export {
   condenseFlameDescriptor,
   FlameDescriptor,
   FlameDescriptor3D,
+  FlameLayer,
+  type FlameBlendMode,
   flameComplexityError,
   isFlameGraphWithinLimits,
   isSafeFlameEntityId,

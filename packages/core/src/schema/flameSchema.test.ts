@@ -82,4 +82,47 @@ describe('core flame schema validation', () => {
     expect(isSafeFlameEntityId('constructor')).toBe(false)
     expect(isSafeFlameEntityId('')).toBe(false)
   })
+
+  it('validates a flame with compositing layers', () => {
+    const layeredFlame = {
+      renderSettings: { ...renderSettingsDefault },
+      transforms: {
+        t1: {
+          probability: 1,
+          preAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+          postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+          color: { x: 0, y: 0 },
+          variations: {
+            v1: { type: 'linearVar', weight: 1 },
+          },
+        },
+      },
+      layers: [
+        {
+          id: 'layer_bg',
+          name: 'Background Nebula',
+          visible: true,
+          opacity: 0.8,
+          blendMode: 'screen',
+          transforms: {
+            t_bg: {
+              probability: 1,
+              preAffine: { a: 0.5, b: 0, c: 0, d: 0, e: 0.5, f: 0 },
+              postAffine: { a: 1, b: 0, c: 0, d: 0, e: 1, f: 0 },
+              color: { x: 0.5, y: 0.5 },
+              variations: {
+                v_bg: { type: 'sphericalVar', weight: 1 },
+              },
+            },
+          },
+        },
+      ],
+    }
+
+    const validated = validateFlame(layeredFlame)
+    expect(validated.layers).toBeDefined()
+    expect(validated.layers).toHaveLength(1)
+    expect(validated.layers?.[0]?.blendMode).toBe('screen')
+    expect(validated.layers?.[0]?.opacity).toBe(0.8)
+  })
 })

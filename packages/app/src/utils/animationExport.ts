@@ -33,6 +33,10 @@ export type AnimationExportConfig = {
   audioBuffer?: AudioBuffer
   /** Audio-reactive mappings applied per frame (requires audioBuffer). */
   audioMapping?: AudioMappingEntry[]
+  /** Number of temporal sub-frame accumulation passes per output frame (1 = disabled, 4 = smooth, 8 = high, 16 = cinematic). */
+  motionBlurSamples?: number
+  /** Shutter angle in degrees (e.g. 180 for standard cinematic 180-degree shutter). */
+  shutterAngle?: number
 }
 
 function estimatePointCount(
@@ -169,40 +173,50 @@ export function createAnimationExport(
         }
 
         const frame = config.frameStart + (frameIndex % totalFrames)
+        const motionBlurSamples = Math.max(1, config.motionBlurSamples ?? 1)
+        const shutterAngle = config.shutterAngle ?? 180
+        const shutterDuration = shutterAngle / 360
+        let subFrameIndex = 0
 
-        // Advance the playhead so anything resolved from currentFrame outside the
-        // flame descriptor — notably the morph's animated blendWeight (read via
-        // resolvedBlendWeight on the live Flam3) — tracks this export frame.
-        timeline.setCurrentFrame(frame)
+        function applySubFrame(subIdx: number) {
+          const subOffset =
+            motionBlurSamples > 1
+              ? (subIdx / motionBlurSamples) * shutterDuration
+              : 0
+          const subFrame = frame + subOffset
 
-        // Clone flame and apply timeline for this frame
-        const flameClone = deepClone(baseFlame)
-        applyTimelineToFlameAtFrame(timeline, flameClone, frame)
+          // Advance the playhead so anything resolved from currentFrame tracks this subFrame.
+          timeline.setCurrentFrame(subFrame)
 
-        // Apply audio-reactive mappings if configured
-        if (audioAnalyzer && config.audioMapping) {
-          const audioFrame = frameIndex % audioAnalyzer.totalFrames
-          const frameData = audioAnalyzer.getFrameData(audioFrame)
-          applyAudioMappingsToFlame(flameClone, frameData, config.audioMapping)
+          // Clone flame and apply timeline for this subFrame
+          const flameClone = deepClone(baseFlame)
+          applyTimelineToFlameAtFrame(timeline, flameClone, subFrame)
+
+          // Apply audio-reactive mappings if configured
+          if (audioAnalyzer && config.audioMapping) {
+            const audioFrame = frameIndex % audioAnalyzer.totalFrames
+            const frameData = audioAnalyzer.getFrameData(audioFrame)
+            applyAudioMappingsToFlame(
+              flameClone,
+              frameData,
+              config.audioMapping,
+            )
+          }
+
+          // Set flame descriptor to the per-frame clone so Flam3 picks it up
+          setFlameDescriptor((draft) => {
+            draft.renderSettings = flameClone.renderSettings
+            draft.transforms = flameClone.transforms
+          })
         }
 
-        // Set flame descriptor to the per-frame clone so Flam3 picks it up
-        setFlameDescriptor((draft) => {
-          // Apply render settings
-          draft.renderSettings = flameClone.renderSettings
-          // Apply transforms
-
-          draft.transforms = flameClone.transforms
-          // edgeFadeColor lives under renderSettings (copied wholesale above);
-          // the old top-level copy was a dead no-op (issue #30 exposed it).
-        })
-
+        applySubFrame(0)
         setExportQuality(config.quality)
 
         frameAccumStartMs = performance.now()
         if (DEBUG_MODE) {
           console.info(
-            `[AnimExport ${logTime()}] setup frame ${frameIndex + 1}/${totalRenders} (timeline frame ${frame})`,
+            `[AnimExport ${logTime()}] setup frame ${frameIndex + 1}/${totalRenders} (timeline frame ${frame}${motionBlurSamples > 1 ? `, ${motionBlurSamples}x motion blur` : ''})`,
           )
         }
         let capturing = false
@@ -223,6 +237,21 @@ export function createAnimationExport(
             const current = accumulatedPointCount()
 
             updateProgress(current, limit)
+
+            // Accumulate subsequent sub-frames into the same buffer if motion blur is active
+            if (
+              motionBlurSamples > 1 &&
+              subFrameIndex < motionBlurSamples - 1
+            ) {
+              const subLimit = Math.round(
+                ((subFrameIndex + 1) / motionBlurSamples) * limit,
+              )
+              if (current >= subLimit) {
+                subFrameIndex++
+                applySubFrame(subFrameIndex)
+              }
+              return
+            }
 
             if (current < limit) return
 

@@ -67,6 +67,15 @@ const bindGroupLayout = tgpu.bindGroupLayout({
   },
 })
 
+export function isHdrFormat(format: GPUTextureFormat): boolean {
+  return (
+    format === 'rgba16float' ||
+    format === 'rgba32float' ||
+    format === 'r32float' ||
+    format === 'rg32float'
+  )
+}
+
 export function createColorGradingPipeline(
   root: TgpuRoot,
   uniforms: LayoutEntryToInput<(typeof bindGroupLayout)['entries']['uniforms']>,
