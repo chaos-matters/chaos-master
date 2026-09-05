@@ -8,9 +8,7 @@ import { accumulatedPointCount, animationExportProgress, animationExportRunning,
 import { DEFAULT_RENDERER_RANDOM_IMPLEMENTATION_ID } from '@/shaders/random'
 import { deepClone } from '@/utils/clone'
 import { createTimestampQuery } from '@/utils/createTimestampQuery'
-import { formatPointCount } from '@/utils/formatPointCount'
 import { logTime } from '@/utils/logTime'
-import { isAppleWebKit } from '@/utils/platform'
 import { recordEntries } from '@/utils/record'
 import { applyTimelineToFlame } from '@/utils/timeline'
 import { vramTrack } from '@/utils/vramLog'
@@ -18,7 +16,10 @@ import { Camera3DContext } from '../lib/Camera3DContext'
 import { CameraContext } from '../lib/CameraContext'
 import { useCanvas } from '../lib/CanvasContext'
 import { useLiveRootContext } from '../lib/RootContext'
-import { createAnimationFrame } from '../utils/createAnimationFrame'
+import { createExportRenderDriver, createInteractiveRenderDriver, EXPORT_COUNT_SIGNAL_INTERVAL_MS, EXPORT_INITIAL_ITERATIONS, EXPORT_PRESENT_INTERVAL_MS, } from './renderDrivers'
+import type { CompletedPointCountInfo, RenderTickResult } from './renderDrivers'
+
+export type { CompletedPointCountInfo }
 import { createAdaptiveBlurPipeline } from './adaptiveBlurPipeline'
 import { ColorGradingUniforms, createColorGradingPipeline, } from './colorGrading'
 import { createDensityEstimationPipeline } from './densityEstimationPipeline'
@@ -44,51 +45,6 @@ const OUTPUT_INTERVAL_BATCH_INDEX = 10
 // quality cap and blowing out brightness. The camera may zoom closer; only the
 // normalization is held here.
 const MIN_DENSITY_NORM_RADIUS = 0.01
-
-// Export driver tuning. During exports the render loop is driven by a
-// self-scheduling async loop instead of requestAnimationFrame: rAF cadence is
-// owned by the browser compositor, which Chrome collapses under sustained GPU
-// queue pressure (and stops entirely in background tabs) — that stalled long
-// ultra-quality exports. The export loop submits one bounded chunk at a time
-// and awaits queue.onSubmittedWorkDone(), so the GPU queue stays shallow and
-// the chunk wall time is an accurate measure of its GPU cost.
-// Chunk sizing: in visible Chrome tabs, onSubmittedWorkDone resolution is
-// aligned to the compositor, giving every await a fixed latency floor of one
-// vsync period (~16.7ms at 60Hz, ~33ms at 30Hz) regardless of chunk size.
-// The controller therefore targets a tick time well above that floor and
-// never divides it per-iteration: grow fast while clearly latency-bound,
-// creep upward inside the band, shrink proportionally only when the chunk
-// itself overshoots. Hidden tabs / Firefox have no floor and settle near the
-// target.
-const EXPORT_TARGET_TICK_MS = 32
-const EXPORT_TICK_GROW_BELOW_MS = 24
-const EXPORT_TICK_SHRINK_ABOVE_MS = 48
-const EXPORT_INITIAL_ITERATIONS = 2
-const EXPORT_MAX_ITERATIONS = 512
-const EXPORT_IDLE_DELAY_MS = 8
-const EXPORT_PRESENT_INTERVAL_MS = 250
-// Telemetry: periodic throughput line + slow-tick events, timestamped so
-// stalls can be correlated with tab switches / window occlusion.
-const EXPORT_LOG_INTERVAL_MS = 2000
-const EXPORT_SLOW_TICK_MS = 300
-// During export, the global point counter (quality pills, speed readout)
-// updates at this interval instead of every tick — per-tick signal writes fan
-// out to UI subscribers and that main-thread work competes with the export
-// while the tab is visible.
-const EXPORT_COUNT_SIGNAL_INTERVAL_MS = 100
-
-type RenderTickResult = {
-  iterations: number
-  presented: boolean
-  hadWork: boolean
-}
-
-export type CompletedPointCountInfo = {
-  /** Cumulative plotted-point count captured for this exact submission. */
-  count: number
-  /** Queue-fenced completion time from `performance.now()`. */
-  completedAtMs: number
-}
 
 type Flam3Props = {
   quality: number
@@ -722,25 +678,22 @@ export function Flam3(props: Flam3Props) {
     // Tunable via VITE_PERSIST_RESEED_INTERVAL — lower it to make skipIters /
     // warmup read more strongly and reduce settle flicker, at a throughput cost.
     let dispatchesSincePersistReseed = 0
-    // Interactive estimator state: last iteration count, used to cap growth.
+    // Estimator state: last iteration count, used to cap growth.
     let lastInteractiveIterationCount = 1
-    // Export driver state: chunk size adapted from measured chunk wall time,
-    // and the wall-clock time of the last canvas present.
-    let exportIterationCount = EXPORT_INITIAL_ITERATIONS
     let lastPresentMs = 0
     let lastCountSignalMs = 0
     // Reused by the rAF pressure limiter, export driver, timestamp reader, and
     // benchmark completion callback. Keeping one fence per submission avoids
     // asking the queue for several equivalent promises.
     let latestQueueFence: Promise<void> = Promise.resolve()
-    // Wakes the export driver when reactive work arrives (next frame's
-    // descriptor, forced redraw). Keeps the idle wait event-driven: timers are
-    // clamped to 1Hz by Chrome in hidden or occluded windows, signals are not.
-    let notifyExportWork: (() => void) | undefined
+    const drivers: {
+      interactive?: ReturnType<typeof createInteractiveRenderDriver>
+      export?: ReturnType<typeof createExportRenderDriver>
+    } = {}
 
     function requestRedraw() {
-      rafLoop?.redraw()
-      notifyExportWork?.()
+      drivers.interactive?.redraw()
+      drivers.export?.wake()
     }
 
     // Re-blit the current color-graded accumulation to the canvas without doing
@@ -971,7 +924,9 @@ export function Flam3(props: Flam3Props) {
       let iterationCount = 0
       if (continueRendering(accumulatedPointCount_)) {
         if (exportMode) {
-          iterationCount = exportIterationCount
+          iterationCount =
+            drivers.export?.getExportIterationCount() ??
+            EXPORT_INITIAL_ITERATIONS
         } else if (timings) {
           // Cap growth at 1.5x per tick: without GPU timestamps the ifsMs
           // fallback measures submit→completion wall latency, which on an
@@ -1219,225 +1174,28 @@ export function Flam3(props: Flam3Props) {
       }
     }
 
-    const rafLoop = createAnimationFrame(
-      (frameId) => {
-        renderTick(frameId)
-      },
-      () =>
-        continueRendering(accumulatedPointCount_)
-          ? props.renderInterval
-          : Infinity,
-      () => latestQueueFence,
-      // Tear the rAF loop down entirely when an export takes over OR when the
-      // device is lost. The `!gpuReady()` read is reactive, so a device loss
-      // disposes every preview's loop on the spot (no more requestAnimationFrame,
-      // no more onSubmittedWorkDone holds against a dead queue).
-      () => exportDriverActive() || !gpuReady(),
-    )
-
-    // Present pump (Apple WebKit only): a WebGPU canvas that isn't drawn every
-    // frame shows stale swapchain buffers. The interactive loop above only
-    // presents when an IFS batch completes — on a slow GPU that can be
-    // 100-200ms apart during a load, long enough for WebKit to flash the
-    // previous flame between presents. Re-present the current image every frame
-    // while the flame is still accumulating so no gap is ever visible.
-    //
-    // Scoped tightly, because a re-blit is not free — it submits a full-screen
-    // color-grading pass into the same queue the IFS uses:
-    //  - WebKit only. On Blink/Gecko the pump buys nothing, and its cost lands
-    //    in `ifsMs` (the no-timestamp fallback measures the whole queue
-    //    draining), which shrinks the estimated iteration count and slows
-    //    accumulation for everyone.
-    //  - Main visible canvas only (previews/gallery tiles excluded).
-    //  - Never during an export — that driver owns the canvas.
-    //  - Only while the main renderer is actually running: at
-    //    `renderInterval === Infinity` a modal gallery has deliberately taken
-    //    the GPU, and the accumulation buffer is frozen, so pumping would
-    //    re-blit an identical image at 60Hz against the very previews the
-    //    pause exists to feed.
-    createAnimationFrame(
-      () => {
-        if (!gpuReady() || exportDriverActive()) return
-        // Skip the pre-first-present window (no accumulation yet — avoid a black
-        // flash) and stop once quality is reached (swapchain already warm).
-        if (
-          accumulatedPointCount_ <= 0 ||
-          !continueRendering(accumulatedPointCount_)
-        ) {
-          return
-        }
-        presentToCanvas()
-      },
-      0,
-      undefined,
-      () =>
-        !isAppleWebKit() ||
-        exportDriverActive() ||
-        !gpuReady() ||
-        !Number.isFinite(props.renderInterval) ||
-        !(props.isExportRenderer ?? false),
-    )
-
-    // When the render interval drops from Infinity (modal closed) back to a
-    // finite rate, force an immediate redraw so the first frame appears without
-    // waiting for the next rAF delta-time check. On iOS Safari this also helps
-    // recover from any transient GPU-queue stall during the modal transition.
-    // Gate on the Infinity -> finite transition only: every flame load already
-    // redraws via resetAccumulation(), so redrawing on every finite interval
-    // change (e.g. entering/leaving export at interval 0) would be redundant.
-    // Seed with untrack() so this outer (pipeline-building) scope does not
-    // subscribe to renderInterval — only the inner effect below should.
-    let renderIntervalWasFinite = untrack(() =>
-      Number.isFinite(props.renderInterval),
-    )
-    createEffect(() => {
-      const finite = Number.isFinite(props.renderInterval)
-      const resumedFromStall = finite && !renderIntervalWasFinite
-      renderIntervalWasFinite = finite
-      if (resumedFromStall) {
+    drivers.interactive = createInteractiveRenderDriver({
+      renderTick,
+      renderInterval: () => props.renderInterval,
+      continueRendering: () => continueRendering(accumulatedPointCount_),
+      hasAccumulatedPoints: () => accumulatedPointCount_ > 0,
+      latestQueueFence: () => latestQueueFence,
+      exportDriverActive,
+      gpuReady,
+      presentToCanvas,
+      isExportRenderer: () => props.isExportRenderer ?? false,
+      onStallResumed: () => {
         requestRedraw()
-      }
+      },
     })
 
-    // Export driver: replaces the rAF loop while an export runs. The loop
-    // awaits each submission, so at most one chunk is in flight — the browser
-    // compositor never sees a deep GPU queue (no rAF collapse in Chrome), the
-    // export keeps running in background tabs, and chunk wall time is a valid
-    // measurement to size the next chunk with.
-    createEffect(() => {
-      // Stop driving on device loss too: a reactive !gpuReady() re-runs this
-      // effect, fires onCleanup (disposed = true) and breaks the export loop.
-      if (!exportDriverActive() || !gpuReady()) return
-
-      let disposed = false
-      onCleanup(() => {
-        disposed = true
-        notifyExportWork = undefined
-      })
-
-      exportIterationCount = EXPORT_INITIAL_ITERATIONS
-      let exportFrameId = 0
-
-      // Telemetry — timestamped so stalls can be correlated with tab
-      // switches, window moves and occlusion. Chrome fires visibilitychange
-      // (-> hidden) also when the window is fully covered by another window.
-      let windowStartMs = performance.now()
-      let windowPoints = 0
-      let windowTickMs = 0
-      let windowTicks = 0
-      let idleSinceMs: number | undefined
-
-      if (DEBUG_MODE) {
-        const onVisibilityChange = () => {
-          console.info(
-            `[ExportDriver ${logTime()}] document became ${document.visibilityState}`,
-          )
-        }
-        document.addEventListener('visibilitychange', onVisibilityChange)
-        onCleanup(() => {
-          document.removeEventListener('visibilitychange', onVisibilityChange)
-        })
-      }
-
-      const loop = async () => {
-        // Leave the effect's tracking scope before the first tick so signal
-        // reads inside renderTick don't become dependencies of this effect.
-        await Promise.resolve()
-
-        while (!disposed) {
-          const startMs = performance.now()
-          const tick = renderTick(exportFrameId++)
-
-          if (!tick.hadWork) {
-            // Waiting for a capture or the next frame's descriptor.
-            // Event-driven wake (requestRedraw) with a timer backstop; the
-            // timer alone could be clamped to 1Hz in hidden/occluded windows.
-            idleSinceMs ??= startMs
-            await new Promise<void>((resolve) => {
-              notifyExportWork = resolve
-              setTimeout(() => {
-                resolve()
-              }, EXPORT_IDLE_DELAY_MS)
-            })
-            notifyExportWork = undefined
-            continue
-          }
-
-          if (idleSinceMs !== undefined) {
-            const idleMs = startMs - idleSinceMs
-            if (DEBUG_MODE && idleMs > 1000) {
-              console.info(
-                `[ExportDriver ${logTime()}] resumed work after ${(idleMs / 1000).toFixed(1)}s idle`,
-              )
-            }
-            idleSinceMs = undefined
-          }
-
-          try {
-            await latestQueueFence
-          } catch {
-            // Device lost — stop driving; the app-level handler takes over.
-            break
-          }
-
-          const tickMs = performance.now() - startMs
-          windowPoints +=
-            tick.iterations * props.pointCountPerBatch * plotsPerChainBaked
-          windowTickMs += tickMs
-          windowTicks += 1
-
-          if (DEBUG_MODE && tickMs > EXPORT_SLOW_TICK_MS) {
-            console.info(
-              `[ExportDriver ${logTime()}] slow tick: ${tickMs.toFixed(0)}ms for a ${tick.iterations}-iteration chunk${tick.presented ? ' (presented)' : ''}`,
-            )
-          }
-
-          const nowMs = performance.now()
-          if (nowMs - windowStartMs >= EXPORT_LOG_INTERVAL_MS) {
-            if (DEBUG_MODE) {
-              const seconds = (nowMs - windowStartMs) / 1000
-              const avgTickMs = windowTickMs / Math.max(windowTicks, 1)
-              console.info(
-                `[ExportDriver ${logTime()}] ${formatPointCount(windowPoints / seconds)} pts/s | ${windowTicks} ticks, avg ${avgTickMs.toFixed(1)}ms | chunk=${exportIterationCount} iters`,
-              )
-            }
-            windowStartMs = nowMs
-            windowPoints = 0
-            windowTickMs = 0
-            windowTicks = 0
-          }
-
-          if (tick.iterations > 0 && !tick.presented) {
-            // Dual-rate controller (presentation ticks are skipped: their
-            // wall time includes the filter/grading passes and would skew it).
-            if (tickMs < EXPORT_TICK_GROW_BELOW_MS) {
-              // Clearly latency-bound — the fixed await floor dominates, so
-              // more iterations are effectively free. Double.
-              exportIterationCount = Math.min(
-                exportIterationCount * 2,
-                EXPORT_MAX_ITERATIONS,
-              )
-            } else if (tickMs <= EXPORT_TICK_SHRINK_ABOVE_MS) {
-              // Inside the band (e.g. sitting exactly on a vsync floor that
-              // is >= the grow threshold) — creep upward to find the point
-              // where GPU time, not latency, sets the pace.
-              exportIterationCount = Math.min(
-                Math.ceil(exportIterationCount * 1.25),
-                EXPORT_MAX_ITERATIONS,
-              )
-            } else {
-              // The chunk itself overshot the budget — shrink proportionally.
-              exportIterationCount = Math.max(
-                Math.ceil(
-                  exportIterationCount * (EXPORT_TARGET_TICK_MS / tickMs),
-                ),
-                1,
-              )
-            }
-          }
-        }
-      }
-      void loop()
+    drivers.export = createExportRenderDriver({
+      exportDriverActive,
+      gpuReady,
+      renderTick,
+      latestQueueFence: () => latestQueueFence,
+      pointCountPerBatch: () => props.pointCountPerBatch,
+      plotsPerChainBaked: () => plotsPerChainBaked,
     })
 
     // When quality changes (up or down), force a redraw so the interval function
