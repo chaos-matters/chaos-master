@@ -8,7 +8,7 @@
  */
 
 import { vi } from 'vitest'
-import type { CommandContext } from '@/commands/types'
+import type { CommandContext, DirectorState } from '@/commands/types'
 import type { FlameDescriptor } from '@/flame/schema/flameSchema'
 import type { HistorySetter } from '@/utils/createStoreHistory'
 
@@ -66,6 +66,8 @@ export function createMockCommandContext(): CommandContext {
   let flame = createTestFlame()
   const undoStack: FlameDescriptor[] = []
   const redoStack: FlameDescriptor[] = []
+  let directorOpen = false
+  let directorState: DirectorState | null = null
 
   // Honours the real `HistorySetter` contract: the recipe receives a draft,
   // usually mutates it and returns nothing. The old mock passed the live
@@ -111,13 +113,6 @@ export function createMockCommandContext(): CommandContext {
       setPlayer2Stats: vi.fn(),
       selectFighter: vi.fn(),
     },
-    director: {
-      open: vi.fn(() => false),
-      setOpen: vi.fn(),
-      state: vi.fn(() => null),
-      setState: vi.fn(),
-      selectCandidate: vi.fn(),
-    },
     camera: {
       center: vi.fn(),
     },
@@ -153,6 +148,38 @@ export function createMockCommandContext(): CommandContext {
       setMapping: vi.fn(),
       setEnabled: vi.fn(),
       setSource: vi.fn(),
+    },
+    director: {
+      open: () => directorOpen,
+      setOpen: vi.fn((open: boolean | ((prev: boolean) => boolean)) => {
+        directorOpen = typeof open === 'function' ? open(directorOpen) : open
+        return directorOpen
+      }),
+      state: () => directorState,
+      setState: vi.fn(
+        (
+          s:
+            | DirectorState
+            | null
+            | ((prev: DirectorState | null) => DirectorState | null),
+        ) => {
+          directorState = typeof s === 'function' ? s(directorState) : s
+        },
+      ),
+      selectCandidate: vi.fn((index: number) => {
+        if (directorState && directorState.candidates[index]?.flame) {
+          flame = directorState.candidates[index].flame
+          directorState.lastFeedback = {
+            selectedIndex: index,
+            candidates: directorState.candidates.map((c, i) => ({
+              index: i,
+              reaction: c.reaction ?? null,
+              tags: c.tags ?? [],
+              rationale: c.rationale,
+            })),
+          }
+        }
+      }),
     },
     modal: {
       open: vi.fn(),

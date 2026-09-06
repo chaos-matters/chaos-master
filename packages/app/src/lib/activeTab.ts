@@ -10,7 +10,7 @@ import { createSignal } from 'solid-js'
 export type AppTab = 'home' | 'workspace' | 'arcade'
 
 /** The Arcade panels a deep link (or a tool) can open the hub on. */
-export type ArcadeMode = 'teach' | 'cinema' | 'duel' | 'beats'
+export type ArcadeMode = 'teach' | 'cinema' | 'duel' | 'beats' | 'director'
 
 /**
  * The tab lives in the URL fragment (`#home`, `#arcade`, `#arcade=teach`)
@@ -23,7 +23,13 @@ export type ArcadeMode = 'teach' | 'cinema' | 'duel' | 'beats'
  */
 const HOME_HASH = '#home'
 const ARCADE_HASH = '#arcade'
-const ARCADE_MODES: readonly ArcadeMode[] = ['teach', 'cinema', 'duel', 'beats']
+const ARCADE_MODES: readonly ArcadeMode[] = [
+  'teach',
+  'cinema',
+  'duel',
+  'beats',
+  'director',
+]
 
 // The parameter is named `fragment` rather than `hash` because the security
 // lint rule reads any comparison against a "hash" as a timing attack.

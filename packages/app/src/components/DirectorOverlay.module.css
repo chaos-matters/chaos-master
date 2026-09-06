@@ -3,10 +3,10 @@
 .modal {
   display: flex;
   flex-direction: column;
-  width: 580px;
-  max-width: min(92vw, 580px);
-  max-height: min(88vh, 740px);
-  height: 720px;
+  width: 640px;
+  max-width: min(94vw, 640px);
+  max-height: min(90vh, 780px);
+  height: 740px;
   background: var(--neutral-950, #0a0a0f);
   border: 1px solid rgba(52, 211, 153, 0.25);
   border-radius: 16px;
@@ -103,36 +103,37 @@
 }
 
 .sectionLabel {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   color: #a3a3a3;
 }
 
 .promptInput {
-  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
   padding: 8px 12px;
   font-size: 0.8rem;
-  background: rgba(23, 23, 23, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
   color: #ffffff;
   outline: none;
-  transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
+  transition: border-color 0.15s;
 }
 
 .promptInput:focus {
   border-color: #34d399;
-  box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.2);
+}
+
+.promptInput::placeholder {
+  color: #525252;
 }
 
 .candidatesHeader {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
 }
 
 .hint {
@@ -147,125 +148,196 @@
 }
 
 .card {
-  position: relative;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(23, 23, 23, 0.8);
-  padding: 10px;
-  transition: all 0.2s ease;
+  position: relative;
+  transition: all 0.18s ease;
 }
 
 .card:hover {
-  border-color: rgba(255, 255, 255, 0.2);
-  background: rgba(30, 30, 30, 0.9);
+  border-color: rgba(52, 211, 153, 0.4);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .cardSelected {
-  border-color: #34d399 !important;
-  background: rgba(6, 78, 59, 0.3) !important;
-  box-shadow: 0 0 16px rgba(52, 211, 153, 0.25);
+  border-color: #34d399;
+  background: rgba(16, 185, 129, 0.08);
+  box-shadow: 0 0 12px rgba(52, 211, 153, 0.2);
 }
 
 .previewThumb {
   position: relative;
   width: 100%;
-  padding-bottom: 56.25%;
-  min-height: 80px;
-  border-radius: 8px;
+  aspect-ratio: 16 / 9;
+  border-radius: 6px;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.06);
   background: #000000;
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .previewLayer {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .previewInner {
-  position: absolute;
-  inset: 0;
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  color: #525252;
 }
 
 .previewLabel {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.5);
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
 }
 
 .fitnessBadge {
   position: absolute;
   top: 6px;
-  right: 6px;
-  font-size: 0.68rem;
-  font-weight: 800;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.85);
+  left: 6px;
+  padding: 2px 7px;
+  border-radius: 12px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.75);
   color: #34d399;
-  border: 1px solid rgba(52, 211, 153, 0.3);
+  border: 1px solid rgba(52, 211, 153, 0.4);
   backdrop-filter: blur(4px);
+  z-index: 2;
 }
 
 .selectCheckbox {
   position: absolute;
   top: 6px;
-  left: 6px;
+  right: 6px;
   width: 22px;
   height: 22px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(0, 0, 0, 0.7);
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.6);
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 800;
   transition: all 0.15s;
-  color: transparent;
+  z-index: 2;
+}
+
+.selectCheckbox:hover {
+  border-color: #34d399;
 }
 
 .selectCheckboxChecked {
-  background: #34d399 !important;
-  border-color: #34d399 !important;
-  color: #000000 !important;
+  background: #34d399;
+  border-color: #34d399;
+  color: #064e3b;
 }
 
-.ratingRow {
+.rationaleBox {
+  margin-top: 6px;
+  padding: 4px 8px;
+  font-size: 0.68rem;
+  color: #94a3b8;
+  background: rgba(15, 23, 42, 0.6);
+  border-radius: 4px;
+  border-left: 2px solid #38bdf8;
+  line-height: 1.3;
+}
+
+.feedbackRow {
   margin-top: 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-.stars {
+.reactionGroup {
   display: flex;
-  gap: 2px;
+  gap: 6px;
 }
 
-.starBtn {
-  background: transparent;
-  border: none;
-  padding: 2px;
-  cursor: pointer;
-  color: #404040;
-  transition: color 0.15s;
+.reactionBtn {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #a3a3a3;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
-.starBtnActive {
-  color: #fbbf24;
+.reactionBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f5f5f5;
 }
 
-.starBtn:hover {
-  color: #fde68a;
+.likeBtnActive {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #34d399;
+  color: #6ee7b7;
+}
+
+.likeBtnActive:hover {
+  background: rgba(16, 185, 129, 0.3);
+  color: #ffffff;
+}
+
+.dislikeBtnActive {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #f87171;
+  color: #fca5a5;
+}
+
+.dislikeBtnActive:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #ffffff;
+}
+
+.tagChips {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tagChip {
+  font-size: 0.62rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: #737373;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.tagChip:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #d4d4d4;
+}
+
+.tagChipActive {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #38bdf8;
+  font-weight: 600;
 }
 
 .indexTag {

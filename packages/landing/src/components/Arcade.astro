@@ -19,18 +19,13 @@ const icons = {
   info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11.2v5"/><circle cx="12" cy="7.9" r="0.55" fill="currentColor" stroke="none"/></svg>`,
 }
 
-// The hub's other two cards. Taglines are the hub's own, so a visitor reads
+// The hub's other card. Tagline is the hub's own, so a visitor reads
 // the same sentence here and on the card itself.
 const soon = [
   {
     icon: 'zap',
     name: 'Arena',
     tag: 'Flames clash on real stats; the winner gets a shareable card.',
-  },
-  {
-    icon: 'lineage',
-    name: 'Director',
-    tag: 'The agent learns your taste and evolves flames toward it.',
   },
 ]
 
@@ -58,6 +53,12 @@ const modes = [
     name: 'Beats',
     tag: 'Agent drives',
     body: 'Pick a track and a musical goal. The agent inspects your flame, maps audio frequency bands and beat onsets to affine matrices, variation weights, and color speed, and makes it dance.',
+  },
+  {
+    icon: 'lineage',
+    name: 'Director',
+    tag: 'Agent drives',
+    body: 'The agent inspects your taste profile, proposes a curated generation of candidates, and explains the geometry behind each. Rate them with Like or Dislike, select quick feedback tags, and watch your fractal lineage evolve toward what you love.',
   },
 ]
 ---

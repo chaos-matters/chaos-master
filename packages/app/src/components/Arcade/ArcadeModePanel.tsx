@@ -2,7 +2,7 @@ import { createSignal, For, Match, onMount, Show, Switch } from 'solid-js'
 import { BUNDLED_TRACKS } from '@/arcade/bundledTracks'
 import { clampDuelSeconds, DEFAULT_DUEL_SECONDS, MAX_DUEL_SECONDS, MIN_DUEL_SECONDS, } from '@/arcade/duel'
 import { beginDuel } from '@/arcade/duelActions'
-import { BEATS_PRESETS, beatsPromptCard, CINEMA_PRESETS, cinemaPromptCard, duelPromptCard, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, } from '@/arcade/topics'
+import { BEATS_PRESETS, beatsPromptCard, CINEMA_PRESETS, cinemaPromptCard, DIRECTOR_PRESETS, directorPromptCard, duelPromptCard, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, } from '@/arcade/topics'
 import { variationTypesFor } from '@/flame/variationRegistry'
 import { Copy, Cross, Swords } from '@/icons'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
@@ -27,6 +27,7 @@ const TITLES: Record<ArcadeMode, string> = {
   cinema: 'Cinema',
   duel: 'Duel',
   beats: 'Beats',
+  director: 'Director',
 }
 
 const STEPS = [
@@ -125,12 +126,16 @@ export function ArcadeModePanel(props: {
   })
   const [selectedTrack, setSelectedTrack] = createSignal(BUNDLED_TRACKS[0]!)
   const [beatsGoal, setBeatsGoal] = createSignal(BEATS_PRESETS[0]!.wish)
+  const [directorGoal, setDirectorGoal] = createSignal(
+    DIRECTOR_PRESETS[0]!.wish,
+  )
 
   const ready = () =>
     props.mode === 'teach' ||
     props.mode === 'cinema' ||
     props.mode === 'duel' ||
-    props.mode === 'beats'
+    props.mode === 'beats' ||
+    props.mode === 'director'
   const prompt = () =>
     props.mode === 'teach'
       ? teachPromptCard(topic())
@@ -138,7 +143,9 @@ export function ArcadeModePanel(props: {
         ? duelPromptCard(duelSeconds(), startFrom(), duelDimensions())
         : props.mode === 'beats'
           ? beatsPromptCard(selectedTrack().name, beatsGoal())
-          : cinemaPromptCard(description())
+          : props.mode === 'director'
+            ? directorPromptCard(directorGoal())
+            : cinemaPromptCard(description())
   return (
     <aside
       class={ui.panel}
@@ -349,6 +356,48 @@ export function ArcadeModePanel(props: {
               placeholder="Wire sub-bass to scale and exposure, mids to color speed, and highs to variation weights"
             />
           </label>
+        </Match>
+        <Match when={props.mode === 'director'}>
+          <p>
+            The agent proposes generations of candidates based on your taste
+            profile. React with Like or Dislike, select feedback tags, and guide
+            fractal evolution.
+          </p>
+          <div class={ui.chips} aria-label="Aesthetic direction presets">
+            <For each={DIRECTOR_PRESETS}>
+              {(preset) => (
+                <button
+                  type="button"
+                  classList={{
+                    [ui.chip!]: true,
+                    [ui.chipActive!]: directorGoal() === preset.wish,
+                  }}
+                  onClick={() => setDirectorGoal(preset.wish)}
+                >
+                  {preset.label}
+                </button>
+              )}
+            </For>
+          </div>
+          <label class={ui.field}>
+            <span>Aesthetic Goal</span>
+            <textarea
+              rows={3}
+              value={directorGoal()}
+              onInput={(ev) => setDirectorGoal(ev.currentTarget.value)}
+              placeholder="Evolve candidates toward higher symmetry, warm gradients, and complex flora forms"
+            />
+          </label>
+          <button
+            type="button"
+            class={ui.soloDuelButton}
+            onClick={() => {
+              const ctx = getWebMcpContext()
+              ctx?.director?.setOpen(true)
+            }}
+          >
+            Launch Art Director Overlay
+          </button>
         </Match>
         <Match when={!ready()}>
           <p>

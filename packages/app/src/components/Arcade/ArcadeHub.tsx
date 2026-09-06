@@ -7,7 +7,7 @@ import { WebMcpStatusPill } from './WebMcpStatusPill'
 import type { Component } from 'solid-js'
 import type { ArcadeMode } from '@/lib/activeTab'
 
-type CardId = ArcadeMode | 'arena' | 'director'
+type CardId = ArcadeMode | 'arena'
 type CardDef = {
   id: CardId
   title: string
@@ -65,8 +65,8 @@ export const ARCADE_MODES: CardDef[] = [
     id: 'director',
     title: 'Director',
     tagline: 'The agent learns your taste and evolves flames toward it.',
-    tag: 'Roadmap',
-    ready: false,
+    tag: 'Agent drives',
+    ready: true,
     icon: Lineage,
   },
 ]

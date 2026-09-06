@@ -51,4 +51,23 @@ describe('ArcadeModePanel duel setup', () => {
     cyberChip.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     expect(promptCard.textContent).toContain('Cyber Pulse')
   })
+
+  it('renders director mode with aesthetic presets and prompt card', () => {
+    const ctx = createMockCommandContext()
+    setWebMcpContext(ctx)
+    render(() => <ArcadeModePanel mode="director" onClose={() => {}} />)
+
+    expect(screen.getByText(/Structured Mandalas/i)).toBeDefined()
+    expect(screen.getByText(/Deep Bioluminescence/i)).toBeDefined()
+
+    const promptCard = screen.getByTestId('prompt-card')
+    expect(promptCard.textContent).toContain('director_get_taste_profile')
+    expect(promptCard.textContent).toContain('director_propose')
+    expect(promptCard.textContent).toContain('director_get_feedback')
+
+    // Clicking launch button opens director modal
+    const launchBtn = screen.getByText(/Launch Art Director Overlay/i)
+    launchBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(ctx.director?.setOpen).toHaveBeenCalledWith(true)
+  })
 })
