@@ -79,7 +79,8 @@ import { newDefaultTransform } from './flame/newTransform'
 import { generateRandomFlame, mutateFlame, randomizeAllColors, randomRange, } from './flame/randomize'
 import { accumulatedPointCount, animationExportCancel, animationExportProgress, animationExportRunning, qualityPointCountLimit, setExportQuality, setForceAnimationExportNow, } from './flame/renderStats'
 import { tryValidateFlame } from './flame/schema/flameSchema'
-import { generateTransformId, generateVariationId, } from './flame/transformFunction'
+import { extractFlameUniforms, generateTransformId, generateVariationId, } from './flame/transformFunction'
+import { extractFlameUniforms3D } from './flame/transformFunction3D'
 import { allTransformVariations, isAnyParametricVariationType, } from './flame/variations'
 import { collectFlameCustomVariations, deleteCustomVariation, duplicateCustomVariation, getCustomVariations, loadCustomVariations, persistSharedVariations, restoreCustomVariation, } from './flame/variations/custom'
 import { getVariationDefault } from './flame/variations/utils'
@@ -599,12 +600,25 @@ export function MainWorkspace(props: AppProps) {
     }
     openReplaySession(session)
   }
+  const initialFlame = (() => {
+    const welcome = props.flameFromWelcome?.()
+    if (welcome) {
+      const valid = tryValidateFlame(welcome)
+      if (valid) return valid
+    }
+    const query = props.flameFromQuery?.flame
+    if (query) {
+      const valid = tryValidateFlame(query)
+      if (valid) return valid
+      console.error(
+        '[share] initial flame from query is invalid, falling back to example1',
+        query,
+      )
+    }
+    return example1
+  })()
   const [flameDescriptor, setFlameDescriptor, history] = createStoreHistory(
-    createStore(
-      deepClone(
-        props.flameFromWelcome?.() ?? props.flameFromQuery?.flame ?? example1,
-      ),
-    ),
+    createStore(deepClone(initialFlame)),
     // The main flame history joins the app-wide undo journal so Ctrl+Z can
     // arbitrate chronologically against the timeline's undo stack. The
     // session recorder listens to every pushed entry to flag edits that
@@ -2860,29 +2874,48 @@ export function MainWorkspace(props: AppProps) {
     if (!data || queryApplied) return
     queryApplied = true
 
-    if (IS_DEV) console.info('[share] applying flame from shared URL')
-    history.replace(deepClone(data.flame))
-
-    if (data.animation && data.animation.tracks.length > 0) {
-      if (IS_DEV) {
-        console.info(
-          '[anim] loading shared animation:',
-          data.animation.tracks.length,
-          'tracks',
-        )
+    try {
+      const validated = tryValidateFlame(data.flame)
+      if (!validated) {
+        throw new Error('Flame descriptor failed schema validation')
       }
-      timeline.loadTracks(data.animation.tracks)
-      timeline.setAnimationEnabled(true)
-      setAnimationEnabled(true)
-      timeline.setConfig({
-        ...timeline.config(),
-        ...data.animation.config,
-      })
-      timeline.goToFrame(0)
-      timeline.play()
+      if ((validated.renderSettings.dimensions ?? 2) === 3) {
+        extractFlameUniforms3D(validated)
+      } else {
+        extractFlameUniforms(validated)
+      }
+
+      if (IS_DEV) console.info('[share] applying flame from shared URL')
+      history.replace(deepClone(validated))
+
+      if (data.animation && data.animation.tracks.length > 0) {
+        if (IS_DEV) {
+          console.info(
+            '[anim] loading shared animation:',
+            data.animation.tracks.length,
+            'tracks',
+          )
+        }
+        timeline.loadTracks(data.animation.tracks)
+        timeline.setAnimationEnabled(true)
+        setAnimationEnabled(true)
+        timeline.setConfig({
+          ...timeline.config(),
+          ...data.animation.config,
+        })
+        timeline.goToFrame(0)
+        timeline.play()
+      }
+      // A shared link is a fresh starting point for dirty tracking.
+      markLoadedBaseline()
+    } catch (err) {
+      console.error('Failed to open shared flame:', err)
+      showToast(
+        'The shared flame could not be opened because it contains invalid data. Reverting to default flame.',
+        6000,
+      )
+      return
     }
-    // A shared link is a fresh starting point for dirty tracking.
-    markLoadedBaseline()
 
     // Offer to save any custom variations the link brought in. They are already
     // registered (transiently) so the flame renders; this only asks which to

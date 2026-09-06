@@ -56,7 +56,12 @@ export function getParamsEditor<T extends { type: string; params?: unknown }>(
 ): { component: EditorFor<T['params']>; value: T['params'] } {
   const v = allTransformVariations[
     variation.type as keyof typeof allTransformVariations
-  ] as { editor?: EditorFor<T['params']> } | undefined
+  ] as
+    | {
+        editor?: EditorFor<T['params']>
+        paramDefaults?: Record<string, unknown>
+      }
+    | undefined
   const component = resolveParamEditor(
     variation.type,
     v?.editor as EditorFor<Record<string, number>> | undefined,
@@ -64,6 +69,12 @@ export function getParamsEditor<T extends { type: string; params?: unknown }>(
   return {
     component,
     get value() {
+      if (v?.paramDefaults) {
+        return {
+          ...v.paramDefaults,
+          ...(variation.params ?? {}),
+        } as T['params']
+      }
       return variation.params as T['params']
     },
   }

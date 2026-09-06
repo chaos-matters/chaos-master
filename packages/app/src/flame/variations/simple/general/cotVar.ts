@@ -1,6 +1,6 @@
 import { vec2f } from 'typegpu/data'
-import { abs, cos, cosh, select, sin, sinh } from 'typegpu/std'
-import { EPS } from '../../../constants'
+import { cos, cosh, sin, sinh } from 'typegpu/std'
+import { safeDenom } from '../../safeMath'
 import { simpleVariation } from '../types'
 
 export const cotVar = simpleVariation(
@@ -12,8 +12,7 @@ export const cotVar = simpleVariation(
     const cotsinh = sinh(2.0 * pos.y)
     const cotcosh = cosh(2.0 * pos.y)
     const denom = cotcosh - cotcos
-    const safeDenom = select(denom, EPS.$, abs(denom) < EPS.$)
-    const cotden = 1.0 / safeDenom
+    const cotden = 1.0 / safeDenom(denom)
     return vec2f(cotden * cotsin, -cotden * cotsinh).mul(varInfo.weight)
   },
   'general',
