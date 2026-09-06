@@ -262,3 +262,64 @@ export function duelPromptCard(
 
 ${WEBMCP_FALLBACK_NOTE}`
 }
+
+/**
+ * Commands an agent may use in Beats mode.
+ */
+export const BEATS_ALLOWED = [
+  ...ALWAYS_ALLOWED,
+  'audio.applySnapshot',
+  'audio.setPreset',
+  'audio.setMapping',
+  'audio.addMapping',
+  'audio.removeMapping',
+  'audio.clearMappings',
+  'sonification.setConfig',
+  'sonification.setEnabled',
+  'camera.center',
+  'camera.zoomTo',
+] as const
+
+export const BEATS_STEP_BUDGET = 30
+
+export interface BeatsPreset {
+  id: string
+  label: string
+  wish: string
+}
+
+export const BEATS_PRESETS: readonly BeatsPreset[] = [
+  {
+    id: 'pulse-and-breathe',
+    label: 'Pulse & Breathe',
+    wish: 'Wire sub-bass to scale and exposure so the fractal breathes on each beat, with mids driving subtle color drift.',
+  },
+  {
+    id: 'color-symphony',
+    label: 'Color Symphony',
+    wish: 'Connect frequency bands across presence and brilliance to colorSpeed and palettePhase for an evolving color show.',
+  },
+  {
+    id: 'structural-drift',
+    label: 'Structural Drift',
+    wish: 'Map bass and beat onsets to affine rotation and variation weights so the geometry morphs dynamically with the groove.',
+  },
+  {
+    id: 'chaos-morph',
+    label: 'Chaos Morph',
+    wish: 'Drive non-linear variation weights and contrast with RMS energy and beat transients for an intense, energetic response.',
+  },
+] as const
+
+export function beatsPromptCard(
+  trackName: string = 'Ember Drift',
+  styleGoal?: string,
+): string {
+  const goalText =
+    styleGoal?.trim() ||
+    'Wire sub-bass and bass to structural scale, vibrancy and exposure, map mids to color speed, and link high frequencies and beat onsets to variation weights so the flame moves expressively with the track.'
+
+  return `Make my flame dance in Lumen Apeiron to "${trackName}". Call arcade_start_beats to lock the editor and begin. Then call arcade_get_audio_catalog to see available audio features and valid flame modulation targets. Build your audio-reactive configuration using arcade_set_audio_mapping: ${goalText}. Narrate your musical choices with arcade_narrate, and finish with arcade_end_beats when your audio-reactive mapping is complete.
+
+${WEBMCP_FALLBACK_NOTE}`
+}

@@ -1,7 +1,7 @@
 import '@/commands/builtins'
 import { describe, expect, it } from 'vitest'
 import { getAllCommands } from '@/commands/registry'
-import { ALWAYS_ALLOWED, CINEMA_ALLOWED, CINEMA_PRESETS, cinemaPromptCard, DUEL_ALLOWED, DUEL_STEP_BUDGET, duelPromptCard, isTopicId, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, WEBMCP_FALLBACK_NOTE, } from './topics'
+import { ALWAYS_ALLOWED, BEATS_ALLOWED, BEATS_PRESETS, BEATS_STEP_BUDGET, beatsPromptCard, CINEMA_ALLOWED, CINEMA_PRESETS, cinemaPromptCard, DUEL_ALLOWED, DUEL_STEP_BUDGET, duelPromptCard, isTopicId, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, WEBMCP_FALLBACK_NOTE, } from './topics'
 
 describe('lesson topics', () => {
   it('has every topic with a goal, a budget and an allow-list', () => {
@@ -125,6 +125,34 @@ describe('duel', () => {
     expect(card).toContain('arcade_duel_ready')
     expect(card).not.toContain('arcade_end_duel')
     expect(card).toContain('3 minutes')
+    expect(card).toContain(WEBMCP_FALLBACK_NOTE)
+  })
+})
+
+describe('beats', () => {
+  it('allows audio wiring and sonification commands in beats mode', () => {
+    expect(BEATS_ALLOWED).toContain('audio.applySnapshot')
+    expect(BEATS_ALLOWED).toContain('audio.setMapping')
+    expect(BEATS_ALLOWED).toContain('sonification.setConfig')
+    expect(BEATS_STEP_BUDGET).toBeGreaterThanOrEqual(20)
+  })
+
+  it('offers beats presets that provide distinct musical goals', () => {
+    expect(BEATS_PRESETS.length).toBeGreaterThanOrEqual(3)
+    for (const preset of BEATS_PRESETS) {
+      expect(preset.label.length).toBeGreaterThan(3)
+      expect(preset.wish.length).toBeGreaterThan(20)
+    }
+  })
+
+  it('beats prompt card includes track name and beats tools', () => {
+    const card = beatsPromptCard('Cyber Pulse', 'Map bass to scale')
+    expect(card).toContain('Cyber Pulse')
+    expect(card).toContain('Map bass to scale')
+    expect(card).toContain('arcade_start_beats')
+    expect(card).toContain('arcade_get_audio_catalog')
+    expect(card).toContain('arcade_set_audio_mapping')
+    expect(card).toContain('arcade_end_beats')
     expect(card).toContain(WEBMCP_FALLBACK_NOTE)
   })
 })

@@ -50,7 +50,7 @@ export const ARCADE_MODES: CardDef[] = [
     title: 'Beats',
     tagline: 'The agent wires your flame to a song so it dances.',
     tag: 'Agent drives',
-    ready: false,
+    ready: true,
     icon: MusicNote,
   },
   {

@@ -33,4 +33,22 @@ describe('ArcadeModePanel duel setup', () => {
     select.dispatchEvent(new Event('change', { bubbles: true }))
     expect(names()).toEqual(['3D', 'Orbit camera per side', '43 variations'])
   })
+
+  it('renders beats mode with bundled tracks and prompt card', () => {
+    render(() => <ArcadeModePanel mode="beats" onClose={() => {}} />)
+
+    expect(screen.getByText(/Ember Drift \(100 BPM\)/i)).toBeDefined()
+    expect(screen.getByText(/Cyber Pulse \(120 BPM\)/i)).toBeDefined()
+
+    const promptCard = screen.getByTestId('prompt-card')
+    expect(promptCard.textContent).toContain('arcade_start_beats')
+    expect(promptCard.textContent).toContain('arcade_get_audio_catalog')
+    expect(promptCard.textContent).toContain('arcade_set_audio_mapping')
+    expect(promptCard.textContent).toContain('Ember Drift')
+
+    // Click Cyber Pulse track chip
+    const cyberChip = screen.getByText(/Cyber Pulse \(120 BPM\)/i)
+    cyberChip.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(promptCard.textContent).toContain('Cyber Pulse')
+  })
 })

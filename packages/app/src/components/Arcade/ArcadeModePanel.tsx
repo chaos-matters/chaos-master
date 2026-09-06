@@ -1,7 +1,8 @@
 import { createSignal, For, Match, onMount, Show, Switch } from 'solid-js'
+import { BUNDLED_TRACKS } from '@/arcade/bundledTracks'
 import { clampDuelSeconds, DEFAULT_DUEL_SECONDS, MAX_DUEL_SECONDS, MIN_DUEL_SECONDS, } from '@/arcade/duel'
 import { beginDuel } from '@/arcade/duelActions'
-import { CINEMA_PRESETS, cinemaPromptCard, duelPromptCard, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, } from '@/arcade/topics'
+import { BEATS_PRESETS, beatsPromptCard, CINEMA_PRESETS, cinemaPromptCard, duelPromptCard, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, } from '@/arcade/topics'
 import { variationTypesFor } from '@/flame/variationRegistry'
 import { Copy, Cross, Swords } from '@/icons'
 import { getWebMcpContext } from '@/webmcp/contextBridge'
@@ -122,14 +123,22 @@ export function ArcadeModePanel(props: {
   onMount(() => {
     closeButton?.focus()
   })
+  const [selectedTrack, setSelectedTrack] = createSignal(BUNDLED_TRACKS[0]!)
+  const [beatsGoal, setBeatsGoal] = createSignal(BEATS_PRESETS[0]!.wish)
+
   const ready = () =>
-    props.mode === 'teach' || props.mode === 'cinema' || props.mode === 'duel'
+    props.mode === 'teach' ||
+    props.mode === 'cinema' ||
+    props.mode === 'duel' ||
+    props.mode === 'beats'
   const prompt = () =>
     props.mode === 'teach'
       ? teachPromptCard(topic())
       : props.mode === 'duel'
         ? duelPromptCard(duelSeconds(), startFrom(), duelDimensions())
-        : cinemaPromptCard(description())
+        : props.mode === 'beats'
+          ? beatsPromptCard(selectedTrack().name, beatsGoal())
+          : cinemaPromptCard(description())
   return (
     <aside
       class={ui.panel}
@@ -293,6 +302,53 @@ export function ArcadeModePanel(props: {
               </Show>
             </div>
           </Show>
+        </Match>
+        <Match when={props.mode === 'beats'}>
+          <p>
+            Choose a track and a musical goal. The agent inspects your flame,
+            maps audio frequency bands to its parameters, and makes it dance.
+          </p>
+          <div class={ui.chips} aria-label="Bundled tracks">
+            <For each={BUNDLED_TRACKS}>
+              {(track) => (
+                <button
+                  type="button"
+                  classList={{
+                    [ui.chip!]: true,
+                    [ui.chipActive!]: selectedTrack().id === track.id,
+                  }}
+                  onClick={() => setSelectedTrack(track)}
+                >
+                  {track.name} ({track.bpm} BPM)
+                </button>
+              )}
+            </For>
+          </div>
+          <div class={ui.chips} aria-label="Musical style presets">
+            <For each={BEATS_PRESETS}>
+              {(preset) => (
+                <button
+                  type="button"
+                  classList={{
+                    [ui.chip!]: true,
+                    [ui.chipActive!]: beatsGoal() === preset.wish,
+                  }}
+                  onClick={() => setBeatsGoal(preset.wish)}
+                >
+                  {preset.label}
+                </button>
+              )}
+            </For>
+          </div>
+          <label class={ui.field}>
+            <span>Musical Goal</span>
+            <textarea
+              rows={3}
+              value={beatsGoal()}
+              onInput={(ev) => setBeatsGoal(ev.currentTarget.value)}
+              placeholder="Wire sub-bass to scale and exposure, mids to color speed, and highs to variation weights"
+            />
+          </label>
         </Match>
         <Match when={!ready()}>
           <p>
