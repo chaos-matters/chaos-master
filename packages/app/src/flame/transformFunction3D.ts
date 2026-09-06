@@ -275,30 +275,30 @@ export function extractFlameUniforms3D({
           }
           if (isAffine3D(aff)) {
             return {
-              a: aff.a ?? 1,
-              b: aff.b ?? 0,
-              c: aff.c ?? 0,
-              d: aff.d ?? 0,
-              e: aff.e ?? 0,
-              f: aff.f ?? 1,
-              g: aff.g ?? 0,
-              h: aff.h ?? 0,
-              i: aff.i ?? 0,
-              j: aff.j ?? 0,
-              k: aff.k ?? 1,
-              l: aff.l ?? 0,
+              a: Number.isFinite(aff.a) ? (aff.a ?? 1) : 1,
+              b: Number.isFinite(aff.b) ? (aff.b ?? 0) : 0,
+              c: Number.isFinite(aff.c) ? (aff.c ?? 0) : 0,
+              d: Number.isFinite(aff.d) ? (aff.d ?? 0) : 0,
+              e: Number.isFinite(aff.e) ? (aff.e ?? 0) : 0,
+              f: Number.isFinite(aff.f) ? (aff.f ?? 1) : 1,
+              g: Number.isFinite(aff.g) ? (aff.g ?? 0) : 0,
+              h: Number.isFinite(aff.h) ? (aff.h ?? 0) : 0,
+              i: Number.isFinite(aff.i) ? (aff.i ?? 0) : 0,
+              j: Number.isFinite(aff.j) ? (aff.j ?? 0) : 0,
+              k: Number.isFinite(aff.k) ? (aff.k ?? 1) : 1,
+              l: Number.isFinite(aff.l) ? (aff.l ?? 0) : 0,
             }
           }
           // Correct mapping from 2D parameter keys a-f to 3D matrix elements a-l
           return {
-            a: aff.a ?? 1,
-            b: aff.b ?? 0,
+            a: Number.isFinite(aff.a) ? (aff.a ?? 1) : 1,
+            b: Number.isFinite(aff.b) ? (aff.b ?? 0) : 0,
             c: 0,
-            d: aff.c ?? 0, // Translation X
-            e: aff.d ?? 0,
-            f: aff.e ?? 1,
+            d: Number.isFinite(aff.c) ? (aff.c ?? 0) : 0, // Translation X
+            e: Number.isFinite(aff.d) ? (aff.d ?? 0) : 0,
+            f: Number.isFinite(aff.e) ? (aff.e ?? 1) : 1,
             g: 0,
-            h: aff.f ?? 0, // Translation Y
+            h: Number.isFinite(aff.f) ? (aff.f ?? 0) : 0, // Translation Y
             i: 0,
             j: 0,
             k: 1,
@@ -309,9 +309,15 @@ export function extractFlameUniforms3D({
         return [
           `flame${tid}`,
           {
-            probability: isVisible ? probability / totalProbability : 0,
-            color: vec2f(color?.x ?? 0, color?.y ?? 0),
-            colorSpeed: colorSpeed ?? 0.4,
+            probability: isVisible
+              ? (Number.isFinite(probability) ? probability : 0) /
+                totalProbability
+              : 0,
+            color: vec2f(
+              Number.isFinite(color?.x) ? (color?.x ?? 0) : 0,
+              Number.isFinite(color?.y) ? (color?.y ?? 0) : 0,
+            ),
+            colorSpeed: Number.isFinite(colorSpeed) ? (colorSpeed ?? 0.4) : 0.4,
             preAffine: mapAffine(pAffine),
             postAffine: mapAffine(postAff),
             ...Object.fromEntries(
@@ -337,8 +343,11 @@ export function extractFlameUniforms3D({
                     params?: Record<string, number>
                   }
                   const isVarVisible = varVisible !== false
+                  const rawWeight = Number.isFinite(rest.weight)
+                    ? rest.weight
+                    : 1
                   const typed: Record<string, unknown> = {
-                    weight: isVarVisible ? (rest.weight ?? 1) : 0,
+                    weight: isVarVisible ? rawWeight : 0,
                   }
                   const variationType = resolveVariationType3D(_type)!
                   let isParametric = false
@@ -361,7 +370,7 @@ export function extractFlameUniforms3D({
                     if (rest.params) {
                       for (const key of Object.keys(defaults)) {
                         const val = rest.params[key]
-                        if (val !== undefined) {
+                        if (val !== undefined && Number.isFinite(val)) {
                           safe[key] = val
                         }
                       }
@@ -369,7 +378,11 @@ export function extractFlameUniforms3D({
                     typed.params = safe
                   } else {
                     if (rest.params) {
-                      typed.params = { ...rest.params }
+                      const safe: Record<string, number> = {}
+                      for (const [key, val] of Object.entries(rest.params)) {
+                        if (Number.isFinite(val)) safe[key] = val
+                      }
+                      typed.params = safe
                     }
                   }
                   return [`variation${vid}`, typed]

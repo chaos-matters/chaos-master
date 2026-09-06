@@ -2,6 +2,7 @@ import { f32, struct, vec2f } from 'typegpu/data'
 import { atan2, cos, sin, sqrt } from 'typegpu/std'
 import { RangeEditor } from '@/components/Sliders/ParametricEditors/RangeEditor'
 import { editorProps } from '@/components/Sliders/ParametricEditors/types'
+import { safeDenom } from '../../safeMath'
 import { parametricVariation } from '../types'
 import type { Infer } from 'typegpu/data'
 import type { EditorFor } from '@/components/Sliders/ParametricEditors/types'
@@ -46,10 +47,11 @@ export const whorlVar = parametricVariation(
     const r = sqrt(pos.x * pos.x + pos.y * pos.y)
 
     let a = pos.x
+    const diff = safeDenom(w - r)
     if (r < w) {
-      a = atan2(pos.y, pos.x) + P.inside / (w - r)
+      a = atan2(pos.y, pos.x) + P.inside / diff
     } else {
-      a = atan2(pos.y, pos.x) + P.outside / (w - r)
+      a = atan2(pos.y, pos.x) + P.outside / diff
     }
 
     return vec2f(w * r * cos(a), w * r * sin(a))

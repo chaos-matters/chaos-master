@@ -148,7 +148,9 @@ export function Wrappers() {
         }
         return result
       } catch (err) {
-        setQueryError('Failed to decode the shared fractal.')
+        setQueryError(
+          'Failed to decode the shared fractal. The link may be malformed or corrupted.',
+        )
         console.error('Failed to decode share payload:', err)
       }
     }

@@ -1076,14 +1076,61 @@ function ShowVariationSelector(props: VariationSelectorModalProps) {
                                           ) {
                                             throw new Error(`Unreachable code`)
                                           }
-                                          ;(
-                                            variationDraft as {
-                                              params: Record<string, number>
-                                            }
-                                          ).params = value as Record<
+                                          const v = variationDraft as {
+                                            params?: Record<string, number>
+                                          }
+                                          v.params = {
+                                            ...(v.params ?? {}),
+                                            ...(value as Record<
+                                              string,
+                                              number
+                                            >),
+                                          }
+                                        },
+                                      )
+                                      // Invalidate this tile's cached preview so it
+                                      // re-renders live with the new params.
+                                      setParamRev((r) => ({
+                                        ...r,
+                                        [id]: (r[id] ?? 0) + 1,
+                                      }))
+                                    }}
+                                    setParamValue={(
+                                      paramName: string,
+                                      value: number,
+                                    ) => {
+                                      setVariationExamples(
+                                        (
+                                          draft: Record<
                                             string,
-                                            number
-                                          >
+                                            FlameDescriptor
+                                          >,
+                                        ) => {
+                                          const variationDraft =
+                                            draft[id]?.transforms[
+                                              getTransformPreviewTid(
+                                                variation.type,
+                                              )
+                                            ]?.variations[
+                                              getTransformPreviewVid(
+                                                variation.type,
+                                              )
+                                            ]
+                                          if (
+                                            variationDraft === undefined ||
+                                            !isAnyParametricVariationType(
+                                              variationDraft.type,
+                                            )
+                                          ) {
+                                            throw new Error(`Unreachable code`)
+                                          }
+                                          const v = variationDraft as {
+                                            params?: Record<string, number>
+                                          }
+                                          if (!v.params) {
+                                            v.params = {}
+                                          }
+                                          v.params[paramName] = value
                                         },
                                       )
                                       // Invalidate this tile's cached preview so it

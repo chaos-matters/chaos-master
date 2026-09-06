@@ -1,5 +1,5 @@
 import { isSafeFlameEntityId } from '@/flame/schema/flameSchema'
-import { TransformVariationDescriptor } from '@/flame/variations'
+import { allTransformVariations, TransformVariationDescriptor, } from '@/flame/variations'
 import { getVariationDefault } from '@/flame/variations/utils'
 import { deepClone } from '@/utils/clone'
 import * as v from '@/valibot'
@@ -137,15 +137,37 @@ registerCommand({
       if (!transform) return
       const vKey = resolveVariationKey(transform.variations, variationRef)
       const variation = vKey ? transform.variations[vKey] : undefined
-      if (variation && 'params' in variation) {
-        const params = variation.params as Record<string, number>
-        if (!Object.hasOwn(params, name)) {
+      if (variation) {
+        const vtype = (variation as { type?: unknown }).type
+        const variationDef =
+          typeof vtype === 'string'
+            ? (
+                allTransformVariations as Record<
+                  string,
+                  { paramDefaults?: Record<string, number> }
+                >
+              )[vtype]
+            : undefined
+        const defaults = variationDef?.paramDefaults
+        const existingParams = (
+          variation as { params?: Record<string, number> }
+        ).params
+        const isKnownParam =
+          (existingParams && Object.hasOwn(existingParams, name)) ||
+          (defaults && Object.hasOwn(defaults, name))
+        if (!isKnownParam) {
           console.warn(
-            `[cmd] flame.setVariationParams: "${name}" is not a parameter of ${String((variation as { type?: unknown }).type)} (has ${Object.keys(params).join(', ')})`,
+            `[cmd] flame.setVariationParams: "${name}" is not a parameter of ${String(vtype)} (has ${Object.keys(existingParams ?? defaults ?? {}).join(', ')})`,
           )
           return
         }
-        params[name] = value
+        const currentParams = (variation as { params?: Record<string, number> })
+          .params
+        ;(variation as { params: Record<string, number> }).params = {
+          ...(defaults ?? {}),
+          ...(currentParams ?? {}),
+          [name]: value,
+        }
       }
     })
   },
