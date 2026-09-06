@@ -323,3 +323,42 @@ export function beatsPromptCard(
 
 ${WEBMCP_FALLBACK_NOTE}`
 }
+
+export interface DirectorPreset {
+  id: string
+  label: string
+  wish: string
+}
+
+export const DIRECTOR_PRESETS: readonly DirectorPreset[] = [
+  {
+    id: 'mandala-symmetry',
+    label: 'Structured Mandalas',
+    wish: 'Evolve candidates toward higher rotational symmetry, clean radial boundaries, and harmonious sacred geometry.',
+  },
+  {
+    id: 'deep-bioluminescence',
+    label: 'Deep Bioluminescence',
+    wish: 'Develop rich jewel-toned palettes, deep contrasts, and organic flora-like structural complexity.',
+  },
+  {
+    id: 'chaotic-curls',
+    label: 'Chaotic Curls',
+    wish: 'Push high non-linear chaos levels, turbulent spiral curls, and energetic tendrils.',
+  },
+  {
+    id: 'minimalist-geometry',
+    label: 'Minimalist Geometry',
+    wish: 'Focus on sparse, elegant transforms with balanced weights and understated color palettes.',
+  },
+] as const
+
+export function directorPromptCard(goal?: string): string {
+  const goalText =
+    goal?.trim() ||
+    'Inspect my current flame and taste profile with director_get_taste_profile. Propose a generation of 4-6 diverse candidate flames using director_propose, explaining your artistic rationale for each. Then call director_get_feedback to review my Like/Dislike reactions and tags, and breed or mutate the next generation toward my preferences.'
+
+  return `Act as the Evolutionary Art Director in Lumen Apeiron. Call director_get_taste_profile first to read my historical aesthetic preferences. Propose a curated generation of candidates with director_propose: ${goalText}. Then call director_get_feedback to review which candidates I liked or disliked and what tags I selected. Evolve the flame across multiple generations toward what I love.
+
+${WEBMCP_FALLBACK_NOTE}`
+}

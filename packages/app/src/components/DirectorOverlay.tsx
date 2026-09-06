@@ -1,14 +1,15 @@
 import { createSignal, For, Show } from 'solid-js'
+import { extractFlameTasteFeatures, recordCandidateFeedback, } from '@/arcade/tasteStore'
 import { VariationPreview } from '@/components/VariationSelector/VariationSelector'
 import { ComputeGate } from '@/contexts/ComputeGateContext'
 import { COMPUTE_GATE_CAPACITY } from '@/defaults'
 import { breedFlames } from '@/flame/breedFlame'
+import { scoreFlame as evaluateFlameFitness } from '@/flame/fitness'
 import { mutateFlame } from '@/flame/randomize'
-import { Cross, Star } from '@/icons'
+import { Check, Cross } from '@/icons'
 import ui from './DirectorOverlay.module.css'
 import type { Component } from 'solid-js'
-import type { CommandContext } from '@/commands/types'
-import type { FlameDescriptor } from '@/flame/schema/flameSchema'
+import type { CommandContext, DirectorCandidate } from '@/commands/types'
 import type { HardwareTier } from '@/utils/hardwareTier'
 
 export interface DirectorOverlayProps {
@@ -19,11 +20,20 @@ export interface DirectorOverlayProps {
 }
 
 const PREVIEW_RES = { width: 320, height: 180 }
+const QUICK_TAGS = [
+  '+Symmetry',
+  '-Symmetry',
+  'Warmer',
+  'Cooler',
+  'Simpler',
+  'Chaotic',
+  'Loved palette',
+  'Darker',
+] as const
 
 export const DirectorOverlay: Component<DirectorOverlayProps> = (props) => {
   const directorState = () => props.director.state()
   const [selectedIndices, setSelectedIndices] = createSignal<number[]>([])
-  const [ratings, setRatings] = createSignal<Record<number, number>>({})
   const [prompt, setPrompt] = createSignal('')
   const [version, setVersion] = createSignal(0)
 
@@ -39,11 +49,89 @@ export const DirectorOverlay: Component<DirectorOverlayProps> = (props) => {
     )
   }
 
-  const setRating = (index: number, stars: number) => {
-    setRatings((prev) => ({
-      ...prev,
-      [index]: prev[index] === stars ? 0 : stars,
-    }))
+  const toggleReaction = (index: number, reaction: 'like' | 'dislike') => {
+    const s = directorState()
+    if (!s) return
+    const candidate = s.candidates[index]
+    if (!candidate) return
+
+    const newReaction = candidate.reaction === reaction ? null : reaction
+    const updatedCandidates = [...s.candidates]
+    const updatedCandidate: DirectorCandidate = {
+      ...candidate,
+      reaction: newReaction,
+    }
+    updatedCandidates[index] = updatedCandidate
+
+    props.director.setState({
+      ...s,
+      candidates: updatedCandidates,
+      lastFeedback: {
+        selectedIndex: s.lastFeedback?.selectedIndex,
+        candidates: updatedCandidates.map((c, i) => ({
+          index: i,
+          reaction: c.reaction ?? null,
+          tags: c.tags ?? [],
+          rationale: c.rationale,
+        })),
+      },
+    })
+
+    if (candidate.flame) {
+      recordCandidateFeedback({
+        generation: s.generation,
+        candidateIndex: index,
+        reaction: newReaction ?? 'neutral',
+        tags: candidate.tags ?? [],
+        note: prompt(),
+        wasSelected: s.lastFeedback?.selectedIndex === index,
+        features: extractFlameTasteFeatures(candidate.flame),
+      })
+    }
+  }
+
+  const toggleTag = (index: number, tag: string) => {
+    const s = directorState()
+    if (!s) return
+    const candidate = s.candidates[index]
+    if (!candidate) return
+
+    const prevTags = candidate.tags ?? []
+    const newTags = prevTags.includes(tag)
+      ? prevTags.filter((t) => t !== tag)
+      : [...prevTags, tag]
+
+    const updatedCandidates = [...s.candidates]
+    updatedCandidates[index] = {
+      ...candidate,
+      tags: newTags,
+    }
+
+    props.director.setState({
+      ...s,
+      candidates: updatedCandidates,
+      lastFeedback: {
+        selectedIndex: s.lastFeedback?.selectedIndex,
+        candidates: updatedCandidates.map((c, i) => ({
+          index: i,
+          reaction: c.reaction ?? null,
+          tags: c.tags ?? [],
+          rationale: c.rationale,
+        })),
+      },
+    })
+
+    if (candidate.flame) {
+      recordCandidateFeedback({
+        generation: s.generation,
+        candidateIndex: index,
+        reaction: candidate.reaction ?? 'neutral',
+        tags: newTags,
+        note: prompt(),
+        wasSelected: s.lastFeedback?.selectedIndex === index,
+        features: extractFlameTasteFeatures(candidate.flame),
+      })
+    }
   }
 
   const breedSelectedCandidates = () => {
@@ -69,8 +157,9 @@ export const DirectorOverlay: Component<DirectorOverlayProps> = (props) => {
 
     props.director.setState({
       generation: s.generation + 1,
-      candidates: offspring.map((flame, idx) => ({
-        fitness: 0.75 + (idx % 3) * 0.08,
+      steeringPrompt: prompt(),
+      candidates: offspring.map((flame) => ({
+        fitness: evaluateFlameFitness(flame).composite,
         flame,
       })),
     })
@@ -84,13 +173,18 @@ export const DirectorOverlay: Component<DirectorOverlayProps> = (props) => {
     const candidates = s.candidates
     if (candidates.length === 0) return
 
-    const r = ratings()
     let bestIdx = 0
-    let bestScore = -1
+    let bestScore = -1000
     for (let i = 0; i < candidates.length; i++) {
       const cand = candidates[i]
       if (cand) {
-        const score = (r[i] ?? 0) * 10 + (cand.fitness ?? 0) * 100
+        const reactionBonus =
+          cand.reaction === 'like'
+            ? 200
+            : cand.reaction === 'dislike'
+              ? -200
+              : 0
+        const score = reactionBonus + (cand.fitness ?? 0) * 100
         if (score > bestScore) {
           bestScore = score
           bestIdx = i
@@ -101,7 +195,7 @@ export const DirectorOverlay: Component<DirectorOverlayProps> = (props) => {
     const baseFlame = candidates[bestIdx]?.flame
     if (!baseFlame) return
 
-    const newCandidates: { fitness: number; flame: FlameDescriptor }[] = []
+    const newCandidates: DirectorCandidate[] = []
     for (let i = 0; i < 4; i++) {
       const mutated = mutateFlame(
         baseFlame,
@@ -122,13 +216,14 @@ export const DirectorOverlay: Component<DirectorOverlayProps> = (props) => {
         },
       )
       newCandidates.push({
-        fitness: 0.8 + (i % 3) * 0.06,
+        fitness: evaluateFlameFitness(mutated).composite,
         flame: mutated,
       })
     }
 
     props.director.setState({
       generation: s.generation + 1,
+      steeringPrompt: prompt(),
       candidates: newCandidates,
     })
     setSelectedIndices([])
@@ -195,7 +290,9 @@ export const DirectorOverlay: Component<DirectorOverlayProps> = (props) => {
                     <span class={ui.sectionLabel}>
                       Candidates ({state().candidates.length})
                     </span>
-                    <span class={ui.hint}>Rate or select to breed</span>
+                    <span class={ui.hint}>
+                      Like, dislike, or select to breed
+                    </span>
                   </div>
 
                   <div class={ui.grid}>
@@ -203,7 +300,8 @@ export const DirectorOverlay: Component<DirectorOverlayProps> = (props) => {
                       {(candidate, index) => {
                         const isSelected = () =>
                           selectedIndices().includes(index())
-                        const rating = () => ratings()[index()] ?? 0
+                        const reaction = () => candidate.reaction ?? null
+                        const tags = () => candidate.tags ?? []
 
                         return (
                           <div
@@ -261,28 +359,67 @@ export const DirectorOverlay: Component<DirectorOverlayProps> = (props) => {
                               </button>
                             </div>
 
-                            {/* Star Ratings */}
-                            <div class={ui.ratingRow}>
-                              <div class={ui.stars}>
-                                <For each={[1, 2, 3, 4, 5]}>
-                                  {(star) => (
-                                    <button
-                                      class={ui.starBtn}
-                                      classList={{
-                                        [ui.starBtnActive!]: rating() >= star,
-                                      }}
-                                      onClick={() => {
-                                        setRating(index(), star)
-                                      }}
-                                      title={`Rate ${star} star${star > 1 ? 's' : ''}`}
-                                      aria-label={`Rate ${star} star${star > 1 ? 's' : ''}`}
-                                    >
-                                      <Star width="0.9rem" height="0.9rem" />
-                                    </button>
-                                  )}
-                                </For>
+                            {/* Rationale if provided by agent */}
+                            <Show when={candidate.rationale}>
+                              <div class={ui.rationaleBox}>
+                                {candidate.rationale}
+                              </div>
+                            </Show>
+
+                            {/* Like / Dislike reaction row */}
+                            <div class={ui.feedbackRow}>
+                              <div class={ui.reactionGroup}>
+                                <button
+                                  type="button"
+                                  class={ui.reactionBtn}
+                                  classList={{
+                                    [ui.likeBtnActive!]: reaction() === 'like',
+                                  }}
+                                  onClick={() => {
+                                    toggleReaction(index(), 'like')
+                                  }}
+                                  title="Like this candidate"
+                                >
+                                  <Check width="0.8rem" height="0.8rem" />
+                                  <span>Like</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  class={ui.reactionBtn}
+                                  classList={{
+                                    [ui.dislikeBtnActive!]:
+                                      reaction() === 'dislike',
+                                  }}
+                                  onClick={() => {
+                                    toggleReaction(index(), 'dislike')
+                                  }}
+                                  title="Dislike this candidate"
+                                >
+                                  <Cross width="0.8rem" height="0.8rem" />
+                                  <span>Dislike</span>
+                                </button>
                               </div>
                               <span class={ui.indexTag}>#{index() + 1}</span>
+                            </div>
+
+                            {/* Feedback Tag Chips */}
+                            <div class={ui.tagChips}>
+                              <For each={QUICK_TAGS}>
+                                {(tag) => (
+                                  <button
+                                    type="button"
+                                    class={ui.tagChip}
+                                    classList={{
+                                      [ui.tagChipActive!]: tags().includes(tag),
+                                    }}
+                                    onClick={() => {
+                                      toggleTag(index(), tag)
+                                    }}
+                                  >
+                                    {tag}
+                                  </button>
+                                )}
+                              </For>
                             </div>
 
                             {/* Action Button */}

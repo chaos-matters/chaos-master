@@ -31,27 +31,27 @@ git log --format='%h %ad %s' --date=iso --since=2026-08-25 \
 
 ## Tool catalog
 
-38 tools are registered (`packages/app/src/webmcp/tools/index.ts`). Every
+41 tools are registered (`packages/app/src/webmcp/tools/index.ts`). Every
 description is at most 500 characters and every result is kept under about
-1.5 KB of JSON. The table below lists 36: `arcade_end_duel` is registered
+1.5 KB of JSON. The table below lists 40: `arcade_end_duel` is registered
 but does nothing except refuse, so it is described where that refusal is
 explained rather than offered here as a capability.
 
-| Tool                                                                                                      | Kind  | Purpose                                                                           |
-| --------------------------------------------------------------------------------------------------------- | ----- | --------------------------------------------------------------------------------- |
-| `get_flame`, `get_flame_detail`                                                                           | read  | Compact and paginated views of the active flame                                   |
-| `list_commands`                                                                                           | read  | Command ids, labels, descriptions, prefix index                                   |
-| `list_variations`                                                                                         | read  | Registered variation names, with the parameters of parametric ones                |
-| `get_undo_state`, `diff_flames`                                                                           | read  | History depth; structural diff between two flames                                 |
-| `execute_command`                                                                                         | write | Run any registered command (validated, guarded while the Arcade drives, recorded) |
-| `set_flame`, `randomize_flame`, `mutate_flame`, `undo`, `redo`, `create_share_link`, `load_share_link`    | mixed | Document-level tools                                                              |
-| `score_flame`, `score_clash_round`, `simulate_clash`, `create_clash_flame`, `animate_clash`, `open_arena` | mixed | Arena (roadmap: the scoring heuristics still need grounding)                      |
-| `breed_flames`, `create_custom_variation`, `open_art_director`                                            | mixed | Genetics and Director (roadmap: the taste loop)                                   |
-| `arcade_status`                                                                                           | read  | Pilot phase, steps, budget, lock, recorder, last narration, duel clock            |
-| `arcade_start_lesson`, `arcade_narrate`, `arcade_end_lesson`                                              | write | Teach mode                                                                        |
-| `arcade_start_cinema`, `arcade_get_animatable_paths`, `arcade_set_keyframes`, `arcade_end_cinema`         | mixed | Cinema mode                                                                       |
-| `arcade_start_duel`, `arcade_duel_ready`                                                                  | write | Duel mode: opens the split screen; the clock ends it and saves both takes         |
-| `arcade_start_beats`, `arcade_get_audio_catalog`, `arcade_set_audio_mapping`, `arcade_end_beats`          | mixed | Beats mode: inspects targets, wires frequency bands to parameters, records take   |
+| Tool                                                                                                                                      | Kind  | Purpose                                                                           |
+| ----------------------------------------------------------------------------------------------------------------------------------------- | ----- | --------------------------------------------------------------------------------- |
+| `get_flame`, `get_flame_detail`                                                                                                           | read  | Compact and paginated views of the active flame                                   |
+| `list_commands`                                                                                                                           | read  | Command ids, labels, descriptions, prefix index                                   |
+| `list_variations`                                                                                                                         | read  | Registered variation names, with the parameters of parametric ones                |
+| `get_undo_state`, `diff_flames`                                                                                                           | read  | History depth; structural diff between two flames                                 |
+| `execute_command`                                                                                                                         | write | Run any registered command (validated, guarded while the Arcade drives, recorded) |
+| `set_flame`, `randomize_flame`, `mutate_flame`, `undo`, `redo`, `create_share_link`, `load_share_link`                                    | mixed | Document-level tools                                                              |
+| `score_flame`, `score_clash_round`, `simulate_clash`, `create_clash_flame`, `animate_clash`, `open_arena`                                 | mixed | Arena (roadmap: the scoring heuristics still need grounding)                      |
+| `breed_flames`, `create_custom_variation`, `open_art_director`, `director_propose`, `director_get_feedback`, `director_get_taste_profile` | mixed | Genetics and Director: evolutionary proposals, like/dislike taste loop, profile   |
+| `arcade_status`                                                                                                                           | read  | Pilot phase, steps, budget, lock, recorder, last narration, duel clock            |
+| `arcade_start_lesson`, `arcade_narrate`, `arcade_end_lesson`                                                                              | write | Teach mode                                                                        |
+| `arcade_start_cinema`, `arcade_get_animatable_paths`, `arcade_set_keyframes`, `arcade_end_cinema`                                         | mixed | Cinema mode                                                                       |
+| `arcade_start_duel`, `arcade_duel_ready`                                                                                                  | write | Duel mode: opens the split screen; the clock ends it and saves both takes         |
+| `arcade_start_beats`, `arcade_get_audio_catalog`, `arcade_set_audio_mapping`, `arcade_end_beats`                                          | mixed | Beats mode: inspects targets, wires frequency bands to parameters, records take   |
 
 ## How an agent write reaches the document
 

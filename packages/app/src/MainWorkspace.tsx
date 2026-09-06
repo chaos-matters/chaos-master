@@ -6,6 +6,7 @@ import { agentDriving } from '@/arcade/pilot'
 import { executeCommand, executeReplayCommand, preflightReplayCommand, } from '@/commands/registry'
 import { useKeyframeTarget } from '@/contexts/KeyframeTargetContext'
 import { useToast } from '@/contexts/ToastContext'
+import { scoreFlame as evaluateFlameFitness } from '@/flame/fitness'
 import { setActiveTab, workspaceIsVisible } from '@/lib/activeTab'
 import { SHOWCASE_CONSENT_VERSION } from '@/lib/communityShowcase'
 import { trackAppInit } from '@/lib/telemetry'
@@ -141,7 +142,7 @@ import type { SharePayload } from './utils/jsonQueryParam'
 import type { RandomizerHistoryEntry } from './utils/randomizerHistoryDB'
 import type { SonificationConfig } from './utils/sonification'
 import type { EasingCurve, KeyframeInterpolation, TimelineTrack, } from './utils/timeline'
-import type { CommandContext } from '@/commands/types'
+import type { CommandContext, DirectorState } from '@/commands/types'
 import type { CommunityShowcaseRequest } from '@/lib/communityShowcase'
 
 export type { ExportImageInfo, ExportImageType } from '@/flame/exportImageType'
@@ -353,13 +354,9 @@ export function MainWorkspace(props: AppProps) {
   const { isCompact, setCompact } = useCompactMode()
 
   const [directorOpen, setDirectorOpen] = createSignal(false)
-  const [directorState, setDirectorState] = createSignal<{
-    generation: number
-    candidates: {
-      fitness?: number
-      flame?: any /* eslint-disable-line @typescript-eslint/no-explicit-any */
-    }[]
-  } | null>(null)
+  const [directorState, setDirectorState] = createSignal<DirectorState | null>(
+    null,
+  )
 
   const _requestModal = useRequestModal()
 
@@ -371,6 +368,19 @@ export function MainWorkspace(props: AppProps) {
         () => deepClone(candidateFlame),
         `Art Director: Candidate ${index + 1}`,
       )
+      setDirectorState({
+        ...s,
+        lastFeedback: {
+          ...s.lastFeedback,
+          selectedIndex: index,
+          candidates: s.candidates.map((c, i) => ({
+            index: i,
+            reaction: c.reaction ?? null,
+            tags: c.tags ?? [],
+            rationale: c.rationale,
+          })),
+        },
+      })
       showToast(`Art Director: Loaded candidate ${index + 1} into workspace.`)
     }
   }
@@ -430,7 +440,7 @@ export function MainWorkspace(props: AppProps) {
           },
         )
         return {
-          fitness: 0.82 + (i % 3) * 0.05,
+          fitness: evaluateFlameFitness(mutated).composite,
           flame: mutated,
         }
       })

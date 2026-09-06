@@ -17,6 +17,28 @@ type KeyframeValue =
   | string
   | [number, number, number]
   | [number, number, number, number]
+export interface DirectorCandidate {
+  flame: FlameDescriptor
+  fitness?: number
+  rationale?: string
+  reaction?: 'like' | 'dislike' | null
+  tags?: string[]
+}
+
+export interface DirectorState {
+  generation: number
+  steeringPrompt?: string
+  candidates: DirectorCandidate[]
+  lastFeedback?: {
+    selectedIndex?: number
+    candidates: Array<{
+      index: number
+      reaction: 'like' | 'dislike' | null
+      tags: string[]
+      rationale?: string
+    }>
+  }
+}
 
 export interface CommandContext {
   /**
@@ -54,14 +76,8 @@ export interface CommandContext {
   director?: {
     open: Accessor<boolean>
     setOpen: Setter<boolean>
-    state: Accessor<{
-      generation: number
-      candidates: { fitness?: number; flame?: FlameDescriptor }[]
-    } | null>
-    setState: Setter<{
-      generation: number
-      candidates: { fitness?: number; flame?: FlameDescriptor }[]
-    } | null>
+    state: Accessor<DirectorState | null>
+    setState: Setter<DirectorState | null>
     selectCandidate: (index: number) => void
   }
   /**

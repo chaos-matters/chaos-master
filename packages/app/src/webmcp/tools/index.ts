@@ -8,6 +8,7 @@
 import { animateClash } from './animateClash'
 import { arcadeEndBeats, arcadeGetAudioCatalog, arcadeSetAudioMapping, arcadeStartBeats, } from './arcadeBeats'
 import { arcadeEndCinema, arcadeGetAnimatablePaths, arcadeSetKeyframes, arcadeStartCinema, } from './arcadeCinema'
+import { directorGetFeedback, directorGetTasteProfile, directorPropose, openArtDirector, } from './arcadeDirector'
 import { arcadeDuelReady, arcadeEndDuel, arcadeStartDuel } from './arcadeDuel'
 import { arcadeEndLesson, arcadeNarrate, arcadeStartLesson, arcadeStatus, } from './arcadeTeach'
 import { breedFlamesTool } from './breedFlames'
@@ -23,7 +24,6 @@ import { listCommands } from './listCommands'
 import { listVariations } from './listVariations'
 import { mutateFlame } from './mutateFlame'
 import { openArena } from './openArena'
-import { openArtDirector } from './openArtDirector'
 import { randomizeFlame } from './randomizeFlame'
 import { scoreClashRound } from './scoreClashRound'
 import { scoreFlame } from './scoreFlame'
@@ -54,6 +54,9 @@ export {
   createClashFlame,
   openArena,
   openArtDirector,
+  directorPropose,
+  directorGetFeedback,
+  directorGetTasteProfile,
   breedFlamesTool,
   createCustomVariationTool,
   scoreClashRound,
@@ -87,6 +90,8 @@ export const allTools: readonly WebMcpTool[] = [
   arcadeStatus,
   arcadeGetAnimatablePaths,
   arcadeGetAudioCatalog,
+  directorGetFeedback,
+  directorGetTasteProfile,
   diffFlamesTool,
   createShareLink,
   scoreFlame,
@@ -114,6 +119,7 @@ export const allTools: readonly WebMcpTool[] = [
   loadShareLink,
   createClashFlame,
   openArena,
+  directorPropose,
   openArtDirector,
   breedFlamesTool,
   createCustomVariationTool,

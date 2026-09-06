@@ -1,7 +1,7 @@
 import '@/commands/builtins'
 import { describe, expect, it } from 'vitest'
 import { getAllCommands } from '@/commands/registry'
-import { ALWAYS_ALLOWED, BEATS_ALLOWED, BEATS_PRESETS, BEATS_STEP_BUDGET, beatsPromptCard, CINEMA_ALLOWED, CINEMA_PRESETS, cinemaPromptCard, DUEL_ALLOWED, DUEL_STEP_BUDGET, duelPromptCard, isTopicId, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, WEBMCP_FALLBACK_NOTE, } from './topics'
+import { ALWAYS_ALLOWED, BEATS_ALLOWED, BEATS_PRESETS, BEATS_STEP_BUDGET, beatsPromptCard, CINEMA_ALLOWED, CINEMA_PRESETS, cinemaPromptCard, DIRECTOR_PRESETS, directorPromptCard, DUEL_ALLOWED, DUEL_STEP_BUDGET, duelPromptCard, isTopicId, LESSON_TOPICS, teachPromptCard, TOPIC_IDS, WEBMCP_FALLBACK_NOTE, } from './topics'
 
 describe('lesson topics', () => {
   it('has every topic with a goal, a budget and an allow-list', () => {
@@ -153,6 +153,25 @@ describe('beats', () => {
     expect(card).toContain('arcade_get_audio_catalog')
     expect(card).toContain('arcade_set_audio_mapping')
     expect(card).toContain('arcade_end_beats')
+    expect(card).toContain(WEBMCP_FALLBACK_NOTE)
+  })
+})
+
+describe('director', () => {
+  it('offers director presets with distinct aesthetic goals', () => {
+    expect(DIRECTOR_PRESETS.length).toBeGreaterThanOrEqual(3)
+    for (const preset of DIRECTOR_PRESETS) {
+      expect(preset.label.length).toBeGreaterThan(3)
+      expect(preset.wish.length).toBeGreaterThan(20)
+    }
+  })
+
+  it('director prompt card mentions taste profile and propose/feedback loop', () => {
+    const card = directorPromptCard('Explore organic bioluminescence')
+    expect(card).toContain('Explore organic bioluminescence')
+    expect(card).toContain('director_get_taste_profile')
+    expect(card).toContain('director_propose')
+    expect(card).toContain('director_get_feedback')
     expect(card).toContain(WEBMCP_FALLBACK_NOTE)
   })
 })
