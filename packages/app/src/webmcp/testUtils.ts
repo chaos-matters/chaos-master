@@ -142,6 +142,18 @@ export function createMockCommandContext(): CommandContext {
       setConfig: vi.fn(),
       setEnabled: vi.fn(),
     },
+    audio: {
+      snapshot: vi.fn(() => ({
+        mapping: { preset: 'custom' as const, mappings: [] },
+        enabled: false,
+        source: 'file' as const,
+        trackName: 'Ember Drift',
+      })),
+      canEnable: vi.fn(() => true),
+      setMapping: vi.fn(),
+      setEnabled: vi.fn(),
+      setSource: vi.fn(),
+    },
     modal: {
       open: vi.fn(),
     },

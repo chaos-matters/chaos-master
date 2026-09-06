@@ -31,9 +31,9 @@ git log --format='%h %ad %s' --date=iso --since=2026-08-25 \
 
 ## Tool catalog
 
-34 tools are registered (`packages/app/src/webmcp/tools/index.ts`). Every
+38 tools are registered (`packages/app/src/webmcp/tools/index.ts`). Every
 description is at most 500 characters and every result is kept under about
-1.5 KB of JSON. The table below lists 32: `arcade_end_duel` is registered
+1.5 KB of JSON. The table below lists 36: `arcade_end_duel` is registered
 but does nothing except refuse, so it is described where that refusal is
 explained rather than offered here as a capability.
 
@@ -51,6 +51,7 @@ explained rather than offered here as a capability.
 | `arcade_start_lesson`, `arcade_narrate`, `arcade_end_lesson`                                              | write | Teach mode                                                                        |
 | `arcade_start_cinema`, `arcade_get_animatable_paths`, `arcade_set_keyframes`, `arcade_end_cinema`         | mixed | Cinema mode                                                                       |
 | `arcade_start_duel`, `arcade_duel_ready`                                                                  | write | Duel mode: opens the split screen; the clock ends it and saves both takes         |
+| `arcade_start_beats`, `arcade_get_audio_catalog`, `arcade_set_audio_mapping`, `arcade_end_beats`          | mixed | Beats mode: inspects targets, wires frequency bands to parameters, records take   |
 
 ## How an agent write reaches the document
 

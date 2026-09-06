@@ -6,6 +6,7 @@
  */
 
 import { animateClash } from './animateClash'
+import { arcadeEndBeats, arcadeGetAudioCatalog, arcadeSetAudioMapping, arcadeStartBeats, } from './arcadeBeats'
 import { arcadeEndCinema, arcadeGetAnimatablePaths, arcadeSetKeyframes, arcadeStartCinema, } from './arcadeCinema'
 import { arcadeDuelReady, arcadeEndDuel, arcadeStartDuel } from './arcadeDuel'
 import { arcadeEndLesson, arcadeNarrate, arcadeStartLesson, arcadeStatus, } from './arcadeTeach'
@@ -69,6 +70,10 @@ export {
   arcadeStartDuel,
   arcadeDuelReady,
   arcadeEndDuel,
+  arcadeStartBeats,
+  arcadeGetAudioCatalog,
+  arcadeSetAudioMapping,
+  arcadeEndBeats,
 }
 
 /** All Tier 1 tools, in registration order. */
@@ -81,6 +86,7 @@ export const allTools: readonly WebMcpTool[] = [
   getUndoState,
   arcadeStatus,
   arcadeGetAnimatablePaths,
+  arcadeGetAudioCatalog,
   diffFlamesTool,
   createShareLink,
   scoreFlame,
@@ -100,6 +106,9 @@ export const allTools: readonly WebMcpTool[] = [
   arcadeStartDuel,
   arcadeDuelReady,
   arcadeEndDuel,
+  arcadeStartBeats,
+  arcadeSetAudioMapping,
+  arcadeEndBeats,
   undo,
   redo,
   loadShareLink,
